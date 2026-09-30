@@ -89,13 +89,36 @@ export class MediaUnavailableError extends Error {
 }
 
 /** One opened input (one version of the bytes) and the leases on it. */
-interface Handle {
-  opening: Promise<OpenMedia>;
-  media: OpenMedia | null;
-  leases: number;
+class Handle {
+  media: OpenMedia | null = null;
+  leases = 0;
   /** Replaced by newer bytes or unregistered: dispose when the last lease ends. */
-  retired: boolean;
-  idleTimer: unknown;
+  retired = false;
+  idleTimer: unknown = null;
+  readonly opening: Promise<OpenMedia>;
+
+  constructor(key: string, version: number, spec: MediaSourceSpec) {
+    this.opening = this.open(key, version, spec);
+  }
+
+  dispose(): void {
+    this.retired = true;
+    if (this.media) this.media.input.dispose();
+    else this.opening.then((media) => media.input.dispose(), () => undefined);
+  }
+
+  private async open(key: string, version: number, spec: MediaSourceSpec): Promise<OpenMedia> {
+    const input = new Input({ formats: ALL_FORMATS, source: await openSource(spec) });
+    try {
+      const media: OpenMedia = { key, version, input, ...(await describeInput(input)) };
+      this.media = media;
+      if (this.retired && this.leases === 0) input.dispose();
+      return media;
+    } catch (error) {
+      input.dispose();
+      throw error;
+    }
+  }
 }
 
 interface Entry {
@@ -199,7 +222,7 @@ export class MediaRegistry {
       released = true;
       handle.leases -= 1;
       if (handle.leases > 0) return;
-      if (handle.retired) disposeHandle(handle);
+      if (handle.retired) handle.dispose();
       else this.scheduleIdle(entry, handle);
     };
     try {
@@ -255,7 +278,7 @@ export class MediaRegistry {
       entry.handle = null;
       if (handle) {
         this.cancelIdle(handle);
-        disposeHandle(handle);
+        handle.dispose();
       }
     }
     this.entries.clear();
@@ -284,23 +307,8 @@ export class MediaRegistry {
   }
 
   private openHandle(entry: Entry): Handle {
-    const { key, version, spec } = entry;
-    // The body reads `handle` only after its first await, when it is assigned.
-    let handle!: Handle;
-    const opening = (async () => {
-      const input = new Input({ formats: ALL_FORMATS, source: await openSource(spec) });
-      try {
-        const media: OpenMedia = { key, version, input, ...(await describeInput(input)) };
-        handle.media = media;
-        if (handle.retired && handle.leases === 0) input.dispose();
-        return media;
-      } catch (error) {
-        input.dispose();
-        throw error;
-      }
-    })();
-    handle = { opening, media: null, leases: 0, retired: false, idleTimer: null };
-    opening.catch(() => {
+    const handle = new Handle(entry.key, entry.version, entry.spec);
+    handle.opening.catch(() => {
       // A failed open (network, unsupported format) is retried by the next acquire.
       if (entry.handle === handle) entry.handle = null;
     });
@@ -322,7 +330,7 @@ export class MediaRegistry {
     if (!handle) return;
     handle.retired = true;
     this.cancelIdle(handle);
-    if (handle.leases === 0) disposeHandle(handle);
+    if (handle.leases === 0) handle.dispose();
   }
 
   private scheduleIdle(entry: Entry, handle: Handle): void {
@@ -331,7 +339,7 @@ export class MediaRegistry {
       handle.idleTimer = null;
       if (handle.leases > 0 || entry.handle !== handle) return;
       entry.handle = null;
-      disposeHandle(handle);
+      handle.dispose();
     }, this.idleMs);
   }
 
@@ -349,12 +357,6 @@ export class MediaRegistry {
   private assertLive(): void {
     if (this.disposed) throw new Error("MediaRegistry is disposed");
   }
-}
-
-function disposeHandle(handle: Handle): void {
-  handle.retired = true;
-  if (handle.media) handle.media.input.dispose();
-  else handle.opening.then((media) => media.input.dispose(), () => undefined);
 }
 
 function fileKey(fileId: string): string {
