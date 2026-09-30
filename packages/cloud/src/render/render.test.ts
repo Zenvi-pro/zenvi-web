@@ -1,0 +1,119 @@
+import { createHash } from "node:crypto";
+import { describe, expect, it } from "vitest";
+import { fakeRenderer } from "../testing/fakes.js";
+import { harness, sampleProject, USER_A } from "../testing/helpers.js";
+import { resolveRenderOptions } from "./options.js";
+
+const sha = (data: string): string => createHash("sha256").update(data).digest("hex");
+
+describe("render jobs", () => {
+  it("fail clearly while no renderer is available, but keep job records", async () => {
+    const h = await harness();
+    const token = await h.userToken(USER_A);
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id;
+    const started = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: { preset: "mp4" } });
+    expect(started.status).toBe(202);
+    expect(started.json).toMatchObject({ status: "queued", progress: 0, format: "mp4" });
+    await h.services.renders.drain();
+    const job = await h.request("GET", `/v1/projects/${id}/renders/${started.json.renderId}`, { token });
+    expect(job.json).toMatchObject({ status: "error" });
+    expect(job.json.error).toContain("renderer not available");
+    expect((await h.request("GET", `/v1/projects/${id}/renders`, { token })).json.renders).toHaveLength(1);
+  });
+
+  it("render a snapshot of the requested revision with the project's media, and upload the result", async () => {
+    const seen: { width: number; clips: number }[] = [];
+    const renderer = fakeRenderer({ onRender: (input) => seen.push({ width: input.options.width, clips: input.project.clips.length }) });
+    const h = await harness({ renderer });
+    const token = await h.userToken(USER_A);
+    const bytes = "clip bytes";
+    const hash = sha(bytes);
+    const ticket = await h.request("POST", "/v1/media", { token, json: { sha256: hash, size: bytes.length, name: "a.mp4", contentType: "video/mp4" } });
+    await h.blobs.acceptSignedWrite(ticket.json.uploadUrl, bytes);
+    await h.request("POST", `/v1/media/${hash}/complete`, { token });
+    const project = sampleProject({
+      files: [{ id: "F1", path: "a.mp4", media_type: "video", cloud: { sha256: hash, size: bytes.length, name: "a.mp4" } }],
+      clips: [{ id: "C1", file_id: "F1", position: 0, start: 0, end: 2, layer: 1000000 }],
+    });
+    const created = await h.request("POST", "/v1/projects", { token, json: { name: "My film", project } });
+    const id = created.json.id as string;
+
+    const started = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: { preset: "mp4-720p", options: { quality: "low" } } });
+    const renderId = started.json.renderId as string;
+    // Editing after the request does not change what renders.
+    await h.request("PUT", `/v1/projects/${id}`, { token, json: sampleProject({ width: 640, height: 360 }), headers: { "if-match": created.json.revision } });
+    await h.services.renders.drain();
+
+    const done = await h.request("GET", `/v1/projects/${id}/renders/${renderId}`, { token });
+    expect(done.json).toMatchObject({ status: "done", progress: 1, bytes: expect.any(Number) });
+    expect(done.json.options).toMatchObject({ format: "mp4", width: 1280, height: 720, quality: "low" });
+    expect((await h.blobs.acceptSignedRead(done.json.url)).toString()).toBe("FAKE mp4 1280x720");
+    expect(new URL(done.json.url).searchParams.get("rscd")).toBe('attachment; filename="My film.mp4"');
+    expect(seen).toEqual([{ width: 1280, clips: 1 }]);
+    expect(h.blobs.paths()).toContain(`u/${USER_A}/p/${id}/renders/${renderId}.mp4`);
+  });
+
+  it("return the existing job for the same revision and options", async () => {
+    const h = await harness({ renderer: fakeRenderer() });
+    const token = await h.userToken(USER_A);
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id;
+    const a = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: { preset: "webm" } });
+    const b = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: { preset: "webm" } });
+    expect(b.json.renderId).toBe(a.json.renderId);
+    await h.services.renders.drain();
+    const c = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: { preset: "webm" } });
+    expect(c.json.renderId).toBe(a.json.renderId);
+    const d = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: { preset: "gif" } });
+    expect(d.json.renderId).not.toBe(a.json.renderId);
+  });
+
+  it("explain which media is missing from the cloud", async () => {
+    const h = await harness({ renderer: fakeRenderer() });
+    const token = await h.userToken(USER_A);
+    const project = sampleProject({
+      files: [{ id: "F1", path: "/Users/me/big.mov", media_type: "video" }],
+      clips: [{ id: "C1", file_id: "F1", position: 0, start: 0, end: 2, layer: 1000000 }],
+    });
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P", project } })).json.id;
+    const started = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
+    await h.services.renders.drain();
+    const job = await h.request("GET", `/v1/projects/${id}/renders/${started.json.renderId}`, { token });
+    expect(job.json.status).toBe("error");
+    expect(job.json.error).toContain('"big.mov" is not in Zenvi Cloud');
+  });
+
+  it("re-queue interrupted jobs after a restart", async () => {
+    const h = await harness({ renderer: fakeRenderer() });
+    const token = await h.userToken(USER_A);
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id;
+    const started = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
+    await h.services.renders.drain();
+    // Pretend the process died mid-render.
+    await h.tables.update("renders", { partitionKey: USER_A, rowKey: started.json.renderId, status: "running", attempts: 1 });
+    expect(await h.services.renders.resume()).toBe(1);
+    await h.services.renders.drain();
+    const job = await h.request("GET", `/v1/projects/${id}/renders/${started.json.renderId}`, { token });
+    expect(job.json.status).toBe("done");
+  });
+
+  it("validate options", async () => {
+    const h = await harness();
+    const token = await h.userToken(USER_A);
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id;
+    expect((await h.request("POST", `/v1/projects/${id}/renders`, { token, json: { preset: "mp5" } })).status).toBe(400);
+    expect((await h.request("POST", `/v1/projects/${id}/renders`, { token, json: { options: { width: 99999 } } })).status).toBe(400);
+    expect((await h.request("POST", `/v1/projects/${id}/renders`, { token, json: { options: { output: "/etc/passwd" } } })).status).toBe(400);
+  });
+});
+
+describe("render options", () => {
+  const project = sampleProject({ width: 1920, height: 1080, fps: { num: 30000, den: 1001 } }) as never;
+
+  it("fill size and rate from the project and keep the aspect ratio", () => {
+    expect(resolveRenderOptions(project, undefined)).toEqual({ format: "mp4", width: 1920, height: 1080, fps: { num: 30000, den: 1001 }, quality: "high" });
+    expect(resolveRenderOptions(project, "mp4-720p")).toMatchObject({ width: 1280, height: 720, quality: "medium" });
+    expect(resolveRenderOptions(project, "mp4", { width: 853 })).toMatchObject({ width: 854, height: 480 });
+    expect(resolveRenderOptions(project, "mp3")).toMatchObject({ format: "mp3" });
+    expect(resolveRenderOptions(project, "gif")).toMatchObject({ format: "gif", width: 640, height: 360 });
+  });
+});

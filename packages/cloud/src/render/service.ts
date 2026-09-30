@@ -1,0 +1,387 @@
+/**
+ * Render jobs: records in the `renders` table (PK user id, RK render id), an
+ * in-process queue with concurrency 1, and a worker that downloads the media a
+ * project uses into a temp dir, calls the renderer and uploads the result to
+ * `u/{user}/p/{project}/renders/{render}.{ext}`.
+ *
+ * The project is snapshotted when the job is created, so the render shows
+ * exactly the revision that was asked for even if editing continues. Asking
+ * again for the same revision and options returns the existing job
+ * (idempotent: remote MCP hosts retry slow calls).
+ */
+
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import type { ExportOptions, Project, ProjectFile } from "@zenvi/engine";
+import { ApiError, notFound } from "../http/errors.js";
+import type { Logger } from "../http/log.js";
+import { errorMessage } from "../http/log.js";
+import type { BlobStore, TableEntity, TableStore } from "../storage/types.js";
+import type { Clock } from "../util/clock.js";
+import { isoAt } from "../util/clock.js";
+import { randomId, sha256Hex } from "../util/crypto.js";
+import { displayName, fileSha256 } from "../projects/model.js";
+import type { MediaService } from "../services/media.js";
+import { attachmentDisposition } from "../services/media.js";
+import { renderPath, renderSnapshotPath } from "../services/paths.js";
+import type { ProjectService } from "../services/projects.js";
+import { CONTENT_TYPES, type PresetName, type RenderFormat, type RenderOverrides, resolveRenderOptions } from "./options.js";
+import type { Renderer } from "./renderer.js";
+
+export type RenderStatus = "queued" | "running" | "done" | "error";
+
+export interface RenderJob {
+  renderId: string;
+  projectId: string;
+  status: RenderStatus;
+  /** 0..1 */
+  progress: number;
+  format: RenderFormat;
+  options: ExportOptions;
+  revision: string;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  bytes?: number;
+  error?: string;
+  fileName: string;
+}
+
+export interface RenderJobView extends RenderJob {
+  url?: string;
+  urlExpiresAt?: string;
+}
+
+interface RenderRow extends TableEntity {
+  projectId: string;
+  status: RenderStatus;
+  progress: number;
+  format: string;
+  options: string;
+  revision: string;
+  requestKey: string;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  bytes?: number;
+  error?: string;
+  fileName: string;
+  attempts: number;
+}
+
+const TABLE = "renders" as const;
+const MAX_ATTEMPTS = 2;
+const REUSE_DONE_MS = 24 * 3_600_000;
+const PROGRESS_WRITE_MS = 2_000;
+const URL_SECONDS = 3600;
+
+function toJob(row: RenderRow): RenderJob {
+  let options: ExportOptions;
+  try {
+    options = JSON.parse(row.options) as ExportOptions;
+  } catch {
+    options = { format: row.format as RenderFormat, width: 0, height: 0, fps: { num: 0, den: 1 } };
+  }
+  return {
+    renderId: row.rowKey,
+    projectId: row.projectId,
+    status: row.status,
+    progress: typeof row.progress === "number" ? row.progress : 0,
+    format: row.format as RenderFormat,
+    options,
+    revision: row.revision,
+    createdAt: row.createdAt,
+    startedAt: row.startedAt ?? undefined,
+    finishedAt: row.finishedAt ?? undefined,
+    bytes: typeof row.bytes === "number" ? row.bytes : undefined,
+    error: row.error ?? undefined,
+    fileName: row.fileName,
+  };
+}
+
+function safeFileBase(name: string): string {
+  return name.replace(/[^\w.\- ]+/g, "_").trim().slice(0, 100) || "render";
+}
+
+function extensionOf(name: string): string {
+  const match = /\.([A-Za-z0-9]{1,8})$/.exec(name);
+  return match ? `.${match[1]!.toLowerCase()}` : "";
+}
+
+export interface RenderServiceOptions {
+  tables: TableStore;
+  blobs: BlobStore;
+  projects: ProjectService;
+  media: MediaService;
+  renderer: Renderer;
+  clock: Clock;
+  log: Logger;
+  tmpDir: string;
+  maxRenderMediaBytes: number;
+}
+
+export class RenderService {
+  private readonly queue: { userId: string; renderId: string }[] = [];
+  private running: { userId: string; renderId: string; controller: AbortController } | null = null;
+  private idle: Promise<void> = Promise.resolve();
+  private stopped = false;
+
+  constructor(private readonly options: RenderServiceOptions) {}
+
+  get rendererAvailable(): boolean {
+    return this.options.renderer.available;
+  }
+
+  async start(userId: string, projectId: string, input: { preset?: PresetName; options?: RenderOverrides }): Promise<RenderJob> {
+    const loaded = await this.options.projects.get(userId, projectId);
+    const options = resolveRenderOptions(loaded.project, input.preset, input.options ?? {});
+    const requestKey = sha256Hex(`${loaded.revision}\n${JSON.stringify(options)}`).slice(0, 32);
+
+    const now = this.options.clock.now();
+    for await (const row of this.options.tables.query<RenderRow>(TABLE, {
+      partitionKey: userId,
+      where: [
+        ["projectId", "eq", projectId],
+        ["requestKey", "eq", requestKey],
+      ],
+    })) {
+      if (row.status === "queued" || row.status === "running") return toJob(row);
+      if (row.status === "done" && row.finishedAt && now - Date.parse(row.finishedAt) < REUSE_DONE_MS) {
+        const blob = await this.options.blobs.head(renderPath(userId, projectId, row.rowKey, row.format));
+        if (blob) return toJob(row);
+      }
+    }
+
+    const renderId = randomId("r_", 16);
+    await this.options.blobs.write(renderSnapshotPath(userId, projectId, renderId), JSON.stringify(loaded.project), {
+      contentType: "application/json",
+    });
+    const row: RenderRow = {
+      partitionKey: userId,
+      rowKey: renderId,
+      projectId,
+      status: "queued",
+      progress: 0,
+      format: options.format,
+      options: JSON.stringify(options),
+      revision: loaded.revision,
+      requestKey,
+      createdAt: isoAt(now),
+      fileName: `${safeFileBase(loaded.meta.name)}.${options.format}`,
+      attempts: 0,
+    };
+    await this.options.tables.create(TABLE, row);
+    this.options.media.invalidateUsage(userId);
+    this.enqueue(userId, renderId);
+    return toJob(row);
+  }
+
+  async get(userId: string, projectId: string, renderId: string): Promise<RenderJobView> {
+    const row = await this.options.tables.get<RenderRow>(TABLE, userId, renderId);
+    if (!row || row.projectId !== projectId) throw notFound("Render");
+    return this.view(userId, row);
+  }
+
+  /** A job by id alone (MCP `get_render_status`); still scoped to the user. */
+  async getById(userId: string, renderId: string): Promise<RenderJobView> {
+    const row = await this.options.tables.get<RenderRow>(TABLE, userId, renderId);
+    if (!row) throw notFound("Render");
+    return this.view(userId, row);
+  }
+
+  async list(userId: string, projectId: string): Promise<RenderJob[]> {
+    const jobs: RenderJob[] = [];
+    for await (const row of this.options.tables.query<RenderRow>(TABLE, { partitionKey: userId, where: [["projectId", "eq", projectId]] })) {
+      jobs.push(toJob(row));
+    }
+    return jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 50);
+  }
+
+  /** Wait until the job finishes or `timeoutMs` passes; returns its latest state. */
+  async waitFor(userId: string, renderId: string, timeoutMs: number, signal?: AbortSignal): Promise<RenderJobView> {
+    const deadline = this.options.clock.now() + timeoutMs;
+    for (;;) {
+      const job = await this.getById(userId, renderId);
+      if (job.status === "done" || job.status === "error") return job;
+      if (this.options.clock.now() >= deadline || signal?.aborted) return job;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  /** Re-queue jobs a restart interrupted. Call once at startup. */
+  async resume(): Promise<number> {
+    const pending: RenderRow[] = [];
+    for (const status of ["running", "queued"] as const) {
+      for await (const row of this.options.tables.query<RenderRow>(TABLE, { where: [["status", "eq", status]] })) pending.push(row);
+    }
+    pending.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    for (const row of pending) {
+      if (row.status === "running" && row.attempts >= MAX_ATTEMPTS) {
+        await this.finish(row.partitionKey, row.rowKey, { status: "error", error: "The render was interrupted twice; start it again." });
+        continue;
+      }
+      if (row.status === "running") {
+        await this.options.tables.update<RenderRow>(TABLE, { partitionKey: row.partitionKey, rowKey: row.rowKey, status: "queued", progress: 0 } as RenderRow);
+      }
+      this.enqueue(row.partitionKey, row.rowKey);
+    }
+    return pending.length;
+  }
+
+  /** Stop taking jobs and abort the running one (it resumes after restart). */
+  async stop(): Promise<void> {
+    this.stopped = true;
+    this.running?.controller.abort(new Error("service shutting down"));
+    await this.idle;
+  }
+
+  /** Resolves when the queue is empty (tests). */
+  async drain(): Promise<void> {
+    while (this.running || this.queue.length > 0) await this.idle;
+  }
+
+  private enqueue(userId: string, renderId: string): void {
+    this.queue.push({ userId, renderId });
+    if (!this.running) this.idle = this.pump();
+  }
+
+  private async pump(): Promise<void> {
+    while (!this.stopped) {
+      const next = this.queue.shift();
+      if (!next) return;
+      const controller = new AbortController();
+      this.running = { ...next, controller };
+      try {
+        await this.run(next.userId, next.renderId, controller.signal);
+      } catch (error) {
+        this.options.log.error("render worker failed", { renderId: next.renderId, error: errorMessage(error) });
+      } finally {
+        this.running = null;
+      }
+    }
+  }
+
+  private async run(userId: string, renderId: string, signal: AbortSignal): Promise<void> {
+    const row = await this.options.tables.get<RenderRow>(TABLE, userId, renderId);
+    if (!row || row.status !== "queued") return;
+    const job = toJob(row);
+    await this.options.tables.update<RenderRow>(TABLE, {
+      partitionKey: userId,
+      rowKey: renderId,
+      status: "running",
+      startedAt: isoAt(this.options.clock.now()),
+      attempts: (row.attempts ?? 0) + 1,
+      progress: 0,
+    } as RenderRow);
+
+    const tmp = await mkdtemp(join(this.options.tmpDir, "zenvi-render-"));
+    const started = this.options.clock.now();
+    try {
+      const snapshot = await this.options.blobs.read(renderSnapshotPath(userId, job.projectId, renderId));
+      if (!snapshot) throw new Error("The project snapshot for this render is missing.");
+      const project = JSON.parse(snapshot.data.toString("utf8")) as Project;
+      const resolveMedia = await this.mediaResolver(userId, project, tmp, signal);
+      let lastWrite = 0;
+      const output = join(tmp, `output.${job.format}`);
+      await this.options.renderer.render({
+        project,
+        resolveMedia,
+        output,
+        options: job.options,
+        signal,
+        onProgress: (fraction) => {
+          const now = this.options.clock.now();
+          if (now - lastWrite < PROGRESS_WRITE_MS) return;
+          lastWrite = now;
+          const progress = Math.max(0, Math.min(0.99, fraction));
+          void this.options.tables
+            .update<RenderRow>(TABLE, { partitionKey: userId, rowKey: renderId, progress } as RenderRow)
+            .catch(() => undefined);
+        },
+      });
+      const { size } = await this.options.blobs.writeFile(renderPath(userId, job.projectId, renderId, job.format), output, {
+        contentType: CONTENT_TYPES[job.format],
+        contentDisposition: attachmentDisposition(job.fileName),
+      });
+      this.options.media.invalidateUsage(userId);
+      await this.finish(userId, renderId, { status: "done", bytes: size });
+      this.options.log.info("render done", { renderId, ms: this.options.clock.now() - started, bytes: size });
+    } catch (error) {
+      if (signal.aborted && this.stopped) {
+        this.options.log.warn("render interrupted by shutdown", { renderId });
+        return;
+      }
+      const message = errorMessage(error).slice(0, 500);
+      await this.finish(userId, renderId, { status: "error", error: message });
+      this.options.log.warn("render failed", { renderId, error: message });
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * A resolver that downloads each media file once, on first use. Refuses
+   * files that are not in Zenvi Cloud and projects whose clip media together
+   * exceed the render media cap.
+   */
+  private async mediaResolver(
+    userId: string,
+    project: Project,
+    tmp: string,
+    signal: AbortSignal,
+  ): Promise<(file: ProjectFile) => Promise<string>> {
+    const inventory = await this.options.media.inventory(userId);
+    const used = new Set(project.clips.map((clip) => clip.file_id));
+    let total = 0;
+    for (const file of project.files) {
+      if (!used.has(file.id)) continue;
+      const sha = fileSha256(file);
+      const info = sha ? inventory.get(sha) : undefined;
+      if (!sha || !info) {
+        throw new ApiError(409, "media_missing", `"${displayName(file)}" is not in Zenvi Cloud yet. Upload it, then render again.`);
+      }
+      total += info.size;
+    }
+    if (total > this.options.maxRenderMediaBytes) {
+      throw new Error(`This project uses ${Math.round(total / 1024 ** 3)} GB of media; cloud renders are limited to ${Math.round(this.options.maxRenderMediaBytes / 1024 ** 3)} GB.`);
+    }
+    const downloads = new Map<string, Promise<string>>();
+    return async (file) => {
+      signal.throwIfAborted();
+      const sha = fileSha256(file);
+      if (!sha || !inventory.has(sha)) throw new Error(`"${displayName(file)}" is not in Zenvi Cloud.`);
+      let pending = downloads.get(sha);
+      if (!pending) {
+        const target = join(tmp, `${sha}${extensionOf(displayName(file))}`);
+        pending = this.options.media.download(userId, sha, target).then(() => target);
+        downloads.set(sha, pending);
+      }
+      return pending;
+    };
+  }
+
+  private async finish(userId: string, renderId: string, result: { status: "done" | "error"; bytes?: number; error?: string }): Promise<void> {
+    await this.options.tables.update<RenderRow>(TABLE, {
+      partitionKey: userId,
+      rowKey: renderId,
+      status: result.status,
+      progress: result.status === "done" ? 1 : 0,
+      finishedAt: isoAt(this.options.clock.now()),
+      bytes: result.bytes,
+      error: result.error,
+    } as RenderRow);
+  }
+
+  private async view(userId: string, row: RenderRow): Promise<RenderJobView> {
+    const job = toJob(row);
+    if (job.status !== "done") return job;
+    const path = renderPath(userId, job.projectId, job.renderId, job.format);
+    const url = await this.options.blobs.signUrl(path, {
+      permission: "read",
+      expiresInSeconds: URL_SECONDS,
+      contentType: CONTENT_TYPES[job.format],
+      contentDisposition: attachmentDisposition(job.fileName),
+    });
+    return { ...job, url, urlExpiresAt: isoAt(this.options.clock.now() + URL_SECONDS * 1000) };
+  }
+}
