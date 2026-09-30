@@ -173,3 +173,14 @@ describe("clip timing (clip_utils.clamp_timing_to_media)", () => {
     expect(t.end).toBe(30);
   });
 });
+
+describe("profiles", () => {
+  it("findProfile follows get_profile: key, current description, legacy upgrade", async () => {
+    const { findProfile, profileKey, PROFILES } = await import("./profiles.js");
+    expect(findProfile("01280x0720p0030_16-09")?.description).toBe("HD 720p 30 fps");
+    expect(findProfile("hd 720p 30 fps")?.key).toBe("01280x0720p0030_16-09");
+    expect(findProfile("HD 1080p 25 fps")?.key).toBe("01920x1080p0025_16-09");
+    expect(findProfile("nope")).toBeUndefined();
+    for (const p of PROFILES.filter((x) => !x.legacy)) expect(profileKey(p), p.key).toBe(p.key);
+  });
+});

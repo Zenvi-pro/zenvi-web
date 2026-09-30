@@ -35,6 +35,7 @@ for (const [path, bytes] of readTree("src/profiles/")) {
     display_ratio: { num: int("display_aspect_num"), den: int("display_aspect_den") },
   };
   if (p.colorspace) entry.colorspace = int("colorspace");
+  if (p.spherical === "1") entry.spherical = true;
   if (dir === "legacy") entry.legacy = true;
   for (const [k, v] of Object.entries(entry)) {
     if (typeof v === "number" && !Number.isFinite(v)) throw new Error(`${rel}: bad ${k}`);
