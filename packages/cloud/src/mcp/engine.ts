@@ -58,6 +58,17 @@ const ENVELOPE: JsonSchemaObject = {
   required: ["ok", "project_id"],
 };
 
+/**
+ * The catalog's own MCP input schema when the tool carries one (W4's
+ * `CatalogTool.inputSchema`: the desktop's merged schema for contract tools),
+ * which describes coerced string arguments better than a zod conversion.
+ */
+function catalogSchema(tool: AnyTool): JsonSchemaObject | undefined {
+  const schema = (tool as { inputSchema?: unknown }).inputSchema;
+  if (typeof schema !== "object" || schema === null || (schema as { type?: unknown }).type !== "object") return undefined;
+  return structuredClone(schema) as JsonSchemaObject;
+}
+
 /** Capabilities the cloud host can offer, given what this build has. */
 export function cloudCapabilities(options: { media: boolean; frames: boolean }): Set<HostCapability> {
   const caps = new Set<HostCapability>();
@@ -75,10 +86,11 @@ export function engineTools(
   const out: McpTool[] = [];
   for (const tool of registry.tools) {
     if (!tool.surfaces.includes("mcp") || HIDDEN_ENGINE_TOOLS.has(tool.name) || reserved.has(tool.name)) continue;
+    if ((tool as { deprecated?: boolean }).deprecated === true) continue;
     if ((tool.requires ?? []).some((cap) => !capabilities.has(cap))) continue;
     let inputSchema: JsonSchemaObject;
     try {
-      inputSchema = jsonSchema(tool.input, "input");
+      inputSchema = catalogSchema(tool) ?? jsonSchema(tool.input, "input");
     } catch (error) {
       log(`skipping engine tool ${tool.name}: no JSON schema (${error instanceof Error ? error.message : String(error)})`);
       continue;
@@ -126,10 +138,24 @@ async function callEngineTool(
     }
   });
   const result = edit.value;
-  if (!result.ok) return errorResult(result.text);
+  const text = displayText(result);
+  if (!result.ok) return errorResult(text);
   const structured: Record<string, unknown> = { ok: true, project_id: projectId };
   if (result.data !== undefined) structured.data = result.data;
-  return okResult(result.text, structured, result.images ?? []);
+  return okResult(text, structured, result.images ?? []);
+}
+
+/**
+ * The human line for a result. Catalog tools answer with a contract-3
+ * receipt serialized into `text` (what the Assistant bridge sends); on MCP the
+ * receipt already travels as structuredContent, so show its `summary`.
+ */
+export function displayText(result: ToolResult): string {
+  const data = result.data as { contract?: unknown; summary?: unknown } | undefined;
+  if (data && typeof data === "object" && data.contract === 3 && typeof data.summary === "string" && result.text.trimStart().startsWith("{")) {
+    return data.summary;
+  }
+  return result.text;
 }
 
 /** The platform capabilities engine tools get in the cloud, for one project. */

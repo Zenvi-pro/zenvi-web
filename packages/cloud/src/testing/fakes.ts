@@ -106,9 +106,15 @@ export function fakeEngine(hooks: { beforeAddMarker?: () => Promise<void> } = {}
     requires: ["player"],
     run: () => ({ ok: true, text: "playing" }),
   };
+  const retired = { ...countMarkers, name: "old_count_markers_tool", deprecated: true } as AnyTool;
+  const withCatalogSchema = {
+    ...countMarkers,
+    name: "describe_markers_tool",
+    inputSchema: { type: "object", properties: { detail_level: { type: "string", enum: ["summary", "full"] } } },
+  } as AnyTool;
   const registry = {
     runs: [] as string[],
-    tools: [countMarkers, addMarker, localOnly],
+    tools: [countMarkers, addMarker, localOnly, retired, withCatalogSchema],
     async run(ctx: ToolContext, name: string, args: unknown): Promise<ToolResult> {
       registry.runs.push(name);
       const tool = registry.tools.find((t) => t.name === name);

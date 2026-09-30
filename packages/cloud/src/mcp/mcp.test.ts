@@ -356,6 +356,18 @@ describe("import_media_from_url", () => {
   });
 });
 
+describe("engine results", () => {
+  it("show a contract-3 receipt's summary as the text, keeping the receipt structured", async () => {
+    const { displayText } = await import("./engine.js");
+    const receipt = { contract: 3, status: "applied", tool: "x", summary: "Added clip C1 at 2s" };
+    expect(displayText({ ok: true, text: JSON.stringify(receipt), data: receipt })).toBe("Added clip C1 at 2s");
+    expect(displayText({ ok: false, text: JSON.stringify({ ...receipt, summary: "Error: no such clip" }), data: { ...receipt, summary: "Error: no such clip" } })).toBe(
+      "Error: no such clip",
+    );
+    expect(displayText({ ok: true, text: "3 markers", data: { count: 3 } })).toBe("3 markers");
+  });
+});
+
 describe("engine tools on the cloud", () => {
   it("run in one transaction per call, save with If-Match and keep undo history", async () => {
     const engine = fakeEngine();
@@ -365,6 +377,9 @@ describe("engine tools on the cloud", () => {
     const names = tools.map((t) => t.name);
     expect(names).toContain("add_marker_tool");
     expect(names).not.toContain("play_tool");
+    expect(names).not.toContain("old_count_markers_tool");
+    const described = tools.find((t) => t.name === "describe_markers_tool");
+    expect(Object.keys((described?.inputSchema.properties as object) ?? {})).toEqual(["detail_level", "project_id"]);
     const add = tools.find((t) => t.name === "add_marker_tool");
     expect(add?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
     expect(Object.keys((add?.inputSchema.properties as object) ?? {})).toEqual(expect.arrayContaining(["position", "project_id"]));
