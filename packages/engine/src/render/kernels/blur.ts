@@ -114,8 +114,8 @@ export const blur: KernelSpec = {
     if (!area) return;
     const aw = rectWidth(area);
     const ah = rectHeight(area);
-    let a = copyRect(image, area.x1, area.y1, aw, ah).data;
-    let b = new Uint8ClampedArray(a);
+    let a: Uint8ClampedArray = copyRect(image, area.x1, area.y1, aw, ah).data;
+    let b: Uint8ClampedArray = new Uint8ClampedArray(a);
     const hr = Math.min(Math.max(0, hRadius), Math.max(0, aw - 1));
     const vr = Math.min(Math.max(0, vRadius), Math.max(0, ah - 1));
     let blurred = false;
