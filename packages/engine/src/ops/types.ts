@@ -61,10 +61,31 @@ export type ColorInput = string | { red: number; green: number; blue: number; al
  */
 export type PropertyValue = number | string | boolean | ColorInput;
 
+/**
+ * What a copy holds (desktop Copy menu): whole items, or one property group
+ * (Copy ▸ Keyframes ▸ All/Alpha/Scale/Shear/Rotation/Location/Time/Volume,
+ * Copy ▸ Effects; transitions: Keyframes ▸ All/Brightness/Contrast).
+ */
+export type CopyPart =
+  | "all"
+  | "keyframes"
+  | "alpha"
+  | "scale"
+  | "shear"
+  | "rotation"
+  | "location"
+  | "time"
+  | "volume"
+  | "effects"
+  | "brightness"
+  | "contrast";
+
 /** What `copyItems` puts on the clipboard (desktop `application/x-zenvi-generic`). */
 export interface ClipboardData {
   kind: "zenvi/clipboard";
   version: 1;
+  /** Whole items (`all`, the default when absent) or one property group. */
+  part?: CopyPart;
   /** Deep copies of the copied clips, in timeline order. */
   clips: Clip[];
   /** Deep copies of the copied transitions, in timeline order. */
