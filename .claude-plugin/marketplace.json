@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "zenvi",
+  "description": "Zenvi: video editing for Claude Code (local, ffmpeg-based, same editing engine as the Zenvi app).",
+  "owner": {
+    "name": "Zenvi",
+    "url": "https://zenvi.pro"
+  },
+  "plugins": [
+    {
+      "name": "zenvi",
+      "source": "./plugins/zenvi",
+      "description": "Edit videos with Zenvi: import, cut, arrange, titles, transitions, effects, audio, frame previews, rendering, and handoff to the Zenvi app or web editor.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Zenvi"
+      },
+      "homepage": "https://zenvi.pro",
+      "category": "productivity"
+    }
+  ]
+}

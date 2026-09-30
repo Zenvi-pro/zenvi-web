@@ -1,0 +1,13 @@
+{
+  "name": "zenvi",
+  "version": "0.1.0",
+  "description": "Edit videos with Zenvi from Claude Code: import footage, cut and arrange it, add titles, transitions, effects and music, look at frames, render, then open the result in the Zenvi app or share a web editor link.",
+  "author": {
+    "name": "Zenvi",
+    "url": "https://zenvi.pro"
+  },
+  "homepage": "https://zenvi.pro",
+  "repository": "https://github.com/Zenvi-pro/zenvi-web",
+  "license": "GPL-3.0-or-later",
+  "keywords": ["video", "video-editing", "editor", "ffmpeg", "mcp", "zenvi"]
+}
