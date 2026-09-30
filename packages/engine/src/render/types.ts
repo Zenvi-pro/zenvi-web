@@ -122,3 +122,34 @@ export interface PlanSize {
   width: number;
   height: number;
 }
+
+// ---------------------------------------------------------------------------
+// Kernels: effect math shared by every renderer
+// ---------------------------------------------------------------------------
+
+export interface KernelContext {
+  /** Effect-local frame number (EffectInstance.frame). */
+  frame: number;
+  /** Canvas (output) size the layer will be composited into. */
+  canvasWidth: number;
+  canvasHeight: number;
+  /**
+   * Extra images the kernel needs (mask images for Mask), keyed by path.
+   * Renderers preload them; kernels are synchronous.
+   */
+  images: ReadonlyMap<string, RgbaImage>;
+}
+
+/**
+ * A video effect, in place on straight RGBA. May return a new image when the
+ * effect changes the image size; otherwise returns void.
+ */
+export type VideoKernel = (image: RgbaImage, params: Record<string, EvaluatedParam>, ctx: KernelContext) => RgbaImage | void;
+
+/** An audio effect, in place on planar float samples (one array per channel). */
+export type AudioKernel = (
+  channels: Float32Array[],
+  sampleRate: number,
+  params: Record<string, EvaluatedParam>,
+  state: Map<string, unknown>,
+) => void;
