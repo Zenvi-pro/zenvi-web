@@ -31,6 +31,19 @@ export interface EffectInstance {
   /** Frame number local to the effect (libopenshot passes this to GetFrame). */
   frame: number;
   params: Record<string, EvaluatedParam>;
+  /**
+   * libopenshot `apply_before_clip` (default true): run on the source image
+   * before the clip transform. When false (Shadow, Glow defaults) the kernel
+   * runs on the canvas-sized, already-transformed layer (`Clip::GetFrame` step 6).
+   */
+  applyBeforeClip?: boolean;
+  /**
+   * Paths of images this kernel reads from `KernelContext.images` (effect
+   * `mask_reader`, Displace `map_reader`). Renderers preload them at draw size.
+   */
+  images?: string[];
+  /** Paths of text resources (e.g. ColorMap `.cube` LUTs) read from `KernelContext.texts`. */
+  texts?: string[];
 }
 
 export interface MaskInstance {
@@ -44,7 +57,25 @@ export interface MaskInstance {
 }
 
 export type LayerSource =
-  | { kind: "video"; fileId: string; path: string; time: number; frame: number }
+  | {
+      kind: "video";
+      fileId: string;
+      path: string;
+      /**
+       * Seconds from the source's first video frame: libopenshot source frame k
+       * (1-based, after FrameMapper and `time` remapping) → (k − 1) / reader fps.
+       * Renderers pick the decoded picture whose (pts − first pts) rounds to
+       * that frame (half-frame tolerance, like FFmpegReader).
+       */
+      time: number;
+      /** The 1-based source frame number `time` was derived from. */
+      frame: number;
+      /**
+       * Apply container rotation metadata (`reader_orientation_mode`). False
+       * for legacy clips whose keyframes already rotate. Default true.
+       */
+      applyRotation?: boolean;
+    }
   | { kind: "image"; fileId: string; path: string }
   | { kind: "svg"; fileId: string; path: string }
   | { kind: "color"; color: RGBA };
@@ -59,6 +90,11 @@ export interface LayerPlan {
   /**
    * Size the source should be rasterized/decoded at before `transform` is
    * applied (after the clip's scale mode). Renderers may decode at this size.
+   * Stable across a clip's frames: derived from the clip's maximum scale over
+   * its keyframes (libopenshot decode box), so zooms do not re-decode per frame.
+   * A kernel that returns a differently sized image (Crop `resize`) is drawn
+   * into (0, 0, drawWidth, drawHeight); the planner folds the aspect change
+   * into `transform`.
    */
   drawWidth: number;
   drawHeight: number;
@@ -66,6 +102,8 @@ export interface LayerPlan {
   transform: Affine;
   /** 0..1, multiplied into the layer after effects. */
   opacity: number;
+  /** libopenshot `CompositeType` blend mode: 0 normal (default), 12–23 (Add … Exclusion). */
+  composite?: number;
   /** Clip effects in apply order, evaluated at this frame. */
   effects: EffectInstance[];
   /** Transitions that apply to this layer at this frame, in apply order. */
@@ -100,9 +138,16 @@ export interface AudioSegment {
   sourceStart: number;
   /** Length on the timeline, seconds. */
   duration: number;
-  /** Playback rate (1 = normal; time keyframes are sampled into rate changes). */
+  /**
+   * Playback rate (1 = normal; time keyframes are sampled into rate changes).
+   * Negative = reverse. Segments may extend past a requested range; renderers clip.
+   */
   rate: number;
-  /** Piecewise-linear gain envelope sampled from the volume keyframe. */
+  /**
+   * Piecewise-linear gain envelope sampled from the volume keyframe, with
+   * volume mixing (AVERAGE/REDUCE) and transition audio fades already folded
+   * in. Renderers apply it verbatim.
+   */
   gain: GainPoint[];
   /** Audio effects to run on the segment, evaluated at its start. */
   effects: EffectInstance[];
@@ -138,6 +183,8 @@ export interface KernelContext {
    * Renderers preload them; kernels are synchronous.
    */
   images: ReadonlyMap<string, RgbaImage>;
+  /** Text resources (LUT `.cube` files), keyed by path. Preloaded by renderers. */
+  texts?: ReadonlyMap<string, string>;
 }
 
 /**
