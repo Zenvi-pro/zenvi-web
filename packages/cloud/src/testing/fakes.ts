@@ -16,7 +16,9 @@ export const PNG_1X1 = Buffer.from(
   "base64",
 );
 
-export function fakeRenderer(options: { fail?: string; onRender?: (input: Parameters<Renderer["render"]>[0]) => void } = {}): Renderer & {
+export function fakeRenderer(
+  options: { fail?: string; frameFail?: string; onRender?: (input: Parameters<Renderer["render"]>[0]) => void } = {},
+): Renderer & {
   renders: number;
   frames: number;
 } {
@@ -39,6 +41,7 @@ export function fakeRenderer(options: { fail?: string; onRender?: (input: Parame
     },
     async frame(): Promise<Uint8Array> {
       renderer.frames += 1;
+      if (options.frameFail) throw new Error(options.frameFail);
       return PNG_1X1;
     },
   };

@@ -238,6 +238,18 @@ describe("renders and frames over MCP", () => {
   });
 });
 
+describe("renderer failures", () => {
+  it("reach the model as a clear error, not a generic failure", async () => {
+    const h = await harness({ renderer: fakeRenderer({ frameFail: "The Blur effect is not supported yet." }) });
+    const client = await connect(h, await pat(h));
+    await call(client, "create_project", { name: "P" });
+    const res = await call(client, "preview_frame", { time_seconds: 0 });
+    expect(res.isError).toBe(true);
+    expect(res.content[0]?.text).toBe("Error: Could not render that frame: The Blur effect is not supported yet.");
+    await client.close();
+  });
+});
+
 describe("the preview view resource", () => {
   it("is listed and readable as an MCP Apps HTML resource with a CSP for blob storage", async () => {
     const h = await harness();

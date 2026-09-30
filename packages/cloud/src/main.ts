@@ -43,7 +43,8 @@ async function main(): Promise<void> {
   const ffprobe = resolveBinary("ffprobe");
   const haveFfprobe = isAbsolute(ffprobe) || whichSync(ffprobe) !== undefined;
   if (!haveFfprobe) log.warn("ffprobe not found: URL imports are disabled");
-  const renderer = nodeRenderer();
+  const { renderer, reason } = await nodeRenderer();
+  if (reason) log.warn("rendering unavailable", { reason });
 
   const services = createServices({
     config,

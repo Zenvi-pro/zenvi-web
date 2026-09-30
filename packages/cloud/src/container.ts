@@ -93,7 +93,7 @@ export function createServices(deps: Dependencies): Services {
         resolver: deps.network?.resolver,
       }));
   const clients = new ClientRegistry(tables, clock, fetchClientDocument);
-  const cache = new MediaCache(join(config.renderTmpDir, "zenvi-media-cache"), 2 * 1024 ** 3, media);
+  const cache = new MediaCache(join(config.renderTmpDir, "zenvi-media-cache"), config.limits.mediaCacheBytes, media);
   return {
     config,
     clock,

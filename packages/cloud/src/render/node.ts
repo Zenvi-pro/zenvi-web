@@ -37,12 +37,24 @@ export const nodeProber: MediaProber = {
   probe: (filePath) => renderNode.probe(filePath),
 };
 
-export function nodeRenderer(): Renderer {
+/**
+ * The render-node renderer, or `unavailableRenderer` (with the reason) when
+ * this build lacks `renderProject` or the engine's planner/compositor that
+ * render-node drives (`defaultRenderEngine`).
+ */
+export async function nodeRenderer(): Promise<{ renderer: Renderer; reason?: string }> {
   const mod = renderNode as unknown as Record<string, unknown>;
   const renderProject = typeof mod.renderProject === "function" ? (mod.renderProject as RenderProjectFn) : null;
   const renderFrame = typeof mod.renderFrame === "function" ? (mod.renderFrame as RenderFrameFn) : null;
-  if (!renderProject) return unavailableRenderer;
-  return {
+  if (!renderProject) return { renderer: unavailableRenderer, reason: "@zenvi/render-node has no renderProject" };
+  if (typeof mod.defaultRenderEngine === "function") {
+    try {
+      await (mod.defaultRenderEngine as () => Promise<unknown>)();
+    } catch (error) {
+      return { renderer: unavailableRenderer, reason: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  const renderer: Renderer = {
     available: true,
     framesAvailable: renderFrame !== null,
     async render(input) {
@@ -64,6 +76,7 @@ export function nodeRenderer(): Renderer {
       });
     },
   };
+  return { renderer };
 }
 
 const PORTABLE = ["transitions", "emojis", "colors"] as const;

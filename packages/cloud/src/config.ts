@@ -23,6 +23,8 @@ export interface Limits {
   verifyHashMaxBytes: number;
   /** Total media a single render may download, bytes. */
   maxRenderMediaBytes: number;
+  /** On-disk cache of media for frame previews, bytes. */
+  mediaCacheBytes: number;
 }
 
 export interface Config {
@@ -129,7 +131,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       maxUserBytes: bytes(env.MAX_USER_BYTES, 20 * GiB),
       importMaxBytes: bytes(env.IMPORT_MAX_BYTES, 512 * MiB),
       verifyHashMaxBytes: bytes(env.VERIFY_HASH_MAX_BYTES, 64 * MiB),
-      maxRenderMediaBytes: bytes(env.MAX_RENDER_MEDIA_BYTES, 3 * GiB),
+      // The container has 4 GiB of ephemeral disk: renders + cache + imports must fit.
+      maxRenderMediaBytes: bytes(env.MAX_RENDER_MEDIA_BYTES, 2 * GiB),
+      mediaCacheBytes: bytes(env.MEDIA_CACHE_BYTES, 512 * MiB),
     },
     tokens: {
       accessTtlSeconds: 3600,

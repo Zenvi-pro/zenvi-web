@@ -57,17 +57,22 @@ export class FrameService {
     if (cached) {
       bytes = cached.data;
     } else {
-      bytes = await this.renderer.frame({
-        project: input.project,
-        seconds: input.seconds,
-        width,
-        format: "png",
-        resolveMedia: projectPathResolver(input.project, {
-          fetchFile: (file) => this.cache.get(input.userId, file),
-          resolveAsset: this.resolveAsset,
-        }),
-        signal: input.signal,
-      });
+      try {
+        bytes = await this.renderer.frame({
+          project: input.project,
+          seconds: input.seconds,
+          width,
+          format: "png",
+          resolveMedia: projectPathResolver(input.project, {
+            fetchFile: (file) => this.cache.get(input.userId, file),
+            resolveAsset: this.resolveAsset,
+          }),
+          signal: input.signal,
+        });
+      } catch (error) {
+        // Renderer failures (missing media, unsupported effect…) are the person's to act on.
+        throw new ApiError(422, "preview_failed", `Could not render that frame: ${error instanceof Error ? error.message : String(error)}`);
+      }
       await this.blobs.write(path, bytes, { contentType: "image/png" });
     }
     const url = await this.blobs.signUrl(path, { permission: "read", expiresInSeconds: URL_SECONDS, contentType: "image/png" });
