@@ -12,7 +12,6 @@ import {
 } from "../test-support/fixtures.js";
 import { jpegOrientation } from "./exif.js";
 import { fingerprint, sha256File } from "./fingerprint.js";
-import { desktopMediaType, isAudioOnlyMedia } from "./media-type.js";
 import { probe, ProbeError } from "./probe.js";
 
 let dir: string;
@@ -148,18 +147,6 @@ describe("probe", () => {
       expect({ file, ...actual }).toEqual({ file, ...expected });
     }
   }, 60_000);
-});
-
-describe("media type (image_types.py)", () => {
-  it("prefers the extension over stream flags", () => {
-    expect(desktopMediaType({ path: "/a/song.mp3", has_video: true, has_audio: true })).toBe("audio");
-    expect(desktopMediaType({ path: "/a/pic.PNG", has_video: true, has_audio: false })).toBe("image");
-    expect(desktopMediaType({ path: "/a/clip.mov", has_video: true, has_audio: true })).toBe("video");
-    expect(desktopMediaType({ path: "/a/voice.m4a", has_video: false, has_audio: true })).toBe("audio");
-    expect(desktopMediaType({ path: "/a/x.bin", has_video: false, has_audio: false })).toBe("video");
-    expect(isAudioOnlyMedia({ path: "/a/cover.mp3", has_video: true, has_audio: true })).toBe(true);
-    expect(isAudioOnlyMedia({ path: "/a/v.mp4", has_video: true, has_audio: true, media_type: "video" })).toBe(false);
-  });
 });
 
 describe("fingerprints", () => {

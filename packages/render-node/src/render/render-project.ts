@@ -22,7 +22,8 @@ import type { ScaleQuality } from "../decode/video.js";
 import { streamStarts } from "../probe/starts.js";
 import { buildAudioGraph } from "./audio-graph.js";
 import { encoderCommand, ffmpegMajorVersion, FORMATS } from "./encoder.js";
-import { defaultRenderEngine, type RenderEngine } from "./engine.js";
+import { nodeTextRasterizer } from "../svg/text.js";
+import { defaultRenderEngine, projectNeedsText, type RenderEngine } from "./engine.js";
 
 export interface RenderProgress {
   /** 0..1 */
@@ -158,11 +159,13 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
 
     if (info.video) {
       const stdin = encoder.child.stdin!;
+      const state = engine.createState();
+      const text = projectNeedsText(project) ? await nodeTextRasterizer() : undefined;
       for (let i = 0; i < frames; i += 1) {
         if (signal?.aborted) throw new AbortedError();
-        const plan = engine.planFrame(project, first + i, { width, height });
+        const plan = engine.planFrame(project, first + i, { width, height }, { preview: false });
         const prepared = await sources.prepare(plan);
-        const image = engine.composite(plan, prepared);
+        const image = engine.compositeFrame(plan, { ...prepared, text, state });
         if (image.width !== width || image.height !== height) {
           throw new RenderError(`Compositor returned ${image.width}x${image.height}, expected ${width}x${height}.`);
         }

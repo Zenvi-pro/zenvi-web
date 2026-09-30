@@ -20,12 +20,11 @@
 
 import { stat } from "node:fs/promises";
 import path from "node:path";
-import type { Fraction, MediaType, ReaderInfo } from "@zenvi/engine";
+import { getMediaType, type Fraction, type MediaType, type ReaderInfo } from "@zenvi/engine";
 import { decoderNameFor } from "../ffmpeg/capabilities.js";
 import { readSvgFile, svgIntrinsicSize } from "../svg/rasterize.js";
 import { imageOrientation, orientationSwapsAxes } from "./exif.js";
 import { ffprobe, type FfprobeResult, type FfprobeStream } from "./ffprobe.js";
-import { desktopMediaType } from "./media-type.js";
 import { PIXEL_FORMATS } from "./pixfmt.gen.js";
 
 /** Reader info plus the desktop's `media_type`. */
@@ -446,7 +445,8 @@ function finish(info: MutableInfo): ProbedInfo {
   const out: Record<string, unknown> = { ...info };
   if (info.type === "FFmpegReader") out.duration_strategy = "VideoPreferred";
   const sorted = sortKeys(out) as ReaderInfo;
-  return { ...sorted, media_type: desktopMediaType(sorted) } as ProbedInfo;
+  // The desktop importer's media type (image_types.py get_media_type), from the engine.
+  return { ...sorted, media_type: getMediaType(sorted) } as ProbedInfo;
 }
 
 export interface ProbeOptions {

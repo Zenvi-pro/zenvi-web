@@ -88,11 +88,17 @@ function engine(audio: AudioSegment[] = []): RenderEngine {
     planAudio(_p, range): AudioPlan {
       return { sampleRate: 48000, channels: 2, start: range.start, end: range.end, segments: audio };
     },
-    composite(plan, prepared) {
+    compositeFrame(plan, sources) {
       const out = createRgba(plan.width, plan.height);
-      out.data.set(prepared.layers[0]!.data);
+      const layer = sources.layers[0];
+      if (layer) out.data.set(layer.data);
+      else {
+        const source = plan.layers[0]!.source;
+        if (source.kind === "color") for (let i = 0; i < out.data.length; i += 4) out.data.set(source.color, i);
+      }
       return out;
     },
+    createState: () => ({}),
   };
 }
 

@@ -1,32 +1,47 @@
 /**
- * The engine functions a Node render needs: the frame and audio planners and
- * the CPU compositor (`@zenvi/engine/render`). Kept behind one interface so
- * tests can drive the encoder pipeline with synthetic plans.
+ * The engine functions a Node render needs, from `@zenvi/engine/render`:
+ * the frame and audio planners and the CPU compositor. Behind one interface
+ * so tests can drive the encoder pipeline with synthetic plans.
+ * API: scratchpad/requests/W2-render.md.
  */
 
-import type { AudioPlan, FramePlan, PlanSize, Project, RgbaImage } from "@zenvi/engine";
-import type { PreparedFrame } from "../decode/sources.js";
+import type { AudioPlan, FramePlan, KernelAudio, PlanSize, Project, RgbaImage, TextRasterizer } from "@zenvi/engine";
+
+/** What the compositor reads for one frame (engine `CompositeSources`). */
+export interface CompositeSources {
+  /** Decoded source per `plan.layers` index (draw size for video/SVG, natural size for stills); null for color layers. */
+  layers: readonly (RgbaImage | null | undefined)[];
+  /** Masks and effect images by path, natural size. */
+  images?: ReadonlyMap<string, RgbaImage>;
+  /** LUT texts by path. */
+  texts?: ReadonlyMap<string, string>;
+  /** Font hook for Caption/Timer. */
+  text?: TextRasterizer;
+  /** Clip audio per layer index, for layers whose plan asks for it. */
+  audio?: readonly (KernelAudio | null | undefined)[];
+  /** The render's compositor state (same object for every frame of a sequential render). */
+  state?: unknown;
+}
+
+export interface PlanOptions {
+  /** true: `size` is a preview box (desktop preview semantics); false: an export size. */
+  preview?: boolean;
+}
 
 export interface RenderEngine {
-  planFrame(project: Project, frame: number, size: PlanSize): FramePlan;
+  planFrame(project: Project, frame: number, size: PlanSize, options?: PlanOptions): FramePlan;
   planAudio(project: Project, range: { start: number; end: number }): AudioPlan;
-  /** Composite one planned frame from its decoded sources into a canvas-sized image. */
-  composite(plan: FramePlan, prepared: PreparedFrame): RgbaImage;
+  compositeFrame(plan: FramePlan, sources: CompositeSources): RgbaImage;
+  /** A fresh compositor state for one sequential render. */
+  createState(): unknown;
 }
 
 type EngineRenderModule = {
-  planFrame?: (project: Project, frame: number, size: PlanSize) => FramePlan;
-  planAudio?: (project: Project, range: { start: number; end: number }) => AudioPlan;
-  compositeFrame?: (plan: FramePlan, sources: CompositeSources) => RgbaImage;
+  planFrame?: RenderEngine["planFrame"];
+  planAudio?: RenderEngine["planAudio"];
+  compositeFrame?: (plan: FramePlan, sources: CompositeSources, out?: RgbaImage) => RgbaImage;
+  createCompositorState?: () => unknown;
 };
-
-/** What the engine compositor reads for one frame. */
-export interface CompositeSources {
-  /** Source image per `plan.layers` entry, at its draw size. */
-  layers: RgbaImage[];
-  images: ReadonlyMap<string, RgbaImage>;
-  texts: ReadonlyMap<string, string>;
-}
 
 let cached: Promise<RenderEngine> | undefined;
 
@@ -41,8 +56,16 @@ export function defaultRenderEngine(): Promise<RenderEngine> {
     return {
       planFrame,
       planAudio,
-      composite: (plan, prepared) => compositeFrame(plan, { layers: prepared.layers, images: prepared.images, texts: prepared.texts }),
+      compositeFrame: (plan, sources) => compositeFrame(plan, sources),
+      createState: () => (m.createCompositorState ? m.createCompositorState() : undefined),
     };
   });
   return cached;
+}
+
+/** Effects that draw text and need the font hook. */
+const TEXT_EFFECTS = new Set(["Caption", "Timer"]);
+
+export function projectNeedsText(project: Project): boolean {
+  return (project.clips ?? []).some((clip) => clip.effects?.some((e) => TEXT_EFFECTS.has(String(e.class_name ?? e.type))));
 }

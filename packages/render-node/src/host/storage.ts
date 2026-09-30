@@ -148,9 +148,21 @@ async function tryAcquire(lockFile: string): Promise<boolean> {
   return false;
 }
 
-/** Run `fn` holding `<file>.lock`. Waits up to `timeoutMs` for another holder. */
+/** Lock files this process holds (the lock is reentrant within a process). */
+const held = new Map<string, number>();
+
+/** Run `fn` holding `<file>.lock`. Waits up to `timeoutMs` for another process's hold. */
 export async function withProjectLock<T>(file: string, fn: () => Promise<T>, timeoutMs = 30_000): Promise<T> {
   const lockFile = `${path.resolve(file)}.lock`;
+  const depth = held.get(lockFile) ?? 0;
+  if (depth > 0) {
+    held.set(lockFile, depth + 1);
+    try {
+      return await fn();
+    } finally {
+      held.set(lockFile, (held.get(lockFile) ?? 1) - 1);
+    }
+  }
   const deadline = Date.now() + timeoutMs;
   let delay = 25;
   while (!(await tryAcquire(lockFile))) {
@@ -160,9 +172,11 @@ export async function withProjectLock<T>(file: string, fn: () => Promise<T>, tim
     await new Promise((resolve) => setTimeout(resolve, delay));
     delay = Math.min(250, delay * 2);
   }
+  held.set(lockFile, 1);
   try {
     return await fn();
   } finally {
+    held.delete(lockFile);
     await rm(lockFile, { force: true });
   }
 }

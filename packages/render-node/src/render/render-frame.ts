@@ -10,7 +10,8 @@ import { encodePng } from "../image/png.js";
 import { flattenOver } from "../image/rgba.js";
 import { SourceManager, type MediaResolver } from "../decode/sources.js";
 import type { ScaleQuality } from "../decode/video.js";
-import { defaultRenderEngine, type RenderEngine } from "./engine.js";
+import { nodeTextRasterizer } from "../svg/text.js";
+import { defaultRenderEngine, projectNeedsText, type RenderEngine } from "./engine.js";
 import { applyOverlay } from "./overlay.js";
 
 export interface RenderFrameOptions {
@@ -43,9 +44,12 @@ export async function renderFrameImage(project: Project, seconds: number, option
   const sources =
     options.sources ?? new SourceManager(project, { resolveMedia: options.resolveMedia, quality: options.scaleQuality ?? "export", signal: options.signal });
   try {
-    const plan = engine.planFrame(project, frame, size);
+    // Preview semantics (desktop preview widget): the project fitted into the box.
+    const plan = engine.planFrame(project, frame, size, { preview: true });
     const prepared = await sources.prepare(plan);
-    return await applyOverlay(engine.composite(plan, prepared), options.overlay);
+    const text = projectNeedsText(project) ? await nodeTextRasterizer() : undefined;
+    const image = engine.compositeFrame(plan, { ...prepared, text, state: engine.createState() });
+    return await applyOverlay(image, options.overlay);
   } finally {
     if (own) await sources.close();
   }

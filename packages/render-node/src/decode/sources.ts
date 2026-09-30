@@ -1,15 +1,26 @@
 /**
- * Everything a frame plan needs decoded: layer sources at draw size, mask and
- * effect images, and text resources (LUTs). One `SourceManager` serves one
- * render (or one preview session) and owns every ffmpeg child it starts.
+ * Everything a frame plan needs decoded, per the engine compositor's
+ * contract (scratchpad/requests/W2-render.md):
+ *
+ * - video layers: the frame at draw size (one ffmpeg child per clip);
+ * - raster stills: the natural image, EXIF-oriented (the compositor scales
+ *   it with Qt's smooth-scale, reproducing QtImageReader);
+ * - SVG layers: rasterized at draw size (vector, so no rescale);
+ * - color layers: nothing;
+ * - masks / effect images: natural size (SVG fitted to the canvas like
+ *   QtImageReader); LUT texts; per-layer clip audio when a layer asks.
+ *
+ * One `SourceManager` serves one render or preview and owns its children.
  */
 
 import { readFile } from "node:fs/promises";
-import type { FramePlan, LayerPlan, Project, ProjectFile, RgbaImage, RGBA } from "@zenvi/engine";
+import type { FramePlan, KernelAudio, LayerPlan, Project, ProjectFile, RgbaImage } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { runBinary } from "../ffmpeg/process.js";
-import { createRgba } from "../image/rgba.js";
+import { imageOrientation, orientationSwapsAxes } from "../probe/exif.js";
+import { streamStarts } from "../probe/starts.js";
 import { readSvgFile, svgIntrinsicSize } from "../svg/rasterize.js";
+import { AudioSampleReader, type LayerAudioRequest } from "./audio.js";
 import { decodeStill, isSvgPath, StillCache } from "./still.js";
 import { VideoDecoder, type ScaleQuality, type VideoSourceInfo } from "./video.js";
 
@@ -20,50 +31,28 @@ export interface SourceManagerOptions {
   resolveMedia: MediaResolver;
   quality?: ScaleQuality;
   signal?: AbortSignal;
-  /** Close a clip's decoder after it has been idle this many frames. */
+  /** Close a clip's decoders after this many frames without use. */
   idleFrames?: number;
 }
 
 export interface PreparedFrame {
-  /** Source image per layer (index into `plan.layers`), at the layer's draw size. */
-  layers: RgbaImage[];
-  /** Mask and effect images by path. */
+  /** Per `plan.layers` index; null for color layers. */
+  layers: (RgbaImage | null)[];
   images: Map<string, RgbaImage>;
-  /** Text resources by path. */
   texts: Map<string, string>;
+  /** Per layer index, when the layer's plan asks for audio. */
+  audio: (KernelAudio | null)[];
 }
 
-interface StartTimes {
-  videoStart: number;
-  formatStart: number;
-}
-
-async function probeStartTimes(file: string, signal?: AbortSignal): Promise<StartTimes> {
-  const { stdout } = await runBinary(
-    resolveBinary("ffprobe"),
-    ["-v", "error", "-print_format", "json", "-show_entries", "stream=codec_type,start_time:format=start_time", file],
-    { signal, timeoutMs: 60_000 },
-  );
-  const parsed = JSON.parse(stdout.toString("utf8")) as {
-    streams?: Array<{ codec_type?: string; start_time?: string }>;
-    format?: { start_time?: string };
-  };
-  const video = parsed.streams?.find((s) => s.codec_type === "video");
-  const num = (v: string | undefined) => (v !== undefined && Number.isFinite(Number(v)) ? Number(v) : 0);
-  return { videoStart: num(video?.start_time), formatStart: num(parsed.format?.start_time) };
-}
-
-function colorKey(color: RGBA, w: number, h: number): string {
-  return `${color.join(",")}@${w}x${h}`;
-}
+type VideoSource = Extract<LayerPlan["source"], { kind: "video" }>;
 
 export class SourceManager {
   private readonly decoders = new Map<string, { decoder: VideoDecoder; lastFrame: number }>();
+  private readonly audioReaders = new Map<string, { reader: AudioSampleReader; lastFrame: number }>();
   private readonly stills = new StillCache();
-  private readonly startTimes = new Map<string, Promise<StartTimes>>();
   private readonly resolved = new Map<string, Promise<string>>();
   private readonly texts = new Map<string, Promise<string>>();
-  private readonly colors = new Map<string, RgbaImage>();
+  private readonly naturalSizes = new Map<string, Promise<{ width: number; height: number }>>();
   private readonly files: Map<string, ProjectFile>;
   private frameCounter = 0;
   private closed = false;
@@ -85,16 +74,7 @@ export class SourceManager {
     return hit;
   }
 
-  private startTimesFor(file: string): Promise<StartTimes> {
-    let hit = this.startTimes.get(file);
-    if (!hit) {
-      hit = probeStartTimes(file, this.options.signal).catch(() => ({ videoStart: 0, formatStart: 0 }));
-      this.startTimes.set(file, hit);
-    }
-    return hit;
-  }
-
-  private async videoFrame(layer: LayerPlan, source: Extract<LayerPlan["source"], { kind: "video" }>): Promise<RgbaImage> {
+  private async videoFrame(layer: LayerPlan, source: VideoSource): Promise<RgbaImage> {
     const width = Math.max(1, Math.round(layer.drawWidth));
     const height = Math.max(1, Math.round(layer.drawHeight));
     const autorotate = source.applyRotation !== false;
@@ -105,19 +85,16 @@ export class SourceManager {
       const reader = this.files.get(source.fileId);
       const fps = reader?.fps && reader.fps.num > 0 && reader.fps.den > 0 ? reader.fps : { num: 30, den: 1 };
       const frameCount = Number(reader?.video_length);
-      const times = await this.startTimesFor(file);
+      const starts = await streamStarts(file, this.options.signal);
       const info: VideoSourceInfo = {
         path: file,
         fps,
-        videoStart: times.videoStart,
-        formatStart: times.formatStart,
+        videoStart: starts.videoStart,
+        formatStart: starts.formatStart,
         frameCount: Number.isFinite(frameCount) && frameCount > 0 ? frameCount : undefined,
         autorotate,
       };
-      entry = {
-        decoder: new VideoDecoder(info, { width, height }, { quality: this.options.quality, signal: this.options.signal }),
-        lastFrame: this.frameCounter,
-      };
+      entry = { decoder: new VideoDecoder(info, { width, height }, { quality: this.options.quality, signal: this.options.signal }), lastFrame: this.frameCounter };
       this.decoders.set(key, entry);
     }
     entry.lastFrame = this.frameCounter;
@@ -125,51 +102,55 @@ export class SourceManager {
     return entry.decoder.frame(Math.max(0, Math.round(source.frame) - 1));
   }
 
-  private colorImage(color: RGBA, width: number, height: number): RgbaImage {
-    const key = colorKey(color, width, height);
-    let image = this.colors.get(key);
-    if (!image) {
-      image = createRgba(width, height);
-      const d = image.data;
-      for (let i = 0; i < d.length; i += 4) {
-        d[i] = color[0];
-        d[i + 1] = color[1];
-        d[i + 2] = color[2];
-        d[i + 3] = color[3];
-      }
-      if (this.colors.size > 32) this.colors.clear();
-      this.colors.set(key, image);
+  /** Natural size of a raster image after EXIF orientation. */
+  private naturalSize(file: string): Promise<{ width: number; height: number }> {
+    let hit = this.naturalSizes.get(file);
+    if (!hit) {
+      hit = Promise.all([
+        runBinary(resolveBinary("ffprobe"), ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", file], {
+          signal: this.options.signal,
+          timeoutMs: 60_000,
+        }),
+        imageOrientation(file).catch(() => 1 as const),
+      ]).then(([{ stdout }, orientation]) => {
+        const [w, h] = stdout.toString("utf8").trim().split("x").map(Number);
+        if (!w || !h) throw new Error(`Cannot read the image size of ${file}`);
+        return orientationSwapsAxes(orientation) ? { width: h, height: w } : { width: w, height: h };
+      });
+      this.naturalSizes.set(file, hit);
     }
-    return image;
+    return hit;
   }
 
-  /** The source image for one layer at its draw size. */
-  async layerImage(layer: LayerPlan): Promise<RgbaImage> {
+  private async naturalStill(file: string): Promise<RgbaImage> {
+    const size = await this.naturalSize(file);
+    return this.stills.get(file, size, () => decodeStill(file, size, { quality: this.options.quality, signal: this.options.signal }));
+  }
+
+  /** The source image for one layer, or null for color layers. */
+  async layerImage(layer: LayerPlan): Promise<RgbaImage | null> {
     if (this.closed) throw new Error("SourceManager is closed");
-    const width = Math.max(1, Math.round(layer.drawWidth));
-    const height = Math.max(1, Math.round(layer.drawHeight));
     const source = layer.source;
     switch (source.kind) {
       case "video":
         return this.videoFrame(layer, source);
-      case "image":
+      case "image": {
+        const file = await this.resolve(source.path);
+        if (!isSvgPath(file)) return this.naturalStill(file);
+        const size = { width: Math.max(1, Math.round(layer.drawWidth)), height: Math.max(1, Math.round(layer.drawHeight)) };
+        return this.stills.get(file, size, () => decodeStill(file, size, { signal: this.options.signal }));
+      }
       case "svg": {
         const file = await this.resolve(source.path);
-        return this.stills.get(file, { width, height }, () =>
-          decodeStill(file, { width, height }, { quality: this.options.quality, signal: this.options.signal }),
-        );
+        const size = { width: Math.max(1, Math.round(layer.drawWidth)), height: Math.max(1, Math.round(layer.drawHeight)) };
+        return this.stills.get(file, size, () => decodeStill(file, size, { signal: this.options.signal }));
       }
       case "color":
-        return this.colorImage(source.color, width, height);
+        return null;
     }
   }
 
-  /**
-   * An auxiliary image (transition mask, effect mask, displacement map) at
-   * its natural size, like libopenshot's reader hands it to the effect, which
-   * then scales it. SVGs are rasterized to fit `fit` keeping their aspect
-   * (QtImageReader renders SVGs at the canvas size).
-   */
+  /** A mask / effect image at natural size (SVG fitted to `fit` keeping its aspect). */
   async auxImage(projectPath: string, fit: { width: number; height: number }): Promise<RgbaImage> {
     const file = await this.resolve(projectPath);
     if (isSvgPath(file)) {
@@ -178,26 +159,7 @@ export class SourceManager {
       const size = { width: Math.max(1, Math.round(natural.width * scale)), height: Math.max(1, Math.round(natural.height * scale)) };
       return this.stills.get(file, size, () => decodeStill(file, size, { signal: this.options.signal }));
     }
-    const dims = await this.naturalSize(file);
-    return this.stills.get(file, dims, () => decodeStill(file, dims, { signal: this.options.signal }));
-  }
-
-  private readonly naturalSizes = new Map<string, Promise<{ width: number; height: number }>>();
-
-  private naturalSize(file: string): Promise<{ width: number; height: number }> {
-    let hit = this.naturalSizes.get(file);
-    if (!hit) {
-      hit = runBinary(resolveBinary("ffprobe"), ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", file], {
-        signal: this.options.signal,
-        timeoutMs: 60_000,
-      }).then(({ stdout }) => {
-        const [w, h] = stdout.toString("utf8").trim().split("x").map(Number);
-        if (!w || !h) throw new Error(`Cannot read image size of ${file}`);
-        return { width: w, height: h };
-      });
-      this.naturalSizes.set(file, hit);
-    }
-    return hit;
+    return this.naturalStill(file);
   }
 
   /** A text resource (e.g. a `.cube` LUT), read once. */
@@ -208,6 +170,19 @@ export class SourceManager {
       this.texts.set(projectPath, hit);
     }
     return hit;
+  }
+
+  private async layerAudio(layer: LayerPlan, request: LayerAudioRequest): Promise<KernelAudio> {
+    const key = `${layer.clipId}\0${request.sampleRate}\0${request.channels}`;
+    let entry = this.audioReaders.get(key);
+    if (!entry) {
+      const file = await this.resolve(request.path);
+      const starts = await streamStarts(file, this.options.signal);
+      entry = { reader: new AudioSampleReader(file, request.sampleRate, request.channels, starts, this.options.signal), lastFrame: this.frameCounter };
+      this.audioReaders.set(key, entry);
+    }
+    entry.lastFrame = this.frameCounter;
+    return { sampleRate: request.sampleRate, channels: await entry.reader.read(request.sourceStart, request.samples) };
   }
 
   /** Decode everything `plan` references. */
@@ -223,13 +198,19 @@ export class SourceManager {
         for (const p of effect.texts ?? []) textPaths.add(p);
       }
     }
-    const [layers, images, texts] = await Promise.all([
+    const [layers, images, texts, audio] = await Promise.all([
       Promise.all(plan.layers.map((layer) => this.layerImage(layer))),
       Promise.all([...imagePaths].map(async (p) => [p, await this.auxImage(p, fit)] as const)),
       Promise.all([...textPaths].map(async (p) => [p, await this.text(p)] as const)),
+      Promise.all(
+        plan.layers.map((layer) => {
+          const request = (layer as { audio?: LayerAudioRequest }).audio;
+          return request ? this.layerAudio(layer, request) : Promise.resolve(null);
+        }),
+      ),
     ]);
     this.sweep();
-    return { layers, images: new Map(images), texts: new Map(texts) };
+    return { layers, images: new Map(images), texts: new Map(texts), audio };
   }
 
   /** Stop decoders whose clips have not been drawn recently. */
@@ -241,6 +222,12 @@ export class SourceManager {
         this.decoders.delete(key);
       }
     }
+    for (const [key, entry] of this.audioReaders) {
+      if (this.frameCounter - entry.lastFrame > idle) {
+        void entry.reader.close();
+        this.audioReaders.delete(key);
+      }
+    }
   }
 
   get activeDecoders(): number {
@@ -249,10 +236,11 @@ export class SourceManager {
 
   async close(): Promise<void> {
     this.closed = true;
-    const all = [...this.decoders.values()];
+    const decoders = [...this.decoders.values()];
+    const readers = [...this.audioReaders.values()];
     this.decoders.clear();
-    await Promise.all(all.map((e) => e.decoder.close()));
+    this.audioReaders.clear();
+    await Promise.all([...decoders.map((e) => e.decoder.close()), ...readers.map((e) => e.reader.close())]);
     this.stills.clear();
-    this.colors.clear();
   }
 }
