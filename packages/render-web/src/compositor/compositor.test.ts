@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { FramePlan, LayerPlan, MaskInstance, RgbaImage, VideoKernel } from "@zenvi/engine/render";
+import type { EffectInstance, FramePlan, KernelContext, LayerPlan, MaskInstance, RgbaImage } from "@zenvi/engine/render";
 import { Compositor, type LayerResources } from "./compositor.js";
 import type { RenderEngine } from "../engine.js";
 import { FakeContext, FakeImage, installFakeCanvas } from "../test-support/fake-canvas.js";
@@ -38,6 +38,8 @@ interface KernelCall {
   frame: number;
   images: string[];
   texts: string[];
+  state: Map<string, unknown> | undefined;
+  context: KernelContext;
 }
 
 interface Harness {
@@ -46,6 +48,7 @@ interface Harness {
   kernelCalls: KernelCall[];
   maskCalls: { transitionId: string; w: number; h: number; after: number }[];
   released: string[];
+  imageRequests: { path: string; w: number; h: number; time: number | undefined }[];
 }
 
 /** `kernels` maps an effect type to the size it resizes to (or null to keep the size), or "throw". */
@@ -53,11 +56,7 @@ function harness(kernels: Record<string, [number, number] | null | "throw"> = {}
   const kernelCalls: KernelCall[] = [];
   const maskCalls: Harness["maskCalls"] = [];
   const released: string[] = [];
-  const kernel = (type: string, behaviour: [number, number] | null | "throw"): VideoKernel => (image, _params, ctx) => {
-    kernelCalls.push({ type, w: image.width, h: image.height, frame: ctx.frame, images: [...ctx.images.keys()], texts: [...(ctx.texts?.keys() ?? [])] });
-    if (behaviour === "throw") throw new Error(`${type} exploded`);
-    if (behaviour) return { width: behaviour[0], height: behaviour[1], data: new Uint8ClampedArray(behaviour[0] * behaviour[1] * 4) };
-  };
+  const imageRequests: Harness["imageRequests"] = [];
   const engine: RenderEngine = {
     planFrame: () => {
       throw new Error("unused");
@@ -65,11 +64,16 @@ function harness(kernels: Record<string, [number, number] | null | "throw"> = {}
     planAudio: () => {
       throw new Error("unused");
     },
-    getVideoKernel: (type) => (type in kernels ? kernel(type, kernels[type]!) : undefined),
+    supportsVideoEffect: (type) => type in kernels,
+    applyVideoEffect: (image: RgbaImage, effect: EffectInstance, ctx: KernelContext) => {
+      const behaviour = kernels[effect.type];
+      kernelCalls.push({ type: effect.type, w: image.width, h: image.height, frame: ctx.frame, images: [...ctx.images.keys()], texts: [...(ctx.texts?.keys() ?? [])], state: ctx.state, context: ctx });
+      if (behaviour === "throw") throw new Error(`${effect.type} exploded`);
+      if (behaviour) return { width: behaviour[0], height: behaviour[1], data: new Uint8ClampedArray(behaviour[0] * behaviour[1] * 4) };
+      return image;
+    },
     getAudioKernel: () => undefined,
-    applyMask: (image: RgbaImage, mask: RgbaImage, instance: MaskInstance) => {
-      expect(mask.width).toBe(image.width);
-      expect(mask.height).toBe(image.height);
+    applyMask: (image: RgbaImage, _mask: RgbaImage, instance: MaskInstance) => {
       maskCalls.push({ transitionId: instance.transitionId, w: image.width, h: image.height, after: kernelCalls.length });
     },
     frameAt: () => 1,
@@ -83,14 +87,18 @@ function harness(kernels: Record<string, [number, number] | null | "throw"> = {}
       const image = new FakeImage(l.drawWidth, l.drawHeight, `pic:${l.clipId}`);
       return { image: image as unknown as ImageBitmap, width: image.width, height: image.height, release: () => released.push(l.clipId) };
     },
-    async image(_path, width, height) {
+    async image(path, width, height, time) {
+      imageRequests.push({ path, w: width, h: height, time });
       return { width, height, data: new Uint8ClampedArray(width * height * 4) };
     },
     async text(path) {
       return `text:${path}`;
     },
+    async audio(request) {
+      return { sampleRate: request.sampleRate, channels: [new Float32Array(request.samples)] };
+    },
   };
-  return { compositor: new Compositor({ engine }), resources, kernelCalls, maskCalls, released };
+  return { compositor: new Compositor({ engine, text: null }), resources, kernelCalls, maskCalls, released, imageRequests };
 }
 
 const mainContext = () => new FakeContext({ width: 400, height: 300 });
@@ -164,7 +172,7 @@ describe("Compositor", () => {
     expect(draw.args.slice(1)).toEqual([0, 0, 160, 90]);
   });
 
-  it("draws a resized kernel result into the draw rect and resamples later masks", async () => {
+  it("draws a resized kernel result into the draw rect; masks then see the new size", async () => {
     const { compositor, resources, maskCalls } = harness({ Crop: [80, 45] });
     const ctx = mainContext();
     const p = plan([
@@ -179,15 +187,80 @@ describe("Compositor", () => {
     expect(draw.args.slice(1)).toEqual([0, 0, 160, 90]);
   });
 
-  it("runs applyBeforeClip:false kernels on the transformed layer at canvas size", async () => {
-    const { compositor, resources, kernelCalls } = harness({ Shadow: null });
+  it("runs canvas-stage effects then canvas-stage masks on the layer drawn with its opacity", async () => {
+    const { compositor, resources, kernelCalls, maskCalls, imageRequests } = harness({ Shadow: null });
     const ctx = mainContext();
-    const p = plan([layer({ opacity: 0.8, effects: [{ id: "S", type: "Shadow", frame: 3, params: {}, applyBeforeClip: false, images: ["glow.png"] }] })]);
+    const p = plan([
+      layer({
+        opacity: 0.8,
+        composite: 13,
+        effects: [{ id: "S", type: "Shadow", frame: 3, params: {}, applyBeforeClip: false, images: ["glow.png"] }],
+        masks: [{ transitionId: "T", maskPath: "wipe.png", brightness: 0, contrast: 0, replaceImage: false, applyBeforeClip: false }],
+      }),
+    ]);
     await compositor.render(p, asContext(ctx), resources, { viewport: { x: 4, y: 2, scale: 1 } });
-    expect(kernelCalls).toEqual([{ type: "Shadow", w: 320, h: 180, frame: 3, images: ["glow.png"], texts: [] }]);
+    expect(kernelCalls.map((k) => [k.type, k.w, k.h, k.frame, k.images])).toEqual([["Shadow", 320, 180, 3, ["glow.png"]]]);
+    expect(maskCalls).toEqual([{ transitionId: "T", w: 320, h: 180, after: 1 }]);
+    // Canvas-stage resources are loaded at canvas size.
+    expect(imageRequests.map((r) => [r.path, r.w, r.h])).toEqual([
+      ["wipe.png", 320, 180],
+      ["glow.png", 320, 180],
+    ]);
+    // Opacity went into the layer before its effects; the finished layer composites at full alpha.
     const draw = ctx.calls.filter((c) => c.op === "drawImage").at(-1)!;
-    expect(draw.state).toMatchObject({ alpha: 0.8, transform: [1, 0, 0, 1, 4, 2] });
+    expect(draw.state).toMatchObject({ alpha: 1, composite: "multiply", transform: [1, 0, 0, 1, 4, 2] });
     expect(draw.args.slice(1)).toEqual([0, 0, 320, 180]);
+    const { FakeOffscreenCanvas } = await import("../test-support/fake-canvas.js");
+    const layerDraw = FakeOffscreenCanvas.created.flatMap((c) => c.__ctx.calls).filter((c) => c.op === "drawImage" && c.args[0] === "pic:C1").at(-1)!;
+    expect(layerDraw.state).toMatchObject({ alpha: 0.8, transform: [2, 0, 0, 2, 10, 20] });
+  });
+
+  it("clips to the corner radius in draw space", async () => {
+    const { compositor, resources } = harness();
+    const ctx = mainContext();
+    await compositor.render(plan([layer({ cornerRadius: 12 })]), asContext(ctx), resources);
+    const round = ctx.calls.find((c) => c.op === "roundRect")!;
+    expect(round.args).toEqual([0, 0, 160, 90, 12]);
+    expect(round.state.transform).toEqual([2, 0, 0, 2, 10, 20]);
+    // A radius larger than half the rect is capped (a circle at most).
+    const ctx2 = mainContext();
+    await compositor.render(plan([layer({ cornerRadius: 500 })]), asContext(ctx2), resources);
+    expect(ctx2.calls.find((c) => c.op === "roundRect")!.args[4]).toBe(45);
+  });
+
+  it("keeps per-effect state across a sequential render and forgets it on reset", async () => {
+    const { compositor, resources, kernelCalls } = harness({ BeatSync: null });
+    const ctx = mainContext();
+    const p = plan([layer({ effects: [{ id: "B", type: "BeatSync", frame: 1, params: {} }] })]);
+    await compositor.render(p, asContext(ctx), resources);
+    kernelCalls[0]!.state!.set("envelope", 0.5);
+    await compositor.render(p, asContext(ctx), resources);
+    expect(kernelCalls[1]!.state!.get("envelope")).toBe(0.5);
+    compositor.resetEffectState();
+    await compositor.render(p, asContext(ctx), resources);
+    expect(kernelCalls[2]!.state!.has("envelope")).toBe(false);
+  });
+
+  it("gives kernels the plan's timeline format, the clip timing and the layer's audio", async () => {
+    const { compositor, resources, kernelCalls, imageRequests } = harness({ AudioVisualization: null });
+    const ctx = mainContext();
+    const p: FramePlan = {
+      ...plan([
+        layer({
+          clip: { mappedFrame: 9, readerFps: 25, duration: 4 },
+          audio: { fileId: "F1", path: "a.webm", sourceStart: 1, samples: 1600, sampleRate: 48000, channels: 2 },
+          effects: [{ id: "V", type: "AudioVisualization", frame: 9, params: {}, images: ["map.webm"], imageFrames: { "map.webm": { frame: 5, time: 0.16 } } }],
+        }),
+      ]),
+      fps: { num: 30, den: 1 },
+      timelineWidth: 1920,
+      timelineHeight: 1080,
+    };
+    await compositor.render(p, asContext(ctx), resources);
+    const context = kernelCalls[0]!.context;
+    expect(context).toMatchObject({ frame: 9, effectId: "V", fps: { num: 30, den: 1 }, timelineWidth: 1920, timelineHeight: 1080, clip: { mappedFrame: 9, readerFps: 25, duration: 4 } });
+    expect(context.audio?.channels[0]).toHaveLength(1600);
+    expect(imageRequests).toEqual([{ path: "map.webm", w: 160, h: 90, time: 0.16 }]);
   });
 
   it("isolates a failing kernel: the layer still draws and the error is reported", async () => {

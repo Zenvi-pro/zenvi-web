@@ -68,6 +68,9 @@ export class FakeContext {
   rect(...args: number[]) {
     this.record("rect", args);
   }
+  roundRect(...args: number[]) {
+    this.record("roundRect", args);
+  }
   clip() {
     this.record("clip", []);
   }

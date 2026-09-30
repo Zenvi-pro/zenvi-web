@@ -5,7 +5,7 @@
  */
 
 import type { Project } from "@zenvi/engine";
-import type { AudioKernel, AudioPlan, EffectInstance, FramePlan, GainPoint, LayerPlan, MaskInstance, RGBA, RgbaImage, VideoKernel } from "@zenvi/engine/render";
+import type { AudioKernel, AudioPlan, EffectInstance, FramePlan, GainPoint, LayerPlan, MaskInstance, PlanSize, RGBA, RgbaImage, VideoKernel } from "@zenvi/engine/render";
 import type { RenderEngine } from "../../src/engine.js";
 
 export interface TestClip {
@@ -29,6 +29,9 @@ export interface TestClip {
   masks?: MaskInstance[];
   /** Audio segment of this clip. */
   audio?: { gain?: GainPoint[]; rate?: number; effects?: EffectInstance[] };
+  /** Ask for this frame's audio for kernels (LayerPlan.audio), from this file. */
+  kernelAudio?: { fileId: string; path: string };
+  cornerRadius?: number;
 }
 
 export function makeProject(clips: TestClip[], options: { fps?: number; width?: number; height?: number; sampleRate?: number } = {}): Project {
@@ -99,8 +102,40 @@ const gainKernel: AudioKernel = (channels, _rate, params) => {
   for (const channel of channels) for (let i = 0; i < channel.length; i += 1) channel[i]! *= factor;
 };
 
+/** Forces every pixel opaque: tells whether opacity was applied before it ran. */
+const opaque: VideoKernel = (image) => {
+  for (let i = 3; i < image.data.length; i += 4) image.data[i] = 255;
+};
+
+/** Paints the layer gray at the peak of the frame's audio (reads KernelContext.audio). */
+const audioLevel: VideoKernel = (image, _params, ctx) => {
+  const channel = ctx.audio?.channels[0];
+  let peak = 0;
+  if (channel) for (const v of channel) peak = Math.max(peak, Math.abs(v));
+  const level = Math.round(peak * 255);
+  for (let i = 0; i < image.data.length; i += 4) {
+    image.data[i] = level;
+    image.data[i + 1] = channel?.length === 1600 ? level : 0;
+    image.data[i + 2] = level;
+    image.data[i + 3] = 255;
+  }
+};
+
+const TEST_KERNELS: Record<string, VideoKernel> = { TestInvert: invert, TestHalve: halve, TestOpaque: opaque, TestAudioLevel: audioLevel };
+
+/** The project fitted into a preview box, never larger than the project (what the real planner does). */
+function previewSize(project: Project, box: PlanSize): PlanSize {
+  const W = project.width;
+  const H = project.height;
+  const w = Math.min(box.width, W);
+  const h = Math.min(box.height, H);
+  const rw = Math.trunc((h * W) / H);
+  return rw <= w ? { width: rw, height: h } : { width: w, height: Math.trunc((w * H) / W) };
+}
+
 export const testEngine: RenderEngine = {
-  planFrame(project, frame, size): FramePlan {
+  planFrame(project, frame, box, options): FramePlan {
+    const size = options?.preview ? previewSize(project, box) : box;
     const fps = fpsOf(project);
     const t = (frame - 1) / fps;
     const visible = clipsOf(project)
@@ -126,6 +161,8 @@ export const testEngine: RenderEngine = {
         transform: [1, 0, 0, 1, rx * size.width, ry * size.height],
         opacity: c.opacity ?? 1,
         ...(c.composite !== undefined ? { composite: c.composite } : {}),
+        ...(c.cornerRadius ? { cornerRadius: c.cornerRadius } : {}),
+        ...(c.kernelAudio ? { audio: { ...c.kernelAudio, sourceStart: sourceTime, samples: 1600, sampleRate: 48000, channels: 2 } } : {}),
         effects: c.effects ?? [],
         masks: c.masks ?? [],
       };
@@ -148,7 +185,8 @@ export const testEngine: RenderEngine = {
       }));
     return { sampleRate: project.sample_rate, channels: project.channels, start: range.start, end: range.end, segments };
   },
-  getVideoKernel: (type) => (type === "TestInvert" ? invert : type === "TestHalve" ? halve : undefined),
+  supportsVideoEffect: (type) => type in TEST_KERNELS,
+  applyVideoEffect: (image, effect, ctx) => TEST_KERNELS[effect.type]?.(image, effect.params, ctx) ?? image,
   getAudioKernel: (type) => (type === "TestGain" ? gainKernel : undefined),
   applyMask(image: RgbaImage, mask: RgbaImage) {
     // Test math only: the mask's red channel scales alpha.

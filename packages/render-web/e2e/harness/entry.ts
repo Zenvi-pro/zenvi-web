@@ -7,14 +7,17 @@
  * source frame it is.
  */
 
-import type { ReaderInfo } from "@zenvi/engine";
+import { ProjectDocument, addClip, addFile, createProject, type Profile, type ReaderInfo } from "@zenvi/engine";
 import {
   AudioRenderer,
+  CanvasTextRasterizer,
   Compositor,
+  KernelAudioSource,
   FrameProvider,
   MediaRegistry,
   PreviewPlayer,
   StillCache,
+  defaultEngine,
   exportFrame,
   exportProject,
   generateThumbnails,
@@ -210,6 +213,142 @@ const api = {
     compositor.dispose();
     media.dispose();
     return { opacityErrors, opacity, screen, invert, maskErrors, mask, halvedErrors, halvedCode, canvasStage, stills: stillPixels, cacheStable, videoCode };
+  },
+
+  /** Kernel resources on real canvases: corner radius, opacity before canvas effects, video masks, kernel audio, text. */
+  async kernelResources() {
+    const codes = await file("codes.webm");
+    const media = new MediaRegistry({ resolvePath: (path) => (path === "@transitions/test/codes.webm" ? { kind: "blob", blob: codes, name: "codes.webm" } : undefined) });
+    media.register("codes", { kind: "blob", blob: codes });
+    media.register("tone", { kind: "blob", blob: await file("tone48.wav") });
+    const frames = new FrameProvider({ media });
+    const stills = new StillCache({ media });
+    const audio = new KernelAudioSource(media);
+    const compositor = new Compositor({ engine: testEngine });
+    const resources = mediaResources({ media, frames, stills, audio });
+    const canvas = new OffscreenCanvas(160, 90);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    const render = async (clips: TestClip[], frame = 1) => {
+      const errors = await compositor.render(testEngine.planFrame(makeProject(clips), frame, { width: 160, height: 90 }), ctx, resources, { mode: "sequential" });
+      return errors.map((e) => `${e.clipId}:${e.stage}:${String(e.error)}`);
+    };
+    const white = (overrides: Partial<TestClip> = {}): TestClip => ({ id: "w", kind: "color", color: [255, 255, 255, 255], position: 0, start: 0, end: 10, layer: 2, ...overrides });
+    const red: TestClip = { id: "r", kind: "color", color: [255, 0, 0, 255], position: 0, start: 0, end: 10, layer: 1 };
+
+    const cornerErrors = await render([white({ cornerRadius: 30, layer: 1 })]);
+    const corners = { corner: pixel(ctx, 2, 2), center: pixel(ctx, 80, 45), edgeMid: pixel(ctx, 80, 1) };
+
+    // Half-transparent white, then a canvas-stage kernel that forces alpha 255: libopenshot applies
+    // opacity first, so the result is opaque white (the other order would give pink).
+    const orderErrors = await render([red, white({ opacity: 0.5, effects: [{ id: "o", type: "TestOpaque", frame: 1, params: {}, applyBeforeClip: false }] })]);
+    const opacityFirst = pixel(ctx, 80, 45);
+
+    // A video mask decoded at maskTime: white shows only where the mask frame's blocks are white.
+    const maskErrors = await render([white({ layer: 1, masks: [{ transitionId: "T", maskPath: "@transitions/test/codes.webm", brightness: 0, contrast: 0, replaceImage: false, maskTime: 43 / 30, maskFrame: 44 }] })]);
+    const videoMaskCode = readCode(ctx, 0, 0, 160, 90);
+
+    // The frame's audio reaches the kernel: a 0.5 sine peaks at ~0.5 → gray ~128 (green set when 1600 samples arrived).
+    const audioErrors = await render([{ ...white({ layer: 1 }), kernelAudio: { fileId: "tone", path: "tone48.wav" }, effects: [{ id: "a", type: "TestAudioLevel", frame: 1, params: {} }] }], 16);
+    const audioPixel = pixel(ctx, 80, 45);
+
+    const text = new CanvasTextRasterizer();
+    const font = { family: "sans", pixelSize: 40 };
+    const metrics = text.fontMetrics(font);
+    const advance = text.advance("Zenvi", font);
+    const ink = text.inkBounds("Zenvi", font);
+    const target = { width: 200, height: 60, data: new Uint8ClampedArray(200 * 60 * 4) };
+    text.drawText(target, "Zenvi", 10, 45, font, [255, 255, 0, 255], [0, 0, 255, 255], 2);
+    let inked = 0;
+    for (let i = 3; i < target.data.length; i += 4) if (target.data[i]! > 0) inked += 1;
+    const clipped = { width: 200, height: 60, data: new Uint8ClampedArray(200 * 60 * 4) };
+    text.drawText(clipped, "Zenvi", 10, 45, font, [255, 255, 0, 255], null, 0, { x: 0, y: 0, width: 50, height: 60 });
+    let outside = 0;
+    for (let y = 0; y < 60; y += 1) for (let x = 55; x < 200; x += 1) if (clipped.data[(y * 200 + x) * 4 + 3]! > 0) outside += 1;
+
+    await audio.reset();
+    await frames.dispose();
+    stills.dispose();
+    compositor.dispose();
+    media.dispose();
+    return {
+      errors: [...cornerErrors, ...orderErrors, ...maskErrors, ...audioErrors],
+      corners,
+      opacityFirst,
+      videoMaskCode,
+      audioPixel,
+      text: { ascent: metrics.ascent, descent: metrics.descent, advance, inkWidth: ink.width, inkHeight: ink.height, inked, outside },
+    };
+  },
+
+  /** The real engine end to end: probe → addFile/addClip ops → planFrame → this compositor. */
+  async realEngine() {
+    const blob = await file("codes.webm");
+    const info = await probeMedia({ kind: "blob", blob }, { path: "codes.webm" });
+    const profile: Profile = {
+      key: "test",
+      description: "Test 160x90 30 fps",
+      width: 160,
+      height: 90,
+      fps: { num: 30, den: 1 },
+      progressive: true,
+      pixel_ratio: { num: 1, den: 1 },
+      display_ratio: { num: 16, den: 9 },
+    };
+    const doc = new ProjectDocument(createProject({ profile }));
+    doc.transaction("Import", (tx) => {
+      const added = addFile(tx, { path: "codes.webm", info, name: "codes.webm" }, { id: "codes" });
+      addClip(tx, { fileId: added.id, position: 0, layer: 1000000, id: "CLIP1" });
+    });
+    const media = new MediaRegistry();
+    media.register("codes", { kind: "blob", blob });
+    // planAudio is not in the engine yet: silence for this video-only check.
+    const engine = { ...defaultEngine, planAudio: (_p: unknown, range: { start: number; end: number }) => ({ sampleRate: 48000, channels: 2, start: range.start, end: range.end, segments: [] }) };
+    const frames = new FrameProvider({ media });
+    const stills = new StillCache({ media });
+    const compositor = new Compositor({ engine });
+    const resources = mediaResources({ media, frames, stills });
+    const canvas = new OffscreenCanvas(160, 90);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    const codes: number[] = [];
+    for (let k = 1; k <= 60; k += 1) {
+      const errors = await compositor.render(engine.planFrame(doc.project, k, { width: 160, height: 90 }), ctx, resources, { mode: "sequential" });
+      if (errors.length) throw new Error(errors.map((e) => String(e.error)).join("; "));
+      codes.push(readCode(ctx, 0, 0, 160, 90));
+    }
+    const plan10 = engine.planFrame(doc.project, 10, { width: 160, height: 90 });
+    const preview = engine.planFrame(doc.project, 10, { width: 640, height: 640 }, { preview: true });
+    const small = engine.planFrame(doc.project, 10, { width: 80, height: 80 }, { preview: true });
+
+    // Scale the clip to half size (constant keyframes): it stays centered on black.
+    const half = { Points: [{ co: { X: 1, Y: 0.5 }, interpolation: 2 }] };
+    doc.transaction("Scale", (tx) => tx.update(["clips", { id: "CLIP1" }], { scale_x: half, scale_y: half }));
+    await compositor.render(engine.planFrame(doc.project, 10, { width: 160, height: 90 }), ctx, resources, { mode: "seek" });
+    const scaled = { corner: pixel(ctx, 5, 5), code: readCode(ctx, 40, 23, 80, 45) };
+
+    const exported = await exportProject(doc.project, media, { format: "webm", width: 160, height: 90, fps: { num: 30, den: 1 } }, { engine });
+    media.register("out", { kind: "blob", blob: exported, name: "out.webm" });
+    // The export has the half-size clip too: read its codes from the centered 80×45 area.
+    const exportedCodes: number[] = [];
+    const probe = new OffscreenCanvas(160, 90).getContext("2d", { willReadFrequently: true })!;
+    for (const k of [1, 2, 10, 45]) {
+      const picture = await frames.frame({ ref: { fileId: "out" }, sourceTime: (k - 1) / 30, width: 160, height: 90, lane: "x", mode: "seek" });
+      if (picture) probe.drawImage(picture.image, 0, 0, 160, 90);
+      exportedCodes.push(picture ? readCode(probe, 40, 23, 80, 45) : -1);
+      picture?.release();
+    }
+    await frames.dispose();
+    stills.dispose();
+    compositor.dispose();
+    media.dispose();
+    return {
+      codes,
+      plan10: { width: plan10.width, height: plan10.height, layers: plan10.layers.length, source: plan10.layers[0]?.source, transform: plan10.layers[0]?.transform, background: plan10.background },
+      preview: [preview.width, preview.height],
+      small: [small.width, small.height],
+      scaled,
+      exportedCodes,
+      lastFrame: engine.lastFrame(doc.project),
+    };
   },
 
   /** exportProject → re-probe and re-decode the result. */

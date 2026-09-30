@@ -88,6 +88,39 @@ test("the compositor draws opacity, blend modes, kernels, masks and stills on re
   expect(r.videoCode).toBe(11);
 });
 
+test("the real engine end to end: ops-built project, planFrame, compositor, export", async ({ page }) => {
+  const r = await page.evaluate(() => window.harness.realEngine());
+  console.log(`real planFrame layer 0: ${JSON.stringify(r.plan10)}`);
+  expect(r.codes).toEqual(range(60));
+  expect(r.lastFrame).toBe(60);
+  expect(r.plan10).toMatchObject({ width: 160, height: 90, layers: 1, source: { kind: "video", fileId: "codes", frame: 10 } });
+  expect((r.plan10.source as { time: number }).time).toBeCloseTo(9 / 30, 9);
+  // Preview boxes fit the project and never exceed it (Timeline::SetMaxSize).
+  expect(r.preview).toEqual([160, 90]);
+  expect(r.small).toEqual([80, 45]);
+  expect(r.scaled.corner.slice(0, 3)).toEqual([0, 0, 0]);
+  expect(r.scaled.code).toBe(9);
+  expect(r.exportedCodes).toEqual([0, 1, 9, 44]);
+});
+
+test("kernel resources: corner radius, opacity before canvas effects, video masks, kernel audio, text", async ({ page }) => {
+  const r = await page.evaluate(() => window.harness.kernelResources());
+  const near = (actual: number[], expected: number[], tolerance = 4) => actual.slice(0, expected.length).forEach((v, i) => expect(Math.abs(v - expected[i]!), `${actual} vs ${expected}`).toBeLessThanOrEqual(tolerance));
+  expect(r.errors).toEqual([]);
+  near(r.corners.corner, [0, 0, 0, 255]);
+  near(r.corners.center, [255, 255, 255, 255]);
+  near(r.corners.edgeMid, [255, 255, 255, 255]);
+  near(r.opacityFirst, [255, 255, 255, 255]);
+  expect(r.videoMaskCode).toBe(43);
+  near(r.audioPixel, [128, 128, 128, 255], 6);
+  expect(r.text.ascent).toBeGreaterThan(20);
+  expect(r.text.descent).toBeGreaterThan(3);
+  expect(r.text.advance).toBeGreaterThan(60);
+  expect(r.text.inkWidth).toBeGreaterThan(50);
+  expect(r.text.inked).toBeGreaterThan(300);
+  expect(r.text.outside).toBe(0);
+});
+
 test("export produces a playable file of the right length whose frames match the timeline", async ({ page }) => {
   for (const format of ["webm", "mp4"] as const) {
     const result = await page.evaluate((f) => window.harness.exportRoundTrip(f), format);

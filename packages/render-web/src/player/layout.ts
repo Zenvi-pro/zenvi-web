@@ -1,25 +1,10 @@
 /**
- * Preview geometry: the plan size for a canvas, and where the frame sits.
+ * Preview geometry: where the planned frame sits in the canvas. The plan's
+ * own size comes from the planner (`planFrame(…, { preview: true })`).
  */
 
 import type { Viewport } from "../compositor/compositor.js";
 import type { Size } from "../util/size-bucket.js";
-
-/**
- * libopenshot `Timeline::SetMaxSize` (`Timeline.cpp:1860-1871`): the project
- * size scaled into the box with Qt's integer KeepAspectRatio math, never
- * larger than the project itself.
- */
-export function previewPlanSize(project: Size, box: Size): Size {
-  const W = Math.max(1, Math.round(project.width));
-  const H = Math.max(1, Math.round(project.height));
-  const w = Math.max(1, Math.min(Math.floor(box.width), W));
-  const h = Math.max(1, Math.min(Math.floor(box.height), H));
-  // QSize(W, H).scaled(w, h, Qt::KeepAspectRatio), libopenshot-semantics §0.
-  const rw = Math.trunc((h * W) / H);
-  if (rw <= w) return { width: Math.max(1, rw), height: h };
-  return { width: w, height: Math.max(1, Math.trunc((w * H) / W)) };
-}
 
 /** The project frame fitted into the canvas, centered (letterboxed), as a plan → canvas viewport. */
 export function fitViewport(canvas: Size, project: Size, plan: Size): Viewport {

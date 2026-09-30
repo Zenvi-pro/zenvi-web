@@ -4,6 +4,7 @@
  */
 
 import type { Project } from "@zenvi/engine";
+import { KernelAudioSource } from "../audio/kernel-audio.js";
 import { Compositor, type LayerError, type LayerResources } from "../compositor/compositor.js";
 import { mediaResources } from "../compositor/resources.js";
 import { createCanvas, type Scratch } from "../compositor/scratch.js";
@@ -30,6 +31,7 @@ export class FrameRenderer {
   private readonly stills: StillCache;
   private readonly compositor: Compositor;
   private readonly resources: LayerResources;
+  private readonly kernelAudio: KernelAudioSource;
   private canvas: Scratch | null = null;
 
   constructor(options: FrameRendererOptions) {
@@ -38,7 +40,8 @@ export class FrameRenderer {
     this.frames = new FrameProvider({ media: options.media, cache: new FrameCache(options.frameCacheBytes ?? 256 * 1024 * 1024), quality: "high" });
     this.stills = new StillCache({ media: options.media, quality: "high", ...(options.svgRasterizer ? { svgRasterizer: options.svgRasterizer } : {}) });
     this.compositor = new Compositor({ engine: this.engine });
-    this.resources = mediaResources({ media: options.media, frames: this.frames, stills: this.stills });
+    this.kernelAudio = new KernelAudioSource(options.media);
+    this.resources = mediaResources({ media: options.media, frames: this.frames, stills: this.stills, audio: this.kernelAudio });
   }
 
   /** The canvas frames are drawn into (reused while the size stays the same). */
@@ -65,6 +68,7 @@ export class FrameRenderer {
   }
 
   async dispose(): Promise<void> {
+    await this.kernelAudio.reset();
     await this.frames.dispose();
     this.frames.cache.clear();
     this.stills.dispose();

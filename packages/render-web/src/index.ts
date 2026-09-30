@@ -38,14 +38,16 @@ export {
   type PreparedFrame,
   type Viewport,
 } from "./compositor/compositor.js";
-export { mediaResources } from "./compositor/resources.js";
+export { mediaResources, type MediaResourcesOptions } from "./compositor/resources.js";
+export { CanvasTextRasterizer } from "./compositor/text.js";
 
 // Preview
 export { PreviewPlayer, type PlayerErrorEvent, type PlayerState, type PreviewPlayerOptions } from "./player/preview-player.js";
-export { previewPlanSize } from "./player/layout.js";
+export { fitViewport } from "./player/layout.js";
 
 // Audio
 export { AudioRenderer, type PreparedPiece } from "./audio/renderer.js";
+export { KernelAudioSource } from "./audio/kernel-audio.js";
 export { AudioPlayback, type AudioPlaybackOptions } from "./audio/playback.js";
 export { mixWindow } from "./audio/mixdown.js";
 
@@ -58,5 +60,5 @@ export { FrameRenderer } from "./export/frame-renderer.js";
 export { generateThumbnails, generateWaveform, type ThumbnailOptions, type WaveformOptions } from "./timeline/thumbnails.js";
 
 // Engine bridge and tool hosts
-export { defaultEngine, type RenderEngine } from "./engine.js";
+export { defaultEngine, type PlanFrameOptions, type RenderEngine } from "./engine.js";
 export { createExportHost, createFrameHost, type WebExportHostOptions, type WebFrameHostOptions } from "./hosts.js";

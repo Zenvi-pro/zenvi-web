@@ -1,15 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { audioClock, audibleContextTime, performanceClock } from "./clock.js";
-import { fitViewport, previewPlanSize } from "./layout.js";
-
-describe("previewPlanSize (Timeline::SetMaxSize)", () => {
-  it("fits the project into the canvas keeping aspect, never above project size", () => {
-    expect(previewPlanSize({ width: 1920, height: 1080 }, { width: 800, height: 800 })).toEqual({ width: 800, height: 450 });
-    expect(previewPlanSize({ width: 1920, height: 1080 }, { width: 4000, height: 3000 })).toEqual({ width: 1920, height: 1080 });
-    expect(previewPlanSize({ width: 1080, height: 1920 }, { width: 1000, height: 500 })).toEqual({ width: 281, height: 500 });
-    expect(previewPlanSize({ width: 1280, height: 720 }, { width: 641.7, height: 360.2 })).toEqual({ width: 640, height: 360 });
-  });
-});
+import { fitViewport } from "./layout.js";
 
 describe("fitViewport", () => {
   it("centers the frame and scales plan pixels to canvas pixels", () => {

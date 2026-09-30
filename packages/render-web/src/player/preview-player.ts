@@ -12,6 +12,7 @@
 
 import type { Project } from "@zenvi/engine";
 import { AudioPlayback } from "../audio/playback.js";
+import { KernelAudioSource } from "../audio/kernel-audio.js";
 import { AudioRenderer } from "../audio/renderer.js";
 import type { ClockAnchor } from "../audio/schedule.js";
 import { Compositor, type LayerError, type LayerResources } from "../compositor/compositor.js";
@@ -24,7 +25,7 @@ import { FrameCache } from "../video/frame-cache.js";
 import { FrameProvider } from "../video/frame-provider.js";
 import { bindCanvas, type CanvasSurface, type PreviewCanvas } from "./canvas-binding.js";
 import { audibleContextTime, audioClock, performanceClock, type PlaybackClock } from "./clock.js";
-import { fitViewport, previewPlanSize } from "./layout.js";
+import { fitViewport } from "./layout.js";
 
 export interface PlayerState {
   playing: boolean;
@@ -82,6 +83,7 @@ export class PreviewPlayer {
   private readonly compositor: Compositor;
   private readonly resources: LayerResources;
   private readonly audioRenderer: AudioRenderer;
+  private readonly kernelAudio: KernelAudioSource;
   private readonly resolution: number;
   private readonly letterbox: string;
   private audioContext: AudioContext | null;
@@ -123,7 +125,8 @@ export class PreviewPlayer {
     this.ownsStills = !options.stills;
     this.stills = options.stills ?? new StillCache({ media: this.media, quality: "high" });
     this.compositor = new Compositor({ engine: this.engine });
-    this.resources = mediaResources({ media: this.media, frames: this.frames, stills: this.stills });
+    this.kernelAudio = new KernelAudioSource(this.media);
+    this.resources = mediaResources({ media: this.media, frames: this.frames, stills: this.stills, audio: this.kernelAudio });
     this.audioRenderer = new AudioRenderer({
       media: this.media,
       engine: this.engine,
@@ -314,6 +317,7 @@ export class PreviewPlayer {
     this.surface.dispose();
     this.audio?.dispose();
     void this.audioRenderer.dispose();
+    void this.kernelAudio.reset();
     if (this.ownsAudioContext) void this.audioContext?.close().catch(() => undefined);
     void this.frames.dispose();
     this.frames.cache.clear();
@@ -372,10 +376,13 @@ export class PreviewPlayer {
     const generation = this.generation;
     const canvas = this.surface.size();
     const projectSize = { width: project.width, height: project.height };
-    const planSize = previewPlanSize(projectSize, { width: canvas.width * this.resolution, height: canvas.height * this.resolution });
+    // The planner fits the project into this box (Timeline::SetMaxSize).
+    const box = { width: Math.max(1, Math.floor(canvas.width * this.resolution)), height: Math.max(1, Math.floor(canvas.height * this.resolution)) };
     let prepared: Awaited<ReturnType<Compositor["prepare"]>> | null = null;
     try {
-      const plan = this.engine.planFrame(project, frame, planSize);
+      const plan = this.engine.planFrame(project, frame, box, { preview: true });
+      // A frame that does not follow the last one starts stateful effects afresh.
+      if (mode === "seek") this.compositor.resetEffectState();
       prepared = await this.compositor.prepare(plan, this.resources, { mode });
       // A resize or a new project arrived meanwhile: its own render follows.
       if (generation !== this.generation || this.disposed) return;
