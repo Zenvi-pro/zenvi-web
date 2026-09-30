@@ -13,3 +13,8 @@ export * from "./decode/video.js";
 export * from "./decode/still.js";
 export * from "./decode/sources.js";
 export * from "./probe/exif.js";
+export * from "./probe/starts.js";
+export * from "./render/audio-graph.js";
+export * from "./render/encoder.js";
+export * from "./render/engine.js";
+export * from "./render/render-project.js";
