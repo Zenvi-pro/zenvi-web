@@ -44,6 +44,12 @@ export interface EffectInstance {
   images?: string[];
   /** Paths of text resources (e.g. ColorMap `.cube` LUTs) read from `KernelContext.texts`. */
   texts?: string[];
+  /**
+   * For entries of `images` that are videos (a video `mask_reader` or map):
+   * the 1-based source frame to decode and its time from the first frame.
+   * Stills have no entry.
+   */
+  imageFrames?: Record<string, { frame: number; time: number }>;
 }
 
 export interface MaskInstance {
@@ -54,6 +60,15 @@ export interface MaskInstance {
   contrast: number;
   /** libopenshot Mask `replace_image`: draw the mask itself instead of applying it. */
   replaceImage: boolean;
+  /** EffectBase `mask_invert` (default false). */
+  invert?: boolean;
+  /** `apply_before_clip` (default true): mask the source before the transform, else the canvas-sized layer. */
+  applyBeforeClip?: boolean;
+  /** Effect-local frame the brightness/contrast were evaluated at. */
+  frame?: number;
+  /** When the mask is a video: the 1-based source frame to decode and its time from the first frame. */
+  maskFrame?: number;
+  maskTime?: number;
 }
 
 export type LayerSource =
@@ -104,6 +119,19 @@ export interface LayerPlan {
   opacity: number;
   /** libopenshot `CompositeType` blend mode: 0 normal (default), 12–23 (Add … Exclusion). */
   composite?: number;
+  /**
+   * Clip `corner_radius` as a radius in draw-space pixels: the source is
+   * clipped to the antialiased rounded rectangle (0, 0, drawWidth,
+   * drawHeight) before it is drawn (Clip.cpp:1416-1426). Absent or 0 = none.
+   */
+  cornerRadius?: number;
+  /** Clip timing for kernels that read their clip (Timer). */
+  clip?: KernelClipContext;
+  /**
+   * Audio this layer's kernels need (waveform clips, AudioVisualization,
+   * BeatSync): renderers decode it and pass it as `KernelContext.audio`.
+   */
+  audio?: LayerAudioRequest;
   /** Clip effects in apply order, evaluated at this frame. */
   effects: EffectInstance[];
   /** Transitions that apply to this layer at this frame, in apply order. */
@@ -120,6 +148,26 @@ export interface FramePlan {
   background: RGBA;
   /** Bottom to top. */
   layers: LayerPlan[];
+  /** Timeline frame rate. */
+  fps?: { num: number; den: number };
+  /** libopenshot `timeline->info.width/height` (project or export size; the canvas may be a preview). */
+  timelineWidth?: number;
+  timelineHeight?: number;
+  /** Timeline audio format. */
+  sampleRate?: number;
+  channels?: number;
+}
+
+/** A window of a clip's source audio, resampled to the timeline rate. */
+export interface LayerAudioRequest {
+  fileId: string;
+  path: string;
+  /** Seconds from the start of the source's audio. */
+  sourceStart: number;
+  /** Samples per channel for this frame, at `sampleRate`. */
+  samples: number;
+  sampleRate: number;
+  channels: number;
 }
 
 export interface GainPoint {

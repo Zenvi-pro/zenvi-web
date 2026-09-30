@@ -21,48 +21,69 @@ interface RectF {
   h: number;
 }
 
+/**
+ * Crop's paint (destination) and copy (source) rectangles after the offset
+ * and image-border clamping (Crop.cpp:73-102). Qt QRectF setLeft/setRight
+ * semantics: moving an edge changes the size.
+ */
+export function cropRects(params: Params, W: number, H: number): { paint: RectF; copy: RectF } {
+  const left = num(params, "left", 0);
+  const top = num(params, "top", 0);
+  const right = num(params, "right", 0);
+  const bottom = num(params, "bottom", 0);
+  const xShift = num(params, "x", 0);
+  const yShift = num(params, "y", 0);
+  const paint: RectF = { x: left * W, y: top * H, w: Math.max(0, 1 - left - right) * W, h: Math.max(0, 1 - top - bottom) * H };
+  const copy: RectF = { x: paint.x + xShift * W, y: paint.y + yShift * H, w: paint.w, h: paint.h };
+  const setLeft = (r: RectF, pos: number): void => {
+    const diff = pos - r.x;
+    r.x += diff;
+    r.w -= diff;
+  };
+  const setTop = (r: RectF, pos: number): void => {
+    const diff = pos - r.y;
+    r.y += diff;
+    r.h -= diff;
+  };
+  if (copy.x < 0) {
+    setLeft(paint, paint.x - copy.x);
+    setLeft(copy, 0);
+  }
+  if (copy.x + copy.w > W) {
+    paint.w = paint.x + paint.w - (copy.x + copy.w - W) - paint.x;
+    copy.w = W - copy.x;
+  }
+  if (copy.y < 0) {
+    setTop(paint, paint.y - copy.y);
+    setTop(copy, 0);
+  }
+  if (copy.y + copy.h > H) {
+    paint.h = paint.y + paint.h - (copy.y + copy.h - H) - paint.y;
+    copy.h = H - copy.y;
+  }
+  return { paint, copy };
+}
+
+/**
+ * The size of Crop's output image: the input size, or with `resize` the
+ * paint rectangle's `toRect()` size (0×0 when nothing is visible).
+ */
+export function cropOutputSize(params: Params, W: number, H: number): { width: number; height: number } {
+  if (!bool(params, "resize", false)) return { width: W, height: H };
+  const { paint } = cropRects(params, W, H);
+  const r = toRect({ x: paint.x, y: paint.y, width: paint.w, height: paint.h });
+  if (r.width === 0 && r.height === 0) return { width: W, height: H };
+  if (r.width <= 0 || r.height <= 0) return { width: 0, height: 0 };
+  return { width: r.width, height: r.height };
+}
+
 export const crop: KernelSpec = {
   type: "Crop",
   supported: true,
   run(image: PremulImage, params: Params): PremulImage {
-    const left = num(params, "left", 0);
-    const top = num(params, "top", 0);
-    const right = num(params, "right", 0);
-    const bottom = num(params, "bottom", 0);
-    const xShift = num(params, "x", 0);
-    const yShift = num(params, "y", 0);
     const W = image.width;
     const H = image.height;
-
-    const paint: RectF = { x: left * W, y: top * H, w: Math.max(0, 1 - left - right) * W, h: Math.max(0, 1 - top - bottom) * H };
-    const copy: RectF = { x: paint.x + xShift * W, y: paint.y + yShift * H, w: paint.w, h: paint.h };
-    const setLeft = (r: RectF, pos: number): void => {
-      const diff = pos - r.x;
-      r.x += diff;
-      r.w -= diff;
-    };
-    const setTop = (r: RectF, pos: number): void => {
-      const diff = pos - r.y;
-      r.y += diff;
-      r.h -= diff;
-    };
-    if (copy.x < 0) {
-      setLeft(paint, paint.x - copy.x);
-      setLeft(copy, 0);
-    }
-    if (copy.x + copy.w > W) {
-      paint.w = paint.x + paint.w - (copy.x + copy.w - W) - paint.x;
-      copy.w = W - copy.x;
-    }
-    if (copy.y < 0) {
-      setTop(paint, paint.y - copy.y);
-      setTop(copy, 0);
-    }
-    if (copy.y + copy.h > H) {
-      paint.h = paint.y + paint.h - (copy.y + copy.h - H) - paint.y;
-      copy.h = H - copy.y;
-    }
-
+    const { paint, copy } = cropRects(params, W, H);
     const cropped = createPremul(W, H);
     drawImageRect(cropped, image, { x: paint.x, y: paint.y, width: paint.w, height: paint.h }, { x: copy.x, y: copy.y, width: copy.w, height: copy.h });
 
