@@ -1,0 +1,487 @@
+{
+ "ref": "b63c39be7",
+ "get_project_info": "Project: profile=HD 720p 30 fps, fps=30/1, duration=300, scale=15.0",
+ "list_files": "Media bin files (4):\n  media_bin_file_id=FILEINTRVW name='interview.mp4' duration=60.00s analyzed=True indexed=True summary_preview='Founder interview in a sunlit studio' path=interview.mp4\n  media_bin_file_id=FILEMUSIC1 name='music_bed.mp3' duration=120.00s analyzed=True indexed=False summary_preview='Upbeat synth music bed' path=music_bed.mp3\n  media_bin_file_id=FILELOGO01 name='logo.png' duration=3600.00s analyzed=False indexed=False summary_preview='' path=logo.png\n  media_bin_file_id=FILEBROLL1 name=\"Tom's b-roll\" duration=30.00s analyzed=True indexed=True summary_preview='Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests b' path=broll.mov",
+ "list_clips": {
+  "contract": 3,
+  "status": "applied",
+  "tool": "list_clips_tool",
+  "summary": "Timeline clips (7).",
+  "clips": [],
+  "shifted": [],
+  "removedClipIds": [],
+  "createdTracks": [],
+  "markers": [],
+  "removedMarkerIds": [],
+  "warnings": [],
+  "notes": [],
+  "watchSuggested": null,
+  "undoSteps": 0,
+  "data": {
+   "clips": [
+    {
+     "id": "CLIPMUSIC1",
+     "file_id": "FILEMUSIC1",
+     "title": "music_bed.mp3",
+     "layer": 1000000,
+     "track": 1,
+     "position": 0.0,
+     "start": 0.0,
+     "end": 60.0
+    },
+    {
+     "id": "CLIPINTRV1",
+     "file_id": "FILEINTRVW",
+     "title": "interview.mp4",
+     "layer": 2000000,
+     "track": 2,
+     "position": 0.0,
+     "start": 0.0,
+     "end": 30.0
+    },
+    {
+     "id": "CLIPINTRV2",
+     "file_id": "FILEINTRVW",
+     "title": "interview.mp4",
+     "layer": 2000000,
+     "track": 2,
+     "position": 40.0,
+     "start": 40.0,
+     "end": 55.0
+    },
+    {
+     "id": "CLIPBROLL1",
+     "file_id": "FILEBROLL1",
+     "title": "Tom's b-roll",
+     "layer": 4000000,
+     "track": 4,
+     "position": 10.0,
+     "start": 5.0,
+     "end": 12.5
+    },
+    {
+     "id": "CLIPLOGO01",
+     "file_id": "FILELOGO01",
+     "title": "Logo",
+     "layer": 5000000,
+     "track": 5,
+     "position": 2.0,
+     "start": 0.0,
+     "end": 5.0
+    },
+    {
+     "id": "CLIPORPHAN",
+     "file_id": "FILEINTRVW",
+     "title": "",
+     "layer": 7000000,
+     "track": null,
+     "position": 70.0,
+     "start": 10.0,
+     "end": 12.0
+    },
+    {
+     "id": "CLIPSUBCL1",
+     "file_id": "FILESUBCL1",
+     "title": "Launch passage",
+     "layer": 3000000,
+     "track": 3,
+     "position": 60.0,
+     "start": 40.0,
+     "end": 55.0
+    }
+   ],
+   "legacy_text": "Timeline clips (7):\n  timeline_clip_id=CLIPMUSIC1 media_bin_file_id=FILEMUSIC1 title='music_bed.mp3' file='music_bed.mp3' summary_preview='Upbeat synth music bed' layer_number=1000000 ui_track=1 track_id=L1 position=0.0 timeline_end=60.00 source_start=0.0 source_end=60.0 audio_role=music\n  timeline_clip_id=CLIPINTRV1 media_bin_file_id=FILEINTRVW title='interview.mp4' file='interview.mp4' summary_preview='Founder interview in a sunlit studio' occurrence_hint=1 layer_number=2000000 ui_track=2 track_id=L2 position=0.0 timeline_end=30.00 source_start=0.0 source_end=30.0 audio_role=speech\n  timeline_clip_id=CLIPINTRV2 media_bin_file_id=FILEINTRVW title='interview.mp4' file='interview.mp4' summary_preview='Founder interview in a sunlit studio' occurrence_hint=2 layer_number=2000000 ui_track=2 track_id=L2 position=40.0 timeline_end=55.00 source_start=40.0 source_end=55.0 audio_role=speech\n  timeline_clip_id=CLIPBROLL1 media_bin_file_id=FILEBROLL1 title=\"Tom's b-roll\" file=\"Tom's b-roll\" summary_preview='Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests b' layer_number=4000000 ui_track=4 track_id=L4 position=10.0 timeline_end=17.50 source_start=5.0 source_end=12.5 audio_role=ambient\n  timeline_clip_id=CLIPLOGO01 media_bin_file_id=FILELOGO01 title='Logo' file='logo.png' layer_number=5000000 ui_track=5 track_id=L5 position=2.0 timeline_end=7.00 source_start=0.0 source_end=5.0 audio_role=silent\n  timeline_clip_id=CLIPORPHAN media_bin_file_id=FILEINTRVW title='' file='interview.mp4' summary_preview='Founder interview in a sunlit studio' layer_number=7000000 position=70.0 timeline_end=72.00 source_start=10.0 source_end=12.0 audio_role=ambient\n  timeline_clip_id=CLIPSUBCL1 media_bin_file_id=FILESUBCL1 parent_file_id=FILEINTRVW title='Launch passage' file='Launch passage' summary_preview='Founder interview in a sunlit studio' layer_number=3000000 ui_track=3 track_id=L3 position=60.0 timeline_end=75.00 source_start=40.0 source_end=55.0 audio_role=speech"
+  }
+ },
+ "list_clips_voice": {
+  "contract": 3,
+  "status": "applied",
+  "tool": "list_clips_tool",
+  "summary": "Timeline clips (2).",
+  "clips": [],
+  "shifted": [],
+  "removedClipIds": [],
+  "createdTracks": [],
+  "markers": [],
+  "removedMarkerIds": [],
+  "warnings": [],
+  "notes": [],
+  "watchSuggested": null,
+  "undoSteps": 0,
+  "data": {
+   "clips": [
+    {
+     "id": "CLIPINTRV1",
+     "file_id": "FILEINTRVW",
+     "title": "interview.mp4",
+     "layer": 2000000,
+     "track": 2,
+     "position": 0.0,
+     "start": 0.0,
+     "end": 30.0
+    },
+    {
+     "id": "CLIPINTRV2",
+     "file_id": "FILEINTRVW",
+     "title": "interview.mp4",
+     "layer": 2000000,
+     "track": 2,
+     "position": 40.0,
+     "start": 40.0,
+     "end": 55.0
+    }
+   ],
+   "legacy_text": "Timeline clips (2):\n  timeline_clip_id=CLIPINTRV1 media_bin_file_id=FILEINTRVW title='interview.mp4' file='interview.mp4' summary_preview='Founder interview in a sunlit studio' occurrence_hint=1 layer_number=2000000 ui_track=2 track_id=L2 position=0.0 timeline_end=30.00 source_start=0.0 source_end=30.0 audio_role=speech\n  timeline_clip_id=CLIPINTRV2 media_bin_file_id=FILEINTRVW title='interview.mp4' file='interview.mp4' summary_preview='Founder interview in a sunlit studio' occurrence_hint=2 layer_number=2000000 ui_track=2 track_id=L2 position=40.0 timeline_end=55.00 source_start=40.0 source_end=55.0 audio_role=speech"
+  }
+ },
+ "list_clips_bad_track": "Error: Unknown track or layer 'nope'. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label.",
+ "list_layers": "Layers (5). Z-ORDER uses layer_number only (higher covers lower). Track labels/names are cosmetic — they can be anything and do NOT imply priority.\nBOTTOM (drawn under): layer_number=1000000 label=''\nTOP (covers all below): layer_number=5000000 label='Titles'\nStack bottom→top:\n  layer_number=1000000 ui_track=1 z_from_bottom=0 label='' track_id='L1' lock=False\n  layer_number=2000000 ui_track=2 z_from_bottom=1 label='Voice' track_id='L2' lock=False\n  layer_number=3000000 ui_track=3 z_from_bottom=2 label='Música' track_id='L3' lock=False\n  layer_number=4000000 ui_track=4 z_from_bottom=3 label='B-roll' track_id='L4' lock=True\n  layer_number=5000000 ui_track=5 z_from_bottom=4 label='Titles' track_id='L5' lock=False\nTRACK_STACK_JSON=[{\"layer_number\":1000000,\"ui_track\":1,\"z_from_bottom\":0,\"label\":\"\",\"track_id\":\"L1\"},{\"layer_number\":2000000,\"ui_track\":2,\"z_from_bottom\":1,\"label\":\"Voice\",\"track_id\":\"L2\"},{\"layer_number\":3000000,\"ui_track\":3,\"z_from_bottom\":2,\"label\":\"M\\u00fasica\",\"track_id\":\"L3\"},{\"layer_number\":4000000,\"ui_track\":4,\"z_from_bottom\":3,\"label\":\"B-roll\",\"track_id\":\"L4\"},{\"layer_number\":5000000,\"ui_track\":5,\"z_from_bottom\":4,\"label\":\"Titles\",\"track_id\":\"L5\"}]",
+ "list_markers": "Markers (1):\n  id=MARKER0001 position=12.5 name=",
+ "get_timeline_state": {
+  "contract": 3,
+  "status": "applied",
+  "tool": "get_timeline_state_tool",
+  "summary": "Timeline: 7 clip(s), 5 track(s).",
+  "clips": [],
+  "shifted": [],
+  "removedClipIds": [],
+  "createdTracks": [],
+  "markers": [],
+  "removedMarkerIds": [],
+  "warnings": [],
+  "notes": [],
+  "watchSuggested": null,
+  "undoSteps": 0,
+  "data": {
+   "clips": [
+    {
+     "id": "CLIPMUSIC1",
+     "file_id": "FILEMUSIC1",
+     "title": "music_bed.mp3",
+     "layer": 1000000,
+     "track": 1,
+     "position": 0.0,
+     "start": 0.0,
+     "end": 60.0
+    },
+    {
+     "id": "CLIPINTRV1",
+     "file_id": "FILEINTRVW",
+     "title": "interview.mp4",
+     "layer": 2000000,
+     "track": 2,
+     "position": 0.0,
+     "start": 0.0,
+     "end": 30.0
+    },
+    {
+     "id": "CLIPINTRV2",
+     "file_id": "FILEINTRVW",
+     "title": "interview.mp4",
+     "layer": 2000000,
+     "track": 2,
+     "position": 40.0,
+     "start": 40.0,
+     "end": 55.0
+    },
+    {
+     "id": "CLIPBROLL1",
+     "file_id": "FILEBROLL1",
+     "title": "Tom's b-roll",
+     "layer": 4000000,
+     "track": 4,
+     "position": 10.0,
+     "start": 5.0,
+     "end": 12.5
+    },
+    {
+     "id": "CLIPLOGO01",
+     "file_id": "FILELOGO01",
+     "title": "Logo",
+     "layer": 5000000,
+     "track": 5,
+     "position": 2.0,
+     "start": 0.0,
+     "end": 5.0
+    },
+    {
+     "id": "CLIPORPHAN",
+     "file_id": "FILEINTRVW",
+     "title": "",
+     "layer": 7000000,
+     "track": null,
+     "position": 70.0,
+     "start": 10.0,
+     "end": 12.0
+    },
+    {
+     "id": "CLIPSUBCL1",
+     "file_id": "FILESUBCL1",
+     "title": "Launch passage",
+     "layer": 3000000,
+     "track": 3,
+     "position": 60.0,
+     "start": 40.0,
+     "end": 55.0
+    }
+   ],
+   "tracks": [
+    {
+     "id": "L1",
+     "layer": 1000000,
+     "track": 1,
+     "label": ""
+    },
+    {
+     "id": "L2",
+     "layer": 2000000,
+     "track": 2,
+     "label": "Voice"
+    },
+    {
+     "id": "L3",
+     "layer": 3000000,
+     "track": 3,
+     "label": "Música"
+    },
+    {
+     "id": "L4",
+     "layer": 4000000,
+     "track": 4,
+     "label": "B-roll"
+    },
+    {
+     "id": "L5",
+     "layer": 5000000,
+     "track": 5,
+     "label": "Titles"
+    }
+   ],
+   "effects": [
+    {
+     "id": "TRANS00001",
+     "type": "Mask",
+     "class_name": "Mask",
+     "layer": 2000000,
+     "position": 29.0,
+     "start": 0.0,
+     "end": 1.0,
+     "title": "fade",
+     "brightness": {
+      "Points": [
+       {
+        "co": {
+         "X": 1.0,
+         "Y": 1.0
+        },
+        "handle_left": {
+         "X": 0.5,
+         "Y": 1.0
+        },
+        "handle_right": {
+         "X": 0.5,
+         "Y": 0.0
+        },
+        "handle_type": 0,
+        "interpolation": 0
+       }
+      ]
+     },
+     "contrast": {
+      "Points": [
+       {
+        "co": {
+         "X": 1.0,
+         "Y": 3.0
+        },
+        "handle_left": {
+         "X": 0.5,
+         "Y": 1.0
+        },
+        "handle_right": {
+         "X": 0.5,
+         "Y": 0.0
+        },
+        "handle_type": 0,
+        "interpolation": 0
+       }
+      ]
+     },
+     "reader": {
+      "type": "QtImageReader",
+      "path": "@transitions/common/fade.svg"
+     },
+     "replace_image": false
+    },
+    {
+     "id": "TRANS00002",
+     "type": "Mask",
+     "class_name": "Mask",
+     "layer": 4000000,
+     "position": 12.0,
+     "start": 0.0,
+     "end": 0.5,
+     "brightness": {
+      "Points": [
+       {
+        "co": {
+         "X": 1.0,
+         "Y": 1.0
+        },
+        "handle_left": {
+         "X": 0.5,
+         "Y": 1.0
+        },
+        "handle_right": {
+         "X": 0.5,
+         "Y": 0.0
+        },
+        "handle_type": 0,
+        "interpolation": 0
+       }
+      ]
+     },
+     "contrast": {
+      "Points": [
+       {
+        "co": {
+         "X": 1.0,
+         "Y": 3.0
+        },
+        "handle_left": {
+         "X": 0.5,
+         "Y": 1.0
+        },
+        "handle_right": {
+         "X": 0.5,
+         "Y": 0.0
+        },
+        "handle_type": 0,
+        "interpolation": 0
+       }
+      ]
+     },
+     "reader": {
+      "type": "QtImageReader",
+      "path": "@transitions/common/circle_in_to_out.svg"
+     },
+     "replace_image": false
+    }
+   ],
+   "legacy_text": "=== TIMELINE STATE ===\nZ-ORDER: higher layer_number covers lower. Track labels are cosmetic names only — never infer priority from the label text. Call list_layers_tool for TRACK_STACK_JSON before multi-track placement. Hero/foreground → highest layer_number; backgrounds → lowest.\n\nlayer_number=5000000 | z_from_bottom=4 | ui_track=5 | track_id=L5 | label='Titles':\n  timeline_clip_id=CLIPLOGO01 media_bin_file_id=FILELOGO01 file='logo.png' title='Logo' analyzed=False source=0.0-5.0s audio_role=silent @ 2.00s–7.00s (dur=5.00s)\n\nlayer_number=4000000 | z_from_bottom=3 | ui_track=4 | track_id=L4 | label='B-roll':\n  timeline_clip_id=CLIPBROLL1 media_bin_file_id=FILEBROLL1 file=\"Tom's b-roll\" title=\"Tom's b-roll\" summary_preview='Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests b' source=5.0-12.5s audio_role=ambient @ 10.00s–17.50s (dur=7.50s)\n\nlayer_number=3000000 | z_from_bottom=2 | ui_track=3 | track_id=L3 | label='Música':\n  timeline_clip_id=CLIPSUBCL1 media_bin_file_id=FILESUBCL1 file='Launch passage' title='Launch passage' summary_preview='Founder interview in a sunlit studio' analyzed=False source=40.0-55.0s audio_role=speech @ 60.00s–75.00s (dur=15.00s)\n\nlayer_number=2000000 | z_from_bottom=1 | ui_track=2 | track_id=L2 | label='Voice':\n  timeline_clip_id=CLIPINTRV1 media_bin_file_id=FILEINTRVW file='interview.mp4' title='interview.mp4' summary_preview='Founder interview in a sunlit studio' source=0.0-30.0s audio_role=speech @ 0.00s–30.00s (dur=30.00s)\n  timeline_clip_id=CLIPINTRV2 media_bin_file_id=FILEINTRVW file='interview.mp4' title='interview.mp4' summary_preview='Founder interview in a sunlit studio' source=40.0-55.0s audio_role=speech @ 40.00s–55.00s (dur=15.00s)\n\nlayer_number=1000000 | z_from_bottom=0 | ui_track=1 | track_id=L1:\n  timeline_clip_id=CLIPMUSIC1 media_bin_file_id=FILEMUSIC1 file='music_bed.mp3' title='music_bed.mp3' summary_preview='Upbeat synth music bed' source=0.0-60.0s audio_role=music @ 0.00s–60.00s (dur=60.00s)\n\nlayer_number=7000000 | z_from_bottom=?:\n  timeline_clip_id=CLIPORPHAN media_bin_file_id=FILEINTRVW file='FILEINTRVW' title='' @ 70.00s–72.00s (dur=2.00s)\n\nEffects/Transitions (2):\n  id=TRANS00001 title='fade' layer=2000000 @ 29.00s end=1.00s\n  id=TRANS00002 title='?' layer=4000000 @ 12.00s end=0.50s\n\nTotal timeline duration: 75.00s\n\nTRACK_STACK_JSON=[{\"layer_number\":1000000,\"ui_track\":1,\"z_from_bottom\":0,\"label\":\"\",\"track_id\":\"L1\"},{\"layer_number\":2000000,\"ui_track\":2,\"z_from_bottom\":1,\"label\":\"Voice\",\"track_id\":\"L2\"},{\"layer_number\":3000000,\"ui_track\":3,\"z_from_bottom\":2,\"label\":\"M\\u00fasica\",\"track_id\":\"L3\"},{\"layer_number\":4000000,\"ui_track\":4,\"z_from_bottom\":3,\"label\":\"B-roll\",\"track_id\":\"L4\"},{\"layer_number\":5000000,\"ui_track\":5,\"z_from_bottom\":4,\"label\":\"Titles\",\"track_id\":\"L5\"}]"
+  }
+ },
+ "editor_snapshot": "[Editor snapshot]\nProject files count: 4\nNOTE: media-bin files exist independently of the timeline; an empty timeline does NOT mean no project files.\nMEDIA_BIN:\n  media_bin_file_id=FILEINTRVW name='interview.mp4' duration=60.00s analyzed=True indexed=True summary_preview='Founder interview in a sunlit studio'\n  media_bin_file_id=FILEMUSIC1 name='music_bed.mp3' duration=120.00s analyzed=True indexed=False summary_preview='Upbeat synth music bed'\n  media_bin_file_id=FILELOGO01 name='logo.png' duration=3600.00s analyzed=False indexed=False summary_preview=''\n  media_bin_file_id=FILEBROLL1 name=\"Tom's b-roll\" duration=30.00s analyzed=True indexed=True summary_preview='Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests b'\nTIMELINE:\n=== TIMELINE STATE ===\nZ-ORDER: higher layer_number covers lower. Track labels are cosmetic names only — never infer priority from the label text. Call list_layers_tool for TRACK_STACK_JSON before multi-track placement. Hero/foreground → highest layer_number; backgrounds → lowest.\n\nlayer_number=5000000 | z_from_bottom=4 | ui_track=5 | track_id=L5 | label='Titles':\n  timeline_clip_id=CLIPLOGO01 media_bin_file_id=FILELOGO01 file='logo.png' title='Logo' analyzed=False source=0.0-5.0s audio_role=silent @ 2.00s–7.00s (dur=5.00s)\n\nlayer_number=4000000 | z_from_bottom=3 | ui_track=4 | track_id=L4 | label='B-roll':\n  timeline_clip_id=CLIPBROLL1 media_bin_file_id=FILEBROLL1 file=\"Tom's b-roll\" title=\"Tom's b-roll\" summary_preview='Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests b' source=5.0-12.5s audio_role=ambient @ 10.00s–17.50s (dur=7.50s)\n\nlayer_number=3000000 | z_from_bottom=2 | ui_track=3 | track_id=L3 | label='Música':\n  timeline_clip_id=CLIPSUBCL1 media_bin_file_id=FILESUBCL1 file='Launch passage' title='Launch passage' summary_preview='Founder interview in a sunlit studio' analyzed=False source=40.0-55.0s audio_role=speech @ 60.00s–75.00s (dur=15.00s)\n\nlayer_number=2000000 | z_from_bottom=1 | ui_track=2 | track_id=L2 | label='Voice':\n  timeline_clip_id=CLIPINTRV1 media_bin_file_id=FILEINTRVW file='interview.mp4' title='interview.mp4' summary_preview='Founder interview in a sunlit studio' source=0.0-30.0s audio_role=speech @ 0.00s–30.00s (dur=30.00s)\n  timeline_clip_id=CLIPINTRV2 media_bin_file_id=FILEINTRVW file='interview.mp4' title='interview.mp4' summary_preview='Founder interview in a sunlit studio' source=40.0-55.0s audio_role=speech @ 40.00s–55.00s (dur=15.00s)\n\nlayer_number=1000000 | z_from_bottom=0 | ui_track=1 | track_id=L1:\n  timeline_clip_id=CLIPMUSIC1 media_bin_file_id=FILEMUSIC1 file='music_bed.mp3' title='music_bed.mp3' summary_preview='Upbeat synth music bed' source=0.0-60.0s audio_role=music @ 0.00s–60.00s (dur=60.00s)\n\nlayer_number=7000000 | z_from_bottom=?:\n  timeline_clip_id=CLIPORPHAN media_bin_file_id=FILEINTRVW file='FILEINTRVW' title='' @ 70.00s–72.00s (dur=2.00s)\n\nEffects/Transitions (2):\n  id=TRANS00001 title='fade' layer=2000000 @ 29.00s end=1.00s\n  id=TRANS00002 title='?' layer=4000000 @ 12.00s end=0.50s\n\nTotal timeline duration: 75.00s\n\nTRACK_STACK_JSON=[{\"layer_number\":1000000,\"ui_track\":1,\"z_from_bottom\":0,\"label\":\"\",\"track_id\":\"L1\"},{\"layer_number\":2000000,\"ui_track\":2,\"z_from_bottom\":1,\"label\":\"Voice\",\"track_id\":\"L2\"},{\"layer_number\":3000000,\"ui_track\":3,\"z_from_bottom\":2,\"label\":\"M\\u00fasica\",\"track_id\":\"L3\"},{\"layer_number\":4000000,\"ui_track\":4,\"z_from_bottom\":3,\"label\":\"B-roll\",\"track_id\":\"L4\"},{\"layer_number\":5000000,\"ui_track\":5,\"z_from_bottom\":4,\"label\":\"Titles\",\"track_id\":\"L5\"}]\n[/Editor snapshot]\n",
+ "editor_snapshot_900": "[Editor snapshot]\nProject files count: 4\nNOTE: media-bin files exist independently of the timeline; an empty timeline does NOT mean no project files.\nMEDIA_BIN:\n  media_bin_file_id=FILEINTRVW name='interview.mp4' duration=60.00s analyzed=True indexed=True summary_preview='Founder interview in a sunlit studio'\n  media_bin_file_id=FILEMUSIC1 name='music_bed.mp3' duration=120.00s analyzed=True indexed=False summary_preview='Upbeat synth music bed'\n  media_bin_file_id=FILELOGO01 name='logo.png' duration=3600.00s analyzed=False indexed=False summary_preview=''\n  media_bin_file_id=FILEBROLL1 name=\"Tom's b-roll\" duration=30.00s analyzed=True indexed=True summary_preview='Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests b'\nTIMELINE:\n=== TIMELINE STATE ===\nZ-ORDER: higher layer_number covers lower. Track labels are cosmetic names only — never\n... (truncated)\n[/Editor snapshot]\n",
+ "analyze_timeline_audio": "Timeline audio (6 clip(s) with sound):\n  timeline_clip_id=CLIPMUSIC1 audio_role=music track=1000000 (stack_from_bottom=1, z_from_bottom=0) title='music_bed.mp3' 0.00s-60.00s level=1.00 (+0.0 dB) indexed=yes\n  timeline_clip_id=CLIPINTRV1 audio_role=speech track=2000000 (stack_from_bottom=2, z_from_bottom=1, label='Voice') title='interview.mp4' 0.00s-30.00s level=1.00 (+0.0 dB) indexed=yes\n  timeline_clip_id=CLIPBROLL1 audio_role=ambient track=4000000 (stack_from_bottom=4, z_from_bottom=3, label='B-roll') title=\"Tom's b-roll\" 10.00s-17.50s level=1.00 (+0.0 dB) indexed=yes\n  timeline_clip_id=CLIPINTRV2 audio_role=speech track=2000000 (stack_from_bottom=2, z_from_bottom=1, label='Voice') title='interview.mp4' 40.00s-55.00s level=1.00 (+0.0 dB) indexed=yes\n  timeline_clip_id=CLIPSUBCL1 audio_role=unknown track=3000000 (stack_from_bottom=3, z_from_bottom=2, label='Música') title='Launch passage' 60.00s-75.00s level=1.00 (+0.0 dB) indexed=no\n  timeline_clip_id=CLIPORPHAN audio_role=ambient track=7000000 title='clip' 70.00s-72.00s level=1.00 (+0.0 dB) indexed=yes\nSummary: 2 speech, 1 music/sfx bed(s), 1 unknown.\n  unknown = source not indexed yet; index it or pass the clip id explicitly to mix it.",
+ "analyze_timeline_audio_windows": "Timeline audio (6 clip(s) with sound):\n  timeline_clip_id=CLIPMUSIC1 audio_role=music track=1000000 (stack_from_bottom=1, z_from_bottom=0) title='music_bed.mp3' 0.00s-60.00s level=1.00 (+0.0 dB) indexed=yes\n  timeline_clip_id=CLIPINTRV1 audio_role=speech track=2000000 (stack_from_bottom=2, z_from_bottom=1, label='Voice') title='interview.mp4' 0.00s-30.00s level=1.00 (+0.0 dB) indexed=yes\n    speech windows (cues, timeline s): 1.00-4.50, 5.00-9.00\n  timeline_clip_id=CLIPBROLL1 audio_role=ambient track=4000000 (stack_from_bottom=4, z_from_bottom=3, label='B-roll') title=\"Tom's b-roll\" 10.00s-17.50s level=1.00 (+0.0 dB) indexed=yes\n  timeline_clip_id=CLIPINTRV2 audio_role=speech track=2000000 (stack_from_bottom=2, z_from_bottom=1, label='Voice') title='interview.mp4' 40.00s-55.00s level=1.00 (+0.0 dB) indexed=yes\n    speech windows (cues, timeline s): 41.00-44.00\n  timeline_clip_id=CLIPSUBCL1 audio_role=unknown track=3000000 (stack_from_bottom=3, z_from_bottom=2, label='Música') title='Launch passage' 60.00s-75.00s level=1.00 (+0.0 dB) indexed=no\n  timeline_clip_id=CLIPORPHAN audio_role=ambient track=7000000 title='clip' 70.00s-72.00s level=1.00 (+0.0 dB) indexed=yes\nSummary: 2 speech, 1 music/sfx bed(s), 1 unknown.\n  unknown = source not indexed yet; index it or pass the clip id explicitly to mix it.",
+ "get_clips_with_full_metadata": "Project files with full metadata:\n\n  media_bin_file_id=FILEINTRVW  name=interview.mp4  type=video  duration=1:00\n    analyzed=True  indexed=False  chapter_count=2  scene_count=2\n    tl_search_hint=visual_ok\n    twelvelabs_index_id=\n    twelvelabs_index_name=\n    twelvelabs_video_id=\n    short_summary=Founder interview in a sunlit studio\n    description=Scene:\nA founder talks to camera about the product launch.\nSounds: voice\n    chapter_snippets:\n      [0:00-0:20] Intro: Founder introduces the company\n      [0:20-1:00] Launch: Talks about the launch plan\n\n  media_bin_file_id=FILEMUSIC1  name=music_bed.mp3  type=audio  duration=2:00\n    analyzed=True  indexed=False  chapter_count=0  scene_count=0\n    tl_search_hint=visual_ok\n    twelvelabs_index_id=\n    twelvelabs_index_name=\n    twelvelabs_video_id=\n    short_summary=Upbeat synth music bed\n    description=\n\n  media_bin_file_id=FILELOGO01  name=logo.png  type=image  duration=60:00\n    analyzed=False  indexed=False  chapter_count=0  scene_count=0\n    tl_search_hint=visual_ok\n    twelvelabs_index_id=\n    twelvelabs_index_name=\n    twelvelabs_video_id=\n    short_summary=\n    description=\n\n  media_bin_file_id=FILEBROLL1  name=Tom's b-roll  type=video  duration=0:30\n    analyzed=True  indexed=True  chapter_count=0  scene_count=0\n    tl_search_hint=visual_ok\n    twelvelabs_index_id=IDX1\n    twelvelabs_index_name=\n    twelvelabs_video_id=VID_BROLL\n    short_summary=Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests below and a river\n    description=Wide aerial landscape",
+ "get_clips_with_full_metadata_full": "Project files with full metadata:\n\n  media_bin_file_id=FILEINTRVW  name=interview.mp4  type=video  duration=1:00\n    analyzed=True  indexed=False  chapter_count=2  scene_count=2\n    tl_search_hint=visual_ok\n    twelvelabs_index_id=\n    twelvelabs_index_name=\n    twelvelabs_video_id=\n    short_summary=Founder interview in a sunlit studio\n    description=Scene:\nA founder talks to camera about the product launch.\nSounds: voice\n    sounds=voice, room tone\n    transcript=We built this for editors who hate busywork.\n    chapter_snippets:\n      [0:00-0:20] Intro: Founder introduces the company\n      [0:20-1:00] Launch: Talks about the launch plan\n\n  media_bin_file_id=FILEMUSIC1  name=music_bed.mp3  type=audio  duration=2:00\n    analyzed=True  indexed=False  chapter_count=0  scene_count=0\n    tl_search_hint=visual_ok\n    twelvelabs_index_id=\n    twelvelabs_index_name=\n    twelvelabs_video_id=\n    short_summary=Upbeat synth music bed\n    description=\n\n  media_bin_file_id=FILELOGO01  name=logo.png  type=image  duration=60:00\n    analyzed=False  indexed=False  chapter_count=0  scene_count=0\n    tl_search_hint=visual_ok\n    twelvelabs_index_id=\n    twelvelabs_index_name=\n    twelvelabs_video_id=\n    short_summary=\n    description=\n\n  media_bin_file_id=FILESUBCL1  name=Launch passage  type=video  duration=1:00\n  alias_of=FILEINTRVW\n    analyzed=False  indexed=False  chapter_count=0  scene_count=0\n    tl_search_hint=visual_ok\n    twelvelabs_index_id=\n    twelvelabs_index_name=\n    twelvelabs_video_id=\n    short_summary=\n    description=\n\n  media_bin_file_id=FILEBROLL1  name=Tom's b-roll  type=video  duration=0:30\n    analyzed=True  indexed=True  chapter_count=0  scene_count=0\n    tl_search_hint=visual_ok\n    twelvelabs_index_id=IDX1\n    twelvelabs_index_name=\n    twelvelabs_video_id=VID_BROLL\n    short_summary=Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests below and a river\n    description=Wide aerial landscape",
+ "get_timeline_placements_metadata": "Timeline placements (7):\n\n  timeline_clip_id=CLIPMUSIC1 file_id=FILEMUSIC1 parent_file_id=FILEMUSIC1\n    title='music_bed.mp3' track=1000000 ui_track=1 position=0.00s timeline_end=60.00s\n    source_window=0.00-60.00s index_status='' duplicate_group=''\n    summary_preview='Upbeat synth music bed'\n\n  timeline_clip_id=CLIPINTRV1 file_id=FILEINTRVW parent_file_id=FILEINTRVW occurrence_hint=1\n    title='interview.mp4' track=2000000 ui_track=2 position=0.00s timeline_end=30.00s\n    source_window=0.00-30.00s index_status='ready' duplicate_group='FILEINTRVW:2000000'\n    summary_preview='Founder interview in a sunlit studio'\n    effective_scenes:\n      [0:02] Close-up of the founder smiling\n\n  timeline_clip_id=CLIPINTRV2 file_id=FILEINTRVW parent_file_id=FILEINTRVW occurrence_hint=2\n    title='interview.mp4' track=2000000 ui_track=2 position=40.00s timeline_end=55.00s\n    source_window=40.00-55.00s index_status='ready' duplicate_group='FILEINTRVW:2000000'\n    summary_preview='Founder interview in a sunlit studio'\n    effective_scenes:\n      [0:02] Wide shot of the studio\n\n  timeline_clip_id=CLIPSUBCL1 file_id=FILESUBCL1 parent_file_id=FILEINTRVW\n    title='Launch passage' track=3000000 ui_track=3 position=60.00s timeline_end=75.00s\n    source_window=40.00-55.00s index_status='ready' duplicate_group=''\n    summary_preview='Founder interview in a sunlit studio'\n    effective_scenes:\n      [0:02] Wide shot of the studio\n\n  timeline_clip_id=CLIPBROLL1 file_id=FILEBROLL1 parent_file_id=FILEBROLL1\n    title=\"Tom's b-roll\" track=4000000 ui_track=4 position=10.00s timeline_end=17.50s\n    source_window=5.00-12.50s index_status='ready' duplicate_group=''\n    summary_preview='Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests b'\n\n  timeline_clip_id=CLIPLOGO01 file_id=FILELOGO01 parent_file_id=FILELOGO01\n    title='Logo' track=5000000 ui_track=5 position=2.00s timeline_end=7.00s\n    source_window=0.00-5.00s index_status='' duplicate_group=''\n    summary_preview=''\n\n  timeline_clip_id=CLIPORPHAN file_id=FILEINTRVW parent_file_id=FILEINTRVW\n    title='interview.mp4' track=7000000 ui_track=None position=70.00s timeline_end=72.00s\n    source_window=10.00-12.00s index_status='ready' duplicate_group=''\n    summary_preview='Founder interview in a sunlit studio'",
+ "track_stack_json": "[{\"layer_number\":1000000,\"ui_track\":1,\"z_from_bottom\":0,\"label\":\"\",\"track_id\":\"L1\"},{\"layer_number\":2000000,\"ui_track\":2,\"z_from_bottom\":1,\"label\":\"Voice\",\"track_id\":\"L2\"},{\"layer_number\":3000000,\"ui_track\":3,\"z_from_bottom\":2,\"label\":\"M\\u00fasica\",\"track_id\":\"L3\"},{\"layer_number\":4000000,\"ui_track\":4,\"z_from_bottom\":3,\"label\":\"B-roll\",\"track_id\":\"L4\"},{\"layer_number\":5000000,\"ui_track\":5,\"z_from_bottom\":4,\"label\":\"Titles\",\"track_id\":\"L5\"}]",
+ "normalize_track": {
+  "1000000": [
+   1000000,
+   null
+  ],
+  "L3": [
+   3000000,
+   null
+  ],
+  "voice": [
+   2000000,
+   null
+  ],
+  "Track Voice": [
+   2000000,
+   null
+  ],
+  "ui track 2": [
+   null,
+   "Error: Unknown track or layer 'ui track 2'. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label."
+  ],
+  "3": [
+   3000000,
+   null
+  ],
+  "musica": [
+   null,
+   "Error: Unknown track or layer 'musica'. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label."
+  ],
+  "Música": [
+   3000000,
+   null
+  ],
+  "b": [
+   4000000,
+   null
+  ],
+  "9": [
+   null,
+   "Error: Unknown track or layer '9'. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label."
+  ],
+  "0": [
+   null,
+   "Error: Unknown track or layer '0'. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label."
+  ],
+  "2.7": [
+   2000000,
+   null
+  ],
+  "abc": [
+   null,
+   "Error: Unknown track or layer 'abc'. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label."
+  ],
+  "": [
+   null,
+   null
+  ]
+ },
+ "format_track_label": {
+  "1000000": "1000000 (stack_from_bottom=1, z_from_bottom=0)",
+  "3000000": "3000000 (stack_from_bottom=3, z_from_bottom=2, label='Música')",
+  "7000000": "7000000"
+ },
+ "resolve": {
+  "query_interview": {
+   "ok": false,
+   "clip": null,
+   "error": "Same source file appears 2 times on the same track for clip_query — pass occurrence (1-based), position_near (timeline seconds), or timeline_clip_id:\n  1. timeline_clip_id=CLIPINTRV1 title='interview.mp4' track=2000000 ui_track=2 file='interview.mp4' source=0.0-30.0s score=1.00\n  2. timeline_clip_id=CLIPINTRV2 title='interview.mp4' track=2000000 ui_track=2 file='interview.mp4' source=40.0-55.0s score=1.00\n  3. timeline_clip_id=CLIPSUBCL1 title='Launch passage' track=3000000 ui_track=3 file='Launch passage' source=40.0-55.0s score=1.00\nPass timeline_clip_id from list_clips_tool, or disambiguate with track, occurrence (1-based), or position_near (timeline seconds)."
+  },
+  "query_interview_occ2": {
+   "ok": true,
+   "clip": "CLIPINTRV2",
+   "error": ""
+  },
+  "query_interview_track": {
+   "ok": false,
+   "clip": null,
+   "error": "Same source file appears 2 times on the same track for clip_query — pass occurrence (1-based), position_near (timeline seconds), or timeline_clip_id:\n  1. timeline_clip_id=CLIPINTRV1 title='interview.mp4' track=2000000 ui_track=2 file='interview.mp4' source=0.0-30.0s score=1.00\n  2. timeline_clip_id=CLIPINTRV2 title='interview.mp4' track=2000000 ui_track=2 file='interview.mp4' source=40.0-55.0s score=1.00\nPass timeline_clip_id from list_clips_tool, or disambiguate with track, occurrence (1-based), or position_near (timeline seconds)."
+  },
+  "query_drone": {
+   "ok": true,
+   "clip": "CLIPBROLL1",
+   "error": ""
+  },
+  "query_nothing": {
+   "ok": false,
+   "clip": null,
+   "error": "No confident match for clip_query 'spaceship explosion'.\n  1. timeline_clip_id=CLIPMUSIC1 title='music_bed.mp3' track=1000000 ui_track=1 file='music_bed.mp3' source=0.0-60.0s score=0.00\n  2. timeline_clip_id=CLIPINTRV1 title='interview.mp4' track=2000000 ui_track=2 file='interview.mp4' source=0.0-30.0s score=0.00\n  3. timeline_clip_id=CLIPINTRV2 title='interview.mp4' track=2000000 ui_track=2 file='interview.mp4' source=40.0-55.0s score=0.00\nPass timeline_clip_id from list_clips_tool, or disambiguate with track, occurrence (1-based), or position_near (timeline seconds)."
+  },
+  "id_missing": {
+   "ok": false,
+   "clip": null,
+   "error": "Error: No timeline clip with id='NOPE'."
+  },
+  "no_target": {
+   "ok": false,
+   "clip": null,
+   "error": "Error: Multiple clips on timeline — pass clip_query (filename, subject, track) or timeline_clip_id from list_clips_tool."
+  },
+  "near_45": {
+   "ok": false,
+   "clip": null,
+   "error": "Error: Multiple clips on timeline — pass clip_query (filename, subject, track) or timeline_clip_id from list_clips_tool."
+  }
+ }
+}

@@ -80,11 +80,24 @@ export interface ImportedMedia {
   cloud?: CloudMediaRef;
 }
 
+/** What `MediaHost.listPaths` found for one import entry. */
+export interface PathListing {
+  /** `directory`: `files` is every file under it, recursively, sorted per folder. */
+  kind: "file" | "directory" | "glob" | "missing";
+  files: string[];
+}
+
 export interface MediaHost {
   /** Probe media the host can reach and return libopenshot-style reader info. */
   probe(path: string): Promise<ReaderInfo>;
   /** Make a local file available to the project (CLI: path on disk). */
   importPath?(path: string): Promise<ImportedMedia>;
+  /**
+   * Expand one import entry (a file, a folder, a glob, a file:// URL) into
+   * files, like the desktop's import_files_tool. The engine filters folder
+   * contents by media extension.
+   */
+  listPaths?(entry: string): Promise<PathListing>;
   /** Download a URL and make it available to the project. */
   importUrl?(url: string, options?: { filename?: string; signal?: AbortSignal }): Promise<ImportedMedia>;
   /** Ask the person to pick files (web). */
@@ -145,9 +158,42 @@ export interface ExportHost {
   export(project: Project, options: ExportOptions, onProgress?: (fraction: number) => void): Promise<ExportResult>;
 }
 
+/** Drawn over an inspect frame (zenvi-core agent_tools/inspect_overlay.py). Hosts may ignore it. */
+export interface FrameOverlay {
+  /** 0-1 coordinate grid, origin top-left: minor lines every 0.05, labels every 0.1. */
+  grid?: boolean;
+  /** Caption in the top-left corner, e.g. "f120  00:04.00". */
+  caption?: string;
+}
+
 export interface FrameHost {
   /** Render one timeline frame for a model or a person to look at. */
-  renderFrame(project: Project, seconds: number, options?: { width?: number; format?: "png" | "jpeg" }): Promise<ToolImage>;
+  renderFrame(
+    project: Project,
+    seconds: number,
+    options?: { width?: number; format?: "png" | "jpeg"; overlay?: FrameOverlay },
+  ): Promise<ToolImage>;
+}
+
+/** Per-frame loudness of a file's audio (the input of the desktop's energy VAD). */
+export interface AudioEnvelope {
+  /** Rate the audio was measured at. The desktop measures 16 kHz mono. */
+  sampleRate: number;
+  /** Samples per RMS frame (desktop: 480, 30 ms at 16 kHz). The last frame may be shorter. */
+  frameSize: number;
+  /** RMS of each frame of the mono mixdown, PCM normalized to -1..1, from source time 0. */
+  rms: ArrayLike<number>;
+}
+
+export interface AudioHost {
+  /**
+   * Decode `path`'s audio to mono (default 16 kHz, 480-sample frames) and
+   * return its RMS envelope. Rejects when the file has no audio stream.
+   */
+  analyzeAudio(
+    path: string,
+    options?: { sampleRate?: number; frameSize?: number; signal?: AbortSignal },
+  ): Promise<AudioEnvelope>;
 }
 
 export interface BackendHost {
@@ -162,6 +208,10 @@ export interface StorageHost {
   save(project: Project, path?: string): Promise<string>;
   /** Open a project from a path or id the host understands. */
   open(path: string): Promise<Project>;
+  /** Read a small text file (subtitles to import). */
+  readText?(path: string): Promise<string>;
+  /** Write a small text file (exported subtitles). Returns where it went. */
+  writeText?(path: string, text: string, contentType?: string): Promise<string>;
 }
 
 export interface ToolHost {
@@ -172,6 +222,7 @@ export interface ToolHost {
   frames?: FrameHost;
   backend?: BackendHost;
   storage?: StorageHost;
+  audio?: AudioHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }
