@@ -1,0 +1,12 @@
+# Keep `az acr build … .` uploads small: images install their own deps.
+**/node_modules
+**/dist
+**/coverage
+**/.vercel
+**/playwright-report
+**/test-results
+.git
+.cache
+*.log
+.env
+.env.*
