@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": null,
+  "rewrites": [
+    { "source": "/editor/api/zenvi/:path*", "destination": "https://api.zenvi.pro/api/v1/:path*" },
+    { "source": "/editor/:path*", "destination": "/editor/index.html" }
+  ],
+  "redirects": [{ "source": "/", "destination": "/editor/", "permanent": false }],
+  "headers": [
+    {
+      "source": "/editor/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/editor/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}

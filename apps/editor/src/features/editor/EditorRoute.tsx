@@ -1,0 +1,154 @@
+import type { Project } from "@zenvi/engine";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
+import { cloudClient, parseCloudRouteId } from "@/lib/cloud";
+import { takeQueuedImports } from "@/lib/projectFactory";
+import { mediaStore } from "@/lib/storage/media";
+import { describeProject, projectRepository, type LocalProjectMeta } from "@/lib/storage/projects";
+import { FullScreenLoader } from "@/app/FullScreenLoader";
+import { Button } from "@/ui/Button";
+import { ZenviMark } from "@/ui/Logo";
+import { importMedia } from "./actions/importMedia";
+import { EditorLayout } from "./layout/EditorLayout";
+import { bindRegistry, probe } from "./render";
+import { SessionProvider } from "./session/context";
+import { EditorSession } from "./session/EditorSession";
+import { MediaLibrary } from "./session/media";
+
+type LoadState =
+  | { kind: "loading" }
+  | { kind: "ready"; session: EditorSession }
+  | { kind: "missing" }
+  | { kind: "signin" }
+  | { kind: "error"; message: string };
+
+function newMediaLibrary(): MediaLibrary {
+  const media = new MediaLibrary({
+    store: mediaStore,
+    probe,
+    cloud: () => (useAuth.getState().status === "signed-in" ? cloudClient() : null),
+  });
+  bindRegistry(media);
+  return media;
+}
+
+async function openLocal(id: string): Promise<{ meta: LocalProjectMeta; project: Project } | null> {
+  const stored = await projectRepository().load(id);
+  if (!stored) return null;
+  const meta = { ...stored.meta, openedAt: Date.now() };
+  void projectRepository().updateMeta(id, { openedAt: meta.openedAt });
+  return { meta, project: stored.project };
+}
+
+/**
+ * Cloud projects are cached locally under their route id, so edits survive a
+ * reload or going offline. The cloud copy wins unless the cache has changes
+ * made on top of the same revision that were not synced yet.
+ */
+async function openCloud(routeId: string, cloudId: string): Promise<{ meta: LocalProjectMeta; project: Project }> {
+  const cached = await projectRepository().load(routeId);
+  const remote = await cloudClient().getProject(cloudId);
+  const unsynced =
+    cached?.meta.cloud &&
+    cached.meta.cloud.revision === remote.revision &&
+    (cached.meta.cloud.syncedAt ?? 0) < cached.meta.updatedAt;
+  const now = Date.now();
+  const project = unsynced && cached ? cached.project : remote.project;
+  const meta: LocalProjectMeta = {
+    id: routeId,
+    name: remote.name,
+    createdAt: cached?.meta.createdAt ?? now,
+    updatedAt: unsynced && cached ? cached.meta.updatedAt : now,
+    openedAt: now,
+    source: "cloud",
+    thumbnail: cached?.meta.thumbnail,
+    cloud: { id: cloudId, revision: remote.revision, syncedAt: unsynced ? (cached?.meta.cloud?.syncedAt ?? null) : now },
+    ...describeProject(project),
+  };
+  await projectRepository().save(meta, project);
+  return { meta, project };
+}
+
+export default function EditorRoute() {
+  const { projectId = "" } = useParams();
+  const authStatus = useAuth((s) => s.status);
+  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const cloudId = parseCloudRouteId(projectId);
+  // Local projects never wait for (or reload on) auth; cloud projects need a session.
+  const gate = cloudId === null ? "local" : authStatus === "loading" ? "wait" : authStatus === "signed-in" ? "in" : "out";
+  const waitingForAuth = gate === "wait";
+
+  useEffect(() => {
+    if (gate === "wait") return;
+    let cancelled = false;
+    let session: EditorSession | null = null;
+    setState({ kind: "loading" });
+    (async () => {
+      if (gate === "out") {
+        setState({ kind: "signin" });
+        return;
+      }
+      const opened = cloudId !== null ? await openCloud(projectId, cloudId) : await openLocal(projectId);
+      if (cancelled) return;
+      if (!opened) {
+        setState({ kind: "missing" });
+        return;
+      }
+      session = new EditorSession({
+        meta: opened.meta,
+        project: opened.project,
+        repository: projectRepository(),
+        media: newMediaLibrary(),
+        cloud: () => (useAuth.getState().status === "signed-in" ? cloudClient() : null),
+      });
+      document.title = `${opened.meta.name} · Zenvi`;
+      setState({ kind: "ready", session });
+      const queued = takeQueuedImports(projectId);
+      if (queued.length) void importMedia(session, queued, "end");
+    })().catch((error: unknown) => {
+      if (!cancelled) setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+    });
+    return () => {
+      cancelled = true;
+      void session?.dispose();
+    };
+  }, [projectId, cloudId, gate]);
+
+  if (state.kind === "loading" || waitingForAuth) return <FullScreenLoader label="Opening project" />;
+  if (state.kind === "ready") {
+    return (
+      <SessionProvider value={state.session}>
+        <EditorLayout />
+      </SessionProvider>
+    );
+  }
+  const copy = {
+    missing: { title: "Project not found", body: "It may have been deleted, or it was created in another browser. Projects are stored per browser unless you sync them to Zenvi Cloud." },
+    signin: { title: "Sign in to open this project", body: "This project lives in Zenvi Cloud. Sign in with the account that owns it." },
+    error: { title: "Could not open the project", body: state.kind === "error" ? state.message : "" },
+  }[state.kind];
+  return (
+    <main className="grid h-full place-items-center bg-canvas px-4">
+      <div className="flex max-w-md flex-col items-center text-center">
+        <ZenviMark size={26} className="mb-6 text-fg" />
+        <h1 className="font-serif text-3xl text-fg">{copy.title}</h1>
+        <p className="mt-3 text-md text-fg-subtle">{copy.body}</p>
+        <div className="mt-8 flex gap-2">
+          {state.kind === "signin" ? (
+            <Link to={`/login?next=${encodeURIComponent(`/p/${projectId}`)}`}>
+              <Button variant="white" size="lg">
+                Sign in
+              </Button>
+            </Link>
+          ) : null}
+          <Link to="/">
+            <Button variant={state.kind === "signin" ? "secondary" : "white"} size="lg">
+              Go to projects
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}
