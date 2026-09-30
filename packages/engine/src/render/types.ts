@@ -185,6 +185,85 @@ export interface KernelContext {
   images: ReadonlyMap<string, RgbaImage>;
   /** Text resources (LUT `.cube` files), keyed by path. Preloaded by renderers. */
   texts?: ReadonlyMap<string, string>;
+  /** libopenshot effect `Id()`: FilmGrain and AnalogTape seed their noise from it. */
+  effectId?: string;
+  /** Timeline (project) frame rate; effects fall back to 30 fps without it. */
+  fps?: { num: number; den: number };
+  /**
+   * libopenshot `timeline->info.width/height`: the project (or export) size,
+   * not the preview canvas. FilmGrain and AnalogTape scale their noise by
+   * `timelineWidth / image width`. Defaults to the canvas size.
+   */
+  timelineWidth?: number;
+  timelineHeight?: number;
+  /** The clip the effect belongs to (Timer). Absent for timeline effects. */
+  clip?: KernelClipContext;
+  /** This frame's audio for the clip (AudioVisualization, BeatSync, waveform clips). */
+  audio?: KernelAudio;
+  /** Text shaping and rasterization (Caption, Timer). Without it text effects draw nothing. */
+  text?: TextRasterizer;
+  /**
+   * Per effect-instance state that must survive across frames (BeatSync's
+   * envelope, DenoiseImage's previous frame). Renderers keep one Map per
+   * effect id for a sequential render and clear it on seeks.
+   */
+  state?: Map<string, unknown>;
+}
+
+export interface KernelClipContext {
+  /** Clip frame after time remapping: `max(1, time.GetLong(n))` when `time` has 2+ points, else n. */
+  mappedFrame: number;
+  /** The clip reader's native frame rate (libopenshot `clip->Reader()->info.fps`). */
+  readerFps: number;
+  /** `Clip::End() - Start()` in seconds. */
+  duration: number;
+}
+
+export interface KernelAudio {
+  sampleRate: number;
+  /**
+   * Planar samples of this frame (one array per channel): the clip's audio
+   * after time remapping, before clip volume, like `frame->GetAudioSamples`.
+   */
+  channels: readonly Float32Array[];
+}
+
+/** A font request: family name and pixel size (QFont + setPixelSize). */
+export interface TextFont {
+  family: string;
+  pixelSize: number;
+}
+
+/** Axis-aligned rectangle in pixels. */
+export interface TextRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Font engine hook for Caption and Timer. The engine does all layout (line
+ * breaking, alignment, backgrounds, fades) in pure TypeScript and asks the
+ * host only for metrics and glyph rasterization. Coordinates are pixels with
+ * the text origin on the baseline, like `QPainterPath::addText`.
+ */
+export interface TextRasterizer {
+  /** `QFontMetricsF` line metrics. */
+  fontMetrics(font: TextFont): { ascent: number; descent: number; lineSpacing: number };
+  /** `QFontMetricsF::horizontalAdvance(text)`. */
+  advance(text: string, font: TextFont): number;
+  /** `QFontMetricsF::boundingRect(text)`, relative to the baseline origin. */
+  bounds(text: string, font: TextFont): TextRect;
+  /** Ink bounds of the glyph outlines (`QPainterPath::addText(0, 0, …).boundingRect()`). */
+  inkBounds(text: string, font: TextFont): TextRect;
+  /**
+   * Draw `text` with its baseline origin at (x, y) onto a transparent,
+   * straight-RGBA `target`: fill with `fill`, then (when `strokeWidth` > 0)
+   * stroke the outline centered with `stroke` (square cap, bevel join).
+   * Colors are straight RGBA 0..255. `clip` limits drawing when given.
+   */
+  drawText(target: RgbaImage, text: string, x: number, y: number, font: TextFont, fill: RGBA, stroke: RGBA | null, strokeWidth: number, clip?: TextRect): void;
 }
 
 /**
