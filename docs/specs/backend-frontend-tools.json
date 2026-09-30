@@ -1,0 +1,1269 @@
+{
+  "tools": {
+    "analyze_timeline_audio_tool": {
+      "module": "audio_tools",
+      "description": "Report the audio role, level and speech windows of every timeline clip. Roles: speech (has transcript cues), music/sfx (audio-only, no cues), ambient (video, no cues), unknown (not indexed yet). Read this before mixing so you know which clips are beds and which carry the voice. detail='windows' also lists detected speech ranges in timeline seconds, plus warnings for overlapping voices and beds stacked above speech.",
+      "parameters": {
+        "description": "Report the audio role, level and speech windows of every timeline clip. Roles: speech (has transcript cues), music/sfx (audio-only, no cues), ambient (video, no cues), unknown (not indexed yet). Read this before mixing so you know which clips are beds and which carry the voice. detail='windows' also lists detected speech ranges in timeline seconds, plus warnings for overlapping voices and beds stacked above speech.",
+        "properties": {
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          },
+          "timeline_clip_id": {
+            "default": "",
+            "title": "Timeline Clip Id",
+            "type": "string"
+          },
+          "detail": {
+            "default": "summary",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "title": "analyze_timeline_audio_tool",
+        "type": "object"
+      }
+    },
+    "set_clip_volume_tool": {
+      "module": "audio_tools",
+      "description": "Set one timeline clip's audio level, over the whole clip or one time window. Give exactly one of level_db (decibels, negative is quieter) or level (0.0-1.3 linear). mode='replace' sets the level outright, mode='scale' multiplies the clip's existing automation. start_seconds/end_seconds are TIMELINE seconds; omit both for a flat level over the whole clip. Use this for a static balance pass; use duck_under_speech_tool to keep music out of the way of dialogue.",
+      "parameters": {
+        "description": "Set one timeline clip's audio level, over the whole clip or one time window. Give exactly one of level_db (decibels, negative is quieter) or level (0.0-1.3 linear). mode='replace' sets the level outright, mode='scale' multiplies the clip's existing automation. start_seconds/end_seconds are TIMELINE seconds; omit both for a flat level over the whole clip. Use this for a static balance pass; use duck_under_speech_tool to keep music out of the way of dialogue.",
+        "properties": {
+          "timeline_clip_id": {
+            "default": "",
+            "title": "Timeline Clip Id",
+            "type": "string"
+          },
+          "clip_query": {
+            "default": "",
+            "title": "Clip Query",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          },
+          "occurrence": {
+            "default": "0",
+            "title": "Occurrence",
+            "type": "string"
+          },
+          "level_db": {
+            "default": "",
+            "title": "Level Db",
+            "type": "string"
+          },
+          "level": {
+            "default": "",
+            "title": "Level",
+            "type": "string"
+          },
+          "start_seconds": {
+            "default": "",
+            "title": "Start Seconds",
+            "type": "string"
+          },
+          "end_seconds": {
+            "default": "",
+            "title": "End Seconds",
+            "type": "string"
+          },
+          "fade_ms": {
+            "default": "150",
+            "title": "Fade Ms",
+            "type": "string"
+          },
+          "mode": {
+            "default": "replace",
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "title": "set_clip_volume_tool",
+        "type": "object"
+      }
+    },
+    "duck_under_speech_tool": {
+      "module": "audio_tools",
+      "description": "Duck music/SFX beds under speech with volume keyframes, restoring them in the gaps. Writes timeline volume automation only \u2014 no media is re-encoded and no clip changes track, position or trim. With speech_clip_ids='auto' the speech clips come from indexed transcript cues; beds default to every music/sfx clip overlapping speech. This is the correct fix when music buries the voice \u2014 never restack tracks to solve a mix problem. Use dry_run='true' to preview the envelope first.",
+      "parameters": {
+        "description": "Duck music/SFX beds under speech with volume keyframes, restoring them in the gaps. Writes timeline volume automation only \u2014 no media is re-encoded and no clip changes track, position or trim. With speech_clip_ids='auto' the speech clips come from indexed transcript cues; beds default to every music/sfx clip overlapping speech. This is the correct fix when music buries the voice \u2014 never restack tracks to solve a mix problem. Use dry_run='true' to preview the envelope first.",
+        "properties": {
+          "bed_clip_ids": {
+            "default": "",
+            "title": "Bed Clip Ids",
+            "type": "string"
+          },
+          "bed_query": {
+            "default": "",
+            "title": "Bed Query",
+            "type": "string"
+          },
+          "bed_track": {
+            "default": "",
+            "title": "Bed Track",
+            "type": "string"
+          },
+          "speech_clip_ids": {
+            "default": "auto",
+            "title": "Speech Clip Ids",
+            "type": "string"
+          },
+          "duck_db": {
+            "default": "-12",
+            "title": "Duck Db",
+            "type": "string"
+          },
+          "attack_ms": {
+            "default": "150",
+            "title": "Attack Ms",
+            "type": "string"
+          },
+          "release_ms": {
+            "default": "400",
+            "title": "Release Ms",
+            "type": "string"
+          },
+          "pad_before_ms": {
+            "default": "200",
+            "title": "Pad Before Ms",
+            "type": "string"
+          },
+          "pad_after_ms": {
+            "default": "300",
+            "title": "Pad After Ms",
+            "type": "string"
+          },
+          "boost_speech_db": {
+            "default": "0",
+            "title": "Boost Speech Db",
+            "type": "string"
+          },
+          "dry_run": {
+            "default": "false",
+            "title": "Dry Run",
+            "type": "string"
+          }
+        },
+        "title": "duck_under_speech_tool",
+        "type": "object"
+      }
+    },
+    "get_file_info_tool": {
+      "module": "clip_tools",
+      "description": "Return fps, video_length, and path for a project file.",
+      "parameters": {
+        "description": "Return fps, video_length, and path for a project file.",
+        "properties": {
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_id"
+        ],
+        "title": "get_file_info_tool",
+        "type": "object"
+      }
+    },
+    "add_clip_to_timeline_tool": {
+      "module": "clip_tools",
+      "description": "Place a project file on the timeline, optionally trimmed to a window.\n\n    Trim with start_seconds + either duration_seconds or end_seconds (the keep-window\n    form from search_clips_tool). Seconds only \u2014 never frames.\n    Cut points are automatically pulled off mid-sentence and mid-musical-phrase using\n    the file's transcript cues and chapters, so trims do not land inside dialogue.\n    An optional query names the action; a wide window is vision-checked before trimming\n    (a window already narrow enough is trusted as-is). Audio needs position_seconds and\n    duration_seconds, or full_file=\"true\" for one continuous bed.\n    Empty track uses the bottom underlay layer.",
+      "parameters": {
+        "description": "Place a project file on the timeline, optionally trimmed to a window.\n\nTrim with start_seconds + either duration_seconds or end_seconds (the keep-window\nform from search_clips_tool). Seconds only \u2014 never frames.\nCut points are automatically pulled off mid-sentence and mid-musical-phrase using\nthe file's transcript cues and chapters, so trims do not land inside dialogue.\nAn optional query names the action; a wide window is vision-checked before trimming\n(a window already narrow enough is trusted as-is). Audio needs position_seconds and\nduration_seconds, or full_file=\"true\" for one continuous bed.\nEmpty track uses the bottom underlay layer.",
+        "properties": {
+          "file_id": {
+            "default": "",
+            "title": "File Id",
+            "type": "string"
+          },
+          "position_seconds": {
+            "default": "",
+            "title": "Position Seconds",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "default": "",
+            "title": "Duration Seconds",
+            "type": "string"
+          },
+          "start_seconds": {
+            "default": "",
+            "title": "Start Seconds",
+            "type": "string"
+          },
+          "end_seconds": {
+            "default": "",
+            "title": "End Seconds",
+            "type": "string"
+          },
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          },
+          "full_file": {
+            "default": "",
+            "title": "Full File",
+            "type": "string"
+          }
+        },
+        "title": "add_clip_to_timeline_tool",
+        "type": "object"
+      }
+    },
+    "place_motion_graphic_tool": {
+      "module": "clip_tools",
+      "description": "Place a HyperFrames motion graphic with overlay/gap/cut_in enforcement.\n\n    mode=overlay: transparent files only, HIGH overlay track (never opaque over hero).\n    mode=gap: opaque plate only when primary track is clear at [t, t+dur).\n    mode=cut_in: opaque plate \u2014 ripple primary-track clips at/after t, then insert as a cut.\n    Pass layout_region from propose_overlay_windows_tool (lower_third|corner_br|corner_tr|full_frame|mid_plate).\n    Prefer this over add_clip_to_timeline_tool for MG renders.\n    Watch of the key on-screen graphic is built in \u2014 watch_clip_window_tool is not needed.",
+      "parameters": {
+        "description": "Place a HyperFrames motion graphic with overlay/gap/cut_in enforcement.\n\nmode=overlay: transparent files only, HIGH overlay track (never opaque over hero).\nmode=gap: opaque plate only when primary track is clear at [t, t+dur).\nmode=cut_in: opaque plate \u2014 ripple primary-track clips at/after t, then insert as a cut.\nPass layout_region from propose_overlay_windows_tool (lower_third|corner_br|corner_tr|full_frame|mid_plate).\nPrefer this over add_clip_to_timeline_tool for MG renders.\nWatch of the key on-screen graphic is built in \u2014 watch_clip_window_tool is not needed.",
+        "properties": {
+          "file_id": {
+            "default": "",
+            "title": "File Id",
+            "type": "string"
+          },
+          "position_seconds": {
+            "default": "",
+            "title": "Position Seconds",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "default": "",
+            "title": "Duration Seconds",
+            "type": "string"
+          },
+          "mode": {
+            "default": "overlay",
+            "title": "Mode",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          },
+          "layout_region": {
+            "default": "",
+            "title": "Layout Region",
+            "type": "string"
+          },
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "title": "place_motion_graphic_tool",
+        "type": "object"
+      }
+    },
+    "import_video_url_and_add_to_timeline_tool": {
+      "module": "clip_tools",
+      "description": "Download a VIDEO from a URL, import it, and place it on the timeline.\n\n    For Manim/server-rendered MP4s only. Do NOT use for Freesound, MP3, or music \u2014\n    call stock_music(query=..., track=...) instead.",
+      "parameters": {
+        "description": "Download a VIDEO from a URL, import it, and place it on the timeline.\n\nFor Manim/server-rendered MP4s only. Do NOT use for Freesound, MP3, or music \u2014\ncall stock_music(query=..., track=...) instead.",
+        "properties": {
+          "video_url": {
+            "default": "",
+            "title": "Video Url",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          },
+          "position_seconds": {
+            "default": "",
+            "title": "Position Seconds",
+            "type": "string"
+          }
+        },
+        "title": "import_video_url_and_add_to_timeline_tool",
+        "type": "object"
+      }
+    },
+    "slice_clip_at_playhead_tool": {
+      "module": "clip_tools",
+      "description": "Split the clip currently under the playhead, keeping both sides.",
+      "parameters": {
+        "description": "Split the clip currently under the playhead, keeping both sides.",
+        "properties": {},
+        "title": "slice_clip_at_playhead_tool",
+        "type": "object"
+      }
+    },
+    "delete_from_timeline_tool": {
+      "module": "clip_tools",
+      "description": "Delete from the timeline: one clip placement, or an entire track.\n\n    This is the ONLY delete tool. Target it one of three ways:\n      timeline_clip_id - an id from list_clips_tool or the timeline snapshot\n      clip_query       - a description, narrowed with track / occurrence\n                         (1-based) / position_near (timeline seconds)\n      track            - clear that whole track (UI \"Track 1\"..\"N\", bottom=1,\n                         or a storage layer_number)\n\n    Leave scope=\"auto\": a clip id or query deletes ONE placement, a bare track\n    clears the track. Force it with scope=\"clip\" or scope=\"track\".\n    include_transitions also removes transitions on the track (track scope).\n\n    Deleting leaves a gap - it never ripples. The whole call is a single undo\n    step, whether it removes one clip or fifty.",
+      "parameters": {
+        "description": "Delete from the timeline: one clip placement, or an entire track.\n\nThis is the ONLY delete tool. Target it one of three ways:\n  timeline_clip_id - an id from list_clips_tool or the timeline snapshot\n  clip_query       - a description, narrowed with track / occurrence\n                     (1-based) / position_near (timeline seconds)\n  track            - clear that whole track (UI \"Track 1\"..\"N\", bottom=1,\n                     or a storage layer_number)\n\nLeave scope=\"auto\": a clip id or query deletes ONE placement, a bare track\nclears the track. Force it with scope=\"clip\" or scope=\"track\".\ninclude_transitions also removes transitions on the track (track scope).\n\nDeleting leaves a gap - it never ripples. The whole call is a single undo\nstep, whether it removes one clip or fifty.",
+        "properties": {
+          "timeline_clip_id": {
+            "default": "",
+            "title": "Timeline Clip Id",
+            "type": "string"
+          },
+          "clip_query": {
+            "default": "",
+            "title": "Clip Query",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          },
+          "scope": {
+            "default": "auto",
+            "title": "Scope",
+            "type": "string"
+          },
+          "occurrence": {
+            "default": "0",
+            "title": "Occurrence",
+            "type": "string"
+          },
+          "position_near": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Position Near"
+          },
+          "include_transitions": {
+            "default": true,
+            "title": "Include Transitions",
+            "type": "boolean"
+          }
+        },
+        "title": "delete_from_timeline_tool",
+        "type": "object"
+      }
+    },
+    "export_video_tool": {
+      "module": "export_tools",
+      "description": "Export the project. Default opens the export dialog; set show_dialog=false to render immediately with optional output_path.",
+      "parameters": {
+        "description": "Export the project. Default opens the export dialog; set show_dialog=false to render immediately with optional output_path.",
+        "properties": {
+          "show_dialog": {
+            "default": "true",
+            "title": "Show Dialog",
+            "type": "string"
+          },
+          "output_path": {
+            "default": "",
+            "title": "Output Path",
+            "type": "string"
+          }
+        },
+        "title": "export_video_tool",
+        "type": "object"
+      }
+    },
+    "get_export_settings_tool": {
+      "module": "export_tools",
+      "description": "Return current export settings (resolution, fps, codecs, format, path, frame range).",
+      "parameters": {
+        "description": "Return current export settings (resolution, fps, codecs, format, path, frame range).",
+        "properties": {},
+        "title": "get_export_settings_tool",
+        "type": "object"
+      }
+    },
+    "set_export_setting_tool": {
+      "module": "export_tools",
+      "description": "Set one export setting (key: width, height, fps_num, fps_den, video_codec, audio_codec, output_path, start_frame, end_frame, vformat).",
+      "parameters": {
+        "description": "Set one export setting (key: width, height, fps_num, fps_den, video_codec, audio_codec, output_path, start_frame, end_frame, vformat).",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "set_export_setting_tool",
+        "type": "object"
+      }
+    },
+    "import_stock_media_tool": {
+      "module": "media_tools",
+      "description": "Download stock (source=pexels|freesound) and import to Project Files, or pass local_path. Returns file_id \u2014 then add_clip_to_timeline_tool.",
+      "parameters": {
+        "description": "Download stock (source=pexels|freesound) and import to Project Files, or pass local_path. Returns file_id \u2014 then add_clip_to_timeline_tool.",
+        "properties": {
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "video_id": {
+            "default": "",
+            "title": "Video Id",
+            "type": "string"
+          },
+          "link": {
+            "default": "",
+            "title": "Link",
+            "type": "string"
+          },
+          "sound_id": {
+            "default": "",
+            "title": "Sound Id",
+            "type": "string"
+          },
+          "preview_url": {
+            "default": "",
+            "title": "Preview Url",
+            "type": "string"
+          },
+          "filename": {
+            "default": "",
+            "title": "Filename",
+            "type": "string"
+          },
+          "local_path": {
+            "default": "",
+            "title": "Local Path",
+            "type": "string"
+          }
+        },
+        "title": "import_stock_media_tool",
+        "type": "object"
+      }
+    },
+    "resummarize_project_file_tool": {
+      "module": "media_tools",
+      "description": "Re-run Pegasus audiovisual summary for an indexed project file (rejects clips > 30 min).",
+      "parameters": {
+        "description": "Re-run Pegasus audiovisual summary for an indexed project file (rejects clips > 30 min).",
+        "properties": {
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_id"
+        ],
+        "title": "resummarize_project_file_tool",
+        "type": "object"
+      }
+    },
+    "reindex_project_file_tool": {
+      "module": "media_tools",
+      "description": "Re-index a project file in TwelveLabs then regenerate Pegasus summary (rejects clips > 30 min).",
+      "parameters": {
+        "description": "Re-index a project file in TwelveLabs then regenerate Pegasus summary (rejects clips > 30 min).",
+        "properties": {
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_id"
+        ],
+        "title": "reindex_project_file_tool",
+        "type": "object"
+      }
+    },
+    "get_clips_with_full_metadata_tool": {
+      "module": "media_tools",
+      "description": "Media-bin AI metadata (summaries, chapters) for planning \u2014 not timeline clip positions.",
+      "parameters": {
+        "description": "Media-bin AI metadata (summaries, chapters) for planning \u2014 not timeline clip positions.",
+        "properties": {
+          "detail_level": {
+            "default": "summary",
+            "title": "Detail Level",
+            "type": "string"
+          }
+        },
+        "title": "get_clips_with_full_metadata_tool",
+        "type": "object"
+      }
+    },
+    "get_timeline_placements_metadata_tool": {
+      "module": "media_tools",
+      "description": "Per-timeline-clip trim-aware AI metadata (position, track, summary, scenes). Use before placing overlays.",
+      "parameters": {
+        "description": "Per-timeline-clip trim-aware AI metadata (position, track, summary, scenes). Use before placing overlays.",
+        "properties": {
+          "detail_level": {
+            "default": "summary",
+            "title": "Detail Level",
+            "type": "string"
+          }
+        },
+        "title": "get_timeline_placements_metadata_tool",
+        "type": "object"
+      }
+    },
+    "play_tool": {
+      "module": "playback_tools",
+      "description": "Start or toggle playback.",
+      "parameters": {
+        "description": "Start or toggle playback.",
+        "properties": {},
+        "title": "play_tool",
+        "type": "object"
+      }
+    },
+    "go_to_start_tool": {
+      "module": "playback_tools",
+      "description": "Seek to the start of the timeline.",
+      "parameters": {
+        "description": "Seek to the start of the timeline.",
+        "properties": {},
+        "title": "go_to_start_tool",
+        "type": "object"
+      }
+    },
+    "go_to_end_tool": {
+      "module": "playback_tools",
+      "description": "Seek to the end of the timeline.",
+      "parameters": {
+        "description": "Seek to the end of the timeline.",
+        "properties": {},
+        "title": "go_to_end_tool",
+        "type": "object"
+      }
+    },
+    "undo_tool": {
+      "module": "playback_tools",
+      "description": "Undo the last action, or the last N actions.\n\n    steps: how many actions to undo, most recent first (default 1, max 20).\n\n    Undo is sequential \u2014 it walks one shared history stack. To undo more than\n    once, emit ONE call with steps=N. Never emit several undo_tool calls.\n    Reports how many steps actually applied, and errors if there is nothing\n    left to undo.",
+      "parameters": {
+        "description": "Undo the last action, or the last N actions.\n\nsteps: how many actions to undo, most recent first (default 1, max 20).\n\nUndo is sequential \u2014 it walks one shared history stack. To undo more than\nonce, emit ONE call with steps=N. Never emit several undo_tool calls.\nReports how many steps actually applied, and errors if there is nothing\nleft to undo.",
+        "properties": {
+          "steps": {
+            "default": 1,
+            "title": "Steps",
+            "type": "integer"
+          }
+        },
+        "title": "undo_tool",
+        "type": "object"
+      }
+    },
+    "redo_tool": {
+      "module": "playback_tools",
+      "description": "Redo the last undone action, or the last N undone actions.\n\n    steps: how many actions to redo (default 1, max 20).\n\n    Redo is sequential \u2014 it walks one shared history stack. To redo more than\n    once, emit ONE call with steps=N. Never emit several redo_tool calls.",
+      "parameters": {
+        "description": "Redo the last undone action, or the last N undone actions.\n\nsteps: how many actions to redo (default 1, max 20).\n\nRedo is sequential \u2014 it walks one shared history stack. To redo more than\nonce, emit ONE call with steps=N. Never emit several redo_tool calls.",
+        "properties": {
+          "steps": {
+            "default": 1,
+            "title": "Steps",
+            "type": "integer"
+          }
+        },
+        "title": "redo_tool",
+        "type": "object"
+      }
+    },
+    "watch_clip_tool": {
+      "module": "playback_tools",
+      "description": "Import a video (default test trailer if path empty), add to timeline, and play.",
+      "parameters": {
+        "description": "Import a video (default test trailer if path empty), add to timeline, and play.",
+        "properties": {
+          "file_path": {
+            "default": "",
+            "title": "File Path",
+            "type": "string"
+          }
+        },
+        "title": "watch_clip_tool",
+        "type": "object"
+      }
+    },
+    "get_project_info_tool": {
+      "module": "project_tools",
+      "description": "Return project profile, fps, duration, and scale.",
+      "parameters": {
+        "description": "Return project profile, fps, duration, and scale.",
+        "properties": {},
+        "title": "get_project_info_tool",
+        "type": "object"
+      }
+    },
+    "list_files_tool": {
+      "module": "project_tools",
+      "description": "List media-bin files (paths, ids) \u2014 not timeline positions. For clip IDs on tracks use get_timeline_state_tool.",
+      "parameters": {
+        "description": "List media-bin files (paths, ids) \u2014 not timeline positions. For clip IDs on tracks use get_timeline_state_tool.",
+        "properties": {},
+        "title": "list_files_tool",
+        "type": "object"
+      }
+    },
+    "list_clips_tool": {
+      "module": "project_tools",
+      "description": "List timeline clips with source_start/end, summary_preview, and occurrence_hint when duplicates exist.",
+      "parameters": {
+        "description": "List timeline clips with source_start/end, summary_preview, and occurrence_hint when duplicates exist.",
+        "properties": {
+          "layer": {
+            "default": "",
+            "title": "Layer",
+            "type": "string"
+          },
+          "detail_level": {
+            "default": "summary",
+            "title": "Detail Level",
+            "type": "string"
+          }
+        },
+        "title": "list_clips_tool",
+        "type": "object"
+      }
+    },
+    "list_layers_tool": {
+      "module": "project_tools",
+      "description": "List tracks/layers (ui_track and layer_number). Use before filtering list_clips_tool by track.",
+      "parameters": {
+        "description": "List tracks/layers (ui_track and layer_number). Use before filtering list_clips_tool by track.",
+        "properties": {},
+        "title": "list_layers_tool",
+        "type": "object"
+      }
+    },
+    "get_timeline_state_tool": {
+      "module": "project_tools",
+      "description": "Primary timeline snapshot: every track, clip id/position/duration, effects. Call at most once per turn.",
+      "parameters": {
+        "description": "Primary timeline snapshot: every track, clip id/position/duration, effects. Call at most once per turn.",
+        "properties": {
+          "detail_level": {
+            "default": "summary",
+            "title": "Detail Level",
+            "type": "string"
+          }
+        },
+        "title": "get_timeline_state_tool",
+        "type": "object"
+      }
+    },
+    "list_markers_tool": {
+      "module": "project_tools",
+      "description": "List every marker in the project.",
+      "parameters": {
+        "description": "List every marker in the project.",
+        "properties": {},
+        "title": "list_markers_tool",
+        "type": "object"
+      }
+    },
+    "new_project_tool": {
+      "module": "project_tools",
+      "description": "Create a new empty project.",
+      "parameters": {
+        "description": "Create a new empty project.",
+        "properties": {},
+        "title": "new_project_tool",
+        "type": "object"
+      }
+    },
+    "save_project_tool": {
+      "module": "project_tools",
+      "description": "Save the project to file_path (e.g. /home/user/my.zvn).",
+      "parameters": {
+        "description": "Save the project to file_path (e.g. /home/user/my.zvn).",
+        "properties": {
+          "file_path": {
+            "title": "File Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_path"
+        ],
+        "title": "save_project_tool",
+        "type": "object"
+      }
+    },
+    "open_project_tool": {
+      "module": "project_tools",
+      "description": "Open a project from file_path.",
+      "parameters": {
+        "description": "Open a project from file_path.",
+        "properties": {
+          "file_path": {
+            "title": "File Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_path"
+        ],
+        "title": "open_project_tool",
+        "type": "object"
+      }
+    },
+    "search_clips_tool": {
+      "module": "search_clip_tools",
+      "description": "Search ALL indexed media in THIS project's index (videos, images, audio \u2014 deeper than tags).\n\n    look_for: \"on_screen\" when the user describes who/what is VISIBLE (\"the guy with the iPad\"),\n    \"spoken\" when they describe what is SAID (\"when he talks about smartphones\"), empty for both.\n    Set it whenever the request is clearly one or the other: short visual descriptions otherwise\n    match transcript lines that merely share a word.\n\n    Returns media_bin_file_id plus start_seconds/end_seconds/peak_seconds (raw, 3dp) and M:SS for humans.\n    Pass the raw *_seconds values straight to place_moment \u2014 do not convert to frames. To PLACE the moment,\n    call place_moment(file_id, start_seconds, end_seconds, query) \u2014 it watches, trims, and places.\n    Do not convert to frames. For moments inside one known\n    timeline clip use search_clip_scenes_tool then slice_moment.",
+      "parameters": {
+        "description": "Search ALL indexed media in THIS project's index (videos, images, audio \u2014 deeper than tags).\n\nlook_for: \"on_screen\" when the user describes who/what is VISIBLE (\"the guy with the iPad\"),\n\"spoken\" when they describe what is SAID (\"when he talks about smartphones\"), empty for both.\nSet it whenever the request is clearly one or the other: short visual descriptions otherwise\nmatch transcript lines that merely share a word.\n\nReturns media_bin_file_id plus start_seconds/end_seconds/peak_seconds (raw, 3dp) and M:SS for humans.\nPass the raw *_seconds values straight to place_moment \u2014 do not convert to frames. To PLACE the moment,\ncall place_moment(file_id, start_seconds, end_seconds, query) \u2014 it watches, trims, and places.\nDo not convert to frames. For moments inside one known\ntimeline clip use search_clip_scenes_tool then slice_moment.",
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "top_k": {
+            "default": 5,
+            "title": "Top K",
+            "type": "integer"
+          },
+          "look_for": {
+            "default": "",
+            "title": "Look For",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_clips_tool",
+        "type": "object"
+      }
+    },
+    "search_clip_scenes_tool": {
+      "module": "search_clip_tools",
+      "description": "Search moments inside a timeline clip. query=what happens; clip_query/timeline_clip_id=which clip; track/occurrence/position_near disambiguate duplicate placements.",
+      "parameters": {
+        "description": "Search moments inside a timeline clip. query=what happens; clip_query/timeline_clip_id=which clip; track/occurrence/position_near disambiguate duplicate placements.",
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "top_k": {
+            "default": "5",
+            "title": "Top K",
+            "type": "string"
+          },
+          "occurrence": {
+            "default": "0",
+            "title": "Occurrence",
+            "type": "string"
+          },
+          "clip_query": {
+            "default": "",
+            "title": "Clip Query",
+            "type": "string"
+          },
+          "timeline_clip_id": {
+            "default": "",
+            "title": "Timeline Clip Id",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          },
+          "position_near": {
+            "default": "",
+            "title": "Position Near",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_clip_scenes_tool",
+        "type": "object"
+      }
+    },
+    "get_project_catalog_tool": {
+      "module": "search_clip_tools",
+      "description": "Orientation pass: list short summaries for all indexed project media (video/image/audio).\n\n    Call this first for open-ended requests like \"make a vlog from the project files\"\n    before using search_clips_tool for targeted moments. Stock imports are indexed before\n    the import tool returns, so catalog should include them immediately after import.",
+      "parameters": {
+        "description": "Orientation pass: list short summaries for all indexed project media (video/image/audio).\n\nCall this first for open-ended requests like \"make a vlog from the project files\"\nbefore using search_clips_tool for targeted moments. Stock imports are indexed before\nthe import tool returns, so catalog should include them immediately after import.",
+        "properties": {},
+        "title": "get_project_catalog_tool",
+        "type": "object"
+      }
+    },
+    "slice_clip_at_best_match_tool": {
+      "module": "search_clip_tools",
+      "description": "Slice a timeline clip at the visual peak of the best semantic match. Internal primitive \u2014 agents should call slice_moment (watch is built in).",
+      "parameters": {
+        "description": "Slice a timeline clip at the visual peak of the best semantic match. Internal primitive \u2014 agents should call slice_moment (watch is built in).",
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "occurrence": {
+            "default": "0",
+            "title": "Occurrence",
+            "type": "string"
+          },
+          "clip_query": {
+            "default": "",
+            "title": "Clip Query",
+            "type": "string"
+          },
+          "timeline_clip_id": {
+            "default": "",
+            "title": "Timeline Clip Id",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          },
+          "start_seconds": {
+            "default": "",
+            "title": "Start Seconds",
+            "type": "string"
+          },
+          "end_seconds": {
+            "default": "",
+            "title": "End Seconds",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "slice_clip_at_best_match_tool",
+        "type": "object"
+      }
+    },
+    "watch_clip_window_tool": {
+      "module": "search_clip_tools",
+      "description": "Vision-check whether a query is actually visible in a window of a placed clip.\n\n    start/end are SOURCE seconds (the source media time search results report), and every\n    time it returns is source seconds too. Returns the frames watched, the shot cuts in the\n    window, and where the query is visible. Read-only \u2014 never edits the timeline.\n    Put times ONLY in start/end, never in query. For \"where does the shot change\", read the\n    shot cuts line instead of re-watching. To cut at a time you found, call slice_moment with\n    start_seconds (and end_seconds for a range).\n    place_moment / slice_moment / stock_video already watch on their own, so call this\n    ONLY to check one uncertain window, then act on the answer. After a few watches with no\n    edit, further watches are refused.",
+      "parameters": {
+        "description": "Vision-check whether a query is actually visible in a window of a placed clip.\n\nstart/end are SOURCE seconds (the source media time search results report), and every\ntime it returns is source seconds too. Returns the frames watched, the shot cuts in the\nwindow, and where the query is visible. Read-only \u2014 never edits the timeline.\nPut times ONLY in start/end, never in query. For \"where does the shot change\", read the\nshot cuts line instead of re-watching. To cut at a time you found, call slice_moment with\nstart_seconds (and end_seconds for a range).\nplace_moment / slice_moment / stock_video already watch on their own, so call this\nONLY to check one uncertain window, then act on the answer. After a few watches with no\nedit, further watches are refused.",
+        "properties": {
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          },
+          "start": {
+            "default": "",
+            "title": "Start",
+            "type": "string"
+          },
+          "end": {
+            "default": "",
+            "title": "End",
+            "type": "string"
+          },
+          "clip_query": {
+            "default": "",
+            "title": "Clip Query",
+            "type": "string"
+          },
+          "timeline_clip_id": {
+            "default": "",
+            "title": "Timeline Clip Id",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          }
+        },
+        "title": "watch_clip_window_tool",
+        "type": "object"
+      }
+    },
+    "propose_overlay_windows_tool": {
+      "module": "search_clip_tools",
+      "description": "Propose safe timeline windows for motion-graphics (timing + layout region).\n\n    Returns JSON windows with t / score / avoid / prefer / scene_label / track_hint /\n    suggest_transparent / layout_region / place_mode (overlay|gap).\n    Score uses scene regex + embedding similarity when the project index is available.\n    Bake layout_region into session/draft.html; pass place_mode into place_motion_graphic_tool.\n    Does NOT invent titles or block_query.",
+      "parameters": {
+        "description": "Propose safe timeline windows for motion-graphics (timing + layout region).\n\nReturns JSON windows with t / score / avoid / prefer / scene_label / track_hint /\nsuggest_transparent / layout_region / place_mode (overlay|gap).\nScore uses scene regex + embedding similarity when the project index is available.\nBake layout_region into session/draft.html; pass place_mode into place_motion_graphic_tool.\nDoes NOT invent titles or block_query.",
+        "properties": {
+          "beat_count": {
+            "default": "4",
+            "title": "Beat Count",
+            "type": "string"
+          },
+          "prefer_transparent": {
+            "default": "true",
+            "title": "Prefer Transparent",
+            "type": "string"
+          }
+        },
+        "title": "propose_overlay_windows_tool",
+        "type": "object"
+      }
+    },
+    "suggest_motion_graphics_placements_tool": {
+      "module": "search_clip_tools",
+      "description": "Deprecated \u2014 use propose_overlay_windows_tool + agent-authored beats_json.",
+      "parameters": {
+        "description": "Deprecated \u2014 use propose_overlay_windows_tool + agent-authored beats_json.",
+        "properties": {
+          "brief": {
+            "default": "",
+            "title": "Brief",
+            "type": "string"
+          },
+          "beat_count": {
+            "default": "4",
+            "title": "Beat Count",
+            "type": "string"
+          }
+        },
+        "title": "suggest_motion_graphics_placements_tool",
+        "type": "object"
+      }
+    },
+    "add_track_tool": {
+      "module": "timeline_tools",
+      "description": "Add a new track (layer) below the selected track.",
+      "parameters": {
+        "description": "Add a new track (layer) below the selected track.",
+        "properties": {},
+        "title": "add_track_tool",
+        "type": "object"
+      }
+    },
+    "add_marker_tool": {
+      "module": "timeline_tools",
+      "description": "Add a marker at the current playhead position.",
+      "parameters": {
+        "description": "Add a marker at the current playhead position.",
+        "properties": {},
+        "title": "add_marker_tool",
+        "type": "object"
+      }
+    },
+    "zoom_in_tool": {
+      "module": "timeline_tools",
+      "description": "Zoom in the timeline.",
+      "parameters": {
+        "description": "Zoom in the timeline.",
+        "properties": {},
+        "title": "zoom_in_tool",
+        "type": "object"
+      }
+    },
+    "zoom_out_tool": {
+      "module": "timeline_tools",
+      "description": "Zoom out the timeline.",
+      "parameters": {
+        "description": "Zoom out the timeline.",
+        "properties": {},
+        "title": "zoom_out_tool",
+        "type": "object"
+      }
+    },
+    "center_on_playhead_tool": {
+      "module": "timeline_tools",
+      "description": "Center the timeline view on the playhead.",
+      "parameters": {
+        "description": "Center the timeline view on the playhead.",
+        "properties": {},
+        "title": "center_on_playhead_tool",
+        "type": "object"
+      }
+    },
+    "import_files_tool": {
+      "module": "timeline_tools",
+      "description": "Open the import files dialog.",
+      "parameters": {
+        "description": "Open the import files dialog.",
+        "properties": {},
+        "title": "import_files_tool",
+        "type": "object"
+      }
+    },
+    "wait_until_project_indexed_tool": {
+      "module": "timeline_tools",
+      "description": "Block until every media file in the project has finished indexing. Call this after importing files and before searching or planning against them -- an unindexed clip has no scenes, no transcript and no embeddings, so search returns nothing and the plan is built on guesses. Returns once all files are analyzed, or lists the file ids still pending when the timeout runs out.",
+      "parameters": {
+        "description": "Block until every media file in the project has finished indexing. Call this after importing files and before searching or planning against them -- an unindexed clip has no scenes, no transcript and no embeddings, so search returns nothing and the plan is built on guesses. Returns once all files are analyzed, or lists the file ids still pending when the timeout runs out.",
+        "properties": {
+          "timeout_seconds": {
+            "default": "1800",
+            "title": "Timeout Seconds",
+            "type": "string"
+          }
+        },
+        "title": "wait_until_project_indexed_tool",
+        "type": "object"
+      }
+    },
+    "list_transitions_tool": {
+      "module": "transitions_tools",
+      "description": "List available OpenShot transitions; category is 'all', 'common', or 'extra'.",
+      "parameters": {
+        "description": "List available OpenShot transitions; category is 'all', 'common', or 'extra'.",
+        "properties": {
+          "category": {
+            "default": "all",
+            "title": "Category",
+            "type": "string"
+          }
+        },
+        "title": "list_transitions_tool",
+        "type": "object"
+      }
+    },
+    "search_transitions_tool": {
+      "module": "transitions_tools",
+      "description": "Search OpenShot transitions by name (e.g. fade, wipe, circle).",
+      "parameters": {
+        "description": "Search OpenShot transitions by name (e.g. fade, wipe, circle).",
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_transitions_tool",
+        "type": "object"
+      }
+    },
+    "apply_transition_tool": {
+      "module": "transitions_tools",
+      "description": "Apply an OpenShot transition. placement='between' needs clip1_id+clip2_id; 'start'/'end' uses clip1_id only.",
+      "parameters": {
+        "description": "Apply an OpenShot transition. placement='between' needs clip1_id+clip2_id; 'start'/'end' uses clip1_id only.",
+        "properties": {
+          "clip1_id": {
+            "title": "Clip1 Id",
+            "type": "string"
+          },
+          "clip2_id": {
+            "default": "",
+            "title": "Clip2 Id",
+            "type": "string"
+          },
+          "transition_name": {
+            "default": "fade",
+            "title": "Transition Name",
+            "type": "string"
+          },
+          "duration": {
+            "default": "1.0",
+            "title": "Duration",
+            "type": "string"
+          },
+          "placement": {
+            "default": "between",
+            "title": "Placement",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clip1_id"
+        ],
+        "title": "apply_transition_tool",
+        "type": "object"
+      }
+    },
+    "generate_video_and_add_to_timeline_tool": {
+      "module": "video_gen_tools",
+      "description": "Generate a brand-new AI video from a text prompt (Kling O1 Pro, default 5 seconds).\n\n    ONLY when the user explicitly asks to generate/create an AI video.\n    Do NOT use for stock/Pexels/royalty-free requests \u2014 use search_pexels_videos_tool\n    + import_stock_media_tool instead.\n\n    Leave duration_seconds empty for 5s. Only pass '10' when the user explicitly asks for a 10-second clip.\n    Watch of the generated clip's key visual section is built in before place.",
+      "parameters": {
+        "description": "Generate a brand-new AI video from a text prompt (Kling O1 Pro, default 5 seconds).\n\nONLY when the user explicitly asks to generate/create an AI video.\nDo NOT use for stock/Pexels/royalty-free requests \u2014 use search_pexels_videos_tool\n+ import_stock_media_tool instead.\n\nLeave duration_seconds empty for 5s. Only pass '10' when the user explicitly asks for a 10-second clip.\nWatch of the generated clip's key visual section is built in before place.",
+        "properties": {
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "default": "",
+            "title": "Duration Seconds",
+            "type": "string"
+          },
+          "position_seconds": {
+            "default": "",
+            "title": "Position Seconds",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "generate_video_and_add_to_timeline_tool",
+        "type": "object"
+      }
+    },
+    "modify_clip_tool": {
+      "module": "video_gen_tools",
+      "description": "AI-edit a timeline clip resolved by clip_query or timeline_clip_id. Use track/occurrence when duplicates exist.",
+      "parameters": {
+        "description": "AI-edit a timeline clip resolved by clip_query or timeline_clip_id. Use track/occurrence when duplicates exist.",
+        "properties": {
+          "mode": {
+            "default": "replace",
+            "title": "Mode",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          },
+          "fade_ms": {
+            "default": "400",
+            "title": "Fade Ms",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "default": "",
+            "title": "Duration Seconds",
+            "type": "string"
+          },
+          "clip_query": {
+            "default": "",
+            "title": "Clip Query",
+            "type": "string"
+          },
+          "timeline_clip_id": {
+            "default": "",
+            "title": "Timeline Clip Id",
+            "type": "string"
+          },
+          "track": {
+            "default": "",
+            "title": "Track",
+            "type": "string"
+          },
+          "occurrence": {
+            "default": "0",
+            "title": "Occurrence",
+            "type": "string"
+          }
+        },
+        "title": "modify_clip_tool",
+        "type": "object"
+      }
+    },
+    "generate_transition_clip_tool": {
+      "module": "video_gen_tools",
+      "description": "Bake clip A + AI morph + clip B into one project file with merged tags; replaces both clips on the timeline.",
+      "parameters": {
+        "description": "Bake clip A + AI morph + clip B into one project file with merged tags; replaces both clips on the timeline.",
+        "properties": {
+          "clip_a_id": {
+            "default": "",
+            "title": "Clip A Id",
+            "type": "string"
+          },
+          "clip_b_id": {
+            "default": "",
+            "title": "Clip B Id",
+            "type": "string"
+          },
+          "clip_a_query": {
+            "default": "",
+            "title": "Clip A Query",
+            "type": "string"
+          },
+          "clip_b_query": {
+            "default": "",
+            "title": "Clip B Query",
+            "type": "string"
+          },
+          "prompt_hint": {
+            "default": "",
+            "title": "Prompt Hint",
+            "type": "string"
+          }
+        },
+        "title": "generate_transition_clip_tool",
+        "type": "object"
+      }
+    },
+    "generate_tts_and_add_to_timeline_tool": {
+      "module": "core.tools.tts_tools",
+      "description": "Generate narration with OpenAI TTS and place it on the timeline (desktop only).\n\n    Single tool for all voice-over requests. Do not call separate generate/add TTS tools.",
+      "parameters": {
+        "description": "Generate narration with OpenAI TTS and place it on the timeline (desktop only).\n\nSingle tool for all voice-over requests. Do not call separate generate/add TTS tools.",
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "voice": {
+            "default": "alloy",
+            "title": "Voice",
+            "type": "string"
+          },
+          "model": {
+            "default": "tts-1",
+            "title": "Model",
+            "type": "string"
+          },
+          "speed": {
+            "default": 1.0,
+            "title": "Speed",
+            "type": "number"
+          },
+          "track": {
+            "default": 0,
+            "title": "Track",
+            "type": "integer"
+          },
+          "position": {
+            "default": 0.0,
+            "title": "Position",
+            "type": "number"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "generate_tts_and_add_to_timeline_tool",
+        "type": "object"
+      }
+    }
+  },
+  "missing": [
+    "delete_clips_on_track_tool",
+    "fetch_motion_graphics_video_tool",
+    "fetch_remotion_video_from_supabase_tool",
+    "remove_clip_tool"
+  ]
+}

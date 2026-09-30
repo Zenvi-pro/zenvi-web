@@ -1,0 +1,17 @@
+{
+  "name": "@zenvi/render-node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Node media runtime for Zenvi: ffmpeg probe/decode/encode, CPU compositor and SVG rasterization for the CLI and the cloud render worker.",
+  "license": "GPL-3.0-or-later",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@zenvi/engine": "*"
+  }
+}

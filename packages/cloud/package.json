@@ -1,0 +1,31 @@
+{
+  "name": "@zenvi/cloud",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zenvi Cloud: projects and media storage, render jobs, remote MCP server for ChatGPT and Claude, OAuth, and CLI device login.",
+  "license": "GPL-3.0-or-later",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/server.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@azure/data-tables": "^13.3.0",
+    "@azure/storage-blob": "^12.34.0",
+    "@hono/node-server": "^2.1.0",
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "@zenvi/engine": "*",
+    "@zenvi/render-node": "*",
+    "hono": "^4.13.0",
+    "jose": "^6.2.0",
+    "zod": "^4.6.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

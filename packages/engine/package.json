@@ -1,0 +1,21 @@
+{
+  "name": "@zenvi/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zenvi project model, editing operations, undo history, tool catalog and frame planner. Pure TypeScript: no DOM, no Node APIs.",
+  "license": "GPL-3.0-or-later",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./tools": "./src/tools/index.ts",
+    "./render": "./src/render/index.ts",
+    "./assets/*": "./assets/*"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.0"
+  }
+}
