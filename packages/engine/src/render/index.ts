@@ -12,3 +12,5 @@ export { evaluateAnimatedCurve, evaluateEffectParams, evaluateValue, sampleCurve
 export { clonePremul, createPremul, premultiply, unpremultiply, wrapPremul, type PremulImage } from "./pixels.js";
 export { smoothScale } from "./qt/smooth-scale.js";
 export { QTransform } from "./qt/transform.js";
+export { planFrame, planCanvas, remappedClipFrame, type PlanOptions } from "./plan/frame-plan.js";
+export { compositeFrame, createCompositorState, kernelContext, type CompositeSources, type CompositorState } from "./cpu/compositor.js";
