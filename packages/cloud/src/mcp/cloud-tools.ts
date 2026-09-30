@@ -177,6 +177,54 @@ const openProject = defineTool({
   },
 });
 
+/** Adds downloaded media to the project bin (shared by the URL and attachment imports). */
+async function importInto(ctx: McpCallContext, projectIdInput: string | undefined, url: string, name: string | undefined) {
+  const retryAfter = ctx.services.limiter.hit(`import:${ctx.principal.userId}`, { limit: 30, windowMs: 3_600_000 });
+  if (retryAfter > 0) throw new ApiError(429, "rate_limited", `Too many imports; try again in ${Math.ceil(retryAfter / 60)} minutes.`);
+  const projectId = await resolveProjectId(ctx, projectIdInput);
+  const imported = await ctx.services.importer.importUrl(ctx.principal.userId, url, { filename: name, signal: ctx.signal });
+  const edit = await editProject(ctx, projectId, async (doc) => {
+    let result: ReturnType<typeof addMediaFile> | undefined;
+    doc.transaction(`Import ${imported.name}`, (tx) => {
+      result = addMediaFile(tx, imported);
+    });
+    if (!result) throw new Error("import transaction produced no file");
+    return result;
+  });
+  const { file, added } = edit.value;
+  const data = {
+    project_id: projectId,
+    file_id: file.id,
+    name: imported.name,
+    media_type: String(file.media_type),
+    duration_seconds: seconds(Number(file.duration) || 0),
+    width: Number(file.width) || 0,
+    height: Number(file.height) || 0,
+    size_bytes: imported.size,
+    sha256: imported.sha256,
+    already_in_project: !added,
+  };
+  return {
+    text: added
+      ? `Imported "${imported.name}" as file ${file.id} (${data.media_type}, ${data.duration_seconds}s). Add it to the timeline with the clip tools.`
+      : `"${imported.name}" is already in the project as file ${file.id}.`,
+    data,
+  };
+}
+
+const importedShape = z.object({
+  project_id: z.string(),
+  file_id: z.string(),
+  name: z.string(),
+  media_type: z.string(),
+  duration_seconds: z.number(),
+  width: z.number(),
+  height: z.number(),
+  size_bytes: z.number(),
+  sha256: z.string(),
+  already_in_project: z.boolean(),
+});
+
 const importMediaFromUrl = defineTool({
   name: "import_media_from_url",
   title: "Import media from a URL",
@@ -187,55 +235,37 @@ const importMediaFromUrl = defineTool({
     name: z.string().max(255).optional().describe("File name to show in the project (defaults to the name in the URL)."),
     project_id: projectIdArg,
   }),
-  output: z.object({
-    project_id: z.string(),
-    file_id: z.string(),
-    name: z.string(),
-    media_type: z.string(),
-    duration_seconds: z.number(),
-    width: z.number(),
-    height: z.number(),
-    size_bytes: z.number(),
-    sha256: z.string(),
-    already_in_project: z.boolean(),
-  }),
+  output: importedShape,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   scope: SCOPE_WRITE,
   invoking: "Importing the file…",
   invoked: "File imported",
-  async run(ctx, input) {
-    const retryAfter = ctx.services.limiter.hit(`import:${ctx.principal.userId}`, { limit: 30, windowMs: 3_600_000 });
-    if (retryAfter > 0) throw new ApiError(429, "rate_limited", `Too many imports; try again in ${Math.ceil(retryAfter / 60)} minutes.`);
-    const projectId = await resolveProjectId(ctx, input.project_id);
-    const imported = await ctx.services.importer.importUrl(ctx.principal.userId, input.url, { filename: input.name, signal: ctx.signal });
-    const edit = await editProject(ctx, projectId, async (doc) => {
-      let result: ReturnType<typeof addMediaFile> | undefined;
-      doc.transaction(`Import ${imported.name}`, (tx) => {
-        result = addMediaFile(tx, imported);
-      });
-      if (!result) throw new Error("import transaction produced no file");
-      return result;
-    });
-    const { file, added } = edit.value;
-    const data = {
-      project_id: projectId,
-      file_id: file.id,
-      name: imported.name,
-      media_type: String(file.media_type),
-      duration_seconds: seconds(Number(file.duration) || 0),
-      width: Number(file.width) || 0,
-      height: Number(file.height) || 0,
-      size_bytes: imported.size,
-      sha256: imported.sha256,
-      already_in_project: !added,
-    };
-    return {
-      text: added
-        ? `Imported "${imported.name}" as file ${file.id} (${data.media_type}, ${data.duration_seconds}s). Add it to the timeline with the clip tools.`
-        : `"${imported.name}" is already in the project as file ${file.id}.`,
-      data,
-    };
-  },
+  run: (ctx, input) => importInto(ctx, input.project_id, input.url, input.name),
+});
+
+const importAttachedFile = defineTool({
+  name: "import_attached_file",
+  title: "Import an attached file",
+  description:
+    "Add a video, audio or image file the person attached in this chat to the open project's media bin (not the timeline). Use this when the person attaches media; the host passes the file automatically. Importing the same file again returns the existing entry.",
+  input: z.object({
+    file: z
+      .object({
+        download_url: z.string().min(1).max(8192),
+        file_id: z.string().min(1).max(512),
+        mime_type: z.string().max(200).optional(),
+        file_name: z.string().max(255).optional(),
+      })
+      .describe("The attached file."),
+    project_id: projectIdArg,
+  }),
+  output: importedShape,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  scope: SCOPE_WRITE,
+  invoking: "Importing the attachment…",
+  invoked: "Attachment imported",
+  meta: { "openai/fileParams": ["file"] },
+  run: (ctx, input) => importInto(ctx, input.project_id, input.file.download_url, input.file.file_name),
 });
 
 const getUploadLink = defineTool({
@@ -422,6 +452,6 @@ const previewFrame = defineTool({
 });
 
 export function cloudTools(): McpTool[] {
-  return [listProjects, createProject, openProject, importMediaFromUrl, getUploadLink, openInEditor, renderProject, getRenderStatus, previewFrame];
+  return [listProjects, createProject, openProject, importMediaFromUrl, importAttachedFile, getUploadLink, openInEditor, renderProject, getRenderStatus, previewFrame];
 }
 

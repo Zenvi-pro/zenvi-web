@@ -36,6 +36,10 @@ Education on the web; workspace admins may have to allow it).
    e.g. "List my Zenvi projects", "Create a vertical 30 fps project called
    Launch teaser and import https://example.com/clip.mp4", "Render it".
 
+Media: attach a video, audio or image file in the chat and ask Zenvi to use
+it (ChatGPT hands the file to `import_attached_file`), give a direct https
+link, or ask for an upload link to drop files in the web editor.
+
 Notes: ChatGPT gives each tool call about a minute, so renders run in the
 background — ChatGPT calls `render_project`, then `get_render_status` until
 the download link is ready. Write tools ask for confirmation unless you

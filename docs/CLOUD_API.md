@@ -318,6 +318,7 @@ the same JSON as text, ChatGPT status strings):
 | `create_project {name, format?, fps?}` | new empty project (formats: `landscape_1080p` default, `landscape_720p`, `landscape_4k`, `vertical_1080p`, `square_1080p`; fps 24/25/30/50/60), opens it |
 | `open_project {project_id}` | makes it the open project for this connection; overview with files |
 | `import_media_from_url {url, name?}` | server-side download (https, public addresses only, pinned DNS, redirects re-checked, 512 MB, media types only), content-addressed, added to the bin; idempotent |
+| `import_attached_file {file}` | a file attached in ChatGPT (`openai/fileParams`: `{download_url, file_id, mime_type?, file_name?}`), imported like a URL |
 | `get_upload_link` | `${editor}/p/<id>?upload=1` for files on the person's device |
 | `open_in_editor` | `${editor}/p/<id>` |
 | `render_project {preset?, format?, height?, quality?, start_seconds?, end_seconds?}` | starts a render, returns `render_id` at once; idempotent |

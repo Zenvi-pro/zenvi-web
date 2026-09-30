@@ -23,7 +23,8 @@ export function widgetResourceMeta(blobOrigin: string): Record<string, unknown> 
     ui: { csp: { resourceDomains: [blobOrigin], connectDomains: [] }, prefersBorder: true },
     "openai/widgetDescription": "Shows the previewed frame, or the rendered video with its download link.",
     "openai/widgetPrefersBorder": true,
-    "openai/widgetCSP": { resource_domains: [blobOrigin], connect_domains: [] },
+    // redirect_domains lets the Download button open the signed blob link (ChatGPT openExternal).
+    "openai/widgetCSP": { resource_domains: [blobOrigin], connect_domains: [], redirect_domains: [blobOrigin] },
   };
 }
 

@@ -321,6 +321,26 @@ describe("import_media_from_url", () => {
     await client.close();
   });
 
+  it("imports a file attached in ChatGPT (openai/fileParams)", async () => {
+    const h = await harness({ prober: fakeProber, network });
+    const port = await mediaServer(Buffer.from("attached bytes"));
+    const client = await connect(h, await pat(h));
+    const { tools } = await client.listTools();
+    const attach = tools.find((t) => t.name === "import_attached_file");
+    expect((attach?._meta as Record<string, unknown>)["openai/fileParams"]).toEqual(["file"]);
+    const file = (attach?.inputSchema.properties as Record<string, { properties: object; required: string[] }>).file;
+    expect(Object.keys(file?.properties ?? {}).sort()).toEqual(["download_url", "file_id", "file_name", "mime_type"]);
+    expect(file?.required.sort()).toEqual(["download_url", "file_id"]);
+
+    await call(client, "create_project", { name: "P" });
+    const res = await call(client, "import_attached_file", {
+      file: { download_url: `http://media.test:${port}/files/abc`, file_id: "file_123", mime_type: "video/mp4", file_name: "holiday.mp4" },
+    });
+    expect(res.isError).toBeFalsy();
+    expect(res.structuredContent).toMatchObject({ name: "holiday.mp4", media_type: "video", already_in_project: false });
+    await client.close();
+  });
+
   it("refuses redirects to private addresses and web pages", async () => {
     const h = await harness({ prober: fakeProber, network });
     const port = await mediaServer(Buffer.from("<html></html>"), "text/html");
