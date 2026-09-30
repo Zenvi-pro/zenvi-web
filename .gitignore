@@ -12,6 +12,4 @@ playwright-report/
 test-results/
 .cache/
 *.log
-# generated at build time
-plugins/zenvi/dist/
 .npm-install.lock/
