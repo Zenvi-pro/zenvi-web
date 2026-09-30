@@ -10,8 +10,10 @@ import type { Transaction } from "../history/document.js";
 import type { MediaType, ProjectFile } from "../model/types.js";
 import { clipsUsingFile } from "../model/query.js";
 import { idFactory } from "../model/ids.js";
+import { getMediaType, isAudioOnlyMedia } from "../model/media.js";
 import type { ImportedMedia } from "../tools/types.js";
 import { OpError, invalid, requireFile } from "./errors.js";
+import { sameJson } from "./internal.js";
 
 export interface AddFileOptions {
   /** Explicit id (tests, deterministic imports). Must not be in use. */
@@ -22,41 +24,41 @@ export interface AddFileOptions {
   mediaType?: MediaType;
   tags?: string;
   /**
-   * When a file with the same path (or the same sha256 fingerprint) is already
-   * in the project, return it instead of adding a duplicate. Default true, like
-   * the desktop importer, which skips files already in the bin.
+   * When a file with the same `path` is already in the bin, return it instead
+   * of adding a duplicate (desktop importer: `File.get(path=…)`). Default
+   * true. (`fingerprint.sha256` is a partial hash, so it is never used to
+   * match files.)
    */
   dedupe?: boolean;
 }
 
 /**
- * The media type the desktop assigns on import (files_model.py): an image when
- * the reader has a single image, video when it has video, audio otherwise.
+ * The media type the desktop importer assigns (image_types.py
+ * `get_media_type`), using the original file name when the path has no
+ * extension (browser storage, URLs).
  */
-export function detectMediaType(info: ImportedMedia["info"]): MediaType {
-  if (info.media_type === "video" || info.media_type === "audio" || info.media_type === "image") {
-    return info.media_type;
-  }
-  if (info.has_single_image) return "image";
-  if (info.has_video) return "video";
-  return "audio";
+export function detectMediaType(media: Pick<ImportedMedia, "path" | "info" | "name">): MediaType {
+  return getMediaType({ path: media.path, has_video: media.info.has_video, has_audio: media.info.has_audio }, media.name);
 }
 
 /**
- * Add imported media to the bin. Returns the new entry (or the existing one
- * when `dedupe` found a match, in which case nothing is recorded).
+ * Add imported media to the bin like the desktop importer
+ * (files_model.py `add_files`): reader info + `media_type` + an id, and for
+ * audio-only media `has_video = false` with the project's width/height.
+ * Returns the new entry, or the existing one when `dedupe` found the same
+ * path (nothing is recorded then).
  */
 export function addFile(tx: Transaction, media: ImportedMedia, opts: AddFileOptions = {}): ProjectFile {
   if (!media || typeof media.path !== "string" || media.path === "") {
     throw invalid("media.path is required.");
   }
   if (!media.info || typeof media.info !== "object") throw invalid("media.info is required.");
+  if (opts.mediaType !== undefined && !["video", "audio", "image"].includes(opts.mediaType)) {
+    throw invalid(`mediaType must be video, audio or image (got ${String(opts.mediaType)}).`);
+  }
   const project = tx.project;
   if (opts.dedupe !== false) {
-    const sha = media.fingerprint?.sha256;
-    const existing = project.files.find(
-      (file) => file.path === media.path || (sha !== undefined && file.fingerprint?.sha256 === sha),
-    );
+    const existing = project.files.find((file) => file.path === media.path);
     if (existing) return existing;
   }
   if (opts.id !== undefined && project.files.some((file) => file.id === opts.id)) {
@@ -64,16 +66,21 @@ export function addFile(tx: Transaction, media: ImportedMedia, opts: AddFileOpti
   }
   const id = opts.id ?? idFactory(project)();
   const entry: ProjectFile = {
-    ...media.info,
+    ...structuredClone(media.info),
     path: media.path,
     id,
-    media_type: opts.mediaType ?? detectMediaType(media.info),
+    media_type: opts.mediaType ?? detectMediaType(media),
   };
+  if (isAudioOnlyMedia(entry)) {
+    entry.has_video = false;
+    entry.width = project.width;
+    entry.height = project.height;
+  }
   const name = opts.name ?? media.name;
   if (name !== undefined) entry.name = name;
   if (opts.tags !== undefined) entry.tags = opts.tags;
-  if (media.fingerprint) entry.fingerprint = media.fingerprint;
-  if (media.cloud) entry.cloud = media.cloud;
+  if (media.fingerprint) entry.fingerprint = structuredClone(media.fingerprint);
+  if (media.cloud) entry.cloud = structuredClone(media.cloud);
   tx.insert(["files"], entry);
   return requireFile(tx.project, id);
 }
@@ -130,8 +137,4 @@ export function updateFile(tx: Transaction, fileId: string, patch: Partial<Proje
   if (changed.length === 0) return file;
   tx.update(["files", { id: fileId }], Object.fromEntries(changed));
   return requireFile(tx.project, fileId);
-}
-
-function sameJson(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
 }

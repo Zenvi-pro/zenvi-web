@@ -46,6 +46,13 @@ export function invalid(message: string, details?: Record<string, unknown>): OpE
   return new OpError("invalid_argument", message, details);
 }
 
+/** Throw `invalid_argument` unless `value` is a (non-array) object. */
+export function requireObject(value: unknown, what: string): void {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw invalid(`${what} must be an object.`);
+  }
+}
+
 /** A finite number, or throw `invalid_argument` naming `what`. */
 export function requireFinite(value: unknown, what: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
