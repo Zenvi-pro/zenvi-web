@@ -23,8 +23,8 @@ export interface MaskSettings {
   contrast: number;
   /** `replace_image`: output the mask itself (grayscale) instead of masking. */
   replaceImage: boolean;
-  /** EffectBase `mask_invert`. */
-  invert: boolean;
+  /** EffectBase `mask_invert` (default false). */
+  invert?: boolean;
 }
 
 /** mul_lut[alpha][value] = value * alpha / 255, integer division (Mask.cpp:92-100). */
