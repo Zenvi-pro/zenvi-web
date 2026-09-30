@@ -7,7 +7,7 @@
  * use hand-built plans).
  */
 
-import type { Project } from "@zenvi/engine";
+import { frameContaining, frameToSeconds, maxFrame, type Project } from "@zenvi/engine";
 import type { AudioKernel, AudioPlan, FramePlan, MaskInstance, PlanSize, RgbaImage, VideoKernel } from "@zenvi/engine/render";
 
 export interface RenderEngine {
@@ -30,26 +30,23 @@ export interface RenderEngine {
 }
 
 // ---------------------------------------------------------------------------
-// STUB (W5, remove when the engine lands): `@zenvi/engine/render` does not yet
-// export planFrame/planAudio/getVideoKernel/getAudioKernel/applyMask (W2), and
-// the timeline helpers (frameContaining, frameToSeconds, maxFrame; W1) are not
-// committed. Replace this block with direct imports of those functions.
+// STUB (W5, remove when W2 lands): `@zenvi/engine/render` does not yet export
+// planFrame/planAudio/getVideoKernel/getAudioKernel/applyMask. Replace these
+// five entries with direct imports of those functions.
 // ---------------------------------------------------------------------------
 
 function notYet(name: string): never {
   throw new Error(`${name} is not available yet: @zenvi/engine/render has not shipped it`);
 }
 
-const pendingEngine: RenderEngine = {
+/** The engine render-web uses when a caller does not pass one. */
+export const defaultEngine: RenderEngine = {
   planFrame: () => notYet("planFrame"),
   planAudio: () => notYet("planAudio"),
   getVideoKernel: () => undefined,
   getAudioKernel: () => undefined,
   applyMask: () => notYet("applyMask"),
-  frameAt: () => notYet("frameAt (timeline frameContaining)"),
-  frameTime: () => notYet("frameTime (timeline frameToSeconds)"),
-  lastFrame: () => notYet("lastFrame (timeline maxFrame)"),
+  frameAt: (project, seconds) => frameContaining(seconds, project.fps),
+  frameTime: (project, frame) => frameToSeconds(frame, project.fps),
+  lastFrame: (project) => maxFrame(project),
 };
-
-/** The engine render-web uses when a caller does not pass one. */
-export const defaultEngine: RenderEngine = pendingEngine;
