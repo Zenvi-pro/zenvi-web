@@ -46,6 +46,22 @@ describe("sources", () => {
     expect(sourceName({ kind: "blob", blob: new File([], "f.png") })).toBe("f.png");
   });
 
+  it("keeps a renewed signature for every later read of the same media", async () => {
+    let refreshes = 0;
+    const spec = {
+      kind: "url" as const,
+      url: "https://x/a?sig=old",
+      refresh: async () => {
+        refreshes += 1;
+        return "https://x/a?sig=new";
+      },
+      fetch: async (input: RequestInfo | URL) => (String(input).endsWith("new") ? new Response("bytes") : new Response("", { status: 403 })),
+    };
+    expect(await (await readBlob(spec)).text()).toBe("bytes");
+    expect(await (await readBlob(spec)).text()).toBe("bytes");
+    expect(refreshes).toBe(1);
+  });
+
   it("reads a URL into a Blob through the refreshing fetch", async () => {
     let n = 0;
     const blob = await readBlob({

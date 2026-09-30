@@ -23,7 +23,7 @@ import type { DecodeMode } from "../video/decode-cursor.js";
 import { FrameCache } from "../video/frame-cache.js";
 import { FrameProvider } from "../video/frame-provider.js";
 import { bindCanvas, type CanvasSurface, type PreviewCanvas } from "./canvas-binding.js";
-import { audioClock, performanceClock, type PlaybackClock } from "./clock.js";
+import { audibleContextTime, audioClock, performanceClock, type PlaybackClock } from "./clock.js";
 import { fitViewport, previewPlanSize } from "./layout.js";
 
 export interface PlayerState {
@@ -63,8 +63,11 @@ export interface PreviewPlayerOptions {
 
 /** Audio scheduled this far in the future on play, so the first window is decoded before it is due. */
 const AUDIO_START_DELAY = 0.12;
-/** How long to wait for a suspended AudioContext before playing silently. */
-const AUDIO_RESUME_TIMEOUT_MS = 600;
+/**
+ * How long to wait for the output device to start playing the first window
+ * (a suspended context, a device that is waking up) before playing silently.
+ */
+const AUDIO_START_TIMEOUT_MS = 2000;
 /** Playback faster than this seeks each frame instead of decoding every picture. */
 const MAX_SEQUENTIAL_RATE = 4;
 
@@ -89,7 +92,8 @@ export class PreviewPlayer {
 
   private playing = false;
   private clock: PlaybackClock | null = null;
-  private audioWaitSince: number | null = null;
+  /** Set while the audio clock waits for the device to reach the anchor. */
+  private audioWait: { since: number; anchor: ClockAnchor } | null = null;
   private timeValue = 0;
   private rateValue = 1;
   private loopValue = false;
@@ -409,7 +413,7 @@ export class PreviewPlayer {
     const project = this.project;
     if (!project) return;
     this.audio?.stop();
-    this.audioWaitSince = null;
+    this.audioWait = null;
     const rate = this.rateValue;
     const plan = rate > 0 ? this.engine.planAudio(project, { start: t, end: this.duration }) : null;
     const context = plan && plan.segments.length > 0 ? this.ensureAudio() : null;
@@ -418,7 +422,7 @@ export class PreviewPlayer {
       const anchor: ClockAnchor = { timeline: t, context: context.currentTime + AUDIO_START_DELAY, rate };
       this.audio.start(plan, anchor);
       this.clock = audioClock(anchor, context, now);
-      if (context.state !== "running") this.audioWaitSince = now();
+      this.audioWait = { since: now(), anchor };
       return;
     }
     this.clock = performanceClock({ timeline: t, performanceMs: now(), rate }, now);
@@ -460,15 +464,17 @@ export class PreviewPlayer {
     const project = this.project;
     if (!this.playing || !project || this.disposed) return;
 
-    // A context that never starts (no user gesture): play on, silently.
-    if (this.audioWaitSince !== null) {
-      if (this.audioContext?.state === "running") this.audioWaitSince = null;
-      else if (now() - this.audioWaitSince > AUDIO_RESUME_TIMEOUT_MS) {
-        const t = this.currentClockTime();
+    // Video holds until the first sound is heard. A context that never starts
+    // (no user gesture, a dead output device): play on, silently.
+    const wait = this.audioWait;
+    if (wait && this.audioContext) {
+      if (this.audioContext.state === "running" && audibleContextTime(this.audioContext, now) >= wait.anchor.context) {
+        this.audioWait = null;
+      } else if (now() - wait.since > AUDIO_START_TIMEOUT_MS) {
         this.audio?.stop();
-        this.audioWaitSince = null;
-        this.clock = performanceClock({ timeline: t, performanceMs: now(), rate: this.rateValue }, now);
-        this.report("audio:suspended", { kind: "audio", error: new Error("Audio could not start; playing without sound") });
+        this.audioWait = null;
+        this.clock = performanceClock({ timeline: wait.anchor.timeline, performanceMs: now(), rate: this.rateValue }, now);
+        this.report("audio:start", { kind: "audio", error: new Error("Audio output did not start; playing without sound") });
       }
     }
 

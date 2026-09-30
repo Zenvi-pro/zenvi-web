@@ -83,6 +83,22 @@ export function createRefreshingFetch(
   return { fetch: wrapped, currentUrl: () => url };
 }
 
+/**
+ * One refreshing fetch per URL spec, so a signature renewed by one reader
+ * (the preview's demuxer) is used by every later one (probe, stills, export)
+ * instead of each starting from the expired URL.
+ */
+const refreshers = new WeakMap<MediaSourceSpec, RefreshingFetch>();
+
+function refresherFor(spec: Extract<MediaSourceSpec, { kind: "url" }>): RefreshingFetch {
+  let refreshing = refreshers.get(spec);
+  if (!refreshing) {
+    refreshing = createRefreshingFetch(spec.url, spec.refresh, spec.fetch);
+    refreshers.set(spec, refreshing);
+  }
+  return refreshing;
+}
+
 /** A Mediabunny `Source` for demuxing. */
 export async function openSource(spec: MediaSourceSpec): Promise<Source> {
   switch (spec.kind) {
@@ -91,8 +107,8 @@ export async function openSource(spec: MediaSourceSpec): Promise<Source> {
     case "opfs":
       return new BlobSource(await spec.handle.getFile());
     case "url": {
-      const refreshing = createRefreshingFetch(spec.url, spec.refresh, spec.fetch);
-      return new UrlSource(spec.url, {
+      const refreshing = refresherFor(spec);
+      return new UrlSource(refreshing.currentUrl(), {
         fetchFn: refreshing.fetch,
         ...(spec.requestInit ? { requestInit: spec.requestInit } : {}),
       });
@@ -108,8 +124,8 @@ export async function readBlob(spec: MediaSourceSpec, signal?: AbortSignal): Pro
     case "opfs":
       return spec.handle.getFile();
     case "url": {
-      const refreshing = createRefreshingFetch(spec.url, spec.refresh, spec.fetch);
-      const response = await refreshing.fetch(spec.url, { ...spec.requestInit, ...(signal ? { signal } : {}) });
+      const refreshing = refresherFor(spec);
+      const response = await refreshing.fetch(refreshing.currentUrl(), { ...spec.requestInit, ...(signal ? { signal } : {}) });
       if (!response.ok) throw new Error(`Could not read ${sourceName(spec) || "media"}: HTTP ${response.status}`);
       return response.blob();
     }
