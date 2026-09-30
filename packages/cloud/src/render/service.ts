@@ -12,7 +12,7 @@
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { ExportOptions, Project, ProjectFile } from "@zenvi/engine";
+import type { ExportOptions, Project } from "@zenvi/engine";
 import { ApiError, notFound } from "../http/errors.js";
 import type { Logger } from "../http/log.js";
 import { errorMessage } from "../http/log.js";
@@ -26,7 +26,8 @@ import { attachmentDisposition } from "../services/media.js";
 import { renderPath, renderSnapshotPath } from "../services/paths.js";
 import type { ProjectService } from "../services/projects.js";
 import { CONTENT_TYPES, type PresetName, type RenderFormat, type RenderOverrides, resolveRenderOptions } from "./options.js";
-import type { Renderer } from "./renderer.js";
+import type { PathResolver, Renderer } from "./renderer.js";
+import { projectPathResolver } from "./resolve.js";
 
 export type RenderStatus = "queued" | "running" | "done" | "error";
 
@@ -118,6 +119,8 @@ export interface RenderServiceOptions {
   log: Logger;
   tmpDir: string;
   maxRenderMediaBytes: number;
+  /** Built-in assets (`@transitions/…`) on disk, when this build ships them. */
+  resolveAsset?: (projectPath: string) => string | undefined;
 }
 
 export class RenderService {
@@ -324,12 +327,7 @@ export class RenderService {
    * files that are not in Zenvi Cloud and projects whose clip media together
    * exceed the render media cap.
    */
-  private async mediaResolver(
-    userId: string,
-    project: Project,
-    tmp: string,
-    signal: AbortSignal,
-  ): Promise<(file: ProjectFile) => Promise<string>> {
+  private async mediaResolver(userId: string, project: Project, tmp: string, signal: AbortSignal): Promise<PathResolver> {
     const inventory = await this.options.media.inventory(userId);
     const used = new Set(project.clips.map((clip) => clip.file_id));
     let total = 0;
@@ -346,18 +344,20 @@ export class RenderService {
       throw new Error(`This project uses ${Math.round(total / 1024 ** 3)} GB of media; cloud renders are limited to ${Math.round(this.options.maxRenderMediaBytes / 1024 ** 3)} GB.`);
     }
     const downloads = new Map<string, Promise<string>>();
-    return async (file) => {
-      signal.throwIfAborted();
-      const sha = fileSha256(file);
-      if (!sha || !inventory.has(sha)) throw new Error(`"${displayName(file)}" is not in Zenvi Cloud.`);
-      let pending = downloads.get(sha);
-      if (!pending) {
-        const target = join(tmp, `${sha}${extensionOf(displayName(file))}`);
-        pending = this.options.media.download(userId, sha, target).then(() => target);
-        downloads.set(sha, pending);
-      }
-      return pending;
-    };
+    return projectPathResolver(project, {
+      resolveAsset: this.options.resolveAsset,
+      fetchFile: async (file, sha) => {
+        signal.throwIfAborted();
+        if (!inventory.has(sha)) throw new Error(`"${displayName(file)}" is not in Zenvi Cloud.`);
+        let pending = downloads.get(sha);
+        if (!pending) {
+          const target = join(tmp, `${sha}${extensionOf(displayName(file))}`);
+          pending = this.options.media.download(userId, sha, target).then(() => target);
+          downloads.set(sha, pending);
+        }
+        return pending;
+      },
+    });
   }
 
   private async finish(userId: string, renderId: string, result: { status: "done" | "error"; bytes?: number; error?: string }): Promise<void> {

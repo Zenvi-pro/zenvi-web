@@ -22,6 +22,7 @@ export function fakeRenderer(options: { fail?: string; onRender?: (input: Parame
 } {
   const renderer = {
     available: true,
+    framesAvailable: true,
     renders: 0,
     frames: 0,
     async render(input: Parameters<Renderer["render"]>[0]): Promise<void> {
@@ -29,7 +30,8 @@ export function fakeRenderer(options: { fail?: string; onRender?: (input: Parame
       options.onRender?.(input);
       for (const clip of input.project.clips) {
         const file = input.project.files.find((f) => f.id === clip.file_id);
-        if (file) await input.resolveMedia(file);
+        const path = typeof clip.reader?.path === "string" ? clip.reader.path : file?.path;
+        if (path) await input.resolveMedia(path);
       }
       input.onProgress(0.5);
       if (options.fail) throw new Error(options.fail);

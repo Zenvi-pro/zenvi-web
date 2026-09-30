@@ -53,7 +53,7 @@ export function newProject(id: string, profile: ProfileSpec = profileFor("landsc
     id,
     fps: { ...profile.fps },
     display_ratio: { ...profile.displayRatio },
-    pixel_ratio: { num: 1, den: 1 },
+    pixel_ratio: { ...profile.pixelRatio },
     width: profile.width,
     height: profile.height,
     sample_rate: 48000,

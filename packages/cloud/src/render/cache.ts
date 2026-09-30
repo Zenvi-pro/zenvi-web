@@ -28,10 +28,6 @@ export class MediaCache {
     private readonly media: MediaService,
   ) {}
 
-  resolver(userId: string): (file: ProjectFile) => Promise<string> {
-    return (file) => this.get(userId, file);
-  }
-
   async get(userId: string, file: ProjectFile): Promise<string> {
     const sha = fileSha256(file);
     if (!sha) throw new Error(`"${displayName(file)}" is not in Zenvi Cloud.`);

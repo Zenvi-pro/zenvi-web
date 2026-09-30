@@ -3,13 +3,17 @@
  * background housekeeping and graceful shutdown. Bundled to dist/server.mjs.
  */
 
+import { isAbsolute } from "node:path";
 import { serve } from "@hono/node-server";
+import { resolveBinary, whichSync } from "@zenvi/render-node";
 import { createApp } from "./app.js";
 import { createSupabaseVerifier } from "./auth/supabase.js";
 import { loadConfig } from "./config.js";
 import { createServices } from "./container.js";
 import { createLogger, errorMessage } from "./http/log.js";
 import { loadEngineRegistry } from "./mcp/engine.js";
+import { nodeAssetResolver, nodeProber, nodeRenderer } from "./render/node.js";
+import { unavailableProber } from "./render/renderer.js";
 import { AzureBlobStore, AzureTableStore } from "./storage/azure.js";
 import { MemoryBlobStore, MemoryTableStore } from "./storage/memory.js";
 import type { BlobStore, TableStore } from "./storage/types.js";
@@ -36,12 +40,20 @@ async function main(): Promise<void> {
     return null;
   });
 
+  const ffprobe = resolveBinary("ffprobe");
+  const haveFfprobe = isAbsolute(ffprobe) || whichSync(ffprobe) !== undefined;
+  if (!haveFfprobe) log.warn("ffprobe not found: URL imports are disabled");
+  const renderer = nodeRenderer();
+
   const services = createServices({
     config,
     blobs,
     tables,
     log,
     engine,
+    renderer,
+    prober: haveFfprobe ? nodeProber : unavailableProber,
+    resolveAsset: nodeAssetResolver(),
     supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl, log: (message) => log.warn(message) }),
   });
   const app = createApp(services);

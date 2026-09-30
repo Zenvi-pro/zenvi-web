@@ -88,6 +88,8 @@ export function createApp(services: Services): Hono<AppEnv> {
       uptimeSeconds: Math.round((services.clock.now() - services.startedAt) / 1000),
       storage: services.blobs.kind,
       renderer: services.renders.rendererAvailable,
+      frames: services.frames.available,
+      imports: services.importer.available,
       engineTools: services.engine?.tools.length ?? 0,
     }),
   );

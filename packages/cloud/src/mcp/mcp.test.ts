@@ -293,6 +293,22 @@ describe("import_media_from_url", () => {
     await client.close();
   });
 
+  it("keeps two different files that share a name", async () => {
+    const h = await harness({ prober: fakeProber, network });
+    const server = createServer((req, res) => res.writeHead(200, { "content-type": "video/mp4" }).end(`bytes of ${req.url}`));
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    const client = await connect(h, await pat(h));
+    const projectId = (await call(client, "create_project", { name: "P" })).structuredContent?.project_id as string;
+    const a = await call(client, "import_media_from_url", { url: `http://media.test:${port}/a/clip.mp4` });
+    const b = await call(client, "import_media_from_url", { url: `http://media.test:${port}/b/clip.mp4` });
+    expect(b.structuredContent?.file_id).not.toBe(a.structuredContent?.file_id);
+    const { project } = await h.services.projects.get(USER_A, projectId);
+    expect(project.files.map((f) => f.path)).toEqual(["clip.mp4", `clip-${String(b.structuredContent?.sha256).slice(0, 8)}.mp4`]);
+    await client.close();
+  });
+
   it("refuses redirects to private addresses and web pages", async () => {
     const h = await harness({ prober: fakeProber, network });
     const port = await mediaServer(Buffer.from("<html></html>"), "text/html");

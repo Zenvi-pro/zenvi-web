@@ -47,6 +47,8 @@ export interface Dependencies {
   fetchClientDocument?: JsonFetcher;
   /** Network policy for server-side downloads (tests loosen it). */
   network?: { policy?: UrlPolicy; resolver?: Resolver };
+  /** Built-in renderer assets (`@transitions/…`) on disk. */
+  resolveAsset?: (projectPath: string) => string | undefined;
 }
 
 export interface Services {
@@ -112,6 +114,7 @@ export function createServices(deps: Dependencies): Services {
       log,
       tmpDir: config.renderTmpDir,
       maxRenderMediaBytes: config.limits.maxRenderMediaBytes,
+      resolveAsset: deps.resolveAsset,
     }),
     devices: new DeviceService(tables, tokens, clock, config.editorUrl, config.tokens.devicePatDays),
     clients,
@@ -134,7 +137,7 @@ export function createServices(deps: Dependencies): Services {
       policy: deps.network?.policy,
       resolver: deps.network?.resolver,
     }),
-    frames: new FrameService(renderer, cache, blobs, clock),
+    frames: new FrameService(renderer, cache, blobs, clock, deps.resolveAsset),
     limiter: new RateLimiter(clock),
     engine: deps.engine ?? null,
     startedAt: clock.now(),

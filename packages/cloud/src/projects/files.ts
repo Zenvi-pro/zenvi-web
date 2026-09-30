@@ -1,51 +1,36 @@
 /**
- * Add imported media to a project's bin inside a ProjectDocument transaction.
+ * Add imported media to a project's bin inside a ProjectDocument transaction,
+ * with the engine's `addFile` op (dedupes by path and by sha256 fingerprint,
+ * so importing the same bytes twice records nothing).
  *
- * Stand-in for the engine's `addFile` op (W1 `packages/engine/src/ops/files.ts`,
- * not yet exported from `@zenvi/engine`); owner W7, replace with the engine op
- * once exported. Mirrors it: desktop file entry = reader info + id +
- * media_type (zenvi-core src/windows/models/files_model.py `add_files`),
- * deduplicated by sha256 so importing the same bytes twice is a no-op.
+ * Cloud imports are named after the file (`beach.mp4`), so two different
+ * files can share a name; the second gets a hash-suffixed path so `addFile`
+ * does not mistake it for the first.
  */
 
-import { randomInt } from "node:crypto";
-import type { ImportedMedia, MediaType, ProjectFile, Transaction } from "@zenvi/engine";
+import { addFile, type ImportedMedia, OpError, type ProjectFile, type Transaction } from "@zenvi/engine";
+import { ApiError } from "../http/errors.js";
 
-const ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-/** 10 characters from A-Z0-9, like the desktop's `generate_id` (project_data.py). */
-export function newObjectId(taken: ReadonlySet<string>): string {
-  for (;;) {
-    let id = "";
-    for (let i = 0; i < 10; i += 1) id += ID_ALPHABET[randomInt(ID_ALPHABET.length)];
-    if (!taken.has(id)) return id;
-  }
-}
-
-export function mediaTypeOf(info: ImportedMedia["info"]): MediaType {
-  if (info.media_type === "video" || info.media_type === "audio" || info.media_type === "image") return info.media_type;
-  if (info.has_single_image) return "image";
-  if (info.has_video) return "video";
-  return "audio";
+function withSuffix(path: string, suffix: string): string {
+  const dot = path.lastIndexOf(".");
+  return dot > 0 ? `${path.slice(0, dot)}-${suffix}${path.slice(dot)}` : `${path}-${suffix}`;
 }
 
 /** Returns the file entry and whether it was newly added. */
 export function addMediaFile(tx: Transaction, media: ImportedMedia): { file: ProjectFile; added: boolean } {
-  const sha = media.fingerprint?.sha256 ?? media.cloud?.sha256;
-  const existing = tx.project.files.find(
-    (file) => (sha !== undefined && (file.fingerprint?.sha256 === sha || file.cloud?.sha256 === sha)) || file.path === media.path,
-  );
-  if (existing) return { file: existing, added: false };
-  const taken = new Set(tx.project.files.map((f) => f.id));
-  const file: ProjectFile = {
-    ...media.info,
-    id: newObjectId(taken),
-    path: media.path,
-    media_type: mediaTypeOf(media.info),
-    ...(media.name ? { name: media.name } : {}),
-    ...(media.fingerprint ? { fingerprint: media.fingerprint } : {}),
-    ...(media.cloud ? { cloud: media.cloud } : {}),
-  };
-  tx.insert(["files"], file);
-  return { file, added: true };
+  const before = new Set(tx.project.files.map((file) => file.id));
+  const sha = media.fingerprint?.sha256;
+  let entry = media;
+  const clash = tx.project.files.find((file) => file.path === media.path);
+  if (clash && sha !== undefined && clash.fingerprint?.sha256 !== sha && clash.cloud?.sha256 !== sha) {
+    const path = withSuffix(media.path, sha.slice(0, 8));
+    entry = { ...media, path, info: { ...media.info, path } };
+  }
+  try {
+    const file = addFile(tx, entry);
+    return { file, added: !before.has(file.id) };
+  } catch (error) {
+    if (error instanceof OpError) throw new ApiError(422, "invalid_media", error.message);
+    throw error;
+  }
 }
