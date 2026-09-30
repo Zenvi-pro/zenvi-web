@@ -17,6 +17,7 @@ import type { Transaction } from "../history/document.js";
 import type { Layer, Project } from "../model/types.js";
 import { idFactory } from "../model/ids.js";
 import { findLayerById } from "../model/query.js";
+import { sortedLayers } from "../timeline/queries.js";
 import { OpError, invalid, requireLayer } from "./errors.js";
 
 /** Track number spacing (main_window.py `renumber_all_layers` stride). */
@@ -29,10 +30,6 @@ export interface AddTrackOptions {
   below?: number;
   label?: string;
   id?: string;
-}
-
-function sortedLayers(project: Project): Layer[] {
-  return [...project.layers].sort((a, b) => a.number - b.number);
 }
 
 /**
