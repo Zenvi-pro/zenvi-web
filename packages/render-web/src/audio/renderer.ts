@@ -10,7 +10,7 @@
  */
 
 import { AudioSampleSink, type AudioSample } from "mediabunny";
-import type { AudioSegment, EffectInstance } from "@zenvi/engine/render";
+import type { AudioPlan, AudioSegment, EffectInstance } from "@zenvi/engine/render";
 import type { RenderEngine } from "../engine.js";
 import type { MediaLease, MediaRef, MediaRegistry } from "../media/registry.js";
 import { PcmCursor } from "./pcm-cursor.js";
@@ -87,6 +87,33 @@ export class AudioRenderer {
       this.runKernels(kernels, channels, audio.sampleRate, lane.effectState);
     }
     return { piece, channels, sampleRate: audio.sampleRate, speed };
+  }
+
+  /**
+   * Close the decoders of clips whose segments in `plan` all end at or before
+   * `time` (timeline seconds): playback and export have passed them. Without
+   * this a long timeline would keep one decoder per clip open.
+   */
+  async releaseEnded(plan: AudioPlan, time: number): Promise<void> {
+    const live = new Set(plan.segments.filter((s) => s.timelineStart + s.duration > time).map((s) => s.clipId));
+    const ended = new Set(plan.segments.filter((s) => !live.has(s.clipId)).map((s) => s.clipId));
+    if (ended.size === 0) return;
+    const closing: Promise<void>[] = [];
+    for (const [id, pending] of this.lanes) {
+      const clipId = id.slice(id.lastIndexOf("#") + 1);
+      if (!ended.has(clipId)) continue;
+      this.lanes.delete(id);
+      closing.push(
+        pending.then(
+          async (lane) => {
+            await lane.cursor?.close();
+            lane.lease.release();
+          },
+          () => undefined,
+        ),
+      );
+    }
+    await Promise.all(closing);
   }
 
   /** Forget decode positions and effect state (after a seek). */

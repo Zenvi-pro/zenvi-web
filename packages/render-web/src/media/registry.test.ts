@@ -38,7 +38,7 @@ describe("MediaRegistry", () => {
     expect(a.media.video).toBeNull();
     expect(a.media.audio).toMatchObject({ codec: "pcm-s16", sampleRate: 8000, channels: 2 });
     expect(a.media.timeOffset).toBe(0);
-    expect(a.media.duration).toBeCloseTo(1.5, 3);
+    expect(await a.media.duration()).toBeCloseTo(1.5, 3);
     a.release();
     b.release();
     media.dispose();
@@ -76,7 +76,7 @@ describe("MediaRegistry", () => {
     expect(seen).toEqual(["file:F1"]);
     const v2 = await media.acquire({ fileId: "F1" });
     expect(v2.media.version).toBe(2);
-    expect(v2.media.duration).toBeCloseTo(2, 3);
+    expect(await v2.media.duration()).toBeCloseTo(2, 3);
     // The old input stays usable for whoever still holds it, then goes away.
     expect(v1.media.input.disposed).toBe(false);
     v1.release();

@@ -157,6 +157,7 @@ export async function exportProject(project: Project, media: MediaRegistry, opti
       const to = Math.min(end, audioAt + AUDIO_WINDOW);
       const buffer = await mixWindow(audio, audioPlan, audioAt, to, sampleRate, channels);
       await audioSource.add(buffer);
+      await audio.releaseEnded(audioPlan, to);
       audioAt = to;
     }
   };

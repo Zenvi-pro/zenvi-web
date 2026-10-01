@@ -77,6 +77,7 @@ describe("AudioPlayback", () => {
         return piece ? { piece, channels: [new Float32Array(piece.endFrame - piece.startFrame)], sampleRate: 1000, speed: piece.speed } : null;
       },
       async reset() {},
+      async releaseEnded() {},
       async dispose() {},
     } as unknown as AudioRenderer;
   }
@@ -122,6 +123,7 @@ describe("AudioPlayback", () => {
         return { piece, channels: [new Float32Array(piece.endFrame - piece.startFrame)], sampleRate: 1000, speed: 1 };
       },
       async reset() {},
+      async releaseEnded() {},
     } as unknown as AudioRenderer;
     const playback = new AudioPlayback({ context: ctx as unknown as AudioContext, renderer });
     playback.start(plan, { timeline: 0, context: 0, rate: 1 });

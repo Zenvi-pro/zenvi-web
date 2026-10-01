@@ -35,8 +35,9 @@ export async function generateThumbnails(media: MediaRegistry, fileId: string, o
 
   const lease = await media.acquire(ref);
   try {
-    const { video, timeOffset, duration } = lease.media;
+    const { video, timeOffset } = lease.media;
     if (!video) return [];
+    const duration = await lease.media.duration();
     const width = Math.max(1, Math.round((height * video.displayWidth) / Math.max(1, video.displayHeight)));
     const times = options.times ?? evenlySpacedTimes(options.count ?? 1, duration);
     const targets = times.map((t) => timeOffset + Math.min(Math.max(0, t), Math.max(0, duration)));
@@ -130,8 +131,9 @@ export async function generateWaveform(media: MediaRegistry, fileId: string, opt
   if (peaks.length === 0 || kind === "image" || kind === "svg") return peaks;
   const lease = await media.acquire({ fileId });
   try {
-    const { audio, timeOffset, duration } = lease.media;
+    const { audio, timeOffset } = lease.media;
     if (!audio || !audio.canDecode) return peaks;
+    const duration = await lease.media.duration();
     const start = Math.max(0, options.start ?? 0);
     const end = Math.min(duration, options.end ?? duration);
     if (!(end > start)) return peaks;

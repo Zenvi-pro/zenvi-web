@@ -54,7 +54,6 @@ interface MediaSlot {
   /** Null when the media has no video stream. */
   sink: VideoSampleSink | null;
   keyframes: KeyframeIndex;
-  lastTimestamp: Promise<number | null>;
   lastUsed: number;
 }
 
@@ -89,9 +88,9 @@ export class FrameProvider {
     slot.lastUsed = this.now();
 
     const applyRotation = request.applyRotation ?? true;
-    const last = await slot.lastTimestamp;
-    let timestamp = decodeTimestamp(request.sourceTime, media.timeOffset, video.frameDuration);
-    if (last !== null) timestamp = Math.min(timestamp, last);
+    // Past the end the last picture freezes: a cursor that reaches the end
+    // gives it an open-ended span, so later requests hit the cache.
+    const timestamp = decodeTimestamp(request.sourceTime, media.timeOffset, video.frameDuration);
 
     const quarterTurn = video.rotation === 90 || video.rotation === 270;
     const natural: Size =
@@ -201,7 +200,7 @@ export class FrameProvider {
 function makeSlot(lease: MediaLease, now: number): MediaSlot {
   const video = lease.media.video;
   if (!video) {
-    return { lease, sink: null, keyframes: { nextKeyframeAfter: async () => null }, lastTimestamp: Promise.resolve(null), lastUsed: now };
+    return { lease, sink: null, keyframes: { nextKeyframeAfter: async () => null }, lastUsed: now };
   }
   const packets = new EncodedPacketSink(video.track);
   const keyframes: KeyframeIndex = {
@@ -211,8 +210,5 @@ function makeSlot(lease: MediaLease, now: number): MediaSlot {
       return next ? next.timestamp : null;
     },
   };
-  // The last picture's timestamp: requests past it clamp there, so the frozen
-  // last picture hits the cache instead of re-decoding.
-  const lastTimestamp = packets.getPacket(Infinity, { metadataOnly: true }).then((p) => (p ? p.timestamp : null), () => null);
-  return { lease, sink: new VideoSampleSink(video.track), keyframes, lastTimestamp, lastUsed: now };
+  return { lease, sink: new VideoSampleSink(video.track), keyframes, lastUsed: now };
 }

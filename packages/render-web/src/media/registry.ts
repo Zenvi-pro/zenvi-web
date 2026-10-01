@@ -60,8 +60,12 @@ export interface OpenMedia {
    * timestamps (codec priming) are never presented.
    */
   readonly timeOffset: number;
-  /** End of the media in seconds of source time. */
-  readonly duration: number;
+  /**
+   * End of the media in seconds of source time. From container metadata when
+   * it has it; otherwise computed from the last packets on first call (which
+   * can read much of a file without an index), so it is a method.
+   */
+  duration(): Promise<number>;
 }
 
 export interface MediaLease {
@@ -388,8 +392,12 @@ async function describeInput(input: Input): Promise<Omit<OpenMedia, "key" | "ver
   const video = videoTrack ? await describeVideo(videoTrack) : null;
   const audio = audioTrack ? await describeAudio(audioTrack) : null;
   const timeOffset = Math.max(0, video ? video.firstTimestamp : (audio?.firstTimestamp ?? 0));
-  const end = (await input.getDurationFromMetadata()) ?? (await input.computeDuration());
-  return { video, audio, timeOffset, duration: Math.max(0, end - timeOffset) };
+  let end: Promise<number> | null = null;
+  const duration = () => {
+    end ??= input.getDurationFromMetadata().then(async (stored) => Math.max(0, (stored ?? (await input.computeDuration())) - timeOffset));
+    return end;
+  };
+  return { video, audio, timeOffset, duration };
 }
 
 async function canDecode(track: InputVideoTrack | InputAudioTrack): Promise<boolean> {

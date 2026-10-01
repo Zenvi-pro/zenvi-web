@@ -15,7 +15,11 @@ import { PcmCursor } from "./pcm-cursor.js";
 interface Lane {
   lease: MediaLease;
   cursor: PcmCursor<AudioSample> | null;
+  lastUsed: number;
 }
+
+/** Lanes (decoders) of clips not read for this long are closed. */
+const IDLE_LANE_MS = 5000;
 
 /** Stretch `input` (planar) to exactly `frames` frames by linear interpolation. */
 export function fitFrames(input: readonly Float32Array[], frames: number): Float32Array[] {
@@ -50,6 +54,8 @@ export class KernelAudioSource {
     const entry = await this.lane(request, lane);
     const audio = entry?.lease.media.audio;
     if (!entry?.cursor || !audio) return null;
+    entry.lastUsed = performance.now();
+    void this.closeIdle(entry.lastUsed);
     const rate = audio.sampleRate;
     // Integer frame bounds: consecutive windows of a clip are contiguous reads.
     const startFrame = Math.round(request.sourceStart * rate);
@@ -57,6 +63,16 @@ export class KernelAudioSource {
     const raw = await entry.cursor.read(startFrame, Math.max(startFrame, endFrame));
     const samples = Math.max(0, Math.round(request.samples));
     return { sampleRate: request.sampleRate, channels: mapChannels(fitFrames(raw, samples), request.channels, samples) };
+  }
+
+  private async closeIdle(now: number): Promise<void> {
+    for (const [id, pending] of this.lanes) {
+      const lane = await pending.catch(() => null);
+      if (!lane || now - lane.lastUsed <= IDLE_LANE_MS || this.lanes.get(id) !== pending) continue;
+      this.lanes.delete(id);
+      await lane.cursor?.close();
+      lane.lease.release();
+    }
   }
 
   /** Forget decode positions (after a seek). */
@@ -89,7 +105,7 @@ export class KernelAudioSource {
           audio && audio.canDecode
             ? new PcmCursor(new AudioSampleSink(audio.track), { timeOffset: lease.media.timeOffset, sampleRate: audio.sampleRate, channels: audio.channels })
             : null;
-        return { lease, cursor };
+        return { lease, cursor, lastUsed: performance.now() };
       });
       this.lanes.set(id, pending);
       pending.catch(() => this.lanes.delete(id));

@@ -142,6 +142,8 @@ export class AudioPlayback {
       this.voices.add(voice);
       voice.source.addEventListener("ended", () => this.voices.delete(voice), { once: true });
     }
+    // Clips that ended before this window no longer need their decoders.
+    await this.renderer.releaseEnded(plan, from);
   }
 
   private applyVolume(): void {
