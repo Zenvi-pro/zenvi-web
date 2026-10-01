@@ -19,5 +19,6 @@ export * from "./history/document.js";
 export * from "./ops/index.js";
 export * from "./io/index.js";
 export * from "./transitions/index.js";
+export * from "./titles/templates.js";
 export type * from "./tools/types.js";
 export type * from "./render/types.js";
