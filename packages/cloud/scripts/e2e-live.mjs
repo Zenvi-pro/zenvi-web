@@ -228,7 +228,11 @@ try {
     const placedClip = await tool(pat, "add_clip_to_timeline_tool", { file_id: imported.structuredContent.file_id, position_seconds: "0" });
     const afterClip = (await http("GET", `/v1/projects/${mcpProject}`, { token: pat })).data;
     check("tool add_clip_to_timeline_tool (engine catalog)", !placedClip?.isError && afterClip?.stats?.clips === 1, placedClip?.content?.[0]?.text);
+    const pngOf = (result) => Buffer.from(result?.content?.find((c) => c.type === "image")?.data ?? "", "base64");
+    const beforeTitle = pngOf(await tool(pat, "preview_frame", { time_seconds: 1, width: 320 }));
     const titled = await tool(pat, "add_title_tool", { text: "Zenvi E2E", duration_seconds: "2" });
+    const withTitle = pngOf(await tool(pat, "preview_frame", { time_seconds: 1, width: 320 }));
+    check("the title shows in a cloud-rendered frame", beforeTitle.length > 0 && withTitle.length > 0 && !beforeTitle.equals(withTitle), `frame without ${beforeTitle.length} B, with title ${withTitle.length} B`);
     const afterTitle = (await http("GET", `/v1/projects/${mcpProject}`, { token: pat })).data;
     const titleFile = afterTitle?.project?.files?.find((f) => String(f.path).startsWith("@assets/title/"));
     check(
