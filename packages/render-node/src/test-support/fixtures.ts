@@ -128,12 +128,13 @@ export async function ffprobeJson(file: string): Promise<{ streams: Array<Record
   return JSON.parse(stdout) as { streams: Array<Record<string, unknown>>; format: Record<string, unknown> };
 }
 
-/** Linear RMS of a file's audio over all channels (ffmpeg astats "Overall"). */
-export async function audioRms(file: string, range?: { start: number; duration: number }): Promise<number> {
+/** Linear RMS of a file's audio over all channels (ffmpeg astats "Overall"), or of one channel. */
+export async function audioRms(file: string, range?: { start: number; duration: number }, channel?: number): Promise<number> {
   const seek = range ? ["-ss", String(range.start), "-t", String(range.duration)] : [];
+  const pick = channel !== undefined ? `pan=mono|c0=c${channel},` : "";
   const { stderr } = await exec(
     resolveBinary("ffmpeg"),
-    ["-hide_banner", "-nostats", ...seek, "-i", file, "-vn", "-af", "astats=measure_perchannel=none", "-f", "null", "-"],
+    ["-hide_banner", "-nostats", ...seek, "-i", file, "-vn", "-af", `${pick}astats=measure_perchannel=none`, "-f", "null", "-"],
     { maxBuffer: 8 * 1024 * 1024 },
   );
   const matches = [...stderr.matchAll(/RMS level dB:\s*(-?[\d.]+|-inf)/g)];

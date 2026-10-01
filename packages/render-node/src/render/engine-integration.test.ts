@@ -7,14 +7,14 @@ import { execFile } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { addClip, addFile, createProject, ProjectDocument, type Project } from "@zenvi/engine";
+import { addClip, addFile, createProject, ProjectDocument, setClipKeyframes, setClipProperty, type Project } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { liveChildCount } from "../ffmpeg/process.js";
 import { probe } from "../probe/probe.js";
 import { encodePng } from "../image/png.js";
 import { createRgba } from "../image/rgba.js";
-import { decodeRgba, ffprobeJson, makeTempDir, removeDir } from "../test-support/fixtures.js";
+import { audioRms, decodeRgba, ffprobeJson, makeAudio, makeTempDir, removeDir } from "../test-support/fixtures.js";
 import { renderFrameImage } from "./render-frame.js";
 import { renderProject } from "./render-project.js";
 
@@ -35,13 +35,16 @@ async function numberedVideo(file: string): Promise<string> {
 
 const frameOf = (gray: number) => Math.round((gray * 219) / 255 / 3);
 
-async function project(clips: Array<{ file: string; position: number; start?: number; end?: number }>): Promise<Project> {
+type ClipEdit = (tx: Parameters<Parameters<ProjectDocument["transaction"]>[1]>[0], clipId: string) => void;
+
+async function project(clips: Array<{ file: string; position: number; start?: number; end?: number; edit?: ClipEdit }>): Promise<Project> {
   const doc = new ProjectDocument(createProject({ profile: "HD 720p 30 fps" }));
   for (const c of clips) {
     const info = await probe(c.file);
     doc.transaction("add", (tx) => {
       const file = addFile(tx, { path: c.file, info });
-      addClip(tx, { fileId: file.id, position: c.position, layer: doc.project.layers[0]!.number, start: c.start, end: c.end });
+      const clip = addClip(tx, { fileId: file.id, position: c.position, layer: doc.project.layers[0]!.number, start: c.start, end: c.end });
+      c.edit?.(tx, clip.id);
     });
   }
   return doc.project;
@@ -106,6 +109,55 @@ describe("render with the engine planner and compositor", () => {
     expect([image.width, image.height]).toEqual([320, 180]);
     const center = image.data[((90 * 320) + 160) * 4]!;
     expect(frameOf(center)).toBe(30);
+  });
+
+  it("mixes clip audio with its volume (planAudio)", async () => {
+    const tone = await makeAudio(dir, "tone.wav", { hz: 1000, duration: 2, amplitude: 0.5, channels: 1 });
+    const out = path.join(dir, "half.wav");
+    const result = await renderProject(await project([{ file: tone, position: 0, edit: (tx, id) => setClipProperty(tx, id, "volume", 0.5) }]), {
+      resolveMedia: (p) => p,
+      output: out,
+      options: { format: "wav", width: 160, height: 90, fps: { num: 30, den: 1 } },
+    });
+    expect(result.warnings).toEqual([]);
+    // 0.5 sine, mono upmixed at -3 dB, gain 0.5 → 0.125
+    const rms = await audioRms(out, { start: 0.2, duration: 1.5 });
+    expect(rms).toBeGreaterThan(0.115);
+    expect(rms).toBeLessThan(0.135);
+  });
+
+  it("follows volume keyframes (fade in)", async () => {
+    const tone = await makeAudio(dir, "tone2.wav", { hz: 1000, duration: 2, amplitude: 0.5, channels: 2 });
+    const out = path.join(dir, "fade.wav");
+    const fade: ClipEdit = (tx, id) => setClipKeyframes(tx, id, "volume", [{ frame: 1, value: 0, interpolation: 1 }, { frame: 31, value: 1, interpolation: 1 }]);
+    await renderProject(await project([{ file: tone, position: 0, edit: fade }]), {
+      resolveMedia: (p) => p,
+      output: out,
+      options: { format: "wav", width: 160, height: 90, fps: { num: 30, den: 1 } },
+    });
+    const early = await audioRms(out, { start: 0.02, duration: 0.2 });
+    const late = await audioRms(out, { start: 1.2, duration: 0.5 });
+    expect(early).toBeLessThan(late * 0.3);
+    // Full gain after the fade: the fixture's 0.5 sine is upmixed to stereo at -3 dB → RMS 0.25.
+    expect(late).toBeGreaterThan(0.23);
+    expect(late).toBeLessThan(0.27);
+  });
+
+  it("applies channel_filter and channel_mapping", async () => {
+    const leftOnly = path.join(dir, "left.wav");
+    await exec(resolveBinary("ffmpeg"), ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "aevalsrc=0.5*sin(2*PI*1000*t)|0:s=48000:d=1", "-c:a", "pcm_s16le", leftOnly]);
+    const out = path.join(dir, "swapped.wav");
+    const route: ClipEdit = (tx, id) => {
+      setClipProperty(tx, id, "channel_filter", 0);
+      setClipProperty(tx, id, "channel_mapping", 1);
+    };
+    await renderProject(await project([{ file: leftOnly, position: 0, edit: route }]), {
+      resolveMedia: (p) => p,
+      output: out,
+      options: { format: "wav", width: 160, height: 90, fps: { num: 30, den: 1 } },
+    });
+    expect(await audioRms(out, { start: 0.1, duration: 0.8 }, 0)).toBeLessThan(0.001);
+    expect(await audioRms(out, { start: 0.1, duration: 0.8 }, 1)).toBeGreaterThan(0.3);
   });
 
   it("draws still images (natural size, scaled by the compositor)", async () => {
