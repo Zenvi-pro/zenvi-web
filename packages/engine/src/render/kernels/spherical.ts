@@ -35,7 +35,6 @@ import { fmaExact } from "./lens-flare.js";
 import { int, num } from "./params.js";
 import type { KernelSpec, Params } from "./types.js";
 
-const f32 = Math.fround;
 const DEG = Math.PI / 180;
 const HALF_PI = Math.PI / 2;
 const TWO_PI = 2 * Math.PI;
