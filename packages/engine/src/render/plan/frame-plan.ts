@@ -159,7 +159,7 @@ interface Stage {
 /** Timeline effects on the clip's layer at `f` (Timeline::apply_effects, Timeline.cpp:561-607). */
 function timelineEffects(project: Project, layer: number, f: number, fps: Fraction, before: Stage, after: Stage): void {
   for (const raw of sortEffects(project.effects ?? [])) {
-    const effect = raw as Effect;
+    const effect = raw as unknown as Effect;
     if (int(effect.layer) !== layer) continue;
     const window = frameWindow({ position: Number(effect.position ?? 0), start: Number(effect.start ?? 0), end: Number(effect.end ?? 0) }, fps);
     if (!windowContains(window, f)) continue;
