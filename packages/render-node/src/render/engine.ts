@@ -6,6 +6,7 @@
  */
 
 import type { AudioPlan, FramePlan, KernelAudio, PlanSize, Project, RgbaImage, TextRasterizer } from "@zenvi/engine";
+import * as render from "@zenvi/engine/render";
 
 /** What the compositor reads for one frame (engine `CompositeSources`). */
 export interface CompositeSources {
@@ -34,33 +35,24 @@ export interface RenderEngine {
   compositeFrame(plan: FramePlan, sources: CompositeSources): RgbaImage;
   /** A fresh compositor state for one sequential render. */
   createState(): unknown;
+  /** Set when this build lacks part of the pipeline (rendered anyway, degraded). */
+  limitations?: string[];
 }
 
-type EngineRenderModule = {
-  planFrame?: RenderEngine["planFrame"];
-  planAudio?: RenderEngine["planAudio"];
-  compositeFrame?: (plan: FramePlan, sources: CompositeSources, out?: RgbaImage) => RgbaImage;
-  createCompositorState?: () => unknown;
-};
+type PlanAudio = RenderEngine["planAudio"];
 
-let cached: Promise<RenderEngine> | undefined;
-
-/** The engine's planner and compositor. Fails clearly if this build lacks them. */
-export function defaultRenderEngine(): Promise<RenderEngine> {
-  cached ??= import("@zenvi/engine/render").then((mod) => {
-    const m = mod as unknown as EngineRenderModule;
-    const { planFrame, planAudio, compositeFrame } = m;
-    if (!planFrame || !planAudio || !compositeFrame) {
-      throw new Error("This Zenvi build has no frame planner/compositor (@zenvi/engine/render); rendering is unavailable.");
-    }
-    return {
-      planFrame,
-      planAudio,
-      compositeFrame: (plan, sources) => compositeFrame(plan, sources),
-      createState: () => (m.createCompositorState ? m.createCompositorState() : undefined),
-    };
-  });
-  return cached;
+/** The engine's planner and compositor. */
+export async function defaultRenderEngine(): Promise<RenderEngine> {
+  const planAudio = (render as unknown as { planAudio?: PlanAudio }).planAudio;
+  const limitations: string[] = [];
+  if (!planAudio) limitations.push("This build has no audio planner yet: renders are silent.");
+  return {
+    planFrame: (project, frame, size, options) => render.planFrame(project, frame, size, options),
+    planAudio: planAudio ?? ((project, range) => ({ sampleRate: project.sample_rate, channels: project.channels, start: range.start, end: range.end, segments: [] })),
+    compositeFrame: (plan, sources) => render.compositeFrame(plan, sources as render.CompositeSources),
+    createState: () => render.createCompositorState(),
+    limitations,
+  };
 }
 
 /** Effects that draw text and need the font hook. */

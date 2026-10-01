@@ -123,7 +123,7 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
     : path.join(outDir, `.${path.basename(destination)}.${token}.partial${path.extname(destination)}`);
   const scriptPath = path.join(outDir, `.zenvi-render-${token}.filtergraph`);
 
-  const warnings: string[] = [];
+  const warnings: string[] = [...(engine.limitations ?? [])];
   const sources = new SourceManager(project, { resolveMedia: opts.resolveMedia, quality: opts.scaleQuality ?? "export", signal });
   let encoder: ReturnType<typeof spawnManaged> | undefined;
   let scriptWritten = false;
