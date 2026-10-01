@@ -83,7 +83,7 @@ export async function fakeDesktop(token: string, project?: string): Promise<Fake
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const args = (request.params.arguments ?? {}) as Record<string, unknown>;
       state.calls.push({ tool: request.params.name, args });
-      if (request.params.name === "open_project_tool") state.project = String(args.path);
+      if (request.params.name === "open_project_tool") state.project = String(args.file_path);
       const receipt = applied(request.params.name, `desktop ran ${request.params.name}`, { data: { project: state.project ?? null } }, request.params.name === "add_marker_tool" ? 1 : 0);
       const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [{ type: "text", text: JSON.stringify(receipt) }];
       if (request.params.name === "inspect_timeline_tool") content.push({ type: "image", data: Buffer.from("fake-jpeg").toString("base64"), mimeType: "image/jpeg" });

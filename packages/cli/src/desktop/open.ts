@@ -41,7 +41,7 @@ export async function openInDesktop(options: OpenOptions): Promise<OpenResult> {
     }
     const client = new DesktopClient(gui, options.clientVersion);
     try {
-      const result = await client.callTool("open_project_tool", { path: project });
+      const result = await client.callTool("open_project_tool", { file_path: project });
       if (result.isError) throw new CliError(`Zenvi could not open the project: ${(result.receipt?.summary ?? result.text).replace(/^Error:\s*/, "")}`);
     } finally {
       await client.close();

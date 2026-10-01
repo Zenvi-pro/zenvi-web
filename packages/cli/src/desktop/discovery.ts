@@ -1,10 +1,15 @@
 /**
  * Finding a running Zenvi desktop app's MCP server.
  *
- * Contract (agreed with zenvi-core, branch jashan/headless-runtime): the GUI
- * writes `~/.openshot_qt/gui_mcp.json`, the headless runtime
- * `~/.openshot_qt/headless_mcp.json`, both
- * `{"url","token_file","pid","project","version"}`.
+ * Contract (zenvi-core #233, classes/mcp_discovery.py): the GUI writes
+ * `~/.openshot_qt/gui_mcp.json`, `launch.py --headless`
+ * `~/.openshot_qt/headless_mcp.json` (Windows: %USERPROFILE%\.openshot_qt),
+ * exactly `{"url","token_file","pid","project","version"}`; the bearer is the
+ * token file's contents; `project` is null while untitled. The files are
+ * removed on a clean exit but a crash leaves them, so `pid` and `url` are a
+ * claim: an endpoint counts only when its pid is alive AND its URL answers
+ * one `initialize` (the desktop's server is stateless, so this leaves
+ * nothing behind).
  *
  * Safety: generic port probes have crashed running desktop apps (SIGPIPE).
  * So this module only ever contacts the exact URL a discovery file names,
@@ -71,7 +76,7 @@ interface DiscoveryFile {
   version?: unknown;
 }
 
-async function fromFile(config: ZenviConfig, name: string, kind: "gui" | "headless"): Promise<DesktopEndpoint | undefined> {
+async function fromFile(config: ZenviConfig, name: string, kind: "gui" | "headless", options: DiscoverOptions): Promise<DesktopEndpoint | undefined> {
   const file = path.join(config.desktopDir, name);
   let data: DiscoveryFile;
   try {
@@ -89,6 +94,7 @@ async function fromFile(config: ZenviConfig, name: string, kind: "gui" | "headle
       : path.join(config.desktopDir, "mcp_token");
   const token = await readToken(tokenFile);
   if (!token) return undefined;
+  if (options.verify !== false && !(await probeEndpoint(data.url, token, options))) return undefined;
   const project = typeof data.project === "string" && data.project ? data.project : undefined;
   return {
     kind,
@@ -104,16 +110,23 @@ async function fromFile(config: ZenviConfig, name: string, kind: "gui" | "headle
 export interface DiscoverOptions {
   /** Also try the legacy fixed endpoint (one initialize request). */
   legacy?: boolean;
+  /** Check that a discovery file's URL answers (default true). */
+  verify?: boolean;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   clientVersion?: string;
 }
 
 /** One JSON-RPC initialize to the legacy endpoint; true when it answers like an MCP server. */
-export async function probeLegacy(token: string, options: DiscoverOptions = {}): Promise<boolean> {
+export function probeLegacy(token: string, options: DiscoverOptions = {}): Promise<boolean> {
+  return probeEndpoint(LEGACY_URL, token, options);
+}
+
+/** One JSON-RPC initialize to `url` (an exact discovery URL); true when it answers like an MCP server. */
+export async function probeEndpoint(url: string, token: string, options: DiscoverOptions = {}): Promise<boolean> {
   const doFetch = options.fetchImpl ?? fetch;
   try {
-    const response = await doFetch(LEGACY_URL, {
+    const response = await doFetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -153,7 +166,7 @@ export async function discoverDesktop(config: ZenviConfig, options: DiscoverOpti
     ["gui_mcp.json", "gui"],
     ["headless_mcp.json", "headless"],
   ] as const) {
-    const endpoint = await fromFile(config, name, kind);
+    const endpoint = await fromFile(config, name, kind, options);
     if (endpoint) found.push(endpoint);
   }
   if (found.length === 0 && options.legacy) {

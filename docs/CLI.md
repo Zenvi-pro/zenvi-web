@@ -226,14 +226,23 @@ with nothing on them are the background, composited once.
   desktop entry. For a development checkout set
   `ZENVI_DESKTOP_CMD="/path/to/zenvi/.venv/bin/python /path/to/zenvi/src/launch.py"`.
 
-A running app is found through the discovery files it writes,
-`~/.openshot_qt/gui_mcp.json` (GUI) and `~/.openshot_qt/headless_mcp.json`
-(headless runtime): `{"url", "token_file", "pid", "project", "version"}`.
-`zenvi` only trusts a file whose `pid` is alive and whose URL is a loopback
-address, and only contacts that URL. For desktop builds without discovery
-files, `--desktop` (and `zenvi doctor`) send a single JSON-RPC `initialize`
-to `http://127.0.0.1:7434/mcp` with the token in `~/.openshot_qt/mcp_token`;
-`zenvi` never scans ports.
+A running app is found through the discovery files it writes (zenvi-core
+#233), `~/.openshot_qt/gui_mcp.json` (the window) and
+`~/.openshot_qt/headless_mcp.json` (`launch.py --headless`; on Windows both
+in `%USERPROFILE%\.openshot_qt`): exactly `{"url", "token_file", "pid",
+"project", "version"}`, with the bearer token in `token_file` and `project`
+null while untitled. A crashed app leaves its file behind, so `zenvi` trusts
+a file only when its `pid` is alive, its URL is a loopback address, and that
+URL answers one JSON-RPC `initialize` with the token; it contacts no other
+address. For desktop builds without discovery files, `--desktop` (and
+`zenvi doctor`) send a single `initialize` to `http://127.0.0.1:7434/mcp`
+with the token in `~/.openshot_qt/mcp_token`; `zenvi` never scans ports.
+
+Renders sent to the app (`zenvi render` while it has the project open) use
+its `export_video_tool`. On macOS, when the app's export settings name
+`h264_videotoolbox` (which aborts with libopenshot 1.0), `zenvi` first sets
+the project's export codec to `libx264` with `set_export_setting_tool` (no
+undo step).
 
 ## Signing in and Zenvi Cloud
 

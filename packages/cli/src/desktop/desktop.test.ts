@@ -1,4 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { createProject } from "@zenvi/engine";
 import { makeTempDir, removeDir } from "@zenvi/render-node/test-support";
@@ -7,6 +9,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { loadConfig } from "../config.js";
 import { fakeDesktop, testEnv, writeDiscovery, zenvi, type FakeDesktop } from "../test-support/harness.js";
 import { testRegistry } from "../test-support/registry.js";
+import { exportOnDesktop } from "../commands/render.js";
+import type { CallOutcome, Executor } from "../engine/executor.js";
 import { discoverDesktop, hasProjectOpen, isLoopbackUrl, LEGACY_URL, probeLegacy } from "./discovery.js";
 import type { LauncherDeps } from "./launcher.js";
 import { openInDesktop } from "./open.js";
@@ -32,6 +36,7 @@ afterAll(async () => {
 beforeEach(async () => {
   home = await makeTempDir("zenvi-home-");
   desktop.calls.length = 0;
+  desktop.rejected = 0;
   desktop.project = projectFile;
 });
 
@@ -54,6 +59,20 @@ describe("discovery", () => {
     expect(await discoverDesktop(config())).toEqual([]);
     expect(isLoopbackUrl("http://localhost:7434/mcp")).toBe(true);
     expect(isLoopbackUrl("http://10.0.0.2:7434/mcp")).toBe(false);
+  });
+
+  it("skips a file a crashed app left behind: live pid, but its URL does not answer", async () => {
+    const closed = createServer();
+    await new Promise<void>((r) => closed.listen(0, "127.0.0.1", r));
+    const port = (closed.address() as AddressInfo).port;
+    await new Promise((r) => closed.close(r));
+    await writeDiscovery(home, { ...desktop, url: `http://127.0.0.1:${port}/mcp` });
+    expect(await discoverDesktop(config())).toEqual([]);
+    // A wrong token is not an answer either.
+    await writeDiscovery(home, { ...desktop, token: "stale-token" });
+    expect(await discoverDesktop(config())).toEqual([]);
+    await writeDiscovery(home, desktop);
+    expect(await discoverDesktop(config())).toHaveLength(1);
   });
 
   it("lists the GUI before the headless runtime", async () => {
@@ -155,7 +174,8 @@ describe("open in the desktop app", () => {
     const log: string[] = [];
     const result = await openInDesktop({ config: config(), project: other, deps: deps(log) });
     expect(result.method).toBe("loaded");
-    expect(desktop.calls).toEqual([{ tool: "open_project_tool", args: { path: other } }]);
+    // zenvi-core develop's open_project_tool takes (and requires) file_path.
+    expect(desktop.calls).toEqual([{ tool: "open_project_tool", args: { file_path: other } }]);
     expect(log).toEqual(["run open -a /Applications/Zenvi.app"]);
   });
 
@@ -165,3 +185,31 @@ describe("open in the desktop app", () => {
     await expect(openInDesktop({ config: config(), project: projectFile, deps: missing })).rejects.toThrow(/not installed/);
   });
 });
+
+describe("desktop exports", () => {
+  const fakeExecutor = (codec: string, calls: Array<[string, Record<string, unknown>]>): Executor => ({
+    engine: "desktop",
+    async call(name, args): Promise<CallOutcome> {
+      calls.push([name, args]);
+      const text = name === "get_export_settings_tool" ? `Export type: Video & Audio\nVideo: 1920x1080, 30/1 fps, codec ${codec}, format mp4, bitrate 2000000` : "ok";
+      return { engine: "desktop", ok: true, text, images: [] };
+    },
+    async close() {},
+  });
+
+  it("switches h264_videotoolbox to libx264 on macOS before export_video_tool", async () => {
+    const calls: Array<[string, Record<string, unknown>]> = [];
+    await exportOnDesktop(fakeExecutor("h264_videotoolbox", calls), "/tmp/out.mp4", "darwin");
+    expect(calls.map(([name]) => name)).toEqual(["get_export_settings_tool", "set_export_setting_tool", "export_video_tool"]);
+    expect(calls[1]![1]).toEqual({ key: "video_codec", value: "libx264" });
+    expect(calls[2]![1]).toEqual({ show_dialog: "false", output_path: "/tmp/out.mp4" });
+  });
+
+  it("leaves software codecs and other platforms alone", async () => {
+    const calls: Array<[string, Record<string, unknown>]> = [];
+    await exportOnDesktop(fakeExecutor("libx264", calls), undefined, "darwin");
+    await exportOnDesktop(fakeExecutor("h264_videotoolbox", calls), undefined, "linux");
+    expect(calls.map(([name]) => name)).toEqual(["get_export_settings_tool", "export_video_tool", "export_video_tool"]);
+  });
+});
+

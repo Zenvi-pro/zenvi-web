@@ -17,7 +17,7 @@ import { isProjectPath } from "../project/select.js";
 import type { CommandContext } from "../commands/context.js";
 import { cloudClient, keepCloudRefs } from "../commands/account.js";
 import { newProject } from "../commands/project.js";
-import { exportOptionsFrom, type RenderFlags } from "../commands/render.js";
+import { exportOnDesktop, exportOptionsFrom, type RenderFlags } from "../commands/render.js";
 import { parseTime } from "../commands/edit.js";
 import { VERSION } from "../version.js";
 import type { McpState } from "./state.js";
@@ -124,7 +124,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const desktop = await state.desktopExecutor();
         const output = text(args.output) ? path.resolve(ctx.cwd, text(args.output)!) : undefined;
         if (desktop) {
-          const outcome = await desktop.call("export_video_tool", { show_dialog: "false", ...(output ? { output_path: output } : {}) });
+          const outcome = await exportOnDesktop(desktop, output);
           return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)) };
         }
         const session = state.session;

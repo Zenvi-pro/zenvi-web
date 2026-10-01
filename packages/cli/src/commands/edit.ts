@@ -281,6 +281,8 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .description("set a clip's volume (0.5, 50% or -6dB), optionally for a time range")
     .argument("<clip>", "clip id")
     .argument("<level>", "linear gain, percent, or dB")
+    // "-6dB" looks like an option to the parser; let it through as the level.
+    .allowUnknownOption()
     .option("--start <time>", "range start (timeline)")
     .option("--end <time>", "range end (timeline)")
     .action(async (clip: string, level: string, opts: { start?: string; end?: string }) => {

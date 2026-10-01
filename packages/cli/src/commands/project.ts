@@ -114,6 +114,6 @@ export function registerProjectCommands(program: Command, ctx: CommandContext): 
     .description("save the project (optionally to a new file)")
     .argument("[file]", "save as this file")
     .action(async (file?: string) => {
-      await runToolCommand(ctx, "save_project_tool", file ? { path: path.resolve(ctx.cwd, file) } : {});
+      await runToolCommand(ctx, "save_project_tool", file ? { file_path: path.resolve(ctx.cwd, file) } : {});
     });
 }

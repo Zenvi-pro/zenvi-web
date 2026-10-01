@@ -126,7 +126,8 @@ so you can open it in the desktop app at any time.
   typical session ends with "show me": the agent calls `launch_editor` and
   you review the cut on the real timeline.
 - The server finds the app only through `~/.openshot_qt/gui_mcp.json` /
-  `headless_mcp.json` with a live process id; it never probes ports.
+  `headless_mcp.json` whose process is alive and whose URL answers; it
+  never probes other ports.
 
 ## Troubleshooting
 

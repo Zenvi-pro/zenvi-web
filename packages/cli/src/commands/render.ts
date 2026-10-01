@@ -5,7 +5,7 @@ import path from "node:path";
 import type { Command } from "commander";
 import { timelineEnd, type ContainerFormat, type ExportOptions, type Fraction, type Project } from "@zenvi/engine";
 import { ENCODER_PRESETS, FORMATS, formatFromPath, frameCaption, isEncoderPreset, type NodeExportOptions, type RenderResult } from "@zenvi/render-node";
-import { PortableExecutor } from "../engine/executor.js";
+import { PortableExecutor, type CallOutcome, type Executor } from "../engine/executor.js";
 import { CliError } from "../output.js";
 import { openUrl } from "../util/open-url.js";
 import { printOutcome, withExecutor, type CommandContext } from "./context.js";
@@ -82,6 +82,25 @@ export function exportOptionsFrom(project: Project, output: string | undefined, 
   return options;
 }
 
+/**
+ * Export through the desktop app (export_video_tool). On macOS the desktop's
+ * default export can pick h264_videotoolbox, which aborts with libopenshot
+ * 1.0 (zenvi-core #233 known issue): when the app's export settings name it,
+ * switch the project's export codec to libx264 first (set_export_setting_tool
+ * writes no undo step).
+ */
+export async function exportOnDesktop(executor: Executor, output: string | undefined, platform: NodeJS.Platform = process.platform): Promise<CallOutcome> {
+  if (platform === "darwin") {
+    const settings = await executor.call("get_export_settings_tool", {});
+    const data = settings.receipt?.data as { legacy_text?: unknown } | undefined;
+    const text = [settings.text, settings.receipt?.summary, typeof data?.legacy_text === "string" ? data.legacy_text : ""].join("\n");
+    if (settings.ok && /codec\s+h264_videotoolbox/i.test(text)) {
+      await executor.call("set_export_setting_tool", { key: "video_codec", value: "libx264" });
+    }
+  }
+  return executor.call("export_video_tool", { show_dialog: "false", ...(output ? { output_path: output } : {}) });
+}
+
 function parseBitrate(text: string): number {
   const m = /^(\d+(?:\.\d+)?)\s*([kKmM]?)(?:b\/?s|bps)?$/.exec(text.trim());
   if (!m) throw new CliError(`Not a bitrate: ${text} (e.g. 8M, 192k).`, 2);
@@ -117,8 +136,7 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
       await withExecutor(ctx, async (executor) => {
         const output = outputArg ? path.resolve(ctx.cwd, outputArg) : undefined;
         if (!(executor instanceof PortableExecutor)) {
-          const outcome = await executor.call("export_video_tool", { show_dialog: "false", ...(output ? { output_path: output } : {}) });
-          printOutcome(ctx, outcome);
+          printOutcome(ctx, await exportOnDesktop(executor, output));
           return;
         }
         const session = executor.session;
