@@ -54,6 +54,16 @@ without them. Media are generated into a temp dir (≤ 320×180, ≤ 3 s).
 | parent-clip | `parentObjectId` transform inheritance | 1 | exact |
 | preview-160x90 | `SetMaxSize` preview (swscale fast bilinear decode) | 1, 20 | exact |
 | export-192x108 | export size, `HIGH_QUALITY_SCALING` (bicubic decode) | 1, 20 | exact |
+| shadow-after-transform | Shadow (applied after the transform) on a rotated, scaled still | 1 | exact |
+| glow | Glow over video | 1 | exact |
+| shadow-blend-mode | after-transform effect with a blend mode (layer canvas path) | 1 | exact |
+| ntsc-timeline | 30 fps source on a 30000/1001 timeline | 1, 17, 40 | exact |
+| time-remap-slow | half-speed `time` curve | 1, 9, 40 | exact |
+| effect-mask-reader | generic effect mask (`mask_reader`) on scaled video | 1 | exact |
+| effect-mask-reader-still | effect mask on a FIT still (mask reader decodes to the clip's box) | 1 | exact |
+| displace-map | Displace with a still map | 1 | exact |
+| corner-rotate-alpha | corner radius with rotation and opacity | 1 | exact |
+| crop-resize-rotate | Crop `resize` with rotation | 1 | exact |
 
 ### Kernels
 
@@ -128,7 +138,6 @@ tracking data.
 | Caption | Negative padding: Qt fills a malformed shape; the engine draws nothing (`Caption.cpp:304-332`) | – |
 | Robotization, Whisperization | vDSP FFT (`juce_FFT.cpp:434-536`); the engine uses a double-precision real FFT and mirrors `|X[k]|` itself (`Robotization.cpp:76-78`). `ScopedNoDenormals` is not emulated | ≤ 9e-8 |
 | SphericalProjection | UV map in V8 `Math.*` without fused ops; the C++ also clears its UV cache on every property edit (`SphericalProjection.cpp:486-491`) | ~4e-9 of map values could round differently; none observed |
-| Effect masks, Displace maps | Readers parented to the clip first fit the image to the clip's decode box (`EffectBase.cpp:345`, `effects/Displace.cpp:103`), then stretch it to the frame; the engine stretches the natural image once | resampling differences on mask edges |
 | Audio resampling | FrameMapper resamples with libswresample and `apply_timemapping` with JUCE's `ResamplingAudioSource`; renderers use their own resampler | sample values, not timing |
 | Time-remapped audio | `Clip::apply_timemapping` (`Clip.cpp:585-720`) is replayed from the clip's first frame, as an export plays it; the desktop preview resets its read position on seeks and jumps | positions after seeks in the desktop preview |
 | Muted frames and effects | Frames with `has_audio` 0 still run through the clip's audio effects on the desktop (silence in, `Clip.cpp:788`) and are dropped at mix time; the engine has no segment for them, so stateful effects (Delay, Echo) do not see that silence | tails after a mute toggle |

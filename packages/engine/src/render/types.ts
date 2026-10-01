@@ -50,6 +50,14 @@ export interface EffectInstance {
    * Stills have no entry.
    */
   imageFrames?: Record<string, { frame: number; time: number }>;
+  /**
+   * Size the effect's reader delivers an image in `images` at, when that
+   * differs from its natural size: mask and Displace map readers are
+   * parented to the clip, so stills are first fitted to the clip's decode
+   * box (QtImageReader.cpp:154-182). Kernels scale to it before their own
+   * stretch; pass it on as `KernelContext.imageSizes`.
+   */
+  imageSizes?: Record<string, { width: number; height: number }>;
 }
 
 export interface MaskInstance {
@@ -256,6 +264,8 @@ export interface KernelContext {
   images: ReadonlyMap<string, RgbaImage>;
   /** Text resources (LUT `.cube` files), keyed by path. Preloaded by renderers. */
   texts?: ReadonlyMap<string, string>;
+  /** `EffectInstance.imageSizes`: the reader-delivered size of an image in `images`. */
+  imageSizes?: Readonly<Record<string, { width: number; height: number }>>;
   /** libopenshot effect `Id()`: FilmGrain and AnalogTape seed their noise from it. */
   effectId?: string;
   /** Timeline (project) frame rate; effects fall back to 30 fps without it. */

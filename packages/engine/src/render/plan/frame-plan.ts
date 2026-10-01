@@ -18,9 +18,9 @@ import { frameWindow, localFrame, windowContains, type FrameWindow } from "../..
 import { cropOutputSize } from "../kernels/geometry.js";
 import { QTransform } from "../qt/transform.js";
 import type { EffectInstance, FramePlan, KernelClipContext, LayerAudioRequest, LayerPlan, LayerSource, MaskInstance, PlanSize, RGBA } from "../types.js";
-import { applyBeforeClip, effectInstance, effectValue, mapMaskFrame, maskReaderOf, resolveParentEffect, sortEffects, VIDEO_EFFECT_TYPES } from "./effects.js";
+import { applyBeforeClip, displaceMapReader, effectInstance, effectValue, mapMaskFrame, maskReaderOf, resolveParentEffect, sortEffects, VIDEO_EFFECT_TYPES } from "./effects.js";
 import { mappedSourceFrame } from "./frame-mapper.js";
-import { deliveredSource, qsizeScaled } from "./reader.js";
+import { deliveredSource, qsizeScaled, type DecodeContext } from "./reader.js";
 import { clipKeyframe, clipTransform } from "./transform.js";
 
 export interface PlanOptions {
@@ -151,6 +151,23 @@ function waveformEffect(clip: Clip, n: number): EffectInstance {
   };
 }
 
+/**
+ * Sizes at which a clip effect's mask and Displace map readers deliver their
+ * images: they are parented to the clip (EffectBase.cpp:345,
+ * Displace.cpp:103), so they decode to the clip's box like the clip's own
+ * reader (QtImageReader::calculate_max_size, FFmpegReader's decode size).
+ */
+function parentedImageSizes(clip: Clip, effect: Effect, decode: DecodeContext): Record<string, { width: number; height: number }> | undefined {
+  const out: Record<string, { width: number; height: number }> = {};
+  for (const reader of [maskReaderOf(effect), effect.type === "Displace" ? displaceMapReader(effect) : undefined]) {
+    if (!reader) continue;
+    const delivered = deliveredSource({ ...clip, reader } as Clip, decode);
+    if (delivered.kind === "unsupported") continue;
+    if (delivered.width !== int(reader.width) || delivered.height !== int(reader.height)) out[reader.path] = { width: delivered.width, height: delivered.height };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 interface Stage {
   effects: EffectInstance[];
   masks: MaskInstance[];
@@ -216,7 +233,13 @@ function planLayer(
     .filter((e) => VIDEO_EFFECT_TYPES.has(String(e.type)));
   const before: Stage = { effects: [], masks: [] };
   const after: Stage = { effects: [], masks: [] };
-  for (const e of clipEffects) (applyBeforeClip(e) ? before : after).effects.push(effectInstance(e, n, fps, false));
+  const decode = { previewWidth: canvas.width, previewHeight: canvas.height, timelineWidth: canvas.timelineWidth };
+  for (const e of clipEffects) {
+    const instance = effectInstance(e, n, fps, false);
+    const sizes = parentedImageSizes(clip, e, decode);
+    if (sizes) instance.imageSizes = sizes;
+    (applyBeforeClip(e) ? before : after).effects.push(instance);
+  }
   if (isTop) timelineEffects(project, int(clip.layer), f, fps, before, after);
 
   let source: LayerSource;

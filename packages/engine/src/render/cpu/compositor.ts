@@ -70,6 +70,7 @@ export function kernelContext(
     timelineHeight: plan.timelineHeight ?? plan.height,
   };
   if (extras.texts) ctx.texts = extras.texts;
+  if (effect.imageSizes) ctx.imageSizes = effect.imageSizes;
   if (plan.fps) ctx.fps = plan.fps;
   if (layer.clip) ctx.clip = layer.clip;
   if (extras.audio) ctx.audio = extras.audio;

@@ -65,7 +65,7 @@ function displaceKernel(image: PremulImage, params: Params, ctx: KernelContext):
   const width = image.width;
   const height = image.height;
   if (!source || source.width <= 0 || source.height <= 0 || width <= 0 || height <= 0) return;
-  const map = scaledPremul(source, width, height).data;
+  const map = scaledPremul(source, width, height, ctx.imageSizes?.[path]).data;
 
   const strength = f32(num(params, "strength", 1));
   const xAmount = f32(f32(f32(num(params, "horizontal", 0.05)) * width) * strength);

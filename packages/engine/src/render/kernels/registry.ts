@@ -102,7 +102,7 @@ export function processEffect(image: PremulImage, effect: EffectInstance, ctx: K
   const original = clonePremul(image);
   const out = spec.run(image, params, kctx) ?? image;
   if (out.width !== original.width || out.height !== original.height || out.width === 0 || out.height === 0) return out;
-  const maskImage = scaledPremul(maskSource, out.width, out.height);
+  const maskImage = scaledPremul(maskSource, out.width, out.height, ctx.imageSizes?.[maskPath!]);
   const invert = bool(params, "mask_invert", false);
   if (spec.customMaskBlend && int(params, "mask_mode", 0) === 1) blendVaryStrength(original, out, maskImage, invert);
   else blendWithMask(original, out, maskImage, invert);
