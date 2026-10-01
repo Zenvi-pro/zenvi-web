@@ -13,6 +13,7 @@ import { keymap, type EditorCommand } from "../commands";
 import { useCommands } from "../layout/commandsContext";
 import { useProject, useSession } from "../session/context";
 import { fileDisplayName, matchRelinkCandidates } from "../session/media";
+import { toolEntries } from "./ToolRunner";
 
 const GROUP_ORDER: EditorCommand["group"][] = ["Playback", "Timeline", "Edit", "Keyframes", "File", "View", "Help"];
 
@@ -55,19 +56,40 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
   );
 }
 
+interface PaletteItem {
+  id: string;
+  label: string;
+  group: string;
+  shortcut?: string;
+  run: () => void;
+}
+
+/** Engine tools shown once the query matches them (the Assistant's catalog, run by hand). */
+const MAX_TOOL_MATCHES = 8;
+
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const session = useSession();
   const commands = useCommands();
+  const tools = useMemo(() => toolEntries(), []);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const list = useMemo(() => {
+  const list = useMemo<PaletteItem[]>(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return [...commands.values()].filter((c) => !c.hidden && (!c.enabled || c.enabled()) && terms.every((t) => `${c.label} ${c.group}`.toLowerCase().includes(t)));
-  }, [commands, query]);
+    const matches = (text: string) => terms.every((t) => text.toLowerCase().includes(t));
+    const items: PaletteItem[] = [...commands.values()]
+      .filter((c) => !c.hidden && (!c.enabled || c.enabled()) && matches(`${c.label} ${c.group}`))
+      .map((c) => ({ id: c.id, label: c.label, group: c.group, shortcut: keymap.get(c.id)?.[0], run: () => c.run() }));
+    if (terms.length > 0) {
+      const found = tools.filter((t) => matches(`${t.title} ${t.name.replace(/_tool$/, "").replace(/_/g, " ")}`)).slice(0, MAX_TOOL_MATCHES);
+      for (const t of found) items.push({ id: `tool:${t.name}`, label: t.title, group: "Tool", run: () => session.ui.setState({ dialog: "tool", toolName: t.name }) });
+    }
+    return items;
+  }, [commands, tools, query, session]);
   const runAt = (index: number) => {
-    const command = list[index];
-    if (!command) return;
+    const item = list[index];
+    if (!item) return;
     onClose();
-    setTimeout(() => command.run(), 0);
+    setTimeout(() => item.run(), 0);
   };
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()} title="Command palette" width={520} bodyClassName="pb-2">
@@ -77,7 +99,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           setQuery(v);
           setActive(0);
         }}
-        placeholder="Type a command"
+        placeholder="Type a command or a tool"
         autoFocus
         onKeyDown={(e) => {
           if (e.key === "ArrowDown") {
@@ -105,7 +127,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             >
               <span className="min-w-0 flex-1 truncate">{c.label}</span>
               <span className={cn("text-xs", i === active ? "text-white/70" : "text-fg-faint")}>{c.group}</span>
-              {keymap.get(c.id)?.[0] ? <Kbd shortcut={keymap.get(c.id)![0]!} /> : null}
+              {c.shortcut ? <Kbd shortcut={c.shortcut} /> : null}
             </button>
           </li>
         ))}

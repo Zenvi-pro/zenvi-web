@@ -44,8 +44,9 @@ function kindOf(schema: FieldSchema): "boolean" | "number" | "enum" | "text" {
   return "text";
 }
 
-export function ToolRunnerDialog({ name, onClose }: { name: ContractToolName | null; onClose: () => void }) {
+export function ToolRunnerDialog({ name: requested, onClose }: { name: string | null; onClose: () => void }) {
   const session = useSession();
+  const name = requested && requested in contractMeta ? (requested as ContractToolName) : null;
   const meta = name ? contractMeta[name] : null;
   const fields = useMemo(() => {
     if (!meta) return [];
@@ -65,7 +66,7 @@ export function ToolRunnerDialog({ name, onClose }: { name: ContractToolName | n
     setResult(null);
     try {
       const args = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== "" && v !== undefined));
-      const wire = await runAssistantTool(session, createToolHost(session, async () => []), name, args, new AbortController().signal, "editor");
+      const wire = await runAssistantTool(session, createToolHost(session, async () => []), name, args, new AbortController().signal);
       let text = wire.result;
       try {
         const parsed = JSON.parse(text) as { summary?: unknown };

@@ -6,13 +6,12 @@ import type { CloudMediaRef, ExportOptions, ExportResult, ImportedMedia, ReaderI
 import { backendRequest } from "@/lib/backend";
 import { config } from "@/lib/env";
 import { downloadBlob, safeFileName } from "@/lib/projectFactory";
-import { mediaStore } from "@/lib/storage/media";
 import { toast } from "@/ui/Toast";
-import { exportAvailable, probe, renderFrame, startExport } from "../render";
+import { exportAvailable, extensionForMime, probe, renderFrame, startExport } from "../render";
 import type { EditorSession } from "../session/EditorSession";
 import { assetUrl } from "../catalog";
-import { contentTypeFor, fileHash, mediaPath, type MediaSourceSpec } from "../session/media";
-import { hashFile } from "@/lib/storage/hash";
+import { analyzeAudio } from "./audioAnalysis";
+import { contentTypeFor, fileHash, type MediaSourceSpec } from "../session/media";
 
 const MAX_URL_IMPORT_BYTES = 2 * 1024 * 1024 * 1024;
 
@@ -133,16 +132,9 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
         return out;
       },
       async writeGenerated(name, bytes, contentType) {
-        const file = new File([bytes as BlobPart], name, { type: contentType });
-        const sha256 = await hashFile(file);
-        const store = await mediaStore();
-        await store.put(sha256, file, name);
-        const stored = await store.get(sha256);
-        const path = mediaPath(sha256, name);
-        const intake = intakeOf(session);
-        intake.specs.set(path, stored?.handle ? { kind: "opfs", handle: stored.handle } : { kind: "blob", blob: file, name });
-        intake.refs.set(path, { sha256, size: file.size, content_type: contentType, name });
-        return path;
+        // Stored like any import (content-addressed, probed), so it relinks, reloads and uploads the same way.
+        const media = await prepare(session, new File([bytes as BlobPart], name, { type: contentType }));
+        return media.path;
       },
     },
     backend: {
@@ -157,6 +149,20 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       async open() {
         throw new Error("Open projects from the Zenvi projects page in the web editor.");
       },
+      // Exported captions and other text files arrive as downloads.
+      async writeText(path, text, contentType) {
+        const name = safeFileName(path.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") || session.meta.getState().name, path.match(/\.([a-z0-9]+)$/i)?.[1] ?? "txt");
+        downloadBlob(new Blob([text], { type: contentType ?? "text/plain;charset=utf-8" }), name);
+        return name;
+      },
+    },
+    audio: {
+      async analyzeAudio(path, options) {
+        const file = session.project.files.find((f) => f.path === path || f.id === path);
+        const spec = (file ? session.media.spec(file.id) : undefined) ?? intakeOf(session).specs.get(path);
+        if (!spec) throw new Error(`the media for ${path} is not loaded (relink it first)`);
+        return analyzeAudio(spec, options);
+      },
     },
     log: (message) => console.debug(`[zenvi tools] ${message}`),
   };
@@ -165,7 +171,7 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       async export(project, options: ExportOptions, onProgress): Promise<ExportResult> {
         const job = startExport(project, options, (f) => onProgress?.(f), session.media);
         const blob = await job.promise;
-        const name = safeFileName(session.meta.getState().name, options.format === "webm" ? "webm" : "mp4");
+        const name = safeFileName(session.meta.getState().name, extensionForMime(blob.type));
         downloadBlob(blob, name);
         return { location: name, bytes: blob.size, mimeType: blob.type };
       },

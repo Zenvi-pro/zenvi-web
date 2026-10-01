@@ -49,7 +49,8 @@ type Preview =
   | { kind: "trim"; id: string; position: number; start: number; end: number };
 
 type Gesture =
-  | { kind: "pending-move"; x0: number; y0: number; items: DragItem[]; invertSnap: boolean }
+  /** `cycleTo`: a plain click on the selected clip selects the clip stacked under it there. */
+  | { kind: "pending-move"; x0: number; y0: number; items: DragItem[]; invertSnap: boolean; cycleTo?: string }
   | { kind: "move"; x0: number; y0: number; items: DragItem[]; snap: SnapSettings | null; last: MoveResult }
   | { kind: "trim"; x0: number; itemKind: "clip" | "transition"; id: string; edge: "left" | "right"; subject: TrimSubject; edgeTime0: number; snap: SnapSettings | null; last: TrimResult | null }
   | { kind: "marquee"; x0: number; y0: number; base: Selection; moved: boolean }
@@ -296,10 +297,13 @@ export function TimelineBody() {
 
   const renderFrom = Math.max(0, view.left - view.width);
   const renderTo = view.left + view.width * 2;
-  const visibleClips = project.clips.filter((c) => {
-    const g = clipGeometry(c);
-    return g.left + g.width >= renderFrom && g.left <= renderTo;
-  });
+  // Later clips draw over earlier ones (the selected one over all), so overlapping clips keep an edge to grab.
+  const visibleClips = project.clips
+    .filter((c) => {
+      const g = clipGeometry(c);
+      return g.left + g.width >= renderFrom && g.left <= renderTo;
+    })
+    .sort((a, b) => a.position - b.position);
   const visibleTransitions = project.effects.filter((t) => {
     const g = transitionGeometry(t);
     return g.left + g.width >= renderFrom && g.left <= renderTo;
@@ -378,6 +382,16 @@ export function TimelineBody() {
   // Gestures
   // ---------------------------------------------------------------------------
 
+  /** The next clip stacked with `id` on its track at `time` (in drawing order), if any. */
+  const stackedClipBelow = (id: string, time: number): string | undefined => {
+    const clip = findClip(session.project, id);
+    if (!clip) return undefined;
+    const stack = session.project.clips.filter((c) => c.layer === clip.layer && c.position <= time && itemEnd(c) > time).sort((a, b) => a.position - b.position);
+    if (stack.length < 2) return undefined;
+    const index = stack.findIndex((c) => c.id === id);
+    return stack[(index - 1 + stack.length) % stack.length]!.id;
+  };
+
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const el = viewport.current;
@@ -401,6 +415,7 @@ export function TimelineBody() {
         return;
       }
       const listKey = kind === "clip" ? "clips" : "transitions";
+      const wasOnlySelection = !additive && kind === "clip" && current.clips.length === 1 && current.clips[0] === id && current.transitions.length === 0;
       let sel = current;
       if (additive) {
         sel = clickSelect(current, kind, id, true);
@@ -432,7 +447,7 @@ export function TimelineBody() {
           last: null,
         };
       } else {
-        gesture.current = { kind: "pending-move", x0: x, y0: y, items: dragItemsFor(sel), invertSnap: e.altKey };
+        gesture.current = { kind: "pending-move", x0: x, y0: y, items: dragItemsFor(sel), invertSnap: e.altKey, ...(wasOnlySelection ? { cycleTo: stackedClipBelow(id, x / pps) } : {}) };
       }
       return;
     }
@@ -575,6 +590,8 @@ export function TimelineBody() {
           g.itemKind === "clip" ? trimClipEdge(tx, g.id, g.edge, time) : trimTransition(tx, g.id, g.edge, time),
         );
       }
+    } else if (g.kind === "pending-move" && g.cycleTo) {
+      setSelection({ ...EMPTY_SELECTION, clips: [g.cycleTo] });
     } else if (g.kind === "marquee" && !g.moved) {
       setSelection(g.base);
     } else if (g.kind === "marker") {

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { addClip, addFile, createProject, findProfile, ProjectDocument, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
-import { desktopPlacement, placeAtDefaults } from "./placement";
+import { desktopPlacement, freeTrack, placeAtDefaults } from "./placement";
 
 const base: ReaderInfo = {
   type: "FFmpegReader",
@@ -56,6 +56,37 @@ describe("desktop add-to-timeline defaults (tool_handlers _do_add)", () => {
     const { doc, video, music } = setup();
     const clips = doc.transaction("place", (tx) => placeAtDefaults(tx, [video, video, music], null));
     expect(clips.map((c) => c.position)).toEqual([0, 4 + 1 / 30, 0]);
-    expect(doc.undoLabels.at(-1)).toBe("place");
+    expect(doc.undoLabels).toEqual(["files", "place"]);
+  });
+});
+
+describe("the Add-to-timeline gesture never stacks clips", () => {
+  it("puts music under the video when the video's track is the bottom one (adding a track, one undo step)", () => {
+    const { doc, video, music } = setup();
+    const layers = doc.project.layers.length;
+    const [clipA] = doc.transaction("video", (tx) => placeAtDefaults(tx, [video], null));
+    const [bed] = doc.transaction("music", (tx) => placeAtDefaults(tx, [music], null));
+    expect(bed!.position).toBe(0);
+    // No track below the video was free, so the gesture added one under it.
+    expect(bed!.layer).not.toBe(clipA!.layer);
+    const picture = doc.project.clips.find((c) => c.id === clipA!.id)!;
+    expect(bed!.layer).toBeLessThan(picture.layer);
+    expect(doc.project.layers.length).toBe(layers + 1);
+    expect(doc.undoLabels.at(-1)).toBe("music");
+    doc.undo();
+    expect(doc.project.layers.length).toBe(layers);
+    expect(doc.project.clips).toHaveLength(1);
+  });
+
+  it("takes the lowest free track and prefers tracks below the picture for audio", () => {
+    const { doc, video } = setup();
+    const sorted = [...doc.project.layers].sort((a, b) => a.number - b.number).map((l) => l.number);
+    doc.transaction("mid", (tx) => addClip(tx, { fileId: video.id, position: 0, layer: sorted[1]! }));
+    expect(freeTrack(doc.project, sorted[1]!, 0, 2, true)).toBe(sorted[0]);
+    // Nothing free below the picture: no track (the gesture adds one at the bottom).
+    doc.transaction("low", (tx) => addClip(tx, { fileId: video.id, position: 0, layer: sorted[0]! }));
+    expect(freeTrack(doc.project, sorted[0]!, 0, 2, true)).toBeNull();
+    expect(freeTrack(doc.project, sorted[1]!, 0, 2, false)).toBe(sorted[2]);
+    expect(freeTrack(doc.project, sorted[1]!, 10, 12, false)).toBe(sorted[1]);
   });
 });

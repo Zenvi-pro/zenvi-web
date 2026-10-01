@@ -8,7 +8,7 @@
  */
 import { createClient, type Session, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { create } from "zustand";
-import { authEnabled, config, editorUrl } from "./env";
+import { authEnabled, config, oauthRedirectUrl } from "./env";
 
 let client: SupabaseClient | null = null;
 
@@ -104,7 +104,7 @@ export function safeNext(next: string | null | undefined): string {
 }
 
 export async function signInWithOAuth(provider: "github" | "google", next: string): Promise<void> {
-  const redirectTo = `${editorUrl("/login")}?next=${encodeURIComponent(safeNext(next))}`;
+  const redirectTo = oauthRedirectUrl(safeNext(next));
   const { error } = await requireClient().auth.signInWithOAuth({ provider, options: { redirectTo } });
   if (error) throw error;
 }

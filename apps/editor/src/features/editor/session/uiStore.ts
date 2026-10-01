@@ -7,7 +7,7 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 export type Tool = "select" | "razor";
 export type LeftTab = "files" | "effects" | "transitions" | "titles" | "stock" | "generate";
 export type RightTab = "properties" | "assistant";
-export type DialogId = "export" | "shortcuts" | "relink" | "profile" | "title" | "palette" | "share" | "cloudConflict" | "upload";
+export type DialogId = "export" | "shortcuts" | "relink" | "profile" | "title" | "palette" | "share" | "cloudConflict" | "upload" | "tool";
 
 export interface Selection {
   clips: string[];
@@ -33,6 +33,8 @@ export interface EditorUiState {
   editingTitleFileId: string | null;
   /** Template the title dialog starts from. */
   titleTemplate: string | null;
+  /** The engine tool the "tool" dialog runs (from the command palette). */
+  toolName: string | null;
   panels: { left: number; right: number; timeline: number; leftCollapsed: boolean; rightCollapsed: boolean };
   /**
    * Properties the person chose to animate (`<ownerId>:<prop>`) while they
@@ -99,6 +101,7 @@ export function createUiStore(initial: Partial<EditorUiState> = {}): UiStore {
     dialog: null,
     editingTitleFileId: null,
     titleTemplate: null,
+    toolName: null,
     panels: loadPanels(),
     armedKeyframes: [],
     ...initial,

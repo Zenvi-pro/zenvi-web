@@ -5,7 +5,7 @@ import { normalizeHex } from "@/ui/ColorField";
 import { clampValue, parseNumberInput, roundTo } from "@/ui/NumberField";
 import { safeNext } from "./auth";
 import { backendPath, fetchModelCatalog } from "./backend";
-import { chatSocketUrl } from "./env";
+import { chatSocketUrl, config, oauthRedirectUrl, websiteCallbackFor } from "./env";
 import { formatBytes, formatDuration, formatFps, formatRelativeTime, formatResolution } from "./format";
 import { cleanFileName, COMMON_PRESETS, presetProfile, safeFileName } from "./projectFactory";
 
@@ -122,5 +122,23 @@ describe("project factory", () => {
     expect(safeFileName('My: "Trip"/2026', "zvn")).toBe("My Trip 2026.zvn");
     expect(safeFileName("   ", "mp4")).toBe("Untitled.mp4");
     expect(cleanFileName("a\u0001b", "_")).toBe("a_b");
+  });
+});
+
+describe("OAuth redirects", () => {
+  it("returns through the website's /auth/callback under zenvi.pro, with the editor path as next", () => {
+    expect(websiteCallbackFor("https://zenvi.pro", "")).toBe("https://zenvi.pro/auth/callback");
+    const url = new URL(oauthRedirectUrl("/p/c_rcoyyeo9vq4uv1kp", "https://zenvi.pro"));
+    expect(url.origin + url.pathname).toBe("https://zenvi.pro/auth/callback");
+    expect(url.searchParams.get("next")).toBe(`${config.basename}/p/c_rcoyyeo9vq4uv1kp`);
+  });
+
+  it("keeps the editor's own /login elsewhere, and honours a configured callback", () => {
+    expect(websiteCallbackFor("https://zenvi-editor.vercel.app", "")).toBeNull();
+    expect(oauthRedirectUrl("/", "http://localhost:5173")).toBe(`http://localhost:5173${config.basename}/login?next=%2F`);
+    expect(websiteCallbackFor("https://zenvi-pro-git-x.vercel.app", "/auth/callback")).toBe("https://zenvi-pro-git-x.vercel.app/auth/callback");
+    expect(websiteCallbackFor("https://preview.zenvi.pro", "https://preview.zenvi.pro/auth/callback")).toBe("https://preview.zenvi.pro/auth/callback");
+    expect(websiteCallbackFor("https://zenvi-editor.vercel.app", "https://preview.zenvi.pro/auth/callback")).toBeNull();
+    expect(websiteCallbackFor("https://x.example", "//evil.example/cb")).toBeNull();
   });
 });

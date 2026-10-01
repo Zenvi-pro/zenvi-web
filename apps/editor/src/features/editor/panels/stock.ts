@@ -82,7 +82,7 @@ export async function importStock(session: EditorSession, item: StockItem, place
       ? { source: "pexels", link: pexelsLink(item.video), video_id: String(item.video.id) }
       : { source: "freesound", preview_url: item.sound.previews.hq_mp3 || item.sound.previews.lq_mp3, sound_id: String(item.sound.id) };
   if (placement && placement !== "end") args.position_seconds = String(placement.position);
-  const wire = await runAssistantTool(session, host, "import_stock_media_tool", args, new AbortController().signal, "editor");
+  const wire = await runAssistantTool(session, host, "import_stock_media_tool", args, new AbortController().signal);
   if (wire.result.startsWith("Error")) toast.error("Import failed", { description: wire.result.replace(/^Error:\s*/, "") });
   else toast.success(item.kind === "pexels" ? "Stock video imported" : "Stock audio imported");
 }

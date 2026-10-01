@@ -5,6 +5,7 @@
 import type { ExportOptions, Project, ToolImage } from "@zenvi/engine";
 import {
   createFrameHost,
+  ExportError,
   exportProject,
   generateThumbnails as rwThumbnails,
   generateWaveform as rwWaveform,
@@ -150,21 +151,45 @@ export interface ExportJob {
 /** In-browser export needs WebCodecs encoders; without them export offers a cloud render. */
 export const exportAvailable = browserSupport().canExport;
 
+export interface StartExportOptions {
+  /** Export without sound when the browser cannot encode audio (else ExportError "no-audio-encoder"). */
+  allowVideoOnly?: boolean;
+  /** How the file differs from what was asked (container, codecs, size). */
+  onNotes?: (notes: string[]) => void;
+}
+
 export function startExport(
   project: Project,
   options: ExportOptions,
   onProgress: (fraction: number, stage?: ExportProgress["stage"]) => void,
   media: MediaLibrary,
-  onNotes?: (notes: string[]) => void,
+  run: StartExportOptions = {},
 ): ExportJob {
   const controller = new AbortController();
   const promise = exportProject(project, registryOf(media), options, {
     signal: controller.signal,
     onProgress: (p) => onProgress(p.fraction, p.stage),
-    // How the file differs from what was asked (container, codecs, no audio…).
-    onNotes: (notes) => onNotes?.(notes),
+    onNotes: (notes) => run.onNotes?.(notes),
+    ...(run.allowVideoOnly ? { allowVideoOnly: true } : {}),
   });
   return { promise, cancel: () => controller.abort() };
+}
+
+/** File extension for an exported file's MIME type (the exporter may change container). */
+export function extensionForMime(type: string): string {
+  if (type.includes("webm")) return "webm";
+  if (type.includes("quicktime")) return "mov";
+  if (type.includes("matroska")) return "mkv";
+  if (type.includes("wav")) return "wav";
+  return "mp4";
+}
+
+export type ExportFailure = "no-audio-encoder" | "no-encoder" | "unsupported-format" | "empty-range" | "aborted" | "other";
+
+/** What went wrong with a browser export, for the dialog to offer the right way out. */
+export function exportFailure(error: unknown): ExportFailure {
+  if ((error as { name?: string } | null)?.name === "AbortError") return "aborted";
+  return error instanceof ExportError ? error.code : "other";
 }
 
 export async function renderFrame(project: Project, seconds: number, options: { width?: number; format?: "png" | "jpeg" }, media: MediaLibrary): Promise<ToolImage> {

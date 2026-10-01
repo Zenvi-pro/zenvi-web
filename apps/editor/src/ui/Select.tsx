@@ -7,6 +7,7 @@ export interface SelectOption<V extends string | number> {
   value: V;
   label: string;
   hint?: string;
+  disabled?: boolean;
 }
 
 export interface SelectProps<V extends string | number> {
@@ -50,7 +51,7 @@ export function Select<V extends string | number>({
           sideOffset={4}
           collisionPadding={8}
           loop
-          className={cn(menuContentClass, "min-w-[var(--radix-dropdown-menu-trigger-width)]")}
+          className={cn(menuContentClass, "max-h-[min(380px,var(--radix-dropdown-menu-content-available-height))] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto")}
         >
           <RadixDropdown.RadioGroup value={String(value)} onValueChange={(v) => {
             const option = options.find((o) => String(o.value) === v);
@@ -60,7 +61,8 @@ export function Select<V extends string | number>({
               <RadixDropdown.RadioItem
                 key={String(option.value)}
                 value={String(option.value)}
-                className="group relative flex h-7 cursor-default select-none items-center gap-2 rounded-md pl-7 pr-2 outline-none data-[highlighted]:bg-accent data-[highlighted]:text-white"
+                disabled={option.disabled}
+                className="group relative flex h-7 data-[disabled]:opacity-40 cursor-default select-none items-center gap-2 rounded-md pl-7 pr-2 outline-none data-[highlighted]:bg-accent data-[highlighted]:text-white"
               >
                 <RadixDropdown.ItemIndicator className="absolute left-2 inline-flex">
                   <Check size={13} strokeWidth={2.5} />

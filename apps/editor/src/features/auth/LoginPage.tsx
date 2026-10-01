@@ -2,6 +2,7 @@ import { Eye, EyeOff, MailCheck } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { safeNext, signInWithOAuth, signInWithPassword, signUp, useAuth } from "@/lib/auth";
+import { oauthOffered } from "@/lib/env";
 import { GitHubIcon, GoogleIcon } from "@/ui/BrandIcons";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Input";
@@ -166,20 +167,24 @@ export function LoginPage() {
         </Button>
       </form>
 
-      <div className="my-5 flex items-center gap-3">
-        <span className="h-px flex-1 bg-line-strong" />
-        <span className="text-2xs uppercase tracking-wider text-fg-faint">or</span>
-        <span className="h-px flex-1 bg-line-strong" />
-      </div>
+      {oauthOffered() ? (
+        <>
+          <div className="my-5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-line-strong" />
+            <span className="text-2xs uppercase tracking-wider text-fg-faint">or</span>
+            <span className="h-px flex-1 bg-line-strong" />
+          </div>
 
-      <div className="space-y-2">
-        <Button variant="accent-outline" size="lg" className="w-full font-normal" onClick={() => oauth("github")} loading={busy === "github"} disabled={busy !== null} icon={<GitHubIcon />}>
-          Continue with GitHub
-        </Button>
-        <Button variant="accent-outline" size="lg" className="w-full font-normal" onClick={() => oauth("google")} loading={busy === "google"} disabled={busy !== null} icon={<GoogleIcon />}>
-          Continue with Google
-        </Button>
-      </div>
+          <div className="space-y-2">
+            <Button variant="accent-outline" size="lg" className="w-full font-normal" onClick={() => oauth("github")} loading={busy === "github"} disabled={busy !== null} icon={<GitHubIcon />}>
+              Continue with GitHub
+            </Button>
+            <Button variant="accent-outline" size="lg" className="w-full font-normal" onClick={() => oauth("google")} loading={busy === "google"} disabled={busy !== null} icon={<GoogleIcon />}>
+              Continue with Google
+            </Button>
+          </div>
+        </>
+      ) : null}
 
       <p className="mt-6 text-center text-sm text-fg-subtle">
         {mode === "signin" ? "New to Zenvi?" : "Already have an account?"}{" "}

@@ -9,23 +9,10 @@ import { assistantWireForError, buildEditorSnapshot, runTool, toAssistantWire, t
 import type { EditorSession } from "../session/EditorSession";
 import { attachPendingMedia } from "./host";
 
-/** Where a call comes from: the backend's tool calls, or the editor's own UI. */
-export type ToolCaller = "assistant" | "editor";
-
-/**
- * Run one tool against the session's document. `surface` "assistant" refuses
- * the direct (non-contract) tools, as the desktop's bridge does.
- */
-export async function runAssistantTool(
-  session: EditorSession,
-  host: ToolHost,
-  name: string,
-  args: Record<string, unknown>,
-  signal: AbortSignal,
-  surface: ToolCaller = "assistant",
-): Promise<AssistantWire> {
+/** Run one tool against the session's document (the "editor" surface: every contract and direct tool). */
+export async function runAssistantTool(session: EditorSession, host: ToolHost, name: string, args: Record<string, unknown>, signal: AbortSignal): Promise<AssistantWire> {
   try {
-    const result = await runTool({ doc: session.doc, host, signal }, name, args, { surface });
+    const result = await runTool({ doc: session.doc, host, signal }, name, args, { surface: "editor" });
     attachPendingMedia(session);
     return toAssistantWire(result);
   } catch (error) {

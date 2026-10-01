@@ -21,13 +21,13 @@ export interface VideoRequest {
 export async function generateVideo(session: EditorSession, request: VideoRequest, placement: Placement): Promise<void> {
   const args: Record<string, unknown> = { prompt: request.prompt, duration_seconds: request.durationSeconds === 10 ? "10" : "" };
   if (placement && placement !== "end") args.position_seconds = String(placement.position);
-  const wire = await runAssistantTool(session, createToolHost(session, async () => []), "generate_video_and_add_to_timeline_tool", args, new AbortController().signal, "editor");
+  const wire = await runAssistantTool(session, createToolHost(session, async () => []), "generate_video_and_add_to_timeline_tool", args, new AbortController().signal);
   if (wire.result.startsWith("Error")) throw new Error(wire.result.replace(/^Error:\s*/, ""));
 }
 
 export async function generateVoiceover(session: EditorSession, text: string, voice: TtsVoice, speed: number, placement: Placement): Promise<void> {
   const args: Record<string, unknown> = { text, voice, model: "tts-1", speed };
   if (placement && placement !== "end") args.position = placement.position;
-  const wire = await runAssistantTool(session, createToolHost(session, async () => []), "generate_tts_and_add_to_timeline_tool", args, new AbortController().signal, "editor");
+  const wire = await runAssistantTool(session, createToolHost(session, async () => []), "generate_tts_and_add_to_timeline_tool", args, new AbortController().signal);
   if (wire.result.startsWith("Error")) throw new Error(wire.result.replace(/^Error:\s*/, ""));
 }

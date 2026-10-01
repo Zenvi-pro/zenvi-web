@@ -1,5 +1,5 @@
-import { timelineEnd, type ExportOptions } from "@zenvi/engine";
-import { Cloud, Download, Monitor, RectangleHorizontal, RectangleVertical, Settings2, Square } from "lucide-react";
+import { timelineEnd } from "@zenvi/engine";
+import { Cloud, Download, FileVideo, Monitor, RectangleHorizontal, RectangleVertical, Square, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore } from "zustand";
 import { useAuth } from "@/lib/auth";
@@ -10,42 +10,49 @@ import { downloadBlob, safeFileName } from "@/lib/projectFactory";
 import { secondsToTimecode } from "@/lib/timecode";
 import { Button } from "@/ui/Button";
 import { cn } from "@/ui/cn";
+import { Switch } from "@/ui/Controls";
 import { Dialog } from "@/ui/Dialog";
 import { NumberField } from "@/ui/NumberField";
 import { Select } from "@/ui/Select";
 import { ProgressBar } from "@/ui/Spinner";
-import { exportAvailable, startExport, type ExportJob } from "../render";
+import { exportAvailable, exportFailure, extensionForMime, startExport, type ExportJob } from "../render";
 import { useProject, useSession } from "../session/context";
+import {
+  activePick,
+  choiceFor,
+  cloudRenderOptions,
+  describeChoice,
+  exportOptionsFor,
+  presetById,
+  profileOptions,
+  projectTypeOptions,
+  QUICK_PICKS,
+  qualityOptions,
+  targetHasSound,
+  targetOptions,
+  targetSupport,
+  type ExportChoice,
+  type QuickPick,
+} from "./exportPlan";
 
-type PresetId = "project" | "1080p" | "4k" | "vertical" | "square" | "custom";
-
-interface Preset {
-  id: PresetId;
-  label: string;
-  hint: string;
-  icon: ReactNode;
-  size?: { width: number; height: number };
-  cloudPreset?: string;
-}
-
-const PRESETS: Preset[] = [
-  { id: "project", label: "Match project", hint: "Same size as the timeline", icon: <Monitor size={16} /> },
-  { id: "1080p", label: "YouTube 1080p", hint: "1920 × 1080", icon: <RectangleHorizontal size={16} />, size: { width: 1920, height: 1080 }, cloudPreset: "mp4-1080p" },
-  { id: "4k", label: "4K", hint: "3840 × 2160", icon: <RectangleHorizontal size={16} />, size: { width: 3840, height: 2160 }, cloudPreset: "mp4-2160p" },
-  { id: "vertical", label: "Vertical", hint: "TikTok · Reels · Shorts", icon: <RectangleVertical size={16} />, size: { width: 1080, height: 1920 } },
-  { id: "square", label: "Square", hint: "1080 × 1080", icon: <Square size={16} />, size: { width: 1080, height: 1080 } },
-  { id: "custom", label: "Custom", hint: "Size, frame rate, quality", icon: <Settings2 size={16} /> },
-];
-
-type Quality = NonNullable<ExportOptions["quality"]>;
+const PICK_ICONS: Record<QuickPick["shape"], ReactNode> = {
+  project: <Monitor size={16} />,
+  landscape: <RectangleHorizontal size={16} />,
+  portrait: <RectangleVertical size={16} />,
+  square: <Square size={16} />,
+  file: <FileVideo size={16} />,
+};
 
 type Phase =
   | { kind: "setup" }
   | { kind: "running"; fraction: number; stage: string; startedAt: number; target: "browser" | "cloud" }
   | { kind: "done"; blob?: Blob; url?: string; name: string; seconds: number; notes: string[] }
-  | { kind: "error"; message: string };
+  /** The browser has no audio encoder: the person decides (never drop sound silently). */
+  | { kind: "noAudio" }
+  | { kind: "error"; message: string; cloudHint?: boolean };
 
-const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
+/** The exporter's own note when sound was dropped on request (the person already chose it). */
+const VIDEO_ONLY_NOTE = /no audio encoder is available; exporting video only/i;
 
 export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const session = useSession();
@@ -53,8 +60,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
   const signedIn = useAuth((s) => s.status === "signed-in");
   const cloudLink = useStore(session.meta, (m) => m.cloud);
   const end = timelineEnd(project);
-  const [preset, setPreset] = useState<PresetId>("project");
-  const [custom, setCustom] = useState({ width: project.width, height: project.height, fps: `${project.fps.num}/${project.fps.den}`, quality: "high" as Quality });
+  const [choice, setChoice] = useState<ExportChoice>(() => choiceFor(project, presetById(QUICK_PICKS[0]!.presetId)));
   const [range, setRange] = useState<"all" | "custom">("all");
   const [rangeValue, setRangeValue] = useState({ start: 0, end });
   const [phase, setPhase] = useState<Phase>({ kind: "setup" });
@@ -67,30 +73,31 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
     setRangeValue({ start: 0, end: timelineEnd(session.project) });
   }, [open, session]);
 
-  useEffect(() => () => {
-    job.current?.cancel();
-    if (poll.current) clearInterval(poll.current);
-  }, []);
+  useEffect(
+    () => () => {
+      job.current?.cancel();
+      if (poll.current) clearInterval(poll.current);
+    },
+    [],
+  );
 
-  const size = (() => {
-    const p = PRESETS.find((x) => x.id === preset)!;
-    if (preset === "custom") return { width: even(custom.width), height: even(custom.height) };
-    return p.size ?? { width: project.width, height: project.height };
-  })();
-  const fps = (() => {
-    if (preset !== "custom") return project.fps;
-    const [num, den] = custom.fps.split("/").map(Number);
-    return { num: num || project.fps.num, den: den || 1 };
-  })();
-  const quality: Quality = preset === "custom" ? custom.quality : "high";
+  const preset = presetById(choice.presetId);
+  const support = targetSupport(preset);
+  const cloudPossible = signedIn && cloudEnabled();
   const exportRange = range === "custom" ? { start: Math.max(0, rangeValue.start), end: Math.max(rangeValue.start + 0.04, rangeValue.end) } : undefined;
-  const options: ExportOptions = { format: "mp4", width: size.width, height: size.height, fps, quality, ...(exportRange ? { range: exportRange } : {}) };
+  const effective: ExportChoice = { ...choice, ...(exportRange ? { range: exportRange } : {}) };
+  const options = exportOptionsFor(project, effective);
+  const summary = describeChoice(project, effective);
   const length = exportRange ? exportRange.end - exportRange.start : end;
   const name = session.meta.getState().name;
+  const browserOk = support.browser && exportAvailable;
 
-  const runBrowser = () => {
+  const pickPreset = (presetId: string) => setChoice((c) => ({ ...choiceFor(project, presetById(presetId)), sound: c.sound }));
+
+  const runBrowser = (allowVideoOnly = false) => {
     const startedAt = performance.now();
     const notes: string[] = [];
+    const soundOff = !effective.sound || allowVideoOnly;
     setPhase({ kind: "running", fraction: 0, stage: "Rendering video", startedAt, target: "browser" });
     const current = startExport(
       session.project,
@@ -98,21 +105,27 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
       (fraction, stage) =>
         setPhase({ kind: "running", fraction, stage: stage === "audio" ? "Mixing audio" : stage === "finalizing" ? "Finishing file" : "Rendering video", startedAt, target: "browser" }),
       session.media,
-      (n) => notes.push(...n),
+      {
+        // "No sound" uses channels 0; the exporter then needs leave to skip audio.
+        allowVideoOnly: soundOff,
+        onNotes: (n) => notes.push(...n.filter((note) => !(soundOff && VIDEO_ONLY_NOTE.test(note)))),
+      },
     );
     job.current = current;
     current.promise
       .then((blob) => {
         job.current = null;
-        const ext = blob.type.includes("webm") ? "webm" : blob.type.includes("quicktime") ? "mov" : "mp4";
-        const fileName = safeFileName(name, ext);
+        const fileName = safeFileName(name, extensionForMime(blob.type));
         downloadBlob(blob, fileName);
+        if (allowVideoOnly) notes.unshift("Exported without sound: this browser cannot encode audio.");
         setPhase({ kind: "done", blob, name: fileName, seconds: (performance.now() - startedAt) / 1000, notes });
       })
       .catch((error: unknown) => {
         job.current = null;
-        if ((error as { name?: string }).name === "AbortError") setPhase({ kind: "setup" });
-        else setPhase({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+        const failure = exportFailure(error);
+        if (failure === "aborted") setPhase({ kind: "setup" });
+        else if (failure === "no-audio-encoder") setPhase({ kind: "noAudio" });
+        else setPhase({ kind: "error", message: error instanceof Error ? error.message : String(error), cloudHint: failure === "no-encoder" });
       });
   };
 
@@ -122,9 +135,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
     setPhase({ kind: "running", fraction: 0, stage: "Queued in Zenvi Cloud", startedAt, target: "cloud" });
     try {
       await session.saveCloud();
-      const p = PRESETS.find((x) => x.id === preset);
-      const request = p?.cloudPreset && !exportRange ? { preset: p.cloudPreset } : { options: { format: "mp4", width: size.width, height: size.height, fps, quality, ...(exportRange ? { range: exportRange } : {}) } };
-      const started = await cloudClient().startRender(cloudLink.id, request);
+      const started = await cloudClient().startRender(cloudLink.id, { options: cloudRenderOptions(options) });
       const check = async () => {
         let status: RenderStatus;
         try {
@@ -136,7 +147,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
         }
         if (status.status === "done" && status.url) {
           if (poll.current) clearInterval(poll.current);
-          setPhase({ kind: "done", url: status.url, name: safeFileName(name, "mp4"), seconds: (performance.now() - startedAt) / 1000, notes: [] });
+          setPhase({ kind: "done", url: status.url, name: safeFileName(name, options.format), seconds: (performance.now() - startedAt) / 1000, notes: [] });
         } else if (status.status === "error") {
           if (poll.current) clearInterval(poll.current);
           setPhase({ kind: "error", message: status.error ?? "The cloud render failed." });
@@ -158,7 +169,11 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
   };
 
   const running = phase.kind === "running";
-  const cloudPossible = signedIn && cloudEnabled();
+  const cloudButton = cloudPossible && support.cloud ? (
+    <Button variant={browserOk ? "secondary" : "primary"} icon={<Cloud size={14} />} disabled={!cloudLink || end <= 0} onClick={() => void runCloud()} title={cloudLink ? undefined : "Share the project to Zenvi Cloud first"}>
+      Render in Zenvi Cloud
+    </Button>
+  ) : null;
 
   let footer: ReactNode;
   if (phase.kind === "running") {
@@ -184,23 +199,41 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
         </Button>
       </>
     );
+  } else if (phase.kind === "noAudio") {
+    footer = (
+      <>
+        <Button variant="secondary" onClick={() => setPhase({ kind: "setup" })}>
+          Back
+        </Button>
+        {cloudButton}
+        <Button variant={cloudButton ? "secondary" : "primary"} icon={<VolumeX size={14} />} onClick={() => runBrowser(true)}>
+          Export without sound
+        </Button>
+      </>
+    );
   } else {
     footer = (
       <>
-        {cloudPossible ? (
-          <Button variant="secondary" icon={<Cloud size={14} />} disabled={!cloudLink || end <= 0} onClick={() => void runCloud()} title={cloudLink ? undefined : "Share the project to Zenvi Cloud first"}>
-            Render in Zenvi Cloud
+        {cloudButton}
+        {support.browser ? (
+          <Button variant="primary" icon={<Download size={14} />} disabled={!exportAvailable || end <= 0} onClick={() => runBrowser()}>
+            Export
           </Button>
         ) : null}
-        <Button variant="primary" icon={<Download size={14} />} disabled={!exportAvailable || end <= 0} onClick={runBrowser}>
-          Export
-        </Button>
       </>
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && !running && onClose()} dismissible={!running} title="Export video" description={`${formatDuration(length)} · ${size.width} × ${size.height} · ${(fps.num / fps.den).toFixed(fps.den === 1 ? 0 : 2)} fps`} width={560} footer={footer}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => !o && !running && onClose()}
+      dismissible={!running}
+      title="Export video"
+      description={`${formatDuration(length)} · ${preset.title}`}
+      width={600}
+      footer={footer}
+    >
       {phase.kind === "running" ? (
         <div className="py-6">
           <div className="mb-2 flex items-baseline justify-between text-sm">
@@ -226,77 +259,115 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
             </ul>
           ) : null}
         </div>
+      ) : phase.kind === "noAudio" ? (
+        <div className="space-y-2 py-2 text-sm">
+          <p className="text-fg">This browser can&apos;t encode sound.</p>
+          <p className="text-fg-subtle">
+            It has no AAC, Opus or Vorbis encoder, so neither MP4 nor WebM can carry your audio. Export the picture without sound, or
+            {cloudPossible ? " render the full file in Zenvi Cloud." : " sign in to render the full file in Zenvi Cloud, or use Chrome or Edge."}
+          </p>
+        </div>
       ) : (
         <div className="space-y-5">
-          {phase.kind === "error" ? <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{phase.message}</p> : null}
-          {!exportAvailable ? (
+          {phase.kind === "error" ? (
+            <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+              {phase.message}
+              {phase.cloudHint && cloudPossible ? " Render in Zenvi Cloud instead." : ""}
+            </p>
+          ) : null}
+          {support.browser && !exportAvailable ? (
             <p className="rounded-md bg-warning-soft px-3 py-2 text-sm text-warning">
               This browser can&apos;t encode video. {cloudPossible ? "Render in Zenvi Cloud instead." : "Sign in to render in Zenvi Cloud, or use Chrome or Edge."}
             </p>
           ) : null}
-          <div className="grid grid-cols-3 gap-2">
-            {PRESETS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                aria-pressed={preset === p.id}
-                onClick={() => setPreset(p.id)}
-                className={cn(
-                  "flex flex-col items-start gap-1.5 rounded-lg border px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent",
-                  preset === p.id ? "border-accent bg-accent/[0.12]" : "border-line-strong hover:border-line-bright hover:bg-white/[0.03]",
-                )}
-              >
-                <span className={cn(preset === p.id ? "text-accent-hover" : "text-fg-subtle")}>{p.icon}</span>
-                <span className="text-sm font-medium text-fg">{p.label}</span>
-                <span className="text-xs text-fg-subtle">{p.id === "project" ? `${project.width} × ${project.height}` : p.hint}</span>
-              </button>
-            ))}
+
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Quick targets">
+            {QUICK_PICKS.map((pick) => {
+              const active = activePick(choice) === pick.id;
+              return (
+                <button
+                  key={pick.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => pickPreset(pick.presetId)}
+                  className={cn(
+                    "flex flex-col items-start gap-1.5 rounded-lg border px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent",
+                    active ? "border-accent bg-accent/[0.12]" : "border-line-strong hover:border-line-bright hover:bg-white/[0.03]",
+                  )}
+                >
+                  <span className={cn(active ? "text-accent-hover" : "text-fg-subtle")}>{PICK_ICONS[pick.shape]}</span>
+                  <span className="text-sm font-medium text-fg">{pick.label}</span>
+                  <span className="text-xs text-fg-subtle">{pick.shape === "project" ? `${project.width} × ${project.height}` : pick.hint}</span>
+                </button>
+              );
+            })}
           </div>
 
-          {preset === "custom" ? (
-            <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1">
-                <span className="text-xs text-fg-subtle">Width</span>
-                <NumberField ariaLabel="Width" value={custom.width} min={16} max={7680} step={2} precision={0} unit="px" onCommit={(v) => setCustom((c) => ({ ...c, width: Math.round(v) }))} />
-              </label>
-              <label className="space-y-1">
-                <span className="text-xs text-fg-subtle">Height</span>
-                <NumberField ariaLabel="Height" value={custom.height} min={16} max={4320} step={2} precision={0} unit="px" onCommit={(v) => setCustom((c) => ({ ...c, height: Math.round(v) }))} />
-              </label>
-              <label className="space-y-1">
-                <span className="text-xs text-fg-subtle">Frame rate</span>
-                <Select<string>
-                  ariaLabel="Frame rate"
-                  value={custom.fps}
-                  onChange={(v) => setCustom((c) => ({ ...c, fps: v }))}
-                  className="w-full"
-                  options={[
-                    { value: `${project.fps.num}/${project.fps.den}`, label: "Match project" },
-                    { value: "24/1", label: "24 fps" },
-                    { value: "25/1", label: "25 fps" },
-                    { value: "30000/1001", label: "29.97 fps" },
-                    { value: "30/1", label: "30 fps" },
-                    { value: "50/1", label: "50 fps" },
-                    { value: "60/1", label: "60 fps" },
-                  ]}
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-xs text-fg-subtle">Quality</span>
-                <Select<Quality>
-                  ariaLabel="Quality"
-                  value={custom.quality}
-                  onChange={(v) => setCustom((c) => ({ ...c, quality: v }))}
-                  className="w-full"
-                  options={[
-                    { value: "low", label: "Low (small file)" },
-                    { value: "medium", label: "Medium" },
-                    { value: "high", label: "High" },
-                    { value: "lossless", label: "Very high" },
-                  ]}
-                />
-              </label>
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="space-y-1">
+              <span className="text-xs text-fg-subtle">Project type</span>
+              <Select<string>
+                ariaLabel="Project type"
+                value={preset.type}
+                options={projectTypeOptions()}
+                onChange={(type) => {
+                  const first = targetOptions(type, cloudPossible).find((o) => !o.disabled) ?? targetOptions(type, cloudPossible)[0];
+                  if (first) pickPreset(first.value);
+                }}
+                className="w-full"
+                size="md"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs text-fg-subtle">Target</span>
+              <Select<string> ariaLabel="Target" value={preset.id} options={targetOptions(preset.type, cloudPossible)} onChange={pickPreset} className="w-full" size="md" />
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs text-fg-subtle">Video profile</span>
+              <Select<string>
+                ariaLabel="Video profile"
+                value={choice.profile}
+                options={profileOptions(project, preset)}
+                onChange={(profile) => setChoice((c) => ({ ...c, profile }))}
+                className="w-full"
+                size="md"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs text-fg-subtle">Quality</span>
+              <Select<string>
+                ariaLabel="Quality"
+                value={choice.quality}
+                options={qualityOptions(preset)}
+                onChange={(quality) => setChoice((c) => ({ ...c, quality: quality as ExportChoice["quality"] }))}
+                className="w-full"
+                size="md"
+              />
+            </label>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-lg bg-white/[0.03] px-3 py-2.5">
+            <p className="min-w-0 truncate text-xs text-fg-muted" title={summary}>
+              {summary}
+            </p>
+            {targetHasSound(preset) ? (
+              <span className="flex shrink-0 items-center gap-2 text-xs text-fg-subtle">
+                Sound
+                <Switch label="Include sound" checked={choice.sound} onCheckedChange={(sound) => setChoice((c) => ({ ...c, sound }))} />
+              </span>
+            ) : null}
+          </div>
+
+          {!support.browser ? (
+            <p className="rounded-md bg-white/[0.04] px-3 py-2 text-xs text-fg-subtle">
+              {support.cloud
+                ? cloudPossible
+                  ? cloudLink
+                    ? `${preset.title} renders in Zenvi Cloud.`
+                    : `${preset.title} renders in Zenvi Cloud. Share the project to the cloud first (Share, top right).`
+                  : `${preset.title} renders in Zenvi Cloud. Sign in to use it.`
+                : `${preset.title} needs the Zenvi desktop app.`}
+            </p>
           ) : null}
 
           <div className="space-y-2">
@@ -330,7 +401,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
               </div>
             ) : null}
           </div>
-          {cloudPossible && !cloudLink ? <p className="text-xs text-fg-subtle">To render in Zenvi Cloud, share this project to the cloud first (Share, top right).</p> : null}
+          {cloudPossible && !cloudLink && support.browser ? <p className="text-xs text-fg-subtle">To render in Zenvi Cloud, share this project to the cloud first (Share, top right).</p> : null}
         </div>
       )}
     </Dialog>

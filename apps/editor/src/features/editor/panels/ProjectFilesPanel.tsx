@@ -175,12 +175,11 @@ export function ProjectFilesPanel() {
   }, [files, query, filter]);
 
   const addToTimeline = (ids: string[]) => {
-    void addFilesToTimeline(session, ids).then((created) => {
-      if (!created.length) return;
-      session.ui.setState({ selection: { ...EMPTY_SELECTION, clips: created } });
-      const last = session.project.clips.find((c) => c.id === created[created.length - 1]);
-      if (last) session.views.timeline?.reveal(last.position);
-    });
+    const created = addFilesToTimeline(session, ids);
+    if (!created.length) return;
+    session.ui.setState({ selection: { ...EMPTY_SELECTION, clips: created } });
+    const last = session.project.clips.find((c) => c.id === created[created.length - 1]);
+    if (last) session.views.timeline?.reveal(last.position);
   };
 
   const remove = (file: ProjectFile) => {
