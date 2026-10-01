@@ -67,14 +67,21 @@ function probeSize(path: string): { width: number; height: number } {
   return { width: w!, height: h! };
 }
 
-/** Every frame of a media file as straight RGBA (lossless sources decode exactly). */
-function decode(path: string): Decoded {
-  const { width, height } = probeSize(path);
-  const r = cp.spawnSync("ffmpeg", ["-v", "error", "-i", path, "-f", "rawvideo", "-pix_fmt", "rgba", "-"], { maxBuffer: 1 << 30 });
+/**
+ * Every frame of a media file as straight RGBA (lossless sources decode
+ * exactly). With `size`, frames are scaled by swscale with `flags` in the
+ * decoder, like FFmpegReader (SWS_FAST_BILINEAR in preview, SWS_BICUBIC when
+ * exporting).
+ */
+function decode(path: string, size?: { width: number; height: number; flags: string }): Decoded {
+  const natural = probeSize(path);
+  const { width, height } = size ?? natural;
+  const scale = size ? ["-vf", `scale=${size.width}:${size.height}:flags=${size.flags}`] : [];
+  const r = cp.spawnSync("ffmpeg", ["-v", "error", "-i", path, ...scale, "-f", "rawvideo", "-pix_fmt", "rgba", "-"], { maxBuffer: 1 << 30 });
   if (r.status !== 0) throw new Error(`ffmpeg failed on ${path}: ${r.stderr.toString("utf8")}`);
-  const size = width * height * 4;
+  const bytes = width * height * 4;
   const frames: Uint8ClampedArray[] = [];
-  for (let o = 0; o + size <= r.stdout.length; o += size) frames.push(new Uint8ClampedArray(r.stdout.slice(o, o + size)));
+  for (let o = 0; o + bytes <= r.stdout.length; o += bytes) frames.push(new Uint8ClampedArray(r.stdout.slice(o, o + bytes)));
   return { width, height, frames };
 }
 
@@ -83,6 +90,7 @@ interface ManifestCase {
   project: string;
   frames: Record<string, { path: string; width: number; height: number }>;
   preview?: [number, number];
+  export?: [number, number];
 }
 
 const enabled = available();
@@ -92,6 +100,7 @@ describe.skipIf(!enabled)("frame parity with libopenshot 1.0", () => {
   let dir = "";
   let cases: ManifestCase[] = [];
   const media = new Map<string, Decoded>();
+  const scaled = new Map<string, Decoded>();
 
   beforeAll(() => {
     dir = fs.mkdtempSync(pathApi.join(os.tmpdir(), "zenvi-parity-"));
@@ -119,12 +128,21 @@ describe.skipIf(!enabled)("frame parity with libopenshot 1.0", () => {
         const frame = Number(frameText);
         const plan = c.preview
           ? planFrame(project, frame, { width: c.preview[0], height: c.preview[1] }, { preview: true })
-          : planFrame(project, frame);
+          : c.export
+            ? planFrame(project, frame, { width: c.export[0], height: c.export[1] })
+            : planFrame(project, frame);
+        const flags = c.export ? "bicubic" : "fast_bilinear";
         const layers = plan.layers.map((layer): RgbaImage | null => {
           const s = layer.source;
           if (s.kind === "color") return null;
-          const m = media.get(s.path);
+          let m = media.get(s.path);
           if (!m) return null;
+          if (s.kind === "video" && (m.width !== layer.drawWidth || m.height !== layer.drawHeight)) {
+            // FFmpegReader scales in the decoder: fast bilinear in preview, bicubic when exporting.
+            const key = `${s.path}@${layer.drawWidth}x${layer.drawHeight}/${flags}`;
+            m = scaled.get(key) ?? decode(s.path, { width: layer.drawWidth, height: layer.drawHeight, flags });
+            scaled.set(key, m);
+          }
           const data = s.kind === "video" ? m.frames[Math.min(m.frames.length, s.frame) - 1] : m.frames[0];
           return data ? { width: m.width, height: m.height, data } : null;
         });

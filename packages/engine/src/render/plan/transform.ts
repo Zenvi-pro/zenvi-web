@@ -9,6 +9,7 @@ import { evaluate } from "../../keyframe/evaluate.js";
 import { resolvePoints } from "../../keyframe/points.js";
 import type { Clip, Fraction } from "../../model/types.js";
 import { Gravity, ScaleMode } from "../../model/types.js";
+import { fmaf } from "../qt/fma.js";
 import { QTransform } from "../qt/transform.js";
 import { scaleSize } from "./reader.js";
 
@@ -164,8 +165,9 @@ export function clipTransform(
     x = f32(x + locationOffset(lx, f32(x - layoutX), f32(layoutW), ssw));
     y = f32(y + locationOffset(ly, f32(y - layoutY), f32(layoutH), ssh));
   } else {
-    x = f32(x + f32(width * lx));
-    y = f32(y + f32(height * ly));
+    // `x += width * lx` in float, contracted to one fmadd (Clip.cpp get_transform).
+    x = fmaf(width, lx, x);
+    y = fmaf(height, ly, y);
   }
   const shx = f32(clipKeyframe(clip, "shear_x", n) + pShx);
   const shy = f32(clipKeyframe(clip, "shear_y", n) + pShy);

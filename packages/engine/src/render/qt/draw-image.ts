@@ -10,6 +10,7 @@
 
 import { qRound, type PremulImage } from "../pixels.js";
 import { blendSourceOverFast, CompositionMode, composerFor } from "./compose.js";
+import { fma } from "./fma.js";
 import {
   clipBoxFor,
   fillRectSpans,
@@ -122,21 +123,30 @@ function setupMatrix(t: QTransform): TextureMatrix | null {
   const delta = new QTransform().translate(1 / 65536, 1 / 65536);
   const inv = delta.multiply(t).inverted();
   if (!inv) return null;
-  const f1 = inv.m11 * inv.m11 + inv.m21 * inv.m21;
-  const f2 = inv.m12 * inv.m12 + inv.m22 * inv.m22;
+  const f1 = fma(inv.m11, inv.m11, inv.m21 * inv.m21);
+  const f2 = fma(inv.m12, inv.m12, inv.m22 * inv.m22);
   const fast = f1 < 1e4 && f2 < 1e4 && f1 > 1 / 65536 && f2 > 1 / 65536 && Math.abs(inv.dx) < 1e4 && Math.abs(inv.dy) < 1e4;
   return { m11: inv.m11, m12: inv.m12, m21: inv.m21, m22: inv.m22, dx: inv.dx, dy: inv.dy, fast };
+}
+
+/** `m21·cy + m11·cx + dx` as compiled (fused left product, qdrawhelper.cpp:3433). */
+function sourceX(m: TextureMatrix, cx: number, cy: number): number {
+  return fma(m.m21, cy, m.m11 * cx) + m.dx;
+}
+
+function sourceY(m: TextureMatrix, cx: number, cy: number): number {
+  return fma(m.m22, cy, m.m12 * cx) + m.dy;
 }
 
 /** canUseFastMatrixPath (qdrawhelper.cpp:2081-2096). */
 function fastPathFits(m: TextureMatrix, cx: number, cy: number, length: number): boolean {
   if (!m.fast) return false;
-  let fx = (m.m21 * cy + m.m11 * cx + m.dx) * FIXED;
-  let fy = (m.m22 * cy + m.m12 * cx + m.dy) * FIXED;
+  let fx = sourceX(m, cx, cy) * FIXED;
+  let fy = sourceY(m, cx, cy) * FIXED;
   let minc = Math.min(fx, fy);
   let maxc = Math.max(fx, fy);
-  fx += Math.trunc(m.m11 * FIXED) * length;
-  fy += Math.trunc(m.m12 * FIXED) * length;
+  fx = fma(Math.trunc(m.m11 * FIXED), length, fx);
+  fy = fma(Math.trunc(m.m12 * FIXED), length, fy);
   minc = Math.min(minc, Math.min(fx, fy));
   maxc = Math.max(maxc, Math.max(fx, fy));
   return minc >= -2147483648 && maxc <= 2147483647;
@@ -187,8 +197,8 @@ function fetchBilinear(src: PremulImage, m: TextureMatrix, x: number, y: number,
   if (fastPathFits(m, cx, cy, length)) {
     const fdx = Math.trunc(m.m11 * FIXED);
     const fdy = Math.trunc(m.m12 * FIXED);
-    let fx = Math.trunc((m.m21 * cy + m.m11 * cx + m.dx) * FIXED) - HALF;
-    let fy = Math.trunc((m.m22 * cy + m.m12 * cx + m.dy) * FIXED) - HALF;
+    let fx = Math.trunc(sourceX(m, cx, cy) * FIXED) - HALF;
+    let fy = Math.trunc(sourceY(m, cx, cy) * FIXED) - HALF;
     for (let i = 0; i < length; i += 1) {
       sampleBilinear(src, fx >> 16, fy >> 16, (fx & 0xffff) >> 8, (fy & 0xffff) >> 8, out, i * 4);
       fx = (fx + fdx) | 0;
@@ -197,8 +207,8 @@ function fetchBilinear(src: PremulImage, m: TextureMatrix, x: number, y: number,
     return;
   }
   // Float path (large or degenerate matrices).
-  let fx = m.m21 * cy + m.m11 * cx + m.dx;
-  let fy = m.m22 * cy + m.m12 * cx + m.dy;
+  let fx = sourceX(m, cx, cy);
+  let fy = sourceY(m, cx, cy);
   for (let i = 0; i < length; i += 1) {
     const px = fx - 0.5;
     const py = fy - 0.5;
@@ -231,8 +241,8 @@ function fetchNearest(src: PremulImage, m: TextureMatrix, x: number, y: number, 
   if (fastPathFits(m, cx, cy, length)) {
     const fdx = Math.trunc(m.m11 * FIXED);
     const fdy = Math.trunc(m.m12 * FIXED);
-    let fx = Math.trunc((m.m21 * cy + m.m11 * cx + m.dx) * FIXED);
-    let fy = Math.trunc((m.m22 * cy + m.m12 * cx + m.dy) * FIXED);
+    let fx = Math.trunc(sourceX(m, cx, cy) * FIXED);
+    let fy = Math.trunc(sourceY(m, cx, cy) * FIXED);
     for (let i = 0; i < length; i += 1) {
       put(fx >> 16, fy >> 16, i);
       fx = (fx + fdx) | 0;
@@ -240,8 +250,8 @@ function fetchNearest(src: PremulImage, m: TextureMatrix, x: number, y: number, 
     }
     return;
   }
-  let fx = m.m21 * cy + m.m11 * cx + m.dx;
-  let fy = m.m22 * cy + m.m12 * cx + m.dy;
+  let fx = sourceX(m, cx, cy);
+  let fy = sourceY(m, cx, cy);
   for (let i = 0; i < length; i += 1) {
     put(Math.trunc(fx) - (fx < 0 ? 1 : 0), Math.trunc(fy) - (fy < 0 ? 1 : 0), i);
     fx += m.m11;

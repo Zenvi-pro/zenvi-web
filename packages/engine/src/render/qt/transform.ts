@@ -8,9 +8,14 @@
  * floating-point results identical to the desktop.
  *
  * Mapping (row vectors, like Qt): x' = m11·x + m21·y + dx, y' = m12·x + m22·y + dy.
+ *
+ * Qt is compiled with FMA contraction on arm64 (see ./fma.ts), so every
+ * `a*b + c` below is fused exactly where clang fuses the C++ expression;
+ * otherwise sampling positions drift by an ulp and bilinear weights flip.
  */
 
 import type { Affine } from "../types.js";
+import { fma } from "./fma.js";
 
 export const TxNone = 0x00;
 export const TxTranslate = 0x01;
@@ -85,7 +90,7 @@ export class QTransform {
     // Fall through from the dirty level down, like the C++ switch.
     const level = this.mDirty;
     if (level >= TxRotate && (!fuzzyIsNull(this.m12) || !fuzzyIsNull(this.m21))) {
-      const dot = this.m11 * this.m21 + this.m12 * this.m22;
+      const dot = fma(this.m11, this.m21, this.m12 * this.m22);
       t = fuzzyIsNull(dot) ? TxRotate : TxShear;
     } else if (level >= TxScale && (!fuzzyIsNull(this.m11 - 1) || !fuzzyIsNull(this.m22 - 1))) {
       t = TxScale;
@@ -117,12 +122,12 @@ export class QTransform {
         this.dy += dy;
         break;
       case TxScale:
-        this.dx += dx * this.m11;
-        this.dy += dy * this.m22;
+        this.dx = fma(dx, this.m11, this.dx);
+        this.dy = fma(dy, this.m22, this.dy);
         break;
       default:
-        this.dx += dx * this.m11 + dy * this.m21;
-        this.dy += dy * this.m22 + dx * this.m12;
+        this.dx += fma(dx, this.m11, dy * this.m21);
+        this.dy += fma(dy, this.m22, dx * this.m12);
         break;
     }
     if (this.mDirty < TxTranslate) this.mDirty = TxTranslate;
@@ -186,10 +191,10 @@ export class QTransform {
         break;
       }
       default: {
-        const tm11 = cosa * this.m11 + sina * this.m21;
-        const tm12 = cosa * this.m12 + sina * this.m22;
-        const tm21 = -sina * this.m11 + cosa * this.m21;
-        const tm22 = -sina * this.m12 + cosa * this.m22;
+        const tm11 = fma(cosa, this.m11, sina * this.m21);
+        const tm12 = fma(cosa, this.m12, sina * this.m22);
+        const tm21 = fma(-sina, this.m11, cosa * this.m21);
+        const tm22 = fma(-sina, this.m12, cosa * this.m22);
         this.m11 = tm11;
         this.m12 = tm12;
         this.m21 = tm21;
@@ -243,15 +248,15 @@ export class QTransform {
     } else if (type === TxScale) {
       t.m11 = this.m11 * m.m11;
       t.m22 = this.m22 * m.m22;
-      t.dx = this.dx * m.m11 + m.dx;
-      t.dy = this.dy * m.m22 + m.dy;
+      t.dx = fma(this.dx, m.m11, m.dx);
+      t.dy = fma(this.dy, m.m22, m.dy);
     } else {
-      t.m11 = this.m11 * m.m11 + this.m12 * m.m21;
-      t.m12 = this.m11 * m.m12 + this.m12 * m.m22;
-      t.m21 = this.m21 * m.m11 + this.m22 * m.m21;
-      t.m22 = this.m21 * m.m12 + this.m22 * m.m22;
-      t.dx = this.dx * m.m11 + this.dy * m.m21 + m.dx;
-      t.dy = this.dx * m.m12 + this.dy * m.m22 + m.dy;
+      t.m11 = fma(this.m11, m.m11, this.m12 * m.m21);
+      t.m12 = fma(this.m11, m.m12, this.m12 * m.m22);
+      t.m21 = fma(this.m21, m.m11, this.m22 * m.m21);
+      t.m22 = fma(this.m21, m.m12, this.m22 * m.m22);
+      t.dx = fma(this.dx, m.m11, this.dy * m.m21) + m.dx;
+      t.dy = fma(this.dx, m.m12, this.dy * m.m22) + m.dy;
     }
     t.mDirty = type;
     t.mType = type;
@@ -281,7 +286,7 @@ export class QTransform {
         break;
       default: {
         // QMatrix::inverted (qmatrix.cpp).
-        const dtr = this.m11 * this.m22 - this.m12 * this.m21;
+        const dtr = fma(this.m11, this.m22, -(this.m12 * this.m21));
         if (dtr === 0) {
           ok = false;
           break;
@@ -291,8 +296,8 @@ export class QTransform {
         inv.m12 = -this.m12 * dinv;
         inv.m21 = -this.m21 * dinv;
         inv.m22 = this.m11 * dinv;
-        inv.dx = (this.m21 * this.dy - this.m22 * this.dx) * dinv;
-        inv.dy = (this.m12 * this.dx - this.m11 * this.dy) * dinv;
+        inv.dx = fma(this.m21, this.dy, -(this.m22 * this.dx)) * dinv;
+        inv.dy = fma(this.m12, this.dx, -(this.m11 * this.dy)) * dinv;
         break;
       }
     }
@@ -310,9 +315,9 @@ export class QTransform {
       case TxTranslate:
         return [x + this.dx, y + this.dy];
       case TxScale:
-        return [this.m11 * x + this.dx, this.m22 * y + this.dy];
+        return [fma(this.m11, x, this.dx), fma(this.m22, y, this.dy)];
       default:
-        return [this.m11 * x + this.m21 * y + this.dx, this.m12 * x + this.m22 * y + this.dy];
+        return [fma(this.m11, x, this.m21 * y) + this.dx, fma(this.m12, x, this.m22 * y) + this.dy];
     }
   }
 
@@ -321,8 +326,8 @@ export class QTransform {
     const t = this.inlineType();
     if (t <= TxTranslate) return { x: x + this.dx, y: y + this.dy, width: w, height: h };
     if (t <= TxScale) {
-      let rx = this.m11 * x + this.dx;
-      let ry = this.m22 * y + this.dy;
+      let rx = fma(this.m11, x, this.dx);
+      let ry = fma(this.m22, y, this.dy);
       let rw = this.m11 * w;
       let rh = this.m22 * h;
       if (rw < 0) {
@@ -364,10 +369,10 @@ export function scaleIsUniform(t: QTransform): boolean {
   const type = t.type();
   if (type <= TxTranslate) return true;
   if (type === TxScale) return fuzzyCompare(Math.abs(t.m11), Math.abs(t.m22));
-  const xScale1 = t.m11 * t.m11 + t.m21 * t.m21;
-  const yScale1 = t.m12 * t.m12 + t.m22 * t.m22;
-  const xScale2 = t.m11 * t.m11 + t.m12 * t.m12;
-  const yScale2 = t.m21 * t.m21 + t.m22 * t.m22;
+  const xScale1 = fma(t.m11, t.m11, t.m21 * t.m21);
+  const yScale1 = fma(t.m12, t.m12, t.m22 * t.m22);
+  const xScale2 = fma(t.m11, t.m11, t.m12 * t.m12);
+  const yScale2 = fma(t.m21, t.m21, t.m22 * t.m22);
   if (Math.abs(xScale1 - yScale1) > Math.abs(xScale2 - yScale2)) {
     return type === TxRotate && fuzzyCompare(xScale1, yScale1);
   }

@@ -198,10 +198,15 @@ def cases(media):
     return out
 
 
-def render(proj, frames, out_prefix, max_size=None):
+def render(proj, frames, out_prefix, max_size=None, export_size=None):
     t = openshot.Timeline(proj["width"], proj["height"], openshot.Fraction(proj["fps"]["num"], proj["fps"]["den"]), 48000, 2, openshot.LAYOUT_STEREO)
     t.SetJson(json.dumps(proj))
     t.Open()
+    openshot.Settings.Instance().HIGH_QUALITY_SCALING = export_size is not None
+    if export_size:
+        # The desktop exporter (windows/export.py:990-1060): the canvas becomes the export size.
+        t.info.width, t.info.height = export_size
+        t.SetMaxSize(export_size[0], export_size[1])
     if max_size:
         t.SetMaxSize(max_size[0], max_size[1])
     refs = {}
@@ -235,6 +240,14 @@ def main():
         json.dump(proj, fh)
     refs = render(copy.deepcopy(proj), [1, 20], os.path.join(out, name), max_size=(160, 90))
     manifest["cases"].append({"name": name, "project": proj_path, "frames": refs, "preview": [160, 90]})
+    # Export below the project size: bicubic decoder scaling, canvas = export size.
+    name = "export-192x108"
+    proj_path = os.path.join(out, f"{name}.json")
+    with open(proj_path, "w") as fh:
+        json.dump(proj, fh)
+    refs = render(copy.deepcopy(proj), [1, 20], os.path.join(out, name), export_size=(192, 108))
+    manifest["cases"].append({"name": name, "project": proj_path, "frames": refs, "export": [192, 108]})
+    openshot.Settings.Instance().HIGH_QUALITY_SCALING = False
     with open(os.path.join(out, "manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=1)
     print(os.path.join(out, "manifest.json"))
