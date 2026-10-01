@@ -4,7 +4,7 @@
  * depending on the full catalog. Test-only.
  */
 
-import { addClip, addFile, addMarker, createProject, type ToolContext, type ToolResult } from "@zenvi/engine";
+import { addClip, addFile, addMarker, createProject, type ImportedMedia, type ToolContext, type ToolResult } from "@zenvi/engine";
 import { applied, failed, refused, unchanged, type ToolReceipt } from "@zenvi/engine/tools";
 import type { JsonSchema } from "@zenvi/engine/tools";
 import { createRegistry, type Registry, type RegistryTool } from "../engine/registry.js";
@@ -49,7 +49,7 @@ export function testRegistry(): Registry {
         const media = ctx.host.media;
         if (!media?.importPath) return refused("import_files_tool", "no media host");
         const paths = JSON.parse(String(args.paths ?? "[]")) as string[];
-        const imported = [];
+        const imported: ImportedMedia[] = [];
         for (const p of paths) imported.push(await media.importPath(p));
         const files = ctx.doc.transaction("Import files", (tx) => imported.map((m) => addFile(tx, m)));
         return applied("import_files_tool", `Imported ${files.length} file(s)`, { data: { files: files.map((f) => ({ id: f.id, path: f.path })) } });

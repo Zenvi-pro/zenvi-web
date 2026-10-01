@@ -1,5 +1,5 @@
 // @zenvi/cli programmatic API (the `zenvi` binary is src/bin.ts).
-export { runCli, buildProgram, type RunCliOptions } from "./program.js";
+export { runCli, buildProgram, createContext, type RunCliOptions } from "./program.js";
 export { loadConfig, DEFAULTS, type ZenviConfig } from "./config.js";
 export { createZenviMcpServer, runStdioServer, SERVER_INSTRUCTIONS } from "./mcp/server.js";
 export { discoverDesktop, type DesktopEndpoint } from "./desktop/discovery.js";

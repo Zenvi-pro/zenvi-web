@@ -67,22 +67,28 @@ Examples:
   return program;
 }
 
-export async function runCli(options: RunCliOptions): Promise<number> {
+/** The context commands (and the MCP server) run with. */
+export function createContext(options: Omit<RunCliOptions, "args"> & { flags?: () => GlobalFlags } = {}): CommandContext {
   const env = options.env ?? process.env;
-  const stdout = options.stdout ?? process.stdout;
-  const stderr = options.stderr ?? process.stderr;
   const config = loadConfig(env);
-  let flags: GlobalFlags = {};
-  const ctx: CommandContext = {
+  return {
     config,
-    out: new Output({ json: false, stdout, stderr, env }),
+    out: new Output({ json: false, stdout: options.stdout, stderr: options.stderr, env }),
     auth: new Auth(config, options.fetchImpl ?? fetch),
     registry: options.registry ?? engineRegistry(),
-    flags: () => flags,
+    flags: options.flags ?? (() => ({})),
     cwd: options.cwd ?? process.cwd(),
     env,
     exitCode: 0,
   };
+}
+
+export async function runCli(options: RunCliOptions): Promise<number> {
+  const env = options.env ?? process.env;
+  const stdout = options.stdout ?? process.stdout;
+  const stderr = options.stderr ?? process.stderr;
+  let flags: GlobalFlags = {};
+  const ctx = createContext({ ...options, stdout, stderr, flags: () => flags });
   const program = buildProgram(ctx, stdout, stderr);
   program.hook("preAction", (thisCommand) => {
     flags = thisCommand.optsWithGlobals() as GlobalFlags;
