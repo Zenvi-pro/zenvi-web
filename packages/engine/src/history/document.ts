@@ -311,23 +311,23 @@ export class ProjectDocument {
   // -------------------------------------------------------------------------
 
   private recorder(open: { id: string; actions: AppliedAction[] }): Transaction {
-    const self = this;
+    const current = (): Project => this.current;
     return {
       id: open.id,
       get project() {
-        return self.current;
+        return current();
       },
-      insert(key, value) {
-        open.actions.push(self.perform("insert", key, value, open.id));
+      insert: (key, value) => {
+        open.actions.push(this.perform("insert", key, value, open.id));
       },
-      update(key, value) {
-        open.actions.push(self.perform("update", key, value, open.id));
+      update: (key, value) => {
+        open.actions.push(this.perform("update", key, value, open.id));
       },
-      replace(key, value) {
-        open.actions.push(self.perform("update", key, value, open.id, undefined, true));
+      replace: (key, value) => {
+        open.actions.push(this.perform("update", key, value, open.id, undefined, true));
       },
-      delete(key) {
-        open.actions.push(self.perform("delete", key, null, open.id));
+      delete: (key) => {
+        open.actions.push(this.perform("delete", key, null, open.id));
       },
     };
   }
