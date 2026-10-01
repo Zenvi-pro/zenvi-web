@@ -152,7 +152,7 @@ as JSON.
 ```bash
 zenvi render [output] [-f mp4|webm|mov|mkv|gif|mp3|wav|png] [--quality low|medium|high|lossless]
              [--width px] [--height px] [--fps 30|30000/1001] [--start t] [--end t]
-             [--video-bitrate 8M] [--audio-bitrate 192k] [--encoder-preset veryfast] [--open]
+             [--video-bitrate 8M] [--audio-bitrate 192k] [--crf n] [--encoder-preset veryfast] [--open]
 zenvi frame <t> [output.png|.jpg] [--width 1280] [--jpeg] [--grid]
 ```
 
@@ -200,7 +200,8 @@ with nothing on them are the background, composited once.
 - Quality → the desktop's preset ladders (the engine's `encoderRates`):
   H.264 CRF 30 / 23 / 20 (`low` / `medium` / `high`, the default), VP9 CRF
   for the same levels from its presets, AAC 96 / 128 / 160 kb/s;
-  `lossless` is x264 `-qp 0` with 4:4:4 chroma. A bitrate flag replaces
+  `lossless` is x264 `-qp 0` with 4:4:4 chroma. `--crf` sets the constant
+  quality directly (0 is lossless on x264/x265/VP9); a bitrate flag replaces
   the CRF.
 - Speed: `--encoder-preset` (x264/x265 preset names, VP9 maps them to
   `-cpu-used`). The default `veryfast` keeps renders quick; `medium` is what

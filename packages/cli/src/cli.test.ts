@@ -1,9 +1,10 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { parseProjectText, PROJECT_FORMAT_VERSION } from "@zenvi/engine";
+import { createProject, parseProjectText, PROJECT_FORMAT_VERSION } from "@zenvi/engine";
 import { makeTempDir, makeVideo, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { placementWindow } from "./commands/edit.js";
+import { exportOptionsFrom } from "./commands/render.js";
 import { testEnv, zenvi } from "./test-support/harness.js";
 import { testRegistry } from "./test-support/registry.js";
 
@@ -182,6 +183,23 @@ describe("zenvi add windows", () => {
     expect(placementWindow({ start: 1 })).toEqual({ start_seconds: 1 });
     expect(() => placementWindow({ start: 3, end: 2 })).toThrow(/after --start/);
     expect(() => placementWindow({ end: 2, duration: 1 })).toThrow(/not both/);
+  });
+});
+
+describe("zenvi render options", () => {
+  it("maps flags onto ExportOptions: format from the name, quality, crf, encoder preset, range", () => {
+    const project = createProject({ profile: "HD 720p 30 fps" });
+    expect(exportOptionsFrom(project, "/tmp/a.webm", {})).toMatchObject({ format: "webm", width: 1280, height: 720, quality: "high" });
+    expect(exportOptionsFrom(project, undefined, { width: "640", crf: "18", encoderPreset: "medium" })).toMatchObject({
+      format: "mp4",
+      width: 640,
+      height: 360,
+      crf: 18,
+      encoderPreset: "medium",
+    });
+    expect(() => exportOptionsFrom(project, undefined, { crf: "x" })).toThrow(/--crf/);
+    expect(() => exportOptionsFrom(project, undefined, { encoderPreset: "warp" })).toThrow(/--encoder-preset/);
+    expect(() => exportOptionsFrom(project, undefined, { quality: "ultra" })).toThrow(/--quality/);
   });
 });
 

@@ -36,6 +36,7 @@ export interface RenderFlags {
   end?: string;
   videoBitrate?: string;
   audioBitrate?: string;
+  crf?: string;
   encoderPreset?: string;
   open?: boolean;
 }
@@ -68,6 +69,11 @@ export function exportOptionsFrom(project: Project, output: string | undefined, 
   }
   if (flags.videoBitrate) options.videoBitrate = parseBitrate(flags.videoBitrate);
   if (flags.audioBitrate) options.audioBitrate = parseBitrate(flags.audioBitrate);
+  if (flags.crf !== undefined) {
+    const crf = Number(flags.crf);
+    if (!Number.isInteger(crf) || crf < 0 || crf > 63) throw new CliError("--crf must be a whole number from 0 to 63.", 2);
+    options.crf = crf;
+  }
   if (flags.encoderPreset !== undefined) {
     if (!isEncoderPreset(flags.encoderPreset)) throw new CliError(`--encoder-preset must be one of ${ENCODER_PRESETS.join(", ")}.`, 2);
     options.encoderPreset = flags.encoderPreset;
@@ -104,6 +110,7 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
     .option("--end <time>", "render up to this timeline time")
     .option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)")
     .option("--audio-bitrate <rate>", "e.g. 192k")
+    .option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)")
     .option("--encoder-preset <preset>", "encoder speed: ultrafast … veryslow (default veryfast; the desktop app encodes at medium)")
     .option("--open", "open the result when done")
     .action(async (outputArg: string | undefined, flags: RenderFlags) => {
