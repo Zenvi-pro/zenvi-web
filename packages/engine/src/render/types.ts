@@ -176,29 +176,52 @@ export interface GainPoint {
   gain: number;
 }
 
+/**
+ * A run of one clip's source audio (`planAudio`). Renderers read the source
+ * at the timeline sample rate from `sourceStart`, at `rate` (negative =
+ * backwards from `sourceStart`), for `duration` timeline seconds (source past
+ * the end of the media is silence); run `effects` in order with per-effect
+ * state that carries over to the clip's next segment; multiply by `gain`;
+ * and add the result into the mix with no clamping.
+ */
 export interface AudioSegment {
   clipId: string;
   fileId: string;
   path: string;
-  /** Timeline start of this segment, seconds. */
+  /** Timeline start of this segment, seconds (a timeline frame boundary of the audio stream). */
   timelineStart: number;
-  /** Source start, seconds. */
+  /**
+   * Source start, seconds from the reader's frame 1: for video files the
+   * first video frame (libopenshot drops audio before it), else the first
+   * audio sample.
+   */
   sourceStart: number;
   /** Length on the timeline, seconds. */
   duration: number;
   /**
-   * Playback rate (1 = normal; time keyframes are sampled into rate changes).
-   * Negative = reverse. Segments may extend past a requested range; renderers clip.
+   * Source seconds per timeline second (1 = normal; time keyframes are
+   * sampled into rate changes). Negative = reverse. Segments cover whole
+   * timeline frames, so they may extend past a requested range; renderers clip.
    */
   rate: number;
   /**
-   * Piecewise-linear gain envelope sampled from the volume keyframe, with
-   * volume mixing (AVERAGE/REDUCE) and transition audio fades already folded
-   * in. Renderers apply it verbatim.
+   * Piecewise-linear gain envelope over t ∈ [0, duration]: the volume
+   * keyframe (libopenshot ramps from volume(n-1) to volume(n) across each
+   * frame), with volume mixing (AVERAGE/REDUCE) and transition audio fades
+   * already folded in. Two points with the same `t` are a step. Renderers
+   * apply it verbatim.
    */
   gain: GainPoint[];
-  /** Audio effects to run on the segment, evaluated at its start. */
+  /**
+   * Audio effects to run on the segment (before the gain), evaluated at its
+   * first frame. Segments split where evaluated parameters change. Run them
+   * in blocks of one timeline frame to match libopenshot.
+   */
   effects: EffectInstance[];
+  /** `channel_filter`: only this source channel is mixed (absent = all). */
+  channelFilter?: number;
+  /** `channel_mapping`: mixed channels go to this output channel (absent = same channel). */
+  channelMapping?: number;
 }
 
 export interface AudioPlan {
