@@ -5,7 +5,7 @@
  * API: scratchpad/requests/W2-render.md.
  */
 
-import type { AudioPlan, FramePlan, KernelAudio, PlanSize, Project, RgbaImage, TextRasterizer } from "@zenvi/engine";
+import type { AudioKernel, AudioPlan, FramePlan, KernelAudio, PlanSize, Project, RgbaImage, TextRasterizer } from "@zenvi/engine";
 import * as render from "@zenvi/engine/render";
 
 /** What the compositor reads for one frame (engine `CompositeSources`). */
@@ -35,6 +35,8 @@ export interface RenderEngine {
   compositeFrame(plan: FramePlan, sources: CompositeSources): RgbaImage;
   /** A fresh compositor state for one sequential render. */
   createState(): unknown;
+  /** Audio effect DSP (engine kernels); absent: audio effects are skipped with a warning. */
+  getAudioKernel?(type: string): AudioKernel | undefined;
   /** Set when this build lacks part of the pipeline (rendered anyway, degraded). */
   limitations?: string[];
 }
@@ -51,6 +53,7 @@ export async function defaultRenderEngine(): Promise<RenderEngine> {
     planAudio: planAudio ?? ((project, range) => ({ sampleRate: project.sample_rate, channels: project.channels, start: range.start, end: range.end, segments: [] })),
     compositeFrame: (plan, sources) => render.compositeFrame(plan, sources as render.CompositeSources),
     createState: () => render.createCompositorState(),
+    getAudioKernel: (type) => render.getAudioKernel(type),
     limitations,
   };
 }

@@ -10,7 +10,8 @@
  */
 
 import { once } from "node:events";
-import { mkdir, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { frameContaining, maxFrame, type ExportOptions, type ExportResult, type Fraction, type Project } from "@zenvi/engine";
@@ -124,10 +125,13 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
   const scriptPath = path.join(outDir, `.zenvi-render-${token}.filtergraph`);
 
   const warnings: string[] = [...(engine.limitations ?? [])];
+  const tempDirs: string[] = [];
   const sources = new SourceManager(project, { resolveMedia: opts.resolveMedia, quality: opts.scaleQuality ?? "export", signal });
   let encoder: ReturnType<typeof spawnManaged> | undefined;
   let scriptWritten = false;
   try {
+    const effectsDir = info.audio ? await mkdtemp(path.join(tmpdir(), "zenvi-audio-fx-")) : undefined;
+    tempDirs.push(...(effectsDir ? [effectsDir] : []));
     const audio = info.audio
       ? await buildAudioGraph({
           plan: engine.planAudio(project, { start, end }),
@@ -137,6 +141,9 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
           firstInput: info.video ? 1 : 0,
           resolve: (p) => sources.resolve(p),
           startsOf: (file) => streamStarts(file, signal),
+          effects: engine.getAudioKernel
+            ? { getKernel: engine.getAudioKernel, tempDir: effectsDir!, blockSize: Math.max(64, Math.round((sampleRate * fps.den) / fps.num)), signal }
+            : undefined,
         })
       : undefined;
     if (audio) warnings.push(...audio.warnings);
@@ -214,6 +221,7 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
     throw error;
   } finally {
     await sources.close();
+    for (const d of tempDirs) await rm(d, { recursive: true, force: true });
     if (scriptWritten) await rm(scriptPath, { force: true });
     if (stagingDir) await rm(stagingDir, { recursive: true, force: true });
     else await rm(staged, { force: true });

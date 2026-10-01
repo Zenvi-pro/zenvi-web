@@ -15,7 +15,9 @@
  * converted.
  */
 
-import type { AudioPlan, AudioSegment, GainPoint } from "@zenvi/engine";
+import path from "node:path";
+import type { AudioKernel, AudioPlan, AudioSegment, GainPoint } from "@zenvi/engine";
+import { renderSegmentEffects, splitEffects } from "./audio-effects.js";
 import type { StreamStarts } from "../probe/starts.js";
 
 export interface AudioInput {
@@ -44,6 +46,14 @@ export interface BuildAudioGraphOptions {
   firstInput: number;
   resolve: (projectPath: string) => Promise<string>;
   startsOf: (file: string) => Promise<StreamStarts>;
+  /** Run clip audio effects with the engine kernels (pre-rendered to temp WAVs). */
+  effects?: {
+    getKernel: (type: string) => AudioKernel | undefined;
+    tempDir: string;
+    /** Samples per processing block (one timeline frame). */
+    blockSize: number;
+    signal?: AbortSignal;
+  };
 }
 
 /** Shortest decimal for ffmpeg (no exponent, trailing zeros trimmed). */
@@ -171,9 +181,6 @@ export async function buildAudioGraph(options: BuildAudioGraphOptions): Promise<
       warnings.push(`Skipped a frozen audio segment of clip ${segment.clipId} (rate ${rate}).`);
       continue;
     }
-    if (segment.effects.length > 0) {
-      warnings.push(`Audio effects on clip ${segment.clipId} (${segment.effects.map((e) => e.type).join(", ")}) are not applied by the Node renderer yet.`);
-    }
     const file = await options.resolve(segment.path);
     const starts = await options.startsOf(file);
     const anchor = (starts.videoStart ?? starts.audioStart ?? starts.formatStart) - starts.formatStart;
@@ -188,12 +195,33 @@ export async function buildAudioGraph(options: BuildAudioGraphOptions): Promise<
     }
     if (span <= 1e-6) continue;
     const index = options.firstInput + inputs.length;
-    inputs.push({ path: file, seek: Math.max(0, anchor + lo), duration: span });
-
-    const filters = ["asetpts=PTS-STARTPTS"];
-    if (rate < 0) filters.push("areverse");
-    filters.push(...atempoChain(rate));
-    filters.push(`aformat=sample_fmts=fltp:sample_rates=${sampleRate}:channel_layouts=${layout}`);
+    const source: AudioInput = { path: file, seek: Math.max(0, anchor + lo), duration: span };
+    const toTimeline = ["asetpts=PTS-STARTPTS", ...(rate < 0 ? ["areverse"] : []), ...atempoChain(rate), `aformat=sample_fmts=fltp:sample_rates=${sampleRate}:channel_layouts=${layout}`];
+    let filters: string[];
+    const { runnable, missing } = options.effects ? splitEffects(segment.effects, options.effects.getKernel) : { runnable: [], missing: segment.effects.map((e) => e.type) };
+    if (missing.length > 0) warnings.push(`Audio effects ${missing.join(", ")} on clip ${segment.clipId} are not available in this build; the clip plays without them.`);
+    if (runnable.length > 0 && options.effects) {
+      // libopenshot runs clip audio effects before the gain: process the
+      // segment at timeline rate, then mix the result like any source.
+      const wav = path.join(options.effects.tempDir, `segment-${inputs.length}.wav`);
+      await renderSegmentEffects({
+        input: source,
+        filters: toTimeline,
+        sampleRate,
+        channels,
+        seconds: part.length,
+        effects: runnable,
+        getKernel: options.effects.getKernel,
+        blockSize: options.effects.blockSize,
+        output: wav,
+        signal: options.effects.signal,
+      });
+      inputs.push({ path: wav, seek: 0, duration: part.length });
+      filters = ["asetpts=PTS-STARTPTS", `aformat=sample_fmts=fltp:sample_rates=${sampleRate}:channel_layouts=${layout}`];
+    } else {
+      inputs.push(source);
+      filters = toTimeline;
+    }
     const pan = channelPan(channels, layout, segment.channelFilter, segment.channelMapping);
     if (pan) filters.push(pan);
     const gain = gainExpression(segment.gain, part.offset);

@@ -29,3 +29,4 @@ export * from "./decode/audio.js";
 export * from "./svg/opentype.js";
 export * from "./svg/text.js";
 export * from "./svg/fonts.js";
+export * from "./render/audio-effects.js";

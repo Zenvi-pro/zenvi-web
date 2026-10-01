@@ -7,7 +7,7 @@ import { execFile } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { addClip, addFile, createProject, ProjectDocument, setClipKeyframes, setClipProperty, type Project } from "@zenvi/engine";
+import { addClip, addEffect, addFile, createProject, ProjectDocument, setClipKeyframes, setClipProperty, type Project } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { liveChildCount } from "../ffmpeg/process.js";
@@ -158,6 +158,21 @@ describe("render with the engine planner and compositor", () => {
     });
     expect(await audioRms(out, { start: 0.1, duration: 0.8 }, 0)).toBeLessThan(0.001);
     expect(await audioRms(out, { start: 0.1, duration: 0.8 }, 1)).toBeGreaterThan(0.3);
+  });
+
+  it("runs clip audio effects with the engine's DSP (Delay)", async () => {
+    const blip = path.join(dir, "blip.wav");
+    await exec(resolveBinary("ffmpeg"), ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "aevalsrc=0.5*sin(2*PI*1000*t)*lt(t\\,0.3):s=48000:d=1.5", "-c:a", "pcm_s16le", blip]);
+    const out = path.join(dir, "delayed-fx.wav");
+    const result = await renderProject(await project([{ file: blip, position: 0, edit: (tx, id) => void addEffect(tx, id, "Delay", { delay_time: 0.5 }) }]), {
+      resolveMedia: (p) => p,
+      output: out,
+      options: { format: "wav", width: 160, height: 90, fps: { num: 30, den: 1 } },
+    });
+    expect(result.warnings).toEqual([]);
+    // The 0.3 s blip now starts 0.5 s later.
+    expect(await audioRms(out, { start: 0.05, duration: 0.35 })).toBeLessThan(0.01);
+    expect(await audioRms(out, { start: 0.55, duration: 0.2 })).toBeGreaterThan(0.1);
   });
 
   it("draws still images (natural size, scaled by the compositor)", async () => {
