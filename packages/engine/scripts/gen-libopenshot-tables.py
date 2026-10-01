@@ -183,6 +183,48 @@ def gen_effects():
     print(f"wrote {path} ({len(effects)} effects)")
 
 
+def gen_clip_fixture():
+    """`openshot.Clip(path).Json()` for a generated video, MP3 and PNG (needs ffmpeg).
+
+    The parity test checks model/defaults.ts `libopenshotClipDefaults()` against
+    it (everything but `reader`, `id`, `end`, `duration`, which the desktop's
+    add-to-timeline overwrites).
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("ffmpeg"):
+        print("ffmpeg not found; clip fixture left unchanged", file=sys.stderr)
+        return
+    tmp = tempfile.mkdtemp(prefix="zenvi-clip-")
+    try:
+        def run(*args):
+            subprocess.run(["ffmpeg", "-v", "error", "-y", *args], check=True)
+        video = os.path.join(tmp, "v.mp4")
+        audio = os.path.join(tmp, "a.mp3")
+        image = os.path.join(tmp, "i.png")
+        run("-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
+            "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", video)
+        run("-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100", "-t", "2", audio)
+        run("-f", "lavfi", "-i", "testsrc2=size=320x240", "-frames:v", "1", image)
+        out = {}
+        for kind, path in (("video", video), ("audio", audio), ("image", image)):
+            data = json.loads(openshot.Clip(path).Json())
+            for key in ("reader", "id", "end", "duration"):
+                data.pop(key, None)
+            out[kind] = data
+        target = os.path.join(SRC, "model", "__fixtures__", "libopenshot-clips.json")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "w") as f:
+            json.dump(out, f, sort_keys=True, separators=(",", ":"))
+            f.write("\n")
+        print(f"wrote {target}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     gen_defaults()
     gen_effects()
+    gen_clip_fixture()

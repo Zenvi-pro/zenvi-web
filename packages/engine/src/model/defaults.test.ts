@@ -184,3 +184,11 @@ describe("profiles", () => {
     for (const p of PROFILES.filter((x) => !x.legacy)) expect(profileKey(p), p.key).toBe(p.key);
   });
 });
+
+describe("libopenshot parity", () => {
+  it("libopenshotClipDefaults() equals Clip(path).Json() for video, audio and image readers", async () => {
+    const fixture = (await import("./__fixtures__/libopenshot-clips.json")).default as Record<string, Record<string, unknown>>;
+    const ours = libopenshotClipDefaults();
+    for (const [kind, json] of Object.entries(fixture)) expect(ours, kind).toEqual(json);
+  });
+});
