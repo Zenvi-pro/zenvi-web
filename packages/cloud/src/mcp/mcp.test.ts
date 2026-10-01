@@ -305,6 +305,18 @@ describe("import_media_from_url", () => {
     await client.close();
   });
 
+  it("returns the existing entry for the same bytes under another name", async () => {
+    const h = await harness({ prober: fakeProber, network });
+    const port = await mediaServer(Buffer.from("same bytes"));
+    const client = await connect(h, await pat(h));
+    const projectId = (await call(client, "create_project", { name: "P" })).structuredContent?.project_id as string;
+    const first = await call(client, "import_media_from_url", { url: `http://media.test:${port}/one.mp4` });
+    const second = await call(client, "import_media_from_url", { url: `http://media.test:${port}/two.mp4` });
+    expect(second.structuredContent).toMatchObject({ file_id: first.structuredContent?.file_id, name: "one.mp4", already_in_project: true });
+    expect((await h.services.projects.get(USER_A, projectId)).project.files).toHaveLength(1);
+    await client.close();
+  });
+
   it("keeps two different files that share a name", async () => {
     const h = await harness({ prober: fakeProber, network });
     const server = createServer((req, res) => res.writeHead(200, { "content-type": "video/mp4" }).end(`bytes of ${req.url}`));

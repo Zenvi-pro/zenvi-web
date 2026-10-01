@@ -367,6 +367,8 @@ Logs: `az containerapp logs show -g zenvi-rg -n zenvi-cloud --tail 100`
 Local run: `STORAGE=memory PUBLIC_BASE_URL=http://localhost:8080 npm run dev -w @zenvi/cloud`.
 
 Known limits of this release: one replica (in-process render queue and rate
-limits); renders need every clip's media in the cloud; projects are listed by
-scanning the user's blob prefix; orphaned media (no project uses them) are not
-garbage-collected yet.
+limits; render jobs are claimed with ETags and heartbeat, so an overlapping
+instance during a deploy never renders a job twice); renders need every
+clip's media in the cloud; projects are listed by scanning the user's blob
+prefix; orphaned media (no project uses them) and unused dynamically
+registered OAuth clients are not garbage-collected yet.

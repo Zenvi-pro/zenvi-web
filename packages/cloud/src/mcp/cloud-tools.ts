@@ -13,6 +13,7 @@ import { z } from "zod";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
 import { addMediaFile } from "../projects/files.js";
+import { displayName } from "../projects/model.js";
 import { PROJECT_FORMATS, PROJECT_FPS, profileFor, type ProjectFormat, type ProjectFps } from "../projects/profiles.js";
 import { PRESET_NAMES, RENDER_FORMATS } from "../render/options.js";
 import type { RenderJobView } from "../render/service.js";
@@ -192,10 +193,11 @@ async function importInto(ctx: McpCallContext, projectIdInput: string | undefine
     return result;
   });
   const { file, added } = edit.value;
+  const shownName = added ? imported.name : displayName(file);
   const data = {
     project_id: projectId,
     file_id: file.id,
-    name: imported.name,
+    name: shownName,
     media_type: String(file.media_type),
     duration_seconds: seconds(Number(file.duration) || 0),
     width: Number(file.width) || 0,
@@ -206,8 +208,8 @@ async function importInto(ctx: McpCallContext, projectIdInput: string | undefine
   };
   return {
     text: added
-      ? `Imported "${imported.name}" as file ${file.id} (${data.media_type}, ${data.duration_seconds}s). Add it to the timeline with the clip tools.`
-      : `"${imported.name}" is already in the project as file ${file.id}.`,
+      ? `Imported "${shownName}" as file ${file.id} (${data.media_type}, ${data.duration_seconds}s). Add it to the timeline with the clip tools.`
+      : `That file is already in the project as "${shownName}" (file ${file.id}).`,
     data,
   };
 }
