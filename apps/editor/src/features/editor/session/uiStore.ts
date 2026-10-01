@@ -5,7 +5,7 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 export type Tool = "select" | "razor";
-export type LeftTab = "files" | "effects" | "transitions" | "titles";
+export type LeftTab = "files" | "effects" | "transitions" | "titles" | "stock" | "generate";
 export type RightTab = "properties" | "assistant";
 export type DialogId = "export" | "shortcuts" | "relink" | "profile" | "title" | "palette" | "share" | "cloudConflict";
 

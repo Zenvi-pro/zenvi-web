@@ -193,6 +193,8 @@ export function TopBar() {
       item("showEffects"),
       item("showTransitions"),
       item("showTitles"),
+      item("showStock"),
+      item("showGenerate"),
       sep,
       item("actionProperties"),
       item("showAssistant"),

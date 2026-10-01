@@ -1,11 +1,13 @@
-import { Blend, Clapperboard, Sparkles, Type } from "lucide-react";
+import { Blend, Clapperboard, Images, Sparkles, Type, WandSparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/ui/cn";
 import { Tooltip } from "@/ui/Tooltip";
 import { useSession, useUi } from "../session/context";
 import type { LeftTab } from "../session/uiStore";
 import { EffectsPanel } from "./EffectsPanel";
+import { GeneratePanel } from "./GeneratePanel";
 import { ProjectFilesPanel } from "./ProjectFilesPanel";
+import { StockPanel } from "./StockPanel";
 import { TitlesPanel } from "./TitlesPanel";
 import { TransitionsPanel } from "./TransitionsPanel";
 
@@ -14,6 +16,8 @@ const TABS: { id: LeftTab; label: string; icon: ReactNode }[] = [
   { id: "effects", label: "Effects", icon: <Sparkles size={18} /> },
   { id: "transitions", label: "Transitions", icon: <Blend size={18} /> },
   { id: "titles", label: "Titles", icon: <Type size={18} /> },
+  { id: "stock", label: "Stock media", icon: <Images size={18} /> },
+  { id: "generate", label: "Generate with AI", icon: <WandSparkles size={18} /> },
 ];
 
 export function LeftPanel({ width }: { width: number }) {
@@ -55,6 +59,8 @@ export function LeftPanel({ width }: { width: number }) {
           {tab === "effects" ? <EffectsPanel /> : null}
           {tab === "transitions" ? <TransitionsPanel /> : null}
           {tab === "titles" ? <TitlesPanel /> : null}
+          {tab === "stock" ? <StockPanel /> : null}
+          {tab === "generate" ? <GeneratePanel /> : null}
         </div>
       ) : null}
     </aside>

@@ -325,6 +325,8 @@ export function createCommands(session: EditorSession, env: CommandEnv): Map<str
     { id: "showEffects", label: "Effects", group: "View", run: () => showTab("effects") },
     { id: "showTransitions", label: "Transitions", group: "View", run: () => showTab("transitions") },
     { id: "showTitles", label: "Titles", group: "View", run: () => showTab("titles") },
+    { id: "showStock", label: "Stock media", group: "View", run: () => showTab("stock") },
+    { id: "showGenerate", label: "Generate with AI", group: "View", run: () => showTab("generate") },
 
     // Help
     { id: "showShortcuts", label: "Keyboard shortcuts", group: "Help", run: () => openDialog("shortcuts") },
