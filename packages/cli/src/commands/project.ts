@@ -30,18 +30,23 @@ export function newProject(profile?: string): Project {
 export function registerProjectCommands(program: Command, ctx: CommandContext): void {
   program
     .command("new")
-    .description("create an empty project (.zvn)")
-    .argument("[file]", "project file to create", "untitled.zvn")
+    .description("create an empty project (.zvn); the file is [file], else -p/ZENVI_PROJECT, else ./untitled.zvn")
+    .argument("[file]", "project file to create")
     .option("--profile <profile>", 'video profile, e.g. "HD 1080p 30 fps" (`list` prints them)')
     .option("-f, --force", "overwrite an existing file")
-    .action(async (fileArg: string, opts: { profile?: string; force?: boolean }) => {
+    .action(async (positional: string | undefined, opts: { profile?: string; force?: boolean }) => {
       if (opts.profile === "list") {
         const current = PROFILES.filter((p) => !p.legacy);
         if (ctx.out.json) ctx.out.data({ profiles: current.map((p) => ({ key: p.key, description: p.description, width: p.width, height: p.height, fps: p.fps })) });
         else ctx.out.table(["profile", "size", "fps"], current.map((p) => [p.description, `${p.width}x${p.height}`, (p.fps.num / p.fps.den).toFixed(3).replace(/\.?0+$/, "")]));
         return;
       }
-      const file = path.resolve(ctx.cwd, isProjectPath(fileArg) ? fileArg : `${fileArg}.zvn`);
+      const named = ctx.flags().project ?? ctx.env.ZENVI_PROJECT?.trim() ?? undefined;
+      const asFile = (value: string) => path.resolve(ctx.cwd, isProjectPath(value) ? value : `${value}.zvn`);
+      if (positional && named && asFile(positional) !== asFile(named)) {
+        throw new CliError(`Two different project files given: ${asFile(positional)} and ${asFile(named)} (-p/ZENVI_PROJECT).`, 2, "Pass only one.");
+      }
+      const file = asFile(positional ?? named ?? "untitled.zvn");
       if (existsSync(file) && !opts.force) throw new CliError(`${file} already exists.`, 1, "Pass --force to replace it.");
       const project = newProject(opts.profile);
       await mkdir(path.dirname(file), { recursive: true });

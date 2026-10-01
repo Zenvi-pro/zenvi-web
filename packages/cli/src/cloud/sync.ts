@@ -21,7 +21,8 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { Project, ProjectFile } from "@zenvi/engine";
-import { assetsDirFor, isPortableAssetPath, mapPaths, sha256File, writeFileAtomic, writeProjectFile } from "@zenvi/render-node";
+import { projectAssetsDir, serializeProject } from "@zenvi/engine";
+import { isPortableAssetPath, mapPathValues, sha256File, writeFileAtomic, writeProjectFile } from "@zenvi/render-node";
 import type { ZenviConfig } from "../config.js";
 import { CliError } from "../output.js";
 import { CloudClient, CloudError, type CloudProject } from "./client.js";
@@ -141,7 +142,7 @@ export function cloudProjectJson(project: Project, media: LocalMedia[], warn?: (
     if (typeof m.file.path === "string") byPath.set(m.file.path, m);
   }
   const unmapped = new Set<string>();
-  const mapped = mapPaths(project, (value) => {
+  const mapped = mapPathValues(project, (value) => {
     if (!value || isPortableAssetPath(value) || /^https?:\/\//i.test(value)) return value;
     const hit = byPath.get(value);
     if (hit) return hit.cloudName;
@@ -211,7 +212,9 @@ export async function pushProject(options: PushOptions): Promise<PushResult> {
   }
 
   options.onProgress?.({ phase: "saving", done: 0, total: 1 });
-  const body = cloudProjectJson(project, media, warn);
+  // Through serializeProject like every saved project: the version stamp tells the
+  // desktop the data is current (an unstamped project gets its clip alpha flipped).
+  const body = JSON.parse(serializeProject(cloudProjectJson(project, media, warn))) as Project;
   const name = options.name ?? path.basename(options.projectFile, path.extname(options.projectFile));
   const link = await getLink(config, options.projectFile);
   let projectId: string;
@@ -318,7 +321,7 @@ export async function pullProject(options: PullOptions): Promise<PullResult> {
   const name = safeFileName(remote.name || id);
   const dir = path.resolve(options.cwd, options.dir ?? name);
   const projectFile = path.join(dir, `${name}.zvn`);
-  const mediaDir = path.join(assetsDirFor(projectFile), "media");
+  const mediaDir = path.join(projectAssetsDir(projectFile), "media");
   await mkdir(mediaDir, { recursive: true });
 
   const project = remote.project as unknown as Project;
@@ -345,7 +348,7 @@ export async function pullProject(options: PullOptions): Promise<PullResult> {
   const missing = remote.missingMedia.map((m) => m.name);
   for (const m of missing) warn(`${m} is not in Zenvi Cloud; its clips will show as missing media.`);
 
-  const local = mapPaths(project, (value) => localFor.get(value) ?? value);
+  const local = mapPathValues(project, (value) => localFor.get(value) ?? value);
   for (const clip of local.clips ?? []) {
     const dest = localFor.get(`#${clip.file_id}`);
     if (dest && clip.reader && typeof clip.reader === "object") clip.reader.path = dest;

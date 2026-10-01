@@ -14,7 +14,8 @@ import { fileURLToPath } from "node:url";
 import type { ImportedMedia, MediaHost, PathListing } from "@zenvi/engine";
 import { fingerprint } from "../probe/fingerprint.js";
 import { probe } from "../probe/probe.js";
-import { assetsDirFor, pathIsUnder } from "./paths.js";
+import { projectAssetsDir } from "@zenvi/engine";
+import { isInside } from "./paths.js";
 
 /**
  * reference: keep media where it is (desktop default). copy: copy into
@@ -167,7 +168,7 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
 
   const mediaDir = async (sub: "media" | "title"): Promise<string> => {
     const project = options.projectFile();
-    const dir = project ? path.join(assetsDirFor(project), sub) : path.join(scratch, sub);
+    const dir = project ? path.join(projectAssetsDir(project), sub) : path.join(scratch, sub);
     await mkdir(dir, { recursive: true });
     return dir;
   };
@@ -187,10 +188,10 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
     // Probe before copying so a bad file leaves nothing behind.
     const info = await probe(source);
     const project = options.projectFile();
-    const inAssets = project !== undefined && pathIsUnder(source, assetsDirFor(project));
+    const inAssets = project !== undefined && isInside(source, projectAssetsDir(project));
     const temp = options.tempRoot ?? tmpdir();
-    const projectInTemp = project !== undefined && pathIsUnder(project, temp);
-    const copy = !inAssets && (policy === "copy" || (policy === "auto" && pathIsUnder(source, temp) && !projectInTemp));
+    const projectInTemp = project !== undefined && isInside(project, temp);
+    const copy = !inAssets && (policy === "copy" || (policy === "auto" && isInside(source, temp) && !projectInTemp));
     if (!copy) return imported(source, undefined, info);
     const dest = await uniquePath(await mediaDir("media"), safeName(path.basename(source)));
     await copyFile(source, dest);

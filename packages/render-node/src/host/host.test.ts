@@ -2,14 +2,15 @@ import { createServer, type Server } from "node:http";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
-import type { Project } from "@zenvi/engine";
+import { createClip, createProject, createTransition } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { analyzeAudio, NoAudioError } from "../audio/analyze.js";
-import { makeAudio, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
+import { probe } from "../probe/probe.js";
+import { makeAudio, makeImage, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
 import { createBackendHost } from "./backend.js";
 import { createNodeMediaHost, globToRegExp, listPaths } from "./media.js";
-import { assetsDirFor, createMediaResolver, mapPaths, toAbsolutePath, toStoredPath } from "./paths.js";
-import { parseProjectText, readProjectFile, serializeProjectFile, withProjectLock, writeProjectFile } from "./storage.js";
+import { createMediaResolver, isPortableAssetPath, mapPathValues } from "./paths.js";
+import { parseProjectFileText, readProjectFile, serializeProjectFile, withProjectLock, writeProjectFile } from "./storage.js";
 
 let dir: string;
 let server: Server;
@@ -49,75 +50,74 @@ afterAll(async () => {
   await removeDir(dir);
 });
 
-describe("desktop path rules (json_data.py)", () => {
-  const project = "/work/edits/Trip.zvn";
-  const ctx = { projectFile: project, engineAssetsDir: "/opt/zenvi/assets" };
-
-  it("stores paths relative inside the project folder and absolute outside it", () => {
-    expect(toStoredPath("/work/edits/clips/a.mp4", ctx)).toBe("clips/a.mp4");
-    expect(toStoredPath("/work/edits/a.mp4", ctx)).toBe("a.mp4");
-    expect(toStoredPath("/media/b.mov", ctx)).toBe("/media/b.mov");
-    expect(toStoredPath("/work/edits/Trip_assets/title/t.svg", ctx)).toBe("@assets/title/t.svg");
-    expect(toStoredPath("/opt/zenvi/assets/transitions/common/fade.svg", ctx)).toBe("@transitions/common/fade.svg");
-    expect(toStoredPath("@transitions/extra/x.jpg", ctx)).toBe("@transitions/extra/x.jpg");
-    expect(toStoredPath("", ctx)).toBe("");
-    expect(toStoredPath("https://example.com/v.mp4", ctx)).toBe("https://example.com/v.mp4");
+describe("stored paths (engine rules, Node roots)", () => {
+  it("saves paths the desktop way and loads them back absolute", async () => {
+    const projectFile = path.join(dir, "paths", "Trip.zvn");
+    await mkdir(path.dirname(projectFile), { recursive: true });
+    const assets = path.join(dir, "bundle-assets");
+    const info = await probe(await makeImage(dir, "probe-me.png"));
+    const fileAt = (id: string, p: string) => ({ ...info, id, path: p, media_type: "image" as const });
+    const project = createProject();
+    project.files = [
+      fileAt("F1", path.join(dir, "paths", "clips", "a.png")),
+      fileAt("F2", "/media/elsewhere/b.png"),
+      fileAt("F3", path.join(dir, "paths", "Trip_assets", "title", "t.png")),
+    ];
+    const fps = project.fps;
+    const layer = project.layers[0]!.number;
+    const clip = createClip({ id: "C1", file: project.files[0]!, position: 0, layer, fps });
+    const mask = { ...info, path: path.join(assets, "transitions", "extra", "x.jpg") };
+    const t1 = createTransition({ id: "T1", layer, position: 0, duration: 1, reader: mask, fps });
+    const t2 = createTransition({ id: "T2", layer, position: 1, duration: 1, reader: { ...info, path: "@transitions/common/fade.svg" }, fps });
+    project.clips = [clip];
+    project.effects = [t1, t2];
+    await writeProjectFile(projectFile, project, { engineAssetsDir: assets });
+    const stored = JSON.parse(await readFile(projectFile, "utf8")) as Record<string, any>;
+    expect(stored.files.map((f: { path: string }) => f.path)).toEqual(["clips/a.png", "/media/elsewhere/b.png", "@assets/title/t.png"]);
+    expect(stored.clips[0].reader.path).toBe("clips/a.png");
+    expect(stored.effects.map((t: { reader: { path: string } }) => t.reader.path)).toEqual(["@transitions/extra/x.jpg", "@transitions/common/fade.svg"]);
+    expect(stored.version["openshot-qt"]).not.toBe("0.0.0");
+    const back = await readProjectFile(projectFile);
+    expect(back.files.map((f) => f.path)).toEqual([path.join(dir, "paths", "clips", "a.png"), "/media/elsewhere/b.png", path.join(dir, "paths", "Trip_assets", "title", "t.png")]);
+    // Portable aliases stay aliases in memory; the resolver maps them to the bundle.
+    expect(back.effects[0]!.reader.path).toBe("@transitions/extra/x.jpg");
+    const resolve = createMediaResolver({ projectFile, engineAssetsDir: assets });
+    expect(resolve("@transitions/extra/x.jpg")).toBe(path.join(assets, "transitions", "extra", "x.jpg"));
+    expect(resolve("clips/a.png")).toBe(path.join(dir, "paths", "clips", "a.png"));
+    expect(resolve("@assets/title/t.png")).toBe(path.join(dir, "paths", "Trip_assets", "title", "t.png"));
   });
 
-  it("resolves stored paths back to absolute ones", () => {
-    expect(toAbsolutePath("clips/a.mp4", ctx)).toBe("/work/edits/clips/a.mp4");
-    expect(toAbsolutePath("../../.openshot_qt/Downloads/x.mp3", ctx)).toBe("/.openshot_qt/Downloads/x.mp3");
-    expect(toAbsolutePath("@assets/title/t.svg", ctx)).toBe("/work/edits/Trip_assets/title/t.svg");
-    expect(toAbsolutePath("@transitions/common/fade.svg", ctx)).toBe("@transitions/common/fade.svg");
-    expect(toAbsolutePath("/abs/v.mp4", ctx)).toBe("/abs/v.mp4");
-  });
-
-  it("follows the Windows drive rule", () => {
-    const win = { projectFile: "C:\\Users\\me\\Trip.zvn", pathApi: path.win32 };
-    expect(toStoredPath("C:\\Users\\me\\clips\\a.mp4", win)).toBe("clips/a.mp4");
-    expect(toStoredPath("D:\\media\\b.mp4", win)).toBe("D:/media/b.mp4");
-    expect(toAbsolutePath("clips/a.mp4", win)).toBe("C:\\Users\\me\\clips\\a.mp4");
-  });
-
-  it("rewrites only path keys, everywhere including history", () => {
-    const data = { files: [{ path: "/work/edits/a.mp4", name: "/work/edits/a.mp4" }], history: { undo: [{ value: { image: "/work/edits/t.png" } }] } };
-    const stored = mapPaths(data, (p) => toStoredPath(p, ctx));
-    expect(stored.files[0]).toEqual({ path: "a.mp4", name: "/work/edits/a.mp4" });
-    expect(stored.history.undo[0]!.value.image).toBe("t.png");
-  });
-
-  it("names the assets folder like get_assets_path", () => {
-    expect(assetsDirFor("/x/My Film.zvn")).toBe("/x/My Film_assets");
-  });
-
-  it("resolves portable asset prefixes to the bundled assets", () => {
-    const resolve = createMediaResolver({ projectFile: project, engineAssetsDir: "/opt/zenvi/assets" });
-    expect(resolve("@transitions/common/fade.svg")).toBe("/opt/zenvi/assets/transitions/common/fade.svg");
-    expect(resolve("clips/a.mp4")).toBe("/work/edits/clips/a.mp4");
+  it("rewrites only path keys, everywhere", () => {
+    const data = { files: [{ path: "a", name: "a" }], deep: [{ x: { image: "b", resource: "c", lut_path: "d", other: "e" } }] };
+    expect(mapPathValues(data, (p) => p.toUpperCase())).toEqual({ files: [{ path: "A", name: "a" }], deep: [{ x: { image: "B", resource: "C", lut_path: "D", other: "e" } }] });
+    expect(isPortableAssetPath("@emojis/1F600.svg")).toBe(true);
+    expect(isPortableAssetPath("@assets/media/a.mp4")).toBe(false);
   });
 });
 
 describe("project storage", () => {
-  const minimal = (media: string): Project =>
-    ({ id: "P1", fps: { num: 30, den: 1 }, clips: [], effects: [], files: [{ id: "F1", path: media }], layers: [], history: { undo: [], redo: [] } }) as unknown as Project;
-
   it("round-trips with relative paths and the desktop's indent=1 layout", async () => {
     const file = path.join(dir, "rt", "cut.zvn");
     await mkdir(path.dirname(file), { recursive: true });
-    await writeProjectFile(file, minimal(path.join(dir, "rt", "media", "a.mp4")));
+    const info = await probe(await makeImage(dir, "rt-probe.png"));
+    const project = createProject();
+    project.files = [{ ...info, id: "F1", path: path.join(dir, "rt", "media", "a.png"), media_type: "image" }];
+    await writeProjectFile(file, project);
     const text = await readFile(file, "utf8");
-    expect(text).toContain('\n "files": [\n  {\n   "id": "F1",\n   "path": "media/a.mp4"\n  }\n ]');
+    expect(text.startsWith('{\n "id": ')).toBe(true);
+    expect(text).toContain('\n   "path": "media/a.png"');
     const back = await readProjectFile(file);
-    expect(back.files[0]!.path).toBe(path.join(dir, "rt", "media", "a.mp4"));
+    expect(back.files[0]!.path).toBe(path.join(dir, "rt", "media", "a.png"));
     expect((await readdir(path.dirname(file))).filter((n) => n.endsWith(".tmp"))).toEqual([]);
     expect(serializeProjectFile(back, file)).toBe(text);
   });
 
   it("rejects files that are not projects with a clear error", () => {
-    expect(() => parseProjectText("{nope", "/x.zvn")).toThrow(/not valid JSON/);
-    expect(() => parseProjectText("[]", "/x.zvn")).toThrow(/not a Zenvi project/);
-    expect(() => parseProjectText('{"clips": 3}', "/x.zvn")).toThrow(/must be a list/);
-    expect(parseProjectText('\ufeff{"clips": [], "fps": {"num": 1, "den": 1}}', "/x.zvn").clips).toEqual([]);
+    expect(() => parseProjectFileText("{nope", "/x.zvn")).toThrow(/not a Zenvi project: .*not valid JSON/);
+    expect(() => parseProjectFileText("[]", "/x.zvn")).toThrow(/not a Zenvi project/);
+    expect(() => parseProjectFileText('{"clips": 3}', "/x.zvn")).toThrow(/not a Zenvi project: clips/);
+    expect(() => parseProjectFileText("  ", "/x.zvn")).toThrow(/empty/);
+    expect(parseProjectFileText('\ufeff{"clips": [], "fps": {"num": 1, "den": 1}}', "/x.zvn").clips).toEqual([]);
   });
 
   it("serializes concurrent edits with a lock and breaks stale locks", async () => {

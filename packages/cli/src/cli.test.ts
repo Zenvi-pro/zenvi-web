@@ -86,7 +86,7 @@ describe("zenvi CLI", () => {
       expect(none.stderr).toMatch(/No project given/);
       const viaEnv = await zenvi(["info", "--json"], { cwd: empty, env: testEnv(home, { ZENVI_PROJECT: path.join(work, "trip.zvn") }), registry });
       expect(viaEnv.json()).toMatchObject({ status: "applied", project: path.join(work, "trip.zvn") });
-      await writeFile(path.join(empty, "a.zvn"), "{}");
+      await writeFile(path.join(empty, "a.zvn"), "{ this is not json");
       await writeFile(path.join(empty, "b.zvn"), "{}");
       const many = await run(["info"], empty);
       expect(many.code).toBe(2);
@@ -96,6 +96,40 @@ describe("zenvi CLI", () => {
       expect(broken.json()).toMatchObject({ status: "error" });
     } finally {
       await removeDir(empty);
+    }
+  });
+
+  it("honours -p for every command and never touches the folder's own project", async () => {
+    const elsewhere = await makeTempDir("zenvi-cli-elsewhere-");
+    const decoyDir = await makeTempDir("zenvi-cli-decoy-");
+    try {
+      // The current folder has its own project; -p must win everywhere.
+      expect((await run(["new", "decoy.zvn"], decoyDir)).code).toBe(0);
+      const decoy = await readFile(path.join(decoyDir, "decoy.zvn"), "utf8");
+      const target = path.join(elsewhere, "target.zvn");
+      const created = await run(["-p", target, "new", "--json"], decoyDir);
+      expect(created.json()).toMatchObject({ project: target });
+      await makeVideo(path.join(elsewhere, "media"), "clip.mp4", { duration: 1, width: 64, height: 48 });
+      const media = path.join(elsewhere, "media", "clip.mp4");
+      const commands: string[][] = [
+        ["info"], ["files"], ["clips"], ["tracks"], ["markers"], ["import", media], ["add", media],
+        ["marker", "add", "1", "x"], ["undo"], ["redo"], ["call", "get_project_info_tool"], ["save"],
+      ];
+      for (const args of commands) {
+        const r = await run(["-p", target, ...args, "--json"], decoyDir);
+        expect(r.json<{ project?: string }>().project, args.join(" ")).toBe(target);
+      }
+      // ZENVI_PROJECT works for `new` too, and conflicting files are refused.
+      const viaEnv = path.join(elsewhere, "env.zvn");
+      const envNew = await zenvi(["new", "--json"], { cwd: decoyDir, env: testEnv(home, { ZENVI_PROJECT: viaEnv }), registry });
+      expect(envNew.json()).toMatchObject({ project: viaEnv });
+      const conflict = await run(["-p", target, "new", "other.zvn"], decoyDir);
+      expect(conflict.code).toBe(2);
+      expect(await readFile(path.join(decoyDir, "decoy.zvn"), "utf8")).toBe(decoy);
+      expect((await import("node:fs")).existsSync(path.join(decoyDir, "untitled.zvn"))).toBe(false);
+    } finally {
+      await removeDir(elsewhere);
+      await removeDir(decoyDir);
     }
   });
 

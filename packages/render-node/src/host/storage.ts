@@ -1,9 +1,12 @@
 /**
  * Reading and writing `.zvn` project files on disk.
  *
- * - Paths: converted with the desktop's rules (paths.ts) on open and save.
- * - Layout: `json.dumps(data, ensure_ascii=False, indent=1)` like zenvi-core
- *   (json_data.py `write_to_file`), so diffs against desktop saves stay small.
+ * - Parsing, validation, the desktop's load upgrades and the version stamp
+ *   come from the engine (`parseProjectText`, `serializeProject`); every
+ *   write goes through `serializeProject`, because an unstamped project makes
+ *   the desktop flip clip alpha on open.
+ * - Paths: the engine's stored-path rules (`fromStoredPaths` / `toStoredPaths`,
+ *   the desktop's json_data.py) with the Node host's roots (paths.ts).
  * - Atomic: written to a temp file in the same folder, fsynced, then renamed
  *   over the target, so a crash never leaves a half-written project.
  * - Locked: `<file>.lock` (pid + host) guards load → edit → save sequences
@@ -15,8 +18,8 @@ import { randomBytes } from "node:crypto";
 import { open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
 import path from "node:path";
-import type { Project } from "@zenvi/engine";
-import { mapPaths, toAbsolutePath, toStoredPath } from "./paths.js";
+import { fromStoredPaths, parseProjectText as parseEngineProject, ProjectParseError, serializeProject, toStoredPaths, type Project } from "@zenvi/engine";
+import { loadRoots, storeRoots } from "./paths.js";
 
 export class ProjectFileError extends Error {
   constructor(
@@ -32,28 +35,22 @@ export interface ProjectFileOptions {
   engineAssetsDir?: string;
 }
 
-/** Parse project JSON text read from `file` (paths made absolute). */
-export function parseProjectText(text: string, file: string): Project {
-  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-  let data: unknown;
+function describeParseError(error: ProjectParseError): string {
+  const issues = error.issues.slice(0, 3).map((i) => (i.path ? `${i.path}: ${i.message}` : i.message));
+  return `${issues.join("; ")}${error.issues.length > 3 ? ` (+${error.issues.length - 3} more)` : ""}`;
+}
+
+/** Parse project file text read from `file` (upgraded like the desktop, paths made absolute). */
+export function parseProjectFileText(text: string, file: string): Project {
+  if (!text.trim()) throw new ProjectFileError(`${file} is empty.`, file);
+  let project: Project;
   try {
-    data = JSON.parse(body);
+    project = parseEngineProject(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
   } catch (error) {
-    throw new ProjectFileError(`${file} is not valid JSON: ${(error as Error).message}`, file);
+    if (error instanceof ProjectParseError) throw new ProjectFileError(`${file} is not a Zenvi project: ${describeParseError(error)}`, file);
+    throw error;
   }
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    throw new ProjectFileError(`${file} is not a Zenvi project (expected a JSON object).`, file);
-  }
-  const obj = data as Record<string, unknown>;
-  for (const key of ["clips", "files", "effects", "layers"]) {
-    if (obj[key] !== undefined && !Array.isArray(obj[key])) {
-      throw new ProjectFileError(`${file} is not a Zenvi project ("${key}" must be a list).`, file);
-    }
-  }
-  if (!Array.isArray(obj.clips) && !Array.isArray(obj.files) && !obj.fps) {
-    throw new ProjectFileError(`${file} is not a Zenvi project (no clips, files or fps).`, file);
-  }
-  return mapPaths(obj, (p) => toAbsolutePath(p, { projectFile: file })) as unknown as Project;
+  return fromStoredPaths(project, path.dirname(file), loadRoots(file));
 }
 
 export async function readProjectFile(file: string): Promise<Project> {
@@ -65,14 +62,13 @@ export async function readProjectFile(file: string): Promise<Project> {
     const code = (error as NodeJS.ErrnoException).code;
     throw new ProjectFileError(code === "ENOENT" ? `Project file not found: ${abs}` : `Cannot read ${abs}: ${(error as Error).message}`, abs);
   }
-  if (!text.trim()) throw new ProjectFileError(`${abs} is empty.`, abs);
-  return parseProjectText(text, abs);
+  return parseProjectFileText(text, abs);
 }
 
-/** The JSON text the desktop would write for `project` saved at `file`. */
+/** The file text the desktop would read for `project` saved at `file`. */
 export function serializeProjectFile(project: Project, file: string, options: ProjectFileOptions = {}): string {
-  const stored = mapPaths(project, (p) => toStoredPath(p, { projectFile: file, engineAssetsDir: options.engineAssetsDir }));
-  return JSON.stringify(stored, null, 1);
+  const abs = path.resolve(file);
+  return serializeProject(toStoredPaths(project, path.dirname(abs), storeRoots(abs, options.engineAssetsDir)));
 }
 
 /** Write `text` to `file` atomically (temp file + fsync + rename). */
