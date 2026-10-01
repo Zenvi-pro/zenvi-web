@@ -239,7 +239,7 @@ describe("serializeProject", () => {
     const back = JSON.parse(text) as Record<string, unknown>;
     expect(back.version).toEqual(PROJECT_FORMAT_VERSION);
     expect(back.extra).toEqual({ kept: true });
-    // The input keeps its own stamp.
-    expect(project.version).toEqual({ "openshot-qt": "0.0.0", libopenshot: "0.0.0" });
+    // createProject() already carries the current stamp, so nothing reads it as a beta project.
+    expect(project.version).toEqual(PROJECT_FORMAT_VERSION);
   });
 });

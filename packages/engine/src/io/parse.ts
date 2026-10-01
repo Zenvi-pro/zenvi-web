@@ -122,6 +122,10 @@ function fillDefaults(data: Data): void {
   const profileName = typeof data.profile === "string" && findProfile(data.profile) ? data.profile : undefined;
   // A missing id becomes the template id "T0", which the upgrade replaces with a fresh one.
   const defaults = createProject({ profile: profileName, id: "T0" }) as unknown as Data;
+  // createProject() stamps the current format, but a file WITHOUT a version is
+  // an OpenShot beta project: the desktop merges it over _default.project, whose
+  // stamp is "0.0.0", and runs the beta upgrades. Keep that inference.
+  if (!isRecord(data.version)) data.version = { "openshot-qt": BETA_VERSION, libopenshot: BETA_VERSION };
   for (const [key, value] of Object.entries(defaults)) {
     if (!(key in data)) data[key] = value;
   }
