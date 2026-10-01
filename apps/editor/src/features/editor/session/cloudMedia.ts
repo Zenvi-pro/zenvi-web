@@ -6,7 +6,7 @@
 import type { Project } from "@zenvi/engine";
 import { uploadToSas, type CloudClient } from "@/lib/cloud";
 import type { MediaStore } from "@/lib/storage/media";
-import { fileHash } from "./media";
+import { fileDisplayName, fileHash } from "./media";
 
 export interface MediaUploadProgress {
   done: number;
@@ -14,10 +14,26 @@ export interface MediaUploadProgress {
   label: string;
 }
 
+/** A project file the cloud copy refers to but Zenvi Cloud does not have, and this browser cannot upload. */
+export interface MissingCloudFile {
+  fileId: string;
+  name: string;
+}
+
 export interface MediaUploadResult {
   uploaded: number;
-  /** Files whose bytes are not in this browser (cannot be uploaded from here). */
+  /** How many files are in `missing`. */
   unavailable: number;
+  missing: MissingCloudFile[];
+}
+
+export interface UploadOptions {
+  onProgress?: (p: MediaUploadProgress) => void;
+  /**
+   * Files the cloud already has by other means (it matched a desktop file by
+   * its own hash and listed it in `GET /v1/projects/:id` → `media`).
+   */
+  inCloud?: (fileId: string) => boolean;
 }
 
 export async function uploadMissingMedia(
@@ -25,19 +41,21 @@ export async function uploadMissingMedia(
   cloud: CloudClient,
   store: MediaStore,
   alreadyUploaded: Set<string>,
-  onProgress?: (p: MediaUploadProgress) => void,
+  options: UploadOptions = {},
 ): Promise<MediaUploadResult> {
+  const { onProgress, inCloud } = options;
   const byHash = new Map<string, Project["files"][number]>();
-  let unavailable = 0;
+  const missing: MissingCloudFile[] = [];
+  const miss = (file: Project["files"][number]) => missing.push({ fileId: String(file.id), name: fileDisplayName(file) });
   for (const file of project.files) {
     const sha = fileHash(file);
     if (!sha) {
-      unavailable += 1;
+      if (!inCloud?.(String(file.id))) miss(file);
       continue;
     }
     if (!alreadyUploaded.has(sha)) byHash.set(sha, file);
   }
-  if (byHash.size === 0) return { uploaded: 0, unavailable };
+  if (byHash.size === 0) return { uploaded: 0, unavailable: missing.length, missing };
   onProgress?.({ done: 0, total: 1, label: "Checking what Zenvi Cloud already has" });
   const existing = await cloud.checkMedia([...byHash.keys()]);
   for (const sha of existing) alreadyUploaded.add(sha);
@@ -46,7 +64,7 @@ export async function uploadMissingMedia(
     if (existing.has(sha)) continue;
     const stored = await store.get(sha);
     if (!stored) {
-      unavailable += 1;
+      if (!inCloud?.(String(file.id))) miss(file);
       continue;
     }
     todo.push({
@@ -69,5 +87,5 @@ export async function uploadMissingMedia(
     done += item.blob.size;
     onProgress?.({ done, total, label: `Uploaded ${item.name}` });
   }
-  return { uploaded: todo.length, unavailable };
+  return { uploaded: todo.length, unavailable: missing.length, missing };
 }

@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Cloud, CloudOff, Download, Redo2, Share2, Undo2 } from "lucide-react";
+import { AlertTriangle, Check, Cloud, CloudAlert, CloudOff, Download, Redo2, Share2, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "zustand";
@@ -119,6 +119,10 @@ function SaveStatus() {
       icon = <AlertTriangle size={12} />;
       text = "Conflict";
       tone = "text-warning";
+    } else if (cloud.state === "partial") {
+      icon = <CloudAlert size={12} />;
+      text = `${cloud.missing.length} not synced`;
+      tone = "text-warning";
     } else if (cloud.state === "offline" || cloud.state === "error") {
       icon = <CloudOff size={12} />;
       text = cloud.state === "offline" ? "Offline" : "Sync failed";
@@ -137,6 +141,22 @@ function SaveStatus() {
       : linked
         ? cloud.error ?? "Saved in this browser and Zenvi Cloud"
         : "Saved in this browser";
+  if (linked && (cloud.state === "partial" || cloud.state === "conflict")) {
+    // Actionable: relink the files the cloud lacks, or resolve the conflict.
+    return (
+      <Tooltip label={detail}>
+        <button
+          type="button"
+          role="status"
+          onClick={() => session.ui.setState({ dialog: cloud.state === "partial" ? "relink" : "cloudConflict" })}
+          className={cn("inline-flex items-center gap-1 rounded-sm text-xs outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent", tone)}
+        >
+          {icon}
+          {text}
+        </button>
+      </Tooltip>
+    );
+  }
   return (
     <Tooltip label={detail}>
       <span role="status" className={cn("inline-flex items-center gap-1 text-xs", tone)}>

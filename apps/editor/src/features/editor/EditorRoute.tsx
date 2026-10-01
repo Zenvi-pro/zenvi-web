@@ -83,6 +83,8 @@ export default function EditorRoute() {
         media: newMediaLibrary(opened.cloudMedia),
         cloud: () => (useAuth.getState().status === "signed-in" ? cloudClient() : null),
       });
+      // This browser's unsynced edits sit on an older cloud revision: the person decides, nothing is dropped.
+      if (opened.conflict) session.markConflict(opened.conflict.cloudRevision, "Zenvi Cloud has a newer version than the changes you made in this browser.");
       document.title = `${opened.meta.name} · Zenvi`;
       exposeForDebugging(session);
       setState({ kind: "ready", session });

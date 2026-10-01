@@ -111,6 +111,16 @@ export class MediaLibrary {
     return this.specs.get(fileId);
   }
 
+  /** Where this library stores bytes (uploads read from it). */
+  storage(): Promise<MediaStore> {
+    return this.options.store();
+  }
+
+  /** Zenvi Cloud has this file's bytes (listed with the project, or loaded from the cloud here). */
+  inCloud(fileId: string): boolean {
+    return this.cloudByFile.has(fileId) || this.status.getState()[fileId]?.origin === "cloud";
+  }
+
   /** Resolve every file in the project that is not resolved yet; forget removed files. */
   async sync(project: Project): Promise<void> {
     const ids = new Set(project.files.map((f) => f.id));

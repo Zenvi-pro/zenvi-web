@@ -3,7 +3,7 @@ import { addClip, addFile, createProject, findProfile, parseProject, ProjectDocu
 import { describe, expect, it, vi } from "vitest";
 import { cloudRouteId, DisabledCloudClient, parseCloudRouteId, type CloudClient, type CloudProjectDocument } from "@/lib/cloud";
 import { MemoryProjectRepository } from "@/lib/storage/projects";
-import { currentStampForWebCopies, openCloud, openLocal } from "./openProject";
+import { adoptCloudCopy, currentStampForWebCopies, hasUnsyncedEdits, openCloud, openLocal } from "./openProject";
 
 const info: ReaderInfo = {
   type: "FFmpegReader",
@@ -45,6 +45,23 @@ function fakeCloud(remote: Omit<CloudProjectDocument, "id">) {
 
 const current = { "openshot-qt": "1.0.188", libopenshot: "1.0.0" };
 
+function cachedMeta(id: string, at: { revision: string; syncedAt: number; updatedAt: number }) {
+  return {
+    id,
+    name: "Mine",
+    createdAt: 1,
+    updatedAt: at.updatedAt,
+    source: "cloud" as const,
+    cloud: { id, revision: at.revision, syncedAt: at.syncedAt },
+    width: 1920,
+    height: 1080,
+    fps: { num: 30, den: 1 },
+    duration: 4,
+    clipCount: 1,
+    fileCount: 1,
+  };
+}
+
 describe("opening /editor/p/:id", () => {
   it("opens cloud project c_rcoyyeo9vq4uv1kp from the route /editor/p/c_rcoyyeo9vq4uv1kp", async () => {
     const routeId = "c_rcoyyeo9vq4uv1kp";
@@ -69,21 +86,52 @@ describe("opening /editor/p/:id", () => {
     expect(await openLocal(repo, "p8f3k2")).toBeNull();
   });
 
-  it("prefers the cloud copy unless the cache has unsynced edits on the same revision", async () => {
+  it("prefers the cloud copy, but continues this browser's unsynced edits on the same revision", async () => {
     const repo = new MemoryProjectRepository();
     const local = projectWithClip(current);
     const remote = { ...projectWithClip(current), clips: [] };
-    await repo.save(
-      { id: "c_x", name: "Mine", createdAt: 1, updatedAt: 50, source: "cloud", cloud: { id: "c_x", revision: "r1", syncedAt: 10 }, width: 1920, height: 1080, fps: { num: 30, den: 1 }, duration: 4, clipCount: 1, fileCount: 1 },
-      local,
-    );
+    await repo.save(cachedMeta("c_x", { revision: "r1", syncedAt: 10, updatedAt: 50 }), local);
     const same = await openCloud(repo, fakeCloud({ name: "Mine", revision: "r1", project: remote, media: [] }).cloud, "c_x", 100);
     expect(same.project.clips).toHaveLength(1);
+    expect(same.conflict).toBeUndefined();
     expect(same.meta.cloud?.syncedAt).toBe(10);
 
-    const moved = await openCloud(repo, fakeCloud({ name: "Mine", revision: "r2", project: remote, media: [] }).cloud, "c_x", 200);
-    expect(moved.project.clips).toHaveLength(0);
-    expect(moved.meta.cloud).toEqual({ id: "c_x", revision: "r2", syncedAt: 200 });
+    // Synced cache: the cloud copy wins.
+    await repo.save(cachedMeta("c_y", { revision: "r1", syncedAt: 60, updatedAt: 50 }), local);
+    const synced = await openCloud(repo, fakeCloud({ name: "Mine", revision: "r2", project: remote, media: [] }).cloud, "c_y", 200);
+    expect(synced.project.clips).toHaveLength(0);
+    expect(synced.meta.cloud).toEqual({ id: "c_y", revision: "r2", syncedAt: 200 });
+  });
+
+  it("never drops unsynced edits when the cloud moved on: opens them with a conflict", async () => {
+    const repo = new MemoryProjectRepository();
+    const local = projectWithClip(current);
+    const remote = { ...projectWithClip(current), clips: [] };
+    await repo.save(cachedMeta("c_x", { revision: "r1", syncedAt: 10, updatedAt: 50 }), local);
+    const opened = await openCloud(repo, fakeCloud({ name: "Theirs", revision: "r2", project: remote, media: [] }).cloud, "c_x", 100);
+    expect(opened.project.clips).toHaveLength(1);
+    expect(opened.conflict).toEqual({ cloudRevision: "r2", cloudName: "Theirs" });
+    // The cache still holds this browser's edits, on their base revision.
+    const cached = await repo.load("c_x");
+    expect(cached?.project.clips).toHaveLength(1);
+    expect(cached?.meta.cloud?.revision).toBe("r1");
+  });
+
+  it("'use the cloud version' keeps this browser's copy as its own local project", async () => {
+    const repo = new MemoryProjectRepository();
+    const local = projectWithClip(current);
+    const remote = { ...projectWithClip(current), clips: [] };
+    await repo.save(cachedMeta("c_x", { revision: "r1", syncedAt: 10, updatedAt: 50 }), local);
+    const stored = (await repo.load("c_x"))!;
+    const { archivedId, archivedName } = await adoptCloudCopy(repo, fakeCloud({ name: "Theirs", revision: "r2", project: remote, media: [] }).cloud, "c_x", stored, 300);
+    const archived = await repo.load(archivedId);
+    expect(archived?.project.clips).toHaveLength(1);
+    expect(archived?.meta.cloud).toBeUndefined();
+    expect(archived?.meta.name).toBe(archivedName);
+    const cache = await repo.load("c_x");
+    expect(cache?.project.clips).toHaveLength(0);
+    expect(cache?.meta.cloud).toEqual({ id: "c_x", revision: "r2", syncedAt: 300 });
+    expect(hasUnsyncedEdits(cache)).toBe(false);
   });
 
   it("passes the signed media URLs the cloud sent along", async () => {

@@ -13,6 +13,9 @@ import { keymap, type EditorCommand } from "../commands";
 import { useCommands } from "../layout/commandsContext";
 import { useProject, useSession } from "../session/context";
 import { fileDisplayName, matchRelinkCandidates } from "../session/media";
+import { cloudClient } from "@/lib/cloud";
+import { projectRepository } from "@/lib/storage/projects";
+import { adoptCloudCopy } from "../openProject";
 import { toolEntries } from "./ToolRunner";
 
 const GROUP_ORDER: EditorCommand["group"][] = ["Playback", "Timeline", "Edit", "Keyframes", "File", "View", "Help"];
@@ -245,27 +248,34 @@ export function RelinkDialog({ open, onClose }: { open: boolean; onClose: () => 
 
 export function CloudConflictDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const session = useSession();
-  const [busy, setBusy] = useState<"mine" | "theirs" | null>(null);
+  const [busy, setBusy] = useState<"mine" | "cloud" | null>(null);
+  const chooseCloud = async () => {
+    const link = session.meta.getState().cloud;
+    if (!link) return;
+    setBusy("cloud");
+    try {
+      await session.autosave.flush();
+      // This browser's copy stays, as its own local project; then the cloud copy opens.
+      const { archivedName } = await adoptCloudCopy(projectRepository(), cloudClient(), link.id, { meta: session.meta.getState(), project: session.snapshotForSave() });
+      toast.success("Opening the cloud version", { description: `Your edits are kept in Projects as “${archivedName}”.` });
+      window.location.reload();
+    } catch (error) {
+      setBusy(null);
+      toast.error("Could not load the cloud version", { description: error instanceof Error ? error.message : String(error) });
+    }
+  };
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title="This project changed somewhere else"
-      description="Someone (or another device) saved a newer version to Zenvi Cloud while you were editing."
-      width={460}
+      description={session.cloudSync.getState().error ?? "Someone (or another device) saved a newer version to Zenvi Cloud."}
+      width={480}
       dismissible={busy === null}
       footer={
         <>
-          <Button
-            variant="secondary"
-            loading={busy === "theirs"}
-            disabled={busy !== null}
-            onClick={() => {
-              setBusy("theirs");
-              window.location.reload();
-            }}
-          >
-            Load their version
+          <Button variant="secondary" loading={busy === "cloud"} disabled={busy !== null} onClick={() => void chooseCloud()}>
+            Use the cloud version
           </Button>
           <Button
             variant="primary"
@@ -273,7 +283,7 @@ export function CloudConflictDialog({ open, onClose }: { open: boolean; onClose:
             disabled={busy !== null}
             onClick={() => {
               setBusy("mine");
-              void session.saveCloud(true).finally(() => {
+              void session.keepMine().finally(() => {
                 setBusy(null);
                 onClose();
               });
@@ -285,7 +295,8 @@ export function CloudConflictDialog({ open, onClose }: { open: boolean; onClose:
       }
     >
       <p className="text-sm text-fg-subtle">
-        <span className="text-fg-muted">Keep mine</span> replaces the cloud copy with what you see now. <span className="text-fg-muted">Load their version</span> reloads the cloud copy; your local changes since the last sync are discarded.
+        <span className="text-fg-muted">Keep mine</span> replaces the cloud copy with what you see now. <span className="text-fg-muted">Use the cloud version</span> opens the cloud copy and keeps
+        your edits as a separate project in Projects. Until you choose, your edits keep saving in this browser.
       </p>
     </Dialog>
   );

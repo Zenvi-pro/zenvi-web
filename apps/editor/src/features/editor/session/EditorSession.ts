@@ -21,22 +21,26 @@ import {
 } from "@zenvi/engine";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { CloudConflictError, type CloudClient } from "@/lib/cloud";
-import { mediaStore } from "@/lib/storage/media";
 import { describeProject, type LocalProjectMeta, type ProjectRepository } from "@/lib/storage/projects";
 import { toast } from "@/ui/Toast";
 import { Autosaver } from "./autosave";
-import { uploadMissingMedia, type MediaUploadProgress } from "./cloudMedia";
-import { MediaLibrary } from "./media";
+import { uploadMissingMedia, type MediaUploadProgress, type MediaUploadResult, type MissingCloudFile } from "./cloudMedia";
+import { fileDisplayName, MediaLibrary } from "./media";
 import { createPlaybackStore, type PlaybackStore, type PreviewEngine } from "./playback";
 import { PreviewCache } from "./previews";
 import { createUiStore, pruneSelection, type UiStore } from "./uiStore";
 
-export type CloudSyncState = "local" | "pending" | "syncing" | "synced" | "offline" | "conflict" | "error";
+/** `partial`: the project synced, but some of its media is neither in Zenvi Cloud nor in this browser. */
+export type CloudSyncState = "local" | "pending" | "syncing" | "synced" | "partial" | "offline" | "conflict" | "error";
 
 export interface CloudSyncStatus {
   state: CloudSyncState;
   error: string | null;
   lastSyncedAt: number | null;
+  /** Files the cloud copy refers to that Zenvi Cloud does not have (state `partial`). */
+  missing: MissingCloudFile[];
+  /** The cloud's revision when this copy conflicts with it (state `conflict`). */
+  conflictRevision?: string | null;
 }
 
 /** The timeline view's imperative handle (zoom and scroll live in the view). */
@@ -95,6 +99,10 @@ export class EditorSession {
   private reverseRaf = 0;
   /** Media hashes known to be in Zenvi Cloud (skips repeated checks). */
   private readonly uploadedMedia = new Set<string>();
+  /** The cloud save in flight; saves never overlap (each needs the revision the previous one got). */
+  private cloudSaving: Promise<void> | null = null;
+  /** A save asked for while one was in flight (coalesced into one more run). */
+  private cloudWanted: { force: boolean } | null = null;
   private disposed = false;
 
   constructor(private readonly options: EditorSessionOptions) {
@@ -107,6 +115,7 @@ export class EditorSession {
       state: options.meta.cloud ? "synced" : "local",
       error: null,
       lastSyncedAt: options.meta.cloud?.syncedAt ?? null,
+      missing: [],
     }));
     this.autosave = new Autosaver({ save: () => this.saveLocal() });
 
@@ -118,6 +127,7 @@ export class EditorSession {
     document.addEventListener("visibilitychange", onHide);
     this.disposers.push(() => document.removeEventListener("visibilitychange", onHide));
     this.mediaReady = this.media.sync(this.doc.project).catch(() => undefined);
+    void this.mediaReady.then(() => this.noteMissingCloudMedia());
     // Media that becomes readable after a frame was drawn (tool imports, cloud URLs, relinks): draw again.
     let redrawQueued = false;
     this.disposers.push(
@@ -356,6 +366,8 @@ export class EditorSession {
 
   private scheduleCloudSave(): void {
     if (this.cloudTimer) clearTimeout(this.cloudTimer);
+    // In a conflict nothing syncs until the person chooses; edits keep saving locally.
+    if (this.cloudSync.getState().state === "conflict") return;
     this.cloudSync.setState({ state: "pending", error: null });
     this.cloudTimer = setTimeout(() => {
       this.cloudTimer = null;
@@ -363,30 +375,56 @@ export class EditorSession {
     }, 2500);
   }
 
-  /** Push the current project to Zenvi Cloud (linked projects only). */
-  async saveCloud(force = false): Promise<void> {
+  /**
+   * Push the current project to Zenvi Cloud (linked projects only). Saves run
+   * one at a time: a save asked for while one is in flight runs once after
+   * it, with the revision it got, so autosave and "Sync now" never send the
+   * same If-Match twice. `force` overwrites a conflicting cloud copy.
+   */
+  saveCloud(force = false): Promise<void> {
+    this.cloudWanted = { force: (this.cloudWanted?.force ?? false) || force };
+    if (this.cloudSaving) return this.cloudSaving;
+    const run = (async () => {
+      try {
+        while (this.cloudWanted) {
+          const next = this.cloudWanted;
+          this.cloudWanted = null;
+          await this.saveCloudOnce(next.force);
+        }
+      } finally {
+        this.cloudSaving = null;
+      }
+    })();
+    this.cloudSaving = run;
+    return run;
+  }
+
+  private async saveCloudOnce(force: boolean): Promise<void> {
     const link = this.meta.getState().cloud;
     const cloud = this.options.cloud();
     if (!link || !cloud?.enabled) return;
-    if (this.cloudSync.getState().state === "conflict" && !force) return;
+    const status = this.cloudSync.getState();
+    if (status.state === "conflict" && !force) return;
+    // Overwriting a conflict: the save must name the cloud's current revision.
+    const revision = force && status.state === "conflict" && status.conflictRevision !== undefined ? status.conflictRevision : link.revision;
     this.cloudSync.setState({ state: "syncing", error: null });
     try {
-      // Media first, so the cloud project never points at bytes the cloud lacks.
-      await this.uploadMedia();
-      const { revision } = await cloud.saveProject(link.id, this.snapshotForSave(), link.revision);
+      // Media first, so the cloud project points at as few missing bytes as possible.
+      const media = await this.uploadMedia();
+      const saved = await cloud.saveProject(link.id, this.snapshotForSave(), revision);
       const syncedAt = Date.now();
-      const cloudLink = { ...link, revision, syncedAt };
+      const cloudLink = { ...link, revision: saved.revision, syncedAt };
       this.meta.setState({ ...this.meta.getState(), cloud: cloudLink });
       await this.options.repository.updateMeta(this.meta.getState().id, { cloud: cloudLink });
-      this.cloudSync.setState({ state: "synced", error: null, lastSyncedAt: syncedAt });
+      this.cloudSync.setState(this.syncedStatus(syncedAt, media));
     } catch (error) {
       if (error instanceof CloudConflictError) {
-        if (force && error.currentRevision) {
-          this.meta.setState({ ...this.meta.getState(), cloud: { ...link, revision: error.currentRevision } });
-          return this.saveCloud(false);
+        if (force) {
+          // The cloud moved again while overwriting: overwrite that revision.
+          this.cloudSync.setState({ state: "conflict", error: error.message, conflictRevision: error.currentRevision });
+          if (error.currentRevision) return this.saveCloudOnce(true);
         }
-        this.cloudSync.setState({ state: "conflict", error: error.message });
-        this.ui.setState({ dialog: "cloudConflict" });
+        this.markConflict(error.currentRevision, error.message);
         return;
       }
       const offline = typeof navigator !== "undefined" && navigator.onLine === false;
@@ -394,11 +432,50 @@ export class EditorSession {
     }
   }
 
+  private syncedStatus(syncedAt: number, media: MediaUploadResult): CloudSyncStatus {
+    if (media.missing.length === 0) return { state: "synced", error: null, lastSyncedAt: syncedAt, missing: [], conflictRevision: undefined };
+    const names = media.missing.map((m) => m.name);
+    const list = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
+    return {
+      state: "partial",
+      error: `Not fully synced: ${list} ${names.length === 1 ? "is" : "are"} not in Zenvi Cloud and not in this browser. Relink ${names.length === 1 ? "it" : "them"} to upload.`,
+      lastSyncedAt: syncedAt,
+      missing: media.missing,
+      conflictRevision: undefined,
+    };
+  }
+
+  /** A linked project whose media is neither here nor in the cloud is not fully synced, even before the next save. */
+  private noteMissingCloudMedia(): void {
+    if (this.disposed || !this.meta.getState().cloud) return;
+    const status = this.cloudSync.getState();
+    if (status.state !== "synced") return;
+    const missing = this.media
+      .missing(this.doc.project)
+      .filter((f) => !this.media.inCloud(f.id))
+      .map((f) => ({ fileId: f.id, name: fileDisplayName(f) }));
+    if (missing.length > 0) this.cloudSync.setState(this.syncedStatus(status.lastSyncedAt ?? Date.now(), { uploaded: 0, unavailable: missing.length, missing }));
+  }
+
+  /** The cloud copy changed elsewhere: stop syncing until the person decides (nothing is discarded). */
+  markConflict(cloudRevision: string | null, message = "This project was changed somewhere else."): void {
+    this.cloudSync.setState({ state: "conflict", error: message, conflictRevision: cloudRevision });
+    this.ui.setState({ dialog: "cloudConflict" });
+  }
+
+  /** Conflict → "Keep mine": overwrite the cloud copy (If-Match: its current revision). */
+  keepMine(): Promise<void> {
+    return this.saveCloud(true);
+  }
+
   /** Upload media the cloud does not have yet (deduplicated by content hash). */
-  async uploadMedia(onProgress?: (p: MediaUploadProgress) => void): Promise<{ uploaded: number; unavailable: number }> {
+  async uploadMedia(onProgress?: (p: MediaUploadProgress) => void): Promise<MediaUploadResult> {
     const cloud = this.options.cloud();
-    if (!cloud?.enabled) return { uploaded: 0, unavailable: 0 };
-    return uploadMissingMedia(this.doc.project, cloud, await mediaStore(), this.uploadedMedia, onProgress);
+    if (!cloud?.enabled) return { uploaded: 0, unavailable: 0, missing: [] };
+    return uploadMissingMedia(this.doc.project, cloud, await this.media.storage(), this.uploadedMedia, {
+      onProgress,
+      inCloud: (fileId) => this.media.inCloud(fileId),
+    });
   }
 
   /** Link this project to a cloud project (after Share / push). */
@@ -406,7 +483,7 @@ export class EditorSession {
     const cloud = { id: cloudId, revision, syncedAt: Date.now() };
     this.meta.setState({ ...this.meta.getState(), cloud });
     await this.options.repository.updateMeta(this.meta.getState().id, { cloud });
-    this.cloudSync.setState({ state: "synced", error: null, lastSyncedAt: cloud.syncedAt });
+    this.cloudSync.setState({ state: "synced", error: null, lastSyncedAt: cloud.syncedAt, missing: [] });
   }
 
   async dispose(): Promise<void> {
