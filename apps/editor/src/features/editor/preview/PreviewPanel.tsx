@@ -9,6 +9,7 @@ import { useRunCommand } from "../layout/commandsContext";
 import { createPreviewEngine } from "../render";
 import { usePlayback, useProjectSelector, useSession } from "../session/context";
 import { LiveTimecode } from "../timeline/TimelineToolbar";
+import { TransformOverlay } from "./TransformOverlay";
 
 type Zoom = "fit" | "0.5" | "1";
 
@@ -84,6 +85,7 @@ export function PreviewPanel() {
       <div ref={stage} className={cn("relative min-h-0 flex-1", zoom === "fit" ? "grid place-items-center overflow-hidden" : "overflow-auto p-3")} onDoubleClick={toggleFullscreen}>
         <div className="relative shrink-0 bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.06)]" style={{ width: frame.width, height: frame.height }}>
           <canvas ref={canvas} className="block h-full w-full" aria-label="Video preview" />
+          {renders && hasClips ? <TransformOverlay width={frame.width} height={frame.height} /> : null}
           {!hasClips ? (
             <div className="absolute inset-0 grid place-items-center text-center">
               <div>

@@ -52,7 +52,7 @@ export function createProjectFromProfile(profile: Profile): Project {
   return createProject({ profile });
 }
 
-export function parseProjectJson(json: unknown): Project {
+export function parseProjectJson(json: unknown): Promise<Project> {
   return parseProjectCompat(json, createProject({ profile: resolveProfile(DEFAULT_PROFILE_DESCRIPTION) }));
 }
 
@@ -77,7 +77,7 @@ export async function importProjectFile(file: File): Promise<string> {
   } catch {
     throw new Error(`${file.name} is not a valid project file.`);
   }
-  const project = parseProjectJson(json);
+  const project = await parseProjectJson(json);
   const id = newLocalId();
   const name = file.name.replace(/\.(zvn|osp|flow|json)$/i, "") || "Imported project";
   await projectRepository().save(freshMeta(id, name, project, "zvn"), project);

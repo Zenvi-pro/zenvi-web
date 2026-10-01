@@ -240,8 +240,15 @@ function EffectInspector({ clip, effect, project, filter }: { clip: Clip; effect
   const table = entry?.properties ?? {};
   const writer = useMemo(() => effectWriter(session, clip, effect, table), [session, clip, effect, table]);
   const q = filter.trim().toLowerCase();
-  const keys = Object.keys(effect).filter((k) => !HIDDEN_EFFECT_KEYS.has(k) && !k.startsWith("mask_") && (!q || label(table[k], k).toLowerCase().includes(q)));
-  const maskKeys = Object.keys(effect).filter((k) => k.startsWith("mask_") && k !== "mask_reader" && k !== "mask_source_id");
+  const matches = (k: string) => !q || label(table[k], k).toLowerCase().includes(q);
+  const shown = (k: string) => k in effect && !HIDDEN_EFFECT_KEYS.has(k) && matches(k);
+  // Registry order: the effect's own parameters first, then the EffectBase ones.
+  const params = entry?.params ?? [];
+  const own = params.filter((p) => !p.common && !p.key.startsWith("mask_")).map((p) => p.key).filter(shown);
+  const extra = Object.keys(effect).filter((k) => !params.some((p) => p.key === k) && !k.startsWith("mask_") && shown(k));
+  const keys = [...own, ...extra];
+  const advanced = params.filter((p) => p.common && !p.key.startsWith("mask_")).map((p) => p.key).filter(shown);
+  const maskKeys = params.filter((p) => p.key.startsWith("mask_")).map((p) => p.key).filter(shown);
   return (
     <>
       <div className="flex items-center gap-1.5 border-b border-line px-1.5 py-2">
@@ -259,8 +266,15 @@ function EffectInspector({ clip, effect, project, filter }: { clip: Clip; effect
           <PropertyRow key={key} propKey={key} meta={table[key]} raw={effect[key]} frame={frame} writer={writer} />
         ))}
       </Section>
-      {maskKeys.length && !q ? (
-        <Section title="Mask" defaultOpen={false}>
+      {advanced.length ? (
+        <Section title="Advanced" defaultOpen={Boolean(q)}>
+          {advanced.map((key) => (
+            <PropertyRow key={key} propKey={key} meta={table[key]} raw={effect[key]} frame={frame} writer={writer} />
+          ))}
+        </Section>
+      ) : null}
+      {maskKeys.length ? (
+        <Section title="Mask" defaultOpen={Boolean(q)}>
           {maskKeys.map((key) => (
             <PropertyRow key={key} propKey={key} meta={table[key]} raw={effect[key]} frame={frame} writer={writer} />
           ))}

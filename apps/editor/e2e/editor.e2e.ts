@@ -74,8 +74,32 @@ test("new project → import → arrange → split → undo → play → export"
 
   // Properties of the selected clip.
   await clips(page).first().click();
-  await expect(page.getByText("Transform")).toBeVisible();
+  await expect(page.getByText("Transform", { exact: true })).toBeVisible();
   await shot(page, "05-properties");
+
+  // Transform handles on the preview: drag the clip, then undo.
+  const handles = page.getByRole("group", { name: "Transform handles" });
+  await expect(handles).toBeVisible();
+  const box2 = (await handles.locator("polygon").boundingBox())!;
+  await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box2.x + box2.width / 2 + 120, box2.y + box2.height / 2 + 40, { steps: 8 });
+  await page.mouse.up();
+  const locationX = page.getByRole("spinbutton", { name: "Location X" });
+  await expect(locationX).not.toHaveAttribute("aria-valuenow", "0");
+  await shot(page, "05b-transform");
+  await page.keyboard.press(`${mod}+Z`);
+  await expect(locationX).toHaveAttribute("aria-valuenow", "0");
+
+  // Drop an effect from the library onto the clip.
+  const rail = page.getByRole("navigation", { name: "Library sections" });
+  await rail.getByRole("button", { name: "Effects" }).click();
+  const blur = page.getByRole("button", { name: /^Blur/ }).first();
+  await expect(blur).toBeVisible();
+  await blur.dragTo(clips(page).first());
+  await expect(page.getByText("Parameters")).toBeVisible();
+  await shot(page, "05c-effect");
+  await rail.getByRole("button", { name: "Project files" }).click();
 
   // Export in the browser and receive the file.
   await page.getByRole("button", { name: "Export", exact: true }).first().click();

@@ -4,13 +4,15 @@
  * exported. Only `projectFactory.ts` imports this; delete it once
  * `@zenvi/engine` exports `parseProject`.
  */
-import * as engine from "@zenvi/engine";
 import { generateId, type Project } from "@zenvi/engine";
 
-const ns = engine as unknown as Record<string, unknown>;
-
-/** Engine `parseProject` once exported, else a structural check that fills missing keys. */
-export function parseProjectCompat(json: unknown, template: Project): Project {
+/**
+ * Engine `parseProject` once exported, else a structural check that fills
+ * missing keys. The engine is loaded lazily so the projects home does not
+ * pull every engine module into its bundle.
+ */
+export async function parseProjectCompat(json: unknown, template: Project): Promise<Project> {
+  const ns = (await import("@zenvi/engine")) as unknown as Record<string, unknown>;
   const fn = ns.parseProject as ((json: unknown) => Project) | undefined;
   return typeof fn === "function" ? fn(json) : stubParseProject(json, template);
 }

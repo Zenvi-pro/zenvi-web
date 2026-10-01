@@ -72,9 +72,13 @@ test("a 30-minute, 300-clip timeline stays smooth while scrubbing and scrolling"
     session.edit("Stress", (tx) => {
       for (let i = 0; i < 300; i += 1) engine.addClip(tx, { fileId, position: Math.floor(i / 3) * 18, layer: layers[i % 3]! });
     });
-    session.ui.setState({ pxPerSecond: 12 });
   });
   await expect(page.locator('[data-kind="clip"]').first()).toBeVisible();
+  // The first clips on an empty timeline are fitted into view; then zoom in to ~100 s per screen.
+  await page.waitForTimeout(800);
+  await page.evaluate(() => {
+    (window as unknown as { __zenvi: { session: { ui: { setState: (s: unknown) => void } } } }).__zenvi.session.ui.setState({ pxPerSecond: 12 });
+  });
   await page.waitForTimeout(1500);
   const rendered = await page.locator('[data-kind="clip"]').count();
   expect(rendered).toBeLessThan(120); // virtualized: only clips near the view are in the DOM
