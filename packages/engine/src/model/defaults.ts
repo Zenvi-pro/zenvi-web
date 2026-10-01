@@ -19,6 +19,7 @@ import { DEFAULT_PROFILE_DESCRIPTION, findProfile, type Profile } from "./profil
 import { LIBOPENSHOT_CLIP_JSON } from "./libopenshot-defaults.data.js";
 import { pyRound } from "./rounding.js";
 import { isAudioOnlyMedia } from "./media.js";
+import { PROJECT_FORMAT_VERSION } from "../io/versions.js";
 
 /** Desktop preference `default-image-length` (seconds a still image lasts when added). */
 export const DEFAULT_IMAGE_LENGTH = 10;
@@ -92,7 +93,14 @@ export interface CreateProjectOptions {
   id?: string;
 }
 
-/** A new, empty project like the desktop's File ▸ New. Throws on an unknown profile. */
+/**
+ * A new, empty project like the desktop's File ▸ New. Throws on an unknown profile.
+ *
+ * One deliberate difference: the desktop keeps `_default.project`'s "0.0.0"
+ * stamp until it saves; this stamps `PROJECT_FORMAT_VERSION` right away, so a
+ * new project written without `serializeProject` is never read back as an
+ * OpenShot beta project (whose load migration flips every clip's alpha).
+ */
 export function createProject(opts: CreateProjectOptions = {}): Project {
   const project = defaultProjectTemplate();
   const profile =
@@ -106,6 +114,7 @@ export function createProject(opts: CreateProjectOptions = {}): Project {
   project.channels = channels;
   project.channel_layout = layout;
   project.id = opts.id ?? generateId();
+  project.version = { ...project.version, ...PROJECT_FORMAT_VERSION };
   return project;
 }
 

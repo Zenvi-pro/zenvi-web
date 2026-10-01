@@ -5,6 +5,7 @@ import { getMediaType, isAudioOnlyMedia, isSingleImageMedia } from "./media.js";
 import { CLIP_PROPERTIES, TRANSITION_PROPERTIES, valueKind } from "./properties.js";
 import { clampTimingToMedia, videoLengthToProjectFrames } from "./timing.js";
 import { isGeneratedId } from "./ids.js";
+import { PROJECT_FORMAT_VERSION } from "../io/versions.js";
 
 const fps30 = { num: 30, den: 1 };
 
@@ -47,6 +48,15 @@ describe("createProject", () => {
     expect(p.fps).toEqual({ num: 30000, den: 1001 });
     expect([p.width, p.height, p.channels, p.channel_layout]).toEqual([1920, 1080, 1, 4]);
     expect(() => createProject({ profile: "nope" })).toThrow(/Unknown profile/);
+  });
+
+  it("stamps the engine's project format version; the template keeps the beta stamp", () => {
+    const p = createProject();
+    expect(p.version).toEqual({ "openshot-qt": "1.0.188", libopenshot: "1.0.0" });
+    expect(p.version).toEqual(PROJECT_FORMAT_VERSION);
+    // A copy, not the frozen constant: hosts may add their own version keys.
+    expect(Object.isFrozen(p.version)).toBe(false);
+    expect(defaultProjectTemplate().version).toEqual({ "openshot-qt": "0.0.0", libopenshot: "0.0.0" });
   });
 });
 
