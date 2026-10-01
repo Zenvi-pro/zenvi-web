@@ -88,7 +88,7 @@ describe("AudioPlayback", () => {
     const ctx = new FakeAudioContext();
     const log: [string, number, number][] = [];
     const playback = new AudioPlayback({ context: ctx as unknown as AudioContext, renderer: fakeRenderer(log), lookahead: 2, window: 1 });
-    playback.start(plan, { timeline: 1, context: 0.1, rate: 1 });
+    playback.start(plan, { timeline: 1, context: 0.1, rate: 1 }, { num: 30, den: 1 });
     for (let i = 0; i < 5; i += 1) {
       await new Promise((r) => setTimeout(r, 0));
       playback.pump();
@@ -126,7 +126,7 @@ describe("AudioPlayback", () => {
       async releaseEnded() {},
     } as unknown as AudioRenderer;
     const playback = new AudioPlayback({ context: ctx as unknown as AudioContext, renderer });
-    playback.start(plan, { timeline: 0, context: 0, rate: 1 });
+    playback.start(plan, { timeline: 0, context: 0, rate: 1 }, { num: 30, den: 1 });
     playback.stop();
     release();
     await new Promise((r) => setTimeout(r, 0));

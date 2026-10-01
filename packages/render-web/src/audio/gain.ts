@@ -10,7 +10,11 @@
 
 import type { GainPoint } from "@zenvi/engine/render";
 
-/** Envelope value at `t` (seconds from the segment start); constant beyond the ends, 1 when empty. */
+/**
+ * Envelope value at `t` (seconds from the segment start), approaching from
+ * the left: at a step (two points with the same `t`) the value before it.
+ * Constant beyond the ends, 1 when empty.
+ */
 export function gainAt(points: readonly GainPoint[], t: number): number {
   if (points.length === 0) return 1;
   const first = points[0]!;
@@ -26,11 +30,23 @@ export function gainAt(points: readonly GainPoint[], t: number): number {
   return points[points.length - 1]!.gain;
 }
 
+/** Envelope value just after `t`: at a step, the value after it. */
+export function gainAfter(points: readonly GainPoint[], t: number): number {
+  for (let i = points.length - 1; i >= 0; i -= 1) {
+    if (points[i]!.t === t) return points[i]!.gain;
+  }
+  return gainAt(points, t);
+}
+
 export type GainEvent = { kind: "set" | "ramp"; t: number; value: number };
 
-/** Automation for the envelope between `from` and `to` (segment-relative seconds). */
+/**
+ * Automation for the envelope between `from` and `to` (segment-relative
+ * seconds). Playback runs forward, so it starts from the value after `from`
+ * and ends on the value before `to`; steps inside become zero-length ramps.
+ */
 export function gainEvents(points: readonly GainPoint[], from: number, to: number): GainEvent[] {
-  const events: GainEvent[] = [{ kind: "set", t: from, value: gainAt(points, from) }];
+  const events: GainEvent[] = [{ kind: "set", t: from, value: gainAfter(points, from) }];
   for (const point of points) {
     if (point.t > from && point.t < to) events.push({ kind: "ramp", t: point.t, value: point.gain });
   }

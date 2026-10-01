@@ -219,7 +219,7 @@ async function encode(project: Project, media: MediaRegistry, options: ExportOpt
     while (audioAt < until - 1e-9) {
       if (signal?.aborted) throw abortReason(signal);
       const to = Math.min(end, audioAt + AUDIO_WINDOW);
-      const buffer = await mixWindow(audio, audioPlan, audioAt, to, sampleRate, channels);
+      const buffer = await mixWindow(audio, audioPlan, audioAt, to, sampleRate, channels, fps);
       await audioSource.add(buffer);
       await audio.releaseEnded(audioPlan, to);
       audioAt = to;

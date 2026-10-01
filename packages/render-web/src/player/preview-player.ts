@@ -453,7 +453,7 @@ export class PreviewPlayer {
     if (plan && context && this.audio) {
       void context.resume().catch((error: unknown) => this.report("audio:resume", { kind: "audio", error }));
       const anchor: ClockAnchor = { timeline: t, context: context.currentTime + AUDIO_START_DELAY, rate };
-      this.audio.start(plan, anchor);
+      this.audio.start(plan, anchor, project.fps);
       this.clock = audioClock(anchor, context, now);
       this.audioWait = { since: now(), anchor };
       return;

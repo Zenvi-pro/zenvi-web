@@ -8,10 +8,10 @@
  */
 
 import { frameContaining, frameToSeconds, maxFrame, type Project } from "@zenvi/engine";
-import { planAudioInterim } from "./audio/plan-audio-interim.js";
 import {
   applyMask,
   applyVideoEffect,
+  planAudio,
   planFrame,
   supportedVideoEffects,
   type AudioKernel,
@@ -60,14 +60,12 @@ let supported: Set<string> | null = null;
 /** The engine render-web uses when a caller does not pass one. */
 export const defaultEngine: RenderEngine = {
   // STUB (W5, remove when W2 lands): `@zenvi/engine/render` does not export
-  // planAudio/getAudioKernel yet. Until it does, an interim planner gives
-  // clips their sound at normal speed with their volume keyframes
-  // (audio/plan-audio-interim.ts) and audio effects are skipped. Replace
-  // these two entries with direct imports.
-  planAudio: (project, range) => planAudioInterim(project, range),
+  // getAudioKernel yet; until it does, audio effects are skipped. Replace
+  // this entry with a direct import.
   getAudioKernel: () => undefined,
 
   planFrame: (project, frame, size, options) => planFrame(project, frame, size, options),
+  planAudio: (project, range) => planAudio(project, range),
   applyVideoEffect,
   supportsVideoEffect: (type) => (supported ??= new Set(supportedVideoEffects())).has(type),
   applyMask,

@@ -34,6 +34,29 @@ describe("gain envelopes", () => {
     expect(gainAt([], 3)).toBe(1);
   });
 
+  it("treats two points at the same time as a step, on either side of a window boundary", () => {
+    const step = [
+      { t: 0, gain: 0.5 },
+      { t: 1, gain: 0.5 },
+      { t: 1, gain: 1 },
+      { t: 2, gain: 1 },
+    ];
+    expect(gainEvents(step, 0, 1)).toEqual([
+      { kind: "set", t: 0, value: 0.5 },
+      { kind: "ramp", t: 1, value: 0.5 },
+    ]);
+    expect(gainEvents(step, 1, 2)).toEqual([
+      { kind: "set", t: 1, value: 1 },
+      { kind: "ramp", t: 2, value: 1 },
+    ]);
+    expect(gainEvents(step, 0.5, 1.5)).toEqual([
+      { kind: "set", t: 0.5, value: 0.5 },
+      { kind: "ramp", t: 1, value: 0.5 },
+      { kind: "ramp", t: 1, value: 1 },
+      { kind: "ramp", t: 1.5, value: 1 },
+    ]);
+  });
+
   it("automates a piece: set at its start, ramps through inner points to its end", () => {
     expect(gainEvents(fade, 0.5, 4.5)).toEqual([
       { kind: "set", t: 0.5, value: 0.5 },

@@ -7,8 +7,9 @@
  * every voice at once; the next start decodes from the new position.
  */
 
+import type { Fraction } from "@zenvi/engine";
 import type { AudioPlan } from "@zenvi/engine/render";
-import type { AudioRenderer } from "./renderer.js";
+import type { AudioRenderer, TimelineAudioFormat } from "./renderer.js";
 import { timelineTimeOf, type ClockAnchor } from "./schedule.js";
 import { scheduleVoice, type Voice } from "./voice.js";
 
@@ -33,6 +34,7 @@ export class AudioPlayback {
   private readonly onError: ((error: unknown) => void) | undefined;
   private plan: AudioPlan | null = null;
   private anchor: ClockAnchor | null = null;
+  private format: TimelineAudioFormat | null = null;
   private scheduledUntil = 0;
   private firstWindow = true;
   private inflight = 0;
@@ -76,13 +78,15 @@ export class AudioPlayback {
 
   /**
    * Schedule `plan` so timeline `anchor.timeline` sounds at context time
-   * `anchor.context` and advances at `anchor.rate` (> 0).
+   * `anchor.context` and advances at `anchor.rate` (> 0). `fps` is the
+   * timeline frame rate (audio effects run one frame at a time).
    */
-  start(plan: AudioPlan, anchor: ClockAnchor): void {
+  start(plan: AudioPlan, anchor: ClockAnchor, fps: Fraction): void {
     this.stop();
     if (!(anchor.rate > 0)) return;
     this.plan = plan;
     this.anchor = anchor;
+    this.format = { sampleRate: plan.sampleRate, channels: plan.channels, fps };
     this.scheduledUntil = Math.max(anchor.timeline, plan.start);
     this.firstWindow = true;
     this.pump();
@@ -90,8 +94,8 @@ export class AudioPlayback {
 
   /** Top up the schedule. Call regularly (every animation frame) while playing. */
   pump(): void {
-    const { plan, anchor } = this;
-    if (!plan || !anchor) return;
+    const { plan, anchor, format } = this;
+    if (!plan || !anchor || !format) return;
     const audible = timelineTimeOf(anchor, this.context.currentTime);
     const horizon = Math.min(plan.end, Math.max(audible, anchor.timeline) + this.lookahead * anchor.rate);
     const generation = this.generation;
@@ -102,7 +106,7 @@ export class AudioPlayback {
       this.firstWindow = false;
       this.scheduledUntil = to;
       this.inflight += 1;
-      void this.scheduleWindow(plan, anchor, from, to, generation).finally(() => {
+      void this.scheduleWindow(plan, anchor, format, from, to, generation).finally(() => {
         if (generation === this.generation) this.inflight -= 1;
       });
     }
@@ -114,6 +118,7 @@ export class AudioPlayback {
     this.inflight = 0;
     this.plan = null;
     this.anchor = null;
+    this.format = null;
     for (const voice of this.voices) voice.stop();
     this.voices.clear();
     void this.renderer.reset().catch((error: unknown) => this.onError?.(error));
@@ -124,11 +129,11 @@ export class AudioPlayback {
     this.master.disconnect();
   }
 
-  private async scheduleWindow(plan: AudioPlan, anchor: ClockAnchor, from: number, to: number, generation: number): Promise<void> {
+  private async scheduleWindow(plan: AudioPlan, anchor: ClockAnchor, format: TimelineAudioFormat, from: number, to: number, generation: number): Promise<void> {
     const segments = plan.segments.filter((s) => s.timelineStart < to && s.timelineStart + s.duration > from);
     const pieces = await Promise.all(
       segments.map((segment) =>
-        this.renderer.render(segment, from, to).catch((error: unknown) => {
+        this.renderer.render(segment, from, to, format).catch((error: unknown) => {
           this.onError?.(error);
           return null;
         }),

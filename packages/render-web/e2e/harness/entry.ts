@@ -557,7 +557,7 @@ const api = {
     const bounds = [0, 0.7, 1.33, 1.9, 3];
     const parts: Float32Array[] = [];
     for (let i = 0; i + 1 < bounds.length; i += 1) {
-      const buffer = await mixWindow(renderer, plan, bounds[i]!, bounds[i + 1]!, sampleRate, 2);
+      const buffer = await mixWindow(renderer, plan, bounds[i]!, bounds[i + 1]!, sampleRate, 2, { num: 30, den: 1 });
       parts.push(buffer.getChannelData(0).slice());
     }
     await renderer.dispose();
@@ -597,7 +597,7 @@ const api = {
       { id: "fx", kind: "audio", fileId: "tone", path: "tone48.wav", position: 2, start: 0, end: 1, layer: 0, audio: { effects: [{ id: "g", type: "TestGain", frame: 1, params: { factor: 0.25 } }] } },
     ]);
     const renderer = new AudioRenderer({ media, engine: testEngine });
-    const buffer = await mixWindow(renderer, testEngine.planAudio(project, { start: 0, end: 3 }), 0, 3, 48000, 1);
+    const buffer = await mixWindow(renderer, testEngine.planAudio(project, { start: 0, end: 3 }), 0, 3, 48000, 1, { num: 30, den: 1 });
     await renderer.dispose();
     const data = buffer.getChannelData(0);
     const peak = (from: number, to: number) => Math.max(...data.subarray(Math.round(from * 48000), Math.round(to * 48000)).map(Math.abs));

@@ -10,9 +10,11 @@
  */
 
 import { AudioSampleSink, type AudioSample } from "mediabunny";
+import type { Fraction } from "@zenvi/engine";
 import type { AudioPlan, AudioSegment, EffectInstance } from "@zenvi/engine/render";
 import type { RenderEngine } from "../engine.js";
 import type { MediaLease, MediaRef, MediaRegistry } from "../media/registry.js";
+import { frameBlocks, routeChannels, toTimelineChannels } from "./channels.js";
 import { PcmCursor } from "./pcm-cursor.js";
 import { LinearResampler } from "./resample.js";
 import { segmentPiece, type SegmentPiece } from "./schedule.js";
@@ -24,6 +26,14 @@ export interface PreparedPiece {
   sampleRate: number;
   /** Node playback rate before the player's rate: the segment speed, or 1 when already stretched. */
   speed: number;
+}
+
+/** The timeline's audio format: what effects and channel routing work in. */
+export interface TimelineAudioFormat {
+  sampleRate: number;
+  channels: number;
+  /** Timeline frame rate: audio effects run one timeline frame at a time, as in libopenshot. */
+  fps: Fraction;
 }
 
 export interface AudioRendererOptions {
@@ -38,7 +48,8 @@ interface Lane {
   cursor: PcmCursor<AudioSample> | null;
   /** Frame after the last forward read, to detect discontinuities. */
   lastEnd: number | null;
-  resampler: LinearResampler | null;
+  /** Stretches source audio to the timeline rate for effects; kept while reads are contiguous. */
+  resampler: { factor: number; resampler: LinearResampler } | null;
   effectState: Map<string, Map<string, unknown>>;
 }
 
@@ -55,8 +66,14 @@ export class AudioRenderer {
     this.onUnsupported = options.onUnsupported;
   }
 
-  /** The part of `segment` inside timeline `[from, to)`, or null when it is silent here. */
-  async render(segment: AudioSegment, from: number, to: number): Promise<PreparedPiece | null> {
+  /**
+   * The part of `segment` inside timeline `[from, to)`, or null when it is
+   * silent here. Without effects or channel routing the source keeps its own
+   * rate and layout (Web Audio resamples and up/down-mixes); with them the
+   * audio is brought to the timeline's format first, like libopenshot's
+   * FrameMapper, so effects run on what libopenshot's see.
+   */
+  async render(segment: AudioSegment, from: number, to: number, format: TimelineAudioFormat): Promise<PreparedPiece | null> {
     const lane = await this.lane(segment);
     if (!lane) return null;
     const audio = lane.lease.media.audio;
@@ -71,22 +88,32 @@ export class AudioRenderer {
     let channels = await reading;
     if (piece.reversed) for (const channel of channels) channel.reverse();
 
-    let speed = piece.speed;
     const kernels = segment.effects.filter((e) => this.engine.getAudioKernel(e.type));
+    const routed = segment.channelFilter !== undefined || segment.channelMapping !== undefined;
+    if (kernels.length === 0 && !routed) return { piece, channels, sampleRate: audio.sampleRate, speed: piece.speed };
+
+    channels = toTimelineChannels(channels, format.channels);
+    let sampleRate = audio.sampleRate;
+    let speed = piece.speed;
     if (kernels.length > 0) {
       if (!continuous) {
         lane.effectState.clear();
         lane.resampler = null;
       }
-      if (speed !== 1) {
-        // Effects run after the speed change in libopenshot: stretch first.
-        lane.resampler ??= new LinearResampler(channels.length, speed);
-        channels = lane.resampler.process(channels);
-        speed = 1;
+      // Effects see timeline-rate audio after the speed change (libopenshot-semantics §4.4).
+      const factor = (piece.speed * audio.sampleRate) / format.sampleRate;
+      if (factor !== 1) {
+        if (!lane.resampler || lane.resampler.factor !== factor || lane.resampler.resampler.channels !== channels.length) {
+          lane.resampler = { factor, resampler: new LinearResampler(channels.length, factor) };
+        }
+        channels = lane.resampler.resampler.process(channels);
       }
-      this.runKernels(kernels, channels, audio.sampleRate, lane.effectState);
+      sampleRate = format.sampleRate;
+      speed = 1;
+      this.runKernels(kernels, channels, piece.timelineStart, format, lane.effectState);
     }
-    return { piece, channels, sampleRate: audio.sampleRate, speed };
+    if (routed) channels = routeChannels(channels, format.channels, segment.channelFilter, segment.channelMapping);
+    return { piece, channels, sampleRate, speed };
   }
 
   /**
@@ -137,16 +164,21 @@ export class AudioRenderer {
     await this.reset();
   }
 
-  private runKernels(kernels: EffectInstance[], channels: Float32Array[], sampleRate: number, state: Map<string, Map<string, unknown>>): void {
-    for (const effect of kernels) {
-      const kernel = this.engine.getAudioKernel(effect.type);
-      if (!kernel) continue;
-      let effectState = state.get(effect.id);
-      if (!effectState) {
-        effectState = new Map();
-        state.set(effect.id, effectState);
+  /** Run `kernels` in place, one timeline frame per block, with state per effect instance. */
+  private runKernels(kernels: EffectInstance[], channels: Float32Array[], timelineStart: number, format: TimelineAudioFormat, state: Map<string, Map<string, unknown>>): void {
+    const length = channels[0]?.length ?? 0;
+    for (const [from, to] of frameBlocks(timelineStart, length, format.sampleRate, format.fps, format.channels)) {
+      const block = channels.map((channel) => channel.subarray(from, to));
+      for (const effect of kernels) {
+        const kernel = this.engine.getAudioKernel(effect.type);
+        if (!kernel) continue;
+        let effectState = state.get(effect.id);
+        if (!effectState) {
+          effectState = new Map();
+          state.set(effect.id, effectState);
+        }
+        kernel(block, format.sampleRate, effect.params, effectState);
       }
-      kernel(channels, sampleRate, effect.params, effectState);
     }
   }
 
