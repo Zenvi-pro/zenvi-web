@@ -12,13 +12,10 @@
 
 import type { Transaction } from "../history/document.js";
 import type { Clip, Effect, Project, Transition } from "../model/types.js";
-import { createLayer } from "../model/defaults.js";
 import { findClip, findTransition } from "../model/query.js";
-import { generateId } from "../model/ids.js";
-import { pyRound } from "../model/rounding.js";
 import { OpError, invalid, requireFinite, requireUnlocked } from "./errors.js";
 import { ensureLayer, ids, isRecord, patchClip, patchTransition, reassignEffectIds, sameJson } from "./internal.js";
-import { addTrack } from "./tracks.js";
+import { trackBelowOrCreate } from "./tracks.js";
 import type { ClipboardData, CopyPart } from "./types.js";
 
 /** Clip keys each Copy ▸ Keyframes submenu copies (Copy_Triggered). */
@@ -95,31 +92,13 @@ export function copyItems(project: Project, itemIds: readonly string[], opts: Co
   };
 }
 
-/** main_window.py `create_track_below`: the track under `layer`, creating one when needed. */
-function trackBelow(tx: Transaction, layer: number): number {
-  const numbers = tx.project.layers.map((l) => l.number).filter((n) => n > 0).sort((a, b) => a - b);
-  const index = numbers.indexOf(layer);
-  if (index > 0) return numbers[index - 1]!;
-  const bottom = numbers[0];
-  if (bottom === undefined) {
-    tx.insert(["layers"], createLayer(1_000_000, generateId((id) => tx.project.layers.some((l) => l.id === id))));
-    return 1_000_000;
-  }
-  if (bottom > 2) {
-    const number = Math.max(1, pyRound(bottom / 2));
-    ensureLayer(tx, number);
-    return number;
-  }
-  return addTrack(tx, { below: bottom }).number;
-}
-
 /** main_window.py `track_stack_from`: `count` tracks from `layer` downwards. */
 function trackStack(tx: Transaction, layer: number, count: number): number[] {
   ensureLayer(tx, layer);
   const tracks = [layer];
   let current = layer;
   while (tracks.length < count) {
-    current = trackBelow(tx, current);
+    current = trackBelowOrCreate(tx, current);
     if (tracks.includes(current)) break;
     tracks.push(current);
   }

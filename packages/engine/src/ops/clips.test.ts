@@ -10,6 +10,7 @@ import {
   fadeClip,
   moveClip,
   removeGap,
+  separateAudio,
   setClipKeyframes,
   setClipProperty,
   setClipSpeed,
@@ -391,5 +392,49 @@ describe("setClipVolume", () => {
     expectRefused(doc2, "invalid_argument", (tx) => setClipVolume(tx, "CLIP000001", { level: 0.5, levelDb: -3 }));
     expectRefused(doc2, "invalid_argument", (tx) => setClipVolume(tx, "CLIP000001", {}));
     expectRefused(doc2, "invalid_argument", (tx) => setClipVolume(tx, "CLIP000001", { level: 0.5, start: 50, end: 60 }));
+  });
+});
+
+describe("separateAudio (Split_Audio_Triggered)", () => {
+  it("moves a video clip's sound to a new clip on the track below and mutes the original", () => {
+    const doc = docWithClip(1);
+    doc.transaction("move up", (tx) => moveClip(tx, "CLIP000001", { layer: V2 }));
+    const before = doc.project;
+    const [audio] = doc.transaction("separate", (tx) => separateAudio(tx, "CLIP000001"));
+    expect(audio!.layer).toBe(V1);
+    expect(audio!.title).toBe("clip.mp4 (all channels)");
+    expect(audio!.has_video.Points).toEqual([{ co: { X: 1, Y: 0 }, interpolation: Interpolation.CONSTANT }]);
+    expect(audio!.has_audio.Points[0]!.co.Y).toBe(-1);
+    expect(audio!.scale).toBe(ScaleMode.NONE);
+    expect(clip(doc).has_audio.Points[0]!.co.Y).toBe(0);
+    expect(doc.undoLabels.at(-1)).toBe("separate");
+    expectUndoRedo(doc, before);
+  });
+
+  it("one clip per channel, each on the next track down (created when missing)", () => {
+    const doc = docWithClip(1);
+    const clips = doc.transaction("channels", (tx) => separateAudio(tx, "CLIP000001", { perChannel: true }));
+    expect(clips.map((c) => [c.title, c.channel_filter.Points[0]!.co.Y])).toEqual([
+      ["clip.mp4 (channel 1)", 0],
+      ["clip.mp4 (channel 2)", 1],
+    ]);
+    // The clip is on the bottom track, so tracks are created below it.
+    expect(clips[0]!.layer).toBe(500_000);
+    expect(clips[1]!.layer).toBe(250_000);
+  });
+
+  it("reuses an audio-only clip and refuses clips without audio", () => {
+    const doc = makeDoc();
+    doc.transaction("song", (tx) => addClip(tx, { fileId: "AUDIO00001", position: 0, layer: V2, id: "SONG" }));
+    const [same] = doc.transaction("single", (tx) => separateAudio(tx, "SONG"));
+    expect(same!.id).toBe("SONG");
+    expect(same!.channel_filter.Points[0]!.co.Y).toBe(-1);
+    const split = doc.transaction("multi", (tx) => separateAudio(tx, "SONG", { perChannel: true }));
+    expect(split.map((c) => [c.id === "SONG", c.layer])).toEqual([
+      [true, V2],
+      [false, V1],
+    ]);
+    doc.transaction("img", (tx) => addClip(tx, { fileId: "IMAGE00001", position: 0, layer: V1, id: "IMG" }));
+    expectRefused(doc, "invalid_argument", (tx) => separateAudio(tx, "IMG"));
   });
 });

@@ -16,6 +16,7 @@
 import type { Transaction } from "../history/document.js";
 import type { Layer, Project } from "../model/types.js";
 import { idFactory } from "../model/ids.js";
+import { pyRound } from "../model/rounding.js";
 import { findLayerById } from "../model/query.js";
 import { sortedLayers } from "../timeline/queries.js";
 import { OpError, invalid, requireLayer } from "./errors.js";
@@ -151,6 +152,30 @@ export function setTrackLocked(tx: Transaction, layerNumber: number, locked: boo
   if (layer.lock === locked) return layer;
   tx.update(["layers", { id: layer.id }], { lock: locked });
   return requireLayer(tx.project, layerNumber);
+}
+
+/**
+ * The track directly below `layer`, creating one when there is none
+ * (main_window.py `create_track_below`): halfway between 0 and the bottom
+ * track, or a renumbered slot when the bottom track is at 1 or 2. Returns
+ * its number.
+ */
+export function trackBelowOrCreate(tx: Transaction, layer: number): number {
+  const numbers = tx.project.layers
+    .map((l) => l.number)
+    .filter((n) => n > 0)
+    .sort((a, b) => a - b);
+  const index = numbers.indexOf(layer);
+  if (index > 0) return numbers[index - 1]!;
+  const bottom = numbers[0];
+  if (bottom === undefined) return addTrack(tx).number;
+  if (bottom > 2) {
+    const number = Math.max(1, pyRound(bottom / 2));
+    const id = idFactory(tx.project)();
+    tx.insert(["layers"], { id, number, y: 0, label: "", lock: false } satisfies Layer);
+    return number;
+  }
+  return addTrack(tx, { below: bottom }).number;
 }
 
 /**

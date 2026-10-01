@@ -12,7 +12,7 @@
 
 import type { Transaction } from "../history/document.js";
 import type { Clip, ColorKeyframe, Keyframe, KeyframePoint, Project } from "../model/types.js";
-import { Interpolation } from "../model/types.js";
+import { Interpolation, ScaleMode } from "../model/types.js";
 import { createClip, type CreateClipInput } from "../model/defaults.js";
 import { CLIP_COLOR_KEYS, CLIP_KEYFRAME_KEYS, CLIP_PROPERTIES, hasChoices } from "../model/properties.js";
 import { findClip, findLayer, findTransition } from "../model/query.js";
@@ -59,6 +59,7 @@ import {
   withClampedTiming,
 } from "./internal.js";
 import { retimeClip } from "./retime.js";
+import { trackBelowOrCreate } from "./tracks.js";
 import type { ColorInput, Edge, KeyframeAt, KeyframePointInput, PropertyValue, SliceKeep } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -901,13 +902,94 @@ export interface SeparateAudioOptions {
 }
 
 /**
- * Split a clip's sound onto its own clip(s) on the track below (created when
- * needed), and mute the original's audio (desktop Split_Audio_Triggered).
- * Returns the new audio clips.
+ * Split a clip's sound onto its own clip(s) (desktop Split_Audio_Triggered).
+ *
+ * - A clip with video: new audio-only clips (`has_video` off, scale NONE,
+ *   `has_audio` auto) go on the track(s) below — one with every channel, or
+ *   one per channel (`channel_filter`), each on the next track down — and the
+ *   original clip's audio is switched off. Tracks are created when missing.
+ * - An audio-only clip is reused: single keeps it with all channels; per
+ *   channel keeps channel 1 on it and adds the others below.
+ *
+ * New clips get new clip and effect ids. Returns the audio clips (new or
+ * reused). Clips without audio are refused.
  */
 export function separateAudio(tx: Transaction, clipId: string, opts: SeparateAudioOptions = {}): Clip[] {
-  void tx;
-  void clipId;
-  void opts;
-  throw new OpError("unsupported", "not implemented: separateAudio");
+  const project = tx.project;
+  const clip = requireEditableClip(project, clipId);
+  const reader: Record<string, unknown> = isRecord(clip.reader) ? clip.reader : {};
+  const hasAudio = reader.has_audio === undefined || reader.has_audio === null ? true : Boolean(reader.has_audio);
+  const channelCount = reader.channels === undefined || reader.channels === null ? null : Math.trunc(Number(reader.channels));
+  const hasVideo = reader.has_video === undefined || reader.has_video === null ? true : Boolean(reader.has_video);
+  if (!hasAudio || (channelCount !== null && !(channelCount > 0))) {
+    throw invalid(`Clip ${clipId} has no audio to separate.`);
+  }
+  if (opts.perChannel && channelCount === null) throw invalid(`Clip ${clipId} does not report its channel count.`);
+  // Validate before recording: the existing tracks the new clips land on must be unlocked.
+  const needed = hasVideo ? (opts.perChannel ? channelCount! : 1) : opts.perChannel ? channelCount! - 1 : 0;
+  for (const layer of project.layers
+    .filter((l) => l.number < clip.layer)
+    .sort((a, b) => b.number - a.number)
+    .slice(0, needed)) {
+    requireUnlocked(project, layer.number);
+  }
+  const constant = (value: number): Keyframe => ({ Points: [openshotPoint(1, value, Interpolation.CONSTANT)] });
+  const title = String(clip.title ?? "");
+  const nextId = ids(project);
+  const out: Clip[] = [];
+  const insertCopy = (data: Record<string, unknown>): void => {
+    const copy = structuredClone(data);
+    copy.id = nextId();
+    reassignEffectIds(copy, nextId);
+    tx.insert(["clips"], copy);
+    out.push(requireClip(tx.project, copy.id as string));
+  };
+
+  if (!hasVideo) {
+    if (!opts.perChannel) return [patchClip(tx, clipId, { channel_filter: constant(-1.0) })];
+    let layer = clip.layer;
+    for (let channel = 0; channel < channelCount!; channel += 1) {
+      const fields = {
+        channel_filter: constant(channel),
+        has_video: constant(0.0),
+        scale: ScaleMode.NONE,
+        title: `${title} (channel ${channel + 1})`,
+      };
+      if (channel === 0) {
+        out.push(patchClip(tx, clipId, fields));
+      } else {
+        layer = trackBelowOrCreate(tx, layer);
+        insertCopy({ ...requireClip(tx.project, clipId), ...fields, layer });
+      }
+    }
+    return out;
+  }
+
+  const base = { ...clip, has_audio: constant(-1.0) } as Record<string, unknown>;
+  if (!opts.perChannel) {
+    const layer = trackBelowOrCreate(tx, clip.layer);
+    insertCopy({
+      ...base,
+      channel_filter: constant(-1.0),
+      has_video: constant(0.0),
+      scale: ScaleMode.NONE,
+      layer,
+      title: `${title} (all channels)`,
+    });
+  } else {
+    let layer = clip.layer;
+    for (let channel = 0; channel < channelCount!; channel += 1) {
+      layer = trackBelowOrCreate(tx, layer);
+      insertCopy({
+        ...base,
+        channel_filter: constant(channel),
+        has_video: constant(0.0),
+        scale: ScaleMode.NONE,
+        layer,
+        title: `${title} (channel ${channel + 1})`,
+      });
+    }
+  }
+  patchClip(tx, clipId, { has_audio: constant(0.0) });
+  return out;
 }
