@@ -1,8 +1,7 @@
 /**
  * Creating, importing and storing local projects.
  */
-import { createProject, DEFAULT_PROFILE_DESCRIPTION, findProfile, PROFILES, type Profile, type Project } from "@zenvi/engine";
-import { parseProjectCompat } from "./engineStubs";
+import { createProject, DEFAULT_PROFILE_DESCRIPTION, findProfile, parseProject, PROFILES, serializeProject, type Profile, type Project } from "@zenvi/engine";
 import { describeProject, newLocalId, projectRepository, type LocalProjectMeta } from "./storage/projects";
 
 export interface ProfilePreset {
@@ -52,8 +51,9 @@ export function createProjectFromProfile(profile: Profile): Project {
   return createProject({ profile });
 }
 
-export function parseProjectJson(json: unknown): Promise<Project> {
-  return parseProjectCompat(json, createProject({ profile: resolveProfile(DEFAULT_PROFILE_DESCRIPTION) }));
+/** Validate and upgrade a desktop project (engine `parseProject`, the desktop's load rules). */
+export function parseProjectJson(json: unknown): Project {
+  return parseProject(json);
 }
 
 function freshMeta(id: string, name: string, project: Project, source: LocalProjectMeta["source"]): LocalProjectMeta {
@@ -77,16 +77,16 @@ export async function importProjectFile(file: File): Promise<string> {
   } catch {
     throw new Error(`${file.name} is not a valid project file.`);
   }
-  const project = await parseProjectJson(json);
+  const project = parseProjectJson(json);
   const id = newLocalId();
   const name = file.name.replace(/\.(zvn|osp|flow|json)$/i, "") || "Imported project";
   await projectRepository().save(freshMeta(id, name, project, "zvn"), project);
   return id;
 }
 
-/** Serialize a project for download as a desktop-compatible `.zvn`. */
+/** Serialize a project for download as a desktop-compatible `.zvn` (version-stamped). */
 export function projectFileBlob(project: Project): Blob {
-  return new Blob([JSON.stringify(project, null, 1)], { type: "application/json" });
+  return new Blob([serializeProject(project)], { type: "application/json" });
 }
 
 /** Drop characters file systems reject (control characters and \\ / : * ? " < > |). */
