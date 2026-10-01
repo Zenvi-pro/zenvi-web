@@ -1,5 +1,6 @@
 // Bundle the service into one ESM file, dist/server.mjs (+ source map), plus
 // the non-JS resources @zenvi/render-node loads at runtime, next to it:
+//   dist/composite-worker.mjs  compositor worker threads (render-node CompositePool)
 //   dist/resvg.wasm   SVG rasterizer (titles, transition masks)
 //   dist/fonts/       bundled fallback fonts (OFL)
 //   dist/assets/      engine assets (transition masks, title templates), when present
@@ -38,6 +39,22 @@ await build({
   logLevel: "info",
   define: { __ZENVI_BUNDLE__: "true" },
   // CommonJS dependencies bundled into ESM still call require() for Node built-ins.
+  banner: { js: "import { createRequire as __zenviCreateRequire } from 'node:module'; const require = __zenviCreateRequire(import.meta.url);" },
+});
+
+// The compositor worker (render-node CompositePool) loads composite-worker.mjs
+// next to the bundle; without it cloud renders composite on one thread.
+await build({
+  entryPoints: [join(packages, "render-node", "src", "render", "composite-worker.ts")],
+  outfile: join(outdir, "composite-worker.mjs"),
+  bundle: true,
+  platform: "node",
+  target: "node22",
+  format: "esm",
+  sourcemap: true,
+  legalComments: "none",
+  logLevel: "warning",
+  define: { __ZENVI_BUNDLE__: "true" },
   banner: { js: "import { createRequire as __zenviCreateRequire } from 'node:module'; const require = __zenviCreateRequire(import.meta.url);" },
 });
 
