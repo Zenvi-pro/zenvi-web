@@ -7,14 +7,36 @@ import { execFile } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { addClip, addEffect, addFile, createProject, ProjectDocument, setClipKeyframes, setClipProperty, type Project } from "@zenvi/engine";
+import {
+  addClip,
+  addEffect,
+  addFile,
+  applyTransitionBetween,
+  createProject,
+  findProfile,
+  ProjectDocument,
+  setClipKeyframes,
+  setClipProperty,
+  type Project,
+} from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { liveChildCount } from "../ffmpeg/process.js";
 import { probe } from "../probe/probe.js";
 import { encodePng } from "../image/png.js";
 import { createRgba } from "../image/rgba.js";
-import { audioRms, decodeRgba, ffprobeJson, makeAudio, makeTempDir, removeDir } from "../test-support/fixtures.js";
+import { createMediaResolver } from "../host/paths.js";
+import { engineAssetsDir } from "../resources.js";
+import {
+  audioRms,
+  decodeRgba,
+  ffprobeJson,
+  libopenshotTimelineFrames,
+  makeAudio,
+  makeTempDir,
+  makeVideo,
+  removeDir,
+} from "../test-support/fixtures.js";
 import { renderFrameImage } from "./render-frame.js";
 import { renderProject } from "./render-project.js";
 
@@ -183,3 +205,61 @@ describe("render with the engine planner and compositor", () => {
     expect(back[0]).toBe(255);
   });
 });
+
+/** A project of `width`x`height` at 30 fps with the given clips (absolute paths). */
+async function sizedProject(width: number, height: number, clips: Array<{ file: string; position: number }>): Promise<{ project: Project; clipIds: string[] }> {
+  const base = findProfile("HD 720p 30 fps")!;
+  const doc = new ProjectDocument(createProject({ profile: { ...base, key: `test-${width}x${height}`, description: `Test ${width}x${height}`, width, height } }));
+  const clipIds: string[] = [];
+  for (const c of clips) {
+    const info = await probe(c.file);
+    doc.transaction("add", (tx) => {
+      const file = addFile(tx, { path: c.file, info });
+      clipIds.push(addClip(tx, { fileId: file.id, position: c.position, layer: doc.project.layers[0]!.number }).id);
+    });
+  }
+  return { project: doc.project, clipIds };
+}
+
+/** The project as libopenshot reads it: `@transitions/…` masks as absolute files. */
+function forLibopenshot(project: Project): Project {
+  const assets = engineAssetsDir()!;
+  return JSON.parse(JSON.stringify(project).replaceAll('"@transitions/', JSON.stringify(`${assets}/transitions/`).slice(0, -1))) as Project;
+}
+
+function maxChannelDifference(a: Uint8Array | Uint8ClampedArray, b: Uint8Array | Uint8ClampedArray): number {
+  let max = 0;
+  for (let i = 0; i < a.length; i += 1) max = Math.max(max, Math.abs(a[i]! - b[i]!));
+  return max;
+}
+
+describe("pixels match the desktop's libopenshot Timeline", () => {
+  it("upscaled and native video through a mask transition, and a bicubic downscale: identical RGBA", async (t) => {
+    const small = await makeVideo(dir, "parity-small.mp4", { width: 320, height: 180, duration: 1 });
+    const native = await makeVideo(dir, "parity-native.mp4", { width: 640, height: 360, duration: 1, source: "smptebars=size=640x360:rate=30:duration=1" });
+    const { project: up, clipIds } = await sizedProject(640, 360, [
+      { file: small, position: 0 },
+      { file: native, position: 1 },
+    ]);
+    const doc = new ProjectDocument(up);
+    doc.transaction("transition", (tx) => applyTransitionBetween(tx, clipIds[0]!, clipIds[1]!, "fade", 0.5));
+    const { project: down } = await sizedProject(320, 180, [{ file: native, position: 0 }]);
+
+    const upFrames = [1, 18, 23, 28, 45];
+    const reference = await libopenshotTimelineFrames(forLibopenshot(doc.project), upFrames, { highQuality: true });
+    const referenceDown = await libopenshotTimelineFrames(forLibopenshot(down), [10], { highQuality: true });
+    if (!reference || !referenceDown) {
+      t.skip(); // libopenshot's Python bindings are not installed here
+      return;
+    }
+    const resolveMedia = createMediaResolver({ projectFile: path.join(dir, "parity.zvn"), engineAssetsDir: engineAssetsDir() });
+    for (const n of upFrames) {
+      const ours = await renderFrameImage(doc.project, (n - 1) / 30, { resolveMedia, width: 640 });
+      expect([ours.width, ours.height]).toEqual([640, 360]);
+      expect(maxChannelDifference(ours.data, reference.get(n)!.data), `frame ${n}`).toBe(0);
+    }
+    const ours = await renderFrameImage(down, 9 / 30, { resolveMedia, width: 320 });
+    expect(maxChannelDifference(ours.data, referenceDown.get(10)!.data), "downscaled frame 10").toBe(0);
+  }, 120_000);
+});
+

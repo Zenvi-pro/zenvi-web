@@ -53,7 +53,7 @@ function fpsValue(fps: Fraction): number {
 
 /** swscale flags: desktop export uses SWS_BICUBIC (HIGH_QUALITY_SCALING), preview SWS_FAST_BILINEAR (FFmpegReader.cpp:2061). */
 function scaleFlags(quality: ScaleQuality): string {
-  return quality === "export" ? "bicubic+accurate_rnd+full_chroma_int" : "fast_bilinear";
+  return quality === "export" ? "bicubic" : "fast_bilinear";
 }
 
 export function videoDecodeArgs(source: VideoSourceInfo, startFrame: number, size: DecodeSize, quality: ScaleQuality = "export"): string[] {

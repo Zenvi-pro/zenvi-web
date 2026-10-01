@@ -109,6 +109,10 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
   const end = last / fpsValue;
   const sampleRate = options.sampleRate ?? project.sample_rate ?? 48000;
   const channels = options.channels ?? project.channels ?? 2;
+  // channels: 0 means no audio stream (libopenshot reads a zero channel count
+  // that way; the engine's "Video Only" export settings use it).
+  const withAudio = info.audio && channels > 0;
+  if (!info.video && !withAudio) throw new RenderError(`A ${format} export needs audio channels (channels is ${channels}).`);
   const engine = opts.engine ?? (await defaultRenderEngine());
   const signal = opts.signal;
   if (signal?.aborted) throw new AbortedError();
@@ -130,9 +134,9 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
   let encoder: ReturnType<typeof spawnManaged> | undefined;
   let scriptWritten = false;
   try {
-    const effectsDir = info.audio ? await mkdtemp(path.join(tmpdir(), "zenvi-audio-fx-")) : undefined;
+    const effectsDir = withAudio ? await mkdtemp(path.join(tmpdir(), "zenvi-audio-fx-")) : undefined;
     tempDirs.push(...(effectsDir ? [effectsDir] : []));
-    const audio = info.audio
+    const audio = withAudio
       ? await buildAudioGraph({
           plan: engine.planAudio(project, { start, end }),
           range: { start, end },

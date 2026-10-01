@@ -8,7 +8,7 @@
  */
 
 import path from "node:path";
-import type { ContainerFormat, ExportOptions, Fraction } from "@zenvi/engine";
+import { encoderRates, type ContainerFormat, type ExportOptions, type Fraction, type VideoRate } from "@zenvi/engine";
 import type { AudioGraph } from "./audio-graph.js";
 
 export type Quality = NonNullable<ExportOptions["quality"]>;
@@ -39,19 +39,17 @@ export function formatFromPath(file: string): ContainerFormat | undefined {
   return (Object.keys(FORMATS) as ContainerFormat[]).find((f) => FORMATS[f].extension === ext);
 }
 
-const X264: Record<Quality, { crf: number; preset: string }> = {
-  low: { crf: 28, preset: "veryfast" },
-  medium: { crf: 23, preset: "medium" },
-  high: { crf: 18, preset: "medium" },
-  lossless: { crf: 0, preset: "veryfast" },
-};
-const VP9: Record<Quality, { crf: number; cpu: number }> = {
-  low: { crf: 40, cpu: 5 },
-  medium: { crf: 32, cpu: 4 },
-  high: { crf: 24, cpu: 2 },
-  lossless: { crf: 0, cpu: 4 },
-};
-const AUDIO_BITRATE: Record<Quality, number> = { low: 128_000, medium: 192_000, high: 256_000, lossless: 320_000 };
+/**
+ * Encoder speed per quality level. Rate control (crf / bitrate / lossless)
+ * comes from the desktop preset ladders through the engine's `encoderRates`,
+ * so a quality level encodes the same as the desktop and the browser.
+ */
+const X264_PRESET: Record<Quality, string> = { low: "veryfast", medium: "medium", high: "medium", lossless: "veryfast" };
+const VP9_CPU: Record<Quality, number> = { low: 5, medium: 4, high: 2, lossless: 4 };
+/** Used only when the engine has no ladder for the codec (wav has no bitrate). */
+const FALLBACK_AUDIO_BITRATE = 192_000;
+/** libopus accepts at most 510 kb/s for stereo. */
+const OPUS_MAX_BITRATE = 510_000;
 
 export interface EncodeJob {
   format: ContainerFormat;
@@ -78,9 +76,36 @@ const PAD_EVEN = "pad=ceil(iw/2)*2:ceil(ih/2)*2";
 const TO_YUV = (pixFmt: string) => `scale=out_color_matrix=bt709:out_range=tv,format=${pixFmt}`;
 const COLOR_TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
 
+/** The options `encoderRates` sees: the frame actually encoded, quality defaulting to the dialog's "high". */
+function rateOptions(job: EncodeJob): ExportOptions {
+  const frame = job.video ?? { width: job.options.width, height: job.options.height, fps: job.options.fps };
+  return { ...job.options, width: frame.width, height: frame.height, fps: frame.fps };
+}
+
+/** ffmpeg rate-control arguments for x264/x265/VP9/other encoders. */
+export function videoRateArgs(rate: VideoRate | null, codec: string): string[] {
+  if (!rate) return [];
+  const vpx = codec.startsWith("libvpx");
+  const x26x = codec === "libx264" || codec === "libx265";
+  switch (rate.mode) {
+    case "bitrate":
+      return ["-b:v", String(Math.round(rate.bitsPerSecond))];
+    case "lossless":
+      if (codec === "libx265") return ["-x265-params", "lossless=1"];
+      if (vpx) return ["-lossless", "1"];
+      return x26x ? ["-qp", "0"] : [];
+    case "qp":
+      if (vpx) return ["-b:v", "0", "-crf", String(rate.value)];
+      return x26x ? ["-qp", String(rate.value)] : ["-q:v", String(rate.value)];
+    case "crf":
+      if (vpx) return ["-b:v", "0", "-crf", String(rate.value)];
+      return x26x ? ["-crf", String(rate.value)] : [];
+  }
+}
+
 function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
-  const quality = job.options.quality ?? "medium";
-  const bitrate = job.options.videoBitrate;
+  const quality = job.options.quality ?? "high";
+  const rate = encoderRates(rateOptions(job)).video;
   switch (job.format) {
     case "gif":
       return {
@@ -91,17 +116,13 @@ function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
       return { chain: `[0:v]format=rgba[vout]`, codecArgs: ["-c:v", "png", "-f", "image2", "-start_number", "1"] };
     case "webm": {
       const codec = job.options.videoCodec ?? "libvpx-vp9";
-      const preset = VP9[quality];
-      const rate =
-        quality === "lossless" ? ["-lossless", "1"] : bitrate ? ["-b:v", String(Math.round(bitrate))] : ["-b:v", "0", "-crf", String(preset.crf)];
       return {
         chain: `[0:v]${PAD_EVEN},${TO_YUV("yuv420p")}[vout]`,
-        codecArgs: ["-c:v", codec, ...rate, "-deadline", "good", "-cpu-used", String(preset.cpu), "-row-mt", "1", ...COLOR_TAGS],
+        codecArgs: ["-c:v", codec, ...videoRateArgs(rate, codec), "-deadline", "good", "-cpu-used", String(VP9_CPU[quality]), "-row-mt", "1", ...COLOR_TAGS],
       };
     }
     default: {
       const codec = job.options.videoCodec ?? "libx264";
-      const preset = X264[quality];
       if (codec.startsWith("prores")) {
         const profile = quality === "low" ? "0" : quality === "medium" ? "2" : quality === "high" ? "3" : "4";
         return {
@@ -109,32 +130,26 @@ function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
           codecArgs: ["-c:v", codec, "-profile:v", profile, ...COLOR_TAGS],
         };
       }
-      const pixFmt = quality === "lossless" ? "yuv444p" : "yuv420p";
-      let rate: string[];
-      if (codec === "libx264" || codec === "libx265") {
-        const r = quality === "lossless" ? ["-qp", "0"] : bitrate ? ["-b:v", String(Math.round(bitrate))] : ["-crf", String(preset.crf)];
-        rate = ["-preset", preset.preset, ...r];
-      } else {
-        rate = bitrate ? ["-b:v", String(Math.round(bitrate))] : [];
-      }
+      const lossless = rate?.mode === "lossless";
+      const speed = codec === "libx264" || codec === "libx265" ? ["-preset", X264_PRESET[lossless ? "lossless" : quality]] : [];
       return {
-        chain: `[0:v]${PAD_EVEN},${TO_YUV(pixFmt)}[vout]`,
-        codecArgs: ["-c:v", codec, ...rate, ...COLOR_TAGS],
+        chain: `[0:v]${PAD_EVEN},${TO_YUV(lossless ? "yuv444p" : "yuv420p")}[vout]`,
+        codecArgs: ["-c:v", codec, ...speed, ...videoRateArgs(rate, codec), ...COLOR_TAGS],
       };
     }
   }
 }
 
 function audioCodecArgs(job: EncodeJob): string[] {
-  const quality = job.options.quality ?? "medium";
-  const bitrate = String(Math.round(job.options.audioBitrate ?? AUDIO_BITRATE[quality]));
+  const rate = encoderRates(rateOptions(job)).audioBitsPerSecond ?? job.options.audioBitrate ?? FALLBACK_AUDIO_BITRATE;
+  const bitrate = String(Math.round(rate));
   switch (job.format) {
     case "wav":
       return ["-c:a", job.options.audioCodec ?? "pcm_s16le"];
     case "mp3":
       return ["-c:a", job.options.audioCodec ?? "libmp3lame", "-b:a", bitrate];
     case "webm":
-      return ["-c:a", job.options.audioCodec ?? "libopus", "-b:a", String(Math.min(Number(bitrate), 256_000))];
+      return ["-c:a", job.options.audioCodec ?? "libopus", "-b:a", String(Math.min(Number(bitrate), OPUS_MAX_BITRATE))];
     default:
       return ["-c:a", job.options.audioCodec ?? "aac", "-b:a", bitrate];
   }

@@ -56,7 +56,15 @@ export function testRegistry(): Registry {
       },
       ["media"],
     ),
-    tool("add_clip_to_timeline_tool", { file_id: { type: "string" }, position_seconds: { type: ["string", "number"] }, track: { type: "string" }, query: { type: "string" } }, (ctx, args) => {
+    tool("add_clip_to_timeline_tool", {
+      file_id: { type: "string" },
+      position_seconds: { type: ["string", "number"] },
+      track: { type: "string" },
+      query: { type: "string" },
+      start_seconds: { type: ["string", "number"] },
+      end_seconds: { type: ["string", "number"] },
+      full_file: { type: "string" },
+    }, (ctx, args) => {
       const fileId = String(args.file_id ?? ctx.doc.project.files.find((f) => String(f.path).endsWith(String(args.query)))?.id ?? "");
       const layer = ctx.doc.project.layers[0]?.number ?? 1_000_000;
       const clip = ctx.doc.transaction("Add clip", (tx) => addClip(tx, { fileId, position: Number(args.position_seconds ?? 0), layer }));

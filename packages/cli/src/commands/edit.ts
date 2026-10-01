@@ -37,6 +37,45 @@ export function parseLevel(text: string): { volume?: number; db?: number } {
 
 const CLIP = ["timeline_clip_id", "clip_id", "clipId"];
 
+/** The source window `zenvi add` asks add_clip_to_timeline_tool for. */
+export interface PlacementWindow {
+  start_seconds?: number;
+  end_seconds?: number;
+  full_file?: "true";
+}
+
+/**
+ * A person typing `zenvi add` names exactly the part of the file they want,
+ * so the tool must neither refuse nor "watch" for a better window:
+ * no flags is the whole file (`full_file`), `--duration` is the window from
+ * `--start` (default 0), and `--start` alone is the rest of the file when its
+ * length is known. Those are the tool's explicit-window forms.
+ */
+export function placementWindow(flags: { start?: number; end?: number; duration?: number }, fileLength?: number): PlacementWindow {
+  const { start, end, duration } = flags;
+  if (start === undefined && end === undefined && duration === undefined) return { full_file: "true" };
+  const from = start ?? 0;
+  if (end !== undefined) {
+    if (end <= from) throw new CliError(`--end (${end}s) must be after --start (${from}s).`, 2);
+    if (duration !== undefined) throw new CliError("Give --end or --duration, not both.", 2);
+    return { start_seconds: from, end_seconds: end, full_file: "true" };
+  }
+  if (duration !== undefined) {
+    if (!(duration > 0)) throw new CliError("--duration must be more than 0 seconds.", 2);
+    return { start_seconds: from, end_seconds: from + duration, full_file: "true" };
+  }
+  // --start alone: the rest of the file.
+  if (fileLength !== undefined && fileLength > from) return { start_seconds: from, end_seconds: fileLength, full_file: "true" };
+  return { start_seconds: from };
+}
+
+/** Length in seconds of a project file entry (`duration`, else its reader's). */
+function fileLength(file: unknown): number | undefined {
+  const f = file as { duration?: unknown; reader?: { duration?: unknown } } | undefined;
+  const value = typeof f?.duration === "number" ? f.duration : f?.reader?.duration;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 export function registerEditCommands(program: Command, ctx: CommandContext): void {
   program
     .command("import")
@@ -56,7 +95,7 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .option("-t, --track <track>", "track number from the bottom, or layer")
     .option("--start <time>", "source in point")
     .option("--end <time>", "source out point")
-    .option("--duration <time>", "length on the timeline")
+    .option("--duration <time>", "how much of the file to use, from --start (default: the whole file)")
     .action(async (file: string, opts: { at?: string; track?: string; start?: string; end?: string; duration?: string }) => {
       await withExecutor(ctx, async (executor) => {
         let fileId: string | undefined = file;
@@ -77,14 +116,17 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
           }
           if (!fileId) query = path.basename(local);
         }
+        const flags = { start: parseTime(opts.start), end: parseTime(opts.end), duration: parseTime(opts.duration) };
+        const known = executor instanceof PortableExecutor && fileId ? executor.session.doc.project.files.find((f) => f.id === fileId) : undefined;
+        const window = placementWindow(flags, fileLength(known));
         const args = toolArgs(ctx, "add_clip_to_timeline_tool", [
           [["file_id"], fileId],
           [["query"], query],
           [["position_seconds"], parseTime(opts.at)],
           [["track"], opts.track],
-          [["start_seconds"], parseTime(opts.start)],
-          [["end_seconds"], parseTime(opts.end)],
-          [["duration_seconds"], parseTime(opts.duration)],
+          [["start_seconds"], window.start_seconds],
+          [["end_seconds"], window.end_seconds],
+          [["full_file"], window.full_file],
         ]);
         printOutcome(ctx, await executor.call("add_clip_to_timeline_tool", args));
       });
@@ -298,18 +340,26 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
 
   program
     .command("transition")
-    .description("add a transition (default: fade) at a clip's start or between it and the next clip")
-    .argument("<clip>", "clip id")
+    .description("add a transition (default: fade) between a clip and the next one on its track, or at its start/end")
+    .argument("<clip>", "clip id (the earlier clip)")
     .option("--name <name>", "transition name (`zenvi call list_transitions_tool`)", "fade")
+    .option("--to <clip>", "the clip it leads into (default: the next clip on the track)")
+    .option("--placement <where>", "between (default), start (fade the clip in) or end (fade it out)", "between")
     .option("--duration <time>", "length", "1")
-    .option("--at <time>", "timeline position")
-    .action(async (clip: string, opts: { name: string; duration: string; at?: string }) => {
-      await runToolCommand(ctx, "apply_transition_tool", {
-        timeline_clip_id: clip,
-        name: opts.name,
-        duration_seconds: parseTime(opts.duration),
-        ...(opts.at !== undefined ? { position_seconds: parseTime(opts.at) } : {}),
-      });
+    .action(async (clip: string, opts: { name: string; to?: string; placement: string; duration: string }) => {
+      if (!["between", "start", "end"].includes(opts.placement)) throw new CliError("--placement must be between, start or end.", 2);
+      if (opts.to !== undefined && opts.placement !== "between") throw new CliError("--to only goes with --placement between.", 2);
+      await runToolCommand(
+        ctx,
+        "apply_transition_tool",
+        toolArgs(ctx, "apply_transition_tool", [
+          [["clip1_id", "timeline_clip_id"], clip],
+          [["clip2_id"], opts.to],
+          [["transition_name", "name"], opts.name],
+          [["placement"], opts.placement],
+          [["duration_seconds", "duration"], parseTime(opts.duration)],
+        ]),
+      );
     });
 
   program
@@ -332,11 +382,12 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
 
   program
     .command("keyframe")
-    .description("animate a clip property: time=value pairs (volume, alpha, location_x/y, scale_x/y, rotation)")
+    .description("animate a clip property (volume, alpha, location_x/y, scale_x/y, rotation) with time=value points; replaces its curve")
     .argument("<clip>", "clip id")
     .argument("<property>", "property name")
-    .argument("<points...>", "time=value (timeline time), or f<frame>=value")
-    .action(async (clip: string, property: string, points: string[]) => {
+    .argument("<points...>", "time=value (timeline time), or f<frame>=value (the clip's 1-based source frame)")
+    .option("--clip-time", "times are seconds into the clip's source instead of timeline times")
+    .action(async (clip: string, property: string, points: string[], opts: { clipTime?: boolean }) => {
       const parsed = points.map((p) => {
         const eq = p.indexOf("=");
         if (eq <= 0) throw new CliError(`Use time=value, e.g. 0=1 2.5=0 (got "${p}").`, 2);
@@ -346,7 +397,36 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
         const frame = /^f(\d+)$/i.exec(at);
         return frame ? { frame: Number(frame[1]), value } : { seconds: parseTime(at)!, value };
       });
-      await runToolCommand(ctx, "set_keyframes_tool", { timeline_clip_id: clip, property, points: parsed });
+      await withExecutor(ctx, async (executor) => {
+        let points_ = parsed;
+        if (!opts.clipTime && parsed.some((p) => p.seconds !== undefined)) {
+          // The tool keys points by the clip's source time; the CLI speaks timeline time.
+          const listing = await executor.call("list_clips_tool", {});
+          const clips = (listing.receipt?.data as { clips?: Array<{ id?: unknown; position?: unknown; start?: unknown }> } | undefined)?.clips ?? [];
+          const found = clips.find((c) => c.id === clip);
+          if (!found || typeof found.position !== "number" || typeof found.start !== "number") {
+            throw new CliError(`Cannot find timeline clip '${clip}' to place its keyframes; give f<frame>=value points or --clip-time.`);
+          }
+          const { position, start } = found as { position: number; start: number };
+          points_ = parsed.map((p) => {
+            if (p.seconds === undefined) return p;
+            const seconds = p.seconds - position + start;
+            if (seconds < 0) throw new CliError(`${p.seconds}s is before the clip starts on the timeline (${position}s).`, 2);
+            return { seconds: Math.round(seconds * 1e6) / 1e6, value: p.value };
+          });
+        }
+        printOutcome(
+          ctx,
+          await executor.call(
+            "set_keyframes_tool",
+            toolArgs(ctx, "set_keyframes_tool", [
+              [CLIP, clip],
+              [["property"], property],
+              [["points"], points_],
+            ]),
+          ),
+        );
+      });
     });
 
   const marker = program.command("marker").description("timeline markers");
@@ -357,12 +437,15 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .action(async (time: string, label?: string) => {
       await runToolCommand(ctx, "add_marker_tool", { position_seconds: parseTime(time), ...(label ? { label } : {}) });
     });
-  marker
-    .command("rm")
-    .argument("<marker>", "marker id")
-    .action(async (id: string) => {
-      await runToolCommand(ctx, "remove_marker_tool", toolArgs(ctx, "remove_marker_tool", [[["marker_id", "id"], id]]));
-    });
+  // The desktop contract has no marker removal tool; offer it when the catalog does.
+  if (ctx.registry.get("remove_marker_tool")) {
+    marker
+      .command("rm")
+      .argument("<marker>", "marker id")
+      .action(async (id: string) => {
+        await runToolCommand(ctx, "remove_marker_tool", toolArgs(ctx, "remove_marker_tool", [[["marker_id", "id"], id]]));
+      });
+  }
 
   const track = program.command("track").description("tracks");
   track

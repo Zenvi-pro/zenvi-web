@@ -3,6 +3,7 @@ import path from "node:path";
 import { parseProjectText, PROJECT_FORMAT_VERSION } from "@zenvi/engine";
 import { makeTempDir, makeVideo, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { placementWindow } from "./commands/edit.js";
 import { testEnv, zenvi } from "./test-support/harness.js";
 import { testRegistry } from "./test-support/registry.js";
 
@@ -169,3 +170,18 @@ describe("zenvi CLI", () => {
     expect(help.stdout).toMatch(/Usage: zenvi/);
   });
 });
+
+describe("zenvi add windows", () => {
+  it("asks for exactly what the person typed: whole file, a window, or the rest from --start", () => {
+    expect(placementWindow({})).toEqual({ full_file: "true" });
+    expect(placementWindow({ duration: 2 })).toEqual({ start_seconds: 0, end_seconds: 2, full_file: "true" });
+    expect(placementWindow({ start: 1, duration: 2 })).toEqual({ start_seconds: 1, end_seconds: 3, full_file: "true" });
+    expect(placementWindow({ start: 1, end: 4 })).toEqual({ start_seconds: 1, end_seconds: 4, full_file: "true" });
+    expect(placementWindow({ start: 1 }, 6)).toEqual({ start_seconds: 1, end_seconds: 6, full_file: "true" });
+    // Unknown length (the desktop app's project): the tool keeps the rest itself.
+    expect(placementWindow({ start: 1 })).toEqual({ start_seconds: 1 });
+    expect(() => placementWindow({ start: 3, end: 2 })).toThrow(/after --start/);
+    expect(() => placementWindow({ end: 2, duration: 1 })).toThrow(/not both/);
+  });
+});
+

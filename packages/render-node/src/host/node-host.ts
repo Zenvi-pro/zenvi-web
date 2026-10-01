@@ -6,7 +6,7 @@
 
 import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import type { ExportOptions, ToolHost } from "@zenvi/engine";
+import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
 import { analyzeAudio } from "../audio/analyze.js";
 import { engineAssetsDir } from "../resources.js";
 import { FORMATS } from "../render/encoder.js";
@@ -42,6 +42,24 @@ export interface NodeHost extends ToolHost {
 }
 
 const MAX_TEXT_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Bundled engine assets by their path under `assets/` (`titles/Bar_1.svg`):
+ * the title templates the title tools fill in. Paths outside the folder are
+ * refused.
+ */
+export function createAssetHost(dir: string): AssetHost {
+  const root = path.resolve(dir);
+  return {
+    async readText(assetPath) {
+      const file = path.resolve(root, assetPath);
+      const rel = path.relative(root, file);
+      if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
+      if ((await stat(file)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
+      return readFile(file, "utf8");
+    },
+  };
+}
 
 export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   const current = (): string | undefined => {
@@ -123,6 +141,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     },
     log: options.log,
   };
+  if (assets) host.assets = createAssetHost(assets);
   if (options.backend) host.backend = createBackendHost(options.backend);
   return host;
 }

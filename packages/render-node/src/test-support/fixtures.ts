@@ -188,3 +188,51 @@ export async function libopenshotReaderJson(files: string[]): Promise<Record<str
     return undefined;
   }
 }
+
+const TIMELINE_ORACLE = `
+import json, sys, openshot
+project_file, out_dir, high_quality = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+frames = [int(f) for f in sys.argv[4:]]
+openshot.Settings.Instance().HIGH_QUALITY_SCALING = high_quality
+with open(project_file) as f:
+    project = json.load(f)
+t = openshot.Timeline(project["width"], project["height"], openshot.Fraction(project["fps"]["num"], project["fps"]["den"]),
+                      project["sample_rate"], project["channels"], project["channel_layout"])
+t.SetJson(json.dumps(project))
+t.Open()
+for n in frames:
+    t.GetFrame(n).Save("%s/frame-%d.png" % (out_dir, n), 1.0)
+t.Close()
+print("ok")
+`;
+
+/**
+ * Timeline frames rendered by libopenshot's own Timeline (the desktop's
+ * renderer) from an in-memory project with absolute media paths, as RGBA;
+ * undefined when the bindings are unavailable. `highQuality` is the
+ * desktop's export setting (SWS_BICUBIC decode scaling).
+ */
+export async function libopenshotTimelineFrames(
+  project: { width: number; height: number },
+  frames: number[],
+  options: { highQuality?: boolean } = {},
+): Promise<Map<number, { width: number; height: number; data: Uint8Array }> | undefined> {
+  const py = libopenshotPython();
+  if (!py) return undefined;
+  const dir = await makeTempDir("zenvi-libopenshot-");
+  try {
+    const projectFile = path.join(dir, "project.json");
+    await writeFile(projectFile, JSON.stringify(project));
+    await exec(py.python, ["-c", TIMELINE_ORACLE, projectFile, dir, options.highQuality ? "1" : "0", ...frames.map(String)], {
+      env: py.env,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    const out = new Map<number, { width: number; height: number; data: Uint8Array }>();
+    const { width, height } = project;
+    for (const n of frames) out.set(n, { width, height, data: await decodeRgba(path.join(dir, `frame-${n}.png`), { width, height }) });
+    return out;
+  } finally {
+    await removeDir(dir);
+  }
+}
+

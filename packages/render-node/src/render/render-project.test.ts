@@ -6,6 +6,7 @@ import { liveChildCount } from "../ffmpeg/process.js";
 import { createRgba } from "../image/rgba.js";
 import { audioRms, ffprobeJson, makeAudio, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
 import { atempoChain, channelPan, gainExpression, simplifyGain } from "./audio-graph.js";
+import { encoderCommand, type EncodeJob } from "./encoder.js";
 import type { RenderEngine } from "./engine.js";
 import { exportFrameRange, renderProject } from "./render-project.js";
 
@@ -231,6 +232,21 @@ describe("renderProject", () => {
     ).rejects.toThrow(/Encoding failed.*no_such_codec/s);
   });
 
+  it("writes no audio stream for channels: 0 (video only)", async () => {
+    const out = path.join(dir, "silent.mp4");
+    const result = await renderProject(project(1), {
+      resolveMedia: (p) => p,
+      output: out,
+      options: { format: "mp4", width: 160, height: 90, fps: { num: 25, den: 1 }, channels: 0 },
+      engine: engine([segment({})]),
+    });
+    expect(result.frames).toBe(25);
+    expect((await ffprobeJson(out)).streams.map((s) => s.codec_type)).toEqual(["video"]);
+    await expect(
+      renderProject(project(1), { resolveMedia: (p) => p, output: path.join(dir, "silent.wav"), options: { format: "wav", width: 160, height: 90, fps: { num: 25, den: 1 }, channels: 0 }, engine: engine() }),
+    ).rejects.toThrow(/needs audio channels/);
+  });
+
   it("refuses an empty timeline", async () => {
     const empty = { ...project(1), clips: [] };
     await expect(
@@ -271,3 +287,44 @@ describe("audio graph helpers", () => {
     expect(exportFrameRange(p, { num: 25, den: 1 }, { start: 0.52, end: 1 })).toEqual({ first: 14, last: 25 });
   });
 });
+
+describe("encoder rate control (the desktop preset ladders, engine encoderRates)", () => {
+  const job = (options: Partial<EncodeJob["options"]> & { format: EncodeJob["format"] }): string[] =>
+    encoderCommand({
+      format: options.format,
+      output: "/tmp/out." + options.format,
+      video: { width: 1280, height: 720, fps: { num: 30, den: 1 } },
+      audio: { graph: { inputs: [], filter: "anullsrc[aout]", warnings: [] } as unknown as NonNullable<EncodeJob["audio"]>["graph"], sampleRate: 48000, channels: 2 },
+      options: { width: 1280, height: 720, fps: { num: 30, den: 1 }, ...options },
+      ffmpegMajor: 7,
+      scriptPath: "/tmp/graph.txt",
+    }).args;
+  const after = (args: string[], flag: string): string | undefined => {
+    const i = args.indexOf(flag);
+    return i >= 0 ? args[i + 1] : undefined;
+  };
+
+  it("uses libx264 crf 30/23/20 (Low/Med/High) and qp 0 for lossless", () => {
+    expect(after(job({ format: "mp4", quality: "low" }), "-crf")).toBe("30");
+    expect(after(job({ format: "mp4", quality: "medium" }), "-crf")).toBe("23");
+    expect(after(job({ format: "mp4" }), "-crf")).toBe("20"); // default: the dialog's High
+    const lossless = job({ format: "mp4", quality: "lossless" });
+    expect(after(lossless, "-qp")).toBe("0");
+    expect(lossless).not.toContain("-crf");
+  });
+
+  it("uses vp9 constant quality with -b:v 0, explicit crf and bitrates first", () => {
+    const webm = job({ format: "webm", quality: "medium" });
+    expect([after(webm, "-crf"), after(webm, "-b:v")]).toEqual(["34", "0"]);
+    expect(after(job({ format: "mp4", quality: "low", crf: 18 }), "-crf")).toBe("18");
+    const bitrate = job({ format: "mp4", videoBitrate: 5_000_000, audioBitrate: 64_000 });
+    expect([after(bitrate, "-b:v"), after(bitrate, "-b:a")]).toEqual(["5000000", "64000"]);
+    expect(bitrate).not.toContain("-crf");
+  });
+
+  it("takes audio bitrates from the same ladder", () => {
+    expect(after(job({ format: "mp4", quality: "low" }), "-b:a")).toBe("96000");
+    expect(after(job({ format: "mp4", quality: "medium" }), "-b:a")).toBe("128000");
+  });
+});
+

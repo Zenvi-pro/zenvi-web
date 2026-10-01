@@ -27,7 +27,7 @@ const pkg = JSON.parse(await readFile(path.join(cliRoot, "package.json"), "utf8"
 const require = createRequire(import.meta.url);
 
 /** Engine asset folders the Node runtime reads (effect icons are UI-only). */
-const ENGINE_ASSETS = ["transitions", "titles", "emojis", "colors"];
+const ENGINE_ASSETS = ["transitions", "titles", "effects", "emojis", "colors"];
 
 async function exists(p) {
   try {

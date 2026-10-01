@@ -115,7 +115,7 @@ Times accept seconds (`12.5`, `12.5s`, `2m`) or timecodes (`1:05.5`,
 | Command | Tool | Notes |
 | --- | --- | --- |
 | `zenvi import <paths…> [--index]` | `import_files_tool` | Files, folders, globs. `--index` also sends media to the Zenvi backend for AI indexing (sign-in needed). |
-| `zenvi add <file> [--at t] [-t n] [--start t] [--end t] [--duration t]` | `add_clip_to_timeline_tool` | `<file>` is a file id or a path (imported first). Default position: after the last clip on the track. |
+| `zenvi add <file> [--at t] [-t n] [--start t] [--end t \| --duration t]` | `add_clip_to_timeline_tool` | `<file>` is a file id or a path (imported first). No window flags = the whole file (`full_file`); `--duration` counts from `--start`; `--start` alone keeps the rest. The window you give is used as is (no AI re-trim). Default position: after the last clip on the track. |
 | `zenvi move <clip> [--to t \| --by t] [-t n]` | `move_clip_tool` | `--by` shifts relative to the current position. |
 | `zenvi trim <clip> [--start t] [--end t] [--edge left\|right --to t]` | `trim_clip_tool` | Source in/out points, or drag an edge to a timeline time. |
 | `zenvi split [clip] --at t [--keep both\|left\|right]` | `split_clip_tool` | Desktop slice semantics; without a clip, cuts everything under that time. |
@@ -128,10 +128,10 @@ Times accept seconds (`12.5`, `12.5s`, `2m`) or timecodes (`1:05.5`,
 | `zenvi effect list [--audio\|--video]` | `list_effects_tool` | The effect catalog and parameters. |
 | `zenvi effect rm <effect-id>` | `remove_effect_tool` | |
 | `zenvi effect set <effect-id> <prop>=<value> [--at t]` | `set_effect_property_tool` | Keyframe at `--at`. |
-| `zenvi transition <clip> [--name fade] [--duration 1] [--at t]` | `apply_transition_tool` | `zenvi call list_transitions_tool` lists names. |
+| `zenvi transition <clip> [--to clip2] [--placement between\|start\|end] [--name fade] [--duration 1]` | `apply_transition_tool` | Between `<clip>` and `--to` (default: the next clip on its track, moved left to overlap by the duration), or a fade in/out of one clip. `zenvi call list_transitions_tool` lists names. |
 | `zenvi title <text> [--template n] [--at t] [--duration t] [-t n]` | `add_title_tool` | SVG title templates. |
-| `zenvi keyframe <clip> <property> <t=v…>` | `set_keyframes_tool` | `volume`, `alpha`, `location_x/y`, `scale_x/y`, `rotation`; `f120=v` addresses a frame. |
-| `zenvi marker add <t> [label]` / `zenvi marker rm <id>` | `add_marker_tool` / `remove_marker_tool` | |
+| `zenvi keyframe <clip> <property> <t=v…> [--clip-time]` | `set_keyframes_tool` | `volume`, `alpha`, `location_x/y`, `scale_x/y`, `rotation`; replaces the curve. Times are timeline times (`--clip-time`: seconds into the clip's source); `f120=v` addresses the clip's source frame. |
+| `zenvi marker add <t> [label]` | `add_marker_tool` | (`marker rm` appears when the catalog has `remove_marker_tool`.) |
 | `zenvi track add [label]` | `add_track_tool` | |
 
 ### Any tool

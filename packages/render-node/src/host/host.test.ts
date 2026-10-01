@@ -56,7 +56,8 @@ describe("stored paths (engine rules, Node roots)", () => {
     await mkdir(path.dirname(projectFile), { recursive: true });
     const assets = path.join(dir, "bundle-assets");
     const info = await probe(await makeImage(dir, "probe-me.png"));
-    const fileAt = (id: string, p: string) => ({ ...info, id, path: p, media_type: "image" as const });
+    // Project data is a JSON tree: every entry gets its own copy of the reader info.
+    const fileAt = (id: string, p: string) => ({ ...structuredClone(info), id, path: p, media_type: "image" as const });
     const project = createProject();
     project.files = [
       fileAt("F1", path.join(dir, "paths", "clips", "a.png")),
@@ -66,9 +67,9 @@ describe("stored paths (engine rules, Node roots)", () => {
     const fps = project.fps;
     const layer = project.layers[0]!.number;
     const clip = createClip({ id: "C1", file: project.files[0]!, position: 0, layer, fps });
-    const mask = { ...info, path: path.join(assets, "transitions", "extra", "x.jpg") };
+    const mask = { ...structuredClone(info), path: path.join(assets, "transitions", "extra", "x.jpg") };
     const t1 = createTransition({ id: "T1", layer, position: 0, duration: 1, reader: mask, fps });
-    const t2 = createTransition({ id: "T2", layer, position: 1, duration: 1, reader: { ...info, path: "@transitions/common/fade.svg" }, fps });
+    const t2 = createTransition({ id: "T2", layer, position: 1, duration: 1, reader: { ...structuredClone(info), path: "@transitions/common/fade.svg" }, fps });
     project.clips = [clip];
     project.effects = [t1, t2];
     await writeProjectFile(projectFile, project, { engineAssetsDir: assets });
