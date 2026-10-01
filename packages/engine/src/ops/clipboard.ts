@@ -17,7 +17,7 @@ import { findClip, findTransition } from "../model/query.js";
 import { generateId } from "../model/ids.js";
 import { pyRound } from "../model/rounding.js";
 import { OpError, invalid, requireFinite, requireUnlocked } from "./errors.js";
-import { ensureLayer, ids, isRecord, patchClip, patchTransition, reassignEffectIds } from "./internal.js";
+import { ensureLayer, ids, isRecord, patchClip, patchTransition, reassignEffectIds, sameJson } from "./internal.js";
 import { addTrack } from "./tracks.js";
 import type { ClipboardData, CopyPart } from "./types.js";
 
@@ -246,9 +246,8 @@ export function pasteOnto(tx: Transaction, data: ClipboardData, targetIds: reado
         patch[key] = structuredClone(value);
       }
     }
-    const before = JSON.stringify(current);
     const after = kind === "clip" ? patchClip(tx, id, patch) : patchTransition(tx, id, patch);
-    if (JSON.stringify(after) !== before) changed.push(id);
+    if (!sameJson(after, current)) changed.push(id);
   }
   return changed;
 }

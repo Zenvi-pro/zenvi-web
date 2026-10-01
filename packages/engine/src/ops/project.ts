@@ -22,7 +22,7 @@ import { pyRound } from "../model/rounding.js";
 import { scaleKeyframe } from "../keyframe/edit.js";
 import { fpsFromRate, sameFps } from "../timeline/time.js";
 import { OpError, invalid } from "./errors.js";
-import { changedFields, isRecord } from "./internal.js";
+import { changedFields, isRecord, sameJson } from "./internal.js";
 
 type Timed = { position: number; start?: number; end?: number; [key: string]: unknown };
 
@@ -102,7 +102,7 @@ function applyFrameRateChange(tx: Transaction, project: Project, oldFps: Fractio
       } else {
         next = rescaleItemKeyframes(next, factor);
       }
-      if (JSON.stringify(next) === JSON.stringify(original)) return;
+      if (sameJson(next, original)) return;
       tx.replace([i < clipCount ? "clips" : "effects", { id: String(original.id) }], next);
     });
   }

@@ -54,6 +54,7 @@ import {
   reassignEffectIds,
   requireEditableClip,
   resolveClipFrame,
+  sameJson,
   snapSeconds,
   withClampedTiming,
 } from "./internal.js";
@@ -695,7 +696,7 @@ export interface SetClipSpeedOptions {
 
 /** Replace a clip wholesale when anything changed. */
 export function replaceClip(tx: Transaction, before: Clip, after: Clip): Clip {
-  if (JSON.stringify(before) === JSON.stringify(after)) return before;
+  if (sameJson(before, after)) return before;
   tx.replace(["clips", { id: before.id }], after);
   return requireClip(tx.project, before.id);
 }
