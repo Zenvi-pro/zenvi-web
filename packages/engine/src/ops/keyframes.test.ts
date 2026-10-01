@@ -4,7 +4,7 @@ import { findClip } from "../model/query.js";
 import { addClip, setClipKeyframes, setClipProperty } from "./clips.js";
 import { addEffect, setEffectProperty } from "./effects.js";
 import { addTransition } from "./transitions.js";
-import { KEYFRAME_BEZIER_PRESETS, removeKeyframe, setKeyframeInterpolation } from "./keyframes.js";
+import { KEYFRAME_BEZIER_PRESETS, moveKeyframes, removeKeyframe, removeKeyframesAt, setKeyframeInterpolation } from "./keyframes.js";
 import { expectRefused, expectUndoRedo, makeDoc } from "./testkit.js";
 
 function setup() {
@@ -71,5 +71,38 @@ describe("removeKeyframe", () => {
     doc.transaction("color", (tx) => removeKeyframe(tx, { clipId: "C" }, "wave_color", { frame: 1 }));
     const wave = findClip(doc.project, "C")!.wave_color;
     expect([wave.red.Points[0]!.co.Y, wave.green.Points[0]!.co.Y, wave.blue.Points[0]!.co.Y]).toEqual([0, 123, 255]);
+  });
+});
+
+describe("keyframe markers (moveKeyframes / removeKeyframesAt)", () => {
+  it("moves every point at a frame across properties and effects", () => {
+    const doc = setup();
+    doc.transaction("more", (tx) => {
+      setClipProperty(tx, "C", "scale_x", 2, { frame: 31 });
+      addEffect(tx, "C", "Blur", {}, { id: "FX" });
+      setEffectProperty(tx, "FX", "sigma", 9, { frame: 31 });
+    });
+    const before = doc.project;
+    const c = doc.transaction("drag", (tx) => moveKeyframes(tx, { clipId: "C" }, 31, 45));
+    expect((c as { alpha: Keyframe }).alpha.Points.map((p) => p.co.X)).toEqual([1, 45, 61]);
+    expect(findClip(doc.project, "C")!.scale_x.Points.map((p) => p.co.X)).toEqual([1, 45]);
+    const sigma = findClip(doc.project, "C")!.effects[0]!.sigma as Keyframe;
+    expect(sigma.Points.map((p) => p.co.X)).toEqual([1, 45]);
+    expectUndoRedo(doc, before);
+    // Clamped to the clip: frames 1..600 for a 20 s clip.
+    doc.transaction("far", (tx) => moveKeyframes(tx, { clipId: "C" }, 45, 9999, { props: ["alpha"] }));
+    expect(alpha(doc).Points.map((p) => p.co.X)).toEqual([1, 61, 600]);
+    expect(findClip(doc.project, "C")!.scale_x.Points.map((p) => p.co.X)).toEqual([1, 45]);
+  });
+
+  it("removes every point at a frame", () => {
+    const doc = setup();
+    doc.transaction("scale", (tx) => setClipProperty(tx, "C", "scale_x", 2, { frame: 31 }));
+    doc.transaction("rm", (tx) => removeKeyframesAt(tx, { clipId: "C" }, 31));
+    expect(alpha(doc).Points.map((p) => p.co.X)).toEqual([1, 61]);
+    expect(findClip(doc.project, "C")!.scale_x.Points.map((p) => p.co.X)).toEqual([1]);
+    const labels = doc.undoLabels.length;
+    doc.transaction("none", (tx) => removeKeyframesAt(tx, { clipId: "C" }, 500));
+    expect(doc.undoLabels.length).toBe(labels);
   });
 });

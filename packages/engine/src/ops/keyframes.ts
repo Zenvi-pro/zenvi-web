@@ -18,6 +18,8 @@ import { findClipEffect } from "../model/query.js";
 import { clipFrameAtTime } from "../timeline/windows.js";
 import { OpError, invalid, requireClip, requireTransition, requireUnlocked } from "./errors.js";
 import { fpsOf, isRecord, patchClip, patchTransition, resolveClipFrame } from "./internal.js";
+import { pyRound } from "../model/rounding.js";
+import { normalizeKeyframe } from "../keyframe/edit.js";
 import { requireInterpolation } from "./values.js";
 import type { KeyframeAt } from "./types.js";
 
@@ -225,4 +227,102 @@ function current(tx: Transaction, target: KeyframeTarget): Clip | Effect | Trans
   if ("clipId" in target) return requireClip(tx.project, target.clipId);
   if ("effectId" in target) return findClipEffect(tx.project, target.effectId)!.effect;
   return requireTransition(tx.project, target.transitionId);
+}
+
+// ---------------------------------------------------------------------------
+// Keyframe markers (timeline keyframe panel)
+// ---------------------------------------------------------------------------
+
+export interface KeyframeMarkerOptions {
+  /** Only these properties (default: every keyframed property of the target, colors included). */
+  props?: readonly string[];
+}
+
+/** Apply `fn` to every keyframe's points nested in `value` (colors, effects, curves), skipping `ui` and readers. */
+function mapPointsDeep(value: unknown, fn: (points: KeyframePoint[]) => KeyframePoint[]): unknown {
+  if (Array.isArray(value)) return value.map((v) => mapPointsDeep(v, fn));
+  if (!isRecord(value)) return value;
+  if (Array.isArray(value.Points)) return { ...value, Points: fn(value.Points as KeyframePoint[]) };
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) out[k] = k === "ui" || k === "reader" ? v : mapPointsDeep(v, fn);
+  return out;
+}
+
+/** The top-level keys a marker edit touches: every key, or `props` (a clip's effects only without `props`). */
+function markerKeys(data: Record<string, unknown>, props: readonly string[] | undefined): string[] {
+  const keys = Object.keys(data).filter((k) => k !== "ui" && k !== "reader" && k !== "id");
+  return props ? keys.filter((k) => props.includes(k)) : keys;
+}
+
+function frameOf(p: KeyframePoint): number | null {
+  const x = Number(p?.co?.X);
+  return Number.isFinite(x) ? pyRound(x) : null;
+}
+
+function itemFrameSpan(tx: Transaction, target: KeyframeTarget): { first: number; last: number } {
+  const project = tx.project;
+  const rate = fpsOf(project).num / fpsOf(project).den;
+  const timed =
+    "clipId" in target
+      ? requireClip(project, target.clipId)
+      : "effectId" in target
+        ? findClipEffect(project, target.effectId)?.clip
+        : requireTransition(project, target.transitionId);
+  if (!timed) throw new OpError("not_found", "No such keyframe owner.");
+  const first = pyRound(Number(timed.start) * rate) + 1;
+  // _clamp_keyframe_seconds: up to one frame before the end.
+  const last = Math.max(first, pyRound(Number(timed.end) * rate));
+  return { first, last };
+}
+
+/**
+ * Drag a keyframe marker (timeline keyframe panel, qwidget/keyframe.py
+ * `_move_keyframes_in_object`): every point at `fromFrame` (rounded) moves to
+ * `toFrame`, clamped to the owner's frames, across all of the target's
+ * keyframed properties (a clip includes its effects) or only `props`.
+ */
+export function moveKeyframes(
+  tx: Transaction,
+  target: KeyframeTarget,
+  fromFrame: number,
+  toFrame: number,
+  opts: KeyframeMarkerOptions = {},
+): Clip | Effect | Transition {
+  if (!Number.isFinite(fromFrame) || !Number.isFinite(toFrame)) throw invalid("Frames must be finite numbers.");
+  const resolved = resolveTarget(tx, target, { frame: fromFrame });
+  const span = itemFrameSpan(tx, target);
+  const from = pyRound(fromFrame);
+  const to = Math.min(Math.max(pyRound(toFrame), span.first), span.last);
+  if (from === to) return current(tx, target);
+  const patch: Record<string, unknown> = {};
+  for (const key of markerKeys(resolved.data, opts.props)) {
+    // Re-sorted like libopenshot loads it (a point landing on another replaces it).
+    patch[key] = mapPointsDeep(resolved.data[key], (points) =>
+      normalizeKeyframe({ Points: points.map((p) => (frameOf(p) === from ? { ...p, co: { ...p.co, X: to } } : p)) }).Points,
+    );
+  }
+  resolved.save(tx, patch);
+  return current(tx, target);
+}
+
+/**
+ * Delete a keyframe marker (qwidget/keyframe.py `_remove_keyframes_in_object`):
+ * every point at `frame` (rounded), across the target's keyframed properties
+ * or only `props`.
+ */
+export function removeKeyframesAt(
+  tx: Transaction,
+  target: KeyframeTarget,
+  frame: number,
+  opts: KeyframeMarkerOptions = {},
+): Clip | Effect | Transition {
+  if (!Number.isFinite(frame)) throw invalid("frame must be a finite number.");
+  const resolved = resolveTarget(tx, target, { frame });
+  const at = pyRound(frame);
+  const patch: Record<string, unknown> = {};
+  for (const key of markerKeys(resolved.data, opts.props)) {
+    patch[key] = mapPointsDeep(resolved.data[key], (points) => points.filter((p) => frameOf(p) !== at));
+  }
+  resolved.save(tx, patch);
+  return current(tx, target);
 }
