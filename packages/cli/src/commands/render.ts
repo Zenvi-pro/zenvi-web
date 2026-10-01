@@ -91,7 +91,7 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
     .description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav) or PNG frames")
     .argument("[output]", "output file (default: <project>.mp4 next to the project)")
     .option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav or png (default: from the file name)")
-    .option("-q, --quality <quality>", "low, medium, high or lossless", "high")
+    .option("--quality <quality>", "low, medium, high or lossless", "high")
     .option("--width <px>", "output width (height follows the project aspect)")
     .option("--height <px>", "output height")
     .option("--fps <rate>", "frame rate, e.g. 30 or 30000/1001 (default: the project's)")

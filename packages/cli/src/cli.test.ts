@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { parseProjectText, PROJECT_FORMAT_VERSION } from "@zenvi/engine";
 import { makeTempDir, makeVideo, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { testEnv, zenvi } from "./test-support/harness.js";
@@ -44,6 +45,18 @@ describe("zenvi CLI", () => {
     const saved = JSON.parse(await readFile(path.join(work, "trip.zvn"), "utf8")) as { files: Array<{ path: string; media_type: string }>; clips: Array<{ position: number; reader: { path: string } }> };
     expect(saved.files[0]).toMatchObject({ path: "footage/beach.mp4", media_type: "video" });
     expect(saved.clips[0]).toMatchObject({ position: 2, reader: { path: "footage/beach.mp4" } });
+  });
+
+  it("writes projects the desktop reopens unchanged: version stamp kept, clip alpha stays 1", async () => {
+    const text = await readFile(path.join(work, "trip.zvn"), "utf8");
+    const raw = JSON.parse(text) as { version: Record<string, string>; clips: Array<{ alpha: { Points: Array<{ co: { Y: number } }> } }> };
+    expect(raw.version).toMatchObject(PROJECT_FORMAT_VERSION);
+    expect(raw.version["openshot-qt"]).not.toBe("0.0.0");
+    // A "0.0.0" stamp would make the desktop (and parseProject) flip every clip's alpha.
+    const reopened = parseProjectText(text);
+    expect(reopened.clips).toHaveLength(1);
+    expect(reopened.clips[0]!.alpha.Points.map((p) => p.co.Y)).toEqual([1]);
+    expect(raw.clips[0]!.alpha.Points.map((p) => p.co.Y)).toEqual([1]);
   });
 
   it("keeps undo history in the file across invocations", async () => {

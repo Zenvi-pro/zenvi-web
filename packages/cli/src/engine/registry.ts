@@ -27,14 +27,15 @@ export interface Registry {
   get(name: string): RegistryTool | undefined;
   /** Tools for a surface; hides those whose capabilities the host lacks unless asked. */
   list(surface: ToolSurface, host: ToolHost, options?: { includeUnavailable?: boolean }): RegistryTool[];
-  /** Run a tool by name (unknown names give an error receipt, never a throw). */
-  run(ctx: ToolContext, name: string, args: unknown): Promise<ToolResult>;
+  /** Run a tool by name on a surface (unknown names give an error receipt, never a throw). */
+  run(ctx: ToolContext, name: string, args: unknown, surface?: ToolSurface): Promise<ToolResult>;
 }
 
 type ToolsModule = {
   allTools?: readonly RegistryTool[];
   getTool?: (name: string) => RegistryTool | undefined;
-  runTool?: (ctx: ToolContext, name: string, args: unknown) => Promise<ToolResult>;
+  listTools?: (options: { surface?: ToolSurface; host?: ToolHost; includeUnavailable?: boolean }) => RegistryTool[];
+  runTool?: (ctx: ToolContext, name: string, args: unknown, options?: { surface?: ToolSurface }) => Promise<ToolResult>;
 };
 
 export function missingCapabilities(tool: RegistryTool, host: ToolHost): HostCapability[] {
@@ -48,27 +49,28 @@ export function unknownToolResult(name: string): ToolResult {
   return { ok: false, text: JSON.stringify(receipt), data: receipt };
 }
 
-export function createRegistry(list: readonly RegistryTool[], runTool?: ToolsModule["runTool"]): Registry {
+export function createRegistry(list: readonly RegistryTool[], engine: Pick<ToolsModule, "runTool" | "listTools"> = {}): Registry {
   const byName = new Map(list.map((t) => [t.name, t]));
   return {
     tools: list,
     get: (name) => byName.get(name),
     list(surface, host, options = {}) {
+      if (engine.listTools) return engine.listTools({ surface, host, includeUnavailable: options.includeUnavailable });
       return list.filter(
         (t) => t.surfaces.includes(surface) && !t.deprecated && (options.includeUnavailable || missingCapabilities(t, host).length === 0),
       );
     },
-    async run(ctx, name, args) {
-      if (runTool) return runTool(ctx, name, args);
+    async run(ctx, name, args, surface) {
+      if (engine.runTool) return engine.runTool(ctx, name, args ?? {}, surface ? { surface } : {});
       const tool = byName.get(name);
-      if (!tool) return unknownToolResult(name);
+      if (!tool || (surface && !tool.surfaces.includes(surface))) return unknownToolResult(name);
       return tool.run(ctx, args ?? {});
     },
   };
 }
 
-/** The catalog shipped in this build. */
+/** The catalog shipped in this build (`@zenvi/engine/tools`). */
 export function engineRegistry(): Registry {
   const mod = tools as unknown as ToolsModule;
-  return createRegistry(mod.allTools ?? [], mod.runTool);
+  return createRegistry(mod.allTools ?? [], { runTool: mod.runTool, listTools: mod.listTools });
 }

@@ -28,7 +28,7 @@ export class McpState {
   }
 
   static async create(ctx: CommandContext, projectFile: string | undefined): Promise<McpState> {
-    const options = { registry: ctx.registry, host: hostOptions(ctx) };
+    const options = { registry: ctx.registry, host: hostOptions(ctx), surface: "mcp" as const };
     const session = projectFile ? await ProjectSession.open(projectFile, options) : ProjectSession.fromProject(newProject(), undefined, options);
     return new McpState(ctx, session);
   }

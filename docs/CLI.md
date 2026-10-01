@@ -150,7 +150,7 @@ as JSON.
 ### Rendering and previews
 
 ```bash
-zenvi render [output] [-f mp4|webm|mov|mkv|gif|mp3|wav|png] [-q low|medium|high|lossless]
+zenvi render [output] [-f mp4|webm|mov|mkv|gif|mp3|wav|png] [--quality low|medium|high|lossless]
              [--width px] [--height px] [--fps 30|30000/1001] [--start t] [--end t]
              [--video-bitrate 8M] [--audio-bitrate 192k] [--open]
 zenvi frame <t> [output.png|.jpg] [--width 1280] [--jpeg] [--grid]

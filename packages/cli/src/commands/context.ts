@@ -119,7 +119,9 @@ export function printOutcome(ctx: CommandContext, outcome: CallOutcome, extra: R
     return;
   }
   const receipt = outcome.receipt;
-  const summary = receipt?.summary ?? outcome.text;
+  // Listings carry the desktop's full text (legacy_text) behind a one-line summary.
+  const data = receipt?.data as { legacy_text?: unknown } | undefined;
+  const summary = outcome.ok && typeof data?.legacy_text === "string" && data.legacy_text ? data.legacy_text : (receipt?.summary ?? outcome.text);
   const [first, ...rest] = summary.split("\n");
   if (!outcome.ok) {
     ctx.out.error(summary.replace(/^Error:\s*/, ""));

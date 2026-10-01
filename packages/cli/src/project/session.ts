@@ -13,7 +13,7 @@
  */
 
 import path from "node:path";
-import type { Project, ToolHost, ToolResult } from "@zenvi/engine";
+import type { Project, ToolHost, ToolResult, ToolSurface } from "@zenvi/engine";
 import { ProjectDocument } from "@zenvi/engine";
 import {
   createNodeHost,
@@ -31,6 +31,8 @@ export const HISTORY_LIMIT = 50;
 
 export interface SessionOptions {
   registry: Registry;
+  /** Surface tool calls run on (`cli` for commands, `mcp` for the MCP server). */
+  surface?: ToolSurface;
   /** Host settings (backend, import policy…). `projectFile` is managed by the session. */
   host?: Omit<NodeHostOptions, "projectFile">;
   historyLimit?: number;
@@ -179,7 +181,7 @@ export class ProjectSession {
     const fileBefore = this.fileValue;
     this.openedDuringCall = false;
     const loadsBefore = this.loadEvents;
-    const result = await this.options.registry.run({ doc, host: this.host, signal }, name, args);
+    const result = await this.options.registry.run({ doc, host: this.host, signal }, name, args, this.options.surface ?? "cli");
     const changed = doc.revision !== before;
     // A tool loaded a different project into the document (new_project_tool,
     // open_project_tool). Opening already switched files; anything else is a
