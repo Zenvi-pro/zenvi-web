@@ -357,6 +357,12 @@ export function buildTitleSvg(template: string, fields: TitleFields): string {
  * `_set_svg_text`): the first `<tspan>` (or `<text>` when there are no
  * tspans) gets `text` as its only content; every other one is emptied so
  * template placeholders disappear.
+ *
+ * Divergence from the desktop: every target whose placeholder text equals the
+ * first target's also gets `text`. Reflection templates (Bar_1, the default)
+ * draw the title twice — a mirrored copy (`scale(1,-1)`) first, then the real
+ * line — and the desktop's first-only rule writes the text into the
+ * reflection and blanks the real line, so the title comes out upside down.
  */
 export function setSvgText(template: string, text: string): string {
   const spans = scan(template);
@@ -377,9 +383,13 @@ export function setSvgText(template: string, text: string): string {
     for (let p = span.parent; p; p = p.parent) if (targets.includes(p)) return true;
     return false;
   };
+  const placeholder = (span: ElementSpan): string =>
+    span.selfClosing ? "" : xmlUnescape(template.slice(span.openEnd, span.closeStart).replace(/<[^>]*>/g, "")).trim();
+  const first = placeholder(targets[0]!);
   targets.forEach((span, i) => {
     if (covered(span)) return;
-    setContent(span, i === 0 ? xmlEscapeText(text) : "");
+    const same = i === 0 || (first !== "" && placeholder(span) === first);
+    setContent(span, same ? xmlEscapeText(text) : "");
   });
   return apply(template, edits);
 }

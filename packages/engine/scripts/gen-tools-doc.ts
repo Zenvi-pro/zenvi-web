@@ -25,6 +25,10 @@ const OUT = path.join(ROOT, "docs", "TOOLS.md");
  */
 const DIVERGENCES: [string, string][] = [
   [
+    "add_title_tool",
+    "The text also replaces every line whose placeholder matches the first line's. Reflection templates (Bar_1, the default) draw a mirrored copy first; the desktop's `_set_svg_text` (agent_tools/titles.py:32) fills only that copy and blanks the real line, so its titles render upside down.",
+  ],
+  [
     "add_clip_to_timeline_tool",
     "Appending (no position_seconds) butts the clip against the last clip on the track. The desktop places it at `last_end + _one_frame` (tool_handlers.py:2365, develop :2394), leaving a one-frame black/silent gap.",
   ],

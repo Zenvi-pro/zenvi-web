@@ -47,10 +47,13 @@ describe("title templates", () => {
         expect(out).toBe(svg);
         continue;
       }
-      // First line replaced, every other line blanked (_set_svg_text).
+      // First line replaced; copies of the same placeholder (reflections)
+      // get the text too; every other line is blanked (_set_svg_text).
       const after = titleLines(out);
       expect(after[0]).toBe("Hello & welcome");
-      expect(after.slice(1).every((line) => line === "")).toBe(true);
+      after.slice(1).forEach((line, i) => {
+        expect(line).toBe(lines[i + 1]!.trim() === lines[0]!.trim() ? "Hello & welcome" : "");
+      });
     }
   });
 });

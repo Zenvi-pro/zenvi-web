@@ -14,6 +14,22 @@ interface Case {
   editor: Summary;
 }
 const cases = fixture.cases as unknown as Case[];
+
+/**
+ * The desktop's `_set_svg_text` output, with the one documented divergence:
+ * every node whose placeholder equals the first target's placeholder (the
+ * mirrored copy in reflection templates such as Bar_1) gets the text too.
+ */
+function withReflectionsFilled(c: Case, text: string): Case["agent"] {
+  const nodes = c.original.nodes;
+  const firstTarget = nodes.find((n) => n.tag === "tspan") ?? nodes.find((n) => n.tag === "text");
+  const placeholder = firstTarget?.text.trim() ?? "";
+  if (placeholder === "") return c.agent;
+  return {
+    ...c.agent,
+    nodes: c.agent.nodes.map((node, i) => (nodes[i]!.text.trim() === placeholder ? { ...node, text } : node)),
+  };
+}
 const e = fixture.editor;
 
 describe("title SVG substitution (parity with the desktop's minidom edits)", () => {
@@ -22,8 +38,8 @@ describe("title SVG substitution (parity with the desktop's minidom edits)", () 
       expect(inspectTitleSvg(c.svg)).toEqual(c.original);
     });
 
-    it(`${c.name}: _set_svg_text`, () => {
-      expect(inspectTitleSvg(setSvgText(c.svg, "Hello & <World>"))).toEqual(c.agent);
+    it(`${c.name}: _set_svg_text (desktop output, reflection copies filled)`, () => {
+      expect(inspectTitleSvg(setSvgText(c.svg, "Hello & <World>"))).toEqual(withReflectionsFilled(c, "Hello & <World>"));
     });
 
     it(`${c.name}: title editor lines, font, colors, background`, () => {
