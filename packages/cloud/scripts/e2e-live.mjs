@@ -4,14 +4,15 @@
 //   device login → personal token → media upload via SAS → projects with
 //   If-Match → MCP tools (projects, URL import, upload link, render, frame).
 //
-//   node packages/cloud/scripts/e2e-live.mjs [base-url]
+//   npx tsx packages/cloud/scripts/e2e-live.mjs [base-url]
+//   (tsx: the render step builds a clip with @zenvi/engine's addClip)
 //
 // Signs in as the E2E test user from ~/.config/zenvi-dev/test-user.env
 // (ZENVI_E2E_EMAIL, ZENVI_E2E_PASSWORD, SUPABASE_URL, SUPABASE_ANON_KEY).
 // Needs ffmpeg (makes a 3 s test clip in a temp dir). Prints no secrets.
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -215,19 +216,38 @@ try {
   check("tool open_in_editor", /\/editor\/p\/c_/.test(editor?.structuredContent?.url ?? ""), editor?.structuredContent?.url);
   const opened = await tool(pat, "open_project", { project_id: mcpProject });
   check("tool open_project", opened?.structuredContent?.files?.length === 1, opened?.content?.[0]?.text?.split("\n")[0]);
-  const render = await tool(pat, "render_project", { preset: "mp4-720p" });
-  if (render?.isError) {
-    pass("tool render_project (reports unavailable in this build)", render?.content?.[0]?.text);
+  if (!health.data?.renderer) {
+    const render = await tool(pat, "render_project", { preset: "mp4-720p" });
+    check("tool render_project reports unavailable (renderer not in this build)", render?.isError === true, render?.content?.[0]?.text);
   } else {
+    // Put the imported clip on the timeline the way every surface does: the engine's addClip, saved with If-Match.
+    const { ProjectDocument, addClip } = await import("@zenvi/engine");
+    const current = await http("GET", `/v1/projects/${mcpProject}`, { token: pat });
+    const doc = new ProjectDocument(current.data.project);
+    doc.transaction("Add clip", (tx) => addClip(tx, { fileId: imported.structuredContent.file_id, position: 0, layer: doc.project.layers[0].number }));
+    const placed = await http("PUT", `/v1/projects/${mcpProject}`, { token: pat, json: doc.toJSON(), headers: { "if-match": `"${current.data.revision}"` } });
+    check("clip placed on the timeline (engine addClip + If-Match)", placed.status === 200 && placed.data?.stats?.clips === 1, `duration ${placed.data?.stats?.duration}s`);
+    const frame = await tool(pat, "preview_frame", { time_seconds: 1, width: 320 });
+    const image = frame?.content?.find((c) => c.type === "image");
+    const png = image ? Buffer.from(image.data, "base64") : Buffer.alloc(0);
+    check("tool preview_frame → PNG", !frame?.isError && png.subarray(1, 4).toString() === "PNG", frame?.isError ? frame?.content?.[0]?.text : `${png.length} bytes, link ${frame?.structuredContent?.image_url ? "ok" : "missing"}`);
+    const render = await tool(pat, "render_project", { preset: "mp4-720p" });
     const renderId = render?.structuredContent?.render_id;
     let status = render?.structuredContent;
-    for (let i = 0; i < 6 && status?.status !== "done" && status?.status !== "error"; i++) {
+    for (let i = 0; i < 8 && status?.status !== "done" && status?.status !== "error"; i++) {
       status = (await tool(pat, "get_render_status", { render_id: renderId, wait_seconds: 40 }))?.structuredContent;
     }
-    check("render_project → get_render_status", status?.status === "done" || status?.status === "error", `${renderId}: ${status?.status}${status?.error ? ` (${status.error})` : ""}`);
+    check("render_project → get_render_status done", status?.status === "done" && !!status?.url, `${renderId}: ${status?.status}${status?.error ? ` (${status.error})` : ""} ${status?.size_bytes ?? ""} bytes`);
+    if (status?.url) {
+      const out = join(work, "render.mp4");
+      writeFileSync(out, Buffer.from(await (await fetch(status.url)).arrayBuffer()));
+      const probe = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration:stream=codec_type,codec_name,width,height", "-of", "json", out]);
+      const info = JSON.parse(probe.stdout.toString() || "{}");
+      const video = info.streams?.find((st) => st.codec_type === "video");
+      const duration = Number(info.format?.duration);
+      check("rendered MP4 plays (ffprobe)", video?.width === 1280 && video?.height === 720 && Math.abs(duration - 3) < 0.25, `${video?.codec_name} ${video?.width}x${video?.height}, ${duration}s, audio ${info.streams?.some((st) => st.codec_type === "audio")}`);
+    }
   }
-  const frame = await tool(pat, "preview_frame", { time_seconds: 0 });
-  pass("tool preview_frame", frame?.isError ? frame?.content?.[0]?.text : `image ${frame?.content?.find((c) => c.type === "image")?.mimeType}`);
 } finally {
   rmSync(work, { recursive: true, force: true });
   for (const id of createdProjects.filter(Boolean)) await http("DELETE", `/v1/projects/${id}`, { token: jwt });
