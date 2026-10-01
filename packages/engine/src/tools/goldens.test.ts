@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { ProjectDocument } from "../history/document.js";
 import type { Project } from "../model/types.js";
 import goldens from "./__fixtures__/desktop-goldens.json" with { type: "json" };
 import fixture from "./__fixtures__/golden-project.json" with { type: "json" };
@@ -20,7 +21,9 @@ import {
   timelineStateData,
   timelineStateText,
 } from "./reports.js";
+import { runTool } from "./registry.js";
 import { resolveTimelineClip } from "./resolve.js";
+import { fakeHost } from "./test-support/fake-host.js";
 import { formatTrackLabelForLlm, normalizeTrackOrLayerArg, trackStackJson } from "./tracks.js";
 
 const project = fixture as unknown as Project;
@@ -105,4 +108,23 @@ describe("desktop parity: clip resolver", () => {
       expect({ ok: got.ok, clip: got.ok ? got.clip.id : null, error: got.ok ? "" : got.error }).toEqual(want);
     });
   }
+});
+
+describe("desktop parity: tool results through runTool", () => {
+  const run = async (name: string, args: Record<string, unknown>): Promise<string> => {
+    const doc = new ProjectDocument(structuredClone(project));
+    const host = fakeHost({ without: ["backend", "frames", "audio"], playhead: 1 });
+    const result = await runTool({ doc, host }, name, args);
+    return result.data!.summary;
+  };
+
+  it.each([
+    ["analyze_timeline_audio_tool", {}, "analyze_timeline_audio"],
+    ["analyze_timeline_audio_tool", { detail: "windows" }, "analyze_timeline_audio_windows"],
+    ["get_clips_with_full_metadata_tool", {}, "get_clips_with_full_metadata"],
+    ["get_clips_with_full_metadata_tool", { detail_level: "full" }, "get_clips_with_full_metadata_full"],
+    ["get_timeline_placements_metadata_tool", {}, "get_timeline_placements_metadata"],
+  ] as const)("%s %j", async (name, args, key) => {
+    expect(await run(name, args)).toBe(goldens[key]);
+  });
 });
