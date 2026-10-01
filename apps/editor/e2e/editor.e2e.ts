@@ -67,10 +67,9 @@ test("new project → import → arrange → split → undo → play → export"
   await page.keyboard.press("Home");
   const before = await timecode(page).textContent();
   await page.keyboard.press("Space");
-  await page.waitForTimeout(1200);
+  // Playback start time varies with machine load: wait for the playhead to move.
+  await expect.poll(() => timecode(page).textContent(), { timeout: 15_000 }).not.toBe(before);
   await page.keyboard.press("Space");
-  const after = await timecode(page).textContent();
-  expect(after).not.toBe(before);
 
   // Properties of the selected clip.
   await clips(page).first().click();
