@@ -23,9 +23,10 @@ import {
   type Target,
 } from "mediabunny";
 import type { Project } from "@zenvi/engine";
+import type { AudioPlan } from "@zenvi/engine/render";
 import type { ExportOptions } from "@zenvi/engine/tools";
 import { windowEnd } from "../audio/channels.js";
-import { mixWindow } from "../audio/mixdown.js";
+import { mixWindow, planHasSound } from "../audio/mixdown.js";
 import { AudioRenderer } from "../audio/renderer.js";
 import type { LayerError } from "../compositor/compositor.js";
 import { defaultEngine, type RenderEngine } from "../engine.js";
@@ -58,6 +59,8 @@ export interface ExportRunOptions {
    * Export without sound when the browser cannot encode audio. Default false:
    * such an export fails with `ExportError` code `no-audio-encoder`, so the UI
    * can ask the person (or offer a cloud render) instead of dropping sound.
+   * A timeline with nothing audible, or a project with `channels: 0`, never
+   * needs it: its file simply has no audio track.
    */
   allowVideoOnly?: boolean;
   svgRasterizer?: SvgRasterizer;
@@ -155,6 +158,28 @@ export async function exportProjectTo(
   }
 }
 
+export interface ExportAudio {
+  plan: AudioPlan;
+  sampleRate: number;
+  channels: number;
+  /** Whether the file gets an audio track. */
+  hasAudio: boolean;
+}
+
+/**
+ * The audio an export encodes. A project with no channels (`channels: 0`) or
+ * a range where nothing is audible gets no audio track, so it needs no audio
+ * encoder; a WAV export always has one (silence when nothing plays).
+ */
+export function exportAudio(project: Project, engine: RenderEngine, options: Pick<ExportOptions, "format" | "sampleRate" | "channels">, range: { start: number; end: number }): ExportAudio {
+  const sampleRate = options.sampleRate ?? project.sample_rate ?? 48000;
+  const channels = Math.max(0, Math.trunc(options.channels ?? project.channels ?? 2) || 0);
+  if (options.format === "wav" && channels < 1) throw new ExportError("unsupported-format", "A WAV export needs at least one audio channel");
+  if (channels < 1) return { plan: { sampleRate, channels: 0, start: range.start, end: range.end, segments: [] }, sampleRate, channels: 0, hasAudio: false };
+  const plan = engine.planAudio(project, range);
+  return { plan, sampleRate, channels, hasAudio: options.format === "wav" || planHasSound(plan) };
+}
+
 /** The export pipeline, writing to any Mediabunny target. */
 async function encode(project: Project, media: MediaRegistry, options: ExportOptions, run: ExportRunOptions, target: Target): Promise<{ mimeType: string }> {
   const engine = run.engine ?? defaultEngine;
@@ -171,9 +196,7 @@ async function encode(project: Project, media: MediaRegistry, options: ExportOpt
   const frameCount = Math.round((end - start) * rate);
   if (!(frameCount > 0)) throw new ExportError("empty-range", "Nothing to export: the range has no frames");
 
-  const sampleRate = options.sampleRate ?? project.sample_rate ?? 48000;
-  const channels = options.channels ?? project.channels ?? 2;
-  const audioPlan = engine.planAudio(project, { start, end });
+  const { plan: audioPlan, sampleRate, channels, hasAudio } = exportAudio(project, engine, options, { start, end });
   const choice = await chooseCodecs(
     {
       format: options.format,
@@ -186,7 +209,7 @@ async function encode(project: Project, media: MediaRegistry, options: ExportOpt
       ...(options.audioBitrate ? { audioBitrate: options.audioBitrate } : {}),
       sampleRate,
       channels,
-      hasAudio: audioPlan.segments.length > 0 || options.format === "wav",
+      hasAudio,
       ...(run.allowVideoOnly ? { allowVideoOnly: true } : {}),
     },
     run.support ?? defaultSupport,

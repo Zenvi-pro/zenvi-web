@@ -58,7 +58,9 @@ A `MediaRef` is `{ fileId?, path? }`; a file id wins over a path.
 `MediaSourceSpec`:
 
 - `{ kind: "blob", blob, name? }` — a `File`/`Blob` in memory.
-- `{ kind: "opfs", handle }` — an origin private file system `FileSystemFileHandle`, read lazily.
+- `{ kind: "opfs", handle, name? }` — an origin private file system `FileSystemFileHandle`, read
+  lazily. Pass the original file `name` when the entry is stored under an id: images, SVGs and
+  audio files are classified by the project path's extension, or by this name when the path has none.
 - `{ kind: "url", url, refresh?, requestInit?, name? }` — HTTP(S), read with range requests. When the
   server answers 401/403 (an expired signature) `refresh()` is called once for a new URL and the
   request retried; every later reader of that media uses the renewed URL.
@@ -135,7 +137,8 @@ discards the partial file).
   cannot get H.264 — or no MP4 audio codec can be encoded — the export becomes WebM. Sound is never
   dropped silently: when no audio codec at all can be encoded the export fails with `ExportError`
   code `no-audio-encoder`, unless `allowVideoOnly: true` (ask the person first, or offer a cloud
-  render). `onNotes` reports container/codec/size changes; H.264 sizes are rounded to even.
+  render). A project with `channels: 0`, or a range where nothing is audible, has no sound to keep:
+  it exports without an audio track and needs no audio encoder. `onNotes` reports container/codec/size changes; H.264 sizes are rounded to even.
   `videoCodec`/`audioCodec` accept the desktop presets' FFmpeg names (`libx264`, `libopus`, …).
 - `quality` maps to Mediabunny qualities; `videoBitrate`/`audioBitrate` override it.
 - Cancel with the signal: the promise rejects with the signal's reason, encoders are released.

@@ -9,7 +9,7 @@
 
 import { ALL_FORMATS, Input, type AudioCodec, type InputAudioTrack, type InputVideoTrack, type Rotation, type VideoCodec } from "mediabunny";
 import type { ReaderInfo } from "@zenvi/engine";
-import { mediaKind, probeMedia, type MediaKind, type ProbeOptions } from "./probe.js";
+import { probeMedia, sourceKind, type MediaKind, type ProbeOptions } from "./probe.js";
 import { openSource, readBlob, sourceName, type MediaSourceSpec } from "./source.js";
 
 /** How a plan or caller names media: a project file id, a path, or both (id wins). */
@@ -204,8 +204,7 @@ export class MediaRegistry {
   kindOf(ref: MediaRef): MediaKind | undefined {
     const entry = this.entryFor(ref);
     if (!entry) return undefined;
-    const mime = entry.spec.kind === "blob" ? entry.spec.blob.type : "";
-    return mediaKind(ref.path || sourceName(entry.spec), mime);
+    return sourceKind(entry.spec, ref.path);
   }
 
   spec(ref: MediaRef): MediaSourceSpec | undefined {
@@ -377,9 +376,10 @@ function newEntry(key: string, spec: MediaSourceSpec): Entry {
 
 function sameSpec(a: MediaSourceSpec, b: MediaSourceSpec): boolean {
   if (a.kind !== b.kind) return false;
-  if (a.kind === "blob" && b.kind === "blob") return a.blob === b.blob;
-  if (a.kind === "opfs" && b.kind === "opfs") return a.handle === b.handle;
-  if (a.kind === "url" && b.kind === "url") return a.url === b.url && a.refresh === b.refresh;
+  // A new name can change how the bytes are classified.
+  if (a.kind === "blob" && b.kind === "blob") return a.blob === b.blob && a.name === b.name;
+  if (a.kind === "opfs" && b.kind === "opfs") return a.handle === b.handle && a.name === b.name;
+  if (a.kind === "url" && b.kind === "url") return a.url === b.url && a.refresh === b.refresh && a.name === b.name;
   return false;
 }
 

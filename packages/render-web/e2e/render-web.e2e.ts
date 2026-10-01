@@ -170,6 +170,14 @@ test("exports keep the clips' sound: an audio stream with each tone where its cl
   }
 });
 
+test("a project with no channels or nothing audible exports video-only without an audio encoder", async ({ page }) => {
+  const r = await page.evaluate(() => window.harness.exportVideoOnly());
+  expect(r.noChannels).toMatchObject({ ok: true, hasVideo: true, hasAudio: false });
+  expect(r.noAudibleClip).toMatchObject({ ok: true, hasVideo: true, hasAudio: false });
+  // Sound that cannot be encoded is still never dropped silently.
+  expect(r.withSound).toEqual({ ok: false, code: "no-audio-encoder" });
+});
+
 test("export can be cancelled", async ({ page }) => {
   const result = await page.evaluate(() => window.harness.exportCancel());
   expect(result.rejected).toBe(true);

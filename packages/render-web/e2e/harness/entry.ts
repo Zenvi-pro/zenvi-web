@@ -8,7 +8,7 @@
  */
 
 import { ProjectDocument, addClip, addEffect, addFile, createProject, type Profile, type ReaderInfo } from "@zenvi/engine";
-import { ALL_FORMATS, AudioSampleSink, BlobSource, Input } from "mediabunny";
+import { ALL_FORMATS, AudioSampleSink, BlobSource, Input, canEncodeVideo } from "mediabunny";
 import {
   AudioRenderer,
   CanvasTextRasterizer,
@@ -433,6 +433,45 @@ const api = {
       return { rms: Math.sqrt(sum / Math.max(1, n)), hz: crossings / (to - from) };
     };
     return { mime: blob.type, notes, hasAudio: info.has_audio, acodec: info.acodec, duration: info.duration, first: stats(0.2, 1.8), second: stats(2.2, 3.8) };
+  },
+
+  /**
+   * A browser without audio encoders: projects with `channels: 0` or no
+   * audible clip export video-only without `allowVideoOnly`; a project with
+   * sound still fails loudly.
+   */
+  async exportVideoOnly() {
+    const media = new MediaRegistry();
+    const support = { canEncodeVideo, canEncodeAudio: async () => false };
+    const build = async (name: string) => {
+      const blob = await file(name);
+      media.register(name, { kind: "blob", blob });
+      const info = await media.probe({ fileId: name }, { path: name });
+      const doc = new ProjectDocument(createProject({ profile: "HD 720p 30 fps" }));
+      doc.transaction("Import", (tx) => {
+        addFile(tx, { path: name, info, name }, { id: name });
+        addClip(tx, { fileId: name, position: 0, layer: 1000000, id: `clip-${name}` });
+      });
+      return doc.project;
+    };
+    const options = { format: "webm" as const, width: 160, height: 90, fps: { num: 30, den: 1 } };
+    const outcome = async (project: Parameters<typeof exportProject>[0]) => {
+      try {
+        const blob = await exportProject(project, media, options, { support });
+        const info = await probeMedia({ kind: "blob", blob, name: "out.webm" }, { path: "out.webm" });
+        return { ok: true, hasVideo: info.has_video, hasAudio: info.has_audio, duration: info.duration };
+      } catch (error) {
+        return { ok: false, code: (error as { code?: string }).code ?? String(error) };
+      }
+    };
+    const withSound = await build("tone440.webm");
+    const result = {
+      noChannels: await outcome({ ...withSound, channels: 0 }),
+      noAudibleClip: await outcome(await build("codes.webm")),
+      withSound: await outcome(withSound),
+    };
+    media.dispose();
+    return result;
   },
 
   /** exportProject → re-probe and re-decode the result. */

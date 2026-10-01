@@ -62,6 +62,25 @@ export function mediaKind(name: string, mimeType = ""): MediaKind {
   return "av";
 }
 
+/**
+ * The name whose extension classifies a source: the project path, or the
+ * source's own file name when the path has no extension (browser storage
+ * keys, ids, signed URLs), as the engine's `getMediaType` does.
+ */
+export function classifyingName(spec: MediaSourceSpec, path?: string): string {
+  return path && hasExtension(path) ? path : sourceName(spec) || path || "";
+}
+
+/** How `spec` is read, given the project `path` it is registered under (if any). */
+export function sourceKind(spec: MediaSourceSpec, path?: string): MediaKind {
+  return mediaKind(classifyingName(spec, path), spec.kind === "blob" ? spec.blob.type : "");
+}
+
+function hasExtension(path: string): boolean {
+  const base = path.split(/[?#]/)[0]!.split(/[\\/]/).pop() ?? "";
+  return /\.[a-z0-9]{1,5}$/i.test(base);
+}
+
 export class ProbeError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -73,14 +92,13 @@ export class ProbeError extends Error {
 export async function probeMedia(spec: MediaSourceSpec, options: ProbeOptions = {}): Promise<ReaderInfo> {
   const name = sourceName(spec);
   const path = options.path ?? name;
-  const mime = spec.kind === "blob" ? spec.blob.type : "";
-  const kind = mediaKind(path || name, mime);
+  const kind = sourceKind(spec, path);
   if (kind !== "av") return probeStill(spec, kind, path, options.signal);
 
   const input = new Input({ formats: ALL_FORMATS, source: await openSource(spec) });
   try {
     const facts = await gatherFacts(input);
-    return readerInfoFromFacts(facts, { path, ...(options.audioOnlySize ? { audioOnlySize: options.audioOnlySize } : {}) });
+    return readerInfoFromFacts(facts, { path, name: classifyingName(spec, path), ...(options.audioOnlySize ? { audioOnlySize: options.audioOnlySize } : {}) });
   } catch (error) {
     if (error instanceof UnsupportedInputFormatError) {
       throw new ProbeError(`Unsupported media format: ${name || "file"}`, { cause: error });

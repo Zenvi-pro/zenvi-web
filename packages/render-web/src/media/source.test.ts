@@ -44,6 +44,9 @@ describe("sources", () => {
     expect(sourceName({ kind: "url", url: "https://cdn/u/1/media/My%20Clip.mp4?sig=abc" })).toBe("My Clip.mp4");
     expect(sourceName({ kind: "blob", blob: new Blob([]), name: "t.svg" })).toBe("t.svg");
     expect(sourceName({ kind: "blob", blob: new File([], "f.png") })).toBe("f.png");
+    const handle = { kind: "file", name: "f-123" } as unknown as FileSystemFileHandle;
+    expect(sourceName({ kind: "opfs", handle })).toBe("f-123");
+    expect(sourceName({ kind: "opfs", handle, name: "photo.png" })).toBe("photo.png");
   });
 
   it("keeps a renewed signature for every later read of the same media", async () => {

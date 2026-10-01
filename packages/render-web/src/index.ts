@@ -14,7 +14,7 @@ export {
   type VideoStreamInfo,
 } from "./media/registry.js";
 export { type MediaSourceSpec, sourceName } from "./media/source.js";
-export { probeMedia, mediaKind, ProbeError, type MediaKind, type ProbeOptions } from "./media/probe.js";
+export { probeMedia, mediaKind, sourceKind, ProbeError, type MediaKind, type ProbeOptions } from "./media/probe.js";
 export { parseSvgSize, type SvgRasterizer, type SvgSize } from "./media/svg.js";
 export { createImageElementSvgRasterizer } from "./media/svg-dom.js";
 export { StillCache, type StillCacheOptions, type StillRequest } from "./media/stills.js";

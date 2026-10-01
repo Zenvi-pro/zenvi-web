@@ -104,6 +104,33 @@ describe("MediaRegistry", () => {
     media.dispose();
   });
 
+  it("classifies OPFS files stored under an id by their original name", async () => {
+    const handle = (name: string, file: File) => ({ kind: "file", name, getFile: async () => file }) as unknown as FileSystemFileHandle;
+    const svgFile = new File(['<svg xmlns="http://www.w3.org/2000/svg" width="64" height="32"/>'], "f-1");
+    const media = new MediaRegistry();
+    media.register("S", { kind: "opfs", handle: handle("f-1", svgFile), name: "logo.svg" });
+    media.register("P", { kind: "opfs", handle: handle("f-2", new File([new Uint8Array(8)], "f-2")), name: "Photo.PNG" });
+    media.register("A", { kind: "opfs", handle: handle("f-3", new File([makeWav({ seconds: 0.5 }) as BlobPart], "f-3")), name: "voice.wav" });
+    // The project path has no extension (a storage key): the name decides.
+    expect(media.kindOf({ fileId: "S", path: "files/f-1" })).toBe("svg");
+    expect(media.kindOf({ fileId: "P" })).toBe("image");
+    expect(media.kindOf({ fileId: "A", path: "files/f-3" })).toBe("av");
+    // A project path with an extension still decides first.
+    expect(media.kindOf({ fileId: "P", path: "/media/clip.svg" })).toBe("svg");
+    expect(await media.probe({ fileId: "S", path: "files/f-1" })).toMatchObject({ type: "QtImageReader", width: 64, height: 32, path: "files/f-1", media_type: "image" });
+    expect(await media.probe({ fileId: "A", path: "files/f-3" })).toMatchObject({ has_audio: true, has_video: false, media_type: "audio", path: "files/f-3" });
+
+    // Without a name the same bytes read as audio/video, and a new name is a change.
+    const bare = handle("f-1", svgFile);
+    media.register("N", { kind: "opfs", handle: bare });
+    expect(media.kindOf({ fileId: "N" })).toBe("av");
+    const before = media.versionOf({ fileId: "N" });
+    media.register("N", { kind: "opfs", handle: bare, name: "logo.svg" });
+    expect(media.versionOf({ fileId: "N" })).toBe(before + 1);
+    expect(media.kindOf({ fileId: "N" })).toBe("svg");
+    media.dispose();
+  });
+
   it("caches probe results until the file changes", async () => {
     const media = new MediaRegistry();
     media.register("F1", { kind: "blob", blob: wav(1) });

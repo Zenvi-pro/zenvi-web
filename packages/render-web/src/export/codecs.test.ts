@@ -35,6 +35,8 @@ describe("chooseCodecs", () => {
     expect(silent.audioCodec).toBeNull();
     expect(silent.notes).toContain("No audio encoder is available; exporting video only");
     expect((await chooseCodecs({ ...base, hasAudio: false }, support(["avc"], ["aac"]))).audioCodec).toBeNull();
+    // Nothing to encode: no audio encoder needed, no note.
+    expect(await chooseCodecs({ ...base, hasAudio: false }, support(["avc"], []))).toMatchObject({ container: "mp4", audioCodec: null, notes: [] });
   });
 
   it("switches to WebM to keep the sound when MP4 has no encodable audio codec", async () => {

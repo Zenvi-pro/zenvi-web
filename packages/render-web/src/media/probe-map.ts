@@ -68,6 +68,8 @@ export interface MediaFacts {
 export interface ReaderInfoOptions {
   /** Value stored in `path`. */
   path: string;
+  /** The original file name, whose extension classifies `media_type` when `path` has none. */
+  name?: string;
   /**
    * Picture size reported for audio-only media. libopenshot uses the parent
    * timeline's preview size and falls back to 720×480 (`FFmpegReader.cpp:988-1004`).
@@ -356,7 +358,7 @@ export function readerInfoFromFacts(facts: MediaFacts, options: ReaderInfoOption
     video_timebase: videoTimebase,
     width,
     // The desktop importer's classification (extension first: MP3 cover art reports video).
-    media_type: getMediaType({ path: options.path, has_video: video !== null, has_audio: audio !== null }),
+    media_type: getMediaType({ path: options.path, has_video: video !== null, has_audio: audio !== null }, options.name),
   };
 }
 

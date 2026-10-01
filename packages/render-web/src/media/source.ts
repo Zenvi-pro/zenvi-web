@@ -8,8 +8,13 @@ import { BlobSource, UrlSource, type Source } from "mediabunny";
 export type MediaSourceSpec =
   /** A `File` or `Blob` in memory (picked, dropped, generated). */
   | { kind: "blob"; blob: Blob; name?: string }
-  /** A file in the origin private file system; read lazily. */
-  | { kind: "opfs"; handle: FileSystemFileHandle }
+  /**
+   * A file in the origin private file system; read lazily. `name` is the
+   * original file name when the OPFS entry is stored under another one (an
+   * id without an extension), so images, SVGs and audio files are still
+   * recognized.
+   */
+  | { kind: "opfs"; handle: FileSystemFileHandle; name?: string }
   /**
    * An HTTP(S) URL, typically a short-lived signed URL. When the server answers
    * 401/403 (expired signature) `refresh` is called once for a new URL and the
@@ -31,7 +36,7 @@ export function sourceName(spec: MediaSourceSpec): string {
     case "blob":
       return spec.name ?? (spec.blob instanceof File ? spec.blob.name : "");
     case "opfs":
-      return spec.handle.name;
+      return spec.name ?? spec.handle.name;
     case "url": {
       if (spec.name) return spec.name;
       try {

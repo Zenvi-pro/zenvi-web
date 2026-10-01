@@ -9,6 +9,15 @@ import type { AudioRenderer } from "./renderer.js";
 import { scheduleVoice } from "./voice.js";
 
 /**
+ * Whether `plan` has sound to encode: some segment that plays (non-zero
+ * length and rate) with a gain envelope that is not zero throughout. Clips
+ * whose files have no audio stream are not planned at all.
+ */
+export function planHasSound(plan: AudioPlan): boolean {
+  return plan.segments.some((s) => s.duration > 0 && s.rate !== 0 && (s.gain.length === 0 || s.gain.some((p) => p.gain !== 0)));
+}
+
+/**
  * Mix timeline `[from, to)` of `plan` into an `AudioBuffer` at `sampleRate`
  * with `channels` channels (up/down-mixed by Web Audio's speaker rules, as
  * FFmpeg's resampler does for the desktop's FrameMapper). `fps` is the
