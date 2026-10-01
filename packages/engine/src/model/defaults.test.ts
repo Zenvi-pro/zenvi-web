@@ -188,7 +188,8 @@ describe("profiles", () => {
 describe("libopenshot parity", () => {
   it("libopenshotClipDefaults() equals Clip(path).Json() for video, audio and image readers", async () => {
     const fixture = (await import("./__fixtures__/libopenshot-clips.json")).default as Record<string, Record<string, unknown>>;
-    const ours = libopenshotClipDefaults();
+    // end/duration come from the reader there; add-to-timeline sets both itself.
+    const { end: _end, duration: _duration, ...ours } = libopenshotClipDefaults();
     for (const [kind, json] of Object.entries(fixture)) expect(ours, kind).toEqual(json);
   });
 });
