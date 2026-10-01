@@ -10,6 +10,7 @@ import {
   fadeClip,
   moveClip,
   removeGap,
+  retimeClipTo,
   separateAudio,
   setClipKeyframes,
   setClipProperty,
@@ -461,5 +462,22 @@ describe("ripple slice", () => {
     expect([clip(doc2, "A").position, clip(doc2, "A").start]).toEqual([0, 5]);
     expect(clip(doc2, "B").position).toBe(15);
     expectRefused(doc2, "invalid_argument", (tx) => splitClip(tx, "A", 3, "both", { ripple: true }));
+  });
+});
+
+describe("retimeClipTo (Timing tool)", () => {
+  it("stretches the clip to a new length by changing its speed", () => {
+    const doc = docWithClip(1);
+    const before = doc.project;
+    const c = doc.transaction("retime", (tx) => retimeClipTo(tx, "CLIP000001", { duration: 40 }));
+    expect([c.position, c.start, c.end]).toEqual([1, 0, 40]);
+    expect(c.time.Points.map((p) => [p.co.X, p.co.Y])).toEqual([
+      [1, 1],
+      [1201, 600],
+    ]);
+    expectUndoRedo(doc, before);
+    const left = doc.transaction("left", (tx) => retimeClipTo(tx, "CLIP000001", { duration: 10, position: 2 }));
+    expect([left.position, left.end]).toEqual([2, 10]);
+    expectRefused(doc, "invalid_argument", (tx) => retimeClipTo(tx, "CLIP000001", { duration: 0 }));
   });
 });

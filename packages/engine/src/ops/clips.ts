@@ -703,6 +703,36 @@ export function setClipSpeed(tx: Transaction, clipId: string, factor: number, op
   return replaceClip(tx, clip, next as unknown as Clip);
 }
 
+export interface RetimeClipInput {
+  /** New length on the timeline, seconds (> 0). */
+  duration: number;
+  /** New timeline start, seconds (left-edge drags move it). Default unchanged. */
+  position?: number;
+}
+
+/**
+ * Timing-mode drag (desktop Timing tool, timeline.py `RetimeClip`): stretch
+ * or squeeze a clip to a new timeline length, changing its speed instead of
+ * its content (retime.py `retime_clip`, forward). Cached waveform samples are
+ * dropped because they no longer match.
+ */
+export function retimeClipTo(tx: Transaction, clipId: string, input: RetimeClipInput): Clip {
+  const project = tx.project;
+  const clip = requireEditableClip(project, clipId);
+  requireObject(input, "retimeClipTo input");
+  const duration = requireFinite(input.duration, "duration");
+  if (!(duration > 0)) throw invalid("duration must be > 0.");
+  const position = input.position === undefined ? clip.position : requireNonNegative(input.position, "position");
+  const retimed = retimeClip(clip, Number(clip.start) + duration, fpsOf(project), 1, position);
+  if (!retimed) throw invalid("That length leaves the clip empty.");
+  if (isRecord(retimed.ui)) {
+    const ui = { ...retimed.ui };
+    for (const key of ["audio_data", "audio_data_rms", "audio_data_rate", "audio_data_format"]) delete ui[key];
+    retimed.ui = ui;
+  }
+  return replaceClip(tx, clip, withClampedTiming(retimed as unknown as Record<string, unknown>, project, clip) as unknown as Clip);
+}
+
 export interface FadeClipOptions {
   /** Fade-in length in seconds from the clip start (0 removes a fade-in). */
   fadeIn?: number;
