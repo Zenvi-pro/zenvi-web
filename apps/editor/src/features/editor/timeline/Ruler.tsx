@@ -76,10 +76,12 @@ export const Ruler = forwardRef<RulerHandle, RulerProps>(function Ruler(
         const x = Math.round(tick.t * pxPerSecond - scrollLeft) + 0.5;
         if (x < -60 || x > width + 1) continue;
         if (tick.major) {
+          const text = rulerLabel(tick.t, scale, fps);
+          const frameLabel = text.endsWith("f");
           ctx.fillStyle = "rgba(255,255,255,0.32)";
-          ctx.fillRect(x, RULER_HEIGHT - 11, 1, 11);
-          ctx.fillStyle = "rgba(255,255,255,0.52)";
-          ctx.fillText(rulerLabel(tick.t, scale, fps), x + 4, 5);
+          ctx.fillRect(x, RULER_HEIGHT - (frameLabel ? 8 : 11), 1, frameLabel ? 8 : 11);
+          ctx.fillStyle = frameLabel ? "rgba(255,255,255,0.34)" : "rgba(255,255,255,0.56)";
+          ctx.fillText(text, x + 4, 5);
         } else {
           ctx.fillStyle = "rgba(255,255,255,0.16)";
           ctx.fillRect(x, RULER_HEIGHT - 5, 1, 5);

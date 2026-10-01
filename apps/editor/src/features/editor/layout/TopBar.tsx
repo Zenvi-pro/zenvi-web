@@ -11,7 +11,7 @@ import { ZenviMark } from "@/ui/Logo";
 import { DropdownMenu, type MenuSpec } from "@/ui/Menu";
 import { Spinner } from "@/ui/Spinner";
 import { Tooltip } from "@/ui/Tooltip";
-import { shortcutFor, type EditorCommand } from "../commands";
+import { shortcutFor } from "../commands";
 import { useHistory, useSession } from "../session/context";
 import { useCommands } from "./commandsContext";
 
@@ -168,6 +168,7 @@ export function TopBar() {
     sep,
     item("actionProfile"),
     sep,
+    item("actionSaveFrame"),
     item("actionExportVideo"),
   ];
   const editMenu = (): MenuSpec[] => [
@@ -311,4 +312,3 @@ export function TopBar() {
   );
 }
 
-export type { EditorCommand };

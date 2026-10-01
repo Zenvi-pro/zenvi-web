@@ -19,6 +19,11 @@ export interface KeyframeAt {
 
 /** How a row writes its value; clips, transitions and effects each provide one. */
 export interface PropertyWriter {
+  /** Owner id (clip, transition or effect) for per-property UI state. */
+  ownerId: string;
+  /** Whether the person armed this property for animation (see ui `armedKeyframes`). */
+  isArmed(key: string): boolean;
+  arm(key: string): void;
   preview(key: string, value: PropertyValue, at?: KeyframeAt): void;
   endPreview(): void;
   commit(key: string, value: PropertyValue, at?: KeyframeAt): void;
@@ -54,14 +59,19 @@ const INTERPOLATION_LABEL: Record<number, string> = {
 function KeyframeButton({ raw, frame, value, propKey, writer, label }: { raw: unknown; frame: number; value: number; propKey: string; writer: PropertyWriter; label: string }) {
   const frames = keyframeFrames(raw as KeyframeLike);
   const points = pointsOf(raw);
-  const here = points.find((p) => Math.round(p.co.X) === frame);
-  const animated = frames.length > 1;
+  // A single stored point is the property's value, not an animation keyframe.
+  const animated = frames.length > 1 || writer.isArmed(propKey);
+  const here = animated ? points.find((p) => Math.round(p.co.X) === frame) : undefined;
   const prev = [...frames].reverse().find((f) => f < frame);
   const next = frames.find((f) => f > frame);
   const toggle = () => {
     if (here) {
       if (points.length > 1) writer.removePoint?.(propKey, frame);
+    } else if (!animated && points.some((p) => Math.round(p.co.X) === frame)) {
+      // Already holds the value at this frame: arm it so the next change elsewhere animates.
+      writer.arm(propKey);
     } else {
+      writer.arm(propKey);
       writer.commit(propKey, value, { frame });
     }
   };
@@ -101,7 +111,7 @@ function KeyframeButton({ raw, frame, value, propKey, writer, label }: { raw: un
             onClick={toggle}
             className={cn(
               "inline-flex h-6 w-5 items-center justify-center rounded-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent",
-              here ? "text-keyframe" : animated ? "text-keyframe/60 hover:text-keyframe" : "text-fg-faint hover:text-fg-muted",
+              here ? "text-keyframe" : animated ? "text-keyframe/70 hover:text-keyframe" : "text-fg-faint hover:text-fg-muted",
             )}
           >
             <Diamond size={11} fill={here ? "currentColor" : "none"} strokeWidth={2} />
@@ -168,14 +178,14 @@ export function PropertyRow({ propKey, meta, raw, frame, writer, label, disabled
             value={Number(current.value)}
             disabled={readonly}
             options={choices.map((c) => ({ value: Number(c.value), label: c.name }))}
-            onChange={(v) => writer.commit(propKey, v, keyframeTarget(raw, frame))}
+            onChange={(v) => writer.commit(propKey, v, keyframeTarget(raw, frame, writer.isArmed(propKey)))}
             className="w-full"
           />
         </Row>
       );
     }
     const fmt = numberFormat(meta?.min ?? null, meta?.max ?? null, propKey);
-    const at = keyframeTarget(raw, frame);
+    const at = keyframeTarget(raw, frame, writer.isArmed(propKey));
     return (
       <Row label={name} trailing={readonly ? null : <KeyframeButton raw={raw} frame={frame} value={value} propKey={propKey} writer={writer} label={name} />}>
         <NumberField
@@ -188,7 +198,7 @@ export function PropertyRow({ propKey, meta, raw, frame, writer, label, disabled
           scale={fmt.scale}
           unit={fmt.unit}
           disabled={readonly}
-          animated={keyframeFrames(raw as KeyframeLike).length > 1}
+          animated={keyframeFrames(raw as KeyframeLike).length > 1 || writer.isArmed(propKey)}
           onScrub={(v) => writer.preview(propKey, v, at)}
           onScrubCancel={() => writer.endPreview()}
           onCommit={(v) => writer.commit(propKey, v, at)}
@@ -277,6 +287,6 @@ export function PropertyRow({ propKey, meta, raw, frame, writer, label, disabled
  * writes a point at the current frame; the web editor asks for an explicit
  * keyframe (the diamond) before animating, which is what new users expect.
  */
-function keyframeTarget(raw: unknown, frame: number): KeyframeAt | undefined {
-  return keyframeFrames(raw as KeyframeLike).length > 1 ? { frame } : undefined;
+function keyframeTarget(raw: unknown, frame: number, armed: boolean): KeyframeAt | undefined {
+  return armed || keyframeFrames(raw as KeyframeLike).length > 1 ? { frame } : undefined;
 }

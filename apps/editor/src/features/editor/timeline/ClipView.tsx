@@ -20,7 +20,10 @@ const tones: Record<MediaType, { body: string; head: string; edge: string }> = {
 
 export interface ClipViewProps {
   clip: Clip;
-  geometry: ClipGeometry;
+  left: number;
+  width: number;
+  top: number;
+  height: number;
   mediaType: MediaType;
   title: string;
   selected: boolean;
@@ -37,7 +40,10 @@ export interface ClipViewProps {
 
 export const ClipView = memo(function ClipView({
   clip,
-  geometry,
+  left,
+  width,
+  top,
+  height,
   mediaType,
   title,
   selected,
@@ -50,6 +56,7 @@ export const ClipView = memo(function ClipView({
   fileId,
   hasAudio,
 }: ClipViewProps) {
+  const geometry = { left, width, top, height };
   const tone = tones[mediaType];
   const effects = clip.effects?.length ?? 0;
   const narrow = geometry.width < 28;
@@ -111,12 +118,16 @@ export const ClipView = memo(function ClipView({
 
 export interface TransitionViewProps {
   transition: Transition;
-  geometry: ClipGeometry;
+  left: number;
+  width: number;
+  top: number;
+  height: number;
   selected: boolean;
   dragging: boolean;
 }
 
-export const TransitionView = memo(function TransitionView({ transition, geometry, selected, dragging }: TransitionViewProps) {
+export const TransitionView = memo(function TransitionView({ transition, left, width, top, height, selected, dragging }: TransitionViewProps) {
+  const geometry = { left, width, top, height };
   const title = typeof transition.title === "string" && transition.title ? transition.title : "Transition";
   return (
     <div

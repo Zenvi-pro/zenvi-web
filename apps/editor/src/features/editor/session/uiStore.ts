@@ -34,6 +34,11 @@ export interface EditorUiState {
   /** Template the title dialog starts from. */
   titleTemplate: string | null;
   panels: { left: number; right: number; timeline: number; leftCollapsed: boolean; rightCollapsed: boolean };
+  /**
+   * Properties the person chose to animate (`<ownerId>:<prop>`) while they
+   * still hold one value: the next edit at another frame adds a keyframe.
+   */
+  armedKeyframes: string[];
 }
 
 export const MIN_PX_PER_SECOND = 0.5;
@@ -82,6 +87,7 @@ export function createUiStore(initial: Partial<EditorUiState> = {}): UiStore {
     editingTitleFileId: null,
     titleTemplate: null,
     panels: loadPanels(),
+    armedKeyframes: [],
     ...initial,
   }));
 }

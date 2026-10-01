@@ -16,6 +16,21 @@ import { SessionProvider } from "./session/context";
 import { EditorSession } from "./session/EditorSession";
 import { MediaLibrary } from "./session/media";
 
+/**
+ * With `localStorage["zenvi.debug"] = "1"`, expose the open session and the
+ * engine on `window.__zenvi` (end-to-end stress tests, bug reports).
+ */
+function exposeForDebugging(session: EditorSession): void {
+  try {
+    if (localStorage.getItem("zenvi.debug") !== "1") return;
+    void import("@zenvi/engine").then((engine) => {
+      (window as unknown as { __zenvi?: unknown }).__zenvi = { session, engine };
+    });
+  } catch {
+    // Storage blocked: no debug handle.
+  }
+}
+
 type LoadState =
   | { kind: "loading" }
   | { kind: "ready"; session: EditorSession }
@@ -103,6 +118,7 @@ export default function EditorRoute() {
         cloud: () => (useAuth.getState().status === "signed-in" ? cloudClient() : null),
       });
       document.title = `${opened.meta.name} · Zenvi`;
+      exposeForDebugging(session);
       setState({ kind: "ready", session });
       const queued = takeQueuedImports(projectId);
       if (queued.length) void importMedia(session, queued, "end");

@@ -15,7 +15,6 @@ import {
   type KeyframePoint,
   type KeyframePointInput,
   type Project,
-  type PropertyValue,
   type Timed,
   type Transition,
 } from "@zenvi/engine";
@@ -62,9 +61,22 @@ function label(meta: PropertyMeta | undefined, key: string): string {
   return meta?.name ?? humanize(key);
 }
 
+function arming(session: EditorSession, ownerId: string): Pick<PropertyWriter, "ownerId" | "isArmed" | "arm"> {
+  return {
+    ownerId,
+    isArmed: (key) => session.ui.getState().armedKeyframes.includes(`${ownerId}:${key}`),
+    arm: (key) => {
+      const id = `${ownerId}:${key}`;
+      const list = session.ui.getState().armedKeyframes;
+      if (!list.includes(id)) session.ui.setState({ armedKeyframes: [...list, id] });
+    },
+  };
+}
+
 function clipWriter(session: EditorSession, clipId: string, table: PropertyTable | null): PropertyWriter {
   const at = (a?: KeyframeAt) => (a ? { frame: a.frame, ...(a.interpolation !== undefined ? { interpolation: a.interpolation } : {}) } : {});
   return {
+    ...arming(session, clipId),
     preview: (key, value, a) => session.preview((tx) => void setClipProperty(tx, clipId, key, value, at(a))),
     endPreview: () => session.endPreview(),
     commit: (key, value, a) => void session.edit(`Change ${label(table?.[key], key)}`, (tx) => setClipProperty(tx, clipId, key, value, at(a))),
@@ -84,6 +96,7 @@ function clipWriter(session: EditorSession, clipId: string, table: PropertyTable
 function effectWriter(session: EditorSession, clip: Clip, effect: Effect, table: PropertyTable): PropertyWriter {
   const at = (a?: KeyframeAt) => (a ? { frame: a.frame, ...(a.interpolation !== undefined ? { interpolation: a.interpolation } : {}) } : {});
   return {
+    ...arming(session, effect.id),
     preview: (key, value, a) => session.preview((tx) => void setEffectProperty(tx, effect.id, key, value, at(a))),
     endPreview: () => session.endPreview(),
     commit: (key, value, a) => void session.edit(`Change ${label(table[key], key)}`, (tx) => setEffectProperty(tx, effect.id, key, value, at(a))),
@@ -94,6 +107,7 @@ function effectWriter(session: EditorSession, clip: Clip, effect: Effect, table:
 function transitionWriter(session: EditorSession, transition: Transition, table: PropertyTable | null): PropertyWriter {
   const at = (a?: KeyframeAt) => (a ? { frame: a.frame, ...(a.interpolation !== undefined ? { interpolation: a.interpolation } : {}) } : {});
   return {
+    ...arming(session, transition.id),
     preview: (key, value, a) => session.preview((tx) => void setTransitionProperty(tx, transition.id, key, value, at(a))),
     endPreview: () => session.endPreview(),
     commit: (key, value, a) => void session.edit(`Change ${label(table?.[key], key)}`, (tx) => setTransitionProperty(tx, transition.id, key, value, at(a))),
@@ -299,6 +313,7 @@ function ProjectSummary({ project }: { project: Project }) {
 export function PropertiesPanel() {
   const project = useProject();
   const selection = useUi((s) => s.selection);
+  useUi((s) => s.armedKeyframes);
   const [filter, setFilter] = useState("");
   const session = useSession();
 
@@ -335,4 +350,3 @@ export function PropertiesPanel() {
   );
 }
 
-export type { PropertyValue };

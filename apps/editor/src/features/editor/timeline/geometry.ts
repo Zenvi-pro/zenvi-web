@@ -71,7 +71,10 @@ export function rulerScale(pxPerSecond: number, fps: Fraction): RulerScale {
   return { major, minor, showFrames };
 }
 
-/** Ruler label: "0:05", "1:02:03", or "0:05:12" (frames) at frame zoom. */
+/**
+ * Ruler label: "0:05", "1:02:03"; at frame zoom whole seconds keep the time
+ * and the ticks between them show the frame within the second ("12f").
+ */
 export function rulerLabel(seconds: number, scale: RulerScale, fps: Fraction): string {
   const total = Math.max(0, seconds + 1e-6);
   const h = Math.floor(total / 3600);
@@ -80,7 +83,7 @@ export function rulerLabel(seconds: number, scale: RulerScale, fps: Fraction): s
   const base = h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
   if (!scale.showFrames) return base;
   const f = Math.round((total - Math.floor(total)) * (fps.num / fps.den));
-  return `${base}:${String(f).padStart(2, "0")}`;
+  return f === 0 ? base : `${f}f`;
 }
 
 /** Tick times in [range.start, range.end], each flagged major or minor. */

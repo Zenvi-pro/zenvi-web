@@ -26,6 +26,8 @@ import {
   type SliceKeep,
 } from "@zenvi/engine";
 import { downloadBlob, projectFileBlob, safeFileName } from "@/lib/projectFactory";
+import { secondsToTimecode } from "@/lib/timecode";
+import { renderFrame } from "./render";
 import { buildKeymap, primaryShortcut, type Keymap } from "@/lib/keyboard/keymap";
 import type { ShortcutCommand } from "@/lib/keyboard/dispatcher";
 import { toast } from "@/ui/Toast";
@@ -297,6 +299,22 @@ export function createCommands(session: EditorSession, env: CommandEnv): Map<str
       run: () => downloadBlob(projectFileBlob(session.snapshotForSave()), safeFileName(session.meta.getState().name, "zvn")),
     },
     { id: "actionExportVideo", label: "Export video…", group: "File", run: () => openDialog("export") },
+    {
+      id: "actionSaveFrame",
+      label: "Save current frame (PNG)",
+      group: "File",
+      run: () => {
+        const t = time();
+        const project = session.project;
+        renderFrame(project, t, { width: project.width, format: "png" }, session.media)
+          .then((image) => {
+            const bytes = Uint8Array.from(atob(image.data), (c) => c.charCodeAt(0));
+            const stamp = secondsToTimecode(t, project.fps).replace(/:/g, "-");
+            downloadBlob(new Blob([bytes], { type: image.mimeType }), safeFileName(`${session.meta.getState().name} ${stamp}`, "png"));
+          })
+          .catch((e: unknown) => toast.error("Could not save the frame", { description: e instanceof Error ? e.message : String(e) }));
+      },
+    },
     { id: "actionProfile", label: "Project format…", group: "File", run: () => openDialog("profile") },
     { id: "actionTitle", label: "New title…", group: "File", run: () => session.ui.setState({ dialog: "title", editingTitleFileId: null }) },
 

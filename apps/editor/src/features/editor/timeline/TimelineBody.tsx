@@ -190,6 +190,16 @@ export function TimelineBody() {
     };
   }, [session, setZoom]);
 
+  // When the first clips land on an empty timeline, fit them into view.
+  const hadClips = useRef(project.clips.length > 0);
+  useEffect(() => {
+    const has = project.clips.length > 0;
+    if (has && !hadClips.current) {
+      requestAnimationFrame(() => session.views.timeline?.zoomToFit());
+    }
+    hadClips.current = has;
+  }, [project.clips.length, session]);
+
   // Ctrl/⌘ + wheel (and trackpad pinch) zooms around the pointer.
   useEffect(() => {
     const el = viewport.current;
@@ -806,7 +816,10 @@ export function TimelineBody() {
                   <ClipView
                     key={clip.id}
                     clip={clip}
-                    geometry={geometry}
+                    left={geometry.left}
+                    width={geometry.width}
+                    top={geometry.top}
+                    height={geometry.height}
                     mediaType={mediaType}
                     title={(typeof clip.title === "string" && clip.title) || (file ? fileDisplayName(file) : "Missing file")}
                     selected={selection.clips.includes(clip.id) || (drop?.kind === "effect" && drop.clipId === clip.id)}
@@ -822,15 +835,21 @@ export function TimelineBody() {
                 );
               })}
               {/* Transitions */}
-              {visibleTransitions.map((t) => (
-                <TransitionView
-                  key={t.id}
-                  transition={t}
-                  geometry={transitionGeometry(t)}
-                  selected={selection.transitions.includes(t.id)}
-                  dragging={preview?.kind === "move" && preview.ids.has(t.id)}
-                />
-              ))}
+              {visibleTransitions.map((t) => {
+                const g = transitionGeometry(t);
+                return (
+                  <TransitionView
+                    key={t.id}
+                    transition={t}
+                    left={g.left}
+                    width={g.width}
+                    top={g.top}
+                    height={g.height}
+                    selected={selection.transitions.includes(t.id)}
+                    dragging={preview?.kind === "move" && preview.ids.has(t.id)}
+                  />
+                );
+              })}
               {/* Drop preview */}
               {drop && drop.kind !== "effect" ? (
                 <div

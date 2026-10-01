@@ -37,9 +37,12 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
               {items.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
                   <span className="truncate text-fg-muted">{c.label}</span>
-                  <span className="flex shrink-0 gap-1">
-                    {(keymap.get(c.id) ?? []).slice(0, 2).map((combo) => (
-                      <Kbd key={combo} shortcut={combo} />
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    {(keymap.get(c.id) ?? []).slice(0, 2).map((combo, n) => (
+                      <span key={combo} className="flex items-center gap-1.5">
+                        {n > 0 ? <span className="text-2xs text-fg-faint">or</span> : null}
+                        <Kbd shortcut={combo} />
+                      </span>
                     ))}
                   </span>
                 </li>

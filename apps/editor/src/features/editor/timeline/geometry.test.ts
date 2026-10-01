@@ -53,7 +53,8 @@ describe("ruler", () => {
     expect(scale.showFrames).toBe(true);
     expect(scale.major).toBeCloseTo(5 / 30);
     expect(scale.minor).toBeCloseTo(1 / 30);
-    expect(rulerLabel(1 + 12 / 30, scale, fps30)).toBe("0:01:12");
+    expect(rulerLabel(1 + 12 / 30, scale, fps30)).toBe("12f");
+    expect(rulerLabel(2, scale, fps30)).toBe("0:02");
   });
 
   it("keeps minor ticks an exact division of majors, also at 29.97 fps", () => {
