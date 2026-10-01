@@ -269,34 +269,77 @@ export function fromStoredPath(path: string, projectDir: string, roots: PathRoot
   return ops.normalize(ops.join(projectDir, path));
 }
 
-function rewritePaths<T>(project: T, rewrite: (path: string) => string): T {
-  const copy = structuredClone(project);
-  const stack: unknown[] = [copy];
+type Container = Record<string, unknown> | unknown[];
+
+interface Visit {
+  node: Container;
+  parent: Visit | null;
+  key: string | number;
+}
+
+/** Define an own property (never the `__proto__` setter). */
+function setOwn(container: Container, key: string | number, value: unknown): void {
+  if (Array.isArray(container)) container[key as number] = value;
+  else Object.defineProperty(container, key, { value, writable: true, enumerable: true, configurable: true });
+}
+
+/**
+ * Rewrite every path string without touching the input: containers above a
+ * changed string are copied, everything else is shared with the input.
+ * Iterative, so deeply nested data cannot overflow the stack. The data must
+ * be a JSON tree (an object reached twice throws `TypeError`).
+ */
+function rewritePaths<T>(root: T, rewrite: (path: string) => string): T {
+  if (typeof root !== "object" || root === null) return root;
+  const copies = new Map<Container, Container>();
+  let result: Container = root as Container;
+  /** The copy of `visit.node`, copying and relinking its ancestors as needed. */
+  const writable = (visit: Visit): Container => {
+    const chain: Visit[] = [];
+    for (let up: Visit | null = visit; up && !copies.has(up.node); up = up.parent) chain.push(up);
+    for (let i = chain.length - 1; i >= 0; i -= 1) {
+      const v = chain[i]!;
+      const copy: Container = Array.isArray(v.node) ? [...v.node] : { ...v.node };
+      copies.set(v.node, copy);
+      if (v.parent) setOwn(copies.get(v.parent.node)!, v.key, copy);
+      else result = copy;
+    }
+    return copies.get(visit.node)!;
+  };
+  const stack: Visit[] = [{ node: root as Container, parent: null, key: "" }];
+  const seen = new Set<object>([root as object]);
+  const push = (value: unknown, parent: Visit, key: string | number): void => {
+    if (typeof value !== "object" || value === null) return;
+    if (seen.has(value)) throw new TypeError("project data must be a JSON tree (an object is referenced twice)");
+    seen.add(value);
+    stack.push({ node: value as Container, parent, key });
+  };
   while (stack.length > 0) {
-    const node = stack.pop();
-    if (Array.isArray(node)) {
-      for (const item of node) if (typeof item === "object" && item !== null) stack.push(item);
-    } else if (typeof node === "object" && node !== null) {
-      const record = node as Record<string, unknown>;
-      for (const [key, value] of Object.entries(record)) {
-        if (typeof value === "string") {
-          if (PATH_KEY_SET.has(key)) record[key] = rewrite(value);
-        } else if (typeof value === "object" && value !== null) {
-          stack.push(value);
-        }
+    const visit = stack.pop()!;
+    if (Array.isArray(visit.node)) {
+      visit.node.forEach((item, index) => push(item, visit, index));
+      continue;
+    }
+    for (const [key, value] of Object.entries(visit.node)) {
+      if (typeof value === "string") {
+        if (!PATH_KEY_SET.has(key)) continue;
+        const next = rewrite(value);
+        if (next !== value) setOwn(writable(visit), key, next);
+      } else {
+        push(value, visit, key);
       }
     }
   }
-  return copy;
+  return result as T;
 }
 
-/** A copy of `project` with every path in its stored form (see `toStoredPath`). */
+/** `project` with every path in its stored form (see `toStoredPath`). The input is not modified. */
 export function toStoredPaths<T>(project: T, projectDir: string, roots: PathRoots = {}): T {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
   return rewritePaths(project, (path) => toStoredPath(path, projectDir, roots));
 }
 
-/** A copy of `project` with every stored path made absolute (see `fromStoredPath`). */
+/** `project` with every stored path made absolute (see `fromStoredPath`). The input is not modified. */
 export function fromStoredPaths<T>(project: T, projectDir: string, roots: PathRoots = {}): T {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
   return rewritePaths(project, (path) => fromStoredPath(path, projectDir, roots));

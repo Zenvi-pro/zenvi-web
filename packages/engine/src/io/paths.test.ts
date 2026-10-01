@@ -84,6 +84,37 @@ describe("stored path edge cases", () => {
     expect(projectAssetsDir(`/v/${"x".repeat(300)}.zvn`)).toBe(`/v/${"x".repeat(248)}_assets`);
   });
 
+  it("copies only what changes and shares the rest", () => {
+    const project = {
+      files: [{ id: "F1", path: "/home/me/Videos/Trip/a.mp4" }],
+      clips: [{ id: "C1", reader: { path: "@transitions/x.svg" }, alpha: { Points: [] } }],
+      settings: { deep: { deeper: { path: "" } } },
+    };
+    const stored = toStoredPaths(project, dir);
+    expect(stored).not.toBe(project);
+    expect(stored.files).not.toBe(project.files);
+    expect(stored.files[0]!.path).toBe("a.mp4");
+    expect(stored.clips).toBe(project.clips);
+    expect(stored.settings).toBe(project.settings);
+    // Nothing to change: the same object comes back.
+    expect(toStoredPaths(stored, dir)).toBe(stored);
+  });
+
+  it("keeps __proto__ keys as data and rejects data that is not a tree", () => {
+    const parsed = JSON.parse('{"files": [{"__proto__": {"x": 1}, "path": "/home/me/Videos/Trip/a.mp4"}]}') as {
+      files: Record<string, unknown>[];
+    };
+    const stored = toStoredPaths(parsed, dir);
+    expect(Object.getPrototypeOf(stored.files[0])).toBe(Object.prototype);
+    expect(Object.hasOwn(stored.files[0]!, "__proto__")).toBe(true);
+    const shared = { path: "/home/me/Videos/Trip/a.mp4" };
+    expect(() => toStoredPaths({ a: shared, b: shared }, dir)).toThrow(TypeError);
+    const deep: Record<string, unknown> = { path: "/home/me/Videos/Trip/a.mp4" };
+    let top = deep;
+    for (let i = 0; i < 100_000; i += 1) top = { next: top };
+    expect(() => toStoredPaths(top, dir)).not.toThrow();
+  });
+
   it("rewrites every path key at any depth and nothing else", () => {
     const project = {
       files: [{ id: "F1", path: "/home/me/Videos/Trip/a.mp4", image: "/home/me/Videos/Trip/trip_assets/thumbnail/F1.png", name: "/home/me/x" }],
