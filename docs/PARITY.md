@@ -16,7 +16,7 @@ libopenshot source line.
 
 | Harness | What it compares | Command |
 |---|---|---|
-| Qt raster oracle | `drawImage` with every transform class, opacity, antialiasing and clip; smooth scaling; the 24 composition modes; span quantization | `npx vitest run packages/engine/src/render/qt` (goldens from `scripts/qt-oracle`, C++ against Homebrew Qt 5.15) |
+| Qt raster oracle | `drawImage` with every transform class, opacity, and libopenshot's antialiased rounded-corner clip; smooth scaling; the 24 composition modes (51 cases, all exact) | `npx vitest run packages/engine/src/render/qt` (goldens from `scripts/qt-oracle`, C++ against Homebrew Qt 5.15) |
 | Kernel goldens | each video kernel against `EffectBase::ProcessFrame` in libopenshot's Python bindings | `npx vitest run packages/engine/src/render/kernels` |
 | Audio goldens | each audio effect against libopenshot on deterministic PCM frames | `npx vitest run packages/engine/src/render/audio` |
 | Frame parity | whole timeline frames: `planFrame` + `compositeFrame` against `Timeline::GetFrame` | `npx vitest run packages/engine/src/render/parity` |
@@ -49,7 +49,7 @@ without them. Media are generated into a temp dir (≤ 320×180, ≤ 3 s).
 | effects-crop | Crop, including `resize` | 1 | exact |
 | chroma-key | ChromaKey over video | 1 | exact |
 | blend-modes | four composite modes | 1 | exact |
-| corner-radius | antialiased rounded-rect clip | 1 | 56.43 dB (see below) |
+| corner-radius | antialiased rounded-rect clip | 1 | exact |
 | time-remap-reverse | decreasing `time` curve | 1, 20, 45 | exact |
 | parent-clip | `parentObjectId` transform inheritance | 1 | exact |
 | preview-160x90 | `SetMaxSize` preview (swscale fast bilinear decode) | 1, 20 | exact |
@@ -77,7 +77,12 @@ tracking data.
   bilinear fetch with 8-bit weights, span coverage and clip quantization, the
   arm64 NEON SourceOver rounding (`qpaintengine_raster.cpp`, `qdrawhelper*.cpp`)
   and Qt's fuzzy transform classification (`qtransform.cpp`) are ported
-  literally (`render/qt`).
+  literally (`render/qt`). So are the path machinery behind antialiased
+  clips and edges (`QPainterPath::addRoundedRect`, `QOutlineMapper`'s curve
+  flattening, the gray raster `qgrayraster.c`) and the way spans reach the
+  blend: 256-span batches, `qt_span_fill_clipped`, and `handleSpans`
+  merging only within one call. The batching matters because every new run
+  recomputes the bilinear sampling position instead of accumulating it.
 - **Fused multiply-adds.** clang contracts `a*b + c` on arm64. QTransform,
   `Clip::get_transform` and many kernels are evaluated with a correctly
   rounded fma emulation at exactly the expressions clang fuses
@@ -116,7 +121,6 @@ tracking data.
 
 | Where | Difference | Size |
 |---|---|---|
-| Corner radius | libopenshot clips with `QPainterPath::addRoundedRect` (`Clip.cpp:1415-1426`), whose arcs Qt flattens as cubic Béziers in the outline mapper; the engine rasterizes true circular arcs | edge pixels only, ≤ 15 levels; 56 dB in the parity case |
 | Rotation | `QTransform::rotate` uses Apple's `sin`/`cos`; V8's `Math.sin`/`Math.cos` differ by 1 ulp for ~5% of angles (neither is correctly rounded) | occasionally ±1 on a few edge or sample pixels |
 | Caption, Timer glyphs | Qt path fill of the font's outlines (`effects/Caption.cpp:266, 350-374`, `effects/Timer.cpp:363-389`); the engine draws glyphs with the host's `TextRasterizer` | text pixels; layout uses host metrics (Timer's `tightBoundingRect` is the host's ink bounds, `Timer.cpp:280-285, 368`) |
 | Timer | Per-character runs: Qt strokes overlapping glyphs once; the host draws all fills then all strokes (`Timer.cpp:389`) | only at `font_alpha` < 1 |
