@@ -366,7 +366,10 @@ declarations), `u/{userId}/mcp/{connection}.json` (open project). Tables —
 `renders` (`<userId>/<renderId>`). Expired rows are swept every 6 h.
 
 Deploy: `scripts/azure/deploy.sh` (ACR build of the committed tree, roll the
-app, wait for `/health`); configuration: `scripts/azure/provision.sh`.
+app, wait for `/health`); configuration: `scripts/azure/provision.sh`; live
+end-to-end check (OAuth, device login, uploads, MCP tools, a real render):
+`npx tsx packages/cloud/scripts/e2e-live.mjs` (test user from
+`~/.config/zenvi-dev/test-user.env`).
 Logs: `az containerapp logs show -g zenvi-rg -n zenvi-cloud --tail 100`
 (JSON lines; tokens, codes, query strings and signed URLs are never logged).
 Local run: `STORAGE=memory PUBLIC_BASE_URL=http://localhost:8080 npm run dev -w @zenvi/cloud`.
