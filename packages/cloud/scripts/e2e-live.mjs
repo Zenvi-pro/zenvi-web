@@ -205,6 +205,8 @@ try {
   check("tool import_media_from_url (server download + ffprobe)", !imported?.isError && imported?.structuredContent?.media_type === "video", imported?.content?.[0]?.text);
   const again = await tool(pat, "import_media_from_url", { url: readUrl, name: "e2e-clip.mp4" });
   check("import is idempotent", again?.structuredContent?.already_in_project === true, again?.content?.[0]?.text);
+  const attached = await tool(pat, "import_attached_file", { file: { download_url: readUrl, file_id: "file_e2e", file_name: "attached.mp4", mime_type: "video/mp4" } });
+  check("tool import_attached_file (same bytes → same bin entry)", attached?.structuredContent?.already_in_project === true, attached?.content?.[0]?.text);
   const ssrf = await tool(pat, "import_media_from_url", { url: "https://169.254.169.254/latest/meta-data" });
   check("SSRF guard refuses metadata address", ssrf?.isError === true, ssrf?.content?.[0]?.text);
   const upload = await tool(pat, "get_upload_link");
