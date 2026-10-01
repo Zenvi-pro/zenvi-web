@@ -46,7 +46,7 @@
     "watch_clip_window_tool": {
       "props": {
         "query": {"description": "What should be on screen in the window."},
-        "start": {"description": "Window start, source seconds. Omit start/end to find the window with index search."},
+        "start": {"description": "Window start, source seconds (12, 12.5 or 0:12). Give start and end together, or neither to watch the best search match."},
         "end": {"description": "Window end, source seconds."}
       }
     },
@@ -154,11 +154,11 @@
       "props": {
         "track": {"description": "Track (default: the selected track, else the bottom track)."},
         "position_seconds": {"description": "Timeline position, seconds (default: right after the last clip on the track; 0 for audio)."},
-        "duration_seconds": {"description": "Use this much of the source (keep window length), seconds."},
-        "start_seconds": {"description": "Source in-point relative to the file start, seconds."},
-        "end_seconds": {"description": "Source out-point (keep window end); duration_seconds wins when both are given."},
+        "duration_seconds": {"description": "Keep window length, seconds. Alone on a full video nothing has looked at it is refused: name the window with start_seconds and end_seconds."},
+        "start_seconds": {"description": "Source in-point relative to the file start, seconds. Alone it keeps the rest of the file."},
+        "end_seconds": {"description": "Source out-point (keep window end). A duration_seconds that disagrees with it wins."},
         "query": {"description": "What the kept moment shows (used to confirm the window when the host can watch frames)."},
-        "full_file": {"description": "true to place a whole audio file as one continuous bed."}
+        "full_file": {"description": "true to place the whole file (one continuous audio bed, or a whole video) without a watch."}
       }
     },
     "import_video_url_and_add_to_timeline_tool": {
@@ -172,7 +172,7 @@
         "limit": {"description": "Maximum media items to show (1-20, default 5)."},
         "top_k": {"description": "Alias for limit."},
         "file_id": {"description": "Only show matches in this media-bin file."},
-        "look_for": {"description": "on_screen | spoken (default: both)."}
+        "look_for": {"description": "\"on_screen\" when the query describes who or what is visible, \"spoken\" when it describes what is said; omit for both."}
       }
     },
     "search_clip_scenes_tool": {
@@ -186,8 +186,8 @@
       "props": {
         "query": {"description": "The moment to cut at, or an explicit source range like 'from 4 seconds to 10 seconds'."},
         "file_id": {"description": "Slice the timeline clip that plays this file."},
-        "start_seconds": {"description": "Explicit range start, SOURCE seconds (cuts before and after the range)."},
-        "end_seconds": {"description": "Explicit range end, SOURCE seconds."}
+        "start_seconds": {"description": "Source seconds (12, 12.5 or 0:12). With end_seconds: keep that range (cuts before and after it). Alone: one cut at that time."},
+        "end_seconds": {"description": "Range end, source seconds. Alone: one cut at that time."}
       }
     },
     "suggest_motion_graphics_placements_tool": {
@@ -274,7 +274,7 @@
       "props": {
         "clip1_id": {"description": "First (earlier) clip; the only clip for placement=start|end."},
         "clip2_id": {"description": "Second clip (placement=between): moved left to overlap clip1 by duration. Default: the next clip on clip1's track."},
-        "transition_name": {"description": "Transition name from list_transitions_tool / search_transitions_tool, e.g. 'fade' or 'wipe left'."},
+        "transition_name": {"description": "Transition name from list_transitions_tool / search_transitions_tool, e.g. 'fade' or 'wipe left' (default fade)."},
         "name": {"description": "Alias for transition_name."},
         "transition": {"description": "Alias for transition_name."},
         "duration": {"description": "Transition length in seconds (default 1.0)."},

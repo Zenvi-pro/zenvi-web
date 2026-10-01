@@ -87,7 +87,22 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   backend: "the Zenvi backend (sign in to Zenvi)",
   storage: "project storage",
   audio: "audio analysis",
+  assets: "the bundled title templates",
 };
+
+/**
+ * The refusal for something this surface cannot do. The Zenvi Assistant is
+ * told that "Error: … not available …" means "do not retry" (zenvi-backend
+ * #40), so every surface limitation uses this wording.
+ */
+export function unavailableMessage(tool: string, reason: string): string {
+  return `Error: ${tool} is not available in this Zenvi surface: ${reason}`;
+}
+
+/** A refused receipt for a surface limitation (see `unavailableMessage`). */
+export function unavailable(tool: string, reason: string): ToolReceipt {
+  return refused(tool, unavailableMessage(tool, reason));
+}
 
 /** Human name of a host capability, for refusals and docs. */
 export function capabilityName(capability: HostCapability): string {
@@ -102,7 +117,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function toResult(receipt: ToolReceipt, images?: ToolImage[]): ToolResult<ToolReceipt> {
+/**
+ * The ToolResult for a receipt: `text` is the receipt JSON (what the
+ * Assistant bridge sends back), `data` the receipt, `ok` for applied /
+ * unchanged. Images only travel with a successful receipt.
+ */
+export function resultFor(receipt: ToolReceipt, images?: ToolImage[]): ToolResult<ToolReceipt> {
   const ok = isOkStatus(receipt.status);
   const result: ToolResult<ToolReceipt> = { ok, text: JSON.stringify(receipt), data: receipt };
   // output.py ToolOutput drops images from failed receipts.
@@ -134,7 +154,7 @@ function fillEmpty(receipt: ToolReceipt, before: TimelineSnapshot, after: Timeli
 /** Map an exception from an op or implementation to a receipt. */
 function receiptForError(tool: string, error: unknown, host: ToolHost): ToolReceipt {
   if (isOpError(error)) {
-    return error.code === "unsupported" ? refused(tool, error.message) : failed(tool, error.message);
+    return error.code === "unsupported" ? unavailable(tool, error.message) : failed(tool, error.message);
   }
   const message = error instanceof Error ? error.message : String(error);
   host.log?.(`tool ${tool} failed: ${error instanceof Error && error.stack ? error.stack : message}`);
@@ -159,13 +179,13 @@ export async function executeTool<I extends z.ZodType>(
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const message = issue ? invalidArgumentsMessage(name, issue, args) : `Error: Invalid arguments for ${name}.`;
-    return toResult(refused(name, message));
+    return resultFor(refused(name, message));
   }
 
   const missing = missingCapabilities(tool.requires, ctx.host);
   if (missing.length > 0) {
     const needs = missing.map(capabilityName).join(" and ");
-    return toResult(refused(name, `Error: ${name} needs ${needs}, which this Zenvi surface does not provide.`));
+    return resultFor(unavailable(name, `it needs ${needs}, which this host does not provide.`));
   }
 
   const doc = ctx.doc;
@@ -192,7 +212,7 @@ export async function executeTool<I extends z.ZodType>(
   try {
     outcome = await impl.run(call, parsed.data as z.output<I>);
   } catch (error) {
-    return toResult(receiptForError(name, error, ctx.host));
+    return resultFor(receiptForError(name, error, ctx.host));
   }
 
   const mutated = state.undoAfter > state.undoBefore;
@@ -200,13 +220,13 @@ export async function executeTool<I extends z.ZodType>(
 
   if (typeof outcome === "string") {
     // execute.py: prose results, classified by prefix, enriched from snapshots when history grew.
-    if (outcome.startsWith("Error") || isErrorResult(outcome)) return toResult(fromHandlerText(name, outcome, false));
+    if (outcome.startsWith("Error") || isErrorResult(outcome)) return resultFor(fromHandlerText(name, outcome, false));
     const receipt = fromHandlerText(name, outcome, mutated);
     if (mutated && state.before && state.after && receipt.status === "applied") {
-      return toResult(mutationResult(state.before, state.after, name, receipt.summary, { undoSteps }));
+      return resultFor(mutationResult(state.before, state.after, name, receipt.summary, { undoSteps }));
     }
     receipt.undoSteps = mutated ? undoSteps : 0;
-    return toResult(receipt);
+    return resultFor(receipt);
   }
 
   const receipt = "receipt" in outcome && !("contract" in outcome) ? outcome.receipt : (outcome as ToolReceipt);
@@ -216,7 +236,7 @@ export async function executeTool<I extends z.ZodType>(
     if (mutated) {
       ctx.host.log?.(`tool ${name} returned ${receipt.status} after recording an undo step`);
     }
-    return toResult(receipt);
+    return resultFor(receipt);
   }
   if (mutated && state.before && state.after) {
     receipt.undoSteps = undoSteps;
@@ -235,7 +255,7 @@ export async function executeTool<I extends z.ZodType>(
       receipt.status = "unchanged";
     }
   }
-  return toResult(receipt, images);
+  return resultFor(receipt, images);
 }
 
 function buildTool<I extends z.ZodType>(

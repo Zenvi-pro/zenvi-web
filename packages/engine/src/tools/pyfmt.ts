@@ -10,6 +10,7 @@
  * - `pyFixed(x, n)`: `format(x, ".nf")`, correctly rounded with ties to even
  *   on the exact binary value (JS `toFixed` rounds ties up);
  * - `pyFloat(x)`: `str(float)` / `repr(float)` ("12.0", "1e-05");
+ * - `pyG(x)`: `format(x, "g")` ("8.5", "10", "1e-05");
  * - `pySlice(s, a, b)`: slicing by code point, not UTF-16 unit.
  */
 
@@ -113,6 +114,66 @@ export function pyFloat(x: number): string {
 export function pyNumber(x: number, asFloat = false): string {
   if (Number.isInteger(x) && !asFloat && Math.abs(x) < 1e16) return String(x);
   return pyFloat(x);
+}
+
+/**
+ * CPython `format(x, "g")` (precision 6 by default): `precision` significant
+ * digits, correctly rounded with ties to even, trailing zeros dropped,
+ * scientific notation below 1e-4 or from 10**precision up.
+ */
+export function pyG(x: number, precision = 6): string {
+  if (Number.isNaN(x)) return "nan";
+  if (!Number.isFinite(x)) return x > 0 ? "inf" : "-inf";
+  if (x === 0) return Object.is(x, -0) ? "-0" : "0";
+  const p = Math.max(1, Math.trunc(precision));
+  const { mant, exp } = decompose(Math.abs(x));
+  // round(|x| * 10^(p-1-e10)) on the exact binary value, ties to even.
+  const roundAt = (e10: number): bigint => {
+    const shift = p - 1 - e10;
+    let num = mant;
+    let den = 1n;
+    if (exp >= 0) num <<= BigInt(exp);
+    else den <<= BigInt(-exp);
+    if (shift >= 0) num *= 10n ** BigInt(shift);
+    else den *= 10n ** BigInt(-shift);
+    let q = num / den;
+    const twice = (num % den) * 2n;
+    if (twice > den || (twice === den && (q & 1n) === 1n)) q += 1n;
+    return q;
+  };
+  const limit = 10n ** BigInt(p);
+  let e10 = Math.floor(Math.log10(Math.abs(x)));
+  let q = roundAt(e10);
+  if (q >= limit) {
+    e10 += 1;
+    q = roundAt(e10);
+  } else if (q < limit / 10n) {
+    e10 -= 1;
+    q = roundAt(e10);
+    if (q >= limit) {
+      e10 += 1;
+      q = roundAt(e10);
+    }
+  }
+  const digits = q.toString();
+  let body: string;
+  if (e10 >= -4 && e10 < p) {
+    if (e10 >= 0) {
+      const frac = digits.slice(e10 + 1).replace(/0+$/, "");
+      body = frac ? `${digits.slice(0, e10 + 1)}.${frac}` : digits.slice(0, e10 + 1);
+    } else {
+      body = `0.${("0".repeat(-e10 - 1) + digits).replace(/0+$/, "")}`;
+    }
+  } else {
+    const rest = digits.slice(1).replace(/0+$/, "");
+    body = `${digits[0]}${rest ? "." + rest : ""}e${e10 < 0 ? "-" : "+"}${String(Math.abs(e10)).padStart(2, "0")}`;
+  }
+  return (x < 0 ? "-" : "") + body;
+}
+
+/** `str()` of a JSON value in desktop text (f-string `{value}`): strings bare, the rest like `repr`. */
+export function pyStr(value: unknown): string {
+  return typeof value === "string" ? value : pyRepr(value);
 }
 
 /** `repr()` of a JSON value in desktop text. */

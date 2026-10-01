@@ -237,7 +237,9 @@ export function listMarkersText(project: Project): string {
     const data = m as unknown as Record<string, unknown>;
     const position = data.position ?? 0;
     // Desktop marker positions are floats ((frame - 1) / fps), printed with str().
-    return `  id=${String(data.id ?? "")} position=${typeof position === "number" ? pyFloat(position) : String(position)} name=${String(data.name ?? "")}`;
+    // Desktop markers carry no label; the web's `label` (ops addMarker) shows as the name.
+    const name = data.name ?? data.label ?? "";
+    return `  id=${String(data.id ?? "")} position=${typeof position === "number" ? pyFloat(position) : String(position)} name=${String(name)}`;
   });
   return `Markers (${markers.length}):\n` + lines.join("\n");
 }

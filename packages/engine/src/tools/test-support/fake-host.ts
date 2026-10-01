@@ -1,0 +1,280 @@
+/**
+ * A fake ToolHost for tool tests (used only by `*.test.ts`). Every
+ * capability is present by default and records what it was asked to do;
+ * `fakeHost({ without: [...] })` drops capabilities and `omit` drops
+ * optional methods, so tests can check each surface limitation.
+ */
+
+import type { Project } from "../../model/types.js";
+import type {
+  AudioEnvelope,
+  ExportOptions,
+  HostCapability,
+  ImportedMedia,
+  PathListing,
+  ToolHost,
+  ToolImage,
+} from "../types.js";
+import { TRANSCRIPT_CUES, infoForPath } from "./fixture.js";
+
+/** A 1×1 PNG. */
+export const PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+export type OptionalMethod =
+  | "media.importPath"
+  | "media.listPaths"
+  | "media.importUrl"
+  | "media.pickFiles"
+  | "media.writeGenerated"
+  | "storage.readText"
+  | "storage.writeText"
+  | "ui.openExportDialog"
+  | "ui.selectedIds";
+
+export interface BackendCall {
+  path: string;
+  method: string;
+  body: unknown;
+}
+
+export interface FakeHostOptions {
+  /** Capabilities to leave out. */
+  without?: HostCapability[];
+  /** Optional methods to leave out. */
+  omit?: OptionalMethod[];
+  /** Extra backend routes (path prefix → handler); they win over the defaults. */
+  routes?: Record<string, (body: unknown, path: string) => unknown>;
+  /** Files `storage.readText` can read. */
+  texts?: Record<string, string>;
+  /** Bundled assets `assets.readText` can read (default: a minimal Bar_1 title template). */
+  assets?: Record<string, string>;
+  /** Player position, seconds. */
+  playhead?: number;
+}
+
+export interface FakeHost extends ToolHost {
+  readonly calls: string[];
+  readonly backendCalls: BackendCall[];
+  readonly written: Map<string, Uint8Array | string>;
+  readonly exports: ExportOptions[];
+}
+
+/** A tiny title template: one text line, like the desktop's Bar_1.svg. */
+export const TITLE_TEMPLATE_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><rect style="fill:#000000" width="1920" height="200"/>' +
+  '<text x="100" y="100" style="font-size:72px"><tspan x="100" y="100">Title</tspan></text></svg>';
+
+function defaultRoutes(): Record<string, (body: unknown, path: string) => unknown> {
+  return {
+    "/api/v1/indexing/status": () => ({ configured: true }),
+    "/api/v1/search": () => ({
+      results: [
+        { video_id: "VID0001", start: 2.5, end: 4.5, rank: 2, score: 0.7, transcription: "today we talk about cameras" },
+        { video_id: "VID0001", start: 12.0, end: 13.5, rank: 1, score: 0.9 },
+      ],
+    }),
+    "/api/v1/indexing/watch-window": (body) => {
+      const b = body as { window_start?: number; window_end?: number; fallback_cut?: number; fallback_in?: number; fallback_out?: number };
+      const cut = Number(b.fallback_cut ?? b.window_start ?? 0);
+      return {
+        matched: true,
+        used_fallback: false,
+        cut_source: cut,
+        in_source: Number(b.fallback_in ?? cut),
+        out_source: Number(b.fallback_out ?? cut + 1),
+        confidence: 0.9,
+        reason: "The query is on screen.",
+        visible_at: [cut],
+      };
+    },
+    "/api/v1/indexing/catalog": () => ({
+      items: [{ file_id: "FILEINTV01", filename: "interview.mp4", media_type: "video", duration_sec: 20, short_summary: "A speaker introduces a camera review." }],
+    }),
+    "/api/v1/indexing/summarize": () => ({ success: true, ai_metadata: { analyzed: true, short_summary: "Re-summarized." } }),
+    "/api/v1/generation/video": () => ({ video_url: "https://cdn.example.com/generated.mp4" }),
+    "/api/v1/generation/tts": () => ({ success: true, audio_base64: "SUQzAwAAAAAAAA==" }),
+    "/api/v1/pexels/search": () => ({
+      videos: [{ id: 101, url: "https://www.pexels.com/video/101/", video_files: [{ quality: "hd", link: "https://videos.pexels.com/101-hd.mp4" }] }],
+    }),
+    "/api/v1/freesound/search": () => ({
+      sounds: [{ id: 202, name: "Rain", previews: { hq_mp3: "https://freesound.org/202-hq.mp3" } }],
+    }),
+  };
+}
+
+export function fakeHost(options: FakeHostOptions = {}): FakeHost {
+  const without = new Set(options.without ?? []);
+  const omit = new Set(options.omit ?? []);
+  const calls: string[] = [];
+  const backendCalls: BackendCall[] = [];
+  const written = new Map<string, Uint8Array | string>();
+  const exports: ExportOptions[] = [];
+  const texts = { ...(options.texts ?? {}) };
+  const assets = options.assets ?? { "titles/Bar_1.svg": TITLE_TEMPLATE_SVG };
+  const routes = { ...defaultRoutes(), ...(options.routes ?? {}) };
+  let playhead = options.playhead ?? 1;
+  let playing = false;
+
+  const host: FakeHost = { calls, backendCalls, written, exports, log: () => {} };
+
+  if (!without.has("media")) {
+    const imported = (path: string, name?: string): ImportedMedia => (name === undefined ? { path, info: infoForPath(path) } : { path, info: infoForPath(path), name });
+    host.media = {
+      probe: async (path) => {
+        calls.push(`probe ${path}`);
+        if (path.includes("missing")) throw new Error(`No media at ${path}`);
+        return infoForPath(path);
+      },
+    };
+    if (!omit.has("media.importPath")) {
+      host.media.importPath = async (path) => {
+        calls.push(`importPath ${path}`);
+        if (path.includes("missing")) throw new Error(`No such file: ${path}`);
+        return imported(path);
+      };
+    }
+    if (!omit.has("media.listPaths")) {
+      host.media.listPaths = async (entry): Promise<PathListing> => {
+        calls.push(`listPaths ${entry}`);
+        if (entry.includes("missing")) return { kind: "missing", files: [] };
+        if (entry.endsWith("/clips")) return { kind: "directory", files: [`${entry}/a.mp4`, `${entry}/notes.txt`, `${entry}/b.mov`] };
+        return { kind: "file", files: [entry] };
+      };
+    }
+    if (!omit.has("media.importUrl")) {
+      host.media.importUrl = async (url, opts) => {
+        calls.push(`importUrl ${url}`);
+        const name = opts?.filename || url.split("/").pop() || "download.mp4";
+        return imported(`/downloads/${name}`, name);
+      };
+    }
+    if (!omit.has("media.pickFiles")) host.media.pickFiles = async () => [];
+    if (!omit.has("media.writeGenerated")) {
+      host.media.writeGenerated = async (name, bytes) => {
+        const path = `/generated/${name}`;
+        calls.push(`writeGenerated ${name}`);
+        written.set(path, bytes);
+        return path;
+      };
+    }
+  }
+  if (!without.has("player")) {
+    host.player = {
+      get playhead() {
+        return playhead;
+      },
+      get playing() {
+        return playing;
+      },
+      play: () => {
+        calls.push("play");
+        playing = true;
+      },
+      pause: () => {
+        calls.push("pause");
+        playing = false;
+      },
+      toggle: () => {
+        calls.push("toggle");
+        playing = !playing;
+      },
+      seek: (seconds) => {
+        calls.push(`seek ${seconds}`);
+        playhead = seconds;
+      },
+    };
+  }
+  if (!without.has("ui")) {
+    host.ui = {
+      zoomIn: () => calls.push("zoomIn"),
+      zoomOut: () => calls.push("zoomOut"),
+      centerOnPlayhead: () => calls.push("centerOnPlayhead"),
+      notify: (message) => calls.push(`notify ${message}`),
+    };
+    if (!omit.has("ui.selectedIds")) host.ui.selectedIds = () => [];
+    if (!omit.has("ui.openExportDialog")) host.ui.openExportDialog = () => calls.push("openExportDialog");
+  }
+  if (!without.has("exporter")) {
+    host.exporter = {
+      export: async (project: Project, exportOptions, onProgress) => {
+        calls.push(`export ${exportOptions.format}`);
+        exports.push(exportOptions);
+        onProgress?.(1);
+        return { location: exportOptions.output ?? "/exports/export.mp4", bytes: 1234, mimeType: "video/mp4", durationSeconds: 1 };
+      },
+    };
+  }
+  if (!without.has("frames")) {
+    host.frames = {
+      renderFrame: async (_project, seconds, frameOptions): Promise<ToolImage> => {
+        calls.push(`renderFrame ${Number(seconds).toFixed(2)}${frameOptions?.overlay?.grid ? " grid" : ""}`);
+        return { mimeType: frameOptions?.format === "jpeg" ? "image/jpeg" : "image/png", data: PNG_1PX };
+      },
+    };
+  }
+  if (!without.has("backend")) {
+    host.backend = {
+      baseUrl: "https://api.zenvi.test",
+      request: async <T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> => {
+        backendCalls.push({ path, method: init?.method ?? "GET", body: init?.body });
+        const route = Object.keys(routes)
+          .filter((prefix) => path.startsWith(prefix))
+          .sort((a, b) => b.length - a.length)[0];
+        if (!route) throw new Error(`no fake route for ${path}`);
+        return routes[route]!(init?.body, path) as T;
+      },
+    };
+  }
+  if (!without.has("storage")) {
+    host.storage = {
+      save: async (_project, path) => {
+        calls.push(`save ${path ?? ""}`);
+        return path ?? "/projects/current.zvn";
+      },
+      open: async (path) => {
+        calls.push(`open ${path}`);
+        throw new Error(`cannot open ${path} in tests`);
+      },
+    };
+    if (!omit.has("storage.readText")) {
+      host.storage.readText = async (path) => {
+        calls.push(`readText ${path}`);
+        const textValue = texts[path];
+        if (textValue === undefined) throw new Error(`No such file: ${path}`);
+        return textValue;
+      };
+    }
+    if (!omit.has("storage.writeText")) {
+      host.storage.writeText = async (path, textValue) => {
+        calls.push(`writeText ${path}`);
+        written.set(path, textValue);
+        return path;
+      };
+    }
+  }
+  if (!without.has("audio")) {
+    host.audio = {
+      analyzeAudio: async (path): Promise<AudioEnvelope> => {
+        calls.push(`analyzeAudio ${path}`);
+        // 20 s at 16 kHz / 480: speech 0.5-2.0 s and 2.5-4.5 s, silence elsewhere.
+        const frames = Math.round((20 * 16000) / 480);
+        const rms = Array.from({ length: frames }, (_, i) => {
+          const t = (i * 480) / 16000;
+          return TRANSCRIPT_CUES.some((c) => t >= c.start && t < c.end) ? 0.3 : 0.001;
+        });
+        return { sampleRate: 16000, frameSize: 480, rms };
+      },
+    };
+  }
+  if (!without.has("assets")) {
+    host.assets = {
+      readText: async (path) => {
+        calls.push(`asset ${path}`);
+        const textValue = assets[path];
+        if (textValue === undefined) throw new Error(`No asset ${path}`);
+        return textValue;
+      },
+    };
+  }
+  return host;
+}

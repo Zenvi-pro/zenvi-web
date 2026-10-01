@@ -137,6 +137,8 @@ export interface ExportOptions {
   /** Video bitrate in bits/s, or a quality preset. */
   videoBitrate?: number;
   quality?: "low" | "medium" | "high" | "lossless";
+  /** Constant rate factor for CRF codecs (libx264/libx265/VP9), e.g. the desktop presets' Low/Med/High = 30/23/20 for libx264. Wins over `quality`. */
+  crf?: number;
   audioBitrate?: number;
   sampleRate?: number;
   channels?: number;
@@ -214,6 +216,15 @@ export interface StorageHost {
   writeText?(path: string, text: string, contentType?: string): Promise<string>;
 }
 
+/** Files bundled with the engine (`packages/engine/assets/…`), such as the title templates. */
+export interface AssetHost {
+  /**
+   * Text of a bundled asset by its path under the engine's `assets/`
+   * folder, e.g. `titles/Bar_1.svg`. Rejects when there is no such asset.
+   */
+  readText(path: string): Promise<string>;
+}
+
 export interface ToolHost {
   media?: MediaHost;
   player?: PlayerHost;
@@ -223,6 +234,7 @@ export interface ToolHost {
   backend?: BackendHost;
   storage?: StorageHost;
   audio?: AudioHost;
+  assets?: AssetHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }

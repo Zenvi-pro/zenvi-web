@@ -188,10 +188,11 @@ export function formatIssue(issue: z.core.$ZodIssue, payload: unknown): { messag
       if (issue.origin === "array") {
         return { message: Number(issue.minimum) <= 1 ? `${shown} should be non-empty` : `${shown} is too short`, path };
       }
-      return { message: `${shown} is less than the minimum of ${String(issue.minimum)}`, path };
+      // jsonschema: exclusiveMinimum reads "less than or equal to the minimum".
+      return { message: `${shown} is less than ${issue.inclusive === false ? "or equal to " : ""}the minimum of ${pyRepr(Number(issue.minimum))}`, path };
     case "too_big":
       if (issue.origin === "array") return { message: `${shown} is too long`, path };
-      return { message: `${shown} is greater than the maximum of ${String(issue.maximum)}`, path };
+      return { message: `${shown} is greater than ${issue.inclusive === false ? "or equal to " : ""}the maximum of ${pyRepr(Number(issue.maximum))}`, path };
     default:
       return { message: issue.message, path };
   }

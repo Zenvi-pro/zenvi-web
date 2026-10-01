@@ -20,3 +20,35 @@ export {
   type EditorSnapshotOptions,
   type TimelineStateData,
 } from "./reports.js";
+export {
+  capabilityName,
+  missingCapabilities,
+  resultFor,
+  unavailable,
+  unavailableMessage,
+  type CatalogTool,
+  type ToolCall,
+  type ToolOutcome,
+} from "./define.js";
+export {
+  allTools,
+  getTool,
+  listTools,
+  runTool,
+  unknownToolMessage,
+  type ListToolsOptions,
+  type RunToolOptions,
+} from "./registry.js";
+export {
+  SURFACE_PROFILES,
+  TOOL_NEEDS,
+  toolAvailability,
+  availabilityMatrix,
+  type Availability,
+  type AvailabilitySurface,
+  type HostMethod,
+  type SurfaceProfile,
+  type ToolAvailability,
+  type ToolNeeds,
+} from "./availability.js";
+export { RECEIPT_OUTPUT_SCHEMA } from "./output-schema.js";

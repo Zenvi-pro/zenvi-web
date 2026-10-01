@@ -7,7 +7,7 @@
 
 import { parsePythonFloat } from "./coerce.js";
 import { quantizeSpan, type Fps } from "./frame-time.js";
-import { pyRepr } from "./pyfmt.js";
+import { pyFloat, pyRepr } from "./pyfmt.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -27,29 +27,8 @@ function orZero(value: unknown): number {
   return float(value) ?? 0;
 }
 
-// ---------------------------------------------------------------------------
-// image_types.py
-// ---------------------------------------------------------------------------
-
-const AUDIO_EXTS = [".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a", ".wma", ".opus", ".aiff", ".aif", ".oga"];
-
-/** True when a path ends with a pure-audio extension (query strings ignored). */
-export function isAudioPath(path: string | null | undefined): boolean {
-  const p = String(path ?? "").toLowerCase().split("?")[0]!;
-  return AUDIO_EXTS.some((ext) => p.endsWith(ext));
-}
-
-/**
- * True when a file should never composite video (music, SFX, voice-over).
- * Extension first: libopenshot reports has_video for MP3s with cover art.
- */
-export function isAudioOnlyMedia(file: unknown): boolean {
-  if (!isRecord(file)) return false;
-  if (isAudioPath(String(file.path ?? ""))) return true;
-  const mediaType = String(file.media_type ?? "").trim().toLowerCase();
-  if (mediaType) return mediaType === "audio";
-  return Boolean(file.has_audio) && !file.has_video;
-}
+// image_types.py lives in model/media.ts (one copy for the engine).
+export { isAudioOnlyMedia, isAudioPath } from "../model/media.js";
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"]);
 
@@ -113,6 +92,86 @@ export function computeClipTrimBounds(
   return [startSec, endSec];
 }
 
+/**
+ * A planned position this close to where the clip before it was planned to
+ * end was planned against that clip (clip_placement.py
+ * PLANNED_POSITION_TOLERANCE_SEC, zenvi-core #168).
+ */
+export const PLANNED_POSITION_TOLERANCE_SEC = 0.1;
+
+/** Where a resized placement was planned to end, and where it really ends (timeline seconds). */
+export interface ResizedPlacement {
+  plannedEnd: number;
+  actualEnd: number;
+}
+
+/**
+ * Timeline position that closes the gap or overlap a resized clip left
+ * behind (clip_placement.py `butt_against_previous_clip`). Snapping a
+ * placement onto phrase edges, or a watch trimming it, changes its length
+ * after the caller planned where the next clip goes; a position on one of
+ * those planned ends moves to where that clip really ends. Any other
+ * position, a deliberate gap or overlap included, is kept.
+ */
+export function buttAgainstPreviousClip(
+  position: number,
+  resized: readonly ResizedPlacement[],
+  tolerance = PLANNED_POSITION_TOLERANCE_SEC,
+): number {
+  let best: { miss: number; end: number } | null = null;
+  for (const r of resized) {
+    const miss = Math.abs(position - r.plannedEnd);
+    if (miss <= tolerance && (best === null || miss < best.miss)) best = { miss, end: r.actualEnd };
+  }
+  return best ? best.end : position;
+}
+
+/**
+ * A duration_seconds this close to end_seconds - start_seconds names the same
+ * out-point (clip_placement.py KEEP_WINDOW_AGREE_SEC).
+ */
+export const KEEP_WINDOW_AGREE_SEC = 0.05;
+
+/**
+ * True when end_seconds sets the out-point of a placement
+ * (clip_placement.py `end_bounds_keep_window`): duration_seconds wins when
+ * both are given, so an end_seconds it overrides is a leftover argument; one
+ * that agrees with start + duration names the same out-point.
+ */
+export function endBoundsKeepWindow(
+  trimStart: number | null,
+  trimDur: number | null,
+  trimEnd: number | null,
+  tolerance = KEEP_WINDOW_AGREE_SEC,
+): boolean {
+  if (trimEnd === null) return false;
+  if (trimDur === null) return true;
+  return Math.abs(trimEnd - (trimStart || 0) - trimDur) <= tolerance;
+}
+
+/**
+ * True when a trim has no boundary behind it at all
+ * (clip_placement.py `blind_trim_rejected`): only a blind "keep the first N
+ * seconds" duration trim on a full file is refused. A watch, an explicit
+ * start_seconds or an end_seconds that sets the out-point all bound the
+ * window; audio, images and subclips are exempt. Times written only in the
+ * query never count.
+ */
+export function blindTrimRejected(options: {
+  trimDur: number | null;
+  watchedStart: number | null;
+  hasExplicitEnd?: boolean;
+  hasExplicitStart?: boolean;
+  isAudio?: boolean;
+  isImage?: boolean;
+  isSubclip?: boolean;
+}): boolean {
+  if (options.watchedStart !== null || options.hasExplicitEnd || options.hasExplicitStart) return false;
+  if (options.isAudio || options.isImage || options.isSubclip) return false;
+  const span = options.trimDur ?? 0;
+  return Number.isFinite(span) && span > 0;
+}
+
 /** Seconds for "SS", "M:SS" or "H:M:SS" (parse_timecode_token). */
 export function parseTimecodeToken(token: unknown): number | null {
   if (typeof token === "number") return Number.isFinite(token) ? token : null;
@@ -142,14 +201,14 @@ export class TimeArgError extends Error {
 /**
  * An agent time argument in seconds (parse_seconds_arg): blank means
  * "not supplied" (`fallback`); numbers, "12.5", "12s", "0:12" parse; anything
- * else throws TimeArgError naming the raw value.
+ * else (nan and inf included) throws TimeArgError naming the raw value.
  */
 export function parseSecondsArg(value: unknown, fallback: number | null, field = ""): number | null {
   const label = field || "value";
   if (value === null || value === undefined) return fallback;
   if (typeof value === "boolean") throw new TimeArgError(`${label}=${value ? "True" : "False"} is not a time in seconds`);
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new TimeArgError(`${label}=${String(value)} is not a time in seconds`);
+    if (!Number.isFinite(value)) throw new TimeArgError(`${label}=${pyFloat(value)} is not a time in seconds`);
     return value;
   }
   const text = String(value).trim();
@@ -162,7 +221,8 @@ export function parseSecondsArg(value: unknown, fallback: number | null, field =
     }
   }
   const parsed = parseTimecodeToken(lowered);
-  if (parsed === null) {
+  // zenvi-core #168: nan/inf are refused too (float() accepts them).
+  if (parsed === null || !Number.isFinite(parsed)) {
     throw new TimeArgError(
       `${label}=${pyRepr(value)} is not a time in seconds ` +
         "(use seconds like 12 or 12.5, or a timecode like 0:12)",
@@ -214,4 +274,48 @@ export function shouldWatchPlacement(options: {
   if (options.isAlreadyWatchedSubclip && !options.explicitQuery) return false;
   const span = Number.isFinite(options.windowSec) ? (options.windowSec as number) : 0;
   return span > 1e-3 && span <= (options.maxWindowSec ?? WATCH_MAX_WINDOW_SEC) + 1e-6;
+}
+
+/**
+ * A concrete source time range named in a query ("from 4 seconds to 10
+ * seconds", "4s to 10s", "0:04 to 0:10"), or null
+ * (tool_handlers._parse_explicit_source_time_range_sec).
+ */
+export function parseExplicitSourceTimeRange(query: string | null | undefined): [number, number] | null {
+  if (!query || typeof query !== "string") return null;
+  const s = query.trim();
+  const pair = (a: string, b: string): [number, number] | null => {
+    const t0 = Number(a);
+    const t1 = Number(b);
+    return t1 > t0 ? [t0, t1] : null;
+  };
+  let m = /(\d+(?:\.\d+)?)\s*(?:seconds?|secs?)\s+to\s+(\d+(?:\.\d+)?)\s*(?:seconds?|secs?)\b/i.exec(s);
+  if (m) {
+    const r = pair(m[1]!, m[2]!);
+    if (r) return r;
+  }
+  m = /from\s+(\d+(?:\.\d+)?)\s+to\s+(\d+(?:\.\d+)?)\s*(?:seconds?|secs?)\b/i.exec(s);
+  if (m) {
+    const r = pair(m[1]!, m[2]!);
+    if (r) return r;
+  }
+  m = /(\d+(?:\.\d+)?)\s*s\b\s+to\s+(\d+(?:\.\d+)?)\s*s\b/i.exec(s);
+  if (m) {
+    const r = pair(m[1]!, m[2]!);
+    if (r) return r;
+  }
+  m = /(\d+:\d{2}(?::\d{2})?)\s+to\s+(\d+:\d{2}(?::\d{2})?)/i.exec(s);
+  if (m) {
+    const t0 = parseTimecodeToken(m[1]!);
+    const t1 = parseTimecodeToken(m[2]!);
+    if (t0 !== null && t1 !== null && t1 > t0) return [t0, t1];
+  }
+  if (/\bsec/i.test(s)) {
+    m = /from\s+(\d+(?:\.\d+)?)\s+to\s+(\d+(?:\.\d+)?)\b/i.exec(s);
+    if (m) {
+      const r = pair(m[1]!, m[2]!);
+      if (r) return r;
+    }
+  }
+  return null;
 }
