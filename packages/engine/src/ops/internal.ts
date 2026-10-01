@@ -154,3 +154,19 @@ export function mapKeyframesDeep(value: unknown, fn: (kf: Keyframe) => Keyframe)
   for (const [k, v] of Object.entries(value)) out[k] = mapKeyframesDeep(v, fn);
   return out;
 }
+
+/** Replace a clip wholesale when anything changed. */
+export function replaceClip(tx: Transaction, before: Clip, after: Clip): Clip {
+  if (sameJson(before, after)) return before;
+  tx.replace(["clips", { id: before.id }], after);
+  return requireClip(tx.project, before.id);
+}
+
+/** What the desktop fades for a clip: alpha when it shows a picture (or waveform), volume when it has audio. */
+export function fadeTargets(clip: Clip): { alpha: boolean; volume: boolean } {
+  const reader: Record<string, unknown> = isRecord(clip.reader) ? clip.reader : {};
+  return {
+    alpha: Boolean(reader.has_video ?? true) || Boolean(clip.waveform),
+    volume: Boolean(reader.has_audio ?? true),
+  };
+}

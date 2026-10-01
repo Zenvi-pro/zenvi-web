@@ -51,9 +51,10 @@ import {
   patchTransition,
   rateOf,
   reassignEffectIds,
+  fadeTargets,
+  replaceClip,
   requireEditableClip,
   resolveClipFrame,
-  sameJson,
   snapSeconds,
   withClampedTiming,
 } from "./internal.js";
@@ -444,7 +445,7 @@ export function deleteClips(tx: Transaction, clipIds: readonly string[], opts: D
 }
 
 /** main_window.py `ripple_delete_gap`: items on `layer` strictly after `from` move left by `gap`. */
-export function rippleShift(tx: Transaction, layer: number, from: number, gap: number): void {
+function rippleShift(tx: Transaction, layer: number, from: number, gap: number): void {
   for (const c of tx.project.clips.filter((c) => c.layer === layer && c.position > from)) {
     tx.update(["clips", { id: c.id }], { position: c.position - gap });
   }
@@ -676,13 +677,6 @@ export interface SetClipSpeedOptions {
   direction?: "forward" | "backward";
 }
 
-/** Replace a clip wholesale when anything changed. */
-export function replaceClip(tx: Transaction, before: Clip, after: Clip): Clip {
-  if (sameJson(before, after)) return before;
-  tx.replace(["clips", { id: before.id }], after);
-  return requireClip(tx.project, before.id);
-}
-
 /**
  * Play a clip `factor` times faster (2 = twice as fast, 0.5 = half speed),
  * like the desktop Time presets (1/16x to 16x): the clip's timeline length
@@ -745,23 +739,14 @@ export interface FadeClipOptions {
 }
 
 /** Desktop fade zone: 3 s (the slow fade), timeline.py Fade_Triggered. */
-export const FADE_ZONE_SECONDS = 3.0;
-
-/** What the desktop fades for a clip: alpha when it shows a picture (or waveform), volume when it has audio. */
-export function fadeTargets(clip: Clip): { alpha: boolean; volume: boolean } {
-  const reader: Record<string, unknown> = isRecord(clip.reader) ? clip.reader : {};
-  return {
-    alpha: Boolean(reader.has_video ?? true) || Boolean(clip.waveform),
-    volume: Boolean(reader.has_audio ?? true),
-  };
-}
+const FADE_ZONE_SECONDS = 3.0;
 
 /**
  * Fade-in for one keyframe (Fade_Triggered IN_* branch): clear the 3 s zone,
  * then 0 at the clip's first frame rising to the zone-boundary value after
  * `length` seconds.
  */
-export function fadeInKeyframe(kf: Keyframe | undefined, startOfClip: number, endOfClip: number, length: number, rate: number): Keyframe {
+function fadeInKeyframe(kf: Keyframe | undefined, startOfClip: number, endOfClip: number, length: number, rate: number): Keyframe {
   const zoneEnd = Math.min(startOfClip + FADE_ZONE_SECONDS * rate, endOfClip);
   const target = evaluate(kf, Math.trunc(pyRound(zoneEnd)), 1.0);
   const endAnimation = Math.min(startOfClip + length * rate, endOfClip);
@@ -777,7 +762,7 @@ export function fadeInKeyframe(kf: Keyframe | undefined, startOfClip: number, en
  * then the zone-boundary value `length` seconds before the end falling to 0
  * at the clip's end frame.
  */
-export function fadeOutKeyframe(kf: Keyframe | undefined, endOfClip: number, length: number, rate: number): Keyframe {
+function fadeOutKeyframe(kf: Keyframe | undefined, endOfClip: number, length: number, rate: number): Keyframe {
   const zoneStart = Math.max(1.0, endOfClip - FADE_ZONE_SECONDS * rate);
   const source = evaluate(kf, Math.trunc(pyRound(zoneStart)), 1.0);
   const startAnimation = Math.max(1.0, endOfClip - length * rate);
@@ -795,7 +780,7 @@ function clearFadeZone(kf: Keyframe | undefined, from: number, to: number): Keyf
 }
 
 /** The desktop's first/last keyframe X of a clip (`round(start*fps)+1`, `round(end*fps)+1`). */
-export function clipFrameSpan(clip: Clip, rate: number): { startOfClip: number; endOfClip: number } {
+function clipFrameSpan(clip: Clip, rate: number): { startOfClip: number; endOfClip: number } {
   return { startOfClip: pyRound(Number(clip.start) * rate) + 1, endOfClip: pyRound(Number(clip.end) * rate) + 1 };
 }
 
