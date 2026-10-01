@@ -170,7 +170,8 @@ GET    /health
 GET    /v1/me
 GET    /v1/projects                 POST /v1/projects
 GET    /v1/projects/:id             PUT  /v1/projects/:id (If-Match revision)   DELETE /v1/projects/:id
-POST   /v1/projects/:id/media       → { mediaId, uploadUrl (SAS), exists }      (dedupe by sha256)
+POST   /v1/media/check {sha256[]}  POST /v1/media {sha256,size,name,contentType} → { uploadUrl (SAS), exists }
+POST   /v1/media/:sha256/complete  GET  /v1/media/:sha256/url                   (content-addressed per user, full-file SHA-256)
 POST   /v1/projects/:id/renders     GET /v1/projects/:id/renders/:renderId
 POST   /v1/device/code              POST /v1/device/approve   POST /v1/device/token
 GET    /v1/tokens                   POST /v1/tokens           DELETE /v1/tokens/:id
