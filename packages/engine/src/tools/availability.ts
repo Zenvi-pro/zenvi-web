@@ -122,7 +122,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.readText",
       "storage.writeText",
     ],
-    conditional: { backend: "signed in to Zenvi (zenvi login)" },
+    conditional: { backend: "signed in with zenvi login" },
   },
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",

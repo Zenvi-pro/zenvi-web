@@ -354,9 +354,12 @@ export async function planPlacement(call: ToolCall, file: ProjectFile, args: Pla
   if (posArg === null) {
     if (isAudio) position = 0;
     else {
+      // Append right after the last clip on the track. Divergence: the desktop
+      // (tool_handlers.py add_clip_to_timeline ~L2394, `last_end + _one_frame`)
+      // leaves a one-frame black/silent gap; here the new clip butts against it.
       const same = (project.clips ?? []).filter((c) => Number(c.layer ?? 0) === layer);
       position = same.length > 0
-        ? Math.max(...same.map((c) => (Number(c.position) || 0) + ((Number(c.end) || 0) - (Number(c.start) || 0)))) + 1 / Math.max(fpsFloat, 1)
+        ? Math.max(...same.map((c) => (Number(c.position) || 0) + ((Number(c.end) || 0) - (Number(c.start) || 0))))
         : 0;
     }
   } else if (isAudio) {

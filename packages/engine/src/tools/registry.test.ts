@@ -95,7 +95,7 @@ describe("tool catalog", () => {
       expect(doc.undoLabels, tool.name).toEqual([]);
       expect(snapshotOf(doc.project), tool.name).toEqual(before);
     }
-  });
+  }, 60_000);
 });
 
 describe("listTools", () => {

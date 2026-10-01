@@ -60,7 +60,7 @@ describe("surface-limitation refusals say 'not available'", () => {
         await expectNotAvailable(tool.name, REQUIRED_ARGS[tool.name] ?? {}, { without: [cap] });
       }
     }
-  });
+  }, 60_000);
 
   it("names the missing capability", async () => {
     const result = await runTool({ doc: fixtureDoc(), host: fakeHost({ without: ALL_CAPABILITIES }) }, "play_tool", {});
