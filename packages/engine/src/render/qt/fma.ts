@@ -10,8 +10,11 @@
  * before the final rounding to nearest (Boldo & Melquiond, "Emulation of FMA
  * and correctly rounded sums: proved algorithms using rounding to odd", IEEE
  * TC 57(4), 2008). Inputs whose products could overflow or underflow take an
- * exact BigInt path instead.
+ * exact BigInt path instead. Every render module imports its fused
+ * operations from here.
  */
+
+import { fma as fmaFast } from "../../model/fma.js";
 
 const f64 = new Float64Array(1);
 const u32 = new Uint32Array(f64.buffer);
@@ -55,7 +58,6 @@ function addRoundToOdd(x: number, y: number): number {
   return (err > 0) === (s > 0) ? stepAwayFromZero(s) : stepTowardZero(s);
 }
 
-const SPLIT = 134217729; // 2^27 + 1
 const SAFE_MAX = 2 ** 480;
 const SAFE_MIN = 2 ** -480;
 
@@ -64,26 +66,16 @@ function safe(x: number): boolean {
   return a === 0 || (a < SAFE_MAX && a > SAFE_MIN);
 }
 
-/** a·b + c with a single rounding to the nearest double (IEEE fusedMultiplyAdd). */
+/**
+ * a·b + c with a single rounding to the nearest double (IEEE
+ * fusedMultiplyAdd): the engine-wide Dekker/Knuth/round-to-odd emulation
+ * (model/fma.ts), with the exact path where products could overflow or
+ * underflow.
+ */
 export function fma(a: number, b: number, c: number): number {
   if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return a * b + c;
-  if (a === 0 || b === 0) return a * b + c;
-  if (c === 0) return a * b;
   if (!safe(a) || !safe(b) || !safe(c) || !safe(a * b)) return fmaExact(a, b, c);
-  // Exact product a·b = uh + ul (Dekker).
-  const uh = a * b;
-  let t = SPLIT * a;
-  const ah = t - (t - a);
-  const al = a - ah;
-  t = SPLIT * b;
-  const bh = t - (t - b);
-  const bl = b - bh;
-  const ul = ah * bh - uh + ah * bl + al * bh + al * bl;
-  // Exact sum c + uh = th + tl (Knuth).
-  const th = c + uh;
-  const v = th - c;
-  const tl = c - (th - v) + (uh - v);
-  return th + addRoundToOdd(tl, ul);
+  return fmaFast(a, b, c);
 }
 
 /**
@@ -97,62 +89,73 @@ export function fmaf(a: number, b: number, c: number): number {
   return Math.fround(addRoundToOdd(p, c));
 }
 
-// --- Exact reference path ---------------------------------------------------
+// --- Exact path -------------------------------------------------------------
 
-const view = new DataView(new ArrayBuffer(8));
+const VIEW = new DataView(new ArrayBuffer(8));
 
-/** x = mantissa · 2^exponent exactly (x finite and non-zero). */
-function decompose(x: number): [bigint, number] {
-  view.setFloat64(0, x);
-  const hi = view.getUint32(0);
-  const lo = view.getUint32(4);
-  const expBits = (hi >>> 20) & 0x7ff;
-  let m = (BigInt(hi & 0xfffff) << 32n) | BigInt(lo);
-  let e: number;
-  if (expBits === 0) e = -1074;
-  else {
-    m |= 1n << 52n;
-    e = expBits - 1075;
-  }
-  return [hi >>> 31 ? -m : m, e];
+/** `x = mantissa · 2^exponent` with an integer mantissa (finite, non-zero x). */
+function decompose(x: number): { m: bigint; e: number } {
+  VIEW.setFloat64(0, x);
+  const bits = VIEW.getBigUint64(0);
+  const sign = bits >> 63n ? -1n : 1n;
+  const biased = Number((bits >> 52n) & 0x7ffn);
+  const frac = bits & 0xfffffffffffffn;
+  if (biased === 0) return { m: sign * frac, e: -1074 };
+  return { m: sign * (frac | 0x10000000000000n), e: biased - 1075 };
 }
 
-/** Round m · 2^e (m > 0) to the nearest double, ties to even. */
-function roundToDouble(m: bigint, e: number): number {
-  const bits = m.toString(2).length;
-  if (bits > 64) {
-    const shift = bits - 64;
-    const sticky = (m & ((1n << BigInt(shift)) - 1n)) !== 0n ? 1n : 0n;
-    m = (m >> BigInt(shift)) | sticky;
-    e += shift;
+/** `x · 2^k` without intermediate overflow or underflow. */
+function scale2(x: number, k: number): number {
+  let v = x;
+  let n = k;
+  while (n > 1000) {
+    v *= 2 ** 1000;
+    n -= 1000;
   }
-  // Number(bigint) rounds to nearest-even; the sticky bit breaks false ties.
-  let v = Number(m);
-  const half = Math.trunc(e / 2);
-  v *= 2 ** half;
-  v *= 2 ** (e - half);
-  return v;
+  while (n < -1000) {
+    v *= 2 ** -1000;
+    n += 1000;
+  }
+  return v * 2 ** n;
+}
+
+/** Round the exact value `m · 2^e` to the nearest double, ties to even (subnormals included). */
+function roundToDouble(m: bigint, e: number): number {
+  if (m === 0n) return 0;
+  const neg = m < 0n;
+  const a = neg ? -m : m;
+  const top = e + a.toString(2).length - 1;
+  const ulpExp = Math.max(top, -1022) - 52;
+  let q = a;
+  let qExp = e;
+  if (ulpExp > e) {
+    const shift = BigInt(ulpExp - e);
+    q = a >> shift;
+    const rem = a - (q << shift);
+    const half = 1n << (shift - 1n);
+    if (rem > half || (rem === half && (q & 1n) === 1n)) q += 1n;
+    qExp = ulpExp;
+  }
+  // At most 54 bits after rounding up: exact as a double.
+  const v = scale2(Number(q), qExp);
+  return neg ? -v : v;
 }
 
 /** fma computed exactly with BigInt (slow; extreme magnitudes and tests). */
 export function fmaExact(a: number, b: number, c: number): number {
-  if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return a * b + c;
-  if (a === 0 || b === 0) return a * b + c;
-  if (c === 0) return a * b;
-  const [ma, ea] = decompose(a);
-  const [mb, eb] = decompose(b);
-  const [mc, ec] = decompose(c);
-  const mp = ma * mb;
-  const ep = ea + eb;
-  let m: bigint;
-  let e: number;
-  if (ep <= ec) {
-    m = mp + (mc << BigInt(ec - ep));
-    e = ep;
+  if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c) || a === 0 || b === 0) return a * b + c;
+  const da = decompose(a);
+  const db = decompose(b);
+  let pm = da.m * db.m;
+  let pe = da.e + db.e;
+  if (c === 0) return roundToDouble(pm, pe);
+  const dc = decompose(c);
+  let cm = dc.m;
+  if (pe > dc.e) {
+    pm <<= BigInt(pe - dc.e);
+    pe = dc.e;
   } else {
-    m = (mp << BigInt(ep - ec)) + mc;
-    e = ec;
+    cm <<= BigInt(dc.e - pe);
   }
-  if (m === 0n) return 0;
-  return m < 0n ? -roundToDouble(-m, e) : roundToDouble(m, e);
+  return roundToDouble(pm + cm, pe);
 }

@@ -20,7 +20,7 @@
 import { roundHalfAway } from "../../model/rounding.js";
 import { clampU8, clonePremul, type PremulImage } from "../pixels.js";
 import { scaledPremul } from "./image-cache.js";
-import { fmaf } from "./lens-flare.js";
+import { fmaf } from "../qt/fma.js";
 import type { KernelContext } from "../types.js";
 import { bool, num, readerPath } from "./params.js";
 import type { KernelSpec, Params } from "./types.js";

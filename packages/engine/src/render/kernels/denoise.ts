@@ -17,6 +17,7 @@
  */
 
 import type { PremulImage } from "../pixels.js";
+import { fmaf } from "../qt/fma.js";
 import { DENOISE_RESPONSE_NODES, evaluateAnimatedCurve } from "../plan/effect-params.js";
 import type { KernelContext } from "../types.js";
 import { num, numbers, record } from "./params.js";
@@ -31,10 +32,6 @@ const LUMA_B = f32(0.114);
 
 /** DenoiseImage's default response curve (shared with the planner, which keeps it for `nodes: []`). */
 export { DENOISE_RESPONSE_NODES };
-
-function fmaf(a: number, b: number, c: number): number {
-  return f32(a * b + c);
-}
 
 function clamp01(v: number): number {
   return v < 1 ? (v > 0 ? v : 0) : 1;

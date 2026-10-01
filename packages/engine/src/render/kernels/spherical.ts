@@ -18,7 +18,7 @@
  * `Math.sin`/`atan2`/... can differ from Apple's libm by 1 ulp. Both are
  * absorbed by the float32 store except in about 4e-9 of the values. Sampling
  * is exact: plain double math, recomputed with the fused operations
- * (`fmaExact`) whenever a value lands within 1e-7 of a rounding boundary.
+ * (`fma`) whenever a value lands within 1e-7 of a rounding boundary.
  *
  * Divergence (docs/PARITY.md): libopenshot leaves the frame as straight-alpha
  * ARGB32 (SphericalProjection.cpp:66-67, 370), so later effects and mask
@@ -31,7 +31,7 @@ import { roundHalfAway } from "../../model/rounding.js";
 import { byteMul, createPremul, type PremulImage } from "../pixels.js";
 import type { KernelContext } from "../types.js";
 import { unpremultiplyNeon } from "../qt/convert.js";
-import { fmaExact } from "./lens-flare.js";
+import { fma } from "../qt/fma.js";
 import { int, num } from "./params.js";
 import type { KernelSpec, Params } from "./types.js";
 
@@ -250,9 +250,9 @@ function bilinearByte(p00: number, p10: number, p01: number, p11: number, dxr: n
   const iy = 1 - dyr;
   const v = (p00 * ix + p10 * dxr) * iy + (p01 * ix + p11 * dxr) * dyr;
   if (!nearHalf(v)) return Math.trunc(v + 0.5);
-  const v0 = fmaExact(p00, ix, p10 * dxr);
-  const v1 = fmaExact(p01, ix, p11 * dxr);
-  return Math.trunc(fmaExact(v0, iy, v1 * dyr) + 0.5);
+  const v0 = fma(p00, ix, p10 * dxr);
+  const v1 = fma(p01, ix, p11 * dxr);
+  return Math.trunc(fma(v0, iy, v1 * dyr) + 0.5);
 }
 
 /** `cubic_interp` (:51-59), plain double math. */
@@ -265,10 +265,10 @@ function cubic(p0: number, p1: number, p2: number, p3: number, t: number): numbe
 
 /** `cubic_interp` as the arm64 build evaluates it (every `a*b + c` fused). */
 function cubicFused(p0: number, p1: number, p2: number, p3: number, t: number): number {
-  const a0 = fmaExact(p3, 0.5, fmaExact(p2, -1.5, fmaExact(p0, -0.5, p1 * 1.5)));
-  const a1 = fmaExact(p3, -0.5, fmaExact(p2, 2, fmaExact(p1, -2.5, p0)));
-  const a2 = fmaExact(p0, -0.5, p2 * 0.5);
-  return fmaExact(fmaExact(fmaExact(a0, t, a1), t, a2), t, p1);
+  const a0 = fma(p3, 0.5, fma(p2, -1.5, fma(p0, -0.5, p1 * 1.5)));
+  const a1 = fma(p3, -0.5, fma(p2, 2, fma(p1, -2.5, p0)));
+  const a2 = fma(p0, -0.5, p2 * 0.5);
+  return fma(fma(fma(a0, t, a1), t, a2), t, p1);
 }
 
 interface Plane {

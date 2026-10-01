@@ -23,6 +23,7 @@
 
 import { byteMul, qRound, type PremulImage } from "../pixels.js";
 import { CompositionMode, composerFor } from "../qt/compose.js";
+import { fma, fmaf } from "../qt/fma.js";
 import { fuzzyCompare, fuzzyIsNull } from "../qt/transform.js";
 import { color, num } from "./params.js";
 import type { KernelSpec, Params } from "./types.js";
@@ -32,77 +33,6 @@ const f32 = Math.fround;
 // ---------------------------------------------------------------------------
 // Float helpers shared by the light kernels
 // ---------------------------------------------------------------------------
-
-/**
- * C `fmaf(a, b, c)` for float operands: `a * b + c` rounded once to float,
- * what clang emits for a contracted float `a * b + c` on arm64. The product of
- * two floats is exact in double; the only hazard of `fround(a * b + c)` is a
- * double sum that lands exactly on a float midpoint, settled here by the sign
- * of the sum's rounding error. Checked against hardware `fmaf` on 400k cases.
- */
-export function fmaf(a: number, b: number, c: number): number {
-  const p = a * b;
-  const s = p + c;
-  const r = f32(s);
-  if (r === s || !Number.isFinite(s)) return r;
-  const other = 2 * s - r;
-  if (f32(other) !== other) return r;
-  const bb = s - p;
-  const err = p - (s - bb) + (c - bb);
-  if (err === 0) return r;
-  return err > 0 ? Math.max(r, other) : Math.min(r, other);
-}
-
-const F64 = new Float64Array(1);
-const U64 = new BigUint64Array(F64.buffer);
-
-/** A finite double as `m * 2^e` with an integer mantissa. */
-function decompose(x: number): [bigint, number] {
-  F64[0] = x;
-  const bits = U64[0]!;
-  const biased = Number((bits >> 52n) & 0x7ffn);
-  let m = bits & 0xfffffffffffffn;
-  let e = -1074;
-  if (biased !== 0) {
-    m |= 1n << 52n;
-    e = biased - 1075;
-  }
-  return [bits >> 63n ? -m : m, e];
-}
-
-/**
- * C `fma(a, b, c)` for doubles, correctly rounded (round half to even),
- * computed exactly with BigInt. Slow; used where a fused double product decides
- * a rounding (QColor HSV conversion, SphericalProjection samples next to a
- * rounding boundary). Results that would be subnormal or overflow fall back
- * to `a * b + c`. Checked against hardware `fma` on 400k cases.
- */
-export function fmaExact(a: number, b: number, c: number): number {
-  if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c) || a === 0 || b === 0) return a * b + c;
-  if (c === 0) return a * b;
-  const [am, ae] = decompose(a);
-  const [bm, be] = decompose(b);
-  const [cm, ce] = decompose(c);
-  const pe = ae + be;
-  const e = Math.min(pe, ce);
-  let m = ((am * bm) << BigInt(pe - e)) + (cm << BigInt(ce - e));
-  if (m === 0n) return 0;
-  const negative = m < 0n;
-  if (negative) m = -m;
-  let exp = e;
-  const length = m.toString(2).length;
-  if (length > 53) {
-    const shift = BigInt(length - 53);
-    const q = m >> shift;
-    const rem = m - (q << shift);
-    const half = 1n << (shift - 1n);
-    m = rem > half || (rem === half && (q & 1n) === 1n) ? q + 1n : q;
-    exp += length - 53;
-  }
-  if (exp < -1022 || exp > 960) return a * b + c;
-  const v = Number(m) * 2 ** exp;
-  return negative ? -v : v;
-}
 
 // ---------------------------------------------------------------------------
 // QColor (qtbase 5.15 src/gui/painting/qcolor.cpp), the parts LensFlare uses
@@ -167,12 +97,12 @@ function hsvToRgb(c: Hsv16): Rgb16 {
   const p = qRound(v * (1 - s) * USHRT_MAX);
   const vv = qRound(v * USHRT_MAX);
   if (i & 1) {
-    const q = qRound(v * fmaExact(-s, f, 1) * USHRT_MAX);
+    const q = qRound(v * fma(-s, f, 1) * USHRT_MAX);
     if (i === 1) return { a: c.a, r: q, g: vv, b: p };
     if (i === 3) return { a: c.a, r: p, g: q, b: vv };
     return { a: c.a, r: vv, g: p, b: q };
   }
-  const t = qRound(v * fmaExact(-s, 1 - f, 1) * USHRT_MAX);
+  const t = qRound(v * fma(-s, 1 - f, 1) * USHRT_MAX);
   if (i === 0) return { a: c.a, r: vv, g: t, b: p };
   if (i === 2) return { a: c.a, r: p, g: vv, b: t };
   return { a: c.a, r: t, g: p, b: vv };

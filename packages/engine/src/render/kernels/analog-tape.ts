@@ -15,77 +15,17 @@
  * Every float step follows the arm64 build (`scratchpad/disfn.sh
  * 10AnalogTape8GetFrame`, all OpenMP-outlined loops): `f32(a*b + c)` where
  * clang fused a multiply-add (the float product is exact in double), plain
- * rounding elsewhere, and exact double FMAs (`fmaDouble`) for the three fused
+ * rounding elsewhere, and exact double FMAs (`fma`) for the three fused
  * double expressions (burst probability, hum argument, wobble phase).
  */
 
 import type { PremulImage } from "../pixels.js";
+import { fma, fmaf } from "../qt/fma.js";
 import type { KernelContext } from "../types.js";
 import { int, num } from "./params.js";
 import type { KernelSpec, Params } from "./types.js";
 
 const f32 = Math.fround;
-
-/** A fused float multiply-add: the product of two floats is exact in double. */
-function fmaf(a: number, b: number, c: number): number {
-  return f32(a * b + c);
-}
-
-// ---------------------------------------------------------------------------
-// Exact double fused multiply-add (arm64 fmadd/fnmsub on doubles)
-// ---------------------------------------------------------------------------
-
-const F64 = new Float64Array(1);
-const U64 = new BigUint64Array(F64.buffer);
-
-/** x = m · 2^e with an integer mantissa m (finite, non-zero x). */
-function decompose(x: number): { m: bigint; e: number } {
-  F64[0] = x;
-  const bits = U64[0]!;
-  const exp = Number((bits >> 52n) & 0x7ffn);
-  let m = bits & 0xfffffffffffffn;
-  let e: number;
-  if (exp === 0) e = -1074;
-  else {
-    m |= 0x10000000000000n;
-    e = exp - 1075;
-  }
-  return { m: bits >> 63n ? -m : m, e };
-}
-
-/** The double nearest to m · 2^e (ties to even). */
-function roundToDouble(m: bigint, e: number): number {
-  const negative = m < 0n;
-  let mag = negative ? -m : m;
-  const bitLength = mag.toString(2).length;
-  if (bitLength > 53) {
-    const shift = bitLength - 53;
-    const big = BigInt(shift);
-    let q = mag >> big;
-    const rem = mag - (q << big);
-    const half = 1n << (big - 1n);
-    if (rem > half || (rem === half && (q & 1n) === 1n)) q += 1n;
-    mag = q;
-    e += shift;
-  }
-  // mag < 2^54 and 2^e is a power of two: both conversions are exact.
-  const value = Number(mag) * 2 ** e;
-  return negative ? -value : value;
-}
-
-/** `std::fma(a, b, c)` in double precision, rounded once. */
-export function fmaDouble(a: number, b: number, c: number): number {
-  if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c) || a === 0 || b === 0) return a * b + c;
-  if (c === 0) return a * b;
-  const pa = decompose(a);
-  const pb = decompose(b);
-  const pc = decompose(c);
-  const ep = pa.e + pb.e;
-  const e = Math.min(ep, pc.e);
-  const sum = ((pa.m * pb.m) << BigInt(ep - e)) + (pc.m << BigInt(pc.e - e));
-  if (sum === 0n) return 0;
-  return roundToDouble(sum, e);
-}
 
 // ---------------------------------------------------------------------------
 // Hashes (AnalogTape.h:44-78)
@@ -353,7 +293,7 @@ export const analogTape: KernelSpec = {
       const lambda = rate * 0.25 * (f32(rowDensity(SCHED_SEED, frame | 0, 0) * 1.5) + 0.25);
       const ex = Math.exp(-lambda);
       const probGe1 = 1 - ex;
-      const probGe2 = fmaDouble(-lambda, ex, probGe1);
+      const probGe2 = fma(-lambda, ex, probGe1);
       const spawn = (kseed: number): void => {
         const start = f32(hash01(SCHED_SEED, winIdx >>> 0, 11 + kseed, 0) * 0.25);
         const center = fmaf(hash01(SCHED_SEED, winIdx >>> 0, 12 + kseed, 0), f32(fh - Hburst), f32(Hburst * 0.5));
@@ -393,7 +333,7 @@ export const analogTape: KernelSpec = {
         if (burstF < pe) burstF = pe;
       }
       // fmsub: 1 - (1 - sat_band) * burstF, rounded once.
-      const satRow = f32(1 - f32(1 - satBand) * burstF);
+      const satRow = fmaf(-f32(1 - satBand), burstF, 1);
       if (burstF > 0 && satRow !== 1) {
         const o = y * Uw;
         for (let xh = 0; xh < Uw; xh += 1) {
@@ -404,7 +344,7 @@ export const analogTape: KernelSpec = {
       const rowBias = rowDensity(SEED, frame | 0, yRef);
       let p = f32(baseP * fmaf(rowBias, 1.5, 0.25));
       p = f32(fmaf(burstF, 2, fmaf(bandF, 1.5, 1)) * p);
-      const humArg = fmaDouble(t, f32(0.08), f32(f32(yRef) * sixOverRefH)) * TWO_PI_F;
+      const humArg = fma(t, f32(0.08), f32(f32(yRef) * sixOverRefH)) * TWO_PI_F;
       const hum = f32(Math.sin(humArg) * humScale);
       const yRefU = yRef >>> 0;
       const yMul = Math.imul(0x85eb, yRefU);
@@ -445,7 +385,7 @@ export const analogTape: KernelSpec = {
     const Hsk = fmaf(f32(fh * f32(0.1)), kTrack, 0);
     const S = f32(invSx * f32(5 * kTrack));
     const seedTerm = f32(f32(f32(SEED) * f32(0.001)) * f32(0.7));
-    const phase = f32(fmaDouble(t * fHz, TWO_PI_F, seedTerm));
+    const phase = f32(fma(t * fHz, TWO_PI_F, seedTerm));
     const hMinusHsk = f32(fh - Hsk);
     const maxHsk = Hsk > 1 ? Hsk : 1;
     const dx = new Float32Array(h);
