@@ -152,7 +152,7 @@ as JSON.
 ```bash
 zenvi render [output] [-f mp4|webm|mov|mkv|gif|mp3|wav|png] [--quality low|medium|high|lossless]
              [--width px] [--height px] [--fps 30|30000/1001] [--start t] [--end t]
-             [--video-bitrate 8M] [--audio-bitrate 192k] [--open]
+             [--video-bitrate 8M] [--audio-bitrate 192k] [--encoder-preset veryfast] [--open]
 zenvi frame <t> [output.png|.jpg] [--width 1280] [--jpeg] [--grid]
 ```
 
@@ -177,9 +177,12 @@ tools show models.
 
 `zenvi render` plans each frame with the engine (libopenshot 1.0
 semantics), decodes the clips that are visible with one ffmpeg process per
-clip (frame-accurate, at the size each clip is drawn), composites on the
-CPU, and streams the frames into one ffmpeg encoder that also mixes the
-audio.
+clip (frame-accurate, at the size each clip is drawn, read ahead), composites
+on the CPU, and streams the frames into one ffmpeg encoder that also mixes
+the audio. Renders of 60 frames or more composite on up to 4 worker threads
+(`ZENVI_RENDER_THREADS`, 0 = main thread only); frames with clip effects all
+go to one worker in order, so the pixels are identical either way. Frames
+with nothing on them are the background, composited once.
 
 - Range: the whole timeline (frames 1 … the end of the last clip, like the
   desktop's export dialog), or `--start`/`--end`.
@@ -194,9 +197,14 @@ audio.
   | `mp3`, `wav` | — | MP3 / PCM 16-bit | |
   | `png` | PNG frames `name_00001.png`… | — | keeps alpha |
 
-- Quality → H.264 CRF 28 / 23 / 18 (`low` / `medium` / `high`), VP9 CRF
-  40 / 32 / 24; `lossless` is x264 `-qp 0` with 4:4:4 chroma. A bitrate
-  flag replaces the CRF.
+- Quality → the desktop's preset ladders (the engine's `encoderRates`):
+  H.264 CRF 30 / 23 / 20 (`low` / `medium` / `high`, the default), VP9 CRF
+  for the same levels from its presets, AAC 96 / 128 / 160 kb/s;
+  `lossless` is x264 `-qp 0` with 4:4:4 chroma. A bitrate flag replaces
+  the CRF.
+- Speed: `--encoder-preset` (x264/x265 preset names, VP9 maps them to
+  `-cpu-used`). The default `veryfast` keeps renders quick; `medium` is what
+  the desktop app encodes with (smaller files, slower).
 - Colors are written as BT.709 (tagged), so players show what the preview
   showed.
 - The output is written to a temporary file next to the destination and
@@ -263,6 +271,7 @@ to `http://127.0.0.1:7434/mcp` with the token in `~/.openshot_qt/mcp_token`;
 | `ZENVI_MCP_COMMAND` | — | Command `mcp-config` writes instead of `node <bundle> mcp`. |
 | `ZENVI_DEBUG=1` | — | Stack traces and host logs on stderr. |
 | `ZENVI_RESOURCES_DIR`, `ZENVI_ASSETS_DIR` | next to the bundle | Where `resvg.wasm`, `fonts/` and engine assets are. |
+| `ZENVI_RENDER_THREADS` | up to 4 (cores − 1) for renders of 60+ frames | Compositor worker threads; `0` composites on the main thread. |
 
 Titles are rasterized with resvg. Fonts come from the system font folders;
 a title asking for a font that is not installed (the desktop's templates use

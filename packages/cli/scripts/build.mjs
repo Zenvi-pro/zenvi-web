@@ -26,7 +26,7 @@ const withPlugin = !process.argv.includes("--no-plugin");
 const pkg = JSON.parse(await readFile(path.join(cliRoot, "package.json"), "utf8"));
 const require = createRequire(import.meta.url);
 
-/** Engine asset folders the Node runtime reads (effect icons are UI-only). */
+/** Engine asset folders the Node runtime reads (effect icons ship for tools that list effects). */
 const ENGINE_ASSETS = ["transitions", "titles", "effects", "emojis", "colors"];
 
 async function exists(p) {
@@ -64,6 +64,24 @@ const result = await build({
       "import { createRequire as __zenviCreateRequire } from 'node:module';",
       "const require = __zenviCreateRequire(import.meta.url);",
     ].join("\n"),
+  },
+});
+
+// The compositor worker (render-node CompositePool) is its own file next to the bundle.
+await build({
+  entryPoints: [path.join(repoRoot, "packages", "render-node", "src", "render", "composite-worker.ts")],
+  outfile: path.join(dist, "composite-worker.mjs"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+  sourcemap: false,
+  minify: false,
+  legalComments: "eof",
+  logLevel: "warning",
+  define: { __ZENVI_BUNDLE__: "true", __ZENVI_VERSION__: JSON.stringify(pkg.version) },
+  banner: {
+    js: ["import { createRequire as __zenviCreateRequire } from 'node:module';", "const require = __zenviCreateRequire(import.meta.url);"].join("\n"),
   },
 });
 

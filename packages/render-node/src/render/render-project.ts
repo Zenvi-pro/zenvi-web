@@ -10,11 +10,12 @@
  */
 
 import { once } from "node:events";
+import { performance } from "node:perf_hooks";
 import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { frameContaining, maxFrame, type ExportOptions, type ExportResult, type Fraction, type Project } from "@zenvi/engine";
+import { frameContaining, maxFrame, type ExportResult, type FramePlan, type Fraction, type Project, type RgbaImage } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { binaryVersion } from "../ffmpeg/capabilities.js";
 import { AbortedError, spawnManaged } from "../ffmpeg/process.js";
@@ -22,7 +23,8 @@ import { SourceManager, type MediaResolver } from "../decode/sources.js";
 import type { ScaleQuality } from "../decode/video.js";
 import { streamStarts } from "../probe/starts.js";
 import { buildAudioGraph } from "./audio-graph.js";
-import { encoderCommand, ffmpegMajorVersion, FORMATS } from "./encoder.js";
+import { CompositePool, compositeThreads } from "./composite-pool.js";
+import { encoderCommand, ffmpegMajorVersion, FORMATS, type NodeExportOptions } from "./encoder.js";
 import { nodeTextRasterizer } from "../svg/text.js";
 import { defaultRenderEngine, projectNeedsText, type RenderEngine } from "./engine.js";
 
@@ -38,13 +40,33 @@ export interface RenderProjectOptions {
   resolveMedia: MediaResolver;
   /** Destination file (png-sequence: `name.png` → `name_00001.png`…, or a `%05d` pattern). */
   output: string;
-  options: ExportOptions;
+  /** Export options; `encoderPreset` sets the encoder speed (default veryfast). */
+  options: NodeExportOptions;
   onProgress?: (progress: RenderProgress) => void;
   signal?: AbortSignal;
   /** Planner + compositor; defaults to `@zenvi/engine/render`. */
   engine?: RenderEngine;
   /** Decode scaling quality. Default "export" (desktop HIGH_QUALITY_SCALING). */
   scaleQuality?: ScaleQuality;
+  /**
+   * Compositor worker threads (default: `compositeThreads`, from
+   * `ZENVI_RENDER_THREADS` or the core count; 0 composites on the main
+   * thread). Only the default engine composites on workers.
+   */
+  threads?: number;
+  log?: (message: string) => void;
+}
+
+/** Where a render spent its time (milliseconds on the main thread). */
+export interface RenderStats {
+  threads: number;
+  plan: number;
+  decode: number;
+  /** Compositing on the main thread, or waiting for the workers. */
+  composite: number;
+  /** Waiting for the encoder to take frames. */
+  encode: number;
+  total: number;
 }
 
 export interface RenderResult extends ExportResult {
@@ -53,6 +75,7 @@ export interface RenderResult extends ExportResult {
   durationSeconds: number;
   mimeType: string;
   warnings: string[];
+  stats: RenderStats;
 }
 
 export class RenderError extends Error {
@@ -132,7 +155,10 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
   const tempDirs: string[] = [];
   const sources = new SourceManager(project, { resolveMedia: opts.resolveMedia, quality: opts.scaleQuality ?? "export", signal });
   let encoder: ReturnType<typeof spawnManaged> | undefined;
+  let pool: CompositePool | undefined;
   let scriptWritten = false;
+  const started = performance.now();
+  const stats: RenderStats = { threads: 0, plan: 0, decode: 0, composite: 0, encode: 0, total: 0 };
   try {
     const effectsDir = withAudio ? await mkdtemp(path.join(tmpdir(), "zenvi-audio-fx-")) : undefined;
     tempDirs.push(...(effectsDir ? [effectsDir] : []));
@@ -171,27 +197,77 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
     if (info.video) {
       const stdin = encoder.child.stdin!;
       const state = engine.createState();
-      const text = projectNeedsText(project) ? await nodeTextRasterizer() : undefined;
-      for (let i = 0; i < frames; i += 1) {
-        if (signal?.aborted) throw new AbortedError();
-        const plan = engine.planFrame(project, first + i, { width, height }, { preview: false });
-        const prepared = await sources.prepare(plan);
-        const image = engine.compositeFrame(plan, { ...prepared, text, state });
+      const needsText = projectNeedsText(project);
+      const text = needsText ? await nodeTextRasterizer() : undefined;
+      const threads = opts.engine ? 0 : (opts.threads ?? compositeThreads(frames));
+      pool = await CompositePool.start(threads, opts.log);
+      stats.threads = pool?.size ?? 0;
+      // Frames composited ahead of the encoder (each holds one canvas).
+      const ahead = pool ? pool.size * 2 + 1 : 0;
+      const queue: Promise<RgbaImage>[] = [];
+      // A frame with nothing on it is the background: composite it once per color.
+      const backgrounds = new Map<string, RgbaImage>();
+      const background = (plan: FramePlan): RgbaImage => {
+        const key = plan.background.join(",");
+        let image = backgrounds.get(key);
+        if (!image) {
+          image = engine.compositeFrame(plan, { layers: [], state });
+          backgrounds.set(key, image);
+        }
+        return image;
+      };
+      let written = 0;
+      let encoderGone = false;
+      const write = async (image: RgbaImage): Promise<void> => {
         if (image.width !== width || image.height !== height) {
           throw new RenderError(`Compositor returned ${image.width}x${image.height}, expected ${width}x${height}.`);
         }
         const bytes = Buffer.from(image.data.buffer, image.data.byteOffset, image.data.byteLength);
         if (!stdin.write(bytes)) {
           // EPIPE means ffmpeg exited: stop writing and report its exit status below.
+          const t = performance.now();
           const drained = once(stdin, "drain").then(
             () => "drain" as const,
             () => "exited" as const,
           );
           const winner = await Promise.race([drained, exitedEarly]);
-          if (winner === "exited") break;
+          stats.encode += performance.now() - t;
+          if (winner === "exited") encoderGone = true;
         }
-        opts.onProgress?.({ fraction: (i + 1) / frames, frame: i + 1, frames });
+        written += 1;
+        opts.onProgress?.({ fraction: written / frames, frame: written, frames });
+      };
+      const next = async (): Promise<RgbaImage> => {
+        const t = performance.now();
+        const image = await queue.shift()!;
+        stats.composite += performance.now() - t;
+        return image;
+      };
+      for (let i = 0; i < frames && !encoderGone; i += 1) {
+        if (signal?.aborted) throw new AbortedError();
+        let t = performance.now();
+        const plan = engine.planFrame(project, first + i, { width, height }, { preview: false });
+        stats.plan += performance.now() - t;
+        if (plan.layers.length === 0) {
+          queue.push(Promise.resolve(background(plan)));
+        } else {
+          t = performance.now();
+          const prepared = await sources.prepare(plan);
+          stats.decode += performance.now() - t;
+          if (pool) {
+            const composited = pool.composite(plan, prepared, needsText);
+            // Awaited in order below; never an unhandled rejection meanwhile.
+            composited.catch(() => undefined);
+            queue.push(composited);
+          } else {
+            t = performance.now();
+            queue.push(Promise.resolve(engine.compositeFrame(plan, { ...prepared, text, state })));
+            stats.composite += performance.now() - t;
+          }
+        }
+        while (queue.length > ahead && !encoderGone) await write(await next());
       }
+      while (queue.length > 0 && !encoderGone) await write(await next());
       if (!stdin.destroyed) stdin.end();
     }
     const code = await encoder.exited;
@@ -219,11 +295,13 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
       mimeType: info.mimeType,
       frames: info.video ? frames : 0,
       warnings,
+      stats: { ...stats, total: performance.now() - started },
     };
   } catch (error) {
     await encoder?.kill(200);
     throw error;
   } finally {
+    await pool?.close();
     await sources.close();
     for (const d of tempDirs) await rm(d, { recursive: true, force: true });
     if (scriptWritten) await rm(scriptPath, { force: true });

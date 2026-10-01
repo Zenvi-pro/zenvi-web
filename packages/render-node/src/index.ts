@@ -17,6 +17,7 @@ export * from "./render/audio-graph.js";
 export * from "./render/encoder.js";
 export * from "./render/engine.js";
 export * from "./render/render-project.js";
+export { CompositePool, compositeThreads, compositeWorkerScript } from "./render/composite-pool.js";
 export * from "./render/overlay.js";
 export * from "./render/render-frame.js";
 export * from "./audio/analyze.js";

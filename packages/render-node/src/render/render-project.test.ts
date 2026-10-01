@@ -322,6 +322,13 @@ describe("encoder rate control (the desktop preset ladders, engine encoderRates)
     expect(bitrate).not.toContain("-crf");
   });
 
+  it("encodes at veryfast by default; --encoder-preset medium is the desktop's x264 speed", () => {
+    expect(after(job({ format: "mp4" }), "-preset")).toBe("veryfast");
+    expect(after(job({ format: "mp4", encoderPreset: "medium" }), "-preset")).toBe("medium");
+    expect(after(job({ format: "webm" }), "-cpu-used")).toBe("5");
+    expect(after(job({ format: "webm", encoderPreset: "medium" }), "-cpu-used")).toBe("2");
+  });
+
   it("takes audio bitrates from the same ladder", () => {
     expect(after(job({ format: "mp4", quality: "low" }), "-b:a")).toBe("96000");
     expect(after(job({ format: "mp4", quality: "medium" }), "-b:a")).toBe("128000");

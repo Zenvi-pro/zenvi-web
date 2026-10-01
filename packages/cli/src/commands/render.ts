@@ -4,7 +4,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
 import { timelineEnd, type ContainerFormat, type ExportOptions, type Fraction, type Project } from "@zenvi/engine";
-import { FORMATS, formatFromPath, frameCaption, type RenderResult } from "@zenvi/render-node";
+import { ENCODER_PRESETS, FORMATS, formatFromPath, frameCaption, isEncoderPreset, type NodeExportOptions, type RenderResult } from "@zenvi/render-node";
 import { PortableExecutor } from "../engine/executor.js";
 import { CliError } from "../output.js";
 import { openUrl } from "../util/open-url.js";
@@ -36,11 +36,12 @@ export interface RenderFlags {
   end?: string;
   videoBitrate?: string;
   audioBitrate?: string;
+  encoderPreset?: string;
   open?: boolean;
 }
 
 /** Export options from flags + project defaults. */
-export function exportOptionsFrom(project: Project, output: string | undefined, flags: RenderFlags): ExportOptions {
+export function exportOptionsFrom(project: Project, output: string | undefined, flags: RenderFlags): NodeExportOptions {
   const fromPath = output ? formatFromPath(output) : undefined;
   const format = (flags.format === "png" ? "png-sequence" : flags.format) as ContainerFormat | undefined;
   const chosen = format ?? fromPath ?? "mp4";
@@ -54,7 +55,7 @@ export function exportOptionsFrom(project: Project, output: string | undefined, 
   if (!(width > 0 && height > 0)) throw new CliError("--width/--height must be positive numbers.", 2);
   const start = parseTime(flags.start);
   const end = parseTime(flags.end);
-  const options: ExportOptions = {
+  const options: NodeExportOptions = {
     format: chosen,
     width,
     height,
@@ -67,6 +68,10 @@ export function exportOptionsFrom(project: Project, output: string | undefined, 
   }
   if (flags.videoBitrate) options.videoBitrate = parseBitrate(flags.videoBitrate);
   if (flags.audioBitrate) options.audioBitrate = parseBitrate(flags.audioBitrate);
+  if (flags.encoderPreset !== undefined) {
+    if (!isEncoderPreset(flags.encoderPreset)) throw new CliError(`--encoder-preset must be one of ${ENCODER_PRESETS.join(", ")}.`, 2);
+    options.encoderPreset = flags.encoderPreset;
+  }
   if (output) options.output = output;
   return options;
 }
@@ -99,6 +104,7 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
     .option("--end <time>", "render up to this timeline time")
     .option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)")
     .option("--audio-bitrate <rate>", "e.g. 192k")
+    .option("--encoder-preset <preset>", "encoder speed: ultrafast … veryslow (default veryfast; the desktop app encodes at medium)")
     .option("--open", "open the result when done")
     .action(async (outputArg: string | undefined, flags: RenderFlags) => {
       await withExecutor(ctx, async (executor) => {

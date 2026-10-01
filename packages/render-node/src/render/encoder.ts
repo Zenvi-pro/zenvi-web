@@ -40,12 +40,25 @@ export function formatFromPath(file: string): ContainerFormat | undefined {
 }
 
 /**
- * Encoder speed per quality level. Rate control (crf / bitrate / lossless)
- * comes from the desktop preset ladders through the engine's `encoderRates`,
- * so a quality level encodes the same as the desktop and the browser.
+ * Encoder speed: an x264/x265 `-preset` name (VP9 maps it to `-cpu-used`).
+ * Rate control (crf / bitrate / lossless) comes from the desktop preset
+ * ladders through the engine's `encoderRates`, so a quality level encodes
+ * the same as the desktop and the browser whatever the speed. The default
+ * favours speed; "medium" is what the desktop's libopenshot uses (x264's own
+ * default, FFmpegWriter.cpp sets no preset for crf > 0).
  */
-const X264_PRESET: Record<Quality, string> = { low: "veryfast", medium: "medium", high: "medium", lossless: "veryfast" };
-const VP9_CPU: Record<Quality, number> = { low: 5, medium: 4, high: 2, lossless: 4 };
+export const ENCODER_PRESETS = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"] as const;
+export type EncoderPreset = (typeof ENCODER_PRESETS)[number];
+export const DEFAULT_ENCODER_PRESET: EncoderPreset = "veryfast";
+const VP9_CPU: Record<EncoderPreset, number> = { ultrafast: 8, superfast: 6, veryfast: 5, faster: 4, fast: 3, medium: 2, slow: 1, slower: 1, veryslow: 0 };
+
+/** `ExportOptions` plus the Node exporter's encoder speed. */
+export type NodeExportOptions = ExportOptions & { encoderPreset?: EncoderPreset };
+
+export function isEncoderPreset(value: unknown): value is EncoderPreset {
+  return typeof value === "string" && (ENCODER_PRESETS as readonly string[]).includes(value);
+}
+
 /** Used only when the engine has no ladder for the codec (wav has no bitrate). */
 const FALLBACK_AUDIO_BITRATE = 192_000;
 /** libopus accepts at most 510 kb/s for stereo. */
@@ -57,7 +70,7 @@ export interface EncodeJob {
   output: string;
   video?: { width: number; height: number; fps: Fraction };
   audio?: { graph: AudioGraph; sampleRate: number; channels: number };
-  options: ExportOptions;
+  options: NodeExportOptions;
   /** ffmpeg major version (filter script syntax changed in 7.0). */
   ffmpegMajor: number;
   /** Where to put a large filter graph script. */
@@ -105,6 +118,7 @@ export function videoRateArgs(rate: VideoRate | null, codec: string): string[] {
 
 function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
   const quality = job.options.quality ?? "high";
+  const preset = isEncoderPreset(job.options.encoderPreset) ? job.options.encoderPreset : DEFAULT_ENCODER_PRESET;
   const rate = encoderRates(rateOptions(job)).video;
   switch (job.format) {
     case "gif":
@@ -118,7 +132,7 @@ function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
       const codec = job.options.videoCodec ?? "libvpx-vp9";
       return {
         chain: `[0:v]${PAD_EVEN},${TO_YUV("yuv420p")}[vout]`,
-        codecArgs: ["-c:v", codec, ...videoRateArgs(rate, codec), "-deadline", "good", "-cpu-used", String(VP9_CPU[quality]), "-row-mt", "1", ...COLOR_TAGS],
+        codecArgs: ["-c:v", codec, ...videoRateArgs(rate, codec), "-deadline", "good", "-cpu-used", String(VP9_CPU[preset]), "-row-mt", "1", ...COLOR_TAGS],
       };
     }
     default: {
@@ -131,7 +145,7 @@ function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
         };
       }
       const lossless = rate?.mode === "lossless";
-      const speed = codec === "libx264" || codec === "libx265" ? ["-preset", X264_PRESET[lossless ? "lossless" : quality]] : [];
+      const speed = codec === "libx264" || codec === "libx265" ? ["-preset", preset] : [];
       return {
         chain: `[0:v]${PAD_EVEN},${TO_YUV(lossless ? "yuv444p" : "yuv420p")}[vout]`,
         codecArgs: ["-c:v", codec, ...speed, ...videoRateArgs(rate, codec), ...COLOR_TAGS],

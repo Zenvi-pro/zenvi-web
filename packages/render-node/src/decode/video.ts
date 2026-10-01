@@ -102,6 +102,7 @@ export class VideoFrameStream {
   private error: Error | undefined;
   /** Index of the frame the next `read()` returns. */
   position: number;
+  private readonly prefetch: number;
 
   constructor(
     readonly source: VideoSourceInfo,
@@ -111,7 +112,9 @@ export class VideoFrameStream {
   ) {
     this.position = startFrame;
     this.frameBytes = size.width * size.height * 4;
-    const prefetch = options.prefetch ?? 3;
+    // Read ahead up to ~32 MB (3..16 frames) so ffmpeg keeps decoding while frames composite.
+    this.prefetch = options.prefetch ?? Math.max(3, Math.min(16, Math.floor((32 * 1024 * 1024) / Math.max(1, this.frameBytes))));
+    const prefetch = this.prefetch;
     this.managed = spawnManaged(resolveBinary("ffmpeg"), videoDecodeArgs(source, startFrame, size, options.quality), {
       signal: options.signal,
     });
@@ -156,7 +159,7 @@ export class VideoFrameStream {
       this.managed.child.stdout?.resume();
       frame = await new Promise<Uint8Array | undefined>((resolve) => this.waiters.push(resolve));
     }
-    if (this.queue.length < 2) this.managed.child.stdout?.resume();
+    if (this.queue.length < this.prefetch) this.managed.child.stdout?.resume();
     if (!frame) {
       if (this.error) throw this.error;
       return undefined;

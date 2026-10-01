@@ -4,7 +4,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import {
@@ -260,6 +260,45 @@ describe("pixels match the desktop's libopenshot Timeline", () => {
     }
     const ours = await renderFrameImage(down, 9 / 30, { resolveMedia, width: 320 });
     expect(maxChannelDifference(ours.data, referenceDown.get(10)!.data), "downscaled frame 10").toBe(0);
+  }, 120_000);
+});
+
+describe("compositing on worker threads", () => {
+  it("writes the same pixels as the main thread, stateful effects included (ordered lane)", async () => {
+    const a = await makeVideo(dir, "pool-a.mp4", { width: 160, height: 90, duration: 1 });
+    const b = await makeVideo(dir, "pool-b.mp4", { width: 320, height: 180, duration: 1, source: "smptebars=size=320x180:rate=30:duration=1" });
+    const { project: base, clipIds } = await sizedProject(320, 180, [
+      { file: a, position: 0 },
+      { file: b, position: 1 },
+      { file: still, position: 0 },
+    ]);
+    const doc = new ProjectDocument(base);
+    doc.transaction("edit", (tx) => {
+      // DenoiseImage keeps the previous frame (temporal): frames must reach it in order.
+      addEffect(tx, clipIds[0]!, "DenoiseImage");
+      applyTransitionBetween(tx, clipIds[0]!, clipIds[1]!, "fade", 0.5);
+      setClipProperty(tx, clipIds[2]!, "alpha", 0.5);
+      setClipProperty(tx, clipIds[2]!, "end", 1.5);
+    });
+    const resolveMedia = createMediaResolver({ projectFile: path.join(dir, "pool.zvn"), engineAssetsDir: engineAssetsDir() });
+    const render = async (threads: number) => {
+      const out = path.join(dir, `pool-${threads}`, "f.png");
+      const result = await renderProject(doc.project, {
+        resolveMedia,
+        output: out,
+        threads,
+        options: { format: "png-sequence", width: 320, height: 180, fps: { num: 30, den: 1 } },
+      });
+      expect(result.stats.threads).toBe(threads);
+      const names = (await readdir(path.dirname(out))).sort();
+      return Promise.all(names.map((n) => readFile(path.join(path.dirname(out), n))));
+    };
+    const single = await render(0);
+    const pooled = await render(3);
+    expect(single.length).toBe(45);
+    expect(pooled.length).toBe(single.length);
+    pooled.forEach((png, i) => expect(png.equals(single[i]!), `frame ${i + 1}`).toBe(true));
+    expect(liveChildCount()).toBe(0);
   }, 120_000);
 });
 
