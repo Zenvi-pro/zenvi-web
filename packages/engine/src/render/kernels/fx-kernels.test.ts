@@ -7,11 +7,12 @@
 
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { premultiply, type PremulImage } from "../pixels.js";
+import { createPremul, fillPremul, premultiply, type PremulImage } from "../pixels.js";
 import { evaluateEffectParams } from "../plan/effect-params.js";
 import { diffBytes, fromBase64 } from "../testing/images.js";
-import type { KernelContext, RgbaImage } from "../types.js";
+import type { KernelAudio, KernelContext, RgbaImage } from "../types.js";
 import { analogTape } from "./analog-tape.js";
+import { beatSync } from "./beat-sync.js";
 import goldens from "./fx-goldens.json";
 
 interface TapeCase {
@@ -26,11 +27,29 @@ interface TapeCase {
   out: string;
 }
 
+interface BeatStep {
+  frame: number;
+  /** [offset, count, channels] into the decoded audio, or null for a frame without audio. */
+  audio: [number, number, number] | null;
+  width: number;
+  height: number;
+  color: [number, number, number, number];
+}
+
+interface BeatCase {
+  name: string;
+  input: string;
+  timeline: [number, number] | null;
+  json: Record<string, unknown>;
+  steps: BeatStep[];
+}
+
 interface Doc {
   images: Record<string, { width: number; height: number; data: string }>;
   audio: { sampleRate: number; length: number; segments: Record<string, number>; data: string };
   base: Record<string, Record<string, unknown>>;
   analogTape: TapeCase[];
+  beatSync: BeatCase[];
 }
 
 const doc = goldens as unknown as Doc;
@@ -39,7 +58,29 @@ function inflate(b64: string): Uint8Array {
   return new Uint8Array(inflateSync(fromBase64(b64)));
 }
 
+/** The decoded test WAV as planar floats (exactly s16 / 32768, as FFmpegReader decodes it). */
+const PCM: Float32Array[] = (() => {
+  const bytes = inflate(doc.audio.data);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const n = doc.audio.length;
+  const planes = [new Float32Array(n), new Float32Array(n)];
+  for (let c = 0; c < 2; c += 1) for (let i = 0; i < n; i += 1) planes[c]![i] = view.getInt16((c * n + i) * 2, true) / 32768;
+  return planes;
+})();
+
+function audioSlice(spec: [number, number, number] | null): KernelAudio | undefined {
+  if (!spec) return undefined;
+  const [offset, count, channels] = spec;
+  return { sampleRate: doc.audio.sampleRate, channels: PCM.slice(0, channels).map((p) => p.slice(offset, offset + count)) };
+}
+
 function input(name: string): PremulImage {
+  if (name === "pixel") {
+    // openshot::Frame(1, 1, 1, "#000000"): one opaque black pixel.
+    const px = createPremul(1, 1);
+    fillPremul(px, 0, 0, 0, 255);
+    return px;
+  }
   const img = doc.images[name]!;
   const straight: RgbaImage = { width: img.width, height: img.height, data: new Uint8ClampedArray(fromBase64(img.data)) };
   return premultiply(straight);
@@ -69,4 +110,40 @@ describe("AnalogTape matches libopenshot 1.0", () => {
       expect(diff.maxDiff, `${diff.differing} bytes differ`).toBe(0);
     });
   }
+});
+
+describe("BeatSync matches libopenshot 1.0 (stateful sequences)", () => {
+  for (const c of doc.beatSync) {
+    it(c.name, () => {
+      const state = new Map<string, unknown>();
+      for (const step of c.steps) {
+        const image = input(c.input);
+        const ctx = baseContext(step.frame, image.width, image.height, c.json.id);
+        if (c.timeline) {
+          ctx.timelineWidth = c.timeline[0];
+          ctx.timelineHeight = c.timeline[1];
+        }
+        ctx.audio = audioSlice(step.audio);
+        ctx.state = state;
+        const out = beatSync.run(image, params("BeatSync", c.json, step.frame), ctx) ?? image;
+        expect([out.width, out.height], `frame ${step.frame} size`).toEqual([step.width, step.height]);
+        const expected = new Uint8Array(out.data.length);
+        for (let i = 0; i < expected.length; i += 4) expected.set(step.color, i);
+        const diff = diffBytes(expected, out.data);
+        expect(diff.maxDiff, `frame ${step.frame}: got ${Array.from(out.data.subarray(0, 4)).join(",")} want ${step.color.join(",")}`).toBe(0);
+      }
+    });
+  }
+
+  it("starts every frame from a fresh envelope without ctx.state", () => {
+    const c = doc.beatSync[0]!;
+    const step = c.steps[0]!;
+    const image = input(c.input);
+    const ctx = baseContext(step.frame, image.width, image.height, c.json.id);
+    ctx.audio = audioSlice(step.audio);
+    const a = beatSync.run(image, params("BeatSync", c.json, step.frame), ctx) as PremulImage;
+    const b = beatSync.run(image, params("BeatSync", c.json, step.frame), ctx) as PremulImage;
+    expect(Array.from(a.data.subarray(0, 4))).toEqual(step.color);
+    expect(Array.from(b.data.subarray(0, 4))).toEqual(step.color);
+  });
 });

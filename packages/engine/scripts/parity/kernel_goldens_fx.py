@@ -320,6 +320,74 @@ def analog_tape_cases(inputs, base):
     return cases
 
 
+# ---------------------------------------------------------------------------
+# BeatSync (stateful: each sequence reuses one effect instance)
+# ---------------------------------------------------------------------------
+
+
+def curve(nodes, enabled=1):
+    out = []
+    for i, (x, y, interpolation) in enumerate(nodes):
+        out.append({"id": i, "x": kf(x), "y": kf(y), "interpolation": interpolation,
+                    "left_handle_x": kf(0.3), "left_handle_y": kf(0.9),
+                    "right_handle_x": kf(0.6), "right_handle_y": kf(0.2), "handle_type": 0})
+    return {"enabled": kf(enabled), "nodes": out}
+
+
+def beats(frames, size, channels=2, start_frame=1):
+    """Steps over consecutive `size`-sample slices of the beeps segment."""
+    return [(start_frame + i, ("beeps", i * size, size, channels)) for i in range(frames)]
+
+
+# (name, image, timeline size or None, params, [(frame, (segment, offset, count, channels) | None)])
+BEAT_CASES = [
+    ("defaults-with-seek", "tiny", None, {},
+     beats(10, 800) + [(20, ("beeps", 8000, 800, 2)), (21, ("beeps", 8800, 800, 2)), (22, ("beeps", 9600, 800, 2))]),
+    ("band-invert-curve", "tiny", None, {
+        "low_color": color(10, 20, 200, 255), "high_color": color(255, 120, 0, 180), "intensity": kf(4),
+        "threshold": kf(0.3), "attack_ms": kf(30), "decay_ms": kf(80), "frequency_low": kf(0.2),
+        "frequency_high": kf(0.5), "invert": True, "response_curve": curve([(0, 0, 1), (0.35, 0.1, 0), (1, 1, 1)])},
+     beats(12, 800)),
+    ("tones-mono-1600", "tiny", None, {"threshold": kf(0), "decay_ms": kf(40)},
+     [(n, ("tones", (n - 1) * 400, 1600, 1)) for n in range(1, 5)] + [(5, ("quiet", 0, 1600, 1)), (6, ("noise", 0, 1600, 1))]),
+    ("no-audio-pixel-fallback", "pixel", (32, 18), {"color": color(40, 220, 90, 255), "decay_ms": kf(60)},
+     [(1, ("tones", 0, 800, 2)), (2, None), (3, None), (4, ("loud", 0, 800, 2)), (5, ("beeps", 0, 800, 2))]),
+    ("keyframed-step-back", "tiny", None, {
+        "intensity": kf_ramp(1, 0.5, 10, 8), "attack_ms": kf(1), "decay_ms": kf(5000),
+        "low_color": color(0, 0, 0, 0), "high_color": color(255, 255, 255, 128),
+        "response_curve": curve([(0, 0, 1), (1, 1, 1)], enabled=0)},
+     [(5, ("beeps", 0, 800, 2)), (6, ("beeps", 800, 800, 2)), (5, ("beeps", 1600, 800, 2)), (6, ("beeps", 2400, 800, 2)),
+      (7, ("noise", 0, 800, 2))]),
+]
+
+
+def beat_sync_cases(inputs, audio, base):
+    cases = []
+    for name, image, size, params, steps in BEAT_CASES:
+        effect = make_effect("BeatSync", params, f"beat-{name}")
+        tl = timeline(size, (30, 1))
+        if tl is not None:
+            effect.ParentTimeline(tl)
+        out_steps = []
+        for number, slice_ in steps:
+            frame = inputs.frame(image)
+            if slice_ is not None:
+                segment, offset, count, channels = slice_
+                audio.fill(frame, audio.at(segment, offset), count, channels)
+            w, h, pixels = run(effect, frame, number)
+            first = pixels[:4]
+            if pixels != first * (w * h):
+                raise RuntimeError(f"BeatSync {name}: output is not a solid fill")
+            out_steps.append({
+                "frame": number,
+                "audio": [audio.at(slice_[0], slice_[1]), slice_[2], slice_[3]] if slice_ else None,
+                "width": w, "height": h, "color": list(first),
+            })
+        cases.append({"name": name, "input": image, "timeline": list(size) if size else None,
+                      "json": json_overrides(effect, base), "steps": out_steps})
+    return cases
+
+
 def main():
     work = tempfile.mkdtemp(prefix="zenvi-fx-goldens-")
     try:
@@ -333,6 +401,7 @@ def main():
             "audio": audio.encode(),
             "base": base,
             "analogTape": analog_tape_cases(inputs, base["AnalogTape"]),
+            "beatSync": beat_sync_cases(inputs, audio, base["BeatSync"]),
         }
     finally:
         shutil.rmtree(work, ignore_errors=True)
