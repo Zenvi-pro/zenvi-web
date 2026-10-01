@@ -665,7 +665,7 @@ export function rasterizePolygonsAliased(subpaths: readonly (readonly number[])[
 }
 
 // ---------------------------------------------------------------------------
-// Antialiased polygon coverage (stand-in for qgrayraster.c)
+// Coverage masks (antialiased fills come from ./gray-raster.ts)
 // ---------------------------------------------------------------------------
 
 /** Coverage of a device region: values 0..255 over the rectangle (x, y, width, height). */
@@ -678,123 +678,9 @@ export interface CoverageMask {
 }
 
 /**
- * Exact-area coverage of closed polygons (nonzero rule; the shapes libopenshot
- * fills are simple, where nonzero and odd-even agree). Coordinates are first
- * truncated to 1/64 px like Qt's outline mapper; coverage is
- * min(255, floor(area·256)) like qgrayraster's `gray_hline`.
+ * Emit a coverage mask as spans in raster order: maximal runs of equal
+ * non-zero coverage, which is what the gray raster's `gray_hline` emits.
  */
-export function rasterizePolygonsAA(subpaths: readonly (readonly number[])[], clip: ClipBox): CoverageMask | null {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const pts of subpaths) {
-    for (let i = 0; i + 1 < pts.length; i += 2) {
-      minX = Math.min(minX, pts[i]!);
-      maxX = Math.max(maxX, pts[i]!);
-      minY = Math.min(minY, pts[i + 1]!);
-      maxY = Math.max(maxY, pts[i + 1]!);
-    }
-  }
-  if (!Number.isFinite(minX)) return null;
-  const x0 = Math.max(clip.left, Math.floor(minX));
-  const y0 = Math.max(clip.top, Math.floor(minY));
-  const x1 = Math.min(clip.right + 1, Math.ceil(maxX) + 1);
-  const y1 = Math.min(clip.bottom + 1, Math.ceil(maxY) + 1);
-  if (x1 <= x0 || y1 <= y0) return null;
-  const w = x1 - x0;
-  const h = y1 - y0;
-  // Signed-area accumulation (font-rs style): acc holds per-cell area deltas.
-  const acc = new Float64Array(w * h + 1);
-  const addLine = (px0: number, py0: number, px1: number, py1: number): void => {
-    if (py0 === py1) return;
-    let dir = 1;
-    if (py0 > py1) {
-      [px0, px1] = [px1, px0];
-      [py0, py1] = [py1, py0];
-      dir = -1;
-    }
-    const dxdy = (px1 - px0) / (py1 - py0);
-    let x = px0;
-    const yStart = Math.max(Math.floor(py0), y0);
-    const yEnd = Math.min(Math.ceil(py1), y1);
-    if (py0 < y0) x += (y0 - py0) * dxdy;
-    for (let yi = yStart; yi < yEnd; yi += 1) {
-      const rowTop = Math.max(yi, py0);
-      const rowBottom = Math.min(yi + 1, py1);
-      const dy = rowBottom - rowTop;
-      if (dy <= 0) continue;
-      const xNext = x + dxdy * dy;
-      const d = dy * dir;
-      const rowBase = (yi - y0) * w;
-      const xa = Math.min(x, xNext) - x0;
-      const xb = Math.max(x, xNext) - x0;
-      if (xb <= 0) {
-        acc[rowBase] = acc[rowBase]! + d;
-      } else if (xa >= w) {
-        // Entirely right of the mask: contributes nothing inside.
-      } else {
-        const ixa = Math.floor(xa);
-        const ixb = Math.floor(xb);
-        if (ixa === ixb || xb - xa < 1e-12) {
-          const xm = (xa + xb) * 0.5 - ixa;
-          const cell = Math.max(0, ixa);
-          if (ixa < 0) acc[rowBase] = acc[rowBase]! + d;
-          else {
-            acc[rowBase + cell] = acc[rowBase + cell]! + d * (1 - xm);
-            if (cell + 1 < w) acc[rowBase + cell + 1] = acc[rowBase + cell + 1]! + d * xm;
-          }
-        } else {
-          // Split the crossing across cells by x; the part left of the mask
-          // lands in column 0 in one piece.
-          const inv = 1 / (xb - xa);
-          let xl = xa;
-          let firstCell = ixa;
-          if (xa < 0) {
-            acc[rowBase] = acc[rowBase]! + d * (Math.min(xb, 0) - xa) * inv;
-            xl = 0;
-            firstCell = 0;
-          }
-          for (let cx = firstCell; cx <= ixb && cx < w; cx += 1) {
-            const xr = Math.min(cx + 1, xb);
-            if (xr <= xl) continue;
-            const part = d * (xr - xl) * inv;
-            const xm = (xl + xr) * 0.5 - cx;
-            if (cx < 0) acc[rowBase] = acc[rowBase]! + part;
-            else {
-              acc[rowBase + cx] = acc[rowBase + cx]! + part * (1 - xm);
-              if (cx + 1 < w) acc[rowBase + cx + 1] = acc[rowBase + cx + 1]! + part * xm;
-            }
-            xl = xr;
-          }
-        }
-      }
-      x = xNext;
-    }
-  };
-  for (const pts of subpaths) {
-    const n = pts.length >> 1;
-    if (n < 2) continue;
-    const q = (v: number): number => Math.trunc(v * 64) / 64;
-    for (let i = 0; i < n; i += 1) {
-      const j = (i + 1) % n;
-      addLine(q(pts[i * 2]!), q(pts[i * 2 + 1]!), q(pts[j * 2]!), q(pts[j * 2 + 1]!));
-    }
-  }
-  const data = new Uint8Array(w * h);
-  for (let row = 0; row < h; row += 1) {
-    let sum = 0;
-    const base = row * w;
-    for (let col = 0; col < w; col += 1) {
-      sum += acc[base + col]!;
-      const a = Math.min(1, Math.abs(sum));
-      data[base + col] = Math.min(255, Math.floor(a * 256 + 1e-9));
-    }
-  }
-  return { x: x0, y: y0, width: w, height: h, data };
-}
-
-/** Emit a coverage mask as spans (one per run of equal coverage). */
 export function maskSpans(mask: CoverageMask, sink: SpanSink): void {
   for (let row = 0; row < mask.height; row += 1) {
     const base = row * mask.width;

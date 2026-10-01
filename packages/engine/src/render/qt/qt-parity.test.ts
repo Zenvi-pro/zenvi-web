@@ -3,7 +3,7 @@ import { createPremul, type PremulImage } from "../pixels.js";
 import { diffBytes, fromBase64, gradientImage, noiseImage } from "../testing/images.js";
 import { drawImageRect, fastScaled } from "./blit.js";
 import { composerFor } from "./compose.js";
-import { drawImage } from "./draw-image.js";
+import { drawImage, roundedRectClip } from "./draw-image.js";
 import { GOLDEN_CASES, type GoldenCase } from "./qt-golden-cases.js";
 import goldens from "./qt-goldens.json";
 import { smoothScale } from "./smooth-scale.js";
@@ -43,7 +43,9 @@ function render(c: GoldenCase): PremulImage {
       }
       if (!isNear(f(c.sw), 1) || !isNear(f(c.sh), 1)) t.scale(f(c.sw), f(c.sh));
       const canvas = createPremul(c.cw, c.ch);
-      drawImage(canvas, img, { transform: t, smooth: !t.isIdentity(), antialias: false, opacity: f(c.alpha), mode: 0, clip: null });
+      const corner = Math.max(0, Math.min(0.5, c.corner));
+      const clip = corner > 0 ? roundedRectClip(img.width, img.height, corner * Math.min(img.width, img.height), t, c.cw, c.ch) : null;
+      drawImage(canvas, img, { transform: t, smooth: !t.isIdentity(), antialias: corner > 0, opacity: f(c.alpha), mode: 0, clip });
       return canvas;
     }
     case "compose": {

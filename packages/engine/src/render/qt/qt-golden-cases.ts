@@ -75,5 +75,16 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
   clip("shear", 16, 12, 32, 24, 7, 5, 0, 0.35, 0.1, 1, 1, 1, 0, "noise"),
   clip("opacity-scaled", 16, 10, 28, 18, 2, 2, 0, 0, 0, 1.5, 1.5, 0.3, 0, "mixed"),
   clip("opacity-identity", 16, 10, 16, 10, 0, 0, 0, 0, 0, 1, 1, 0.55, 0, "mixed"),
+  // Corner radius: antialiased rounded-rect clip path plus antialiased image edges.
+  clip("corner-identity", 24, 16, 24, 16, 0, 0, 0, 0, 0, 1, 1, 1, 0.2, "mixed"),
+  clip("corner-translate", 16, 12, 28, 20, 5.5, 3.25, 0, 0, 0, 1, 1, 1, 0.25, "mixed"),
+  clip("corner-scale", 14, 10, 32, 24, 3.3, 2.7, 0, 0, 0, 1.73, 1.41, 1, 0.3, "noise"),
+  clip("corner-fit-down", 40, 24, 20, 12, 0, 0, 0, 0, 0, 0.5, 0.5, 1, 0.5, "gradient"),
+  clip("corner-rotate", 20, 12, 32, 28, 6, 8, 30, 0, 0, 1, 1, 1, 0.15, "noise"),
+  clip("corner-rotate-scale", 20, 14, 32, 28, 5, 6, 12, 0, 0, 1.2, 0.7, 1, 0.45, "gradient"),
+  clip("corner-shear", 16, 12, 32, 24, 7, 5, 0, 0.35, 0.1, 1, 1, 1, 0.2, "noise"),
+  clip("corner-opacity", 16, 10, 28, 18, 2, 2, 0, 0, 0, 1.5, 1.5, 0.3, 0.1, "mixed"),
+  clip("corner-large-rotate", 120, 80, 200, 160, 40, 30, 17, 0, 0, 1.1, 1.1, 1, 0.12, "noise"),
+  clip("corner-large-shear", 96, 64, 180, 140, 30, 20, 8, 0.2, 0, 1.3, 1.2, 0.8, 0.3, "mixed"),
   ...Array.from({ length: 24 }, (_, mode): GoldenCase => ({ kind: "compose", name: `mode-${mode}`, mode, w: 8, h: 8, seed: 100 + mode })),
 ];

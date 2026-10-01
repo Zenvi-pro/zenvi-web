@@ -11,16 +11,10 @@
 import { qRound, type PremulImage } from "../pixels.js";
 import { blendSourceOverFast, CompositionMode, composerFor } from "./compose.js";
 import { fma } from "./fma.js";
-import {
-  clipBoxFor,
-  fillRectSpans,
-  maskSpans,
-  rasterizeLine,
-  rasterizePolygonsAA,
-  rasterizePolygonsAliased,
-  type ClipBox,
-  type CoverageMask,
-} from "./rasterizer.js";
+import { grayRasterize } from "./gray-raster.js";
+import { outlineContours, PainterPath } from "./path.js";
+import { clipBoxFor, fillRectSpans, rasterizeLine, rasterizePolygonsAliased, type ClipBox } from "./rasterizer.js";
+import { BUFFER_SIZE, ClipData, deliverSpans, handleSpans, maskSpans, type FetchRun, type Span } from "./spans.js";
 import { QTransform, TxScale, TxTranslate, scaleIsUniform } from "./transform.js";
 
 export interface PainterState {
@@ -34,79 +28,12 @@ export interface PainterState {
   opacity: number;
   /** `QPainter::CompositionMode` (libopenshot `composite`). */
   mode: number;
-  /** Device-space clip coverage (`QPainter::setClipPath`), or none. */
-  clip?: CoverageMask | null;
+  /** Path clip (`QPainter::setClipPath`, e.g. `roundedRectClip`), or none. */
+  clip?: ClipData | null;
 }
 
-/** qdrawhelper.cpp BufferSize: spans are fetched in chunks of this many pixels. */
-const BUFFER_SIZE = 2048;
 const FIXED = 65536;
 const HALF = 32768;
-
-interface Run {
-  x: number;
-  len: number;
-  /** Coverage per pixel of the run (0..255, already combined with the clip). */
-  cov: Uint8Array;
-}
-
-/**
- * Collects spans per row, applies the clip mask (qt_div_255 of both
- * coverages, qpaintengine_raster.cpp:4127) and hands merged runs of adjacent
- * pixels to `flush`, like `handleSpans` merges adjacent spans before fetching.
- */
-class RowCollector {
-  private rows = new Map<number, [number, number, number][]>();
-
-  constructor(private readonly clip: CoverageMask | null | undefined) {}
-
-  add = (x: number, y: number, len: number, coverage: number): void => {
-    let list = this.rows.get(y);
-    if (!list) {
-      list = [];
-      this.rows.set(y, list);
-    }
-    list.push([x, len, coverage]);
-  };
-
-  forEachRun(fn: (y: number, run: Run) => void): void {
-    const ys = [...this.rows.keys()].sort((a, b) => a - b);
-    for (const y of ys) {
-      const spans = this.rows.get(y)!;
-      spans.sort((a, b) => a[0] - b[0]);
-      let i = 0;
-      while (i < spans.length) {
-        const start = spans[i]![0];
-        let end = start + spans[i]![1];
-        let j = i + 1;
-        while (j < spans.length && spans[j]![0] === end) {
-          end += spans[j]![1];
-          j += 1;
-        }
-        const cov = new Uint8Array(end - start);
-        for (let k = i; k < j; k += 1) {
-          const [sx, slen, sc] = spans[k]!;
-          cov.fill(sc, sx - start, sx - start + slen);
-        }
-        this.applyClip(y, start, cov);
-        fn(y, { x: start, len: end - start, cov });
-        i = j;
-      }
-    }
-  }
-
-  private applyClip(y: number, x: number, cov: Uint8Array): void {
-    const clip = this.clip;
-    if (!clip) return;
-    const row = y - clip.y;
-    for (let i = 0; i < cov.length; i += 1) {
-      const col = x + i - clip.x;
-      const c = row >= 0 && row < clip.height && col >= 0 && col < clip.width ? clip.data[row * clip.width + col]! : 0;
-      const v = cov[i]! * c;
-      cov[i] = (v + (v >> 8) + 0x80) >> 8;
-    }
-  }
-}
 
 /** Inverse texture matrix (`QSpanData::setupMatrix`, qpaintengine_raster.cpp:4708-4738). */
 interface TextureMatrix {
@@ -259,49 +186,55 @@ function fetchNearest(src: PremulImage, m: TextureMatrix, x: number, y: number, 
   }
 }
 
-/** Compose a fetched chunk into `dst` row `y`, pixel by coverage run. */
-function composeChunk(
-  dst: PremulImage,
-  mode: number,
-  y: number,
-  x: number,
-  length: number,
-  fetched: Uint8ClampedArray,
-  cov: Uint8Array,
-  covOffset: number,
-  intOpacity: number,
-): void {
-  const compose = composerFor(mode);
-  const rowBase = y * dst.width * 4;
-  let i = 0;
-  while (i < length) {
-    const c = cov[covOffset + i]!;
-    let j = i + 1;
-    while (j < length && cov[covOffset + j] === c) j += 1;
-    // handleSpans: coverage = (span coverage * const_alpha) >> 8.
-    const ca = (c * intOpacity) >> 8;
-    if (c > 0) compose(dst.data, rowBase + (x + i) * 4, fetched, i * 4, j - i, ca);
-    i = j;
+/** Spans of `fillRect_normalized` (qpaintengine_raster.cpp): the rect clipped to the clip's bounds or the device. */
+function rectSpans(x: number, y: number, w: number, h: number, device: ClipBox, clip: ClipData | null | undefined): Span[] {
+  const spans: Span[] = [];
+  const sink = (sx: number, sy: number, len: number, coverage: number): void => {
+    spans.push({ x: sx, y: sy, len, coverage });
+  };
+  if (clip) {
+    const x1 = Math.max(x, clip.xmin);
+    const x2 = Math.min(x + w, clip.xmax);
+    const y1 = Math.max(y, clip.ymin);
+    const y2 = Math.min(y + h, clip.ymax);
+    if (x2 > x1 && y2 > y1) for (let row = y1; row < y2; row += 1) sink(x1, row, x2 - x1, 255);
+    return spans;
   }
+  fillRectSpans(x, y, w, h, device, sink);
+  return spans;
 }
 
-let scratch = new Uint8ClampedArray(BUFFER_SIZE * 4);
+/** `QRasterPaintEnginePrivate::initializeRasterizer`'s clip rect: the device, intersected with the clip's bounds. */
+function rasterizerBox(device: ClipBox, clip: ClipData | null | undefined): ClipBox {
+  if (!clip) return device;
+  return {
+    left: Math.max(device.left, clip.xmin),
+    top: Math.max(device.top, clip.ymin),
+    right: Math.min(device.right, clip.xmax - 1),
+    bottom: Math.min(device.bottom, clip.ymax - 1),
+  };
+}
 
 /** Draw `src` at the origin under `state` onto `dst`, like the Qt raster engine. */
 export function drawImage(dst: PremulImage, src: PremulImage, state: PainterState): void {
   if (src.width <= 0 || src.height <= 0 || dst.width <= 0 || dst.height <= 0) return;
   const intOpacity = Math.trunc(Math.min(1, Math.max(0, state.opacity)) * 256);
   if (intOpacity === 0) return;
+  const clip = state.clip ?? null;
+  if (clip && clip.spans.length === 0) return;
   const t = state.transform;
   const type = t.type();
-  const clipBox: ClipBox = clipBoxFor(dst.width, dst.height);
-  const rows = new RowCollector(state.clip);
+  const device: ClipBox = clipBoxFor(dst.width, dst.height);
+  const compose = composerFor(state.mode);
+  const process = (x: number, y: number, len: number, coverage: number, fetched: Uint8ClampedArray, offset: number): void => {
+    if (coverage > 0) compose(dst.data, (y * dst.width + x) * 4, fetched, offset * 4, len, coverage);
+  };
 
   if (type <= TxTranslate) {
     // drawImage(QPointF): integer placement at qRound(pt) (untransformed fetch).
     const ox = qRound(t.dx);
     const oy = qRound(t.dy);
-    if (!state.smooth && state.mode === CompositionMode.SourceOver && !state.clip) {
+    if (!state.smooth && state.mode === CompositionMode.SourceOver && !clip) {
       // canUseFastImageBlending → qBlendFunctions (qpaintengine_raster.cpp:2206).
       const x0 = Math.max(0, ox);
       const x1 = Math.min(dst.width, ox + src.width);
@@ -315,17 +248,11 @@ export function drawImage(dst: PremulImage, src: PremulImage, state: PainterStat
       }
       return;
     }
-    fillRectSpans(ox, oy, src.width, src.height, clipBox, rows.add);
-    rows.forEachRun((y, run) => {
-      const sy = y - oy;
-      for (let start = 0; start < run.len; start += BUFFER_SIZE) {
-        const len = Math.min(BUFFER_SIZE, run.len - start);
-        const sx = run.x + start - ox;
-        const from = (sy * src.width + sx) * 4;
-        const fetched = src.data.subarray(from, from + len * 4);
-        composeChunk(dst, state.mode, y, run.x + start, len, fetched, run.cov, start, intOpacity);
-      }
-    });
+    const fetch: FetchRun = (x, y, length) => {
+      const from = ((y - oy) * src.width + (x - ox)) * 4;
+      return src.data.subarray(from, from + length * 4);
+    };
+    deliverSpans(rectSpans(ox, oy, src.width, src.height, device, clip), clip, (chunk) => handleSpans(chunk, intOpacity, fetch, process));
     return;
   }
 
@@ -337,37 +264,52 @@ export function drawImage(dst: PremulImage, src: PremulImage, state: PainterStat
     const rr = t.mapRect(0, 0, 1, 1);
     const x1 = qRound(rr.x);
     const y1 = qRound(rr.y);
-    fillRectSpans(x1, y1, qRound(rr.x + rr.width) - x1, qRound(rr.y + rr.height) - y1, clipBox, rows.add);
     const color = new Uint8ClampedArray(4);
     for (let c = 0; c < 4; c += 1) {
       const c16 = ((src.data[c]! * 257 * intOpacity) >> 8) >>> 0;
       color[c] = (c16 - (c16 >> 8) + 0x80) >> 8;
     }
-    rows.forEachRun((y, run) => {
-      if (scratch.length < run.len * 4) scratch = new Uint8ClampedArray(run.len * 4);
-      for (let i = 0; i < run.len; i += 1) scratch.set(color, i * 4);
-      composeChunk(dst, state.mode, y, run.x, run.len, scratch, run.cov, 0, 256);
-    });
+    let solid = new Uint8ClampedArray(0);
+    const fetch: FetchRun = (_x, _y, length) => {
+      if (solid.length < length * 4) {
+        solid = new Uint8ClampedArray(length * 4);
+        for (let i = 0; i < length; i += 1) solid.set(color, i * 4);
+      }
+      return solid;
+    };
+    const spans = rectSpans(x1, y1, qRound(rr.x + rr.width) - x1, qRound(rr.y + rr.height) - y1, device, clip);
+    deliverSpans(spans, clip, (chunk) => handleSpans(chunk, 256, fetch, process));
     return;
   }
 
   const m = setupMatrix(t);
   if (!m) return;
 
+  let spans: Span[];
+  const sink = (x: number, y: number, len: number, coverage: number): void => {
+    spans.push({ x, y, len, coverage });
+  };
+  spans = [];
   if (!state.antialias && type === TxScale) {
     const rr = t.mapRect(0, 0, w, h);
     const x1 = qRound(rr.x);
     const y1 = qRound(rr.y);
     const x2 = qRound(rr.x + rr.width);
     const y2 = qRound(rr.y + rr.height);
-    fillRectSpans(x1, y1, x2 - x1, y2 - y1, clipBox, rows.add);
+    spans = rectSpans(x1, y1, x2 - x1, y2 - y1, device, clip);
   } else {
     const noShear = scaleIsUniform(t);
     if (noShear || type === TxScale) {
       const [ax, ay] = t.map(0, h * 0.5);
       const [bx, by] = t.map(w, h * 0.5);
       const width = noShear ? h / w : Math.abs((t.m22 * h) / (t.m11 * w));
-      rasterizeLine(ax, ay, bx, by, width, state.antialias, clipBox, rows.add);
+      rasterizeLine(ax, ay, bx, by, width, state.antialias, rasterizerBox(device, clip), sink);
+    } else if (state.antialias) {
+      // fillPath → QOutlineMapper → gray raster (qpaintengine_raster.cpp fillPath).
+      const path = new PainterPath();
+      path.addRect(0, 0, w, h);
+      const mask = grayRasterize(outlineContours(path, t), true, dst.width, dst.height);
+      spans = mask ? maskSpans(mask) : [];
     } else {
       const poly: number[] = [];
       for (const [px, py] of [
@@ -380,45 +322,27 @@ export function drawImage(dst: PremulImage, src: PremulImage, state: PainterStat
         const [mx, my] = t.map(px, py);
         poly.push(mx, my);
       }
-      if (state.antialias) {
-        const mask = rasterizePolygonsAA([poly], clipBox);
-        if (mask) maskSpans(mask, rows.add);
-      } else {
-        rasterizePolygonsAliased([poly], true, clipBox, rows.add);
-      }
+      rasterizePolygonsAliased([poly], true, rasterizerBox(device, clip), sink);
     }
   }
 
-  const fetch = state.smooth ? fetchBilinear : fetchNearest;
-  rows.forEachRun((y, run) => {
-    for (let start = 0; start < run.len; start += BUFFER_SIZE) {
-      const len = Math.min(BUFFER_SIZE, run.len - start);
-      fetch(src, m, run.x + start, y, len, scratch);
-      composeChunk(dst, state.mode, y, run.x + start, len, scratch, run.cov, start, intOpacity);
-    }
-  });
+  const scratch = new Uint8ClampedArray(BUFFER_SIZE * 4);
+  const sample = state.smooth ? fetchBilinear : fetchNearest;
+  const fetch: FetchRun = (x, y, length) => {
+    sample(src, m, x, y, length, scratch);
+    return scratch;
+  };
+  deliverSpans(spans, clip, (chunk) => handleSpans(chunk, intOpacity, fetch, process));
 }
 
 /**
- * Antialiased clip for `QPainterPath::addRoundedRect(QRectF(0, 0, w, h), r, r)`
- * mapped by `transform` (libopenshot corner_radius, Clip.cpp:1416-1426).
+ * libopenshot's corner-radius clip (Clip.cpp:1415-1426):
+ * `QPainterPath::addRoundedRect(QRectF(0, 0, w, h), radius, radius)` set
+ * with `setClipPath` under `transform` with antialiasing, i.e. flattened by
+ * the outline mapper and scan-converted by the gray raster.
  */
-export function roundedRectClip(w: number, h: number, radius: number, transform: QTransform, width: number, height: number): CoverageMask | null {
-  const rx = Math.min(radius, w / 2);
-  const ry = Math.min(radius, h / 2);
-  const pts: number[] = [];
-  const steps = Math.max(8, Math.ceil(Math.sqrt(Math.max(rx, ry)) * 6));
-  const corner = (cx: number, cy: number, fromDeg: number): void => {
-    for (let i = 0; i <= steps; i += 1) {
-      const a = ((fromDeg + (90 * i) / steps) * Math.PI) / 180;
-      const [mx, my] = transform.map(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry);
-      pts.push(mx, my);
-    }
-  };
-  // Clockwise on screen (y down): top-left, top-right, bottom-right, bottom-left.
-  corner(rx, ry, 180);
-  corner(w - rx, ry, 270);
-  corner(w - rx, h - ry, 0);
-  corner(rx, h - ry, 90);
-  return rasterizePolygonsAA([pts], clipBoxFor(width, height));
+export function roundedRectClip(w: number, h: number, radius: number, transform: QTransform, width: number, height: number): ClipData {
+  const path = new PainterPath();
+  path.addRoundedRect(0, 0, w, h, radius, radius);
+  return ClipData.fromMask(grayRasterize(outlineContours(path, transform), true, width, height));
 }
