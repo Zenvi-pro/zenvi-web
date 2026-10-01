@@ -12,7 +12,7 @@ import { loadConfig } from "./config.js";
 import { createServices } from "./container.js";
 import { createLogger, errorMessage } from "./http/log.js";
 import { loadEngineRegistry } from "./mcp/engine.js";
-import { nodeAssetResolver, nodeProber, nodeRenderer } from "./render/node.js";
+import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeProber, nodeRenderer } from "./render/node.js";
 import { unavailableProber } from "./render/renderer.js";
 import { AzureBlobStore, AzureTableStore } from "./storage/azure.js";
 import { MemoryBlobStore, MemoryTableStore } from "./storage/memory.js";
@@ -40,9 +40,16 @@ async function main(): Promise<void> {
     return null;
   });
 
-  const ffprobe = resolveBinary("ffprobe");
-  const haveFfprobe = isAbsolute(ffprobe) || whichSync(ffprobe) !== undefined;
-  if (!haveFfprobe) log.warn("ffprobe not found: URL imports are disabled");
+  const found = (name: "ffmpeg" | "ffprobe"): boolean => {
+    const binary = resolveBinary(name);
+    return isAbsolute(binary) || whichSync(binary) !== undefined;
+  };
+  const haveFfprobe = found("ffprobe");
+  const haveFfmpeg = found("ffmpeg");
+  if (!haveFfprobe) log.warn("ffprobe not found: URL imports and generated media are disabled");
+  if (!haveFfmpeg) log.warn("ffmpeg not found: audio analysis is disabled");
+  const assets = nodeAssetSource();
+  if (!assets) log.warn("engine assets not found: title tools are disabled");
   const { renderer, reason } = await nodeRenderer();
   if (reason) log.warn("rendering unavailable", { reason });
 
@@ -55,6 +62,8 @@ async function main(): Promise<void> {
     renderer,
     prober: haveFfprobe ? nodeProber : unavailableProber,
     resolveAsset: nodeAssetResolver(),
+    assets,
+    analyzeAudio: haveFfmpeg ? nodeAnalyzeAudio : undefined,
     supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl, log: (message) => log.warn(message) }),
   });
   const app = createApp(services);

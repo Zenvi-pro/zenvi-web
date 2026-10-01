@@ -7,7 +7,7 @@
  * a clear message while queues and job records keep working.
  */
 
-import type { ExportOptions, Project, ReaderInfo } from "@zenvi/engine";
+import type { AudioEnvelope, ExportOptions, Project, ReaderInfo } from "@zenvi/engine";
 
 /**
  * Maps a path as stored in the project (a clip's `reader.path`, a file's
@@ -51,6 +51,17 @@ export interface MediaProber {
   /** libopenshot-style reader info for a local file. */
   probe(filePath: string): Promise<ReaderInfo>;
 }
+
+/** Files bundled with the engine (`packages/engine/assets/…`), e.g. `titles/Bar_1.svg`. */
+export interface AssetSource {
+  readText(path: string): Promise<string>;
+}
+
+/** Mono RMS envelope of a local file's audio (`@zenvi/render-node` `analyzeAudio`). */
+export type AudioAnalyzer = (
+  filePath: string,
+  options?: { sampleRate?: number; frameSize?: number; signal?: AbortSignal },
+) => Promise<AudioEnvelope>;
 
 export class RendererUnavailableError extends Error {
   constructor(what = "renderer") {

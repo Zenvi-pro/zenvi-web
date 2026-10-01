@@ -73,6 +73,13 @@ export function defineTool<I extends z.ZodObject, O extends z.ZodObject>(spec: T
     scope: spec.scope,
     call: (ctx, args) =>
       guard(ctx, spec.name, async () => {
+        // An argument the tool does not know is an error, not silently dropped:
+        // the caller meant something by it (e.g. a `profile` the tool lacked).
+        const known = Object.keys(spec.input.shape);
+        const unknown = Object.keys(args).filter((key) => !known.includes(key));
+        if (unknown.length > 0) {
+          return errorResult(`Unknown argument${unknown.length > 1 ? "s" : ""} for ${spec.name}: ${unknown.join(", ")}. Accepted: ${known.join(", ")}.`);
+        }
         const parsed = spec.input.safeParse(args);
         if (!parsed.success) return errorResult(`Invalid arguments for ${spec.name}: ${describeIssues(parsed.error)}`);
         const outcome = await spec.run(ctx, parsed.data);

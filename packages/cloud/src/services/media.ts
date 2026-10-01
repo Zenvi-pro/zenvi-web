@@ -243,6 +243,21 @@ export class MediaService {
     return { sha256, size: head.size, name: pending?.name ?? sha256, contentType, verified, uploadedAt: metadata.uploadedat };
   }
 
+  /** Store bytes the server generated (title SVGs…), content-addressed; a no-op when already stored. */
+  async storeBytes(userId: string, input: { sha256: string; bytes: Uint8Array; name: string; contentType: string }): Promise<MediaInfo> {
+    const existing = await this.get(userId, input.sha256);
+    if (existing) return existing;
+    await this.assertFits(userId, input.bytes.byteLength);
+    const uploadedAt = isoAt(this.clock.now());
+    const name = cleanFileName(input.name);
+    await this.blobs.write(mediaPath(userId, input.sha256), input.bytes, {
+      contentType: input.contentType,
+      metadata: { name: encodeMeta(name), contenttype: input.contentType, complete: "1", verified: "1", uploadedat: uploadedAt },
+    });
+    this.invalidateUsage(userId);
+    return { sha256: input.sha256, size: input.bytes.byteLength, name, contentType: input.contentType, verified: true, uploadedAt };
+  }
+
   /** Store a local file the server produced or downloaded (hash already known). */
   async storeFile(userId: string, input: { sha256: string; filePath: string; size: number; name: string; contentType: string }): Promise<MediaInfo> {
     const existing = await this.get(userId, input.sha256);

@@ -6,6 +6,7 @@
  *   u/{userId}/p/{projectId}/renders/{renderId}.{ext}
  *   u/{userId}/p/{projectId}/renders/{renderId}.project.json   snapshot rendered
  *   u/{userId}/p/{projectId}/frames/{hash}.{png|jpg}           preview frames
+ *   u/{userId}/p/{projectId}/exports/{name}                    files tools export (captions)
  *   u/{userId}/media/{sha256}                        content-addressed media
  *   u/{userId}/uploads/{sha256}.json                 pending upload declaration
  *   u/{userId}/mcp/{connection}.json                 MCP session state
@@ -38,6 +39,9 @@ export const renderSnapshotPath = (userId: string, projectId: string, renderId: 
   `${projectPrefix(userId, projectId)}renders/${check(renderId, RENDER_ID, "render id")}.project.json`;
 export const framePath = (userId: string, projectId: string, key: string, ext: "png" | "jpg"): string =>
   `${projectPrefix(userId, projectId)}frames/${check(key, /^[0-9a-f]{16,64}$/, "frame key")}.${ext}`;
+/** Files tools export for download (captions…): `exports/<name>`. */
+export const exportPath = (userId: string, projectId: string, name: string): string =>
+  `${projectPrefix(userId, projectId)}exports/${check(name, /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/, "export file name")}`;
 export const mediaPrefix = (userId: string): string => `${userPrefix(userId)}media/`;
 export const mediaPath = (userId: string, sha256: string): string => `${mediaPrefix(userId)}${check(sha256, SHA256, "sha256")}`;
 export const uploadPath = (userId: string, sha256: string): string => `${userPrefix(userId)}uploads/${check(sha256, SHA256, "sha256")}.json`;

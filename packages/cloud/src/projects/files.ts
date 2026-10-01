@@ -14,7 +14,8 @@
 import { addFile, type ImportedMedia, OpError, type ProjectFile, type Transaction } from "@zenvi/engine";
 import { ApiError } from "../http/errors.js";
 
-function withSuffix(path: string, suffix: string): string {
+/** `clip.mp4` + `ab12cd34` → `clip-ab12cd34.mp4`. */
+export function withSuffix(path: string, suffix: string): string {
   const dot = path.lastIndexOf(".");
   return dot > 0 ? `${path.slice(0, dot)}-${suffix}${path.slice(dot)}` : `${path}-${suffix}`;
 }

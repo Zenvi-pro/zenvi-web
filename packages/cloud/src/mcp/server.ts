@@ -16,7 +16,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Services } from "../container.js";
 import { cloudTools } from "./cloud-tools.js";
-import { cloudCapabilities, engineTools } from "./engine.js";
+import { engineTools } from "./engine.js";
+import { cloudCapabilities } from "./host.js";
 import { errorResult } from "./results.js";
 import type { McpCallContext, McpTool } from "./types.js";
 import { WIDGET_HTML, WIDGET_MIME, WIDGET_URI, widgetResourceMeta } from "./widget.js";
@@ -31,7 +32,7 @@ export function buildToolList(services: Services): McpTool[] {
   const cloud = cloudTools();
   if (!services.engine) return cloud;
   const reserved = new Set(cloud.map((tool) => tool.name));
-  const capabilities = cloudCapabilities({ media: services.importer.available, frames: services.frames.available });
+  const capabilities = cloudCapabilities(services);
   const engine = engineTools(services.engine, capabilities, reserved, (message) => services.log.warn(message));
   return [...cloud, ...engine];
 }

@@ -23,7 +23,8 @@ function baseName(path: string): string {
   return path.split(/[\\/]/).pop() || path;
 }
 
-export function projectPathResolver(project: Project, deps: ResolveDeps): PathResolver {
+/** Project files by every path the project uses for them: `file.path` and clips' `reader.path`. */
+export function filesByPath(project: Project): Map<string, ProjectFile> {
   const byPath = new Map<string, ProjectFile>();
   for (const file of project.files) if (typeof file.path === "string") byPath.set(file.path, file);
   const byId = new Map(project.files.map((file) => [file.id, file]));
@@ -32,6 +33,11 @@ export function projectPathResolver(project: Project, deps: ResolveDeps): PathRe
     const file = byId.get(clip.file_id);
     if (typeof readerPath === "string" && file && !byPath.has(readerPath)) byPath.set(readerPath, file);
   }
+  return byPath;
+}
+
+export function projectPathResolver(project: Project, deps: ResolveDeps): PathResolver {
+  const byPath = filesByPath(project);
   return async (projectPath) => {
     const file = byPath.get(projectPath);
     if (file) {

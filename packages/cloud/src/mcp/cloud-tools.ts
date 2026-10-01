@@ -14,7 +14,7 @@ import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
 import { addMediaFile } from "../projects/files.js";
 import { displayName } from "../projects/model.js";
-import { PROJECT_FORMATS, PROJECT_FPS, profileFor, type ProjectFormat, type ProjectFps } from "../projects/profiles.js";
+import { PROFILE_SHORTHANDS, PROJECT_FORMATS, PROJECT_FPS, profileFor, resolveProfile } from "../projects/profiles.js";
 import { PRESET_NAMES, RENDER_FORMATS } from "../render/options.js";
 import type { RenderJobView } from "../render/service.js";
 import { defineTool } from "./define.js";
@@ -88,15 +88,25 @@ const createProject = defineTool({
   name: "create_project",
   title: "Create project",
   description:
-    "Create a new, empty Zenvi Cloud video project and open it, so later editing tools act on it. Use this when the person wants to start a new video. Choose the format from where the video will be shown (vertical_1080p for Reels/TikTok/Shorts).",
+    "Create a new, empty Zenvi Cloud video project and open it, so later editing tools act on it. Use this when the person wants to start a new video. " +
+    `Pick the frame with profile: ${PROFILE_SHORTHANDS}. ` +
+    "Choose it from where the video will be shown (vertical for Reels/TikTok/Shorts). Progressive profiles are used unless interlaced is asked for; " +
+    "when nothing matches, the tool answers with the closest profiles instead of guessing. Alternatively give format + fps. Default: landscape 1080p 30 fps.",
   input: z.object({
     name: z.string().min(1).max(200).describe("Project name shown in Zenvi."),
-    format: z.enum(PROJECT_FORMATS).optional().describe("Frame size (default landscape_1080p, 1920×1080)."),
-    fps: z.literal(PROJECT_FPS).optional().describe("Frames per second (default 30)."),
+    profile: z
+      .string()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Profile name or shorthand, e.g. "vertical 1080p 30", "square", "4k 24", "FHD 1080p 25 fps". Use alone (not with format/fps).'),
+    format: z.enum(PROJECT_FORMATS).optional().describe("Frame size (default landscape_1080p, 1920×1080) when no profile is given."),
+    fps: z.literal(PROJECT_FPS).optional().describe("Frames per second with format (default 30)."),
   }),
   output: z.object({
     project_id: z.string(),
     name: z.string(),
+    profile: z.string(),
     width: z.number(),
     height: z.number(),
     fps: z.number(),
@@ -107,19 +117,29 @@ const createProject = defineTool({
   invoking: "Creating the project…",
   invoked: "Project created",
   async run(ctx, input) {
-    const profile = profileFor((input.format ?? "landscape_1080p") as ProjectFormat, (input.fps ?? 30) as ProjectFps);
+    if (input.profile !== undefined && (input.format !== undefined || input.fps !== undefined)) {
+      throw new ApiError(
+        400,
+        "invalid_request",
+        'Give either profile (it can include the frame rate, e.g. "vertical 1080p 60") or format + fps, not both.',
+      );
+    }
+    const choice = input.profile !== undefined ? resolveProfile(input.profile) : profileFor(input.format ?? "landscape_1080p", input.fps ?? 30);
+    if (!choice.ok) throw new ApiError(400, "unknown_profile", choice.message);
+    const profile = choice.profile;
     const created = await ctx.services.projects.create(ctx.principal.userId, { name: input.name, profile });
     await ctx.services.sessions.set(ctx.principal.userId, ctx.connection, created.id);
     const data = {
       project_id: created.id,
       name: created.name,
+      profile: profile.description,
       width: profile.width,
       height: profile.height,
-      fps: profile.fps.num / profile.fps.den,
+      fps: seconds(profile.fps.num / profile.fps.den),
       editor_url: editorLink(ctx, created.id),
     };
     return {
-      text: `Created "${created.name}" (${created.id}, ${profile.description}) and opened it. Import media with import_media_from_url or get_upload_link.`,
+      text: `Created "${created.name}" (${created.id}, ${profile.description}, ${profile.width}×${profile.height}) and opened it. Import media with import_media_from_url or get_upload_link.`,
       data,
     };
   },

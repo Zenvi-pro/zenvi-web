@@ -18,7 +18,7 @@ import type { Resolver, UrlPolicy } from "./net/ssrf.js";
 import { CIMD_FETCH_LIMIT, ClientRegistry, type JsonFetcher } from "./oauth/clients.js";
 import { OAuthService } from "./oauth/service.js";
 import { MediaCache } from "./render/cache.js";
-import type { MediaProber, Renderer } from "./render/renderer.js";
+import type { AssetSource, AudioAnalyzer, MediaProber, Renderer } from "./render/renderer.js";
 import { unavailableProber, unavailableRenderer } from "./render/renderer.js";
 import { RenderService } from "./render/service.js";
 import { TokenRepo } from "./repos/tokens.js";
@@ -49,6 +49,10 @@ export interface Dependencies {
   network?: { policy?: UrlPolicy; resolver?: Resolver };
   /** Built-in renderer assets (`@transitions/…`) on disk. */
   resolveAsset?: (projectPath: string) => string | undefined;
+  /** The engine's bundled assets (title templates) for catalog tools. */
+  assets?: AssetSource;
+  /** Audio loudness analysis for catalog tools (remove_silence_tool). */
+  analyzeAudio?: AudioAnalyzer;
 }
 
 export interface Services {
@@ -68,6 +72,10 @@ export interface Services {
   sessions: SessionStore;
   importer: MediaImporter;
   frames: FrameService;
+  prober: MediaProber;
+  mediaCache: MediaCache;
+  assets: AssetSource | null;
+  analyzeAudio: AudioAnalyzer | null;
   limiter: RateLimiter;
   engine: EngineRegistry | null;
   startedAt: number;
@@ -138,6 +146,10 @@ export function createServices(deps: Dependencies): Services {
       resolver: deps.network?.resolver,
     }),
     frames: new FrameService(renderer, cache, blobs, clock, deps.resolveAsset),
+    prober,
+    mediaCache: cache,
+    assets: deps.assets ?? null,
+    analyzeAudio: deps.analyzeAudio ?? null,
     limiter: new RateLimiter(clock),
     engine: deps.engine ?? null,
     startedAt: clock.now(),

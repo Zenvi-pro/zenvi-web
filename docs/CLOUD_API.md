@@ -329,7 +329,7 @@ the same JSON as text, ChatGPT status strings):
 | Tool | Does |
 | --- | --- |
 | `list_projects` | the person's projects and the open one |
-| `create_project {name, format?, fps?}` | new empty project (formats: `landscape_1080p` default, `landscape_720p`, `landscape_4k`, `vertical_1080p`, `square_1080p`; fps 24/25/30/50/60), opens it |
+| `create_project {name, profile? \| format? + fps?}` | new empty project, opens it. `profile`: an exact desktop profile name/key, or words — orientation (vertical, portrait, 9:16, square, 1:1, 4:5, landscape), resolution (4k, 1440p, 1080p, 720p, 480p, `1920x1080`), frame rate (24, 25, 29.97, 30, 50, 59.94, 60), e.g. `"vertical 1080p 30"`, `"4k 24"`. Progressive profiles win unless interlaced is asked for; no match → an error listing close profiles. Or `format` (`landscape_1080p` default, `landscape_720p`, `landscape_4k`, `vertical_1080p`, `square_1080p`) + `fps` |
 | `open_project {project_id}` | makes it the open project for this connection; overview with files |
 | `import_media_from_url {url, name?}` | server-side download (https, public addresses only, pinned DNS, redirects re-checked, 512 MB, media types only), content-addressed, added to the bin; idempotent |
 | `import_attached_file {file}` | a file attached in ChatGPT (`openai/fileParams`: `{download_url, file_id, mime_type?, file_name?}`), imported like a URL |
@@ -338,7 +338,23 @@ the same JSON as text, ChatGPT status strings):
 | `render_project {preset?, format?, height?, quality?, start_seconds?, end_seconds?}` | starts a render, returns `render_id` at once; idempotent |
 | `get_render_status {render_id, wait_seconds?}` | status/progress; download link when done (waits up to 45 s) |
 | `preview_frame {time_seconds, width?}` | PNG of one frame as image content + a 1 h link |
-| engine tools | the editing catalog of `@zenvi/engine/tools` for surface `mcp` (when the registry is in the build), each with an extra optional `project_id` |
+| engine tools | the editing catalog of `@zenvi/engine/tools` for surface `mcp`, each with an extra optional `project_id`; hidden when they need a host capability the cloud lacks (see below) |
+
+Cloud tools reject arguments they do not declare (`Unknown argument for
+create_project: …. Accepted: …`) instead of ignoring them.
+
+Host capabilities the catalog gets in the cloud (`GET /health` →
+`hostCapabilities`): `media` (probe project media; URL imports;
+`writeGenerated` stores generated files such as title SVGs as
+content-addressed media at `@assets/title/<name>` with `file.cloud`, so they
+render in cloud renders and travel with the project), `frames`, `assets` (the
+engine's bundled title templates), `audio` (loudness analysis for
+`remove_silence_tool`) and `storage` (`readText` of project media;
+`writeText` stores an export such as captions under the project and returns a
+24 h download link; save/open are refused — cloud projects save themselves).
+Not available: tools that need the Zenvi backend with the person's own
+zenvi.pro session (search, catalog, AI generation, TTS, re-summarize, watch
+windows), playback/zoom/local-file tools, and deprecated ones.
 
 Every project tool takes an optional `project_id`; without it the tool uses
 the open project of this connection (the OAuth grant or personal token),
@@ -366,7 +382,7 @@ with `If-Match`, replaying the change if someone else saved in between.
 | `ZENVI_CLOUD_VERSION` | `dev` | set to the image tag by deploy.sh |
 
 Storage (account `zenvicloud`): blob container `zenvi` —
-`u/{userId}/p/{projectId}/{project.json,meta.json,renders/…,frames/…}`,
+`u/{userId}/p/{projectId}/{project.json,meta.json,renders/…,frames/…,exports/…}`,
 `u/{userId}/media/{sha256}`, `u/{userId}/uploads/{sha256}.json` (pending
 declarations), `u/{userId}/mcp/{connection}.json` (open project). Tables —
 `tokens` (lookup rows `t:<hash prefix>/<sha256>` + per-user index

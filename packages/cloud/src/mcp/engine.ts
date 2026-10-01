@@ -9,11 +9,11 @@
  * (`preview_frame`, renders, new/open project) are not exposed.
  */
 
-import type { AnyTool, HostCapability, ToolContext, ToolHost, ToolResult } from "@zenvi/engine";
+import type { AnyTool, HostCapability, ToolContext, ToolResult } from "@zenvi/engine";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
-import { sha256Hex } from "../util/crypto.js";
 import { guard, jsonSchema } from "./define.js";
+import { createCloudHost } from "./host.js";
 import { editProject, resolveProjectId } from "./projects.js";
 import { errorResult, okResult } from "./results.js";
 import type { JsonSchemaObject, McpCallContext, McpTool } from "./types.js";
@@ -69,14 +69,6 @@ function catalogSchema(tool: AnyTool): JsonSchemaObject | undefined {
   return structuredClone(schema) as JsonSchemaObject;
 }
 
-/** Capabilities the cloud host can offer, given what this build has. */
-export function cloudCapabilities(options: { media: boolean; frames: boolean }): Set<HostCapability> {
-  const caps = new Set<HostCapability>();
-  if (options.media) caps.add("media");
-  if (options.frames) caps.add("frames");
-  return caps;
-}
-
 export function engineTools(
   registry: EngineRegistry,
   capabilities: Set<HostCapability>,
@@ -130,11 +122,14 @@ async function callEngineTool(
   if (rawProjectId !== undefined && typeof rawProjectId !== "string") return errorResult("project_id must be a string.");
   const projectId = await resolveProjectId(ctx, rawProjectId);
   const edit = await editProject(ctx, projectId, async (doc) => {
+    const { host, dispose } = createCloudHost(ctx, projectId, () => doc.project);
     try {
-      return await registry.run({ doc, host: cloudHost(ctx, projectId), signal: ctx.signal }, tool.name, toolArgs);
+      return await registry.run({ doc, host, signal: ctx.signal }, tool.name, toolArgs);
     } catch (error) {
       if (error instanceof ApiError) return { ok: false, text: `Error: ${error.message}` } satisfies ToolResult;
       throw error;
+    } finally {
+      await dispose();
     }
   });
   const result = edit.value;
@@ -156,38 +151,6 @@ export function displayText(result: ToolResult): string {
     return data.summary;
   }
   return result.text;
-}
-
-/** The platform capabilities engine tools get in the cloud, for one project. */
-export function cloudHost(ctx: McpCallContext, projectId: string): ToolHost {
-  const { importer, frames, log } = ctx.services;
-  const userId = ctx.principal.userId;
-  const host: ToolHost = { log: (message) => log.debug(message) };
-  if (importer.available) {
-    host.media = {
-      probe: async () => {
-        throw new ApiError(400, "invalid_request", "Zenvi Cloud cannot read files by path. Import media with import_media_from_url or get_upload_link.");
-      },
-      importUrl: (url, options) => importer.importUrl(userId, url, { filename: options?.filename, signal: options?.signal ?? ctx.signal }),
-    };
-  }
-  if (frames.available) {
-    host.frames = {
-      renderFrame: async (project, seconds, options) => {
-        const preview = await frames.preview({
-          userId,
-          projectId,
-          project,
-          revision: sha256Hex(JSON.stringify(project)),
-          seconds,
-          width: options?.width,
-          signal: ctx.signal,
-        });
-        return preview.image;
-      },
-    };
-  }
-  return host;
 }
 
 /**

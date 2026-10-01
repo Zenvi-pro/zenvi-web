@@ -130,7 +130,7 @@ describe("render jobs", () => {
     await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
     // A second service over the same tables (the other instance) recovers the queued job too.
     const { createServices } = await import("../container.js");
-    const other = createServices({ ...h.services, supabase: { verify: async () => null }, renderer });
+    const other = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, supabase: { verify: async () => null }, renderer });
     await other.renders.recover();
     await Promise.all([h.services.renders.drain(), other.renders.drain()]);
     expect(renderer.renders).toBe(1);

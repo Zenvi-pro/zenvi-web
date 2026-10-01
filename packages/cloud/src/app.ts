@@ -14,6 +14,7 @@ import type { AppEnv } from "./http/context.js";
 import { ApiError } from "./http/errors.js";
 import { errorMessage } from "./http/log.js";
 import { originMatcher, requestOrigin } from "./http/origins.js";
+import { cloudCapabilities } from "./mcp/host.js";
 import { buildToolList } from "./mcp/server.js";
 import { OAuthError } from "./oauth/service.js";
 import { deviceRoutes } from "./routes/device.js";
@@ -91,6 +92,8 @@ export function createApp(services: Services): Hono<AppEnv> {
       frames: services.frames.available,
       imports: services.importer.available,
       engineTools: services.engine?.tools.length ?? 0,
+      mcpTools: tools.length,
+      hostCapabilities: [...cloudCapabilities(services)].sort(),
     }),
   );
 

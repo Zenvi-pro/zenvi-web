@@ -5,7 +5,7 @@
 //   If-Match → MCP tools (projects, URL import, upload link, render, frame).
 //
 //   npx tsx packages/cloud/scripts/e2e-live.mjs [base-url]
-//   (tsx: the render step builds a clip with @zenvi/engine's addClip)
+//   (tsx: the render step checks the stored project with @zenvi/engine's parseProject)
 //
 // Signs in as the E2E test user from ~/.config/zenvi-dev/test-user.env
 // (ZENVI_E2E_EMAIL, ZENVI_E2E_PASSWORD, SUPABASE_URL, SUPABASE_ANON_KEY).
@@ -200,6 +200,10 @@ try {
   const mcpProject = made?.structuredContent?.project_id;
   createdProjects.push(mcpProject);
   check("tool create_project", !made?.isError && /^c_/.test(mcpProject ?? ""), made?.content?.[0]?.text);
+  const vertical = await tool(pat, "create_project", { name: "E2E vertical", profile: "Vertical HD 1080p 30 fps" });
+  createdProjects.push(vertical?.structuredContent?.project_id);
+  check("create_project profile shorthand → progressive vertical", vertical?.structuredContent?.profile === "FHD Vertical 1080p 30 fps" && vertical?.structuredContent?.height === 1920, `${vertical?.structuredContent?.profile} ${vertical?.structuredContent?.width}x${vertical?.structuredContent?.height}`);
+  await tool(pat, "open_project", { project_id: mcpProject });
   const listed = await tool(pat, "list_projects");
   check("tool list_projects", listed?.structuredContent?.current_project_id === mcpProject, `${listed?.structuredContent?.total} projects`);
   const imported = await tool(pat, "import_media_from_url", { url: readUrl, name: "e2e-clip.mp4" });
@@ -220,16 +224,21 @@ try {
     const render = await tool(pat, "render_project", { preset: "mp4-720p" });
     check("tool render_project reports unavailable (renderer not in this build)", render?.isError === true, render?.content?.[0]?.text);
   } else {
-    // Put the imported clip on the timeline the way every surface does: the engine's addClip, saved with If-Match.
-    const { ProjectDocument, addClip } = await import("@zenvi/engine");
-    const current = await http("GET", `/v1/projects/${mcpProject}`, { token: pat });
-    const doc = new ProjectDocument(current.data.project);
-    doc.transaction("Add clip", (tx) => addClip(tx, { fileId: imported.structuredContent.file_id, position: 0, layer: doc.project.layers[0].number }));
-    const placed = await http("PUT", `/v1/projects/${mcpProject}`, { token: pat, json: doc.toJSON(), headers: { "if-match": `"${current.data.revision}"` } });
-    check("clip placed on the timeline (engine addClip + If-Match)", placed.status === 200 && placed.data?.stats?.clips === 1, `duration ${placed.data?.stats?.duration}s`);
+    // Edit with the engine catalog over MCP, as a connector would.
+    const placedClip = await tool(pat, "add_clip_to_timeline_tool", { file_id: imported.structuredContent.file_id, position_seconds: "0" });
+    const afterClip = (await http("GET", `/v1/projects/${mcpProject}`, { token: pat })).data;
+    check("tool add_clip_to_timeline_tool (engine catalog)", !placedClip?.isError && afterClip?.stats?.clips === 1, placedClip?.content?.[0]?.text);
+    const titled = await tool(pat, "add_title_tool", { text: "Zenvi E2E", duration_seconds: "2" });
+    const afterTitle = (await http("GET", `/v1/projects/${mcpProject}`, { token: pat })).data;
+    const titleFile = afterTitle?.project?.files?.find((f) => String(f.path).startsWith("@assets/title/"));
+    check(
+      "tool add_title_tool → SVG stored as cloud media (file.cloud)",
+      !titled?.isError && /^[0-9a-f]{64}$/.test(titleFile?.cloud?.sha256 ?? "") && afterTitle?.media?.some((m) => m.sha256 === titleFile?.cloud?.sha256),
+      titled?.isError ? titled?.content?.[0]?.text : `${titleFile?.path} ${titleFile?.cloud?.content_type}`,
+    );
     const { parseProject } = await import("@zenvi/engine");
     const stored = (await http("GET", `/v1/projects/${mcpProject}`, { token: pat })).data?.project;
-    const alpha = parseProject(stored).clips[0]?.alpha?.Points?.[0]?.co?.Y;
+    const alpha = parseProject(stored).clips.find((c) => c.file_id === imported.structuredContent.file_id)?.alpha?.Points?.[0]?.co?.Y;
     check("stored project stamped; clip alpha stays 1 after parseProject", stored?.version?.["openshot-qt"] === "1.0.188" && alpha === 1, `version ${JSON.stringify(stored?.version)}, alpha ${alpha}`);
     const frame = await tool(pat, "preview_frame", { time_seconds: 1, width: 320 });
     const image = frame?.content?.find((c) => c.type === "image");
@@ -249,7 +258,8 @@ try {
       const info = JSON.parse(probe.stdout.toString() || "{}");
       const video = info.streams?.find((st) => st.codec_type === "video");
       const duration = Number(info.format?.duration);
-      check("rendered MP4 plays (ffprobe)", video?.width === 1280 && video?.height === 720 && Math.abs(duration - 3) < 0.25, `${video?.codec_name} ${video?.width}x${video?.height}, ${duration}s, audio ${info.streams?.some((st) => st.codec_type === "audio")}`);
+      const expected = afterTitle?.stats?.duration ?? 3;
+      check("rendered MP4 plays (ffprobe)", video?.width === 1280 && video?.height === 720 && Math.abs(duration - expected) < 0.25, `${video?.codec_name} ${video?.width}x${video?.height}, ${duration}s (timeline ${expected}s), audio ${info.streams?.some((st) => st.codec_type === "audio")}`);
     }
   }
 } finally {

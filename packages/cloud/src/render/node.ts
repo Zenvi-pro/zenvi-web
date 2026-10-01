@@ -9,10 +9,11 @@
  */
 
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { ExportOptions, Project } from "@zenvi/engine";
 import * as renderNode from "@zenvi/render-node";
-import type { MediaProber, PathResolver, Renderer } from "./renderer.js";
+import type { AssetSource, AudioAnalyzer, MediaProber, PathResolver, Renderer } from "./renderer.js";
 import { RendererUnavailableError, unavailableRenderer } from "./renderer.js";
 
 type RenderProjectFn = (
@@ -108,3 +109,23 @@ export function nodeAssetResolver(): ((projectPath: string) => string | undefine
     return undefined;
   };
 }
+
+/**
+ * The engine's bundled assets (title templates, transition masks) from
+ * render-node's asset folder — `dist/assets` in the image. Paths are relative
+ * to that folder and cannot leave it.
+ */
+export function nodeAssetSource(): AssetSource | undefined {
+  const dir = renderNode.engineAssetsDir();
+  if (!dir || !existsSync(dir)) return undefined;
+  const root = path.resolve(dir);
+  return {
+    async readText(assetPath) {
+      const full = path.resolve(root, assetPath.replace(/^\/+/, ""));
+      if (!full.startsWith(`${root}${path.sep}`)) throw new Error(`not a bundled asset: ${assetPath}`);
+      return readFile(full, "utf8");
+    },
+  };
+}
+
+export const nodeAnalyzeAudio: AudioAnalyzer = (filePath, options) => renderNode.analyzeAudio(filePath, options);
