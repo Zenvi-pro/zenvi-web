@@ -16,7 +16,7 @@ import { EffectParamError, createEffect, effectParamJson, getEffect } from "../e
 import type { EffectParam } from "../effects/types.js";
 import { OpError, invalid, requireClipEffect, requireUnlocked } from "./errors.js";
 import { ids, patchClip, requireEditableClip, resolveClipFrame } from "./internal.js";
-import { writeColorKeyframe, writeKeyframeValue } from "./clips.js";
+import { writeColorKeyframe, writeKeyframeValue } from "./values.js";
 import type { ColorInput, KeyframeAt, PropertyValue } from "./types.js";
 
 export interface AddEffectOptions {

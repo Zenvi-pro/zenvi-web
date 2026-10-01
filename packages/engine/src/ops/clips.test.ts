@@ -71,6 +71,14 @@ describe("addClip", () => {
     expect(doc.project).toEqual(before);
   });
 
+  it("attaches a Caption effect for files with stored caption text", () => {
+    const project = baseProject();
+    project.files[0]!.caption = "00:00:00,000 --> 00:00:02,000\nHello";
+    const doc = makeDoc(project);
+    const c = doc.transaction("add", (tx) => addClip(tx, { fileId: "VIDEO00001", position: 0, layer: V1 }));
+    expect(c.effects.map((e) => [e.class_name, e.caption_text])).toEqual([["Caption", "00:00:00,000 --> 00:00:02,000\nHello"]]);
+  });
+
   it("refuses bad input without touching history", () => {
     const doc = makeDoc();
     expectRefused(doc, "not_found", (tx) => addClip(tx, { fileId: "NOPE", position: 0, layer: V1 }));

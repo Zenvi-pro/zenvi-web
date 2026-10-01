@@ -14,6 +14,7 @@ import type { Transaction } from "../history/document.js";
 import type { Clip, ColorKeyframe, Keyframe, KeyframePoint, Project } from "../model/types.js";
 import { Interpolation, ScaleMode } from "../model/types.js";
 import { createClip, type CreateClipInput } from "../model/defaults.js";
+import { createEffect } from "../effects/registry.js";
 import { CLIP_COLOR_KEYS, CLIP_KEYFRAME_KEYS, CLIP_PROPERTIES, hasChoices } from "../model/properties.js";
 import { findClip, findLayer, findTransition } from "../model/query.js";
 import { pyRound } from "../model/rounding.js";
@@ -23,11 +24,9 @@ import {
   openshotPoint,
   removeKeyframePointsInRange,
   setKeyframePoints,
-  setKeyframeValue,
   type PointOptions,
 } from "../keyframe/edit.js";
 import { evaluate } from "../keyframe/evaluate.js";
-import { parseHexColor } from "../keyframe/color.js";
 import { itemEnd } from "../timeline/windows.js";
 import { findGap, itemsOnLayer } from "../timeline/queries.js";
 import { buildStaticLevelPoints, currentStaticLevel, dbToGain, hasAudioStream } from "../tools/audio-mix.js";
@@ -59,6 +58,8 @@ import {
   withClampedTiming,
 } from "./internal.js";
 import { retimeClip } from "./retime.js";
+import { requireInterpolation, writeColorKeyframe, writeKeyframeValue } from "./values.js";
+import { addAutoTransition } from "./transitions.js";
 import { trackBelowOrCreate } from "./tracks.js";
 import type { ColorInput, Edge, KeyframeAt, KeyframePointInput, PropertyValue, SliceKeep } from "./types.js";
 
@@ -87,6 +88,11 @@ export interface AddClipInput {
   title?: string;
   /** Explicit id (tests, deterministic imports). */
   id?: string;
+  /**
+   * Add the automatic transition when the clip overlaps another on its track
+   * (`addAutoTransition`; the desktop's "Auto-Transition" preference). Default false.
+   */
+  autoTransition?: boolean;
 }
 
 /**
@@ -114,7 +120,8 @@ export function addClip(tx: Transaction, input: AddClipInput): Clip {
   }
   if (input.title !== undefined && typeof input.title !== "string") throw invalid("title must be a string.");
 
-  const id = input.id ?? ids(project)();
+  const nextId = ids(project);
+  const id = input.id ?? nextId();
   const clipInput: CreateClipInput = {
     id,
     file,
@@ -129,8 +136,12 @@ export function addClip(tx: Transaction, input: AddClipInput): Clip {
   if (!(clip.end - clip.start > 0)) {
     throw invalid(`The requested range leaves the clip empty (media is ${String(file.duration ?? "?")} s).`);
   }
+  // apply_file_caption_to_clip: stored caption text becomes a Caption effect.
+  const caption = typeof file.caption === "string" ? file.caption.trim() : "";
+  if (caption) clip.effects = [createEffect("Caption", { caption_text: caption }, { id: nextId() })];
   ensureLayer(tx, input.layer);
   tx.insert(["clips"], clip);
+  if (input.autoTransition) addAutoTransition(tx, id);
   return requireClip(tx.project, id);
 }
 
@@ -139,6 +150,8 @@ export interface MoveClipInput {
   position?: number;
   /** New track number. The track must exist and be unlocked. */
   layer?: number;
+  /** Add the automatic transition when the move creates an overlap (desktop drag). Default false. */
+  autoTransition?: boolean;
 }
 
 /** Move a clip in time and/or to another track. Moving nowhere records nothing. */
@@ -155,7 +168,9 @@ export function moveClip(tx: Transaction, clipId: string, to: MoveClipInput): Cl
     requireUnlocked(project, to.layer);
     patch.layer = to.layer;
   }
-  return patchClip(tx, clipId, patch);
+  const moved = patchClip(tx, clipId, patch);
+  if (to.autoTransition) addAutoTransition(tx, clipId);
+  return moved;
 }
 
 export interface TrimClipInput {
@@ -498,72 +513,6 @@ function choiceValues(prop: string): number[] | null {
   const meta = CLIP_PROPERTIES[prop];
   if (!hasChoices(meta)) return null;
   return meta!.choices!.map((c) => Number(c.value));
-}
-
-/** Parse a `ColorInput` into channels 0..255 (CSS `#rrggbbaa` order, like timeline.py `_parse_effect_color`). */
-export function parseColorInput(value: unknown): [number, number, number, number] {
-  if (typeof value === "string") {
-    const rgba = parseHexColor(value);
-    if (!rgba) throw invalid(`Not a color: ${value} (use #rrggbb or #rrggbbaa).`);
-    return rgba;
-  }
-  if (isRecord(value)) {
-    const channel = (key: string, fallback: number): number => {
-      const v = value[key] ?? fallback;
-      if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 255) {
-        throw invalid(`Color ${key} must be 0..255 (got ${String(v)}).`);
-      }
-      return v;
-    };
-    return [channel("red", 0), channel("green", 0), channel("blue", 0), channel("alpha", 255)];
-  }
-  throw invalid(`Not a color: ${String(value)}.`);
-}
-
-function requireInterpolation(value: unknown): Interpolation | undefined {
-  if (value === undefined) return undefined;
-  if (value !== 0 && value !== 1 && value !== 2) throw invalid(`interpolation must be 0 (bezier), 1 (linear) or 2 (constant).`);
-  return value;
-}
-
-/**
- * Write a keyframed number. With no frame the property becomes one constant
- * point; with a frame, the point there is updated or inserted (desktop
- * Properties panel: new points LINEAR, choice properties CONSTANT).
- */
-export function writeKeyframeValue(
-  kf: Keyframe | undefined,
-  value: number,
-  frame: number | undefined,
-  interpolation: Interpolation | undefined,
-  choice = false,
-): Keyframe {
-  if (frame === undefined) {
-    const keep = kf && typeof kf === "object" ? kf : {};
-    const interp = choice ? Interpolation.CONSTANT : (interpolation ?? Interpolation.BEZIER);
-    return { ...keep, Points: constantKeyframe(value, interp).Points };
-  }
-  return setKeyframeValue(kf, frame, value, choice ? Interpolation.CONSTANT : interpolation);
-}
-
-/** Write a color keyframe channel by channel (same frame rules as `writeKeyframeValue`). */
-export function writeColorKeyframe(
-  color: ColorKeyframe | undefined,
-  value: ColorInput,
-  frame: number | undefined,
-  interpolation: Interpolation | undefined,
-): ColorKeyframe {
-  const rgba = parseColorInput(value);
-  const channels = ["red", "green", "blue", "alpha"] as const;
-  const out: Record<string, unknown> = { ...(color ?? {}) };
-  channels.forEach((channel, i) => {
-    const current = color?.[channel] as Keyframe | undefined;
-    out[channel] =
-      frame === undefined
-        ? { Points: [openshotPoint(1, rgba[i]!, interpolation ?? Interpolation.BEZIER)] }
-        : setKeyframeValue(current, frame, rgba[i]!, interpolation);
-  });
-  return out as ColorKeyframe;
 }
 
 /**

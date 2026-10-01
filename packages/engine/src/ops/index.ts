@@ -20,6 +20,7 @@ export * from "./errors.js";
 export * from "./types.js";
 export * from "./files.js";
 export * from "./clips.js";
+export * from "./values.js";
 export * from "./effects.js";
 export * from "./transitions.js";
 export * from "./tracks.js";

@@ -19,7 +19,7 @@ import { reverseKeyframe, scaleKeyframe } from "../keyframe/edit.js";
 import { clipFrameAtTime } from "../timeline/windows.js";
 import { OpError, invalid, requireClip, requireFinite, requireNonNegative, requireTransition, requireUnlocked } from "./errors.js";
 import { ensureLayer, fpsOf, frameSeconds, ids, patchClip, patchTransition, rateOf, snapSeconds } from "./internal.js";
-import { writeKeyframeValue } from "./clips.js";
+import { writeKeyframeValue } from "./values.js";
 import { maskReader, resolveTransitionMask, type TransitionMask } from "./transition-masks.js";
 import type { Edge, KeyframeAt, PropertyValue } from "./types.js";
 
@@ -396,4 +396,80 @@ export function setTransitionProperty(
     });
   }
   throw invalid(`Unknown transition property: ${prop}.`);
+}
+
+export interface MissingTransition {
+  position: number;
+  layer: number;
+  start: number;
+  end: number;
+}
+
+/**
+ * The automatic transition a clip's overlap on its own track calls for
+ * (timeline.py `_find_missing_transition_details`): the first overlap of at
+ * least 0.5 s with a clip on the same track, unless a transition already
+ * starts or ends there (±0.01 s). Null when none is needed.
+ */
+export function findMissingTransition(project: Transaction["project"], clipId: string): MissingTransition | null {
+  const clip = project.clips.find((c) => c.id === clipId);
+  if (!clip) return null;
+  const duration = Number(clip.end) - Number(clip.start);
+  if (!(duration > 0)) return null;
+  const left = Number(clip.position);
+  const right = left + duration;
+  let found: MissingTransition | null = null;
+  const sameLayer = project.clips
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => c.layer === clip.layer)
+    .sort((a, b) => Number(a.c.position) - Number(b.c.position) || a.i - b.i)
+    .map(({ c }) => c);
+  for (const other of sameLayer) {
+    if (other.id === clipId) continue;
+    const otherLeft = Number(other.position);
+    const otherRight = otherLeft + (Number(other.end) - Number(other.start));
+    if (left < otherRight && left > otherLeft) {
+      found = { position: left, layer: clip.layer, start: 0, end: otherRight - left };
+    } else if (right > otherLeft && right < otherRight) {
+      found = { position: otherLeft, layer: clip.layer, start: 0, end: right - otherLeft };
+    }
+    if (found && found.end >= 0.5) break;
+    if (found && found.end < 0.5) found = null;
+  }
+  if (!found) return null;
+  const newLeft = found.position;
+  const newRight = found.position + (found.end - found.start);
+  for (const t of project.effects) {
+    if (t.layer !== clip.layer) continue;
+    const tLeft = Number(t.position);
+    const tRight = tLeft + (Number(t.end) - Number(t.start));
+    if (Math.abs(tLeft - newLeft) < 0.01 || Math.abs(tRight - newRight) < 0.01) return null;
+  }
+  return found;
+}
+
+/**
+ * Add the automatic transition for a clip's new overlap, if one is needed
+ * (timeline.py `add_missing_transition`: fade mask, brightness 1 → -1,
+ * contrast 3, `fade_audio_hint` so the audio crossfades too). The desktop
+ * does this only when its "Auto-Transition" preference is on; callers decide.
+ * Returns the transition, or null when none was needed.
+ */
+export function addAutoTransition(tx: Transaction, clipId: string): Transition | null {
+  requireClip(tx.project, clipId);
+  const missing = findMissingTransition(tx.project, clipId);
+  if (!missing) return null;
+  requireUnlocked(tx.project, missing.layer);
+  const transition = createTransition({
+    id: ids(tx.project)(),
+    layer: missing.layer,
+    position: missing.position,
+    duration: missing.end - missing.start,
+    reader: maskReader("@transitions/common/fade.svg"),
+    fps: fpsOf(tx.project),
+    direction: "in",
+    fadeAudio: true,
+  });
+  tx.insert(["effects"], transition);
+  return requireTransition(tx.project, transition.id);
 }

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { findClip, findTransition } from "../model/query.js";
-import { addClip } from "./clips.js";
+import { addClip, moveClip } from "./clips.js";
 import {
+  addAutoTransition,
   addTransition,
   applyTransitionBetween,
   applyTransitionToClip,
+  findMissingTransition,
   inferDropSide,
   moveTransition,
   removeTransition,
@@ -154,5 +156,30 @@ describe("move / trim / reverse / remove / properties", () => {
     doc.transaction("rm", (tx) => removeTransition(tx, "T"));
     expect(findTransition(doc.project, "T")).toBeUndefined();
     expectRefused(doc, "not_found", (tx) => removeTransition(tx, "T"));
+  });
+});
+
+describe("automatic transitions (add_missing_transition)", () => {
+  it("adds a fade over a new overlap of at least 0.5 s, once", () => {
+    const doc = twoClips();
+    // Move B back by 1 s: it overlaps A by 1 s.
+    doc.transaction("drag", (tx) => moveClip(tx, "B", { position: 4, autoTransition: true }));
+    expect(findMissingTransition(doc.project, "B")).toBeNull();
+    expect(doc.project.effects).toHaveLength(1);
+    const t = doc.project.effects[0]!;
+    expect(t).toMatchObject({ layer: V1, position: 4, start: 0, end: 1, fade_audio_hint: true, title: "Transition" });
+    expect(t.reader.path).toBe("@transitions/common/fade.svg");
+    expect(doc.undoLabels.at(-1)).toBe("drag");
+    doc.undo();
+    expect(doc.project.effects).toEqual([]);
+    expect(findClip(doc.project, "B")!.position).toBe(5);
+  });
+
+  it("ignores short overlaps and clips that do not overlap", () => {
+    const doc = twoClips();
+    doc.transaction("nudge", (tx) => moveClip(tx, "B", { position: 4.8, autoTransition: true }));
+    expect(doc.project.effects).toEqual([]);
+    expect(findMissingTransition(doc.project, "A")).toBeNull();
+    expect(doc.transaction("none", (tx) => addAutoTransition(tx, "A"))).toBeNull();
   });
 });
