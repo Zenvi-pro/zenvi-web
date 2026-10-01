@@ -47157,7 +47157,7 @@ async function readToken(file3) {
     return void 0;
   }
 }
-async function fromFile(config2, name, kind) {
+async function fromFile(config2, name, kind, options) {
   const file3 = path19.join(config2.desktopDir, name);
   let data;
   try {
@@ -47170,6 +47170,7 @@ async function fromFile(config2, name, kind) {
   const tokenFile = typeof data.token_file === "string" && data.token_file ? path19.isAbsolute(data.token_file) ? data.token_file : path19.join(config2.desktopDir, data.token_file) : path19.join(config2.desktopDir, "mcp_token");
   const token = await readToken(tokenFile);
   if (!token) return void 0;
+  if (options.verify !== false && !await probeEndpoint(data.url, token, options)) return void 0;
   const project = typeof data.project === "string" && data.project ? data.project : void 0;
   return {
     kind,
@@ -47181,10 +47182,13 @@ async function fromFile(config2, name, kind) {
     source: file3
   };
 }
-async function probeLegacy(token, options = {}) {
+function probeLegacy(token, options = {}) {
+  return probeEndpoint(LEGACY_URL, token, options);
+}
+async function probeEndpoint(url2, token, options = {}) {
   const doFetch = options.fetchImpl ?? fetch;
   try {
-    const response = await doFetch(LEGACY_URL, {
+    const response = await doFetch(url2, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -47221,7 +47225,7 @@ async function discoverDesktop(config2, options = {}) {
     ["gui_mcp.json", "gui"],
     ["headless_mcp.json", "headless"]
   ]) {
-    const endpoint = await fromFile(config2, name, kind);
+    const endpoint = await fromFile(config2, name, kind, options);
     if (endpoint) found.push(endpoint);
   }
   if (found.length === 0 && options.legacy) {
@@ -47424,12 +47428,13 @@ var init_json_schema2 = __esm({
 });
 
 // ../engine/src/tools/schemas.gen.ts
-var CONTRACT_REF, contractInputs, contractMeta, CONTRACT_TOOL_NAMES;
+var CONTRACT_REF, SNAPSHOT_REF, contractInputs, contractMeta, CONTRACT_TOOL_NAMES;
 var init_schemas_gen = __esm({
   "../engine/src/tools/schemas.gen.ts"() {
     "use strict";
     init_zod();
     CONTRACT_REF = "2c99ed2c0fd5";
+    SNAPSHOT_REF = "b63c39be7c3c";
     contractInputs = {
       get_project_info_tool: external_exports.strictObject({}),
       list_files_tool: external_exports.strictObject({}),
@@ -56621,6 +56626,7 @@ __export(tools_exports, {
   MUTATION_CLIP_LIMIT: () => MUTATION_CLIP_LIMIT,
   RECEIPT_OUTPUT_SCHEMA: () => RECEIPT_OUTPUT_SCHEMA,
   SHIFT_GROUP_MINIMUM: () => SHIFT_GROUP_MINIMUM,
+  SNAPSHOT_REF: () => SNAPSHOT_REF,
   SURFACE_PROFILES: () => SURFACE_PROFILES,
   TOOL_NEEDS: () => TOOL_NEEDS,
   allTools: () => allTools,
@@ -81123,7 +81129,7 @@ function registerEditCommands(program2, ctx) {
       ])
     );
   });
-  program2.command("volume").description("set a clip's volume (0.5, 50% or -6dB), optionally for a time range").argument("<clip>", "clip id").argument("<level>", "linear gain, percent, or dB").option("--start <time>", "range start (timeline)").option("--end <time>", "range end (timeline)").action(async (clip2, level, opts) => {
+  program2.command("volume").description("set a clip's volume (0.5, 50% or -6dB), optionally for a time range").argument("<clip>", "clip id").argument("<level>", "linear gain, percent, or dB").allowUnknownOption().option("--start <time>", "range start (timeline)").option("--end <time>", "range end (timeline)").action(async (clip2, level, opts) => {
     const parsed = parseLevel(level);
     await runToolCommand(ctx, "set_clip_volume_tool", {
       timeline_clip_id: clip2,
@@ -81458,7 +81464,7 @@ async function openInDesktop(options) {
     }
     const client = new DesktopClient(gui, options.clientVersion);
     try {
-      const result = await client.callTool("open_project_tool", { path: project });
+      const result = await client.callTool("open_project_tool", { file_path: project });
       if (result.isError) throw new CliError(`Zenvi could not open the project: ${(result.receipt?.summary ?? result.text).replace(/^Error:\s*/, "")}`);
     } finally {
       await client.close();
@@ -83178,7 +83184,7 @@ function registerProjectCommands(program2, ctx) {
     });
   }
   program2.command("save").description("save the project (optionally to a new file)").argument("[file]", "save as this file").action(async (file3) => {
-    await runToolCommand(ctx, "save_project_tool", file3 ? { path: path26.resolve(ctx.cwd, file3) } : {});
+    await runToolCommand(ctx, "save_project_tool", file3 ? { file_path: path26.resolve(ctx.cwd, file3) } : {});
   });
 }
 var init_project3 = __esm({
@@ -83234,12 +83240,28 @@ function exportOptionsFrom(project, output2, flags) {
   }
   if (flags.videoBitrate) options.videoBitrate = parseBitrate(flags.videoBitrate);
   if (flags.audioBitrate) options.audioBitrate = parseBitrate(flags.audioBitrate);
+  if (flags.crf !== void 0) {
+    const crf = Number(flags.crf);
+    if (!Number.isInteger(crf) || crf < 0 || crf > 63) throw new CliError("--crf must be a whole number from 0 to 63.", 2);
+    options.crf = crf;
+  }
   if (flags.encoderPreset !== void 0) {
     if (!isEncoderPreset(flags.encoderPreset)) throw new CliError(`--encoder-preset must be one of ${ENCODER_PRESETS.join(", ")}.`, 2);
     options.encoderPreset = flags.encoderPreset;
   }
   if (output2) options.output = output2;
   return options;
+}
+async function exportOnDesktop(executor, output2, platform = process.platform) {
+  if (platform === "darwin") {
+    const settings = await executor.call("get_export_settings_tool", {});
+    const data = settings.receipt?.data;
+    const text3 = [settings.text, settings.receipt?.summary, typeof data?.legacy_text === "string" ? data.legacy_text : ""].join("\n");
+    if (settings.ok && /codec\s+h264_videotoolbox/i.test(text3)) {
+      await executor.call("set_export_setting_tool", { key: "video_codec", value: "libx264" });
+    }
+  }
+  return executor.call("export_video_tool", { show_dialog: "false", ...output2 ? { output_path: output2 } : {} });
 }
 function parseBitrate(text3) {
   const m = /^(\d+(?:\.\d+)?)\s*([kKmM]?)(?:b\/?s|bps)?$/.exec(text3.trim());
@@ -83254,12 +83276,11 @@ function formatBytes(n) {
   return `${Math.round(n / 1e3)} KB`;
 }
 function registerRenderCommands(program2, ctx) {
-  program2.command("render").description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav) or PNG frames").argument("[output]", "output file (default: <project>.mp4 next to the project)").option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav or png (default: from the file name)").option("--quality <quality>", "low, medium, high or lossless", "high").option("--width <px>", "output width (height follows the project aspect)").option("--height <px>", "output height").option("--fps <rate>", "frame rate, e.g. 30 or 30000/1001 (default: the project's)").option("--start <time>", "render from this timeline time").option("--end <time>", "render up to this timeline time").option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)").option("--audio-bitrate <rate>", "e.g. 192k").option("--encoder-preset <preset>", "encoder speed: ultrafast \u2026 veryslow (default veryfast; the desktop app encodes at medium)").option("--open", "open the result when done").action(async (outputArg, flags) => {
+  program2.command("render").description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav) or PNG frames").argument("[output]", "output file (default: <project>.mp4 next to the project)").option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav or png (default: from the file name)").option("--quality <quality>", "low, medium, high or lossless", "high").option("--width <px>", "output width (height follows the project aspect)").option("--height <px>", "output height").option("--fps <rate>", "frame rate, e.g. 30 or 30000/1001 (default: the project's)").option("--start <time>", "render from this timeline time").option("--end <time>", "render up to this timeline time").option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)").option("--audio-bitrate <rate>", "e.g. 192k").option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)").option("--encoder-preset <preset>", "encoder speed: ultrafast \u2026 veryslow (default veryfast; the desktop app encodes at medium)").option("--open", "open the result when done").action(async (outputArg, flags) => {
     await withExecutor(ctx, async (executor) => {
       const output2 = outputArg ? path27.resolve(ctx.cwd, outputArg) : void 0;
       if (!(executor instanceof PortableExecutor)) {
-        const outcome = await executor.call("export_video_tool", { show_dialog: "false", ...output2 ? { output_path: output2 } : {} });
-        printOutcome(ctx, outcome);
+        printOutcome(ctx, await exportOnDesktop(executor, output2));
         return;
       }
       const session = executor.session;
@@ -83415,7 +83436,7 @@ function extraTools(ctx) {
         const desktop = await state.desktopExecutor();
         const output2 = text2(args.output) ? path28.resolve(ctx.cwd, text2(args.output)) : void 0;
         if (desktop) {
-          const outcome = await desktop.call("export_video_tool", { show_dialog: "false", ...output2 ? { output_path: output2 } : {} });
+          const outcome = await exportOnDesktop(desktop, output2);
           return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)) };
         }
         const session = state.session;
