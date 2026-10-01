@@ -62,6 +62,22 @@ export function fileHash(file: Pick<ProjectFile, "cloud">): string | null {
   return typeof sha === "string" && /^[0-9a-f]{64}$/i.test(sha) ? sha.toLowerCase() : null;
 }
 
+/**
+ * The bytes of a stored file for the renderer. OPFS files are named by their
+ * hash, so the spec carries the real file name: render-web decides SVG,
+ * image, audio or video from the extension. (An OPFS `File` is read lazily
+ * from disk, and content-addressed files are never rewritten.)
+ */
+function storedSpec(file: File, name: string): MediaSourceSpec {
+  return { kind: "blob", blob: file, name };
+}
+
+/** The original file name (with extension): the stored path's basename, else the display name. */
+export function sourceFileName(file: Pick<ProjectFile, "name" | "path">): string {
+  const base = String(file.path ?? "").split(/[\\/]/).pop();
+  return base || fileDisplayName(file);
+}
+
 /** Display name of a project file: its `name`, else the path's basename. */
 export function fileDisplayName(file: Pick<ProjectFile, "name" | "path">): string {
   if (typeof file.name === "string" && file.name) return file.name;
@@ -144,9 +160,7 @@ export class MediaLibrary {
       report("storing", 0);
       await store.put(sha256, file, file.name);
       const stored = await store.get(sha256);
-      const spec: MediaSourceSpec = stored?.handle
-        ? { kind: "opfs", handle: stored.handle }
-        : { kind: "blob", blob: stored?.file ?? file, name: file.name };
+      const spec = storedSpec(stored?.file ?? file, file.name);
       report("probing", 0);
       const [info, fingerprint] = await Promise.all([
         this.options.probe({ kind: "blob", blob: file, name: file.name }, { path: file.name }),
@@ -179,7 +193,7 @@ export class MediaLibrary {
     const [sha256, fingerprint] = await Promise.all([hashFile(file), partialFingerprint(file)]);
     await store.put(sha256, file, file.name);
     const stored = await store.get(sha256);
-    const spec: MediaSourceSpec = stored?.handle ? { kind: "opfs", handle: stored.handle } : { kind: "blob", blob: file, name: file.name };
+    const spec = storedSpec(stored?.file ?? file, file.name);
     this.attach(target.id, spec, "local");
     // The desktop fingerprint tells whether this is the same file the project used.
     const known = target.fingerprint?.sha256;
@@ -203,7 +217,7 @@ export class MediaLibrary {
         const store = await this.options.store();
         const stored = await store.get(sha);
         if (stored) {
-          this.attach(file.id, stored.handle ? { kind: "opfs", handle: stored.handle } : { kind: "blob", blob: stored.file, name: fileDisplayName(file) }, "local");
+          this.attach(file.id, storedSpec(stored.file, sourceFileName(file)), "local");
           return;
         }
       }

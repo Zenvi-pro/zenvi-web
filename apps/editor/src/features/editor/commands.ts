@@ -310,7 +310,7 @@ export function createCommands(session: EditorSession, env: CommandEnv): Map<str
       label: "Download project (.zvn)",
       group: "File",
       allowInInputs: true,
-      run: () => downloadBlob(projectFileBlob(session.snapshotForSave()), safeFileName(session.meta.getState().name, "zvn")),
+      run: () => void projectFileBlob(session.snapshotForSave()).then((blob) => downloadBlob(blob, safeFileName(session.meta.getState().name, "zvn"))),
     },
     { id: "actionExportVideo", label: "Export video…", group: "File", run: () => openDialog("export") },
     {

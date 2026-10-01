@@ -1,18 +1,7 @@
 /**
  * Creating, importing and storing local projects.
  */
-import {
-  createProject,
-  DEFAULT_PROFILE_DESCRIPTION,
-  findProfile,
-  parseProjectText,
-  PROFILES,
-  PROJECT_FORMAT_VERSION,
-  ProjectParseError,
-  serializeProject,
-  type Profile,
-  type Project,
-} from "@zenvi/engine";
+import { createProject, DEFAULT_PROFILE_DESCRIPTION, findProfile, PROFILES, PROJECT_FORMAT_VERSION, type Profile, type Project } from "@zenvi/engine";
 import { describeProject, newLocalId, projectRepository, type LocalProjectMeta } from "./storage/projects";
 
 export interface ProfilePreset {
@@ -83,6 +72,8 @@ export async function createLocalProject(profile: Profile, name = "Untitled proj
  */
 export async function readProjectFile(file: File): Promise<Project> {
   const text = await file.text();
+  // The parser (validation schema included) loads on demand, off the projects page's first paint.
+  const { parseProjectText, ProjectParseError } = await import("@zenvi/engine");
   try {
     return parseProjectText(text);
   } catch (error) {
@@ -100,8 +91,9 @@ export async function importProjectFile(file: File): Promise<string> {
   return id;
 }
 
-/** Serialize a project for download as a desktop-compatible `.zvn` (version-stamped). */
-export function projectFileBlob(project: Project): Blob {
+/** Serialize a project for download as a desktop-compatible `.zvn` (version-stamped, `serializeProject`). */
+export async function projectFileBlob(project: Project): Promise<Blob> {
+  const { serializeProject } = await import("@zenvi/engine");
   return new Blob([serializeProject(project)], { type: "application/json" });
 }
 

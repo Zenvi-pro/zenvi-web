@@ -5,7 +5,13 @@
  * is deployed and without it (`DisabledCloudClient`). Every request carries
  * the Supabase access token; the cloud authorizes by owner.
  */
-import { serializeProject, type Project } from "@zenvi/engine";
+import type { Project } from "@zenvi/engine";
+
+/** The engine's project writer, loaded on first save (keeps the projects page light). */
+async function serialize(project: Project): Promise<string> {
+  const { serializeProject } = await import("@zenvi/engine");
+  return serializeProject(project);
+}
 import { getAccessToken } from "./auth";
 import { cloudEnabled, config } from "./env";
 
@@ -219,7 +225,7 @@ export class HttpCloudClient implements CloudClient {
 
   async createProject(name: string, project?: Project): Promise<{ id: string; revision: string | null }> {
     // Projects only ever leave as `serializeProject` text (version-stamped, desktop layout).
-    const jsonText = project ? `{"name":${JSON.stringify(name)},"project":${serializeProject(project)}}` : JSON.stringify({ name });
+    const jsonText = project ? `{"name":${JSON.stringify(name)},"project":${await serialize(project)}}` : JSON.stringify({ name });
     const { data, response } = await this.request<Record<string, unknown>>("/v1/projects", { method: "POST", jsonText });
     return {
       id: String(pick(data ?? {}, "id", "projectId") ?? ""),
@@ -249,7 +255,7 @@ export class HttpCloudClient implements CloudClient {
     const headers: Record<string, string> = { "If-Match": revision ?? "*" };
     const { data, response } = await this.request<Record<string, unknown>>(`/v1/projects/${encodeURIComponent(id)}`, {
       method: "PUT",
-      jsonText: serializeProject(project),
+      jsonText: await serialize(project),
       headers,
     });
     return { revision: pick<string>(data ?? {}, "revision") ?? response.headers.get("ETag") };

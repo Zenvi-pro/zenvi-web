@@ -239,7 +239,7 @@ export function HomePage() {
                   onDownload={() => {
                     void projectRepository()
                       .load(p.id)
-                      .then((stored) => stored && downloadBlob(projectFileBlob(stored.project), safeFileName(p.name, "zvn")));
+                      .then(async (stored) => stored && downloadBlob(await projectFileBlob(stored.project), safeFileName(p.name, "zvn")));
                   }}
                   onDelete={() => setConfirmDelete(p)}
                 />

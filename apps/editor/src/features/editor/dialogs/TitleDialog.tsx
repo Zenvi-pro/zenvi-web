@@ -1,4 +1,4 @@
-import { addTitleClip, buildTitleSvg, type TitleFields } from "@zenvi/engine";
+import { addTitleClip, buildTitleSvg, titleLines, type TitleFields } from "@zenvi/engine";
 import { Bold, Italic, Type } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/ui/Button";
@@ -17,15 +17,18 @@ import { EMPTY_SELECTION } from "../session/uiStore";
 const FONTS = ["Sans", "Geist", "Serif", "Monospace", "Arial", "Helvetica", "Georgia", "Impact"];
 const TITLE_SECONDS = 5;
 
-/** Text of each <tspan>/<text> with text, in document order (the desktop editor's Line 1, Line 2…). */
-function templateLines(svg: string): string[] {
+/**
+ * The editable texts of a template: the engine's "Line N" fields
+ * (`titleLines`), with repeated placeholders merged into one field —
+ * reflection templates (Bar 1) draw the same line twice, mirrored, and both
+ * copies must change together.
+ */
+function templateTexts(svg: string): { originals: string[]; fields: string[] } {
   try {
-    const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
-    const spans = [...doc.querySelectorAll("tspan")].map((t) => t.textContent ?? "").filter((t) => t.trim());
-    if (spans.length) return spans;
-    return [...doc.querySelectorAll("text")].map((t) => t.textContent ?? "").filter((t) => t.trim());
+    const originals = titleLines(svg);
+    return { originals, fields: [...new Set(originals.map((t) => t.trim()))] };
   } catch {
-    return [];
+    return { originals: [], fields: [] };
   }
 }
 
@@ -35,7 +38,9 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
   const templates = titleTemplates();
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
+  /** `lines` holds one value per distinct placeholder (`texts.fields`). */
   const [fields, setFields] = useState<TitleFields & { lines: string[] }>({ lines: [], textColor: "#ffffff", fontFamily: "Sans" });
+  const [texts, setTexts] = useState<{ originals: string[]; fields: string[] }>({ originals: [], fields: [] });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -54,8 +59,10 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
       .then((r) => r.text())
       .then((text) => {
         if (cancelled) return;
+        const found = templateTexts(text);
         setSvg(text);
-        setFields((f) => ({ ...f, lines: templateLines(text) }));
+        setTexts(found);
+        setFields((f) => ({ ...f, lines: found.fields }));
       })
       .catch(() => !cancelled && setSvg(null));
     return () => {
@@ -66,11 +73,13 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
   const built = useMemo(() => {
     if (!svg) return { svg: null as string | null, error: null as string | null };
     try {
-      return { svg: buildTitleSvg(svg, fields), error: null };
+      // Every copy of a placeholder gets its field's text.
+      const lines = texts.originals.map((original) => fields.lines[texts.fields.indexOf(original.trim())] ?? original);
+      return { svg: buildTitleSvg(svg, { ...fields, lines }), error: null };
     } catch (error) {
       return { svg: null, error: error instanceof Error ? error.message : String(error) };
     }
-  }, [svg, fields]);
+  }, [svg, fields, texts]);
 
   const add = async () => {
     if (!built.svg) return;
@@ -82,11 +91,13 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
       if (!item) throw new Error("Could not store the title.");
       const position = session.playback.getState().time;
       // Over whatever plays then, never stacked on another clip (one undo step, track included).
-      const result = session.edit("Add title", (tx) =>
-        addTitleClip(tx, { file: item.media, position, duration: TITLE_SECONDS, layer: overlayTrack(tx, position, position + TITLE_SECONDS), title: fields.lines[0] || "Title" }),
-      );
+      const result = session.edit("Add title", (tx) => {
+        const added = addTitleClip(tx, { file: item.media, position, duration: TITLE_SECONDS, layer: overlayTrack(tx, position, position + TITLE_SECONDS), title: fields.lines[0] || "Title" });
+        // Bytes before the change lands, so the first preview frame has the title.
+        session.media.attach(added.file.id, item.spec);
+        return added;
+      });
       if (result) {
-        session.media.attach(result.file.id, item.spec);
         session.ui.setState({ selection: { ...EMPTY_SELECTION, clips: [result.clip.id] } });
         onClose();
       }
@@ -144,7 +155,7 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
           <div className="space-y-3">
             {fields.lines.map((line, i) => (
               <label key={i} className="block space-y-1">
-                <span className="text-xs text-fg-subtle">Line {i + 1}</span>
+                <span className="text-xs text-fg-subtle">{fields.lines.length === 1 ? "Text" : `Line ${i + 1}`}</span>
                 <TextInput value={line} onChange={(e) => setFields((f) => ({ ...f, lines: f.lines.map((l, n) => (n === i ? e.target.value : l)) }))} />
               </label>
             ))}

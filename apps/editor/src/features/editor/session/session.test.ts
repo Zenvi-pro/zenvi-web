@@ -49,6 +49,16 @@ describe("EditorSession", () => {
     expect(session.snapshotForSave().version).toMatchObject(PROJECT_FORMAT_VERSION);
   });
 
+  it("redraws the preview when media becomes readable after a frame was drawn", async () => {
+    const { session } = newSession();
+    const engine = { setProject: vi.fn(), seek: vi.fn(), play: vi.fn(), pause: vi.fn(), setRate: vi.fn(), setLoop: vi.fn(), resize: vi.fn(), onTime: () => () => {}, onState: () => () => {}, renders: true, dispose: vi.fn() };
+    session.attachEngine(engine);
+    engine.setProject.mockClear();
+    session.media.attach("LATE", { kind: "blob", blob: new Blob(["x"]), name: "late.svg" });
+    await Promise.resolve();
+    expect(engine.setProject).toHaveBeenCalledTimes(1);
+  });
+
   it("records one undo step per edit and undoes it", () => {
     const { session } = newSession();
     const clip = withClip(session);

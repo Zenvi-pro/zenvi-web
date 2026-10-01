@@ -118,6 +118,19 @@ export class EditorSession {
     document.addEventListener("visibilitychange", onHide);
     this.disposers.push(() => document.removeEventListener("visibilitychange", onHide));
     this.mediaReady = this.media.sync(this.doc.project).catch(() => undefined);
+    // Media that becomes readable after a frame was drawn (tool imports, cloud URLs, relinks): draw again.
+    let redrawQueued = false;
+    this.disposers.push(
+      this.media.status.subscribe((next, previous) => {
+        const becameReady = Object.entries(next).some(([id, entry]) => entry.status === "ready" && previous[id]?.status !== "ready");
+        if (!becameReady || redrawQueued) return;
+        redrawQueued = true;
+        queueMicrotask(() => {
+          redrawQueued = false;
+          this.engine?.setProject(this.displayProject());
+        });
+      }),
+    );
   }
 
   // -------------------------------------------------------------------------
