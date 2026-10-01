@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "../config.js";
 import { testEnv } from "../test-support/harness.js";
 import { CloudClient } from "./client.js";
-import { cloudProjectJson, getLink, projectIdFrom, pullProject, pushProject } from "./sync.js";
+import { cloudProjectJson, cloudRef, getLink, projectIdFrom, pullProject, pushProject } from "./sync.js";
 
 let root: string;
 let server: Server;
@@ -142,12 +142,43 @@ describe("push and pull", () => {
       expect(JSON.stringify(f)).not.toContain(root);
     }
     expect(declared.get(stored.files[0]!.cloud!.sha256)?.contentType).toBe("video/mp4");
+    // The desktop's shape (zenvi-core #238): whole-file sha256, size, name, content_type, mtime.
+    const shot = stored.files[0]!.cloud as unknown as Record<string, unknown>;
+    expect(Object.keys(shot).sort()).toEqual(["content_type", "mtime", "name", "sha256", "size"]);
+    expect(typeof shot.mtime).toBe("number");
+    expect(result.cloudRefs[stored.files[0]!.id]).toMatchObject({ sha256: shot.sha256, mtime: shot.mtime });
     expect(await getLink(config(), file)).toMatchObject({ projectId: "p1", revision: "1" });
 
     // Second push updates the same project with If-Match and uploads nothing.
     const again = await pushProject({ config: config(), client: client(), projectFile: file, project });
     expect(again).toMatchObject({ projectId: "p1", created: false, uploaded: 0, reused: 2 });
     expect(projects.get("p1")!.revision).toBe(2);
+  });
+
+  it("reuses a stored hash while size and mtime match, and keeps unknown cloud keys", async () => {
+    const { file, project } = await localProject();
+    const first = await pushProject({ config: config(), client: client(), projectFile: file, project, force: true });
+    const shotId = project.files[0]!.id;
+    const fake = "f".repeat(64);
+    const withRefs = structuredClone(project);
+    withRefs.files[0]!.cloud = { ...first.cloudRefs[shotId]!, sha256: fake, desktop_extra: "kept" } as never;
+    const checked: string[] = [];
+    const spy = new CloudClient(base, async () => "zvn_pat_test");
+    const original = spy.checkMedia.bind(spy);
+    spy.checkMedia = async (hashes) => {
+      checked.push(...hashes);
+      return original(hashes);
+    };
+    const again = await pushProject({ config: config(), client: spy, projectFile: file, project: withRefs, force: true }).catch(() => undefined);
+    expect(checked).toContain(fake);
+    void again;
+    const ref = cloudRef({ ...project.files[0]!, cloud: { sha256: fake, size: 1, name: "n", desktop_extra: "kept" } }, { sha256: "a".repeat(64), size: 2, contentType: "video/mp4", name: "shot.mp4", mtime: 3 });
+    expect(ref).toEqual({ sha256: "a".repeat(64), size: 2, name: "shot.mp4", content_type: "video/mp4", mtime: 3, desktop_extra: "kept" });
+    // A changed mtime means re-hash.
+    withRefs.files[0]!.cloud = { ...first.cloudRefs[shotId]!, sha256: fake, mtime: 1 } as never;
+    checked.length = 0;
+    await pushProject({ config: config(), client: spy, projectFile: file, project: withRefs, force: true });
+    expect(checked).not.toContain(fake);
   });
 
   it("reports a conflict when the cloud copy changed since the last push", async () => {

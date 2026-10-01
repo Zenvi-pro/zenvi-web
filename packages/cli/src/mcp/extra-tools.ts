@@ -15,7 +15,7 @@ import { openInDesktop } from "../desktop/open.js";
 import { CliError } from "../output.js";
 import { isProjectPath } from "../project/select.js";
 import type { CommandContext } from "../commands/context.js";
-import { cloudClient } from "../commands/account.js";
+import { cloudClient, keepCloudRefs } from "../commands/account.js";
 import { newProject } from "../commands/project.js";
 import { exportOptionsFrom, type RenderFlags } from "../commands/render.js";
 import { parseTime } from "../commands/edit.js";
@@ -256,6 +256,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
             force: args.force === true || args.force === "true",
             warn: (m) => warnings.push(m),
           });
+          await keepCloudRefs(ctx, state.session, result.cloudRefs);
           return { receipt: applied(tool, `Pushed to Zenvi Cloud: ${result.editorUrl}`, { data: result, warnings }, 0) };
         } catch (error) {
           return { receipt: failed(tool, error instanceof CliError && error.hint ? `${error.message} ${error.hint}` : (error as Error).message, { warnings }) };

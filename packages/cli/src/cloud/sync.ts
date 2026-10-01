@@ -20,7 +20,7 @@ import { mkdir, readFile, realpath, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import type { Project, ProjectFile } from "@zenvi/engine";
+import type { CloudMediaRef, Project, ProjectFile } from "@zenvi/engine";
 import { projectAssetsDir, serializeProject } from "@zenvi/engine";
 import { isPortableAssetPath, mapPathValues, sha256File, writeFileAtomic, writeProjectFile } from "@zenvi/render-node";
 import type { ZenviConfig } from "../config.js";
@@ -114,6 +114,8 @@ export interface PushResult {
   uploaded: number;
   reused: number;
   skipped: string[];
+  /** `files[].cloud` per file id, to keep in the local project (the desktop reuses the hash while size and mtime match). */
+  cloudRefs: Record<string, CloudMediaRef>;
 }
 
 interface LocalMedia {
@@ -121,8 +123,28 @@ interface LocalMedia {
   local: string;
   sha256: string;
   size: number;
+  /** Seconds, like Python's os.stat().st_mtime. */
+  mtime: number;
   contentType: string;
   cloudName: string;
+}
+
+/**
+ * `files[].cloud` as the desktop writes it (zenvi-core #238):
+ * `{sha256 (whole file), size, name, content_type, mtime}`, keeping keys
+ * this version does not know.
+ */
+export function cloudRef(file: ProjectFile, m: { sha256: string; size: number; contentType: string; name: string; mtime: number }): CloudMediaRef {
+  const previous = file.cloud && typeof file.cloud === "object" ? file.cloud : {};
+  return { ...previous, sha256: m.sha256, size: m.size, name: m.name, content_type: m.contentType, mtime: m.mtime };
+}
+
+/** The stored hash, when the file still has the size and mtime it was hashed at. */
+function reusableHash(file: ProjectFile, size: number, mtime: number): string | undefined {
+  const c = file.cloud as (CloudMediaRef & { mtime?: unknown }) | undefined;
+  if (!c || typeof c.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(c.sha256)) return undefined;
+  if (c.size !== size || typeof c.mtime !== "number" || Math.abs(c.mtime - mtime) > 1e-3) return undefined;
+  return c.sha256;
 }
 
 function uniqueName(name: string, taken: Set<string>): string {
@@ -154,7 +176,7 @@ export function cloudProjectJson(project: Project, media: LocalMedia[], warn?: (
   });
   for (const file of mapped.files) {
     const m = media.find((x) => x.file.id === file.id);
-    if (m) file.cloud = { sha256: m.sha256, size: m.size, content_type: m.contentType, name: m.cloudName };
+    if (m) file.cloud = cloudRef(file, { ...m, name: m.cloudName });
   }
   for (const value of unmapped) {
     if (!/[\\/]thumbnail[\\/]/.test(value)) warn?.(`${path.basename(value)} is referenced by the project but is not a project file; it was not uploaded.`);
@@ -174,10 +196,12 @@ export async function pushProject(options: PushOptions): Promise<PushResult> {
     const local = String(file.path);
     options.onProgress?.({ phase: "hashing", file: path.basename(local), done, total: candidates.length });
     let size: number;
+    let mtime: number;
     try {
       const st = await stat(local);
       if (!st.isFile()) throw new Error("not a file");
       size = st.size;
+      mtime = st.mtimeMs / 1000;
     } catch {
       skipped.push(local);
       warn(`Media file missing, not uploaded: ${local}`);
@@ -189,9 +213,10 @@ export async function pushProject(options: PushOptions): Promise<PushResult> {
       warn(`${path.basename(local)} is not a media type Zenvi Cloud stores; skipped.`);
       continue;
     }
-    const sha256 = await sha256File(local);
+    // Never the desktop's fingerprint.sha256: it only hashes the first and last MB.
+    const sha256 = reusableHash(file, size, mtime) ?? (await sha256File(local));
     const displayName = typeof file.name === "string" && file.name && path.extname(file.name) ? file.name : path.basename(local);
-    media.push({ file, local, sha256, size, contentType, cloudName: uniqueName(displayName, taken) });
+    media.push({ file, local, sha256, size, mtime, contentType, cloudName: uniqueName(displayName, taken) });
     done += 1;
   }
 
@@ -248,7 +273,9 @@ export async function pushProject(options: PushOptions): Promise<PushResult> {
     ({ id: projectId, revision, editorUrl } = await create());
   }
   await setLink(config, options.projectFile, { projectId, revision, editorUrl, syncedAt: new Date().toISOString() });
-  return { projectId, revision, editorUrl, created, uploaded, reused: unique.length - uploaded, skipped };
+  const cloudRefs: Record<string, CloudMediaRef> = {};
+  for (const m of media) cloudRefs[m.file.id] = cloudRef(m.file, { ...m, name: m.cloudName });
+  return { projectId, revision, editorUrl, created, uploaded, reused: unique.length - uploaded, skipped, cloudRefs };
 }
 
 // ---------------------------------------------------------------------------
@@ -355,7 +382,13 @@ export async function pullProject(options: PullOptions): Promise<PullResult> {
   }
   for (const file of local.files ?? []) {
     const dest = localFor.get(`#${file.id}`);
-    if (dest) file.path = dest;
+    if (!dest) continue;
+    file.path = dest;
+    // The download was hash-checked: record this copy's size and mtime so
+    // the desktop and later pushes reuse the hash instead of re-reading it.
+    const entry = byFile.get(file.id);
+    const st = await stat(dest);
+    if (entry) file.cloud = cloudRef(file, { sha256: entry.sha256, size: st.size, contentType: entry.contentType ?? file.cloud?.content_type ?? contentTypeFor(dest), name: entry.name, mtime: st.mtimeMs / 1000 });
   }
   await writeProjectFile(projectFile, local);
   await setLink(options.config, projectFile, { projectId: id, revision: remote.revision ?? "", editorUrl: remote.editorUrl, syncedAt: new Date().toISOString() });

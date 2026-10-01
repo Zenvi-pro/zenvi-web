@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { liveChildCount } from "../ffmpeg/process.js";
 import { createRgba } from "../image/rgba.js";
 import { audioRms, ffprobeJson, makeAudio, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
-import { atempoChain, gainExpression, simplifyGain } from "./audio-graph.js";
+import { atempoChain, channelPan, gainExpression, simplifyGain } from "./audio-graph.js";
 import type { RenderEngine } from "./engine.js";
 import { exportFrameRange, renderProject } from "./render-project.js";
 
@@ -240,6 +240,13 @@ describe("renderProject", () => {
 });
 
 describe("audio graph helpers", () => {
+  it("maps channel_filter / channel_mapping like Timeline::add_layer", () => {
+    expect(channelPan(2, "stereo")).toBeUndefined();
+    expect(channelPan(2, "stereo", 0)).toBe("pan=stereo|c0=c0|c1=0*c0");
+    expect(channelPan(2, "stereo", 0, 1)).toBe("pan=stereo|c0=0*c0|c1=c0");
+    expect(channelPan(2, "stereo", -1, 0)).toBe("pan=stereo|c0=c0+c1|c1=0*c0");
+  });
+
   it("chains atempo inside its 0.5..100 range", () => {
     expect(atempoChain(1)).toEqual([]);
     expect(atempoChain(-2)).toEqual(["atempo=2"]);

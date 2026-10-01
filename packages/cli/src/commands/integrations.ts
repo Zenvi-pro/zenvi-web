@@ -14,7 +14,7 @@ import { CliError } from "../output.js";
 import { findProject } from "../project/select.js";
 import { openUrl } from "../util/open-url.js";
 import { VERSION } from "../version.js";
-import { cloudClient } from "./account.js";
+import { cloudClient, keepCloudRefs } from "./account.js";
 import { openSession, type CommandContext } from "./context.js";
 
 export function registerIntegrationCommands(program: Command, ctx: CommandContext): void {
@@ -29,6 +29,7 @@ export function registerIntegrationCommands(program: Command, ctx: CommandContex
         if (!project) throw new CliError("No project to open.", 2, "Pass a .zvn file.");
         const session = await openSession(ctx, project);
         const result = await pushProject({ config: ctx.config, client: cloudClient(ctx), projectFile: project, project: session.doc.toJSON(), warn: (m) => ctx.out.warn(m) });
+        await keepCloudRefs(ctx, session, result.cloudRefs);
         const opened = await openUrl(result.editorUrl, ctx.env);
         if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Opened ${result.editorUrl}`, engine: "portable", project, method: "web", opened, ...result });
         else ctx.out.line(`${ctx.out.style("✓", "green")} ${opened ? "Opened" : "Open"} ${result.editorUrl}`);

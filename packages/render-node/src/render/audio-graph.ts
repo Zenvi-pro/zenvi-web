@@ -115,6 +115,22 @@ export function atempoChain(rate: number): string[] {
   return out;
 }
 
+/**
+ * libopenshot `channel_filter` / `channel_mapping` (Timeline::add_layer,
+ * Timeline.cpp:695-728): with a filter, only that source channel plays; each
+ * playing channel is added to its mapped output channel (default: itself).
+ */
+export function channelPan(channels: number, layout: string, filter = -1, mapping = -1): string | undefined {
+  if (filter < 0 && mapping < 0) return undefined;
+  const outputs: string[][] = Array.from({ length: channels }, () => []);
+  for (let c = 0; c < channels; c += 1) {
+    if (filter >= 0 && c !== filter) continue;
+    const target = mapping >= 0 ? mapping : c;
+    if (target < channels) outputs[target]!.push(`c${c}`);
+  }
+  return `pan=${layout}|${outputs.map((sources, k) => `c${k}=${sources.length ? sources.join("+") : "0*c0"}`).join("|")}`;
+}
+
 function layoutName(channels: number): string {
   return channels === 1 ? "mono" : channels === 2 ? "stereo" : channels === 6 ? "5.1" : channels === 8 ? "7.1" : `${channels}c`;
 }
@@ -178,6 +194,8 @@ export async function buildAudioGraph(options: BuildAudioGraphOptions): Promise<
     if (rate < 0) filters.push("areverse");
     filters.push(...atempoChain(rate));
     filters.push(`aformat=sample_fmts=fltp:sample_rates=${sampleRate}:channel_layouts=${layout}`);
+    const pan = channelPan(channels, layout, segment.channelFilter, segment.channelMapping);
+    if (pan) filters.push(pan);
     const gain = gainExpression(segment.gain, part.offset);
     if (gain !== "1") filters.push(`asetnsamples=n=${frameSamples}:p=0`, `volume=eval=frame:volume='${gain}'`);
     const delayMs = Math.round((part.cutStart - range.start) * 1000 * 1000) / 1000;

@@ -8,6 +8,9 @@ import { CloudClient } from "../cloud/client.js";
 import { pullProject, pushProject } from "../cloud/sync.js";
 import { CliError } from "../output.js";
 import { requireProject } from "../project/select.js";
+import type { CloudMediaRef } from "@zenvi/engine";
+import { discoverDesktop, hasProjectOpen } from "../desktop/discovery.js";
+import type { ProjectSession } from "../project/session.js";
 import { openUrl } from "../util/open-url.js";
 import { VERSION } from "../version.js";
 import { openSession, type CommandContext } from "./context.js";
@@ -89,6 +92,7 @@ export function registerAccountCommands(program: Command, ctx: CommandContext): 
         onProgress: (p) => ctx.out.progress(p.phase === "saving" ? "Saving project…" : `${p.phase === "hashing" ? "Hashing" : "Uploading"} ${p.file ?? ""} (${p.done + 1}/${p.total})`),
       });
       ctx.out.endProgress();
+      await keepCloudRefs(ctx, session, result.cloudRefs);
       if (opts.open !== false) await openUrl(result.editorUrl, ctx.env);
       if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pushed ${path.basename(file)} to Zenvi Cloud`, engine: "portable", project: file, ...result });
       else {
@@ -139,6 +143,25 @@ export function registerAccountCommands(program: Command, ctx: CommandContext): 
         projects.map((p) => [p.id, p.name, p.updatedAt ? new Date(p.updatedAt).toLocaleString() : "", p.editorUrl ?? ""]),
       );
     });
+}
+
+/**
+ * Store each file's `cloud` ref in the local project (not an undo step), like
+ * the desktop, so later pushes skip re-hashing. Skipped while the desktop app
+ * has the project open: it owns the file then.
+ */
+export async function keepCloudRefs(ctx: CommandContext, session: ProjectSession, refs: Record<string, CloudMediaRef>): Promise<void> {
+  const file = session.file;
+  if (!file || Object.keys(refs).length === 0) return;
+  for (const endpoint of await discoverDesktop(ctx.config)) if (await hasProjectOpen(endpoint, file)) return;
+  let changed = false;
+  for (const [id, ref] of Object.entries(refs)) {
+    const entry = session.doc.project.files.find((f) => f.id === id);
+    if (!entry || JSON.stringify(entry.cloud) === JSON.stringify(ref)) continue;
+    session.doc.setUntracked(["files", { id }], { ...entry, cloud: ref });
+    changed = true;
+  }
+  if (changed) await session.save();
 }
 
 function report(ctx: CommandContext, summary: string, data: Record<string, unknown>): void {
