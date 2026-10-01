@@ -99,6 +99,31 @@ test("new project → import → arrange → split → undo → play → export"
   await blur.dragTo(clips(page).first());
   await expect(page.getByText("Parameters")).toBeVisible();
   await shot(page, "05c-effect");
+
+  // Fade the clip in with a transition from the library (double-click applies it to the selection).
+  await clips(page).first().click();
+  await rail.getByRole("button", { name: "Transitions" }).click();
+  await page.getByRole("button", { name: "Fade", exact: true }).first().dblclick();
+  await expect(page.locator('[data-kind="transition"]')).toHaveCount(1);
+  await shot(page, "05d-transition");
+
+  // A title from a template, over the picture on its own track.
+  await page.keyboard.press("Home");
+  await rail.getByRole("button", { name: "Titles" }).click();
+  await page.getByRole("button", { name: "Bar 1", exact: true }).click();
+  const titleDialog = page.getByRole("dialog", { name: "Title" });
+  await expect(titleDialog).toBeVisible();
+  const line = titleDialog.getByRole("textbox").first();
+  await line.fill("Made in the browser");
+  await expect(titleDialog.getByRole("img", { name: "Title preview" })).toBeVisible();
+  await shot(page, "05e-title-dialog");
+  await titleDialog.getByRole("button", { name: "Add to timeline" }).click();
+  await expect(titleDialog).toBeHidden();
+  await expect(clips(page)).toHaveCount(2);
+  const layersOf = await page.evaluate(() => Array.from(document.querySelectorAll('[data-kind="clip"]')).map((el) => (el as HTMLElement).dataset.track ?? ""));
+  expect(new Set(layersOf).size).toBe(2);
+  await page.waitForTimeout(800);
+  await shot(page, "05f-title");
   await rail.getByRole("button", { name: "Project files" }).click();
 
   // Export in the browser and receive the file.

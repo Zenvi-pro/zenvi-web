@@ -115,3 +115,16 @@ export function addFilesToTimeline(session: EditorSession, fileIds: readonly str
   const clips = session.edit(files.length > 1 ? `Add ${files.length} clips` : "Add to timeline", (tx) => placeAtDefaults(tx, files, selected));
   return clips?.map((c) => c.id) ?? [];
 }
+
+/**
+ * Inside a transaction: the track for an overlay (a title) over [start, end):
+ * the lowest free track above every clip showing then, adding one on top
+ * when there is none.
+ */
+export function overlayTrack(tx: Transaction, start: number, end: number): number {
+  const project = tx.project;
+  const under = project.clips.filter((c) => c.position < end - EPSILON && c.position + (c.end - c.start) > start + EPSILON).map((c) => c.layer);
+  const floor = under.length > 0 ? Math.max(...under) : Number.NEGATIVE_INFINITY;
+  const free = sortedLayers(project).find((l) => !l.lock && l.number > floor && trackIsFree(project, l.number, start, end));
+  return free ? free.number : addTrack(tx).number;
+}

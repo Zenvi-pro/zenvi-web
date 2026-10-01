@@ -10,19 +10,11 @@ import { runChatTurn } from "@/lib/chat/turn";
 import { chatSocketUrl } from "@/lib/env";
 import type { EditorSession } from "../session/EditorSession";
 import { editorSnapshot, runAssistantTool } from "./bridge";
+import { applyToolEvent, newActivityLinks, type ToolActivity } from "./activity";
 import { createToolHost } from "./host";
 
-export type ToolStatus = "running" | "done" | "error";
-
-export interface ToolActivity {
-  callId: string;
-  name: string;
-  label: string;
-  status: ToolStatus;
-  detail?: string;
-  /** Ran in this editor (tool_call) vs on the backend (tool_started). */
-  local: boolean;
-}
+export type { ToolActivity, ToolStatus } from "./activity";
+export { toolLabel } from "./activity";
 
 export interface ChatMessage {
   id: string;
@@ -49,25 +41,6 @@ const MAX_SAVED = 60;
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10);
-}
-
-/** "slice_clip_at_playhead_tool" → "Slice clip at playhead" */
-export function toolLabel(name: string): string {
-  const words = name.replace(/_tool$/, "").replace(/_/g, " ").trim();
-  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Tool";
-}
-
-function summarize(result: string): string {
-  const text = result.trim();
-  if (text.startsWith("{")) {
-    try {
-      const parsed = JSON.parse(text) as { summary?: unknown };
-      if (typeof parsed.summary === "string") return parsed.summary;
-    } catch {
-      // not JSON
-    }
-  }
-  return text.length > 240 ? `${text.slice(0, 240)}…` : text;
 }
 
 interface Controller {
@@ -184,14 +157,8 @@ export async function send(session: EditorSession, text: string): Promise<void> 
   const abort = new AbortController();
   controller.abort = abort;
   const host = createToolHost(session, pickFiles);
-  const upsertTool = (activity: Partial<ToolActivity> & { callId: string }) =>
-    patchReply((m) => {
-      const existing = m.tools.find((t) => t.callId === activity.callId);
-      const tools = existing
-        ? m.tools.map((t) => (t.callId === activity.callId ? { ...t, ...activity } : t))
-        : [...m.tools, { name: "", label: "Tool", status: "running" as ToolStatus, local: false, ...activity }];
-      return { ...m, tools };
-    });
+  const links = newActivityLinks();
+  const onToolEvent = (event: Parameters<typeof applyToolEvent>[1]) => patchReply((m) => ({ ...m, tools: applyToolEvent(m.tools, event, links) }));
 
   const onEvent = (event: ChatEvent) => {
     switch (event.type) {
@@ -199,19 +166,11 @@ export async function send(session: EditorSession, text: string): Promise<void> 
         patchReply((m) => ({ ...m, text: m.text + event.text }));
         break;
       case "tool_call":
-        upsertTool({ callId: event.callId, name: event.name, label: toolLabel(event.name), status: "running", local: true });
-        break;
       case "tool_started":
-        upsertTool({ callId: event.callId, name: event.name, label: toolLabel(event.name), status: "running" });
-        break;
       case "tool_progress":
-        upsertTool({ callId: event.callId, detail: event.line });
-        break;
       case "tool_completed":
-        upsertTool({ callId: event.callId, status: event.ok ? "done" : "error", detail: event.summary ? summarize(event.summary) : undefined });
-        break;
       case "tool_result":
-        upsertTool({ callId: event.callId, status: event.ok ? "done" : "error", detail: summarize(event.result) });
+        onToolEvent(event);
         break;
       case "assistant_response":
         patchReply((m) => ({ ...m, text: stripContextBlocks(event.response) || m.text }));

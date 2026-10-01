@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { addClip, addFile, createProject, findProfile, ProjectDocument, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
-import { desktopPlacement, freeTrack, placeAtDefaults } from "./placement";
+import { desktopPlacement, freeTrack, overlayTrack, placeAtDefaults } from "./placement";
 
 const base: ReaderInfo = {
   type: "FFmpegReader",
@@ -88,5 +88,20 @@ describe("the Add-to-timeline gesture never stacks clips", () => {
     expect(freeTrack(doc.project, sorted[0]!, 0, 2, true)).toBeNull();
     expect(freeTrack(doc.project, sorted[1]!, 0, 2, false)).toBe(sorted[2]);
     expect(freeTrack(doc.project, sorted[1]!, 10, 12, false)).toBe(sorted[1]);
+  });
+});
+
+describe("titles go over the picture", () => {
+  it("uses the lowest free track above what plays, adding one on top when needed", () => {
+    const { doc, video } = setup();
+    const sorted = [...doc.project.layers].sort((a, b) => a.number - b.number).map((l) => l.number);
+    doc.transaction("v", (tx) => addClip(tx, { fileId: video.id, position: 0, layer: sorted[1]! }));
+    expect(doc.transaction("t", (tx) => overlayTrack(tx, 1, 3))).toBe(sorted[2]);
+    const top = sorted[sorted.length - 1]!;
+    doc.transaction("top", (tx) => addClip(tx, { fileId: video.id, position: 0, layer: top }));
+    const layers = doc.project.layers.length;
+    const added = doc.transaction("t2", (tx) => overlayTrack(tx, 1, 3));
+    expect(added).toBeGreaterThan(top);
+    expect(doc.project.layers.length).toBe(layers + 1);
   });
 });

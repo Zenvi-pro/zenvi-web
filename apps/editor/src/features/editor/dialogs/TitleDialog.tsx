@@ -9,7 +9,7 @@ import { Dialog } from "@/ui/Dialog";
 import { TextInput } from "@/ui/Input";
 import { Select } from "@/ui/Select";
 import { toast } from "@/ui/Toast";
-import { defaultTrack } from "../actions/importMedia";
+import { overlayTrack } from "../actions/placement";
 import { titleTemplates } from "../catalog";
 import { useSession, useUi } from "../session/context";
 import { EMPTY_SELECTION } from "../session/uiStore";
@@ -80,10 +80,11 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
       const file = new File([built.svg], name, { type: "image/svg+xml" });
       const [item] = await session.media.importFiles([file]);
       if (!item) throw new Error("Could not store the title.");
-      const layer = defaultTrack(session.project);
-      if (layer === null) throw new Error("Unlock a track first: every track is locked.");
       const position = session.playback.getState().time;
-      const result = session.edit("Add title", (tx) => addTitleClip(tx, { file: item.media, position, duration: TITLE_SECONDS, layer, title: fields.lines[0] || "Title" }));
+      // Over whatever plays then, never stacked on another clip (one undo step, track included).
+      const result = session.edit("Add title", (tx) =>
+        addTitleClip(tx, { file: item.media, position, duration: TITLE_SECONDS, layer: overlayTrack(tx, position, position + TITLE_SECONDS), title: fields.lines[0] || "Title" }),
+      );
       if (result) {
         session.media.attach(result.file.id, item.spec);
         session.ui.setState({ selection: { ...EMPTY_SELECTION, clips: [result.clip.id] } });
