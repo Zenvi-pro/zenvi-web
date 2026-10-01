@@ -195,11 +195,9 @@ export interface ProjectFile extends ReaderInfo {
 // Timeline objects
 // ---------------------------------------------------------------------------
 
-/** A clip effect (libopenshot `EffectBase::JsonValue()`); params vary by effect. */
-export interface Effect {
+/** Fields shared by clip effects and timeline transitions (libopenshot `EffectBase`). */
+export interface EffectFields {
   id: string;
-  /** libopenshot class name, e.g. "Brightness", "Blur", "ChromaKey". */
-  class_name: string;
   /** Same as class_name for effects; "Mask" for transitions. */
   type: string;
   name?: string;
@@ -218,6 +216,12 @@ export interface Effect {
   parent_effect_id?: string;
   /** Effect parameters: Keyframe | ColorKeyframe | number | string | boolean | nested objects. */
   [param: string]: unknown;
+}
+
+/** A clip effect (libopenshot `EffectBase::JsonValue()`); params vary by effect. */
+export interface Effect extends EffectFields {
+  /** libopenshot class name, e.g. "Brightness", "Blur", "ChromaKey". */
+  class_name: string;
 }
 
 export interface Clip {
@@ -286,9 +290,10 @@ export interface Clip {
  * The mask image's luminance, shifted by `brightness` and sharpened by
  * `contrast`, becomes the alpha of the top clip on `layer` while it overlaps.
  */
-export interface Transition extends Effect {
+export interface Transition extends EffectFields {
   type: "Mask";
-  class_name: "Mask";
+  /** Desktop-created transitions omit it; libopenshot infers Mask from `type`. */
+  class_name?: "Mask";
   position: number;
   start: number;
   end: number;
@@ -326,6 +331,13 @@ export interface Marker {
 // Project
 // ---------------------------------------------------------------------------
 
+export interface ExportSettingEntry {
+  name: string;
+  type?: string;
+  value: unknown;
+  [key: string]: unknown;
+}
+
 export interface Project {
   id: string;
   fps: Fraction;
@@ -350,7 +362,8 @@ export interface Project {
   playhead_position: number;
   /** Profile description, e.g. "HD 720p 30 fps". */
   profile: string;
-  export_settings: Record<string, unknown> | null;
+  /** Export dialog widget states as the desktop saves them: `[{ name, type, value }]`. */
+  export_settings: ExportSettingEntry[] | null;
   export_overrides: Record<string, unknown>;
   layers: Layer[];
   markers: Marker[];
