@@ -312,15 +312,47 @@ function splitAt(tx: Transaction, clip: Clip, at: number, keep: SliceKeep): Spli
  * shifting because clip keyframes are in source frame space; both parts keep
  * them all. The cut must fall strictly inside the clip.
  */
-export function splitClip(tx: Transaction, clipId: string, atSeconds: number, keep: SliceKeep = "both"): SplitClipResult {
+export interface SplitClipOptions {
+  /**
+   * Ripple slice (desktop W / Q): after keeping one side, close the gap the
+   * removed part leaves by moving later items on the track left. Only with
+   * `left` / `right`.
+   */
+  ripple?: boolean;
+}
+
+export function splitClip(
+  tx: Transaction,
+  clipId: string,
+  atSeconds: number,
+  keep: SliceKeep = "both",
+  opts: SplitClipOptions = {},
+): SplitClipResult {
   const project = tx.project;
   const clip = requireEditableClip(project, clipId);
   requireKeep(keep);
+  if (opts.ripple && keep === "both") throw invalid("A ripple slice keeps one side (left or right).");
   const at = slicePoint(project, requireFinite(atSeconds, "atSeconds"), keep);
   if (!(clip.position < at && at < itemEnd(clip))) {
     throw invalid(`Time ${atSeconds} s is not inside clip ${clipId} (${clip.position}..${itemEnd(clip)} s).`);
   }
-  return splitAt(tx, clip, at, keep);
+  if (!opts.ripple) return splitAt(tx, clip, at, keep);
+  // timeline.py Slice_Triggered(ripple=True): trim, then ripple_delete_gap (position >= cut).
+  const originalPosition = Number(clip.position);
+  const start = Number(clip.start);
+  const end = Number(clip.end);
+  const newEdge = start + (at - originalPosition);
+  const removed = keep === "left" ? end - start - (newEdge - start) : end - start - (end - newEdge);
+  const later = (p: number): boolean => p >= at;
+  const result = splitAt(tx, clip, at, keep);
+  if (keep === "right") patchClip(tx, clipId, { position: originalPosition });
+  for (const c of tx.project.clips.filter((c) => c.layer === clip.layer && c.id !== clipId && later(Number(c.position)))) {
+    tx.update(["clips", { id: c.id }], { position: Number(c.position) - removed });
+  }
+  for (const t of tx.project.effects.filter((t) => t.layer === clip.layer && later(Number(t.position)))) {
+    tx.update(["effects", { id: t.id }], { position: Number(t.position) - removed });
+  }
+  return result;
 }
 
 export interface SliceAllOptions {

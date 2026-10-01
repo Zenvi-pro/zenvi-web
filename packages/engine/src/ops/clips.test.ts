@@ -446,3 +446,20 @@ describe("separateAudio (Split_Audio_Triggered)", () => {
     expectRefused(doc, "invalid_argument", (tx) => separateAudio(tx, "IMG"));
   });
 });
+
+describe("ripple slice", () => {
+  it("keep left closes the gap after the cut; keep right moves the right part back", () => {
+    const doc = docWithClip(0, "A");
+    doc.transaction("b", (tx) => addClip(tx, { fileId: "VIDEO00001", position: 20, layer: V1, id: "B", end: 5 }));
+    doc.transaction("w", (tx) => splitClip(tx, "A", 5, "left", { ripple: true }));
+    const a = clip(doc, "A");
+    expect(a.end).toBeCloseTo(5 + 1 / 30, 12);
+    expect(clip(doc, "B").position).toBeCloseTo(5 + 1 / 30, 12);
+    const doc2 = docWithClip(0, "A");
+    doc2.transaction("b", (tx) => addClip(tx, { fileId: "VIDEO00001", position: 20, layer: V1, id: "B", end: 5 }));
+    doc2.transaction("q", (tx) => splitClip(tx, "A", 5, "right", { ripple: true }));
+    expect([clip(doc2, "A").position, clip(doc2, "A").start]).toEqual([0, 5]);
+    expect(clip(doc2, "B").position).toBe(15);
+    expectRefused(doc2, "invalid_argument", (tx) => splitClip(tx, "A", 3, "both", { ripple: true }));
+  });
+});
