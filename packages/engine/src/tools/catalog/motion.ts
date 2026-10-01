@@ -325,7 +325,7 @@ export const motionTools: CatalogTool[] = [
   contractTool("propose_overlay_windows_tool", {
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     run: async (call, input) => {
-      const nRaw = Number(text(input.beat_count) || text(input.limit) || "4");
+      const nRaw = Number(text(input.beat_count) || "4");
       const n = Math.max(1, Math.min(8, Number.isFinite(nRaw) ? Math.trunc(nRaw) : 4));
       const preferTr = !["false", "0", "no"].includes(String(input.prefer_transparent ?? "true").trim().toLowerCase());
       const project = call.doc.project;
@@ -382,11 +382,6 @@ export const motionTools: CatalogTool[] = [
         }
       }
       applyTimeBoosts(windows, await overlayIndexBoosts(call, contexts));
-      const theme = text(input.query);
-      if (theme) {
-        const themeTokens = tokenize(theme);
-        for (const w of windows) if ([...tokenize(w.label)].some((t) => themeTokens.has(t))) w.score += 2;
-      }
       segments.sort((a, b) => a.position - b.position);
       const gaps: number[] = [];
       if (segments.length > 0) {
@@ -485,33 +480,11 @@ export const motionTools: CatalogTool[] = [
   contractTool("place_motion_graphic_tool", {
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     run: async (call, input) => {
-      let fid = text(input.file_id);
-      let pending: ImportedMedia | null = null;
-      if (!fid && text(input.url)) {
-        const importUrl = call.host.media?.importUrl;
-        if (!importUrl) return unavailable("place_motion_graphic_tool", "it cannot download media from URLs (url=…); pass file_id.");
-        try {
-          pending = await importUrl.call(call.host.media, text(input.url), { filename: mgFileName(text(input.url)), signal: call.signal });
-        } catch (error) {
-          return `Error importing video: download failed: ${error instanceof Error ? error.message : String(error)}`;
-        }
-      }
-      if (!fid && !pending) return "Error: file_id is required for place_motion_graphic_tool";
+      const fid = text(input.file_id);
+      if (!fid) return "Error: file_id is required for place_motion_graphic_tool";
       const project = call.doc.project;
-      let file: ProjectFile | undefined = fid ? fileById(project, fid) : undefined;
-      if (fid && !file) return `Error: File not found for id=${fid}.`;
-      if (pending) {
-        const existing = project.files.find((f) => f.path === pending!.path);
-        if (existing) {
-          file = existing;
-          fid = String(existing.id);
-          pending = null;
-        } else {
-          const transparent = /\.webm$/i.test(text(input.url).split("?")[0]!);
-          file = { ...pending.info, path: pending.path, id: "", media_type: "video", ...mgStamp("", transparent) } as ProjectFile;
-        }
-      }
-      const fileData = file!;
+      const fileData = fileById(project, fid);
+      if (!fileData) return `Error: File not found for id=${fid}.`;
       const isTransparent = fileLooksTransparent(fileData);
       const mode = String(input.mode ?? "overlay").trim().toLowerCase() || "overlay";
       if (!["overlay", "gap", "cut_in"].includes(mode)) return "Error: mode must be overlay|gap|cut_in";
@@ -562,7 +535,6 @@ export const motionTools: CatalogTool[] = [
         position_seconds: String(t),
         track: String(trackNum),
         duration_seconds: String(dur),
-        start_seconds: input.start_seconds,
         query: watchQuery,
       });
       if (typeof plan === "string") return plan;
@@ -575,19 +547,12 @@ export const motionTools: CatalogTool[] = [
         duration_seconds: dur,
         track: trackNum,
       };
-      const media = pending;
       const clip = call.commit((tx) => {
         for (const [id, position] of shifts) moveClip(tx, id, { position });
-        let targetId = fid;
-        if (media) {
-          const added = addFile(tx, media, { dedupe: true });
-          targetId = String(added.id);
-          tx.update(["files", { id: targetId }], mgStamp("", isTransparent, added));
-        }
-        const current = tx.project.files.find((f) => String(f.id) === targetId);
+        const current = tx.project.files.find((f) => String(f.id) === fid);
         const ai = { ...record(current?.ai_metadata), mg_placement: stamp, ...(isTransparent ? {} : { transparent: false }) };
-        tx.update(["files", { id: targetId }], { ai_metadata: ai });
-        return applyPlacement(tx, targetId, plan);
+        tx.update(["files", { id: fid }], { ai_metadata: ai });
+        return applyPlacement(tx, fid, plan);
       });
       const result = placementText(call.doc.project, plan, clip);
       const trackLabel = formatTrackLabelForLlm(trackNum, layers);

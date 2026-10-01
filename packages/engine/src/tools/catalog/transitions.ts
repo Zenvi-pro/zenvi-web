@@ -10,54 +10,23 @@
  * higher track, desktop keyframes) are the ops' applyTransitionBetween /
  * applyTransitionToClip.
  *
- * Web additions, all named in the contract schema (TOOL_SCHEMAS declares
- * them; the desktop handler ignores them): `name` / `transition` alias
- * transition_name, `timeline_clip_id` aliases clip1_id, `clip_query` /
- * `position_seconds` / `track` find clip 1 (between: the two clips meeting at
- * position_seconds), clip 2 defaults to the next clip on clip 1's track,
- * `duration_seconds` aliases duration, and `brightness` / `contrast` set
- * constant mask values. With no name the transition is a fade (the desktop
- * matched the first file of its transitions folder).
+ * One web difference: clip2 defaults to the next clip on clip1's track
+ * (the desktop answers "Error: clip2_id is required"), and no name means a
+ * fade (the desktop matched the first file of its transitions folder).
  */
 
 import type { Clip, Project } from "../../model/types.js";
-import { applyTransitionBetween, applyTransitionToClip, resolveTransitionMask, setTransitionProperty } from "../../ops/transitions.js";
+import { applyTransitionBetween, applyTransitionToClip, resolveTransitionMask } from "../../ops/transitions.js";
 import { listTransitions, searchTransitions, type TransitionEntry } from "../../transitions/index.js";
 import { parsePythonFloat } from "../coerce.js";
-import { contractTool, type CatalogTool, type ToolCall } from "../define.js";
-import { pyFixed, pyRepr } from "../pyfmt.js";
-import { normalizeTrackOrLayerArg } from "../tracks.js";
-import { resolveClip, text } from "./common.js";
+import { contractTool, type CatalogTool } from "../define.js";
+import { pyFixed } from "../pyfmt.js";
+import { text } from "./common.js";
 
 const READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false } as const;
 
-/** How far position_seconds may sit from a cut and still name it. */
-const CUT_TOLERANCE_SEC = 0.5;
-
 function toolRow(entry: TransitionEntry): Record<string, string> {
   return { name: entry.name, filename: entry.file, category: entry.category, path: entry.storedPath };
-}
-
-function clipEnd(clip: Clip): number {
-  return (Number(clip.position) || 0) + (Number(clip.end) || 0) - (Number(clip.start) || 0);
-}
-
-/** The two clips on one track meeting nearest `t` (within CUT_TOLERANCE_SEC), top track first. */
-function clipsMeetingAt(project: Project, t: number, layer: number | undefined): [Clip, Clip] | undefined {
-  const layers = [...new Set((project.clips ?? []).map((c) => Number(c.layer)))]
-    .filter((l) => layer === undefined || l === layer)
-    .sort((a, b) => b - a);
-  let best: { d: number; pair: [Clip, Clip] } | undefined;
-  for (const l of layers) {
-    const onLayer = (project.clips ?? []).filter((c) => Number(c.layer) === l).sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
-    for (let i = 1; i < onLayer.length; i += 1) {
-      const a = onLayer[i - 1]!;
-      const b = onLayer[i]!;
-      const d = Math.min(Math.abs(t - (Number(b.position) || 0)), Math.abs(t - clipEnd(a)));
-      if (d <= CUT_TOLERANCE_SEC && (!best || d < best.d)) best = { d, pair: [a, b] };
-    }
-  }
-  return best?.pair;
 }
 
 /** The first clip on `clip`'s track that starts after it. */
@@ -77,51 +46,6 @@ function durationArg(value: unknown): number {
   if (typeof value === "number") return value;
   const n = parsePythonFloat(String(value ?? "").trim());
   return n === null ? 1.0 : n;
-}
-
-/** An optional constant mask value; an error string when it does not parse. */
-function maskValue(value: unknown, field: string): number | null | string {
-  if (value === undefined || value === null || String(value).trim() === "") return null;
-  const n = typeof value === "number" ? value : parsePythonFloat(String(value).trim());
-  if (n === null || !Number.isFinite(n)) return `Error: ${field} must be a number (got ${pyRepr(value)}).`;
-  return n;
-}
-
-async function resolveFirstClip(
-  call: ToolCall,
-  input: Record<string, unknown>,
-  placement: string,
-): Promise<{ clip: Clip; pairNext?: Clip } | string> {
-  const project = call.doc.project;
-  const id = text(input.clip1_id) || text(input.timeline_clip_id);
-  if (id) {
-    const clip = findClip(project, id);
-    return clip ? { clip } : `Error: Clip '${id}' not found.`;
-  }
-  const position = input.position_seconds;
-  const hasPosition = position !== undefined && position !== null && String(position).trim() !== "";
-  if (text(input.clip_query)) {
-    const resolved = await resolveClip(call, { clip_query: input.clip_query, track: input.track, position_near: hasPosition ? position : undefined });
-    return resolved.ok ? { clip: resolved.clip } : resolved.error || "Error: Could not resolve timeline clip.";
-  }
-  if (hasPosition) {
-    const t = typeof position === "number" ? position : parsePythonFloat(String(position).trim());
-    if (t === null || !Number.isFinite(t)) return `Error: position_seconds=${pyRepr(position)} is not a time in seconds`;
-    let layer: number | undefined;
-    if (text(input.track)) {
-      const r = normalizeTrackOrLayerArg(text(input.track), project.layers);
-      if (r.error) return r.error;
-      layer = r.layer;
-    }
-    if (placement === "between") {
-      const pair = clipsMeetingAt(project, t, layer);
-      if (!pair) return `Error: No cut between two clips within ${pyFixed(CUT_TOLERANCE_SEC, 1)}s of ${pyFixed(t, 2)}s. Pass clip1_id and clip2_id.`;
-      return { clip: pair[0], pairNext: pair[1] };
-    }
-    const resolved = await resolveClip(call, { track: input.track, position_near: t });
-    return resolved.ok ? { clip: resolved.clip } : resolved.error || "Error: Could not resolve timeline clip.";
-  }
-  return "Error: apply_transition_tool needs clip1_id (or timeline_clip_id, clip_query or position_seconds).";
 }
 
 export const transitionTools: CatalogTool[] = [
@@ -149,23 +73,17 @@ export const transitionTools: CatalogTool[] = [
 
   contractTool("apply_transition_tool", {
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    run: async (call, input) => {
+    run: (call, input) => {
       const place = (text(input.placement) || "between").toLowerCase();
       if (place !== "between" && place !== "start" && place !== "end") {
         return "Error: placement must be 'between', 'start', or 'end'.";
       }
-      const name = text(input.transition_name) || text(input.name) || text(input.transition) || "fade";
-      const durationRaw = input.duration !== undefined && String(input.duration).trim() !== "" ? input.duration : input.duration_seconds;
-      const duration = durationArg(durationRaw);
-      const brightness = maskValue(input.brightness, "brightness");
-      if (typeof brightness === "string") return brightness;
-      const contrast = maskValue(input.contrast, "contrast");
-      if (typeof contrast === "string") return contrast;
-
-      const first = await resolveFirstClip(call, input, place);
-      if (typeof first === "string") return first;
+      const name = text(input.transition_name) || "fade";
+      const duration = durationArg(input.duration);
       const project = call.doc.project;
-      const clip1 = first.clip;
+      const id1 = text(input.clip1_id);
+      const clip1 = findClip(project, id1);
+      if (!clip1) return `Error: Clip '${id1}' not found.`;
       let clip2: Clip | undefined;
       if (place === "between") {
         const id2 = text(input.clip2_id);
@@ -173,36 +91,20 @@ export const transitionTools: CatalogTool[] = [
           clip2 = findClip(project, id2);
           if (!clip2) return `Error: Clip '${id2}' not found.`;
         } else {
-          clip2 = first.pairNext ?? nextClipOnTrack(project, clip1);
-          if (!clip2) return `Error: clip2_id is required when placement='between' (no clip follows ${String(clip1.id)} on its track).`;
+          clip2 = nextClipOnTrack(project, clip1);
+          if (!clip2) return `Error: clip2_id is required when placement='between' (no clip follows ${id1} on its track).`;
         }
       }
       if (!resolveTransitionMask(name)) return `Error: Transition '${name}' not found. Use search_transitions_tool.`;
-
-      const applyMask = (transitionId: string, tx: Parameters<typeof setTransitionProperty>[0]): void => {
-        if (brightness !== null) setTransitionProperty(tx, transitionId, "brightness", brightness);
-        if (contrast !== null) setTransitionProperty(tx, transitionId, "contrast", contrast);
-      };
       if (clip2) {
-        const id1 = String(clip1.id);
         const id2 = String(clip2.id);
-        const result = call.commit((tx) => {
-          const r = applyTransitionBetween(tx, id1, id2, name, duration);
-          applyMask(r.transition.id, tx);
-          return r;
-        });
-        const t = result.transition;
+        const t = call.commit((tx) => applyTransitionBetween(tx, id1, id2, name, duration).transition);
         return (
           `Added '${name}' transition between clips (overlap: ${pyFixed(t.end - t.start, 2)}s).\n` +
           `Clip2 moved to ${pyFixed(t.position, 2)}s. Transition ID: ${t.id}`
         );
       }
-      const id1 = String(clip1.id);
-      const t = call.commit((tx) => {
-        const transition = applyTransitionToClip(tx, id1, name, place === "end" ? "end" : "start", duration);
-        applyMask(transition.id, tx);
-        return transition;
-      });
+      const t = call.commit((tx) => applyTransitionToClip(tx, id1, name, place === "end" ? "end" : "start", duration));
       return `Added '${name}' transition at ${place} of clip.\nID: ${t.id}, Duration: ${pyFixed(t.end - t.start, 2)}s, Position: ${pyFixed(t.position, 2)}s`;
     },
   }),

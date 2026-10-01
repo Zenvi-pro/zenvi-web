@@ -47,7 +47,7 @@ import { applied } from "../receipt.js";
 import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, normalizeTrackOrLayerArg } from "../tracks.js";
 import type { ImportedMedia } from "../types.js";
 import { confirmWatchWindow, type WatchResult } from "../watch.js";
-import { fileById, floatArg, fmtMmss, forgetFile, recallFile, record, rememberFile, selectedTrack, text } from "./common.js";
+import { boolArg, fileById, floatArg, fmtMmss, forgetFile, recallFile, record, rememberFile, selectedTrack, text } from "./common.js";
 
 /** Seconds a text-index window may span before a vision match is required (MAX_PLACE_SPAN_SEC). */
 export const MAX_PLACE_SPAN_SEC = 20.0;
@@ -129,17 +129,6 @@ export function describeFileForLlm(project: Project, fileId: string, file: Proje
       "Pass start_seconds/end_seconds (in source seconds) - never frame numbers.";
   }
   return line;
-}
-
-function findFileByQuery(project: Project, query: string): ProjectFile | undefined {
-  const q = query.toLowerCase();
-  const files = (project.files ?? []).filter((f) => !f.zenvi_subclip);
-  const byName = files.find((f) => String(f.name || f.path || "").toLowerCase().includes(q));
-  if (byName) return byName;
-  return files.find((f) => {
-    const ai = record(f.ai_metadata);
-    return `${String(ai.short_summary ?? "")} ${String(ai.description ?? "")}`.toLowerCase().includes(q);
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -506,6 +495,14 @@ function secondsToTimeParts(secs: number, fpsNum: number, fpsDen: number): { hou
   return { hour: pad(hour), min: pad(minute), sec: pad(sec), frame: pad(frame) };
 }
 
+/** tool_handlers._positive_int_arg: int(float(x)) when > 0, else null. */
+function positiveIntArg(value: unknown): number | null {
+  const n = floatArg(value, null);
+  if (n === null) return null;
+  const i = Math.trunc(n);
+  return i > 0 ? i : null;
+}
+
 function stem(path: string): string {
   const base = String(path ?? "").split(/[\\/]/).pop() ?? "";
   const dot = base.lastIndexOf(".");
@@ -521,8 +518,7 @@ export const clipTools: CatalogTool[] = [
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     run: (call, input) => {
       const project = call.doc.project;
-      let id = text(input.file_id);
-      if (!id && text(input.query)) id = String(findFileByQuery(project, text(input.query))?.id ?? "");
+      const id = text(input.file_id);
       if (!id) return "Error: file_id is required.";
       const file = fileById(project, id);
       if (!file) return `Error: File not found for id=${id}.`;
@@ -571,11 +567,17 @@ export const clipTools: CatalogTool[] = [
 
       const [srcStart, srcEnd] = sourceWindowForFile(data);
       const query = text(input.query);
-      // tool_handlers._coerce_time_arg: float(str(x).strip()) or None.
-      const t0Raw = floatArg(input.start_seconds, null);
-      const t1Raw = floatArg(input.end_seconds, null);
+      // tool_handlers._coerce_time_arg: float(str(x).strip()) or None; frames are 1-based.
+      let t0Raw = floatArg(input.start_seconds, null);
+      let t1Raw = floatArg(input.end_seconds, null);
       if (t0Raw === null || t1Raw === null) {
-        return "Error: Provide start_seconds+end_seconds (preferred) or start_frame+end_frame (1-based).";
+        const sf = positiveIntArg(input.start_frame);
+        const ef = positiveIntArg(input.end_frame);
+        if (sf === null || ef === null) {
+          return "Error: Provide start_seconds+end_seconds (preferred) or start_frame+end_frame (1-based).";
+        }
+        t0Raw = srcStart + (sf - 1) / fps;
+        t1Raw = srcStart + ef / fps;
       }
       let t0 = Math.min(t0Raw, t1Raw);
       let t1 = Math.max(t0Raw, t1Raw);
@@ -587,7 +589,8 @@ export const clipTools: CatalogTool[] = [
 
       const skipWatch = parseExplicitSourceTimeRange(query) !== null;
       const origSpan = t1 - t0;
-      const requireVisual = origSpan > MAX_PLACE_SPAN_SEC;
+      // The desktop reads bool(require_visual_match), so the string "false" counts as true there.
+      const requireVisual = boolArg(input.require_visual_match) || origSpan > MAX_PLACE_SPAN_SEC;
       let watchedNote = "";
       let watchRecord: WatchResult | null = null;
       if (!skipWatch && !windowIsDialogueDriven(data, t0, t1)) {
@@ -596,7 +599,7 @@ export const clipTools: CatalogTool[] = [
           file: meta.file,
           start: t0,
           end: t1,
-          query: query || "the matching action in this window",
+          query: query || text(input.name) || "the matching action in this window",
           fallbackCut: (t0 + t1) / 2,
           duration: meta.duration,
           cues: meta.cues,
@@ -640,7 +643,7 @@ export const clipTools: CatalogTool[] = [
         if (entry.tags) entry.tags = filterTagsStringForWindow(String(entry.tags), effective);
       }
       const t = secondsToTimeParts(s, fpsNum, fpsDen);
-      const clipName = `${stem(String(data.path || data.name || "clip"))} (${t.hour}:${t.min}:${t.sec}:${t.frame})`;
+      const clipName = text(input.name) || `${stem(String(data.path || data.name || "clip"))} (${t.hour}:${t.min}:${t.sec}:${t.frame})`;
       entry.zenvi_subclip = true;
       if (watchRecord) {
         entry.zenvi_watch_confirmed = !watchRecord.used_fallback;
@@ -648,42 +651,21 @@ export const clipTools: CatalogTool[] = [
         entry.zenvi_watch_sparse = Boolean(watchRecord.sparse);
       }
 
-      // The contract's position_seconds/track also place the subclip (one undo step).
-      const place = text(input.position_seconds) !== "" || text(input.track) !== "";
       const media: ImportedMedia = {
         path: String(data.path ?? ""),
         info: entry as unknown as ImportedMedia["info"],
         name: clipName,
       };
-      let plan: PlacementPlan | string | null = null;
-      if (place) {
-        plan = await planPlacement(call, provisionalFile(media, { ...(entry as Partial<ProjectFile>), name: clipName }), {
-          position_seconds: input.position_seconds,
-          track: input.track,
-          query,
-        });
-        if (typeof plan === "string") return plan;
-      }
-      const placement = plan;
-      const result = call.commit((tx) => {
-        const sub = addFile(tx, media, { dedupe: false, name: clipName, mediaType: file.media_type });
-        const clip = placement ? applyPlacement(tx, String(sub.id), placement) : undefined;
-        return { sub, clip };
-      });
-      const newId = String(result.sub.id);
-      let summary =
-        `Subclip created: "${clipName}" (file_id=${newId}) ` +
-        `from ${fmtMmss(s)}–${fmtMmss(e)} source${watchedNote}. `;
-      if (result.clip && placement) {
-        summary += placementText(call.doc.project, placement, result.clip);
-        forgetFile(call);
-      } else {
-        summary +=
+      const sub = call.commit((tx) => addFile(tx, media, { dedupe: false, name: clipName, mediaType: file.media_type }));
+      const newId = String(sub.id);
+      rememberFile(call, newId);
+      return applied(
+        "split_file_add_clip_tool",
+        `Subclip created: "${clipName}" (file_id=${newId}) from ${fmtMmss(s)}–${fmtMmss(e)} source${watchedNote}. ` +
           `Call add_clip_to_timeline_tool(file_id="${newId}") to place it ` +
-          "(do not pass duration_seconds — this subclip is already trimmed).";
-        rememberFile(call, newId);
-      }
-      return result.clip ? summary : applied("split_file_add_clip_tool", summary, { data: { file_id: newId } });
+          "(do not pass duration_seconds — this subclip is already trimmed).",
+        { data: { file_id: newId } },
+      );
     },
   }),
 ];

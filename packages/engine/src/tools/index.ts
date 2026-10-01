@@ -6,6 +6,7 @@ export * from "./json-schema.js";
 export { HIDDEN_PARAMS, normalizeArgs } from "./coerce.js";
 export {
   CONTRACT_REF,
+  SNAPSHOT_REF,
   CONTRACT_TOOL_NAMES,
   contractInputs,
   contractMeta,
@@ -52,3 +53,4 @@ export {
   type ToolNeeds,
 } from "./availability.js";
 export { RECEIPT_OUTPUT_SCHEMA } from "./output-schema.js";
+export { pickPexelsHdLink } from "./backend.js";

@@ -148,3 +148,60 @@ describe("explicit times on slice and watch", () => {
     expect(rendered).toEqual(expect.arrayContaining(["1.30", "2.70"]));
   });
 });
+
+describe("develop #172 / #183 arguments", () => {
+  it("import_files_tool dry_run previews without importing", async () => {
+    for (const dryRun of ["true", true]) {
+      const doc = fixtureDoc();
+      const result = await runTool({ doc, host: fakeHost() }, "import_files_tool", { folder: "/clips", dry_run: dryRun });
+      expect(result.data!.summary).toBe(
+        [
+          "dry_run=true — nothing imported.",
+          "resolved=/clips",
+          "would_import=2 (video=2 audio=0 image=0)",
+          "sample:",
+          "  a.mp4",
+          "  b.mov",
+          "skipped_non_media=1",
+          "Ask the user to confirm, then call again with dry_run=false.",
+        ].join("\n"),
+      );
+      expect(doc.project.files).toHaveLength(4);
+      expect(doc.undoLabels).toEqual([]);
+    }
+  });
+
+  it("import_files_tool media_types filters folder contents", async () => {
+    const doc = fixtureDoc();
+    const result = await runTool({ doc, host: fakeHost() }, "import_files_tool", { folder: "/clips", media_types: "audio" });
+    expect(result.data!.summary).toBe("Error: Nothing to import (no media files found in: /clips).");
+    const videos = await runTool({ doc, host: fakeHost() }, "import_files_tool", { folder: "/clips", media_types: "video" });
+    expect(videos.data!.summary).toMatch(/^Imported 2 file\(s\)\. indexing_started=false skipped_non_media=1\n/);
+  });
+
+  it("split_file_add_clip_tool takes 1-based frames and a name", async () => {
+    const doc = fixtureDoc();
+    const result = await runTool({ doc, host: fakeHost(NO_WATCH) }, "split_file_add_clip_tool", {
+      file_id: IDS.broll,
+      start_frame: "31",
+      end_frame: "90",
+      name: "Wide shot",
+    });
+    expect(result.data!.summary).toMatch(/^Subclip created: "Wide shot" \(file_id=\w+\) from 0:01–0:03 source\./);
+    const sub = doc.project.files.find((f) => f.name === "Wide shot");
+    expect(sub).toMatchObject({ start: 1, end: 3, parent_file_id: IDS.broll, zenvi_subclip: true });
+  });
+
+  it("import_video_url_and_add_to_timeline_tool passes the keep window to the placement", async () => {
+    const doc = fixtureDoc();
+    const result = await runTool({ doc, host: fakeHost(NO_WATCH) }, "import_video_url_and_add_to_timeline_tool", {
+      video_url: "https://example.com/clip.mp4",
+      position_seconds: "20",
+      start_seconds: "1",
+      end_seconds: "3",
+    });
+    expect(result.ok).toBe(true);
+    const id = /timeline_clip_id=(\w+)/.exec(result.data!.summary)![1];
+    expect(doc.project.clips.find((c) => c.id === id)).toMatchObject({ position: 20, start: 1, end: 3 });
+  });
+});

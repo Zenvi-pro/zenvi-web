@@ -18,7 +18,7 @@
 import type { ProjectFile } from "../../model/types.js";
 import { addFile } from "../../ops/files.js";
 import { getIndexBlock, isIndexed } from "../ai-metadata.js";
-import { freesoundSearch, pexelsSearch, pickPexelsHdLink, projectIndexName, summarizeIndexedVideo } from "../backend.js";
+import { projectIndexName, summarizeIndexedVideo } from "../backend.js";
 import { contractTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { pyFixed } from "../pyfmt.js";
 import { applied, unchanged } from "../receipt.js";
@@ -26,12 +26,48 @@ import type { ImportedMedia } from "../types.js";
 import { importAndPlace, placeExistingFile } from "./clips.js";
 import { fileById, record, rememberFile, text } from "./common.js";
 
-/** Extensions collected from folders (tool_handlers._IMPORT_MEDIA_EXTS). */
-export const IMPORT_MEDIA_EXTS = [
-  ".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mpg", ".mpeg", ".wmv",
-  ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg",
-  ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp",
-];
+/** Extensions collected from folders (tool_handlers._IMPORT_VIDEO/AUDIO/IMAGE_EXTS). */
+export const IMPORT_VIDEO_EXTS = [".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mpg", ".mpeg", ".wmv"];
+export const IMPORT_AUDIO_EXTS = [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"];
+export const IMPORT_IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp"];
+export const IMPORT_MEDIA_EXTS = [...IMPORT_VIDEO_EXTS, ...IMPORT_AUDIO_EXTS, ...IMPORT_IMAGE_EXTS];
+
+/** Cap on listed result lines so a large folder does not flood the model (_IMPORT_RESULT_LINE_CAP). */
+export const IMPORT_RESULT_LINE_CAP = 25;
+
+/** tool_handlers._allowed_exts_for_media_types: "all" (default), video, audio, image, or a list. */
+export function allowedExtsForMediaTypes(mediaTypes: unknown): string[] {
+  const t = String(mediaTypes ?? "all").trim().toLowerCase();
+  if (!t || ["all", "*", "any", "media"].includes(t)) return IMPORT_MEDIA_EXTS;
+  const kinds = new Set(t.split(/[,|\s]+/).filter(Boolean));
+  const exts: string[] = [];
+  if (kinds.has("video") || kinds.has("videos")) exts.push(...IMPORT_VIDEO_EXTS);
+  if (["audio", "audios", "sound", "music"].some((k) => kinds.has(k))) exts.push(...IMPORT_AUDIO_EXTS);
+  if (["image", "images", "photo", "photos", "picture", "pictures"].some((k) => kinds.has(k))) exts.push(...IMPORT_IMAGE_EXTS);
+  return exts.length > 0 ? exts : IMPORT_MEDIA_EXTS;
+}
+
+/** tool_handlers._import_truthy: real booleans, or "1/true/yes/y/on". */
+export function importTruthy(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") return value;
+  const t = String(value ?? "").trim().toLowerCase();
+  if (!t) return fallback;
+  return ["1", "true", "yes", "y", "on"].includes(t);
+}
+
+function importMediaKind(path: string): "video" | "audio" | "image" | "other" {
+  const ext = extOf(path);
+  if (IMPORT_VIDEO_EXTS.includes(ext)) return "video";
+  if (IMPORT_AUDIO_EXTS.includes(ext)) return "audio";
+  if (IMPORT_IMAGE_EXTS.includes(ext)) return "image";
+  return "other";
+}
+
+/** tool_handlers._format_capped_lines. */
+function cappedLines(lines: readonly string[], cap = IMPORT_RESULT_LINE_CAP): string {
+  if (lines.length <= cap) return lines.join("\n");
+  return `${lines.slice(0, cap).join("\n")}\n... and ${lines.length - cap} more. Use list_files_tool to see the rest.`;
+}
 
 /** A list, a JSON array, or a comma/newline separated string (tool_handlers._coerce_path_list). */
 export function coercePathList(value: unknown): string[] {
@@ -77,10 +113,15 @@ function extOf(path: string): string {
 }
 
 /** Expand entries into media paths (folders filtered by extension) plus what was missing and notes. */
-async function expandImportPaths(call: ToolCall, entries: readonly string[]): Promise<{ resolved: string[]; missing: string[]; notes: string[] }> {
+async function expandImportPaths(
+  call: ToolCall,
+  entries: readonly string[],
+  allowedExts: readonly string[] = IMPORT_MEDIA_EXTS,
+): Promise<{ resolved: string[]; missing: string[]; notes: string[]; skippedNonMedia: number }> {
   const resolved: string[] = [];
   const missing: string[] = [];
   const notes: string[] = [];
+  let skippedNonMedia = 0;
   const seen = new Set<string>();
   const list = call.host.media?.listPaths;
   for (const entry of entries) {
@@ -98,7 +139,12 @@ async function expandImportPaths(call: ToolCall, entries: readonly string[]): Pr
       else missing.push(entry);
       continue;
     }
-    const files = listing.kind === "directory" ? listing.files.filter((f) => IMPORT_MEDIA_EXTS.includes(extOf(f))) : listing.files;
+    // Folder contents are filtered by type; explicit files pass through (the reader decides).
+    let files = listing.files;
+    if (listing.kind === "directory") {
+      files = listing.files.filter((f) => allowedExts.includes(extOf(f)));
+      skippedNonMedia += listing.files.length - files.length;
+    }
     if (listing.kind === "glob" && files.length === 0) notes.push(`No files matched: ${entry}`);
     for (const f of files) {
       if (!seen.has(f)) {
@@ -107,7 +153,7 @@ async function expandImportPaths(call: ToolCall, entries: readonly string[]): Pr
       }
     }
   }
-  return { resolved, missing, notes };
+  return { resolved, missing, notes, skippedNonMedia };
 }
 
 function sizeMb(media: ImportedMedia): number {
@@ -157,10 +203,31 @@ export const mediaTools: CatalogTool[] = [
       }
       const importPath = call.host.media!.importPath;
       if (!importPath) return unavailable("import_files_tool", "it cannot open local file paths. Use the editor's import dialog.");
-      const { resolved, missing, notes } = await expandImportPaths(call, entries);
+      const { resolved, missing, notes, skippedNonMedia } = await expandImportPaths(call, entries, allowedExtsForMediaTypes(input.media_types));
       if (resolved.length === 0) {
-        const detail = notes.length ? notes.join("; ") : `no media files found in: ${entries.join(", ")}`;
+        let detail = notes.length ? notes.join("; ") : `no media files found in: ${entries.join(", ")}`;
+        if (missing.length > 0 && notes.length === 0) detail = `not found: ${missing.join(", ")}`;
         return `Error: Nothing to import (${detail}).`;
+      }
+      if (importTruthy(input.dry_run)) {
+        // zenvi-core #172: preview what would be imported; nothing changes.
+        const counts = { video: 0, audio: 0, image: 0, other: 0 };
+        for (const p of resolved) counts[importMediaKind(p)] += 1;
+        const lines = [
+          "dry_run=true — nothing imported.",
+          `resolved=${entries.map(fromFileUrl).join(", ")}`,
+          `would_import=${resolved.length} (video=${counts.video} audio=${counts.audio} image=${counts.image})`,
+        ];
+        const mt = String(input.media_types ?? "all").trim() || "all";
+        if (!["all", "*", "any", "media"].includes(mt.toLowerCase())) lines.push(`media_types=${mt}`);
+        lines.push("sample:");
+        const sample = cappedLines(resolved.map((p) => `  ${p.split(/[\\/]/).pop() ?? p}`));
+        if (sample) lines.push(sample);
+        lines.push(`skipped_non_media=${skippedNonMedia}`);
+        if (missing.length > 0) lines.push(`not found: ${missing.join(", ")}`);
+        if (notes.length > 0) lines.push("Notes: " + notes.join("; "));
+        lines.push("Ask the user to confirm, then call again with dry_run=false.");
+        return lines.join("\n");
       }
       const imported: ImportedMedia[] = [];
       const failures: string[] = [];
@@ -179,12 +246,13 @@ export const mediaTools: CatalogTool[] = [
       const lines = files.map((f, i) => `file_id=${f.id} path=${imported[i]!.path}`);
       rememberFile(call, String(files[files.length - 1]!.id));
       let head = `Imported ${files.length} file(s). indexing_started=false`;
+      if (skippedNonMedia > 0) head += ` skipped_non_media=${skippedNonMedia}`;
       if (missing.length > 0) head += ` (not found: ${missing.join(", ")})`;
       const allNotes = [...notes, ...failures.map((f) => `Could not open ${f}`)];
       if (allNotes.length > 0) head += "\nNotes: " + allNotes.join("; ");
       return applied(
         "import_files_tool",
-        head + "\n" + lines.join("\n"),
+        head + "\n" + cappedLines(lines),
         {
           data: { fileIds: files.map((f) => String(f.id)) },
           notes: ["This Zenvi surface does not run AI indexing; files keep any index they already have."],
@@ -197,7 +265,7 @@ export const mediaTools: CatalogTool[] = [
     annotations: IMPORT_WEB,
     requires: ["media"],
     run: async (call, input) => {
-      const url = text(input.url) || text(input.video_url);
+      const url = text(input.video_url);
       if (!url) return "Error: video_url is required.";
       if (!call.host.media!.importUrl) return unavailable("import_video_url_and_add_to_timeline_tool", "it cannot download media from URLs.");
       const lowerPath = url.split("?")[0]!.replace(/\/+$/, "").toLowerCase();
@@ -212,9 +280,17 @@ export const mediaTools: CatalogTool[] = [
       const media = await importUrlWithFallbacks(call, [url], filename);
       if (typeof media === "string") return `Error importing video from URL: ${media}`;
       const existing = (call.doc.project.files ?? []).find((f) => f.path === media.path);
-      const placed = existing
-        ? await placeExistingFile(call, existing, { position_seconds: input.position_seconds, track: input.track })
-        : await importAndPlace(call, media, { position_seconds: input.position_seconds, track: input.track });
+      // The desktop passes the keep-window arguments through to add_clip_to_timeline.
+      const args = {
+        position_seconds: input.position_seconds,
+        track: input.track,
+        query: input.query,
+        start_seconds: input.start_seconds,
+        end_seconds: input.end_seconds,
+        duration_seconds: input.duration_seconds,
+        full_file: typeof input.full_file === "boolean" ? String(input.full_file) : input.full_file,
+      };
+      const placed = existing ? await placeExistingFile(call, existing, args) : await importAndPlace(call, media, args);
       if (!placed.clip) return placed.text;
       const fileId = String(placed.clip.file_id);
       return `✅ Video imported (file_id: ${fileId}, ${pyFixed(sizeMb(media), 1)} MB) and added to the timeline.\n${placed.text}`;
@@ -237,7 +313,7 @@ export const mediaTools: CatalogTool[] = [
         } catch (error) {
           return `Error: File not found: ${localPath} (${error instanceof Error ? error.message : String(error)})`;
         }
-      } else if ((source === "pexels" || source === "freesound" || text(input.query)) && !call.host.media!.importUrl) {
+      } else if ((source === "pexels" || source === "freesound") && !call.host.media!.importUrl) {
         return unavailable("import_stock_media_tool", "it cannot download media from URLs.");
       } else if (source === "pexels") {
         const link = text(input.link);
@@ -253,28 +329,6 @@ export const mediaTools: CatalogTool[] = [
         const ext = preview.endsWith(".ogg") ? ".ogg" : ".mp3";
         media = await importUrlWithFallbacks(call, freesoundCandidates(preview), `${(filenameHint || `freesound_${sid}`).replace(/[^\w-]/g, "_")}${ext}`);
         if (typeof media === "string") return `Freesound download error: ${media}`;
-      } else if (text(input.query)) {
-        // Contract: search stock media and import the best result.
-        const q = text(input.query);
-        const kind = text(input.media_type).toLowerCase() || "video";
-        if (!call.host.backend) return unavailable("import_stock_media_tool", "stock search needs the Zenvi backend (sign in to Zenvi).");
-        if (kind === "audio") {
-          const res = await freesoundSearch(call, q, 15, 1);
-          if (res.error) return `Error: ${res.error}`;
-          const sound = res.sounds[0];
-          const preview = String(record(sound?.previews).hq_mp3 || record(sound?.previews).lq_mp3 || "");
-          if (!sound || !preview) return `No stock audio found for '${q}'.`;
-          media = await importUrlWithFallbacks(call, freesoundCandidates(preview), `freesound_${String(sound.id)}.mp3`);
-          if (typeof media === "string") return `Freesound download error: ${media}`;
-        } else {
-          const res = await pexelsSearch(call, q, 15, 1);
-          if (res.error) return `Error: ${res.error}`;
-          const video = res.videos[0];
-          const link = video ? pickPexelsHdLink(video) : "";
-          if (!video || !link) return `No stock video found for '${q}'.`;
-          media = await importUrlWithFallbacks(call, [link], `pexels_${String(video.id)}.mp4`);
-          if (typeof media === "string") return `Pexels download error: ${media}`;
-        }
       } else {
         return "Error: source must be 'pexels' or 'freesound' (or pass local_path).";
       }
@@ -289,6 +343,7 @@ export const mediaTools: CatalogTool[] = [
           "(or empty file_id to use this just-imported file) to place it on the timeline."
         );
       }
+      // Web extra (the editor's stock panel): place the import right away.
       if (text(input.position_seconds) || text(input.track)) {
         const placed = await importAndPlace(call, media, {
           position_seconds: input.position_seconds,
@@ -312,9 +367,8 @@ export const mediaTools: CatalogTool[] = [
   contractTool("wait_until_project_indexed_tool", {
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     run: (call, input) => {
-      const only = text(input.file_id);
-      const targets = (call.doc.project.files ?? []).filter((f) => !f.zenvi_subclip && (!only || String(f.id) === only));
-      if (targets.length === 0) return only ? `Error: File not found (id=${only}).` : "No project files to index.";
+      const targets = (call.doc.project.files ?? []).filter((f) => !f.zenvi_subclip);
+      if (targets.length === 0) return "No project files to index.";
       const done: string[] = [];
       const pending: string[] = [];
       for (const f of targets) {

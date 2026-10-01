@@ -64,7 +64,6 @@ export const generationTools: CatalogTool[] = [
       const project = call.doc.project;
       const [width, height] = t2vDims(project.width, project.height);
       const extra: Record<string, unknown> = { width, height, mode: "t2v" };
-      if (text(input.model)) extra.model = text(input.model);
       const result = await generateVideo(call, prompt, duration, extra);
       if ("error" in result) return `Error: ${result.error}`;
       if (!result.videoUrl) return "Error: No video URL returned from generation.";
@@ -140,7 +139,7 @@ export const generationTools: CatalogTool[] = [
       if (!writeGenerated) return unavailable("generate_tts_and_add_to_timeline_tool", "it cannot store generated audio.");
       let position: number;
       try {
-        position = parseSecondsArg(input.position_seconds ?? input.position, 0, "position") ?? 0;
+        position = parseSecondsArg(input.position, 0, "position") ?? 0;
       } catch (error) {
         if (error instanceof TimeArgError) return `Error: ${error.message}`;
         throw error;

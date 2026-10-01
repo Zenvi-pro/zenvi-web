@@ -95,7 +95,7 @@ export const projectTools: CatalogTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["storage"],
     run: async (call, input) => {
-      const path = text(input.path) || text(input.file_path);
+      const path = text(input.file_path);
       if (!path) return "Error: file_path is required.";
       const project: Project = await call.host.storage!.open(path);
       call.doc.load(project);

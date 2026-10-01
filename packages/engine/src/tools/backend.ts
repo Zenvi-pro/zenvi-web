@@ -4,7 +4,7 @@
  * Ports of zenvi-core src/classes/api_client.py (ref b63c39be7):
  * `search`, `watch_window`, `is_indexing_configured`, `get_project_catalog`,
  * `generate_video`, `generate_tts`, `summarize_indexed_video`,
- * `pexels_search`, `freesound_search`; and of classes/project_tl_index.py
+ * `pick_pexels_hd_link`; and of classes/project_tl_index.py
  * (the project's shared video index) and classes/twelvelabs_match.py (hit
  * selection). Like the desktop client, failures come back as `{ error }`
  * instead of throwing.
@@ -172,30 +172,6 @@ export async function generateTts(
   if (!res.ok) return { error: res.error };
   if (!res.data.success) return { error: String(res.data.error || "TTS generation failed") };
   return { audioBase64: String(res.data.audio_base64 ?? "") };
-}
-
-/** GET /api/v1/pexels/search (api_client.pexels_search). */
-export async function pexelsSearch(call: ToolCall, text: string, perPage = 15, page = 1): Promise<{ videos: Record<string, unknown>[]; error?: string }> {
-  const res = await backendRequest<Record<string, unknown>>(call.host.backend, `/api/v1/pexels/search${query({ query: text, per_page: perPage, page })}`, {
-    signal: call.signal,
-  });
-  if (!res.ok) return { videos: [], error: res.error };
-  const videos = Array.isArray(res.data.videos) ? res.data.videos.filter(isRecord) : [];
-  const error = typeof res.data.error === "string" && res.data.error ? res.data.error : undefined;
-  return error ? { videos, error } : { videos };
-}
-
-/** GET /api/v1/freesound/search (api_client.freesound_search). */
-export async function freesoundSearch(call: ToolCall, text: string, pageSize = 15, page = 1): Promise<{ sounds: Record<string, unknown>[]; error?: string }> {
-  const res = await backendRequest<Record<string, unknown>>(
-    call.host.backend,
-    `/api/v1/freesound/search${query({ query: text, page_size: pageSize, page })}`,
-    { signal: call.signal },
-  );
-  if (!res.ok) return { sounds: [], error: res.error };
-  const sounds = Array.isArray(res.data.sounds) ? res.data.sounds.filter(isRecord) : [];
-  const error = typeof res.data.error === "string" && res.data.error ? res.data.error : undefined;
-  return error ? { sounds, error } : { sounds };
 }
 
 /** The HD file of a Pexels video, else its first file (api_client.pick_pexels_hd_link). */

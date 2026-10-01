@@ -14,7 +14,6 @@ import { contractTool, type CatalogTool } from "../define.js";
 import { pyFixed, pyReprString, pySlice } from "../pyfmt.js";
 import { applied } from "../receipt.js";
 import { timelineStateData } from "../reports.js";
-import { normalizeTrackOrLayerArg } from "../tracks.js";
 import { fmtMmss, record, text } from "./common.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -30,17 +29,13 @@ function pyStr(value: unknown): string {
 }
 
 /** get_clips_with_full_metadata's text. */
-export function fullMetadataText(project: Project, level: string, onlyFile = "", limit?: number): string {
-  let files = project.files ?? [];
+export function fullMetadataText(project: Project, level: string): string {
+  const files = project.files ?? [];
   if (files.length === 0) return "No files in project.";
-  if (onlyFile) files = files.filter((f) => String(f.id) === onlyFile);
   const lines = ["Project files with full metadata:"];
-  let listed = 0;
   for (const f of files) {
     const d = f as unknown as Record<string, unknown>;
     if (d.zenvi_subclip && level !== "full") continue;
-    if (limit !== undefined && listed >= limit) break;
-    listed += 1;
     const dur = Math.trunc(Number(d.duration) || 0);
     const m = Math.floor(dur / 60);
     const s = ((dur % 60) + 60) % 60;
@@ -108,9 +103,8 @@ export function fullMetadataText(project: Project, level: string, onlyFile = "",
 }
 
 /** get_timeline_placements_metadata's text. */
-export function placementsMetadataText(project: Project, level: string, layerFilter?: number): string {
-  let contexts = enumerateTimelineContexts(project);
-  if (layerFilter !== undefined) contexts = contexts.filter((c) => c.layer === layerFilter);
+export function placementsMetadataText(project: Project, level: string): string {
+  const contexts = enumerateTimelineContexts(project);
   if (contexts.length === 0) return "No clips on timeline.";
   const groups = new Map<string, typeof contexts>();
   for (const ctx of contexts) {
@@ -160,24 +154,14 @@ export const metadataTools: CatalogTool[] = [
   contractTool("get_clips_with_full_metadata_tool", {
     annotations: READ,
     run: (call, input) => {
-      const level = (text(input.detail_level) || "summary").toLowerCase();
-      const limitRaw = Number(text(input.limit));
-      const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.trunc(limitRaw) : undefined;
-      return fullMetadataText(call.doc.project, level, text(input.file_id), limit);
+      return fullMetadataText(call.doc.project, (text(input.detail_level) || "summary").toLowerCase());
     },
   }),
 
   contractTool("get_timeline_placements_metadata_tool", {
     annotations: READ,
     run: (call, input) => {
-      const project = call.doc.project;
-      let layer: number | undefined;
-      if (text(input.track)) {
-        const r = normalizeTrackOrLayerArg(text(input.track), project.layers);
-        if (r.error) return r.error;
-        layer = r.layer;
-      }
-      return placementsMetadataText(project, (text(input.detail_level) || "summary").toLowerCase(), layer);
+      return placementsMetadataText(call.doc.project, (text(input.detail_level) || "summary").toLowerCase());
     },
   }),
 

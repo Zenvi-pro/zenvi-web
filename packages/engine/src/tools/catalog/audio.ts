@@ -196,11 +196,6 @@ export const audioTools: CatalogTool[] = [
         entries = entries.filter((e) => e.id === wanted);
         if (entries.length === 0) return `Error: No timeline clip with id=${wanted} (or it has no audio).`;
       }
-      const winStart = floatArg(input.start_seconds, null);
-      const winEnd = floatArg(input.end_seconds, null);
-      if (winStart !== null || winEnd !== null) {
-        entries = entries.filter((e) => e.end > (winStart ?? -Infinity) && e.start < (winEnd ?? Infinity));
-      }
       if (entries.length === 0) return "No timeline clips with audio.";
 
       const showWindows = String(input.detail ?? "").trim().toLowerCase() === "windows";
@@ -241,7 +236,7 @@ export const audioTools: CatalogTool[] = [
       if (!text(input.timeline_clip_id) && !text(input.clip_query)) {
         return "Error: set_clip_volume requires timeline_clip_id or clip_query.";
       }
-      // Contract aliases: volume ("0.5" or "-6dB"), gain -> level; db -> level_db.
+      // Web aliases (the CLI's): volume ("0.5" or "-6dB"), gain -> level; db -> level_db.
       let levelDbRaw: unknown = input.level_db ?? input.db;
       let levelRaw: unknown = input.level ?? input.gain;
       if (levelRaw === undefined && levelDbRaw === undefined && input.volume !== undefined) {

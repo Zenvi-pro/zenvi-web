@@ -349,12 +349,6 @@ function secsList(times: readonly number[]): string {
 }
 
 async function clipForSearch(call: ToolCall, input: Record<string, unknown>): Promise<{ ok: true; clip: Clip } | { ok: false; error: string }> {
-  const fileId = text(input.file_id);
-  if (!text(input.timeline_clip_id) && !text(input.clip_query) && fileId) {
-    const clip = (call.doc.project.clips ?? []).find((c) => String(c.file_id) === fileId);
-    if (!clip) return { ok: false, error: `Error: No timeline clip plays file_id=${fileId}.` };
-    return { ok: true, clip };
-  }
   const resolved = await resolveClip(call, input);
   return resolved.ok ? { ok: true, clip: resolved.clip } : { ok: false, error: resolved.error || "Error: Could not resolve timeline clip." };
 }
@@ -368,7 +362,7 @@ export const searchTools: CatalogTool[] = [
     run: async (call, input) => {
       const q = text(input.query);
       if (!q) return "Error: query is required.";
-      const kRaw = Number(text(input.limit) || text(input.top_k) || 5);
+      const kRaw = Number(text(input.top_k) || 5);
       const k = Math.max(1, Math.min(Number.isFinite(kRaw) ? Math.trunc(kRaw) : 5, 20));
       const project = call.doc.project;
       const info = collectProjectIndex(project);
@@ -378,9 +372,7 @@ export const searchTools: CatalogTool[] = [
       const pageLimit = Math.max(30, k * 10);
       const res = await searchIndex(call, q, { topK: pageLimit, indexId: info.indexId, pageLimit, lookFor: text(input.look_for) || undefined });
       if (res.error) return `Error: ${res.error}`;
-      let results = res.results;
-      const onlyFile = text(input.file_id);
-      if (onlyFile) results = results.filter((r) => mapSearchHitToFile(r, info.videoMap)[0] === onlyFile);
+      const results = res.results;
       if (results.length === 0) {
         return (
           `No index matches for '${q}' in this project's index ` +
@@ -452,7 +444,7 @@ export const searchTools: CatalogTool[] = [
     annotations: SEARCH,
     run: async (call, input) => {
       const query = text(input.query);
-      const kRaw = Number(text(input.limit) || text(input.top_k) || 5);
+      const kRaw = Number(text(input.top_k) || 5);
       const k = Number.isFinite(kRaw) ? Math.trunc(kRaw) : 5;
       const target = await clipForSearch(call, input);
       if (!target.ok) return target.error;
@@ -748,8 +740,7 @@ export const searchTools: CatalogTool[] = [
         if (searchQuery && (await isIndexingConfigured(call)) && info.indexId && info.videoId) {
           const found = await searchInWindow(call, info.indexId, searchQuery, 30, info.videoId);
           if (!found.error && found.items.length > 0) {
-            // The desktop reads `occurrence` from **_kw, which the schema never lets through: ordinal words only.
-            const matches = selectHitsForDisplay(found.items, info.clipStart, info.clipEnd, parseOccurrence("0", query), 1);
+            const matches = selectHitsForDisplay(found.items, info.clipStart, info.clipEnd, parseOccurrence(String(input.occurrence ?? "0"), query), 1);
             if (matches.length > 0) {
               hitStart = Number(matches[0]!.start) || 0;
               hitEnd = Number(matches[0]!.end) || hitStart;

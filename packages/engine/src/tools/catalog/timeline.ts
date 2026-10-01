@@ -25,8 +25,8 @@ interface DeleteArgs {
   clip_query?: string;
   track?: string;
   scope?: "auto" | "clip" | "track";
-  occurrence?: string;
-  position_near?: string | number;
+  occurrence?: string | number;
+  position_near?: string | number | null;
   include_transitions?: boolean;
 }
 
@@ -121,7 +121,8 @@ export const timelineTools: CatalogTool[] = [
   contractTool("add_track_tool", {
     annotations: ADDITIVE,
     run: (call, input) => {
-      const label = text(input.label) || text(input.name);
+      // label is a web extra (the desktop's add_track takes no arguments).
+      const label = text(input.label);
       const selected = selectedTrack(call);
       call.commit((tx) =>
         addTrack(tx, selected ? { below: Math.trunc(Number(selected.number)), label: label || undefined } : { label: label || undefined }),

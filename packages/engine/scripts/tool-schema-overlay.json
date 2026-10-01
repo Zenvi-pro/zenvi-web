@@ -3,7 +3,9 @@
     "Hand-written additions merged by gen-tool-schemas.py on top of zenvi-core TOOL_SCHEMAS",
     "(agent_tools/schema.py) and the backend's frontend-tool schemas (docs/specs/backend-frontend-tools.json).",
     "Only descriptions, the real backend signature of tools the snapshot lacks, and default overrides live here;",
-    "names, types and enums come from the two sources."
+    "names, types and enums come from the two sources.",
+    "web_extra_props: arguments only the web surfaces accept (hosts without a playhead or local paths, CLI aliases);",
+    "listed in docs/TOOLS.md under Divergences. Everything else matches the desktop's TOOL_SCHEMAS."
   ],
   "common_props": {
     "timeline_clip_id": "Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).",
@@ -23,6 +25,9 @@
   },
   "tools": {
     "save_project_tool": {
+      "web_extra_props": {
+        "path": {"type": "string"}
+      },
       "props": {
         "path": {"description": "Where to save the project (.zvn is appended when missing). Omit to save to the current location."},
         "file_path": {"description": "Alias for path (Assistant naming)."}
@@ -30,11 +35,14 @@
     },
     "open_project_tool": {
       "props": {
-        "path": {"description": "Project file path or project id the host understands."},
         "file_path": {"description": "Alias for path (Assistant naming)."}
       }
     },
     "watch_clip_tool": {
+      "web_extra_props": {
+        "file_id": {"type": "string"},
+        "timeline_clip_id": {"type": "string"}
+      },
       "description": "Play a clip in the editor preview: seek to a timeline clip (timeline_clip_id or query) and start playback. A media-bin file (file_id) or a media path (file_path) that is not on the timeline yet is added at the end of the bottom track first.",
       "props": {
         "file_id": {"description": "Media-bin file to play (added to the timeline when it is not there yet)."},
@@ -50,16 +58,31 @@
         "end": {"description": "Window end, source seconds."}
       }
     },
-    "undo_tool": {"props": {"steps": {"description": "Number of undo steps (1-20; words like 'two' work)."}}},
-    "redo_tool": {"props": {"steps": {"description": "Number of redo steps (1-20)."}}},
+    "undo_tool": {
+      "props": {
+        "steps": {"description": "Number of undo steps (1-20; words like 'two' work)."}
+      }
+    },
+    "redo_tool": {
+      "props": {
+        "steps": {"description": "Number of redo steps (1-20)."}
+      }
+    },
     "add_track_tool": {
+      "web_extra_props": {
+        "label": {"type": "string"}
+      },
       "description": "Add a new track below the selected track (on top when nothing is selected). Returns the new track in createdTracks.",
       "props": {
-        "label": {"description": "Optional label for the new track."},
-        "name": {"description": "Alias for label."}
+        "label": {"description": "Optional label for the new track."}
       }
     },
     "add_marker_tool": {
+      "web_extra_props": {
+        "position_seconds": {"oneOf": [{"type": "string"}, {"type": "number"}]},
+        "label": {"type": "string"},
+        "text": {"type": "string"}
+      },
       "description": "Add a timeline marker at the playhead, or at position_seconds.",
       "props": {
         "position_seconds": {"description": "Marker time in timeline seconds (default: the playhead)."},
@@ -74,20 +97,20 @@
       }
     },
     "remove_clip_tool": {
-      "props": {
-        "scope": {"description": "Ignored: this alias always deletes one clip."},
-        "include_transitions": {"description": "Ignored for clip deletes."}
-      }
+
     },
     "analyze_timeline_audio_tool": {
       "props": {
         "timeline_clip_id": {"description": "Only report this clip."},
-        "detail": {"description": "summary (default) or windows (also list speech windows in timeline seconds)."},
-        "start_seconds": {"description": "Only clips overlapping this timeline window (start, seconds)."},
-        "end_seconds": {"description": "Only clips overlapping this timeline window (end, seconds)."}
+        "detail": {"description": "summary (default) or windows (also list speech windows in timeline seconds)."}
       }
     },
     "set_clip_volume_tool": {
+      "web_extra_props": {
+        "volume": {"oneOf": [{"type": "string"}, {"type": "number"}]},
+        "gain": {"oneOf": [{"type": "string"}, {"type": "number"}]},
+        "db": {"oneOf": [{"type": "string"}, {"type": "number"}]}
+      },
       "props": {
         "level_db": {"description": "Target level in dB (0 = unchanged, negative = quieter). Give this or level."},
         "level": {"description": "Target linear gain 0.0-1.3. Give this or level_db."},
@@ -123,8 +146,7 @@
     },
     "wait_until_project_indexed_tool": {
       "props": {
-        "timeout_seconds": {"description": "How long to wait, seconds (min 30, default 1800)."},
-        "file_id": {"description": "Only wait for this file."}
+        "timeout_seconds": {"description": "How long to wait, seconds (min 30, default 1800)."}
       }
     },
     "export_video_tool": {
@@ -139,15 +161,15 @@
         "value": {"description": "New value (integers for the numeric keys)."}
       }
     },
-    "get_file_info_tool": {"props": {"query": {"description": "Describe the file instead of passing file_id."}}},
+    "get_file_info_tool": {
+
+    },
     "split_file_add_clip_tool": {
       "description": "Create a trimmed subclip of a media-bin file (source start_seconds..end_seconds) as a new media-bin entry, and place it on the timeline when position_seconds or track is given. Otherwise call add_clip_to_timeline_tool with the new file_id (no duration_seconds: the subclip is already trimmed).",
       "props": {
         "query": {"description": "What the kept moment shows (used to confirm the window when the host can watch frames)."},
         "start_seconds": {"description": "Subclip in point, SOURCE seconds."},
-        "end_seconds": {"description": "Subclip out point, SOURCE seconds."},
-        "position_seconds": {"description": "Also place the subclip at this timeline time."},
-        "track": {"description": "Track for the placement."}
+        "end_seconds": {"description": "Subclip out point, SOURCE seconds."}
       }
     },
     "add_clip_to_timeline_tool": {
@@ -163,29 +185,23 @@
     },
     "import_video_url_and_add_to_timeline_tool": {
       "props": {
-        "url": {"description": "Public video URL."},
         "video_url": {"description": "Alias for url (Assistant naming)."}
       }
     },
     "search_clips_tool": {
       "props": {
-        "limit": {"description": "Maximum media items to show (1-20, default 5)."},
         "top_k": {"description": "Alias for limit."},
-        "file_id": {"description": "Only show matches in this media-bin file."},
         "look_for": {"description": "\"on_screen\" when the query describes who or what is visible, \"spoken\" when it describes what is said; omit for both."}
       }
     },
     "search_clip_scenes_tool": {
       "props": {
-        "limit": {"description": "Maximum matches (default 5)."},
-        "top_k": {"description": "Alias for limit."},
-        "file_id": {"description": "Search the timeline clip that plays this file."}
+        "top_k": {"description": "Alias for limit."}
       }
     },
     "slice_clip_at_best_match_tool": {
       "props": {
         "query": {"description": "The moment to cut at, or an explicit source range like 'from 4 seconds to 10 seconds'."},
-        "file_id": {"description": "Slice the timeline clip that plays this file."},
         "start_seconds": {"description": "Source seconds (12, 12.5 or 0:12). With end_seconds: keep that range (cuts before and after it). Alone: one cut at that time."},
         "end_seconds": {"description": "Range end, source seconds. Alone: one cut at that time."}
       }
@@ -199,92 +215,58 @@
     "propose_overlay_windows_tool": {
       "props": {
         "beat_count": {"description": "Number of windows to propose (1-8, default 4)."},
-        "limit": {"description": "Alias for beat_count."},
-        "prefer_transparent": {"description": "true (default) prefers transparent overlays over hero footage; false prefers opaque plates in gaps."},
-        "query": {"description": "Optional theme; windows whose scene text matches it rank higher."}
+        "prefer_transparent": {"description": "true (default) prefers transparent overlays over hero footage; false prefers opaque plates in gaps."}
       }
     },
     "place_motion_graphic_tool": {
       "props": {
         "mode": {"description": "overlay (transparent file on a high track), gap (opaque plate where the primary track is empty) or cut_in (opaque: ripple primary-track clips and cut it in)."},
-        "url": {"description": "Import this rendered video first, then place it."},
         "layout_region": {"description": "Region the graphic occupies (lower_third, corner_tr, corner_br, full_frame, mid_plate), recorded with the placement."},
-        "duration_seconds": {"description": "Length on the timeline (default: the file's duration, 0.5-60 s)."},
-        "start_seconds": {"description": "Source in-point, seconds."},
-        "end_seconds": {"description": "Source out-point, seconds."}
+        "duration_seconds": {"description": "Length on the timeline (default: the file's duration, 0.5-60 s)."}
       }
     },
     "fetch_motion_graphics_video_tool": {
-      "description": "Import rendered HyperFrames motion/demo segments into the project media bin. Pass segment_urls (the ordered per-segment URLs) or a single url/supabase_url. Imports skip indexing; label becomes the files' short summary. Then call place_motion_graphic_tool for each file_id.",
-      "extra_props": {
-        "segment_urls": {"type": ["array", "string"], "items": {"type": "string"}, "description": "Ordered segment URLs (a JSON-encoded list is accepted)."},
-        "supabase_url": {"type": "string", "description": "A single rendered video URL (legacy)."},
-        "supabase_path": {"type": "string", "description": "Storage path of the render (cleanup hint)."},
-        "render_job_id": {"type": "string", "description": "HyperFrames job id (label / transparency hints)."},
-        "label": {"type": "string", "description": "Human summary of the graphic (becomes the file's short_summary and name)."}
-      },
-      "props": {
-        "url": {"description": "Alias for supabase_url."},
-        "job_id": {"description": "Alias for render_job_id."},
-        "session_id": {"description": "Chat session id (accepted for compatibility; unused)."}
-      }
+      "description": "Import rendered HyperFrames motion/demo segments into the project media bin. Pass segment_urls (the ordered per-segment URLs) or a single url/supabase_url. Imports skip indexing; label becomes the files' short summary. Then call place_motion_graphic_tool for each file_id."
     },
     "fetch_remotion_video_from_supabase_tool": {
-      "description": "Deprecated alias for fetch_motion_graphics_video_tool.",
-      "extra_props": {
-        "segment_urls": {"type": ["array", "string"], "items": {"type": "string"}, "description": "Ordered segment URLs (a JSON-encoded list is accepted)."},
-        "supabase_url": {"type": "string", "description": "A single rendered video URL (legacy)."},
-        "supabase_path": {"type": "string", "description": "Storage path of the render (cleanup hint)."},
-        "render_job_id": {"type": "string", "description": "HyperFrames job id (label / transparency hints)."},
-        "label": {"type": "string", "description": "Human summary of the graphic."}
-      },
-      "props": {
-        "url": {"description": "Alias for supabase_url."},
-        "job_id": {"description": "Alias for render_job_id."},
-        "session_id": {"description": "Chat session id (accepted for compatibility; unused)."}
-      }
+      "description": "Deprecated alias for fetch_motion_graphics_video_tool."
     },
     "generate_video_and_add_to_timeline_tool": {
       "props": {
         "prompt": {"description": "What the generated shot shows."},
-        "duration_seconds": {"description": "5 (default) or 10."},
-        "model": {"description": "Generation model id (backend default when omitted)."}
+        "duration_seconds": {"description": "5 (default) or 10."}
       }
     },
     "modify_clip_tool": {
       "props": {
         "mode": {"description": "replace (default) or insert."},
-        "description": {"description": "What to generate."},
-        "prompt": {"description": "Alias for description."}
+        "description": {"description": "What to generate."}
       }
     },
     "generate_transition_clip_tool": {
       "props": {
         "clip_a_id": {"description": "Outgoing clip id."},
         "clip_b_id": {"description": "Incoming clip id."},
-        "from_clip_id": {"description": "Alias for clip_a_id."},
-        "to_clip_id": {"description": "Alias for clip_b_id."},
-        "prompt_hint": {"description": "Optional style hint for the morph."},
-        "prompt": {"description": "Alias for prompt_hint."}
+        "prompt_hint": {"description": "Optional style hint for the morph."}
       }
     },
-    "list_transitions_tool": {"props": {"category": {"description": "all (default), common or extra."}}},
-    "search_transitions_tool": {"props": {"query": {"description": "Part of a transition name, e.g. 'wipe' or 'circle'."}}},
+    "list_transitions_tool": {
+      "props": {
+        "category": {"description": "all (default), common or extra."}
+      }
+    },
+    "search_transitions_tool": {
+      "props": {
+        "query": {"description": "Part of a transition name, e.g. 'wipe' or 'circle'."}
+      }
+    },
     "apply_transition_tool": {
       "props": {
         "clip1_id": {"description": "First (earlier) clip; the only clip for placement=start|end."},
         "clip2_id": {"description": "Second clip (placement=between): moved left to overlap clip1 by duration. Default: the next clip on clip1's track."},
         "transition_name": {"description": "Transition name from list_transitions_tool / search_transitions_tool, e.g. 'fade' or 'wipe left' (default fade)."},
-        "name": {"description": "Alias for transition_name."},
-        "transition": {"description": "Alias for transition_name."},
         "duration": {"description": "Transition length in seconds (default 1.0)."},
-        "duration_seconds": {"description": "Alias for duration."},
-        "placement": {"description": "between (default: two clips), start (fade one clip in) or end (fade it out)."},
-        "timeline_clip_id": {"description": "Alias for clip1_id."},
-        "clip_query": {"description": "Describe clip1 instead of passing an id."},
-        "position_seconds": {"description": "Timeline seconds of the cut to put the transition on (picks the clips meeting there)."},
-        "brightness": {"description": "Constant mask brightness instead of the default 1 → -1 animation."},
-        "contrast": {"description": "Mask contrast (default 3)."}
+        "placement": {"description": "between (default: two clips), start (fade one clip in) or end (fade it out)."}
       }
     },
     "generate_tts_and_add_to_timeline_tool": {
@@ -294,11 +276,16 @@
         "model": {"description": "TTS model (default tts-1)."},
         "speed": {"description": "Speaking speed (default 1.0)."},
         "position": {"description": "Timeline position, seconds (default 0)."},
-        "position_seconds": {"description": "Alias for position."},
         "track": {"description": "Track (default: the bottom track).", "drop_default": true}
       }
     },
     "import_stock_media_tool": {
+      "web_extra_props": {
+        "position_seconds": {"oneOf": [{"type": "string"}, {"type": "number"}]},
+        "track": {"type": "string"},
+        "duration_seconds": {"oneOf": [{"type": "string"}, {"type": "number"}]},
+        "start_seconds": {"oneOf": [{"type": "string"}, {"type": "number"}]}
+      },
       "props": {
         "source": {"description": "pexels or freesound (with link / preview_url from a stock search)."},
         "video_id": {"description": "Pexels video id."},
@@ -307,32 +294,31 @@
         "preview_url": {"description": "Freesound preview URL."},
         "filename": {"description": "File name for the download."},
         "local_path": {"description": "Import an already downloaded file instead."},
-        "query": {"description": "Search stock media and import the best result (when no link is given)."},
-        "media_type": {"description": "video, image, audio or any (default: video, audio searches Freesound)."},
-        "limit": {"description": "How many search results to consider (default 1)."},
         "start_seconds": {"description": "Source in-point for the placement, seconds."}
       }
     },
-    "resummarize_project_file_tool": {"props": {"file_id": {"description": "Indexed media-bin file to summarize again."}}},
+    "resummarize_project_file_tool": {
+      "props": {
+        "file_id": {"description": "Indexed media-bin file to summarize again."}
+      }
+    },
     "reindex_project_file_tool": {
       "props": {
         "file_id": {"description": "Media-bin file to index again."},
         "force": {"description": "true to re-index a file that is already indexed."}
-      },
-      "extra_props": {
-        "force": {"type": "string", "description": "true to re-index a file that is already indexed."}
       }
     },
     "get_clips_with_full_metadata_tool": {
-      "props": {
-        "file_id": {"description": "Only this file."},
-        "limit": {"description": "Maximum files to list."}
-      }
+
     },
-    "get_timeline_placements_metadata_tool": {"props": {"track": {"description": "Only clips on this track."}}},
+    "get_timeline_placements_metadata_tool": {
+
+    },
     "add_effect_tool": {
       "description": "Add a libopenshot effect (EffectInfo class_name such as Blur, Brightness, Saturation, ChromaKey) to one timeline clip, with its default parameters. Returns the new effectId.",
-      "props": {"effect_name": {"description": "Alias for effect."}}
+      "props": {
+        "effect_name": {"description": "Alias for effect."}
+      }
     },
     "add_title_tool": {
       "description": "Create a title / lower-third from a bundled SVG template with your text and place it on the timeline (default 5 s at 0 s).",
@@ -373,7 +359,9 @@
     },
     "remove_words_tool": {
       "description": "Cut words out of a timeline clip and close the gaps (one undo step): pass matches (spoken tokens, case/punctuation insensitive), fillerPreset (um_uh or english_fillers) or wordIndices from get_transcript_tool. Needs word-level timings.",
-      "props": {"fillerPreset": {"description": "um_uh or english_fillers."}}
+      "props": {
+        "fillerPreset": {"description": "um_uh or english_fillers."}
+      }
     },
     "remove_silence_tool": {
       "description": "Remove quiet gaps inside a timeline clip and close them (one undo step). Refuses when more than maxRemoveFraction of the clip would go.",
@@ -402,7 +390,9 @@
     },
     "diarize_media_tool": {
       "description": "Label speakers on a file's or clip's transcript words (hosts with on-device diarization).",
-      "props": {"maxSpeakers": {"description": "Maximum speakers (default 2)."}}
+      "props": {
+        "maxSpeakers": {"description": "Maximum speakers (default 2)."}
+      }
     },
     "search_media_local_tool": {
       "description": "Search media-bin files with the on-device visual index (hosts that have one). Cloud index search is search_clips_tool.",

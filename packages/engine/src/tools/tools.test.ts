@@ -76,7 +76,7 @@ const SPECS: Record<string, Spec> = {
   },
   open_project_tool: {
     happy: {
-      args: { path: "/projects/other.zvn" },
+      args: { file_path: "/projects/other.zvn" },
       host: {},
       setup: (_doc, host) => {
         host.storage!.open = async () => ({ ...fixtureDoc().project, id: "OTHER00001", clips: [] });
@@ -87,7 +87,7 @@ const SPECS: Record<string, Spec> = {
         expect(doc.undoLabels).toEqual([]);
       },
     },
-    failure: { args: { path: "/projects/broken.zvn" }, summary: /^Error: .*cannot open \/projects\/broken\.zvn/ },
+    failure: { args: { file_path: "/projects/broken.zvn" }, summary: /^Error: .*cannot open \/projects\/broken\.zvn/ },
   },
   undo_tool: {
     happy: {
@@ -160,7 +160,8 @@ const SPECS: Record<string, Spec> = {
   },
   slice_clip_at_playhead_tool: {
     happy: { summary: /^Sliced 2 item\(s\) at the playhead; both sides kept\.$/, check: ({ doc }) => expect(doc.project.clips).toHaveLength(7) },
-    failure: { args: { timeline_clip_id: "NOPE000000" }, summary: /^Error: No timeline clip with id='NOPE000000'\.$/ },
+    // Slices whatever is under the playhead; no argument can fail it.
+    failure: null,
   },
 
   // --- clips / placement -----------------------------------------------------
@@ -185,8 +186,8 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_id: "NOPE", start_seconds: "2", end_seconds: "6" }, summary: /^Error: / },
   },
   import_video_url_and_add_to_timeline_tool: {
-    happy: { args: { url: "https://example.com/clip.mp4", position_seconds: "20" }, summary: /^✅ Video imported \(file_id: \w+, 0\.0 MB\) and added to the timeline\./ },
-    failure: { args: { url: "" }, summary: /^Error: video_url is required\.$/ },
+    happy: { args: { video_url: "https://example.com/clip.mp4", position_seconds: "20" }, summary: /^✅ Video imported \(file_id: \w+, 0\.0 MB\) and added to the timeline\./ },
+    failure: { args: { video_url: "" }, summary: /^Error: video_url is required\.$/ },
   },
 
   // --- playback / view ---------------------------------------------------------
@@ -248,7 +249,7 @@ const SPECS: Record<string, Spec> = {
   },
   import_stock_media_tool: {
     happy: {
-      args: { query: "ocean waves", media_type: "video", position_seconds: "20" },
+      args: { source: "pexels", video_id: "101", link: "https://videos.pexels.com/101-hd.mp4", position_seconds: "20" },
       summary: /^Added to project: \/downloads\/pexels_101\.mp4 \(file_id=\w+\)\. Added clip to timeline at position 20\.0s/,
       check: ({ host }) => expect(host.calls).toContain("importUrl https://videos.pexels.com/101-hd.mp4"),
     },
@@ -271,7 +272,7 @@ const SPECS: Record<string, Spec> = {
   // --- search / index ----------------------------------------------------------------
   search_clips_tool: {
     happy: {
-      args: { query: "cameras", look_for: "spoken", limit: "5" },
+      args: { query: "cameras", look_for: "spoken", top_k: "5" },
       // The desktop classifies this prose by its words ("already-placed"), so it reads as unchanged.
       status: "unchanged",
       summary: /2 occurrences:\n {6}1\. start_seconds=2\.500 .* \(rank=2\)\n {6}2\. start_seconds=12\.000 .* \(rank=1\) {2}<-- best match\n {6}Place the best match/,
@@ -310,7 +311,7 @@ const SPECS: Record<string, Spec> = {
     failure: null,
   },
   propose_overlay_windows_tool: {
-    happy: { args: { query: "intro" }, summary: /^\{\n {2}"timeline_end": 19,/, check: ({ receipt }) => expect(receipt.data).toMatchObject({ windows: expect.any(Array) }) },
+    happy: { args: { beat_count: "3" }, summary: /^\{\n {2}"timeline_end": 19,/, check: ({ receipt }) => expect(receipt.data).toMatchObject({ windows: expect.any(Array) }) },
     failure: null,
   },
   place_motion_graphic_tool: {
@@ -318,11 +319,11 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_id: IDS.logo, mode: "gap", position_seconds: "10", duration_seconds: "2" }, summary: /^Error: gap mode refused/ },
   },
   fetch_motion_graphics_video_tool: {
-    happy: { args: { url: "https://cdn.example.com/mg.webm" }, summary: /^✅ HyperFrames motion graphic imported into project files \(file_id=\w+/, check: ({ doc }) => expect(doc.project.files).toHaveLength(5) },
+    happy: { args: { segment_urls: "https://cdn.example.com/mg.webm" }, summary: /^✅ Imported 1\/1 HyperFrames segments/, check: ({ doc }) => expect(doc.project.files).toHaveLength(5) },
     failure: { summary: /^Error: segment_urls or supabase_url is required\.$/ },
   },
   fetch_remotion_video_from_supabase_tool: {
-    happy: { args: { url: "https://cdn.example.com/mg2.mp4" }, summary: /^✅ HyperFrames motion graphic imported/ },
+    happy: { args: { supabase_url: "https://cdn.example.com/mg2.mp4" }, summary: /^✅ HyperFrames motion graphic imported/ },
     failure: { summary: /^Error: segment_urls or supabase_url is required\.$/ },
   },
 
@@ -414,13 +415,13 @@ const SPECS: Record<string, Spec> = {
   },
   generate_tts_and_add_to_timeline_tool: {
     happy: {
-      args: { text: "Welcome to the show", position_seconds: "2" },
+      args: { text: "Welcome to the show", position: "2" },
       summary: /^Added TTS audio to timeline at position 2\.0s on track 1000000 .* timeline_clip_id=\w+\.$/,
       check: ({ host }) => expect(host.backendCalls.find((c) => c.path === "/api/v1/generation/tts")?.body).toMatchObject({ text: "Welcome to the show", voice: "alloy" }),
     },
     failure: { args: { text: "Hi", track: "Nope" }, summary: /^Error: Unknown track or layer 'Nope'/ },
   },
-  modify_clip_tool: { happy: { args: { timeline_clip_id: IDS.clipA, prompt: "make it night" }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
+  modify_clip_tool: { happy: { args: { timeline_clip_id: IDS.clipA, description: "make it night" }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
   generate_transition_clip_tool: { happy: { args: { clip_a_id: IDS.clipA, clip_b_id: IDS.clipB }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
 
   // --- transitions / titles ------------------------------------------------------------------------------

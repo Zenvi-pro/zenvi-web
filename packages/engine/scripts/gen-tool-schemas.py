@@ -2,11 +2,15 @@
 """Generate packages/engine/src/tools/schemas.gen.ts.
 
 Sources (read-only):
-  * zenvi-core (the desktop) at the contract-3 ref: TOOL_SCHEMAS in
+  * zenvi-core (the desktop) at the contract ref (develop after #183, where
+    TOOL_SCHEMAS were rebuilt from the real handler signatures and
+    tests/test_agent_schemas.py enforces schema == handler): TOOL_SCHEMAS in
     src/classes/agent_tools/schema.py, handler signatures and docstrings in
     src/classes/tool_handlers.py and src/classes/agent_tools/*.py,
     TOOL_DISPLAY_LABELS and READ_ONLY_TOOLS. Read with `git show`, so the
     desktop working tree is never touched.
+  * zenvi-core at the snapshot ref (nilay-phase-5-speech-ml) for the tools
+    develop does not have yet (inspect and speech, desktop #185 / #220).
   * docs/specs/backend-frontend-tools.json: the schemas the Zenvi Assistant
     (zenvi-backend) model sees. Its argument names are what the Assistant
     actually sends.
@@ -14,10 +18,9 @@ Sources (read-only):
     descriptions, the real backend signature of tools the snapshot lacks, and
     default overrides.
 
-Merge rules (why: on the contract branch TOOL_SCHEMAS and the handlers drifted
-apart for ~20 tools, e.g. set_clip_volume_tool declares volume/gain/db while
-the handler and the backend use level/level_db/mode/fade_ms; with
-additionalProperties=false the desktop would refuse every real Assistant call):
+Merge rules (why: the Assistant backend's schemas and the desktop's are kept
+by different repos, and with additionalProperties=false an argument one side
+sends and the other does not declare is refused):
   * properties = TOOL_SCHEMAS properties, then backend-only properties, then
     overlay extra_props, in that order;
   * a property both sides declare keeps the TOOL_SCHEMAS schema, widened to a
@@ -30,7 +33,8 @@ additionalProperties=false the desktop would refuse every real Assistant call):
 
 Usage:  python3 packages/engine/scripts/gen-tool-schemas.py
 Env:    ZENVI_DESKTOP_REPO (default ~/Projects/zenvi),
-        ZENVI_CONTRACT_REF (default b63c39be7, branch nilay-phase-5-speech-ml).
+        ZENVI_CONTRACT_REF (default 2c99ed2c0, develop with #183),
+        ZENVI_SNAPSHOT_REF (default b63c39be7, branch nilay-phase-5-speech-ml).
 """
 
 from __future__ import annotations
@@ -51,31 +55,35 @@ BACKEND_JSON = os.path.join(ROOT, "docs", "specs", "backend-frontend-tools.json"
 OVERLAY_JSON = os.path.join(HERE, "tool-schema-overlay.json")
 
 REPO = os.environ.get("ZENVI_DESKTOP_REPO", os.path.join(os.path.expanduser("~"), "Projects", "zenvi"))
-REF = os.environ.get("ZENVI_CONTRACT_REF", "b63c39be7")
+REF = os.environ.get("ZENVI_CONTRACT_REF", "2c99ed2c0")
+SNAPSHOT_REF = os.environ.get("ZENVI_SNAPSHOT_REF", "b63c39be7")
 
 HIDDEN = {"self", "chat_session_id", "transaction_id"}
+
+# Overlay descriptions of arguments a tool no longer has (fails the run).
+STALE_OVERLAY: list[str] = []
 
 
 def git(*args: str) -> str:
     return subprocess.check_output(["git", "-C", REPO, *args]).decode("utf-8")
 
 
-def show(path: str) -> str:
-    return git("show", f"{REF}:{path}")
+def show(path: str, ref: str = REF) -> str:
+    return git("show", f"{ref}:{path}")
 
 
 # ---------------------------------------------------------------------------
 # Desktop sources
 # ---------------------------------------------------------------------------
 
-def load_tool_schemas() -> dict[str, dict]:
+def load_tool_schemas(ref: str) -> dict[str, dict]:
     """Execute schema.py with a stub jsonschema (only TOOL_SCHEMAS is needed)."""
     stub = types.ModuleType("jsonschema")
     stub.ValidationError = Exception  # type: ignore[attr-defined]
     stub.Draft202012Validator = object  # type: ignore[attr-defined]
     sys.modules.setdefault("jsonschema", stub)
     namespace: dict[str, Any] = {"__name__": "zenvi_contract_schema"}
-    exec(compile(show("src/classes/agent_tools/schema.py"), "schema.py", "exec"), namespace)
+    exec(compile(show("src/classes/agent_tools/schema.py", ref), "schema.py", "exec"), namespace)
     return namespace["TOOL_SCHEMAS"]
 
 
@@ -91,15 +99,22 @@ def dict_items(node: ast.expr) -> list[tuple[str, ast.expr]]:
     return [(ast.literal_eval(k), v) for k, v in zip(node.keys, node.values)]  # type: ignore[arg-type]
 
 
-def load_handlers() -> tuple[dict[str, tuple[str, str]], dict[str, str], set[str]]:
+def optional_assigned(tree: ast.Module, name: str) -> ast.expr | None:
+    try:
+        return assigned(tree, name)
+    except KeyError:
+        return None
+
+
+def load_handlers(ref: str) -> tuple[dict[str, tuple[str, str]], dict[str, str], set[str]]:
     """tool name -> (source path, function name); display labels; READ_ONLY_TOOLS."""
-    th = ast.parse(show("src/classes/tool_handlers.py"))
+    th = ast.parse(show("src/classes/tool_handlers.py", ref))
     handlers: dict[str, tuple[str, str]] = {}
     for name, value in dict_items(assigned(th, "AGENT_TOOL_HANDLERS")):
         assert isinstance(value, ast.Name)
         handlers[name] = ("src/classes/tool_handlers.py", value.id)
 
-    hi = ast.parse(show("src/classes/agent_tools/handlers/__init__.py"))
+    hi = ast.parse(show("src/classes/agent_tools/handlers/__init__.py", ref))
     modules: dict[str, str] = {}
     for node in hi.body:
         if isinstance(node, ast.ImportFrom) and node.module:
@@ -107,11 +122,13 @@ def load_handlers() -> tuple[dict[str, tuple[str, str]], dict[str, str], set[str
                 modules[alias.asname or alias.name] = "src/" + node.module.replace(".", "/") + ".py"
     labels: dict[str, str] = {}
     for dict_name in ("PHASE3_HANDLERS", "PHASE4_HANDLERS", "PHASE5_HANDLERS"):
-        for name, value in dict_items(assigned(hi, dict_name)):
+        node = optional_assigned(hi, dict_name)
+        for name, value in dict_items(node) if node is not None else []:
             assert isinstance(value, ast.Name)
             handlers[name] = (modules[value.id], value.id)
     for dict_name in ("PHASE3_DISPLAY_LABELS", "PHASE4_DISPLAY_LABELS", "PHASE5_DISPLAY_LABELS"):
-        for name, value in dict_items(assigned(hi, dict_name)):
+        node = optional_assigned(hi, dict_name)
+        for name, value in dict_items(node) if node is not None else []:
             labels[name] = ast.literal_eval(value)
     for name, value in dict_items(assigned(th, "TOOL_DISPLAY_LABELS")):
         labels[name] = ast.literal_eval(value)
@@ -122,11 +139,11 @@ def load_handlers() -> tuple[dict[str, tuple[str, str]], dict[str, str], set[str
     return handlers, labels, read_only
 
 
-def handler_signature(path: str, func: str, cache: dict[str, ast.Module]) -> tuple[str, dict[str, Any]]:
+def handler_signature(ref: str, path: str, func: str, cache: dict[tuple[str, str], ast.Module]) -> tuple[str, dict[str, Any]]:
     """(first docstring paragraph, literal parameter defaults) of a handler."""
-    if path not in cache:
-        cache[path] = ast.parse(show(path))
-    fn = next(n for n in cache[path].body if isinstance(n, ast.FunctionDef) and n.name == func)
+    if (ref, path) not in cache:
+        cache[(ref, path)] = ast.parse(show(path, ref))
+    fn = next(n for n in cache[(ref, path)].body if isinstance(n, ast.FunctionDef) and n.name == func)
     doc = ast.get_docstring(fn) or ""
     first = " ".join(doc.split("\n\n")[0].split())
     defaults: dict[str, Any] = {}
@@ -209,6 +226,10 @@ def merged_schema(
     for key, schema in (tool_overlay.get("extra_props") or {}).items():
         if key not in props:
             props[key] = dict(schema)
+    # Arguments only the web surfaces accept (documented in docs/TOOLS.md).
+    for key, schema in (tool_overlay.get("web_extra_props") or {}).items():
+        if key not in props:
+            props[key] = dict(schema)
 
     for key, schema in props.items():
         extra = prop_overlay.get(key, {})
@@ -220,6 +241,9 @@ def merged_schema(
             value = defaults[key]
             if value is not None and value != "" and isinstance(value, (str, int, float, bool)):
                 schema["default"] = value
+
+    for key in sorted(set(prop_overlay) - set(props)):
+        STALE_OVERLAY.append(f"{name}.{key}")
 
     required = [r for r in contract.get("required") or [] if backend is None or r in backend_props]
     out: dict[str, Any] = {"type": "object", "properties": props, "additionalProperties": False}
@@ -292,10 +316,20 @@ def zod_object(schema: dict) -> str:
     return "z.strictObject({\n" + "\n".join(lines) + "\n  })"
 
 
+def load_source(ref: str) -> dict[str, Any]:
+    schemas = load_tool_schemas(ref)
+    handlers, labels, read_only = load_handlers(ref)
+    missing = sorted(set(handlers) ^ set(schemas))
+    if missing:
+        raise SystemExit(f"{ref}: TOOL_SCHEMAS and AGENT_TOOL_HANDLERS differ: {missing}")
+    commit = git("rev-parse", "--short=12", ref).strip()
+    return {"ref": commit, "schemas": schemas, "handlers": handlers, "labels": labels, "read_only": read_only}
+
+
 def main() -> None:
-    commit = git("rev-parse", "--short=12", REF).strip()
-    tool_schemas = load_tool_schemas()
-    handlers, labels, read_only = load_handlers()
+    primary = load_source(REF)
+    snapshot = load_source(SNAPSHOT_REF)
+    commit = primary["ref"]
     with open(BACKEND_JSON, encoding="utf-8") as fh:
         backend_doc = json.load(fh)
     backend_tools: dict[str, dict] = backend_doc["tools"]
@@ -305,20 +339,22 @@ def main() -> None:
     overlay: dict[str, dict] = overlay_doc["tools"]
     common: dict[str, str] = overlay_doc["common_props"]
 
-    missing = sorted(set(handlers) ^ set(tool_schemas))
-    if missing:
-        raise SystemExit(f"TOOL_SCHEMAS and AGENT_TOOL_HANDLERS differ: {missing}")
-    unknown_overlay = sorted(set(overlay) - set(tool_schemas))
+    # The snapshot's order (stable across regenerations), primary-only tools last.
+    names = [*snapshot["schemas"], *(n for n in primary["schemas"] if n not in snapshot["schemas"])]
+    unknown_overlay = sorted(set(overlay) - set(names))
     if unknown_overlay:
         raise SystemExit(f"overlay names unknown tools: {unknown_overlay}")
 
-    cache: dict[str, ast.Module] = {}
+    cache: dict[tuple[str, str], ast.Module] = {}
     entries = []
-    for name, contract in tool_schemas.items():
-        path, func = handlers[name]
-        doc, defaults = handler_signature(path, func, cache)
+    for name in names:
+        source = primary if name in primary["schemas"] else snapshot
+        contract = source["schemas"][name]
+        path, func = source["handlers"][name]
+        doc, defaults = handler_signature(source["ref"], path, func, cache)
         backend = backend_tools.get(name)
         schema = merged_schema(name, contract, backend, overlay, common, defaults)
+        labels = source["labels"]
         description = (
             overlay.get(name, {}).get("description")
             or ((backend or {}).get("description") or "").strip()
@@ -327,23 +363,30 @@ def main() -> None:
         )
         entries.append({
             "name": name,
-            "title": labels.get(name) or name,
+            "title": labels.get(name) or snapshot["labels"].get(name) or name,
             "description": " ".join(description.split()),
             "assistant": name in assistant_names,
-            "desktopReadOnly": name in read_only,
+            "desktopReadOnly": name in source["read_only"],
             "handler": f"{path}:{func}",
+            "ref": source["ref"],
             "schema": schema,
         })
 
+    if STALE_OVERLAY:
+        raise SystemExit(f"overlay describes arguments the tools do not have: {', '.join(STALE_OVERLAY)}")
+
     out: list[str] = []
     out.append("// Generated by packages/engine/scripts/gen-tool-schemas.py. Do not edit by hand.")
-    out.append(f"// Sources: zenvi-core {commit} (agent_tools/schema.py TOOL_SCHEMAS, tool_handlers.py,")
+    out.append(f"// Sources: zenvi-core {commit} (develop) and {snapshot['ref']} (tools develop lacks): agent_tools/schema.py TOOL_SCHEMAS, tool_handlers.py,")
     out.append("// agent_tools/*.py), docs/specs/backend-frontend-tools.json, scripts/tool-schema-overlay.json.")
     out.append("")
     out.append('import { z } from "zod";')
     out.append('import type { JsonSchemaObject } from "./json-schema.js";')
     out.append("")
+    out.append("/** zenvi-core commit the contract tools follow (develop). */")
     out.append(f"export const CONTRACT_REF = {ts(commit)};")
+    out.append("/** zenvi-core commit of the tools develop does not have yet (inspect, speech). */")
+    out.append(f"export const SNAPSHOT_REF = {ts(snapshot['ref'])};")
     out.append("")
     out.append("/** Static facts about one contract-3 tool. */")
     out.append("export interface ContractToolMeta {")
@@ -358,6 +401,8 @@ def main() -> None:
     out.append("  readonly desktopReadOnly: boolean;")
     out.append("  /** Desktop handler, `path:function`. */")
     out.append("  readonly handler: string;")
+    out.append("  /** zenvi-core commit this tool's schema and handler were read from. */")
+    out.append("  readonly ref: string;")
     out.append("  /** Merged JSON Schema: the MCP inputSchema, and what argument coercion reads. */")
     out.append("  readonly inputSchema: JsonSchemaObject;")
     out.append("}")
@@ -374,7 +419,7 @@ def main() -> None:
     for entry in entries:
         schema = entry["schema"]
         out.append(f"  {entry['name']}: {{")
-        for key in ("name", "title", "description", "assistant", "desktopReadOnly", "handler"):
+        for key in ("name", "title", "description", "assistant", "desktopReadOnly", "handler", "ref"):
             out.append(f"    {key}: {ts(entry[key])},")
         out.append("    inputSchema: {")
         out.append('      type: "object",')
@@ -396,7 +441,8 @@ def main() -> None:
     out.append("")
     with open(OUT, "w", encoding="utf-8") as fh:
         fh.write("\n".join(out))
-    print(f"wrote {os.path.relpath(OUT, ROOT)}: {len(entries)} tools from zenvi-core {commit}")
+    from_snapshot = sum(1 for e in entries if e["ref"] != commit)
+    print(f"wrote {os.path.relpath(OUT, ROOT)}: {len(entries)} tools ({len(entries) - from_snapshot} from zenvi-core {commit}, {from_snapshot} from {snapshot['ref']})")
 
 
 if __name__ == "__main__":
