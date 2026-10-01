@@ -176,6 +176,11 @@ export interface LayerAudioRequest {
   samples: number;
   sampleRate: number;
   channels: number;
+  /**
+   * libopenshot mutes this clip frame (`has_audio` off, or past the media's
+   * length, Clip.cpp:788): supply `samples` zeros per channel instead.
+   */
+  silent?: boolean;
 }
 
 export interface GainPoint {

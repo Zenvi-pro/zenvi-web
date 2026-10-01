@@ -13,7 +13,7 @@ import type { Project } from "../../model/types.js";
 import { compositeFrame } from "../cpu/compositor.js";
 import { planFrame } from "../plan/frame-plan.js";
 import { psnrRgb } from "../testing/images.js";
-import type { RgbaImage } from "../types.js";
+import type { KernelAudio, RgbaImage } from "../types.js";
 
 // Node APIs, typed locally so the engine's compilation stays free of Node types.
 interface SpawnResult {
@@ -85,6 +85,27 @@ function decode(path: string, size?: { width: number; height: number; flags: str
   return { width, height, frames };
 }
 
+const pcmCache = new Map<string, Float32Array[]>();
+
+/** A file's audio as planar float samples at `rate`, like FFmpegReader + FrameMapper deliver it. */
+function audioOf(path: string, rate: number, channels: number): Float32Array[] {
+  const key = `${path}@${rate}/${channels}`;
+  const hit = pcmCache.get(key);
+  if (hit) return hit;
+  const r = cp.spawnSync("ffmpeg", ["-v", "error", "-i", path, "-vn", "-ac", String(channels), "-ar", String(rate), "-f", "f32le", "-"], { maxBuffer: 1 << 30 });
+  if (r.status !== 0) throw new Error(`ffmpeg audio failed on ${path}: ${r.stderr.toString("utf8")}`);
+  const bytes = new Uint8Array(r.stdout);
+  const all = new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4));
+  const n = Math.floor(all.length / channels);
+  const planar = Array.from({ length: channels }, (_, c) => {
+    const ch = new Float32Array(n);
+    for (let i = 0; i < n; i += 1) ch[i] = all[i * channels + c]!;
+    return ch;
+  });
+  pcmCache.set(key, planar);
+  return planar;
+}
+
 interface ManifestCase {
   name: string;
   project: string;
@@ -146,9 +167,23 @@ describe.skipIf(!enabled)("frame parity with libopenshot 1.0", () => {
           const data = s.kind === "video" ? m.frames[Math.min(m.frames.length, s.frame) - 1] : m.frames[0];
           return data ? { width: m.width, height: m.height, data } : null;
         });
+        const audio = plan.layers.map((layer): KernelAudio | null => {
+          const req = layer.audio;
+          if (!req || req.silent) return null;
+          const pcm = audioOf(req.path, req.sampleRate, req.channels);
+          const from = Math.round(req.sourceStart * req.sampleRate);
+          return {
+            sampleRate: req.sampleRate,
+            channels: pcm.map((ch) => {
+              const out = new Float32Array(req.samples);
+              out.set(ch.subarray(Math.max(0, from), Math.max(0, Math.min(ch.length, from + req.samples))));
+              return out;
+            }),
+          };
+        });
         const images = new Map<string, RgbaImage>();
         for (const [path, m] of media) if (m.frames.length === 1) images.set(path, { width: m.width, height: m.height, data: m.frames[0]! });
-        const out = compositeFrame(plan, { layers, images });
+        const out = compositeFrame(plan, { layers, images, audio });
         const expected = new Uint8ClampedArray(fs.readFileSync(ref.path));
         if (out.width !== ref.width || out.height !== ref.height) {
           failures.push(`${c.name}@${frame}: size ${out.width}x${out.height} vs ${ref.width}x${ref.height}`);

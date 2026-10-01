@@ -100,8 +100,12 @@ function parentOf(clip: Clip, project: Project): Clip | undefined {
   return project.clips.find((c) => c.id === id);
 }
 
-/** Samples of clip frame `k` in the FrameMapper's layout (FrameMapper.cpp:260-316, :1097-1117). */
-function audioRequest(clip: Clip, k: number, project: Project, fps: Fraction): LayerAudioRequest | undefined {
+/**
+ * Samples of clip frame `k` in the FrameMapper's layout (FrameMapper.cpp:260-316, :1097-1117).
+ * Clip frame `n` is silent when `has_audio` is off there or it lies past the
+ * mapped reader's length (Clip.cpp:788).
+ */
+function audioRequest(clip: Clip, n: number, k: number, project: Project, fps: Fraction): LayerAudioRequest | undefined {
   const reader = clip.reader;
   if (!reader || reader.has_audio === false) return undefined;
   const rate = int(project.sample_rate, 48000) || 48000;
@@ -112,7 +116,7 @@ function audioRequest(clip: Clip, k: number, project: Project, fps: Fraction): L
   const c = clipStartPosition - clipStartFrame;
   const first = frameSampleOffset(1 + c, fps, rate, channels);
   const start = frameSampleOffset(k + c, fps, rate, channels) - first;
-  return {
+  const request: LayerAudioRequest = {
     fileId: String(clip.file_id ?? ""),
     path: String(reader.path ?? ""),
     sourceStart: start / rate,
@@ -120,13 +124,19 @@ function audioRequest(clip: Clip, k: number, project: Project, fps: Fraction): L
     sampleRate: rate,
     channels,
   };
+  const hasAudio = clip.has_audio === undefined || clip.has_audio === null ? -1 : getInt(clip.has_audio, n);
+  const duration = f32(Number(reader.duration) || 0);
+  const mappedLength = duration > 0 ? roundHalfAway(duration * fpsD) : 0;
+  if (hasAudio === 0 || (mappedLength > 0 && n > mappedLength)) request.silent = true;
+  return request;
 }
 
 /** Clip::apply_waveform's AudioVisualization settings (Clip.cpp:1472-1520). */
 function waveformEffect(clip: Clip, n: number): EffectInstance {
   const channel = (name: "red" | "green" | "blue" | "alpha", fallback: number): number => {
     const kf = clip.wave_color?.[name];
-    return kf === undefined || kf === null ? fallback : getInt(kf, n);
+    // Clip::apply_waveform narrows with static_cast<unsigned char> (Clip.cpp:1502-1506).
+    return kf === undefined || kf === null ? fallback : getInt(kf, n) & 0xff;
   };
   return {
     id: `${clip.id}-waveform`,
@@ -320,7 +330,7 @@ function planLayer(
   };
   if (cornerFraction > 0) layer.cornerRadius = cornerFraction * Math.min(effW, effH) * (drawW / effW);
   if (waveform || layer.effects.some((e) => AUDIO_REACTIVE.has(e.type))) {
-    const request = audioRequest(clip, k, project, fps);
+    const request = audioRequest(clip, n, k, project, fps);
     if (request) layer.audio = request;
   }
   return layer;

@@ -51,7 +51,10 @@ def make_media(out):
     ffmpeg("-f", "lavfi", "-i", "color=c=0x14e61e:s=160x120,format=rgba",
            "-vf", "geq=r='if(lt(hypot(X-80,Y-60),35),220,20)':g='if(lt(hypot(X-80,Y-60),35),120,230)':b='if(lt(hypot(X-80,Y-60),35),80,30)':a='255'",
            "-frames:v", "1", "-pix_fmt", "rgba", p("green.png"))
-    return {name: p(name) for name in ["bars.mkv", "clock24.mkv", "grad.png", "logo.png", "mask.png", "green.png"]}
+    # Video with a PCM tone (exact samples for audio-reactive effects).
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=2", "-f", "lavfi", "-i", "sine=f=330:r=48000:d=2,aformat=channel_layouts=stereo",
+           "-c:v", "png", "-pix_fmt", "rgb24", "-c:a", "pcm_s16le", "-shortest", p("tone.mkv"))
+    return {name: p(name) for name in ["bars.mkv", "clock24.mkv", "grad.png", "logo.png", "mask.png", "green.png", "tone.mkv"]}
 
 
 def kf(*points):
@@ -214,6 +217,9 @@ def cases(media):
     out.append(("corner-rotate-alpha", project([clip(media, "grad.png", end=3.0, layer=1), rounded]), [1]))
     cropped = clip(media, "bars.mkv", rotation=kf((1, 15)), scale_x=kf((1, 0.7)), scale_y=kf((1, 0.7)), effects=[effect("Crop", left=kf((1, 0.2)), right=kf((1, 0.1)), resize=True)])
     out.append(("crop-resize-rotate", project([cropped]), [1]))
+    out.append(("waveform-clip", project([clip(media, "bars.mkv", layer=1), clip(media, "tone.mkv", layer=2, waveform=True)]), [1, 20]))
+    viz = clip(media, "tone.mkv", effects=[effect("AudioVisualization")])
+    out.append(("audio-visualization", project([viz]), [1, 30]))
     return out
 
 

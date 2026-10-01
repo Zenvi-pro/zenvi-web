@@ -7,6 +7,8 @@
 import { clonePremul, premultiply, unpremultiply, type PremulImage } from "../pixels.js";
 import type { EffectInstance, KernelContext, RgbaImage, VideoKernel } from "../types.js";
 import { analogTape } from "./analog-tape.js";
+import { audioVisualization } from "./audio-visualization.js";
+import { beatSync } from "./beat-sync.js";
 import { blur, pixelate } from "./blur.js";
 import { caption } from "./caption.js";
 import { chromaKey } from "./chroma-key.js";
@@ -59,6 +61,8 @@ const SPECS: readonly KernelSpec[] = [
   displace,
   sphericalProjection,
   analogTape,
+  audioVisualization,
+  beatSync,
   caption,
   timer,
   unsupported("Outline"),

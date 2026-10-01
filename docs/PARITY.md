@@ -64,6 +64,8 @@ without them. Media are generated into a temp dir (≤ 320×180, ≤ 3 s).
 | displace-map | Displace with a still map | 1 | exact |
 | corner-rotate-alpha | corner radius with rotation and opacity | 1 | exact |
 | crop-resize-rotate | Crop `resize` with rotation | 1 | exact |
+| waveform-clip | `waveform` clip over video (AudioVisualization shortcut fed with the clip's PCM) | 1, 20 | exact |
+| audio-visualization | AudioVisualization effect on a clip with audio | 1, 30 | exact |
 
 ### Kernels
 
@@ -72,7 +74,8 @@ without them. Media are generated into a temp dir (≤ 320×180, ≤ 3 s).
 | Brightness, Saturation, Hue, Negate, Blur, Pixelate, Crop, Shift, ColorShift, Wave, Deinterlace, Bars, ChromaKey, Sharpen, Mask, generic effect mask (`mask_reader`, both `mask_mode`s) | 43 cases | exact |
 | ColorMap, ColorGrade, FilmGrain, DenoiseImage | 50 cases (74 frames, incl. multi-frame Denoise/FilmGrain) | exact |
 | Shadow, Glow, LensFlare, Displace, SphericalProjection | 39 cases | exact |
-| AnalogTape | see `fx-kernels.test.ts` | exact |
+| AnalogTape | 25 cases | exact |
+| AudioVisualization (all nine modes, styles, palettes, layouts, backgrounds), BeatSync | 34 cases, 6 stateful sequences | exact |
 | Caption, Timer | 38 background renders, 19 timer strings, 144 text-box edges | backgrounds and strings exact; 95/144 edges exact, the rest ±1 px (host fonts) |
 | Compressor, Expander, Delay, Echo, Distortion, ParametricEQ, Noise | 33 cases | exact |
 | Robotization, Whisperization | 2 cases | ≤ 9e-8 absolute (FFT, see below) |
@@ -137,6 +140,7 @@ tracking data.
 | Caption | Wrap width approximates the last glyph's overhang as `max(advance, ink right)`; Qt line breaks at U+2028 inside a line are not reproduced (`Caption.cpp:253`) | rare wrap differences |
 | Caption | Negative padding: Qt fills a malformed shape; the engine draws nothing (`Caption.cpp:304-332`) | – |
 | Robotization, Whisperization | vDSP FFT (`juce_FFT.cpp:434-536`); the engine uses a double-precision real FFT and mirrors `|X[k]|` itself (`Robotization.cpp:76-78`). `ScopedNoDenormals` is not emulated | ≤ 9e-8 |
+| AudioVisualization, BeatSync, SphericalProjection, LensFlare | `sin`/`cos`/`atan2`/`pow`/`exp` come from V8, which can differ from Apple's libm by 1 ulp; fused multiply-adds inside Qt's stroker are not emulated | none observed in any golden or a fuzz run against Qt |
 | SphericalProjection | UV map in V8 `Math.*` without fused ops; the C++ also clears its UV cache on every property edit (`SphericalProjection.cpp:486-491`) | ~4e-9 of map values could round differently; none observed |
 | Audio resampling | FrameMapper resamples with libswresample and `apply_timemapping` with JUCE's `ResamplingAudioSource`; renderers use their own resampler | sample values, not timing |
 | Time-remapped audio | `Clip::apply_timemapping` (`Clip.cpp:585-720`) is replayed from the clip's first frame, as an export plays it; the desktop preview resets its read position on seeks and jumps | positions after seeks in the desktop preview |
@@ -161,6 +165,15 @@ tracking data.
 ### Reproduced on purpose
 
 These are how existing projects look on the desktop, so the engine keeps them:
+
+- The desktop's default transitions (`fade.svg`, brightness 1 → −1 on an
+  ease-in-out Bézier, contrast 3; `timeline.py` and the agent's
+  `add_transition_between_clips`) dissolve over only about a third of their
+  length: for a 1 s fade the blend runs 2 % → 94 % over frames 6–15 of 30,
+  with pure A before and pure B after. The engine renders it identically.
+- The `waveform` clip colour narrows each channel with
+  `static_cast<unsigned char>` (`Clip.cpp:1502-1506`), so out-of-range
+  values wrap.
 
 - ChromaKey: every method except BASIC runs the BASIC_SOFT code, because the
   desktop build has no babl (`effects/ChromaKey.cpp`, the `#if USE_BABL` block).

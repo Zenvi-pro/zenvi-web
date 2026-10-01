@@ -125,7 +125,11 @@ function drawLayer(canvas: PremulImage, plan: FramePlan, layer: LayerPlan, index
   let image = sourceImage(layer, sources.layers[index]);
   if (!image) return;
   const images = sources.images ?? EMPTY_IMAGES;
-  const extras = { images, texts: sources.texts, text: sources.text, state: sources.state, audio: sources.audio?.[index] ?? null };
+  const request = layer.audio;
+  const audio = request?.silent
+    ? { sampleRate: request.sampleRate, channels: Array.from({ length: request.channels }, () => new Float32Array(request.samples)) }
+    : (sources.audio?.[index] ?? null);
+  const extras = { images, texts: sources.texts, text: sources.text, state: sources.state, audio };
 
   for (const effect of layer.effects) {
     if (effect.applyBeforeClip === false) continue;
