@@ -5,22 +5,13 @@
  * desktop would.
  */
 
-import { profilesMatching } from "@zenvi/engine";
+import { type Profile, profilesMatching } from "@zenvi/engine";
 
 export const PROJECT_FORMATS = ["landscape_1080p", "landscape_720p", "landscape_4k", "vertical_1080p", "square_1080p"] as const;
 export type ProjectFormat = (typeof PROJECT_FORMATS)[number];
 
 export const PROJECT_FPS = [24, 25, 30, 50, 60] as const;
 export type ProjectFps = (typeof PROJECT_FPS)[number];
-
-export interface ProfileSpec {
-  width: number;
-  height: number;
-  displayRatio: { num: number; den: number };
-  pixelRatio: { num: number; den: number };
-  fps: { num: number; den: number };
-  description: string;
-}
 
 const SIZES: Record<ProjectFormat, { width: number; height: number }> = {
   landscape_1080p: { width: 1920, height: 1080 },
@@ -30,16 +21,9 @@ const SIZES: Record<ProjectFormat, { width: number; height: number }> = {
   square_1080p: { width: 1080, height: 1080 },
 };
 
-export function profileFor(format: ProjectFormat, fps: ProjectFps): ProfileSpec {
+export function profileFor(format: ProjectFormat, fps: ProjectFps): Profile {
   const { width, height } = SIZES[format];
   const profile = profilesMatching(width, height, { num: fps, den: 1 })[0];
   if (!profile) throw new Error(`no desktop profile for ${width}x${height} at ${fps} fps`);
-  return {
-    width: profile.width,
-    height: profile.height,
-    displayRatio: { ...profile.display_ratio },
-    pixelRatio: { ...profile.pixel_ratio },
-    fps: { ...profile.fps },
-    description: profile.description,
-  };
+  return profile;
 }

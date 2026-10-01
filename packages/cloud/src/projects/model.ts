@@ -1,19 +1,18 @@
 /**
- * Project JSON helpers the cloud needs: validation of untrusted uploads, a new
- * empty project, listing stats and the media a project references.
+ * Project JSON helpers the cloud needs: validation of untrusted uploads,
+ * listing stats and the media a project references. New projects come from
+ * the engine's `createProject`.
  *
- * Validation and defaults belong to the engine (`parseProject` /
- * `createProject`, W1 `packages/engine/src/{io,model}`). Until those are
- * exported from `@zenvi/engine`, `validateProject` and `newProject` here are a
- * deliberately shallow stand-in (owner: W7; swap to the engine functions when
- * they land): they check the fields the cloud relies on and keep every other
- * key untouched.
+ * Validation belongs to the engine (`parseProject`, W1 `packages/engine/src/io`).
+ * Until it is exported from `@zenvi/engine`, `validateProject` here is a
+ * deliberately shallow stand-in (owner: W7; swap to `parseProject` when it
+ * lands): it checks the fields the cloud relies on and keeps every other key
+ * untouched.
  */
 
 import type { Project, ProjectFile } from "@zenvi/engine";
 import { z } from "zod";
 import { ApiError } from "../http/errors.js";
-import { profileFor, type ProfileSpec } from "./profiles.js";
 
 const fraction = z.object({ num: z.number().int().positive(), den: z.number().int().positive() }).passthrough();
 const identified = z.object({ id: z.string().min(1).max(200) }).passthrough();
@@ -40,42 +39,6 @@ export function validateProject(value: unknown): Project {
     throw new ApiError(422, "invalid_project", `Not a valid Zenvi project: ${issues.join("; ")}`, { issues });
   }
   return value as Project;
-}
-
-/**
- * A new empty project: the desktop's `src/settings/_default.project` with a
- * profile applied (default "HD 720p 30 fps", the desktop's default), as the
- * desktop does on File → New.
- */
-export function newProject(id: string, profile: ProfileSpec = profileFor("landscape_720p", 30)): Project {
-  const layer = (n: number) => ({ id: `L${n}`, label: "", number: n * 1_000_000, y: 0, lock: false });
-  return {
-    id,
-    fps: { ...profile.fps },
-    display_ratio: { ...profile.displayRatio },
-    pixel_ratio: { ...profile.pixelRatio },
-    width: profile.width,
-    height: profile.height,
-    sample_rate: 48000,
-    channels: 2,
-    channel_layout: 3,
-    settings: {},
-    clips: [],
-    effects: [],
-    files: [],
-    duration: 300,
-    scale: 15.0,
-    tick_pixels: 100,
-    playhead_position: 0,
-    profile: profile.description,
-    export_settings: null,
-    export_overrides: {},
-    layers: [1, 2, 3, 4, 5].map(layer),
-    markers: [],
-    progress: [],
-    history: { undo: [], redo: [] },
-    version: { "openshot-qt": "0.0.0", libopenshot: "0.0.0" },
-  };
 }
 
 export interface ProjectStats {

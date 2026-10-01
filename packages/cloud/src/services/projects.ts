@@ -4,15 +4,14 @@
  * overwrite each other — the loser gets a 409 with the current revision.
  */
 
-import type { Project } from "@zenvi/engine";
+import { createProject, type Profile, type Project } from "@zenvi/engine";
 import { ApiError, conflict, notFound, PreconditionFailedError, tooLarge } from "../http/errors.js";
 import type { BlobStore } from "../storage/types.js";
 import { decodeMeta, encodeMeta } from "../storage/types.js";
 import type { Clock } from "../util/clock.js";
 import { isoAt } from "../util/clock.js";
 import { randomId } from "../util/crypto.js";
-import { newProject, projectStats, type ProjectStats, validateProject } from "../projects/model.js";
-import type { ProfileSpec } from "../projects/profiles.js";
+import { projectStats, type ProjectStats, validateProject } from "../projects/model.js";
 import { metaPath, projectPath, projectPrefix, userPrefix } from "./paths.js";
 
 export interface ProjectMeta {
@@ -102,14 +101,15 @@ export class ProjectService {
     return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  async create(userId: string, input: { name?: unknown; project?: unknown; profile?: ProfileSpec }): Promise<ProjectSummary> {
+  async create(userId: string, input: { name?: unknown; project?: unknown; profile?: Profile }): Promise<ProjectSummary> {
     const existing = await this.list(userId);
     if (existing.length >= MAX_PROJECTS_PER_USER) {
       throw new ApiError(403, "project_limit", `You have reached the limit of ${MAX_PROJECTS_PER_USER} cloud projects.`);
     }
     const id = randomId("c_", 16);
+    // No project given: the desktop's File ▸ New (default profile "HD 720p 30 fps").
     const project =
-      input.project === undefined || input.project === null ? newProject(id, input.profile) : validateProject(input.project);
+      input.project === undefined || input.project === null ? createProject(input.profile ? { profile: input.profile } : {}) : validateProject(input.project);
     const body = this.serialize(project);
     const now = isoAt(this.clock.now());
     const meta: ProjectMeta = { id, name: cleanName(input.name), createdAt: now, updatedAt: now, stats: projectStats(project) };
