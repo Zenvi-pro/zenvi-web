@@ -82,12 +82,17 @@ export interface MediaRef {
   size?: number;
 }
 
-/** The content hash a project file's bytes live under in Zenvi Cloud, if any. */
+/**
+ * The content address of a project file's bytes in Zenvi Cloud: the full-file
+ * SHA-256 in `file.cloud.sha256` (engine CloudMediaRef), or undefined.
+ *
+ * Never `file.fingerprint.sha256`: the desktop's fingerprint hashes only the
+ * size plus the first and last 1 MB (zenvi-core src/classes/media_fingerprint.py)
+ * for cheap relinking, so it does not identify the content.
+ */
 export function fileSha256(file: ProjectFile): string | undefined {
   const cloud = file.cloud?.sha256;
-  if (isSha256(cloud)) return cloud;
-  const fingerprint = file.fingerprint?.sha256;
-  return isSha256(fingerprint) ? fingerprint : undefined;
+  return isSha256(cloud) ? cloud : undefined;
 }
 
 export function displayName(file: ProjectFile): string {
@@ -97,7 +102,7 @@ export function displayName(file: ProjectFile): string {
   return path.split(/[\\/]/).pop() || file.id;
 }
 
-/** Every project file with a content hash, plus the ones without (not in the cloud). */
+/** Every project file with a cloud content address, plus the ones without (not in the cloud). */
 export function projectMedia(project: Project): { refs: MediaRef[]; unhashed: { fileId: string; name: string }[] } {
   const refs: MediaRef[] = [];
   const unhashed: { fileId: string; name: string }[] = [];

@@ -299,7 +299,10 @@ describe("import_media_from_url", () => {
 
     const { project } = await h.services.projects.get(USER_A, projectId);
     expect(project.files).toHaveLength(1);
-    expect(project.files[0]).toMatchObject({ path: "beach.mp4", media_type: "video", cloud: { name: "beach.mp4", content_type: "video/mp4" } });
+    expect(project.files[0]).toMatchObject({ path: "beach.mp4", media_type: "video" });
+    // Content address in `cloud` only; never a (partial-hash) desktop fingerprint.
+    expect(project.files[0]?.cloud).toEqual({ sha256: first.structuredContent?.sha256, size: 17, name: "beach.mp4", content_type: "video/mp4" });
+    expect(project.files[0]?.fingerprint).toBeUndefined();
     expect((project.history.undo as unknown[]).length).toBeGreaterThan(0);
     expect(await h.services.media.get(USER_A, first.structuredContent?.sha256 as string)).toMatchObject({ verified: true });
     await client.close();
@@ -314,6 +317,23 @@ describe("import_media_from_url", () => {
     const second = await call(client, "import_media_from_url", { url: `http://media.test:${port}/two.mp4` });
     expect(second.structuredContent).toMatchObject({ file_id: first.structuredContent?.file_id, name: "one.mp4", already_in_project: true });
     expect((await h.services.projects.get(USER_A, projectId)).project.files).toHaveLength(1);
+    await client.close();
+  });
+
+  it("does not dedupe against a desktop file whose partial fingerprint matches", async () => {
+    const h = await harness({ prober: fakeProber, network });
+    const bytes = Buffer.from("imported bytes");
+    const port = await mediaServer(bytes);
+    const { createHash } = await import("node:crypto");
+    const sha = createHash("sha256").update(bytes).digest("hex");
+    const client = await connect(h, await pat(h));
+    const projectId = (await call(client, "create_project", { name: "P" })).structuredContent?.project_id as string;
+    const current = await h.services.projects.get(USER_A, projectId);
+    const desktopFile = { ...(await fakeProber.probe("/Users/me/b.mp4")), id: "DESKTOP001", path: "/Users/me/b.mp4", media_type: "video", fingerprint: { sha256: sha, size: bytes.length } };
+    await h.services.projects.save(USER_A, projectId, { ...current.project, files: [desktopFile] }, current.revision);
+    const res = await call(client, "import_media_from_url", { url: `http://media.test:${port}/b.mp4` });
+    expect(res.structuredContent).toMatchObject({ already_in_project: false });
+    expect((await h.services.projects.get(USER_A, projectId)).project.files).toHaveLength(2);
     await client.close();
   });
 

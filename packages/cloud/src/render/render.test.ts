@@ -67,6 +67,26 @@ describe("render jobs", () => {
     expect(d.json.renderId).not.toBe(a.json.renderId);
   });
 
+  it("do not render media known only by the desktop's partial fingerprint", async () => {
+    const h = await harness({ renderer: fakeRenderer() });
+    const token = await h.userToken(USER_A);
+    const bytes = "real bytes";
+    const hash = sha(bytes);
+    const ticket = await h.request("POST", "/v1/media", { token, json: { sha256: hash, size: bytes.length, name: "a.mp4", contentType: "video/mp4" } });
+    await h.blobs.acceptSignedWrite(ticket.json.uploadUrl, bytes);
+    await h.request("POST", `/v1/media/${hash}/complete`, { token });
+    const project = sampleProject({
+      files: [{ id: "F1", path: "/Users/me/a.mp4", media_type: "video", fingerprint: { sha256: hash, size: bytes.length } }],
+      clips: [{ id: "C1", file_id: "F1", position: 0, start: 0, end: 2, layer: 1000000 }],
+    });
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P", project } })).json.id;
+    const started = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
+    await h.services.renders.drain();
+    const job = await h.request("GET", `/v1/projects/${id}/renders/${started.json.renderId}`, { token });
+    expect(job.json.status).toBe("error");
+    expect(job.json.error).toContain('"a.mp4" is not in Zenvi Cloud');
+  });
+
   it("explain which media is missing from the cloud", async () => {
     const h = await harness({ renderer: fakeRenderer() });
     const token = await h.userToken(USER_A);

@@ -3,10 +3,12 @@
  * with the engine's `addFile` op (which dedupes by path, like the desktop).
  *
  * Cloud imports are content-addressed, and MCP hosts retry and re-send the
- * same attachment, so the same bytes already in the bin (by sha256) return
- * that entry and record nothing. Imports are named after the file
- * (`beach.mp4`), so two different files can share a name; the second gets a
- * hash-suffixed path so `addFile` does not mistake it for the first.
+ * same attachment, so the same bytes already in the bin (same
+ * `file.cloud.sha256`) return that entry and record nothing. The desktop's
+ * `fingerprint.sha256` is a partial hash and never matches content. Imports
+ * are named after the file (`beach.mp4`), so two different files can share a
+ * name; the second gets a hash-suffixed path so `addFile` does not mistake it
+ * for the first.
  */
 
 import { addFile, type ImportedMedia, OpError, type ProjectFile, type Transaction } from "@zenvi/engine";
@@ -20,14 +22,14 @@ function withSuffix(path: string, suffix: string): string {
 /** Returns the file entry and whether it was newly added. */
 export function addMediaFile(tx: Transaction, media: ImportedMedia): { file: ProjectFile; added: boolean } {
   const before = new Set(tx.project.files.map((file) => file.id));
-  const sha = media.fingerprint?.sha256 ?? media.cloud?.sha256;
+  const sha = media.cloud?.sha256;
   if (sha !== undefined) {
-    const same = tx.project.files.find((file) => file.fingerprint?.sha256 === sha || file.cloud?.sha256 === sha);
+    const same = tx.project.files.find((file) => file.cloud?.sha256 === sha);
     if (same) return { file: same, added: false };
   }
   let entry = media;
   const clash = tx.project.files.find((file) => file.path === media.path);
-  if (clash && sha !== undefined && clash.fingerprint?.sha256 !== sha && clash.cloud?.sha256 !== sha) {
+  if (clash && sha !== undefined && clash.cloud?.sha256 !== sha) {
     const path = withSuffix(media.path, sha.slice(0, 8));
     entry = { ...media, path, info: { ...media.info, path } };
   }

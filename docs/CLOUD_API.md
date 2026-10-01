@@ -100,8 +100,7 @@ ETag is the project's **revision**. Unknown keys are preserved.
 ```
 
 `GET /v1/projects/:id` also returns, for every `project.files[]` entry whose
-bytes are in the cloud (matched by `file.cloud.sha256`, else
-`file.fingerprint.sha256`):
+bytes are in the cloud (matched by `file.cloud.sha256` only — see §4):
 
 ```jsonc
 "media": [{ "fileId": "F1A2B3C4D5", "sha256": "…", "name": "beach.mp4", "contentType": "video/mp4",
@@ -122,11 +121,16 @@ capped at 20 MB (`MAX_PROJECT_BYTES`).
 
 ## 4. Media
 
-Media are content-addressed per user: `u/{userId}/media/{sha256}`. The same
-bytes are stored once and shared by all of that user's projects. Clients put
-the hash into the project file entry as
-`file.cloud = { sha256, size, content_type, name }` (keep
-`fingerprint.sha256` too, as the desktop does).
+Media are content-addressed per user: `u/{userId}/media/{sha256}`, where
+`sha256` is the SHA-256 of the **whole file**. The same bytes are stored once
+and shared by all of that user's projects. Clients record it in the project
+file entry as `file.cloud = { sha256, size, name, content_type, … }` (extra
+keys such as the desktop's `mtime` are preserved). `file.cloud.sha256` is the
+only content address: the desktop's `file.fingerprint.sha256` hashes just the
+size plus the first and last 1 MB (zenvi-core `media_fingerprint.py`), so the
+cloud never uses it, and files that only have a fingerprint count as not in
+the cloud. Leave `fingerprint` as the desktop wrote it; the cloud never
+writes one.
 
 | Method | Path | Body | Result |
 | --- | --- | --- | --- |
@@ -165,7 +169,8 @@ the blob; upload again). Only completed media count as existing.
 `application/mxf`, `application/x-subrip`, `text/vtt`,
 `application/octet-stream`. Anything else is `415`.
 
-**Push from the desktop / CLI.** Hash each file → `media/check` → for each
+**Push from the desktop / CLI.** Hash each whole file (SHA-256; not the
+fingerprint) → `media/check` → for each
 missing hash: `POST /v1/media`, upload, `complete` → set `file.cloud` in the
 project → `POST /v1/projects {name, project}` (or `PUT` with `If-Match`) →
 open `editorUrl`.

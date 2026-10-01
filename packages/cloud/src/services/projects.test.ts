@@ -35,12 +35,35 @@ describe("projects API", () => {
   it("keeps unknown desktop keys through a round trip", async () => {
     const h = await harness();
     const token = await h.userToken(USER_A);
-    const project = sampleProject({ zenvi_ai: { index: [1, 2, 3] }, files: [{ id: "F1", path: "/x.mp4", tags: "a", fingerprint: { sha256: "0".repeat(64), size: 1 } }] });
+    const project = sampleProject({
+      zenvi_ai: { index: [1, 2, 3] },
+      files: [{ id: "F1", path: "/x.mp4", tags: "a", cloud: { sha256: "0".repeat(64), size: 1, name: "x.mp4", mtime: 1727700000.5 } }],
+    });
     const created = await h.request("POST", "/v1/projects", { token, json: { name: "Imported", project } });
     const got = await h.request("GET", `/v1/projects/${created.json.id}`, { token });
     expect(got.json.project.zenvi_ai).toEqual({ index: [1, 2, 3] });
     expect(got.json.project.files[0].tags).toBe("a");
+    expect(got.json.project.files[0].cloud.mtime).toBe(1727700000.5);
     expect(got.json.missingMedia).toEqual([{ fileId: "F1", name: "x.mp4", sha256: "0".repeat(64), reason: "not_uploaded" }]);
+  });
+
+  it("never treats the desktop's partial fingerprint as a cloud content address", async () => {
+    const h = await harness();
+    const token = await h.userToken(USER_A);
+    // Media whose full SHA-256 happens to equal a file's fingerprint.sha256 must still not be linked to it.
+    const bytes = Buffer.from("cloud bytes");
+    const { createHash } = await import("node:crypto");
+    const sha = createHash("sha256").update(bytes).digest("hex");
+    const ticket = await h.request("POST", "/v1/media", { token, json: { sha256: sha, size: bytes.length, name: "c.mp4", contentType: "video/mp4" } });
+    await h.blobs.acceptSignedWrite(ticket.json.uploadUrl, bytes);
+    await h.request("POST", `/v1/media/${sha}/complete`, { token });
+    const project = sampleProject({
+      files: [{ id: "F1", path: "/Users/me/c.mp4", media_type: "video", fingerprint: { sha256: sha, size: bytes.length, mtime: 1 } }],
+    });
+    const created = await h.request("POST", "/v1/projects", { token, json: { name: "Desktop", project } });
+    const got = await h.request("GET", `/v1/projects/${created.json.id}`, { token });
+    expect(got.json.media).toEqual([]);
+    expect(got.json.missingMedia).toEqual([{ fileId: "F1", name: "c.mp4", reason: "not_in_cloud" }]);
   });
 
   it("never lets one user see or change another user's project", async () => {

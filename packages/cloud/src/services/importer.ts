@@ -157,12 +157,13 @@ export class MediaImporter {
           name,
           contentType,
         }));
+      // Content address in `cloud` only. No `fingerprint`: that is the desktop's
+      // partial hash, and a full hash there would read as "file changed" on the desktop.
       return {
         path: name,
         name,
         info: { ...info, path: name },
-        fingerprint: { size: downloaded.size, sha256: downloaded.sha256 },
-        cloud: { sha256: downloaded.sha256, size: downloaded.size, content_type: stored.contentType, name },
+        cloud: { sha256: downloaded.sha256, size: downloaded.size, name, content_type: stored.contentType },
         sha256: downloaded.sha256,
         size: downloaded.size,
         contentType: stored.contentType,
