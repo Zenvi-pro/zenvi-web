@@ -18,6 +18,7 @@
  */
 
 import { byteMul, createPremul, fillPremul, type PremulImage } from "../pixels.js";
+import { fmaf } from "../qt/fma.js";
 import { evaluateAnimatedCurve, sampleCurve, type EvaluatedCurve } from "../plan/effect-params.js";
 import type { EvaluatedParam, KernelContext, RGBA } from "../types.js";
 import { bool, color, getInt, num, record } from "./params.js";
@@ -68,8 +69,8 @@ export function bandEnergy(audio: FrameAudio | undefined, lowHz: number, highHz:
     let x = 0;
     for (let c = 0; c < channels; c += 1) x = f32(x + ch[c]![s]!);
     x = f32(x / channels);
-    lpHi = f32(alphaHi * f32(x - lpHi) + lpHi);
-    lpLo = f32(alphaLo * f32(x - lpLo) + lpLo);
+    lpHi = fmaf(alphaHi, f32(x - lpHi), lpHi);
+    lpLo = fmaf(alphaLo, f32(x - lpLo), lpLo);
     const filtered = f32(lpHi - lpLo);
     sumSq += f32(filtered * filtered);
     const absV = Math.abs(filtered);
@@ -139,7 +140,7 @@ export const beatSync: KernelSpec = {
     const ms = f32(raw > envelope ? num(params, "attack_ms", 10) : num(params, "decay_ms", 200));
     const tau = ms < 1 ? MS : f32(clampf(ms, 1, 5000) * MS);
     const coef = f32(Math.exp(f32(-frameSec / tau)));
-    envelope = f32(coef * envelope + f32(raw * f32(1 - coef)));
+    envelope = fmaf(coef, envelope, f32(raw * f32(1 - coef)));
     if (state) {
       state.set(ENVELOPE, envelope);
       state.set(LAST_FRAME, frame);
@@ -151,7 +152,7 @@ export const beatSync: KernelSpec = {
     if (envelope > thr) energy = clampf(f32(f32(envelope - thr) / Math.max(f32(1 - thr), MS)), 0, 1);
     if (bool(params, "invert", false)) energy = f32(1 - energy);
     const response = clampf(sampleCurve(responseCurve(params, frame), energy), 0, 1);
-    const blend = clampf(Math.trunc(f32(response * 256 + 0.5)), 0, 256);
+    const blend = clampf(Math.trunc(fmaf(response, 256, 0.5)), 0, 256);
     const inv = 256 - blend;
 
     const low = color(params, "low_color", [0, 0, 0, 255]);

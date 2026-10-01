@@ -101,6 +101,7 @@ def make_images():
     images["alpha"] = (24, 16, alpha(24, 16, 11))
     images["tiny"] = (8, 6, photo(8, 6))
     images["canvas"] = (48, 27, photo(48, 27))
+    images["wide"] = (64, 36, photo(64, 36))
     return images
 
 
@@ -388,6 +389,92 @@ def beat_sync_cases(inputs, audio, base):
     return cases
 
 
+# ---------------------------------------------------------------------------
+# AudioVisualization
+# ---------------------------------------------------------------------------
+
+TONES = ("tones", 0, 1600, 2)
+NOISE = ("noise", 0, 1600, 2)
+LOUD = ("loud", 400, 1600, 2)
+QUIET = ("quiet", 400, 1600, 2)
+BEEPS = ("beeps", 0, 1600, 2)
+MONO = ("tones", 400, 1600, 1)
+
+
+def av(mode, **params):
+    out = {"visualization_type": mode}
+    for k, v in params.items():
+        out[k] = kf(v) if isinstance(v, (int, float)) and k in ("intensity", "smoothing", "detail", "glow", "color_spread", "frequency_low", "frequency_high") else v
+    return out
+
+
+# Clip::apply_waveform's settings (Clip.cpp:1498-1514) on a transparent canvas.
+CLIP_WAVEFORM = {"style": 3, "color": color(250, 160, 40, 255), "intensity": kf(1), "smoothing": kf(0.25), "detail": kf(0.75),
+                 "glow": kf(0), "color_spread": kf(0), "color_mode": 0, "channel_layout": 0, "frequency_low": kf(0),
+                 "frequency_high": kf(1), "background": 0}
+
+# (name, image, frame, audio slice or None, timeline size or None, params)
+AV_CASES = [
+    ("waveform-default", "canvas", 1, TONES, None, av(0)),
+    ("waveform-minimal-combined", "canvas", 2, TONES, None, av(0, style=3, channel_layout=1, background=0, glow=0)),
+    ("waveform-rainbow-overlay-neon", "canvas", 3, NOISE, None, av(0, color_mode=1, channel_layout=3, style=2, background=1)),
+    ("waveform-soft-mono-fade", "wide", 4, MONO, None, av(0, style=1, background=2, detail=0.3)),
+    ("filled-default", "canvas", 5, TONES, None, av(1)),
+    ("filled-clip-waveform", "wide", 6, LOUD, None, dict(CLIP_WAVEFORM, visualization_type=1)),
+    ("filled-rainbow-overlay-gradient", "canvas", 7, NOISE, None, av(1, color_mode=1, channel_layout=3, background=3)),
+    ("filled-neon-split-quiet", "canvas", 8, QUIET, None, av(1, style=2, channel_layout=2, intensity=6)),
+    ("bars-default", "canvas", 9, NOISE, None, av(2)),
+    ("bars-rainbow-soft-band", "wide", 10, TONES, None, av(2, color_mode=1, style=1, background=0, frequency_low=0.2, frequency_high=0.8)),
+    ("bars-minimal-solid", "canvas", 11, BEEPS, None, av(2, style=3, glow=0, background=1, detail=0.1)),
+    ("radial-default", "wide", 12, TONES, None, av(3, background=0)),
+    ("radial-rainbow-neon", "wide", 13, NOISE, None, av(3, color_mode=1, style=2, background=0)),
+    ("radial-minimal-source", "canvas", 14, LOUD, None, av(3, style=3)),
+    ("spectrum-default", "wide", 15, NOISE, None, av(4, background=0, intensity=6)),
+    ("spectrum-rainbow-fade", "canvas", 16, TONES, None, av(4, color_mode=1, background=2)),
+    ("spectrum-minimal", "wide", 17, BEEPS, None, av(4, style=3, background=0, glow=0)),
+    ("phase-default", "wide", 18, LOUD, None, av(5, background=0)),
+    ("phase-rainbow-tones", "wide", 19, TONES, None, av(5, color_mode=1, background=0, intensity=2)),
+    ("phase-minimal-solid", "canvas", 20, NOISE, None, av(5, style=3, background=1)),
+    ("phase-mono-fallback", "canvas", 21, MONO, None, av(5, background=0)),
+    ("particles-default", "wide", 22, NOISE, None, av(6, background=0)),
+    ("particles-rainbow-minimal", "wide", 23, TONES, None, av(6, color_mode=1, style=3, background=0)),
+    ("particles-neon-source", "canvas", 77, LOUD, None, av(6, style=2, detail=0.1)),
+    ("vu-default", "canvas", 24, TONES, None, av(7)),
+    ("vu-minimal-combined", "canvas", 25, LOUD, None, av(7, style=3, channel_layout=1, background=0)),
+    ("vu-soft-quiet-gradient", "canvas", 26, QUIET, None, av(7, style=1, background=3, intensity=8)),
+    ("radialbars-default", "wide", 27, NOISE, None, av(8, background=0)),
+    ("radialbars-rainbow-soft", "wide", 28, TONES, None, av(8, color_mode=1, style=1, background=0, glow=0.6)),
+    ("no-audio-solid", "canvas", 29, None, None, av(2, background=1)),
+    ("pixel-timeline-fallback", "pixel", 30, NOISE, (40, 24), av(2)),
+    ("mode-clamped", "wide", 31, NOISE, None, av(12, background=0)),
+    ("keyframed-color-intensity", "canvas", 15, TONES, None, av(0, background=0,
+        color={"red": kf_ramp(1, 255, 30, 0), "green": kf(120), "blue": kf_ramp(1, 0, 30, 255), "alpha": kf(200)},
+        intensity=kf_ramp(1, 0.5, 30, 4))),
+    ("frequencies-in-hz", "wide", 32, NOISE, None, av(2, background=0, frequency_low=300, frequency_high=4000, intensity=5)),
+]
+
+
+def audio_visualization_cases(inputs, audio, base):
+    cases = []
+    for name, image, number, slice_, size, params in AV_CASES:
+        effect = make_effect("AudioVisualization", params, f"av-{name}")
+        tl = timeline(size, (30, 1))
+        if tl is not None:
+            effect.ParentTimeline(tl)
+        frame = inputs.frame(image)
+        if slice_ is not None:
+            segment, offset, count, channels = slice_
+            audio.fill(frame, audio.at(segment, offset), count, channels)
+        w, h, pixels = run(effect, frame, number)
+        cases.append({
+            "name": name, "input": image, "frame": number,
+            "audio": [audio.at(slice_[0], slice_[1]), slice_[2], slice_[3]] if slice_ else None,
+            "timeline": list(size) if size else None,
+            "json": json_overrides(effect, base), "width": w, "height": h, "out": b64z(pixels),
+        })
+    return cases
+
+
 def main():
     work = tempfile.mkdtemp(prefix="zenvi-fx-goldens-")
     try:
@@ -402,6 +489,7 @@ def main():
             "base": base,
             "analogTape": analog_tape_cases(inputs, base["AnalogTape"]),
             "beatSync": beat_sync_cases(inputs, audio, base["BeatSync"]),
+            "audioVisualization": audio_visualization_cases(inputs, audio, base["AudioVisualization"]),
         }
     finally:
         shutil.rmtree(work, ignore_errors=True)

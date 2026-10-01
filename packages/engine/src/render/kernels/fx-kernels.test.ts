@@ -9,9 +9,11 @@ import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { createPremul, fillPremul, premultiply, type PremulImage } from "../pixels.js";
 import { evaluateEffectParams } from "../plan/effect-params.js";
-import { diffBytes, fromBase64 } from "../testing/images.js";
+import { diffBytes, fromBase64, type ImageDiff } from "../testing/images.js";
 import type { KernelAudio, KernelContext, RgbaImage } from "../types.js";
 import { analogTape } from "./analog-tape.js";
+import { audioVisualization } from "./audio-visualization.js";
+import { mt19937Floats } from "./audio-visualization-analysis.js";
 import { beatSync } from "./beat-sync.js";
 import goldens from "./fx-goldens.json";
 
@@ -44,15 +46,35 @@ interface BeatCase {
   steps: BeatStep[];
 }
 
+interface AvCase {
+  name: string;
+  input: string;
+  frame: number;
+  audio: [number, number, number] | null;
+  timeline: [number, number] | null;
+  json: Record<string, unknown>;
+  width: number;
+  height: number;
+  out: string;
+}
+
 interface Doc {
   images: Record<string, { width: number; height: number; data: string }>;
   audio: { sampleRate: number; length: number; segments: Record<string, number>; data: string };
   base: Record<string, Record<string, unknown>>;
   analogTape: TapeCase[];
   beatSync: BeatCase[];
+  audioVisualization: AvCase[];
 }
 
 const doc = goldens as unknown as Doc;
+
+/**
+ * Golden cases are deterministic, but the heavy ones (the exact double-FMA
+ * spectrum DFT, 1280 radial-gradient particles) take ~1 s alone and can pass
+ * vitest's 5 s default when the whole engine project runs in parallel.
+ */
+const HEAVY_CASE_TIMEOUT_MS = 60_000;
 
 function inflate(b64: string): Uint8Array {
   return new Uint8Array(inflateSync(fromBase64(b64)));
@@ -96,7 +118,7 @@ function baseContext(frame: number, width: number, height: number, effectId: unk
 
 describe("AnalogTape matches libopenshot 1.0", () => {
   for (const c of doc.analogTape) {
-    it(c.name, () => {
+    it(c.name, { timeout: HEAVY_CASE_TIMEOUT_MS }, () => {
       const image = input(c.input);
       const ctx = baseContext(c.frame, image.width, image.height, c.json.id);
       if (c.timeline) {
@@ -145,5 +167,32 @@ describe("BeatSync matches libopenshot 1.0 (stateful sequences)", () => {
     const b = beatSync.run(image, params("BeatSync", c.json, step.frame), ctx) as PremulImage;
     expect(Array.from(a.data.subarray(0, 4))).toEqual(step.color);
     expect(Array.from(b.data.subarray(0, 4))).toEqual(step.color);
+  });
+});
+
+describe("AudioVisualization against libopenshot 1.0", () => {
+  for (const c of doc.audioVisualization) {
+    it(c.name, { timeout: HEAVY_CASE_TIMEOUT_MS }, () => {
+      const image = input(c.input);
+      const ctx = baseContext(c.frame, image.width, image.height, c.json.id);
+      if (c.timeline) {
+        ctx.timelineWidth = c.timeline[0];
+        ctx.timelineHeight = c.timeline[1];
+      }
+      ctx.audio = audioSlice(c.audio);
+      const out = audioVisualization.run(image, params("AudioVisualization", c.json, c.frame), ctx) ?? image;
+      expect([out.width, out.height]).toEqual([c.width, c.height]);
+      const diff: ImageDiff = diffBytes(inflate(c.out), out.data);
+      // Bit-exact against the macOS arm64 desktop build, antialiased strokes included.
+      expect(diff.maxDiff, `${diff.differing} bytes differ (PSNR ${diff.psnr.toFixed(1)} dB)`).toBe(0);
+    });
+  }
+});
+
+describe("AudioVisualization particle randomness", () => {
+  it("draws std::mt19937 + uniform_real_distribution<float> like libc++", () => {
+    // Particle 0 is seeded with (0 + 1) * 747796405 (AudioVisualization.cpp:839-844).
+    const draws = mt19937Floats(747796405, 4).map((v) => v.toPrecision(9));
+    expect(draws).toEqual(["0.823273182", "0.855387032", "0.789077044", "0.333694041"]);
   });
 });
