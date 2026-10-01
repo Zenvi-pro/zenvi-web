@@ -51,7 +51,7 @@ export function TimelineToolbar() {
         <Magnet size={14} />
       </IconButton>
       <Divider vertical />
-      <IconButton size="sm" label="Slice at playhead" shortcut={shortcutFor("sliceSelectedKeepBothSides")} onClick={() => run(hasSelection ? "sliceSelectedKeepBothSides" : "sliceAllKeepBothSides")}>
+      <IconButton size="sm" label="Slice at playhead" shortcut={shortcutFor("sliceSelectedKeepBothSides")} onClick={() => run("sliceSelectedKeepBothSides")}>
         <SquareSplitHorizontal size={14} />
       </IconButton>
       <IconButton size="sm" label="Delete" shortcut="Delete" disabled={!hasSelection} onClick={() => run("deleteItem")}>

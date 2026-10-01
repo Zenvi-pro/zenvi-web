@@ -1,4 +1,4 @@
-import { addClip, clipsUsingFile, removeFile, updateFile, type ProjectFile } from "@zenvi/engine";
+import { clipsUsingFile, removeFile, updateFile, type ProjectFile } from "@zenvi/engine";
 import { AlertTriangle, FileAudio, FileImage, FileVideo, Plus, Upload } from "lucide-react";
 import { memo, useEffect, useMemo, useState, useSyncExternalStore, type DragEvent } from "react";
 import { useStore } from "zustand";
@@ -10,7 +10,8 @@ import { SearchInput, TextInput } from "@/ui/Input";
 import { ContextMenu, type MenuSpec } from "@/ui/Menu";
 import { ProgressBar } from "@/ui/Spinner";
 import { Button } from "@/ui/Button";
-import { defaultTrack, importMedia, importState, trackEnd } from "../actions/importMedia";
+import { importMedia, importState } from "../actions/importMedia";
+import { addFilesToTimeline } from "../actions/placement";
 import { beginDrag, endDrag, isFileDrag } from "../dnd";
 import { useProjectSelector, useSession } from "../session/context";
 import { fileDisplayName, type MediaEntryState } from "../session/media";
@@ -174,21 +175,12 @@ export function ProjectFilesPanel() {
   }, [files, query, filter]);
 
   const addToTimeline = (ids: string[]) => {
-    const created = session.edit(ids.length > 1 ? `Add ${ids.length} clips` : "Add to timeline", (tx) => {
-      const layer = defaultTrack(tx.project);
-      if (layer === null) throw new Error("Unlock a track first: every track is locked.");
-      let cursor = trackEnd(tx.project, layer);
-      return ids.map((fileId) => {
-        const clip = addClip(tx, { fileId, position: cursor, layer });
-        cursor = clip.position + (clip.end - clip.start);
-        return clip.id;
-      });
-    });
-    if (created?.length) {
+    void addFilesToTimeline(session, ids).then((created) => {
+      if (!created.length) return;
       session.ui.setState({ selection: { ...EMPTY_SELECTION, clips: created } });
       const last = session.project.clips.find((c) => c.id === created[created.length - 1]);
       if (last) session.views.timeline?.reveal(last.position);
-    }
+    });
   };
 
   const remove = (file: ProjectFile) => {

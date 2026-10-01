@@ -4,20 +4,56 @@
   "outputDirectory": "dist",
   "framework": null,
   "rewrites": [
-    { "source": "/editor/api/zenvi/:path*", "destination": "https://api.zenvi.pro/api/v1/:path*" },
-    { "source": "/editor/:path*", "destination": "/editor/index.html" }
+    {
+      "source": "/editor/api/zenvi/:path*",
+      "destination": "https://api.zenvi.pro/api/v1/:path*"
+    },
+    {
+      "source": "/editor/:path*",
+      "destination": "/editor/index.html"
+    }
   ],
-  "redirects": [{ "source": "/", "destination": "/editor/", "permanent": false }],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/editor/",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
+      "source": "/editor/(connect|device)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'none'"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    },
+    {
       "source": "/editor/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     },
     {
       "source": "/editor/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
       ]
     }
   ]

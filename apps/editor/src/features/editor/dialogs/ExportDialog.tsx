@@ -42,7 +42,7 @@ type Quality = NonNullable<ExportOptions["quality"]>;
 type Phase =
   | { kind: "setup" }
   | { kind: "running"; fraction: number; stage: string; startedAt: number; target: "browser" | "cloud" }
-  | { kind: "done"; blob?: Blob; url?: string; name: string; seconds: number }
+  | { kind: "done"; blob?: Blob; url?: string; name: string; seconds: number; notes: string[] }
   | { kind: "error"; message: string };
 
 const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
@@ -90,6 +90,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
 
   const runBrowser = () => {
     const startedAt = performance.now();
+    const notes: string[] = [];
     setPhase({ kind: "running", fraction: 0, stage: "Rendering video", startedAt, target: "browser" });
     const current = startExport(
       session.project,
@@ -97,6 +98,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
       (fraction, stage) =>
         setPhase({ kind: "running", fraction, stage: stage === "audio" ? "Mixing audio" : stage === "finalizing" ? "Finishing file" : "Rendering video", startedAt, target: "browser" }),
       session.media,
+      (n) => notes.push(...n),
     );
     job.current = current;
     current.promise
@@ -105,7 +107,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
         const ext = blob.type.includes("webm") ? "webm" : blob.type.includes("quicktime") ? "mov" : "mp4";
         const fileName = safeFileName(name, ext);
         downloadBlob(blob, fileName);
-        setPhase({ kind: "done", blob, name: fileName, seconds: (performance.now() - startedAt) / 1000 });
+        setPhase({ kind: "done", blob, name: fileName, seconds: (performance.now() - startedAt) / 1000, notes });
       })
       .catch((error: unknown) => {
         job.current = null;
@@ -134,7 +136,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
         }
         if (status.status === "done" && status.url) {
           if (poll.current) clearInterval(poll.current);
-          setPhase({ kind: "done", url: status.url, name: safeFileName(name, "mp4"), seconds: (performance.now() - startedAt) / 1000 });
+          setPhase({ kind: "done", url: status.url, name: safeFileName(name, "mp4"), seconds: (performance.now() - startedAt) / 1000, notes: [] });
         } else if (status.status === "error") {
           if (poll.current) clearInterval(poll.current);
           setPhase({ kind: "error", message: status.error ?? "The cloud render failed." });
@@ -216,6 +218,13 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
           <p className="mt-1 text-xs text-fg-subtle">
             {phase.blob ? `${formatBytes(phase.blob.size)} · ` : ""}took {formatDuration(phase.seconds)}
           </p>
+          {phase.notes.length > 0 ? (
+            <ul className="mt-3 space-y-1 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning">
+              {phase.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-5">

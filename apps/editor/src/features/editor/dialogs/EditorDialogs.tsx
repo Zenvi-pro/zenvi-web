@@ -3,6 +3,7 @@ import { ExportDialog } from "./ExportDialog";
 import { ShareDialog } from "./ShareDialog";
 import { CloudConflictDialog, CommandPalette, ProjectFormatDialog, RelinkDialog, ShortcutsDialog } from "./SimpleDialogs";
 import { TitleDialog } from "./TitleDialog";
+import { UploadDialog } from "./UploadDialog";
 
 /** Every editor dialog, driven by `ui.dialog`. */
 export function EditorDialogs() {
@@ -19,6 +20,7 @@ export function EditorDialogs() {
       <RelinkDialog open={dialog === "relink"} onClose={close} />
       <TitleDialog open={dialog === "title"} onClose={close} />
       <CloudConflictDialog open={dialog === "cloudConflict"} onClose={close} />
+      <UploadDialog open={dialog === "upload"} onClose={close} />
     </>
   );
 }

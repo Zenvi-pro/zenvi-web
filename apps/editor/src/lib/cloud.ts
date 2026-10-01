@@ -187,17 +187,20 @@ export class HttpCloudClient implements CloudClient {
     const list = Array.isArray(data) ? data : ((data as { projects?: unknown[] } | null)?.projects ?? []);
     return list
       .filter((p): p is Record<string, unknown> => !!p && typeof p === "object" && typeof (p as { id?: unknown }).id === "string")
-      .map((p) => ({
-        id: p.id as string,
-        name: pick<string>(p, "name") ?? "Untitled",
-        createdAt: pick<string>(p, "createdAt", "created_at"),
-        updatedAt: pick<string>(p, "updatedAt", "updated_at"),
-        revision: pick<string>(p, "revision"),
-        thumbnailUrl: pick<string>(p, "thumbnailUrl", "thumbnail_url", "thumbnail"),
-        width: pick<number>(p, "width"),
-        height: pick<number>(p, "height"),
-        duration: pick<number>(p, "duration"),
-      }));
+      .map((p) => {
+        const stats = (pick<Record<string, unknown>>(p, "stats") ?? {}) as Record<string, unknown>;
+        return {
+          id: p.id as string,
+          name: pick<string>(p, "name") ?? "Untitled",
+          createdAt: pick<string>(p, "createdAt", "created_at"),
+          updatedAt: pick<string>(p, "updatedAt", "updated_at"),
+          revision: pick<string>(p, "revision"),
+          thumbnailUrl: pick<string>(p, "thumbnailUrl", "thumbnail_url", "thumbnail"),
+          width: pick<number>(stats, "width") ?? pick<number>(p, "width"),
+          height: pick<number>(stats, "height") ?? pick<number>(p, "height"),
+          duration: pick<number>(stats, "duration") ?? pick<number>(p, "duration"),
+        };
+      });
   }
 
   async createProject(name: string, project?: Project): Promise<{ id: string; revision: string | null }> {
@@ -405,14 +408,17 @@ export function setCloudClient(next: CloudClient | null): void {
   client = next;
 }
 
-/** Route id for a cloud project (`/editor/p/c_<id>`). */
+/**
+ * Route id for a cloud project. Cloud ids already look like `c_` + 16
+ * characters (docs/CLOUD_API.md §1), so the route is `/editor/p/<cloud id>`.
+ */
 export function cloudRouteId(cloudId: string): string {
-  return `c_${cloudId}`;
+  return cloudId.startsWith("c_") ? cloudId : `c_${cloudId}`;
 }
 
-/** The cloud project id in a route id, or null for a local id. */
+/** The cloud project id in a route id (`c_…`), or null for a local id. */
 export function parseCloudRouteId(routeId: string): string | null {
-  return routeId.startsWith("c_") && routeId.length > 2 ? routeId.slice(2) : null;
+  return routeId.startsWith("c_") && routeId.length > 2 ? routeId : null;
 }
 
 // ---------------------------------------------------------------------------

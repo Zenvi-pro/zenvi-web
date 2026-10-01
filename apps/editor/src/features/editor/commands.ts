@@ -20,6 +20,7 @@ import {
   removeMarker,
   removeTransition,
   setClipProperty,
+  sliceAllAt,
   splitClip,
   type ClipboardData,
   type KeyframeLike,
@@ -70,16 +71,29 @@ export function createCommands(session: EditorSession, env: CommandEnv): Map<str
   const openDialog = (dialog: DialogId) => session.ui.setState({ dialog });
   const hasItems = () => selection().clips.length + selection().transitions.length > 0;
 
+  /**
+   * Desktop slice: the selected clips under the playhead (Ctrl+K), or, with
+   * nothing selected or "all" (Ctrl+Shift+K), every clip and transition
+   * under it (engine `sliceAllAt`).
+   */
   const slice = (keep: SliceKeep, all: boolean) => {
     const t = time();
     const project = session.project;
-    const ids = all ? clipsAt(project, t).map((c) => c.id) : selection().clips.filter((id) => clipsAt(project, t).some((c) => c.id === id));
-    if (ids.length === 0) {
-      toast.info(all ? "No clip under the playhead" : "Select a clip under the playhead to slice it");
+    const label = keep === "both" ? "Slice" : keep === "left" ? "Slice, keep left" : "Slice, keep right";
+    const selected = selection().clips.filter((id) => clipsAt(project, t).some((c) => c.id === id));
+    if (all || selection().clips.length === 0) {
+      const result = session.edit(all ? `${label} all` : label, (tx) => sliceAllAt(tx, t, { keep }));
+      if (result && result.clips.length === 0 && result.transitions.length === 0) toast.info("Nothing under the playhead to slice");
+      if (result && keep === "right") {
+        session.ui.setState({ selection: { ...EMPTY_SELECTION, clips: result.clips.map((r) => r.rightId).filter((x): x is string => !!x) } });
+      }
       return;
     }
-    const label = keep === "both" ? "Slice" : keep === "left" ? "Slice, keep left" : "Slice, keep right";
-    const created = session.edit(label, (tx) => ids.map((id) => splitClip(tx, id, t, keep)));
+    if (selected.length === 0) {
+      toast.info("The selected clips are not under the playhead");
+      return;
+    }
+    const created = session.edit(label, (tx) => selected.map((id) => splitClip(tx, id, t, keep)));
     if (created && keep === "right") {
       session.ui.setState({ selection: { ...EMPTY_SELECTION, clips: created.map((r) => r.rightId).filter((x): x is string => !!x) } });
     }

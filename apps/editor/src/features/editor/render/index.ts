@@ -155,11 +155,14 @@ export function startExport(
   options: ExportOptions,
   onProgress: (fraction: number, stage?: ExportProgress["stage"]) => void,
   media: MediaLibrary,
+  onNotes?: (notes: string[]) => void,
 ): ExportJob {
   const controller = new AbortController();
   const promise = exportProject(project, registryOf(media), options, {
     signal: controller.signal,
     onProgress: (p) => onProgress(p.fraction, p.stage),
+    // How the file differs from what was asked (container, codecs, no audio…).
+    onNotes: (notes) => onNotes?.(notes),
   });
   return { promise, cancel: () => controller.abort() };
 }

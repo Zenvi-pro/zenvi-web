@@ -29,7 +29,8 @@ const TrackHeader = memo(function TrackHeader({ layer, name, height, index }: { 
       <div
         className={cn("group flex items-center gap-1 border-b border-line pl-3 pr-1.5", index % 2 ? "bg-track-alt" : "bg-track")}
         style={{ height }}
-        data-layer={layer.number}
+        data-track={layer.number}
+        data-track-header=""
       >
         <div className="min-w-0 flex-1">
           {renaming ? (

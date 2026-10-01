@@ -1,6 +1,6 @@
 import type { Project } from "@zenvi/engine";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { cloudClient, parseCloudRouteId } from "@/lib/cloud";
 import { takeQueuedImports } from "@/lib/projectFactory";
@@ -87,6 +87,8 @@ async function openCloud(routeId: string, cloudId: string): Promise<{ meta: Loca
 
 export default function EditorRoute() {
   const { projectId = "" } = useParams();
+  const [params, setParams] = useSearchParams();
+  const wantsUpload = params.get("upload") === "1";
   const authStatus = useAuth((s) => s.status);
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const cloudId = parseCloudRouteId(projectId);
@@ -122,6 +124,14 @@ export default function EditorRoute() {
       setState({ kind: "ready", session });
       const queued = takeQueuedImports(projectId);
       if (queued.length) void importMedia(session, queued, "end");
+      // `?upload=1` (MCP get_upload_link): open the media upload panel right away.
+      if (wantsUpload) {
+        session.ui.setState({ dialog: "upload" });
+        setParams((p) => {
+          p.delete("upload");
+          return p;
+        }, { replace: true });
+      }
     })().catch((error: unknown) => {
       if (!cancelled) setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
     });

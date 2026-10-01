@@ -796,6 +796,8 @@ export function TimelineBody() {
                 <div
                   key={layer.id}
                   aria-hidden
+                  data-track={layer.number}
+                  data-track-row=""
                   className={cn("absolute inset-x-0 border-b border-line", index % 2 ? "bg-track-alt" : "bg-track", layer.lock && "bg-[repeating-linear-gradient(135deg,transparent_0_8px,rgba(255,255,255,0.025)_8px_16px)]")}
                   style={{ top: index * trackHeight, height: trackHeight }}
                 />

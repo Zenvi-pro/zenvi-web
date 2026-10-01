@@ -66,6 +66,9 @@ export const ClipView = memo(function ClipView({
     <div
       data-kind="clip"
       data-id={clip.id}
+      data-clip-id={clip.id}
+      data-track={clip.layer}
+      data-selected={selected || undefined}
       role="button"
       aria-label={`Clip ${title}`}
       aria-pressed={selected}
@@ -133,6 +136,9 @@ export const TransitionView = memo(function TransitionView({ transition, left, w
     <div
       data-kind="transition"
       data-id={transition.id}
+      data-transition-id={transition.id}
+      data-track={transition.layer}
+      data-selected={selected || undefined}
       role="button"
       aria-label={`Transition ${title}`}
       aria-pressed={selected}

@@ -20,9 +20,11 @@ import {
 } from "@zenvi/engine";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { CloudConflictError, type CloudClient } from "@/lib/cloud";
+import { mediaStore } from "@/lib/storage/media";
 import { describeProject, type LocalProjectMeta, type ProjectRepository } from "@/lib/storage/projects";
 import { toast } from "@/ui/Toast";
 import { Autosaver } from "./autosave";
+import { uploadMissingMedia, type MediaUploadProgress } from "./cloudMedia";
 import { MediaLibrary } from "./media";
 import { createPlaybackStore, type PlaybackStore, type PreviewEngine } from "./playback";
 import { PreviewCache } from "./previews";
@@ -88,6 +90,8 @@ export class EditorSession {
   private lastThumbnailAt = 0;
   private cloudTimer: ReturnType<typeof setTimeout> | null = null;
   private reverseRaf = 0;
+  /** Media hashes known to be in Zenvi Cloud (skips repeated checks). */
+  private readonly uploadedMedia = new Set<string>();
   private disposed = false;
 
   constructor(private readonly options: EditorSessionOptions) {
@@ -348,6 +352,8 @@ export class EditorSession {
     if (this.cloudSync.getState().state === "conflict" && !force) return;
     this.cloudSync.setState({ state: "syncing", error: null });
     try {
+      // Media first, so the cloud project never points at bytes the cloud lacks.
+      await this.uploadMedia();
       const { revision } = await cloud.saveProject(link.id, this.snapshotForSave(), link.revision);
       const syncedAt = Date.now();
       const cloudLink = { ...link, revision, syncedAt };
@@ -367,6 +373,13 @@ export class EditorSession {
       const offline = typeof navigator !== "undefined" && navigator.onLine === false;
       this.cloudSync.setState({ state: offline ? "offline" : "error", error: error instanceof Error ? error.message : String(error) });
     }
+  }
+
+  /** Upload media the cloud does not have yet (deduplicated by content hash). */
+  async uploadMedia(onProgress?: (p: MediaUploadProgress) => void): Promise<{ uploaded: number; unavailable: number }> {
+    const cloud = this.options.cloud();
+    if (!cloud?.enabled) return { uploaded: 0, unavailable: 0 };
+    return uploadMissingMedia(this.doc.project, cloud, await mediaStore(), this.uploadedMedia, onProgress);
   }
 
   /** Link this project to a cloud project (after Share / push). */

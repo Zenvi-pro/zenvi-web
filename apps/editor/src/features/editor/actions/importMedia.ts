@@ -4,6 +4,7 @@
  * transaction, so a failed import records nothing.
  */
 import { addClip, addFile, itemEnd, sortedLayers, type Clip, type Project, type ProjectFile } from "@zenvi/engine";
+import { placeAtDefaults, selectedLayer } from "./placement";
 import { createStore } from "zustand/vanilla";
 import { toast } from "@/ui/Toast";
 import type { EditorSession } from "../session/EditorSession";
@@ -16,19 +17,13 @@ export interface ImportState {
 
 export const importState = createStore<ImportState>(() => ({ active: false, label: "", fraction: 0 }));
 
+/** An explicit spot (drop position), the desktop default spot per file, or the bin only. */
 export type Placement = { position: number; layer: number } | "end" | null;
 
 /** The top unlocked track, where new clips go by default. */
 export function defaultTrack(project: Project): number | null {
   const layers = sortedLayers(project).filter((l) => !l.lock);
   return layers[layers.length - 1]?.number ?? null;
-}
-
-/** End of the last item on a track (0 when empty). */
-export function trackEnd(project: Project, layer: number): number {
-  let end = 0;
-  for (const clip of project.clips) if (clip.layer === layer) end = Math.max(end, itemEnd(clip));
-  return end;
 }
 
 export async function importMedia(session: EditorSession, files: File[], placement: Placement = null): Promise<{ files: ProjectFile[]; clips: Clip[] } | null> {
@@ -52,21 +47,21 @@ export async function importMedia(session: EditorSession, files: File[], placeme
   importState.setState({ active: false, label: "", fraction: 1 });
 
   const label = placement ? (prepared.length === 1 ? "Add to timeline" : `Add ${prepared.length} clips`) : prepared.length === 1 ? "Import file" : `Import ${prepared.length} files`;
+  const selected = selectedLayer(session);
   const result = session.edit(label, (tx) => {
     const added: ProjectFile[] = [];
-    const clips: Clip[] = [];
-    let cursor: { position: number; layer: number } | null = null;
-    if (placement === "end") {
-      const layer = defaultTrack(tx.project);
-      if (layer !== null) cursor = { position: trackEnd(tx.project, layer), layer };
-    } else if (placement) {
-      cursor = { ...placement };
-    }
     for (const item of prepared) {
       const file = addFile(tx, item.media);
       session.media.attach(file.id, item.spec);
       added.push(file);
-      if (cursor) {
+    }
+    let clips: Clip[] = [];
+    if (placement === "end") {
+      clips = placeAtDefaults(tx, added, selected);
+    } else if (placement) {
+      // Dropped at a spot: lay the files out one after another from there.
+      let cursor = { ...placement };
+      for (const file of added) {
         const clip = addClip(tx, { fileId: file.id, position: cursor.position, layer: cursor.layer });
         clips.push(clip);
         cursor = { position: itemEnd(clip), layer: cursor.layer };

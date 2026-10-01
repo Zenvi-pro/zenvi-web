@@ -21,9 +21,11 @@ const client = (f: typeof fetch, token: string | null = "jwt") => new HttpCloudC
 
 describe("HttpCloudClient", () => {
   it("sends the Supabase token and lists projects", async () => {
-    const { fn, calls } = fakeFetch([{ body: { projects: [{ id: "p1", name: "Trip", updatedAt: "2026-09-30T10:00:00Z", revision: "r1" }] } }]);
+    const { fn, calls } = fakeFetch([
+      { body: { projects: [{ id: "p1", name: "Trip", updatedAt: "2026-09-30T10:00:00Z", revision: "r1", stats: { width: 1920, height: 1080, duration: 94.5 } }] } },
+    ]);
     const list = await client(fn).listProjects();
-    expect(list).toEqual([expect.objectContaining({ id: "p1", name: "Trip", revision: "r1" })]);
+    expect(list).toEqual([expect.objectContaining({ id: "p1", name: "Trip", revision: "r1", width: 1920, height: 1080, duration: 94.5 })]);
     expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe("Bearer jwt");
     expect(calls[0]!.url).toBe("https://cloud.example/v1/projects");
   });
@@ -114,10 +116,10 @@ describe("HttpCloudClient", () => {
 });
 
 describe("cloud route ids", () => {
-  it("round-trips", () => {
-    expect(cloudRouteId("p1")).toBe("c_p1");
-    expect(parseCloudRouteId("c_p1")).toBe("p1");
-    expect(parseCloudRouteId("abc123")).toBeNull();
+  it("uses cloud ids (c_ + 16 chars) verbatim as route ids", () => {
+    expect(cloudRouteId("c_4k2m9q0x7v1b3n5d")).toBe("c_4k2m9q0x7v1b3n5d");
+    expect(parseCloudRouteId("c_4k2m9q0x7v1b3n5d")).toBe("c_4k2m9q0x7v1b3n5d");
+    expect(parseCloudRouteId("abc123defghi")).toBeNull();
     expect(parseCloudRouteId("c_")).toBeNull();
   });
 });

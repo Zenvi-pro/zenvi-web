@@ -1,0 +1,23 @@
+{
+  "clipsInProject": 300,
+  "clipsInDom": 36,
+  "scrub": {
+    "frames": 174,
+    "p50": 16.7,
+    "p95": 16.8,
+    "worst": 50.1,
+    "longTasks": []
+  },
+  "scroll": {
+    "frames": 135,
+    "p50": 16.7,
+    "p95": 50,
+    "worst": 116.6,
+    "longTasks": [
+      97,
+      92,
+      82,
+      68
+    ]
+  }
+}
