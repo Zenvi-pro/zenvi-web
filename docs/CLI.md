@@ -116,16 +116,18 @@ Times accept seconds (`12.5`, `12.5s`, `2m`) or timecodes (`1:05.5`,
 | --- | --- | --- |
 | `zenvi import <paths…> [--index]` | `import_files_tool` | Files, folders, globs. `--index` also sends media to the Zenvi backend for AI indexing (sign-in needed). |
 | `zenvi add <file> [--at t] [-t n] [--start t] [--end t] [--duration t]` | `add_clip_to_timeline_tool` | `<file>` is a file id or a path (imported first). Default position: after the last clip on the track. |
-| `zenvi move <clip> [--to t] [--by t] [-t n]` | `move_clip_tool` | |
-| `zenvi trim <clip> [--start t] [--end t]` | `trim_clip_tool` | Source in/out points. |
-| `zenvi split <clip> --at t [--keep both\|left\|right]` | `split_clip_tool` | Desktop slice semantics. |
+| `zenvi move <clip> [--to t \| --by t] [-t n]` | `move_clip_tool` | `--by` shifts relative to the current position. |
+| `zenvi trim <clip> [--start t] [--end t] [--edge left\|right --to t]` | `trim_clip_tool` | Source in/out points, or drag an edge to a timeline time. |
+| `zenvi split [clip] --at t [--keep both\|left\|right]` | `split_clip_tool` | Desktop slice semantics; without a clip, cuts everything under that time. |
 | `zenvi delete <clips…>` (`rm`) | `delete_from_timeline_tool` | One undo step per clip. |
 | `zenvi fade <clip> [--in t] [--out t] [--video-only]` | `fade_clip_tool` | Picture and sound by default. |
 | `zenvi speed <clip> <factor>` | `set_clip_speed_tool` | `2` twice as fast, `0.5` half, `-1` reversed. |
+| `zenvi set <clip> <prop>=<value> [--at t]` | `set_clip_property_tool` | Any clip property (`alpha`, `scale_x`, `location_y`, `rotation`, `volume`, `gravity`, `title`…); `--at` writes a keyframe. |
 | `zenvi volume <clip> <level> [--start t] [--end t]` | `set_clip_volume_tool` | `0.5`, `50%` or `-6dB`, optionally for a range. |
 | `zenvi effect add <clip> <Effect>` | `add_effect_tool` | libopenshot class names: `Blur`, `Brightness`, `ChromaKey`, `Saturation`, … |
-| `zenvi effect rm <clip> <effect-id>` | `remove_effect_tool` | |
-| `zenvi effect set <clip> <effect-id> <prop>=<value> [--at t]` | `set_effect_property_tool` | Keyframe at `--at`. |
+| `zenvi effect list [--audio\|--video]` | `list_effects_tool` | The effect catalog and parameters. |
+| `zenvi effect rm <effect-id>` | `remove_effect_tool` | |
+| `zenvi effect set <effect-id> <prop>=<value> [--at t]` | `set_effect_property_tool` | Keyframe at `--at`. |
 | `zenvi transition <clip> [--name fade] [--duration 1] [--at t]` | `apply_transition_tool` | `zenvi call list_transitions_tool` lists names. |
 | `zenvi title <text> [--template n] [--at t] [--duration t] [-t n]` | `add_title_tool` | SVG title templates. |
 | `zenvi keyframe <clip> <property> <t=v…>` | `set_keyframes_tool` | `volume`, `alpha`, `location_x/y`, `scale_x/y`, `rotation`; `f120=v` addresses a frame. |

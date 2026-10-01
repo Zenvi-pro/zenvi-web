@@ -99,16 +99,22 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .option("-t, --track <track>", "destination track")
     .action(async (clip: string, opts: { to?: string; by?: string; track?: string }) => {
       if (opts.to === undefined && opts.by === undefined && opts.track === undefined) throw new CliError("Give --to, --by or --track.", 2);
-      await runToolCommand(
-        ctx,
-        "move_clip_tool",
-        toolArgs(ctx, "move_clip_tool", [
+      if (opts.to !== undefined && opts.by !== undefined) throw new CliError("Give --to or --by, not both.", 2);
+      await withExecutor(ctx, async (executor) => {
+        let position = parseTime(opts.to);
+        if (opts.by !== undefined) {
+          if (!(executor instanceof PortableExecutor)) throw new CliError("--by needs the clip's position; use --to while the desktop app has the project open.", 2);
+          const current = executor.session.doc.project.clips.find((c) => c.id === clip);
+          if (!current) throw new CliError(`No timeline clip with id '${clip}'.`);
+          position = Math.max(0, current.position + parseTime(opts.by)!);
+        }
+        const args = toolArgs(ctx, "move_clip_tool", [
           [CLIP, clip],
-          [["position_seconds", "position", "to_seconds"], parseTime(opts.to)],
-          [["delta_seconds", "by_seconds", "offset_seconds"], parseTime(opts.by)],
-          [["track", "layer"], opts.track],
-        ]),
-      );
+          [["position_seconds"], position],
+          [["track"], opts.track],
+        ]);
+        printOutcome(ctx, await executor.call("move_clip_tool", args));
+      });
     });
 
   program
@@ -117,8 +123,13 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .argument("<clip>", "clip id")
     .option("--start <time>", "new source in point")
     .option("--end <time>", "new source out point")
-    .action(async (clip: string, opts: { start?: string; end?: string }) => {
-      if (opts.start === undefined && opts.end === undefined) throw new CliError("Give --start and/or --end.", 2);
+    .option("--edge <edge>", "drag the left or right edge on the timeline (with --to)")
+    .option("--to <time>", "timeline time to drag --edge to")
+    .action(async (clip: string, opts: { start?: string; end?: string; edge?: string; to?: string }) => {
+      const dragging = opts.edge !== undefined || opts.to !== undefined;
+      if (dragging && !(opts.edge === "left" || opts.edge === "right") ) throw new CliError("--edge must be left or right (with --to).", 2);
+      if (dragging && opts.to === undefined) throw new CliError("--edge needs --to <time>.", 2);
+      if (!dragging && opts.start === undefined && opts.end === undefined) throw new CliError("Give --start and/or --end, or --edge with --to.", 2);
       await runToolCommand(
         ctx,
         "trim_clip_tool",
@@ -126,17 +137,19 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
           [CLIP, clip],
           [["start_seconds", "start"], parseTime(opts.start)],
           [["end_seconds", "end"], parseTime(opts.end)],
+          [["edge"], opts.edge],
+          [["at_seconds"], parseTime(opts.to)],
         ]),
       );
     });
 
   program
     .command("split")
-    .description("cut a clip in two at a timeline time")
-    .argument("<clip>", "clip id")
+    .description("cut a clip in two at a timeline time (no clip: cut everything under that time)")
+    .argument("[clip]", "clip id")
     .requiredOption("--at <time>", "timeline time to cut at")
     .option("--keep <side>", "both (default), left or right", "both")
-    .action(async (clip: string, opts: { at: string; keep: string }) => {
+    .action(async (clip: string | undefined, opts: { at: string; keep: string }) => {
       if (!["both", "left", "right"].includes(opts.keep)) throw new CliError("--keep must be both, left or right.", 2);
       await runToolCommand(
         ctx,
@@ -186,8 +199,39 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .description("play a clip faster or slower (2 = twice as fast, -1 = reversed)")
     .argument("<clip>", "clip id")
     .argument("<factor>", "speed factor")
-    .action(async (clip: string, factor: string) => {
-      await runToolCommand(ctx, "set_clip_speed_tool", toolArgs(ctx, "set_clip_speed_tool", [[CLIP, clip], [["speed", "factor", "rate"], factor]]));
+    .action(async (clip: string, factorText: string) => {
+      const factor = Number(factorText);
+      if (!Number.isFinite(factor) || factor === 0) throw new CliError(`Not a speed factor: ${factorText}`, 2);
+      await runToolCommand(
+        ctx,
+        "set_clip_speed_tool",
+        toolArgs(ctx, "set_clip_speed_tool", [
+          [CLIP, clip],
+          [["factor", "speed", "rate"], Math.abs(factor)],
+          [["direction"], factor < 0 ? "backward" : undefined],
+        ]),
+      );
+    });
+
+  program
+    .command("set")
+    .description("set a clip property (alpha, scale_x, location_y, rotation, volume, gravity, title…), optionally as a keyframe")
+    .argument("<clip>", "clip id")
+    .argument("<assignment>", "property=value")
+    .option("--at <time>", "keyframe at this timeline time")
+    .action(async (clip: string, assignment: string, opts: { at?: string }) => {
+      const eq = assignment.indexOf("=");
+      if (eq <= 0) throw new CliError("Use property=value, e.g. alpha=0.5.", 2);
+      await runToolCommand(
+        ctx,
+        "set_clip_property_tool",
+        toolArgs(ctx, "set_clip_property_tool", [
+          [CLIP, clip],
+          [["property"], assignment.slice(0, eq)],
+          [["value"], assignment.slice(eq + 1)],
+          [["at_seconds"], parseTime(opts.at)],
+        ]),
+      );
     });
 
   program
@@ -217,28 +261,33 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
       await runToolCommand(ctx, "add_effect_tool", { timeline_clip_id: clip, effect: name });
     });
   effect
+    .command("list")
+    .description("effects you can add (libopenshot catalog)")
+    .option("--audio", "only audio effects")
+    .option("--video", "only video effects")
+    .action(async (opts: { audio?: boolean; video?: boolean }) => {
+      await runToolCommand(ctx, "list_effects_tool", opts.audio ? { category: "audio" } : opts.video ? { category: "video" } : {});
+    });
+  effect
     .command("rm")
-    .description("remove an effect from a clip")
-    .argument("<clip>", "clip id")
+    .description("remove an effect (ids are in the clip's receipt or `zenvi clips`)")
     .argument("<effect>", "effect id")
-    .action(async (clip: string, id: string) => {
-      await runToolCommand(ctx, "remove_effect_tool", toolArgs(ctx, "remove_effect_tool", [[CLIP, clip], [["effect_id", "effect"], id]]));
+    .action(async (id: string) => {
+      await runToolCommand(ctx, "remove_effect_tool", toolArgs(ctx, "remove_effect_tool", [[["effect_id", "effect"], id]]));
     });
   effect
     .command("set")
     .description("set an effect parameter, optionally as a keyframe at a time")
-    .argument("<clip>", "clip id")
     .argument("<effect>", "effect id")
     .argument("<assignment>", "property=value")
     .option("--at <time>", "keyframe time (timeline)")
-    .action(async (clip: string, id: string, assignment: string, opts: { at?: string }) => {
+    .action(async (id: string, assignment: string, opts: { at?: string }) => {
       const eq = assignment.indexOf("=");
-      if (eq <= 0) throw new CliError('Use property=value, e.g. sigma=4.', 2);
+      if (eq <= 0) throw new CliError("Use property=value, e.g. sigma=4.", 2);
       await runToolCommand(
         ctx,
         "set_effect_property_tool",
         toolArgs(ctx, "set_effect_property_tool", [
-          [CLIP, clip],
           [["effect_id", "effect"], id],
           [["property", "name"], assignment.slice(0, eq)],
           [["value"], assignment.slice(eq + 1)],
