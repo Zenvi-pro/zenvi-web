@@ -90,6 +90,14 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
     try {
       const extraTool = extraByName.get(name);
       if (extraTool) {
+        // The SDK does not validate raw JSON schemas: refuse unknown arguments
+        // instead of silently dropping them (a model that sends `output_path`
+        // must learn the real name, not get a render somewhere else).
+        const known = Object.keys((extraTool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {});
+        const unknown = Object.keys(args ?? {}).filter((key) => !known.includes(key));
+        if (unknown.length > 0) {
+          return toCallResult(failed(name, `Error: unknown argument${unknown.length > 1 ? "s" : ""} for ${name}: ${unknown.join(", ")}. Accepted: ${known.join(", ") || "none"}.`), undefined, "portable");
+        }
         const out = await extraTool.run(state, args, { signal: extra.signal, progress });
         return toCallResult(out.receipt, out.images, "portable");
       }

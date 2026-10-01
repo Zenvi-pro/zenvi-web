@@ -108,6 +108,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         type: "object",
         properties: {
           output: str("Output file (default: <project name>.<format> next to the project)."),
+          output_path: str("Same as output (the desktop export_video_tool name)."),
           format: { type: "string", enum: ["mp4", "webm", "mov", "mkv", "gif", "mp3", "wav", "png"], description: "Container format (default from the file name, else mp4)." },
           quality: { type: "string", enum: ["low", "medium", "high", "lossless"], description: "Default high." },
           width: num("Output width in pixels (height follows the project aspect)."),
@@ -122,7 +123,8 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
       async run(state, args, call) {
         const tool = "render_video";
         const desktop = await state.desktopExecutor();
-        const output = text(args.output) ? path.resolve(ctx.cwd, text(args.output)!) : undefined;
+        const requested = text(args.output) ?? text(args.output_path);
+        const output = requested ? path.resolve(ctx.cwd, requested) : undefined;
         if (desktop) {
           const outcome = await exportOnDesktop(desktop, output);
           return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)) };

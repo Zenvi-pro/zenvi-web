@@ -83420,6 +83420,7 @@ function extraTools(ctx) {
         type: "object",
         properties: {
           output: str2("Output file (default: <project name>.<format> next to the project)."),
+          output_path: str2("Same as output (the desktop export_video_tool name)."),
           format: { type: "string", enum: ["mp4", "webm", "mov", "mkv", "gif", "mp3", "wav", "png"], description: "Container format (default from the file name, else mp4)." },
           quality: { type: "string", enum: ["low", "medium", "high", "lossless"], description: "Default high." },
           width: num10("Output width in pixels (height follows the project aspect)."),
@@ -83434,7 +83435,8 @@ function extraTools(ctx) {
       async run(state, args, call) {
         const tool = "render_video";
         const desktop = await state.desktopExecutor();
-        const output2 = text2(args.output) ? path28.resolve(ctx.cwd, text2(args.output)) : void 0;
+        const requested = text2(args.output) ?? text2(args.output_path);
+        const output2 = requested ? path28.resolve(ctx.cwd, requested) : void 0;
         if (desktop) {
           const outcome = await exportOnDesktop(desktop, output2);
           return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)) };
@@ -83712,6 +83714,11 @@ async function createZenviMcpServer(ctx, projectFile) {
     try {
       const extraTool = extraByName.get(name);
       if (extraTool) {
+        const known = Object.keys(extraTool.inputSchema.properties ?? {});
+        const unknown2 = Object.keys(args ?? {}).filter((key) => !known.includes(key));
+        if (unknown2.length > 0) {
+          return toCallResult(failed(name, `Error: unknown argument${unknown2.length > 1 ? "s" : ""} for ${name}: ${unknown2.join(", ")}. Accepted: ${known.join(", ") || "none"}.`), void 0, "portable");
+        }
         const out = await extraTool.run(state, args, { signal: extra.signal, progress });
         return toCallResult(out.receipt, out.images, "portable");
       }

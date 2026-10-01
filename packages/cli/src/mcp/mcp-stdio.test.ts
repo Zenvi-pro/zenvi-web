@@ -101,6 +101,13 @@ describe("zenvi mcp over stdio (real catalog)", () => {
     expect(probe.streams.map((s) => s.codec_type).sort()).toEqual(["audio", "video"]);
     expect(Math.abs(Number(probe.format.duration) - 2)).toBeLessThan(0.1);
 
+    // The desktop's argument name works too, and unknown arguments are refused
+    // instead of silently dropped (a real Claude Code session sent output_path).
+    const aliased = await call("render_video", { output_path: "alias.mp4", width: 160, quality: "low" });
+    expect(aliased.receipt.status).toBe("applied");
+    expect((await ffprobeJson(path.join(work, "alias.mp4"))).format.duration).toBeDefined();
+    await expect(call("render_video", { destination: "x.mp4" })).rejects.toThrow(/unknown argument for render_video: destination/);
+
     // Every edit autosaved to the project file, in the desktop format.
     const saved = JSON.parse(await readFile(path.join(work, "e2e.zvn"), "utf8")) as { clips: unknown[]; files: unknown[] };
     expect(saved.clips).toHaveLength(3);
