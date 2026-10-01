@@ -1,101 +1,79 @@
 /**
- * Transition mask lookup used by the transition ops.
- *
- * STUB (W1): the transitions catalog (`src/transitions/`, workstream W1b)
- * owns the full list of zenvi-core `src/transitions/{common,extra}` masks.
- * Until it lands this module knows the seven `common` masks and accepts
- * explicit `extra/<name>` ids; `resolveTransitionMask` keeps its signature
- * when it switches to the catalog.
+ * Transition mask lookup used by the transition ops, on top of the
+ * transitions catalog (`src/transitions/`): catalog ids, stored paths and
+ * names (the desktop's fuzzy rule), plus reader JSON for user masks.
  */
 
 import type { ReaderInfo } from "../model/types.js";
+import {
+  matchTransition,
+  resolveTransitionAsset,
+  transitionReader,
+  type TransitionEntry,
+} from "../transitions/catalog.js";
+import { MASK_READER_TEMPLATE } from "../transitions/catalog.data.js";
 
 export interface TransitionMask {
   /** Path as the desktop stores it, e.g. `@transitions/common/fade.svg`, or a user file path. */
   path: string;
   /** Title the desktop's tools give the transition: the file name without extension. */
   title: string;
-  /** Natural size of the mask image. The desktop masks are 720×576. */
+  /** Natural size of the mask image. */
   width: number;
   height: number;
+  /** The catalog entry, for built-in masks. */
+  entry?: TransitionEntry;
 }
 
-/** zenvi-core src/transitions/common (all 720×576 SVGs). */
-const COMMON_MASKS = [
-  "circle_in_to_out",
-  "circle_out_to_in",
-  "fade",
-  "wipe_bottom_to_top",
-  "wipe_left_to_right",
-  "wipe_right_to_left",
-  "wipe_top_to_bottom",
-] as const;
+function stem(file: string): string {
+  const base = file.split(/[\\/]/).pop() ?? file;
+  const dot = base.lastIndexOf(".");
+  return dot > 0 ? base.slice(0, dot) : base;
+}
 
-function mask(category: "common" | "extra", stem: string): TransitionMask {
-  const ext = category === "common" ? "svg" : "jpg";
-  return { path: `@transitions/${category}/${stem}.${ext}`, title: stem, width: 720, height: 576 };
+function fromEntry(entry: TransitionEntry): TransitionMask {
+  return { path: entry.storedPath, title: stem(entry.file), width: entry.width, height: entry.height, entry };
 }
 
 /**
- * Resolve a transition by catalog id (`common/fade`, `extra/barr_ripple_1`),
- * stored path (`@transitions/…`) or name, fuzzy-matched like zenvi-core
- * tool_handlers.py `add_transition_between_clips`: lower-case, spaces to
- * underscores, then the first file whose stem contains the query or is
- * contained in it (common before extra).
+ * Resolve a transition by catalog id (`common/fade`), stored path
+ * (`@transitions/…`) or name (exact, else zenvi-core's fuzzy rule from
+ * tool_handlers.py `add_transition_between_clips`). Undefined when nothing
+ * matches or the query is empty.
  */
 export function resolveTransitionMask(query: string): TransitionMask | undefined {
   const q = String(query ?? "").trim();
   if (!q) return undefined;
-  const stored = /^@transitions\/(common|extra)\/([^/]+)\.(svg|jpg|png)$/i.exec(q);
-  if (stored) return { ...mask(stored[1]!.toLowerCase() as "common" | "extra", stored[2]!), path: q };
-  const id = /^(common|extra)\/([^/.]+)(?:\.(?:svg|jpg|png))?$/i.exec(q);
-  if (id) return mask(id[1]!.toLowerCase() as "common" | "extra", id[2]!);
-  const search = q.toLowerCase().replace(/ /g, "_");
-  const stem = COMMON_MASKS.find((s) => s.includes(search) || search.includes(s));
-  return stem ? mask("common", stem) : undefined;
-}
-
-/**
- * The reader JSON libopenshot 1.0 `QtImageReader(path).Json()` writes for a
- * still mask (QtImageReader.cpp `Open`: 30 fps, one hour, single image).
- */
-export function maskReader(path: string, width = 720, height = 576): ReaderInfo {
-  const g = gcd(width, height);
-  return {
-    acodec: "",
-    audio_bit_rate: 0,
-    audio_stream_index: -1,
-    audio_timebase: { num: 1, den: 1 },
-    channel_layout: 4,
-    channels: 0,
-    display_ratio: { num: width / g, den: height / g },
-    duration: 3600,
-    file_size: width * height * 4,
-    fps: { num: 30, den: 1 },
-    has_audio: false,
-    has_single_image: true,
-    has_video: true,
-    height,
-    interlaced_frame: false,
-    metadata: {},
-    path,
-    pixel_format: -1,
-    pixel_ratio: { num: 1, den: 1 },
-    sample_rate: 0,
-    top_field_first: true,
-    type: "QtImageReader",
-    vcodec: "QImage",
-    video_bit_rate: 0,
-    video_length: 108000,
-    video_stream_index: -1,
-    video_timebase: { num: 1, den: 30 },
-    width,
-  };
+  const asset = resolveTransitionAsset(q);
+  if (asset) return fromEntry(asset);
+  const entry = matchTransition(q);
+  return entry ? fromEntry(entry) : undefined;
 }
 
 function gcd(a: number, b: number): number {
-  a = Math.abs(Math.trunc(a));
-  b = Math.abs(Math.trunc(b));
-  while (b) [a, b] = [b, a % b];
-  return a || 1;
+  let x = Math.abs(Math.trunc(a));
+  let y = Math.abs(Math.trunc(b));
+  while (y) [x, y] = [y, x % y];
+  return x || 1;
+}
+
+/**
+ * The reader JSON the desktop stores for a mask
+ * (`QtImageReader(path).Json()`): exact for built-in masks; for user masks
+ * the same fields with the given size (libopenshot re-reads the image when it
+ * opens it, so size and file_size are informational).
+ */
+export function maskReader(path: string, width = 720, height = 576): ReaderInfo {
+  const entry = resolveTransitionAsset(path);
+  if (entry) return transitionReader(entry);
+  const divisor = gcd(width, height);
+  const fields: Record<string, unknown> = {
+    ...structuredClone(MASK_READER_TEMPLATE),
+    display_ratio: { den: height / divisor, num: width / divisor },
+    file_size: width * height * 4,
+    height,
+    path,
+    width,
+  };
+  return Object.fromEntries(Object.keys(fields).sort().map((key) => [key, fields[key]])) as ReaderInfo;
 }
