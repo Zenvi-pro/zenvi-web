@@ -185,6 +185,25 @@ export function mapMaskFrame(effect: Readonly<Record<string, unknown>>, reader: 
   return Math.max(1, frame);
 }
 
+/**
+ * Displace's map: `map_reader` when present (an empty object clears it), else
+ * the legacy `reader` (Displace.cpp:282-289).
+ */
+export function displaceMapReader(effect: Readonly<Record<string, unknown>>): ReaderInfo | undefined {
+  const json = effect.map_reader !== undefined && effect.map_reader !== null ? effect.map_reader : effect.reader;
+  return readerOf(json);
+}
+
+/** The video-map frame Displace reads at effect frame `n` (Displace.cpp:115-131). */
+export function displaceMapFrame(reader: ReaderInfo, n: number, hostFps: Fraction): number {
+  const length = intOf(reader.video_length);
+  const fps = fraction(reader.fps);
+  if (reader.has_video === false || length <= 0 || !fps) return n;
+  const seconds = Math.max(0, n - 1) / (hostFps.num / hostFps.den);
+  const mapped = Math.floor(seconds * (fps.num / fps.den)) + 1;
+  return Math.min(Math.max(1, mapped), length);
+}
+
 export interface ResourceRefs {
   images: string[];
   texts: string[];
@@ -208,7 +227,15 @@ export function effectResources(effect: Readonly<Record<string, unknown>>, n: nu
     }
   };
   addReader(maskReaderOf(effect));
-  if (effect.type === "Displace") addReader(readerOf(effect.map_reader) ?? readerOf(effect.reader));
+  if (effect.type === "Displace") {
+    const map = displaceMapReader(effect);
+    if (map && !refs.images.includes(map.path)) refs.images.push(map.path);
+    if (map && map.type === "FFmpegReader" && !map.has_single_image) {
+      const frame = displaceMapFrame(map, n, hostFps);
+      const fps = fraction(map.fps);
+      refs.imageFrames[map.path] = { frame, time: fps ? (frame - 1) / (fps.num / fps.den) : (frame - 1) / 30 };
+    }
+  }
   const lut = effect.lut_path;
   if (typeof lut === "string" && lut !== "") refs.texts.push(lut);
   return refs;

@@ -165,10 +165,33 @@ export function evaluateValue(value: unknown, frame: number): EvaluatedParam | u
   return undefined;
 }
 
+/** DenoiseImage's response curve: (0,1), (.5,.55), (1,.2), LINEAR (DenoiseImage.cpp:310-313). */
+export const DENOISE_RESPONSE_NODES: readonly unknown[] = Object.freeze([
+  { id: 0, x: 0, y: 1, interpolation: 1 },
+  { id: 1, x: 0.5, y: 0.55, interpolation: 1 },
+  { id: 2, x: 1, y: 0.2, interpolation: 1 },
+]);
+
+/**
+ * AnimatedCurve properties whose constructor nodes are not the identity.
+ * An empty `nodes` array keeps the constructor's nodes
+ * (AnimatedCurve::SetJsonValue, AnimatedCurve.cpp:169-178).
+ */
+const CURVE_DEFAULTS: Readonly<Record<string, Readonly<Record<string, readonly unknown[]>>>> = {
+  DenoiseImage: { response_curve: DENOISE_RESPONSE_NODES },
+};
+
 /** Every property of an effect's JSON, evaluated at `frame`. */
 export function evaluateEffectParams(effect: Readonly<Record<string, unknown>>, frame: number): Record<string, EvaluatedParam> {
   const out: Record<string, EvaluatedParam> = {};
+  const curveDefaults = CURVE_DEFAULTS[String(effect.type ?? effect.class_name ?? "")];
   for (const [k, v] of Object.entries(effect)) {
+    const nodes = curveDefaults?.[k];
+    if (nodes && isAnimatedCurve(v)) {
+      const c = evaluateAnimatedCurve(v, frame, [...nodes]);
+      out[k] = { enabled: c.enabled, table: c.table };
+      continue;
+    }
     const e = evaluateValue(v, frame);
     if (e !== undefined) out[k] = e;
   }

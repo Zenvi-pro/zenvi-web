@@ -231,8 +231,14 @@ function planLayer(
     before.effects.unshift(waveformEffect(clip, n));
   } else if (!visible) {
     // Transparent frame of the reader's size: only effects can draw on it.
+    // Audio-only FFmpegReaders report the timeline preview size
+    // (FFmpegReader.cpp:999-1019), so Caption/Timer on audio clips cover the canvas.
     if (before.effects.length === 0 && after.effects.length === 0) return null;
     source = { kind: "color", color: [0, 0, 0, 0] };
+    if (delivered.kind === "video" && reader.has_video === false) {
+      drawW = canvas.width;
+      drawH = canvas.height;
+    }
   } else if (delivered.kind === "video") {
     const readerFps = fractionOf(reader.fps, fps);
     const sourceFrame = mappedSourceFrame(

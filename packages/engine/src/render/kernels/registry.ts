@@ -6,15 +6,26 @@
 
 import { clonePremul, premultiply, unpremultiply, type PremulImage } from "../pixels.js";
 import type { EffectInstance, KernelContext, RgbaImage, VideoKernel } from "../types.js";
+import { analogTape } from "./analog-tape.js";
 import { blur, pixelate } from "./blur.js";
+import { caption } from "./caption.js";
 import { chromaKey } from "./chroma-key.js";
 import { brightness, hue, negate, saturation } from "./color-basic.js";
+import { colorGrade } from "./color-grade.js";
+import { colorMap } from "./color-map.js";
+import { denoiseImage } from "./denoise.js";
+import { displace } from "./displace.js";
 import { blendVaryStrength, blendWithMask } from "./effect-mask.js";
+import { filmGrain } from "./film-grain.js";
 import { bars, colorShift, crop, deinterlace, shift, wave } from "./geometry.js";
 import { scaledPremul } from "./image-cache.js";
+import { lensFlare } from "./lens-flare.js";
 import { mask } from "./mask.js";
 import { bool, int, readerPath } from "./params.js";
+import { glow, shadow } from "./shadow-glow.js";
 import { sharpen } from "./sharpen.js";
+import { sphericalProjection } from "./spherical.js";
+import { timer } from "./timer.js";
 import type { KernelSpec } from "./types.js";
 
 /** Effects that need OpenCV models or protobuf tracking data: frames pass through. */
@@ -38,6 +49,18 @@ const SPECS: readonly KernelSpec[] = [
   chromaKey,
   sharpen,
   mask,
+  colorMap,
+  colorGrade,
+  filmGrain,
+  denoiseImage,
+  shadow,
+  glow,
+  lensFlare,
+  displace,
+  sphericalProjection,
+  analogTape,
+  caption,
+  timer,
   unsupported("Outline"),
   unsupported("Stabilizer"),
   unsupported("Tracker"),

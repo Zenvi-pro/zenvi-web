@@ -271,12 +271,18 @@ export interface KernelContext {
   clip?: KernelClipContext;
   /** This frame's audio for the clip (AudioVisualization, BeatSync, waveform clips). */
   audio?: KernelAudio;
-  /** Text shaping and rasterization (Caption, Timer). Without it text effects draw nothing. */
+  /**
+   * Text shaping and rasterization (Caption, Timer). Without it the kernels
+   * still lay out and draw their backgrounds (built-in approximate metrics)
+   * but draw no glyphs. A `drawText` fill with alpha 0 must draw nothing
+   * (the kernels use it for stroke-only passes).
+   */
   text?: TextRasterizer;
   /**
    * Per effect-instance state that must survive across frames (BeatSync's
    * envelope, DenoiseImage's previous frame). Renderers keep one Map per
-   * effect id for a sequential render and clear it on seeks.
+   * effect id for a sequential render and clear it on seeks and when the
+   * effect's JSON changes (libopenshot resets it in SetJson).
    */
   state?: Map<string, unknown>;
 }
