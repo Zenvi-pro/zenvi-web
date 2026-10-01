@@ -208,3 +208,11 @@ test("thumbnails and waveforms for the timeline", async ({ page }) => {
   for (const p of r.peaks) expect(p).toBeCloseTo(0.5, 2);
   expect(r.silentVideo).toEqual([0, 0, 0, 0, 0]);
 });
+
+test("playback cost: 720p VP9 at preview size", async ({ page }) => {
+  const r = await page.evaluate(() => window.harness.playbackCost());
+  console.log(`720p VP9 → 640×360: sequential ${r.sequentialMs.toFixed(1)} ms/frame, random seek ${r.seekMs.toFixed(1)} ms, cached ${r.cachedMs.toFixed(2)} ms`);
+  // Lenient bounds (shared, loaded CI machines); the log line is the signal.
+  expect(r.sequentialMs).toBeLessThan(100);
+  expect(r.cachedMs).toBeLessThan(r.seekMs);
+});

@@ -351,6 +351,37 @@ const api = {
     };
   },
 
+  /** Per-frame cost of decoding a 720p clip at preview size, sequentially and by random access. */
+  async playbackCost() {
+    const media = new MediaRegistry();
+    media.register("hd", { kind: "blob", blob: await file("hd.webm") });
+    const frames = new FrameProvider({ media });
+    const compositor = new Compositor({ engine: testEngine });
+    const stills = new StillCache({ media });
+    const resources = mediaResources({ media, frames, stills });
+    const canvas = new OffscreenCanvas(640, 360);
+    const ctx = canvas.getContext("2d")!;
+    const project = makeProject([{ id: "H", kind: "video", fileId: "hd", path: "hd.webm", position: 0, start: 0, end: 3, layer: 1, width: 1280, height: 720 }], { width: 640, height: 360 });
+    // Warm the decoder once (codec setup is a one-time cost).
+    await compositor.render(testEngine.planFrame(project, 1, { width: 640, height: 360 }), ctx, resources, { mode: "seek" });
+    const t0 = performance.now();
+    for (let k = 2; k <= 90; k += 1) await compositor.render(testEngine.planFrame(project, k, { width: 640, height: 360 }), ctx, resources, { mode: "sequential" });
+    const sequential = (performance.now() - t0) / 89;
+    frames.cache.clear();
+    const order = [77, 12, 55, 31, 88, 3, 64, 40, 20, 70];
+    const t1 = performance.now();
+    for (const k of order) await compositor.render(testEngine.planFrame(project, k, { width: 640, height: 360 }), ctx, resources, { mode: "seek" });
+    const seek = (performance.now() - t1) / order.length;
+    const t2 = performance.now();
+    for (const k of order) await compositor.render(testEngine.planFrame(project, k, { width: 640, height: 360 }), ctx, resources, { mode: "seek" });
+    const cached = (performance.now() - t2) / order.length;
+    await frames.dispose();
+    stills.dispose();
+    compositor.dispose();
+    media.dispose();
+    return { sequentialMs: sequential, seekMs: seek, cachedMs: cached };
+  },
+
   /** exportProject → re-probe and re-decode the result. */
   async exportRoundTrip(format: "webm" | "mp4") {
     const media = new MediaRegistry();

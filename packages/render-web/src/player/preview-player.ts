@@ -71,6 +71,8 @@ const AUDIO_START_DELAY = 0.12;
 const AUDIO_START_TIMEOUT_MS = 2000;
 /** Playback faster than this seeks each frame instead of decoding every picture. */
 const MAX_SEQUENTIAL_RATE = 4;
+/** After this long without rendering, idle decoders are closed (scrubbing across many clips opens many). */
+const IDLE_SWEEP_MS = 4000;
 
 export class PreviewPlayer {
   private project: Project | null = null;
@@ -101,6 +103,7 @@ export class PreviewPlayer {
   private loopValue = false;
   private raf: number | null = null;
   private lastSweep = 0;
+  private idleSweep: ReturnType<typeof setTimeout> | null = null;
 
   private pending: { frame: number; mode: DecodeMode } | null = null;
   private rendering = false;
@@ -313,6 +316,7 @@ export class PreviewPlayer {
     this.pause();
     this.disposed = true;
     this.stopLoop();
+    if (this.idleSweep !== null) clearTimeout(this.idleSweep);
     this.unbindResize();
     this.surface.dispose();
     this.audio?.dispose();
@@ -366,8 +370,19 @@ export class PreviewPlayer {
     } finally {
       this.rendering = false;
       for (const resolve of this.idle.splice(0)) resolve();
-      if (!this.playing && !this.disposed) this.emitState();
+      if (!this.playing && !this.disposed) {
+        this.emitState();
+        this.scheduleIdleSweep();
+      }
     }
+  }
+
+  private scheduleIdleSweep(): void {
+    if (this.idleSweep !== null) clearTimeout(this.idleSweep);
+    this.idleSweep = setTimeout(() => {
+      this.idleSweep = null;
+      if (!this.disposed && !this.playing && !this.rendering) this.frames.sweep();
+    }, IDLE_SWEEP_MS);
   }
 
   private async renderFrame(frame: number, mode: DecodeMode): Promise<void> {

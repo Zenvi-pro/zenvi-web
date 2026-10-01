@@ -103,10 +103,10 @@ export type SvgRasterizer = (svg: Blob, width: number, height: number) => Promis
  * `box`: the document size scaled into the box keeping its aspect ratio
  * (`QtImageReader.cpp`, `QSize::scaled(box, KeepAspectRatio)`).
  */
-export function svgRasterSize(document: SvgSize, box: SvgSize): SvgSize {
-  if (document.width <= 0 || document.height <= 0) return { width: Math.max(1, box.width), height: Math.max(1, box.height) };
+export function svgRasterSize(svgSize: SvgSize, box: SvgSize): SvgSize {
+  if (svgSize.width <= 0 || svgSize.height <= 0) return { width: Math.max(1, box.width), height: Math.max(1, box.height) };
   // QSize::scale(KeepAspectRatio) with Qt's integer math (libopenshot-semantics §0).
-  const rw = Math.trunc((box.height * document.width) / document.height);
+  const rw = Math.trunc((box.height * svgSize.width) / svgSize.height);
   if (rw <= box.width) return { width: Math.max(1, rw), height: Math.max(1, box.height) };
-  return { width: Math.max(1, box.width), height: Math.max(1, Math.trunc((box.width * document.height) / document.width)) };
+  return { width: Math.max(1, box.width), height: Math.max(1, Math.trunc((box.width * svgSize.height) / svgSize.width)) };
 }
