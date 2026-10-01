@@ -13,7 +13,7 @@ import { bucketSize, type Size } from "../util/size-bucket.js";
 import { sampleToBitmap, type ResizeQuality } from "./convert.js";
 import { DecodeCursor, type DecodeMode, type KeyframeIndex } from "./decode-cursor.js";
 import { FrameCache, type FrameKey } from "./frame-cache.js";
-import { decodeTimestamp } from "./frame-lookup.js";
+import { decodeTimestamp, spanCovers, spanEnd } from "./frame-lookup.js";
 import type { FrameImage } from "./shared-bitmap.js";
 
 export interface FrameRequest {
@@ -102,6 +102,7 @@ export class FrameProvider {
 
     const hit = this.cache.lookup(key, timestamp);
     if (hit) return hit;
+    if (request.mode === "preview") return this.keyframePreview(slot, slot.sink, key, timestamp, size, applyRotation, video.frameDuration);
 
     const cursor = this.cursor(media, slot.sink, slot.keyframes, request.lane);
     return cursor.at(timestamp, request.mode, async (sample, span) => {
@@ -112,6 +113,35 @@ export class FrameProvider {
       const bitmap = await sampleToBitmap(sample, size, applyRotation, this.quality);
       return this.cache.insert(key, span, bitmap);
     });
+  }
+
+  /**
+   * The keyframe at or before `timestamp`, decoded alone (one packet): what
+   * scrubbing shows while the exact picture would still take a GOP to decode.
+   * It is cached as the exact picture of its own time.
+   */
+  private async keyframePreview(
+    slot: MediaSlot,
+    sink: VideoSampleSink,
+    key: FrameKey,
+    timestamp: number,
+    size: Size,
+    applyRotation: boolean,
+    frameDuration: number | null,
+  ): Promise<FrameImage | null> {
+    const keyTime = (await slot.keyframes.keyframeAtOrBefore?.(timestamp)) ?? timestamp;
+    // The exact lookup just missed, so a cached keyframe does not cover `timestamp`.
+    const cached = this.cache.lookup(key, keyTime);
+    if (cached) return asPreview(cached, false);
+    const sample = await sink.getSample(keyTime);
+    if (!sample) return null;
+    try {
+      const bitmap = await sampleToBitmap(sample, size, applyRotation, this.quality);
+      const span = { start: sample.timestamp, end: spanEnd(sample.timestamp, sample.duration, null, frameDuration) };
+      return asPreview(this.cache.insert(key, span, bitmap), spanCovers(span, timestamp));
+    } finally {
+      sample.close();
+    }
   }
 
   /** Close cursors and media leases nobody has used for a while. */
@@ -197,6 +227,11 @@ export class FrameProvider {
   }
 }
 
+/** `image`, flagged exact or not, keeping its release. */
+function asPreview(image: FrameImage, exact: boolean): FrameImage {
+  return { image: image.image, width: image.width, height: image.height, exact, release: () => image.release() };
+}
+
 function makeSlot(lease: MediaLease, now: number): MediaSlot {
   const video = lease.media.video;
   if (!video) {
@@ -204,6 +239,10 @@ function makeSlot(lease: MediaLease, now: number): MediaSlot {
   }
   const packets = new EncodedPacketSink(video.track);
   const keyframes: KeyframeIndex = {
+    async keyframeAtOrBefore(timestamp) {
+      const key = (await packets.getKeyPacket(timestamp, { metadataOnly: true })) ?? (await packets.getFirstKeyPacket({ metadataOnly: true }));
+      return key ? key.timestamp : null;
+    },
     async nextKeyframeAfter(timestamp) {
       const key = await packets.getKeyPacket(timestamp, { metadataOnly: true });
       const next = key ? await packets.getNextKeyPacket(key, { metadataOnly: true }) : await packets.getFirstKeyPacket({ metadataOnly: true });

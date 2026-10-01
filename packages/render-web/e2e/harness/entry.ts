@@ -20,6 +20,7 @@ import {
   defaultEngine,
   exportFrame,
   exportProject,
+  exportProjectTo,
   generateThumbnails,
   generateWaveform,
   mediaResources,
@@ -424,6 +425,43 @@ const api = {
     };
   },
 
+  /** Streaming export into an OPFS file (and reading it back through an `opfs` source). */
+  async exportToOpfs(cancel: boolean) {
+    const media = new MediaRegistry();
+    media.register("codes", { kind: "blob", blob: await file("codes.webm") });
+    media.register("tone", { kind: "blob", blob: await file("tone48.wav") });
+    const project = makeProject([videoClip(), { id: "A", kind: "audio", fileId: "tone", path: "tone48.wav", position: 0, start: 0, end: 2, layer: 0, audio: {} }]);
+    const root = await navigator.storage.getDirectory();
+    const name = `export-${cancel ? "cancel" : "ok"}-${Date.now()}.webm`;
+    const handle = await root.getFileHandle(name, { create: true });
+    const writable = await handle.createWritable();
+    const controller = new AbortController();
+    try {
+      const result = await exportProjectTo(writable, project, media, { format: "webm", width: 160, height: 90, fps: { num: 30, den: 1 } }, {
+        engine: testEngine,
+        signal: controller.signal,
+        onProgress: (p) => {
+          if (cancel && p.frame >= 10) controller.abort(new Error("stop streaming"));
+        },
+      });
+      const written = await handle.getFile();
+      media.register("out", { kind: "opfs", handle });
+      const info = await media.probe({ fileId: "out" }, { path: "out.webm" });
+      const frames = new FrameProvider({ media });
+      const picture = await frames.frame({ ref: { fileId: "out" }, sourceTime: 1, width: 160, height: 90, lane: "o", mode: "seek" });
+      const code = picture ? codeOf(picture.image) : -1;
+      picture?.release();
+      await frames.dispose();
+      return { ok: true, message: "", mime: result.mimeType, bytes: result.bytes, fileSize: written.size, videoLength: info.video_length, hasAudio: info.has_audio, code };
+    } catch (error) {
+      const left = await handle.getFile();
+      return { ok: false, message: String(error), mime: "", bytes: 0, fileSize: left.size, videoLength: 0, hasAudio: false, code: -1 };
+    } finally {
+      media.dispose();
+      await root.removeEntry(name).catch(() => undefined);
+    }
+  },
+
   /** Cancelling an export rejects with the abort reason and leaves nothing behind. */
   async exportCancel() {
     const media = new MediaRegistry();
@@ -600,6 +638,46 @@ const api = {
     canvas.remove();
     media.dispose();
     return { seekCode, size, coalescedCode, advanced: paused.time - 0.2, paused, monotonic, timeEvents: times.length, looped, ended, duration: state.duration, errors, trace };
+  },
+
+  /** Scrubbing long-GOP media: a keyframe stands in at once, then the exact frame. */
+  async scrub() {
+    const media = new MediaRegistry();
+    media.register("codes", { kind: "blob", blob: await file("codesgop.webm") });
+    const frames = new FrameProvider({ media });
+    const preview = await frames.frame({ ref: { fileId: "codes" }, sourceTime: 1.5, width: 160, height: 90, lane: "s", mode: "preview" });
+    const previewResult = { exact: preview?.exact ?? null, code: preview ? codeOf(preview.image) : -1 };
+    preview?.release();
+    const exact = await frames.frame({ ref: { fileId: "codes" }, sourceTime: 1.5, width: 160, height: 90, lane: "s", mode: "seek" });
+    const exactResult = { exact: exact?.exact ?? true, code: exact ? codeOf(exact.image) : -1 };
+    exact?.release();
+    // Once decoded, a scrub to that frame is exact straight from the cache.
+    const again = await frames.frame({ ref: { fileId: "codes" }, sourceTime: 1.5, width: 160, height: 90, lane: "s", mode: "preview" });
+    const againExact = again?.exact ?? true;
+    again?.release();
+    await frames.dispose();
+
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "160px";
+    canvas.style.height = "90px";
+    document.body.appendChild(canvas);
+    const player = new PreviewPlayer(canvas, { media, engine: testEngine });
+    player.setProject(makeProject([{ ...videoClip(), path: "codesgop.webm" }]));
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    const ctx = canvas.getContext("2d")!;
+    const shown: number[] = [];
+    const draw = ctx.drawImage.bind(ctx) as (...args: unknown[]) => void;
+    (ctx as unknown as { drawImage: (...args: unknown[]) => void }).drawImage = (...args: unknown[]) => {
+      draw(...args);
+      queueMicrotask(() => shown.push(readCode(ctx, 0, 0, canvas.width, canvas.height)));
+    };
+    await player.seek(1.2, { scrub: true });
+    await new Promise((r) => setTimeout(r, 50));
+    const finalCode = readCode(ctx, 0, 0, canvas.width, canvas.height);
+    player.dispose();
+    canvas.remove();
+    media.dispose();
+    return { preview: previewResult, exact: exactResult, againExact, shown, finalCode };
   },
 
   async timelineHelpers() {

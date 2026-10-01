@@ -5,7 +5,8 @@
 
 import type { ExportHost, ExportOptions, ExportResult, FrameHost, ToolImage } from "@zenvi/engine/tools";
 import type { RenderEngine } from "./engine.js";
-import { exportFrame, exportProject } from "./export/export-project.js";
+import type { StreamTargetChunk } from "mediabunny";
+import { exportFrame, exportProject, exportProjectTo } from "./export/export-project.js";
 import type { MediaRegistry } from "./media/registry.js";
 
 export interface WebFrameHostOptions {
@@ -33,6 +34,12 @@ export interface WebExportHostOptions {
    * Returns the location to report. Default: an object URL (revoke it when done).
    */
   deliver?: (file: Blob, suggestedName: string) => Promise<string>;
+  /**
+   * Stream long exports to disk instead of memory: return a writable (an
+   * OPFS `FileSystemWritableFileStream`) and the location to report. Wins
+   * over `deliver`.
+   */
+  stream?: (suggestedName: string) => Promise<{ writable: WritableStream<StreamTargetChunk>; location: string }>;
   signal?: AbortSignal;
 }
 
@@ -48,17 +55,25 @@ const EXTENSIONS: Record<string, string> = {
 export function createExportHost(media: MediaRegistry, options: WebExportHostOptions = {}): ExportHost {
   return {
     async export(project, exportOptions: ExportOptions, onProgress): Promise<ExportResult> {
-      const blob = await exportProject(project, media, exportOptions, {
+      const run = {
         ...(options.engine ? { engine: options.engine } : {}),
         ...(options.signal ? { signal: options.signal } : {}),
-        ...(onProgress ? { onProgress: (progress) => onProgress(progress.fraction) } : {}),
-      });
-      const base = (blob.type.split(";")[0] ?? "").trim();
-      const extension = EXTENSIONS[base] ?? exportOptions.format;
-      const name = `${typeof project.name === "string" && project.name ? project.name : "export"}.${extension}`;
-      const location = options.deliver ? await options.deliver(blob, name) : URL.createObjectURL(blob);
+        ...(onProgress ? { onProgress: (progress: { fraction: number }) => onProgress(progress.fraction) } : {}),
+      };
+      const stem = typeof project.name === "string" && project.name ? project.name : "export";
       const duration = exportOptions.range ? exportOptions.range.end - exportOptions.range.start : undefined;
-      return { location, bytes: blob.size, mimeType: base, ...(duration !== undefined ? { durationSeconds: duration } : {}) };
+      const extra = duration !== undefined ? { durationSeconds: duration } : {};
+      if (options.stream) {
+        // The container may change (MP4 → WebM without H.264): name it for the requested format.
+        const { writable, location } = await options.stream(`${stem}.${exportOptions.format}`);
+        const result = await exportProjectTo(writable, project, media, exportOptions, run);
+        return { location, bytes: result.bytes, mimeType: (result.mimeType.split(";")[0] ?? "").trim(), ...extra };
+      }
+      const blob = await exportProject(project, media, exportOptions, run);
+      const base = (blob.type.split(";")[0] ?? "").trim();
+      const name = `${stem}.${EXTENSIONS[base] ?? exportOptions.format}`;
+      const location = options.deliver ? await options.deliver(blob, name) : URL.createObjectURL(blob);
+      return { location, bytes: blob.size, mimeType: base, ...extra };
     },
   };
 }

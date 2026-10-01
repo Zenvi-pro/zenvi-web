@@ -20,6 +20,11 @@ export interface FrameImage<T extends ClosableImage = ImageBitmap> {
   readonly image: T;
   readonly width: number;
   readonly height: number;
+  /**
+   * False when a nearby keyframe stands in for the requested picture
+   * (scrubbing with `preview` decoding). Absent or true: the exact picture.
+   */
+  readonly exact?: boolean;
   release(): void;
 }
 

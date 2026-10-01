@@ -95,6 +95,8 @@ interface PreparedLayer {
 export interface PreparedFrame {
   readonly plan: FramePlan;
   readonly layers: readonly PreparedLayer[];
+  /** False when a scrub preview stood in for some layer's exact picture (`preview` decoding). */
+  readonly exact: boolean;
   /** Per-layer failures; the frame still draws without the failed part (libopenshot skips too). */
   readonly errors: LayerError[];
   /** Give the borrowed pictures back. Call once, after the last `draw`. */
@@ -144,6 +146,7 @@ export class Compositor {
       plan,
       layers,
       errors,
+      exact: layers.every((layer) => layer.picture?.exact !== false),
       release: () => {
         for (const layer of layers) {
           layer.picture?.release();

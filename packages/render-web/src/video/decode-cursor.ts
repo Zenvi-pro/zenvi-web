@@ -29,9 +29,17 @@ export interface SampleSink<S extends SampleLike> {
 export interface KeyframeIndex {
   /** Timestamp of the first keyframe after the one at or before `timestamp`, or null when none. */
   nextKeyframeAfter(timestamp: number): Promise<number | null>;
+  /** Timestamp of the keyframe at or before `timestamp` (the first one when before it), or null when none. */
+  keyframeAtOrBefore?(timestamp: number): Promise<number | null>;
 }
 
-export type DecodeMode = "seek" | "sequential";
+/**
+ * - `sequential`: playback and export; walk forward.
+ * - `seek`: frame-accurate random access.
+ * - `preview`: scrubbing; a nearby keyframe may stand in until the exact picture is decoded
+ *   (handled by `FrameProvider`; a cursor treats it like `seek`).
+ */
+export type DecodeMode = "seek" | "sequential" | "preview";
 
 /**
  * How far ahead playback keeps walking the iterator instead of re-seeking.

@@ -90,7 +90,7 @@ new PreviewPlayer(canvas: HTMLCanvasElement | OffscreenCanvas, {
 | | |
 | --- | --- |
 | `setProject(project)` | Show this project (call after every edit; keeps the playhead, restarts sound if playing). |
-| `seek(seconds) → Promise` | Render that frame. Resolves when it, or a later request, is on screen. Requests made while a frame decodes replace each other: only the latest renders. |
+| `seek(seconds, { scrub? }) → Promise` | Render that frame. Resolves when it, or a later request, is on screen. Requests made while a frame decodes replace each other: only the latest renders. Pass `scrub: true` while the playhead is dragged: when the exact picture would take a GOP to decode, the keyframe before it shows at once and the exact frame replaces it unless the playhead moved on. |
 | `play()`, `pause()`, `toggle()`, `stepFrames(n)` | Pause rests on the start of the frame on screen, so an edit at the playhead cuts exactly there. |
 | `rate`, `loop`, `volume`, `muted` | Negative rates play backwards, silently. |
 | `time`, `frame`, `duration`, `isPlaying`, `state`, `droppedFrames` | `duration` is where the last clip ends (playback stops or loops there). |
@@ -118,8 +118,14 @@ new PreviewPlayer(canvas: HTMLCanvasElement | OffscreenCanvas, {
 
 ```ts
 exportProject(project, media, options: ExportOptions, { onProgress?, signal?, engine?, onNotes?, onLayerError? }) → Promise<Blob>
+exportProjectTo(writable, project, media, options, run?) → Promise<{ mimeType, bytes, notes }>   // streams to disk
 exportFrame(project, media, seconds, { width, height }, "image/png" | "image/jpeg" | "image/webp", { quality? }) → Promise<Blob>
 ```
+
+`exportProject` assembles the file in memory. For long exports use `exportProjectTo` with an OPFS
+writable (`await fileHandle.createWritable()`): positioned chunks are written as they are muxed,
+the stream is closed when the file is complete, and aborted on failure or cancel (OPFS then
+discards the partial file).
 
 - Every frame of the range (`options.range`, default the whole timeline) is planned at the output
   size, drawn by the same compositor as the preview into an `OffscreenCanvas` and encoded through a
@@ -131,7 +137,6 @@ exportFrame(project, media, seconds, { width, height }, "image/png" | "image/jpe
   `videoCodec`/`audioCodec` accept the desktop presets' FFmpeg names (`libx264`, `libopus`, …).
 - `quality` maps to Mediabunny qualities; `videoBitrate`/`audioBitrate` override it.
 - Cancel with the signal: the promise rejects with the signal's reason, encoders are released.
-- The file is assembled in memory (`BufferTarget`); very long exports should stream to OPFS (not yet).
 
 ## Timeline helpers
 
@@ -143,9 +148,10 @@ exportFrame(project, media, seconds, { width, height }, "image/png" | "image/jpe
 
 ## Tool hosts
 
-`createFrameHost(media)` and `createExportHost(media, { deliver? })` implement the engine's
-`FrameHost` / `ExportHost` (`@zenvi/engine/tools`), so the tool catalog can render frames
-(`preview_frame`, base64 PNG/JPEG) and export (`render_video`) in the editor.
+`createFrameHost(media)` and `createExportHost(media, { deliver?, stream? })` implement the
+engine's `FrameHost` / `ExportHost` (`@zenvi/engine/tools`), so the tool catalog can render frames
+(`preview_frame`, base64 PNG/JPEG) and export (`render_video`) in the editor. With `stream` the
+export host writes to the writable it returns instead of memory.
 
 ## Building blocks
 
@@ -180,6 +186,7 @@ The browser suite generates its media with ffmpeg (frames carry their index as b
 blocks, so any decoded picture says which frame it is) and checks: frame accuracy (VP9 at 30 and
 25 fps, H.264), signed-URL refresh with range requests, compositing pixels (opacity, blend modes,
 kernels, masks, corner radius, stills, SVG, video masks, kernel audio, text), MP4 and WebM export
-round trips whose decoded frames match the timeline, cancel, seam-free audio mixing, the player
-(seek, coalescing, audio clock, pause, loop, end), thumbnails, waveforms, a project built with the
-engine's ops rendered by the real planner, and decode cost.
+round trips whose decoded frames match the timeline, streaming export into OPFS, cancel,
+seam-free audio mixing, the player (seek, coalescing, scrub previews, audio clock, pause, loop,
+end), thumbnails, waveforms, a project built with the engine's ops rendered by the real planner,
+and decode cost.

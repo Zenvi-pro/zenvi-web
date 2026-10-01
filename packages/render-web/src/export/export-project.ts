@@ -13,11 +13,14 @@ import {
   Mp4OutputFormat,
   Output,
   Quality,
+  StreamTarget,
   WavOutputFormat,
   WebMOutputFormat,
   canEncodeAudio,
   canEncodeVideo,
   type OutputFormat,
+  type StreamTargetChunk,
+  type Target,
 } from "mediabunny";
 import type { Project } from "@zenvi/engine";
 import type { ExportOptions } from "@zenvi/engine/tools";
@@ -88,10 +91,65 @@ function abortReason(signal: AbortSignal): unknown {
 }
 
 /**
- * Render and encode `project` (the whole timeline, or `options.range`).
- * Resolves with the file; rejects with the signal's reason when cancelled.
+ * Render and encode `project` (the whole timeline, or `options.range`) in
+ * memory. Resolves with the file; rejects with the signal's reason when
+ * cancelled. Long exports should use `exportProjectTo` (streams to disk).
  */
 export async function exportProject(project: Project, media: MediaRegistry, options: ExportOptions, run: ExportRunOptions = {}): Promise<Blob> {
+  const target = new BufferTarget();
+  const { mimeType } = await encode(project, media, options, run, target);
+  if (!target.buffer) throw new Error("Export produced no data");
+  return new Blob([target.buffer], { type: mimeType });
+}
+
+export interface StreamedExport {
+  mimeType: string;
+  /** Size of the written file, bytes. */
+  bytes: number;
+  /** How the export deviates from the options (container, codecs, size), if it does. */
+  notes: string[];
+}
+
+/**
+ * Render and encode `project` into `writable` — typically an origin private
+ * file system `FileSystemWritableFileStream` — so the file never has to fit in
+ * memory. The stream is closed when the file is complete and aborted on
+ * failure or cancel (an aborted OPFS writable discards the partial file).
+ */
+export async function exportProjectTo(
+  writable: WritableStream<StreamTargetChunk>,
+  project: Project,
+  media: MediaRegistry,
+  options: ExportOptions,
+  run: ExportRunOptions = {},
+): Promise<StreamedExport> {
+  // Mediabunny locks the stream it writes to; keep our own writer on the
+  // caller's stream so a failure can abort it.
+  const sink = writable.getWriter();
+  let bytes = 0;
+  const proxy = new WritableStream<StreamTargetChunk>({
+    write: async (chunk) => {
+      bytes = Math.max(bytes, chunk.position + chunk.data.byteLength);
+      await sink.ready;
+      await sink.write(chunk);
+    },
+    close: () => sink.close(),
+    abort: (reason) => sink.abort(reason),
+  });
+  let notes: string[] = [];
+  try {
+    const { mimeType } = await encode(project, media, options, { ...run, onNotes: (n, choice) => ((notes = n), run.onNotes?.(n, choice)) }, new StreamTarget(proxy, { chunked: true }));
+    return { mimeType, bytes, notes };
+  } catch (error) {
+    await sink.abort(error).catch(() => undefined);
+    throw error;
+  } finally {
+    sink.releaseLock();
+  }
+}
+
+/** The export pipeline, writing to any Mediabunny target. */
+async function encode(project: Project, media: MediaRegistry, options: ExportOptions, run: ExportRunOptions, target: Target): Promise<{ mimeType: string }> {
   const engine = run.engine ?? defaultEngine;
   const signal = run.signal;
   if (signal?.aborted) throw abortReason(signal);
@@ -127,7 +185,6 @@ export async function exportProject(project: Project, media: MediaRegistry, opti
   );
   if (choice.notes.length > 0) run.onNotes?.(choice.notes, choice);
 
-  const target = new BufferTarget();
   const output = new Output({ format: outputFormat(choice.container), target });
   const frames = choice.videoCodec ? new FrameRenderer({ media, engine, ...(run.svgRasterizer ? { svgRasterizer: run.svgRasterizer } : {}) }) : null;
   const audio = choice.audioCodec ? new AudioRenderer({ media, engine }) : null;
@@ -190,9 +247,7 @@ export async function exportProject(project: Project, media: MediaRegistry, opti
     await frames?.dispose();
     await audio?.dispose();
   }
-  const buffer = target.buffer;
-  if (!buffer) throw new Error("Export produced no data");
-  return new Blob([buffer], { type: await output.getMimeType().catch(() => output.format.mimeType) });
+  return { mimeType: await output.getMimeType().catch(() => output.format.mimeType) };
 }
 
 export interface ExportFrameOptions {

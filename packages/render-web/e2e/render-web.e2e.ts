@@ -141,6 +141,21 @@ test("export produces a playable file of the right length whose frames match the
   }
 });
 
+test("export streams into an OPFS file, and a cancelled one leaves no partial file", async ({ page }) => {
+  const done = await page.evaluate(() => window.harness.exportToOpfs(false));
+  expect(done.ok, done.message).toBe(true);
+  expect(done.mime).toMatch(/^video\/webm/);
+  expect(done.bytes).toBe(done.fileSize);
+  // WebM has no stream durations: the segment's (Opus padding included) can round to one more frame.
+  expect(Math.abs(Number(done.videoLength) - 60)).toBeLessThanOrEqual(1);
+  expect(done.hasAudio).toBe(true);
+  expect(done.code).toBe(30);
+  const cancelled = await page.evaluate(() => window.harness.exportToOpfs(true));
+  expect(cancelled.ok).toBe(false);
+  expect(cancelled.message).toContain("stop streaming");
+  expect(cancelled.fileSize).toBe(0);
+});
+
 test("export can be cancelled", async ({ page }) => {
   const result = await page.evaluate(() => window.harness.exportCancel());
   expect(result.rejected).toBe(true);
@@ -192,6 +207,17 @@ test("PreviewPlayer seeks, coalesces, plays on the audio clock, pauses on a fram
   expect(r.ended.frame).toBe(60);
   expect(r.duration).toBeCloseTo(2, 6);
   expect(r.errors).toEqual([]);
+});
+
+test("scrubbing long-GOP media shows a keyframe at once, then the exact frame", async ({ page }) => {
+  const r = await page.evaluate(() => window.harness.scrub());
+  expect(r.preview).toEqual({ exact: false, code: 0 });
+  expect(r.exact).toEqual({ exact: true, code: 45 });
+  expect(r.againExact).toBe(true);
+  // The player drew the keyframe first and settled on the exact frame (1.2 s → frame index 36).
+  expect(r.shown[0]).toBe(0);
+  expect(r.shown.at(-1)).toBe(36);
+  expect(r.finalCode).toBe(36);
 });
 
 test("thumbnails and waveforms for the timeline", async ({ page }) => {

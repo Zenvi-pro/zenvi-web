@@ -7,6 +7,11 @@
  * `samples()` iterator, so a clip plays as one continuous decode: no seams,
  * no decoder restarts. Other reads re-seek with a short pre-roll, because
  * codecs such as AAC produce a transient on their first packet.
+ *
+ * It reads Mediabunny `AudioSample`s (`AudioSampleSink`) rather than
+ * `AudioBuffer`s: planar floats are what audio kernels and resampling work on,
+ * and `AudioBuffer` does not exist in Workers. Voices build their
+ * `AudioBuffer` from these planes when they schedule.
  */
 
 export interface PcmSampleLike {

@@ -154,8 +154,13 @@ export class PreviewPlayer {
     this.emitState();
   }
 
-  /** Move the playhead and render that frame. Resolves once it (or a later request) is on screen. */
-  seek(seconds: number): Promise<void> {
+  /**
+   * Move the playhead and render that frame. Resolves once it (or a later
+   * request) is on screen. With `scrub` (dragging the playhead), a nearby
+   * keyframe is shown at once when the exact picture would take a GOP to
+   * decode, then replaced by the exact frame unless the playhead moved on.
+   */
+  seek(seconds: number, options: { scrub?: boolean } = {}): Promise<void> {
     this.assertLive();
     const project = this.project;
     if (!project) return Promise.resolve();
@@ -163,7 +168,8 @@ export class PreviewPlayer {
     this.timeValue = t;
     if (this.playing) this.anchorAt(t);
     this.emitTime(t);
-    return this.show(this.engine.frameAt(project, t), this.playing ? this.playbackMode() : "seek");
+    const mode: DecodeMode = this.playing ? this.playbackMode() : options.scrub ? "preview" : "seek";
+    return this.show(this.engine.frameAt(project, t), mode);
   }
 
   /** Step `count` frames (negative steps back) and pause there. */
@@ -397,7 +403,7 @@ export class PreviewPlayer {
     try {
       const plan = this.engine.planFrame(project, frame, box, { preview: true });
       // A frame that does not follow the last one starts stateful effects afresh.
-      if (mode === "seek") this.compositor.resetEffectState();
+      if (mode !== "sequential") this.compositor.resetEffectState();
       prepared = await this.compositor.prepare(plan, this.resources, { mode });
       // A resize or a new project arrived meanwhile: its own render follows.
       if (generation !== this.generation || this.disposed) return;
@@ -412,6 +418,8 @@ export class PreviewPlayer {
       }
       this.compositor.draw(prepared, ctx, fitViewport(canvas, projectSize, plan));
       this.shownFrame = frame;
+      // A scrub preview: decode the exact frame next, unless the playhead already moved on.
+      if (!prepared.exact && !this.pending) this.pending = { frame, mode: "seek" };
       for (const error of prepared.errors) {
         this.report(`${error.clipId}:${error.stage}:${String(error.error)}`, { kind: "layer", ...error });
       }

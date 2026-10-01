@@ -52,7 +52,15 @@ export { AudioPlayback, type AudioPlaybackOptions } from "./audio/playback.js";
 export { mixWindow } from "./audio/mixdown.js";
 
 // Export
-export { exportProject, exportFrame, type ExportFrameOptions, type ExportProgress, type ExportRunOptions } from "./export/export-project.js";
+export {
+  exportProject,
+  exportProjectTo,
+  exportFrame,
+  type ExportFrameOptions,
+  type ExportProgress,
+  type ExportRunOptions,
+  type StreamedExport,
+} from "./export/export-project.js";
 export { chooseCodecs, ExportError, type CodecChoice, type EncodeSupport } from "./export/codecs.js";
 export { FrameRenderer } from "./export/frame-renderer.js";
 

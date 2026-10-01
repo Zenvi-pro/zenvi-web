@@ -43,6 +43,8 @@ export async function prepareFixtures(): Promise<Fixtures> {
   await Promise.all([
     ff(["-f", "lavfi", "-i", `color=c=black:s=160x90:r=30:d=2,format=yuv420p,${CODES}`, "-c:v", "libvpx-vp9", "-lossless", "1", "-g", "30", "codes.webm"]),
     ff(["-f", "lavfi", "-i", `color=c=black:s=160x90:r=25:d=2,format=yuv420p,${CODES}`, "-c:v", "libvpx-vp9", "-lossless", "1", "-g", "25", "codes25.webm"]),
+    // One keyframe for the whole clip: scrubbing has to decode up to 2 s to be exact.
+    ff(["-f", "lavfi", "-i", `color=c=black:s=160x90:r=30:d=2,format=yuv420p,${CODES}`, "-c:v", "libvpx-vp9", "-lossless", "1", "-g", "600", "codesgop.webm"]),
     // Two channels from the source itself: `-ac 2` would upmix at -3 dB.
     ff(["-f", "lavfi", "-i", `aevalsrc=${TONE}|${TONE}:s=48000:d=3`, "-c:a", "pcm_f32le", "tone48.wav"]),
     ff(["-f", "lavfi", "-i", `aevalsrc=${TONE}|${TONE}:s=44100:d=3`, "-c:a", "pcm_f32le", "tone44.wav"]),
@@ -59,7 +61,7 @@ export async function prepareFixtures(): Promise<Fixtures> {
   }
 
   const files = new Map<string, Buffer>();
-  for (const name of ["codes.webm", "codes25.webm", "hd.webm", "tone48.wav", "tone44.wav", "still.png", "halfmask.png", ...(hasH264 ? ["codes.mp4"] : [])]) {
+  for (const name of ["codes.webm", "codes25.webm", "codesgop.webm", "hd.webm", "tone48.wav", "tone44.wav", "still.png", "halfmask.png", ...(hasH264 ? ["codes.mp4"] : [])]) {
     files.set(name, readFileSync(join(dir, name)));
   }
 
