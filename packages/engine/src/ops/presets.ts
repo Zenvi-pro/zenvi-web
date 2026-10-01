@@ -652,3 +652,168 @@ export function layoutShowAll(tx: Transaction, clipIds: readonly string[], opts:
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Repeat (Speed ▸ Repeat)
+// ---------------------------------------------------------------------------
+
+export interface RepeatOptions {
+  /** `loop` restarts each pass; `pingpong` alternates direction. */
+  pattern: "loop" | "pingpong";
+  /** Play the first pass forward (1, default) or backward (-1). */
+  direction?: 1 | -1;
+  /** Number of passes, 2..500 (desktop menu 2/3/4/5/8/10). */
+  passes: number;
+  /** Hold the last frame this many frames between passes. Default 0. */
+  delayFrames?: number;
+  /** Speed change per pass, e.g. 0.25 = each pass 25 % faster. Default 0. */
+  ramp?: number;
+}
+
+type Pt = { co: { X: number; Y: number }; interpolation: number; [key: string]: unknown };
+
+/** repeat.py `_normalize_points`: integer X starting at 1, Y kept. */
+function normalizePoints(points: readonly KeyframePoint[]): Pt[] {
+  if (points.length === 0) return [];
+  const sorted = [...points].sort((a, b) => pyRound(a.co?.X ?? 0) - pyRound(b.co?.X ?? 0));
+  const x0 = pyRound(sorted[0]!.co.X);
+  return sorted.map((p) => ({
+    co: { X: pyRound(p.co.X ?? 0) - x0 + 1, Y: p.co.Y },
+    interpolation: p.interpolation ?? Interpolation.LINEAR,
+  }));
+}
+
+/** repeat.py `_normalize_points_to_trim`. */
+function normalizeToTrim(points: readonly KeyframePoint[], trimStart: number, trimSpan: number): Pt[] {
+  if (points.length === 0 || trimSpan <= 0) return [];
+  const sorted = [...points].sort((a, b) => pyRound(a.co?.X ?? 0) - pyRound(b.co?.X ?? 0));
+  const xs = sorted.map((p) => pyRound(p.co?.X ?? 0));
+  const relative = Math.min(...xs) >= 1 && Math.max(...xs) <= trimSpan;
+  const out: Pt[] = [];
+  sorted.forEach((p, i) => {
+    const x = pyRound(relative ? xs[i]! : xs[i]! - trimStart);
+    if (x < 1 || x > trimSpan) return;
+    const copy = structuredClone(p) as Pt;
+    copy.co = { ...copy.co, X: x };
+    out.push(copy);
+  });
+  return out;
+}
+
+/** repeat.py `_repeat_curve`. */
+function repeatCurve(points: readonly Pt[], span: number, dirSign: number, passes: number, delay: number, ramp: number, pattern: string): [Pt[], number] {
+  const out: Pt[] = [];
+  let base = 0;
+  let dir = dirSign;
+  for (let k = 0; k < passes; k += 1) {
+    const speed = (1 + ramp) ** k;
+    const scale = 1 / Math.abs(speed);
+    const dur = Math.max(1, pyRound(span * scale));
+    const iter = dir > 0 ? points : [...points].reverse();
+    iter.forEach((p, idx) => {
+      const x = pyRound(p.co.X ?? 0) - 1;
+      const off = Math.min(pyRound(x * scale), dur - 1);
+      const nx = dir > 0 ? base + off + 1 : base + (dur - off);
+      let interpolation = p.interpolation ?? Interpolation.LINEAR;
+      if (pattern === "loop" && k > 0 && idx === 0) interpolation = Interpolation.CONSTANT;
+      out.push({ co: { X: nx, Y: p.co.Y }, interpolation });
+    });
+    base += dur;
+    if (k < passes - 1 && delay) {
+      const lastY = out[out.length - 1]!.co.Y;
+      out.push({ co: { X: base, Y: lastY }, interpolation: Interpolation.LINEAR });
+      out.push({ co: { X: base + delay, Y: lastY }, interpolation: Interpolation.LINEAR });
+      base += delay;
+    }
+    if (pattern === "pingpong") dir *= -1;
+  }
+  return [out, base];
+}
+
+/**
+ * Repeat a clip (desktop Speed ▸ Repeat, repeat.py `apply_repeat`): the time
+ * curve (and every animated property) is stamped `passes` times, looping or
+ * ping-ponging, with optional hold frames and speed ramp; the clip then spans
+ * the repeated length from source 0. The original timing is cached in
+ * `repeat_cache` so `time.none` restores it.
+ */
+export function repeatClip(tx: Transaction, clipId: string, opts: RepeatOptions): Clip {
+  const project = tx.project;
+  const clip = requireEditableClip(project, clipId);
+  if (typeof opts !== "object" || opts === null) throw invalid("repeat options are required.");
+  if (opts.pattern !== "loop" && opts.pattern !== "pingpong") throw invalid("pattern must be loop or pingpong.");
+  if (!Number.isInteger(opts.passes) || opts.passes < 2 || opts.passes > 500) throw invalid("passes must be an integer 2..500.");
+  const delay = opts.delayFrames ?? 0;
+  if (!Number.isInteger(delay) || delay < 0) throw invalid("delayFrames must be a non-negative integer.");
+  const ramp = opts.ramp ?? 0;
+  if (!Number.isFinite(ramp) || ramp <= -1) throw invalid("ramp must be > -1.");
+  const rate = rateOf(project);
+  const next = structuredClone(clip) as Clip & Record<string, unknown>;
+  const trimStart = pyRound(Number(clip.start ?? 0) * rate);
+  const trimSpan = Math.max(1, pyRound((Number(clip.end ?? 0) - Number(clip.start ?? 0)) * rate));
+  const targetStartY = trimStart + 1;
+  const targetEndY = targetStartY + trimSpan;
+  const targetRange = Math.max(1, targetEndY - targetStartY);
+
+  const origTime = clip.time?.Points ?? [];
+  let baseTime: Pt[];
+  if (origTime.length >= 2) {
+    baseTime = normalizePoints(origTime);
+    const yStart = pyRound(baseTime[0]!.co.Y ?? 0);
+    const yEnd = pyRound(baseTime[baseTime.length - 1]!.co.Y ?? 0);
+    const yRange = Math.max(1, yEnd - yStart);
+    for (const p of baseTime) p.co.Y = targetStartY + ((p.co.Y - yStart) * targetRange) / yRange;
+  } else {
+    baseTime = [
+      { co: { X: 1, Y: targetStartY }, interpolation: Interpolation.LINEAR },
+      { co: { X: trimSpan, Y: targetEndY }, interpolation: Interpolation.LINEAR },
+    ];
+  }
+  let timeSpan = Math.max(1, pyRound(baseTime[baseTime.length - 1]!.co.X));
+  if (timeSpan !== trimSpan) {
+    const s = trimSpan / timeSpan;
+    for (const p of baseTime) p.co.X = Math.max(1, pyRound((p.co.X ?? 1) * s));
+    timeSpan = trimSpan;
+  }
+
+  if (!("repeat_cache" in next)) {
+    const properties: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(clip)) {
+      if (isRecord(value) && Array.isArray(value.Points) && value.Points.length > 1) properties[key] = structuredClone(value);
+    }
+    next.repeat_cache = { start: clip.start ?? 0, end: clip.end, duration: clip.duration, properties };
+  }
+  const dirSign = (opts.direction ?? 1) >= 0 ? 1 : -1;
+  const [timePoints, timeTotal] = repeatCurve(baseTime, timeSpan, dirSign, opts.passes, delay, ramp, opts.pattern);
+  let total = timeTotal;
+  next.time = { Points: timePoints as KeyframePoint[] };
+
+  const cache = next.repeat_cache as { properties?: Record<string, Keyframe> };
+  for (const [prop, original] of Object.entries(cache.properties ?? {})) {
+    if (prop === "time") continue;
+    let norm = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
+    let span = norm.length ? pyRound(norm[norm.length - 1]!.co.X) : 0;
+    if (!span) continue;
+    if (span !== timeSpan) {
+      const s = timeSpan / span;
+      const firstX = Number(norm[0]!.co.X ?? 1);
+      for (const p of norm) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
+      span = timeSpan;
+    }
+    const latest = new Map<number, Pt>();
+    for (const p of norm) {
+      p.co.X = pyRound(p.co.X ?? 1);
+      latest.set(p.co.X, p);
+    }
+    norm = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x)!);
+    const [points, used] = repeatCurve(norm, span, dirSign, opts.passes, delay, ramp, opts.pattern);
+    next[prop] = { Points: points };
+    total = Math.max(total, used);
+  }
+  const duration = total / rate;
+  next.start = 0;
+  next.end = duration;
+  next.duration = duration;
+  const clamped = withClampedTiming(next as unknown as Record<string, unknown>, project, clip) as unknown as Clip;
+  return replaceClip(tx, clip, clamped);
+}

@@ -3,7 +3,7 @@ import { Gravity, Interpolation, ScaleMode, type Keyframe } from "../model/types
 import { findClip } from "../model/query.js";
 import { evaluate } from "../keyframe/evaluate.js";
 import { addClip, setClipProperty, setClipSpeed } from "./clips.js";
-import { CLIP_PRESET_IDS, applyClipPreset, isClipPresetId, layoutShowAll } from "./presets.js";
+import { CLIP_PRESET_IDS, applyClipPreset, isClipPresetId, layoutShowAll, repeatClip } from "./presets.js";
 import { cameraPanKeyframes, kenBurnsKeyframes, pushPullKeyframes } from "./camera-motion.js";
 import { expectRefused, expectUndoRedo, makeDoc } from "./testkit.js";
 
@@ -216,5 +216,39 @@ describe("layoutShowAll / validation", () => {
     // Speed then a preset still works on the retimed clip.
     doc.transaction("speed", (tx) => setClipSpeed(tx, "C", 2));
     expect(clip(doc).end).toBe(10);
+  });
+});
+
+describe("repeatClip (repeat.py apply_repeat)", () => {
+  it("loops the source twice; time.none restores it", () => {
+    const doc = setup(0);
+    const before = doc.project;
+    const c = doc.transaction("loop", (tx) => repeatClip(tx, "C", { pattern: "loop", passes: 2 }));
+    expect([c.start, c.end]).toEqual([0, 40]);
+    expect(c.time.Points.map((p) => [p.co.X, p.co.Y, p.interpolation])).toEqual([
+      [1, 1, Interpolation.LINEAR],
+      // clamp_timing_to_media keeps the source frame within the media's 600.
+      [600, 600, Interpolation.LINEAR],
+      [601, 1, Interpolation.CONSTANT],
+      [1200, 600, Interpolation.LINEAR],
+    ]);
+    expect(c.repeat_cache).toMatchObject({ start: 0, end: 20 });
+    expectUndoRedo(doc, before);
+    const reset = doc.transaction("reset", (tx) => applyClipPreset(tx, "C", "time.none"));
+    expect([reset.start, reset.end]).toEqual([0, 20]);
+    expect(reset.repeat_cache).toBeUndefined();
+  });
+
+  it("ping-pong alternates direction and repeats animated properties", () => {
+    const doc = setup(0);
+    doc.transaction("alpha", (tx) => setClipProperty(tx, "C", "alpha", 0, { frame: 300 }));
+    const c = doc.transaction("pp", (tx) => repeatClip(tx, "C", { pattern: "pingpong", passes: 2, delayFrames: 30 }));
+    expect(c.end).toBe(1230 / 30);
+    const ys = c.time.Points.map((p) => p.co.Y);
+    expect(ys[0]).toBe(1);
+    expect(ys[ys.length - 1]).toBe(1);
+    expect(c.alpha.Points.length).toBeGreaterThan(2);
+    expectRefused(doc, "invalid_argument", (tx) => repeatClip(tx, "C", { pattern: "spin" as never, passes: 2 }));
+    expectRefused(doc, "invalid_argument", (tx) => repeatClip(tx, "C", { pattern: "loop", passes: 1 }));
   });
 });
