@@ -82,6 +82,15 @@ describe("device login (RFC 8628)", () => {
     expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
   });
 
+  it("counts wrong codes looked up on the approval page too", async () => {
+    const h = await harness();
+    const jwt = await h.userToken(USER_A);
+    for (let i = 0; i < 10; i += 1) expect((await h.request("GET", "/v1/device/info?user_code=BBBB-BBBB", { token: jwt })).status).toBe(404);
+    expect((await h.request("GET", "/v1/device/info?user_code=BBBB-BBBB", { token: jwt })).status).toBe(429);
+    const real = (await h.request("POST", "/v1/device/code", { json: {} })).json;
+    expect((await h.request("POST", "/v1/device/approve", { token: jwt, json: { user_code: real.user_code } })).status).toBe(429);
+  });
+
   it("normalizes typed user codes", () => {
     expect(normalizeUserCode("bcdf-ghjk")).toBe("BCDFGHJK");
     expect(normalizeUserCode(" BCDF GHJK ")).toBe("BCDFGHJK");

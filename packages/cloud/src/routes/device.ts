@@ -55,25 +55,31 @@ export function deviceRoutes(services: Services): Hono<AppEnv> {
 
   const signedIn = requireAuth(services.auth, { allow: ["supabase"] });
 
+  // User codes are short: after a few wrong ones (looked up or approved), stop answering for a while.
+  const guarded = async <T>(userId: string, body: () => Promise<T>): Promise<T> => {
+    const key = `device-approve:${userId}`;
+    const blocked = limiter.blocked(key, RULES.approveFailures);
+    if (blocked > 0) throw rateLimited(blocked);
+    try {
+      return await body();
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 404 || error.status === 400)) limiter.hit(key, RULES.approveFailures);
+      throw error;
+    }
+  };
+
   app.get("/info", signedIn, async (c) => {
     const code = c.req.query("user_code") ?? c.req.query("code") ?? "";
-    return c.json(await devices.info(code));
+    return c.json(await guarded(c.get("principal").userId, () => devices.info(code)));
   });
 
   app.post("/approve", signedIn, async (c) => {
     const principal = c.get("principal");
-    const failureKey = `device-approve:${principal.userId}`;
-    // User codes are short: after a few wrong ones, stop answering for a while.
-    const blocked = limiter.blocked(failureKey, RULES.approveFailures);
-    if (blocked > 0) throw rateLimited(blocked);
     const body = await parseJson(c, z.object({ user_code: z.string().min(1).max(32), approve: z.boolean().optional() }));
-    try {
-      const outcome = await devices.decide(body.user_code, { userId: principal.userId, email: principal.email }, body.approve ?? true);
-      return c.json(outcome);
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 404 || error.status === 400)) limiter.hit(failureKey, RULES.approveFailures);
-      throw error;
-    }
+    const outcome = await guarded(principal.userId, () =>
+      devices.decide(body.user_code, { userId: principal.userId, email: principal.email }, body.approve ?? true),
+    );
+    return c.json(outcome);
   });
 
   return app;

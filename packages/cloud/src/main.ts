@@ -70,10 +70,16 @@ async function main(): Promise<void> {
     });
   });
 
-  services.renders
-    .resume()
-    .then((count) => count > 0 && log.info("resumed render jobs", { count }))
-    .catch((error: unknown) => log.error("resuming render jobs failed", { error: errorMessage(error) }));
+  // Pick up queued jobs and jobs whose worker died (restart, deploy), now and every minute.
+  const recoverJobs = (): void => {
+    services.renders
+      .recover()
+      .then((count) => count > 0 && log.info("picked up render jobs", { count }))
+      .catch((error: unknown) => log.error("render job recovery failed", { error: errorMessage(error) }));
+  };
+  recoverJobs();
+  const recovery = setInterval(recoverJobs, 60_000);
+  recovery.unref();
 
   const housekeeping = setInterval(() => {
     void Promise.allSettled([services.tokens.sweepExpired(), services.devices.sweepExpired(), services.oauth.sweepExpired()]).then((results) => {
@@ -90,6 +96,7 @@ async function main(): Promise<void> {
     stopping = true;
     log.info("shutting down", { signal });
     clearInterval(housekeeping);
+    clearInterval(recovery);
     server.close();
     void services.renders.stop().finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 20_000).unref();

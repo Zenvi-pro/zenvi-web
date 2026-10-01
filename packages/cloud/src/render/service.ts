@@ -13,10 +13,10 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { ExportOptions, Project } from "@zenvi/engine";
-import { ApiError, notFound } from "../http/errors.js";
+import { ApiError, notFound, PreconditionFailedError } from "../http/errors.js";
 import type { Logger } from "../http/log.js";
 import { errorMessage } from "../http/log.js";
-import type { BlobStore, TableEntity, TableStore } from "../storage/types.js";
+import type { BlobStore, Stored, TableEntity, TableStore } from "../storage/types.js";
 import type { Clock } from "../util/clock.js";
 import { isoAt } from "../util/clock.js";
 import { randomId, sha256Hex } from "../util/crypto.js";
@@ -68,10 +68,15 @@ interface RenderRow extends TableEntity {
   error?: string;
   fileName: string;
   attempts: number;
+  /** Refreshed while a worker renders; a stale one means the worker died. */
+  heartbeatAt?: string;
 }
 
 const TABLE = "renders" as const;
 const MAX_ATTEMPTS = 2;
+const HEARTBEAT_MS = 15_000;
+/** A running job whose heartbeat is older than this is re-queued by `recover`. */
+const STALE_MS = 60_000;
 const REUSE_DONE_MS = 24 * 3_600_000;
 const PROGRESS_WRITE_MS = 2_000;
 const URL_SECONDS = 3600;
@@ -125,6 +130,8 @@ export interface RenderServiceOptions {
 
 export class RenderService {
   private readonly queue: { userId: string; renderId: string }[] = [];
+  /** Jobs in this process's queue or running here (`user/render`). */
+  private readonly local = new Set<string>();
   private running: { userId: string; renderId: string; controller: AbortController } | null = null;
   private idle: Promise<void> = Promise.resolve();
   private stopped = false;
@@ -211,24 +218,40 @@ export class RenderService {
     }
   }
 
-  /** Re-queue jobs a restart interrupted. Call once at startup. */
-  async resume(): Promise<number> {
-    const pending: RenderRow[] = [];
+  /**
+   * Pick up jobs no live worker owns: queued ones, and running ones whose
+   * heartbeat stopped (the process died or restarted). Call at startup and
+   * periodically; a second instance during a deploy leaves jobs with a fresh
+   * heartbeat alone, and claims are ETag-checked, so a job never runs twice.
+   */
+  async recover(): Promise<number> {
+    const now = this.options.clock.now();
+    const pending: Stored<RenderRow>[] = [];
     for (const status of ["running", "queued"] as const) {
       for await (const row of this.options.tables.query<RenderRow>(TABLE, { where: [["status", "eq", status]] })) pending.push(row);
     }
     pending.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    let picked = 0;
     for (const row of pending) {
-      if (row.status === "running" && row.attempts >= MAX_ATTEMPTS) {
-        await this.finish(row.partitionKey, row.rowKey, { status: "error", error: "The render was interrupted twice; start it again." });
-        continue;
-      }
+      if (this.local.has(`${row.partitionKey}/${row.rowKey}`)) continue;
       if (row.status === "running") {
-        await this.options.tables.update<RenderRow>(TABLE, { partitionKey: row.partitionKey, rowKey: row.rowKey, status: "queued", progress: 0 } as RenderRow);
+        const beat = Date.parse(row.heartbeatAt ?? row.startedAt ?? row.createdAt);
+        if (now - beat < STALE_MS) continue;
+        if (row.attempts >= MAX_ATTEMPTS) {
+          await this.finish(row.partitionKey, row.rowKey, { status: "error", error: "The render was interrupted twice; start it again." });
+          continue;
+        }
+        try {
+          await this.options.tables.update<RenderRow>(TABLE, { ...row, status: "queued", progress: 0 }, { etag: row.etag, mode: "replace" });
+        } catch (error) {
+          if (error instanceof PreconditionFailedError) continue;
+          throw error;
+        }
       }
       this.enqueue(row.partitionKey, row.rowKey);
+      picked += 1;
     }
-    return pending.length;
+    return picked;
   }
 
   /** Stop taking jobs and abort the running one (it resumes after restart). */
@@ -240,10 +263,13 @@ export class RenderService {
 
   /** Resolves when the queue is empty (tests). */
   async drain(): Promise<void> {
-    while (this.running || this.queue.length > 0) await this.idle;
+    while ((this.running || this.queue.length > 0) && !this.stopped) await this.idle;
   }
 
   private enqueue(userId: string, renderId: string): void {
+    const key = `${userId}/${renderId}`;
+    if (this.local.has(key)) return;
+    this.local.add(key);
     this.queue.push({ userId, renderId });
     if (!this.running) this.idle = this.pump();
   }
@@ -260,6 +286,7 @@ export class RenderService {
         this.options.log.error("render worker failed", { renderId: next.renderId, error: errorMessage(error) });
       } finally {
         this.running = null;
+        this.local.delete(`${next.userId}/${next.renderId}`);
       }
     }
   }
@@ -268,14 +295,24 @@ export class RenderService {
     const row = await this.options.tables.get<RenderRow>(TABLE, userId, renderId);
     if (!row || row.status !== "queued") return;
     const job = toJob(row);
-    await this.options.tables.update<RenderRow>(TABLE, {
-      partitionKey: userId,
-      rowKey: renderId,
-      status: "running",
-      startedAt: isoAt(this.options.clock.now()),
-      attempts: (row.attempts ?? 0) + 1,
-      progress: 0,
-    } as RenderRow);
+    const claimedAt = isoAt(this.options.clock.now());
+    try {
+      // Claim: only one worker (even across instances) moves it to running.
+      await this.options.tables.update<RenderRow>(
+        TABLE,
+        { ...row, status: "running", startedAt: claimedAt, heartbeatAt: claimedAt, attempts: (row.attempts ?? 0) + 1, progress: 0 },
+        { etag: row.etag, mode: "replace" },
+      );
+    } catch (error) {
+      if (error instanceof PreconditionFailedError) return;
+      throw error;
+    }
+    const heartbeat = setInterval(() => {
+      void this.options.tables
+        .update<RenderRow>(TABLE, { partitionKey: userId, rowKey: renderId, heartbeatAt: isoAt(this.options.clock.now()) } as RenderRow)
+        .catch(() => undefined);
+    }, HEARTBEAT_MS);
+    heartbeat.unref();
 
     const tmp = await mkdtemp(join(this.options.tmpDir, "zenvi-render-"));
     const started = this.options.clock.now();
@@ -298,7 +335,7 @@ export class RenderService {
           lastWrite = now;
           const progress = Math.max(0, Math.min(0.99, fraction));
           void this.options.tables
-            .update<RenderRow>(TABLE, { partitionKey: userId, rowKey: renderId, progress } as RenderRow)
+            .update<RenderRow>(TABLE, { partitionKey: userId, rowKey: renderId, progress, heartbeatAt: isoAt(now) } as RenderRow)
             .catch(() => undefined);
         },
       });
@@ -318,6 +355,7 @@ export class RenderService {
       await this.finish(userId, renderId, { status: "error", error: message });
       this.options.log.warn("render failed", { renderId, error: message });
     } finally {
+      clearInterval(heartbeat);
       await rm(tmp, { recursive: true, force: true });
     }
   }

@@ -82,18 +82,38 @@ describe("render jobs", () => {
     expect(job.json.error).toContain('"big.mov" is not in Zenvi Cloud');
   });
 
-  it("re-queue interrupted jobs after a restart", async () => {
-    const h = await harness({ renderer: fakeRenderer() });
+  it("re-queue jobs whose worker died, but leave live ones alone", async () => {
+    const renderer = fakeRenderer();
+    const h = await harness({ renderer });
     const token = await h.userToken(USER_A);
     const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id;
     const started = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
     await h.services.renders.drain();
-    // Pretend the process died mid-render.
-    await h.tables.update("renders", { partitionKey: USER_A, rowKey: started.json.renderId, status: "running", attempts: 1 });
-    expect(await h.services.renders.resume()).toBe(1);
+    expect(renderer.renders).toBe(1);
+    // Pretend a worker (another instance during a deploy) is mid-render: fresh heartbeat.
+    await h.tables.update("renders", { partitionKey: USER_A, rowKey: started.json.renderId, status: "running", attempts: 1, heartbeatAt: new Date(h.clock.now()).toISOString() });
+    expect(await h.services.renders.recover()).toBe(0);
+    // Its heartbeat stops: the job is picked up again and finishes.
+    h.clock.advance(120_000);
+    expect(await h.services.renders.recover()).toBe(1);
     await h.services.renders.drain();
     const job = await h.request("GET", `/v1/projects/${id}/renders/${started.json.renderId}`, { token });
     expect(job.json.status).toBe("done");
+    expect(renderer.renders).toBe(2);
+  });
+
+  it("claim each queued job once even when two workers see it", async () => {
+    const renderer = fakeRenderer();
+    const h = await harness({ renderer });
+    const token = await h.userToken(USER_A);
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id;
+    await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
+    // A second service over the same tables (the other instance) recovers the queued job too.
+    const { createServices } = await import("../container.js");
+    const other = createServices({ ...h.services, supabase: { verify: async () => null }, renderer });
+    await other.renders.recover();
+    await Promise.all([h.services.renders.drain(), other.renders.drain()]);
+    expect(renderer.renders).toBe(1);
   });
 
   it("validate options", async () => {
