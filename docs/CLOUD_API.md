@@ -166,11 +166,22 @@ Upload with the SAS URL (it is valid for exactly that blob, create+write):
   `<BlockList><Latest>id</Latest>…</BlockList>` and header
   `x-ms-blob-content-type`. Blob CORS allows browser uploads.
 
-Then call `complete`. It checks the size against the declaration and, for
-files up to 64 MB, the SHA-256 (`422 size_mismatch` / `hash_mismatch` delete
-the blob; upload again). Only completed media count as existing.
-`MediaInfo = { sha256, size, name, contentType, verified, uploadedAt }`
-(`verified` = hash checked server-side).
+Then call `complete`. It checks the size against the declaration and the
+whole file's SHA-256 — the hash is the content address, so it is always
+verified server-side before anything uses the blob:
+
+- up to 64 MB (`VERIFY_HASH_MAX_BYTES`): checked inline → `200 { …, status: "complete", verified: true }`,
+  or `422 size_mismatch` / `hash_mismatch` (blob deleted; upload again);
+- larger: `202 { …, status: "verifying" }`. The service streams the blob
+  through SHA-256 in the background (bounded memory; resumed after a restart).
+  Until it checks out the blob is not complete: `media/check` lists it as
+  missing, it gets no read URL, renders treat it as not in the cloud, and
+  `POST /v1/media` answers `{ exists: false, verifying: true }` (nothing to
+  upload). A mismatch deletes it. Poll `POST /v1/media/check` (or call
+  `complete` again) until it is `existing`; if the blob was overwritten
+  during the check, `complete` again restarts it.
+
+`MediaInfo = { sha256, size, name, contentType, verified, uploadedAt }`.
 
 **Limits.** 4 GB per file, 20 GB per user (media + projects + renders)
 (`MAX_FILE_BYTES`, `MAX_USER_BYTES`). Allowed types: `video/*`, `audio/*`,
@@ -209,7 +220,9 @@ other follows the project aspect), `fps {num,den}`, `quality`
 
 A render snapshots the project revision it was asked for; later edits do not
 change it. Asking again for the same revision and options returns the
-existing job (queued, running, or done within 24 h). Jobs run one at a time in
+existing job (queued, running, or done within 24 h) — also for concurrent
+requests: the (project, revision, options) key is claimed with an
+insert-if-absent table row, so simultaneous retries share one job. Jobs run one at a time in
 the service; a restart re-queues interrupted jobs. Every clip's media must be
 in the cloud (`409`-style job error `"…" is not in Zenvi Cloud yet`). Output:
 `u/{user}/p/{project}/renders/{renderId}.{ext}`, downloaded as
@@ -388,7 +401,7 @@ declarations), `u/{userId}/mcp/{connection}.json` (open project). Tables —
 `tokens` (lookup rows `t:<hash prefix>/<sha256>` + per-user index
 `u:<userId>/pat:<id>|grant:<id>`), `oauthclients` (`c/<client id>`),
 `oauthcodes` (`req/<id>`, `code/<sha256>`), `devicecodes` (`d/<user code>`),
-`renders` (`<userId>/<renderId>`). Expired rows are swept every 6 h.
+`renders` (`<userId>/<renderId>`, plus idempotency keys `<userId>/key:<projectId>:<hash>`); blob prefix `verify/` holds pending upload hash checks. Expired rows are swept every 6 h.
 
 Deploy: `scripts/azure/deploy.sh` (ACR build of the committed tree, roll the
 app, wait for `/health`); configuration: `scripts/azure/provision.sh`; live

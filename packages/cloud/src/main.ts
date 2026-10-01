@@ -87,6 +87,10 @@ async function main(): Promise<void> {
       .catch((error: unknown) => log.error("render job recovery failed", { error: errorMessage(error) }));
   };
   recoverJobs();
+  services.verifier
+    .resume()
+    .then((count) => count > 0 && log.info("resumed upload hash checks", { count }))
+    .catch((error: unknown) => log.error("resuming upload hash checks failed", { error: errorMessage(error) }));
   const recovery = setInterval(recoverJobs, 60_000);
   recovery.unref();
 

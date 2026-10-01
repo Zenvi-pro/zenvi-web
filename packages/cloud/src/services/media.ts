@@ -18,7 +18,7 @@ import type { Clock } from "../util/clock.js";
 import { isoAt } from "../util/clock.js";
 import type { Limits } from "../config.js";
 import { isSha256 } from "../projects/model.js";
-import { mediaPath, mediaPrefix, uploadPath, userPrefix } from "./paths.js";
+import { mediaPath, mediaPrefix, uploadPath, userPrefix, VERIFY_PREFIX, verifyJobPath } from "./paths.js";
 
 const UPLOAD_URL_SECONDS = 3600;
 const READ_URL_SECONDS = 3600;
@@ -63,10 +63,25 @@ export interface MediaInfo {
   uploadedAt?: string;
 }
 
+export interface CompleteResult extends MediaInfo {
+  /** "verifying": a large upload whose SHA-256 is being checked; poll /v1/media/check until it exists. */
+  status: "complete" | "verifying";
+}
+
+interface VerifyJob {
+  userId: string;
+  sha256: string;
+  /** Blob version `complete` handed to the verifier. */
+  etag: string;
+  createdAt: string;
+}
+
 export interface UploadTicket {
   sha256: string;
   blobPath: string;
   exists: boolean;
+  /** The bytes are uploaded and their hash is being checked; nothing to upload. */
+  verifying?: boolean;
   uploadUrl?: string;
   uploadExpiresAt?: string;
   /** Headers the PUT must carry (single-shot Put Blob). */
@@ -94,6 +109,8 @@ function infoFrom(sha256: string, item: { size: number; metadata: Record<string,
 
 export class MediaService {
   private readonly usageCache = new Map<string, { bytes: number; until: number }>();
+  /** Called when a large upload needs background verification (set by the container). */
+  onVerify?: (userId: string, sha256: string) => void;
 
   constructor(
     private readonly blobs: BlobStore,
@@ -165,6 +182,7 @@ export class MediaService {
     const path = mediaPath(userId, sha256);
     const head = await this.blobs.head(path);
     if (head && head.metadata.complete === "1") return { sha256, blobPath: path, exists: true };
+    if (head && head.metadata.verification === "pending") return { sha256, blobPath: path, exists: false, verifying: true };
     await this.assertFits(userId, input.size, head?.size ?? 0);
 
     const pending: PendingUpload = {
@@ -187,32 +205,34 @@ export class MediaService {
   }
 
   /**
-   * Finish an upload: the blob must exist with the declared size; small files
-   * are hashed here and removed when the hash does not match.
+   * Finish an upload: the blob must exist with the declared size, and its
+   * bytes must hash to the claimed SHA-256 — the hash is the content address,
+   * so an unchecked blob could poison every project that names it.
+   *
+   * Up to `verifyHashMaxBytes` the blob is hashed here. Larger blobs are
+   * hashed in the background (`verifyLarge`, streamed, bounded memory): until
+   * then the blob is "verifying" — not complete, so it is never listed as
+   * existing, deduplicated, signed for reading or resolved by renders — and a
+   * mismatch deletes it.
    */
-  async complete(userId: string, sha256Input: string): Promise<MediaInfo> {
+  async complete(userId: string, sha256Input: string): Promise<CompleteResult> {
     const sha256 = sha256Input.toLowerCase();
     const path = mediaPath(userId, sha256);
     const head = await this.blobs.head(path);
     if (!head) throw notFound("Uploaded media");
-    if (head.metadata.complete === "1") return infoFrom(sha256, head);
+    if (head.metadata.complete === "1") return { ...infoFrom(sha256, head), status: "complete" };
 
-    const pendingBlob = await this.blobs.read(uploadPath(userId, sha256));
-    let pending: PendingUpload | null = null;
-    if (pendingBlob) {
-      try {
-        pending = JSON.parse(pendingBlob.data.toString("utf8")) as PendingUpload;
-      } catch {
-        pending = null;
-      }
-    }
+    const pending = await this.pendingUpload(userId, sha256);
     if (pending && pending.size !== head.size) {
       await this.blobs.delete(path);
       throw new ApiError(422, "size_mismatch", `Uploaded ${head.size} bytes but declared ${pending.size}. Upload the file again.`);
     }
     await this.assertFits(userId, 0);
+    const contentType = pending?.contentType ?? normalizeContentType(head.metadata.contenttype ?? head.contentType) ?? "application/octet-stream";
+    const name = pending?.name ?? decodeMeta(head.metadata.name) ?? sha256;
+    const uploadedAt = isoAt(this.clock.now());
+    const changed = (): ApiError => new ApiError(409, "upload_changed", "The file was overwritten while it was being checked. Call complete again.");
 
-    let verified = false;
     if (head.size <= this.limits.verifyHashMaxBytes) {
       const hashed = await this.blobs.sha256(path);
       if (!hashed) throw notFound("Uploaded media");
@@ -220,27 +240,94 @@ export class MediaService {
         await this.blobs.delete(path);
         throw new ApiError(422, "hash_mismatch", "The uploaded bytes do not match the declared sha256. Upload the file again.");
       }
-      verified = true;
+      if (!(await this.finalize(userId, sha256, hashed.etag, { name, contentType, uploadedAt }))) throw changed();
+      return { sha256, size: head.size, name, contentType, verified: true, uploadedAt, status: "complete" };
     }
-    const contentType = pending?.contentType ?? normalizeContentType(head.contentType) ?? "application/octet-stream";
-    const metadata = {
-      name: encodeMeta(pending?.name ?? sha256),
-      contenttype: contentType,
-      complete: "1",
-      verified: verified ? "1" : "0",
-      uploadedat: isoAt(this.clock.now()),
-    };
+
+    let etag: string;
     try {
-      await this.blobs.setMetadata(path, metadata, { ifMatch: head.etag });
+      ({ etag } = await this.blobs.setMetadata(
+        path,
+        { name: encodeMeta(name), contenttype: contentType, complete: "0", verification: "pending", uploadedat: uploadedAt },
+        { ifMatch: head.etag },
+      ));
     } catch (error) {
-      if (error instanceof PreconditionFailedError) {
-        throw new ApiError(409, "upload_changed", "The file was overwritten while it was being checked. Call complete again.");
-      }
+      if (error instanceof PreconditionFailedError) throw changed();
+      throw error;
+    }
+    const job: VerifyJob = { userId, sha256, etag, createdAt: uploadedAt };
+    await this.blobs.write(verifyJobPath(userId, sha256), JSON.stringify(job), { contentType: "application/json" });
+    this.onVerify?.(userId, sha256);
+    return { sha256, size: head.size, name, contentType, verified: false, uploadedAt, status: "verifying" };
+  }
+
+  /**
+   * The background half of `complete` for large uploads: stream the blob
+   * through SHA-256, then mark it complete or delete it.
+   */
+  async verifyLarge(userId: string, sha256: string): Promise<"verified" | "mismatch" | "changed" | "gone"> {
+    const jobPath = verifyJobPath(userId, sha256);
+    const jobBlob = await this.blobs.read(jobPath);
+    if (!jobBlob) return "gone";
+    const job = JSON.parse(jobBlob.data.toString("utf8")) as VerifyJob;
+    const path = mediaPath(userId, sha256);
+    const done = async (outcome: "verified" | "mismatch" | "changed" | "gone") => {
+      await this.blobs.delete(jobPath);
+      return outcome;
+    };
+    const hashed = await this.blobs.sha256(path);
+    if (!hashed) return done("gone");
+    // Overwritten since complete: the client has to call complete again.
+    if (hashed.etag !== job.etag) return done("changed");
+    if (hashed.sha256 !== sha256) {
+      await this.blobs.delete(path, { ifMatch: hashed.etag }).catch(() => false);
+      await this.blobs.delete(uploadPath(userId, sha256));
+      this.invalidateUsage(userId);
+      return done("mismatch");
+    }
+    const head = await this.blobs.head(path);
+    if (!head) return done("gone");
+    const ok = await this.finalize(userId, sha256, hashed.etag, {
+      name: decodeMeta(head.metadata.name) ?? sha256,
+      contentType: normalizeContentType(head.metadata.contenttype) ?? "application/octet-stream",
+      uploadedAt: head.metadata.uploadedat ?? isoAt(this.clock.now()),
+    });
+    return done(ok ? "verified" : "changed");
+  }
+
+  /** Users and hashes with a verification still to run (restart recovery). */
+  async *pendingVerifications(): AsyncIterable<{ userId: string; sha256: string }> {
+    for await (const item of this.blobs.list(VERIFY_PREFIX)) {
+      const match = /^verify\/([A-Za-z0-9-]{1,64})\/([0-9a-f]{64})\.json$/.exec(item.path);
+      if (match) yield { userId: match[1]!, sha256: match[2]! };
+    }
+  }
+
+  /** Mark a hash-checked blob complete (only if it is still the version that was hashed). */
+  private async finalize(userId: string, sha256: string, etag: string, info: { name: string; contentType: string; uploadedAt: string }): Promise<boolean> {
+    try {
+      await this.blobs.setMetadata(
+        mediaPath(userId, sha256),
+        { name: encodeMeta(info.name), contenttype: info.contentType, complete: "1", verified: "1", uploadedat: info.uploadedAt },
+        { ifMatch: etag },
+      );
+    } catch (error) {
+      if (error instanceof PreconditionFailedError) return false;
       throw error;
     }
     await this.blobs.delete(uploadPath(userId, sha256));
     this.invalidateUsage(userId);
-    return { sha256, size: head.size, name: pending?.name ?? sha256, contentType, verified, uploadedAt: metadata.uploadedat };
+    return true;
+  }
+
+  private async pendingUpload(userId: string, sha256: string): Promise<PendingUpload | null> {
+    const blob = await this.blobs.read(uploadPath(userId, sha256));
+    if (!blob) return null;
+    try {
+      return JSON.parse(blob.data.toString("utf8")) as PendingUpload;
+    } catch {
+      return null;
+    }
   }
 
   /** Store bytes the server generated (title SVGs…), content-addressed; a no-op when already stored. */

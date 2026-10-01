@@ -26,6 +26,7 @@ import { DeviceService } from "./services/device.js";
 import { FrameService } from "./services/frames.js";
 import { MediaImporter } from "./services/importer.js";
 import { MediaService } from "./services/media.js";
+import { MediaVerifier } from "./services/verifier.js";
 import { ProjectService } from "./services/projects.js";
 import type { BlobStore, TableStore } from "./storage/types.js";
 import type { Clock } from "./util/clock.js";
@@ -65,6 +66,7 @@ export interface Services {
   tokens: TokenRepo;
   projects: ProjectService;
   media: MediaService;
+  verifier: MediaVerifier;
   renders: RenderService;
   devices: DeviceService;
   clients: ClientRegistry;
@@ -90,6 +92,8 @@ export function createServices(deps: Dependencies): Services {
   const tokens = new TokenRepo(tables, clock, (message) => log.warn(message));
   const projects = new ProjectService(blobs, clock, config.limits.maxProjectBytes);
   const media = new MediaService(blobs, clock, config.limits);
+  const verifier = new MediaVerifier(media, log);
+  media.onVerify = (userId, sha256) => verifier.enqueue(userId, sha256);
   const fetchClientDocument: JsonFetcher =
     deps.fetchClientDocument ??
     ((url) =>
@@ -112,6 +116,7 @@ export function createServices(deps: Dependencies): Services {
     tokens,
     projects,
     media,
+    verifier,
     renders: new RenderService({
       tables,
       blobs,

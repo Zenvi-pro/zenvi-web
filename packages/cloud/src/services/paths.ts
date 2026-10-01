@@ -10,6 +10,7 @@
  *   u/{userId}/media/{sha256}                        content-addressed media
  *   u/{userId}/uploads/{sha256}.json                 pending upload declaration
  *   u/{userId}/mcp/{connection}.json                 MCP session state
+ *   verify/{userId}/{sha256}.json                    pending hash check of a large upload
  *
  * Every id that reaches a path is validated first, so a path can never escape
  * the user's prefix.
@@ -43,6 +44,10 @@ export const framePath = (userId: string, projectId: string, key: string, ext: "
 export const exportPath = (userId: string, projectId: string, name: string): string =>
   `${projectPrefix(userId, projectId)}exports/${check(name, /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/, "export file name")}`;
 export const mediaPrefix = (userId: string): string => `${userPrefix(userId)}media/`;
+/** Background hash checks of large uploads still to run, across users (restart recovery lists them). */
+export const VERIFY_PREFIX = "verify/";
+export const verifyJobPath = (userId: string, sha256: string): string =>
+  `${VERIFY_PREFIX}${check(userId, USER_ID, "user id")}/${check(sha256, SHA256, "sha256")}.json`;
 export const mediaPath = (userId: string, sha256: string): string => `${mediaPrefix(userId)}${check(sha256, SHA256, "sha256")}`;
 export const uploadPath = (userId: string, sha256: string): string => `${userPrefix(userId)}uploads/${check(sha256, SHA256, "sha256")}.json`;
 export const sessionPath = (userId: string, connection: string): string =>

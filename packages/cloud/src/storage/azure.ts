@@ -173,7 +173,8 @@ export class AzureBlobStore implements BlobStore {
 
   async sha256(path: string): Promise<{ sha256: string; size: number; etag: string } | null> {
     try {
-      const response = await this.container.getBlobClient(path).download(0);
+      // Streamed (bounded memory); the SDK resumes a broken stream from its offset.
+      const response = await this.container.getBlobClient(path).download(0, undefined, { maxRetryRequests: 10 });
       const hash = createHash("sha256");
       let size = 0;
       const body = response.readableStreamBody;

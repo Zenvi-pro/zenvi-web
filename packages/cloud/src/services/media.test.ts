@@ -129,6 +129,76 @@ describe("media API", () => {
   });
 });
 
+describe("large uploads (hash checked in the background)", () => {
+  async function upload(h: Awaited<ReturnType<typeof harness>>, token: string, claimed: string, bytes: Buffer) {
+    const ticket = await h.request("POST", "/v1/media", { token, json: { sha256: claimed, size: bytes.length, name: "big.mp4", contentType: "video/mp4" } });
+    await h.blobs.acceptSignedWrite(ticket.json.uploadUrl, bytes);
+    return h.request("POST", `/v1/media/${claimed}/complete`, { token });
+  }
+
+  it("are never served, deduplicated or listed until their SHA-256 checks out", async () => {
+    const h = await harness({ config: { limits: { verifyHashMaxBytes: 8 } } });
+    const token = await h.userToken(USER_A);
+    const bytes = Buffer.from("twenty bytes of data");
+    const hash = sha(bytes);
+    h.services.media.onVerify = undefined; // hold the background check until the assertions below
+    const done = await upload(h, token, hash, bytes);
+    expect(done.status).toBe(202);
+    expect(done.json).toMatchObject({ status: "verifying", verified: false });
+    expect((await h.request("POST", "/v1/media/check", { token, json: { sha256: [hash] } })).json.missing).toEqual([hash]);
+    expect((await h.request("GET", `/v1/media/${hash}/url`, { token })).status).toBe(404);
+    const again = await h.request("POST", "/v1/media", { token, json: { sha256: hash, size: bytes.length, name: "big.mp4", contentType: "video/mp4" } });
+    expect(again.json).toMatchObject({ exists: false, verifying: true });
+    expect(again.json.uploadUrl).toBeUndefined();
+
+    await h.services.verifier.resume();
+    await h.services.verifier.drain();
+    expect((await h.request("POST", "/v1/media/check", { token, json: { sha256: [hash] } })).json.existing).toEqual([hash]);
+    expect(await h.services.media.get(USER_A, hash)).toMatchObject({ verified: true, name: "big.mp4" });
+    expect((await h.request("POST", `/v1/media/${hash}/complete`, { token })).json.status).toBe("complete");
+    expect(h.blobs.paths().filter((p) => p.startsWith("verify/") || p.includes("/uploads/"))).toEqual([]);
+  });
+
+  it("cannot poison a content address: bytes that do not match the claimed hash are deleted", async () => {
+    const h = await harness({ config: { limits: { verifyHashMaxBytes: 8 } } });
+    const token = await h.userToken(USER_A);
+    const claimed = sha("the media everyone expects");
+    expect((await upload(h, token, claimed, Buffer.from("something else entirely!!"))).status).toBe(202);
+    await h.services.verifier.drain();
+    expect(await h.blobs.head(`u/${USER_A}/media/${claimed}`)).toBeNull();
+    expect((await h.request("POST", "/v1/media/check", { token, json: { sha256: [claimed] } })).json.missing).toEqual([claimed]);
+    const created = await h.request("POST", "/v1/projects", {
+      token,
+      json: { name: "P", project: sampleProject({ files: [{ id: "F1", path: "a.mp4", cloud: { sha256: claimed, size: 26, name: "a.mp4" } }] }) },
+    });
+    const got = await h.request("GET", `/v1/projects/${created.json.id}`, { token });
+    expect(got.json.media).toEqual([]);
+    expect(got.json.missingMedia[0]).toMatchObject({ fileId: "F1", reason: "not_uploaded" });
+  });
+
+  it("re-check when the blob was overwritten during the check, and resume after a restart", async () => {
+    const h = await harness({ config: { limits: { verifyHashMaxBytes: 8 } } });
+    const token = await h.userToken(USER_A);
+    const bytes = Buffer.from("some large media file");
+    const hash = sha(bytes);
+    // Simulate a restart: the job is stored but nobody is running it.
+    h.services.media.onVerify = undefined;
+    expect((await upload(h, token, hash, bytes)).status).toBe(202);
+    expect(await h.services.verifier.resume()).toBe(1);
+    await h.services.verifier.drain();
+    expect(await h.services.media.get(USER_A, hash)).toMatchObject({ verified: true });
+
+    const other = Buffer.from("another large media!!");
+    const otherHash = sha(other);
+    h.services.media.onVerify = undefined;
+    expect((await upload(h, token, otherHash, other)).status).toBe(202);
+    // The client overwrites the blob before the check runs: the check refuses that version.
+    await h.blobs.write(`u/${USER_A}/media/${otherHash}`, other, { metadata: (await h.blobs.head(`u/${USER_A}/media/${otherHash}`))!.metadata });
+    expect(await h.services.media.verifyLarge(USER_A, otherHash)).toBe("changed");
+    expect(await h.services.media.get(USER_A, otherHash)).toBeNull();
+  });
+});
+
 describe("media helpers", () => {
   it("normalizes content types to the allowlist", () => {
     expect(normalizeContentType("Video/MP4; codecs=avc1")).toBe("video/mp4");

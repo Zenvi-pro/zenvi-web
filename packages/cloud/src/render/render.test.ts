@@ -87,6 +87,27 @@ describe("render jobs", () => {
     expect(job.json.error).toContain('"a.mp4" is not in Zenvi Cloud');
   });
 
+  it("return one job to concurrent identical requests, and a new one after a failure", async () => {
+    const renderer = fakeRenderer();
+    const h = await harness({ renderer });
+    const token = await h.userToken(USER_A);
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id as string;
+    const jobs = await Promise.all([1, 2, 3, 4].map(() => h.services.renders.start(USER_A, id, { preset: "mp4" })));
+    expect(new Set(jobs.map((j) => j.renderId)).size).toBe(1);
+    await h.services.renders.drain();
+    expect(renderer.renders).toBe(1);
+    expect((await h.request("GET", `/v1/projects/${id}/renders`, { token })).json.renders).toHaveLength(1);
+
+    const failing = await harness({ renderer: fakeRenderer({ fail: "encoder crashed" }) });
+    const t2 = await failing.userToken(USER_A);
+    const p2 = (await failing.request("POST", "/v1/projects", { token: t2, json: { name: "P" } })).json.id as string;
+    const first = await failing.services.renders.start(USER_A, p2, {});
+    await failing.services.renders.drain();
+    expect((await failing.services.renders.getById(USER_A, first.renderId)).status).toBe("error");
+    const retry = await failing.services.renders.start(USER_A, p2, {});
+    expect(retry.renderId).not.toBe(first.renderId);
+  });
+
   it("explain which media is missing from the cloud", async () => {
     const h = await harness({ renderer: fakeRenderer() });
     const token = await h.userToken(USER_A);

@@ -13,7 +13,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { type ExportOptions, type Project, serializeProject } from "@zenvi/engine";
-import { ApiError, notFound, PreconditionFailedError } from "../http/errors.js";
+import { AlreadyExistsError, ApiError, notFound, PreconditionFailedError } from "../http/errors.js";
 import type { Logger } from "../http/log.js";
 import { errorMessage } from "../http/log.js";
 import type { BlobStore, Stored, TableEntity, TableStore } from "../storage/types.js";
@@ -24,7 +24,7 @@ import { displayName, fileSha256 } from "../projects/model.js";
 import type { MediaService } from "../services/media.js";
 import { attachmentDisposition } from "../services/media.js";
 import { renderPath, renderSnapshotPath } from "../services/paths.js";
-import type { ProjectService } from "../services/projects.js";
+import type { LoadedProject, ProjectService } from "../services/projects.js";
 import { CONTENT_TYPES, type PresetName, type RenderFormat, type RenderOverrides, resolveRenderOptions } from "./options.js";
 import type { PathResolver, Renderer } from "./renderer.js";
 import { projectPathResolver } from "./resolve.js";
@@ -72,7 +72,19 @@ interface RenderRow extends TableEntity {
   heartbeatAt?: string;
 }
 
+/**
+ * Idempotency key row (same partition as the user's jobs): which job renders
+ * a (project, revision, options) combination. Carries no `status` or
+ * `projectId`, so job queries never see it.
+ */
+interface KeyRow extends TableEntity {
+  renderId: string;
+  claimedAt: string;
+}
+
 const TABLE = "renders" as const;
+/** How long a claimed key may wait for its job row before another request takes it over. */
+const CLAIM_GRACE_MS = 30_000;
 const MAX_ATTEMPTS = 2;
 const HEARTBEAT_MS = 15_000;
 /** A running job whose heartbeat is older than this is re-queued by `recover`. */
@@ -142,27 +154,71 @@ export class RenderService {
     return this.options.renderer.available;
   }
 
+  /**
+   * Start a render, or return the job already rendering (or rendered, within
+   * a day) this project revision with these options. Idempotent under
+   * concurrency: the (project, revision, options) key is claimed with an
+   * insert-if-absent row, so simultaneous retries get the same job.
+   */
   async start(userId: string, projectId: string, input: { preset?: PresetName; options?: RenderOverrides }): Promise<RenderJob> {
     const loaded = await this.options.projects.get(userId, projectId);
     const options = resolveRenderOptions(loaded.project, input.preset, input.options ?? {});
     const requestKey = sha256Hex(`${loaded.revision}\n${JSON.stringify(options)}`).slice(0, 32);
+    const keyRowKey = `key:${projectId}:${requestKey}`;
 
-    const now = this.options.clock.now();
-    for await (const row of this.options.tables.query<RenderRow>(TABLE, {
-      partitionKey: userId,
-      where: [
-        ["projectId", "eq", projectId],
-        ["requestKey", "eq", requestKey],
-      ],
-    })) {
-      if (row.status === "queued" || row.status === "running") return toJob(row);
-      if (row.status === "done" && row.finishedAt && now - Date.parse(row.finishedAt) < REUSE_DONE_MS) {
-        const blob = await this.options.blobs.head(renderPath(userId, projectId, row.rowKey, row.format));
-        if (blob) return toJob(row);
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const now = this.options.clock.now();
+      const key = await this.options.tables.get<KeyRow>(TABLE, userId, keyRowKey);
+      if (!key) {
+        const renderId = randomId("r_", 16);
+        try {
+          await this.options.tables.create<KeyRow>(TABLE, { partitionKey: userId, rowKey: keyRowKey, renderId, claimedAt: isoAt(now) });
+        } catch (error) {
+          if (error instanceof AlreadyExistsError) continue; // another request won the key: use its job
+          throw error;
+        }
+        return this.createJob(userId, projectId, renderId, loaded, options, requestKey);
       }
+      const existing = await this.options.tables.get<RenderRow>(TABLE, userId, key.renderId);
+      if (existing && (await this.reusable(userId, existing, now))) return toJob(existing);
+      if (!existing && now - Date.parse(key.claimedAt) < CLAIM_GRACE_MS) {
+        // The winner is still writing its job row.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        continue;
+      }
+      // The keyed job failed, expired or never got written: replace it, if nobody else did first.
+      const renderId = randomId("r_", 16);
+      try {
+        await this.options.tables.update<KeyRow>(
+          TABLE,
+          { partitionKey: userId, rowKey: keyRowKey, renderId, claimedAt: isoAt(now) },
+          { etag: key.etag, mode: "replace" },
+        );
+      } catch (error) {
+        if (error instanceof PreconditionFailedError) continue;
+        throw error;
+      }
+      return this.createJob(userId, projectId, renderId, loaded, options, requestKey);
     }
+    throw new ApiError(503, "busy", "Could not start the render; try again.");
+  }
 
-    const renderId = randomId("r_", 16);
+  private async reusable(userId: string, row: Stored<RenderRow>, now: number): Promise<boolean> {
+    if (row.status === "queued" || row.status === "running") return true;
+    if (row.status === "done" && row.finishedAt && now - Date.parse(row.finishedAt) < REUSE_DONE_MS) {
+      return (await this.options.blobs.head(renderPath(userId, row.projectId, row.rowKey, row.format))) !== null;
+    }
+    return false;
+  }
+
+  private async createJob(
+    userId: string,
+    projectId: string,
+    renderId: string,
+    loaded: LoadedProject,
+    options: ExportOptions,
+    requestKey: string,
+  ): Promise<RenderJob> {
     await this.options.blobs.write(renderSnapshotPath(userId, projectId, renderId), serializeProject(loaded.project), {
       contentType: "application/json",
     });
@@ -176,7 +232,7 @@ export class RenderService {
       options: JSON.stringify(options),
       revision: loaded.revision,
       requestKey,
-      createdAt: isoAt(now),
+      createdAt: isoAt(this.options.clock.now()),
       fileName: `${safeFileBase(loaded.meta.name)}.${options.format}`,
       attempts: 0,
     };

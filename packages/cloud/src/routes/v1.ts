@@ -199,7 +199,9 @@ export function v1Routes(services: Services): Hono<AppEnv> {
 
   app.post("/media/:sha256/complete", async (c) => {
     const hash = parseWith(sha256, c.req.param("sha256"));
-    return c.json(await media.complete(c.get("principal").userId, hash));
+    const result = await media.complete(c.get("principal").userId, hash);
+    // 202: a large upload whose SHA-256 is still being checked in the background.
+    return c.json(result, result.status === "verifying" ? 202 : 200);
   });
 
   app.get("/media/:sha256/url", async (c) => {
