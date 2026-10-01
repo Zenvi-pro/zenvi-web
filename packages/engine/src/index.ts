@@ -20,5 +20,6 @@ export * from "./ops/index.js";
 export * from "./io/index.js";
 export * from "./transitions/index.js";
 export * from "./titles/templates.js";
+export * from "./presets/index.js";
 export type * from "./tools/types.js";
 export type * from "./render/types.js";
