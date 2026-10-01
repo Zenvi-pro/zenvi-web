@@ -127,6 +127,7 @@ CASES = [
     ("sharpen-default", "Sharpen", "photo", 1, {}, {}, {}, None),
     ("sharpen-highpass-all", "Sharpen", "noise", 1, {"amount": 4, "radius": 12}, {"mode": 1, "channel": 0}, {}, None),
     ("sharpen-threshold-chroma", "Sharpen", "photo", 1, {"amount": 20, "threshold": 0.4}, {"channel": 2}, {}, None),
+    ("sharpen-alpha", "Sharpen", "alpha", 1, {"amount": 6, "radius": 2}, {}, {}, None),
     ("mask-effect", "Mask", "photo", 1, {"brightness": 0.2, "contrast": 3}, {}, {}, "mask"),
     ("mask-invert-alpha", "Mask", "alpha", 1, {"brightness": -0.3, "contrast": 8}, {"mask_invert": True}, {}, "mask"),
     ("mask-replace", "Mask", "photo", 1, {"brightness": 0.1, "contrast": 1}, {"replace_image": True}, {}, "mask"),

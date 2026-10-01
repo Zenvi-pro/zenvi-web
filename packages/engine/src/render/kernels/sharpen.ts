@@ -10,7 +10,8 @@
  */
 
 import { roundHalfAway } from "../../model/rounding.js";
-import { byteMul, unpremulChannel, type PremulImage } from "../pixels.js";
+import { byteMul, type PremulImage } from "../pixels.js";
+import { unpremultiplyNeon } from "../qt/convert.js";
 import { int, num } from "./params.js";
 import type { KernelSpec, Params } from "./types.js";
 
@@ -106,17 +107,18 @@ export const sharpen: KernelSpec = {
     if (amt === 0 || rpx <= 0) return;
     const sigma = Math.max(0.1, (rpx * H) / 720);
 
-    // Straight BGR planes (ARGB32 memory order: B, G, R).
+    // Straight BGR planes (ARGB32 memory order: B, G, R), converted like
+    // `convertToFormat(Format_ARGB32)` on arm64 (Sharpen.cpp:235-236).
     const n = W * H;
     const d = image.data;
+    const straight = unpremultiplyNeon(image);
     const planes = [new Float64Array(n), new Float64Array(n), new Float64Array(n)];
     const alpha = new Uint8Array(n);
     for (let p = 0; p < n; p += 1) {
-      const a = d[p * 4 + 3]!;
-      alpha[p] = a;
-      planes[0]![p] = unpremulChannel(d[p * 4 + 2]!, a);
-      planes[1]![p] = unpremulChannel(d[p * 4 + 1]!, a);
-      planes[2]![p] = unpremulChannel(d[p * 4]!, a);
+      alpha[p] = d[p * 4 + 3]!;
+      planes[0]![p] = straight[p * 4 + 2]!;
+      planes[1]![p] = straight[p * 4 + 1]!;
+      planes[2]![p] = straight[p * 4]!;
     }
     const blurred = gaussBlur(planes, W, H, sigma);
 

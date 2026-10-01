@@ -8,7 +8,8 @@ import { fmaExact, fmaf, lensFlare } from "./lens-flare.js";
 import goldens from "./light-goldens.json";
 import { processEffect, registerKernels } from "./registry.js";
 import { glow, shadow } from "./shadow-glow.js";
-import { sphericalProjection, unpremultiplyNeon } from "./spherical.js";
+import { unpremultiplyNeon } from "../qt/convert.js";
+import { sphericalProjection } from "./spherical.js";
 
 registerKernels([shadow, glow, lensFlare, displace, sphericalProjection]);
 
