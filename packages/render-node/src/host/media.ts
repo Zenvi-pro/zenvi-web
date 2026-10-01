@@ -16,7 +16,11 @@ import { fingerprint } from "../probe/fingerprint.js";
 import { probe } from "../probe/probe.js";
 import { assetsDirFor, pathIsUnder } from "./paths.js";
 
-/** reference: keep media where it is (desktop default). copy: copy into `<project>_assets/media`. auto: copy only files under the OS temp folder. */
+/**
+ * reference: keep media where it is (desktop default). copy: copy into
+ * `<project>_assets/media`. auto: copy files from the OS temp folder (they
+ * get cleaned up) unless the project itself lives there.
+ */
 export type ImportPolicy = "reference" | "copy" | "auto";
 
 export interface NodeMediaOptions {
@@ -27,6 +31,8 @@ export interface NodeMediaOptions {
   maxDownloadBytes?: number;
   /** Where media goes when no project file exists yet. */
   scratchDir?: string;
+  /** The OS temp folder for the auto policy (tests). */
+  tempRoot?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -182,7 +188,9 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
     const info = await probe(source);
     const project = options.projectFile();
     const inAssets = project !== undefined && pathIsUnder(source, assetsDirFor(project));
-    const copy = !inAssets && (policy === "copy" || (policy === "auto" && pathIsUnder(source, tmpdir())));
+    const temp = options.tempRoot ?? tmpdir();
+    const projectInTemp = project !== undefined && pathIsUnder(project, temp);
+    const copy = !inAssets && (policy === "copy" || (policy === "auto" && pathIsUnder(source, temp) && !projectInTemp));
     if (!copy) return imported(source, undefined, info);
     const dest = await uniquePath(await mediaDir("media"), safeName(path.basename(source)));
     await copyFile(source, dest);

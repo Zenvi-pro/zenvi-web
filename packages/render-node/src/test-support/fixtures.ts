@@ -6,7 +6,7 @@
 
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -42,6 +42,7 @@ export interface VideoFixture {
 }
 
 export async function makeVideo(dir: string, name: string, opts: VideoFixture = {}): Promise<string> {
+  await mkdir(dir, { recursive: true });
   const out = path.join(dir, name);
   const w = opts.width ?? 320;
   const h = opts.height ?? 240;
@@ -72,6 +73,7 @@ export interface AudioFixture {
 }
 
 export async function makeAudio(dir: string, name: string, opts: AudioFixture = {}): Promise<string> {
+  await mkdir(dir, { recursive: true });
   const out = path.join(dir, name);
   const hz = opts.hz ?? 1000;
   const duration = opts.duration ?? 2;
@@ -89,6 +91,7 @@ export async function makeAudio(dir: string, name: string, opts: AudioFixture = 
 
 /** A solid color (or test pattern) still image. */
 export async function makeImage(dir: string, name: string, opts: { width?: number; height?: number; color?: string } = {}): Promise<string> {
+  await mkdir(dir, { recursive: true });
   const out = path.join(dir, name);
   const w = opts.width ?? 64;
   const h = opts.height ?? 48;

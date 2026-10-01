@@ -138,22 +138,30 @@ describe("project storage", () => {
     expect(order).toEqual(["a-start", "a-end", "b"]);
     await writeFile(`${file}.lock`, JSON.stringify({ pid: 999_999_999, host: (await import("node:os")).hostname(), at: Date.now() }));
     expect(await withProjectLock(file, async () => "got it", 2000)).toBe("got it");
+    // Reentrant within one call chain (load → tool → save under one lock).
+    expect(await withProjectLock(file, () => withProjectLock(file, async () => "nested", 500), 500)).toBe("nested");
   });
 });
 
 describe("media host", () => {
   it("references files by default, copies temp files into the project assets under auto", async () => {
-    const media = await makeVideo(dir, "served.mp4", { duration: 1, width: 160, height: 90 });
+    const media = await makeVideo(path.join(dir, "fake-tmp"), "served.mp4", { duration: 1, width: 160, height: 90 });
+    await makeVideo(dir, "served.mp4", { duration: 1, width: 160, height: 90 });
     const projectFile = path.join(dir, "proj", "edit.zvn");
     const host = createNodeMediaHost({ projectFile: () => projectFile, policy: "reference" });
     const ref = await host.importPath!(media);
     expect(ref.path).toBe(media);
     expect(ref.info.media_type).toBe("video");
     expect(ref.fingerprint?.sha256).toMatch(/^[0-9a-f]{64}$/);
-    const auto = createNodeMediaHost({ projectFile: () => projectFile, policy: "auto" });
+    // auto: a file from the temp folder is copied when the project lives elsewhere…
+    const tempRoot = path.dirname(media);
+    const auto = createNodeMediaHost({ projectFile: () => projectFile, policy: "auto", tempRoot });
     const copied = await auto.importPath!(media);
     expect(copied.path).toBe(path.join(dir, "proj", "edit_assets", "media", "served.mp4"));
     expect(copied.info.path).toBe(copied.path);
+    // …and referenced when the project is in the temp folder too.
+    const inTemp = createNodeMediaHost({ projectFile: () => path.join(tempRoot, "edit.zvn"), policy: "auto", tempRoot });
+    expect((await inTemp.importPath!(media)).path).toBe(media);
     await expect(host.importPath!(path.join(dir, "missing.mp4"))).rejects.toThrow(/not found/);
   });
 

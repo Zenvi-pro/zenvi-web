@@ -10,6 +10,7 @@
  *   from concurrent `zenvi` invocations.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes } from "node:crypto";
 import { open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
@@ -148,35 +149,43 @@ async function tryAcquire(lockFile: string): Promise<boolean> {
   return false;
 }
 
-/** Lock files this process holds (the lock is reentrant within a process). */
-const held = new Map<string, number>();
+/** Locks held by the current async call chain (reentrancy). */
+const heldHere = new AsyncLocalStorage<ReadonlySet<string>>();
+/** In-process queue per lock file: independent operations in this process still exclude each other. */
+const queues = new Map<string, Promise<void>>();
 
-/** Run `fn` holding `<file>.lock`. Waits up to `timeoutMs` for another process's hold. */
+/**
+ * Run `fn` holding `<file>.lock`. Reentrant within one async call chain;
+ * other operations (in this process or others) wait up to `timeoutMs`.
+ */
 export async function withProjectLock<T>(file: string, fn: () => Promise<T>, timeoutMs = 30_000): Promise<T> {
   const lockFile = `${path.resolve(file)}.lock`;
-  const depth = held.get(lockFile) ?? 0;
-  if (depth > 0) {
-    held.set(lockFile, depth + 1);
-    try {
-      return await fn();
-    } finally {
-      held.set(lockFile, (held.get(lockFile) ?? 1) - 1);
-    }
-  }
-  const deadline = Date.now() + timeoutMs;
-  let delay = 25;
-  while (!(await tryAcquire(lockFile))) {
-    if (Date.now() > deadline) {
-      throw new ProjectFileError(`${file} is locked by another zenvi process (remove ${lockFile} if none is running).`, file);
-    }
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    delay = Math.min(250, delay * 2);
-  }
-  held.set(lockFile, 1);
+  const held = heldHere.getStore();
+  if (held?.has(lockFile)) return fn();
+
+  const previous = queues.get(lockFile) ?? Promise.resolve();
+  let release!: () => void;
+  const mine = new Promise<void>((resolve) => (release = resolve));
+  const tail = previous.then(() => mine);
+  queues.set(lockFile, tail);
+  await previous;
   try {
-    return await fn();
+    const deadline = Date.now() + timeoutMs;
+    let delay = 25;
+    while (!(await tryAcquire(lockFile))) {
+      if (Date.now() > deadline) {
+        throw new ProjectFileError(`${file} is locked by another zenvi process (remove ${lockFile} if none is running).`, file);
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay = Math.min(250, delay * 2);
+    }
+    try {
+      return await heldHere.run(new Set([...(held ?? []), lockFile]), fn);
+    } finally {
+      await rm(lockFile, { force: true });
+    }
   } finally {
-    held.delete(lockFile);
-    await rm(lockFile, { force: true });
+    release();
+    if (queues.get(lockFile) === tail) queues.delete(lockFile);
   }
 }
