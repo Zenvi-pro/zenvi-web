@@ -28,12 +28,19 @@ describe("chooseCodecs", () => {
     expect(choice.notes[0]).toMatch(/WEBM/);
   });
 
-  it("uses AAC-less MP4 audio (Opus) and drops audio entirely when nothing encodes it", async () => {
+  it("uses Opus in MP4 without AAC, and never drops the sound silently", async () => {
     expect(await chooseCodecs(base, support(["avc"], ["opus"]))).toMatchObject({ container: "mp4", audioCodec: "opus" });
-    const silent = await chooseCodecs(base, support(["avc"], []));
+    await expect(chooseCodecs(base, support(["avc"], []))).rejects.toMatchObject({ code: "no-audio-encoder" });
+    const silent = await chooseCodecs({ ...base, allowVideoOnly: true }, support(["avc"], []));
     expect(silent.audioCodec).toBeNull();
     expect(silent.notes).toContain("No audio encoder is available; exporting video only");
     expect((await chooseCodecs({ ...base, hasAudio: false }, support(["avc"], ["aac"]))).audioCodec).toBeNull();
+  });
+
+  it("switches to WebM to keep the sound when MP4 has no encodable audio codec", async () => {
+    const choice = await chooseCodecs(base, support(["avc", "vp9"], ["vorbis"]));
+    expect(choice).toMatchObject({ container: "webm", videoCodec: "vp9", audioCodec: "vorbis" });
+    expect(choice.notes.join(" ")).toMatch(/keep the sound/);
   });
 
   it("honours a requested codec by its FFmpeg name when the container allows it", async () => {

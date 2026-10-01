@@ -53,6 +53,12 @@ export interface ExportRunOptions {
   onLayerError?: (error: LayerError, frame: number) => void;
   /** Encoder capability probes (tests). Default: Mediabunny's. */
   support?: EncodeSupport;
+  /**
+   * Export without sound when the browser cannot encode audio. Default false:
+   * such an export fails with `ExportError` code `no-audio-encoder`, so the UI
+   * can ask the person (or offer a cloud render) instead of dropping sound.
+   */
+  allowVideoOnly?: boolean;
   svgRasterizer?: SvgRasterizer;
 }
 
@@ -180,6 +186,7 @@ async function encode(project: Project, media: MediaRegistry, options: ExportOpt
       sampleRate,
       channels,
       hasAudio: audioPlan.segments.length > 0 || options.format === "wav",
+      ...(run.allowVideoOnly ? { allowVideoOnly: true } : {}),
     },
     run.support ?? defaultSupport,
   );

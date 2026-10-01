@@ -30,7 +30,7 @@ export interface EncodeSupport {
 
 export class ExportError extends Error {
   constructor(
-    readonly code: "unsupported-format" | "no-encoder" | "empty-range" | "aborted",
+    readonly code: "unsupported-format" | "no-encoder" | "no-audio-encoder" | "empty-range" | "aborted",
     message: string,
   ) {
     super(message);
@@ -137,6 +137,11 @@ export interface ChooseOptions {
   channels: number;
   /** Whether the timeline has any audio to encode. */
   hasAudio: boolean;
+  /**
+   * Export without sound when no audio codec can be encoded. Default false:
+   * the export fails with `no-audio-encoder` instead of dropping audio silently.
+   */
+  allowVideoOnly?: boolean;
 }
 
 export async function chooseCodecs(options: ChooseOptions, support: EncodeSupport): Promise<CodecChoice> {
@@ -176,21 +181,44 @@ export async function chooseCodecs(options: ChooseOptions, support: EncodeSuppor
   let audioCodec: AudioCodec | null = null;
   if (options.hasAudio) {
     const wantedAudio = audioCodecFromName(options.audioCodec);
-    const candidates = [...(wantedAudio && CONTAINER_AUDIO[container].includes(wantedAudio) ? [wantedAudio] : []), ...CONTAINER_AUDIO[container]];
-    for (const codec of candidates) {
-      const ok = await support.canEncodeAudio(codec, {
-        sampleRate: options.sampleRate,
-        numberOfChannels: options.channels,
-        ...(options.audioBitrate ? { bitrate: options.audioBitrate } : {}),
-      });
-      if (ok) {
-        audioCodec = codec;
-        break;
+    const firstEncodable = async (box: WebContainer): Promise<AudioCodec | null> => {
+      const candidates = [...(wantedAudio && CONTAINER_AUDIO[box].includes(wantedAudio) ? [wantedAudio] : []), ...CONTAINER_AUDIO[box]];
+      for (const codec of candidates) {
+        const ok = await support.canEncodeAudio(codec, {
+          sampleRate: options.sampleRate,
+          numberOfChannels: options.channels,
+          ...(options.audioBitrate ? { bitrate: options.audioBitrate } : {}),
+        });
+        if (ok) return codec;
+      }
+      return null;
+    };
+    audioCodec = await firstEncodable(container);
+    if (!audioCodec && container !== "webm") {
+      // The sound matters more than the container: try WebM (Opus/Vorbis) with a WebM video codec.
+      const webmAudio = await firstEncodable("webm");
+      if (webmAudio) {
+        for (const codec of CONTAINER_VIDEO.webm) {
+          if (await support.canEncodeVideo(codec, { width: options.width, height: options.height, frameRate: options.frameRate })) {
+            notes.push(`No ${container.toUpperCase()} audio encoder is available; exporting WebM (${codec}, ${webmAudio}) to keep the sound`);
+            return finish("webm", codec, webmAudio, notes, options);
+          }
+        }
       }
     }
-    if (!audioCodec) notes.push("No audio encoder is available; exporting video only");
+    if (!audioCodec) {
+      // Never drop the sound silently: the person decides.
+      if (!options.allowVideoOnly) {
+        throw new ExportError("no-audio-encoder", "This browser cannot encode audio (no AAC, Opus or Vorbis encoder); export without sound or render in Zenvi Cloud");
+      }
+      notes.push("No audio encoder is available; exporting video only");
+    }
   }
+  return finish(container, videoCodec, audioCodec, notes, options);
+}
 
+/** The choice with the codec's size constraint applied (H.264/HEVC need even dimensions). */
+function finish(container: WebContainer, videoCodec: VideoCodec, audioCodec: AudioCodec | null, notes: string[], options: ChooseOptions): CodecChoice {
   const width = evenFor(videoCodec, options.width);
   const height = evenFor(videoCodec, options.height);
   if (width !== Math.round(options.width) || height !== Math.round(options.height)) notes.push(`${videoCodec} needs even dimensions; exporting ${width}×${height}`);

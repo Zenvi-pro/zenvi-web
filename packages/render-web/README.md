@@ -132,8 +132,10 @@ discards the partial file).
   Mediabunny `CanvasSource`; audio is mixed in 10 s windows by an `OfflineAudioContext` with the
   preview's voices and added through an `AudioBufferSource`, interleaved with the video.
 - Formats: `mp4` (H.264 + AAC, else Opus), `webm` (VP9/VP8/AV1 + Opus), `mov`, `mkv`, `wav`. When MP4
-  cannot get H.264 the export becomes WebM; audio that cannot be encoded is dropped (the desktop
-  retries "video only" too). `onNotes` reports such changes; H.264 sizes are rounded to even.
+  cannot get H.264 — or no MP4 audio codec can be encoded — the export becomes WebM. Sound is never
+  dropped silently: when no audio codec at all can be encoded the export fails with `ExportError`
+  code `no-audio-encoder`, unless `allowVideoOnly: true` (ask the person first, or offer a cloud
+  render). `onNotes` reports container/codec/size changes; H.264 sizes are rounded to even.
   `videoCodec`/`audioCodec` accept the desktop presets' FFmpeg names (`libx264`, `libopus`, …).
 - `quality` maps to Mediabunny qualities; `videoBitrate`/`audioBitrate` override it.
 - Cancel with the signal: the promise rejects with the signal's reason, encoders are released.
@@ -172,7 +174,10 @@ player's AudioContext touch the DOM. The compositor, decoding and stills run in 
 `src/engine.ts` is the only place that calls `@zenvi/engine` for semantics (`RenderEngine`:
 `planFrame`, `planAudio`, `applyVideoEffect`, `applyMask`, `getAudioKernel`, frame↔time).
 Everything takes an optional `engine` for tests. Until the engine ships `planAudio` and
-`getAudioKernel`, the default engine plans silence (video previews and exports work).
+`getAudioKernel`, the default engine uses an interim planner (`audio/plan-audio-interim.ts`, built
+on the engine's clip windows and keyframe evaluation): clips sound at normal speed with their
+volume and `has_audio` keyframes; time remapping, volume mixing modes, transition audio fades and
+audio effects wait for the engine's planner.
 
 ## Tests
 

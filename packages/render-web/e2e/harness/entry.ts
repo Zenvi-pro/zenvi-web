@@ -8,6 +8,7 @@
  */
 
 import { ProjectDocument, addClip, addFile, createProject, type Profile, type ReaderInfo } from "@zenvi/engine";
+import { ALL_FORMATS, AudioSampleSink, BlobSource, Input } from "mediabunny";
 import {
   AudioRenderer,
   CanvasTextRasterizer,
@@ -381,6 +382,57 @@ const api = {
     compositor.dispose();
     media.dispose();
     return { sequentialMs: sequential, seekMs: seek, cachedMs: cached };
+  },
+
+  /**
+   * QA repro: two clips with sound, exported with the default engine; the
+   * file must carry an audio stream with each clip's tone where it belongs.
+   */
+  async exportWithAudio(format: "mp4" | "webm") {
+    const media = new MediaRegistry();
+    const doc = new ProjectDocument(createProject({ profile: "HD 720p 30 fps" }));
+    for (const [id, name, position] of [["A", "tone440.webm", 0], ["B", "tone660.webm", 2]] as const) {
+      const blob = await file(name);
+      media.register(id, { kind: "blob", blob });
+      const info = await media.probe({ fileId: id }, { path: name });
+      doc.transaction("Import", (tx) => {
+        addFile(tx, { path: name, info, name }, { id });
+        addClip(tx, { fileId: id, position, layer: 1000000, id: `clip-${id}` });
+      });
+    }
+    let notes: string[] = [];
+    const blob = await exportProject(doc.project, media, { format, width: 320, height: 180, fps: { num: 30, den: 1 } }, { onNotes: (n) => (notes = n) });
+    const info = await probeMedia({ kind: "blob", blob, name: `qa.${format}` }, { path: `qa.${format}` });
+    // Decode the exported audio and measure each half.
+    const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+    const track = await input.getPrimaryAudioTrack();
+    const left: number[] = [];
+    let rate = 48000;
+    if (track) {
+      for await (const sample of new AudioSampleSink(track).samples(0, 4)) {
+        rate = sample.sampleRate;
+        const plane = new Float32Array(sample.numberOfFrames);
+        sample.copyTo(plane, { planeIndex: 0, format: "f32-planar" });
+        const at = Math.max(0, Math.round(sample.timestamp * rate));
+        for (let i = 0; i < plane.length; i += 1) left[at + i] = plane[i]!;
+        sample.close();
+      }
+    }
+    input.dispose();
+    media.dispose();
+    const stats = (from: number, to: number) => {
+      let sum = 0;
+      let n = 0;
+      let crossings = 0;
+      for (let i = Math.round(from * rate); i < Math.round(to * rate); i += 1) {
+        const v = left[i] ?? 0;
+        sum += v * v;
+        n += 1;
+        if ((left[i - 1] ?? 0) < 0 && v >= 0) crossings += 1;
+      }
+      return { rms: Math.sqrt(sum / Math.max(1, n)), hz: crossings / (to - from) };
+    };
+    return { mime: blob.type, notes, hasAudio: info.has_audio, acodec: info.acodec, duration: info.duration, first: stats(0.2, 1.8), second: stats(2.2, 3.8) };
   },
 
   /** exportProject → re-probe and re-decode the result. */

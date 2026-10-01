@@ -156,6 +156,20 @@ test("export streams into an OPFS file, and a cancelled one leaves no partial fi
   expect(cancelled.fileSize).toBe(0);
 });
 
+test("exports keep the clips' sound: an audio stream with each tone where its clip is (QA repro)", async ({ page }) => {
+  for (const format of ["mp4", "webm"] as const) {
+    const r = await page.evaluate((f) => window.harness.exportWithAudio(f), format);
+    console.log(`export ${format} with audio: ${r.mime} ${r.acodec}; first ${r.first.rms.toFixed(3)} rms ${r.first.hz.toFixed(0)} Hz, second ${r.second.rms.toFixed(3)} rms ${r.second.hz.toFixed(0)} Hz; notes: ${r.notes.join("; ") || "none"}`);
+    expect(r.hasAudio).toBe(true);
+    expect(r.duration).toBeCloseTo(4, 1);
+    // 0.3 amplitude sines: RMS ≈ 0.21.
+    expect(r.first.rms).toBeGreaterThan(0.12);
+    expect(r.second.rms).toBeGreaterThan(0.12);
+    expect(Math.abs(r.first.hz - 440)).toBeLessThan(15);
+    expect(Math.abs(r.second.hz - 660)).toBeLessThan(15);
+  }
+});
+
 test("export can be cancelled", async ({ page }) => {
   const result = await page.evaluate(() => window.harness.exportCancel());
   expect(result.rejected).toBe(true);

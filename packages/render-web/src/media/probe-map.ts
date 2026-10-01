@@ -10,7 +10,7 @@
  * without a browser; `probe.ts` gathers the facts with Mediabunny.
  */
 
-import type { Fraction, MediaType, ReaderInfo } from "@zenvi/engine";
+import { getMediaType, type Fraction, type ReaderInfo } from "@zenvi/engine";
 import { FALLBACK_FPS, fractionValue, frameRateToFraction, reduceFraction } from "./fraction.js";
 
 export type ContainerKind = "mp4" | "mov" | "matroska" | "webm" | "mp3" | "wav" | "ogg" | "flac" | "adts" | "mpegts" | "other";
@@ -279,29 +279,6 @@ export function rotateTag(rotation: 0 | 90 | 180 | 270): string | undefined {
   }
 }
 
-/** Pure-audio extensions (zenvi-core `classes/image_types.py` `_AUDIO_EXTS`). */
-const AUDIO_EXTENSIONS = [".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a", ".wma", ".opus", ".aiff", ".aif", ".oga"];
-/** Still-image extensions (zenvi-core `classes/image_types.py` `is_image`). */
-const IMAGE_EXTENSIONS = [
-  ".bmp", ".dpx", ".exr", ".jpg", ".jpeg", ".pam", ".pbm", ".pcx", ".pgm", ".png", ".pnm", ".ppm", ".psd", ".sgi",
-  ".svg", ".tga", ".thm", ".tif", ".tiff", ".webp", ".xbm", ".xpm", ".xwd",
-];
-
-function pathEnds(path: string, extensions: string[]): boolean {
-  const p = (path.toLowerCase().split("?")[0] ?? "").trim();
-  return extensions.some((ext) => p.endsWith(ext));
-}
-
-/** zenvi-core `classes/image_types.py:get_media_type` (extension first: MP3 cover art reports has_video). */
-export function mediaTypeOf(info: Pick<ReaderInfo, "path" | "has_video" | "has_audio">): MediaType {
-  const path = info.path ?? "";
-  if (pathEnds(path, AUDIO_EXTENSIONS)) return "audio";
-  if (info.has_video && !pathEnds(path, IMAGE_EXTENSIONS)) return "video";
-  if (info.has_video) return "image";
-  if (info.has_audio && !info.has_video) return "audio";
-  return "video";
-}
-
 /** `ReaderInfo` of an audio/video file (`type: "FFmpegReader"`). */
 export function readerInfoFromFacts(facts: MediaFacts, options: ReaderInfoOptions): ReaderInfo {
   const { video, audio } = facts;
@@ -378,7 +355,8 @@ export function readerInfoFromFacts(facts: MediaFacts, options: ReaderInfoOption
     video_stream_index: video ? video.index : -1,
     video_timebase: videoTimebase,
     width,
-    media_type: mediaTypeOf({ path: options.path, has_video: video !== null, has_audio: audio !== null }),
+    // The desktop importer's classification (extension first: MP3 cover art reports video).
+    media_type: getMediaType({ path: options.path, has_video: video !== null, has_audio: audio !== null }),
   };
 }
 

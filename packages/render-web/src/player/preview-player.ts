@@ -319,8 +319,11 @@ export class PreviewPlayer {
 
   dispose(): void {
     if (this.disposed) return;
-    this.pause();
+    // Stop without pause(): it would ask for one more frame while everything is torn down.
     this.disposed = true;
+    this.playing = false;
+    this.pending = null;
+    this.clock = null;
     this.stopLoop();
     if (this.idleSweep !== null) clearTimeout(this.idleSweep);
     this.unbindResize();

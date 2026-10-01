@@ -49,6 +49,9 @@ export async function prepareFixtures(): Promise<Fixtures> {
     ff(["-f", "lavfi", "-i", `aevalsrc=${TONE}|${TONE}:s=48000:d=3`, "-c:a", "pcm_f32le", "tone48.wav"]),
     ff(["-f", "lavfi", "-i", `aevalsrc=${TONE}|${TONE}:s=44100:d=3`, "-c:a", "pcm_f32le", "tone44.wav"]),
     ff(["-f", "lavfi", "-i", "color=c=0xC83232:s=64x36", "-frames:v", "1", "still.png"]),
+    // The QA repro: two VP9 + Opus clips with 440 Hz and 660 Hz tones.
+    ff(["-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=2", "-f", "lavfi", "-i", "aevalsrc=0.3*sin(2*PI*440*t):s=48000:d=2", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-c:a", "libopus", "-shortest", "tone440.webm"]),
+    ff(["-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=2", "-f", "lavfi", "-i", "aevalsrc=0.3*sin(2*PI*660*t):s=48000:d=2", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-c:a", "libopus", "-shortest", "tone660.webm"]),
     // A realistic clip for the performance check: 720p30 VP9, 3 s, keyframe every 2 s.
     ff(["-f", "lavfi", "-i", "testsrc2=s=1280x720:r=30:d=3", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-b:v", "2M", "-g", "60", "hd.webm"]),
     ff(["-f", "lavfi", "-i", "color=c=black:s=160x90,format=gray,geq=lum='if(gt(X\\,79)\\,255\\,0)'", "-frames:v", "1", "halfmask.png"]),
@@ -61,7 +64,7 @@ export async function prepareFixtures(): Promise<Fixtures> {
   }
 
   const files = new Map<string, Buffer>();
-  for (const name of ["codes.webm", "codes25.webm", "codesgop.webm", "hd.webm", "tone48.wav", "tone44.wav", "still.png", "halfmask.png", ...(hasH264 ? ["codes.mp4"] : [])]) {
+  for (const name of ["codes.webm", "codes25.webm", "codesgop.webm", "hd.webm", "tone440.webm", "tone660.webm", "tone48.wav", "tone44.wav", "still.png", "halfmask.png", ...(hasH264 ? ["codes.mp4"] : [])]) {
     files.set(name, readFileSync(join(dir, name)));
   }
 
