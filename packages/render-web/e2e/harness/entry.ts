@@ -7,7 +7,7 @@
  * source frame it is.
  */
 
-import { ProjectDocument, addClip, addFile, createProject, type Profile, type ReaderInfo } from "@zenvi/engine";
+import { ProjectDocument, addClip, addEffect, addFile, createProject, type Profile, type ReaderInfo } from "@zenvi/engine";
 import { ALL_FORMATS, AudioSampleSink, BlobSource, Input } from "mediabunny";
 import {
   AudioRenderer,
@@ -29,6 +29,7 @@ import {
   probeMedia,
   type ExportProgress,
 } from "../../src/index.js";
+import { windowEnd } from "../../src/audio/channels.js";
 import { makeProject, testEngine, type TestClip } from "./test-engine.js";
 
 const MEDIA = "http://localhost:9/media/";
@@ -303,8 +304,7 @@ const api = {
     });
     const media = new MediaRegistry();
     media.register("codes", { kind: "blob", blob });
-    // planAudio is not in the engine yet: silence for this video-only check.
-    const engine = { ...defaultEngine, planAudio: (_p: unknown, range: { start: number; end: number }) => ({ sampleRate: 48000, channels: 2, start: range.start, end: range.end, segments: [] }) };
+    const engine = defaultEngine;
     const frames = new FrameProvider({ media });
     const stills = new StillCache({ media });
     const compositor = new Compositor({ engine });
@@ -584,6 +584,76 @@ const api = {
     const silenceBefore = Math.max(...mixed.subarray(0, Math.round(0.45 * sampleRate)).map(Math.abs));
     media.dispose();
     return { length: total, expectedLength: 3 * sampleRate, maxError, body, seamDiffs, silenceBefore };
+  },
+
+  /**
+   * The default engine's audio kernels (libopenshot Delay and Noise) on a
+   * 29.97 fps project: mixed in one window and in ~0.37 s windows, which must
+   * agree sample for sample (state carries across windows and blocks stay
+   * whole libopenshot frames).
+   */
+  async realAudioEffects() {
+    const name = "tone48.wav";
+    const blob = await file(name);
+    const media = new MediaRegistry();
+    media.register("tone", { kind: "blob", blob });
+    const info = await media.probe({ fileId: "tone" }, { path: name });
+    const source = await (async () => {
+      const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+      const track = (await input.getPrimaryAudioTrack())!;
+      const out = new Float32Array(3 * 48000);
+      for await (const sample of new AudioSampleSink(track).samples()) {
+        const plane = new Float32Array(sample.numberOfFrames);
+        sample.copyTo(plane, { planeIndex: 0, format: "f32-planar" });
+        out.set(plane.subarray(0, Math.max(0, out.length - Math.round(sample.timestamp * 48000))), Math.round(sample.timestamp * 48000));
+        sample.close();
+      }
+      input.dispose();
+      return out;
+    })();
+    const run = async (type: string, params: Record<string, number>) => {
+      const doc = new ProjectDocument(createProject({ profile: "HD 720p 29.97 fps", sampleRate: 48000 }));
+      doc.transaction("Import", (tx) => {
+        addFile(tx, { path: name, info, name }, { id: "tone" });
+        addClip(tx, { fileId: "tone", position: 0, layer: 1000000, id: "clip" });
+        addEffect(tx, "clip", type, params, { id: `fx-${type}` });
+      });
+      const fps = doc.project.fps;
+      const plan = defaultEngine.planAudio(doc.project, { start: 0, end: 3 });
+      const mix = async (size: number) => {
+        const renderer = new AudioRenderer({ media, engine: defaultEngine });
+        const parts: Float32Array[] = [];
+        for (let from = 0; from < 3; ) {
+          const to = windowEnd(from, size, 3, 48000, fps, 2);
+          parts.push((await mixWindow(renderer, plan, from, to, 48000, 2, fps)).getChannelData(0).slice());
+          from = to;
+        }
+        await renderer.dispose();
+        const out = new Float32Array(parts.reduce((n, p) => n + p.length, 0));
+        parts.reduce((at, p) => (out.set(p, at), at + p.length), 0);
+        return { out, windows: parts.length };
+      };
+      const whole = await mix(3);
+      const pieces = await mix(0.37);
+      let windowDiff = 0;
+      for (let i = 0; i < whole.out.length; i += 1) windowDiff = Math.max(windowDiff, Math.abs(whole.out[i]! - (pieces.out[i] ?? NaN)));
+      return { length: whole.out.length, pieceLength: pieces.out.length, windows: pieces.windows, windowDiff, out: whole.out, effects: [...new Set(plan.segments.flatMap((s) => s.effects.map((e) => e.type)))] };
+    };
+
+    const delay = await run("Delay", { delay_time: 0.25 });
+    const lag = 0.25 * 48000;
+    let head = 0;
+    let delayError = 0;
+    for (let i = 0; i < delay.out.length; i += 1) {
+      if (i < lag) head = Math.max(head, Math.abs(delay.out[i]!));
+      else delayError = Math.max(delayError, Math.abs(delay.out[i]! - source[i - lag]!));
+    }
+    const noise = await run("Noise", { level: 30 });
+    let noiseChange = 0;
+    for (let i = 0; i < noise.out.length; i += 1) noiseChange = Math.max(noiseChange, Math.abs(noise.out[i]! - source[i]!));
+    media.dispose();
+    const summary = ({ out: _out, ...rest }: Awaited<ReturnType<typeof run>>) => rest;
+    return { delay: { ...summary(delay), head, delayError }, noise: { ...summary(noise), noiseChange } };
   },
 
   /** Gain envelope, speed and an audio kernel, through the real Web Audio graph. */

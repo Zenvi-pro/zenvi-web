@@ -204,6 +204,22 @@ test("gain envelopes, speed and audio kernels shape the mix", async ({ page }) =
   expect(r.effectPeak).toBeCloseTo(0.125, 2);
 });
 
+test("the default engine's audio effects run in the mix, continuously across frame-aligned windows", async ({ page }) => {
+  const r = await page.evaluate(() => window.harness.realAudioEffects());
+  // Delay 0.25 s, 100 % wet: silence, then the source 12000 samples late.
+  expect(r.delay.effects).toEqual(["Delay"]);
+  expect(r.delay.length).toBe(3 * 48000);
+  expect(r.delay.pieceLength).toBe(3 * 48000);
+  expect(r.delay.windows).toBeGreaterThan(5);
+  expect(r.delay.head).toBe(0);
+  expect(r.delay.delayError).toBeLessThan(1e-6);
+  expect(r.delay.windowDiff).toBe(0);
+  // Noise draws per sample in block order: equal only when windows split between frames.
+  expect(r.noise.effects).toEqual(["Noise"]);
+  expect(r.noise.noiseChange).toBeGreaterThan(0.01);
+  expect(r.noise.windowDiff).toBe(0);
+});
+
 test("PreviewPlayer seeks, coalesces, plays on the audio clock, pauses on a frame and loops", async ({ page }) => {
   const r = await page.evaluate(() => window.harness.player());
   console.log(`player: advanced ${r.advanced.toFixed(3)} s in ~0.9 s, ${r.timeEvents} time events; errors: ${r.errors.join("; ") || "none"}`);

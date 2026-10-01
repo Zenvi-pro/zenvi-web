@@ -94,8 +94,13 @@ describe("AudioPlayback", () => {
       playback.pump();
     }
     const c1 = log.filter(([id]) => id === "C1").map(([, a, b]) => [a, b]);
-    expect(c1[0]).toEqual([1, 1.25]);
-    for (let i = 1; i < c1.length; i += 1) expect(c1[i]![0]).toBeCloseTo(c1[i - 1]![1]!, 9);
+    // The first window is short (0.25 s), ending on the 30 fps audio frame grid (1600 samples at 48 kHz).
+    expect(c1[0]![0]).toBe(1);
+    expect(Math.round(c1[0]![1]! * 48000)).toBe(37 * 1600);
+    for (let i = 1; i < c1.length; i += 1) {
+      expect(c1[i]![0]).toBe(c1[i - 1]![1]!);
+      expect(Math.round(c1[i]![0]! * 48000) % 1600).toBe(0);
+    }
     // Scheduled through the 2 s lookahead, overshooting by at most one window.
     expect(c1.at(-1)![1]).toBeGreaterThanOrEqual(3);
     expect(c1.at(-1)![1]).toBeLessThanOrEqual(3 + 1);

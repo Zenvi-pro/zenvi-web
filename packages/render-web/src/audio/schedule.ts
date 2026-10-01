@@ -44,20 +44,6 @@ export function segmentPiece(segment: AudioSegment, from: number, to: number, sa
   return { segment, timelineStart: start, timelineEnd: end, startFrame, endFrame, reversed, speed };
 }
 
-/** Consecutive windows `[from, to)` of `size` seconds (the first may be shorter, to start fast). */
-export function windows(from: number, to: number, size: number, firstSize = size): [number, number][] {
-  const out: [number, number][] = [];
-  let t = from;
-  let step = Math.max(1e-3, firstSize);
-  while (t < to - 1e-9) {
-    const end = Math.min(to, t + step);
-    out.push([t, end]);
-    t = end;
-    step = Math.max(1e-3, size);
-  }
-  return out;
-}
-
 /** A playback anchor: timeline time `timeline` sounds at context time `context`, at `rate`. */
 export interface ClockAnchor {
   timeline: number;

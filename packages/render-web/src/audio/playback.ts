@@ -2,13 +2,15 @@
  * Preview audio: keeps a few seconds of the plan scheduled ahead of what is
  * audible, window by window, so the AudioContext clock can drive playback.
  *
- * Windows are contiguous and every clip decodes as one continuous stream, so
- * nothing drifts however long playback runs. Stopping (pause, seek) silences
- * every voice at once; the next start decodes from the new position.
+ * Windows are contiguous, end on timeline audio frame boundaries, and every
+ * clip decodes as one continuous stream, so nothing drifts however long
+ * playback runs. Stopping (pause, seek) silences every voice at once; the
+ * next start decodes from the new position.
  */
 
 import type { Fraction } from "@zenvi/engine";
 import type { AudioPlan } from "@zenvi/engine/render";
+import { windowEnd } from "./channels.js";
 import type { AudioRenderer, TimelineAudioFormat } from "./renderer.js";
 import { timelineTimeOf, type ClockAnchor } from "./schedule.js";
 import { scheduleVoice, type Voice } from "./voice.js";
@@ -102,7 +104,7 @@ export class AudioPlayback {
     while (this.scheduledUntil < horizon - 1e-6 && this.inflight < 2) {
       const from = this.scheduledUntil;
       const size = (this.firstWindow ? Math.min(0.25, this.windowSize) : this.windowSize) * Math.max(1, anchor.rate);
-      const to = Math.min(plan.end, from + size);
+      const to = windowEnd(from, size, plan.end, format.sampleRate, format.fps, format.channels);
       this.firstWindow = false;
       this.scheduledUntil = to;
       this.inflight += 1;

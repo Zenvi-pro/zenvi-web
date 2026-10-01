@@ -11,6 +11,7 @@ import { frameContaining, frameToSeconds, maxFrame, type Project } from "@zenvi/
 import {
   applyMask,
   applyVideoEffect,
+  getAudioKernel,
   planAudio,
   planFrame,
   supportedVideoEffects,
@@ -59,15 +60,11 @@ let supported: Set<string> | null = null;
 
 /** The engine render-web uses when a caller does not pass one. */
 export const defaultEngine: RenderEngine = {
-  // STUB (W5, remove when W2 lands): `@zenvi/engine/render` does not export
-  // getAudioKernel yet; until it does, audio effects are skipped. Replace
-  // this entry with a direct import.
-  getAudioKernel: () => undefined,
-
   planFrame: (project, frame, size, options) => planFrame(project, frame, size, options),
   planAudio: (project, range) => planAudio(project, range),
   applyVideoEffect,
   supportsVideoEffect: (type) => (supported ??= new Set(supportedVideoEffects())).has(type),
+  getAudioKernel,
   applyMask,
   frameAt: (project, seconds) => frameContaining(seconds, project.fps),
   frameTime: (project, frame) => frameToSeconds(frame, project.fps),

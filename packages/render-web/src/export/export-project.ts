@@ -24,6 +24,7 @@ import {
 } from "mediabunny";
 import type { Project } from "@zenvi/engine";
 import type { ExportOptions } from "@zenvi/engine/tools";
+import { windowEnd } from "../audio/channels.js";
 import { mixWindow } from "../audio/mixdown.js";
 import { AudioRenderer } from "../audio/renderer.js";
 import type { LayerError } from "../compositor/compositor.js";
@@ -62,7 +63,7 @@ export interface ExportRunOptions {
   svgRasterizer?: SvgRasterizer;
 }
 
-/** Audio is mixed this many seconds at a time. */
+/** Audio is mixed about this many seconds at a time (windows end on audio frame boundaries). */
 const AUDIO_WINDOW = 10;
 
 const QUALITY: Record<NonNullable<ExportOptions["quality"]>, "low" | "medium" | "high" | "very-high"> = {
@@ -218,7 +219,7 @@ async function encode(project: Project, media: MediaRegistry, options: ExportOpt
     if (!audio || !audioSource) return;
     while (audioAt < until - 1e-9) {
       if (signal?.aborted) throw abortReason(signal);
-      const to = Math.min(end, audioAt + AUDIO_WINDOW);
+      const to = windowEnd(audioAt, AUDIO_WINDOW, end, sampleRate, fps, channels);
       const buffer = await mixWindow(audio, audioPlan, audioAt, to, sampleRate, channels, fps);
       await audioSource.add(buffer);
       await audio.releaseEnded(audioPlan, to);

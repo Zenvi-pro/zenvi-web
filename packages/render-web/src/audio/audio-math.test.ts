@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AudioSegment } from "@zenvi/engine/render";
 import { gainAt, gainEvents, isUnityGain } from "./gain.js";
 import { LinearResampler } from "./resample.js";
-import { contextTimeOf, lateStart, segmentPiece, timelineTimeOf, windows } from "./schedule.js";
+import { contextTimeOf, lateStart, segmentPiece, timelineTimeOf } from "./schedule.js";
 
 const segment = (overrides: Partial<AudioSegment> = {}): AudioSegment => ({
   clipId: "C1",
@@ -83,18 +83,6 @@ describe("segment pieces", () => {
     expect([fast.startFrame, fast.endFrame, fast.speed]).toEqual([2000, 6000, 2]);
     const back = segmentPiece(segment({ rate: -1, sourceStart: 5 }), 10, 12, 1000)!;
     expect([back.startFrame, back.endFrame, back.reversed]).toEqual([3000, 5000, true]);
-  });
-
-  it("covers a range with contiguous windows, the first one shorter", () => {
-    expect(windows(0, 5, 2, 0.5)).toEqual([
-      [0, 0.5],
-      [0.5, 2.5],
-      [2.5, 4.5],
-      [4.5, 5],
-    ]);
-    // Adjacent windows produce adjacent sample ranges (no gaps, no overlaps).
-    const pieces = windows(10, 15, 1.3, 0.2).map(([a, b]) => segmentPiece(segment(), a, b, 44100)!);
-    for (let i = 1; i < pieces.length; i += 1) expect(pieces[i]!.startFrame).toBe(pieces[i - 1]!.endFrame);
   });
 });
 

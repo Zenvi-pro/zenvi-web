@@ -173,11 +173,12 @@ player's AudioContext touch the DOM. The compositor, decoding and stills run in 
 
 `src/engine.ts` is the only place that calls `@zenvi/engine` for semantics (`RenderEngine`:
 `planFrame`, `planAudio`, `applyVideoEffect`, `applyMask`, `getAudioKernel`, frame↔time).
-Everything takes an optional `engine` for tests. Until the engine ships `planAudio` and
-`getAudioKernel`, the default engine uses an interim planner (`audio/plan-audio-interim.ts`, built
-on the engine's clip windows and keyframe evaluation): clips sound at normal speed with their
-volume and `has_audio` keyframes; time remapping, volume mixing modes, transition audio fades and
-audio effects wait for the engine's planner.
+Everything takes an optional `engine` for tests. render-web executes the plans as given: gain
+envelopes (steps included) as AudioParam automation, rate as speed/reverse, `channelFilter` /
+`channelMapping` routing, and audio effects at the timeline's sample rate and layout, one
+libopenshot frame per block, with each effect's state carried across a clip's windows. Audio
+windows (1 s in preview, 10 s in export) end on timeline audio frame boundaries, so effects whose
+random draws follow the blocks (Noise, Whisperization) sound the same whatever the window size.
 
 ## Tests
 
@@ -191,7 +192,8 @@ The browser suite generates its media with ffmpeg (frames carry their index as b
 blocks, so any decoded picture says which frame it is) and checks: frame accuracy (VP9 at 30 and
 25 fps, H.264), signed-URL refresh with range requests, compositing pixels (opacity, blend modes,
 kernels, masks, corner radius, stills, SVG, video masks, kernel audio, text), MP4 and WebM export
-round trips whose decoded frames match the timeline, streaming export into OPFS, cancel,
-seam-free audio mixing, the player (seek, coalescing, scrub previews, audio clock, pause, loop,
+round trips whose decoded frames match the timeline, exports that keep each clip's sound,
+streaming export into OPFS, cancel, seam-free audio mixing, the engine's audio effects (Delay and
+Noise, identical in one window or many), the player (seek, coalescing, scrub previews, audio clock, pause, loop,
 end), thumbnails, waveforms, a project built with the engine's ops rendered by the real planner,
 and decode cost.
