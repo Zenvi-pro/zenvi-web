@@ -160,6 +160,28 @@ export function TimelineBody() {
     [pps, session],
   );
 
+  /** Scroll vertically so the tracks that hold clips are in view (desktop projects use the bottom track). */
+  const revealContent = useCallback(() => {
+    const el = viewport.current;
+    if (!el) return;
+    const p = session.project;
+    const rows = sortedLayers(p)
+      .reverse()
+      .map((l, i) => (p.clips.some((c) => c.layer === l.number) ? i : -1))
+      .filter((i) => i >= 0);
+    if (rows.length === 0) return;
+    const h = session.ui.getState().trackHeight;
+    const top = Math.min(...rows) * h;
+    const bottom = (Math.max(...rows) + 1) * h;
+    if (top >= el.scrollTop && bottom <= el.scrollTop + el.clientHeight) return;
+    el.scrollTop = bottom - top <= el.clientHeight ? Math.max(0, bottom - el.clientHeight) : top;
+  }, [session]);
+
+  // Open on the content: the first paint shows the clips, wherever they sit.
+  useLayoutEffect(() => {
+    revealContent();
+  }, [revealContent]);
+
   // Timeline controller for commands (=, -, \, Shift+C).
   useEffect(() => {
     session.views.timeline = {
@@ -171,6 +193,7 @@ export function TimelineBody() {
         const next = zoomToFit(Math.max(1, timelineEnd(session.project)), el.clientWidth);
         pendingScroll.current = 0;
         session.ui.setState({ pxPerSecond: next });
+        revealContent();
       },
       centerOnPlayhead: () => {
         const el = viewport.current;
@@ -188,7 +211,7 @@ export function TimelineBody() {
       session.views.timeline = null;
       session.views.focusTimeline = null;
     };
-  }, [session, setZoom]);
+  }, [session, setZoom, revealContent]);
 
   // When the first clips land on an empty timeline, fit them into view.
   const hadClips = useRef(project.clips.length > 0);

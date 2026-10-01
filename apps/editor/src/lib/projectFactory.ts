@@ -1,7 +1,18 @@
 /**
  * Creating, importing and storing local projects.
  */
-import { createProject, DEFAULT_PROFILE_DESCRIPTION, findProfile, parseProject, PROFILES, serializeProject, type Profile, type Project } from "@zenvi/engine";
+import {
+  createProject,
+  DEFAULT_PROFILE_DESCRIPTION,
+  findProfile,
+  parseProjectText,
+  PROFILES,
+  PROJECT_FORMAT_VERSION,
+  ProjectParseError,
+  serializeProject,
+  type Profile,
+  type Project,
+} from "@zenvi/engine";
 import { describeProject, newLocalId, projectRepository, type LocalProjectMeta } from "./storage/projects";
 
 export interface ProfilePreset {
@@ -48,12 +59,9 @@ export function presetProfile(preset: ProfilePreset): Profile {
 }
 
 export function createProjectFromProfile(profile: Profile): Project {
-  return createProject({ profile });
-}
-
-/** Validate and upgrade a desktop project (engine `parseProject`, the desktop's load rules). */
-export function parseProjectJson(json: unknown): Project {
-  return parseProject(json);
+  // Stamp the engine's format version (createProject keeps the desktop template's "0.0.0").
+  const project = createProject({ profile });
+  return { ...project, version: { ...project.version, ...PROJECT_FORMAT_VERSION } };
 }
 
 function freshMeta(id: string, name: string, project: Project, source: LocalProjectMeta["source"]): LocalProjectMeta {
@@ -69,15 +77,23 @@ export async function createLocalProject(profile: Profile, name = "Untitled proj
   return id;
 }
 
+/**
+ * Read a `.zvn` / `.osp` file the way the desktop does (`parseProjectText`:
+ * its corruption repairs, Python's NaN/Infinity tokens, the load upgrades).
+ */
+export async function readProjectFile(file: File): Promise<Project> {
+  const text = await file.text();
+  try {
+    return parseProjectText(text);
+  } catch (error) {
+    if (error instanceof ProjectParseError) throw new Error(`${file.name} is not a valid project file: ${error.message}`);
+    throw error;
+  }
+}
+
 /** Store a project opened from a `.zvn` file (desktop project). Returns its storage id. */
 export async function importProjectFile(file: File): Promise<string> {
-  let json: unknown;
-  try {
-    json = JSON.parse(await file.text());
-  } catch {
-    throw new Error(`${file.name} is not a valid project file.`);
-  }
-  const project = parseProjectJson(json);
+  const project = await readProjectFile(file);
   const id = newLocalId();
   const name = file.name.replace(/\.(zvn|osp|flow|json)$/i, "") || "Imported project";
   await projectRepository().save(freshMeta(id, name, project, "zvn"), project);

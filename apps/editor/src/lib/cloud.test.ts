@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { serializeProject } from "@zenvi/engine";
 import { describe, expect, it, vi } from "vitest";
 import { CloudConflictError, CloudError, cloudRouteId, HttpCloudClient, parseCloudRouteId } from "./cloud";
 
@@ -44,6 +45,20 @@ describe("HttpCloudClient", () => {
     expect(calls[0]!.init.method).toBe("PUT");
     await c.saveProject("p1", { id: "X" } as never, null);
     expect((calls[1]!.init.headers as Record<string, string>)["If-Match"]).toBe("*");
+  });
+
+  it("sends projects as serializeProject text, never with the template's 0.0.0 stamp", async () => {
+    const { fn, calls } = fakeFetch([{ body: { id: "c_1", revision: "r1" } }, { body: { revision: "r2" } }]);
+    const c = client(fn);
+    const project = { id: "X", clips: [], version: { "openshot-qt": "0.0.0", libopenshot: "0.0.0" } } as never;
+    await c.createProject("Trip \"one\"", project);
+    const created = JSON.parse(String(calls[0]!.init.body)) as { name: string; project: { version: Record<string, string> } };
+    expect(created.name).toBe('Trip "one"');
+    expect(created.project.version).toEqual({ "openshot-qt": "1.0.188", libopenshot: "1.0.0" });
+    await c.saveProject("c_1", project, "r1");
+    const body = String(calls[1]!.init.body);
+    expect(body).toBe(serializeProject(project));
+    expect(body).toContain('\n "version"');
   });
 
   it("turns 409 into a conflict carrying the current revision", async () => {

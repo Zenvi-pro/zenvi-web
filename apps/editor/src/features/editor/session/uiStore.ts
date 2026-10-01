@@ -46,8 +46,21 @@ export const MAX_PX_PER_SECOND = 1200;
 
 const PANEL_KEY = "zenvi.editor.panels.v1";
 
+/** Defaults that leave the preview room on a 1280×720 laptop and on tablets. */
+function defaultPanels(): EditorUiState["panels"] {
+  const w = typeof window === "undefined" ? 1440 : window.innerWidth;
+  const h = typeof window === "undefined" ? 900 : window.innerHeight;
+  return {
+    left: w < 1200 ? 250 : 300,
+    right: w < 1200 ? 270 : 320,
+    timeline: Math.round(Math.min(340, Math.max(190, h * 0.36))),
+    leftCollapsed: false,
+    rightCollapsed: w < 1000,
+  };
+}
+
 function loadPanels(): EditorUiState["panels"] {
-  const fallback = { left: 300, right: 320, timeline: 300, leftCollapsed: false, rightCollapsed: false };
+  const fallback = defaultPanels();
   try {
     const raw = localStorage.getItem(PANEL_KEY);
     if (!raw) return fallback;

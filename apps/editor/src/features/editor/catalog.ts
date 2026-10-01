@@ -1,28 +1,26 @@
 /**
  * Engine catalogs the editor lists and edits with: effects, transitions,
  * title templates, and libopenshot property metadata (names, ranges,
- * choices, keyframable) for clips, transitions and effects.
- *
- * W1 is still exporting these from `@zenvi/engine` (see
- * scratchpad/requests/W6-editor.md). They are read through the namespace so
- * the editor picks each one up the moment it is exported; until then the
- * panels show an honest "not available yet" state. Nothing here invents
- * domain data.
+ * choices, keyframable) for clips, transitions and effects. Everything comes
+ * from `@zenvi/engine`; this module only adds the URLs of the bundled assets
+ * (`@zenvi/engine/assets/…`) for thumbnails and rendering.
  */
-import * as engine from "@zenvi/engine";
 import {
   CLIP_PROPERTIES,
   DEFAULT_TRANSITION_LENGTH,
   EFFECTS,
   getEffect,
+  resolveTransitionAsset as engineTransitionAsset,
+  TITLE_TEMPLATES,
   TRANSITION_PROPERTIES,
+  TRANSITIONS,
   valueKind as engineValueKind,
   type EffectDefinition,
   type EffectParam,
   type PropertyMeta,
+  type TitleTemplate as EngineTitleTemplate,
+  type TransitionEntry as EngineTransition,
 } from "@zenvi/engine";
-
-const ns = engine as unknown as Record<string, unknown>;
 
 export type { PropertyMeta };
 export type PropertyTable = Readonly<Record<string, PropertyMeta>>;
@@ -42,18 +40,13 @@ export interface EffectEntry {
   params: readonly EffectParam[];
 }
 
-export interface TransitionEntry {
-  /** Catalog id, e.g. "common/fade". */
-  id: string;
-  name: string;
-  category: string;
-  /** URL of the mask image (for the thumbnail). */
+/** A built-in transition mask (engine catalog) with its thumbnail URL. */
+export interface TransitionEntry extends EngineTransition {
   url: string | null;
 }
 
-export interface TitleTemplate {
-  id: string;
-  name: string;
+/** A built-in title template (engine catalog) with the SVG's URL. */
+export interface TitleTemplate extends EngineTitleTemplate {
   url: string | null;
 }
 
@@ -124,80 +117,40 @@ export function effectIconUrl(className: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Transitions and titles
+// Transitions and titles (engine catalogs + bundled asset URLs)
 // ---------------------------------------------------------------------------
 
-const transitionFiles = import.meta.glob("../../../../../packages/engine/assets/transitions/**/*.{svg,png,jpg,jpeg}", {
+const assetFiles = import.meta.glob(["../../../../../packages/engine/assets/transitions/**/*", "../../../../../packages/engine/assets/titles/*.svg"], {
   eager: true,
   query: "?url",
   import: "default",
 }) as Record<string, string>;
 
-const titleFiles = import.meta.glob("../../../../../packages/engine/assets/titles/*.svg", {
-  eager: true,
-  query: "?url",
-  import: "default",
-}) as Record<string, string>;
+/** Bundled asset URL by its path under `@zenvi/engine/assets/` (`"transitions/common/fade.svg"`). */
+const assetUrls = new Map(Object.entries(assetFiles).map(([path, url]) => [path.slice(path.indexOf("/assets/") + "/assets/".length), url]));
 
-function assetKey(path: string, root: string): string {
-  const i = path.indexOf(root);
-  return i >= 0 ? path.slice(i + root.length) : path;
+export function assetUrl(assetPath: string): string | null {
+  return assetUrls.get(assetPath) ?? null;
 }
 
-/** Desktop display name: basename without extension, underscores to spaces, capitalized. */
-export function displayNameFromFile(file: string): string {
-  const base = file.slice(file.lastIndexOf("/") + 1).replace(/\.[^.]+$/, "").replace(/_/g, " ");
-  return base.charAt(0).toUpperCase() + base.slice(1);
+/** Every built-in transition, in the desktop dock's order (common, then extra, by file name). */
+const transitionList: readonly TransitionEntry[] = TRANSITIONS.map((t) => ({ ...t, url: assetUrl(t.assetPath) }));
+
+export function transitions(): readonly TransitionEntry[] {
+  return transitionList;
 }
 
-interface RawTransition {
-  id?: string;
-  name?: string;
-  category?: string;
-  file?: string;
-}
-
-let transitionsCache: TransitionEntry[] | null = null;
-
-export function transitions(): TransitionEntry[] {
-  if (transitionsCache) return transitionsCache;
-  const urls = new Map(Object.entries(transitionFiles).map(([path, url]) => [assetKey(path, "/transitions/"), url]));
-  const raw = (ns.TRANSITIONS ?? ns.TRANSITION_CATALOG) as readonly RawTransition[] | undefined;
-  let list: TransitionEntry[];
-  if (Array.isArray(raw) && raw.length > 0) {
-    list = raw.map((t) => {
-      const file = t.file ?? `${t.id ?? ""}`;
-      const key = file.includes("/") ? file : `${t.category ?? "common"}/${file}`;
-      const url = urls.get(key) ?? [...urls.entries()].find(([k]) => k.startsWith(`${t.id ?? "\u0000"}.`))?.[1] ?? null;
-      return { id: t.id ?? key.replace(/\.[^.]+$/, ""), name: t.name ?? displayNameFromFile(key), category: t.category ?? key.split("/")[0] ?? "common", url };
-    });
-  } else {
-    // Assets without a catalog: derive entries from the file layout (desktop list_transitions does the same).
-    list = [...urls.entries()].map(([key, url]) => ({
-      id: key.replace(/\.[^.]+$/, ""),
-      name: displayNameFromFile(key),
-      category: key.split("/")[0] ?? "common",
-      url,
-    }));
-  }
-  transitionsCache = list.sort((a, b) => (a.category === b.category ? a.name.localeCompare(b.name) : a.category === "common" ? -1 : 1));
-  return transitionsCache;
-}
-
-/** URL for a transition mask path as the project stores it (`@transitions/common/fade.svg`). */
+/** URL of the mask a project's transition reader points at (`@transitions/common/fade.svg` or a desktop install path). */
 export function resolveTransitionAsset(path: string): string | null {
-  const key = path.replace(/^@transitions\//, "").replace(/^.*\/transitions\//, "");
-  for (const [p, url] of Object.entries(transitionFiles)) if (assetKey(p, "/transitions/") === key) return url;
-  return null;
+  const entry = engineTransitionAsset(path);
+  return entry ? assetUrl(entry.assetPath) : null;
 }
 
-export function titleTemplates(): TitleTemplate[] {
-  return Object.entries(titleFiles)
-    .map(([path, url]) => {
-      const file = assetKey(path, "/titles/");
-      return { id: file.replace(/\.svg$/, ""), name: displayNameFromFile(file), url };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+const titleList: readonly TitleTemplate[] = TITLE_TEMPLATES.map((t) => ({ ...t, url: assetUrl(t.assetPath) }));
+
+/** The 50 desktop title templates, sorted by file name like the desktop list. */
+export function titleTemplates(): readonly TitleTemplate[] {
+  return titleList;
 }
 
 /** Desktop default length of a transition dropped from the library, seconds. */

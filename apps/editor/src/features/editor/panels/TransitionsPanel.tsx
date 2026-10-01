@@ -1,4 +1,4 @@
-import { applyTransitionToClip } from "@zenvi/engine";
+import { applyTransitionToClip, searchTransitions } from "@zenvi/engine";
 import { Blend } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/ui/cn";
@@ -8,9 +8,10 @@ import { defaultTransitionSeconds, transitions, type TransitionEntry } from "../
 import { beginDrag, endDrag } from "../dnd";
 import { useSession, useUi } from "../session/context";
 import { EMPTY_SELECTION } from "../session/uiStore";
-import { PanelEmpty, PanelHeader, Segmented } from "./PanelChrome";
+import { PanelHeader, Segmented } from "./PanelChrome";
 
-type Category = "common" | "extra";
+/** The desktop dock's filter: Common, or Show all (common first, then the extra masks). */
+type Category = "common" | "all";
 
 function TransitionTile({ entry, onApply }: { entry: TransitionEntry; onApply: () => void }) {
   return (
@@ -48,8 +49,11 @@ export function TransitionsPanel() {
   const [category, setCategory] = useState<Category>("common");
   const all = transitions();
   const list = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return all.filter((t) => (q ? t.name.toLowerCase().includes(q) : t.category === category));
+    const q = query.trim();
+    if (!q) return category === "all" ? all : all.filter((t) => t.category === "common");
+    // The desktop dock's search: display name or file name, common first.
+    const hits = new Set(searchTransitions(q).map((t) => t.id));
+    return all.filter((t) => hits.has(t.id));
   }, [all, query, category]);
 
   const apply = (entry: TransitionEntry) => {
@@ -65,32 +69,26 @@ export function TransitionsPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PanelHeader title="Transitions" />
-      {all.length === 0 ? (
-        <PanelEmpty icon={<Blend size={22} />} title="Transitions are on their way" body="The transition library ships with the next engine update." />
-      ) : (
-        <>
-          <div className="flex shrink-0 flex-col gap-2 px-3 pb-2 pt-2.5">
-            <SearchInput value={query} onValueChange={setQuery} placeholder={`Search ${all.length} transitions`} aria-label="Search transitions" />
-            {!query ? (
-              <Segmented<Category>
-                label="Transition set"
-                value={category}
-                onChange={setCategory}
-                options={[
-                  { value: "common", label: "Common" },
-                  { value: "extra", label: "All masks" },
-                ]}
-              />
-            ) : null}
-          </div>
-          <div className={cn("grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-1 overflow-y-auto px-2 pb-4")}>
-            {list.map((entry) => (
-              <TransitionTile key={entry.id} entry={entry} onApply={() => apply(entry)} />
-            ))}
-            {list.length === 0 ? <p className="col-span-full py-8 text-center text-xs text-fg-subtle">No transitions match.</p> : null}
-          </div>
-        </>
-      )}
+      <div className="flex shrink-0 flex-col gap-2 px-3 pb-2 pt-2.5">
+        <SearchInput value={query} onValueChange={setQuery} placeholder={`Search ${all.length} transitions`} aria-label="Search transitions" />
+        {!query ? (
+          <Segmented<Category>
+            label="Transition set"
+            value={category}
+            onChange={setCategory}
+            options={[
+              { value: "common", label: "Common" },
+              { value: "all", label: "Show all" },
+            ]}
+          />
+        ) : null}
+      </div>
+      <div className={cn("grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-1 overflow-y-auto px-2 pb-4")}>
+        {list.map((entry) => (
+          <TransitionTile key={entry.id} entry={entry} onApply={() => apply(entry)} />
+        ))}
+        {list.length === 0 ? <p className="col-span-full py-8 text-center text-xs text-fg-subtle">No transitions match.</p> : null}
+      </div>
     </div>
   );
 }

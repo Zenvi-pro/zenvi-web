@@ -38,10 +38,8 @@ export function EditorLayout() {
   useEffect(() => {
     const dispatcher = createDispatcher({ keymap, commands: () => commands });
     const onKey = (e: KeyboardEvent) => {
-      if (session.ui.getState().dialog && e.key !== "Escape") {
-        // Dialogs own the keyboard, except Save.
-        if (!((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s")) return;
-      }
+      // Dialogs own the keyboard (Escape closes them), except Save.
+      if (session.ui.getState().dialog && !((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s")) return;
       dispatcher.handle(e);
     };
     window.addEventListener("keydown", onKey);

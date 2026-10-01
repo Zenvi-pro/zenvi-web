@@ -40,7 +40,7 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
 
   useEffect(() => {
     if (!open) return;
-    setTemplateId(initialTemplate ?? templates[0]?.id ?? null);
+    setTemplateId(initialTemplate ?? (templates.find((t) => t.default) ?? templates[0])?.id ?? null);
   }, [open, initialTemplate, templates]);
 
   const template = templates.find((t) => t.id === templateId);

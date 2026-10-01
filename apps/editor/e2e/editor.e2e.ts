@@ -132,3 +132,45 @@ test("assistant, shortcuts and login screens", async ({ page }) => {
   await page.waitForTimeout(500);
   await shot(page, "10-login");
 });
+
+test("open a desktop .zvn with media on another computer, then relink it", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("zenvi.debug", "1"));
+  await page.goto("/editor/");
+  await page.getByRole("button", { name: /HD 720p/ }).click();
+  await page.waitForFunction(() => Boolean((window as unknown as { __zenvi?: unknown }).__zenvi));
+
+  // A desktop-style project: absolute macOS path, no cloud hash, one clip.
+  const zvn = await page.evaluate(() => {
+    type Engine = {
+      createProject: (o: { profile: string }) => unknown;
+      ProjectDocument: new (p: unknown) => { transaction: (l: string, fn: (tx: unknown) => void) => void; project: unknown };
+      addFile: (tx: unknown, media: unknown) => { id: string };
+      addClip: (tx: unknown, input: unknown) => unknown;
+      serializeProject: (p: unknown) => string;
+    };
+    const { engine } = (window as unknown as { __zenvi: { engine: Engine } }).__zenvi;
+    const doc = new engine.ProjectDocument(engine.createProject({ profile: "HD 720p 30 fps" }));
+    const info = {
+      type: "FFmpegReader", path: "/Users/editor/Footage/pattern.webm", has_video: true, has_audio: true, has_single_image: false,
+      duration: 4, width: 640, height: 360, fps: { num: 30, den: 1 }, video_length: "120", pixel_ratio: { num: 1, den: 1 },
+      display_ratio: { num: 16, den: 9 }, sample_rate: 48000, channels: 2, channel_layout: 3, vcodec: "vp9", acodec: "opus",
+    };
+    doc.transaction("build", (tx) => {
+      const file = engine.addFile(tx, { path: info.path, info, name: "pattern.webm" });
+      engine.addClip(tx, { fileId: file.id, position: 0, layer: 1000000 });
+    });
+    return engine.serializeProject(doc.project);
+  });
+
+  await page.goto("/editor/");
+  await page.locator('input[type="file"][accept*=".zvn"]').setInputFiles({ name: "Desktop edit.zvn", mimeType: "application/json", buffer: Buffer.from(zvn) });
+  const relink = page.getByRole("dialog", { name: "Find missing media" });
+  await expect(relink).toBeVisible();
+  await expect(relink.getByText("/Users/editor/Footage/pattern.webm")).toBeVisible();
+  await shot(page, "12-relink");
+  await relink.locator('input[type="file"]').setInputFiles(fixture("pattern.webm"));
+  await expect(relink.getByText("Every file is linked.")).toBeVisible();
+  await relink.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByText(/files? (is|are) missing/)).toBeHidden();
+  await expect(page.locator('[data-kind="clip"]')).toHaveCount(1);
+});

@@ -4,17 +4,18 @@
  *
  * The source of truth is the engine's `add_clip_to_timeline_tool`
  * (zenvi-core tool_handlers.py `_do_add`, ported in
- * packages/engine/src/tools/catalog/clips.ts `planPlacement`). The editor
- * calls that tool when the catalog is available; until W4 exports it, this
- * mirrors its defaults exactly so both paths place clips the same way:
+ * packages/engine/src/tools/catalog/clips.ts `planPlacement`). One file goes
+ * through that tool; batches use this mirror of its defaults in one
+ * transaction (one intent, one undo step), so both place clips the same way:
  * no track given → audio goes to the bottom track at 0 s; video and images
  * go to the selected clip's track (else the bottom track), one frame after
  * the last clip there.
  */
 import { addClip, frameDuration, isAudioOnlyMedia, sortedLayers, type Clip, type Project, type ProjectFile, type Transaction } from "@zenvi/engine";
-import { runAssistantTool, toolsAvailable } from "../assistant/bridge";
+import { runAssistantTool } from "../assistant/bridge";
 import { createToolHost } from "../assistant/host";
 import type { EditorSession } from "../session/EditorSession";
+import { toast } from "@/ui/Toast";
 
 export interface PlacementSpot {
   layer: number;
@@ -53,17 +54,19 @@ export function placeAtDefaults(tx: Transaction, files: readonly ProjectFile[], 
   return clips;
 }
 
-/** Add bin files to the timeline at their default spots (one undo step). */
+/**
+ * Add bin files to the timeline at their default spots (one undo step).
+ * One file goes through `add_clip_to_timeline_tool` itself; several are
+ * placed with the same defaults in one transaction (one intent, one undo).
+ */
 export async function addFilesToTimeline(session: EditorSession, fileIds: readonly string[]): Promise<string[]> {
-  if (toolsAvailable()) {
-    const host = createToolHost(session, async () => []);
+  const files = fileIds.map((id) => session.project.files.find((f) => f.id === id)).filter((f): f is ProjectFile => Boolean(f));
+  if (files.length === 1) {
     const before = new Set(session.project.clips.map((c) => c.id));
-    for (const id of fileIds) {
-      await runAssistantTool(session, host, "add_clip_to_timeline_tool", { file_id: id, full_file: "true" }, new AbortController().signal);
-    }
+    const wire = await runAssistantTool(session, createToolHost(session, async () => []), "add_clip_to_timeline_tool", { file_id: files[0]!.id, full_file: "true" }, new AbortController().signal, "editor");
+    if (wire.result.startsWith("Error")) toast.warning(wire.result.replace(/^Error:\s*/, ""), { description: "Add to timeline" });
     return session.project.clips.filter((c) => !before.has(c.id)).map((c) => c.id);
   }
-  const files = fileIds.map((id) => session.project.files.find((f) => f.id === id)).filter((f): f is ProjectFile => Boolean(f));
   const selected = selectedLayer(session);
   const clips = session.edit(files.length > 1 ? `Add ${files.length} clips` : "Add to timeline", (tx) => placeAtDefaults(tx, files, selected));
   return clips?.map((c) => c.id) ?? [];

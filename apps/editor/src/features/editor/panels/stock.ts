@@ -2,14 +2,13 @@
  * Stock media search (Pexels videos, Freesound audio) through the backend's
  * `/pexels/search` and `/freesound/search` (same-origin proxy), and import.
  * Importing goes through the engine's `import_stock_media_tool` like the
- * Assistant does; until the tool catalog is exported it downloads from the
- * CDN directly (both CDNs allow CORS) into the normal import pipeline.
+ * Assistant does (the host downloads from the CDN; both allow CORS).
  */
 import * as tools from "@zenvi/engine/tools";
 import { backendRequest } from "@/lib/backend";
 import { toast } from "@/ui/Toast";
-import { importMedia, type Placement } from "../actions/importMedia";
-import { runAssistantTool, toolsAvailable } from "../assistant/bridge";
+import type { Placement } from "../actions/importMedia";
+import { runAssistantTool } from "../assistant/bridge";
 import { createToolHost } from "../assistant/host";
 import type { EditorSession } from "../session/EditorSession";
 
@@ -73,38 +72,17 @@ export function pexelsPreviewLink(video: PexelsVideo): string {
   return files[0]?.link ?? "";
 }
 
-async function download(url: string, name: string, type: string): Promise<File> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Download failed (${response.status})`);
-  const blob = await response.blob();
-  return new File([blob], name, { type: blob.type || type });
-}
-
 export type StockItem = { kind: "pexels"; video: PexelsVideo } | { kind: "freesound"; sound: FreesoundSound };
 
-/** Import one stock item into the bin (and onto the timeline when `placement` is given). */
+/** Import one stock item into the bin and onto the timeline (engine `import_stock_media_tool`). */
 export async function importStock(session: EditorSession, item: StockItem, placement: Placement): Promise<void> {
-  if (toolsAvailable()) {
-    const host = createToolHost(session, async () => []);
-    const args: Record<string, unknown> =
-      item.kind === "pexels"
-        ? { source: "pexels", link: pexelsLink(item.video), video_id: String(item.video.id) }
-        : { source: "freesound", preview_url: item.sound.previews.hq_mp3 || item.sound.previews.lq_mp3, sound_id: String(item.sound.id) };
-    if (placement && placement !== "end") {
-      args.position_seconds = String(placement.position);
-    }
-    const wire = await runAssistantTool(session, host, "import_stock_media_tool", args, new AbortController().signal);
-    if (wire.result.startsWith("Error")) toast.error("Import failed", { description: wire.result.replace(/^Error:\s*/, "") });
-    else toast.success(item.kind === "pexels" ? "Stock video imported" : "Stock audio imported");
-    return;
-  }
-  try {
-    const file =
-      item.kind === "pexels"
-        ? await download(pexelsLink(item.video), `pexels_${item.video.id}.mp4`, "video/mp4")
-        : await download(item.sound.previews.hq_mp3 || item.sound.previews.lq_mp3, `freesound_${item.sound.id}.mp3`, "audio/mpeg");
-    await importMedia(session, [file], placement);
-  } catch (error) {
-    toast.error("Import failed", { description: error instanceof Error ? error.message : String(error) });
-  }
+  const host = createToolHost(session, async () => []);
+  const args: Record<string, unknown> =
+    item.kind === "pexels"
+      ? { source: "pexels", link: pexelsLink(item.video), video_id: String(item.video.id) }
+      : { source: "freesound", preview_url: item.sound.previews.hq_mp3 || item.sound.previews.lq_mp3, sound_id: String(item.sound.id) };
+  if (placement && placement !== "end") args.position_seconds = String(placement.position);
+  const wire = await runAssistantTool(session, host, "import_stock_media_tool", args, new AbortController().signal, "editor");
+  if (wire.result.startsWith("Error")) toast.error("Import failed", { description: wire.result.replace(/^Error:\s*/, "") });
+  else toast.success(item.kind === "pexels" ? "Stock video imported" : "Stock audio imported");
 }

@@ -2,13 +2,14 @@
  * The session's media: where each project file's bytes are, importing new
  * files, and relinking files a desktop project points at.
  *
- * Resolution order for a file: its content hash (`fingerprint.sha256`, or
- * `cloud.sha256`) in this browser's media store → a signed Zenvi Cloud URL
- * (signed in, cloud project) → missing (the relink dialog asks for it).
+ * Resolution order for a file: its content hash (`cloud.sha256`) in this
+ * browser's media store → a signed Zenvi Cloud URL (the ones the cloud sent
+ * with the project, else asked for by hash when signed in) → missing (the
+ * relink dialog asks for it).
  */
 import type { ImportedMedia, Project, ProjectFile, ReaderInfo } from "@zenvi/engine";
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { CloudClient } from "@/lib/cloud";
+import { CloudError, type CloudClient, type CloudMediaEntry } from "@/lib/cloud";
 import { cleanFileName } from "@/lib/projectFactory";
 import { hashFile, partialFingerprint } from "@/lib/storage/hash";
 import type { MediaStore } from "@/lib/storage/media";
@@ -47,6 +48,8 @@ export interface MediaLibraryOptions {
   registry?: MediaRegistryLike | null;
   /** Cloud access for cloud projects (null when signed out or local). */
   cloud?: () => CloudClient | null;
+  /** What the cloud said it has for this project's files (signed URLs included). */
+  cloudMedia?: readonly CloudMediaEntry[];
 }
 
 /**
@@ -71,9 +74,15 @@ export class MediaLibrary {
   private readonly specs = new Map<string, MediaSourceSpec>();
   private readonly resolving = new Map<string, Promise<void>>();
   private registry: MediaRegistryLike | null;
+  private readonly cloudByFile = new Map<string, CloudMediaEntry>();
+  private readonly cloudBySha = new Map<string, CloudMediaEntry>();
 
   constructor(private readonly options: MediaLibraryOptions) {
     this.registry = options.registry ?? null;
+    for (const entry of options.cloudMedia ?? []) {
+      if (entry.fileId) this.cloudByFile.set(entry.fileId, entry);
+      this.cloudBySha.set(entry.sha256.toLowerCase(), entry);
+    }
   }
 
   /** Plug in the renderer's registry once it has loaded; replays known sources. */
@@ -175,8 +184,13 @@ export class MediaLibrary {
     // The desktop fingerprint tells whether this is the same file the project used.
     const known = target.fingerprint?.sha256;
     const matchesFingerprint = known ? known === fingerprint.sha256 && Number(target.fingerprint?.size) === fingerprint.size : null;
+    // Keep every key the desktop or CLI stored in `cloud` (the desktop's
+    // `mtime` lets it skip re-hashing). `mtime` dates the hashed bytes, so it
+    // moves to the picked file when the bytes are different ones.
+    const previous: Record<string, unknown> = { ...(target.cloud ?? {}) };
+    if (previous.sha256 !== sha256 && "mtime" in previous) previous.mtime = file.lastModified / 1000;
     return {
-      patch: { cloud: { ...(target.cloud ?? {}), sha256, size: file.size, content_type: file.type || contentTypeFor(file.name), name: file.name } },
+      patch: { cloud: { ...previous, sha256, size: file.size, content_type: file.type || contentTypeFor(file.name), name: file.name } },
       matchesFingerprint,
     };
   }
@@ -192,17 +206,25 @@ export class MediaLibrary {
           this.attach(file.id, stored.handle ? { kind: "opfs", handle: stored.handle } : { kind: "blob", blob: stored.file, name: fileDisplayName(file) }, "local");
           return;
         }
-        const cloud = this.options.cloud?.();
-        if (cloud?.enabled && file.cloud?.sha256) {
-          const cloudSha = file.cloud.sha256;
-          const url = await cloud.mediaUrl(cloudSha);
-          this.attach(file.id, { kind: "url", url, name: fileDisplayName(file), refresh: () => cloud.mediaUrl(cloudSha) }, "cloud");
-          return;
-        }
+      }
+      // The cloud matched desktop files by their own hashes, so its list is keyed by file id first.
+      const seeded = this.cloudByFile.get(file.id) ?? (sha ? this.cloudBySha.get(sha) : undefined);
+      const cloudSha = seeded?.sha256 ?? sha;
+      if (cloudSha && (seeded?.url || this.options.cloud?.()?.enabled)) {
+        const refresh = () => {
+          const cloud = this.options.cloud?.();
+          if (!cloud?.enabled) return Promise.reject(new Error("Sign in to Zenvi Cloud to load this file."));
+          return cloud.mediaUrl(cloudSha);
+        };
+        const url = seeded?.url ?? (await refresh());
+        this.attach(file.id, { kind: "url", url, name: fileDisplayName(file), refresh }, "cloud");
+        return;
       }
       this.setStatus(file.id, { status: "missing" });
     } catch (error) {
-      this.setStatus(file.id, { status: "error", error: error instanceof Error ? error.message : String(error) });
+      // Not in the cloud is the same as not here: the relink dialog asks for it.
+      if (error instanceof CloudError && error.status === 404) this.setStatus(file.id, { status: "missing" });
+      else this.setStatus(file.id, { status: "error", error: error instanceof Error ? error.message : String(error) });
     }
   }
 

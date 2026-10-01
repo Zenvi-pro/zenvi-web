@@ -5,7 +5,7 @@
  * is deployed and without it (`DisabledCloudClient`). Every request carries
  * the Supabase access token; the cloud authorizes by owner.
  */
-import type { Project } from "@zenvi/engine";
+import { serializeProject, type Project } from "@zenvi/engine";
 import { getAccessToken } from "./auth";
 import { cloudEnabled, config } from "./env";
 
@@ -43,9 +43,15 @@ export interface CloudProjectSummary {
   duration?: number;
 }
 
+/** A project file whose bytes the cloud has (`GET /v1/projects/:id` → `media`). */
 export interface CloudMediaEntry {
+  /** The project file this entry is for. */
+  fileId?: string;
+  /** The hash the cloud stored the bytes under (use it to refresh the URL). */
   sha256: string;
+  /** Signed read URL, valid about an hour. */
   url?: string;
+  expiresAt?: string;
   name?: string;
   size?: number;
   contentType?: string;
@@ -140,7 +146,15 @@ export class HttpCloudClient implements CloudClient {
 
   private async request<T>(
     path: string,
-    init: { method?: string; body?: unknown; headers?: Record<string, string>; signal?: AbortSignal; auth?: boolean } = {},
+    init: {
+      method?: string;
+      body?: unknown;
+      /** A body that is already JSON text (projects: `serializeProject`). */
+      jsonText?: string;
+      headers?: Record<string, string>;
+      signal?: AbortSignal;
+      auth?: boolean;
+    } = {},
   ): Promise<{ data: T; response: Response }> {
     const headers: Record<string, string> = { Accept: "application/json", ...init.headers };
     if (init.auth !== false) {
@@ -149,9 +163,9 @@ export class HttpCloudClient implements CloudClient {
       headers.Authorization = `Bearer ${token}`;
     }
     let body: BodyInit | undefined;
-    if (init.body !== undefined) {
+    if (init.jsonText !== undefined || init.body !== undefined) {
       headers["Content-Type"] = "application/json";
-      body = JSON.stringify(init.body);
+      body = init.jsonText ?? JSON.stringify(init.body);
     }
     let response: Response;
     try {
@@ -204,7 +218,9 @@ export class HttpCloudClient implements CloudClient {
   }
 
   async createProject(name: string, project?: Project): Promise<{ id: string; revision: string | null }> {
-    const { data, response } = await this.request<Record<string, unknown>>("/v1/projects", { method: "POST", body: { name, project } });
+    // Projects only ever leave as `serializeProject` text (version-stamped, desktop layout).
+    const jsonText = project ? `{"name":${JSON.stringify(name)},"project":${serializeProject(project)}}` : JSON.stringify({ name });
+    const { data, response } = await this.request<Record<string, unknown>>("/v1/projects", { method: "POST", jsonText });
     return {
       id: String(pick(data ?? {}, "id", "projectId") ?? ""),
       revision: pick<string>(data ?? {}, "revision") ?? response.headers.get("ETag"),
@@ -233,7 +249,7 @@ export class HttpCloudClient implements CloudClient {
     const headers: Record<string, string> = { "If-Match": revision ?? "*" };
     const { data, response } = await this.request<Record<string, unknown>>(`/v1/projects/${encodeURIComponent(id)}`, {
       method: "PUT",
-      body: project,
+      jsonText: serializeProject(project),
       headers,
     });
     return { revision: pick<string>(data ?? {}, "revision") ?? response.headers.get("ETag") };

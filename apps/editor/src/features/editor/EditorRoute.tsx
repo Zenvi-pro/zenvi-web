@@ -1,11 +1,10 @@
-import type { Project } from "@zenvi/engine";
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { cloudClient, parseCloudRouteId } from "@/lib/cloud";
+import { cloudClient, parseCloudRouteId, type CloudMediaEntry } from "@/lib/cloud";
 import { takeQueuedImports } from "@/lib/projectFactory";
 import { mediaStore } from "@/lib/storage/media";
-import { describeProject, projectRepository, type LocalProjectMeta } from "@/lib/storage/projects";
+import { projectRepository } from "@/lib/storage/projects";
 import { FullScreenLoader } from "@/app/FullScreenLoader";
 import { Button } from "@/ui/Button";
 import { ZenviMark } from "@/ui/Logo";
@@ -15,6 +14,7 @@ import { bindRegistry, probe } from "./render";
 import { SessionProvider } from "./session/context";
 import { EditorSession } from "./session/EditorSession";
 import { MediaLibrary } from "./session/media";
+import { openCloud, openLocal } from "./openProject";
 
 /**
  * With `localStorage["zenvi.debug"] = "1"`, expose the open session and the
@@ -38,51 +38,15 @@ type LoadState =
   | { kind: "signin" }
   | { kind: "error"; message: string };
 
-function newMediaLibrary(): MediaLibrary {
+function newMediaLibrary(cloudMedia: CloudMediaEntry[] = []): MediaLibrary {
   const media = new MediaLibrary({
     store: mediaStore,
     probe,
     cloud: () => (useAuth.getState().status === "signed-in" ? cloudClient() : null),
+    cloudMedia,
   });
   bindRegistry(media);
   return media;
-}
-
-async function openLocal(id: string): Promise<{ meta: LocalProjectMeta; project: Project } | null> {
-  const stored = await projectRepository().load(id);
-  if (!stored) return null;
-  const meta = { ...stored.meta, openedAt: Date.now() };
-  void projectRepository().updateMeta(id, { openedAt: meta.openedAt });
-  return { meta, project: stored.project };
-}
-
-/**
- * Cloud projects are cached locally under their route id, so edits survive a
- * reload or going offline. The cloud copy wins unless the cache has changes
- * made on top of the same revision that were not synced yet.
- */
-async function openCloud(routeId: string, cloudId: string): Promise<{ meta: LocalProjectMeta; project: Project }> {
-  const cached = await projectRepository().load(routeId);
-  const remote = await cloudClient().getProject(cloudId);
-  const unsynced =
-    cached?.meta.cloud &&
-    cached.meta.cloud.revision === remote.revision &&
-    (cached.meta.cloud.syncedAt ?? 0) < cached.meta.updatedAt;
-  const now = Date.now();
-  const project = unsynced && cached ? cached.project : remote.project;
-  const meta: LocalProjectMeta = {
-    id: routeId,
-    name: remote.name,
-    createdAt: cached?.meta.createdAt ?? now,
-    updatedAt: unsynced && cached ? cached.meta.updatedAt : now,
-    openedAt: now,
-    source: "cloud",
-    thumbnail: cached?.meta.thumbnail,
-    cloud: { id: cloudId, revision: remote.revision, syncedAt: unsynced ? (cached?.meta.cloud?.syncedAt ?? null) : now },
-    ...describeProject(project),
-  };
-  await projectRepository().save(meta, project);
-  return { meta, project };
 }
 
 export default function EditorRoute() {
@@ -106,7 +70,7 @@ export default function EditorRoute() {
         setState({ kind: "signin" });
         return;
       }
-      const opened = cloudId !== null ? await openCloud(projectId, cloudId) : await openLocal(projectId);
+      const opened = cloudId !== null ? await openCloud(projectRepository(), cloudClient(), cloudId) : await openLocal(projectRepository(), projectId);
       if (cancelled) return;
       if (!opened) {
         setState({ kind: "missing" });
@@ -116,7 +80,7 @@ export default function EditorRoute() {
         meta: opened.meta,
         project: opened.project,
         repository: projectRepository(),
-        media: newMediaLibrary(),
+        media: newMediaLibrary(opened.cloudMedia),
         cloud: () => (useAuth.getState().status === "signed-in" ? cloudClient() : null),
       });
       document.title = `${opened.meta.name} · Zenvi`;
@@ -124,6 +88,11 @@ export default function EditorRoute() {
       setState({ kind: "ready", session });
       const queued = takeQueuedImports(projectId);
       if (queued.length) void importMedia(session, queued, "end");
+      // Desktop projects point at files on another computer: ask for them once.
+      void session.mediaReady.then(() => {
+        if (cancelled || !session || session.ui.getState().dialog) return;
+        if (session.media.missing(session.project).length > 0) session.ui.setState({ dialog: "relink" });
+      });
       // `?upload=1` (MCP get_upload_link): open the media upload panel right away.
       if (wantsUpload) {
         session.ui.setState({ dialog: "upload" });

@@ -1,40 +1,31 @@
 /**
- * Runs Assistant tool calls with the engine's tool catalog, in one place.
- *
- * `runTool` (the catalog's dispatcher) is read from `@zenvi/engine/tools`
- * through the namespace so this picks it up as soon as W4 exports it; until
- * then every call answers with a clear Error result (never a fake success).
+ * Runs tool calls with the engine's tool catalog, in one place: the
+ * Assistant's `tool_call`s and the editor's own tool UI (command palette,
+ * Stock, Generate, add to timeline) all come through here, so results,
+ * receipts and undo steps are identical everywhere.
  */
-import * as tools from "@zenvi/engine/tools";
-import { assistantWireForError, buildEditorSnapshot, toAssistantWire, type AssistantWire } from "@zenvi/engine/tools";
-import type { ToolContext, ToolHost, ToolResult } from "@zenvi/engine";
+import type { ToolHost } from "@zenvi/engine";
+import { assistantWireForError, buildEditorSnapshot, runTool, toAssistantWire, type AssistantWire } from "@zenvi/engine/tools";
 import type { EditorSession } from "../session/EditorSession";
 import { attachPendingMedia } from "./host";
 
-const ns = tools as unknown as Record<string, unknown>;
+/** Where a call comes from: the backend's tool calls, or the editor's own UI. */
+export type ToolCaller = "assistant" | "editor";
 
-type RunTool = (name: string, ctx: ToolContext, args: unknown) => Promise<ToolResult>;
-
-function dispatcher(): RunTool | null {
-  const run = ns.runTool ?? ns.callTool;
-  return typeof run === "function" ? (run as RunTool) : null;
-}
-
-export function toolsAvailable(): boolean {
-  return dispatcher() !== null;
-}
-
+/**
+ * Run one tool against the session's document. `surface` "assistant" refuses
+ * the direct (non-contract) tools, as the desktop's bridge does.
+ */
 export async function runAssistantTool(
   session: EditorSession,
   host: ToolHost,
   name: string,
   args: Record<string, unknown>,
   signal: AbortSignal,
+  surface: ToolCaller = "assistant",
 ): Promise<AssistantWire> {
-  const run = dispatcher();
-  if (!run) return { result: `Error: ${name} is not available in the web editor yet.` };
   try {
-    const result = await run(name, { doc: session.doc, host, signal }, args);
+    const result = await runTool({ doc: session.doc, host, signal }, name, args, { surface });
     attachPendingMedia(session);
     return toAssistantWire(result);
   } catch (error) {

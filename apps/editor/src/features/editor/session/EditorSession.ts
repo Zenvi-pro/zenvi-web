@@ -10,6 +10,7 @@ import {
   autoFitDuration,
   frameDuration,
   isOpError,
+  PROJECT_FORMAT_VERSION,
   ProjectDocument,
   snapToFrame,
   timelineEnd,
@@ -80,6 +81,8 @@ export class EditorSession {
   /** Timeline filmstrips and waveforms. */
   readonly previews = new PreviewCache();
   clipboard: ClipboardData | null = null;
+  /** Resolves once every file of the opened project was looked up once. */
+  readonly mediaReady: Promise<void>;
   readonly views: SessionViews = { timeline: null, pickMedia: null, pickProject: null, focusTimeline: null };
 
   private engine: PreviewEngine | null = null;
@@ -114,7 +117,7 @@ export class EditorSession {
     };
     document.addEventListener("visibilitychange", onHide);
     this.disposers.push(() => document.removeEventListener("visibilitychange", onHide));
-    void this.media.sync(this.doc.project);
+    this.mediaReady = this.media.sync(this.doc.project).catch(() => undefined);
   }
 
   // -------------------------------------------------------------------------
@@ -315,6 +318,9 @@ export class EditorSession {
       ...json,
       playhead_position: Math.round(this.playback.getState().time * 1000) / 1000,
       scale: Math.round((tick / pps) * 1e6) / 1e6,
+      // Never the template's "0.0.0": the desktop would treat it as an
+      // OpenShot beta project and flip every clip's alpha on load.
+      version: { ...json.version, ...PROJECT_FORMAT_VERSION },
     };
   }
 

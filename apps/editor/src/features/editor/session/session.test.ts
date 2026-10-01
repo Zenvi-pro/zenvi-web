@@ -1,4 +1,4 @@
-import { addClip, addFile, createProject, findProfile, type ReaderInfo } from "@zenvi/engine";
+import { addClip, addFile, createProject, findProfile, PROJECT_FORMAT_VERSION, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryProjectRepository } from "@/lib/storage/projects";
 import { MemoryMediaStore } from "@/lib/storage/media";
@@ -42,6 +42,13 @@ function withClip(session: EditorSession) {
 }
 
 describe("EditorSession", () => {
+  it("stamps the engine's format version on every save (never the template's 0.0.0)", () => {
+    const { session } = newSession();
+    // A project cached before the stamp existed.
+    session.doc.setUntracked(["version"], { "openshot-qt": "0.0.0", libopenshot: "0.0.0" });
+    expect(session.snapshotForSave().version).toMatchObject(PROJECT_FORMAT_VERSION);
+  });
+
   it("records one undo step per edit and undoes it", () => {
     const { session } = newSession();
     const clip = withClip(session);

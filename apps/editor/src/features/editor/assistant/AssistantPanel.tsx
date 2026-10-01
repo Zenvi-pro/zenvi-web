@@ -10,7 +10,6 @@ import { ZenviMark } from "@/ui/Logo";
 import { Select } from "@/ui/Select";
 import { Spinner } from "@/ui/Spinner";
 import { useSession } from "../session/context";
-import { toolsAvailable } from "./bridge";
 import { Markdown } from "./Markdown";
 import { assistantStore, loadModels, newChat, send, setModel, stop, type ChatMessage, type ToolActivity } from "./store";
 
@@ -183,7 +182,6 @@ export default function AssistantPanel() {
                 </button>
               ))}
             </div>
-            {!toolsAvailable() ? <p className="text-2xs text-fg-faint">Editing tools are still rolling out to the web editor; answers work today.</p> : null}
           </div>
         ) : (
           messages.map((m) => <Message key={m.id} message={m} />)

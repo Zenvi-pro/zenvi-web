@@ -2,7 +2,7 @@
  * The web editor as a tool host: what engine tools may use when the
  * Assistant (or the command palette) runs them here.
  */
-import type { ExportOptions, ExportResult, ImportedMedia, ReaderInfo, ToolHost, ToolImage } from "@zenvi/engine";
+import type { CloudMediaRef, ExportOptions, ExportResult, ImportedMedia, ReaderInfo, ToolHost, ToolImage } from "@zenvi/engine";
 import { backendRequest } from "@/lib/backend";
 import { config } from "@/lib/env";
 import { downloadBlob, safeFileName } from "@/lib/projectFactory";
@@ -10,8 +10,9 @@ import { mediaStore } from "@/lib/storage/media";
 import { toast } from "@/ui/Toast";
 import { exportAvailable, probe, renderFrame, startExport } from "../render";
 import type { EditorSession } from "../session/EditorSession";
-import { contentTypeFor, mediaPath, type MediaSourceSpec } from "../session/media";
-import { hashFile, partialFingerprint } from "@/lib/storage/hash";
+import { assetUrl } from "../catalog";
+import { contentTypeFor, fileHash, mediaPath, type MediaSourceSpec } from "../session/media";
+import { hashFile } from "@/lib/storage/hash";
 
 const MAX_URL_IMPORT_BYTES = 2 * 1024 * 1024 * 1024;
 
@@ -27,26 +28,64 @@ async function fileFromUrl(url: string, filename: string | undefined, signal?: A
   return new File([blob], name, { type: blob.type || contentTypeFor(name) });
 }
 
+/**
+ * Media tools brought into the session, by the path they gave the engine:
+ * the bytes (attached once the tool added the file) and the content ref the
+ * file must carry (`cloud`), which engine tools do not know for generated
+ * media (titles, voiceovers) — without it the file would be missing after a
+ * reload and never reach Zenvi Cloud.
+ */
+interface Intake {
+  specs: Map<string, MediaSourceSpec>;
+  refs: Map<string, CloudMediaRef>;
+}
+
+const intakes = new WeakMap<EditorSession, Intake>();
+
+function intakeOf(session: EditorSession): Intake {
+  let intake = intakes.get(session);
+  if (!intake) {
+    intake = { specs: new Map(), refs: new Map() };
+    intakes.set(session, intake);
+    // Redo re-inserts the file as the tool first wrote it: attach it again.
+    session.doc.subscribe((event) => {
+      if (event.source === "redo") queueMicrotask(() => attachPendingMedia(session));
+    });
+  }
+  return intake;
+}
+
 /** Store a File like an import, without adding it to the project (tools call addFile). */
 async function prepare(session: EditorSession, file: File): Promise<ImportedMedia> {
   const [item] = await session.media.importFiles([file]);
   if (!item) throw new Error(`Could not import ${file.name}`);
-  pendingSpecs.set(item.media.path, item.spec);
+  const intake = intakeOf(session);
+  intake.specs.set(item.media.path, item.spec);
+  if (item.media.cloud) intake.refs.set(item.media.path, item.media.cloud);
   return item.media;
 }
 
-/** Bytes for media a tool imported, attached once the tool added the file to the project. */
-const pendingSpecs = new Map<string, MediaSourceSpec>();
-
-/** Attach bytes of files tools added (they know paths, not our specs). */
+/** Attach bytes (and content refs) of files tools added; they know paths, not our specs. */
 export function attachPendingMedia(session: EditorSession): void {
+  const intake = intakes.get(session);
+  if (!intake) return;
   for (const file of session.project.files) {
-    const spec = pendingSpecs.get(String(file.path));
-    if (spec) {
-      session.media.attach(file.id, spec);
-      pendingSpecs.delete(String(file.path));
-    }
+    const path = String(file.path);
+    const spec = intake.specs.get(path);
+    if (spec && !session.media.spec(file.id)) session.media.attach(file.id, spec);
+    const ref = intake.refs.get(path);
+    // Outside history on purpose: the ref describes bytes, not an edit.
+    if (ref && !fileHash(file)) session.doc.setUntracked(["files", { id: file.id }], { ...file, cloud: { ...(file.cloud ?? {}), ...ref } });
   }
+}
+
+/** Text of a bundled engine asset (`titles/Bar_1.svg`), for tools such as add_title_tool. */
+async function readAsset(path: string): Promise<string> {
+  const url = assetUrl(path);
+  if (!url) throw new Error(`No bundled asset ${path}`);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Could not load ${path} (${response.status})`);
+  return response.text();
 }
 
 export function createToolHost(session: EditorSession, pickFiles: () => Promise<File[]>): ToolHost {
@@ -79,7 +118,7 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
     media: {
       async probe(path: string): Promise<ReaderInfo> {
         const file = session.project.files.find((f) => f.path === path || f.id === path);
-        const spec = file ? session.media.spec(file.id) : pendingSpecs.get(path);
+        const spec = (file ? session.media.spec(file.id) : undefined) ?? intakeOf(session).specs.get(path);
         if (!spec) throw new Error(`No media at ${path}`);
         return probe(spec, { path });
       },
@@ -100,9 +139,9 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
         await store.put(sha256, file, name);
         const stored = await store.get(sha256);
         const path = mediaPath(sha256, name);
-        pendingSpecs.set(path, stored?.handle ? { kind: "opfs", handle: stored.handle } : { kind: "blob", blob: file, name });
-        // Keep the fingerprint consistent with regular imports for later relinks.
-        void partialFingerprint(file);
+        const intake = intakeOf(session);
+        intake.specs.set(path, stored?.handle ? { kind: "opfs", handle: stored.handle } : { kind: "blob", blob: file, name });
+        intake.refs.set(path, { sha256, size: file.size, content_type: contentType, name });
         return path;
       },
     },
@@ -132,6 +171,7 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       },
     };
   }
+  host.assets = { readText: readAsset };
   host.frames = {
     async renderFrame(project, seconds, options): Promise<ToolImage> {
       return renderFrame(project, seconds, options ?? {}, session.media);

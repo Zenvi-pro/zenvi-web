@@ -114,6 +114,49 @@ describe("MediaLibrary", () => {
     const other = await library.relink(projectFile({ id: "U", fingerprint: { size: 3, sha256: "0".repeat(64) } }), file);
     expect(other.matchesFingerprint).toBe(false);
   });
+
+  it("keeps the extra keys the desktop stores in file.cloud when relinking", async () => {
+    const library = new MediaLibrary({ store: async () => new MemoryMediaStore(), probe });
+    const file = new File([new Uint8Array([4, 2])], "take.mov", { lastModified: 2_000_000 });
+    const sha = toHex(new Uint8Array(await webcrypto.subtle.digest("SHA-256", new Uint8Array([4, 2]))));
+    const same = projectFile({ id: "S", cloud: { sha256: sha, size: 2, name: "take.mov", mtime: 1_700_000_000.5, origin: "desktop" } as never });
+    expect((await library.relink(same, file)).patch.cloud).toEqual({ sha256: sha, size: 2, name: "take.mov", content_type: "video/quicktime", mtime: 1_700_000_000.5, origin: "desktop" });
+    // Different bytes: mtime now dates the picked file, so the desktop re-hashes instead of trusting it.
+    const changed = projectFile({ id: "C", cloud: { sha256: "b".repeat(64), size: 9, name: "old.mov", mtime: 1_700_000_000.5, origin: "desktop" } as never });
+    expect((await library.relink(changed, file)).patch.cloud).toMatchObject({ sha256: sha, mtime: 2_000, origin: "desktop" });
+  });
+
+  it("loads cloud files from the signed URLs sent with the project, matched by file id", async () => {
+    const registry = { register: vi.fn(), unregister: vi.fn() };
+    const mediaUrl = vi.fn(async (sha: string) => `https://blob.example/${sha}?fresh`);
+    const library = new MediaLibrary({
+      store: async () => new MemoryMediaStore(),
+      probe,
+      registry,
+      cloud: () => ({ enabled: true, mediaUrl }) as never,
+      // The cloud matched this desktop file by its fingerprint; the file has no cloud.sha256.
+      cloudMedia: [{ fileId: "DESK", sha256: "f".repeat(64), url: "https://blob.example/f?sig=1" }],
+    });
+    const desk = projectFile({ id: "DESK", fingerprint: { size: 1, sha256: "f".repeat(64) } });
+    await library.sync({ files: [desk] } as never);
+    expect(library.status.getState().DESK).toEqual({ status: "ready", origin: "cloud" });
+    expect(mediaUrl).not.toHaveBeenCalled();
+    const spec = registry.register.mock.calls[0]![1] as { kind: string; url: string; refresh: () => Promise<string> };
+    expect(spec).toMatchObject({ kind: "url", url: "https://blob.example/f?sig=1" });
+    expect(await spec.refresh()).toBe(`https://blob.example/${"f".repeat(64)}?fresh`);
+  });
+
+  it("reports a file the cloud does not have as missing (not as an error)", async () => {
+    const { CloudError } = await import("@/lib/cloud");
+    const library = new MediaLibrary({
+      store: async () => new MemoryMediaStore(),
+      probe,
+      cloud: () => ({ enabled: true, mediaUrl: async () => Promise.reject(new CloudError("Not found", 404)) }) as never,
+    });
+    const gone = projectFile({ id: "G", cloud: { sha256: "9".repeat(64), size: 1, name: "g.mp4" } });
+    await library.sync({ files: [gone] } as never);
+    expect(library.status.getState().G?.status).toBe("missing");
+  });
 });
 
 describe("matchRelinkCandidates", () => {
