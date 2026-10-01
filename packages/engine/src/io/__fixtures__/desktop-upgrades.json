@@ -1,0 +1,7411 @@
+{
+ "source": "zenvi-core origin/develop src/classes/project_data.py, json_data.py, assets.py",
+ "cases": [
+  {
+   "name": "beta-alpha-flip",
+   "input": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 0.75
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.25
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 30,
+          "Y": 0.25
+         },
+         "interpolation": 1
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "0.0.0",
+     "libopenshot": "0.0.0"
+    }
+   },
+   "output": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 0.25
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.75
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 30,
+          "Y": 0.75
+         },
+         "interpolation": 1
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "0.0.0",
+     "libopenshot": "0.0.0"
+    }
+   }
+  },
+  {
+   "name": "openshot-2.0-handles",
+   "input": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [
+       {
+        "id": "E1",
+        "type": "Blur",
+        "class_name": "Blur",
+        "sigma": {
+         "Points": [
+          {
+           "co": {
+            "X": 1,
+            "Y": 3.0
+           },
+           "interpolation": 0,
+           "handle_left": {
+            "X": 0.2,
+            "Y": 0.9
+           },
+           "handle_right": {
+            "X": 0.3,
+            "Y": 0.1
+           },
+           "handle_type": 0
+          }
+         ]
+        }
+       }
+      ],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.2,
+          "Y": 0.9
+         },
+         "handle_right": {
+          "X": 0.3,
+          "Y": 0.1
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 60,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.2,
+          "Y": 0.9
+         },
+         "handle_right": {
+          "X": 0.3,
+          "Y": 0.1
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      },
+      "wave_color": {
+       "red": {
+        "Points": [
+         {
+          "co": {
+           "X": 1,
+           "Y": 10
+          },
+          "interpolation": 0,
+          "handle_left": {
+           "X": 0.5,
+           "Y": 1.0
+          },
+          "handle_right": {
+           "X": 0.5,
+           "Y": 0.0
+          },
+          "handle_type": 0
+         }
+        ]
+       },
+       "green": {
+        "Points": [
+         {
+          "co": {
+           "X": 1,
+           "Y": 20
+          },
+          "interpolation": 0,
+          "handle_left": {
+           "X": 0.5,
+           "Y": 1.0
+          },
+          "handle_right": {
+           "X": 0.5,
+           "Y": 0.0
+          },
+          "handle_type": 0
+         }
+        ]
+       },
+       "blue": {
+        "Points": [
+         {
+          "co": {
+           "X": 1,
+           "Y": 30
+          },
+          "interpolation": 0,
+          "handle_left": {
+           "X": 0.5,
+           "Y": 1.0
+          },
+          "handle_right": {
+           "X": 0.5,
+           "Y": 0.0
+          },
+          "handle_type": 0
+         }
+        ]
+       },
+       "alpha": {
+        "Points": [
+         {
+          "co": {
+           "X": 1,
+           "Y": 255
+          },
+          "interpolation": 0,
+          "handle_left": {
+           "X": 0.5,
+           "Y": 1.0
+          },
+          "handle_right": {
+           "X": 0.5,
+           "Y": 0.0
+          },
+          "handle_type": 0
+         }
+        ]
+       }
+      }
+     }
+    ],
+    "files": [],
+    "effects": [
+     {
+      "id": "T1",
+      "type": "Mask",
+      "layer": 1000000,
+      "position": 0.0,
+      "start": 0.0,
+      "end": 1.0,
+      "brightness": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.2,
+          "Y": 0.9
+         },
+         "handle_right": {
+          "X": 0.3,
+          "Y": 0.1
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 31,
+          "Y": -1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.2,
+          "Y": 0.9
+         },
+         "handle_right": {
+          "X": 0.3,
+          "Y": 0.1
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "contrast": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 3.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      }
+     }
+    ],
+    "version": {
+     "openshot-qt": "2.0.7",
+     "libopenshot": "0.1.1"
+    }
+   },
+   "output": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [
+       {
+        "id": "E1",
+        "type": "Blur",
+        "class_name": "Blur",
+        "sigma": {
+         "Points": [
+          {
+           "co": {
+            "X": 1,
+            "Y": 3.0
+           },
+           "interpolation": 0,
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0
+          }
+         ]
+        }
+       }
+      ],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 60,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      },
+      "wave_color": {
+       "red": {
+        "Points": [
+         {
+          "co": {
+           "X": 1,
+           "Y": 10
+          },
+          "interpolation": 0,
+          "handle_left": {
+           "X": 0.5,
+           "Y": 1.0
+          },
+          "handle_right": {
+           "X": 0.5,
+           "Y": 0.0
+          },
+          "handle_type": 0
+         }
+        ]
+       },
+       "green": {
+        "Points": [
+         {
+          "co": {
+           "X": 1,
+           "Y": 20
+          },
+          "interpolation": 0,
+          "handle_left": {
+           "X": 0.5,
+           "Y": 1.0
+          },
+          "handle_right": {
+           "X": 0.5,
+           "Y": 0.0
+          },
+          "handle_type": 0
+         }
+        ]
+       },
+       "blue": {
+        "Points": [
+         {
+          "co": {
+           "X": 1,
+           "Y": 30
+          },
+          "interpolation": 0,
+          "handle_left": {
+           "X": 0.5,
+           "Y": 1.0
+          },
+          "handle_right": {
+           "X": 0.5,
+           "Y": 0.0
+          },
+          "handle_type": 0
+         }
+        ]
+       },
+       "alpha": {
+        "Points": [
+         {
+          "co": {
+           "X": 1,
+           "Y": 255
+          },
+          "interpolation": 0,
+          "handle_left": {
+           "X": 0.5,
+           "Y": 1.0
+          },
+          "handle_right": {
+           "X": 0.5,
+           "Y": 0.0
+          },
+          "handle_type": 0
+         }
+        ]
+       }
+      }
+     }
+    ],
+    "files": [],
+    "effects": [
+     {
+      "id": "T1",
+      "type": "Mask",
+      "layer": 1000000,
+      "position": 0.0,
+      "start": 0.0,
+      "end": 1.0,
+      "brightness": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 31,
+          "Y": -1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "contrast": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 3.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      }
+     }
+    ],
+    "version": {
+     "openshot-qt": "2.0.7",
+     "libopenshot": "0.1.1"
+    }
+   }
+  },
+  {
+   "name": "openshot-2.5-crop",
+   "input": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      },
+      "crop_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.1
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "crop_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "crop_width": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "crop_height": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      },
+      "crop_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "crop_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "crop_width": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "crop_height": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      }
+     },
+     {
+      "id": "C3",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      },
+      "crop_height": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 90,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      }
+     },
+     {
+      "id": "C4",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "2.5.1",
+     "libopenshot": "0.2.5"
+    }
+   },
+   "output": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [
+       {
+        "apply_before_clip": true,
+        "bottom": {
+         "Points": [
+          {
+           "co": {
+            "X": 1,
+            "Y": 0.0
+           },
+           "interpolation": 0,
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0
+          }
+         ]
+        },
+        "class_name": "Crop",
+        "description": "Crop out any part of your video.",
+        "duration": 0.0,
+        "end": 0.0,
+        "has_audio": false,
+        "has_tracked_object": false,
+        "has_video": true,
+        "id": "MIGRATED01",
+        "layer": 0,
+        "left": {
+         "Points": [
+          {
+           "co": {
+            "X": 1.0,
+            "Y": 0.0
+           },
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0,
+           "interpolation": 0
+          }
+         ]
+        },
+        "mask_invert": false,
+        "mask_loop_mode": 0,
+        "mask_reader": {},
+        "mask_source_id": "",
+        "mask_time_mode": 1,
+        "name": "Crop",
+        "order": 0,
+        "parent_effect_id": "",
+        "position": 0.0,
+        "resize": false,
+        "right": {
+         "Points": [
+          {
+           "co": {
+            "X": 1,
+            "Y": 0.5
+           },
+           "interpolation": 0,
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0
+          }
+         ]
+        },
+        "start": 0.0,
+        "top": {
+         "Points": [
+          {
+           "co": {
+            "X": 1.0,
+            "Y": 0.0
+           },
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0,
+           "interpolation": 0
+          }
+         ]
+        },
+        "type": "Crop",
+        "x": {
+         "Points": [
+          {
+           "co": {
+            "X": 1,
+            "Y": 0.1
+           },
+           "interpolation": 0,
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0
+          }
+         ]
+        },
+        "y": {
+         "Points": [
+          {
+           "co": {
+            "X": 1,
+            "Y": 0.0
+           },
+           "interpolation": 0,
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0
+          }
+         ]
+        }
+       }
+      ],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C3",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [
+       {
+        "apply_before_clip": true,
+        "bottom": {
+         "Points": [
+          {
+           "co": {
+            "X": 1,
+            "Y": 0.0
+           },
+           "interpolation": 0,
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0
+          },
+          {
+           "co": {
+            "X": 90,
+            "Y": 0.5
+           },
+           "interpolation": 0,
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0
+          }
+         ]
+        },
+        "class_name": "Crop",
+        "description": "Crop out any part of your video.",
+        "duration": 0.0,
+        "end": 0.0,
+        "has_audio": false,
+        "has_tracked_object": false,
+        "has_video": true,
+        "id": "MIGRATED02",
+        "layer": 0,
+        "left": {
+         "Points": [
+          {
+           "co": {
+            "X": 1.0,
+            "Y": 0.0
+           },
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0,
+           "interpolation": 0
+          }
+         ]
+        },
+        "mask_invert": false,
+        "mask_loop_mode": 0,
+        "mask_reader": {},
+        "mask_source_id": "",
+        "mask_time_mode": 1,
+        "name": "Crop",
+        "order": 0,
+        "parent_effect_id": "",
+        "position": 0.0,
+        "resize": false,
+        "right": {
+         "Points": [
+          {
+           "co": {
+            "X": 1.0,
+            "Y": 0.0
+           },
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0,
+           "interpolation": 0
+          }
+         ]
+        },
+        "start": 0.0,
+        "top": {
+         "Points": [
+          {
+           "co": {
+            "X": 1.0,
+            "Y": 0.0
+           },
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0,
+           "interpolation": 0
+          }
+         ]
+        },
+        "type": "Crop",
+        "x": {
+         "Points": [
+          {
+           "co": {
+            "X": 1.0,
+            "Y": 0.0
+           },
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0,
+           "interpolation": 0
+          }
+         ]
+        },
+        "y": {
+         "Points": [
+          {
+           "co": {
+            "X": 1.0,
+            "Y": 0.0
+           },
+           "handle_left": {
+            "X": 0.5,
+            "Y": 1.0
+           },
+           "handle_right": {
+            "X": 0.5,
+            "Y": 0.0
+           },
+           "handle_type": 0,
+           "interpolation": 0
+          }
+         ]
+        }
+       }
+      ],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C4",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "2.5.1",
+     "libopenshot": "0.2.5"
+    }
+   }
+  },
+  {
+   "name": "openshot-3.1-tracked-objects",
+   "input": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [
+       {
+        "id": "E1",
+        "type": "Tracker",
+        "class_name": "Tracker",
+        "name": "Tracker",
+        "display_box_text": {
+         "Points": [
+          {
+           "co": {
+            "X": 1,
+            "Y": 0.0
+           },
+           "interpolation": 2
+          }
+         ]
+        },
+        "objects": {
+         "E1-1": {
+          "child_clip_id": "C2",
+          "background_alpha": {
+           "Points": [
+            {
+             "co": {
+              "X": 1,
+              "Y": 0.25
+             },
+             "interpolation": 0,
+             "handle_left": {
+              "X": 0.5,
+              "Y": 1.0
+             },
+             "handle_right": {
+              "X": 0.5,
+              "Y": 0.0
+             },
+             "handle_type": 0
+            }
+           ]
+          },
+          "stroke_alpha": {
+           "Points": [
+            {
+             "co": {
+              "X": 1,
+              "Y": 1.0
+             },
+             "interpolation": 0,
+             "handle_left": {
+              "X": 0.5,
+              "Y": 1.0
+             },
+             "handle_right": {
+              "X": 0.5,
+              "Y": 0.0
+             },
+             "handle_type": 0
+            },
+            {
+             "co": {
+              "X": 10,
+              "Y": 0.5
+             },
+             "interpolation": 0,
+             "handle_left": {
+              "X": 0.5,
+              "Y": 1.0
+             },
+             "handle_right": {
+              "X": 0.5,
+              "Y": 0.0
+             },
+             "handle_type": 0
+            }
+           ]
+          }
+         }
+        }
+       },
+       {
+        "id": "E2",
+        "type": "ObjectDetection",
+        "class_name": "ObjectDetection",
+        "name": "Object Detector",
+        "display_box_text": {
+         "Points": []
+        },
+        "objects": {}
+       }
+      ],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      },
+      "parentObjectId": ""
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "3.1.1",
+     "libopenshot": "0.3.2"
+    }
+   },
+   "output": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [
+       {
+        "id": "E1",
+        "type": "Tracker",
+        "class_name": "Tracker",
+        "name": "Tracker",
+        "display_box_text": {
+         "Points": [
+          {
+           "co": {
+            "X": 1,
+            "Y": 1.0
+           },
+           "interpolation": 2
+          }
+         ]
+        },
+        "objects": {
+         "E1-1": {
+          "child_clip_id": "C2",
+          "background_alpha": {
+           "Points": [
+            {
+             "co": {
+              "X": 1,
+              "Y": 0.75
+             },
+             "interpolation": 0,
+             "handle_left": {
+              "X": 0.5,
+              "Y": 1.0
+             },
+             "handle_right": {
+              "X": 0.5,
+              "Y": 0.0
+             },
+             "handle_type": 0
+            }
+           ]
+          },
+          "stroke_alpha": {
+           "Points": [
+            {
+             "co": {
+              "X": 1,
+              "Y": 0.0
+             },
+             "interpolation": 0,
+             "handle_left": {
+              "X": 0.5,
+              "Y": 1.0
+             },
+             "handle_right": {
+              "X": 0.5,
+              "Y": 0.0
+             },
+             "handle_type": 0
+            },
+            {
+             "co": {
+              "X": 10,
+              "Y": 0.5
+             },
+             "interpolation": 0,
+             "handle_left": {
+              "X": 0.5,
+              "Y": 1.0
+             },
+             "handle_right": {
+              "X": 0.5,
+              "Y": 0.0
+             },
+             "handle_type": 0
+            }
+           ]
+          }
+         }
+        }
+       },
+       {
+        "id": "E2",
+        "type": "ObjectDetection",
+        "class_name": "ObjectDetection",
+        "name": "Object Detector",
+        "display_box_text": {
+         "Points": [
+          {
+           "co": {
+            "X": 1.0,
+            "Y": 1.0
+           },
+           "interpolation": 2
+          }
+         ]
+        },
+        "objects": {}
+       }
+      ],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      },
+      "parentObjectId": "E1-1"
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "3.1.1",
+     "libopenshot": "0.3.2"
+    }
+   }
+  },
+  {
+   "name": "libopenshot-0.x-crop-locations",
+   "input": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 30,
+          "Y": -0.25
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1000,
+       "height": 1000,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 1,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 30,
+          "Y": -0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 30,
+          "Y": 2.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1000,
+       "height": 1000,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C3",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 8,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": -0.4
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 45,
+          "Y": 0.3
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.2
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 640,
+       "height": 480,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C4",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1000,
+       "height": 1000,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C5",
+      "file_id": "F2",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {}
+     }
+    ],
+    "files": [
+     {
+      "id": "F2",
+      "path": "/media/b.mp4",
+      "width": 400,
+      "height": 800
+     }
+    ],
+    "effects": [],
+    "version": {
+     "openshot-qt": "3.2.0",
+     "libopenshot": "0.4.0"
+    }
+   },
+   "output": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.36
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 30,
+          "Y": -0.18
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1000,
+       "height": 1000,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 1,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 30,
+          "Y": -0.140625
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 30,
+          "Y": 2.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1000,
+       "height": 1000,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C3",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 8,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": -0.4
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 45,
+          "Y": 0.3
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.15000000000000002
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 640,
+       "height": 480,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C4",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1000,
+       "height": 1000,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C5",
+      "file_id": "F2",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.21951219512195122
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {}
+     }
+    ],
+    "files": [
+     {
+      "id": "F2",
+      "path": "/media/b.mp4",
+      "width": 400,
+      "height": 800
+     }
+    ],
+    "effects": [],
+    "version": {
+     "openshot-qt": "3.2.0",
+     "libopenshot": "0.4.0"
+    }
+   }
+  },
+  {
+   "name": "openshot-4.0.0-locations",
+   "input": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": -0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 0,
+      "scale": 2,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.25
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 20,
+          "Y": -0.25
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 640,
+       "height": 360,
+       "has_video": true,
+       "has_audio": true
+      },
+      "margin": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.1
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      }
+     },
+     {
+      "id": "C3",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 7,
+      "scale": 3,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.3
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 320,
+       "height": 240,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C4",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "4.0.0",
+     "libopenshot": "1.0.0"
+    }
+   },
+   "output": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": -0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 0,
+      "scale": 2,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.221875
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 20,
+          "Y": -0.221875
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 640,
+       "height": 360,
+       "has_video": true,
+       "has_audio": true
+      },
+      "margin": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.1
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      }
+     },
+     {
+      "id": "C3",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 7,
+      "scale": 3,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.05
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 320,
+       "height": 240,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C4",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 0,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "4.0.0",
+     "libopenshot": "1.0.0"
+    }
+   }
+  },
+  {
+   "name": "openshot-4.0.0-rc-untouched",
+   "input": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "4.0.0-rc1",
+     "libopenshot": "1.0.0"
+    }
+   },
+   "output": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "4.0.0-rc1",
+     "libopenshot": "1.0.0"
+    }
+   }
+  },
+  {
+   "name": "audio-only-repair",
+   "input": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "A1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/song.mp3",
+       "width": 720,
+       "height": 480,
+       "has_video": true,
+       "has_audio": true
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/song.mp3",
+       "width": 720,
+       "height": 480,
+       "has_video": true,
+       "has_audio": true,
+       "id": "A1"
+      }
+     },
+     {
+      "id": "C3",
+      "file_id": "V1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [
+     {
+      "id": "A1",
+      "path": "/media/song.mp3",
+      "has_video": true,
+      "has_audio": true,
+      "media_type": "audio"
+     },
+     {
+      "id": "V1",
+      "path": "/media/clip.mp4",
+      "has_video": true,
+      "has_audio": true,
+      "media_type": "video"
+     }
+    ],
+    "effects": [],
+    "version": {
+     "openshot-qt": "1.0.150",
+     "libopenshot": "1.0.0"
+    }
+   },
+   "output": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "A1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 3,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/song.mp3",
+       "width": 720,
+       "height": 480,
+       "has_video": false,
+       "has_audio": true
+      },
+      "has_video": {
+       "Points": [
+        {
+         "co": {
+          "X": 1.0,
+          "Y": 0.0
+         },
+         "interpolation": 2
+        }
+       ]
+      }
+     },
+     {
+      "id": "C2",
+      "file_id": "",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 3,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/song.mp3",
+       "width": 720,
+       "height": 480,
+       "has_video": false,
+       "has_audio": true,
+       "id": "A1"
+      },
+      "has_video": {
+       "Points": [
+        {
+         "co": {
+          "X": 1.0,
+          "Y": 0.0
+         },
+         "interpolation": 2
+        }
+       ]
+      }
+     },
+     {
+      "id": "C3",
+      "file_id": "V1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [
+     {
+      "id": "A1",
+      "path": "/media/song.mp3",
+      "has_video": false,
+      "has_audio": true,
+      "media_type": "audio"
+     },
+     {
+      "id": "V1",
+      "path": "/media/clip.mp4",
+      "has_video": true,
+      "has_audio": true,
+      "media_type": "video"
+     }
+    ],
+    "effects": [],
+    "version": {
+     "openshot-qt": "1.0.150",
+     "libopenshot": "1.0.0"
+    }
+   }
+  },
+  {
+   "name": "template-id",
+   "input": {
+    "id": "T0",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "1.0.188",
+     "libopenshot": "1.0.0"
+    }
+   },
+   "output": {
+    "id": "MIGRATED01",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "1.0.188",
+     "libopenshot": "1.0.0"
+    }
+   }
+  },
+  {
+   "name": "zenvi-1.0-handles",
+   "input": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.2,
+          "Y": 0.9
+         },
+         "handle_right": {
+          "X": 0.3,
+          "Y": 0.1
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 60,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.2,
+          "Y": 0.9
+         },
+         "handle_right": {
+          "X": 0.3,
+          "Y": 0.1
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "1.0.188",
+     "libopenshot": "1.0.0"
+    }
+   },
+   "output": {
+    "id": "P1",
+    "width": 1280,
+    "height": 720,
+    "fps": {
+     "num": 30,
+     "den": 1
+    },
+    "clips": [
+     {
+      "id": "C1",
+      "file_id": "F1",
+      "position": 0.0,
+      "start": 0.0,
+      "end": 5.0,
+      "layer": 1000000,
+      "gravity": 4,
+      "scale": 1,
+      "effects": [],
+      "location_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        },
+        {
+         "co": {
+          "X": 60,
+          "Y": 0.5
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "location_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 0.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_x": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "scale_y": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "alpha": {
+       "Points": [
+        {
+         "co": {
+          "X": 1,
+          "Y": 1.0
+         },
+         "interpolation": 0,
+         "handle_left": {
+          "X": 0.5,
+          "Y": 1.0
+         },
+         "handle_right": {
+          "X": 0.5,
+          "Y": 0.0
+         },
+         "handle_type": 0
+        }
+       ]
+      },
+      "reader": {
+       "path": "/media/clip.mp4",
+       "width": 1920,
+       "height": 1080,
+       "has_video": true,
+       "has_audio": true
+      }
+     }
+    ],
+    "files": [],
+    "effects": [],
+    "version": {
+     "openshot-qt": "1.0.188",
+     "libopenshot": "1.0.0"
+    }
+   }
+  }
+ ],
+ "paths": {
+  "posix": {
+   "projectFile": "/home/me/Videos/Trip/trip.zvn",
+   "projectDir": "/home/me/Videos/Trip",
+   "roots": {
+    "transitions": "/opt/zenvi/transitions",
+    "emojis": "/opt/zenvi/emojis/color/svg",
+    "colors": "/opt/zenvi/colors",
+    "assets": "/home/me/Videos/Trip/trip_assets",
+    "thumbnails": "/home/me/Videos/Trip/trip_assets/thumbnail"
+   },
+   "store": [
+    [
+     "/home/me/Videos/Trip/clip.mp4",
+     "clip.mp4"
+    ],
+    [
+     "/home/me/Videos/Trip/media/a b.mp4",
+     "media/a b.mp4"
+    ],
+    [
+     "/home/me/Videos/Trip/media/../clip.mp4",
+     "clip.mp4"
+    ],
+    [
+     "/home/me/Videos/other.mp4",
+     "/home/me/Videos/other.mp4"
+    ],
+    [
+     "/opt/zenvi/transitions/common/fade.svg",
+     "@transitions/common/fade.svg"
+    ],
+    [
+     "/opt/zenvi/transitions/extra/board_1.jpg",
+     "@transitions/extra/board_1.jpg"
+    ],
+    [
+     "/opt/zenvi/emojis/color/svg/1F600.svg",
+     "@emojis/1F600.svg"
+    ],
+    [
+     "/opt/zenvi/colors/cinematic_&_blockbuster/teal_cinema.cube",
+     "@colors/cinematic_&_blockbuster/teal_cinema.cube"
+    ],
+    [
+     "/home/me/Videos/Trip/trip_assets/title/Title 1.svg",
+     "@assets/title/Title 1.svg"
+    ],
+    [
+     "/home/me/Videos/Trip/trip_assets/media/generated_0a1b.mp4",
+     "@assets/media/generated_0a1b.mp4"
+    ],
+    [
+     "/home/me/Videos/Trip/trip_assets/thumbnail/ABCDEFGHIJ.png",
+     "thumbnail/ABCDEFGHIJ.png"
+    ],
+    [
+     "relative/x.mp4",
+     "relative/x.mp4"
+    ],
+    [
+     "../up.mp4",
+     "/home/me/Videos/up.mp4"
+    ],
+    [
+     "",
+     ""
+    ]
+   ],
+   "load": [
+    [
+     "clip.mp4",
+     "/home/me/Videos/Trip/clip.mp4"
+    ],
+    [
+     "media/a b.mp4",
+     "/home/me/Videos/Trip/media/a b.mp4"
+    ],
+    [
+     "../media/x.mp4",
+     "/home/me/Videos/media/x.mp4"
+    ],
+    [
+     "@transitions/common/fade.svg",
+     "/opt/zenvi/transitions/common/fade.svg"
+    ],
+    [
+     "@emojis/1F600.svg",
+     "/opt/zenvi/emojis/color/svg/1F600.svg"
+    ],
+    [
+     "@colors/cinematic_&_blockbuster/teal_cinema.cube",
+     "/opt/zenvi/colors/cinematic_&_blockbuster/teal_cinema.cube"
+    ],
+    [
+     "@assets/title/Title 1.svg",
+     "/home/me/Videos/Trip/trip_assets/title/Title 1.svg"
+    ],
+    [
+     "thumbnail/ABCDEFGHIJ.png",
+     "/home/me/Videos/Trip/thumbnail/ABCDEFGHIJ.png"
+    ],
+    [
+     "/home/me/Videos/abs.mp4",
+     "/home/me/Videos/abs.mp4"
+    ],
+    [
+     "",
+     ""
+    ]
+   ]
+  },
+  "win32": {
+   "projectFile": "C:\\Users\\me\\Videos\\Trip\\trip.zvn",
+   "projectDir": "C:\\Users\\me\\Videos\\Trip",
+   "roots": {
+    "transitions": "C:\\Program Files\\Zenvi\\transitions",
+    "emojis": "C:\\Program Files\\Zenvi\\emojis\\color\\svg",
+    "colors": "C:\\Program Files\\Zenvi\\colors",
+    "assets": "C:\\Users\\me\\Videos\\Trip\\trip_assets",
+    "thumbnails": "C:\\Users\\me\\Videos\\Trip\\trip_assets\\thumbnail"
+   },
+   "store": [
+    [
+     "C:\\Users\\me\\Videos\\Trip\\clip.mp4",
+     "clip.mp4"
+    ],
+    [
+     "C:\\Users\\me\\Videos\\Trip\\media\\a b.mp4",
+     "media/a b.mp4"
+    ],
+    [
+     "C:\\Users\\me\\Videos\\Trip\\media\\..\\clip.mp4",
+     "clip.mp4"
+    ],
+    [
+     "C:\\Users\\me\\Videos\\other.mp4",
+     "C:/Users/me/Videos/other.mp4"
+    ],
+    [
+     "C:\\Program Files\\Zenvi\\transitions\\common\\fade.svg",
+     "@transitions/common/fade.svg"
+    ],
+    [
+     "C:\\Program Files\\Zenvi\\transitions\\extra\\board_1.jpg",
+     "@transitions/extra/board_1.jpg"
+    ],
+    [
+     "C:\\Program Files\\Zenvi\\emojis\\color\\svg\\1F600.svg",
+     "@emojis/1F600.svg"
+    ],
+    [
+     "C:\\Program Files\\Zenvi\\colors\\cinematic_&_blockbuster\\teal_cinema.cube",
+     "@colors/cinematic_&_blockbuster/teal_cinema.cube"
+    ],
+    [
+     "C:\\Users\\me\\Videos\\Trip\\trip_assets\\title\\Title 1.svg",
+     "@assets/title/Title 1.svg"
+    ],
+    [
+     "C:\\Users\\me\\Videos\\Trip\\trip_assets\\media\\generated_0a1b.mp4",
+     "@assets/media/generated_0a1b.mp4"
+    ],
+    [
+     "C:\\Users\\me\\Videos\\Trip\\trip_assets\\thumbnail\\ABCDEFGHIJ.png",
+     "thumbnail/ABCDEFGHIJ.png"
+    ],
+    [
+     "relative/x.mp4",
+     "relative/x.mp4"
+    ],
+    [
+     "../up.mp4",
+     "C:/Users/me/Videos/up.mp4"
+    ],
+    [
+     "",
+     ""
+    ],
+    [
+     "D:\\Media\\x.mp4",
+     "D:/Media/x.mp4"
+    ],
+    [
+     "C:/Users/me/Videos/Trip/fwd/slash.mp4",
+     "fwd/slash.mp4"
+    ],
+    [
+     "c:\\users\\me\\videos\\trip\\lower.mp4",
+     "c:/users/me/videos/trip/lower.mp4"
+    ]
+   ],
+   "load": [
+    [
+     "clip.mp4",
+     "C:\\Users\\me\\Videos\\Trip\\clip.mp4"
+    ],
+    [
+     "media/a b.mp4",
+     "C:\\Users\\me\\Videos\\Trip\\media\\a b.mp4"
+    ],
+    [
+     "../media/x.mp4",
+     "C:\\Users\\me\\Videos\\media\\x.mp4"
+    ],
+    [
+     "@transitions/common/fade.svg",
+     "C:\\Program Files\\Zenvi\\transitions\\common\\fade.svg"
+    ],
+    [
+     "@emojis/1F600.svg",
+     "C:\\Program Files\\Zenvi\\emojis\\color\\svg/1F600.svg"
+    ],
+    [
+     "@colors/cinematic_&_blockbuster/teal_cinema.cube",
+     "C:\\Program Files\\Zenvi\\colors/cinematic_&_blockbuster/teal_cinema.cube"
+    ],
+    [
+     "@assets/title/Title 1.svg",
+     "C:\\Users\\me\\Videos\\Trip\\trip_assets/title/Title 1.svg"
+    ],
+    [
+     "thumbnail/ABCDEFGHIJ.png",
+     "C:\\Users\\me\\Videos\\Trip\\thumbnail\\ABCDEFGHIJ.png"
+    ],
+    [
+     "C:\\Users\\me\\Videos\\abs.mp4",
+     "C:\\Users\\me\\Videos\\abs.mp4"
+    ],
+    [
+     "",
+     ""
+    ],
+    [
+     "D:/Media/x.mp4",
+     "D:\\Media\\x.mp4"
+    ]
+   ]
+  }
+ }
+}

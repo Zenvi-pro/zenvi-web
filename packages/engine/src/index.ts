@@ -17,5 +17,6 @@ export * from "./timeline/index.js";
 export * from "./history/keypath.js";
 export * from "./history/document.js";
 export * from "./ops/index.js";
+export * from "./io/index.js";
 export type * from "./tools/types.js";
 export type * from "./render/types.js";
