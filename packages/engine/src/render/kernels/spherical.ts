@@ -115,7 +115,7 @@ export function unpremultiplyNeon(image: PremulImage): Uint8ClampedArray {
         continue;
       }
       const inv = invPremulFactor(a);
-      for (let c = 0; c < 3; c += 1) out[o + c] = Math.floor((s[o + c]! * inv + 0x8000) / 65536);
+      for (let c = 0; c < 3; c += 1) out[o + c] = Math.floor((s[o + c]! * inv + 0x8000) / 65536) & 0xff;
       out[o + 3] = a;
     }
   }
@@ -360,22 +360,41 @@ interface Plane {
   data: Uint8ClampedArray;
 }
 
-/** The 4×4 clamp-to-edge Catmull-Rom of one channel (:318-335). */
-function bicubicByte(src: Plane, x1: number, y1: number, c: number, tx: number, ty: number, fused: boolean): number {
-  const { w: W, h: H, data } = src;
-  const interp = fused ? cubicFused : cubic;
-  const col = [0, 0, 0, 0];
-  for (let j = -1; j <= 2; j += 1) {
-    const y = clampInt(y1 + j, 0, H - 1) * W;
-    col[j + 1] = interp(
-      data[(y + clampInt(x1 - 1, 0, W - 1)) * 4 + c]!,
-      data[(y + clampInt(x1, 0, W - 1)) * 4 + c]!,
-      data[(y + clampInt(x1 + 1, 0, W - 1)) * 4 + c]!,
-      data[(y + clampInt(x1 + 2, 0, W - 1)) * 4 + c]!,
-      tx,
-    );
+/** Byte offsets of the clamp-to-edge 4×4 neighborhood: 4 row starts, then 4 column offsets. */
+const TAPS = new Int32Array(8);
+
+function setTaps(W: number, H: number, x1: number, y1: number): void {
+  for (let k = 0; k < 4; k += 1) {
+    TAPS[k] = clampInt(y1 + k - 1, 0, H - 1) * W * 4;
+    TAPS[4 + k] = clampInt(x1 + k - 1, 0, W - 1) * 4;
   }
-  return interp(col[0]!, col[1]!, col[2]!, col[3]!, ty);
+}
+
+/** The 4×4 Catmull-Rom of channel `c` at the taps in `TAPS` (:318-335), plain double math. */
+function bicubicValue(data: Uint8ClampedArray, c: number, tx: number, ty: number): number {
+  const x0 = TAPS[4]! + c;
+  const x1 = TAPS[5]! + c;
+  const x2 = TAPS[6]! + c;
+  const x3 = TAPS[7]! + c;
+  let y = TAPS[0]!;
+  const c0 = cubic(data[y + x0]!, data[y + x1]!, data[y + x2]!, data[y + x3]!, tx);
+  y = TAPS[1]!;
+  const c1 = cubic(data[y + x0]!, data[y + x1]!, data[y + x2]!, data[y + x3]!, tx);
+  y = TAPS[2]!;
+  const c2 = cubic(data[y + x0]!, data[y + x1]!, data[y + x2]!, data[y + x3]!, tx);
+  y = TAPS[3]!;
+  const c3 = cubic(data[y + x0]!, data[y + x1]!, data[y + x2]!, data[y + x3]!, tx);
+  return cubic(c0, c1, c2, c3, ty);
+}
+
+/** `bicubicValue` with every `a*b + c` fused, for values next to a rounding boundary. */
+function bicubicValueFused(data: Uint8ClampedArray, c: number, tx: number, ty: number): number {
+  const col = [0, 0, 0, 0];
+  for (let k = 0; k < 4; k += 1) {
+    const y = TAPS[k]!;
+    col[k] = cubicFused(data[y + TAPS[4]! + c]!, data[y + TAPS[5]! + c]!, data[y + TAPS[6]! + c]!, data[y + TAPS[7]! + c]!, tx);
+  }
+  return cubicFused(col[0]!, col[1]!, col[2]!, col[3]!, ty);
 }
 
 /** Mip levels for the Auto path (:252-276): up to three 2×2 truncating box reductions. */
@@ -475,9 +494,10 @@ function sphericalKernel(image: PremulImage, params: Params, ctx: KernelContext)
         const y1 = clampInt(Math.floor(vf), 0, H - 1);
         const tx = uf - x1;
         const ty = vf - y1;
+        setTaps(W, H, x1, y1);
         for (let c = 0; c < 4; c += 1) {
-          let val = bicubicByte(src, x1, y1, c, tx, ty, false);
-          if (val > 0 && val < 255 && nearHalf(val)) val = bicubicByte(src, x1, y1, c, tx, ty, true);
+          let val = bicubicValue(src.data, c, tx, ty);
+          if (val > 0 && val < 255 && nearHalf(val)) val = bicubicValueFused(src.data, c, tx, ty);
           out[o + c] = Math.trunc(clamp(val, 0, 255) + 0.5);
         }
       } else {
