@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { copyFile, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "../config.js";
 import { testEnv } from "../test-support/harness.js";
 import { CloudClient } from "./client.js";
-import { cloudProjectJson, cloudRef, getLink, projectIdFrom, pullProject, pushProject } from "./sync.js";
+import { CLOUD_MARKER_KEY, cloudProjectJson, cloudRef, getLink, projectIdFrom, pullProject, pushProject } from "./sync.js";
 
 let root: string;
 let server: Server;
@@ -200,6 +200,48 @@ describe("push and pull", () => {
     // Pulling again reuses what is on disk.
     const again = await pullProject({ config: config(), client: client(), id: "p1", cwd: path.join(root, "pulled") });
     expect(again).toMatchObject({ downloaded: 0, reused: 3 });
+  });
+
+  it("never pulls over another project: names that sanitize alike get their own folder; local edits need --force", async () => {
+    const cwd = path.join(root, "collide");
+    const empty = () => JSON.parse(JSON.stringify(createProject())) as unknown;
+    projects.set("p7", { name: "Trip/One", project: empty(), revision: 1 });
+    projects.set("p8", { name: "Trip:One", project: empty(), revision: 1 });
+    const pull = (id: string, extra: { dir?: string; force?: boolean } = {}) => pullProject({ config: config(), client: client(), id, cwd, ...extra });
+    const markerOf = async (file: string) => (JSON.parse(await readFile(file, "utf8")) as Record<string, { project_id?: string }>)[CLOUD_MARKER_KEY]?.project_id;
+
+    const first = await pull("p7");
+    expect(first.projectFile).toBe(path.join(cwd, "Trip_One", "Trip_One.zvn"));
+    expect(await markerOf(first.projectFile)).toBe("p7");
+    const second = await pull("p8");
+    expect(second.projectFile).toBe(path.join(cwd, "Trip_One (2)", "Trip_One.zvn"));
+    expect(await markerOf(first.projectFile)).toBe("p7");
+    expect(await markerOf(second.projectFile)).toBe("p8");
+    // The same project pulls into its own folder again.
+    expect((await pull("p7")).projectFile).toBe(first.projectFile);
+    expect((await pull("p8")).projectFile).toBe(second.projectFile);
+
+    // An explicit folder holding another project is only replaced with --force.
+    await expect(pull("p8", { dir: "Trip_One" })).rejects.toThrow(/belongs to cloud project p7/);
+    expect(await markerOf(first.projectFile)).toBe("p7");
+
+    // Local edits since the last sync are never replaced silently.
+    const edited = JSON.parse(await readFile(first.projectFile, "utf8")) as Record<string, unknown>;
+    await writeFile(first.projectFile, JSON.stringify({ ...edited, scale: 20 }));
+    await expect(pull("p7")).rejects.toThrow(/not in Zenvi Cloud yet/);
+    expect((await pull("p7", { force: true })).projectFile).toBe(first.projectFile);
+
+    // A local project that was never in the cloud is not replaced either.
+    await mkdir(path.join(cwd, "Solo"), { recursive: true });
+    await writeProjectFile(path.join(cwd, "Solo", "Solo.zvn"), createProject());
+    projects.set("p9", { name: "Solo", project: empty(), revision: 1 });
+    expect((await pull("p9")).projectFile).toBe(path.join(cwd, "Solo (2)", "Solo.zvn"));
+    await expect(pull("p9", { dir: "Solo" })).rejects.toThrow(/belongs to a local project/);
+
+    // The marker is local: pushing a pulled project does not upload it.
+    const pulled = await readProjectFile(first.projectFile);
+    await pushProject({ config: config(), client: client(), projectFile: first.projectFile, project: pulled });
+    expect(projects.get("p7")!.project as Record<string, unknown>).not.toHaveProperty(CLOUD_MARKER_KEY);
   });
 
   it("tells signed-out users to log in", async () => {

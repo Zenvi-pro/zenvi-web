@@ -5,7 +5,7 @@ import type { Command } from "commander";
 import { deviceLogin } from "../auth/device.js";
 import { browserLogin } from "../auth/supabase.js";
 import { CloudClient } from "../cloud/client.js";
-import { pullProject, pushProject } from "../cloud/sync.js";
+import { markSynced, pullProject, pushProject } from "../cloud/sync.js";
 import { CliError } from "../output.js";
 import { requireProject } from "../project/select.js";
 import type { CloudMediaRef } from "@zenvi/engine";
@@ -105,13 +105,15 @@ export function registerAccountCommands(program: Command, ctx: CommandContext): 
     .command("pull")
     .description("download a Zenvi Cloud project (and its media) into a folder")
     .argument("<project>", "cloud project id or web editor URL")
-    .argument("[dir]", "folder to pull into (default: ./<project name>)")
-    .action(async (id: string, dir?: string) => {
+    .argument("[dir]", "folder to pull into (default: ./<project name>, or ./<project name> (2)… when that holds another project)")
+    .option("--force", "replace a project file there that belongs to another project or has unpushed edits")
+    .action(async (id: string, dir: string | undefined, opts: { force?: boolean }) => {
       const result = await pullProject({
         config: ctx.config,
         client: cloudClient(ctx),
         id,
         dir,
+        force: opts.force,
         cwd: ctx.cwd,
         warn: (m) => ctx.out.warn(m),
         onProgress: (p) => ctx.out.progress(`Downloading ${p.file} (${p.done + 1}/${p.total})`),
@@ -152,16 +154,21 @@ export function registerAccountCommands(program: Command, ctx: CommandContext): 
  */
 export async function keepCloudRefs(ctx: CommandContext, session: ProjectSession, refs: Record<string, CloudMediaRef>): Promise<void> {
   const file = session.file;
-  if (!file || Object.keys(refs).length === 0) return;
-  for (const endpoint of await discoverDesktop(ctx.config)) if (await hasProjectOpen(endpoint, file)) return;
+  if (!file) return;
+  let desktopOwns = false;
+  if (Object.keys(refs).length > 0) {
+    for (const endpoint of await discoverDesktop(ctx.config)) if (await hasProjectOpen(endpoint, file)) desktopOwns = true;
+  }
   let changed = false;
-  for (const [id, ref] of Object.entries(refs)) {
+  for (const [id, ref] of desktopOwns ? [] : Object.entries(refs)) {
     const entry = session.doc.project.files.find((f) => f.id === id);
     if (!entry || JSON.stringify(entry.cloud) === JSON.stringify(ref)) continue;
     session.doc.setUntracked(["files", { id }], { ...entry, cloud: ref });
     changed = true;
   }
   if (changed) await session.save();
+  // What is on disk now is what the cloud has: a later pull may replace it.
+  await markSynced(ctx.config, file);
 }
 
 function report(ctx: CommandContext, summary: string, data: Record<string, unknown>): void {

@@ -11,7 +11,11 @@
  *
  * Pull: download the project and any media not already on disk into
  * `<dir>/<name>_assets/media/`, point the paths at the local copies, save
- * `<dir>/<name>.zvn`.
+ * `<dir>/<name>.zvn` with `zenvi_cloud.project_id`. A pull never replaces a
+ * project file that belongs to another cloud project (or to none: a local
+ * project), nor one with edits made since the last sync, unless forced:
+ * names that collide after sanitizing (`Trip/One`, `Trip:One`) pull into
+ * `Trip_One (2)/` instead.
  */
 
 import { createHash } from "node:crypto";
@@ -37,6 +41,16 @@ export interface CloudLink {
   revision: string;
   editorUrl?: string;
   syncedAt: string;
+  /** SHA-256 of the .zvn as it was after the last push or pull (local edits change it). */
+  fileSha256?: string;
+}
+
+/** Top-level key of a pulled .zvn naming its cloud project (local metadata, never uploaded). */
+export const CLOUD_MARKER_KEY = "zenvi_cloud";
+
+interface CloudMarker {
+  project_id: string;
+  revision?: string;
 }
 
 type LinkFile = Record<string, CloudLink>;
@@ -68,6 +82,53 @@ export async function setLink(config: ZenviConfig, projectFile: string, link: Cl
   links[await linkKey(config, projectFile)] = link;
   await mkdir(config.configDir, { recursive: true, mode: 0o700 });
   await writeFileAtomic(linksPath(config), `${JSON.stringify(links, null, 2)}\n`);
+}
+
+function textSha256(text: string | Buffer): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+/** Record the .zvn's current content as synced (after a push saved cloud refs, or a pull). */
+export async function markSynced(config: ZenviConfig, projectFile: string): Promise<void> {
+  const link = await getLink(config, projectFile);
+  if (!link) return;
+  let bytes: Buffer;
+  try {
+    bytes = await readFile(projectFile);
+  } catch {
+    return;
+  }
+  await setLink(config, projectFile, { ...link, fileSha256: textSha256(bytes) });
+}
+
+/** Which cloud project an existing .zvn belongs to, and whether it changed since its last sync. */
+export type LocalProjectState =
+  | { kind: "missing" }
+  | { kind: "same"; unsynced: boolean }
+  | { kind: "other"; projectId?: string };
+
+export async function localProjectState(config: ZenviConfig, projectFile: string, projectId: string): Promise<LocalProjectState> {
+  let bytes: Buffer;
+  try {
+    bytes = await readFile(projectFile);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { kind: "missing" };
+    throw error;
+  }
+  let marker: string | undefined;
+  try {
+    const value = (JSON.parse(bytes.toString("utf8")) as Record<string, unknown>)[CLOUD_MARKER_KEY] as Partial<CloudMarker> | undefined;
+    if (value && typeof value.project_id === "string") marker = value.project_id;
+  } catch {
+    // Not JSON: certainly not something we pulled; never replace it silently.
+  }
+  const link = await getLink(config, projectFile);
+  const owner = marker ?? link?.projectId;
+  if (owner !== projectId) return { kind: "other", projectId: owner };
+  // Ours. Unsynced when it differs from what the last sync wrote; with no
+  // record of that (a link from an older CLI, or no link) assume it may have.
+  const unsynced = link?.projectId === projectId && link.fileSha256 ? link.fileSha256 !== textSha256(bytes) : true;
+  return { kind: "same", unsynced };
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +242,9 @@ export function cloudProjectJson(project: Project, media: LocalMedia[], warn?: (
   for (const value of unmapped) {
     if (!/[\\/]thumbnail[\\/]/.test(value)) warn?.(`${path.basename(value)} is referenced by the project but is not a project file; it was not uploaded.`);
   }
-  return mapped;
+  // Which cloud project a local copy belongs to is this machine's business.
+  const { [CLOUD_MARKER_KEY]: _marker, ...upload } = mapped as Project & { [CLOUD_MARKER_KEY]?: unknown };
+  return upload as Project;
 }
 
 export async function pushProject(options: PushOptions): Promise<PushResult> {
@@ -285,9 +348,11 @@ export interface PullOptions {
   client: CloudClient;
   /** Project id, or an editor URL ending in /p/<id>. */
   id: string;
-  /** Folder to pull into (default: ./<project name>). */
+  /** Folder to pull into (default: ./<project name>, or `<name> (2)`… when that holds another project). */
   dir?: string;
   cwd: string;
+  /** Replace a project file that belongs to another project or has unsynced local edits. */
+  force?: boolean;
   onProgress?: (p: { file: string; done: number; total: number }) => void;
   warn?: (message: string) => void;
   fetchImpl?: typeof fetch;
@@ -300,6 +365,41 @@ export interface PullResult {
   downloaded: number;
   reused: number;
   missing: string[];
+}
+
+/**
+ * Where a pull writes `<name>.zvn`. An explicit folder is used as is, but a
+ * project file there that belongs to another project (or has edits since its
+ * last sync) is only replaced with `force`. Without a folder, `./<name>` or
+ * the first `./<name> (n)` that is free or holds this same project.
+ */
+async function pullDestination(options: PullOptions, id: string, name: string): Promise<string> {
+  const check = async (projectFile: string, explicit: boolean): Promise<"use" | "skip"> => {
+    const state = await localProjectState(options.config, projectFile, id);
+    if (state.kind === "missing" || options.force) return "use";
+    if (state.kind === "same") {
+      if (!state.unsynced) return "use";
+      throw new CliError(
+        `${projectFile} has edits that are not in Zenvi Cloud yet; pulling would replace them.`,
+        1,
+        "Push them first (`zenvi push`), or pull again with --force to replace them.",
+      );
+    }
+    if (!explicit) return "skip";
+    const whose = state.projectId ? `cloud project ${state.projectId}` : "a local project";
+    throw new CliError(`${projectFile} belongs to ${whose}; pulling ${id} would replace it.`, 1, "Pull into another folder, or use --force to replace it.");
+  };
+  if (options.dir !== undefined) {
+    const projectFile = path.join(path.resolve(options.cwd, options.dir), `${name}.zvn`);
+    await check(projectFile, true);
+    return projectFile;
+  }
+  for (let n = 1; n < 1000; n += 1) {
+    const dir = path.resolve(options.cwd, n === 1 ? name : `${name} (${n})`);
+    const projectFile = path.join(dir, `${name}.zvn`);
+    if ((await check(projectFile, false)) === "use") return projectFile;
+  }
+  throw new CliError(`Too many folders named ${name} here; pull into a folder of your choice.`, 2);
 }
 
 export function projectIdFrom(value: string): string {
@@ -346,8 +446,7 @@ export async function pullProject(options: PullOptions): Promise<PullResult> {
   const id = projectIdFrom(options.id);
   const remote: CloudProject = await client.getProject(id);
   const name = safeFileName(remote.name || id);
-  const dir = path.resolve(options.cwd, options.dir ?? name);
-  const projectFile = path.join(dir, `${name}.zvn`);
+  const projectFile = await pullDestination(options, id, name);
   const mediaDir = path.join(projectAssetsDir(projectFile), "media");
   await mkdir(mediaDir, { recursive: true });
 
@@ -390,7 +489,15 @@ export async function pullProject(options: PullOptions): Promise<PullResult> {
     const st = await stat(dest);
     if (entry) file.cloud = cloudRef(file, { sha256: entry.sha256, size: st.size, contentType: entry.contentType ?? file.cloud?.content_type ?? contentTypeFor(dest), name: entry.name, mtime: st.mtimeMs / 1000 });
   }
+  const marker: CloudMarker = { project_id: id, revision: remote.revision ?? "" };
+  (local as Project & { [CLOUD_MARKER_KEY]?: CloudMarker })[CLOUD_MARKER_KEY] = marker;
   await writeProjectFile(projectFile, local);
-  await setLink(options.config, projectFile, { projectId: id, revision: remote.revision ?? "", editorUrl: remote.editorUrl, syncedAt: new Date().toISOString() });
+  await setLink(options.config, projectFile, {
+    projectId: id,
+    revision: remote.revision ?? "",
+    editorUrl: remote.editorUrl,
+    syncedAt: new Date().toISOString(),
+    fileSha256: textSha256(await readFile(projectFile)),
+  });
   return { projectFile, projectId: id, revision: remote.revision ?? "", downloaded, reused, missing };
 }

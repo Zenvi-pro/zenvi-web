@@ -169,7 +169,7 @@ tools show models.
 | `zenvi mcp-config <claude-code\|claude-desktop\|codex\|cursor> [--install] [--scope user\|project] [--name zenvi] [--force]` | Print or install the MCP server config. |
 | `zenvi login [--device] [--no-browser]` / `logout` / `whoami` | Sign in (browser handoff like the desktop, or a device code). |
 | `zenvi push [--name n] [--force] [--no-open]` | Upload to Zenvi Cloud and open the web editor. |
-| `zenvi pull <id\|editor URL> [dir]` | Download a cloud project and its media. |
+| `zenvi pull <id\|editor URL> [dir] [--force]` | Download a cloud project and its media. |
 | `zenvi cloud ls` | Your cloud projects. |
 | `zenvi doctor` | Check the setup. |
 
@@ -262,6 +262,13 @@ undo step).
   the cloud since, `push` stops (use `zenvi pull`, or `push --force`).
 - `zenvi pull <id or editor URL>` downloads the project and the media you do
   not already have into `./<name>/` (`<name>.zvn` and `<name>_assets/media/`).
+  The pulled `.zvn` records its cloud project (`zenvi_cloud.project_id`,
+  never uploaded). A pull never replaces a project file that belongs to
+  another project (a different cloud project, or a local one): names that
+  collide after making them file-safe (`Trip/One`, `Trip:One`) go to
+  `./Trip_One (2)/`, and an explicit `[dir]` holding another project is an
+  error. Pulling the same project again updates it in place, unless it has
+  edits made since the last push or pull; `--force` replaces in both cases.
 
 ## Environment variables and files
 

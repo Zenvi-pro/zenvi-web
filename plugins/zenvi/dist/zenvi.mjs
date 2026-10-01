@@ -46819,6 +46819,40 @@ async function setLink(config2, projectFile, link) {
   await writeFileAtomic(linksPath(config2), `${JSON.stringify(links, null, 2)}
 `);
 }
+function textSha256(text3) {
+  return createHash2("sha256").update(text3).digest("hex");
+}
+async function markSynced(config2, projectFile) {
+  const link = await getLink(config2, projectFile);
+  if (!link) return;
+  let bytes;
+  try {
+    bytes = await readFile7(projectFile);
+  } catch {
+    return;
+  }
+  await setLink(config2, projectFile, { ...link, fileSha256: textSha256(bytes) });
+}
+async function localProjectState(config2, projectFile, projectId) {
+  let bytes;
+  try {
+    bytes = await readFile7(projectFile);
+  } catch (error62) {
+    if (error62.code === "ENOENT") return { kind: "missing" };
+    throw error62;
+  }
+  let marker2;
+  try {
+    const value = JSON.parse(bytes.toString("utf8"))[CLOUD_MARKER_KEY];
+    if (value && typeof value.project_id === "string") marker2 = value.project_id;
+  } catch {
+  }
+  const link = await getLink(config2, projectFile);
+  const owner = marker2 ?? link?.projectId;
+  if (owner !== projectId) return { kind: "other", projectId: owner };
+  const unsynced = link?.projectId === projectId && link.fileSha256 ? link.fileSha256 !== textSha256(bytes) : true;
+  return { kind: "same", unsynced };
+}
 function contentTypeFor(file3) {
   return CONTENT_TYPES[path17.extname(file3).slice(1).toLowerCase()] ?? "application/octet-stream";
 }
@@ -46864,7 +46898,8 @@ function cloudProjectJson(project, media, warn) {
   for (const value of unmapped) {
     if (!/[\\/]thumbnail[\\/]/.test(value)) warn?.(`${path17.basename(value)} is referenced by the project but is not a project file; it was not uploaded.`);
   }
-  return mapped;
+  const { [CLOUD_MARKER_KEY]: _marker, ...upload } = mapped;
+  return upload;
 }
 async function pushProject(options) {
   const { client, project, config: config2 } = options;
@@ -46954,6 +46989,34 @@ async function pushProject(options) {
   for (const m of media) cloudRefs[m.file.id] = cloudRef(m.file, { ...m, name: m.cloudName });
   return { projectId, revision, editorUrl, created, uploaded, reused: unique.length - uploaded, skipped, cloudRefs };
 }
+async function pullDestination(options, id, name) {
+  const check2 = async (projectFile, explicit) => {
+    const state = await localProjectState(options.config, projectFile, id);
+    if (state.kind === "missing" || options.force) return "use";
+    if (state.kind === "same") {
+      if (!state.unsynced) return "use";
+      throw new CliError(
+        `${projectFile} has edits that are not in Zenvi Cloud yet; pulling would replace them.`,
+        1,
+        "Push them first (`zenvi push`), or pull again with --force to replace them."
+      );
+    }
+    if (!explicit) return "skip";
+    const whose = state.projectId ? `cloud project ${state.projectId}` : "a local project";
+    throw new CliError(`${projectFile} belongs to ${whose}; pulling ${id} would replace it.`, 1, "Pull into another folder, or use --force to replace it.");
+  };
+  if (options.dir !== void 0) {
+    const projectFile = path17.join(path17.resolve(options.cwd, options.dir), `${name}.zvn`);
+    await check2(projectFile, true);
+    return projectFile;
+  }
+  for (let n = 1; n < 1e3; n += 1) {
+    const dir = path17.resolve(options.cwd, n === 1 ? name : `${name} (${n})`);
+    const projectFile = path17.join(dir, `${name}.zvn`);
+    if (await check2(projectFile, false) === "use") return projectFile;
+  }
+  throw new CliError(`Too many folders named ${name} here; pull into a folder of your choice.`, 2);
+}
 function projectIdFrom(value) {
   const m = /\/p\/([A-Za-z0-9_-]+)\/?(?:[?#].*)?$/.exec(value.trim());
   return m ? m[1] : value.trim();
@@ -46994,8 +47057,7 @@ async function pullProject(options) {
   const id = projectIdFrom(options.id);
   const remote = await client.getProject(id);
   const name = safeFileName(remote.name || id);
-  const dir = path17.resolve(options.cwd, options.dir ?? name);
-  const projectFile = path17.join(dir, `${name}.zvn`);
+  const projectFile = await pullDestination(options, id, name);
   const mediaDir = path17.join(projectAssetsDir(projectFile), "media");
   await mkdir6(mediaDir, { recursive: true });
   const project = remote.project;
@@ -47034,11 +47096,19 @@ async function pullProject(options) {
     const st = await stat10(dest);
     if (entry) file3.cloud = cloudRef(file3, { sha256: entry.sha256, size: st.size, contentType: entry.contentType ?? file3.cloud?.content_type ?? contentTypeFor(dest), name: entry.name, mtime: st.mtimeMs / 1e3 });
   }
+  const marker2 = { project_id: id, revision: remote.revision ?? "" };
+  local[CLOUD_MARKER_KEY] = marker2;
   await writeProjectFile(projectFile, local);
-  await setLink(options.config, projectFile, { projectId: id, revision: remote.revision ?? "", editorUrl: remote.editorUrl, syncedAt: (/* @__PURE__ */ new Date()).toISOString() });
+  await setLink(options.config, projectFile, {
+    projectId: id,
+    revision: remote.revision ?? "",
+    editorUrl: remote.editorUrl,
+    syncedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    fileSha256: textSha256(await readFile7(projectFile))
+  });
   return { projectFile, projectId: id, revision: remote.revision ?? "", downloaded, reused, missing };
 }
-var CONTENT_TYPES;
+var CLOUD_MARKER_KEY, CONTENT_TYPES;
 var init_sync = __esm({
   "src/cloud/sync.ts"() {
     "use strict";
@@ -47047,6 +47117,7 @@ var init_sync = __esm({
     init_output();
     init_client();
     init_upload();
+    CLOUD_MARKER_KEY = "zenvi_cloud";
     CONTENT_TYPES = {
       mp4: "video/mp4",
       m4v: "video/x-m4v",
@@ -80885,12 +80956,13 @@ If no browser opens, paste that link into one. Waiting for you to sign in\u2026`
       ctx.out.line(ctx.out.style(`  ${result.uploaded} media uploaded, ${result.reused} already there${result.skipped.length ? `, ${result.skipped.length} skipped` : ""}`, "dim"));
     }
   });
-  program2.command("pull").description("download a Zenvi Cloud project (and its media) into a folder").argument("<project>", "cloud project id or web editor URL").argument("[dir]", "folder to pull into (default: ./<project name>)").action(async (id, dir) => {
+  program2.command("pull").description("download a Zenvi Cloud project (and its media) into a folder").argument("<project>", "cloud project id or web editor URL").argument("[dir]", "folder to pull into (default: ./<project name>, or ./<project name> (2)\u2026 when that holds another project)").option("--force", "replace a project file there that belongs to another project or has unpushed edits").action(async (id, dir, opts) => {
     const result = await pullProject({
       config: ctx.config,
       client: cloudClient(ctx),
       id,
       dir,
+      force: opts.force,
       cwd: ctx.cwd,
       warn: (m) => ctx.out.warn(m),
       onProgress: (p) => ctx.out.progress(`Downloading ${p.file} (${p.done + 1}/${p.total})`)
@@ -80921,16 +80993,20 @@ If no browser opens, paste that link into one. Waiting for you to sign in\u2026`
 }
 async function keepCloudRefs(ctx, session, refs) {
   const file3 = session.file;
-  if (!file3 || Object.keys(refs).length === 0) return;
-  for (const endpoint of await discoverDesktop(ctx.config)) if (await hasProjectOpen(endpoint, file3)) return;
+  if (!file3) return;
+  let desktopOwns = false;
+  if (Object.keys(refs).length > 0) {
+    for (const endpoint of await discoverDesktop(ctx.config)) if (await hasProjectOpen(endpoint, file3)) desktopOwns = true;
+  }
   let changed = false;
-  for (const [id, ref] of Object.entries(refs)) {
+  for (const [id, ref] of desktopOwns ? [] : Object.entries(refs)) {
     const entry = session.doc.project.files.find((f2) => f2.id === id);
     if (!entry || JSON.stringify(entry.cloud) === JSON.stringify(ref)) continue;
     session.doc.setUntracked(["files", { id }], { ...entry, cloud: ref });
     changed = true;
   }
   if (changed) await session.save();
+  await markSynced(ctx.config, file3);
 }
 function report(ctx, summary, data) {
   if (ctx.out.json) ctx.out.data({ status: "applied", summary, ...data });
