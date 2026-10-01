@@ -72,10 +72,15 @@ describe("stored paths (engine rules, Node roots)", () => {
     project.clips = [clip];
     project.effects = [t1, t2];
     await writeProjectFile(projectFile, project, { engineAssetsDir: assets });
-    const stored = JSON.parse(await readFile(projectFile, "utf8")) as Record<string, any>;
-    expect(stored.files.map((f: { path: string }) => f.path)).toEqual(["clips/a.png", "/media/elsewhere/b.png", "@assets/title/t.png"]);
-    expect(stored.clips[0].reader.path).toBe("clips/a.png");
-    expect(stored.effects.map((t: { reader: { path: string } }) => t.reader.path)).toEqual(["@transitions/extra/x.jpg", "@transitions/common/fade.svg"]);
+    const stored = JSON.parse(await readFile(projectFile, "utf8")) as {
+      files: Array<{ path: string }>;
+      clips: Array<{ reader: { path: string } }>;
+      effects: Array<{ reader: { path: string } }>;
+      version: Record<string, string>;
+    };
+    expect(stored.files.map((f) => f.path)).toEqual(["clips/a.png", "/media/elsewhere/b.png", "@assets/title/t.png"]);
+    expect(stored.clips[0]?.reader.path).toBe("clips/a.png");
+    expect(stored.effects.map((t) => t.reader.path)).toEqual(["@transitions/extra/x.jpg", "@transitions/common/fade.svg"]);
     expect(stored.version["openshot-qt"]).not.toBe("0.0.0");
     const back = await readProjectFile(projectFile);
     expect(back.files.map((f) => f.path)).toEqual([path.join(dir, "paths", "clips", "a.png"), "/media/elsewhere/b.png", path.join(dir, "paths", "Trip_assets", "title", "t.png")]);
