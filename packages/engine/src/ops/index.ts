@@ -22,6 +22,7 @@ export * from "./files.js";
 export * from "./clips.js";
 export * from "./values.js";
 export * from "./keyframes.js";
+export * from "./arrange.js";
 export * from "./effects.js";
 export * from "./transitions.js";
 export * from "./tracks.js";
