@@ -320,7 +320,11 @@ export class OAuthService {
   }
 
   async token(params: Record<string, string | undefined>, origin: string): Promise<TokenResponse> {
-    const clientId = params.client_id;
+    let clientId = params.client_id;
+    if (!clientId && params.grant_type === "refresh_token" && params.refresh_token) {
+      // Some public clients omit client_id on refresh; the refresh token is bound to its client anyway.
+      clientId = (await this.options.tokens.lookup(params.refresh_token))?.record.clientId;
+    }
     if (!clientId) throw new OAuthError("invalid_client", "client_id is required (public client).", 401);
     const client = await this.options.clients.get(clientId);
     if (!client) throw new OAuthError("invalid_client", "Unknown client.", 401);

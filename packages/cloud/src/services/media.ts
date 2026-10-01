@@ -214,10 +214,9 @@ export class MediaService {
 
     let verified = false;
     if (head.size <= this.limits.verifyHashMaxBytes) {
-      const blob = await this.blobs.read(path);
-      if (!blob) throw notFound("Uploaded media");
-      const actual = createHash("sha256").update(blob.data).digest("hex");
-      if (actual !== sha256) {
+      const hashed = await this.blobs.sha256(path);
+      if (!hashed) throw notFound("Uploaded media");
+      if (hashed.sha256 !== sha256) {
         await this.blobs.delete(path);
         throw new ApiError(422, "hash_mismatch", "The uploaded bytes do not match the declared sha256. Upload the file again.");
       }

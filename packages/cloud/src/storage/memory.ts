@@ -8,7 +8,7 @@
  * `acceptSignedWrite` plays the part of a client PUT to such a URL.
  */
 
-import { createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { AlreadyExistsError, NotFoundError, PreconditionFailedError } from "../http/errors.js";
 import type {
@@ -87,6 +87,12 @@ export class MemoryBlobStore implements BlobStore {
     if (!blob) throw new NotFoundError(`blob not found: ${path}`);
     await writeFile(filePath, blob.data);
     return { ...blob.properties };
+  }
+
+  async sha256(path: string): Promise<{ sha256: string; size: number; etag: string } | null> {
+    const blob = this.blobs.get(path);
+    if (!blob) return null;
+    return { sha256: createHash("sha256").update(blob.data).digest("hex"), size: blob.data.length, etag: blob.properties.etag };
   }
 
   async setMetadata(path: string, metadata: Record<string, string>, options: { ifMatch?: string } = {}): Promise<{ etag: string }> {

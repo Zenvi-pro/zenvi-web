@@ -341,6 +341,14 @@ describe("refresh tokens", () => {
     expect((await refresh(h, clientId, next.json.refresh_token)).json.error).toBe("invalid_grant");
   });
 
+  it("work without client_id on refresh (the token names its client)", async () => {
+    const h = await harness();
+    const { refresh: token } = await connected(h);
+    const res = await h.request("POST", "/oauth/token", { form: { grant_type: "refresh_token", refresh_token: token } });
+    expect(res.status).toBe(200);
+    expect(res.json.refresh_token).toMatch(/^zvn_ort_/);
+  });
+
   it("belong to one client and cannot widen scope", async () => {
     const h = await harness();
     const { clientId, refresh: token } = await connected(h);

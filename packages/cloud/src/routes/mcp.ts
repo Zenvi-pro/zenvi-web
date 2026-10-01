@@ -42,12 +42,10 @@ export function mcpRoutes(services: Services, tools: readonly McpTool[], originA
 
   app.all("/", async (c) => {
     const origin = c.get("origin");
+    // MCP transport rule: a present, invalid Origin gets 403 (DNS rebinding). "null" is an opaque origin.
     const browserOrigin = c.req.header("origin");
-    if (browserOrigin !== undefined && browserOrigin !== "null" && !originAllowed(browserOrigin)) {
+    if (browserOrigin !== undefined && (browserOrigin === "null" || !originAllowed(browserOrigin))) {
       return c.json({ error: "forbidden_origin", error_description: "This Origin may not call the Zenvi MCP server." }, 403);
-    }
-    if (browserOrigin === "null") {
-      return c.json({ error: "forbidden_origin", error_description: "Opaque origins may not call the Zenvi MCP server." }, 403);
     }
 
     const token = bearerToken(c.req.header("authorization"));

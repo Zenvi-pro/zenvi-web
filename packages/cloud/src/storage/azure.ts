@@ -6,6 +6,7 @@
  * signed with the account key from the connection string.
  */
 
+import { createHash } from "node:crypto";
 import { TableClient, type TableEntityResult } from "@azure/data-tables";
 import { BlobSASPermissions, BlobServiceClient, type ContainerClient, SASProtocol } from "@azure/storage-blob";
 import { AlreadyExistsError, NotFoundError, PreconditionFailedError } from "../http/errors.js";
@@ -167,6 +168,26 @@ export class AzureBlobStore implements BlobStore {
       };
     } catch (error) {
       translate(error, path);
+    }
+  }
+
+  async sha256(path: string): Promise<{ sha256: string; size: number; etag: string } | null> {
+    try {
+      const response = await this.container.getBlobClient(path).download(0);
+      const hash = createHash("sha256");
+      let size = 0;
+      const body = response.readableStreamBody;
+      if (body) {
+        for await (const chunk of body) {
+          const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+          size += bytes.length;
+          hash.update(bytes);
+        }
+      }
+      return { sha256: hash.digest("hex"), size, etag: unquote(response.etag) };
+    } catch (error) {
+      if (statusOf(error) === 404) return null;
+      throw error;
     }
   }
 

@@ -54,6 +54,8 @@ export interface BlobStore {
   writeFile(path: string, filePath: string, options?: BlobWriteOptions): Promise<{ etag: string; size: number }>;
   /** Download a blob to a local file (streamed). Throws NotFoundError when missing. */
   readToFile(path: string, filePath: string): Promise<BlobProperties>;
+  /** SHA-256 (hex) of a blob's bytes, streamed; null when missing. */
+  sha256(path: string): Promise<{ sha256: string; size: number; etag: string } | null>;
   setMetadata(path: string, metadata: Record<string, string>, options?: { ifMatch?: string }): Promise<{ etag: string }>;
   /** Returns false when the blob did not exist. */
   delete(path: string, options?: { ifMatch?: string }): Promise<boolean>;
