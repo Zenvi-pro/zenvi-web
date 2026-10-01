@@ -36,14 +36,14 @@ token that may not use an endpoint gets `403`.
 
 | Status | `code` | When |
 | --- | --- | --- |
-| 400 | `invalid_request` | bad JSON, failed validation (message names the field) |
+| 400 | `invalid_request`, `invalid_project` (+ `issues: [{path, message}]`) | bad JSON, failed validation (message names the field) |
 | 401 | `unauthorized` | no/invalid token |
 | 403 | `forbidden`, `insufficient_scope`, `project_limit` | credential not allowed here |
 | 404 | `not_found` | missing — or not yours (other users' objects are indistinguishable from missing) |
 | 409 | `revision_conflict` (+ `revision`), `code_used`, `request_used`, `media_missing` | state changed |
 | 413 | `too_large`, `file_too_large`, `quota_exceeded` (+ `usedBytes`, `quotaBytes`) | limits |
 | 415 | `unsupported_media_type` | content type not allowed |
-| 422 | `invalid_project` (+ `issues`), `hash_mismatch`, `size_mismatch` | content rejected |
+| 422 | `hash_mismatch`, `size_mismatch`, `download_failed`, `preview_failed` | content rejected |
 | 428 | `precondition_required` | `PUT` without `If-Match` |
 | 429 | `rate_limited` (+ `Retry-After` header) | too many requests |
 | 503 | `unavailable`, `busy` | feature not in this build / retry |
@@ -116,8 +116,17 @@ requests, so the editor can decode without downloading whole files.
 **Saving.** `PUT` requires `If-Match`. Send the revision you loaded; `*`
 overwrites whatever is there. On a stale revision you get
 `409 { "error": { "code": "revision_conflict", … }, "revision": "<current>" }`:
-reload, reapply, save again. Bodies are validated (`422 invalid_project`) and
-capped at 20 MB (`MAX_PROJECT_BYTES`).
+reload, reapply, save again. Bodies are capped at 20 MB (`MAX_PROJECT_BYTES`).
+
+**Project JSON in and out.** `POST`/`PUT` bodies go through the engine's
+`parseProject` (validation, then the desktop's load upgrades); problems give
+`400 invalid_project` with `issues: [{ path, message }]`. Every project the
+service stores — created, saved, edited by MCP tools, snapshotted for a
+render — is `serializeProject` output, stamped
+`version: { "openshot-qt": "1.0.188", "libopenshot": "1.0.0" }`. Send what
+`serializeProject` produces, or exactly what you loaded: a project with no
+`version`, or with the template stamp `0.0.0`, is upgraded as an OpenShot
+beta project (every clip's alpha flips), just as the desktop would.
 
 ## 4. Media
 

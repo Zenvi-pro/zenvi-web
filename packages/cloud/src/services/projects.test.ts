@@ -1,3 +1,4 @@
+import { addClip, addFile, parseProject, PROJECT_FORMAT_VERSION, ProjectDocument } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
 import { harness, sampleProject, USER_A, USER_B } from "../testing/helpers.js";
 
@@ -66,6 +67,56 @@ describe("projects API", () => {
     expect(got.json.missingMedia).toEqual([{ fileId: "F1", name: "c.mp4", reason: "not_in_cloud" }]);
   });
 
+  it("stamps every stored project with the engine's format version (never the 0.0.0 template stamp)", async () => {
+    const h = await harness();
+    const token = await h.userToken(USER_A);
+    const created = await h.request("POST", "/v1/projects", { token, json: { name: "Fresh" } });
+    const got = await h.request("GET", `/v1/projects/${created.json.id}`, { token });
+    expect(got.json.project.version).toEqual(PROJECT_FORMAT_VERSION);
+    // The blob itself is serializeProject output: the desktop's indented layout with the stamp.
+    const blob = await h.blobs.read(`u/${USER_A}/p/${created.json.id}/project.json`);
+    const text = blob?.data.toString("utf8") ?? "";
+    expect(text).toContain('"openshot-qt": "1.0.188"');
+    expect(text.startsWith("{\n")).toBe(true);
+  });
+
+  it("keeps clip alpha at 1 through save, load and the desktop's load upgrades", async () => {
+    const h = await harness();
+    const token = await h.userToken(USER_A);
+    const created = await h.request("POST", "/v1/projects", { token, json: { name: "Alpha" } });
+    const id = created.json.id as string;
+    const loaded = await h.request("GET", `/v1/projects/${id}`, { token });
+    // Edit the stored JSON as-is (no client-side parse), the way MCP edits do:
+    // a ProjectDocument over the loaded project, the engine's ops, then save.
+    const doc = new ProjectDocument(loaded.json.project);
+    doc.transaction("Import", (tx) =>
+      addFile(tx, {
+        path: "clip.mp4",
+        name: "clip.mp4",
+        info: { type: "FFmpegReader", path: "clip.mp4", has_video: true, has_audio: false, has_single_image: false, duration: 4, width: 320, height: 240, fps: { num: 30, den: 1 }, video_length: 120, pixel_ratio: { num: 1, den: 1 }, display_ratio: { num: 4, den: 3 }, sample_rate: 0, channels: 0, channel_layout: 0 },
+        cloud: { sha256: "a".repeat(64), size: 1, name: "clip.mp4" },
+      }),
+    );
+    const fileId = doc.project.files[0]!.id;
+    doc.transaction("Add clip", (tx) => addClip(tx, { fileId, position: 0, layer: doc.project.layers[0]!.number }));
+    const alphaOf = (project: unknown) => (project as { clips: { alpha: { Points: { co: { Y: number } }[] } }[] }).clips[0]!.alpha.Points[0]!.co.Y;
+    expect(alphaOf(doc.project)).toBe(1);
+    await h.services.projects.save(USER_A, id, doc.toJSON(), loaded.json.revision);
+
+    const again = await h.request("GET", `/v1/projects/${id}`, { token });
+    expect(again.json.project.version).toEqual(PROJECT_FORMAT_VERSION);
+    // What the desktop, the editor and the CLI do on open: parseProject. A "0.0.0"
+    // stamp here would run the OpenShot beta migration and turn alpha to 0.
+    expect(alphaOf(parseProject(again.json.project))).toBe(1);
+
+    // A client sending back exactly what it loaded changes nothing either.
+    const resaved = await h.request("PUT", `/v1/projects/${id}`, { token, json: again.json.project, headers: { "if-match": again.json.revision } });
+    expect(resaved.status).toBe(200);
+    const third = await h.request("GET", `/v1/projects/${id}`, { token });
+    expect(alphaOf(third.json.project)).toBe(1);
+    expect(alphaOf(parseProject(third.json.project))).toBe(1);
+  });
+
   it("never lets one user see or change another user's project", async () => {
     const h = await harness();
     const a = await h.userToken(USER_A);
@@ -110,9 +161,11 @@ describe("projects API", () => {
   it("rejects invalid and oversized project JSON", async () => {
     const h = await harness({ config: { limits: { maxProjectBytes: 2048 } } });
     const token = await h.userToken(USER_A);
-    const bad = await h.request("POST", "/v1/projects", { token, json: { name: "x", project: { width: -5 } } });
-    expect(bad.status).toBe(422);
+    const bad = await h.request("POST", "/v1/projects", { token, json: { name: "x", project: { width: -5, clips: [{ id: "C1" }] } } });
+    expect(bad.status).toBe(400);
     expect(bad.json.error.code).toBe("invalid_project");
+    expect(bad.json.issues.length).toBeGreaterThan(0);
+    expect(bad.json.issues[0]).toEqual({ path: expect.any(String), message: expect.any(String) });
 
     const huge = await h.request("POST", "/v1/projects", { token, json: { name: "x", project: sampleProject({ notes: "x".repeat(5000) }) } });
     expect(huge.status).toBe(413);

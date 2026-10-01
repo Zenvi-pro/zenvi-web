@@ -12,7 +12,7 @@
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { ExportOptions, Project } from "@zenvi/engine";
+import { type ExportOptions, type Project, serializeProject } from "@zenvi/engine";
 import { ApiError, notFound, PreconditionFailedError } from "../http/errors.js";
 import type { Logger } from "../http/log.js";
 import { errorMessage } from "../http/log.js";
@@ -163,7 +163,7 @@ export class RenderService {
     }
 
     const renderId = randomId("r_", 16);
-    await this.options.blobs.write(renderSnapshotPath(userId, projectId, renderId), JSON.stringify(loaded.project), {
+    await this.options.blobs.write(renderSnapshotPath(userId, projectId, renderId), serializeProject(loaded.project), {
       contentType: "application/json",
     });
     const row: RenderRow = {

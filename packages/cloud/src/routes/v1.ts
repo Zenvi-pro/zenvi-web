@@ -12,7 +12,7 @@ import { requireAuth } from "../http/auth.js";
 import { parseJson, parseWith, readJson } from "../http/body.js";
 import type { AppEnv } from "../http/context.js";
 import { ApiError, badRequest, notFound } from "../http/errors.js";
-import { projectMedia } from "../projects/model.js";
+import { parseUntrustedProject, projectMedia } from "../projects/model.js";
 import { PRESET_NAMES, renderOptionsSchema } from "../render/options.js";
 import type { RenderJob, RenderJobView } from "../render/service.js";
 import { isProjectId, isRenderId } from "../services/paths.js";
@@ -90,7 +90,8 @@ export function v1Routes(services: Services): Hono<AppEnv> {
       z.object({ name: z.string().max(500).optional(), project: z.unknown().optional() }),
       await readJson(c, config.limits.maxProjectBytes + 64 * 1024),
     );
-    const created = await projects.create(c.get("principal").userId, { name: body.name, project: body.project });
+    const project = body.project === undefined || body.project === null ? undefined : parseUntrustedProject(body.project);
+    const created = await projects.create(c.get("principal").userId, { name: body.name, project });
     c.header("ETag", `"${created.revision}"`);
     return c.json(summary(created), 201);
   });
@@ -122,8 +123,8 @@ export function v1Routes(services: Services): Hono<AppEnv> {
     if (!ifMatch) {
       throw new ApiError(428, "precondition_required", "Send If-Match with the revision you loaded (or * to overwrite).");
     }
-    const body = await readJson(c, config.limits.maxProjectBytes);
-    const saved = await projects.save(c.get("principal").userId, id, body, ifMatch);
+    const project = parseUntrustedProject(await readJson(c, config.limits.maxProjectBytes));
+    const saved = await projects.save(c.get("principal").userId, id, project, ifMatch);
     c.header("ETag", `"${saved.revision}"`);
     return c.json({ id, revision: saved.revision, updatedAt: saved.updatedAt, stats: saved.stats });
   });

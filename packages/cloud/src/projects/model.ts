@@ -1,44 +1,29 @@
 /**
- * Project JSON helpers the cloud needs: validation of untrusted uploads,
- * listing stats and the media a project references. New projects come from
- * the engine's `createProject`.
+ * Project JSON helpers the cloud needs: parsing untrusted uploads, listing
+ * stats and the media a project references.
  *
- * Validation belongs to the engine (`parseProject`, W1 `packages/engine/src/io`).
- * Until it is exported from `@zenvi/engine`, `validateProject` here is a
- * deliberately shallow stand-in (owner: W7; swap to `parseProject` when it
- * lands): it checks the fields the cloud relies on and keeps every other key
- * untouched.
+ * Reading and writing project JSON belongs to the engine (`@zenvi/engine` io):
+ * untrusted input goes through `parseProject` (validation + the desktop's load
+ * upgrades + the current version stamp), and every write goes through
+ * `serializeProject` (services/projects.ts), so no stored project ever carries
+ * the "0.0.0" template stamp the desktop reads as an OpenShot beta project
+ * (it would flip every clip's alpha on open).
  */
 
-import type { Project, ProjectFile } from "@zenvi/engine";
-import { z } from "zod";
+import { parseProject, ProjectParseError, type Project, type ProjectFile } from "@zenvi/engine";
 import { ApiError } from "../http/errors.js";
 
-const fraction = z.object({ num: z.number().int().positive(), den: z.number().int().positive() }).passthrough();
-const identified = z.object({ id: z.string().min(1).max(200) }).passthrough();
+const MAX_ISSUES = 50;
 
-const projectShape = z
-  .object({
-    id: z.string().max(200).optional(),
-    fps: fraction,
-    width: z.number().int().positive().max(16384),
-    height: z.number().int().positive().max(16384),
-    clips: z.array(identified).max(20_000),
-    files: z.array(identified).max(20_000),
-    effects: z.array(identified).max(20_000).optional(),
-    layers: z.array(identified).max(1_000).optional(),
-    markers: z.array(identified).max(20_000).optional(),
-  })
-  .passthrough();
-
-/** Validate an untrusted project JSON value. Throws a 422 ApiError listing the problems. */
-export function validateProject(value: unknown): Project {
-  const result = projectShape.safeParse(value);
-  if (!result.success) {
-    const issues = result.error.issues.slice(0, 10).map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`);
-    throw new ApiError(422, "invalid_project", `Not a valid Zenvi project: ${issues.join("; ")}`, { issues });
+/** Parse project JSON from the network. Throws a 400 ApiError listing the problems. */
+export function parseUntrustedProject(value: unknown): Project {
+  try {
+    return parseProject(value);
+  } catch (error) {
+    if (!(error instanceof ProjectParseError)) throw error;
+    const issues = error.issues.slice(0, MAX_ISSUES).map((issue) => ({ path: issue.path, message: issue.message }));
+    throw new ApiError(400, "invalid_project", error.message, { issues });
   }
-  return value as Project;
 }
 
 export interface ProjectStats {

@@ -2,6 +2,7 @@ import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { PROJECT_FORMAT_VERSION } from "@zenvi/engine";
 import { afterEach, describe, expect, it } from "vitest";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
 import { fakeEngine, fakeProber, fakeRenderer, PNG_1X1 } from "../testing/fakes.js";
@@ -145,10 +146,11 @@ describe("cloud tools", () => {
     const link = await call(client, "open_in_editor");
     expect(link.structuredContent?.url).toBe(`https://zenvi.test/editor/p/${projectId}`);
 
-    // The stored project is the desktop format with the profile the desktop uses.
+    // The stored project is the desktop format with the profile the desktop uses, and the engine's stamp.
     const { project } = await h.services.projects.get(USER_A, projectId);
     expect(project.profile).toBe("FHD Vertical 1080p 30 fps");
     expect(project.display_ratio).toEqual({ num: 9, den: 16 });
+    expect(project.version).toEqual(PROJECT_FORMAT_VERSION);
     await client.close();
   });
 
@@ -329,7 +331,7 @@ describe("import_media_from_url", () => {
     const client = await connect(h, await pat(h));
     const projectId = (await call(client, "create_project", { name: "P" })).structuredContent?.project_id as string;
     const current = await h.services.projects.get(USER_A, projectId);
-    const desktopFile = { ...(await fakeProber.probe("/Users/me/b.mp4")), id: "DESKTOP001", path: "/Users/me/b.mp4", media_type: "video", fingerprint: { sha256: sha, size: bytes.length } };
+    const desktopFile = { ...(await fakeProber.probe("/Users/me/b.mp4")), id: "DESKTOP001", path: "/Users/me/b.mp4", media_type: "video" as const, fingerprint: { sha256: sha, size: bytes.length } };
     await h.services.projects.save(USER_A, projectId, { ...current.project, files: [desktopFile] }, current.revision);
     const res = await call(client, "import_media_from_url", { url: `http://media.test:${port}/b.mp4` });
     expect(res.structuredContent).toMatchObject({ already_in_project: false });

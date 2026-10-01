@@ -227,6 +227,10 @@ try {
     doc.transaction("Add clip", (tx) => addClip(tx, { fileId: imported.structuredContent.file_id, position: 0, layer: doc.project.layers[0].number }));
     const placed = await http("PUT", `/v1/projects/${mcpProject}`, { token: pat, json: doc.toJSON(), headers: { "if-match": `"${current.data.revision}"` } });
     check("clip placed on the timeline (engine addClip + If-Match)", placed.status === 200 && placed.data?.stats?.clips === 1, `duration ${placed.data?.stats?.duration}s`);
+    const { parseProject } = await import("@zenvi/engine");
+    const stored = (await http("GET", `/v1/projects/${mcpProject}`, { token: pat })).data?.project;
+    const alpha = parseProject(stored).clips[0]?.alpha?.Points?.[0]?.co?.Y;
+    check("stored project stamped; clip alpha stays 1 after parseProject", stored?.version?.["openshot-qt"] === "1.0.188" && alpha === 1, `version ${JSON.stringify(stored?.version)}, alpha ${alpha}`);
     const frame = await tool(pat, "preview_frame", { time_seconds: 1, width: 320 });
     const image = frame?.content?.find((c) => c.type === "image");
     const png = image ? Buffer.from(image.data, "base64") : Buffer.alloc(0);

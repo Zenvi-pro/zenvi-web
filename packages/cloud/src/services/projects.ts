@@ -4,14 +4,14 @@
  * overwrite each other — the loser gets a 409 with the current revision.
  */
 
-import { createProject, type Profile, type Project } from "@zenvi/engine";
+import { createProject, type Profile, type Project, serializeProject } from "@zenvi/engine";
 import { ApiError, conflict, notFound, PreconditionFailedError, tooLarge } from "../http/errors.js";
 import type { BlobStore } from "../storage/types.js";
 import { decodeMeta, encodeMeta } from "../storage/types.js";
 import type { Clock } from "../util/clock.js";
 import { isoAt } from "../util/clock.js";
 import { randomId } from "../util/crypto.js";
-import { projectStats, type ProjectStats, validateProject } from "../projects/model.js";
+import { projectStats, type ProjectStats } from "../projects/model.js";
 import { metaPath, projectPath, projectPrefix, userPrefix } from "./paths.js";
 
 export interface ProjectMeta {
@@ -101,15 +101,18 @@ export class ProjectService {
     return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  async create(userId: string, input: { name?: unknown; project?: unknown; profile?: Profile }): Promise<ProjectSummary> {
+  /**
+   * Create a project. `project` must already be parsed (`parseUntrustedProject`
+   * for network input); without one, the desktop's File ▸ New.
+   */
+  async create(userId: string, input: { name?: unknown; project?: Project; profile?: Profile }): Promise<ProjectSummary> {
     const existing = await this.list(userId);
     if (existing.length >= MAX_PROJECTS_PER_USER) {
       throw new ApiError(403, "project_limit", `You have reached the limit of ${MAX_PROJECTS_PER_USER} cloud projects.`);
     }
     const id = randomId("c_", 16);
     // No project given: the desktop's File ▸ New (default profile "HD 720p 30 fps").
-    const project =
-      input.project === undefined || input.project === null ? createProject(input.profile ? { profile: input.profile } : {}) : validateProject(input.project);
+    const project = input.project ?? createProject(input.profile ? { profile: input.profile } : {});
     const body = this.serialize(project);
     const now = isoAt(this.clock.now());
     const meta: ProjectMeta = { id, name: cleanName(input.name), createdAt: now, updatedAt: now, stats: projectStats(project) };
@@ -146,9 +149,10 @@ export class ProjectService {
   /**
    * Replace the project JSON if the stored revision is still `ifMatch`
    * (`*` = any existing revision). 409 with the current revision otherwise.
+   * `project` is trusted (parsed from the network, or produced by the
+   * engine from a stored project).
    */
-  async save(userId: string, id: string, value: unknown, ifMatch: string): Promise<ProjectSummary> {
-    const project = validateProject(value);
+  async save(userId: string, id: string, project: Project, ifMatch: string): Promise<ProjectSummary> {
     const body = this.serialize(project);
     const expected = ifMatch === "*" ? "*" : normalizeRevision(ifMatch);
     let etag: string;
@@ -198,9 +202,14 @@ export class ProjectService {
     for (const path of paths) await this.blobs.delete(path);
   }
 
+  /**
+   * The stored text: the engine's `serializeProject` (desktop file layout,
+   * current version stamp). Its indentation makes it larger than the compact
+   * JSON clients send, hence twice the request limit.
+   */
   private serialize(project: Project): string {
-    const body = JSON.stringify(project);
-    if (Buffer.byteLength(body, "utf8") > this.maxProjectBytes) {
+    const body = serializeProject(project);
+    if (Buffer.byteLength(body, "utf8") > this.maxProjectBytes * 2) {
       throw tooLarge(`Project JSON is larger than ${Math.round(this.maxProjectBytes / 1024 / 1024)} MB.`);
     }
     return body;
