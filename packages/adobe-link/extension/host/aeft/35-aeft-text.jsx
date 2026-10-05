@@ -2,7 +2,7 @@
 // fonts, line breaks, title-safe placement, contrast shadow and an optional
 // entrance) and ae_set_text.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
 
@@ -10,8 +10,9 @@
     var JUSTIFY = ["left", "center", "right"];
     var TEXT_ANIMATIONS = ["fade-in", "slide-in", "scale-pop", "blur-in", "typewriter", "word-cascade", "line-rise"];
 
+    /** @returns {Property} */
     function textProperty(layer) {
-        return layer.property("ADBE Text Properties").property("ADBE Text Document");
+        return /** @type {Property} */ (layer.property("ADBE Text Properties").property("ADBE Text Document"));
     }
 
     function boxArg(args) {
@@ -28,10 +29,12 @@
 
     /** A stand-in for a Source Text property that reads and writes the keyframe at `time`. */
     function keyedText(property, time) {
-        var target = {value: property.valueAtTime(time, true)};
-        target.setValue = function (value) {
-            property.setValueAtTime(time, value);
-            target.value = property.valueAtTime(time, true);
+        var target = {
+            value: property.valueAtTime(time, true),
+            setValue: function (value) {
+                property.setValueAtTime(time, value);
+                target.value = property.valueAtTime(time, true);
+            }
         };
         return target;
     }
@@ -153,7 +156,7 @@
         }
 
         ctx.changed();
-        layers.push(box ? comp.layers.addBoxText(box, broken.text) : comp.layers.addText(broken.text));
+        layers.push(box ? comp.layers.addBoxText(/** @type {[number, number]} */ (box), broken.text) : comp.layers.addText(broken.text));
         layers[0].name = name || firstLine(text);
         applied = AE.setTextDocument(textProperty(layers[0]), spec, ctx);
         if (subSpec) {

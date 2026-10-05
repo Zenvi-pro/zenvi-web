@@ -1,6 +1,6 @@
 // Zenvi Link: layer tools: ae_add_layer, ae_set_layer, ae_arrange_layers.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
 
@@ -239,15 +239,16 @@
         if (outPoint !== null) {
             layer.outPoint = AE.snapTime(comp, outPoint, ctx, "out_point");
         }
+        // Cameras and lights refused three_d and blend_mode above.
         if (threeD !== null) {
-            layer.threeDLayer = threeD;
+            /** @type {AVLayer} */ (layer).threeDLayer = threeD;
         }
         applyTransform(layer, transform, ctx);
         if (parent) {
             layer.parent = parent;
         }
         if (blendValue !== null) {
-            layer.blendingMode = blendValue;
+            /** @type {AVLayer} */ (layer).blendingMode = blendValue;
         }
         if (label !== null) {
             layer.label = label;
@@ -280,6 +281,8 @@
         var comp = AE.findComp(args.comp);
         var layer = AE.findLayer(comp, Z.required(args, "layer", "any"));
         var isAV = layer instanceof AVLayer;
+        // Only read where avOnly() has passed.
+        var av = /** @type {AVLayer} */ (layer);
         var plan = [];
         var unlockFirst = false;
         var lockLast = false;
@@ -354,10 +357,10 @@
             if (!SWITCHES[i].any) {
                 avOnly(SWITCHES[i].arg);
             }
-            if (SWITCHES[i].arg === "collapse" && !layer.canSetCollapseTransformation) {
+            if (SWITCHES[i].arg === "collapse" && !av.canSetCollapseTransformation) {
                 throw Z.refuse("UNSUPPORTED", "Layer \"" + layer.name + "\" cannot collapse transformations (only precomps and vector layers can)");
             }
-            if (SWITCHES[i].arg === "audio_enabled" && !layer.hasAudio) {
+            if (SWITCHES[i].arg === "audio_enabled" && !av.hasAudio) {
                 throw Z.refuse("INVALID_ARGUMENT", "Layer \"" + layer.name + "\" has no audio");
             }
             if (layer[SWITCHES[i].prop] !== value) {
@@ -370,8 +373,8 @@
         if (value !== null) {
             avOnly("blend_mode");
             number = AE.blendModeValue(value);
-            if (layer.blendingMode !== number) {
-                step("blend mode " + value, (function (v) { return function () { layer.blendingMode = v; }; }(number)));
+            if (av.blendingMode !== number) {
+                step("blend mode " + value, (function (v) { return function () { av.blendingMode = v; }; }(number)));
             }
         }
         matte = Z.optional(args, "track_matte", "object", null);
@@ -384,7 +387,7 @@
                     throw Z.refuse("INVALID_ARGUMENT", "A layer cannot be its own track matte");
                 }
             }
-            if (typeof layer.setTrackMatte === "function") {
+            if (typeof av.setTrackMatte === "function") {
                 if (matte.type !== "none" && !matteLayer) {
                     if (layer.index === 1) {
                         throw Z.refuse("INVALID_ARGUMENT", "Layer \"" + layer.name + "\" is the top layer; pass track_matte.layer");
@@ -392,7 +395,7 @@
                     matteLayer = comp.layer(layer.index - 1);
                 }
                 step("track matte " + matte.type + (matteLayer ? " from \"" + matteLayer.name + "\"" : ""), function () {
-                    layer.setTrackMatte(matte.type === "none" ? null : matteLayer, matteType);
+                    av.setTrackMatte(matte.type === "none" ? null : /** @type {AVLayer} */ (matteLayer), matteType);
                 });
             } else {
                 if (matteLayer && matteLayer.index !== layer.index - 1) {
@@ -402,7 +405,7 @@
                 if (matte.type !== "none" && layer.index === 1) {
                     throw Z.refuse("INVALID_ARGUMENT", "Layer \"" + layer.name + "\" is the top layer; there is no layer above to use as its matte");
                 }
-                step("track matte " + matte.type, function () { layer.trackMatteType = matteType; });
+                step("track matte " + matte.type, function () { av.trackMatteType = matteType; });
             }
         }
         if (Z.has(args, "parent")) {
@@ -431,8 +434,8 @@
         if (value !== null) {
             avOnly("quality");
             number = AE.qualityValue(value);
-            if (layer.quality !== number) {
-                step("quality " + value, (function (v) { return function () { layer.quality = v; }; }(number)));
+            if (av.quality !== number) {
+                step("quality " + value, (function (v) { return function () { av.quality = v; }; }(number)));
             }
         }
 

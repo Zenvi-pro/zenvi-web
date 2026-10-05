@@ -13,13 +13,15 @@
     "gen:catalog": "tsx scripts/gen-catalog.ts",
     "install:dev": "tsx scripts/install-dev.mjs",
     "package:zxp": "tsx scripts/package-zxp.mjs",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "typecheck:jsx": "tsc -p extension/host/aeft/types/tsconfig.json"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
     "zod": "^4.6.0"
   },
   "devDependencies": {
-    "acorn": "^8.15.0"
+    "acorn": "^8.15.0",
+    "types-for-adobe": "7.2.6"
   }
 }

@@ -1,0 +1,16 @@
+{
+  "//": "npm run typecheck:jsx: the After Effects host scripts (ES3 ExtendScript) checked against types-for-adobe AfterEffects/26.0.",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "noLib": true,
+    "types": [],
+    "target": "ES5",
+    "module": "none",
+    "strict": false,
+    "noImplicitAny": false,
+    "noErrorTruncation": true
+  },
+  "include": ["extendscript-globals.d.ts", "../*.jsx"]
+}

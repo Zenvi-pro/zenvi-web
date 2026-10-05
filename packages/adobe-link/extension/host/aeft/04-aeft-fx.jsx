@@ -4,7 +4,7 @@
 // Adding a property can invalidate references to its siblings in After
 // Effects, so the helpers re-fetch an effect by index after adding it.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
 
     function lower(text) {
@@ -145,7 +145,7 @@
 
     /** The layer's effect stack, or a refusal for layers without one (cameras, lights). */
     AE.effectStack = function (layer) {
-        var parade = layer.property("ADBE Effect Parade");
+        var parade = /** @type {PropertyGroup} */ (layer.property("ADBE Effect Parade"));
         if (!parade) {
             throw Z.refuse("UNSUPPORTED", "Layer \"" + layer.name + "\" (" + AE.layerType(layer) + ") cannot have effects");
         }
@@ -159,7 +159,7 @@
         if (name) {
             AE.effectStack(layer).property(index).name = name;
         }
-        return AE.effectStack(layer).property(index);
+        return /** @type {PropertyGroup} */ (AE.effectStack(layer).property(index));
     };
 
     /** Remove effects with this instance name; returns how many. */
@@ -186,14 +186,14 @@
             if (Math.floor(ref) !== ref || ref < 1 || ref > parade.numProperties) {
                 throw Z.refuse("NOT_FOUND", "Layer \"" + layer.name + "\" has " + Z.plural(parade.numProperties, "effect") + "; there is no effect " + ref);
             }
-            return parade.property(ref);
+            return /** @type {PropertyGroup} */ (parade.property(ref));
         }
         if (typeof ref !== "string" || !ref.length) {
             throw Z.refuse("INVALID_ARGUMENT", "`effect` must be an index, an instance name or a match name");
         }
         wanted = lower(ref);
         for (i = 1; i <= parade.numProperties; i += 1) {
-            effect = parade.property(i);
+            effect = /** @type {PropertyGroup} */ (parade.property(i));
             if (lower(effect.name) === wanted || effect.matchName === ref) {
                 return effect;
             }
@@ -204,7 +204,7 @@
 
     /** [{index, name, match_name, enabled}] for receipts. */
     AE.effectsJson = function (layer) {
-        var parade = layer.property("ADBE Effect Parade");
+        var parade = /** @type {PropertyGroup} */ (layer.property("ADBE Effect Parade"));
         var out = [];
         var effect;
         var i;

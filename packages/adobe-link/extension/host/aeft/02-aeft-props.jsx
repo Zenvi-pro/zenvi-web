@@ -2,7 +2,7 @@
 // values in each property's own units, eased keyframes (TASTE 2) and values
 // as JSON for receipts.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
 
@@ -200,6 +200,7 @@
         var inTangents;
         var outTangents;
         var shape;
+        /** @returns {any} */
         function points(list, name) {
             var out = [];
             var j;
@@ -446,6 +447,7 @@
     }
     AE.easeDimensions = easeDimensions;
 
+    /** KeyframeEase arrays sized per dimension (the typings model them as tuples). @returns {any} */
     function easeList(count, speed, influence) {
         var out = [];
         var i;
@@ -491,6 +493,7 @@
         return curve.type === "linear" ? KeyframeInterpolationType.LINEAR : KeyframeInterpolationType.BEZIER;
     }
 
+    /** @returns {any} */
     function zeroTangent(property) {
         return property.propertyValueType === PropertyValueType.TwoD_SPATIAL ? [0, 0] : [0, 0, 0];
     }

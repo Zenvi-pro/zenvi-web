@@ -1,7 +1,7 @@
 // Zenvi Link: comp tools: ae_create_comp, ae_set_comp, ae_precompose,
 // ae_add_marker.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
 
@@ -261,7 +261,7 @@
         if (layer) {
             AE.requireUnlocked(layer);
         }
-        target = layer ? layer.property("ADBE Marker") : comp.markerProperty;
+        target = layer ? /** @type {Property} */ (layer.property("ADBE Marker")) : comp.markerProperty;
         replaced = target.numKeys > 0 && Math.abs(target.keyTime(target.nearestKeyIndex(time)) - time) < 1e-4;
         marker = new MarkerValue(comment);
         marker.duration = duration;

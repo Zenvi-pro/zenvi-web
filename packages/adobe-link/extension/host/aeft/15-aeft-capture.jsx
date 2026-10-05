@@ -5,7 +5,7 @@
 // It renders at the comp's resolution factor: wide comps are captured at
 // half, third... resolution and the user's factor is restored afterwards.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
 
     var CAPTURE_TIMEOUT_MS = 20000;

@@ -1,6 +1,6 @@
 // Zenvi Link: property tools: ae_set_property, ae_animate, ae_add_expression.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
 
@@ -56,7 +56,7 @@
         value = AE.toValue(property, args.value, "value", time !== null ? property.valueAtTime(time, true) : property.value);
         before = AE.exportValue(time !== null ? property.valueAtTime(time, true) : property.value);
         after = AE.exportValue(value);
-        data = {layer: AE.layerRef(layer), path: target.path, match_path: target.match_path, before: before, value: after, time: time !== null ? Z.round(time, 4) : null};
+        data = {layer: AE.layerRef(layer), path: target.path, match_path: target.match_path, before: before, value: after, time: time !== null ? Z.round(time, 4) : null, keyframe: null};
         if (time === null && sameJson(before, after)) {
             return Z.unchanged(target.path + " of \"" + layer.name + "\" is already " + JSON.stringify(after), data);
         }

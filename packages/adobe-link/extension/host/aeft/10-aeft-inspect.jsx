@@ -1,7 +1,7 @@
 // Zenvi Link: After Effects read-only tools: ae_list_items, ae_get_comp,
 // ae_get_layer, ae_list_effects.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
 
     var MAX_WALK = 3000;
@@ -275,8 +275,13 @@
         }
     }
 
+    /** @param {Property} property */
+    function valueOf(property) {
+        return AE.exportValue(property.value);
+    }
+
     function masksJson(layer) {
-        var parade = layer.property("ADBE Mask Parade");
+        var parade = /** @type {PropertyGroup} */ (layer.property("ADBE Mask Parade"));
         var out = [];
         var mask;
         var shape;
@@ -285,16 +290,16 @@
             return out;
         }
         for (i = 1; i <= parade.numProperties; i += 1) {
-            mask = parade.property(i);
-            shape = mask.property("ADBE Mask Shape").value;
+            mask = /** @type {MaskPropertyGroup} */ (parade.property(i));
+            shape = /** @type {Shape} */ (/** @type {Property} */ (mask.property("ADBE Mask Shape")).value);
             out.push({
                 index: i,
                 name: mask.name,
                 mode: AE.maskModeName(mask.maskMode),
                 inverted: mask.inverted,
-                feather: AE.exportValue(mask.property("ADBE Mask Feather").value),
-                opacity: AE.exportValue(mask.property("ADBE Mask Opacity").value),
-                expansion: AE.exportValue(mask.property("ADBE Mask Offset").value),
+                feather: valueOf(/** @type {Property} */ (mask.property("ADBE Mask Feather"))),
+                opacity: valueOf(/** @type {Property} */ (mask.property("ADBE Mask Opacity"))),
+                expansion: valueOf(/** @type {Property} */ (mask.property("ADBE Mask Offset"))),
                 vertices: shape.vertices.length,
                 closed: shape.closed
             });
@@ -312,12 +317,13 @@
         var expressions = [];
         var effects = [];
         var parade;
+        /** @type {any} */
         var data;
         var truncated = 0;
         var i;
         Z.inRange("time", time, 0, null);
         Z.inRange("max_keys", maxKeys, 0, 1000);
-        AE.walkProperties(layer.property("ADBE Transform Group"), function (property) {
+        AE.walkProperties(/** @type {PropertyGroup} */ (layer.property("ADBE Transform Group")), function (property) {
             if (property.propertyValueType !== PropertyValueType.NO_VALUE) {
                 transform[property.name] = readValue(property, time);
             }
@@ -339,7 +345,7 @@
         if (truncated) {
             ctx.warn(Z.plural(truncated, "property", "properties") + " had more than " + maxKeys + " keyframes; raise `max_keys` to see them all");
         }
-        parade = layer.property("ADBE Effect Parade");
+        parade = /** @type {PropertyGroup} */ (layer.property("ADBE Effect Parade"));
         for (i = 1; parade && i <= parade.numProperties; i += 1) {
             effects.push(effectJson(parade.property(i), time));
         }
@@ -351,7 +357,8 @@
         data.effects = effects;
         data.masks = masksJson(layer);
         data.markers = markersJson(layer.property("ADBE Marker"));
-        data.text = layer instanceof TextLayer ? AE.textDocumentJson(layer.property("ADBE Text Properties").property("ADBE Text Document").valueAtTime(time, false)) : null;
+        data.text = layer instanceof TextLayer ?
+            AE.textDocumentJson(/** @type {Property} */ (layer.property("ADBE Text Properties").property("ADBE Text Document")).valueAtTime(time, false)) : null;
         return Z.ok("Layer \"" + layer.name + "\" (" + AE.layerType(layer) + ", index " + layer.index + " in \"" + comp.name + "\"): " +
             Z.plural(keyframes.length, "animated property", "animated properties") + ", " + Z.plural(effects.length, "effect") + ", " +
             Z.plural(data.masks.length, "mask"), data);

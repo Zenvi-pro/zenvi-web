@@ -7,7 +7,7 @@
 // Animation). Templates are matched by name with fallbacks, and a render only
 // renders its own queue item (others are unchecked and restored).
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
 
     var CHAINS = {

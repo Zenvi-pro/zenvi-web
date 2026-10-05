@@ -1,7 +1,7 @@
 // Zenvi Link: project, history and script tools: ae_save_project, ae_undo,
 // ae_run_jsx_file, ae_run_script.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
 
     var UNDO_COMMAND_ID = 16;
@@ -48,7 +48,6 @@
         var overwrite = Z.optional(args, "overwrite", "boolean", false);
         var file = null;
         var current = AE.projectPath();
-        var saved;
         if (path === null && !current) {
             throw Z.refuse("INVALID_ARGUMENT", "The project is untitled; pass `path` (an absolute .aep path)");
         }
@@ -66,9 +65,11 @@
             }
         }
         ctx.changed();
-        saved = file ? project.save(file) : project.save();
-        if (saved === false) {
-            throw Z.fail("HOST_ERROR", "After Effects did not save the project");
+        // Project.save returns nothing; a failed save throws.
+        if (file) {
+            project.save(file);
+        } else {
+            project.save();
         }
         return Z.applied("Saved the project to " + AE.projectPath(), {path: AE.projectPath(), previous_path: current, dirty: project.dirty === true}, 0);
     });

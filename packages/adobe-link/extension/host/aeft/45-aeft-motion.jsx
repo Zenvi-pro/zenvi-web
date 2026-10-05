@@ -8,7 +8,7 @@
 // capped at 100 %; with too few units for that stagger, the stagger widens to
 // duration / units and the receipt says so.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
     var TIMING = TASTE.timing;
@@ -394,7 +394,11 @@
             intensity: opts.intensity !== undefined && opts.intensity !== null ? Z.inRange("intensity", opts.intensity, 0, 1) : 0.5,
             direction: opts.direction !== undefined && opts.direction !== null ? Z.oneOf("direction", opts.direction, ["left", "right", "up", "down"]) : (spec.direction || "up"),
             stagger: opts.stagger !== undefined && opts.stagger !== null ? Z.inRange("stagger", opts.stagger, 0.01, 2) : spec.stagger,
+            start: 0,
+            end: 0,
+            /** @type {string[]} */
             paths: [],
+            /** @type {Object<string, any>} */
             data: {}
         };
         duration = opts.duration !== undefined && opts.duration !== null ? Z.inRange("duration", opts.duration, 1 / comp.frameRate, 600) : spec.duration;

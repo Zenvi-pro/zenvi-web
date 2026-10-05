@@ -1,6 +1,6 @@
 // Zenvi Link: effect tools: ae_apply_effect, ae_set_effect, ae_apply_look.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
 
@@ -236,6 +236,7 @@
         var spec = TASTE.color.looks[look];
         var layer = target || findLookLayer(comp);
         var created = false;
+        var adjustment;
         var lumetri;
         var balance;
         var values = [];
@@ -257,12 +258,13 @@
         }
         ctx.changed();
         if (!layer) {
-            layer = comp.layers.addSolid([1, 1, 1], "Zenvi Look", comp.width, comp.height, comp.pixelAspect);
-            layer.adjustmentLayer = true;
-            layer.comment = LOOK_LAYER_MARK;
-            layer.startTime = 0;
-            layer.inPoint = 0;
-            layer.outPoint = comp.duration;
+            adjustment = comp.layers.addSolid([1, 1, 1], "Zenvi Look", comp.width, comp.height, comp.pixelAspect);
+            adjustment.adjustmentLayer = true;
+            adjustment.comment = LOOK_LAYER_MARK;
+            adjustment.startTime = 0;
+            adjustment.inPoint = 0;
+            adjustment.outPoint = comp.duration;
+            layer = adjustment;
             created = true;
         }
         AE.removeEffectsNamed(layer, LOOK_EFFECT);

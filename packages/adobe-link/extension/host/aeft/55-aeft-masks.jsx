@@ -1,6 +1,6 @@
 // Zenvi Link: ae_add_mask.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
 
@@ -8,6 +8,11 @@
     var KAPPA = 0.5522847498;
 
     var ANIMATABLE = {expansion: "ADBE Mask Offset", feather: "ADBE Mask Feather", opacity: "ADBE Mask Opacity"};
+
+    /** @returns {Property} */
+    function maskProperty(mask, matchName) {
+        return /** @type {Property} */ (mask.property(matchName));
+    }
 
     /** The layer's own bounds in layer pixels (text and shapes: their content box). */
     function layerBounds(layer, time) {
@@ -55,7 +60,7 @@
         var opacity = Z.inRange("opacity", Z.optional(args, "opacity", "number", 100), 0, 100);
         var animation = Z.optional(args, "animate", "object", null);
         var bounds = Z.optional(args, "bounds", "object", null);
-        var masks = layer.property("ADBE Mask Parade");
+        var masks = /** @type {PropertyGroup} */ (layer.property("ADBE Mask Parade"));
         var shape;
         var mask;
         var index;
@@ -110,19 +115,19 @@
         AE.requireUnlocked(layer);
         ctx.changed();
         index = masks.addProperty("ADBE Mask Atom").propertyIndex;
-        mask = layer.property("ADBE Mask Parade").property(index);
+        mask = /** @type {MaskPropertyGroup} */ (masks.property(index));
         if (name) {
             mask.name = name;
         }
         mask.maskMode = mode;
         mask.inverted = inverted;
-        mask.property("ADBE Mask Shape").setValue(shape);
-        mask.property("ADBE Mask Feather").setValue(feather);
-        mask.property("ADBE Mask Offset").setValue(expansion);
-        mask.property("ADBE Mask Opacity").setValue(opacity);
+        maskProperty(mask, "ADBE Mask Shape").setValue(shape);
+        maskProperty(mask, "ADBE Mask Feather").setValue(feather);
+        maskProperty(mask, "ADBE Mask Offset").setValue(expansion);
+        maskProperty(mask, "ADBE Mask Opacity").setValue(opacity);
         if (plan) {
             targetValue = plan.property === "feather" ? feather : (plan.property === "opacity" ? opacity : expansion);
-            animated = AE.writeKeyframes(mask.property(ANIMATABLE[plan.property]), [
+            animated = AE.writeKeyframes(maskProperty(mask, ANIMATABLE[plan.property]), [
                 {time: start, value: plan.property === "feather" ? [plan.from, plan.from] : plan.from, curve: plan.curve},
                 {time: end, value: targetValue, curve: plan.curve}
             ], {replace: true}, ctx);

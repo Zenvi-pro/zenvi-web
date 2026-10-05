@@ -4,7 +4,7 @@
 // DOM objects are compared by id or index, never with ===: After Effects
 // hands out a new wrapper object each time a script asks for one.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
 

@@ -2,7 +2,7 @@
 // font fallback, balanced line breaks, title-safe layout and the contrast
 // shadow (TASTE 3 and 4).
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
     var TASTE = Z.TASTE;
     var TYPE = TASTE.type;
@@ -201,7 +201,9 @@
     /** Break `words` into `count` lines minimising the longest line. Returns line start indexes. */
     function balance(words, count) {
         var n = words.length;
+        /** @type {number[][]} */
         var best = [];
+        /** @type {number[][]} */
         var from = [];
         var i;
         var k;
@@ -287,8 +289,9 @@
     // ------------------------------------------------------------------
     // Layout.
 
+    /** @returns {Property} */
     function transformProperty(layer, matchName) {
-        return layer.property("ADBE Transform Group").property(matchName);
+        return /** @type {Property} */ (layer.property("ADBE Transform Group").property(matchName));
     }
 
     /** [x, y] -> the property's own [x, y(, z)], keeping z. */
@@ -402,7 +405,10 @@
         var i;
         for (i = textLayer.index + 1; i <= comp.numLayers; i += 1) {
             layer = comp.layer(i);
-            source = layer instanceof AVLayer ? layer.source : null;
+            if (!(layer instanceof AVLayer)) {
+                continue;
+            }
+            source = layer.source;
             if (source && layer.enabled && !layer.adjustmentLayer && (source instanceof CompItem ||
                     (source instanceof FootageItem && !(source.mainSource instanceof SolidSource) && source.hasVideo))) {
                 return true;
@@ -416,7 +422,7 @@
      * 1080p, 40 % black) named "Zenvi Shadow". Replaces an earlier one.
      */
     AE.addTextShadow = function (comp, layer, ctx) {
-        var parade = layer.property("ADBE Effect Parade");
+        var parade = /** @type {PropertyGroup} */ (layer.property("ADBE Effect Parade"));
         var shadow = TYPE.shadow;
         var effect;
         var index;
@@ -431,11 +437,10 @@
                 parade.property(i).remove();
             }
         }
-        effect = parade.addProperty("ADBE Drop Shadow");
-        index = effect.propertyIndex;
-        effect = layer.property("ADBE Effect Parade").property(index);
+        index = parade.addProperty("ADBE Drop Shadow").propertyIndex;
+        effect = AE.effectStack(layer).property(index);
         effect.name = "Zenvi Shadow";
-        effect = layer.property("ADBE Effect Parade").property(index);
+        effect = /** @type {PropertyGroup} */ (AE.effectStack(layer).property(index));
         AE.effectParam(effect, "ADBE Drop Shadow-0001", "Shadow Color").setValue([0, 0, 0, 1]);
         opacity = AE.effectParam(effect, "ADBE Drop Shadow-0002", "Opacity");
         // Drop Shadow's opacity is 0-255 internally; use the property's own maximum.

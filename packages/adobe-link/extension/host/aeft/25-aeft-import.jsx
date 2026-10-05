@@ -2,12 +2,13 @@
 // footage given by path. Every path is checked before anything is imported,
 // and files already in the project are reused.
 
-(function (Z) {
+(/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
 
     /** Footage items by AE.pathKey of their file. */
     AE.footageByPath = function () {
         var project = AE.requireProject();
+        /** @type {Object<string, FootageItem>} */
         var map = {};
         var item;
         var i;
@@ -78,7 +79,7 @@
             if (!folder) {
                 folder = AE.findOrCreateFolder(folderName);
             }
-            item = app.project.importFile(planned[i].options);
+            item = /** @type {FootageItem} */ (app.project.importFile(planned[i].options));
             item.parentFolder = folder;
             existing[planned[i].key] = item;
             results.push({path: planned[i].path, item: item, reused: false});
