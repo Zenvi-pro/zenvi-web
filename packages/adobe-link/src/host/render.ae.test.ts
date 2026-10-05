@@ -140,6 +140,15 @@ describe("ae_render_for_zenvi", () => {
     expect(existsSync(path.join(h.dir, "overlay.mov"))).toBe(true);
   });
 
+  test("refuses without an active comp and while the queue is rendering, before queueing anything", () => {
+    const h = aeHarness();
+    expect(h.callValidated("ae_render_for_zenvi")).toMatchObject({ status: "refused", error: { code: "NO_ACTIVE_COMP" } });
+    h.mock.addComp();
+    h.mock.project.renderQueue.rendering = true;
+    expect(h.callValidated("ae_render_for_zenvi")).toMatchObject({ status: "refused", undoSteps: 0, error: { code: "BUSY" } });
+    expect(h.mock.project.renderQueue.numItems).toBe(0);
+  });
+
   test("work area only; a failed render is an error and stays in the queue for inspection", () => {
     const { h, comp } = saved();
     comp.workAreaStart = 1;

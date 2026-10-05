@@ -92,6 +92,12 @@ describe("ae_run_script", () => {
     expect(h.mock.state.undoGroups).toEqual(["Zenvi: Run ExtendScript", "Zenvi: Run ExtendScript", "Zenvi: Run ExtendScript", "Zenvi: Run ExtendScript"]);
   });
 
+  test("refuses an empty snippet before opening anything", () => {
+    const h = aeHarness();
+    expect(h.call("ae_run_script", { code: "   " })).toMatchObject({ status: "refused", undoSteps: 0, error: { code: "INVALID_ARGUMENT" } });
+    expect(h.mock.state.undoDepth).toBe(0);
+  });
+
   test("a failing snippet is an error with the message", () => {
     const h = aeHarness();
     const receipt = h.callValidated("ae_run_script", { code: "throw new Error('nope')" });

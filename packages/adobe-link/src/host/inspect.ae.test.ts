@@ -6,6 +6,14 @@ function footage(h: ReturnType<typeof aeHarness>, name: string): FootageItem {
   return h.mock.project.importFile(new ImportOptions(new h.mock.es.File(h.file(name)))) as FootageItem;
 }
 
+describe("ae_get_state", () => {
+  test("refuses NO_PROJECT when After Effects has no project", () => {
+    const h = aeHarness();
+    (h.mock.app as { project: unknown }).project = null;
+    expect(h.callValidated("ae_get_state")).toMatchObject({ status: "refused", error: { code: "NO_PROJECT" } });
+  });
+});
+
 describe("ae_list_items", () => {
   test("lists items with type, size and parent folder; filters by type and name; refuses an unknown type", () => {
     const h = aeHarness();
