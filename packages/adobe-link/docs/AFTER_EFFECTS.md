@@ -49,9 +49,25 @@ the [manual test plan](#manual-test-plan-after-effects-20242026).
   `app.beginUndoGroup("Zenvi: <title>")`. Arguments are validated before
   anything changes, so a refused call leaves the history untouched
   (`undoSteps: 0`). A call that fails after it started changing things says so
-  in `warnings` ("Edit > Undo "Zenvi: …" reverts what it did"). Exceptions:
-  `ae_save_project` and `ae_undo` report `undoSteps: 0`, and `ae_undo` runs Undo
-  between two empty groups, because Undo must not run inside an open one.
+  in `warnings` ("Edit > Undo "Zenvi: …" reverts what it did").
+- **Tools that open their own undo groups.** Four mutating tools are
+  registered without dispatch's group (`{mutating: false}`) because part of
+  their work must not run inside one:
+  - `ae_undo` runs Edit > Undo outside any group (`undoSteps: 0`);
+  - `ae_save_project` saves outside any group (`undoSteps: 0`);
+  - `ae_render` and `ae_render_for_zenvi` render (or hand over to Adobe Media
+    Encoder) outside any group. Every render queue change they make still
+    happens in a group "Zenvi: <title>": queueing is one step; tidying after
+    the render (checking other queued items again, and for
+    `ae_render_for_zenvi` removing its finished queue item) is a second.
+    `undoSteps` says how many: `ae_render` 1, or 2 when other queued items
+    were unchecked; `ae_render_for_zenvi` 2. A call that fails after
+    queueing reports `undoSteps: null` (dispatch cannot count steps outside
+    its group) and says in `warnings` how many it made and what Edit > Undo
+    reverts.
+
+  `ae_capture_frame` is read-only but runs its temporary resolution change
+  inside one group of its own (see below).
 - **Receipts** follow SPEC §3.3: `status` ok / applied / unchanged / refused /
   error, `summary`, `data` (ids from `layerRef`: `layer_id`, `comp_id`,
   `layer_index`, `name`, `type`), `warnings`, `undoSteps`, and `error.code` on
@@ -93,7 +109,7 @@ Bold arguments are required; `=` gives the default the host server fills in
 | `ae_undo` | Undo Zenvi steps | write, destructive | steps=1 |
 | `ae_run_jsx_file` | Run JSX file | write, destructive | **path** |
 | `ae_run_script` | Run ExtendScript | write, destructive | **code** |
-| `ae_render_for_zenvi` | Render for Zenvi | write | comp, alpha=false, output, work_area_only=false, template |
+| `ae_render_for_zenvi` | Render for Zenvi | write | comp, alpha=false, output, work_area_only=false, template, overwrite=false |
 
 Notes per tool, beyond the catalog descriptions:
 
@@ -104,34 +120,54 @@ Notes per tool, beyond the catalog descriptions:
   is restored afterwards; a comp shown at half resolution is captured at full
   resolution. The change and its restore run inside one undo group of their
   own, so if After Effects records resolution changes they cost at most one
-  (no-op) undo step. The comp's end is clamped to its last frame.
-  `data.image_path` becomes the image block (the server deletes the temp file).
+  (no-op) undo step. The factor is at most 99 (After Effects' limit), so a
+  30000 px comp at `max_width: 64` comes back 303 px wide, with a warning. The
+  comp's end is clamped to its last frame. The PNG always goes into Zenvi
+  Link's temp folder (`ZenviLink.tempFile("capture-<comp>-<frame>", "png")`
+  in `ZenviLink.tempDir()`, the folder the server passes, else
+  `<temp>/zenvi-link`); the tool takes no output path. `data.image_path`
+  becomes the image block, and the server deletes the file (it deletes nothing
+  outside that folder).
 - `ae_import_files`: every path must exist and be importable before anything
   is imported; files already in the project are reused (`reused: true`), so a
   repeat call is `unchanged`.
 - `ae_add_layer`: new layers go on top. Footage by `path` is imported into
   "Zenvi Imports" once. Shapes are one group with the primitive, then a stroke
-  above the fill (the stroke draws on top).
+  above the fill (the stroke draws on top). Solids are 4–30000 px
+  (`addSolid`'s range), checked with the colour before anything is added.
 - `ae_set_layer`: refused on a locked layer unless the same call passes
-  `locked: false` (applied first); `locked: true` is applied last.
+  `locked: false` (applied first); `locked: true` is applied last. On After
+  Effects 2023+ `track_matte: {type: "none"}` calls `removeTrackMatte()`
+  (`setTrackMatte` with `NO_TRACK_MATTE` is documented as a no-op); asking for
+  the matte a layer already has is `unchanged`.
+- `ae_set_property` / `ae_animate`: Position with separated dimensions is
+  refused with the paths to use instead (`Transform/X Position`, `Y Position`).
+  Source Text values keep the style of the document in effect at their time
+  (a keyframe's), only the text changes.
 - `ae_arrange_layers`: `split` duplicates the layer, ends the original at
   `time` and starts the copy there, like Edit > Split Layer.
 - `ae_animate`: see [Easing](#easing). Keyframes inside the new span are
   replaced, keyframes outside it kept (`replace: true` clears them all).
   Linear easing on anything but opacity warns (TASTE: linear only for opacity
-  crossfades, loops and tickers). Source Text keys hold.
-- `ae_add_expression`: After Effects checks an expression when it is set; one
-  that reports an error is removed again (the previous expression restored)
-  and the call is refused with After Effects' message.
+  crossfades, loops and tickers). Source Text keys hold. An `overshoot` needs
+  a last segment long enough for its settle keyframe (refused otherwise).
+- `ae_add_expression`: After Effects checks an expression when it is set (a
+  valid one switches itself on; switching on one with an error throws), so the
+  tool reads `expressionError` before touching `expressionEnabled`. One that
+  reports an error is removed again (the previous expression restored, with
+  its switch as it was) and the call is refused with After Effects' message.
 - `ae_apply_effect`: exact match name, exact display name (any case), then a
   unique display-name prefix, then a unique substring; ambiguous names are
   refused with the candidates. Parameters can only be checked once the effect
   exists, so a bad parameter takes the effect off again before refusing.
 - `ae_render` renders only its own queue item: other queued items are
-  unchecked during the render and checked again afterwards.
+  unchecked when it is queued and checked again after the render (the second
+  undo step). See [Renders](#renders) for overwriting and Media Encoder.
 - `ae_undo`: After Effects has no API for its undo history, so the receipt
-  names the Zenvi steps it recorded this session. If someone changed the
-  project by hand after the last Zenvi call, Undo undoes that first.
+  names the Zenvi steps it recorded (a journal in `ZenviLink.state`, which
+  survives the panel evaluating the host script again; it starts empty when
+  After Effects starts). If someone changed the project by hand after the last
+  Zenvi call, Undo undoes that first.
 - `ae_run_jsx_file` / `ae_run_script` run arbitrary code inside one undo step.
   `ae_run_script` returns JSON of the last expression; values that cannot be
   serialized (host objects, cycles) come back as `String(value)`.
@@ -279,6 +315,23 @@ it changed). Render settings default to "Best Settings". `ae_render` writes to
 `<project folder>/Renders/<comp>.<ext>` unless `output` is given (an untitled
 project needs `output`) and refuses to overwrite unless `overwrite`.
 
+- **Replacing a file**: with `overwrite`, `render_now` renders to a staging
+  file next to the target (`<name>.zenvi-partial-<ms>.<ext>`) and replaces the
+  old file only once the render finished, so a failed render keeps the old
+  file. A failed render to a new file removes what After Effects wrote.
+  `queue_only` / `media_encoder` warn that the file will be replaced when the
+  queue runs.
+- **Media Encoder**: `mode: media_encoder` needs `RenderQueue.queueInAME`
+  (refused `UNSUPPORTED` otherwise). `canQueueInAME` only says whether there
+  are queued items to send, so it is read after the comp is queued; if it is
+  still false (Media Encoder missing?) the call is an error and the item stays
+  in the render queue (Edit > Undo "Zenvi: Render comp" takes it off). Only
+  this item is sent; start Media Encoder's queue there.
+- **Templates** are read from a queued item, else from the list remembered in
+  `ZenviLink.state`, else from the tool's own new queue item (inside its undo
+  group; when the plan is refused there, the item is removed again in the same
+  group, which may leave one no-op undo step the receipt does not count).
+
 `ae_render_for_zenvi` reports only codecs Zenvi links (SPEC §3.6: `h264`,
 `prores4444`, `qtrle`; the desktop refuses others), so it has its own
 fallbacks and never renders ProRes 422:
@@ -292,8 +345,10 @@ Every fallback warns (an opaque request rendered with alpha keeps the comp's
 transparent areas transparent in Zenvi). An explicit `template` must be an
 H.264, ProRes 4444 or QuickTime Animation template; anything else is refused,
 and so is a version with no linkable template at all. The render goes into
-`<temp>/zenvi-link/renders/<comp>-<id>-<date>-<time>.<ext>`, removes its queue
-item after a successful render (a failed one stays for inspection), and
+`<temp>/zenvi-link/renders/<comp>-<id>-<date>-<time>.<ext>` (`-2`, `-3`, ...
+when that name is taken), or to `output`, which must not exist unless
+`overwrite` (replaced only by a finished render, as above). It removes its
+queue item after a successful render (a failed one stays for inspection), and
 returns `path`, `comp_id`, `comp_name`, `project`, `width`, `height`, `fps`,
 `fps_rational` (`30000/1001` for 29.97), `duration`, `duration_frames`, `codec`,
 `template`, `rendered_at` and a ready SPEC §3.6 `link`:
@@ -345,7 +400,17 @@ npm run gen:catalog -w @zenvi/adobe-link        # then commit extension/catalog/
   name (`comp.bgColour`,
   `layers.addSolidLayer`) or a misspelled `ZenviLink.ae` helper fails.
 - A test checks that every literal TASTE path the scripts read exists, and
-  that every tool called bare keeps undo groups balanced.
+  that every tool called bare keeps undo groups balanced. The mock records the
+  undo depth of every render queue change and of `render()` /
+  `queueInAME()`, so tests check that renders run outside undo groups and
+  queue changes inside them.
+- No prototype polyfills: every extension in the app shares one ExtendScript
+  engine, so the scripts use `ZenviLink.indexOf`, `trim` and `hasMethod`
+  (feature checks on DOM members never test `typeof === "function"`), and
+  `typecheck:jsx` flags `[].indexOf` or `"".trim()`.
+- State that must outlive the panel evaluating the host script again (the
+  undo journal, the output module template list) lives in
+  `ZenviLink.state.ae`; a test evaluates the bundle twice.
 
 ## Known limits and unverified areas
 
@@ -376,19 +441,34 @@ Effects (the manual plan covers them):
    the expression; the mock only reports syntax errors.
 7. **ae_undo** cannot read the undo history (no API) and uses command 16 when
    `findMenuCommandId("Undo")` finds nothing (the item is renamed after each
-   action). Its journal resets when the host script reloads.
+   action). Its journal survives the host script being evaluated again, not an
+   After Effects restart.
 8. **Codec labels** come from template names ("High Quality with Alpha" and
    any name with 4444: `prores4444`; "Lossless", "Lossless with Alpha":
    `qtrle`, assumed to be QuickTime Animation as in a fresh install). A
    renamed or localized template may need `template`.
-9. **Temp folders**: captures and renders go under ExtendScript's
-   `Folder.temp`; the server deletes captures only inside the OS temp folder,
-   assumed to be the same folder (true on macOS; check on Windows).
+9. **Temp folders**: captures go into `ZenviLink.tempDir()` and renders for
+   Zenvi into its `renders` subfolder. The server passes its own folder
+   (`<os.tmpdir()>/zenvi-link`) to the host script; until it has, the script
+   uses ExtendScript's `Folder.temp` + `/zenvi-link`, assumed to be the same
+   folder (true on macOS; check on Windows). Renders there are kept files the
+   server never deletes, but the OS may clean its temp folder: a linked clip
+   whose render is gone needs Send to Zenvi again (its `link` names the comp
+   and the .aep).
 10. **Blocking renders**: `render_now` and `ae_render_for_zenvi` block After
     Effects until the render finishes (30 min budget per call).
 11. **Exits and holds end with the comp**: a layer that runs past the comp's
     end exits (and Ken Burns / push-in end) at the comp's end, the last frame a
     viewer sees.
+12. **Render queue undo**: assumed that adding, removing and (un)checking
+    render queue items are undoable like other project changes, so the render
+    tools keep each of them inside a "Zenvi: <title>" group. Whether
+    `queueInAME` changes the item's status in After Effects' queue is unknown.
+13. **Lossless on Windows before 2022**: the "Lossless" templates may write
+    AVI rather than QuickTime on Windows After Effects 18–21. The tools ask
+    for `.mov`; if the template writes another format the call fails with
+    "look for <name>.* in <folder>", and an explicit QuickTime `template` (or
+    an H.264 / ProRes template on a newer version) is needed.
 
 ## Manual test plan (After Effects 2024–2026)
 
@@ -448,17 +528,35 @@ after each step check the After Effects UI and Edit > Undo)
     `ae_add_expression {"layer": "Jane Doe", "property": "Rotation",
     "expression": "time *"}` is refused with After Effects' error text and no
     expression remains; `"wiggle(1, 5)"` applies.
-11. Render: `ae_save_project {"path": "<folder>/zenvi-test.aep"}`, then
+11. Render: `ae_save_project {"path": "<folder>/zenvi-test.aep"}` (Edit >
+    Undo gains nothing), add another comp to the render queue by hand, then
     `ae_render {}`. **Pass:** `<folder>/Renders/Zenvi Test.mp4` (2023+) plays;
-    an item already in the render queue was not rendered and is still checked.
+    the other item was not rendered and is still checked; the receipt says
+    `undoSteps: 2` and Edit > Undo shows *Undo Zenvi: Render comp* (twice in
+    the history: queueing, then re-checking the other item; record whether
+    After Effects added any other entries, unverified area 12). Then
+    `ae_render {"overwrite": true}` and click *Stop* in the Render Queue
+    panel while it renders. **Pass:** an error receipt; the old `Zenvi
+    Test.mp4` still plays and no `*.zenvi-partial-*` file is left. Then
+    `ae_render {"mode": "media_encoder", "overwrite": true}`. **Pass:** Adobe
+    Media Encoder opens with only this comp queued (without Media Encoder: an
+    error that says the item stays in the render queue).
 12. Send to Zenvi: click the panel's *Send to Zenvi*. **Pass:** the panel shows
     `Sent "Zenvi Test" to Zenvi (10 s, h264)` and Zenvi shows a linked clip
     whose link info names `aftereffects`, the comp and the .aep. Repeat with a
     comp longer than two minutes of render time (the panel must wait). With
     Zenvi closed, the panel says Zenvi is not running and renders nothing.
     `ae_render_for_zenvi {"alpha": true}` gives a ProRes 4444 .mov with alpha.
-13. Undo: `ae_undo {"steps": 2}`. **Pass:** the last two Zenvi steps are undone
-    (check the comp); the receipt names them.
+    **Pass:** after each, the render queue holds no item for it and Edit >
+    Undo shows *Undo Zenvi: Render for Zenvi* (two entries).
+13. Track matte and undo: on 2023+, `ae_set_layer {"layer": <a solid>,
+    "track_matte": {"type": "alpha", "layer": <a text layer>}}`, then the same
+    with `{"type": "none"}`. **Pass:** the Track Matte column shows the text
+    layer, then *No Track Matte*; repeating either call is `unchanged`. Close
+    and reopen the Zenvi Link panel (it evaluates the host script again), then
+    `ae_undo {"steps": 2}`. **Pass:** the solid has no track matte, Edit >
+    Redo offers *Redo Zenvi: Set layer*, and the receipt names both *Zenvi:
+    Set layer* steps.
 14. Refusal leaves history alone: `ae_add_layer {"kind": "footage"}`.
     **Pass:** refused; Edit > Undo still names the previous step.
 15. Versions: on AE 2024+ a missing `font` falls back with a warning; on AE
