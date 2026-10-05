@@ -15,6 +15,8 @@ interface ZenviContext {
   warnings: string[];
   warn(message: string): void;
   changed(): void;
+  /** Undo steps the call left, when the tool knows (also on failure); dispatch reports it. */
+  undoSteps?: number | null;
 }
 
 interface ZenviResult {

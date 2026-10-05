@@ -129,8 +129,12 @@ function imageMimeType(bytes) {
   return null;
 }
 
-/** True when `file` is in `dir` (or below), comparing real paths; case-insensitive where the file system usually is. */
-async function insideDir(file, dir) {
+/**
+ * Where `file` is relative to `dir`, comparing real paths (case-insensitive
+ * where the file system usually is): "direct" (in dir itself), "below" (in a
+ * subfolder) or "outside".
+ */
+async function placeIn(file, dir) {
   try {
     let parent = await realpath(path.dirname(file));
     let root = await realpath(dir);
@@ -138,10 +142,16 @@ async function insideDir(file, dir) {
       parent = parent.toLowerCase();
       root = root.toLowerCase();
     }
-    return parent === root || parent.indexOf(root + path.sep) === 0;
+    if (parent === root) return "direct";
+    return parent.indexOf(root + path.sep) === 0 ? "below" : "outside";
   } catch (_error) {
-    return false;
+    return "outside";
   }
+}
+
+/** True when `file` is in `dir` or below it. */
+async function insideDir(file, dir) {
+  return (await placeIn(file, dir)) !== "outside";
 }
 
 /** The first `length` bytes and the size of a file. */
@@ -251,14 +261,16 @@ function createLinkServer(options) {
   /**
    * A frame capture as an image block. `image_path` is always dropped from the
    * receipt. The file is checked (PNG/JPEG magic bytes, size cap) before it is
-   * read, and deleted only when it is in Zenvi Link's temp folder.
+   * read. It is deleted only when it passed that check and sits directly in
+   * Zenvi Link's temp folder, where Z.tempFile() puts captures. Subfolders
+   * (renders/, titles/) hold files the project keeps using and are never touched.
    */
   async function takeImage(tool, receipt) {
     const data = receipt.data;
     if (!tool.returnsImage || typeof data.image_path !== "string") return [];
     const file = data.image_path;
     delete data.image_path;
-    const ours = await insideDir(file, tempDir);
+    let capture = false;
     try {
       const head = await readHead(file, 16);
       const mimeType = imageMimeType(head.bytes);
@@ -266,6 +278,7 @@ function createLinkServer(options) {
         receipt.warnings.push("The captured frame is not a PNG or JPEG image: " + file);
         return [];
       }
+      capture = (await placeIn(file, tempDir)) === "direct";
       if (head.size > imageLimit) {
         receipt.warnings.push("The captured frame is " + Math.round(head.size / 1048576) + " MB, over the " + Math.round(imageLimit / 1048576) + " MB limit; capture a smaller size");
         return [];
@@ -276,7 +289,7 @@ function createLinkServer(options) {
       receipt.warnings.push("Could not read the captured frame " + file + ": " + error.message);
       return [];
     } finally {
-      if (ours) await unlink(file).catch(() => undefined);
+      if (capture) await unlink(file).catch(() => undefined);
     }
   }
 

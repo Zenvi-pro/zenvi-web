@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -363,6 +363,25 @@ describe("tools/call", () => {
     expect(refused.content).toHaveLength(1);
     expect(refused.structuredContent.warnings.join(" ")).toContain("not a PNG or JPEG");
     expect(existsSync(text)).toBe(true);
+  });
+
+  test("subfolders of the temp folder (renders/, titles/) are never touched; a non-image there or at the top is kept", async () => {
+    let target = "";
+    const server = await customServer([{ name: "ae_capture", returnsImage: true }], { evalScript: async () => capture(target) }, { tempDir: tempDir() });
+    const kept: string[] = [];
+    for (const relative of ["renders/comp-1.png", "titles/launch-day.png"]) {
+      target = path.join(server.tempDir, relative);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, Buffer.from(TINY_PNG_BASE64, "base64"));
+      const result = (await request(server, { body: call("ae_capture", {}) })).json.result;
+      expect(result.content).toHaveLength(2);
+      kept.push(target);
+    }
+    target = path.join(server.tempDir, "notes.txt");
+    writeFileSync(target, "not an image");
+    expect((await request(server, { body: call("ae_capture", {}) })).json.result.content).toHaveLength(1);
+    kept.push(target);
+    for (const file of kept) expect(existsSync(file), file).toBe(true);
   });
 
   test("oversized captures are not sent", async () => {

@@ -458,7 +458,9 @@ var ZenviLink = (function () {
     Z.stringify = stringify;
 
     function newContext(name) {
-        var ctx = {tool: name, warnings: [], didChange: false};
+        // undoSteps: a tool that knows how many undo steps it left (also when it
+        // fails, e.g. render tools outside the undo group) sets ctx.undoSteps = n.
+        var ctx = {tool: name, warnings: [], didChange: false, undoSteps: undefined};
         /** Add a warning to the receipt (snapping, fallbacks, partial results). */
         ctx.warn = function (message) {
             ctx.warnings.push(String(message));
@@ -470,8 +472,15 @@ var ZenviLink = (function () {
         return ctx;
     }
 
+    /** ctx.undoSteps when the tool set a number (or null for unknown), else undefined. */
+    function reportedUndoSteps(ctx) {
+        var value = ctx.undoSteps;
+        return value === null || (typeof value === "number" && isFinite(value)) ? value : undefined;
+    }
+
     function finish(ctx, entry, outcome) {
         var failed = outcome.status === "refused" || outcome.status === "error";
+        var reported = reportedUndoSteps(ctx);
         var message;
         var receipt = {
             contract: Z.contract,
@@ -499,10 +508,18 @@ var ZenviLink = (function () {
                     receipt.warnings.push("The call failed after it had started changing the project; each change it made is its own undo step.");
                 }
             }
+            if (reported !== undefined) {
+                receipt.undoSteps = reported;
+            }
         } else if (outcome.status === "applied") {
             // Without an undo group (read-only tools, {mutating: false}) the count is the tool's to say.
-            receipt.undoSteps = outcome.undoSteps !== undefined ? outcome.undoSteps :
-                (entry && entry.mutating ? Z.adapter.undoStepsWhenApplied : null);
+            if (outcome.undoSteps !== undefined) {
+                receipt.undoSteps = outcome.undoSteps;
+            } else if (reported !== undefined) {
+                receipt.undoSteps = reported;
+            } else {
+                receipt.undoSteps = entry && entry.mutating ? Z.adapter.undoStepsWhenApplied : null;
+            }
         }
         return stringify(receipt);
     }

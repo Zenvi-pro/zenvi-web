@@ -138,6 +138,20 @@ describe("After Effects undo groups", () => {
     expect(mock.state.undoCalls).toEqual([]);
   });
 
+  test("a tool can report its exact undoSteps, on success and on failure (ctx.undoSteps)", () => {
+    const { host } = loadAe();
+    register(host, "ae_t_render", 'ctx.changed(); ctx.undoSteps = 2; throw new Error("render failed");', "{mutating: false}");
+    register(host, "ae_t_grouped", 'ctx.changed(); ctx.undoSteps = 0; throw ZenviLink.fail("HOST_ERROR", "rolled back");', "{mutating: true}");
+    register(host, "ae_t_counted", 'ctx.undoSteps = 3; return ZenviLink.applied("Did three things", {});', "{mutating: false}");
+    register(host, "ae_t_explicit", 'ctx.undoSteps = 3; return ZenviLink.applied("Explicit wins", {}, 1);', "{mutating: false}");
+    register(host, "ae_t_junk", 'ctx.undoSteps = "two"; return ZenviLink.applied("Ignored", {});', "{mutating: false}");
+    expect(host.dispatch("ae_t_render")).toMatchObject({ status: "error", undoSteps: 2 });
+    expect(host.dispatch("ae_t_grouped")).toMatchObject({ status: "error", undoSteps: 0 });
+    expect(host.dispatch("ae_t_counted")).toMatchObject({ status: "applied", undoSteps: 3 });
+    expect(host.dispatch("ae_t_explicit").undoSteps).toBe(1);
+    expect(host.dispatch("ae_t_junk").undoSteps).toBeNull();
+  });
+
   test("unchanged results report no undo step", () => {
     const { host } = loadAe();
     register(host, "ae_t_same", 'return ZenviLink.unchanged("Already so", {});', "{mutating: true}");
