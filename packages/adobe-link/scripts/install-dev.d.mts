@@ -1,11 +1,7 @@
-export type InstallAction =
-  | { kind: "build"; outDir: string }
-  | { kind: "remove"; path: string }
-  | { kind: "link"; from: string; to: string; type: "dir" | "junction" }
-  | { kind: "copy"; from: string; to: string }
-  | { kind: "run"; command: string; args: string[] };
+import type { InstallAction } from "../src/install.js";
 
-export declare const CSXS_VERSIONS: number[];
+export type { InstallAction };
+export declare const CSXS_VERSIONS: readonly number[];
 export declare function extensionsDir(options: { platform: string; home: string; appData?: string }): string;
 export declare function planInstall(options: {
   platform: string;

@@ -20,8 +20,9 @@ import { fileURLToPath } from "node:url";
 import { HOST_APPS, PACKAGE_ROOT, bundleHostScript } from "../src/host-bundle.ts";
 import { HOST_IDS, catalogFileName, catalogFileText } from "../src/catalog/index.ts";
 import { LINK_VERSION } from "../src/version.ts";
+import { BUNDLE_ID } from "../src/install.ts";
 
-export const BUNDLE_ID = "pro.zenvi.link";
+export { BUNDLE_ID };
 export const DEFAULT_OUT = path.join(PACKAGE_ROOT, "dist");
 const SOURCE = path.join(PACKAGE_ROOT, "extension");
 

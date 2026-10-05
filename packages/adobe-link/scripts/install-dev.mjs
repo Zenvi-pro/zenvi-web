@@ -18,106 +18,24 @@
  * Window > Extensions > Zenvi Link.
  */
 
-import { spawnSync } from "node:child_process";
-import { cpSync, lstatSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUNDLE_ID, DEFAULT_OUT, buildExtension } from "./build-extension.mjs";
+import { DEFAULT_OUT, buildExtension } from "./build-extension.mjs";
+import { BUNDLE_ID, CSXS_VERSIONS, describeAction, extensionsDir, planExtensionInstall, runInstallAction } from "../src/install.ts";
 
-export const CSXS_VERSIONS = [9, 10, 11, 12];
+// The planning lives in src/install.ts (shared with `zenvi adobe install`); this script adds the build.
+export { CSXS_VERSIONS, describeAction, extensionsDir };
 
-/** The per-user CEP extensions folder. */
-export function extensionsDir({ platform, home, appData }) {
-  if (platform === "darwin") return path.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions");
-  if (platform === "win32") return path.win32.join(appData, "Adobe", "CEP", "extensions");
-  throw new Error(`Adobe CEP extensions run on macOS and Windows, not ${platform}`);
-}
-
-function debugModeCommands(platform, enable) {
-  return CSXS_VERSIONS.map((n) =>
-    platform === "darwin"
-      ? enable
-        ? { kind: "run", command: "defaults", args: ["write", `com.adobe.CSXS.${n}`, "PlayerDebugMode", "1"] }
-        : { kind: "run", command: "defaults", args: ["delete", `com.adobe.CSXS.${n}`, "PlayerDebugMode"] }
-      : enable
-        ? { kind: "run", command: "reg", args: ["add", `HKCU\\Software\\Adobe\\CSXS.${n}`, "/v", "PlayerDebugMode", "/t", "REG_SZ", "/d", "1", "/f"] }
-        : { kind: "run", command: "reg", args: ["delete", `HKCU\\Software\\Adobe\\CSXS.${n}`, "/v", "PlayerDebugMode", "/f"] },
-  );
-}
-
-/** What installing (or uninstalling) does, as a list of actions. */
+/** What installing (or uninstalling) does, as a list of actions: build from source, then install the build. */
 export function planInstall({ platform, home, appData, outDir = DEFAULT_OUT, uninstall = false, copy = false }) {
-  const target = (platform === "win32" ? path.win32 : path.posix).join(extensionsDir({ platform, home, appData }), BUNDLE_ID);
-  const source = path.join(outDir, BUNDLE_ID);
-  if (uninstall) {
-    return {
-      target,
-      actions: [{ kind: "remove", path: target }],
-      notes: [
-        "PlayerDebugMode stays on (other unsigned extensions may need it). To turn it off:",
-        ...debugModeCommands(platform, false).map((action) => `  ${action.command} ${action.args.join(" ")}`),
-      ],
-    };
-  }
-  return {
-    target,
-    actions: [
-      { kind: "build", outDir },
-      { kind: "remove", path: target },
-      copy ? { kind: "copy", from: source, to: target } : { kind: "link", from: source, to: target, type: platform === "win32" ? "junction" : "dir" },
-      ...debugModeCommands(platform, true),
-    ],
-    notes: ["Restart After Effects / Premiere Pro, then open Window > Extensions > Zenvi Link."],
-  };
-}
-
-export function describeAction(action) {
-  switch (action.kind) {
-    case "build":
-      return `build ${path.join(action.outDir, BUNDLE_ID)}`;
-    case "remove":
-      return `remove ${action.path}`;
-    case "link":
-      return `link ${action.to} -> ${action.from} (${action.type})`;
-    case "copy":
-      return `copy ${action.from} -> ${action.to}`;
-    default:
-      return `run ${action.command} ${action.args.join(" ")}`;
-  }
-}
-
-function exists(file) {
-  try {
-    lstatSync(file);
-    return true;
-  } catch {
-    return false;
-  }
+  const plan = planExtensionInstall({ platform, home, appData, source: path.join(outDir, BUNDLE_ID), uninstall, copy });
+  return uninstall ? plan : { ...plan, actions: [{ kind: "build", outDir }, ...plan.actions] };
 }
 
 function execute(action) {
-  switch (action.kind) {
-    case "build":
-      buildExtension({ outDir: action.outDir });
-      return;
-    case "remove":
-      if (exists(action.path)) rmSync(action.path, { recursive: true, force: true });
-      return;
-    case "link":
-      mkdirSync(path.dirname(action.to), { recursive: true });
-      symlinkSync(action.from, action.to, action.type);
-      return;
-    case "copy":
-      mkdirSync(path.dirname(action.to), { recursive: true });
-      cpSync(action.from, action.to, { recursive: true });
-      return;
-    default: {
-      const result = spawnSync(action.command, action.args, { stdio: "inherit" });
-      // `defaults delete` / `reg delete` fail when the value is already gone; that is fine.
-      if (result.status !== 0 && !action.args.includes("delete")) throw new Error(`${describeAction(action)} failed (exit ${result.status})`);
-    }
-  }
+  if (action.kind === "build") buildExtension({ outDir: action.outDir });
+  else runInstallAction(action, { stdio: "inherit" });
 }
 
 function option(argv, name) {
