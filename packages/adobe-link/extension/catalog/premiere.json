@@ -19,6 +19,575 @@
       },
       "returnsImage": false,
       "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_list_items",
+      "title": "List project items",
+      "description": "The project's bins and items as a flat list in tree order: nodeId, name, kind (bin, media, sequence, clip), bin path, media path, in/out and duration, offline flag. Use it to find the nodeId of footage before placing it, or to check what is already imported. Filter by `kind`, `name_contains` or a starting `bin`. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bin": {
+            "description": "Start from this bin: its nodeId or its path from the project root, e.g. \"Footage/Day 1\"; default: the whole project",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "kind": {
+            "default": "any",
+            "description": "Only list this kind: media (items with a file), sequence, bin, or any",
+            "type": "string",
+            "enum": [
+              "any",
+              "media",
+              "sequence",
+              "bin"
+            ]
+          },
+          "name_contains": {
+            "description": "Only items whose name contains this text (case-insensitive)",
+            "type": "string",
+            "minLength": 1
+          },
+          "recursive": {
+            "default": true,
+            "description": "Include the contents of nested bins",
+            "type": "boolean"
+          },
+          "limit": {
+            "default": 200,
+            "description": "Most items to return; the receipt says when more exist",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_get_sequence",
+      "title": "Read a sequence",
+      "description": "One sequence in detail (default: the active one): settings, playhead, in/out, every track (index, name, muted, locked, targeted) with its clips (nodeId, name, start/end/in/out in seconds, media path, project item, enabled, speed, selected, applied effects, Motion/Opacity or volume values and which properties are animated) and transitions, plus the sequence markers. Call it before editing so you address clips by nodeId. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          },
+          "include_properties": {
+            "default": true,
+            "description": "Per clip: effects, Motion/Opacity values (video) or volume (audio), and animated properties",
+            "type": "boolean"
+          },
+          "max_clips": {
+            "default": 500,
+            "description": "Most clips to list across all tracks; the receipt says when more exist",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_import_files",
+      "title": "Import media",
+      "description": "Import files (video, audio, stills, .srt, .mogrt) into a bin, \"Zenvi Imports\" by default, created if missing. Files already in the project are not imported twice (`dedupe`): their existing items are returned instead. Returns the nodeId of every item for premiere_place_clip. Missing files are refused before anything is imported. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+            },
+            "description": "Absolute paths of files on this computer"
+          },
+          "bin": {
+            "default": "Zenvi Imports",
+            "description": "Bin to import into, created if missing; \"Footage/Day 1\" nests bins; \"/\" is the project root",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "dedupe": {
+            "default": true,
+            "description": "Return the existing item for files already in the project instead of importing them again",
+            "type": "boolean"
+          },
+          "image_sequence": {
+            "default": false,
+            "description": "Import numbered stills as one image sequence (pass the first frame)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 600000
+    },
+    {
+      "name": "premiere_create_sequence",
+      "title": "Create a sequence",
+      "description": "Create a sequence and make it active. `preset`: 1080p30 (default, 1920x1080 at 30 fps), 1080p25, 1080p24, 4k30 (3840x2160), vertical (1080x1920 at 30, social 9:16), square (1080x1080 at 30). Built from an installed sequence preset (never Premiere's New Sequence dialog) and set to the exact size and rate. Or pass `from_clips` to build it from project items with settings matching the first clip. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "default": "Zenvi Sequence",
+            "description": "Sequence name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "preset": {
+            "default": "1080p30",
+            "description": "Frame size and rate (ignored with from_clips)",
+            "type": "string",
+            "enum": [
+              "1080p30",
+              "1080p25",
+              "1080p24",
+              "4k30",
+              "vertical",
+              "square"
+            ]
+          },
+          "from_clips": {
+            "description": "Build the sequence from these project items, in this order, matching the first clip's settings",
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project item nodeId: `node_id` from premiere_list_items or premiere_import_files"
+            }
+          },
+          "bin": {
+            "description": "Bin for the new sequence (path from the project root, created if missing); default: the project root",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "open": {
+            "default": true,
+            "description": "Make the new sequence the active one",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_open_sequence",
+      "title": "Open a sequence",
+      "description": "Open a sequence in the Timeline and make it the active sequence (tools default to the active one). Changes only what Premiere shows, not the project; nothing to undo.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name"
+          }
+        },
+        "required": [
+          "sequence"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_place_clip",
+      "title": "Place a clip",
+      "description": "Put a project item on a track at a time, optionally using only part of the source (`source_in`/`source_out`). `mode`: overwrite (default) replaces what is there; insert pushes later clips right. Default time: right after the last clip on the track, so repeated calls build a sequence in order. Video items bring their linked audio. The item's own in/out marks are restored afterwards. Cut on action; keep b-roll shots 1.5-3 s, talking heads 4-8 s (TASTE §6). Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project item nodeId: `node_id` from premiere_list_items or premiere_import_files"
+          },
+          "track": {
+            "default": {
+              "kind": "video",
+              "index": 0
+            },
+            "description": "Target track, {kind, index} with 0-based index (V1 = 0); default V1",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "video",
+                  "audio"
+                ],
+                "description": "Track kind"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "0-based track index as in the Premiere DOM: V1 / A1 = 0"
+              }
+            },
+            "required": [
+              "kind",
+              "index"
+            ],
+            "additionalProperties": false
+          },
+          "time": {
+            "description": "Sequence time of the clip's first frame; default: the end of the last clip on the track",
+            "type": "number",
+            "minimum": 0
+          },
+          "source_in": {
+            "description": "Source in point, seconds from the start of the media; default: the item's in mark",
+            "type": "number",
+            "minimum": 0
+          },
+          "source_out": {
+            "description": "Source out point, seconds from the start of the media; default: the item's out mark",
+            "type": "number",
+            "minimum": 0
+          },
+          "mode": {
+            "default": "overwrite",
+            "description": "overwrite replaces what is under it; insert ripples later clips right",
+            "type": "string",
+            "enum": [
+              "overwrite",
+              "insert"
+            ]
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_edit_clip",
+      "title": "Edit a clip",
+      "description": "One edit on a clip by `action`: move (`to` a start time or `by` seconds), trim (new timeline `start` and/or `end`; the source in/out moves with the edge), enable / disable, rename (`name`), speed (`speed` 0.5 = half speed, with `reverse`, `maintain_pitch`, `ripple`; QE DOM), delete (`ripple` closes the gap on the clip's tracks). move, trim, enable/disable and delete include the linked audio/video unless `include_linked` is false. Locked tracks, moves onto other clips and trims into a neighbour are refused, as are trims of retimed clips. delete is destructive. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "move",
+              "trim",
+              "enable",
+              "disable",
+              "rename",
+              "speed",
+              "delete"
+            ],
+            "description": "What to do"
+          },
+          "to": {
+            "description": "move: the new start time on the sequence",
+            "type": "number",
+            "minimum": 0
+          },
+          "by": {
+            "description": "move: shift by this many seconds (negative = earlier)",
+            "type": "number"
+          },
+          "start": {
+            "description": "trim: new start (head) on the sequence; the source in point follows",
+            "type": "number",
+            "minimum": 0
+          },
+          "end": {
+            "description": "trim: new end (tail) on the sequence; the source out point follows",
+            "type": "number",
+            "minimum": 0
+          },
+          "name": {
+            "description": "rename: the new clip name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "speed": {
+            "description": "speed: playback rate, 1 = normal, 0.5 = half speed (twice as long), 2 = double",
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 100
+          },
+          "reverse": {
+            "default": false,
+            "description": "speed: play backwards",
+            "type": "boolean"
+          },
+          "maintain_pitch": {
+            "default": true,
+            "description": "speed: keep the audio pitch",
+            "type": "boolean"
+          },
+          "ripple": {
+            "default": false,
+            "description": "delete: close the gap; speed: push or pull the clips after it",
+            "type": "boolean"
+          },
+          "include_linked": {
+            "default": true,
+            "description": "move, trim, enable/disable, delete: also the clip's linked audio/video",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_razor",
+      "title": "Razor cut",
+      "description": "Cut clips at a time, like the Razor tool, so each side can be trimmed, moved or deleted. Default: every unlocked track with a clip at `time`; pass `tracks` to cut only some. Returns the nodeIds of the new right-hand pieces. Uses the QE DOM. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Sequence time to cut at, in seconds (snapped to the frame grid)"
+          },
+          "tracks": {
+            "description": "Only these tracks, {kind, index} 0-based; default: every unlocked track with a clip at that time",
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "video",
+                    "audio"
+                  ],
+                  "description": "Track kind"
+                },
+                "index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "0-based track index as in the Premiere DOM: V1 / A1 = 0"
+                }
+              },
+              "required": [
+                "kind",
+                "index"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "time"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_add_marker",
+      "title": "Add a marker",
+      "description": "Add a sequence marker, or with `clip` a clip marker (Premiere keeps those on the clip's source item, so every use of that media shows it). Name, comment, duration (0 = a point), colour, type (comment, chapter, segmentation). Default time: the playhead. Use markers to leave notes for the editor and to mark beats and chapters. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "description": "Sequence time; default: the playhead",
+            "type": "number",
+            "minimum": 0
+          },
+          "name": {
+            "description": "Marker name",
+            "type": "string",
+            "maxLength": 500
+          },
+          "comment": {
+            "description": "Marker comment",
+            "type": "string",
+            "maxLength": 5000
+          },
+          "duration": {
+            "default": 0,
+            "description": "Seconds; 0 = a point marker",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 86400
+          },
+          "color": {
+            "description": "Marker colour; default: Premiere's (green)",
+            "type": "string",
+            "enum": [
+              "green",
+              "red",
+              "purple",
+              "orange",
+              "yellow",
+              "white",
+              "blue",
+              "cyan"
+            ]
+          },
+          "type": {
+            "default": "comment",
+            "description": "Marker type",
+            "type": "string",
+            "enum": [
+              "comment",
+              "chapter",
+              "segmentation"
+            ]
+          },
+          "clip": {
+            "description": "Mark this clip instead of the sequence",
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_save_project",
+      "title": "Save the project",
+      "description": "Save the project in place, or with `path` save it as a new .prproj and keep working in that copy (Premiere's Save As closes the original). Save after a batch of edits the user wants to keep. Changes nothing in the project's content; saving is not an undo step.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Save As this .prproj path; default: save in place",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
     }
   ]
 }
