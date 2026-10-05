@@ -381,7 +381,10 @@ var ZenviLink = (function () {
     /**
      * Register the implementation of catalog tool `name`. options (rarely
      * needed): {mutating, undoTitle} override the catalog's readOnlyHint and
-     * title.
+     * title. {mutating: false} keeps a tool that changes the project out of the
+     * dispatch undo group, for tools that must not run inside one (After
+     * Effects: undo itself, saving, rendering); such a tool reports its own
+     * undoSteps (null when it does not say).
      */
     Z.register = function (name, fn, options) {
         var meta;
@@ -488,11 +491,18 @@ var ZenviLink = (function () {
                 receipt.error.line = outcome.line;
             }
             if (ctx.didChange) {
-                receipt.undoSteps = Z.adapter.undoStepsWhenApplied;
-                receipt.warnings.push(Z.adapter.partialChangeWarning(entry ? entry.title : ctx.tool));
+                if (entry && entry.mutating) {
+                    receipt.undoSteps = Z.adapter.undoStepsWhenApplied;
+                    receipt.warnings.push(Z.adapter.partialChangeWarning(entry.title));
+                } else {
+                    receipt.undoSteps = null;
+                    receipt.warnings.push("The call failed after it had started changing the project; each change it made is its own undo step.");
+                }
             }
         } else if (outcome.status === "applied") {
-            receipt.undoSteps = outcome.undoSteps !== undefined ? outcome.undoSteps : Z.adapter.undoStepsWhenApplied;
+            // Without an undo group (read-only tools, {mutating: false}) the count is the tool's to say.
+            receipt.undoSteps = outcome.undoSteps !== undefined ? outcome.undoSteps :
+                (entry && entry.mutating ? Z.adapter.undoStepsWhenApplied : null);
         }
         return stringify(receipt);
     }

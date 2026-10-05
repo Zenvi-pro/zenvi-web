@@ -125,6 +125,19 @@ describe("After Effects undo groups", () => {
     expect(mock.state.undoDepth).toBe(0);
   });
 
+  test("{mutating: false} keeps a tool out of the undo group; its undoSteps are its own to report", () => {
+    const { mock, host } = loadAe();
+    register(host, "ae_t_save", 'return ZenviLink.applied("Saved", {});', "{mutating: false}");
+    register(host, "ae_t_undo", 'return ZenviLink.applied("Undid 2 steps", {}, -2);', "{mutating: false}");
+    register(host, "ae_t_half", 'ctx.changed(); throw new Error("disk full");', "{mutating: false}");
+    expect(host.dispatch("ae_t_save")).toMatchObject({ status: "applied", undoSteps: null });
+    expect(host.dispatch("ae_t_undo")).toMatchObject({ status: "applied", undoSteps: -2 });
+    const half = host.dispatch("ae_t_half");
+    expect(half).toMatchObject({ status: "error", undoSteps: null });
+    expect(half.warnings.join(" ")).toContain("its own undo step");
+    expect(mock.state.undoCalls).toEqual([]);
+  });
+
   test("unchanged results report no undo step", () => {
     const { host } = loadAe();
     register(host, "ae_t_same", 'return ZenviLink.unchanged("Already so", {});', "{mutating: true}");

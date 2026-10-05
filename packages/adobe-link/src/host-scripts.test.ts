@@ -35,7 +35,7 @@ describe.each(HOST_APPS)("%s host script", (app) => {
     expect(common.slice(0, 3)).toEqual(["common/00-json2.jsx", "common/01-polyfills.jsx", "common/10-zenvi.jsx"]);
   });
 
-  test("every catalog tool is registered in JSX and vice versa, with the catalog's title and mutability", () => {
+  test("every catalog tool is registered in JSX and vice versa, with the catalog's title; read-only tools never get an undo group", () => {
     const host = loadHostScript(app, mockFor(app));
     const registered = host.listTools();
     const catalog = catalogFor(HOST_OF_APP[app]);
@@ -43,7 +43,8 @@ describe.each(HOST_APPS)("%s host script", (app) => {
     for (const def of catalog) {
       const tool = registered.find((candidate) => candidate.name === def.name);
       expect(tool?.title).toBe(def.title);
-      expect(tool?.mutating).toBe(def.annotations.readOnlyHint !== true);
+      // A mutating tool may opt out of the undo group with {mutating: false} (undo, save, render).
+      if (def.annotations.readOnlyHint === true) expect(tool?.mutating, def.name).toBe(false);
     }
   });
 
