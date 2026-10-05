@@ -56,10 +56,11 @@ src/testing/        loadHostScript (ES3 vm realm), createAeMock, createPremiereM
                     FakeCep (window.__adobe_cep__ stand-in), typed loaders for extension/*.js
 extension/catalog/  generated catalog JSON (committed; a test fails when stale)
 extension/host/     ExtendScript: common/* (json2, polyfills, ZenviLink runtime), aeft/*, ppro/*
-extension/server/   loopback MCP server, queue, schema check, discovery files, CEP boot (CommonJS, ES2017)
+extension/server/   loopback MCP server, queue, schema check, discovery files, CEP boot, title renderer (CommonJS, ES2017)
 extension/panel/    the panel (vanilla HTML/CSS/JS), panel-core.js, send-to-zenvi-<app>.js hooks
 extension/CSXS/     manifest.xml (version injected by the build); .debug for remote debugging
-scripts/            gen-catalog, build-extension, install-dev, package-zxp
+scripts/            gen-catalog, build-extension, install-dev, package-zxp, typecheck-jsx
+src/fixtures/       zenvi-export/effects.jsx: a real Zenvi After Effects export (compatibility test)
 ```
 
 ## Develop and install
@@ -142,8 +143,23 @@ npm run install:dev -w @zenvi/adobe-link -- --uninstall
     ExtendScript runs.
 - **Frame captures.** A tool with `returnsImage` that sets `data.image_path` gets
   the file attached as an image block, after a PNG/JPEG magic check and a 32 MB
-  cap. The server deletes the file only when it is in Zenvi Link's temp folder
-  (`<system temp>/zenvi-link`, what `ZenviLink.tempDir()` returns).
+  cap. The server deletes the file only when it passed the check and sits
+  directly in Zenvi Link's temp folder (`<system temp>/zenvi-link`, what
+  `ZenviLink.tempDir()` returns, where `Z.tempFile()` puts captures).
+  Subfolders (`renders/` for After Effects renders for Zenvi, `titles/`) are
+  never touched.
+- **Titles in Premiere Pro.** `premiere_add_text` without `image` or `mogrt`
+  renders the title itself (`extension/server/titles.js`).
+  - The text is drawn with the page's canvas into a transparent PNG at the
+    sequence size, inside title-safe, with TASTE type sizes, a soft shadow, and
+    optional stroke and box.
+  - The host script then places the PNG as a still.
+  - The PNG is saved next to the project in `Zenvi Titles/`, because a temp file
+    would eventually go offline. An unsaved project gets `<temp>/titles` and a
+    warning.
+  - This runs as a server *preparer*: a per-tool step inside the call's queue
+    slot that may ask the host for facts (`ZenviLink.ppro.titleFrame`) and
+    replace the arguments.
 - **Sockets.** The server never times out idle sockets (Node 12's default of
   120 s would drop long responses). `HostClient` uses a `node:http` fetch that
   follows no redirects and has no client-side time limit.
@@ -161,6 +177,8 @@ npm run install:dev -w @zenvi/adobe-link -- --uninstall
     `null` when unknown.
   - A tool registered with `{mutating: false}` (undo, save, render) runs outside
     any undo group and reports its own `undoSteps` (`null` by default).
+  - A tool that knows its exact count sets `ctx.undoSteps = n`. Dispatch reports
+    it on failure, and on success when `Z.applied()` gives no count.
 
 ## Adding a host tool
 

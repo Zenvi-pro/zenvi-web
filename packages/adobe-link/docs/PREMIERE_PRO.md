@@ -64,7 +64,7 @@ sequences from presets, and the undo-stack position.
 | `premiere_apply_effect` | Add an effect by Effects-panel name (QE), then set parameters | Unknown names refused with close matches; unknown parameters listed |
 | `premiere_add_transition` | Transition at a clip edge (QE) | Cross Dissolve (video) / Constant Power (audio), 0.5 s centred on the cut, `at` end. Each requested edge is read back from the track: a transition already at that edge is replaced (warned), an edge Premiere skipped is warned, and no transition at all is an error |
 | `premiere_apply_look` | Lumetri Color look | `strength` 0.6; `clips`, else a `track`, else the selected video clips. Locks and the Lumetri effect are checked for every clip before the first change. A Lumetri already on a clip is reused; re-applying a tinting look then strengthens the tint (warned) |
-| `premiere_add_text` | Title from a transparent PNG (`image`) or an After Effects-authored `.mogrt` | Lowest video track above V1 that is free for the title (for a template: free from its start onward, because Premiere lays it down at its own length first); type scale and reading-time duration from TASTE; the duration actually placed is read back. Any change to a clip already on the track is an error. Refused without `image`/`mogrt` |
+| `premiere_add_text` | Title rendered by Zenvi Link, or from a transparent PNG (`image`) or an After Effects-authored `.mogrt` | Without `image` or `mogrt` the server renders the title: a transparent PNG at the sequence size with the canvas of the CEP page, inside title-safe, saved in `Zenvi Titles/` next to the project. It uses `font`, `weight`, `stroke`, `shadow`, `box` and `align`. Lowest video track above V1 that is free for the title (for a template: free from its start onward, because Premiere lays it down at its own length first); type scale and reading-time duration from TASTE; the duration actually placed is read back. Any change to a clip already on the track is an error |
 | `premiere_add_marker` | Sequence marker, or clip marker (on the source item) | Playhead; name, comment, duration, colour, type comment/chapter/segmentation |
 | `premiere_add_captions` | `.srt` into a caption track | `time` 0, format subtitle |
 | `premiere_auto_reframe` | Reframed copy for 9:16 / 1:1 / 4:5 / 16:9 | Keeps the source's short side (1080p → 1080×1920); opened |
@@ -178,9 +178,16 @@ Sources:
 - **Text.** Premiere's ExtendScript cannot create text, and its bundled title
   templates cannot be filled by script. `premiere_add_text` needs a PNG
   (`image`) or an After Effects-authored `.mogrt`.
-  - SPEC §3.4 plans a PNG renderer in the Zenvi Link server (the panel's
-    Chromium canvas). That needs a hook in `extension/server/server.js` and
-    is not done; the call refuses with what to pass instead.
+  - Without either, the Zenvi Link server renders the title itself
+    (`extension/server/titles.js`, SPEC §3.4) with the canvas of its CEP
+    page. It asks `ZenviLink.ppro.titleFrame` for the sequence size and the
+    project path, draws a transparent PNG at the sequence size, and passes it
+    as `image`.
+  - Rendered titles are saved in `Zenvi Titles/` next to the project, or in
+    the temp folder, with a warning, while the project is unsaved. They are
+    named by content, so the same title reuses its file and project item.
+  - Without a canvas (a server not running in CEP), the call still refuses
+    with what to pass.
   - Changing font size inside a MOGRT's JSON is reported to destabilise
     Premiere, so only a template's own size and colour controls are set.
 - **Localised Premiere.** Effect, transition and Lumetri parameter names are
@@ -334,6 +341,12 @@ Record `undoSteps` for each mutating call.
     - With Premiere's own *Basic Title.mogrt* (in
       `…/Essential Graphics/`): refused, with nothing left on the timeline
       (check the History panel).
+    - Call `premiere_add_text {text: "Launch day"}` with no `image` or
+      `mogrt`. A PNG appears in `Zenvi Titles/` next to the saved project. The
+      title shows centred and inside title-safe, with Inter (or the next
+      available font) and a soft shadow. Repeat with `style: "lower-third"`:
+      the text is left-aligned at title-safe with its baseline at 80 % of the
+      frame height.
 11. **Edits.** Run `premiere_razor {time: 2}`, then `premiere_edit_clip`:
     - `trim` the right piece's `end`,
     - `move by: 1`,
