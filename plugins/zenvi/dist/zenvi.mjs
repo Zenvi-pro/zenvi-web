@@ -82083,7 +82083,7 @@ var init_registry5 = __esm({
           hosts.push({ id: "zenvi-desktop", kind: "zenvi", label: "Zenvi desktop app", connected: false, active: false, how_to_connect: DESKTOP_HOW });
         }
         let routesToDesktop = false;
-        if (portable.project) {
+        if (portable.project && this.options.env.ZENVI_MCP_ENGINE !== "portable") {
           for (const endpoint of snap2.desktop) {
             if (await hasProjectOpen(endpoint, portable.project)) {
               routesToDesktop = true;
@@ -82239,6 +82239,24 @@ function hostRefusal(host, tool, code, message, data = {}) {
 function hostFailure(host, tool, code, message) {
   return receipt(host, tool, "error", code, message);
 }
+function branchTypes(prop) {
+  const out = /* @__PURE__ */ new Set();
+  const branches = prop?.anyOf ?? prop?.oneOf ?? [];
+  for (const branch of branches) {
+    const type = branch.type;
+    for (const t of Array.isArray(type) ? type : [type]) if (typeof t === "string") out.add(t);
+  }
+  return out;
+}
+function preferIds(schema, args) {
+  const out = { ...args };
+  for (const [key, value] of Object.entries(args)) {
+    if (typeof value !== "string" || !/^\d+$/.test(value.trim())) continue;
+    const types = branchTypes(schema?.properties?.[key]);
+    if (types.has("integer") && types.has("string")) out[key] = Number.parseInt(value.trim(), 10);
+  }
+  return out;
+}
 function isOkHostStatus(status) {
   return status === "applied" || status === "unchanged" || status === "ok";
 }
@@ -82277,7 +82295,7 @@ async function callAdobeTool(registry2, name, rawArgs, options = {}) {
     const unknown2 = unknownArgumentsMessage(name, rawArgs, schema);
     if (unknown2) return { receipt: hostRefusal(host, name, "INVALID_ARGUMENT", unknown2), images: [] };
   }
-  const args = normalizeArgs(schema, rawArgs);
+  const args = preferIds(schema, normalizeArgs(schema, rawArgs));
   try {
     const result = await connection.client.callTool(name, args, options.timeoutMs ? { timeoutMs: options.timeoutMs } : {});
     const got = result.receipt ?? {
@@ -85587,7 +85605,7 @@ async function ensureDesktop(ctx, state, tool, call) {
     return { ok: false, receipt: refused(tool, `${tool} runs in the Zenvi desktop app, which could not open ${file3}: ${message} If Zenvi has unsaved changes in another project, ask the user to save or close it, then try again.`) };
   }
   state.hosts.invalidate();
-  call.progress?.(0, 0, `${summary} Waiting for it to show the project\u2026`);
+  call.progress?.(0.05, 0, `${summary} Waiting for it to show the project\u2026`);
   const deadline = Date.now() + state.desktopWaitMs;
   for (; ; ) {
     const desktop = await state.desktopExecutor();
@@ -85695,7 +85713,7 @@ function bringFromAfterEffects(ctx) {
         if (declaredName(schema.properties, ["alpha"])) renderArgs.alpha = args.alpha;
         else if (declaredName(schema.properties, ["codec"])) renderArgs.codec = args.alpha ? "prores4444" : "h264";
       }
-      call.progress?.(0, 0, "Rendering in After Effects\u2026");
+      call.progress?.(0.1, 0, "Rendering in After Effects\u2026");
       const render2 = await callAdobeTool(state.hosts, "ae_render_for_zenvi", renderArgs, { timeoutMs: ADOBE_RENDER_WAIT_MS });
       if (!isOkHostStatus(render2.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "rendering in After Effects", render2.receipt), ready2.note), engine: "desktop" };
       const media = aeRenderLink(render2.receipt.data ?? {}, args.alpha);
@@ -85705,7 +85723,7 @@ function bringFromAfterEffects(ctx) {
           engine: "desktop"
         };
       }
-      call.progress?.(0, 0, "Adding the render to the Zenvi project\u2026");
+      call.progress?.(0.9, 0, "Adding the render to the Zenvi project\u2026");
       const importArgs = { path: media.path, link: media.link };
       if (args.position !== void 0) importArgs.position = args.position;
       if (args.track !== void 0 && args.track !== "") importArgs.track = String(args.track);
@@ -85756,7 +85774,7 @@ function bringFromPremiere(ctx) {
         if (!key) return { receipt: refused(tool, "this Zenvi Link's premiere_export_xml does not take a sequence; leave sequence out to export the active one"), engine: null };
         exportArgs[key] = args.sequence;
       }
-      call.progress?.(0, 0, "Exporting the sequence from Premiere Pro\u2026");
+      call.progress?.(0.1, 0, "Exporting the sequence from Premiere Pro\u2026");
       const exported = await callAdobeTool(state.hosts, "premiere_export_xml", exportArgs, { timeoutMs: ADOBE_RENDER_WAIT_MS });
       if (!isOkHostStatus(exported.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "exporting from Premiere Pro", exported.receipt), ready2.note), engine: "desktop" };
       const xml = exportedXmlPath(exported.receipt.data ?? {});
@@ -85766,7 +85784,7 @@ function bringFromPremiere(ctx) {
           engine: "desktop"
         };
       }
-      call.progress?.(0, 0, "Importing the sequence into Zenvi\u2026");
+      call.progress?.(0.9, 0, "Importing the sequence into Zenvi\u2026");
       const { receipt: zenvi } = await forward(ready2.desktop, "import_timeline_xml_tool", { path: xml, placement: args.placement ?? "new_tracks" }, call);
       const name = String(exported.receipt.data?.sequence_name ?? exported.receipt.data?.name ?? args.sequence ?? "the active sequence");
       const summary = zenvi.status === "applied" || zenvi.status === "unchanged" ? `Exported "${name}" from Premiere Pro and imported it into the Zenvi project. ${zenvi.summary}` : `Premiere Pro exported "${name}" to ${xml}, but Zenvi could not import it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
@@ -85960,7 +85978,12 @@ async function createZenviMcpServer(ctx, projectFile, options = {}) {
     const name = request.params.name;
     const args = request.params.arguments ?? {};
     const progressToken = request.params._meta?.progressToken;
-    const progress = progressToken !== void 0 ? (value, total, message) => void extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress: value, ...total > 0 ? { total } : {}, message } }).catch(() => void 0) : void 0;
+    let lastProgress = -Infinity;
+    const progress = progressToken !== void 0 ? (value, total, message) => {
+      if (!(value > lastProgress)) return;
+      lastProgress = value;
+      void extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress: value, ...total > 0 ? { total } : {}, message } }).catch(() => void 0);
+    } : void 0;
     try {
       const extraTool = extraByName.get(name);
       if (extraTool) {
