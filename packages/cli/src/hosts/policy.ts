@@ -1,6 +1,7 @@
 /**
  * Which Adobe tool families `zenvi mcp` lists (SPEC §3.8): ZENVI_MCP_ADOBE =
- * `auto` (default), `on` or `off`. The families cost ~55 tools of context, so
+ * `auto` (default), `on` or `off`. The families are 55 tools (30 After
+ * Effects, 25 Premiere Pro: ~115 KB of definitions, roughly 29k tokens), so
  * `auto` lists one only when it can be used on this machine:
  *
  * - its discovery file exists (Zenvi Link has run in that app here), or

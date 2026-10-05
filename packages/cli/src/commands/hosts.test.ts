@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GEN_FILE, HANDOFF_TOOLS, syncText } from "../../scripts/sync-desktop-handoff-tools.mjs";
 import { tasteModule } from "../../scripts/sync-taste.mjs";
 import { DESKTOP_HANDOFF_TOOLS } from "../hosts/handoff.js";
-import { CAPTURE_FRAME_TOOL, fakeLinkHost } from "../test-support/adobe.js";
+import { fakeLinkHost } from "../test-support/adobe.js";
 import { fakeDesktop, testEnv, writeDiscovery, zenvi } from "../test-support/harness.js";
 import { testRegistry } from "../test-support/registry.js";
 
@@ -116,7 +116,6 @@ describe("zenvi ae / zenvi premiere / zenvi call", () => {
       host: "aftereffects",
       desktopDir: path.join(home, ".openshot_qt"),
       tempDir: tmp,
-      tools: [CAPTURE_FRAME_TOOL],
       handlers: {
         ae_get_state: () => ({ status: "ok", summary: "After Effects 26.3", data: { project: { path: "/Work/promo.aep" } } }),
         ae_capture_frame: async () => {

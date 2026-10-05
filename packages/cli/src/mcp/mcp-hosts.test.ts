@@ -5,7 +5,8 @@
  * paths included), bring_from_* across both, resources and prompts.
  */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -20,7 +21,7 @@ import { defaultDetectDeps } from "../hosts/extension.js";
 import { DESKTOP_HANDOFF_TOOLS } from "../hosts/handoff.js";
 import { TASTE_MARKDOWN } from "../hosts/guides.js";
 import { createContext } from "../program.js";
-import { CAPTURE_FRAME_TOOL, EXPORT_XML_TOOL, fakeLinkHost, realAfterEffects, RENDER_FOR_ZENVI_TOOL, type FakeLinkHostOptions } from "../test-support/adobe.js";
+import { fakeLinkHost, realAfterEffects, type FakeLinkHostOptions } from "../test-support/adobe.js";
 import { fakeDesktop, testEnv, writeDiscovery, zenvi, type FakeDesktop, type FakeDesktopOptions } from "../test-support/harness.js";
 import { testRegistry } from "../test-support/registry.js";
 import { createZenviMcpServer, type ZenviMcpServer } from "./server.js";
@@ -207,12 +208,13 @@ describe("After Effects / Premiere Pro tools", () => {
     const tmp = await makeTempDir("zenvi-capture-");
     cleanup.push(() => removeDir(tmp));
     const png = Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex");
+    // Like the real ae_capture_frame: a PNG directly in Zenvi Link's temp folder, deleted once sent.
+    const file = path.join(tmp, "zenvi-link", "frame.png");
     const host = await ae({
       tempDir: tmp,
-      tools: [CAPTURE_FRAME_TOOL],
       handlers: {
         ae_capture_frame: async (args) => {
-          const file = path.join(tmp, "frame.png");
+          await mkdir(path.dirname(file), { recursive: true });
           await writeFile(file, png);
           return { status: "ok", summary: `Frame at ${String(args.time)} s`, data: { image_path: file, time: args.time } };
         },
@@ -220,25 +222,20 @@ describe("After Effects / Premiere Pro tools", () => {
     });
     const { client } = await connect();
     const r = await call(client, "ae_capture_frame", { time: "1.5" });
-    expect(host.calls).toEqual([{ tool: "ae_capture_frame", args: expect.objectContaining({ time: 1.5 }) }]);
+    // The real catalog's defaults (max_width 1280) are filled in by Zenvi Link.
+    expect(host.calls).toEqual([{ tool: "ae_capture_frame", args: expect.objectContaining({ time: 1.5, max_width: 1280 }) }]);
     expect(r.content.map((c) => [c.type, c.mimeType])).toEqual([["text", undefined], ["image", "image/png"]]);
     expect(Buffer.from(r.content[1]!.data!, "base64")).toEqual(png);
+    expect(r.receipt.data).not.toHaveProperty("image_path");
+    expect(existsSync(file)).toBe(false);
   });
 
   it("treats an all-digits string as the id for id-or-name fields (layer=12 from the CLI)", async () => {
-    const layerTool = {
-      name: "ae_touch_layer",
-      inputSchema: {
-        type: "object" as const,
-        properties: { layer: { anyOf: [{ type: "integer", minimum: 1 }, { type: "string", minLength: 1 }] }, label: { type: "string" } },
-        additionalProperties: false as const,
-      },
-    };
-    const host = await ae({ tools: [layerTool] });
+    const host = await ae();
     const { client } = await connect();
-    await call(client, "ae_touch_layer", { layer: "12", label: "7" });
-    await call(client, "ae_touch_layer", { layer: "Title 2" });
-    expect(host.calls.map((c) => c.args)).toEqual([{ layer: 12, label: "7" }, { layer: "Title 2" }]);
+    await call(client, "ae_set_layer", { layer: "12", name: "7" });
+    await call(client, "ae_set_layer", { layer: "Title 2", name: "Title" });
+    expect(host.calls.map((c) => c.args)).toEqual([expect.objectContaining({ layer: 12, name: "7" }), expect.objectContaining({ layer: "Title 2", name: "Title" })]);
   });
 
   it("refuses when the app is not connected, with how to connect it", async () => {
@@ -263,6 +260,9 @@ describe("After Effects / Premiere Pro tools", () => {
     expect(typo.receipt.summary).toMatch(/unknown argument for ae_set_thing: amont\. Accepted: amount/);
     const invalid = await call(client, "ae_set_thing", { amount: -1 });
     expect(invalid.receipt).toMatchObject({ status: "refused", error: { code: "INVALID_ARGUMENT" } });
+    // A catalog tool: Zenvi Link's own schema check refuses the value before any ExtendScript runs.
+    const negative = await call(client, "ae_capture_frame", { time: -1 });
+    expect(negative.receipt).toMatchObject({ status: "refused", host: "aftereffects", error: { code: "INVALID_ARGUMENT" } });
     const missing = await call(client, "ae_no_such_tool");
     expect(missing.receipt).toMatchObject({ status: "refused", error: { code: "NOT_FOUND" } });
     expect(host.calls).toEqual([]);
@@ -348,7 +348,7 @@ describe("bring_from_after_effects", () => {
 
   it("renders the comp in After Effects and adds it to the Zenvi project as a linked clip, both receipts in one", async () => {
     const file = await projectFile();
-    const host = await ae({ tools: [RENDER_FOR_ZENVI_TOOL], handlers: { ae_render_for_zenvi: () => ({ status: "applied", summary: "Rendered Promo", data: RENDER, warnings: ["snapped the work area"] }) } });
+    const host = await ae({ handlers: { ae_render_for_zenvi: () => ({ status: "applied", summary: "Rendered Promo", data: RENDER, warnings: ["snapped the work area"] }) } });
     const desktop = await desktopWith(file, {
       tools: ["import_linked_media_tool"],
       handlers: { import_linked_media_tool: () => applied("import_linked_media_tool", "Added linked After Effects clip 'Promo' at 2.00-7.00s.", { clips: [{ id: "CLIP000001", track: 3, position: 2 }] }) },
@@ -382,7 +382,7 @@ describe("bring_from_after_effects", () => {
 
   it("reports increasing progress for its steps", async () => {
     const file = await projectFile();
-    await ae({ tools: [RENDER_FOR_ZENVI_TOOL], handlers: { ae_render_for_zenvi: () => ({ status: "applied", data: RENDER }) } });
+    await ae({ handlers: { ae_render_for_zenvi: () => ({ status: "applied", data: RENDER }) } });
     await desktopWith(file, { tools: ["import_linked_media_tool"] });
     const { client } = await connect({ project: file });
     const seen: Array<{ progress: number; message?: string }> = [];
@@ -394,7 +394,7 @@ describe("bring_from_after_effects", () => {
   it("uses Zenvi Link's own link object when it sends one", async () => {
     const file = await projectFile();
     const link = { version: 1, kind: "aftereffects", source: { aep: "/Work/promo.aep", composition: "Logo", composition_key: 4 }, render: { codec: "h264" } };
-    await ae({ tools: [RENDER_FOR_ZENVI_TOOL], handlers: { ae_render_for_zenvi: () => ({ status: "applied", data: { path: "/tmp/Logo.mp4", link } }) } });
+    await ae({ handlers: { ae_render_for_zenvi: () => ({ status: "applied", data: { path: "/tmp/Logo.mp4", link } }) } });
     const desktop = await desktopWith(file, { tools: ["import_linked_media_tool"] });
     const { client } = await connect({ project: file });
     await call(client, "bring_from_after_effects");
@@ -409,7 +409,7 @@ describe("bring_from_after_effects", () => {
     expect(offline.receipt.status).toBe("refused");
     expect(offline.receipt.summary).toMatch(/After Effects is not connected/);
 
-    await ae({ tools: [RENDER_FOR_ZENVI_TOOL], handlers: { ae_render_for_zenvi: () => ({ status: "refused", summary: "Error: no active comp", error: { code: "NO_ACTIVE_COMP", message: "no active comp" } }) } });
+    await ae({ handlers: { ae_render_for_zenvi: () => ({ status: "refused", summary: "Error: no active comp", error: { code: "NO_ACTIVE_COMP", message: "no active comp" } }) } });
     const noComp = await call(client, "bring_from_after_effects");
     expect(noComp.receipt).toMatchObject({ status: "refused", data: { after_effects: { error: { code: "NO_ACTIVE_COMP" } } } });
     expect(noComp.receipt.summary).toMatch(/no active comp \(rendering in After Effects; nothing was added to the Zenvi project\)/);
@@ -422,7 +422,7 @@ describe("bring_from_after_effects", () => {
 describe("bring_from_premiere", () => {
   it("exports the sequence from Premiere and imports it into the Zenvi project", async () => {
     const file = await projectFile();
-    const host = await premiere({ tools: [EXPORT_XML_TOOL], handlers: { premiere_export_xml: () => ({ status: "applied", summary: "Wrote Cut.xml", data: { path: "/tmp/Cut.xml", sequence_name: "Cut" } }) } });
+    const host = await premiere({ handlers: { premiere_export_xml: () => ({ status: "applied", summary: 'Exported "Cut" as FCP XML to /tmp/Cut.xml', data: { path: "/tmp/Cut.xml", sequence_id: "8d1c-seq", name: "Cut" } }) } });
     const desktop = await desktopWith(file, {
       tools: ["import_timeline_xml_tool"],
       handlers: { import_timeline_xml_tool: (args) => applied("import_timeline_xml_tool", `Imported ${String(args.path)}: 4 clips on 2 new tracks`, {}, 1) },
@@ -437,7 +437,7 @@ describe("bring_from_premiere", () => {
 
   it("checks the desktop can import before exporting anything", async () => {
     const file = await projectFile();
-    const host = await premiere({ tools: [EXPORT_XML_TOOL] });
+    const host = await premiere();
     await desktopWith(file);
     const { client } = await connect({ project: file });
     const r = await call(client, "bring_from_premiere");

@@ -180,7 +180,8 @@ created/changed ids, so agents can chain calls without re-reading the timeline.
   `HostClient` per app; unprefixed Zenvi tools go to the desktop app while it
   has the session's project open, else to the portable engine. The Adobe
   families are listed per `ZENVI_MCP_ADOBE` (`auto` lists a family only where
-  Zenvi Link can run, because the two cost ~28k tokens of definitions).
+  Zenvi Link can run, because the 55 tools cost ~115 KB, roughly 29k
+  tokens, of definitions).
 - **Handoffs**: every conversion of the Zenvi format (After Effects `.jsx`,
   Premiere FCP7 XML, Remotion and HyperFrames projects, all imports, linked
   clips) is implemented once, in the desktop app. `zenvi mcp` lists the

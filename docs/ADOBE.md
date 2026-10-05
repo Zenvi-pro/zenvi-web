@@ -113,9 +113,10 @@ Moving edits between the apps and Zenvi is in [HANDOFF.md](HANDOFF.md):
 
 ### Which tools `zenvi mcp` lists
 
-The two families are large (about 18k tokens of tool definitions for After
-Effects, 10k for Premiere Pro), so `zenvi mcp` lists a family only where it
-can be used. `ZENVI_MCP_ADOBE` in the server's environment:
+The two families are large: the 30 After Effects tools are about 72 KB of
+tool definitions (roughly 18k tokens), the 25 Premiere Pro tools about 43 KB
+(roughly 11k tokens). So `zenvi mcp` lists a family only where it can be
+used. `ZENVI_MCP_ADOBE` in the server's environment:
 
 | Value | Lists |
 | --- | --- |
@@ -152,10 +153,14 @@ ignore it pick the tools up after a restart.
   `~/.openshot_qt/link/aftereffects.json` or `premiere.json` (Windows:
   `%USERPROFILE%\.openshot_qt\link\`): `url`, `token_file`, `pid`,
   `project`, `version`, `app`, `app_name`, `app_version`, `protocol`,
-  `started_at`, `last_active_at`. The token goes into `token_file` first.
-  `project` follows the open project; `last_active_at` moves when the app
-  comes to the front and on every tool call. A clean quit removes both
-  files; the newest instance of an app wins.
+  `started_at`, `last_active_at`. Each instance keeps its token in its own
+  `<app>.<pid>.token` (written before the JSON that names it), so the
+  background service, the panel fallback or a second installed version can
+  run side by side; the newest instance owns the discovery file. `project`
+  follows the open project; `last_active_at` moves when the app comes to the
+  front and on every tool call. A clean quit removes the instance's token
+  file, and the discovery file while it still names that instance; files
+  left by a crash are cleaned up by the next instance and by `zenvi`.
 - **Finding it.** A client trusts a file only when its `pid` is alive, its
   URL is `127.0.0.1` / `localhost`, and one `initialize` with the token
   answers within 1.5 s as `zenvi-link-<app>`. It contacts only that URL.
@@ -169,7 +174,8 @@ ignore it pick the tools up after a restart.
   by default (renders allow longer). Arguments are checked against the
   tool's JSON Schema before any ExtendScript runs (unknown keys, types,
   enums, ranges: `refused` with `INVALID_ARGUMENT`), and omitted arguments
-  get the TASTE defaults.
+  get the TASTE defaults. Frame captures are written to Zenvi Link's own
+  temp folder (`<system temp>/zenvi-link`), sent as images and deleted.
 - **Receipts** (contract 3): `status` `ok` (read-only) | `applied` |
   `unchanged` | `refused` | `error`, `summary` (`Error: …` on failure),
   `data` (ids: `comp_id`, `layer_id`, `node_id`, …), `warnings` (frame
@@ -195,8 +201,10 @@ ignore it pick the tools up after a restart.
 - **This computer only.** The server listens on `127.0.0.1` on a random
   port. Clients accept only loopback URLs and never scan ports.
 - **A token per start.** 32 random bytes (hex), new each time the server
-  starts, in a token file readable only by you (mode 0600) and written
-  before the discovery file appears. Requests without it get 401.
+  starts, in that instance's token file (`<app>.<pid>.token`, readable only
+  by you, mode 0600), written before the discovery file that names it.
+  Requests without it get 401. Clients never follow redirects, so the token
+  only ever goes to the URL the discovery file names.
 - **No browsers.** Any request with an `Origin` header gets 403, and so does
   a `Host` header other than `127.0.0.1:<port>` / `localhost:<port>` (DNS
   rebinding). Bodies are limited to 8 MB. `GET` and `DELETE` are refused.
@@ -239,7 +247,7 @@ the same definitions. `zenvi ae` / `zenvi premiere` print the current list.
 | Project and sequences | `premiere_import_files`, `premiere_create_sequence` (1080p30/25/24, 4k30, vertical, square), `premiere_open_sequence`, `premiere_save_project` |
 | Editing | `premiere_place_clip` (overwrite / insert), `premiere_edit_clip` (move, trim, enable, rename, speed, delete with ripple), `premiere_razor` |
 | Motion and look | `premiere_set_clip_properties`, `premiere_animate`, `premiere_apply_effect`, `premiere_add_transition` (Cross Dissolve 0.5 s by default), `premiere_apply_look` |
-| Graphics and assist | `premiere_add_text`, `premiere_add_marker`, `premiere_add_captions` (SRT), `premiere_auto_reframe` (9:16, 1:1, 4:5), `premiere_scene_detect` |
+| Graphics and assist | `premiere_add_text` (an Essential Graphics template, or a title PNG Zenvi Link draws itself inside title-safe, saved in `Zenvi Titles/` next to the project), `premiere_add_marker`, `premiere_add_captions` (SRT), `premiere_auto_reframe` (9:16, 1:1, 4:5), `premiere_scene_detect` |
 | Output | `premiere_export` (presets, range, Media Encoder or direct), `premiere_export_xml` / `premiere_import_xml` (FCP7 XML, used by the Zenvi handoffs) |
 | Scripts | `premiere_run_script` (ExtendScript + QE, escape hatch) |
 

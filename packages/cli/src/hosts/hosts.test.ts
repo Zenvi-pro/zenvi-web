@@ -182,10 +182,17 @@ describe("listHosts (SPEC §3.8)", () => {
     const report = await registry(null).list();
     expect(report.hosts.find((h) => h.id === "after-effects")).toMatchObject({ connected: false, status: "dead" });
     await expect(readFile(host.discoveryFile, "utf8")).rejects.toThrow();
+    // ...together with that instance's own token file (aftereffects.<pid>.token).
+    expect(path.basename(host.tokenFile)).toBe("aftereffects.2000000000.token");
+    await expect(readFile(host.tokenFile, "utf8")).rejects.toThrow();
 
     const live = await fakeLinkHost({ host: "premiere", desktopDir });
     stops.push(() => live.stop());
-    await writeFile(path.join(desktopDir, "link", "premiere.token"), "00".repeat(32));
+    // The discovery file names this instance's token file (<app>.<pid>.token); a wrong token there is refused.
+    const named = (JSON.parse(await readFile(live.discoveryFile, "utf8")) as { token_file: string }).token_file;
+    expect(named).toBe(live.tokenFile);
+    expect(path.basename(named)).toBe(`premiere.${process.pid}.token`);
+    await writeFile(named, "00".repeat(32));
     const unreachable = (await registry(null).list()).hosts.find((h) => h.id === "premiere-pro")!;
     expect(unreachable).toMatchObject({ connected: false, status: "unreachable" });
     expect(String(unreachable.how_to_connect)).toMatch(/did not answer/);

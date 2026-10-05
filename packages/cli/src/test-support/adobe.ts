@@ -23,9 +23,15 @@ interface LinkServer {
 
 interface DiscoveryFileInstance {
   readonly file: string;
+  /** `<app>.<pid>.token`: one token file per instance. */
   readonly tokenFile: string;
-  publish(details: { url: string; token: string; project: string | null; version: string; appName: string; appVersion: string }): void;
+  publish(details: { url: string; token: string; project: string | null; version: string; appName: string; appVersion: string }): Promise<"written" | "yielded" | "failed">;
   remove(): boolean;
+}
+
+async function published(file: DiscoveryFileInstance, details: Parameters<DiscoveryFileInstance["publish"]>[0]): Promise<void> {
+  const outcome = await file.publish(details);
+  if (outcome !== "written") throw new Error(`could not publish ${file.file} (${outcome})`);
 }
 
 const { createLinkServer } = require(path.join(linkRoot, "extension", "server", "server.js")) as {
@@ -54,6 +60,7 @@ export interface FakeLinkHost {
   /** tools/call arguments as the bridge received them (after schema defaults). */
   calls: Array<{ tool: string; args: Record<string, unknown> }>;
   discoveryFile: string;
+  tokenFile: string;
   stop(): Promise<void>;
 }
 
@@ -61,7 +68,7 @@ export interface FakeLinkHostOptions {
   host: HostId;
   /** `~/.openshot_qt` of the test (discovery files go to `<desktopDir>/link`). */
   desktopDir: string;
-  /** Extra catalog tools (added unless the real catalog already has that name). */
+  /** Tools only this fake app has (a newer Zenvi Link); real catalog names are ignored here. */
   tools?: Array<Partial<CatalogToolJson> & { name: string }>;
   handlers?: Record<string, FakeHostHandler>;
   project?: string | null;
@@ -119,7 +126,7 @@ export async function fakeLinkHost(options: FakeLinkHostOptions): Promise<FakeLi
   await server.start();
   const lastActive = options.lastActive;
   const file = new DiscoveryFile({ host, dir: path.join(options.desktopDir, "link"), pid: options.pid, now: lastActive ? () => new Date(lastActive) : undefined });
-  file.publish({
+  await published(file, {
     url: server.url,
     token: server.token,
     project: options.project ?? null,
@@ -133,6 +140,7 @@ export async function fakeLinkHost(options: FakeLinkHostOptions): Promise<FakeLi
     token: server.token,
     calls,
     discoveryFile: file.file,
+    tokenFile: file.tokenFile,
     async stop() {
       file.remove();
       await server.stop();
@@ -158,7 +166,7 @@ export async function realAfterEffects(options: { desktopDir: string; tempDir: s
   const server = createLinkServer({ host: "aftereffects", catalog, bridge: { evalScript: async (script) => evaluate(script) }, tempDir: options.tempDir });
   await server.start();
   const file = new DiscoveryFile({ host: "aftereffects", dir: path.join(options.desktopDir, "link") });
-  file.publish({ url: server.url, token: server.token, project: null, version: catalog.version, appName: "Adobe After Effects 2026", appVersion: "26.3.0" });
+  await published(file, { url: server.url, token: server.token, project: null, version: catalog.version, appName: "Adobe After Effects 2026", appVersion: "26.3.0" });
   return {
     async stop() {
       file.remove();
@@ -166,34 +174,3 @@ export async function realAfterEffects(options: { desktopDir: string; tempDir: s
     },
   };
 }
-
-/** Catalog entries for tools the Zenvi Link catalog may not have yet (the W1b/W1c tools these tests orchestrate). */
-export const RENDER_FOR_ZENVI_TOOL = {
-  name: "ae_render_for_zenvi",
-  inputSchema: {
-    type: "object" as const,
-    properties: {
-      comp: { anyOf: [{ type: "integer", minimum: 1 }, { type: "string", minLength: 1 }] },
-      alpha: { type: "boolean", default: false },
-      output: { type: "string" },
-    },
-    additionalProperties: false as const,
-  },
-  timeoutMs: 1_800_000,
-};
-
-export const EXPORT_XML_TOOL = {
-  name: "premiere_export_xml",
-  inputSchema: {
-    type: "object" as const,
-    properties: { output: { type: "string" }, overwrite: { type: "boolean", default: false }, sequence: { type: "string", minLength: 1 } },
-    additionalProperties: false as const,
-  },
-};
-
-export const CAPTURE_FRAME_TOOL = {
-  name: "ae_capture_frame",
-  inputSchema: { type: "object" as const, properties: { time: { type: "number", minimum: 0 } }, additionalProperties: false as const },
-  annotations: { readOnlyHint: true },
-  returnsImage: true,
-};

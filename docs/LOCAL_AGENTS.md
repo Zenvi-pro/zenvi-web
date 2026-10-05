@@ -150,8 +150,9 @@ whenever the user mentions an Adobe app, to use `ae_*` / `premiere_*` for
 work inside those apps and the unprefixed tools for the Zenvi project, and
 to look at frames before saying an edit is done.
 
-The Adobe families are large (about 18k tokens of tool definitions for After
-Effects, 10k for Premiere Pro), so by default (`ZENVI_MCP_ADOBE=auto`) a
+The Adobe families are large (the 30 After Effects tools are about 72 KB of
+definitions, roughly 18k tokens; the 25 Premiere Pro tools about 43 KB,
+roughly 11k tokens), so by default (`ZENVI_MCP_ADOBE=auto`) a
 family is listed only when Zenvi Link can run it on this machine: the app's
 discovery file exists, or Zenvi Link is installed and the app is installed.
 `ZENVI_MCP_ADOBE=on` lists both, `off` neither. When a family becomes
