@@ -9,7 +9,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build": "tsx scripts/build-extension.mjs",
     "gen:catalog": "tsx scripts/gen-catalog.ts",
+    "install:dev": "tsx scripts/install-dev.mjs",
+    "package:zxp": "tsx scripts/package-zxp.mjs",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
