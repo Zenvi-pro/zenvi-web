@@ -44,9 +44,15 @@
             stale.remove();
         }
         qeSequence.exportFramePNG(timecode, base);
-        size = P.waitForFile(expected, 20000);
+        // QE writes the PNG in the background: wait (up to 20 s) for a whole one, so the server
+        // never reads a half-written image.
+        size = P.waitForFile(expected, 20000, P.isCompletePng);
         if (!size) {
-            throw Z.fail("HOST_ERROR", "Premiere wrote no frame to " + expected + " within 20 s (QE exportFramePNG at " + timecode + ")");
+            stale = new File(expected);
+            if (stale.exists && !stale.remove()) {
+                ctx.warn("Could not remove the incomplete " + expected);
+            }
+            throw Z.fail("HOST_ERROR", "Premiere wrote no complete PNG to " + expected + " within 20 s (QE exportFramePNG at " + timecode + ")");
         }
         return Z.ok("Captured " + timecode + " (" + Z.round(time, 4) + " s) of \"" + sequence.name + "\" at " +
             sequence.frameSizeHorizontal + "x" + sequence.frameSizeVertical, {

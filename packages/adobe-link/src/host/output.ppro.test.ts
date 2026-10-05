@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { fakeInstall, loadPremiere, standardEdit } from "../testing/ppro-fixtures.js";
@@ -177,5 +177,41 @@ describe("files the tools write", () => {
     expect(existsSync(target)).toBe(true);
     writeFileSync(path.join(fx.dir, "tmp", "keep.txt"), "x");
     expect(fx.call("premiere_capture_frame", {}).status).toBe("ok");
+  });
+});
+
+describe("frame captures wait for a whole PNG", () => {
+  test("a PNG QE is still writing is waited for until it ends with its IEND chunk", () => {
+    const fx = loadPremiere();
+    standardEdit(fx);
+    fx.mock.state.qeFrameExport = "async";
+    fx.mock.state.frameWriteSleeps = 5;
+    const receipt = fx.call("premiere_capture_frame", { time: 1 });
+    expect(receipt.status).toBe("ok");
+    const image = readFileSync(String(receipt.data.image_path));
+    expect(image.subarray(-8, -4).toString("latin1")).toBe("IEND");
+    expect(receipt.data.bytes).toBe(image.length);
+    expect(fx.mock.state.sleeps).toBeGreaterThan(5);
+  });
+
+  test("a PNG that never completes is an error after 20 s of polling, and the partial file is removed", () => {
+    const fx = loadPremiere();
+    standardEdit(fx);
+    fx.mock.state.qeFrameExport = "truncated";
+    const receipt = fx.call("premiere_capture_frame", {});
+    expect(receipt).toMatchObject({ status: "error", error: { code: "HOST_ERROR" } });
+    expect(receipt.summary).toContain("no complete PNG");
+    expect(fx.mock.state.sleeps).toBe(200);
+    expect(readdirSync(path.join(fx.dir, "tmp", "zenvi-link")).filter((name) => name.endsWith(".png"))).toEqual([]);
+  });
+
+  test("captures go into the Zenvi-owned temp folder when the runtime names one", () => {
+    const fx = loadPremiere();
+    standardEdit(fx);
+    const owned = path.join(fx.dir, "owned-tmp");
+    fx.host.evaluate(`ZenviLink.tempDir = function () { return ${JSON.stringify(owned)}; };`);
+    const receipt = fx.call("premiere_capture_frame", {});
+    expect(receipt.status).toBe("ok");
+    expect(path.dirname(String(receipt.data.image_path))).toBe(owned);
   });
 });

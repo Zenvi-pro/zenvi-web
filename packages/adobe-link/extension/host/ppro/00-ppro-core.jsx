@@ -1061,9 +1061,15 @@
         return String(folder).replace(/[\\\/]+$/, "") + P.sep() + name;
     };
 
-    /** The folder for Zenvi Link temp files (created). */
+    /**
+     * The folder for Zenvi Link temp files (created): the Zenvi-owned folder
+     * the server gives the host script (ZenviLink.tempDir()) once it has,
+     * else <system temp>/zenvi-link. The server only deletes images it
+     * returns from inside its own folder.
+     */
     P.tempFolder = function () {
-        var folder = new Folder(P.join(Folder.temp.fsName, "zenvi-link"));
+        var owned = typeof Z.tempDir === "function" ? Z.tempDir() : null;
+        var folder = new Folder(owned ? String(owned) : P.join(Folder.temp.fsName, "zenvi-link"));
         if (!folder.exists) {
             folder.create();
         }
@@ -1080,10 +1086,11 @@
 
     /**
      * Wait until a file exists with a non-zero size that stops changing (QE
-     * exports return before the file is complete). Polls every 100 ms, at most
-     * maxMs. Returns the size, or 0 when the file never settled.
+     * exports return before the file is complete) and, when given,
+     * `isComplete(path, size)` accepts it. Polls every 100 ms, at most maxMs.
+     * Returns the size, or 0 when the file never settled.
      */
-    P.waitForFile = function (path, maxMs) {
+    P.waitForFile = function (path, maxMs, isComplete) {
         var polls = Math.ceil(maxMs / 100);
         var last = -1;
         var file;
@@ -1092,13 +1099,43 @@
         for (i = 0; i < polls; i += 1) {
             file = new File(path);
             size = file.exists ? file.length : 0;
-            if (size > 0 && size === last) {
+            if (size > 0 && size === last && (!isComplete || isComplete(path, size))) {
                 return size;
             }
             last = size;
             $.sleep(100);
         }
         return 0;
+    };
+
+    var PNG_SIGNATURE = "\u0089PNG\r\n\u001a\n";
+    // Every complete PNG ends with the IEND chunk: length 0, "IEND", CRC AE 42 60 82.
+    var PNG_TRAILER = "\u0000\u0000\u0000\u0000IEND\u00aeB`\u0082";
+
+    /**
+     * True when the file at `path`, `size` bytes long, starts with the PNG
+     * signature and ends with the IEND chunk. Reads 20 bytes; false while
+     * another process still holds the file so that it cannot be opened.
+     */
+    P.isCompletePng = function (path, size) {
+        var file = new File(path);
+        var head = "";
+        var tail = "";
+        if (size < PNG_SIGNATURE.length + PNG_TRAILER.length) {
+            return false;
+        }
+        file.encoding = "BINARY";
+        if (!file.open("r")) {
+            return false;
+        }
+        try {
+            head = file.read(PNG_SIGNATURE.length);
+            file.seek(size - PNG_TRAILER.length, 0);
+            tail = file.read(PNG_TRAILER.length);
+        } finally {
+            file.close();
+        }
+        return head === PNG_SIGNATURE && tail === PNG_TRAILER;
     };
 
     /**

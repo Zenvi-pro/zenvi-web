@@ -83,8 +83,16 @@ export class PremiereMockState implements ComponentHost {
   qeTransitionArgs = 7;
   /** QE track items have setSpeed. */
   qeSetSpeed = true;
-  /** QE sequences have exportFramePNG / write the file. */
-  qeFrameExport: "writes" | "silent" | "missing" = "writes";
+  /**
+   * QE exportFramePNG: writes the file at once; "async" writes a PNG without its IEND chunk first and completes it
+   * after `frameWriteSleeps` $.sleep calls (as QE writes in the background); "truncated" never completes it;
+   * "silent" writes nothing; "missing" has no exportFramePNG.
+   */
+  qeFrameExport: "writes" | "async" | "truncated" | "silent" | "missing" = "writes";
+  frameWriteSleeps = 3;
+  /** $.sleep calls so far (the mock never waits). */
+  sleeps = 0;
+  private readonly pendingWrites: { at: number; run: () => void }[] = [];
   /** QE project has undoStackIndex(). */
   qeUndoIndex = true;
   /** qe.project.getSequenceAt throws (reported for every index on Premiere 26). */
@@ -136,7 +144,22 @@ export class PremiereMockState implements ComponentHost {
   undoable(label: string): void {
     this.undoIndex += 1;
     this.undoLog.push(label);
-  }}
+  }
+
+  /** Run `action` after `count` more $.sleep calls: a write that finishes in the background. */
+  afterSleeps(count: number, action: () => void): void {
+    this.pendingWrites.push({ at: this.sleeps + count, run: action });
+  }
+
+  /** $.sleep: no waiting; background writes that are due happen now. */
+  sleep(_milliseconds: number): void {
+    this.sleeps += 1;
+    for (const write of this.pendingWrites.filter((pending) => pending.at <= this.sleeps)) {
+      this.pendingWrites.splice(this.pendingWrites.indexOf(write), 1);
+      write.run();
+    }
+  }
+}
 
 export class ProjectItemCollection {}
 
@@ -1105,6 +1128,7 @@ export interface PremiereMock {
 export function createPremiereMock(options: PremiereMockOptions = {}): PremiereMock {
   const es = createExtendScriptMock(options);
   const state = new PremiereMockState(es);
+  es.$.sleep = (milliseconds: number) => state.sleep(milliseconds);
   const app = new PremiereApp(state, options.version ?? "26.0.0");
   state.project = app.project;
   const globals: HostGlobals = {

@@ -28,6 +28,8 @@ interface ZenviResult {
 interface ZenviLinkRuntime {
   version: string;
   host: string | null;
+  /** The Zenvi-owned temp folder the server passes to the host script (W1a review #6); absent on older runtimes. */
+  tempDir?(): string | null;
   TASTE: any;
   CATALOG: any;
   ppro: any;

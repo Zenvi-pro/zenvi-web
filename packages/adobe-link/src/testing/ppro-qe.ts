@@ -179,8 +179,15 @@ export function createQe(mock: PremiereMockState, app: PremiereApp): Record<stri
         record(`sequence.exportFramePNG(${timecode}, ${path.basename(base)})`);
         if (mock.qeFrameExport === "silent") return true;
         const target = path.join(path.dirname(base), `${path.basename(base).split(".")[0]}.png`);
+        const png = pngHead(sequence.frameSizeHorizontal, sequence.frameSizeVertical);
         mkdirSync(path.dirname(target), { recursive: true });
-        writeFileSync(target, pngHead(sequence.frameSizeHorizontal, sequence.frameSizeVertical));
+        if (mock.qeFrameExport === "writes") {
+          writeFileSync(target, png);
+          return true;
+        }
+        // Signature and IHDR only: what a reader sees while QE is still writing.
+        writeFileSync(target, png.subarray(0, png.length - 12));
+        if (mock.qeFrameExport === "async") mock.afterSleeps(mock.frameWriteSleeps, () => writeFileSync(target, png));
         return true;
       };
     }
