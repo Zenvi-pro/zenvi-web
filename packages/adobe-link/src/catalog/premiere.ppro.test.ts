@@ -49,6 +49,23 @@ describe("Premiere catalog", () => {
     expect(byName.get("premiere_edit_clip")?.annotations.destructiveHint).toBe(true);
   });
 
+  test("no defaults inside array items: the host script supplies nested fallbacks itself", () => {
+    const nested: string[] = [];
+    const walk = (node: unknown, where: string, inItems: boolean): void => {
+      if (Array.isArray(node)) {
+        node.forEach((child, i) => walk(child, `${where}[${i}]`, inItems));
+        return;
+      }
+      if (!node || typeof node !== "object") return;
+      for (const [key, child] of Object.entries(node)) {
+        if (key === "default" && inItems) nested.push(where);
+        walk(child, `${where}.${key}`, inItems || key === "items" || key === "prefixItems");
+      }
+    };
+    for (const tool of PREMIERE_TOOLS) walk(inputSchemaFor(tool), tool.name, false);
+    expect(nested).toEqual([]);
+  });
+
   test("enums match the tables the host script uses", () => {
     const fx = loadPremiere();
     const list = (code: string) => String(fx.host.evaluate(code)).split(",");

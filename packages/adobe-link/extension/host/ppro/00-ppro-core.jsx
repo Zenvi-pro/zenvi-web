@@ -25,6 +25,26 @@
     /** Premiere's time unit: 254016000000 ticks per second. */
     P.TICKS_PER_SECOND = 254016000000;
 
+    // No Array.prototype.indexOf / String.prototype.trim: every script in the
+    // app shares one ExtendScript engine, and ES3 has no way to add a
+    // prototype member that stays out of other scripts' for-in loops.
+
+    /** Index of `value` in an array (strict equality), or -1. */
+    P.indexOf = function (list, value) {
+        var i;
+        for (i = 0; list && i < list.length; i += 1) {
+            if (list[i] === value) {
+                return i;
+            }
+        }
+        return -1;
+    };
+
+    /** `text` without leading and trailing whitespace. */
+    P.trim = function (text) {
+        return String(text).replace(/^[\s\u00a0\ufeff]+|[\s\u00a0\ufeff]+$/g, "");
+    };
+
     var qeEnabled = false;
 
     // ------------------------------------------------------------------
@@ -225,7 +245,7 @@
     /** Bin path segments from "A/B", "\\A\\B" or "/" (root). */
     function binSegments(path) {
         return Z.filter(String(path).replace(/\\/g, "/").split("/"), function (part) {
-            return part.trim().length > 0;
+            return P.trim(part).length > 0;
         });
     }
 
@@ -745,12 +765,12 @@
         var components = P.componentsOf(clip);
         var i;
         for (i = 0; i < components.length; i += 1) {
-            if (matchNames.indexOf(String(components[i].matchName)) >= 0) {
+            if (P.indexOf(matchNames, String(components[i].matchName)) >= 0) {
                 return components[i];
             }
         }
         for (i = 0; i < components.length; i += 1) {
-            if (displayNames.indexOf(String(components[i].displayName)) >= 0) {
+            if (P.indexOf(displayNames, String(components[i].displayName)) >= 0) {
                 return components[i];
             }
         }
@@ -809,7 +829,7 @@
         var wanted = Z.map(names, function (name) { return String(name).toLowerCase(); });
         var i;
         for (i = 0; i < params.length; i += 1) {
-            if (wanted.indexOf(String(params[i].displayName).toLowerCase()) >= 0) {
+            if (P.indexOf(wanted, String(params[i].displayName).toLowerCase()) >= 0) {
                 return params[i];
             }
         }
@@ -824,7 +844,7 @@
         return Z.filter(Z.map(P.paramsOf(component), function (param) {
             return String(param.displayName);
         }), function (name) {
-            return name.trim().length > 0;
+            return P.trim(name).length > 0;
         });
     };
 

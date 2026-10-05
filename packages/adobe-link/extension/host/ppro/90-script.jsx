@@ -32,7 +32,7 @@
         var source = Z.required(args, "script", "string");
         var value;
         var line;
-        if (source.trim().length === 0) {
+        if (P.trim(source).length === 0) {
             throw Z.refuse("INVALID_ARGUMENT", "`script` must not be blank");
         }
         try {

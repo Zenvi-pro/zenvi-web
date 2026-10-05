@@ -478,7 +478,7 @@
         }
         if (color !== null) {
             if (typeof marker.setColorByIndex === "function") {
-                marker.setColorByIndex(P.MARKER_COLORS.indexOf(color));
+                marker.setColorByIndex(P.indexOf(P.MARKER_COLORS, color));
             } else {
                 ctx.warn("This Premiere build cannot colour markers by script (Marker.setColorByIndex); the marker kept its default colour");
             }

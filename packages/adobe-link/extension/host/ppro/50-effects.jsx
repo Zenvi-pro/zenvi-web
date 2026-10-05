@@ -125,7 +125,7 @@
 
     Z.register("premiere_apply_effect", function (args, ctx) {
         var found = P.findClip(Z.required(args, "clip", "string"), args.sequence);
-        var name = Z.required(args, "effect", "string").trim();
+        var name = P.trim(Z.required(args, "effect", "string"));
         var params = Z.optional(args, "params", "array", []);
         var effect;
         var added;
@@ -381,7 +381,7 @@
             label = String(params[i].displayName);
             if (start < 0 && label === section) {
                 start = i;
-            } else if (start >= 0 && LUMETRI_SECTIONS.indexOf(label) >= 0) {
+            } else if (start >= 0 && P.indexOf(LUMETRI_SECTIONS, label) >= 0) {
                 end = i;
                 break;
             }

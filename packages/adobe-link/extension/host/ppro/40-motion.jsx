@@ -92,7 +92,7 @@
                     return P.positionToDom(sequence, value);
                 }
                 if (name === "blend_mode") {
-                    return P.BLEND_MODES.indexOf(value);
+                    return P.indexOf(P.BLEND_MODES, value);
                 }
                 return value;
             },

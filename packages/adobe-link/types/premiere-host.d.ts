@@ -68,14 +68,6 @@ interface JSONShim {
 }
 declare const JSON: JSONShim;
 
-interface Array<T> {
-  indexOf(searchElement: T, fromIndex?: number): number;
-}
-
-interface String {
-  trim(): string;
-}
-
 interface ObjectConstructor {
   keys(object: object): string[];
 }

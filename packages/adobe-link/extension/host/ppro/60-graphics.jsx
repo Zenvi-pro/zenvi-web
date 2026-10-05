@@ -364,7 +364,7 @@
         var freeUntil;
         var actual;
 
-        if (text.trim().length === 0) {
+        if (P.trim(text).length === 0) {
             throw Z.refuse("INVALID_ARGUMENT", "`text` must not be blank");
         }
         Z.oneOf("placement", placement, ["center", "lower-third", "top-left", "top-center", "bottom-center"]);

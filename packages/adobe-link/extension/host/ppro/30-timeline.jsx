@@ -444,7 +444,7 @@
     function renameClip(found, args, ctx) {
         var name = Z.required(args, "name", "string");
         var old = String(found.clip.name);
-        if (name.trim().length === 0) {
+        if (P.trim(name).length === 0) {
             throw Z.refuse("INVALID_ARGUMENT", "`name` must not be blank");
         }
         if (old === name) {

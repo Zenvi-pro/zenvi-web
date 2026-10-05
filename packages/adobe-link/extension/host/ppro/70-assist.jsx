@@ -89,7 +89,7 @@
             tracks = P.tracksOf(sequence, kinds[k]);
             for (t = 0; t < tracks.numTracks; t += 1) {
                 Z.each(P.clipsOf(tracks[t]), function (clip) {
-                    var want = ids.indexOf(clip.nodeId) >= 0;
+                    var want = P.indexOf(ids, clip.nodeId) >= 0;
                     if (clip.isSelected() !== want) {
                         clip.setSelected(want, true);
                     }

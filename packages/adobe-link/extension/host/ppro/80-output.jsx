@@ -93,7 +93,7 @@
     var WORK_AREA = {entire: 0, "in-out": 1, "work-area": 2};
 
     function normalName(text) {
-        return String(text).toLowerCase().replace(/\.epr$/, "").replace(/[^a-z0-9]+/g, " ").trim();
+        return P.trim(String(text).toLowerCase().replace(/\.epr$/, "").replace(/[^a-z0-9]+/g, " "));
     }
 
     /** Folders holding export presets: Premiere's and Media Encoder's systempresets, and the user's Media Encoder presets. */
