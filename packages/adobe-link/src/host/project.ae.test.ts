@@ -12,6 +12,8 @@ describe("ae_save_project", () => {
     expect(receipt).toMatchObject({ status: "applied", undoSteps: 0, data: { path: target, previous_path: null, dirty: false } });
     h.mock.project.dirty = true;
     expect(h.callValidated("ae_save_project")).toMatchObject({ status: "applied", data: { path: target, dirty: false } });
+    // Saving runs outside any undo group.
+    expect(h.mock.state.undoCalls).toEqual([]);
   });
 
   test("refuses an untitled save without a path, a wrong extension, a missing folder and someone else's file", () => {
@@ -37,6 +39,23 @@ describe("ae_undo", () => {
     expect(h.mock.state.commands).toEqual([16, 16]);
     expect(h.mock.state.commandDepths).toEqual([0, 0]);
     expect(h.mock.state.undoDepth).toBe(0);
+  });
+
+  test("the journal survives the panel evaluating the host script again, and knows a render's two steps", () => {
+    const h = aeHarness();
+    h.mock.project.save(new h.mock.es.File(path.join(h.dir, "promo.aep")));
+    h.callValidated("ae_create_comp", { name: "A" });
+    h.callValidated("ae_render_for_zenvi");
+    h.host.evaluate(h.host.bundle.text);
+    expect(h.host.hostInfo().loads).toBe(2);
+    const receipt = h.callValidated("ae_undo", { steps: 3 });
+    expect(receipt.warnings.filter((w) => w.includes("recorded"))).toEqual([]);
+    expect((receipt.data.undone as { title: string; summary: string }[]).map((entry) => [entry.title, entry.summary])).toEqual([
+      ["Zenvi: Render for Zenvi", 'Removed the finished render queue item for "A"'],
+      ["Zenvi: Render for Zenvi", 'Queued "A" for Zenvi'],
+      ["Zenvi: Create comp", expect.stringContaining('"A"')],
+    ]);
+    expect(h.mock.state.commandDepths).toEqual([0, 0, 0]);
   });
 
   test("falls back to command 16 when the Undo menu item is renamed, and warns when it knows of no Zenvi step", () => {

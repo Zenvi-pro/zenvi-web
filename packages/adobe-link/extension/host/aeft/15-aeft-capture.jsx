@@ -70,6 +70,11 @@
         }
     };
 
+    function capture(comp, time, file) {
+        comp.saveFrameToPng(time, file);
+        return AE.waitForPng(file, CAPTURE_TIMEOUT_MS);
+    }
+
     Z.register("ae_capture_frame", function (args, ctx) {
         var comp = AE.findComp(args.comp);
         var time = Z.optional(args, "time", "number", null);
@@ -100,25 +105,23 @@
         }
         frame = Math.round(time * comp.frameRate);
         factor = Math.max(1, Math.ceil(comp.width / maxWidth - 1e-9));
-        file = new File(AE.tempFolder("captures").fullName + "/frame-" + comp.id + "-" + frame + "-" + new Date().getTime() + ".png");
+        // Only into Zenvi Link's temp folder: the server deletes a capture there once it has sent it.
+        file = new File(Z.tempFile("capture-" + comp.id + "-" + frame, "png"));
         previous = comp.resolutionFactor;
         changedFactor = previous[0] !== factor || previous[1] !== factor;
         if (changedFactor) {
             // A read-only tool, but After Effects may record resolution changes as undo steps:
             // keep the change and its restore in one step (no step at all if it records nothing).
-            app.beginUndoGroup("Zenvi: " + (Z.CATALOG.ae_capture_frame ? Z.CATALOG.ae_capture_frame.title : "Capture comp frame"));
-        }
-        try {
-            if (changedFactor) {
+            info = AE.inUndoGroup(Z.CATALOG.ae_capture_frame ? Z.CATALOG.ae_capture_frame.title : "Capture comp frame", function () {
                 comp.resolutionFactor = [factor, factor];
-            }
-            comp.saveFrameToPng(time, file);
-            info = AE.waitForPng(file, CAPTURE_TIMEOUT_MS);
-        } finally {
-            if (changedFactor) {
-                comp.resolutionFactor = [previous[0], previous[1]];
-                app.endUndoGroup();
-            }
+                try {
+                    return capture(comp, time, file);
+                } finally {
+                    comp.resolutionFactor = [previous[0], previous[1]];
+                }
+            });
+        } else {
+            info = capture(comp, time, file);
         }
         width = info.valid ? info.width : Math.round(comp.width / factor);
         height = info.valid ? info.height : Math.round(comp.height / factor);

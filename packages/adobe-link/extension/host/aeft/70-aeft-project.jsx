@@ -8,39 +8,31 @@
     var JOURNAL_SIZE = 100;
 
     // ------------------------------------------------------------------
-    // Journal of applied Zenvi steps (this session), so ae_undo can say what
-    // it undid. After Effects has no API to read its undo history.
+    // Journal of applied Zenvi steps, so ae_undo can say what it undid. After
+    // Effects has no API to read its undo history. It lives in AE.state, so it
+    // survives the panel re-evaluating the host script.
 
-    var journal = [];
+    function remember(title, summary) {
+        var journal = AE.state.journal;
+        journal.push({title: "Zenvi: " + title, summary: summary, at: AE.isoTime(new Date())});
+        if (journal.length > JOURNAL_SIZE) {
+            journal.shift();
+        }
+    }
+    AE.remember = remember;
+
     var runMutating = Z.adapter.runMutating;
 
     Z.adapter.runMutating = function (title, fn) {
         var outcome = runMutating(title, fn);
         if (outcome && outcome.zenviResult === true && outcome.status === "applied" && outcome.undoSteps !== 0) {
-            journal.push({title: "Zenvi: " + title, summary: outcome.summary, at: AE.isoTime(new Date())});
-            if (journal.length > JOURNAL_SIZE) {
-                journal.shift();
-            }
+            remember(title, outcome.summary);
         }
         return outcome;
     };
 
-    /**
-     * Run fn with the call's undo group closed: Edit > Undo must not run
-     * inside an open group. The group is reopened (empty, so After Effects
-     * adds nothing to the history) for dispatch to close.
-     */
-    AE.outsideUndoGroup = function (title, fn) {
-        app.endUndoGroup();
-        try {
-            return fn();
-        } finally {
-            app.beginUndoGroup("Zenvi: " + title);
-        }
-    };
-
     // ------------------------------------------------------------------
-    // ae_save_project
+    // ae_save_project (registered without dispatch's undo group: saving is not an undo step)
 
     Z.register("ae_save_project", function (args, ctx) {
         var project = AE.requireProject();
@@ -72,7 +64,7 @@
             project.save();
         }
         return Z.applied("Saved the project to " + AE.projectPath(), {path: AE.projectPath(), previous_path: current, dirty: project.dirty === true}, 0);
-    });
+    }, {mutating: false});
 
     // ------------------------------------------------------------------
     // ae_undo
@@ -81,7 +73,6 @@
         var steps = Z.optional(args, "steps", "integer", 1);
         var command = 0;
         var undone = [];
-        var title = Z.CATALOG.ae_undo ? Z.CATALOG.ae_undo.title : "Undo";
         var i;
         Z.inRange("steps", steps, 1, 50);
         AE.requireProject();
@@ -94,8 +85,8 @@
         if (!command) {
             command = UNDO_COMMAND_ID;
         }
-        for (i = 0; i < steps && journal.length; i += 1) {
-            undone.push(journal.pop());
+        for (i = 0; i < steps && AE.state.journal.length; i += 1) {
+            undone.push(AE.state.journal.pop());
         }
         if (undone.length < steps) {
             ctx.warn((undone.length ? "Only " + Z.plural(undone.length, "Zenvi step") + " recorded" : "No Zenvi steps recorded") +
@@ -103,18 +94,16 @@
         }
         ctx.warn("If the project was changed by hand after the last Zenvi call, After Effects undid that change first");
         ctx.changed();
-        AE.outsideUndoGroup(title, function () {
-            var n;
-            for (n = 0; n < steps; n += 1) {
-                app.executeCommand(command);
-            }
-        });
+        // Registered without dispatch's undo group: Edit > Undo must not run inside one.
+        for (i = 0; i < steps; i += 1) {
+            app.executeCommand(command);
+        }
         return Z.applied("Undid " + Z.plural(steps, "step") + (undone.length ? ": " + Z.map(undone, function (entry) { return entry.title; }).join(", ") : ""), {
             steps: steps,
             undone: Z.map(undone, function (entry) { return {title: entry.title, summary: entry.summary, at: entry.at}; }),
             command_id: command
         }, 0);
-    });
+    }, {mutating: false});
 
     // ------------------------------------------------------------------
     // ae_run_jsx_file
@@ -153,7 +142,7 @@
         var value;
         var json;
         var result;
-        if (!code.trim().length) {
+        if (!Z.trim(code).length) {
             throw Z.refuse("INVALID_ARGUMENT", "`code` is empty");
         }
         ctx.changed();

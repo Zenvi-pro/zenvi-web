@@ -84,7 +84,7 @@
         var hold;
         var i;
 
-        if (!text.trim().length) {
+        if (!Z.trim(text).length) {
             throw Z.refuse("INVALID_ARGUMENT", "`text` is empty");
         }
         style = style === null ? AE.defaultTextStyle(placement) : Z.oneOf("style", style, AE.TEXT_STYLES);
@@ -141,7 +141,7 @@
             reset: true
         };
         if (subtitle !== null) {
-            if (!subtitle.trim().length) {
+            if (!Z.trim(subtitle).length) {
                 throw Z.refuse("INVALID_ARGUMENT", "`subtitle` is empty");
             }
             subSpec = AE.textStyle(style === "lower-third" ? "role" : "subtitle");

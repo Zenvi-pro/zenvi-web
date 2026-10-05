@@ -131,7 +131,7 @@
             keys.push(key);
         }
         for (i = 0; i < keys.length - 1 && !linearWarned; i += 1) {
-            if (keys[i].curve.type === "linear" && LINEAR_OK.indexOf(property.matchName) < 0) {
+            if (keys[i].curve.type === "linear" && Z.indexOf(LINEAR_OK, property.matchName) < 0) {
                 ctx.warn("Linear easing on " + target.path + ": TASTE keeps linear for opacity crossfades, loops and tickers; moves should ease (smooth, out, in, in-out)");
                 linearWarned = true;
             }

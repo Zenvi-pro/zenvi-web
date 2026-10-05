@@ -120,8 +120,8 @@
         }
     }
 
-    /** Uncheck queued items other than `index`, run fn, restore them. */
-    function onlyItem(queue, index, fn) {
+    /** Uncheck the queued items other than `index`, so only it renders. Returns their indexes. */
+    function uncheckOthers(queue, index) {
         var others = [];
         var item;
         var i;
@@ -132,25 +132,14 @@
                 others.push(i);
             }
         }
-        try {
-            fn();
-        } finally {
-            for (i = 0; i < others.length; i += 1) {
-                queue.item(others[i]).render = true;
-            }
-        }
+        return others;
     }
 
-    /** Add `comp` to the render queue with a template, file and time span. Returns {item, index}. */
-    function queueComp(comp, choice, file, workAreaOnly, renderSettings, ctx) {
-        var queue = app.project.renderQueue;
-        var item = queue.items.add(comp);
-        var index = queue.numItems;
+    /** Set up a new queue item: render settings, time span, output template and file. */
+    function configureItem(item, comp, plan, workAreaOnly, renderSettings, ctx) {
         var module;
-        var settings;
         if (renderSettings) {
-            settings = item.templates;
-            if (Z.filter(settings, function (name) { return String(name) === renderSettings; }).length) {
+            if (Z.filter(item.templates, function (name) { return String(name) === renderSettings; }).length) {
                 item.applyTemplate(renderSettings);
             } else {
                 ctx.warn("No render settings template \"" + renderSettings + "\"; kept the default");
@@ -159,18 +148,16 @@
         item.timeSpanStart = workAreaOnly ? comp.workAreaStart : 0;
         item.timeSpanDuration = workAreaOnly ? comp.workAreaDuration : comp.duration;
         module = item.outputModule(1);
-        module.applyTemplate(choice.template);
-        module.file = file;
-        return {item: queue.item(index), index: index};
+        module.applyTemplate(plan.choice.template);
+        module.file = plan.writeTo;
     }
 
+    /** Render the queue (only item `index` is checked). Returns the seconds it took. */
     function renderNow(index) {
         var queue = app.project.renderQueue;
         var item;
         var started = new Date().getTime();
-        onlyItem(queue, index, function () {
-            queue.render();
-        });
+        queue.render();
         item = queue.item(index);
         if (item.status !== RQItemStatus.DONE) {
             throw Z.fail("HOST_ERROR", "The render did not finish (status " + AE.renderStatusName(item.status) + "); see the Render Queue panel");
@@ -181,7 +168,7 @@
     function chooseTemplate(templates, templateName, preset, ctx) {
         var described;
         if (templateName) {
-            if (templates.indexOf(templateName) < 0) {
+            if (Z.indexOf(templates, templateName) < 0) {
                 throw Z.refuse("NOT_FOUND", "No output module template \"" + templateName + "\"; this After Effects has: " + templates.join(", "));
             }
             described = describeTemplate(templateName);
@@ -190,39 +177,22 @@
         return AE.pickTemplate(templates, preset, ctx);
     }
 
-    // Output module templates are the same for every output module. With an
-    // empty queue they are read from a probe item (added and removed again,
-    // net no change) and remembered for the session.
-    var probedTemplates = null;
+    // Output module templates are the same for every output module: read
+    // from a queued item, else remembered across host-script reloads
+    // (AE.state), else read from the new queue item itself (queueForRender).
 
-    function probeTemplates(comp) {
-        var probe = app.project.renderQueue.items.add(comp);
-        try {
-            probedTemplates = templateList(probe.outputModule(1));
-        } finally {
-            probe.remove();
-        }
-        return probedTemplates;
-    }
-
-    /** The output module template names, read before changing anything. */
-    function templateNames(comp, templateName) {
+    /** The output module template names when known without changing anything, else null. */
+    function knownTemplates(templateName) {
         var queue = app.project.renderQueue;
-        var remembered = probedTemplates !== null;
-        var templates;
-        if (queue.numItems > 0) {
+        var remembered = AE.state.outputTemplates;
+        if (queue.numItems > 0 && queue.item(1).numOutputModules > 0) {
             return templateList(queue.item(1).outputModule(1));
         }
-        templates = remembered ? probedTemplates : probeTemplates(comp);
-        if (remembered && templateName && templates.indexOf(templateName) < 0) {
-            // A template saved since the last probe.
-            templates = probeTemplates(comp);
+        if (remembered === null || (templateName && Z.indexOf(remembered, templateName) < 0)) {
+            // Never read, or a template saved since.
+            return null;
         }
-        return templates;
-    }
-
-    function templatesFor(comp, templateName, preset, ctx) {
-        return chooseTemplate(templateNames(comp, templateName), templateName, preset, ctx);
+        return remembered;
     }
 
     // Zenvi links only these codecs (SPEC 3.6; the desktop refuses others), so
@@ -261,12 +231,151 @@
         return file.exists ? file.length : null;
     }
 
+    function splitName(file) {
+        var name = File.decode(file.name);
+        var dot = name.lastIndexOf(".");
+        return dot > 0 ? {base: name.slice(0, dot), ext: name.slice(dot)} : {base: name, ext: ""};
+    }
+
+    /**
+     * A render that replaces an existing file goes to a staging file next to
+     * it and replaces it only once complete, so a failed render never costs
+     * the old file; a render to a new file deletes what it wrote when it fails.
+     */
+    function stagingFile(target) {
+        var parts = splitName(target);
+        return new File(target.parent.fullName + "/" + parts.base + ".zenvi-partial-" + new Date().getTime() + parts.ext);
+    }
+
+    /** Move a finished staging render into place (replacing an old file there). */
+    function install(staging, target) {
+        installed(staging);
+        if (target.exists && !target.remove()) {
+            throw Z.fail("HOST_ERROR", "Could not replace " + target.fsName + "; the render is at " + staging.fsName);
+        }
+        if (!staging.rename(File.decode(target.name))) {
+            throw Z.fail("HOST_ERROR", "Could not move the render to " + target.fsName + "; it is at " + staging.fsName);
+        }
+        return new File(target.fsName);
+    }
+
+    /** The rendered file, which must exist. */
+    function installed(file) {
+        var parts;
+        if (!file.exists) {
+            parts = splitName(file);
+            throw Z.fail("HOST_ERROR", "After Effects finished but " + file.fsName + " is not there (look for " + parts.base + ".* in " +
+                file.parent.fsName + "; the template may write another format)");
+        }
+        return file;
+    }
+
+    function discard(file) {
+        if (file.exists) {
+            file.remove();
+        }
+    }
+
+    function renderTitle(name) {
+        return Z.CATALOG[name] ? Z.CATALOG[name].title : name;
+    }
+
+    /** folder/base.ext, or base-2.ext, base-3.ext ... when that is taken. */
+    function uniqueFile(folder, base, ext) {
+        var file = new File(folder.fullName + "/" + base + "." + ext);
+        var n;
+        for (n = 2; file.exists && n < 1000; n += 1) {
+            file = new File(folder.fullName + "/" + base + "-" + n + "." + ext);
+        }
+        return file;
+    }
+
+    // ------------------------------------------------------------------
+    // Queueing. The render tools are registered without dispatch's undo
+    // group, because After Effects must not render (or hand over to Adobe
+    // Media Encoder) inside one. Every render queue change still happens in
+    // an undo group "Zenvi: <title>": one to queue, and one to tidy up after
+    // the render when there is anything to tidy.
+
+    /**
+     * Queue `comp` in one undo group. `plan(templates)` chooses the template
+     * and output and refuses when it cannot: {choice, file, writeTo}. It runs
+     * before anything changes when the templates are known, else on the new
+     * queue item, which is removed again (same undo group) when plan refuses.
+     * With `alone`, the other queued items are unchecked so only this one
+     * renders. Returns {index, plan, others}.
+     */
+    function queueForRender(title, summary, comp, templateName, plan, alone, settings, ctx) {
+        var queue = app.project.renderQueue;
+        var templates = knownTemplates(templateName);
+        var planned = templates ? plan(templates) : null;
+        return AE.inUndoGroup(title, function () {
+            var item = queue.items.add(comp);
+            var index = queue.numItems;
+            try {
+                if (!planned) {
+                    AE.state.outputTemplates = templateList(item.outputModule(1));
+                    planned = plan(AE.state.outputTemplates);
+                }
+                ensureFolder(planned.file.parent);
+            } catch (refused) {
+                item.remove();
+                throw refused;
+            }
+            ctx.changed();
+            configureItem(queue.item(index), comp, planned, settings.workAreaOnly, settings.renderSettings, ctx);
+            return {index: index, plan: planned, others: alone ? uncheckOthers(queue, index) : []};
+        }, summary);
+    }
+
+    /**
+     * After the render: check the other queued items again and, with
+     * `removeIndex`, remove that item, in one undo group. Returns the undo
+     * steps it added (0 or 1).
+     */
+    function tidyQueue(title, comp, others, removeIndex) {
+        var queue = app.project.renderQueue;
+        var parts = [];
+        var summary;
+        if (removeIndex) {
+            parts.push("removed the finished render queue item for \"" + comp.name + "\"");
+        }
+        if (others.length) {
+            parts.push("checked " + Z.plural(others.length, "other render queue item") + " again");
+        }
+        if (!parts.length) {
+            return 0;
+        }
+        summary = parts.join("; ");
+        AE.inUndoGroup(title, function () {
+            var i;
+            for (i = 0; i < others.length; i += 1) {
+                queue.item(others[i]).render = true;
+            }
+            if (removeIndex) {
+                queue.item(removeIndex).remove();
+            }
+        }, summary.charAt(0).toUpperCase() + summary.slice(1));
+        return 1;
+    }
+
+    /**
+     * A call that fails after queueing says what it left in the undo history
+     * (dispatch reports undoSteps null for tools outside its undo group).
+     */
+    function warnSteps(ctx, title, comp, steps) {
+        ctx.warn(steps > 1 ?
+            "This call made 2 undo steps (\"Zenvi: " + title + "\" twice): queueing \"" + comp.name + "\" and tidying the render queue after" :
+            "This call made 1 undo step: Edit > Undo \"Zenvi: " + title + "\" takes \"" + comp.name + "\" off the render queue again");
+    }
+
     // ------------------------------------------------------------------
     // ae_render
 
     Z.register("ae_render", function (args, ctx) {
         var comp = AE.findComp(args.comp);
         var project = AE.requireProject();
+        var queue = project.renderQueue;
         var preset = Z.oneOf("preset", Z.optional(args, "preset", "string", "h264"), PRESETS);
         var templateName = Z.optional(args, "template", "string", null);
         var renderSettings = Z.optional(args, "render_settings", "string", "Best Settings");
@@ -274,50 +383,78 @@
         var mode = Z.oneOf("mode", Z.optional(args, "mode", "string", "render_now"), ["render_now", "queue_only", "media_encoder"]);
         var overwrite = Z.optional(args, "overwrite", "boolean", false);
         var output = Z.optional(args, "output", "string", null);
+        var title = renderTitle("ae_render");
+        var queued;
         var choice;
         var file;
-        var queued;
+        var steps = 1;
+        var finished = false;
         var seconds = null;
-        var data;
         var summary;
         if (output !== null) {
             AE.requireAbsolutePath(output, "output");
         } else if (!project.file) {
             throw Z.refuse("INVALID_ARGUMENT", "The project is unsaved; pass `output` (an absolute file path)");
         }
-        if (mode === "media_encoder" && !project.renderQueue.canQueueInAME) {
-            throw Z.refuse("UNSUPPORTED", "Adobe Media Encoder is not available to this After Effects; use mode render_now");
-        }
-        requireIdleQueue();
-        choice = templatesFor(comp, templateName, preset, ctx);
-        if (output === null) {
-            output = project.file.parent.fullName + "/Renders/" + AE.safeFileName(comp.name) + "." + (choice.ext || "mov");
-        }
-        file = new File(withExtension(output, choice.ext, ctx));
-        if (file.exists && !overwrite) {
-            throw Z.refuse("INVALID_ARGUMENT", file.fsName + " already exists; pass overwrite: true or another `output`");
+        if (mode === "media_encoder" && !Z.hasMethod(queue, "queueInAME")) {
+            throw Z.refuse("UNSUPPORTED", "This After Effects cannot queue renders in Adobe Media Encoder; use mode render_now");
         }
         if (workAreaOnly && comp.workAreaDuration <= 0) {
             throw Z.refuse("INVALID_ARGUMENT", "Comp \"" + comp.name + "\" has an empty work area");
         }
-        ctx.changed();
-        ensureFolder(file.parent);
-        if (file.exists) {
-            file.remove();
+        requireIdleQueue();
+        queued = queueForRender(title, "Queued \"" + comp.name + "\" for rendering", comp, templateName, function (templates) {
+            var picked = chooseTemplate(templates, templateName, preset, ctx);
+            var target = new File(withExtension(output !== null ? output :
+                project.file.parent.fullName + "/Renders/" + AE.safeFileName(comp.name) + "." + (picked.ext || "mov"), picked.ext, ctx));
+            if (target.exists && !overwrite) {
+                throw Z.refuse("INVALID_ARGUMENT", target.fsName + " already exists; pass overwrite: true or another `output`");
+            }
+            if (target.exists && mode !== "render_now") {
+                ctx.warn(target.fsName + " already exists; the render will replace it when it runs");
+            }
+            // A render that replaces a file goes to a staging file first, so a failed render keeps the old one.
+            return {choice: picked, file: target, writeTo: target.exists && mode === "render_now" ? stagingFile(target) : target};
+        }, mode !== "queue_only", {workAreaOnly: workAreaOnly, renderSettings: renderSettings}, ctx);
+        choice = queued.plan.choice;
+        file = queued.plan.file;
+        try {
+            if (mode === "render_now") {
+                try {
+                    seconds = renderNow(queued.index);
+                } catch (failedRender) {
+                    discard(queued.plan.writeTo);
+                    throw failedRender;
+                }
+            } else if (mode === "media_encoder") {
+                // canQueueInAME says whether there is anything queued to send; ours is now.
+                if (!queue.canQueueInAME) {
+                    throw Z.fail("UNSUPPORTED", "After Effects reports nothing it can send to Adobe Media Encoder (is it installed?); \"" +
+                        comp.name + "\" stays in the render queue as item " + queued.index);
+                }
+                queue.queueInAME(false);
+            }
+            finished = true;
+        } finally {
+            steps += tidyQueue(title, comp, queued.others, 0);
+            if (!finished) {
+                warnSteps(ctx, title, comp, steps);
+            }
         }
-        queued = queueComp(comp, choice, file, workAreaOnly, renderSettings, ctx);
         if (mode === "render_now") {
-            seconds = renderNow(queued.index);
+            try {
+                file = queued.plan.writeTo !== file ? install(queued.plan.writeTo, file) : installed(file);
+            } catch (notInstalled) {
+                warnSteps(ctx, title, comp, steps);
+                throw notInstalled;
+            }
             summary = "Rendered \"" + comp.name + "\" to " + file.fsName + " in " + Z.round(seconds, 1) + " s";
         } else if (mode === "media_encoder") {
-            onlyItem(project.renderQueue, queued.index, function () {
-                project.renderQueue.queueInAME(false);
-            });
             summary = "Queued \"" + comp.name + "\" in Adobe Media Encoder (" + choice.template + "); start its queue there";
         } else {
             summary = "Added \"" + comp.name + "\" to the render queue as item " + queued.index + " (" + choice.template + ")";
         }
-        data = {
+        return Z.applied(summary, {
             comp_id: comp.id,
             comp_name: comp.name,
             output: file.fsName,
@@ -325,16 +462,12 @@
             codec: choice.codec,
             mode: mode,
             render_queue_index: queued.index,
-            status: AE.renderStatusName(project.renderQueue.item(queued.index).status),
+            status: AE.renderStatusName(queue.item(queued.index).status),
             render_seconds: seconds !== null ? Z.round(seconds, 2) : null,
             size_bytes: mode === "render_now" ? fileSize(file.fsName) : null,
             work_area_only: workAreaOnly
-        };
-        if (mode === "render_now" && data.size_bytes === null) {
-            ctx.warn("After Effects reported success but " + file.fsName + " is not there; check the Render Queue's output name");
-        }
-        return Z.applied(summary, data);
-    });
+        }, steps);
+    }, {mutating: false});
 
     // ------------------------------------------------------------------
     // ae_render_for_zenvi
@@ -344,13 +477,17 @@
         var project = AE.requireProject();
         var alpha = Z.optional(args, "alpha", "boolean", false);
         var output = Z.optional(args, "output", "string", null);
+        var overwrite = Z.optional(args, "overwrite", "boolean", false);
         var workAreaOnly = Z.optional(args, "work_area_only", "boolean", false);
         var templateName = Z.optional(args, "template", "string", null);
+        var title = renderTitle("ae_render_for_zenvi");
         var now = new Date();
+        var queued;
         var choice;
         var file;
-        var queued;
         var seconds;
+        var steps;
+        var finished = false;
         var duration = workAreaOnly ? comp.workAreaDuration : comp.duration;
         var fps = AE.fpsRational(comp.frameRate);
         var frames = Math.round(duration * comp.frameRate);
@@ -360,36 +497,59 @@
         if (output !== null) {
             AE.requireAbsolutePath(output, "output");
         }
+        if (workAreaOnly && comp.workAreaDuration <= 0) {
+            throw Z.refuse("INVALID_ARGUMENT", "Comp \"" + comp.name + "\" has an empty work area");
+        }
         requireIdleQueue();
-        if (templateName) {
-            choice = chooseTemplate(templateNames(comp, templateName), templateName, null, ctx);
-            if (ZENVI_CODECS.indexOf(choice.codec) < 0) {
-                throw Z.refuse("INVALID_ARGUMENT", "Template \"" + templateName + "\" renders " + choice.codec + "; Zenvi links only " + ZENVI_CODECS.join(", ") +
-                    " (an H.264, ProRes 4444 or QuickTime Animation template)");
+        queued = queueForRender(title, "Queued \"" + comp.name + "\" for Zenvi", comp, templateName, function (templates) {
+            var picked;
+            var target;
+            if (templateName) {
+                picked = chooseTemplate(templates, templateName, null, ctx);
+                if (Z.indexOf(ZENVI_CODECS, picked.codec) < 0) {
+                    throw Z.refuse("INVALID_ARGUMENT", "Template \"" + templateName + "\" renders " + picked.codec + "; Zenvi links only " + ZENVI_CODECS.join(", ") +
+                        " (an H.264, ProRes 4444 or QuickTime Animation template)");
+                }
+                if (alpha && picked.codec === "h264") {
+                    ctx.warn("alpha: true asked for transparency, but H.264 template \"" + templateName + "\" has none");
+                }
+            } else {
+                picked = zenviTemplate(templates, alpha, ctx);
             }
-            if (alpha && choice.codec === "h264") {
-                ctx.warn("alpha: true asked for transparency, but H.264 template \"" + templateName + "\" has none");
+            if (output === null) {
+                // Zenvi's own renders folder: a new name per render, never another file.
+                target = uniqueFile(AE.tempFolder("renders"), AE.safeFileName(comp.name) + "-" + comp.id + "-" + AE.fileStamp(now), picked.ext || "mov");
+            } else {
+                target = new File(withExtension(output, picked.ext, ctx));
             }
-        } else {
-            choice = zenviTemplate(templateNames(comp, null), alpha, ctx);
-        }
-        if (output === null) {
-            output = AE.tempFolder("renders").fullName + "/" + AE.safeFileName(comp.name) + "-" + comp.id + "-" + AE.fileStamp(now) + "." + (choice.ext || "mov");
-        }
-        file = new File(withExtension(output, choice.ext, ctx));
+            if (target.exists && !overwrite) {
+                throw Z.refuse("INVALID_ARGUMENT", target.fsName + " already exists; pass overwrite: true or another `output`");
+            }
+            return {choice: picked, file: target, writeTo: target.exists ? stagingFile(target) : target};
+        }, true, {workAreaOnly: workAreaOnly, renderSettings: "Best Settings"}, ctx);
+        choice = queued.plan.choice;
+        file = queued.plan.file;
         if (!aep) {
             ctx.warn("The project is unsaved, so Zenvi cannot re-render this clip later; save it (ae_save_project) and send again");
         }
-        ctx.changed();
-        ensureFolder(file.parent);
-        if (file.exists) {
-            file.remove();
+        try {
+            seconds = renderNow(queued.index);
+            finished = true;
+        } catch (failedRender) {
+            discard(queued.plan.writeTo);
+            throw failedRender;
+        } finally {
+            // A failed render stays in the queue for inspection; a finished one is removed.
+            steps = 1 + tidyQueue(title, comp, queued.others, finished ? queued.index : 0);
+            if (!finished) {
+                warnSteps(ctx, title, comp, steps);
+            }
         }
-        queued = queueComp(comp, choice, file, workAreaOnly, "Best Settings", ctx);
-        seconds = renderNow(queued.index);
-        project.renderQueue.item(queued.index).remove();
-        if (!new File(file.fsName).exists) {
-            throw Z.fail("HOST_ERROR", "After Effects finished but " + file.fsName + " is not there");
+        try {
+            file = queued.plan.writeTo !== file ? install(queued.plan.writeTo, file) : installed(file);
+        } catch (notInstalled) {
+            warnSteps(ctx, title, comp, steps);
+            throw notInstalled;
         }
         renderedAt = AE.isoTime(new Date());
         data = {
@@ -430,6 +590,6 @@
             }
         };
         return Z.applied("Rendered \"" + comp.name + "\" for Zenvi (" + choice.codec + ", " + comp.width + "x" + comp.height + ", " + frames + " frames) to " +
-            file.fsName, data);
-    });
+            file.fsName, data, steps);
+    }, {mutating: false});
 }(ZenviLink));

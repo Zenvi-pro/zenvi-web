@@ -18,7 +18,9 @@ describe("ae_capture_frame", () => {
     expect(receipt.status).toBe("ok");
     expect(receipt.data).toMatchObject({ width: 960, height: 540, time: 1.5, frame: 45, comp_id: comp.id, comp_name: "Promo", resolution_factor: 2 });
     const image = receipt.data.image_path as string;
-    expect(path.dirname(image)).toBe(path.join(h.dir, "zenvi-link", "captures"));
+    // Only in Zenvi Link's temp folder (ZenviLink.tempFile), the one the server deletes captures from.
+    expect(path.dirname(image)).toBe(path.join(h.dir, "zenvi-link"));
+    expect(path.basename(image)).toMatch(new RegExp(`^capture-${comp.id}-45-\\d+-\\d+\\.png$`));
     expect(pngSize(image)).toEqual({ width: 960, height: 540 });
     expect(h.mock.state.savedFrames).toEqual([expect.objectContaining({ comp: comp.id, time: 1.5, resolutionFactor: [2, 2] })]);
     expect(h.mock.es.state.sleptMs).toBeGreaterThan(0);

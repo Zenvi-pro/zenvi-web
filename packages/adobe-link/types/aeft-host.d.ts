@@ -12,18 +12,14 @@
  */
 
 // ---------------------------------------------------------------------------
-// ES5 members the host scripts polyfill (ExtendScript is ECMAScript 3).
-
-interface Array<T> {
-  indexOf(searchElement: T, fromIndex?: number): number;
-}
+// ES5 members the host scripts may use (ExtendScript is ECMAScript 3). There is
+// deliberately no Array.prototype.indexOf or String.prototype.trim: the
+// runtime adds nothing to prototypes (every extension shares one engine), so
+// the scripts use ZenviLink.indexOf / ZenviLink.trim and this check flags any
+// [].indexOf or "".trim.
 
 interface ArrayConstructor {
   isArray(value: unknown): boolean;
-}
-
-interface String {
-  trim(): string;
 }
 
 interface ObjectConstructor {
@@ -109,6 +105,19 @@ interface ZenviPlannedImport {
   options: ImportOptions;
 }
 
+/** ZenviLink.state.ae: After Effects state that survives the host script being evaluated again (the panel opening). */
+interface ZenviAeState {
+  journal: { title: string; summary: string; at: string }[];
+  outputTemplates: string[] | null;
+}
+
+/** ZenviLink.state (common/10-zenvi.jsx): a global that survives re-evaluation. */
+interface ZenviLinkState {
+  loads: number;
+  config: Record<string, unknown>;
+  ae?: ZenviAeState;
+}
+
 /** ZenviLink.ae: helpers from aeft/00-aeft-core.jsx and the other aeft/*.jsx files. */
 interface ZenviAe {
   ABSOLUTE_PATH: RegExp;
@@ -135,6 +144,8 @@ interface ZenviAe {
   renderOutputPath(item: RenderQueueItem): string | null;
 
   // 01-aeft-util.jsx
+  state: ZenviAeState;
+  inUndoGroup<T>(title: string, fn: () => T, summary?: string): T;
   blendModeValue(name: string): BlendingMode;
   blendModeName(value: BlendingMode): string | null;
   trackMatteValue(name: string): TrackMatteType;
@@ -237,7 +248,7 @@ interface ZenviAe {
   pickTemplate(templates: string[], preset: string, ctx: ZenviContext): { template: string; codec: string; ext: string | null; preset: string | null };
 
   // 70-aeft-project.jsx
-  outsideUndoGroup<T>(title: string, fn: () => T): T;
+  remember(title: string, summary: string): void;
 }
 
 interface ZenviLinkApi {
@@ -252,6 +263,16 @@ interface ZenviLinkApi {
   ae: ZenviAe;
 
   has(object: unknown, key: string): boolean;
+  /** Prototype-free indexOf / trim: Zenvi Link adds nothing to built-in prototypes. */
+  indexOf<T>(list: ArrayLike<T>, value: T): number;
+  trim(text: unknown): string;
+  /** True when a DOM object has member `name` (host methods may not be typeof "function"). */
+  hasMethod(object: any, name: string): boolean;
+  state: ZenviLinkState;
+  /** Zenvi Link's temp folder (fsName), created if missing; the server deletes captures only inside it. */
+  tempDir(): string;
+  /** A new file path in the temp folder: <prefix>-<time>-<random>.<extension>. */
+  tempFile(prefix?: string, extension?: string): string;
   isArray(value: unknown): boolean;
   isObject(value: unknown): boolean;
   each<T>(list: ArrayLike<T>, fn: (item: T, index: number) => void): void;

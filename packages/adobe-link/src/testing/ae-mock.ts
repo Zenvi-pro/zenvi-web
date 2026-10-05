@@ -306,7 +306,9 @@ export class AeMockState {
   frameWriteDelay = 2;
   /** The undo depth at each `app.executeCommand` call. */
   readonly commandDepths: number[] = [];
-  /** `renderQueue.canQueueInAME`. */
+  /** The undo depth at each render queue change (add, remove, the Render checkbox): 0 = outside any undo group. */
+  readonly queueChangeDepths: number[] = [];
+  /** Whether Adobe Media Encoder is installed (renderQueue.canQueueInAME also needs a queued item). */
   canQueueInAME = true;
   /** Output module template names (default: what this version ships). */
   outputTemplates: string[] = [];
@@ -1831,6 +1833,7 @@ export class RenderQueueItem {
   }
 
   set render(value: boolean) {
+    this.queue.mock.queueChangeDepths.push(this.queue.mock.undoDepth);
     this.renderFlag = value;
     if (this.status === RQItemStatus.QUEUED || this.status === RQItemStatus.UNQUEUED) {
       this.status = value ? RQItemStatus.QUEUED : RQItemStatus.UNQUEUED;
@@ -1857,6 +1860,7 @@ export class RenderQueueItem {
   }
 
   remove(): void {
+    this.queue.mock.queueChangeDepths.push(this.queue.mock.undoDepth);
     this.queue.list.splice(this.queue.list.indexOf(this), 1);
   }
 }
@@ -1870,6 +1874,7 @@ export class RenderQueueItems {
   }
 
   add(comp: CompItem): RenderQueueItem {
+    this.queue.mock.queueChangeDepths.push(this.queue.mock.undoDepth);
     const item = new RenderQueueItem(this.queue, comp);
     this.queue.list.push(item);
     return item;
@@ -1884,13 +1889,16 @@ export class RenderQueue {
   readonly items: RenderQueueItems = oneBased(new RenderQueueItems(this), () => this.list);
   /** Comp ids rendered by render(), in order. */
   readonly rendered: number[] = [];
-  /** Make the next render() stop with ERR_STOPPED (tests). */
+  /** The undo depth when render() / queueInAME() ran (they should run outside any undo group). */
+  readonly undoDepthAtRender: number[] = [];
+  /** Make the next render() stop with ERR_STOPPED, leaving a partial file (tests). */
   failNextRender = false;
 
   constructor(readonly mock: AeMockState) {}
 
+  /** Scripting Guide: whether there are queued items to send; false without Media Encoder (the mock's option). */
   get canQueueInAME(): boolean {
-    return this.mock.canQueueInAME;
+    return this.mock.canQueueInAME && this.list.some((item) => item.status === RQItemStatus.QUEUED && item.render);
   }
 
   get numItems(): number {
@@ -1905,10 +1913,13 @@ export class RenderQueue {
 
   /** Renders queued items with Render checked: writes a small file at each output path and marks them done. */
   render(): void {
+    this.undoDepthAtRender.push(this.mock.undoDepth);
     for (const item of this.list) {
       if (item.status !== RQItemStatus.QUEUED || !item.render) continue;
       if (this.failNextRender) {
+        // Like a render stopped part way: a partial file at the output.
         this.failNextRender = false;
+        for (const module of item.outputModules) if (module.file) writeFileSync(module.file.fsName, "partial");
         item.status = RQItemStatus.ERR_STOPPED;
         continue;
       }
@@ -1921,7 +1932,8 @@ export class RenderQueue {
   }
 
   queueInAME(_renderImmediately: boolean): void {
-    for (const item of this.list) if (item.status === RQItemStatus.QUEUED) this.sentToMediaEncoder.push(item.comp.id);
+    this.undoDepthAtRender.push(this.mock.undoDepth);
+    for (const item of this.list) if (item.status === RQItemStatus.QUEUED && item.render) this.sentToMediaEncoder.push(item.comp.id);
   }
 }
 
@@ -2081,7 +2093,7 @@ export interface AeMockOptions extends ExtendScriptMockOptions {
   fonts?: string[];
   /** `$.sleep` calls before a saved frame has content (default 2; 0 = written at once). */
   frameWriteDelay?: number;
-  /** `renderQueue.canQueueInAME` (default true). */
+  /** Adobe Media Encoder installed (default true); `renderQueue.canQueueInAME` also needs a queued item. */
   canQueueInAME?: boolean;
   /** Output module templates (default: what this version ships). */
   outputTemplates?: string[];

@@ -201,7 +201,7 @@
         }
         for (i = 0; i < refs.length; i += 1) {
             layer = AE.findLayer(comp, refs[i]);
-            if (indexes.indexOf(layer.index) < 0) {
+            if (Z.indexOf(indexes, layer.index) < 0) {
                 indexes.push(layer.index);
                 layers.push(layer);
             }

@@ -74,7 +74,7 @@
         var fonts = app.fonts;
         var found;
         var i;
-        if (!fonts || typeof fonts.getFontsByPostScriptName !== "function") {
+        if (!Z.hasMethod(fonts, "getFontsByPostScriptName")) {
             return null;
         }
         try {
@@ -99,7 +99,7 @@
         var out = requested ? [requested] : [];
         var i;
         for (i = 0; i < list.length; i += 1) {
-            if (out.indexOf(list[i]) < 0) {
+            if (Z.indexOf(out, list[i]) < 0) {
                 out.push(list[i]);
             }
         }

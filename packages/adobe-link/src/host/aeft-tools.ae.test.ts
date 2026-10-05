@@ -38,7 +38,19 @@ describe("TASTE in the After Effects scripts", () => {
   });
 });
 
+// Mutating tools that open their own undo groups (registered {mutating: false}), because part of
+// their work must not run inside one: Edit > Undo, saving, rendering, handing over to Media Encoder.
+const OWN_UNDO_GROUPS = ["ae_render", "ae_render_for_zenvi", "ae_save_project", "ae_undo"];
+
 describe("every After Effects tool, called bare in an empty project", () => {
+  test("only the tools that must work outside an undo group skip dispatch's group", () => {
+    const registered = aeHarness().host.listTools();
+    const skipping = registered.filter((tool) => !tool.mutating).map((tool) => tool.name);
+    const readOnly = AE_TOOLS.filter((def) => def.annotations.readOnlyHint === true).map((def) => def.name);
+    expect(skipping.filter((name) => !readOnly.includes(name)).sort()).toEqual(OWN_UNDO_GROUPS);
+    expect(registered.filter((tool) => tool.mutating && readOnly.includes(tool.name))).toEqual([]);
+  });
+
   test.each(AE_TOOLS.map((def) => [def.name, def.annotations.readOnlyHint === true] as const))("%s keeps undo groups balanced and never reports a refusal as an undo step", (name, readOnly) => {
     const h = aeHarness({ frameWriteDelay: 0 });
     const receipt = h.call(name, {});
@@ -48,9 +60,11 @@ describe("every After Effects tool, called bare in an empty project", () => {
       expect(h.mock.state.undoCalls).toEqual([]);
       expect(receipt.undoSteps).toBe(0);
     } else if (name === "ae_undo") {
-      // Undo runs between two empty groups (it must not run inside one); empty groups add no history.
-      expect(h.mock.state.undoGroups).toEqual(["Zenvi: Undo Zenvi steps", "Zenvi: Undo Zenvi steps"]);
+      // Edit > Undo runs outside any undo group.
+      expect(h.mock.state.undoCalls).toEqual([]);
       expect(h.mock.state.commandDepths).toEqual([0]);
+    } else if (OWN_UNDO_GROUPS.includes(name)) {
+      expect(h.mock.state.undoGroups).toHaveLength(receipt.undoSteps ?? -1);
     } else {
       expect(h.mock.state.undoGroups).toHaveLength(1);
     }

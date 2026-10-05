@@ -387,7 +387,7 @@
                     throw Z.refuse("INVALID_ARGUMENT", "A layer cannot be its own track matte");
                 }
             }
-            if (typeof av.setTrackMatte === "function") {
+            if (Z.hasMethod(av, "setTrackMatte")) {
                 if (matte.type !== "none" && !matteLayer) {
                     if (layer.index === 1) {
                         throw Z.refuse("INVALID_ARGUMENT", "Layer \"" + layer.name + "\" is the top layer; pass track_matte.layer");

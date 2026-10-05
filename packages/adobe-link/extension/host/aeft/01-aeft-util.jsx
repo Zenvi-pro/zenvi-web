@@ -9,6 +9,36 @@
     var TASTE = Z.TASTE;
 
     // ------------------------------------------------------------------
+    // State that must outlive the host script being evaluated again (the
+    // panel opening does that): ae_undo's journal and the output module
+    // template list. ZenviLink.state survives; ZenviLink.ae does not.
+
+    if (!Z.state.ae) {
+        Z.state.ae = {journal: [], outputTemplates: null};
+    }
+    AE.state = Z.state.ae;
+
+    /**
+     * Run fn inside one undo group "Zenvi: <title>", for the tools registered
+     * without dispatch's group because part of their work (Undo, a render,
+     * Media Encoder) must not run inside one. With `summary` the step goes in
+     * ae_undo's journal (AE.remember, 70-aeft-project.jsx).
+     */
+    AE.inUndoGroup = function (title, fn, summary) {
+        var result;
+        app.beginUndoGroup("Zenvi: " + title);
+        try {
+            result = fn();
+        } finally {
+            app.endUndoGroup();
+        }
+        if (summary && AE.remember) {
+            AE.remember(title, summary);
+        }
+        return result;
+    };
+
+    // ------------------------------------------------------------------
     // Enums by name. Members missing in this After Effects refuse UNSUPPORTED.
 
     function enumValue(enumObject, key, name, what) {
@@ -248,15 +278,16 @@
         return /^(Macintosh|Windows)/.test(File.fs) ? key.toLowerCase() : key;
     };
 
-    /** A folder under the system temp folder (created when missing). Paths are joined on fullName, which always uses "/". */
+    /**
+     * A folder inside Zenvi Link's temp folder (ZenviLink.tempDir(): the
+     * server's choice, else <temp>/zenvi-link), created when missing. Renders
+     * for Zenvi go to "renders". Paths are joined on fullName, which always
+     * uses "/".
+     */
     AE.tempFolder = function (name) {
-        var base = new Folder(Folder.temp.fullName + "/zenvi-link");
-        var folder = new Folder(base.fullName + "/" + name);
-        if (!base.exists) {
-            base.create();
-        }
-        if (!folder.exists) {
-            folder.create();
+        var folder = new Folder(new Folder(Z.tempDir()).fullName + "/" + name);
+        if (!folder.exists && !folder.create()) {
+            throw Z.fail("HOST_ERROR", "Could not create folder " + folder.fsName);
         }
         return folder;
     };

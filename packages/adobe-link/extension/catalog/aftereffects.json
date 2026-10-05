@@ -3530,7 +3530,7 @@
     {
       "name": "ae_render",
       "title": "Render comp",
-      "description": "Render a comp through the render queue. preset h264 (After Effects 2023+; falls back to ProRes 422 with a warning), prores-422, prores-4444 (alpha), lossless, lossless-alpha; or an exact output module `template`. mode render_now renders and blocks After Effects until done (default), queue_only adds it to the queue, media_encoder queues it in Adobe Media Encoder. The output defaults to a Renders folder next to the saved project. Existing files are not overwritten unless `overwrite`.",
+      "description": "Render a comp through the render queue. preset h264 (After Effects 2023+; falls back to ProRes 422 with a warning), prores-422, prores-4444 (alpha), lossless, lossless-alpha; or an exact output module `template`. mode render_now renders and blocks After Effects until done (default), queue_only adds it to the queue, media_encoder queues it in Adobe Media Encoder. The output defaults to a Renders folder next to the saved project. Existing files are not overwritten unless `overwrite`; render_now replaces one only once the new render is complete.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3723,7 +3723,7 @@
     {
       "name": "ae_render_for_zenvi",
       "title": "Render for Zenvi",
-      "description": "Render a comp (default: the active comp) for a Zenvi linked clip and return everything Zenvi needs: path, comp id and name, project, size, fps, duration and a ready `link` object (SPEC 3.6) for the desktop's import_linked_media_tool. alpha: true renders ProRes 4444 with alpha (for overlays over other clips; QuickTime Animation where there is no ProRes 4444 template), else H.264 (before After Effects 2023: ProRes 4444, then QuickTime Animation). Only codecs Zenvi links: h264, prores4444, qtrle. Blocks After Effects while it renders; the render queue item is removed afterwards.",
+      "description": "Render a comp (default: the active comp) for a Zenvi linked clip and return everything Zenvi needs: path, comp id and name, project, size, fps, duration and a ready `link` object (SPEC 3.6) for the desktop's import_linked_media_tool. alpha: true renders ProRes 4444 with alpha (for overlays over other clips; QuickTime Animation where there is no ProRes 4444 template), else H.264 (before After Effects 2023: ProRes 4444, then QuickTime Animation). Only codecs Zenvi links: h264, prores4444, qtrle. Blocks After Effects while it renders; the render queue item is removed afterwards (two undo steps: queue, tidy). An existing `output` is replaced only with `overwrite`, and only once the new render is complete.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3762,6 +3762,11 @@
             "description": "Exact output module template name to use instead (H.264, ProRes 4444 or QuickTime Animation)",
             "type": "string",
             "minLength": 1
+          },
+          "overwrite": {
+            "default": false,
+            "description": "Replace an existing file at `output` (the default output is always a new file)",
+            "type": "boolean"
           }
         },
         "additionalProperties": false

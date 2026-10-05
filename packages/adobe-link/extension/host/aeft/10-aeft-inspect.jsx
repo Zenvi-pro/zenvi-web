@@ -110,7 +110,7 @@
         if (!(layer instanceof AVLayer) || !layer.hasTrackMatte) {
             return null;
         }
-        if (typeof layer.setTrackMatte === "function") {
+        if (Z.hasMethod(layer, "setTrackMatte")) {
             matte = layer.trackMatteLayer;
         } else if (layer.index > 1) {
             matte = layer.containingComp.layer(layer.index - 1);

@@ -63,7 +63,7 @@
         var i;
         var segment;
         for (i = 0; i < raw.length; i += 1) {
-            segment = String(raw[i]).trim();
+            segment = Z.trim(raw[i]);
             if (segment.length) {
                 out.push(segment);
             }
@@ -285,7 +285,7 @@
             rangeCheck(property, raw, key, path);
             return raw;
         }
-        if (typeof raw === "number" && SCALE_MATCH_NAMES.indexOf(property.matchName) >= 0) {
+        if (typeof raw === "number" && Z.indexOf(SCALE_MATCH_NAMES, property.matchName) >= 0) {
             return dims === 2 ? [raw, raw] : [raw, raw, raw];
         }
         if (!isNumberList(raw) || raw.length < 2 || raw.length > dims) {
