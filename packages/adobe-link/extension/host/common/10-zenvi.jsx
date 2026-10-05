@@ -25,6 +25,9 @@
 // ES3 only: no let/const, arrow functions, template strings, trailing commas,
 // getters/setters, or reserved words as property names (write obj["in"]).
 // Sources stay ASCII: use \u escapes for other characters in strings.
+// No prototype polyfills (the engine is shared with other extensions): use
+// ZenviLink.indexOf(list, value) and ZenviLink.trim(text), not [].indexOf
+// or "".trim().
 
 var ZenviLink = (function () {
     var Z = {};
@@ -61,7 +64,8 @@ var ZenviLink = (function () {
     ];
 
     // ------------------------------------------------------------------
-    // Small utilities (ES3 has no forEach/map/filter; see 01-polyfills.jsx).
+    // Small utilities (ES3 has no indexOf/trim/forEach/map/filter on the
+    // prototypes, and Zenvi Link adds none; see 01-polyfills.jsx).
 
     function has(object, key) {
         return object !== null && object !== undefined && Object.prototype.hasOwnProperty.call(object, key);
@@ -74,6 +78,22 @@ var ZenviLink = (function () {
 
     Z.isObject = function (value) {
         return value !== null && typeof value === "object" && !Z.isArray(value);
+    };
+
+    /** Index of `value` in an array (===), or -1. */
+    Z.indexOf = function (list, value) {
+        var i;
+        for (i = 0; i < list.length; i += 1) {
+            if (list[i] === value) {
+                return i;
+            }
+        }
+        return -1;
+    };
+
+    /** `text` without leading and trailing whitespace. */
+    Z.trim = function (text) {
+        return String(text).replace(/^[\s\u00a0\ufeff]+|[\s\u00a0\ufeff]+$/g, "");
     };
 
     Z.each = function (list, fn) {
@@ -222,7 +242,7 @@ var ZenviLink = (function () {
 
     /** `value` when it is one of `allowed`. */
     Z.oneOf = function (key, value, allowed) {
-        if (allowed.indexOf(value) < 0) {
+        if (Z.indexOf(allowed, value) < 0) {
             throw Z.refuse("INVALID_ARGUMENT", "`" + key + "` must be one of " + allowed.join(", ") + "; got " + String(value));
         }
         return value;
@@ -320,7 +340,7 @@ var ZenviLink = (function () {
     function failureOutcome(status, code, message) {
         return {
             status: status,
-            code: Z.ERROR_CODES.indexOf(code) >= 0 ? code : "HOST_ERROR",
+            code: Z.indexOf(Z.ERROR_CODES, code) >= 0 ? code : "HOST_ERROR",
             message: String(message)
         };
     }
