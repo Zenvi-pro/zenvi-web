@@ -29,10 +29,27 @@
 // ZenviLink.indexOf(list, value) and ZenviLink.trim(text), not [].indexOf
 // or "".trim().
 
+// State that must survive the bundle being evaluated again: CEP evaluates the
+// manifest's ScriptPath again when the panel opens, which rebuilds ZenviLink
+// (fresh registry, same tools). Long-lived data (render jobs, the configured
+// temp folder) lives on ZenviLink.state, which is this global. Re-declaring a
+// global var does not reset it.
+var ZenviLinkState;
+if (!ZenviLinkState || typeof ZenviLinkState !== "object") {
+    ZenviLinkState = {};
+}
+
 var ZenviLink = (function () {
     var Z = {};
     var registry = {};
     var names = [];
+
+    /** Survives re-evaluation of the host script; keep long-lived registries here. */
+    Z.state = ZenviLinkState;
+    Z.state.loads = (Z.state.loads || 0) + 1;
+    if (!Z.state.config) {
+        Z.state.config = {};
+    }
 
     // Set by the build's generated block (src/host-bundle.ts).
     Z.version = "0.0.0-dev";
@@ -496,6 +513,7 @@ var ZenviLink = (function () {
         info.version = Z.version;
         info.protocol = Z.protocol;
         info.tools = names.length;
+        info.loads = Z.state.loads;
         return stringify(info);
     };
 

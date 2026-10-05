@@ -65,6 +65,20 @@ describe.each(HOST_APPS)("%s host script", (app) => {
   });
 });
 
+describe("evaluating the host script again (CEP does when the panel opens)", () => {
+  test.each(HOST_APPS)("%s keeps ZenviLink.state and registers every tool again", (app) => {
+    const host = loadHostScript(app, mockFor(app));
+    host.evaluate('ZenviLink.state.jobs = {render1: {status: "running"}};');
+    const before = host.listTools();
+    expect(host.hostInfo().loads).toBe(1);
+    host.evaluate(host.bundle.text);
+    expect(host.evaluate("ZenviLink.state.jobs.render1.status")).toBe("running");
+    expect(host.listTools()).toEqual(before);
+    expect(host.hostInfo().loads).toBe(2);
+    expect(JSON.parse(host.dispatchRaw(app === "aeft" ? "ae_get_state" : "premiere_get_state", "{}")).contract).toBe(3);
+  });
+});
+
 describe("ES3 realm", () => {
   test("lacks what ExtendScript lacks; Zenvi Link adds only static polyfills and json2", () => {
     const host = loadHostScript("aeft", createAeMock().globals);
