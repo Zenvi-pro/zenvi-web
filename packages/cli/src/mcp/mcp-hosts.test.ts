@@ -606,6 +606,30 @@ describe("bring_from_after_effects", () => {
     expect(r.receipt.summary).toMatch(/rendered "Promo" to .*Promo-1\.mov, but the Zenvi desktop app failed during import_linked_media_tool: .*desktop crashed mid-import/);
   });
 
+  it("keeps the import call in data.retry when the desktop refuses the import", async () => {
+    // The guide promises data.retry whenever the render did not land, not only when the desktop threw.
+    const file = await projectFile();
+    await ae({ handlers: { ae_render_for_zenvi: () => ({ status: "applied", summary: "Rendered Promo", data: RENDER }) } });
+    await desktopWith(file, {
+      tools: ["import_linked_media_tool"],
+      handlers: { import_linked_media_tool: () => refused("import_linked_media_tool", "no track named Titles") },
+    });
+    const { client } = await connect({ project: file });
+    const r = await call(client, "bring_from_after_effects", { track: "Titles" });
+    expect(r.result.isError).toBe(true);
+    expect(r.receipt).toMatchObject({
+      status: "refused",
+      data: {
+        after_effects: { status: "applied", data: { path: RENDER.path } },
+        zenvi: { status: "refused" },
+        retry: { tool: "import_linked_media_tool", arguments: { path: RENDER.path, track: "Titles", link: { kind: "aftereffects" } } },
+      },
+    });
+    expect(r.receipt.summary).toBe(
+      `Error: After Effects rendered "Promo" to ${RENDER.path}, but Zenvi could not add it: no track named Titles. data.retry is the import call (import_linked_media_tool) to run once that is fixed.`,
+    );
+  });
+
   it("uses Zenvi Link's own link object when it sends one", async () => {
     const file = await projectFile();
     const link = { version: 1, kind: "aftereffects", source: { aep: "/Work/promo.aep", composition: "Logo", composition_key: 4 }, render: { codec: "h264" } };

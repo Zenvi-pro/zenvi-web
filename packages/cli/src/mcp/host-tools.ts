@@ -129,12 +129,6 @@ function transient(endpoint: DesktopEndpoint): { desktop: DesktopExecutor; relea
   return { desktop, release: () => desktop.close() };
 }
 
-/**
- * The desktop app, ready for `tool`: the one with this session's project
- * open; for `any` tools whichever runs; otherwise open the project there
- * (focus / load / launch, like launch_editor, never two launches) and wait
- * for its discovery file to show it.
- */
 /** Refusals that need nothing but this server's settings and session (checked before anything else). */
 function preflight(ctx: CommandContext, state: McpState, tool: string, need: ProjectNeed): ToolReceipt | undefined {
   if (ctx.env.ZENVI_MCP_ENGINE === "portable") {
@@ -146,6 +140,13 @@ function preflight(ctx: CommandContext, state: McpState, tool: string, need: Pro
   return undefined;
 }
 
+/**
+ * The desktop app, ready for `tool`: the one with this session's project
+ * open; for `any` tools whichever runs; `read` tools refuse rather than
+ * switch a GUI that shows another project; otherwise open the project there
+ * (focus / load / launch, like launch_editor, never two launches) and wait
+ * for its discovery file to show it.
+ */
 async function ensureDesktop(ctx: CommandContext, state: McpState, tool: string, call: ExtraCallContext, ticker: Ticker, need: ProjectNeed): Promise<DesktopReady> {
   const file = state.session.file;
   const refusal = preflight(ctx, state, tool, need);
@@ -286,15 +287,21 @@ function adobeStepFailed(tool: string, step: string, host: CliHostReceipt): Tool
   return make(tool, `${host.summary.replace(/^Error:\s*/, "")} (${step}; nothing was added to the Zenvi project)`, { data: { [host.host === "aftereffects" ? "after_effects" : "premiere"]: host }, warnings: host.warnings ?? [] });
 }
 
-/** One receipt for both apps: the desktop's (clips, undo steps) with the Adobe receipt beside it. */
-function combined(tool: string, summary: string, adobeKey: AdobeKey, adobe: CliHostReceipt, zenvi: ToolReceipt, note: string | undefined): ToolReceipt {
+type ImportCall = { tool: string; arguments: Record<string, unknown> };
+
+/**
+ * One receipt for both apps: the desktop's (clips, undo steps) with the Adobe
+ * receipt beside it. When the desktop refused or failed the import, data.retry
+ * is that import call, so the Adobe result is not rendered or exported again.
+ */
+function combined(tool: string, summary: string, adobeKey: AdobeKey, adobe: CliHostReceipt, zenvi: ToolReceipt, retry: ImportCall, note: string | undefined): ToolReceipt {
   const ok = zenvi.status === "applied" || zenvi.status === "unchanged";
   const merged: ToolReceipt = {
     ...zenvi,
     tool,
-    summary: ok ? summary : `Error: ${summary}`,
+    summary: ok ? summary : `Error: ${summary.replace(/[.\s]*$/, ".")} data.retry is the import call (${retry.tool}) to run once that is fixed.`,
     warnings: [...(adobe.warnings ?? []), ...(zenvi.warnings ?? [])],
-    data: { [adobeKey]: adobe, zenvi },
+    data: ok ? { [adobeKey]: adobe, zenvi } : { [adobeKey]: adobe, zenvi, retry },
   };
   return withNote(merged, note);
 }
@@ -304,7 +311,7 @@ function combined(tool: string, summary: string, adobeKey: AdobeKey, adobe: CliH
  * project is no longer open, the import failed): say so, keep the Adobe
  * receipt and the call that adds the result later.
  */
-function notImported(tool: string, status: "refused" | "error", why: string, adobeKey: AdobeKey, adobe: CliHostReceipt, retry: { tool: string; arguments: Record<string, unknown> }, note: string | undefined): ToolReceipt {
+function notImported(tool: string, status: "refused" | "error", why: string, adobeKey: AdobeKey, adobe: CliHostReceipt, retry: ImportCall, note: string | undefined): ToolReceipt {
   const make = status === "refused" ? refused : failed;
   const receipt = make(tool, `${why} Nothing was added to the Zenvi project; data.retry adds the result later (${retry.tool}).`, {
     data: { [adobeKey]: adobe, retry },
@@ -348,8 +355,8 @@ async function importStep(
   adobe: CliHostReceipt,
   what: string,
   note: string | undefined,
-): Promise<{ ok: true; zenvi: ToolReceipt } | { ok: false; receipt: ToolReceipt }> {
-  const retry = { tool: importTool, arguments: importArgs };
+): Promise<{ ok: true; zenvi: ToolReceipt; retry: ImportCall } | { ok: false; receipt: ToolReceipt }> {
+  const retry: ImportCall = { tool: importTool, arguments: importArgs };
   if (call.signal.aborted) {
     return { ok: false, receipt: notImported(tool, "refused", `Cancelled after ${what}.`, adobeKey, adobe, retry, note) };
   }
@@ -361,7 +368,7 @@ async function importStep(
   ticker.say("Adding it to the Zenvi project…");
   try {
     const { receipt } = await forward(target, importTool, importArgs, call, ticker);
-    return { ok: true, zenvi: receipt };
+    return { ok: true, zenvi: receipt, retry };
   } catch (error) {
     const why = `${what}, but the Zenvi desktop app failed during ${importTool}: ${error instanceof Error ? error.message : String(error)}.`;
     return { ok: false, receipt: notImported(tool, "error", why, adobeKey, adobe, retry, note) };
@@ -447,7 +454,7 @@ function bringFromAfterEffects(ctx: CommandContext): ExtraTool {
         zenvi.status === "applied" || zenvi.status === "unchanged"
           ? `Rendered "${comp}" in After Effects and added it to the Zenvi project as a linked clip. ${zenvi.summary}`
           : `After Effects rendered "${comp}" to ${media.path}, but Zenvi could not add it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
-      return { receipt: combined(tool, summary, "after_effects", render.receipt, zenvi, ready.note), engine: "desktop" };
+      return { receipt: combined(tool, summary, "after_effects", render.receipt, zenvi, step.retry, ready.note), engine: "desktop" };
     },
   };
 }
@@ -518,7 +525,7 @@ function bringFromPremiere(ctx: CommandContext): ExtraTool {
         zenvi.status === "applied" || zenvi.status === "unchanged"
           ? `Exported "${name}" from Premiere Pro and imported it into the Zenvi project. ${zenvi.summary}`
           : `Premiere Pro exported "${name}" to ${xml}, but Zenvi could not import it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
-      return { receipt: combined(tool, summary, "premiere", exported.receipt, zenvi, ready.note), engine: "desktop" };
+      return { receipt: combined(tool, summary, "premiere", exported.receipt, zenvi, step.retry, ready.note), engine: "desktop" };
     },
   };
 }

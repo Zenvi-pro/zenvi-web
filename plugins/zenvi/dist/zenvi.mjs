@@ -87189,14 +87189,14 @@ function adobeStepFailed(tool, step, host) {
   const make = host.status === "refused" ? refused : failed;
   return make(tool, `${host.summary.replace(/^Error:\s*/, "")} (${step}; nothing was added to the Zenvi project)`, { data: { [host.host === "aftereffects" ? "after_effects" : "premiere"]: host }, warnings: host.warnings ?? [] });
 }
-function combined(tool, summary, adobeKey, adobe, zenvi, note) {
+function combined(tool, summary, adobeKey, adobe, zenvi, retry, note) {
   const ok = zenvi.status === "applied" || zenvi.status === "unchanged";
   const merged = {
     ...zenvi,
     tool,
-    summary: ok ? summary : `Error: ${summary}`,
+    summary: ok ? summary : `Error: ${summary.replace(/[.\s]*$/, ".")} data.retry is the import call (${retry.tool}) to run once that is fixed.`,
     warnings: [...adobe.warnings ?? [], ...zenvi.warnings ?? []],
-    data: { [adobeKey]: adobe, zenvi }
+    data: ok ? { [adobeKey]: adobe, zenvi } : { [adobeKey]: adobe, zenvi, retry }
   };
   return withNote(merged, note);
 }
@@ -87232,7 +87232,7 @@ async function importStep(state, ticker, call, tool, importTool, importArgs, ado
   ticker.say("Adding it to the Zenvi project\u2026");
   try {
     const { receipt: receipt2 } = await forward(target, importTool, importArgs, call, ticker);
-    return { ok: true, zenvi: receipt2 };
+    return { ok: true, zenvi: receipt2, retry };
   } catch (error62) {
     const why = `${what}, but the Zenvi desktop app failed during ${importTool}: ${error62 instanceof Error ? error62.message : String(error62)}.`;
     return { ok: false, receipt: notImported(tool, "error", why, adobeKey, adobe, retry, note) };
@@ -87308,7 +87308,7 @@ function bringFromAfterEffects(ctx) {
       if (!step.ok) return { receipt: step.receipt, engine: "desktop" };
       const zenvi = step.zenvi;
       const summary = zenvi.status === "applied" || zenvi.status === "unchanged" ? `Rendered "${comp}" in After Effects and added it to the Zenvi project as a linked clip. ${zenvi.summary}` : `After Effects rendered "${comp}" to ${media.path}, but Zenvi could not add it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
-      return { receipt: combined(tool, summary, "after_effects", render2.receipt, zenvi, ready2.note), engine: "desktop" };
+      return { receipt: combined(tool, summary, "after_effects", render2.receipt, zenvi, step.retry, ready2.note), engine: "desktop" };
     }
   };
 }
@@ -87369,7 +87369,7 @@ function bringFromPremiere(ctx) {
       if (!step.ok) return { receipt: step.receipt, engine: "desktop" };
       const zenvi = step.zenvi;
       const summary = zenvi.status === "applied" || zenvi.status === "unchanged" ? `Exported "${name}" from Premiere Pro and imported it into the Zenvi project. ${zenvi.summary}` : `Premiere Pro exported "${name}" to ${xml}, but Zenvi could not import it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
-      return { receipt: combined(tool, summary, "premiere", exported.receipt, zenvi, ready2.note), engine: "desktop" };
+      return { receipt: combined(tool, summary, "premiere", exported.receipt, zenvi, step.retry, ready2.note), engine: "desktop" };
     }
   };
 }
