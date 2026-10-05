@@ -330,37 +330,69 @@ describe("tools/call", () => {
     expect((await request(server, { body: call("ae_quick", {}) })).json.result.structuredContent.status).toBe("ok");
   });
 
-  test("a frame capture's image_path becomes an image block and the temp file is deleted", async () => {
-    const dir = tempDir();
-    const png = path.join(dir, "zenvi-capture.png");
+  const capture = (file: string, tool = "ae_capture") =>
+    JSON.stringify({ contract: 3, status: "ok", tool, host: "aftereffects", summary: "Captured", data: { image_path: file, time: 1 }, warnings: [], undoSteps: 0 });
+
+  test("a frame capture in Zenvi Link's temp folder becomes an image block and is deleted", async () => {
+    const system = tempDir();
+    let png = "";
+    const server = await customServer([{ name: "ae_capture", returnsImage: true }], { evalScript: async () => capture(png) }, { tempDir: system });
+    expect(server.tempDir).toBe(path.join(system, "zenvi-link"));
+    expect(existsSync(server.tempDir)).toBe(true);
+    png = path.join(server.tempDir, "capture-1.png");
     writeFileSync(png, Buffer.from(TINY_PNG_BASE64, "base64"));
-    const server = await customServer(
-      [{ name: "ae_capture", returnsImage: true }],
-      { evalScript: async () => JSON.stringify({ contract: 3, status: "ok", tool: "ae_capture", host: "aftereffects", summary: "Captured", data: { image_path: png, time: 1 }, warnings: [], undoSteps: 0 }) },
-      { tempDir: dir },
-    );
     const result = (await request(server, { body: call("ae_capture", {}) })).json.result;
     expect(result.content[1]).toEqual({ type: "image", data: TINY_PNG_BASE64, mimeType: "image/png" });
     expect(result.structuredContent.data).toEqual({ time: 1 });
     expect(existsSync(png)).toBe(false);
   });
 
-  test("images outside the temp folder are attached but kept; tools without returnsImage are left alone", async () => {
-    const keepDir = tempDir();
-    const png = path.join(keepDir, "frame.png");
+  test("files outside Zenvi Link's temp folder are never deleted, even in the system temp folder", async () => {
+    const system = tempDir();
+    const png = path.join(system, "someone-elses.png");
+    const text = path.join(system, "notes.txt");
     writeFileSync(png, Buffer.from(TINY_PNG_BASE64, "base64"));
-    const receipt = (tool: string) => JSON.stringify({ contract: 3, status: "ok", tool, host: "aftereffects", summary: "x", data: { image_path: png }, warnings: [], undoSteps: 0 });
-    const server = await customServer(
-      [{ name: "ae_capture", returnsImage: true }, { name: "ae_other" }],
-      { evalScript: async (script) => receipt(script.includes("ae_capture") ? "ae_capture" : "ae_other") },
-      { tempDir: tempDir() },
-    );
-    const captured = (await request(server, { body: call("ae_capture", {}) })).json.result;
-    expect(captured.content).toHaveLength(2);
+    writeFileSync(text, "not an image");
+    let target = png;
+    const server = await customServer([{ name: "ae_capture", returnsImage: true }], { evalScript: async () => capture(target) }, { tempDir: system });
+    const attached = (await request(server, { body: call("ae_capture", {}) })).json.result;
+    expect(attached.content).toHaveLength(2);
     expect(existsSync(png)).toBe(true);
+    target = text;
+    const refused = (await request(server, { body: call("ae_capture", {}) })).json.result;
+    expect(refused.content).toHaveLength(1);
+    expect(refused.structuredContent.warnings.join(" ")).toContain("not a PNG or JPEG");
+    expect(existsSync(text)).toBe(true);
+  });
+
+  test("oversized captures are not sent", async () => {
+    let png = "";
+    const server = await customServer([{ name: "ae_capture", returnsImage: true }], { evalScript: async () => capture(png) }, { tempDir: tempDir(), imageLimit: 10 });
+    png = path.join(server.tempDir, "big.png");
+    writeFileSync(png, Buffer.from(TINY_PNG_BASE64, "base64"));
+    const result = (await request(server, { body: call("ae_capture", {}) })).json.result;
+    expect(result.content).toHaveLength(1);
+    expect(result.structuredContent.warnings.join(" ")).toContain("over the 0 MB limit");
+    expect(existsSync(png)).toBe(false);
+  });
+
+  test.skipIf(process.platform === "linux")("the temp folder match ignores case where the file system does", async () => {
+    const server = await customServer([{ name: "ae_capture", returnsImage: true }], { evalScript: async () => "" }, { tempDir: tempDir() });
+    const png = path.join(server.tempDir, "case.png");
+    writeFileSync(png, Buffer.from(TINY_PNG_BASE64, "base64"));
+    const shouted = path.join(path.dirname(server.tempDir), path.basename(server.tempDir).toUpperCase(), "case.png");
+    expect(await serverModule.insideDir(shouted, server.tempDir)).toBe(true);
+    expect(await serverModule.insideDir(path.join(os.tmpdir(), "x.png"), server.tempDir)).toBe(false);
+  });
+
+  test("tools without returnsImage keep image_path and their files", async () => {
+    const keep = path.join(tempDir(), "frame.png");
+    writeFileSync(keep, Buffer.from(TINY_PNG_BASE64, "base64"));
+    const server = await customServer([{ name: "ae_other" }], { evalScript: async () => capture(keep, "ae_other") });
     const other = (await request(server, { body: call("ae_other", {}) })).json.result;
     expect(other.content).toHaveLength(1);
-    expect(other.structuredContent.data.image_path).toBe(png);
+    expect(other.structuredContent.data.image_path).toBe(keep);
+    expect(existsSync(keep)).toBe(true);
   });
 
   test("every call counts as activity and is reported to listeners", async () => {

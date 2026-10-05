@@ -38,9 +38,9 @@ async function bootAe(options: { evalScript?: (script: string) => string } = {})
   mock.project.save(new mock.es.File(path.join(temp, "promo.aep")));
   const host = loadHostScript("aeft", mock.globals);
   const cep = new FakeCep({ appName: "AEFT", appVersion: "26.3.0", extensionDir: EXTENSION_DIR, evalScript: options.evalScript ?? evalInHostScript(host) });
-  const link = await boot({ cep, mode: "service", home, pollMs: 60_000, touchIntervalMs: 0, log: () => undefined });
+  const link = await boot({ cep, mode: "service", home, tempDir: temp, pollMs: 60_000, touchIntervalMs: 0, log: () => undefined });
   running.push(link);
-  return { link, cep, mock, temp, home, desktopDir: path.join(home, ".openshot_qt") };
+  return { link, cep, mock, host, temp, home, desktopDir: path.join(home, ".openshot_qt") };
 }
 
 function discoveryJson(home: string, host: string) {
@@ -63,6 +63,15 @@ describe("boot inside CEP (fake __adobe_cep__, real host script on the mock DOM)
     });
     expect(readFileSync(json.token_file, "utf8")).toBe(link.server.token);
     expect(link.status()).toMatchObject({ mode: "service", ready: true, host: "aftereffects", url: link.server.url, host_script: { ok: true } });
+  });
+
+  test("tells the host script where Zenvi Link's temp folder is", async () => {
+    const { link, host, temp } = await bootAe();
+    expect(link.server.tempDir).toBe(path.join(temp, "zenvi-link"));
+    expect(host.evaluate("ZenviLink.tempDir()")).toBe(link.server.tempDir);
+    const file = String(host.evaluate('ZenviLink.tempFile("capture", "png")'));
+    expect(path.dirname(file)).toBe(link.server.tempDir);
+    expect(path.basename(file)).toMatch(/^capture-\d+-\d+\.png$/);
   });
 
   test("answers status requests from the first moment, then broadcasts once ready", async () => {

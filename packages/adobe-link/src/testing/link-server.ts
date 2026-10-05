@@ -28,7 +28,9 @@ export interface LinkServerOptions {
   bridge: Bridge;
   token?: string;
   busyAfterMs?: number;
+  /** The system temp folder (Zenvi Link uses <tempDir>/zenvi-link). */
   tempDir?: string;
+  imageLimit?: number;
   bodyLimit?: number;
   log?: (line: string) => void;
   onActivity?: () => void;
@@ -46,6 +48,8 @@ export interface LinkServer {
   readonly token: string;
   readonly host: string;
   readonly version: string;
+  /** Zenvi Link's temp folder. */
+  readonly tempDir: string;
   readonly queue: { idle: boolean };
   recentCalls(): CallEvent[];
 }
@@ -54,7 +58,9 @@ export const serverModule = require("../../extension/server/server.js") as {
   createLinkServer(options: LinkServerOptions): LinkServer;
   dispatchScript(name: string, args: unknown): string;
   scriptLiteral(text: string): string;
+  insideDir(file: string, dir: string): Promise<boolean>;
   PROTOCOL_VERSIONS: string[];
+  TEMP_FOLDER: string;
 };
 
 export interface QueueOutcome {
@@ -137,6 +143,7 @@ export const bootModule = require("../../extension/server/index.js") as {
     pollMs?: number;
     touchIntervalMs?: number;
     busyAfterMs?: number;
+    tempDir?: string;
     log?: (line: string) => void;
   }): Promise<BootedLink>;
   marketingName(host: string, appVersion: string): string;

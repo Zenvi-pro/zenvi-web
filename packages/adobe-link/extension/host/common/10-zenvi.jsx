@@ -338,6 +338,44 @@ var ZenviLink = (function () {
     };
 
     // ------------------------------------------------------------------
+    // Settings from the server, and the temp folder.
+
+    /**
+     * Settings the server passes once the host script is loaded, as a JSON
+     * string: {temp_dir}. Kept on ZenviLink.state (they survive the script
+     * being evaluated again). Returns the settings as a JSON string.
+     */
+    Z.configure = function (json) {
+        var settings = typeof json === "string" ? JSON.parse(json) : json;
+        var key;
+        for (key in settings) {
+            if (has(settings, key)) {
+                Z.state.config[key] = settings[key];
+            }
+        }
+        return stringify({ok: true, config: Z.state.config});
+    };
+
+    /**
+     * Zenvi Link's temp folder (the server's choice, else <Folder.temp>/zenvi-link),
+     * created if missing. Frame captures go here: the server deletes a capture
+     * once it has sent it, and deletes nothing outside this folder.
+     */
+    Z.tempDir = function () {
+        var folder = new Folder(Z.state.config.temp_dir || (Folder.temp.fsName + "/zenvi-link"));
+        if (!folder.exists) {
+            folder.create();
+        }
+        return folder.fsName;
+    };
+
+    /** A new file path in the temp folder: <prefix>-<time>-<random>.<extension>. */
+    Z.tempFile = function (prefix, extension) {
+        return Z.tempDir() + "/" + (prefix || "zenvi") + "-" + new Date().getTime() + "-" +
+            Math.floor(Math.random() * 1000000000) + "." + (extension || "tmp");
+    };
+
+    // ------------------------------------------------------------------
     // Registry and dispatch.
 
     /**

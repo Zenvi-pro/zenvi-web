@@ -53,7 +53,7 @@ function serviceRunning() {
 
 /**
  * options: {cep | bridge, window?, mode?: "service" | "panel", extensionDir?, home?, linkDir?, pollMs?,
- *   touchIntervalMs?, busyAfterMs?, log?}
+ *   touchIntervalMs?, busyAfterMs?, tempDir? (system temp folder), log?}
  * Resolves with {host, server, discovery, status(), stop()}.
  */
 async function boot(options) {
@@ -75,11 +75,13 @@ async function boot(options) {
     bridge: bridge,
     log: log,
     busyAfterMs: options.busyAfterMs,
+    tempDir: options.tempDir,
     onActivity: () => discovery.touch(),
   });
   const startedAt = new Date().toISOString();
   let hostScript = { ok: false, problem: "not checked yet" };
   let loadedHostScript = false;
+  let configured = false;
   let ready = false;
   let stopped = false;
 
@@ -138,7 +140,15 @@ async function boot(options) {
       hostScript = missing.length ? { ok: false, problem: "missing tools: " + missing.join(", ") } : { ok: true, problem: null };
     } catch (_error) {
       hostScript = { ok: false, problem: "the host script is not loaded (" + String(raw).slice(0, 80) + ")" };
+      configured = false;
     }
+    if (hostScript.ok && !configured) await configureHostScript();
+  }
+
+  /** Tell the host script where Zenvi Link's temp folder is (it survives re-evaluation of the script). */
+  async function configureHostScript() {
+    const raw = await server.evalWhenIdle("ZenviLink.configure(" + scriptLiteral(JSON.stringify({ temp_dir: server.tempDir })) + ")");
+    configured = raw !== null && /"ok":true/.test(raw);
   }
 
   /**
