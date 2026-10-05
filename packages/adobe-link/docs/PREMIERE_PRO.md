@@ -129,6 +129,7 @@ says so.
 | --- | --- | --- |
 | `Time` ticks (254016000000/s); `Sequence.timebase` is ticks per frame | Scripting guide | Documented |
 | `Track.overwriteClip` / `insertClip(item, seconds)`; `ProjectItem.setInPoint/setOutPoint(seconds, 4)` | Guide, PProPanel | Documented (seconds vs ticks varies across the guide; PProPanel passes seconds) |
+| `source_in` / `source_out` and item in/out marks count from the start of the media, not its source timecode | — | **Unverified** for media whose timecode does not start at 0; the item's original marks are restored as read, so they are unaffected |
 | Trims must write `start` + `inPoint` (or `end` + `outPoint`) together; `TrackItem.end` clamps at the media end | premiere-pro-mcp, live on 25.2 | Community-verified |
 | `TrackItem.remove(true, …)` does not ripple, so ripple deletes move later clips explicitly | premiere-pro-mcp, live on 25.2–26 | Community-verified |
 | `getLinkedItems()` is null for an unlinked clip; only same-source, overlapping clips are treated as partners | premiere-pro-mcp; PProPanel's comment differs | Defensive |

@@ -297,6 +297,16 @@
         }
     }
 
+    function isWanted(wanted, ticks, tolerance) {
+        var i;
+        for (i = 0; i < wanted.length; i += 1) {
+            if (Math.abs(wanted[i] - ticks) < tolerance) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The animated parameter: a built-in name or {effect, param}. */
     function animatedTarget(found, property) {
         var builtin;
@@ -388,7 +398,7 @@
         var param;
         var state = {fallbacks: 0};
         var steps = 0;
-        var wanted = {};
+        var wanted = [];
         var existing;
         var i;
 
@@ -443,7 +453,7 @@
         }
         Z.each(keys, function (key, n) {
             key.at = P.keyTime(clip, key.time);
-            wanted[String(key.at.ticks)] = true;
+            wanted.push(Number(key.at.ticks));
             param.addKey(key.at);
             param.setValueAtKey(key.at, target.toDom(key.value), true);
             steps += 2;
@@ -454,10 +464,11 @@
             steps += 1;
         });
         if (replace && typeof param.getKeys === "function") {
-            // Turning animation on can leave a key at the playhead; with replace only ours remain.
+            // Turning animation on can leave a key at the playhead; with replace only ours remain
+            // (within half a frame, in case Premiere moved a key onto its own grid).
             existing = param.getKeys() || [];
             for (i = 0; i < existing.length; i += 1) {
-                if (existing[i] && !Z.has(wanted, String(existing[i].ticks))) {
+                if (existing[i] && !isWanted(wanted, Number(existing[i].ticks), Number(sequence.timebase) / 2)) {
                     param.removeKey(existing[i]);
                     steps += 1;
                 }

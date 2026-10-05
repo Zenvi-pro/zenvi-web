@@ -37,7 +37,7 @@
         timecode = P.timecode(sequence, time);
         // exportFramePNG(timecode, path without extension) appends ".png" itself and cuts the
         // name at its first dot, so the name has none (premiere-pro-mcp, Premiere 25.2).
-        base = P.tempFolder().fsName + "/" + P.uniqueName("zenvi-frame");
+        base = P.join(P.tempFolder().fsName, P.uniqueName("zenvi-frame"));
         expected = base + ".png";
         stale = new File(expected);
         if (stale.exists) {
@@ -204,7 +204,7 @@
     function outputPath(args, sequence, ext) {
         var output = Z.optional(args, "output", "string", null);
         if (output === null) {
-            return projectFolder() + "/Zenvi Exports/" + P.fileSafe(sequence.name) + "." + ext;
+            return P.join(P.join(projectFolder(), "Zenvi Exports"), P.fileSafe(sequence.name) + "." + ext);
         }
         return P.extensionOf(output) === "" ? output + "." + ext : output;
     }
@@ -304,7 +304,7 @@
         var existing;
         var size;
         if (output === null) {
-            output = P.tempFolder().fsName + "/" + P.safeName(sequence.name) + "-" + new Date().getTime() + ".xml";
+            output = P.join(P.tempFolder().fsName, P.safeName(sequence.name) + "-" + new Date().getTime() + ".xml");
         } else if (P.extensionOf(output) !== "xml") {
             throw Z.refuse("INVALID_ARGUMENT", "`output` must end in .xml, got " + output);
         }

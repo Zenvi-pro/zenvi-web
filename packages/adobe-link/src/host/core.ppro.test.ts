@@ -48,6 +48,13 @@ describe("Premiere helpers", () => {
     expect(fx.host.evaluate("ZenviLink.ppro.fps(app.project.activeSequence)")).toBeCloseTo(29.97, 3);
   });
 
+  test("paths join with the platform separator", () => {
+    const mac = loadPremiere();
+    expect(mac.host.evaluate('ZenviLink.ppro.join("/tmp/zenvi-link/", "frame")')).toBe("/tmp/zenvi-link/frame");
+    const windows = loadPremiere({ os: "windows" });
+    expect(windows.host.evaluate('ZenviLink.ppro.join("C:\\\\Temp\\\\zenvi-link", "frame")')).toBe("C:\\Temp\\zenvi-link\\frame");
+  });
+
   test("the QE item for a clip is matched by start time, skipping gaps", () => {
     const fx = loadPremiere();
     const edit = standardEdit(fx);

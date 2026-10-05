@@ -1028,9 +1028,19 @@
         return prefix + "-" + new Date().getTime() + "-" + Math.floor(Math.random() * 1000000);
     };
 
+    /** The platform's path separator. */
+    P.sep = function () {
+        return Folder.fs === "Windows" ? "\\" : "/";
+    };
+
+    /** `folder` + separator + `name` (folder as an fsName string). */
+    P.join = function (folder, name) {
+        return String(folder).replace(/[\\\/]+$/, "") + P.sep() + name;
+    };
+
     /** The folder for Zenvi Link temp files (created). */
     P.tempFolder = function () {
-        var folder = new Folder(Folder.temp.fsName + "/zenvi-link");
+        var folder = new Folder(P.join(Folder.temp.fsName, "zenvi-link"));
         if (!folder.exists) {
             folder.create();
         }
