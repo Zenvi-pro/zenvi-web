@@ -28,7 +28,9 @@ export interface LinkServerOptions {
   bridge: Bridge;
   token?: string;
   busyAfterMs?: number;
+  /** The system temp folder (Zenvi Link uses <tempDir>/zenvi-link). */
   tempDir?: string;
+  imageLimit?: number;
   bodyLimit?: number;
   log?: (line: string) => void;
   onActivity?: () => void;
@@ -39,6 +41,7 @@ export interface LinkServer {
   stop(): Promise<void>;
   callTool(name: string, args: unknown): Promise<{ receipt: HostReceipt; images: { type: "image"; data: string; mimeType: string }[] }>;
   evalWhenIdle(script: string, timeoutMs?: number): Promise<string | null>;
+  tryEval(script: string, timeoutMs?: number): Promise<{ ran: boolean; value: string | null }>;
   on(event: "call", listener: (call: CallEvent) => void): void;
   off(event: "call", listener: (call: CallEvent) => void): void;
   readonly url: string;
@@ -46,6 +49,8 @@ export interface LinkServer {
   readonly token: string;
   readonly host: string;
   readonly version: string;
+  /** Zenvi Link's temp folder. */
+  readonly tempDir: string;
   readonly queue: { idle: boolean };
   recentCalls(): CallEvent[];
 }
@@ -54,7 +59,9 @@ export const serverModule = require("../../extension/server/server.js") as {
   createLinkServer(options: LinkServerOptions): LinkServer;
   dispatchScript(name: string, args: unknown): string;
   scriptLiteral(text: string): string;
+  insideDir(file: string, dir: string): Promise<boolean>;
   PROTOCOL_VERSIONS: string[];
+  TEMP_FOLDER: string;
 };
 
 export interface QueueOutcome {
@@ -137,11 +144,13 @@ export const bootModule = require("../../extension/server/index.js") as {
     pollMs?: number;
     touchIntervalMs?: number;
     busyAfterMs?: number;
+    tempDir?: string;
     log?: (line: string) => void;
   }): Promise<BootedLink>;
   marketingName(host: string, appVersion: string): string;
   hostOf(environment: { appName?: string }): string | null;
-  EVENTS: Record<"activate" | "beforeQuit" | "statusRequest" | "status" | "call", string>;
+  hostScriptLoader(check: () => Promise<boolean | null>, load: () => Promise<boolean>): () => Promise<void>;
+  EVENTS: Record<"activate" | "activateLegacy" | "beforeQuit" | "beforeQuitLegacy" | "statusRequest" | "status" | "call", string>;
 };
 
 export const bridgeModule = require("../../extension/server/bridge.js") as {

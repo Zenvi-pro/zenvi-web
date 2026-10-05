@@ -29,11 +29,20 @@ const OLD_YEARS = { aftereffects: { 16: 2019, 17: 2020, 18: 2021 }, premiere: { 
 
 const EVENTS = {
   activate: "com.adobe.csxs.events.ApplicationActivate",
+  /** The older name some hosts send instead. */
+  activateLegacy: "applicationActivate",
+  // Neither quit event is documented for After Effects or Premiere Pro (they may
+  // never fire). Cleanup relies on the page's unload, and a crash leaves files
+  // whose dead pid clients ignore (SPEC 3.1).
   beforeQuit: "com.adobe.csxs.events.ApplicationBeforeQuit",
+  beforeQuitLegacy: "applicationBeforeQuit",
   statusRequest: "pro.zenvi.link.status-request",
   status: "pro.zenvi.link.status",
   call: "pro.zenvi.link.call",
 };
+
+const ACTIVATE_EVENTS = [EVENTS.activate, EVENTS.activateLegacy];
+const QUIT_EVENTS = [EVENTS.beforeQuit, EVENTS.beforeQuitLegacy];
 
 /** "Adobe After Effects 2026" for appVersion "26.3.0". */
 function marketingName(host, appVersion) {
@@ -47,13 +56,29 @@ function hostOf(environment) {
   return HOSTS[environment && environment.appName] || null;
 }
 
+/**
+ * Load the bundled host script when CEP's ScriptPath did not, at most once:
+ * an attempt counts only when the load actually ran (the queue was idle).
+ *   check(): Promise<true | false | null>  (null: could not check, the queue was busy)
+ *   load():  Promise<boolean>               (false: nothing ran)
+ */
+function hostScriptLoader(check, load) {
+  let loaded = false;
+  return async function ensure() {
+    if ((await check()) !== false || loaded) return;
+    if (!(await load())) return;
+    loaded = true;
+    await check();
+  };
+}
+
 function serviceRunning() {
   return Object.assign(new Error("a Zenvi Link service already serves this app"), { code: "SERVICE_RUNNING" });
 }
 
 /**
  * options: {cep | bridge, window?, mode?: "service" | "panel", extensionDir?, home?, linkDir?, pollMs?,
- *   touchIntervalMs?, busyAfterMs?, log?}
+ *   touchIntervalMs?, busyAfterMs?, tempDir? (system temp folder), log?}
  * Resolves with {host, server, discovery, status(), stop()}.
  */
 async function boot(options) {
@@ -75,11 +100,12 @@ async function boot(options) {
     bridge: bridge,
     log: log,
     busyAfterMs: options.busyAfterMs,
+    tempDir: options.tempDir,
     onActivity: () => discovery.touch(),
   });
   const startedAt = new Date().toISOString();
   let hostScript = { ok: false, problem: "not checked yet" };
-  let loadedHostScript = false;
+  let configured = false;
   let ready = false;
   let stopped = false;
 
@@ -129,39 +155,43 @@ async function boot(options) {
     }
   }
 
+  /** true / false, or null when it could not look (the queue was busy). */
   async function checkHostScript() {
     const raw = await server.evalWhenIdle("ZenviLink.listTools()");
-    if (raw === null) return;
+    if (raw === null) return null;
     try {
       const registered = JSON.parse(raw).map((tool) => tool.name);
       const missing = catalog.tools.map((tool) => tool.name).filter((name) => registered.indexOf(name) < 0);
       hostScript = missing.length ? { ok: false, problem: "missing tools: " + missing.join(", ") } : { ok: true, problem: null };
     } catch (_error) {
       hostScript = { ok: false, problem: "the host script is not loaded (" + String(raw).slice(0, 80) + ")" };
+      configured = false;
     }
+    if (hostScript.ok && !configured) await configureHostScript();
+    return hostScript.ok;
   }
 
-  /**
-   * CEP loads the manifest's ScriptPath when the extension starts, but that
-   * can fail or race the page; then load the bundled host script directly
-   * (once: later checks only look again).
-   */
-  async function ensureHostScript() {
-    await checkHostScript();
-    if (hostScript.ok || loadedHostScript) return;
-    loadedHostScript = true;
-    const file = path.join(extensionDir, "host", (host === "aftereffects" ? "aeft" : "ppro") + ".jsx").split(path.sep).join("/");
-    log("host script problem: " + hostScript.problem + "; loading " + file);
-    await server.evalWhenIdle("$.evalFile(new File(" + scriptLiteral(file) + "))", 30000);
-    await checkHostScript();
-    if (!hostScript.ok) log("host script still unavailable: " + hostScript.problem);
+  /** Tell the host script where Zenvi Link's temp folder is (it survives re-evaluation of the script). */
+  async function configureHostScript() {
+    const raw = await server.evalWhenIdle("ZenviLink.configure(" + scriptLiteral(JSON.stringify({ temp_dir: server.tempDir })) + ")");
+    configured = raw !== null && /"ok":true/.test(raw);
   }
+
+  // CEP loads the manifest's ScriptPath when the extension starts, but that can
+  // fail or race the page; then load the bundled host script directly.
+  const ensureHostScript = hostScriptLoader(checkHostScript, async () => {
+    const file = path.join(extensionDir, "host", (host === "aftereffects" ? "aeft" : "ppro") + ".jsx").split(path.sep).join("/");
+    const attempt = await server.tryEval("$.evalFile(new File(" + scriptLiteral(file) + "))", 30000);
+    if (attempt.ran) log("host script problem: " + hostScript.problem + "; loaded " + file + " directly");
+    return attempt.ran;
+  });
 
   /** Best effort, never rejects: runs from timers and app events. */
   async function refreshProject() {
     try {
       if (stopped) return;
       if (!hostScript.ok) await ensureHostScript();
+      else if (!configured) await configureHostScript();
       const info = await readHostInfo();
       if (info && !stopped) await discovery.setProject(typeof info.project === "string" && info.project ? info.project : null);
     } catch (error) {
@@ -204,7 +234,7 @@ async function boot(options) {
     refreshProject();
   };
   server.on("call", onCall);
-  bridge.addEventListener(EVENTS.activate, onActivate);
+  for (const type of ACTIVATE_EVENTS) bridge.addEventListener(type, onActivate);
   const poll = setInterval(refreshProject, options.pollMs || 15000);
 
   function stopNow() {
@@ -212,14 +242,15 @@ async function boot(options) {
     stopped = true;
     clearInterval(poll);
     server.off("call", onCall);
-    bridge.removeEventListener(EVENTS.activate, onActivate);
+    for (const type of ACTIVATE_EVENTS) bridge.removeEventListener(type, onActivate);
     bridge.removeEventListener(EVENTS.statusRequest, onStatusRequest);
     discovery.remove();
     server.stop();
   }
 
+  // The page's unload is the cleanup that happens: the app quitting, the extension reloading or closing.
   const onQuit = () => stopNow();
-  bridge.addEventListener(EVENTS.beforeQuit, onQuit);
+  for (const type of QUIT_EVENTS) bridge.addEventListener(type, onQuit);
   if (options.window) options.window.addEventListener("unload", onQuit);
   ready = true;
   onStatusRequest();
@@ -232,10 +263,11 @@ async function boot(options) {
     status: status,
     async stop() {
       stopNow();
-      bridge.removeEventListener(EVENTS.beforeQuit, onQuit);
+      for (const type of QUIT_EVENTS) bridge.removeEventListener(type, onQuit);
+      if (options.window && options.window.removeEventListener) options.window.removeEventListener("unload", onQuit);
       await server.stop();
     },
   };
 }
 
-module.exports = { boot, marketingName, hostOf, EVENTS };
+module.exports = { boot, marketingName, hostOf, hostScriptLoader, EVENTS };

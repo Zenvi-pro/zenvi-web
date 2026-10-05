@@ -97,6 +97,16 @@ describe("inspectHost / discoverHosts", () => {
     expect((await inspectHost(dir, "premiere")).detail).toContain("protocol 2");
   });
 
+  test.each(["null", "[]", "42", '"text"'])("a discovery file holding %s is invalid for that app only", async (content) => {
+    const dir = desktopDir();
+    const { server } = await publish(dir, "aftereffects");
+    writeFileSync(path.join(dir, "link", "premiere.json"), content);
+    const [ae, premiere] = await inspectHosts(dir);
+    expect(premiere).toMatchObject({ host: "premiere", status: "invalid", detail: "the discovery file is not a JSON object" });
+    expect(ae).toMatchObject({ host: "aftereffects", status: "connected" });
+    expect((await discoverHosts(dir)).map((endpoint) => endpoint.url)).toEqual([server.url]);
+  });
+
   test("most recently active host first", async () => {
     const dir = desktopDir();
     await publish(dir, "aftereffects", { lastActive: "2026-10-04T21:00:00.000Z" });

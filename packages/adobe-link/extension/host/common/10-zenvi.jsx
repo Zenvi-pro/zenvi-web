@@ -338,12 +338,53 @@ var ZenviLink = (function () {
     };
 
     // ------------------------------------------------------------------
+    // Settings from the server, and the temp folder.
+
+    /**
+     * Settings the server passes once the host script is loaded, as a JSON
+     * string: {temp_dir}. Kept on ZenviLink.state (they survive the script
+     * being evaluated again). Returns the settings as a JSON string.
+     */
+    Z.configure = function (json) {
+        var settings = typeof json === "string" ? JSON.parse(json) : json;
+        var key;
+        for (key in settings) {
+            if (has(settings, key)) {
+                Z.state.config[key] = settings[key];
+            }
+        }
+        return stringify({ok: true, config: Z.state.config});
+    };
+
+    /**
+     * Zenvi Link's temp folder (the server's choice, else <Folder.temp>/zenvi-link),
+     * created if missing. Frame captures go here: the server deletes a capture
+     * once it has sent it, and deletes nothing outside this folder.
+     */
+    Z.tempDir = function () {
+        var folder = new Folder(Z.state.config.temp_dir || (Folder.temp.fsName + "/zenvi-link"));
+        if (!folder.exists) {
+            folder.create();
+        }
+        return folder.fsName;
+    };
+
+    /** A new file path in the temp folder: <prefix>-<time>-<random>.<extension>. */
+    Z.tempFile = function (prefix, extension) {
+        return Z.tempDir() + "/" + (prefix || "zenvi") + "-" + new Date().getTime() + "-" +
+            Math.floor(Math.random() * 1000000000) + "." + (extension || "tmp");
+    };
+
+    // ------------------------------------------------------------------
     // Registry and dispatch.
 
     /**
      * Register the implementation of catalog tool `name`. options (rarely
      * needed): {mutating, undoTitle} override the catalog's readOnlyHint and
-     * title.
+     * title. {mutating: false} keeps a tool that changes the project out of the
+     * dispatch undo group, for tools that must not run inside one (After
+     * Effects: undo itself, saving, rendering); such a tool reports its own
+     * undoSteps (null when it does not say).
      */
     Z.register = function (name, fn, options) {
         var meta;
@@ -450,11 +491,18 @@ var ZenviLink = (function () {
                 receipt.error.line = outcome.line;
             }
             if (ctx.didChange) {
-                receipt.undoSteps = Z.adapter.undoStepsWhenApplied;
-                receipt.warnings.push(Z.adapter.partialChangeWarning(entry ? entry.title : ctx.tool));
+                if (entry && entry.mutating) {
+                    receipt.undoSteps = Z.adapter.undoStepsWhenApplied;
+                    receipt.warnings.push(Z.adapter.partialChangeWarning(entry.title));
+                } else {
+                    receipt.undoSteps = null;
+                    receipt.warnings.push("The call failed after it had started changing the project; each change it made is its own undo step.");
+                }
             }
         } else if (outcome.status === "applied") {
-            receipt.undoSteps = outcome.undoSteps !== undefined ? outcome.undoSteps : Z.adapter.undoStepsWhenApplied;
+            // Without an undo group (read-only tools, {mutating: false}) the count is the tool's to say.
+            receipt.undoSteps = outcome.undoSteps !== undefined ? outcome.undoSteps :
+                (entry && entry.mutating ? Z.adapter.undoStepsWhenApplied : null);
         }
         return stringify(receipt);
     }

@@ -39,6 +39,9 @@
         <Lifecycle>
           <AutoVisible>false</AutoVisible>
           <StartOn>
+            <!-- ApplicationInitialized starts the service at launch (After Effects needs it);
+                 the activate events cover hosts that send only those. -->
+            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>
             <Event>com.adobe.csxs.events.ApplicationActivate</Event>
             <Event>applicationActivate</Event>
           </StartOn>
@@ -67,6 +70,9 @@
         <Lifecycle>
           <AutoVisible>false</AutoVisible>
           <StartOn>
+            <!-- ApplicationInitialized starts the service at launch (After Effects needs it);
+                 the activate events cover hosts that send only those. -->
+            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>
             <Event>com.adobe.csxs.events.ApplicationActivate</Event>
             <Event>applicationActivate</Event>
           </StartOn>

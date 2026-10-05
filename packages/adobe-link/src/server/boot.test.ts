@@ -38,9 +38,9 @@ async function bootAe(options: { evalScript?: (script: string) => string } = {})
   mock.project.save(new mock.es.File(path.join(temp, "promo.aep")));
   const host = loadHostScript("aeft", mock.globals);
   const cep = new FakeCep({ appName: "AEFT", appVersion: "26.3.0", extensionDir: EXTENSION_DIR, evalScript: options.evalScript ?? evalInHostScript(host) });
-  const link = await boot({ cep, mode: "service", home, pollMs: 60_000, touchIntervalMs: 0, log: () => undefined });
+  const link = await boot({ cep, mode: "service", home, tempDir: temp, pollMs: 60_000, touchIntervalMs: 0, log: () => undefined });
   running.push(link);
-  return { link, cep, mock, temp, home, desktopDir: path.join(home, ".openshot_qt") };
+  return { link, cep, mock, host, temp, home, desktopDir: path.join(home, ".openshot_qt") };
 }
 
 function discoveryJson(home: string, host: string) {
@@ -63,6 +63,34 @@ describe("boot inside CEP (fake __adobe_cep__, real host script on the mock DOM)
     });
     expect(readFileSync(json.token_file, "utf8")).toBe(link.server.token);
     expect(link.status()).toMatchObject({ mode: "service", ready: true, host: "aftereffects", url: link.server.url, host_script: { ok: true } });
+  });
+
+  test("tells the host script where Zenvi Link's temp folder is", async () => {
+    const { link, host, temp } = await bootAe();
+    expect(link.server.tempDir).toBe(path.join(temp, "zenvi-link"));
+    expect(host.evaluate("ZenviLink.tempDir()")).toBe(link.server.tempDir);
+    const file = String(host.evaluate('ZenviLink.tempFile("capture", "png")'));
+    expect(path.dirname(file)).toBe(link.server.tempDir);
+    expect(path.basename(file)).toMatch(/^capture-\d+-\d+\.png$/);
+  });
+
+  test("a configure call that did not get through at boot is retried on the next refresh", async () => {
+    const temp = mkdtempSync(path.join(os.tmpdir(), "zenvi-link-boot-"));
+    const mock = createAeMock({ tempDir: temp });
+    const host = loadHostScript("aeft", mock.globals);
+    const evaluate = evalInHostScript(host);
+    let refusals = 1;
+    const cep = new FakeCep({
+      appName: "AEFT",
+      appVersion: "26.3.0",
+      extensionDir: EXTENSION_DIR,
+      evalScript: (script) => (script.startsWith("ZenviLink.configure(") && refusals-- > 0 ? "EvalScript error." : evaluate(script)),
+    });
+    const link = await boot({ cep, home: path.join(temp, "home"), tempDir: path.join(temp, "system"), pollMs: 60_000, log: () => undefined });
+    running.push(link);
+    expect(host.evaluate("ZenviLink.state.config.temp_dir")).toBeUndefined();
+    cep.fire(EVENTS.activate);
+    await until(() => host.evaluate("ZenviLink.state.config.temp_dir") === link.server.tempDir);
   });
 
   test("answers status requests from the first moment, then broadcasts once ready", async () => {
@@ -152,6 +180,29 @@ describe("boot inside CEP (fake __adobe_cep__, real host script on the mock DOM)
     expect(discoveryJson(home, "aftereffects").last_active_at >= before).toBe(true);
   });
 
+  test("the older activate event name refreshes too", async () => {
+    const { home, mock, cep, temp } = await bootAe();
+    mock.project.save(new mock.es.File(path.join(temp, "legacy.aep")));
+    cep.fire(EVENTS.activateLegacy);
+    await until(() => discoveryJson(home, "aftereffects").project === path.join(temp, "legacy.aep"));
+  });
+
+  test("the page's unload (the cleanup CEP really does) removes the files and stops the server", async () => {
+    const temp = mkdtempSync(path.join(os.tmpdir(), "zenvi-link-boot-"));
+    const home = path.join(temp, "home");
+    const mock = createAeMock({ tempDir: temp });
+    const cep = new FakeCep({ appName: "AEFT", appVersion: "26.3.0", extensionDir: EXTENSION_DIR, evalScript: evalInHostScript(loadHostScript("aeft", mock.globals)) });
+    const unloads: (() => void)[] = [];
+    const window = { addEventListener: (type: string, listener: () => void) => type === "unload" && unloads.push(listener), removeEventListener: () => undefined };
+    const link = await boot({ cep, window, home, tempDir: temp, pollMs: 60_000, log: () => undefined });
+    running.push(link);
+    expect(unloads).toHaveLength(1);
+    unloads[0]?.();
+    expect(existsSync(path.join(home, ".openshot_qt", "link", "aftereffects.json"))).toBe(false);
+    expect(existsSync(link.discovery.tokenFile)).toBe(false);
+    expect(await discoverHosts(path.join(home, ".openshot_qt"))).toEqual([]);
+  });
+
   test("quitting removes the discovery and token files and stops the server", async () => {
     const { link, home, cep, desktopDir } = await bootAe();
     const tokenFile = link.discovery.tokenFile;
@@ -193,6 +244,39 @@ describe("boot inside CEP (fake __adobe_cep__, real host script on the mock DOM)
   test("other Adobe apps are refused", async () => {
     const cep = new FakeCep({ appName: "PHXS", appVersion: "27.0.0", extensionDir: EXTENSION_DIR, evalScript: () => "" });
     await expect(boot({ cep, home: mkdtempSync(path.join(os.tmpdir(), "zenvi-link-boot-")), log: () => undefined })).rejects.toThrow(/not PHXS/);
+  });
+});
+
+describe("hostScriptLoader", () => {
+  test("an attempt that could not run (busy queue) does not count; one that ran is the only one", async () => {
+    const log: string[] = [];
+    let busy = true;
+    let ok = false;
+    const ensure = bootModule.hostScriptLoader(
+      async () => {
+        log.push("check");
+        return ok;
+      },
+      async () => {
+        log.push(busy ? "load (busy)" : "load");
+        return !busy;
+      },
+    );
+    await ensure();
+    busy = false;
+    await ensure();
+    await ensure();
+    expect(log).toEqual(["check", "load (busy)", "check", "load", "check", "check"]);
+    ok = true;
+    await ensure();
+    expect(log.at(-1)).toBe("check");
+  });
+
+  test("no load while the check itself could not run", async () => {
+    let loads = 0;
+    const ensure = bootModule.hostScriptLoader(async () => null, async () => (loads += 1) > 0);
+    await ensure();
+    expect(loads).toBe(0);
   });
 });
 
