@@ -4,6 +4,8 @@
  * returns the host receipt plus any frame captures.
  */
 
+import http from "node:http";
+import { Readable } from "node:stream";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { catalogFor } from "./catalog/index.js";
@@ -35,6 +37,46 @@ export interface HostToolInfo {
 /** The server answers within the tool's timeout; wait a little longer than that. */
 const RESPONSE_MARGIN_MS = 15_000;
 
+/**
+ * fetch for a loopback Zenvi Link server, over node:http. A redirect is never
+ * followed (a 3xx is returned as is, so the SDK fails instead of sending the
+ * token elsewhere), and nothing times out on the client side: global fetch
+ * (undici) gives up on response headers after 300 s, shorter than a render
+ * tool's catalog timeout. The server answers every call within that timeout.
+ */
+export function loopbackFetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(String(input));
+    const signal = init.signal;
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    if (init.body !== undefined && init.body !== null && typeof init.body !== "string") {
+      reject(new TypeError("loopbackFetch sends string bodies only"));
+      return;
+    }
+    const method = (init.method ?? "GET").toUpperCase();
+    const request = http.request(
+      { hostname: url.hostname, port: url.port, path: `${url.pathname}${url.search}`, method, headers: Object.fromEntries(new Headers(init.headers)) },
+      (response) => {
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(response.headers)) {
+          if (Array.isArray(value)) for (const item of value) headers.append(name, item);
+          else if (value !== undefined) headers.set(name, value);
+        }
+        const status = response.statusCode ?? 502;
+        const empty = method === "HEAD" || status === 204 || status === 205 || status === 304;
+        if (empty) response.resume();
+        resolve(new Response(empty ? null : (Readable.toWeb(response) as ReadableStream<Uint8Array>), { status, statusText: response.statusMessage, headers }));
+      },
+    );
+    request.on("error", reject);
+    signal?.addEventListener("abort", () => request.destroy(signal.reason instanceof Error ? signal.reason : new Error("aborted")), { once: true });
+    request.end(init.body ?? undefined);
+  });
+}
+
 export class HostClient {
   private client: Client | undefined;
 
@@ -47,6 +89,7 @@ export class HostClient {
     if (this.client) return this.client;
     const transport = new StreamableHTTPClientTransport(new URL(this.endpoint.url), {
       requestInit: { headers: { Authorization: `Bearer ${this.endpoint.token}` } },
+      fetch: loopbackFetch,
     });
     const client = new Client({ name: "zenvi-cli", version: this.clientVersion }, { capabilities: {} });
     await client.connect(transport);

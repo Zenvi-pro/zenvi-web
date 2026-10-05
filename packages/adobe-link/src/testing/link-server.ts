@@ -41,6 +41,7 @@ export interface LinkServer {
   stop(): Promise<void>;
   callTool(name: string, args: unknown): Promise<{ receipt: HostReceipt; images: { type: "image"; data: string; mimeType: string }[] }>;
   evalWhenIdle(script: string, timeoutMs?: number): Promise<string | null>;
+  tryEval(script: string, timeoutMs?: number): Promise<{ ran: boolean; value: string | null }>;
   on(event: "call", listener: (call: CallEvent) => void): void;
   off(event: "call", listener: (call: CallEvent) => void): void;
   readonly url: string;
@@ -148,7 +149,8 @@ export const bootModule = require("../../extension/server/index.js") as {
   }): Promise<BootedLink>;
   marketingName(host: string, appVersion: string): string;
   hostOf(environment: { appName?: string }): string | null;
-  EVENTS: Record<"activate" | "beforeQuit" | "statusRequest" | "status" | "call", string>;
+  hostScriptLoader(check: () => Promise<boolean | null>, load: () => Promise<boolean>): () => Promise<void>;
+  EVENTS: Record<"activate" | "activateLegacy" | "beforeQuit" | "beforeQuitLegacy" | "statusRequest" | "status" | "call", string>;
 };
 
 export const bridgeModule = require("../../extension/server/bridge.js") as {

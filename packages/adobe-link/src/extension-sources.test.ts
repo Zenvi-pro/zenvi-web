@@ -71,6 +71,7 @@ describe("manifest.xml", () => {
     const panel = /<Extension Id="pro.zenvi.link.panel">([\s\S]*?)<\/Extension>/.exec(manifest)?.[1] ?? "";
     expect(service).toContain("<Type>Custom</Type>");
     expect(service).toContain("<AutoVisible>false</AutoVisible>");
+    expect(service).toContain("<Event>com.adobe.csxs.events.ApplicationInitialized</Event>");
     expect(service).toContain("<Event>com.adobe.csxs.events.ApplicationActivate</Event>");
     expect(service).toContain("<Event>applicationActivate</Event>");
     expect(service).toContain("<MainPath>./server/service.html</MainPath>");
