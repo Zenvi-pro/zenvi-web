@@ -104,6 +104,7 @@
         var parent;
         var entries;
         var bundles;
+        var entry;
         var versions;
         var i;
         var j;
@@ -116,14 +117,15 @@
             parent = /\.app$/i.test(appFolder.fsName) ? appFolder.parent.parent : appFolder.parent;
             entries = parent && parent.exists ? parent.getFiles() : [];
             for (i = 0; i < entries.length; i += 1) {
-                if (entries[i] instanceof Folder && /^Adobe Media Encoder/i.test(decodeURI(entries[i].name))) {
-                    bundles = entries[i].getFiles();
+                entry = entries[i];
+                if (entry instanceof Folder && /^Adobe Media Encoder/i.test(decodeURI(entry.name))) {
+                    bundles = entry.getFiles();
                     for (j = 0; j < bundles.length; j += 1) {
                         if (bundles[j] instanceof Folder && /\.app$/i.test(decodeURI(bundles[j].name))) {
                             roots.push(new Folder(bundles[j].fsName + "/Contents/MediaIO/systempresets"));
                         }
                     }
-                    roots.push(new Folder(entries[i].fsName + "/MediaIO/systempresets"));
+                    roots.push(new Folder(entry.fsName + "/MediaIO/systempresets"));
                 }
             }
         }

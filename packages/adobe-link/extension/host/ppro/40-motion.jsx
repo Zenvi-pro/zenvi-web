@@ -301,6 +301,7 @@
     function animatedTarget(found, property) {
         var builtin;
         var components;
+        /** @type {Component | null} */
         var component = null;
         var param;
         if (typeof property === "string") {

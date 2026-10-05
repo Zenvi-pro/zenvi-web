@@ -98,6 +98,7 @@
         var before;
         var steps = 0;
         var marked = false;
+        /** @type {TrackItem | null} */
         var placed = null;
         var linked;
         var detail;
@@ -453,6 +454,7 @@
         var endTicks = Number(clip.end.ticks);
         var half = Number(sequence.timebase) / 2;
         var newDuration = Math.round((endTicks - startTicks) * current.speed / speed);
+        /** @type {TrackItem | null} */
         var next = null;
         var qeItem;
         var after;

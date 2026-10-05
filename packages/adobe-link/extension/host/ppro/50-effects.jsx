@@ -202,17 +202,17 @@
     function addTransitionAt(qeItem, transition, atStart, durationTimecode, ctx) {
         var errors = [];
         var attempts = [
-            [7, function () { return qeItem.addTransition(transition, atStart, durationTimecode, "0", 0.5, false, true); }],
-            [3, function () { return qeItem.addTransition(transition, atStart, durationTimecode); }],
-            [2, function () { return qeItem.addTransition(transition, atStart); }]
+            {count: 7, run: function () { return qeItem.addTransition(transition, atStart, durationTimecode, "0", 0.5, false, true); }},
+            {count: 3, run: function () { return qeItem.addTransition(transition, atStart, durationTimecode); }},
+            {count: 2, run: function () { return qeItem.addTransition(transition, atStart); }}
         ];
         var i;
         for (i = 0; i < attempts.length; i += 1) {
             try {
-                attempts[i][1]();
+                attempts[i].run();
                 if (i > 0) {
-                    ctx.warn("QE addTransition took " + attempts[i][0] + " arguments on this Premiere build" +
-                        (attempts[i][0] < 3 ? "; the duration is Premiere's default" : ""));
+                    ctx.warn("QE addTransition took " + attempts[i].count + " arguments on this Premiere build" +
+                        (attempts[i].count < 3 ? "; the duration is Premiere's default" : ""));
                 }
                 return;
             } catch (error) {

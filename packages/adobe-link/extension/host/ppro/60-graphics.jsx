@@ -190,6 +190,7 @@
         var file = P.itemForFile(path, ctx);
         var track = sequence.videoTracks[trackIndex];
         var before = P.clipIds(sequence);
+        /** @type {TrackItem | null} */
         var clip = null;
         var size;
         var motion;
