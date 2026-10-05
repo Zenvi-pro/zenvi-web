@@ -77,7 +77,7 @@ describe("dispatch", () => {
     register(host, "ae_t_ok", 'ctx.warn("Snapped 1.01 s"); return ZenviLink.ok("Caf\\u00e9 \\u2014 ok", {n: 1, s: "\\u2028"});');
     const raw = host.dispatchRaw("ae_t_ok", "{}");
     expect(raw).not.toMatch(/[\u0080-\uffff]/);
-    expect(JSON.parse(raw)).toMatchObject({ status: "ok", summary: "Café — ok", data: { n: 1, s: " " }, warnings: ["Snapped 1.01 s"], undoSteps: 0 });
+    expect(JSON.parse(raw)).toMatchObject({ status: "ok", summary: "Caf\u00e9 \u2014 ok", data: { n: 1, s: "\u2028" }, warnings: ["Snapped 1.01 s"], undoSteps: 0 });
   });
 
   test("register rejects bad names and duplicates", () => {

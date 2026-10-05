@@ -15,7 +15,7 @@ protocol, receipts, catalogs). Defaults: `src/taste.ts` (TASTE.md as data).
 ```
 src/catalog/        HostToolDef catalogs (zod) + shared schema blocks; JSON via gen:catalog
 src/taste.ts        TASTE defaults (also injected into the host scripts as ZenviLink.TASTE)
-src/build/          host-bundle.ts: concatenates the host scripts exactly as the build does
+src/host-bundle.ts  concatenates the host scripts exactly as the build does
 src/testing/        loadHostScript (ES3 vm realm), createAeMock, createPremiereMock, checkEs3
 extension/catalog/  generated catalog JSON (committed; a test fails when stale)
 extension/host/     ExtendScript: common/* (json2, polyfills, ZenviLink runtime), aeft/*, ppro/*

@@ -6,7 +6,7 @@
  */
 
 import vm from "node:vm";
-import { bundleHostScript, locateBundleLine, type HostApp, type HostBundle } from "../build/host-bundle.js";
+import { bundleHostScript, locateBundleLine, type HostApp, type HostBundle } from "../host-bundle.js";
 import { BIND_REALM, ES3_REALM_SCRIPT, type HostGlobals, type Realm } from "./realm.js";
 
 /** The receipt dispatch returns (SPEC §3.3). */

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
-import { PACKAGE_ROOT } from "../build/host-bundle.js";
+import { PACKAGE_ROOT } from "../host-bundle.js";
 import { LINK_VERSION } from "../version.js";
 import {
   AE_TOOLS,
