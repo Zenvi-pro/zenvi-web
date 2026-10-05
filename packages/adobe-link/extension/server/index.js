@@ -56,6 +56,22 @@ function hostOf(environment) {
   return HOSTS[environment && environment.appName] || null;
 }
 
+/**
+ * Load the bundled host script when CEP's ScriptPath did not, at most once:
+ * an attempt counts only when the load actually ran (the queue was idle).
+ *   check(): Promise<true | false | null>  (null: could not check, the queue was busy)
+ *   load():  Promise<boolean>               (false: nothing ran)
+ */
+function hostScriptLoader(check, load) {
+  let loaded = false;
+  return async function ensure() {
+    if ((await check()) !== false || loaded) return;
+    if (!(await load())) return;
+    loaded = true;
+    await check();
+  };
+}
+
 function serviceRunning() {
   return Object.assign(new Error("a Zenvi Link service already serves this app"), { code: "SERVICE_RUNNING" });
 }
@@ -89,7 +105,6 @@ async function boot(options) {
   });
   const startedAt = new Date().toISOString();
   let hostScript = { ok: false, problem: "not checked yet" };
-  let loadedHostScript = false;
   let configured = false;
   let ready = false;
   let stopped = false;
@@ -140,9 +155,10 @@ async function boot(options) {
     }
   }
 
+  /** true / false, or null when it could not look (the queue was busy). */
   async function checkHostScript() {
     const raw = await server.evalWhenIdle("ZenviLink.listTools()");
-    if (raw === null) return;
+    if (raw === null) return null;
     try {
       const registered = JSON.parse(raw).map((tool) => tool.name);
       const missing = catalog.tools.map((tool) => tool.name).filter((name) => registered.indexOf(name) < 0);
@@ -152,6 +168,7 @@ async function boot(options) {
       configured = false;
     }
     if (hostScript.ok && !configured) await configureHostScript();
+    return hostScript.ok;
   }
 
   /** Tell the host script where Zenvi Link's temp folder is (it survives re-evaluation of the script). */
@@ -160,21 +177,14 @@ async function boot(options) {
     configured = raw !== null && /"ok":true/.test(raw);
   }
 
-  /**
-   * CEP loads the manifest's ScriptPath when the extension starts, but that
-   * can fail or race the page; then load the bundled host script directly
-   * (once: later checks only look again).
-   */
-  async function ensureHostScript() {
-    await checkHostScript();
-    if (hostScript.ok || loadedHostScript) return;
-    loadedHostScript = true;
+  // CEP loads the manifest's ScriptPath when the extension starts, but that can
+  // fail or race the page; then load the bundled host script directly.
+  const ensureHostScript = hostScriptLoader(checkHostScript, async () => {
     const file = path.join(extensionDir, "host", (host === "aftereffects" ? "aeft" : "ppro") + ".jsx").split(path.sep).join("/");
-    log("host script problem: " + hostScript.problem + "; loading " + file);
-    await server.evalWhenIdle("$.evalFile(new File(" + scriptLiteral(file) + "))", 30000);
-    await checkHostScript();
-    if (!hostScript.ok) log("host script still unavailable: " + hostScript.problem);
-  }
+    const attempt = await server.tryEval("$.evalFile(new File(" + scriptLiteral(file) + "))", 30000);
+    if (attempt.ran) log("host script problem: " + hostScript.problem + "; loaded " + file + " directly");
+    return attempt.ran;
+  });
 
   /** Best effort, never rejects: runs from timers and app events. */
   async function refreshProject() {
@@ -259,4 +269,4 @@ async function boot(options) {
   };
 }
 
-module.exports = { boot, marketingName, hostOf, EVENTS };
+module.exports = { boot, marketingName, hostOf, hostScriptLoader, EVENTS };

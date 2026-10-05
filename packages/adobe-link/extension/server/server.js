@@ -307,11 +307,21 @@ function createLinkServer(options) {
     return { receipt: receipt, images: images };
   }
 
-  /** Evaluate a host-script expression through the queue (status probes); null when busy or failing. */
-  async function evalWhenIdle(script, timeoutMs) {
-    if (!queue.idle) return null;
+  /**
+   * Evaluate a host-script expression through the queue, only when it is idle
+   * (status probes never wait behind tool calls). {ran, value}: ran is false
+   * when nothing ran; value is the result string when it finished, else null.
+   */
+  async function tryEval(script, timeoutMs) {
+    if (!queue.idle) return { ran: false, value: null };
     const outcome = await queue.run("(status)", timeoutMs || 5000, () => bridge.evalScript(script));
-    return outcome.kind === "done" ? outcome.value : null;
+    if (outcome.kind === "busy" || outcome.kind === "expired") return { ran: false, value: null };
+    return { ran: true, value: outcome.kind === "done" ? outcome.value : null };
+  }
+
+  /** tryEval's value: the result string, or null when busy or failing. */
+  async function evalWhenIdle(script, timeoutMs) {
+    return (await tryEval(script, timeoutMs)).value;
   }
 
   async function respond(message) {
@@ -454,6 +464,7 @@ function createLinkServer(options) {
     start: start,
     stop: stop,
     callTool: callTool,
+    tryEval: tryEval,
     evalWhenIdle: evalWhenIdle,
     on: (event, listener) => events.on(event, listener),
     off: (event, listener) => events.removeListener(event, listener),

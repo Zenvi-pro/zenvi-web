@@ -228,6 +228,39 @@ describe("boot inside CEP (fake __adobe_cep__, real host script on the mock DOM)
   });
 });
 
+describe("hostScriptLoader", () => {
+  test("an attempt that could not run (busy queue) does not count; one that ran is the only one", async () => {
+    const log: string[] = [];
+    let busy = true;
+    let ok = false;
+    const ensure = bootModule.hostScriptLoader(
+      async () => {
+        log.push("check");
+        return ok;
+      },
+      async () => {
+        log.push(busy ? "load (busy)" : "load");
+        return !busy;
+      },
+    );
+    await ensure();
+    busy = false;
+    await ensure();
+    await ensure();
+    expect(log).toEqual(["check", "load (busy)", "check", "load", "check", "check"]);
+    ok = true;
+    await ensure();
+    expect(log.at(-1)).toBe("check");
+  });
+
+  test("no load while the check itself could not run", async () => {
+    let loads = 0;
+    const ensure = bootModule.hostScriptLoader(async () => null, async () => (loads += 1) > 0);
+    await ensure();
+    expect(loads).toBe(0);
+  });
+});
+
 test.each([
   ["aftereffects", "26.3.0", "Adobe After Effects 2026"],
   ["aftereffects", "22.0.1", "Adobe After Effects 2022"],
