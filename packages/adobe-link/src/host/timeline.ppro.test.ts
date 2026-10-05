@@ -254,6 +254,17 @@ describe("premiere_razor", () => {
     expect(atCut).toMatchObject({ status: "unchanged", warnings: ["Nothing to cut on V1 at 4 s"] });
   });
 
+  test("refuses an explicitly requested locked track or an unknown track, before cutting anything", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    edit.sequence.audioTrackList[0]!.locked = true;
+    const locked = fx.call("premiere_razor", { time: 2, tracks: [{ kind: "video", index: 0 }, { kind: "audio", index: 0 }] });
+    expect(locked.summary).toBe("Error: Track A1 is locked; unlock it in Premiere first");
+    expect(fx.call("premiere_razor", { time: 2, tracks: [{ kind: "video", index: 7 }] }).error?.code).toBe("NOT_FOUND");
+    expect(fx.mock.state.qeCalls.filter((call) => call.startsWith("track.razor"))).toEqual([]);
+    expect(edit.sequence.videoTrackList[0]?.clipList).toHaveLength(3);
+  });
+
   test("a sequence QE cannot list is opened so QE can reach it", () => {
     const fx = loadPremiere();
     const edit = standardEdit(fx);
