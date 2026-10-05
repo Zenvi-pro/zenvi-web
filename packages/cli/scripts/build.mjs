@@ -2,14 +2,17 @@
 /**
  * Build the single-file `zenvi` CLI: packages/cli/dist/zenvi.mjs plus the
  * resources it loads at runtime (resvg WebAssembly, the OFL fallback font,
- * engine assets such as transition masks and title templates), then mirror
- * the result into plugins/zenvi/dist (committed: marketplace installs of the
- * Claude Code plugin do not build).
+ * engine assets such as transition masks and title templates) and Zenvi Link
+ * (dist/adobe/pro.zenvi.link, the After Effects / Premiere Pro extension that
+ * `zenvi adobe install` copies), then mirror the result into
+ * plugins/zenvi/dist (committed: marketplace installs of the Claude Code
+ * plugin do not build).
  *
  *   npm run build -w @zenvi/cli            # build + copy into the plugin
  *   node packages/cli/scripts/build.mjs --no-plugin
  */
 
+import { spawnSync } from "node:child_process";
 import { chmod, cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -97,6 +100,14 @@ for (const folder of ENGINE_ASSETS) {
     copiedAssets.push(folder);
   }
 }
+// Zenvi Link, release build (no .debug ports). Its build imports TypeScript, so it runs under tsx.
+const linkBuild = spawnSync(
+  process.execPath,
+  ["--import", "tsx", path.join(repoRoot, "packages", "adobe-link", "scripts", "build-extension.mjs"), "--release", "--out", path.join(dist, "adobe")],
+  { cwd: repoRoot, stdio: "inherit" },
+);
+if (linkBuild.status !== 0) throw new Error(`building Zenvi Link failed (exit ${linkBuild.status})`);
+
 await writeFile(
   path.join(dist, "LICENSES.md"),
   [
@@ -107,6 +118,7 @@ await writeFile(
     "- Lato (fonts/Lato-Regular.ttf): SIL Open Font License 1.1, see fonts/OFL.txt.",
     "- assets/ (transition masks, title templates, effect icons): from the Zenvi desktop app (zenvi-core, after OpenShot), GPL-3.0-or-later.",
     "- composite-worker.mjs: the engine's compositor for worker threads (same terms as zenvi.mjs).",
+    "- adobe/pro.zenvi.link: Zenvi Link, the After Effects / Premiere Pro extension, GPL-3.0-or-later; host/*.jsx include Douglas Crockford's json2.js (public domain).",
     "- JavaScript dependencies: license comments at the end of zenvi.mjs.",
     "",
   ].join("\n"),
@@ -114,7 +126,7 @@ await writeFile(
 await chmod(path.join(dist, "zenvi.mjs"), 0o755);
 
 const bytes = (await stat(path.join(dist, "zenvi.mjs"))).size;
-console.log(`built ${path.relative(repoRoot, path.join(dist, "zenvi.mjs"))} (${(bytes / 1e6).toFixed(2)} MB; assets: ${copiedAssets.join(", ") || "none"})`);
+console.log(`built ${path.relative(repoRoot, path.join(dist, "zenvi.mjs"))} (${(bytes / 1e6).toFixed(2)} MB; assets: ${copiedAssets.join(", ") || "none"}; Zenvi Link in adobe/)`);
 if (process.env.ZENVI_BUILD_METAFILE) await writeFile(process.env.ZENVI_BUILD_METAFILE, JSON.stringify(result.metafile));
 
 if (withPlugin) {

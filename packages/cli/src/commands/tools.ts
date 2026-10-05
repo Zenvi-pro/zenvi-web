@@ -3,8 +3,10 @@
 import type { Command } from "commander";
 import { createNodeHost } from "@zenvi/render-node";
 import { missingCapabilities } from "../engine/registry.js";
+import { hostOfTool } from "../hosts/adobe-tools.js";
 import { CliError } from "../output.js";
 import { hostOptions, runToolCommand, type CommandContext } from "./context.js";
+import { runHostToolCommand } from "./hosts.js";
 
 /** `--args '{…}'` merged with `key=value` pairs (values that look like JSON are parsed). */
 export function parseCallArgs(json: string | undefined, pairs: string[]): Record<string, unknown> {
@@ -73,16 +75,19 @@ export function registerToolCommands(program: Command, ctx: CommandContext): voi
           `${(tool.description.split(/(?<=\.)\s/)[0] ?? "").slice(0, 90)}${missing.length ? ctx.out.style(` (needs ${missing.join(", ")})`, "dim") : ""}`,
         ]),
       );
-      ctx.out.line(ctx.out.style(`\n${rows.length} tools. Run one with: zenvi call <tool> key=value …`, "dim"));
+      ctx.out.line(ctx.out.style(`\n${rows.length} tools. Run one with: zenvi call <tool> key=value … (After Effects / Premiere Pro tools: zenvi ae, zenvi premiere)`, "dim"));
     });
 
   program
     .command("call")
-    .description("run any tool with raw arguments: zenvi call add_clip_to_timeline_tool file_id=AB12CD34EF position_seconds=4")
+    .description("run any tool with raw arguments: zenvi call add_clip_to_timeline_tool file_id=AB12CD34EF position_seconds=4 (ae_* / premiere_* run in After Effects / Premiere Pro)")
     .argument("<tool>", "tool name (see `zenvi tools`)")
     .argument("[pairs...]", "key=value arguments")
     .option("--args <json>", "arguments as a JSON object")
     .action(async (tool: string, pairs: string[], opts: { args?: string }) => {
-      await runToolCommand(ctx, tool, parseCallArgs(opts.args, pairs));
+      const args = parseCallArgs(opts.args, pairs);
+      // ae_* / premiere_* run in After Effects / Premiere Pro through Zenvi Link.
+      if (hostOfTool(tool)) await runHostToolCommand(ctx, tool, args);
+      else await runToolCommand(ctx, tool, args);
     });
 }

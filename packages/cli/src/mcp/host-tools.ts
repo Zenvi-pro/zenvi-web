@@ -171,7 +171,7 @@ function bringFromAfterEffects(ctx: CommandContext): ExtraTool {
       if (!state.session.file) return { receipt: refused(tool, NO_FILE), engine: null };
       const connection = await state.hosts.connect("aftereffects");
       if (!connection.ok) {
-        return { receipt: refused(tool, `After Effects is not connected (${connection.discovery.detail}). ${howToConnect("aftereffects", connection.discovery)}`), engine: null };
+        return { receipt: refused(tool, `After Effects is not connected: ${connection.discovery.detail}. ${howToConnect("aftereffects", connection.discovery)}`), engine: null };
       }
       const ready = await ensureDesktop(ctx, state, tool, call);
       if (!ready.ok) return { receipt: ready.receipt, engine: null };
@@ -245,7 +245,7 @@ function bringFromPremiere(ctx: CommandContext): ExtraTool {
       if (!state.session.file) return { receipt: refused(tool, NO_FILE), engine: null };
       const connection = await state.hosts.connect("premiere");
       if (!connection.ok) {
-        return { receipt: refused(tool, `Premiere Pro is not connected (${connection.discovery.detail}). ${howToConnect("premiere", connection.discovery)}`), engine: null };
+        return { receipt: refused(tool, `Premiere Pro is not connected: ${connection.discovery.detail}. ${howToConnect("premiere", connection.discovery)}`), engine: null };
       }
       const ready = await ensureDesktop(ctx, state, tool, call);
       if (!ready.ok) return { receipt: ready.receipt, engine: null };

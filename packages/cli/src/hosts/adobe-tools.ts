@@ -101,7 +101,7 @@ export async function callAdobeTool(registry: HostRegistry, name: string, rawArg
   if (!connection.ok) {
     const { discovery } = connection;
     return {
-      receipt: hostRefusal(host, name, "NOT_CONNECTED", `${app} is not connected (${discovery.detail}). ${howToConnect(host, discovery)}`, { status: discovery.status }),
+      receipt: hostRefusal(host, name, "NOT_CONNECTED", `${app} is not connected: ${discovery.detail}. ${howToConnect(host, discovery)}`, { status: discovery.status }),
       images: [],
     };
   }

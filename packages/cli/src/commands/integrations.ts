@@ -1,14 +1,17 @@
-/** Desktop, agent and diagnostics commands: open, mcp, mcp-config, doctor. */
+/** Desktop, agent and diagnostics commands: open, mcp, mcp-config, doctor (Adobe details: commands/hosts.ts). */
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
+import { inspectHosts } from "@zenvi/adobe-link";
 import { binaryVersion, encoderNames, FontIndex, initResvg, resolveBinary } from "@zenvi/render-node";
 import { AGENT_TARGETS, claudeDesktopConfigPath, codexConfigPath, mcpConfig, type AgentTarget } from "../agents/mcp-config.js";
 import { selfMcpCommand } from "../agents/self-command.js";
 import { pushProject } from "../cloud/sync.js";
 import { discoverDesktop } from "../desktop/discovery.js";
 import { findDesktopApp } from "../desktop/launcher.js";
+import { defaultDetectDeps, findInstalledExtensions } from "../hosts/extension.js";
+import { APP_LABEL } from "../hosts/policy.js";
 import { openInDesktop } from "../desktop/open.js";
 import { CliError } from "../output.js";
 import { findProject } from "../project/select.js";
@@ -169,6 +172,14 @@ export async function runDoctor(ctx: CommandContext): Promise<DoctorCheck[]> {
     level: app ? "ok" : "warn",
     detail: app ? `${app.location}${live.length ? `, running (${live.map((e) => e.kind).join(", ")}${live[0]?.project ? `: ${live[0].project}` : ""})` : ""}` : "not installed",
     hint: "Optional: `zenvi open` shows projects in it. https://zenvi.pro/download",
+  });
+
+  const installed = await findInstalledExtensions(defaultDetectDeps(ctx.config.home, ctx.env));
+  const adobe = (await inspectHosts(ctx.config.desktopDir, { clientVersion: VERSION })).filter((h) => h.endpoint).map((h) => APP_LABEL[h.host]);
+  checks.push({
+    name: "zenvi link",
+    level: "ok",
+    detail: `${installed.length ? `installed (${installed.map((c) => c.version ?? "?").join(", ")})` : "not installed (optional: After Effects / Premiere Pro tools, `zenvi adobe install`)"}${adobe.length ? `; connected: ${adobe.join(", ")}` : ""}. Details: zenvi adobe doctor`,
   });
 
   const [cloud, backend] = await Promise.all([probeUrl(`${ctx.config.cloudUrl}/health`), probeUrl(`${ctx.config.backendUrl}/health`)]);

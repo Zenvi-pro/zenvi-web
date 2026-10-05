@@ -9,6 +9,7 @@ import { Auth } from "./auth/session.js";
 import { registerAccountCommands } from "./commands/account.js";
 import type { CommandContext, GlobalFlags } from "./commands/context.js";
 import { registerEditCommands } from "./commands/edit.js";
+import { registerHostCommands } from "./commands/hosts.js";
 import { registerIntegrationCommands } from "./commands/integrations.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerRenderCommands } from "./commands/render.js";
@@ -52,7 +53,9 @@ Examples:
   zenvi split C1A2B3C4D5 --at 4.5 && zenvi transition C1A2B3C4D5 --name fade
   zenvi frame 5 check.png && zenvi render trip.mp4
   zenvi open            # show it in the Zenvi desktop app
-  zenvi mcp-config claude-code --install`,
+  zenvi mcp-config claude-code --install
+  zenvi hosts           # the desktop app, After Effects, Premiere Pro: connected?
+  zenvi ae add_text text="Launch day" placement=lower-third`,
   );
   registerProjectCommands(program, ctx);
   registerEditCommands(program, ctx);
@@ -60,6 +63,7 @@ Examples:
   registerToolCommands(program, ctx);
   registerAccountCommands(program, ctx);
   registerIntegrationCommands(program, ctx);
+  registerHostCommands(program, ctx);
   for (const cmd of program.commands) {
     cmd.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });
     for (const sub of cmd.commands) sub.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });
