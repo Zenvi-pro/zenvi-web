@@ -109,7 +109,8 @@ export class FileMock extends FsEntryMock {
       this.buffer = "";
       return mode === "e" || mode === "a";
     }
-    this.buffer = readFileSync(this.fsName, "utf8");
+    // encoding "BINARY" keeps one character per byte, as in ExtendScript.
+    this.buffer = readFileSync(this.fsName, /^binary$/i.test(this.encoding) ? "latin1" : "utf8");
     if (mode === "a") this.position = this.buffer.length;
     return true;
   }
@@ -119,6 +120,19 @@ export class FileMock extends FsEntryMock {
     const text = this.buffer.slice(this.position, end);
     this.position = Math.min(end, this.buffer.length);
     return text;
+  }
+
+  /** Move the read position: mode 0 from the start (default), 1 from the current position, 2 from the end. */
+  seek(pos: number, mode = 0): boolean {
+    const base = mode === 1 ? this.position : mode === 2 ? this.buffer.length : 0;
+    const target = base + pos;
+    if (this.mode === undefined || target < 0 || target > this.buffer.length) return false;
+    this.position = target;
+    return true;
+  }
+
+  tell(): number {
+    return this.position;
   }
 
   readln(): string {
@@ -140,7 +154,7 @@ export class FileMock extends FsEntryMock {
   }
 
   close(): boolean {
-    if (this.mode === "w" || this.mode === "e" || this.mode === "a") writeFileSync(this.fsName, this.buffer);
+    if (this.mode === "w" || this.mode === "e" || this.mode === "a") writeFileSync(this.fsName, this.buffer, /^binary$/i.test(this.encoding) ? "latin1" : "utf8");
     this.mode = undefined;
     return true;
   }
