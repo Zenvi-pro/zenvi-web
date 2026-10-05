@@ -107,7 +107,7 @@
         // After Effects takes resolution factors 1-99.
         factor = Math.min(99, Math.max(1, Math.ceil(comp.width / maxWidth - 1e-9)));
         // Only into Zenvi Link's temp folder: the server deletes a capture there once it has sent it.
-        file = new File(Z.tempFile("capture-" + comp.id + "-" + frame, "png"));
+        file = AE.fileAt(Z.tempFile("capture-" + comp.id + "-" + frame, "png"));
         previous = comp.resolutionFactor;
         changedFactor = previous[0] !== factor || previous[1] !== factor;
         if (changedFactor) {

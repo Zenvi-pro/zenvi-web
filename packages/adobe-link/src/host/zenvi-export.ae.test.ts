@@ -27,6 +27,17 @@ test("a Zenvi export runs through ae_run_jsx_file: one comp, placeholders for mi
   expect(comps[0]?.numLayers).toBe(summary.layers);
   const placeholders = h.mock.project.allItems.filter((item) => item instanceof FootageItem && item.mainSource instanceof PlaceholderSource);
   expect(placeholders.length).toBe(summary.placeholders.length);
+  // The export's closing alert would block the call until someone clicks OK in After Effects:
+  // ae_run_jsx_file sets ZENVI_AE_QUIET for the run, and nothing is left behind afterwards.
+  expect(h.mock.state.alerts).toEqual([]);
+  expect(h.host.evaluate("typeof $.global.ZENVI_AE_QUIET")).toBe("undefined");
+});
+
+test("the same export run by hand (File > Scripts) still ends with its summary alert", () => {
+  const h = aeHarness();
+  h.host.evaluate(`$.evalFile(new File(${JSON.stringify(FIXTURE.replace(/%/g, "%25"))}))`);
+  expect(h.mock.state.alerts).toHaveLength(1);
+  expect(h.mock.state.alerts[0]).toMatch(/Promo/);
 });
 
 test("$.evalFile blanks preprocessor directives and keeps line numbers", () => {

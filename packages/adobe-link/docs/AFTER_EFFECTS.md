@@ -35,6 +35,11 @@ the [manual test plan](#manual-test-plan-after-effects-20242026).
   (1 = top) or the exact name. Ambiguous names are refused with the indexes.
 - **Times** are comp seconds, snapped to the comp's frame grid; a receipt
   warning says when a time moved.
+- **File paths** are absolute platform paths, taken literally. ExtendScript's
+  `File()` reads `%XX` as an escape (a folder named `Project%20files` would
+  become `Project files`), so the scripts pass every literal `%` as `%25`
+  (`AE.fileAt`, `AE.folderAt`; `AE.uriName` for names appended to a
+  `fullName`). Nothing else is escaped.
 - **Property paths**: display or match names joined by `/`
   (`"Transform/Position"`, `"ADBE Effect Parade/Gaussian Blur/Blurriness"`).
   `Transform`, `Text` and `Effects` may be left out (`"Position"`,
@@ -171,6 +176,11 @@ Notes per tool, beyond the catalog descriptions:
 - `ae_run_jsx_file` / `ae_run_script` run arbitrary code inside one undo step.
   `ae_run_script` returns JSON of the last expression; values that cannot be
   serialized (host objects, cycles) come back as `String(value)`.
+- `ae_run_jsx_file` sets `$.global.ZENVI_AE_QUIET = true` while the script
+  runs: a Zenvi export written for people ends with an alert unless it is set,
+  and an alert would hold the call until someone clicks OK. The flag is
+  deleted afterwards on every path (in `finally` and again after it), so a
+  later File > Scripts run of the same export still shows its alert.
 
 ## Taste built in
 
@@ -558,7 +568,13 @@ after each step check the After Effects UI and Edit > Undo)
     Redo offers *Redo Zenvi: Set layer*, and the receipt names both *Zenvi:
     Set layer* steps.
 14. Refusal leaves history alone: `ae_add_layer {"kind": "footage"}`.
-    **Pass:** refused; Edit > Undo still names the previous step.
+    **Pass:** refused; Edit > Undo still names the previous step. Literal %
+    and quiet exports: in Zenvi, *File > Send To > After Effects* into a folder
+    named `Project%20files`, then `ae_run_jsx_file {"path": "<that
+    folder>/<export>.jsx"}`. **Pass:** it runs (not NOT_FOUND), no alert
+    appears and the call returns the export's summary; afterwards *File >
+    Scripts > Run Script File* on the same export shows its closing alert
+    (the flag did not stay set).
 15. Versions: on AE 2024+ a missing `font` falls back with a warning; on AE
     2022 (if available) `ae_render` falls back to ProRes 422 with a warning and
     layer ids still work. On a non-English After Effects, `ae_apply_look` is

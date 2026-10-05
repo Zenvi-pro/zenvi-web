@@ -35,7 +35,7 @@
         var i;
         for (i = 0; i < paths.length; i += 1) {
             AE.requireAbsolutePath(paths[i], "paths[" + i + "]");
-            file = new File(paths[i]);
+            file = AE.fileAt(paths[i]);
             if (!file.exists) {
                 missing.push(paths[i]);
                 continue;

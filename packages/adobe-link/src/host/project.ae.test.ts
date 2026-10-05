@@ -1,7 +1,16 @@
-import { writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
-import { aeHarness } from "../testing/ae-harness.js";
+import { aeHarness, type AeHarness } from "../testing/ae-harness.js";
+
+/** Folders whose names File() would URI-decode if the % were passed as is. */
+const PERCENT_FOLDERS = ["Project%20files", "100% done", "a%25b"];
+
+function percentFolder(h: AeHarness, name: string): string {
+  const dir = path.join(h.dir, name);
+  mkdirSync(dir);
+  return dir;
+}
 
 describe("ae_save_project", () => {
   test("save as a path, then save in place; not an undo step", () => {
@@ -24,6 +33,15 @@ describe("ae_save_project", () => {
     const other = h.file("other.aep");
     expect(h.callValidated("ae_save_project", { path: other }).error?.message).toContain("already exists");
     expect(h.callValidated("ae_save_project", { path: other, overwrite: true }).status).toBe("applied");
+  });
+
+  test("a literal % in the folder name is kept (File() would read %20 as a space)", () => {
+    const h = aeHarness();
+    for (const name of PERCENT_FOLDERS) {
+      const target = path.join(percentFolder(h, name), "promo.aep");
+      expect(h.callValidated("ae_save_project", { path: target }), name).toMatchObject({ status: "applied", data: { path: target } });
+      expect(existsSync(target), name).toBe(true);
+    }
   });
 });
 
@@ -87,6 +105,54 @@ describe("ae_run_jsx_file", () => {
     expect(receipt).toMatchObject({ status: "applied", undoSteps: 1, data: { path: file, result: "Built comp Trip with 0 layers" } });
     expect(h.mock.state.undoGroups).toEqual(["Zenvi: Run JSX file"]);
     expect(h.mock.project.allItems.map((item) => item.name)).toEqual(["Trip"]);
+  });
+
+  // How a Zenvi export written for people ends (zenvi-core after_effects_runtime: quietRun()).
+  const EXPORT_END = [
+    "(function () {",
+    "  var quiet = !!($.global && $.global.ZENVI_AE_QUIET === true);",
+    "  if (!quiet) {",
+    '    alert("Built comp Promo with 3 layers.");',
+    "  }",
+    '  return "quiet=" + quiet;',
+    "}());",
+  ].join("\n");
+
+  test("runs with $.global.ZENVI_AE_QUIET true, so an export's closing alert cannot hold the call; the flag is gone afterwards", () => {
+    const h = aeHarness();
+    const file = h.file("export.jsx", EXPORT_END);
+    expect(h.callValidated("ae_run_jsx_file", { path: file })).toMatchObject({ status: "applied", data: { result: "quiet=true" } });
+    expect(h.mock.state.alerts).toEqual([]);
+    expect(h.host.evaluate("typeof ZENVI_AE_QUIET")).toBe("undefined");
+    // Run by hand afterwards (File > Scripts), the same export still says it is done.
+    expect(h.host.evaluate(`$.evalFile(new File(${JSON.stringify(file)}))`)).toBe("quiet=false");
+    expect(h.mock.state.alerts).toEqual(["Built comp Promo with 3 layers."]);
+  });
+
+  test("the flag is cleared when the script fails, clears one left over from elsewhere, and is never set by a refusal", () => {
+    const h = aeHarness();
+    const broken = h.file("broken.jsx", "$.global.seen = $.global.ZENVI_AE_QUIET; throw new Error('nope');");
+    expect(h.callValidated("ae_run_jsx_file", { path: broken })).toMatchObject({ status: "error", error: { code: "HOST_ERROR" } });
+    expect(h.host.evaluate("seen")).toBe(true);
+    expect(h.host.evaluate("typeof ZENVI_AE_QUIET")).toBe("undefined");
+
+    h.host.evaluate("$.global.ZENVI_AE_QUIET = true;");
+    expect(h.callValidated("ae_run_jsx_file", { path: h.file("one.jsx", "1") }).status).toBe("applied");
+    expect(h.host.evaluate("typeof ZENVI_AE_QUIET")).toBe("undefined");
+
+    expect(h.callValidated("ae_run_jsx_file", { path: path.join(h.dir, "missing.jsx") })).toMatchObject({ status: "refused" });
+    expect(h.host.evaluate("typeof ZENVI_AE_QUIET")).toBe("undefined");
+  });
+
+  test("a literal % in the path is found: File() reads %XX as an escape, so the tool passes % as %25", () => {
+    const h = aeHarness();
+    for (const name of PERCENT_FOLDERS) {
+      const file = path.join(percentFolder(h, name), "export.jsx");
+      writeFileSync(file, '"ran"');
+      expect(h.callValidated("ae_run_jsx_file", { path: file }), name).toMatchObject({ status: "applied", data: { path: file, result: "ran" } });
+    }
+    // What the tool works around: "Project%20files" passed as is names "Project files".
+    expect(h.host.evaluate(`new File(${JSON.stringify(path.join(h.dir, "Project%20files", "export.jsx"))}).exists`)).toBe(false);
   });
 
   test("refuses missing files and other extensions; a script error names the file", () => {

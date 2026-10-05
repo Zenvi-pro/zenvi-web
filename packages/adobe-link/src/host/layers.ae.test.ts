@@ -1,5 +1,7 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, test } from "vitest";
-import { BlendingMode, LightType, TrackMatteType, type AVLayer, type FootageItem, type LightLayer, type Property, type PropertyGroup, type ShapeLayer, type SolidSource } from "../testing/ae-mock.js";
+import { BlendingMode, FootageItem, LightType, TrackMatteType, type AVLayer, type LightLayer, type Property, type PropertyGroup, type ShapeLayer, type SolidSource } from "../testing/ae-mock.js";
 import { aeHarness } from "../testing/ae-harness.js";
 
 describe("ae_import_files", () => {
@@ -17,6 +19,18 @@ describe("ae_import_files", () => {
     expect(again).toMatchObject({ status: "unchanged", undoSteps: 0 });
     expect(h.mock.project.allItems.filter((item) => item.name === "beach.mov")).toHaveLength(1);
     expect(h.mock.state.undoGroups).toEqual(["Zenvi: Import files", "Zenvi: Import files"]);
+  });
+
+  test("a literal % in a folder name is imported (not URI-decoded) and reused on the next call", () => {
+    const h = aeHarness();
+    const dir = path.join(h.dir, "Project%20files");
+    mkdirSync(dir);
+    const clip = path.join(dir, "beach.mov");
+    writeFileSync(clip, "x");
+    expect(h.callValidated("ae_import_files", { paths: [clip] })).toMatchObject({ status: "applied", data: { items: [expect.objectContaining({ reused: false })] } });
+    expect(h.callValidated("ae_import_files", { paths: [clip] })).toMatchObject({ status: "unchanged", data: { items: [expect.objectContaining({ reused: true })] } });
+    const footage = h.mock.project.allItems.find((item) => item instanceof FootageItem) as FootageItem;
+    expect(footage.file?.fsName).toBe(clip);
   });
 
   test("checks every path first: one missing or unsupported file imports nothing", () => {

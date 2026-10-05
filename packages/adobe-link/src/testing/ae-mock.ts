@@ -306,6 +306,8 @@ export class AeMockState {
   frameWriteDelay = 2;
   /** The undo depth at each `app.executeCommand` call. */
   readonly commandDepths: number[] = [];
+  /** Messages passed to `alert` (modal in After Effects: a script waits there until someone clicks OK). */
+  readonly alerts: string[] = [];
   /** The undo depth at each render queue change (add, remove, the Render checkbox): 0 = outside any undo group. */
   readonly queueChangeDepths: number[] = [];
   /** Whether Adobe Media Encoder is installed (renderQueue.canQueueInAME also needs a queued item). */
@@ -2198,6 +2200,9 @@ export function createAeMock(options: AeMockOptions = {}): AeMock {
   const app = new App(state, version);
   const globals: HostGlobals = {
     app,
+    alert: (message?: unknown) => {
+      state.alerts.push(String(message));
+    },
     $: es.$,
     File: es.File,
     Folder: es.Folder,
