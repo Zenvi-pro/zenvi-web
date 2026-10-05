@@ -78,6 +78,32 @@ function hostFailure(host: HostId, tool: string, code: string, message: string):
   return receipt(host, tool, "error", code, message);
 }
 
+/** Branch types of an anyOf / oneOf property. */
+function branchTypes(prop: unknown): Set<string> {
+  const out = new Set<string>();
+  const branches = (prop as { anyOf?: unknown[]; oneOf?: unknown[] } | undefined)?.anyOf ?? (prop as { oneOf?: unknown[] } | undefined)?.oneOf ?? [];
+  for (const branch of branches) {
+    const type = (branch as { type?: unknown }).type;
+    for (const t of Array.isArray(type) ? type : [type]) if (typeof t === "string") out.add(t);
+  }
+  return out;
+}
+
+/**
+ * Text arguments (`zenvi ae … layer=12`) for fields that take an id or a name
+ * (`layer`, `comp`: anyOf integer | string): all digits means the id. The
+ * engine's coercion leaves anyOf fields alone, like the desktop.
+ */
+export function preferIds(schema: { properties?: Record<string, unknown> } | undefined, args: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...args };
+  for (const [key, value] of Object.entries(args)) {
+    if (typeof value !== "string" || !/^\d+$/.test(value.trim())) continue;
+    const types = branchTypes(schema?.properties?.[key]);
+    if (types.has("integer") && types.has("string")) out[key] = Number.parseInt(value.trim(), 10);
+  }
+  return out;
+}
+
 export function isOkHostStatus(status: string): boolean {
   return status === "applied" || status === "unchanged" || status === "ok";
 }
@@ -124,7 +150,7 @@ export async function callAdobeTool(registry: HostRegistry, name: string, rawArg
     const unknown = unknownArgumentsMessage(name, rawArgs, schema);
     if (unknown) return { receipt: hostRefusal(host, name, "INVALID_ARGUMENT", unknown), images: [] };
   }
-  const args = normalizeArgs(schema as unknown as JsonSchemaObject, rawArgs) as Record<string, unknown>;
+  const args = preferIds(schema, normalizeArgs(schema as unknown as JsonSchemaObject, rawArgs) as Record<string, unknown>);
   try {
     const result = await connection.client.callTool(name, args, options.timeoutMs ? { timeoutMs: options.timeoutMs } : {});
     const got =

@@ -213,6 +213,22 @@ describe("After Effects / Premiere Pro tools", () => {
     expect(Buffer.from(r.content[1]!.data!, "base64")).toEqual(png);
   });
 
+  it("treats an all-digits string as the id for id-or-name fields (layer=12 from the CLI)", async () => {
+    const layerTool = {
+      name: "ae_touch_layer",
+      inputSchema: {
+        type: "object" as const,
+        properties: { layer: { anyOf: [{ type: "integer", minimum: 1 }, { type: "string", minLength: 1 }] }, label: { type: "string" } },
+        additionalProperties: false as const,
+      },
+    };
+    const host = await ae({ tools: [layerTool] });
+    const { client } = await connect();
+    await call(client, "ae_touch_layer", { layer: "12", label: "7" });
+    await call(client, "ae_touch_layer", { layer: "Title 2" });
+    expect(host.calls.map((c) => c.args)).toEqual([{ layer: 12, label: "7" }, { layer: "Title 2" }]);
+  });
+
   it("refuses when the app is not connected, with how to connect it", async () => {
     const { client } = await connect({ env: { ZENVI_MCP_ADOBE: "on" } });
     const r = await call(client, "premiere_get_state");
