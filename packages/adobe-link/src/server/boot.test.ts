@@ -161,6 +161,29 @@ describe("boot inside CEP (fake __adobe_cep__, real host script on the mock DOM)
     expect(discoveryJson(home, "aftereffects").last_active_at >= before).toBe(true);
   });
 
+  test("the older activate event name refreshes too", async () => {
+    const { home, mock, cep, temp } = await bootAe();
+    mock.project.save(new mock.es.File(path.join(temp, "legacy.aep")));
+    cep.fire(EVENTS.activateLegacy);
+    await until(() => discoveryJson(home, "aftereffects").project === path.join(temp, "legacy.aep"));
+  });
+
+  test("the page's unload (the cleanup CEP really does) removes the files and stops the server", async () => {
+    const temp = mkdtempSync(path.join(os.tmpdir(), "zenvi-link-boot-"));
+    const home = path.join(temp, "home");
+    const mock = createAeMock({ tempDir: temp });
+    const cep = new FakeCep({ appName: "AEFT", appVersion: "26.3.0", extensionDir: EXTENSION_DIR, evalScript: evalInHostScript(loadHostScript("aeft", mock.globals)) });
+    const unloads: (() => void)[] = [];
+    const window = { addEventListener: (type: string, listener: () => void) => type === "unload" && unloads.push(listener), removeEventListener: () => undefined };
+    const link = await boot({ cep, window, home, tempDir: temp, pollMs: 60_000, log: () => undefined });
+    running.push(link);
+    expect(unloads).toHaveLength(1);
+    unloads[0]?.();
+    expect(existsSync(path.join(home, ".openshot_qt", "link", "aftereffects.json"))).toBe(false);
+    expect(existsSync(link.discovery.tokenFile)).toBe(false);
+    expect(await discoverHosts(path.join(home, ".openshot_qt"))).toEqual([]);
+  });
+
   test("quitting removes the discovery and token files and stops the server", async () => {
     const { link, home, cep, desktopDir } = await bootAe();
     const tokenFile = link.discovery.tokenFile;

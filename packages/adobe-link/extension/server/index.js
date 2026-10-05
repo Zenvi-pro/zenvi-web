@@ -29,11 +29,20 @@ const OLD_YEARS = { aftereffects: { 16: 2019, 17: 2020, 18: 2021 }, premiere: { 
 
 const EVENTS = {
   activate: "com.adobe.csxs.events.ApplicationActivate",
+  /** The older name some hosts send instead. */
+  activateLegacy: "applicationActivate",
+  // Neither quit event is documented for After Effects or Premiere Pro (they may
+  // never fire). Cleanup relies on the page's unload, and a crash leaves files
+  // whose dead pid clients ignore (SPEC 3.1).
   beforeQuit: "com.adobe.csxs.events.ApplicationBeforeQuit",
+  beforeQuitLegacy: "applicationBeforeQuit",
   statusRequest: "pro.zenvi.link.status-request",
   status: "pro.zenvi.link.status",
   call: "pro.zenvi.link.call",
 };
+
+const ACTIVATE_EVENTS = [EVENTS.activate, EVENTS.activateLegacy];
+const QUIT_EVENTS = [EVENTS.beforeQuit, EVENTS.beforeQuitLegacy];
 
 /** "Adobe After Effects 2026" for appVersion "26.3.0". */
 function marketingName(host, appVersion) {
@@ -214,7 +223,7 @@ async function boot(options) {
     refreshProject();
   };
   server.on("call", onCall);
-  bridge.addEventListener(EVENTS.activate, onActivate);
+  for (const type of ACTIVATE_EVENTS) bridge.addEventListener(type, onActivate);
   const poll = setInterval(refreshProject, options.pollMs || 15000);
 
   function stopNow() {
@@ -222,14 +231,15 @@ async function boot(options) {
     stopped = true;
     clearInterval(poll);
     server.off("call", onCall);
-    bridge.removeEventListener(EVENTS.activate, onActivate);
+    for (const type of ACTIVATE_EVENTS) bridge.removeEventListener(type, onActivate);
     bridge.removeEventListener(EVENTS.statusRequest, onStatusRequest);
     discovery.remove();
     server.stop();
   }
 
+  // The page's unload is the cleanup that happens: the app quitting, the extension reloading or closing.
   const onQuit = () => stopNow();
-  bridge.addEventListener(EVENTS.beforeQuit, onQuit);
+  for (const type of QUIT_EVENTS) bridge.addEventListener(type, onQuit);
   if (options.window) options.window.addEventListener("unload", onQuit);
   ready = true;
   onStatusRequest();
@@ -242,7 +252,8 @@ async function boot(options) {
     status: status,
     async stop() {
       stopNow();
-      bridge.removeEventListener(EVENTS.beforeQuit, onQuit);
+      for (const type of QUIT_EVENTS) bridge.removeEventListener(type, onQuit);
+      if (options.window && options.window.removeEventListener) options.window.removeEventListener("unload", onQuit);
       await server.stop();
     },
   };

@@ -148,7 +148,7 @@ export const bootModule = require("../../extension/server/index.js") as {
   }): Promise<BootedLink>;
   marketingName(host: string, appVersion: string): string;
   hostOf(environment: { appName?: string }): string | null;
-  EVENTS: Record<"activate" | "beforeQuit" | "statusRequest" | "status" | "call", string>;
+  EVENTS: Record<"activate" | "activateLegacy" | "beforeQuit" | "beforeQuitLegacy" | "statusRequest" | "status" | "call", string>;
 };
 
 export const bridgeModule = require("../../extension/server/bridge.js") as {
