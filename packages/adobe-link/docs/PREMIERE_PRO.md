@@ -52,23 +52,23 @@ sequences from presets, and the undo-stack position.
 | `premiere_get_state` | App version, project, every sequence, active sequence with playhead, in/out, selection | Read-only |
 | `premiere_list_items` | Bins and items as a flat list: nodeId, kind (bin/sequence/media/clip), bin path, media path, in/out, offline | `kind` any, `limit` 200; start from a `bin` path or nodeId |
 | `premiere_get_sequence` | Tracks (muted/locked/targeted), clips (times, source in/out, media, speed, effects, position/scale/rotation/opacity/blend or volume dB, animated properties), transitions, markers | `include_properties` true, `max_clips` 500 |
-| `premiere_capture_frame` | One frame as PNG (returned as an image) via QE `exportFramePNG` | Time defaults to the playhead; a sequence QE cannot reach is opened first |
+| `premiere_capture_frame` | One frame as PNG (returned as an image) via QE `exportFramePNG` | Time defaults to the playhead; a sequence QE cannot reach is opened first. Waits up to 20 s for a whole PNG in the Zenvi temp folder |
 | `premiere_import_files` | Files into a bin, returning nodeIds | Bin "Zenvi Imports" (created); `dedupe` returns existing items; missing files refused first |
-| `premiere_create_sequence` | New sequence, made active | Preset `1080p30`: closest installed `.sqpreset` through `qe.project.newSequence`, then exact size and rate through `setSettings`. Also `1080p25`, `1080p24`, `4k30`, `vertical` (1080×1920), `square`. Or `from_clips`. Never the modal New Sequence dialog |
+| `premiere_create_sequence` | New sequence, made active (`open: false` keeps the previous one active) | Preset `1080p30`: closest installed `.sqpreset` through `qe.project.newSequence`, then exact size and rate through `setSettings`. Also `1080p25`, `1080p24`, `4k30`, `vertical` (1080×1920), `square`. Or `from_clips`. Never the modal New Sequence dialog |
 | `premiere_open_sequence` | Make a sequence active | UI only, no undo step |
 | `premiere_place_clip` | Item onto a track | Defaults: V1, right after the last clip, `overwrite` (or `insert`). Uses `source_in`/`source_out` when given, then restores the item's own in/out marks. Video brings its linked audio |
-| `premiere_edit_clip` | `move` (`to`/`by`), `trim` (`start`/`end`), `enable`/`disable`, `rename`, `speed` (QE), `delete` (`ripple`) | Linked clips move, trim, enable/disable and delete with the clip (`include_linked` true). Refused: overlaps, trims into neighbours, trims of retimed clips, locked tracks |
+| `premiere_edit_clip` | `move` (`to`/`by`), `trim` (`start`/`end`), `enable`/`disable`, `rename`, `speed` (QE), `delete` (`ripple`) | Linked clips move, trim, enable/disable and delete with the clip (`include_linked` true); every member is checked afterwards. A ripple delete shifts the later clips of every touched track by the same amount, the smallest gap, so linked tracks stay in sync. Refused: overlaps, a linked partner pushed before 0, trims into neighbours, trims of retimed clips, locked tracks |
 | `premiere_razor` | Cut at a time | Every unlocked track with a clip under `time`, or `tracks`. QE razor per track, read back |
 | `premiere_set_clip_properties` | Static Motion / Opacity / volume values | Animated properties refused unless `clear_keyframes` |
 | `premiere_animate` | Keyframes on position, scale, rotation, anchor, opacity, volume or `{effect, param}` | `easing` smooth, `replace` true; retimed clips refused |
 | `premiere_apply_effect` | Add an effect by Effects-panel name (QE), then set parameters | Unknown names refused with close matches; unknown parameters listed |
-| `premiere_add_transition` | Transition at a clip edge (QE) | Cross Dissolve (video) / Constant Power (audio), 0.5 s centred on the cut, `at` end; result read back from the track |
-| `premiere_apply_look` | Lumetri Color look | `strength` 0.6; `clips`, else a `track`, else the selected video clips |
-| `premiere_add_text` | Title from a transparent PNG (`image`) or an After Effects-authored `.mogrt` | Lowest free video track above V1; type scale and reading-time duration from TASTE; refused without `image`/`mogrt` |
+| `premiere_add_transition` | Transition at a clip edge (QE) | Cross Dissolve (video) / Constant Power (audio), 0.5 s centred on the cut, `at` end. Each requested edge is read back from the track: a transition already at that edge is replaced (warned), an edge Premiere skipped is warned, and no transition at all is an error |
+| `premiere_apply_look` | Lumetri Color look | `strength` 0.6; `clips`, else a `track`, else the selected video clips. Locks and the Lumetri effect are checked for every clip before the first change. A Lumetri already on a clip is reused; re-applying a tinting look then strengthens the tint (warned) |
+| `premiere_add_text` | Title from a transparent PNG (`image`) or an After Effects-authored `.mogrt` | Lowest video track above V1 that is free for the title (for a template: free from its start onward, because Premiere lays it down at its own length first); type scale and reading-time duration from TASTE; the duration actually placed is read back. Any change to a clip already on the track is an error. Refused without `image`/`mogrt` |
 | `premiere_add_marker` | Sequence marker, or clip marker (on the source item) | Playhead; name, comment, duration, colour, type comment/chapter/segmentation |
 | `premiere_add_captions` | `.srt` into a caption track | `time` 0, format subtitle |
 | `premiere_auto_reframe` | Reframed copy for 9:16 / 1:1 / 4:5 / 16:9 | Keeps the source's short side (1080p → 1080×1920); opened |
-| `premiere_scene_detect` | Scene Edit Detection: razor at scene changes or add markers | V1, every clip, medium sensitivity; selection restored |
+| `premiere_scene_detect` | Scene Edit Detection: razor at scene changes or add markers | V1, every clip, medium sensitivity; selection restored. Markers land on the source items; `new_markers` counts each item once |
 | `premiere_export` | Render to a file | `h264-high` through Media Encoder (queued and started). Also `h264-social-vertical` (9:16 only), `prores-422`, an `.epr`, or `via: direct`. Default output `Zenvi Exports/<sequence>.<ext>` next to the project |
 | `premiere_export_xml` | FCP7 XML of a sequence (Premiere → Zenvi) | New file in the temp folder; dialogs suppressed |
 | `premiere_import_xml` | Import FCP7 XML and open its sequence (Zenvi → Premiere) | Bin "Zenvi Imports"; offline media reported |
@@ -98,7 +98,8 @@ sequences from presets, and the undo-stack position.
   - `teal-orange`: Creative shadow/highlight tint wheels moved 35 % toward
     teal/orange, saturation +6.
   - `moody`: exposure -0.3, contrast +12, saturation -15, vignette -0.8.
-  - `bw-contrast`: saturation 0, contrast +25.
+  - `bw-contrast`: saturation -100, contrast +25. At the default strength
+    that is saturation 40, not black and white; pass `strength: 1` for 0.
 - **Exports.**
   - `h264-high` is "Match Source - Adaptive High Bitrate", or "Match Source -
     High bitrate" on older builds.
@@ -148,6 +149,8 @@ says so.
 | QE `addTransition(t, atStart, duration TC, offset, 0.5, singleSided, alignToVideo)` | premiere-pro-mcp (26.3), Adobe_Premiere_Pro_MCP | Community-verified; shorter signatures tried next |
 | QE `setSpeed(multiplier, duration ticks, reverse, pitch, ripple)` | Adobe_Premiere_Pro_MCP | **Unverified**; the result is read back through `getSpeed()` and an error is reported when it did not take |
 | QE `exportFramePNG(timecode, path without extension)` appends `.png` and cuts the name at its first dot | premiere-pro-mcp, live on 25.2 | Community-verified; a temp folder whose path contains a dot is **unverified** |
+| `exportFramePNG` returns before the PNG is written; the capture polls every 100 ms (at most 20 s) until the size is stable and the file has the PNG signature and ends with the IEND chunk (read with `File.seek`) | Zenvi Link review; premiere-pro-mcp only checks that the file exists, since QE's return value is unreliable | Defensive |
+| Feature checks such as `typeof sequence.autoReframeSequence === "function"` see host methods as functions | premiere-pro-mcp's ExtendScript, live on 25.2–26, gates on the same checks | Community-verified (a build where they read "object" would refuse those features as UNSUPPORTED) |
 | `qe.project.undoStackIndex()` moves by one per undoable step | premiere-pro-mcp on 25.2 | Community-verified; the count is probably capped by the History panel limit (see limits) |
 | Scene Edit Detection is `performSceneEditDetectionOnSelection` (types-for-adobe says `performCutDetectionOnSelection`; both are tried) | Guide, PProPanel | Documented |
 | MOGRT text: After Effects-authored templates expose JSON `textEditValue` through `getMGTComponent()`; Premiere-authored ones (Basic Title) have no MGT component | Adobe forum; premiere-pro-mcp on 25.2 | Community-verified |
@@ -184,7 +187,11 @@ Sources:
   matched in English.
   - Motion, Opacity and Volume fall back to their documented parameter
     positions.
-  - `premiere_apply_look` refuses when none of its Lumetri names are found.
+  - `premiere_apply_look` refuses before any change when QE has no effect
+    named "Lumetri Color". When a clip's Lumetri has none of the English
+    parameter names, the call stops at that clip with an `UNSUPPORTED`
+    error. If it had just added Lumetri Color there, that one effect stays;
+    the receipt's `undoSteps` covers it.
 - **Speed and keyframes.** Retimed clips (speed ≠ 100 % or reversed) are
   refused for keyframes and trims.
   - Speed changes use the undocumented QE `setSpeed` (Adobe: "there is no API
@@ -196,7 +203,11 @@ Sources:
 - **Media Encoder.** `app.encoder` is broken on macOS Premiere 14.3.1–15
   (the guide's warning). `via: direct` still works there.
 - **Frame capture** writes at the sequence's frame size. A 4K PNG is a large
-  image block.
+  image block. A PNG that is not complete after 20 s is an error, and the
+  partial file is removed.
+- **Temp files.** Frame captures and XML exports go into the Zenvi-owned temp
+  folder the server gives the host script (`ZenviLink.tempDir()`), or
+  `<system temp>/zenvi-link` on a runtime that does not provide one yet.
 - **Auto Reframe** refuses while the sequence is still being analysed
   (`BUSY`).
 - **UXP roadmap.** Premiere supports UXP plugins since 25.6. Adobe disables
@@ -214,8 +225,16 @@ npm run gen:catalog -w @zenvi/adobe-link            # after catalog changes
 ```
 
 - `types/premiere-host.d.ts` declares what the typings lack: the ZenviLink
-  runtime, json2 and the polyfills, the QE DOM as used, and missing DOM
-  members.
+  runtime, json2, `Object.keys`, the QE DOM as used, and missing DOM
+  members. It deliberately leaves out `Array.prototype.indexOf` and
+  `String.prototype.trim`, so the typecheck rejects them; use
+  `ZenviLink.ppro.indexOf` / `trim`.
+- The host scripts add nothing to built-in prototypes: every extension in
+  Premiere shares one ExtendScript engine, and ES3 cannot hide a prototype
+  member from other scripts' `for…in` loops.
+- They keep no state between calls either. Opening the panel evaluates the
+  bundle again, which rebuilds `ZenviLink`. Media Encoder jobs are reported
+  in the receipt, not tracked.
 - The mock DOM lives in `src/testing/premiere-mock.ts`, `ppro-components.ts`,
   `ppro-qe.ts` and `ppro-time.ts`; fixtures are in `ppro-fixtures.ts`.
 
@@ -256,6 +275,8 @@ Record `undoSteps` for each mutating call.
    - *Sequence → Sequence Settings* shows 1920×1080 at exactly 30 fps.
    - It is the active sequence.
    - Repeat with `preset: "vertical"`: 1080×1920.
+   - Repeat with `open: false`: the previous sequence stays active and the
+     receipt's `active` is false.
 4. **Three clips.** Call `premiere_place_clip` for a, b and c without `time`,
    with `source_in: 2, source_out: 6` for b.
    **Pass:**
@@ -266,6 +287,9 @@ Record `undoSteps` for each mutating call.
    **Pass:**
    - Two Cross Dissolves of 00:00:00:15, centred on the cuts.
    - The receipts list their spans.
+   - Call it on a again with `transition: "Dip to Black"`: the dissolve at
+     that cut is replaced (one transition there, not two) and the receipt
+     warns.
 6. **Motion keyframes.** Call `premiere_animate` on b: scale `[{time: 0,
    value: 92}, {time: 0.6, value: 100}]`.
    **Pass:**
@@ -295,7 +319,14 @@ Record `undoSteps` for each mutating call.
 10. **Titles.**
     - Call `premiere_add_text {text: "Launch day", image: title.png}`. On V2
       at the playhead for 3 s.
-    - With the AE `.mogrt`: the text reads "Ada Lovelace".
+    - Undo it, put any clip on V2 starting 1 s after where the title ended,
+      and call it again. The title lands on V2 again, and that clip keeps its
+      start and length. This checks that the still's marks limit what is laid
+      down.
+    - Call `premiere_add_text {text: "Ada Lovelace", style: "lower-third",
+      mogrt: lower-third.mogrt}` with the AE template. The text reads "Ada
+      Lovelace". The template goes on a track with nothing after the
+      playhead, not into the gap before the clip on V2.
     - With Premiere's own *Basic Title.mogrt* (in
       `…/Essential Graphics/`): refused, with nothing left on the timeline
       (check the History panel).
@@ -309,7 +340,8 @@ Record `undoSteps` for each mutating call.
     - Each result matches the receipt.
     - The speed change shows 50 % in *Speed/Duration*, or an error says it
       did not take.
-    - The ripple delete closes the gap on V1/A1 only, with a warning.
+    - The ripple delete closes the gap on V1/A1 only, by the same amount on
+      both, with a warning.
 12. **Look before done.** Call `premiere_capture_frame` at 0 s, at the end of
     the scale entrance (b's start + 0.6 s), and mid-title.
     **Pass:**
@@ -347,7 +379,8 @@ Record `undoSteps` for each mutating call.
     **Pass:**
     - Motion, Opacity and volume tools still work through the parameter
       positions.
-    - `premiere_apply_look` refuses with the English-names message.
+    - `premiere_apply_look` refuses, or stops with the English-names
+      message after adding at most one Lumetri Color. Note which.
 
 Report which of the **Unverified** and **check** rows in the table above
 held, with the Premiere version.
