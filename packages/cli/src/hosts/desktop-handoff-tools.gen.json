@@ -3,7 +3,7 @@
   "manifest": {
     "source": "zenvi-core src/classes/editor_tools",
     "manifest_version": 1,
-    "label": "zenvi-core jashan/handoff-integration 80493cc26"
+    "label": "zenvi-core jashan/handoff-integration 1e052ace6"
   },
   "tools": [
     {

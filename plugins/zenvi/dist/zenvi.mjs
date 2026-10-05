@@ -4840,9 +4840,9 @@ function requireInterpolation(value) {
 }
 function writeKeyframeValue(kf, value, frame, interpolation2, choice = false) {
   if (frame === void 0) {
-    const keep = kf && typeof kf === "object" ? kf : {};
+    const keep2 = kf && typeof kf === "object" ? kf : {};
     const interp = choice ? Interpolation.CONSTANT : interpolation2 ?? Interpolation.BEZIER;
-    return { ...keep, Points: constantKeyframe(value, interp).Points };
+    return { ...keep2, Points: constantKeyframe(value, interp).Points };
   }
   return setKeyframeValue(kf, frame, value, choice ? Interpolation.CONSTANT : interpolation2);
 }
@@ -5780,27 +5780,27 @@ function trimClipEdge(tx, clipId2, edge, timelineSeconds) {
   if (patch.position !== void 0) out.position = patch.position;
   return patchClip(tx, clipId2, out);
 }
-function slicePoint(project, atSeconds, keep) {
+function slicePoint(project, atSeconds, keep2) {
   const fps = fpsOf(project);
   let t = pyRound(atSeconds * fps.num / fps.den) * fps.den / fps.num;
-  if (keep === "left") t += fps.den / fps.num;
+  if (keep2 === "left") t += fps.den / fps.num;
   return t;
 }
-function requireKeep(keep) {
-  if (keep !== "both" && keep !== "left" && keep !== "right") throw invalid(`keep must be both, left or right.`);
+function requireKeep(keep2) {
+  if (keep2 !== "both" && keep2 !== "left" && keep2 !== "right") throw invalid(`keep must be both, left or right.`);
 }
-function splitAt(tx, clip2, at, keep) {
+function splitAt(tx, clip2, at, keep2) {
   const project = tx.project;
   const position = Number(clip2.position);
   const start = Number(clip2.start);
   const end = Number(clip2.end);
   const newEnd = start + (at - position);
-  if (keep === "left") {
+  if (keep2 === "left") {
     const left2 = withClampedTiming({ ...clip2, end: newEnd, duration: Math.max(0, newEnd - start) }, project);
     patchClip(tx, clip2.id, timingPatch(clip2, left2));
     return { leftId: clip2.id, rightId: null };
   }
-  if (keep === "right") {
+  if (keep2 === "right") {
     const right = withClampedTiming(
       { ...clip2, position: at, start: newEnd, duration: Math.max(0, end - newEnd) },
       project
@@ -5822,24 +5822,24 @@ function splitAt(tx, clip2, at, keep) {
   tx.insert(["clips"], withClampedTiming(rightData, project));
   return { leftId: clip2.id, rightId: rightData.id };
 }
-function splitClip(tx, clipId2, atSeconds, keep = "both", opts = {}) {
+function splitClip(tx, clipId2, atSeconds, keep2 = "both", opts = {}) {
   const project = tx.project;
   const clip2 = requireEditableClip(project, clipId2);
-  requireKeep(keep);
-  if (opts.ripple && keep === "both") throw invalid("A ripple slice keeps one side (left or right).");
-  const at = slicePoint(project, requireFinite(atSeconds, "atSeconds"), keep);
+  requireKeep(keep2);
+  if (opts.ripple && keep2 === "both") throw invalid("A ripple slice keeps one side (left or right).");
+  const at = slicePoint(project, requireFinite(atSeconds, "atSeconds"), keep2);
   if (!(clip2.position < at && at < itemEnd(clip2))) {
     throw invalid(`Time ${atSeconds} s is not inside clip ${clipId2} (${clip2.position}..${itemEnd(clip2)} s).`);
   }
-  if (!opts.ripple) return splitAt(tx, clip2, at, keep);
+  if (!opts.ripple) return splitAt(tx, clip2, at, keep2);
   const originalPosition = Number(clip2.position);
   const start = Number(clip2.start);
   const end = Number(clip2.end);
   const newEdge = start + (at - originalPosition);
-  const removed = keep === "left" ? end - start - (newEdge - start) : end - start - (end - newEdge);
+  const removed = keep2 === "left" ? end - start - (newEdge - start) : end - start - (end - newEdge);
   const later = (p) => p >= at;
-  const result = splitAt(tx, clip2, at, keep);
-  if (keep === "right") patchClip(tx, clipId2, { position: originalPosition });
+  const result = splitAt(tx, clip2, at, keep2);
+  if (keep2 === "right") patchClip(tx, clipId2, { position: originalPosition });
   for (const c of tx.project.clips.filter((c2) => c2.layer === clip2.layer && c2.id !== clipId2 && later(Number(c2.position)))) {
     tx.update(["clips", { id: c.id }], { position: Number(c.position) - removed });
   }
@@ -5850,30 +5850,30 @@ function splitClip(tx, clipId2, atSeconds, keep = "both", opts = {}) {
 }
 function sliceAllAt(tx, atSeconds, opts = {}) {
   const project = tx.project;
-  const keep = opts.keep ?? "both";
-  requireKeep(keep);
-  const at = slicePoint(project, requireFinite(atSeconds, "atSeconds"), keep);
+  const keep2 = opts.keep ?? "both";
+  requireKeep(keep2);
+  const at = slicePoint(project, requireFinite(atSeconds, "atSeconds"), keep2);
   const locked = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
   const wanted = opts.layers ? new Set(opts.layers) : null;
   const eligible = (layer2) => !locked.has(layer2) && (wanted === null || wanted.has(layer2));
   const clipIds = project.clips.filter((c) => eligible(c.layer) && c.position < at && at < itemEnd(c)).map((c) => c.id);
   const transitionIds = project.effects.filter((t) => eligible(t.layer) && t.position < at && at < itemEnd(t)).map((t) => t.id);
   const result = { clips: [], transitions: [] };
-  for (const id of clipIds) result.clips.push({ clipId: id, ...splitAt(tx, requireClip(tx.project, id), at, keep) });
-  for (const id of transitionIds) result.transitions.push({ transitionId: id, ...sliceTransition(tx, id, at, keep) });
+  for (const id of clipIds) result.clips.push({ clipId: id, ...splitAt(tx, requireClip(tx.project, id), at, keep2) });
+  for (const id of transitionIds) result.transitions.push({ transitionId: id, ...sliceTransition(tx, id, at, keep2) });
   return result;
 }
-function sliceTransition(tx, id, at, keep) {
+function sliceTransition(tx, id, at, keep2) {
   const t = findTransition(tx.project, id);
   const position = Number(t.position);
   const start = Number(t.start);
   const end = Number(t.end);
   const newEnd = start + (at - position);
-  if (keep === "left") {
+  if (keep2 === "left") {
     patchTransition(tx, id, { end: newEnd, duration: Math.max(0, newEnd - start) });
     return { leftId: id, rightId: null };
   }
-  if (keep === "right") {
+  if (keep2 === "right") {
     patchTransition(tx, id, { position: at, start: newEnd, duration: Math.max(0, end - newEnd) });
     return { leftId: null, rightId: id };
   }
@@ -32873,17 +32873,17 @@ function spectrumBins(audio, bins, gain, smooth2, lowHz, highHz) {
     const negStepImag = -stepImag;
     let phaseReal = 1;
     let phaseImag = 0;
-    let real2 = 0;
+    let real3 = 0;
     let imag = 0;
     for (let s = 0; s < n; s += 1) {
       const value = windowed[s];
-      real2 = fma2(value, phaseReal, real2);
+      real3 = fma2(value, phaseReal, real3);
       imag = fma2(-value, phaseImag, imag);
       const nextImag = fma2(phaseReal, stepImag, stepReal * phaseImag);
       phaseReal = fma2(phaseReal, stepReal, phaseImag * negStepImag);
       phaseImag = nextImag;
     }
-    const magnitude = Math.sqrt(fma2(real2, real2, imag * imag)) / n * gain * 8;
+    const magnitude = Math.sqrt(fma2(real3, real3, imag * imag)) / n * gain * 8;
     magnitudes[bin] = clampf(f323(magnitude), 0, 1);
   }
   const oneMinusSmooth = f323(1 - smooth2);
@@ -38980,10 +38980,10 @@ function clampByte3(v) {
 function luma2(r, g, b) {
   return fmaf(LUMA_B2, b, fmaf(r, LUMA_R2, f3210(LUMA_G2 * g)));
 }
-function shrink(value, threshold, keep) {
+function shrink(value, threshold, keep2) {
   const magnitude = Math.abs(value);
-  if (magnitude <= threshold) return f3210(value * keep);
-  const kept = fmaf(threshold, keep, f3210(magnitude - threshold));
+  if (magnitude <= threshold) return f3210(value * keep2);
+  const kept = fmaf(threshold, keep2, f3210(magnitude - threshold));
   return value < 0 ? -kept : kept;
 }
 function smoothstep(edge0, edge1, value) {
@@ -42316,12 +42316,12 @@ var init_libc_rand = __esm({
 
 // ../engine/src/render/audio/noise.ts
 function noiseBlock(channels, level, rand) {
-  const keep = f3220(f3220(f3220(f3220(level) + 1) / -100) + 1);
+  const keep2 = f3220(f3220(f3220(f3220(level) + 1) / -100) + 1);
   for (const data of channels) {
     for (let i = 0; i < data.length; i += 1) {
       const x = data[i];
       const scaled = x * 1e-4 * (rand.next() % 100 + 1);
-      data[i] = f32Fma64(scaled, level, f3220(keep * x));
+      data[i] = f32Fma64(scaled, level, f3220(keep2 * x));
     }
   }
 }
@@ -45033,8 +45033,8 @@ var init_composite_pool = __esm({
         }
       }
       /** Cache `image` in `slot` (or refresh it) and return its key; evictions go to `evict`. */
-      cacheIn(slot, image, store, evict, keep) {
-        keep.add(image);
+      cacheIn(slot, image, store, evict, keep2) {
+        keep2.add(image);
         const hit = slot.cached.get(image);
         if (hit) {
           slot.cached.delete(image);
@@ -45047,7 +45047,7 @@ var init_composite_pool = __esm({
         store.push({ key: entry.key, image });
         for (const [old, info] of slot.cached) {
           if (slot.cachedBytes <= CACHE_BYTES) break;
-          if (keep.has(old)) continue;
+          if (keep2.has(old)) continue;
           slot.cached.delete(old);
           slot.cachedBytes -= info.bytes;
           evict.push(info.key);
@@ -45065,8 +45065,8 @@ var init_composite_pool = __esm({
         if (slot.failure) return Promise.reject(slot.failure);
         const store = [];
         const evict = [];
-        const keep = /* @__PURE__ */ new Set();
-        const stable = (image) => ({ ref: this.cacheIn(slot, image, store, evict, keep) });
+        const keep2 = /* @__PURE__ */ new Set();
+        const stable = (image) => ({ ref: this.cacheIn(slot, image, store, evict, keep2) });
         const layers = plan.layers.map((layer2, i) => {
           const image = prepared.layers[i];
           if (!image) return null;
@@ -46798,8 +46798,8 @@ function linksPath(config2) {
   return path17.join(config2.configDir, "cloud-links.json");
 }
 async function linkKey(config2, projectFile) {
-  const real2 = await realpath(projectFile).catch(() => path17.resolve(projectFile));
-  return `${config2.cloudUrl}|${real2}`;
+  const real3 = await realpath(projectFile).catch(() => path17.resolve(projectFile));
+  return `${config2.cloudUrl}|${real3}`;
 }
 async function readLinks(config2) {
   try {
@@ -47286,6 +47286,14 @@ async function probeEndpoint(url2, token, options = {}) {
     const json2 = text4.trim().startsWith("{") ? text4 : /^data:\s*(\{.*\})\s*$/m.exec(text4)?.[1] ?? "";
     const parsed = JSON.parse(json2);
     return parsed.result !== void 0;
+  } catch {
+    return false;
+  }
+}
+async function desktopProcessAlive(config2, kind = "gui") {
+  try {
+    const data = JSON.parse(await readFile8(path19.join(config2.desktopDir, `${kind}_mcp.json`), "utf8"));
+    return pidAlive2(Number(data.pid));
   } catch {
     return false;
   }
@@ -52718,18 +52726,18 @@ var init_direct = __esm({
         }),
         annotations: EDIT,
         run: (call, input2) => {
-          const keep = input2.keep ?? "both";
+          const keep2 = input2.keep ?? "both";
           if (input2.clip_id) {
             if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
-            const result2 = call.commit((tx) => splitClip(tx, input2.clip_id, input2.at_seconds, keep));
-            return applied("split_clip_tool", `Split clip ${input2.clip_id} at ${input2.at_seconds}s (keep ${keep}).`, { data: result2 });
+            const result2 = call.commit((tx) => splitClip(tx, input2.clip_id, input2.at_seconds, keep2));
+            return applied("split_clip_tool", `Split clip ${input2.clip_id} at ${input2.at_seconds}s (keep ${keep2}).`, { data: result2 });
           }
           const t = resolveTrack(call.doc.project, input2.track);
           if (t.error) return t.error;
-          const result = call.commit((tx) => sliceAllAt(tx, input2.at_seconds, t.layer !== void 0 ? { keep, layers: [t.layer] } : { keep }));
+          const result = call.commit((tx) => sliceAllAt(tx, input2.at_seconds, t.layer !== void 0 ? { keep: keep2, layers: [t.layer] } : { keep: keep2 }));
           const n = result.clips.length + result.transitions.length;
           if (n === 0) return "No clip or transition at that time.";
-          return applied("split_clip_tool", `Split ${n} item(s) at ${input2.at_seconds}s (keep ${keep}).`, { data: result });
+          return applied("split_clip_tool", `Split ${n} item(s) at ${input2.at_seconds}s (keep ${keep2}).`, { data: result });
         }
       }),
       directTool({
@@ -78962,8 +78970,8 @@ async function random2(size) {
   const evenDistCutoff = Math.pow(2, 8) - Math.pow(2, 8) % mask2.length;
   let result = "";
   while (result.length < size) {
-    const randomBytes4 = await getRandomValues(size - result.length);
-    for (const randomByte of randomBytes4) {
+    const randomBytes5 = await getRandomValues(size - result.length);
+    for (const randomByte of randomBytes5) {
       if (randomByte < evenDistCutoff) {
         result += mask2[randomByte % mask2.length];
       }
@@ -80549,7 +80557,8 @@ var init_client4 = __esm({
         const result = await client.callTool({ name, arguments: args }, void 0, {
           timeout: CALL_TIMEOUT_MS,
           resetTimeoutOnProgress: true,
-          ...options.onprogress ? { onprogress: options.onprogress } : {}
+          ...options.onprogress ? { onprogress: options.onprogress } : {},
+          ...options.signal ? { signal: options.signal } : {}
         });
         const content = Array.isArray(result.content) ? result.content : [];
         const texts = content.filter((c) => c.type === "text").map((c) => String(c.text ?? ""));
@@ -80783,20 +80792,26 @@ var init_executor = __esm({
       client;
       project;
       engine = "desktop";
-      toolNames;
-      async call(name, args, _signal, options = {}) {
-        const r = await this.client.callTool(name, args, options);
+      tools;
+      async call(name, args, signal, options = {}) {
+        const r = await this.client.callTool(name, args, { ...options, ...signal ? { signal } : {} });
         return { engine: "desktop", project: this.project ?? this.client.endpoint.project, ok: !r.isError, receipt: r.receipt, text: r.text, images: r.images };
+      }
+      listed() {
+        this.tools ??= this.client.listTools().then((tools) => new Map(tools.map((t) => [t.name, t])));
+        this.tools.catch(() => {
+          this.tools = void 0;
+        });
+        return this.tools;
       }
       /** Whether this desktop build has a tool (its tools/list, read once). */
       async hasTool(name) {
-        this.toolNames ??= this.client.listTools().then((tools) => new Set(tools.map((t) => t.name)));
-        try {
-          return (await this.toolNames).has(name);
-        } catch (error62) {
-          this.toolNames = void 0;
-          throw error62;
-        }
+        return (await this.listed()).has(name);
+      }
+      /** The tool's input schema as this desktop build publishes it, when it lists its properties. */
+      async toolSchema(name) {
+        const schema = (await this.listed()).get(name)?.inputSchema;
+        return schema?.properties ? { properties: schema.properties } : void 0;
       }
       async close() {
         await this.client.close();
@@ -82881,8 +82896,9 @@ var init_client5 = __esm({
 });
 
 // ../adobe-link/src/install.ts
+import { randomBytes as randomBytes4 } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { cpSync, lstatSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import { cpSync, lstatSync, mkdirSync, realpathSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import path24 from "node:path";
 function extensionsDir({ platform, home, appData }) {
   if (platform === "darwin") return path24.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions");
@@ -82938,6 +82954,11 @@ function describeAction(action) {
       return `run ${action.command} ${action.args.join(" ")}`;
   }
 }
+function systemCommand(command, platform = process.platform, env2 = process.env) {
+  if (platform === "win32" && command.toLowerCase() === "reg") return path24.win32.join(env2.SystemRoot ?? env2.windir ?? "C:\\Windows", "System32", "reg.exe");
+  if (platform === "darwin" && ["defaults", "mdfind", "open"].includes(command)) return `/usr/bin/${command}`;
+  return command;
+}
 function exists(file3) {
   try {
     lstatSync(file3);
@@ -82962,12 +82983,66 @@ function runInstallAction(action, options = {}) {
       cpSync(action.from, action.to, { recursive: true });
       return;
     default: {
-      const result = spawnSync(action.command, action.args, { stdio: options.stdio ?? "pipe", windowsHide: true });
+      const result = spawnSync(systemCommand(action.command), action.args, { stdio: options.stdio ?? "pipe", windowsHide: true });
       if (result.status !== 0 && !action.args.includes("delete")) {
         const why = result.error ? result.error.message : `exit ${result.status}`;
         throw new Error(`${describeAction(action)} failed (${why})`);
       }
     }
+  }
+}
+function real(file3) {
+  try {
+    return realpathSync(file3);
+  } catch {
+    return path24.resolve(file3);
+  }
+}
+function replaceInstall(action) {
+  const from = real(action.from);
+  const to = path24.join(real(path24.dirname(action.to)), path24.basename(action.to));
+  const targetIsLink = (() => {
+    try {
+      return lstatSync(action.to).isSymbolicLink();
+    } catch {
+      return false;
+    }
+  })();
+  if (!targetIsLink && (from === to || from.startsWith(to + path24.sep))) {
+    throw new Error(`the extension to install (${action.from}) is the installed copy itself (${action.to}); build it somewhere else first`);
+  }
+  mkdirSync(path24.dirname(action.to), { recursive: true });
+  const tag = `${process.pid}-${randomBytes4(4).toString("hex")}`;
+  const staging = `${action.to}.zenvi-new-${tag}`;
+  const old = `${action.to}.zenvi-old-${tag}`;
+  try {
+    if (action.kind === "copy") cpSync(action.from, staging, { recursive: true });
+    else symlinkSync(action.from, staging, action.type);
+  } catch (error62) {
+    rmSync(staging, { recursive: true, force: true });
+    throw error62;
+  }
+  const hadOld = exists(action.to);
+  try {
+    if (hadOld) renameSync(action.to, old);
+    renameSync(staging, action.to);
+  } catch (error62) {
+    if (hadOld && !exists(action.to) && exists(old)) renameSync(old, action.to);
+    rmSync(staging, { recursive: true, force: true });
+    throw error62;
+  }
+  if (hadOld) rmSync(old, { recursive: true, force: true });
+}
+function runInstallPlan(actions, options = {}) {
+  for (let i = 0; i < actions.length; i += 1) {
+    const action = actions[i];
+    const next = actions[i + 1];
+    if (action.kind === "remove" && next && (next.kind === "copy" || next.kind === "link") && next.to === action.path) {
+      replaceInstall(next);
+      i += 1;
+      continue;
+    }
+    runInstallAction(action, options);
   }
 }
 var BUNDLE_ID, CSXS_VERSIONS;
@@ -83135,6 +83210,24 @@ async function decideFamilies(desktopDir, deps) {
   }
   return decisions;
 }
+function handoffMode(env2) {
+  const value = env2.ZENVI_MCP_HANDOFF?.trim().toLowerCase();
+  return value === "on" || value === "off" ? value : "auto";
+}
+async function decideHandoff(desktopDir, deps) {
+  const mode = handoffMode(deps.env);
+  if (mode === "on") return { listed: true, reason: "ZENVI_MCP_HANDOFF=on" };
+  if (mode === "off") return { listed: false, reason: "ZENVI_MCP_HANDOFF=off", enable: "Unset ZENVI_MCP_HANDOFF (or set it to auto or on) in this server's environment." };
+  for (const name of ["gui_mcp.json", "headless_mcp.json"]) {
+    if (await deps.exists(path26.join(desktopDir, name))) return { listed: true, reason: "the Zenvi desktop app runs on this machine" };
+  }
+  if (await deps.appInstalled()) return { listed: true, reason: "the Zenvi desktop app is installed" };
+  return {
+    listed: false,
+    reason: "the Zenvi desktop app is not installed",
+    enable: "Install the Zenvi desktop app (https://zenvi.pro/download; a development checkout: set ZENVI_DESKTOP_CMD), or set ZENVI_MCP_HANDOFF=on in this server's environment."
+  };
+}
 var APP_LABEL;
 var init_policy = __esm({
   "src/hosts/policy.ts"() {
@@ -83184,8 +83277,8 @@ function describeHosts(report2) {
       `Not connected: ${missing.map((h) => h.kind === "zenvi" ? `${h.label} (launch_editor starts it)` : `${h.label} (${h.status === "absent" ? "not running with Zenvi Link" : String(h.status)})`).join(", ")}.`
     );
   }
-  const hidden = report2.hosts.filter((h) => h.kind !== "zenvi" && h.tools_listed === false);
-  if (hidden.length) parts.push(`Not listed: ${hidden.map((h) => `${h.label} tools (${String(h.enable_hint ?? "")})`).join(" ")}`);
+  const hidden = report2.hosts.filter((h) => h.tools_listed === false);
+  if (hidden.length) parts.push(`Not listed: ${hidden.map((h) => `${h.kind === "zenvi" ? "handoff" : h.label} tools (${String(h.enable_hint ?? "")})`).join(" ")}`);
   return parts.join(" ");
 }
 var ADOBE_HOST_KEY, PORTABLE_HOW, DESKTOP_HOW, HostRegistry;
@@ -83210,6 +83303,8 @@ var init_registry5 = __esm({
       familiesCache;
       clients = /* @__PURE__ */ new Map();
       desktopCalls = /* @__PURE__ */ new Map();
+      /** The pid of the Zenvi Link instance each app's last connection reached. */
+      lastPid = /* @__PURE__ */ new Map();
       detect;
       cacheMs;
       get desktopDir() {
@@ -83254,7 +83349,8 @@ var init_registry5 = __esm({
         this.desktopCalls.set(endpoint.source, Date.now());
       }
       async list() {
-        const [snap2, families] = await Promise.all([this.snapshot(), this.families()]);
+        const [snap2, families, handoff2] = await Promise.all([this.snapshot(), this.families(), this.options.handoff?.()]);
+        const handoffListing = handoff2 ? { tools: this.options.handoffTools ?? 0, tools_listed: handoff2.listed, ...handoff2.enable ? { enable_hint: handoff2.enable } : {} } : {};
         const portable = this.options.portable?.() ?? { project: null };
         const hosts = [];
         const stamps = /* @__PURE__ */ new Map();
@@ -83272,10 +83368,11 @@ var init_registry5 = __esm({
             version: gui.version ?? null,
             pid: gui.pid ?? null,
             ...gui.kind === "headless" ? { headless: true } : {},
-            ...touched > 0 ? { last_active_at: iso(touched) } : {}
+            ...touched > 0 ? { last_active_at: iso(touched) } : {},
+            ...handoffListing
           });
         } else {
-          hosts.push({ id: "zenvi-desktop", kind: "zenvi", label: "Zenvi desktop app", connected: false, active: false, how_to_connect: DESKTOP_HOW });
+          hosts.push({ id: "zenvi-desktop", kind: "zenvi", label: "Zenvi desktop app", connected: false, active: false, how_to_connect: DESKTOP_HOW, ...handoffListing });
         }
         let routesToDesktop = false;
         if (portable.project && this.options.env.ZENVI_MCP_ENGINE !== "portable") {
@@ -83373,7 +83470,9 @@ var init_registry5 = __esm({
         const endpoint = discovery.endpoint;
         const client = new HostClient(endpoint, this.options.clientVersion);
         this.clients.set(host, { key: `${endpoint.url}|${endpoint.pid}|${endpoint.startedAt}`, client, endpoint });
-        return { ok: true, client, endpoint };
+        const previous = this.lastPid.get(host);
+        this.lastPid.set(host, endpoint.pid);
+        return { ok: true, client, endpoint, ...previous !== void 0 && previous !== endpoint.pid ? { switchedFrom: previous } : {} };
       }
       /** The connected app's own tools/list (read once per server instance). */
       async liveTools(host) {
@@ -83434,23 +83533,62 @@ function hostRefusal(host, tool, code, message, data = {}) {
 function hostFailure(host, tool, code, message) {
   return receipt(host, tool, "error", code, message);
 }
-function branchTypes(prop) {
-  const out = /* @__PURE__ */ new Set();
-  const branches = prop?.anyOf ?? prop?.oneOf ?? [];
-  for (const branch of branches) {
-    const type = branch.type;
-    for (const t of Array.isArray(type) ? type : [type]) if (typeof t === "string") out.add(t);
+function leaves(schema, out = []) {
+  if (!schema || typeof schema !== "object") return out;
+  const branches = schema.anyOf ?? schema.oneOf;
+  if (!branches) {
+    out.push(schema);
+    return out;
   }
+  for (const branch of branches) leaves(branch, out);
   return out;
 }
-function preferIds(schema, args) {
-  const out = { ...args };
-  for (const [key, value] of Object.entries(args)) {
-    if (typeof value !== "string" || !/^\d+$/.test(value.trim())) continue;
-    const types = branchTypes(schema?.properties?.[key]);
-    if (types.has("integer") && types.has("string")) out[key] = Number.parseInt(value.trim(), 10);
+function typesOf(leaf) {
+  if (typeof leaf.type === "string") return [leaf.type];
+  if (Array.isArray(leaf.type)) return leaf.type;
+  return (leaf.enum ?? []).map((v) => v === null ? "null" : typeof v === "number" ? Number.isInteger(v) ? "integer" : "number" : typeof v);
+}
+function coerceHostValue(value, schema) {
+  if (value === null || value === void 0 || !schema) return value;
+  const options = leaves(schema);
+  const types = new Set(options.flatMap(typesOf));
+  if (typeof value === "string") {
+    const text4 = value.trim();
+    if (text4 === "") return value;
+    if (text4 === "null" && types.has("null")) return null;
+    if (types.has("integer") && /^\d+$/.test(text4)) return Number.parseInt(text4, 10);
+    if (types.has("string")) return value;
+    if (types.has("integer") && /^-\d+$/.test(text4)) return Number.parseInt(text4, 10);
+    if (types.has("number") && NUMBER_TEXT.test(text4)) return Number(text4);
+    if (types.has("boolean")) {
+      const low = text4.toLowerCase();
+      if (["true", "1", "yes", "on"].includes(low)) return true;
+      if (["false", "0", "no", "off"].includes(low)) return false;
+    }
+    if ((types.has("array") || types.has("object")) && /^[[{]/.test(text4)) {
+      try {
+        return coerceHostValue(JSON.parse(text4), schema);
+      } catch {
+        return value;
+      }
+    }
+    return value;
   }
-  return out;
+  if (Array.isArray(value)) {
+    const lists = options.filter((leaf) => typesOf(leaf).includes("array") && leaf.items);
+    return lists.length === 1 ? value.map((item) => coerceHostValue(item, lists[0].items)) : value;
+  }
+  if (typeof value === "object") {
+    const keys = Object.keys(value);
+    const shape2 = options.find((leaf) => typesOf(leaf).includes("object") && leaf.properties && keys.every((key) => key in leaf.properties));
+    if (!shape2?.properties) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, coerceHostValue(item, shape2.properties[key])]));
+  }
+  return value;
+}
+function coerceHostArgs(schema, args) {
+  const properties = schema?.properties ?? {};
+  return Object.fromEntries(Object.entries(args).map(([key, value]) => [key, coerceHostValue(value, properties[key])]));
 }
 function isOkHostStatus(status) {
   return status === "applied" || status === "unchanged" || status === "ok";
@@ -83490,7 +83628,7 @@ async function callAdobeTool(registry2, name, rawArgs, options = {}) {
     const unknown2 = unknownArgumentsMessage(name, rawArgs, schema);
     if (unknown2) return { receipt: hostRefusal(host, name, "INVALID_ARGUMENT", unknown2), images: [] };
   }
-  const args = preferIds(schema, normalizeArgs(schema, rawArgs));
+  const args = coerceHostArgs(schema, rawArgs);
   try {
     const result = await connection.client.callTool(name, args, options.timeoutMs ? { timeoutMs: options.timeoutMs } : {});
     const got = result.receipt ?? {
@@ -83503,7 +83641,13 @@ async function callAdobeTool(registry2, name, rawArgs, options = {}) {
       warnings: [],
       undoSteps: null
     };
-    return { receipt: got, images: result.images };
+    const endpoint = connection.endpoint;
+    const instance = { pid: endpoint.pid, app_name: endpoint.appName || null, app_version: endpoint.appVersion || null, project: endpoint.project };
+    const warnings = connection.switchedFrom !== void 0 ? [
+      ...got.warnings ?? [],
+      `${app} answered from another instance than the last call (pid ${connection.switchedFrom} -> ${endpoint.pid}${endpoint.project ? `, ${endpoint.project}` : ""}): the newest Zenvi Link took over. Re-read ${STATE_TOOL[host]} before continuing.`
+    ] : got.warnings;
+    return { receipt: { ...got, warnings, host_instance: instance }, images: result.images };
   } catch (error62) {
     if (error62 instanceof McpError && error62.code === ErrorCode.InvalidParams) {
       const version2 = connection.endpoint.version ? ` ${connection.endpoint.version}` : "";
@@ -83529,18 +83673,18 @@ async function liveToolSchema(registry2, host, tool) {
   const schema = found.inputSchema ?? {};
   return { properties: schema.properties ?? {} };
 }
-var STATE_TOOL, catalogs;
+var STATE_TOOL, catalogs, NUMBER_TEXT;
 var init_adobe_tools = __esm({
   "src/hosts/adobe-tools.ts"() {
     "use strict";
     init_types5();
     init_src3();
-    init_tools();
     init_unknown_args();
     init_policy();
     init_registry5();
     STATE_TOOL = { aftereffects: "ae_get_state", premiere: "premiere_get_state" };
     catalogs = /* @__PURE__ */ new Map();
+    NUMBER_TEXT = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
   }
 });
 
@@ -83567,7 +83711,7 @@ function defaultLauncherDeps() {
     listDir: async (dir) => readdir6(dir).catch(() => []),
     run: async (command, args) => {
       try {
-        const { stdout } = await execFileAsync2(command, args, { timeout: 5e3, windowsHide: true, maxBuffer: 1024 * 1024 });
+        const { stdout } = await execFileAsync2(systemCommand(command), args, { timeout: 5e3, windowsHide: true, maxBuffer: 1024 * 1024 });
         return { code: 0, stdout };
       } catch (error62) {
         const e = error62;
@@ -83575,7 +83719,7 @@ function defaultLauncherDeps() {
       }
     },
     spawnDetached: (command, args, env2) => new Promise((resolve, reject) => {
-      const child = spawn3(command, args, { detached: true, stdio: "ignore", windowsHide: false, env: env2 ?? process.env });
+      const child = spawn3(systemCommand(command), args, { detached: true, stdio: "ignore", windowsHide: false, env: env2 ?? process.env });
       child.once("error", reject);
       child.once("spawn", () => {
         child.unref();
@@ -83625,11 +83769,11 @@ async function which(deps, name) {
   return void 0;
 }
 async function isSelf(deps, file3) {
-  const real2 = await realpath3(file3).catch(() => file3);
+  const real3 = await realpath3(file3).catch(() => file3);
   const selves = await Promise.all(deps.selfPaths.map((p) => realpath3(p).catch(() => p)));
-  if (selves.includes(real2)) return true;
-  const head = (await deps.readText(real2))?.slice(0, 200) ?? "";
-  return /^#!.*\bnode\b/.test(head) || /\bzenvi\.mjs\b/.test(real2);
+  if (selves.includes(real3)) return true;
+  const head = (await deps.readText(real3))?.slice(0, 200) ?? "";
+  return /^#!.*\bnode\b/.test(head) || /\bzenvi\.mjs\b/.test(real3);
 }
 async function findMac(deps) {
   const candidates = ["/Applications/Zenvi.app", path31.join(deps.home, "Applications", "Zenvi.app")];
@@ -83737,6 +83881,7 @@ var execFileAsync2, MAC_BUNDLE_ID, WINDOWS_APP_ID;
 var init_launcher = __esm({
   "src/desktop/launcher.ts"() {
     "use strict";
+    init_src3();
     execFileAsync2 = promisify2(execFile2);
     MAC_BUNDLE_ID = "org.zenvi.Zenvi";
     WINDOWS_APP_ID = "{4BB0DCDC-BC24-49EC-8937-72956C33A470}";
@@ -85550,6 +85695,7 @@ never WebM (Zenvi drops VP9 alpha).
 - After Effects and Premiere Pro steps need the app running with Zenvi Link (list_hosts; \`zenvi adobe install\` installs it).
 - Listing or importing a Remotion project, and HyperFrames renders, run that project's own code (Node.js and headless Chrome): only for projects the user trusts.
 - export_to_remotion_tool updates an earlier export in place and refuses to discard changes made there; pass replace_edits only when the user agreed to lose them.
+- When bring_from_after_effects / bring_from_premiere could not import (cancelled, the desktop switched projects, the import failed), the receipt keeps the Adobe result and data.retry, the import call that adds it later: do not render again.
 - Prefer the native tools of the app the user is working in: ae_* inside After Effects, premiere_* inside Premiere Pro, Zenvi tools on the .zvn project. Hand off when the user wants to continue in another app.
 - After every handoff, look at the result in the destination (ae_capture_frame, premiere_capture_frame, preview_frame) and read the warnings to the user: round trips through other apps are not lossless for everything.
 `;
@@ -86005,7 +86151,8 @@ function extraTools(ctx) {
         properties: { path: str2("Project file (default: this session's project).") },
         additionalProperties: false
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+      // Not read-only: it starts or focuses the desktop app and can switch its project.
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       async run(state, args) {
         const tool = "launch_editor";
         const file3 = text3(args.path) ? path34.resolve(ctx.cwd, text3(args.path)) : state.session.file;
@@ -86086,7 +86233,7 @@ var init_desktop_handoff_tools_gen = __esm({
       manifest: {
         source: "zenvi-core src/classes/editor_tools",
         manifest_version: 1,
-        label: "zenvi-core jashan/handoff-integration d933eafc5"
+        label: "zenvi-core jashan/handoff-integration 1e052ace6"
       },
       tools: [
         {
@@ -86210,7 +86357,7 @@ Premiere use send_to_premiere_tool. Example: {"output_path":
           },
           annotations: {
             readOnlyHint: false,
-            destructiveHint: false,
+            destructiveHint: true,
             idempotentHint: false,
             openWorldHint: true
           },
@@ -86245,7 +86392,7 @@ project; the import is one step in Premiere's own undo history.`,
         {
           name: "import_timeline_xml_tool",
           title: "Import Premiere / FCP XML",
-          description: 'Bring a Premiere Pro / Final Cut Pro 7 XML sequence into this project on new tracks, as one undo step (File > Import Project > Premiere Pro XML).\n\nUse for "bring my Premiere edit back", "import this XML". Clips keep their\ntiming, trims, speed / reverse, motion, opacity and volume keyframes;\ndisabled clips come in hidden or muted; Cross Dissolves become fades,\naudio cross fades volume ramps; markers keep names and colours; nested\nsequences are flattened onto extra tracks. Media not already in Project\nFiles is added; media that cannot be found is skipped and listed\n(missing_media). Generators, titles made in Premiere and effects Zenvi\nlacks are listed in warnings. One undo step removes everything it added.\nExample: {"path": "/Users/me/Desktop/Edit.xml"}.',
+          description: 'Bring a Premiere Pro / Final Cut Pro 7 XML sequence into this project on new tracks, as one undo step (File > Import Project > Premiere Pro XML).\n\nUse for "bring my Premiere edit back", "import this XML". Clips keep their\ntiming, trims, speed / reverse, motion, opacity and volume keyframes;\ndisabled clips come in hidden or muted; Cross Dissolves become fades,\naudio cross fades volume ramps; markers keep names and colours; nested\nsequences are flattened onto extra tracks. Media not already in Project\nFiles is added; media that cannot be found is skipped and listed\n(missing_media). Generators, titles made in Premiere, image sequences and\neffects Zenvi lacks are listed in warnings, as are the other sequences of a\nmulti-sequence XML (import one of them with sequence). One undo step\nremoves everything it added. Example: {"path": "/Users/me/Desktop/Edit.xml"}.',
           inputSchema: {
             additionalProperties: false,
             properties: {
@@ -86260,6 +86407,11 @@ project; the import is one step in Premiere's own undo history.`,
                   "new_tracks",
                   "at_playhead"
                 ],
+                type: "string"
+              },
+              sequence: {
+                default: "",
+                description: "Which sequence to import when the XML holds several (its name, as listed in the warnings). Empty = the first top-level sequence.",
                 type: "string"
               }
             },
@@ -86305,9 +86457,9 @@ nothing in Zenvi. Example: {"project_dir": "/Users/me/code/promo"}.`,
             type: "object"
           },
           annotations: {
-            readOnlyHint: true,
+            readOnlyHint: false,
             destructiveHint: false,
-            idempotentHint: true,
+            idempotentHint: false,
             openWorldHint: true
           },
           source: "zenvi-core"
@@ -86416,7 +86568,7 @@ nothing in Zenvi. Example: {"project_dir": "/Users/me/code/promo"}.`,
           },
           annotations: {
             readOnlyHint: false,
-            destructiveHint: false,
+            destructiveHint: true,
             idempotentHint: false,
             openWorldHint: true
           },
@@ -86425,7 +86577,28 @@ nothing in Zenvi. Example: {"project_dir": "/Users/me/code/promo"}.`,
         {
           name: "import_hyperframes_project_tool",
           title: "Import HyperFrames project",
-          description: 'Bring a HyperFrames (HTML video) project into the timeline as one undo step: media as editable clips, compositions as linked clips.\n\nUse for "open this HyperFrames project in Zenvi", "import my hyperframes\nfolder", "bring the HyperFrames video back". Zenvi reads HyperFrames\' own\nresolved timeline (`hyperframes timeline --json`), then: <video>/<img>/\n<audio> primitives become native clips on tracks from data-track-index\n(CSS position and size, GSAP opacity/x/y/scale/rotation tweens as\nkeyframes, data-volume and fades as volume keyframes); each nested\ncomposition (data-composition-src or inline) becomes a linked clip\nrendered on its own with transparency; titles and other scripted DOM of\nthe root become one linked graphics layer. Linked clips keep their\nvariables as props (update_linked_clip_tool), open their code or the\nHyperFrames Studio (open_linked_source_tool) and re-render when the code\nchanges. A Zenvi export comes back natively and losslessly, with timing\nedits made in HyperFrames applied. Renders take seconds to minutes; a\nfailed or cancelled render adds nothing. Needs Node.js 22+ for renders.\nThe receipt lists every clip with its kind (native / linked / restored),\nthe mode used and why, and what could not be rebuilt exactly.\nExample: {"project_dir": "/Users/me/videos/launch", "mode": "auto"}.',
+          description: `Bring a HyperFrames (HTML video) project into the timeline as one undo step: media as editable clips, compositions as linked clips.
+
+Use for "open this HyperFrames project in Zenvi", "import my hyperframes
+folder", "bring the HyperFrames video back". Zenvi reads HyperFrames' own
+resolved timeline (\`hyperframes timeline --json\`), then: <video>/<img>/
+<audio> primitives become native clips on tracks from data-track-index
+(CSS position and size, GSAP opacity/x/y/scale/rotation tweens as
+keyframes, data-volume and fades as volume keyframes); each nested
+composition (data-composition-src or inline) becomes a linked clip
+rendered on its own with transparency; titles and other scripted DOM of
+the root become one linked graphics layer. Linked clips read their
+variables from the HTML at every render (so edits made in HyperFrames
+come through); update_linked_clip_tool's props override them. They open
+their code or the HyperFrames Studio (open_linked_source_tool) and
+re-render when the code changes. A Zenvi export comes back natively and
+losslessly, with timing edits, splits and duplicates made in HyperFrames
+applied. Renders take seconds to minutes and run the project's HTML and
+scripts in a headless browser (import projects the user trusts); a
+failed or cancelled render adds nothing. Needs Node.js 22+ for renders.
+The receipt lists every clip with its kind (native / linked / restored),
+the mode used and why, and what could not be rebuilt exactly.
+Example: {"project_dir": "/Users/me/videos/launch", "mode": "auto"}.`,
           inputSchema: {
             additionalProperties: false,
             properties: {
@@ -86487,7 +86660,10 @@ import_hyperframes_project_tool on the folder restores the clips natively.
 Effects, rounded corners, blend modes, reversed / ramped speed and wipe
 transitions do not translate; the receipt and README.md list each one.
 When the HyperFrames CLI is available the result is linted and the lint
-findings come back in the receipt. Changes nothing in the Zenvi project.
+findings come back in the receipt. Exporting again into the same folder
+replaces only Zenvi's own files, all together; it stops when they were
+edited there since (replace_edits replaces them). Writes files only:
+changes nothing in the Zenvi project (no undo step).
 Example: {"output_dir": "/Users/me/exports/launch-hyperframes"}.`,
           inputSchema: {
             additionalProperties: false,
@@ -86500,6 +86676,11 @@ Example: {"output_dir": "/Users/me/exports/launch-hyperframes"}.`,
               output_dir: {
                 description: "A new or empty folder for the HyperFrames project (an earlier Zenvi export there is updated in place; other files in it are kept).",
                 type: "string"
+              },
+              replace_edits: {
+                default: false,
+                description: "output_dir is an earlier Zenvi export whose files were edited since (in HyperFrames: index.html, package.json, a media copy): replace those edits anyway. Only when the user agreed to lose them; otherwise import that folder first, or pick a new folder.",
+                type: "boolean"
               }
             },
             required: [
@@ -86508,9 +86689,9 @@ Example: {"output_dir": "/Users/me/exports/launch-hyperframes"}.`,
             type: "object"
           },
           annotations: {
-            readOnlyHint: true,
-            destructiveHint: false,
-            idempotentHint: true,
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: false,
             openWorldHint: true
           },
           source: "zenvi-core"
@@ -86727,9 +86908,9 @@ the change in.`,
             type: "object"
           },
           annotations: {
-            readOnlyHint: true,
+            readOnlyHint: false,
             destructiveHint: false,
-            idempotentHint: true,
+            idempotentHint: false,
             openWorldHint: true
           },
           source: "zenvi-core"
@@ -86854,51 +87035,88 @@ var init_handoff = __esm({
 });
 
 // src/mcp/host-tools.ts
-function onprogress(call) {
-  return call.progress ? (p) => call.progress?.(p.progress, p.total ?? 0, p.message ?? "") : void 0;
-}
 async function sleep2(ms, signal) {
   await new Promise((resolve) => {
     const timer2 = setTimeout(resolve, ms);
     signal.addEventListener("abort", () => (clearTimeout(timer2), resolve()), { once: true });
   });
 }
-async function ensureDesktop(ctx, state, tool, call) {
-  const file3 = state.session.file;
-  if (!file3) {
-    return { ok: false, receipt: refused(tool, `${tool} runs in the Zenvi desktop app on a saved project, and this session's project has no file yet: call open_project_file first.`) };
+async function openDesktop(ctx, state) {
+  const gui = (await discoverDesktop(ctx.config)).find((e) => e.kind === "gui");
+  if (!gui && (state.launchPending || await desktopProcessAlive(ctx.config))) return { kind: "starting", summary: "The Zenvi desktop app is starting." };
+  if (!gui && !await findDesktopApp(state.launcher).catch(() => void 0)) return { kind: "not-installed" };
+  try {
+    const opened = await openInDesktop({ config: ctx.config, project: state.session.file, deps: state.launcher, clientVersion: VERSION });
+    if (opened.method === "launched") state.noteLaunch();
+    return { kind: "opened", summary: opened.summary };
+  } catch (error62) {
+    return { kind: "failed", message: error62 instanceof CliError ? [error62.message, error62.hint].filter(Boolean).join(" ") : error62.message };
   }
+}
+async function anyDesktop(ctx) {
+  return (await discoverDesktop(ctx.config))[0];
+}
+function transient(endpoint) {
+  const desktop = new DesktopExecutor(new DesktopClient(endpoint, VERSION), endpoint.project);
+  return { desktop, release: () => desktop.close() };
+}
+function preflight(ctx, state, tool, need) {
   if (ctx.env.ZENVI_MCP_ENGINE === "portable") {
-    return { ok: false, receipt: refused(tool, `${tool} runs in the Zenvi desktop app, but this server never uses the app (ZENVI_MCP_ENGINE=portable). Remove that setting to use handoffs.`) };
+    return refused(tool, `${tool} runs in the Zenvi desktop app, but this server never uses the app (ZENVI_MCP_ENGINE=portable). Remove that setting to use handoffs.`);
   }
-  const live2 = await state.desktopExecutor();
-  if (live2) return { ok: true, desktop: live2 };
-  const running = (await discoverDesktop(ctx.config)).some((e) => e.kind === "gui");
-  if (!running && !await findDesktopApp(state.launcher).catch(() => void 0)) {
+  if (!state.session.file && need !== "any") {
+    return refused(tool, `${tool} runs in the Zenvi desktop app on a saved project, and this session's project has no file yet: call open_project_file first.`);
+  }
+  return void 0;
+}
+async function ensureDesktop(ctx, state, tool, call, ticker, need) {
+  const file3 = state.session.file;
+  const refusal = preflight(ctx, state, tool, need);
+  if (refusal) return { ok: false, receipt: refusal };
+  if (file3) {
+    const live2 = await state.desktopExecutor();
+    if (live2) return { ok: true, desktop: live2, release: keep };
+  }
+  const running = await anyDesktop(ctx);
+  if (running && need === "any") return { ok: true, ...transient(running) };
+  if (running && need === "read" && running.kind === "gui") {
+    return {
+      ok: false,
+      receipt: refused(
+        tool,
+        `The Zenvi desktop app has ${running.project ?? "an untitled project"} open, not ${file3}. ${tool} reads this session's project there and does not switch projects on its own: call launch_editor to open ${file3} in the app (ask the user first if they are working in it), then try again.`
+      )
+    };
+  }
+  const opened = await state.openOnce(() => openDesktop(ctx, state));
+  if (opened.kind === "not-installed") {
     return {
       ok: false,
       receipt: refused(tool, `${tool} runs in the Zenvi desktop app, which is not installed on this machine. Get it at ${DOWNLOAD_URL} (a development checkout: set ZENVI_DESKTOP_CMD).`)
     };
   }
-  let summary;
-  try {
-    summary = (await openInDesktop({ config: ctx.config, project: file3, deps: state.launcher, clientVersion: VERSION })).summary;
-  } catch (error62) {
-    const message = error62 instanceof CliError ? [error62.message, error62.hint].filter(Boolean).join(" ") : error62.message;
-    return { ok: false, receipt: refused(tool, `${tool} runs in the Zenvi desktop app, which could not open ${file3}: ${message} If Zenvi has unsaved changes in another project, ask the user to save or close it, then try again.`) };
+  if (opened.kind === "failed") {
+    return { ok: false, receipt: refused(tool, `${tool} runs in the Zenvi desktop app, which could not open ${file3 ?? "Zenvi"}: ${opened.message} If Zenvi has unsaved changes in another project, ask the user to save or close it, then try again.`) };
   }
+  const summary = opened.summary;
   state.hosts.invalidate();
-  call.progress?.(0.05, 0, `${summary} Waiting for it to show the project\u2026`);
+  ticker.say(`${summary} Waiting for it to ${file3 ? "show the project" : "start"}\u2026`);
   const deadline = Date.now() + state.desktopWaitMs;
   for (; ; ) {
-    const desktop = await state.desktopExecutor();
-    if (desktop) return { ok: true, desktop, note: `${summary} This session's Zenvi edits now go through the app.` };
+    if (file3) {
+      const desktop = await state.desktopExecutor();
+      if (desktop) return { ok: true, desktop, note: `${summary} This session's Zenvi edits now go through the app.`, release: keep };
+    } else {
+      const endpoint = await anyDesktop(ctx);
+      if (endpoint) return { ok: true, ...transient(endpoint), note: summary };
+    }
     if (Date.now() >= deadline || call.signal.aborted) break;
     await sleep2(Math.min(1e3, Math.max(0, deadline - Date.now())), call.signal);
   }
+  if (call.signal.aborted) return { ok: false, receipt: refused(tool, `Cancelled while waiting for the Zenvi desktop app; nothing was sent to it.`) };
   return {
     ok: false,
-    receipt: failed(tool, `${summary} But the app did not show ${file3} within ${Math.round(state.desktopWaitMs / 1e3)} s. Try again once Zenvi shows the project.`)
+    receipt: failed(tool, `${summary} But the app did not ${file3 ? `show ${file3}` : "answer"} within ${Math.round(state.desktopWaitMs / 1e3)} s. Try again once Zenvi ${file3 ? "shows the project" : "is open"}.`)
   };
 }
 async function requireDesktopTool(desktop, tool, forTool) {
@@ -86908,10 +87126,14 @@ async function requireDesktopTool(desktop, tool, forTool) {
 function withNote(receipt2, note) {
   return note ? { ...receipt2, notes: [...receipt2.notes ?? [], note] } : receipt2;
 }
-async function forward(desktop, tool, args, call) {
-  const outcome = await desktop.call(tool, args, void 0, { onprogress: onprogress(call) });
+async function forward(desktop, tool, args, call, ticker) {
+  const outcome = await ticker.during("Working in the Zenvi desktop app", desktop.call(tool, args, call.signal, { onprogress: ticker.relay("Working in the Zenvi desktop app\u2026") }));
   const receipt2 = outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text || `${tool} failed`));
   return { receipt: receipt2, images: outcome.images };
+}
+async function liveUnknownArguments(desktop, tool, args) {
+  const live2 = await desktop.toolSchema(tool);
+  return live2 ? unknownArgumentsMessage(tool, args, live2) : void 0;
 }
 function desktopHandoffTools(ctx) {
   return DESKTOP_HANDOFF_TOOLS.map((def) => ({
@@ -86920,13 +87142,46 @@ function desktopHandoffTools(ctx) {
     description: `Zenvi desktop app: ${def.description}`,
     inputSchema: def.inputSchema,
     annotations: def.annotations,
+    checksOwnArguments: true,
     async run(state, args, call) {
-      const ready2 = await ensureDesktop(ctx, state, def.name, call);
+      const ticker = new Ticker(call, state.keepAliveMs);
+      const need = PROJECT_NEED[def.name] ?? "edit";
+      const refusal = preflight(ctx, state, def.name, need);
+      if (refusal) return { receipt: refusal, engine: null };
+      const running = await anyDesktop(ctx);
+      if (running) {
+        const probe2 = transient(running);
+        try {
+          const unknown2 = await liveUnknownArguments(probe2.desktop, def.name, args);
+          if (unknown2) return { receipt: refused(def.name, unknown2), engine: null };
+        } finally {
+          await probe2.release();
+        }
+      } else {
+        const unknown2 = unknownArgumentsMessage(def.name, args, def.inputSchema);
+        if (unknown2) {
+          return { receipt: refused(def.name, `${unknown2} (this zenvi's copy of the desktop's tools; with a newer Zenvi desktop app, open the project in it first with launch_editor, then try again)`), engine: null };
+        }
+      }
+      const adobe = NEEDS_ADOBE[def.name];
+      if (adobe) {
+        const connection = await state.hosts.connect(adobe);
+        if (!connection.ok) {
+          return { receipt: refused(def.name, `${APP_LABEL[adobe]} is not connected: ${connection.discovery.detail}. ${howToConnect(adobe, connection.discovery)}`), engine: null };
+        }
+      }
+      const ready2 = await ensureDesktop(ctx, state, def.name, call, ticker, need);
       if (!ready2.ok) return { receipt: ready2.receipt, engine: null };
-      const missing = await requireDesktopTool(ready2.desktop, def.name, def.name);
-      if (missing) return { receipt: withNote(missing, ready2.note), engine: "desktop" };
-      const { receipt: receipt2, images } = await forward(ready2.desktop, def.name, resolvePathArgs(args, ctx.cwd, ctx.config.home), call);
-      return { receipt: withNote(receipt2, ready2.note), images, engine: "desktop" };
+      try {
+        const missing = await requireDesktopTool(ready2.desktop, def.name, def.name);
+        if (missing) return { receipt: withNote(missing, ready2.note), engine: "desktop" };
+        const unknown2 = await liveUnknownArguments(ready2.desktop, def.name, args);
+        if (unknown2) return { receipt: withNote(refused(def.name, unknown2), ready2.note), engine: "desktop" };
+        const { receipt: receipt2, images } = await forward(ready2.desktop, def.name, resolvePathArgs(args, ctx.cwd, ctx.config.home), call, ticker);
+        return { receipt: withNote(receipt2, ready2.note), images, engine: "desktop" };
+      } finally {
+        await ready2.release();
+      }
     }
   }));
 }
@@ -86944,6 +87199,44 @@ function combined(tool, summary, adobeKey, adobe, zenvi, note) {
     data: { [adobeKey]: adobe, zenvi }
   };
   return withNote(merged, note);
+}
+function notImported(tool, status, why, adobeKey, adobe, retry, note) {
+  const make = status === "refused" ? refused : failed;
+  const receipt2 = make(tool, `${why} Nothing was added to the Zenvi project; data.retry adds the result later (${retry.tool}).`, {
+    data: { [adobeKey]: adobe, retry },
+    warnings: adobe.warnings ?? []
+  });
+  return withNote(receipt2, note);
+}
+async function importTarget(state) {
+  return state.desktopExecutor();
+}
+function optionalArgs(schema, raw) {
+  const coerced = coerceHostArgs(schema, raw);
+  return Object.fromEntries(Object.entries(coerced).filter(([, value]) => value !== "" && value !== null && value !== void 0));
+}
+async function adobeStep(state, ticker, message, tool, args) {
+  ticker.say(`${message}\u2026`);
+  return ticker.during(message, callAdobeTool(state.hosts, tool, args, { timeoutMs: ADOBE_RENDER_WAIT_MS }));
+}
+async function importStep(state, ticker, call, tool, importTool, importArgs, adobeKey, adobe, what, note) {
+  const retry = { tool: importTool, arguments: importArgs };
+  if (call.signal.aborted) {
+    return { ok: false, receipt: notImported(tool, "refused", `Cancelled after ${what}.`, adobeKey, adobe, retry, note) };
+  }
+  const target = await importTarget(state);
+  if (!target) {
+    const why = `${what}, but the Zenvi desktop app no longer has ${state.session.file} open (it switched projects or quit meanwhile).`;
+    return { ok: false, receipt: notImported(tool, "refused", why, adobeKey, adobe, retry, note) };
+  }
+  ticker.say("Adding it to the Zenvi project\u2026");
+  try {
+    const { receipt: receipt2 } = await forward(target, importTool, importArgs, call, ticker);
+    return { ok: true, zenvi: receipt2 };
+  } catch (error62) {
+    const why = `${what}, but the Zenvi desktop app failed during ${importTool}: ${error62 instanceof Error ? error62.message : String(error62)}.`;
+    return { ok: false, receipt: notImported(tool, "error", why, adobeKey, adobe, retry, note) };
+  }
 }
 function bringFromAfterEffects(ctx) {
   const inputSchema = {
@@ -86966,11 +87259,12 @@ function bringFromAfterEffects(ctx) {
   return {
     name: tool,
     title: "Bring an After Effects comp into Zenvi",
-    description: "Render an After Effects comp and add it to this session's Zenvi project as a linked clip, in one call: ae_render_for_zenvi in After Effects (ProRes 4444 with alpha when alpha is true, else H.264), then import_linked_media_tool in the Zenvi desktop app (opened on the project when needed). The clip remembers its comp: after changes in After Effects, rerender_linked_clip_tool brings them in. Returns both apps' receipts (data.after_effects, data.zenvi) and the new clip. Needs After Effects connected (list_hosts) and a saved project (open_project_file).",
+    description: "Render an After Effects comp and add it to this session's Zenvi project as a linked clip, in one call: ae_render_for_zenvi in After Effects (ProRes 4444 with alpha when alpha is true, else H.264), then import_linked_media_tool in the Zenvi desktop app (opened on the project when needed). The clip remembers its comp: after changes in After Effects, rerender_linked_clip_tool brings them in. Returns both apps' receipts (data.after_effects, data.zenvi) and the new clip; when the render could not be added, data.retry is the call that adds it. Needs After Effects connected (list_hosts) and a saved project (open_project_file).",
     inputSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async run(state, raw, call) {
-      const args = normalizeArgs(inputSchema, raw);
+      const ticker = new Ticker(call, state.keepAliveMs);
+      const args = optionalArgs(inputSchema, raw);
       if (args.alpha !== void 0 && typeof args.alpha !== "boolean") return { receipt: refused(tool, "alpha must be true or false"), engine: null };
       if (args.position !== void 0 && (typeof args.position !== "number" || !(args.position >= 0))) return { receipt: refused(tool, "position must be a time in seconds, 0 or more"), engine: null };
       if (!state.session.file) return { receipt: refused(tool, NO_FILE), engine: null };
@@ -86978,7 +87272,7 @@ function bringFromAfterEffects(ctx) {
       if (!connection.ok) {
         return { receipt: refused(tool, `After Effects is not connected: ${connection.discovery.detail}. ${howToConnect("aftereffects", connection.discovery)}`), engine: null };
       }
-      const ready2 = await ensureDesktop(ctx, state, tool, call);
+      const ready2 = await ensureDesktop(ctx, state, tool, call, ticker, "edit");
       if (!ready2.ok) return { receipt: ready2.receipt, engine: null };
       const missing = await requireDesktopTool(ready2.desktop, "import_linked_media_tool", tool);
       if (missing) return { receipt: withNote(missing, ready2.note), engine: "desktop" };
@@ -86996,8 +87290,8 @@ function bringFromAfterEffects(ctx) {
         if (declaredName(schema.properties, ["alpha"])) renderArgs.alpha = args.alpha;
         else if (declaredName(schema.properties, ["codec"])) renderArgs.codec = args.alpha ? "prores4444" : "h264";
       }
-      call.progress?.(0.1, 0, "Rendering in After Effects\u2026");
-      const render2 = await callAdobeTool(state.hosts, "ae_render_for_zenvi", renderArgs, { timeoutMs: ADOBE_RENDER_WAIT_MS });
+      if (call.signal.aborted) return { receipt: withNote(refused(tool, "Cancelled before rendering; nothing changed."), ready2.note), engine: null };
+      const render2 = await adobeStep(state, ticker, "Rendering in After Effects", "ae_render_for_zenvi", renderArgs);
       if (!isOkHostStatus(render2.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "rendering in After Effects", render2.receipt), ready2.note), engine: "desktop" };
       const media = aeRenderLink(render2.receipt.data ?? {}, args.alpha);
       if (!media) {
@@ -87006,12 +87300,13 @@ function bringFromAfterEffects(ctx) {
           engine: "desktop"
         };
       }
-      call.progress?.(0.9, 0, "Adding the render to the Zenvi project\u2026");
       const importArgs = { path: media.path, link: media.link };
       if (args.position !== void 0) importArgs.position = args.position;
-      if (args.track !== void 0 && args.track !== "") importArgs.track = String(args.track);
-      const { receipt: zenvi } = await forward(ready2.desktop, "import_linked_media_tool", importArgs, call);
+      if (args.track !== void 0) importArgs.track = String(args.track);
       const comp = String(media.link.source?.composition ?? render2.receipt.data?.comp_name ?? "the comp");
+      const step = await importStep(state, ticker, call, tool, "import_linked_media_tool", importArgs, "after_effects", render2.receipt, `After Effects rendered "${comp}" to ${media.path}`, ready2.note);
+      if (!step.ok) return { receipt: step.receipt, engine: "desktop" };
+      const zenvi = step.zenvi;
       const summary = zenvi.status === "applied" || zenvi.status === "unchanged" ? `Rendered "${comp}" in After Effects and added it to the Zenvi project as a linked clip. ${zenvi.summary}` : `After Effects rendered "${comp}" to ${media.path}, but Zenvi could not add it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
       return { receipt: combined(tool, summary, "after_effects", render2.receipt, zenvi, ready2.note), engine: "desktop" };
     }
@@ -87030,11 +87325,12 @@ function bringFromPremiere(ctx) {
   return {
     name: tool,
     title: "Bring a Premiere Pro sequence into Zenvi",
-    description: "Bring a Premiere Pro sequence back into this session's Zenvi project as native, editable clips, in one call: premiere_export_xml in Premiere (Final Cut Pro 7 XML), then import_timeline_xml_tool in the Zenvi desktop app (opened on the project when needed), as one Zenvi undo step. Clips, trims, tracks, motion/opacity keyframes, audio levels, cross dissolves and markers survive. Returns both apps' receipts (data.premiere, data.zenvi). Needs Premiere Pro connected (list_hosts) and a saved project (open_project_file).",
+    description: "Bring a Premiere Pro sequence back into this session's Zenvi project as native, editable clips, in one call: premiere_export_xml in Premiere (Final Cut Pro 7 XML), then import_timeline_xml_tool in the Zenvi desktop app (opened on the project when needed), as one Zenvi undo step. Clips, trims, speed, motion/opacity/volume keyframes, cross dissolves and markers survive. Returns both apps' receipts (data.premiere, data.zenvi); when the sequence could not be imported, data.retry is the call that imports it. Needs Premiere Pro connected (list_hosts) and a saved project (open_project_file).",
     inputSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async run(state, raw, call) {
-      const args = normalizeArgs(inputSchema, raw);
+      const ticker = new Ticker(call, state.keepAliveMs);
+      const args = optionalArgs(inputSchema, raw);
       if (args.placement !== void 0 && args.placement !== "new_tracks" && args.placement !== "at_playhead") {
         return { receipt: refused(tool, "placement must be new_tracks or at_playhead"), engine: null };
       }
@@ -87043,7 +87339,7 @@ function bringFromPremiere(ctx) {
       if (!connection.ok) {
         return { receipt: refused(tool, `Premiere Pro is not connected: ${connection.discovery.detail}. ${howToConnect("premiere", connection.discovery)}`), engine: null };
       }
-      const ready2 = await ensureDesktop(ctx, state, tool, call);
+      const ready2 = await ensureDesktop(ctx, state, tool, call, ticker, "edit");
       if (!ready2.ok) return { receipt: ready2.receipt, engine: null };
       const missing = await requireDesktopTool(ready2.desktop, "import_timeline_xml_tool", tool);
       if (missing) return { receipt: withNote(missing, ready2.note), engine: "desktop" };
@@ -87057,8 +87353,8 @@ function bringFromPremiere(ctx) {
         if (!key) return { receipt: refused(tool, "this Zenvi Link's premiere_export_xml does not take a sequence; leave sequence out to export the active one"), engine: null };
         exportArgs[key] = args.sequence;
       }
-      call.progress?.(0.1, 0, "Exporting the sequence from Premiere Pro\u2026");
-      const exported = await callAdobeTool(state.hosts, "premiere_export_xml", exportArgs, { timeoutMs: ADOBE_RENDER_WAIT_MS });
+      if (call.signal.aborted) return { receipt: withNote(refused(tool, "Cancelled before exporting; nothing changed."), ready2.note), engine: null };
+      const exported = await adobeStep(state, ticker, "Exporting the sequence from Premiere Pro", "premiere_export_xml", exportArgs);
       if (!isOkHostStatus(exported.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "exporting from Premiere Pro", exported.receipt), ready2.note), engine: "desktop" };
       const xml = exportedXmlPath(exported.receipt.data ?? {});
       if (!xml) {
@@ -87067,9 +87363,11 @@ function bringFromPremiere(ctx) {
           engine: "desktop"
         };
       }
-      call.progress?.(0.9, 0, "Importing the sequence into Zenvi\u2026");
-      const { receipt: zenvi } = await forward(ready2.desktop, "import_timeline_xml_tool", { path: xml, placement: args.placement ?? "new_tracks" }, call);
       const name = String(exported.receipt.data?.sequence_name ?? exported.receipt.data?.name ?? args.sequence ?? "the active sequence");
+      const importArgs = { path: xml, placement: args.placement ?? "new_tracks" };
+      const step = await importStep(state, ticker, call, tool, "import_timeline_xml_tool", importArgs, "premiere", exported.receipt, `Premiere Pro exported "${name}" to ${xml}`, ready2.note);
+      if (!step.ok) return { receipt: step.receipt, engine: "desktop" };
+      const zenvi = step.zenvi;
       const summary = zenvi.status === "applied" || zenvi.status === "unchanged" ? `Exported "${name}" from Premiere Pro and imported it into the Zenvi project. ${zenvi.summary}` : `Premiere Pro exported "${name}" to ${xml}, but Zenvi could not import it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
       return { receipt: combined(tool, summary, "premiere", exported.receipt, zenvi, ready2.note), engine: "desktop" };
     }
@@ -87091,29 +87389,73 @@ function listHostsTool() {
 function hostTools(ctx) {
   return [listHostsTool(), ...desktopHandoffTools(ctx), bringFromAfterEffects(ctx), bringFromPremiere(ctx)];
 }
-var ADOBE_RENDER_WAIT_MS, NO_FILE;
+var ADOBE_RENDER_WAIT_MS, PROJECT_NEED, NEEDS_ADOBE, Ticker, keep, NO_FILE, HANDOFF_TOOL_NAMES;
 var init_host_tools = __esm({
   "src/mcp/host-tools.ts"() {
     "use strict";
     init_tools();
+    init_client4();
     init_discovery();
     init_launcher();
     init_open();
+    init_executor();
     init_adobe_tools();
     init_handoff();
+    init_policy();
     init_registry5();
     init_output();
+    init_unknown_args();
     init_version();
     ADOBE_RENDER_WAIT_MS = 3 * 60 * 60 * 1e3;
+    PROJECT_NEED = {
+      list_remotion_compositions_tool: "any",
+      get_linked_clip_tool: "read",
+      open_linked_source_tool: "read"
+    };
+    NEEDS_ADOBE = {
+      send_to_after_effects_tool: "aftereffects",
+      send_to_premiere_tool: "premiere"
+    };
+    Ticker = class {
+      constructor(call, keepAliveMs) {
+        this.call = call;
+        this.keepAliveMs = keepAliveMs;
+      }
+      call;
+      keepAliveMs;
+      tick = 0;
+      say(message) {
+        this.tick += 1;
+        this.call.progress?.(this.tick, 0, message);
+      }
+      /** The desktop's own progress, as messages on this call's ticks. */
+      relay(fallback) {
+        return this.call.progress ? (p) => this.say(p.message || fallback) : void 0;
+      }
+      /** `work`, saying `message` with the elapsed time every keep-alive interval until it settles. */
+      async during(message, work) {
+        if (!this.call.progress) return work;
+        const started = Date.now();
+        const timer2 = setInterval(() => this.say(`${message} (${Math.round((Date.now() - started) / 1e3)} s)`), this.keepAliveMs);
+        try {
+          return await work;
+        } finally {
+          clearInterval(timer2);
+        }
+      }
+    };
+    keep = async () => void 0;
     NO_FILE = "this session's project has no file yet: call open_project_file first (the clips go into a saved project in the Zenvi desktop app).";
+    HANDOFF_TOOL_NAMES = /* @__PURE__ */ new Set([...DESKTOP_HANDOFF_TOOLS.map((t) => t.name), "bring_from_after_effects", "bring_from_premiere"]);
   }
 });
 
 // src/mcp/state.ts
+import { stat as stat15 } from "node:fs/promises";
 function launcherDeps(ctx) {
   return { ...defaultLauncherDeps(), env: ctx.env, home: ctx.config.home };
 }
-var DESKTOP_WAIT_MS, McpState;
+var DESKTOP_WAIT_MS, KEEP_ALIVE_MS, McpState;
 var init_state = __esm({
   "src/mcp/state.ts"() {
     "use strict";
@@ -87123,22 +87465,29 @@ var init_state = __esm({
     init_discovery();
     init_launcher();
     init_executor();
+    init_handoff();
+    init_policy();
     init_registry5();
     init_session2();
     init_version();
     DESKTOP_WAIT_MS = 12e4;
+    KEEP_ALIVE_MS = 15e3;
     McpState = class _McpState {
       constructor(ctx, session, options) {
         this.ctx = ctx;
         this.session = session;
         this.launcher = options.launcher ?? launcherDeps(ctx);
         this.desktopWaitMs = options.desktopWaitMs ?? DESKTOP_WAIT_MS;
+        this.keepAliveMs = options.keepAliveMs ?? KEEP_ALIVE_MS;
         this.hosts = new HostRegistry({
           config: ctx.config,
           env: ctx.env,
           clientVersion: VERSION,
           detect: options.detect,
-          portable: () => ({ project: this.session.file ?? null, lastCallAt: this.lastPortableCall })
+          portable: () => ({ project: this.session.file ?? null, lastCallAt: this.lastPortableCall }),
+          handoff: () => this.handoffDecision(),
+          // The desktop's handoff tools plus bring_from_after_effects / bring_from_premiere.
+          handoffTools: DESKTOP_HANDOFF_TOOLS.length + 2
         });
       }
       ctx;
@@ -87146,6 +87495,13 @@ var init_state = __esm({
       hosts;
       launcher;
       desktopWaitMs;
+      keepAliveMs;
+      /** When this server last started the desktop app (a second call waits for it instead of starting another). */
+      launchedAt;
+      /** The open / launch in flight: concurrent handoffs share it instead of opening the app twice. */
+      opening;
+      handoffCache;
+      appFound;
       desktop;
       desktopKey;
       lastPortableCall;
@@ -87157,6 +87513,53 @@ var init_state = __esm({
       async switchTo(file3, project) {
         await this.session.switchTo(file3, project);
         await this.dropDesktop();
+      }
+      /**
+       * Run `open` unless one is in flight, and share its result. The check and
+       * the registration happen without an await in between, so two calls that
+       * arrive together cannot both open (or start) the app.
+       */
+      openOnce(open7) {
+        if (!this.opening) {
+          const running = open7();
+          this.opening = running;
+          void running.then(
+            () => this.opening === running && (this.opening = void 0),
+            () => this.opening === running && (this.opening = void 0)
+          );
+        }
+        return this.opening;
+      }
+      /** Whether this server lists the handoff tools (ZENVI_MCP_HANDOFF; reused for 2 s). */
+      handoffDecision() {
+        const now = Date.now();
+        if (this.handoffCache && now - this.handoffCache.at <= 2e3) return this.handoffCache.value;
+        const value = decideHandoff(this.ctx.config.desktopDir, {
+          env: this.ctx.env,
+          exists: (file3) => stat15(file3).then(
+            () => true,
+            () => false
+          ),
+          appInstalled: () => this.desktopInstalled()
+        });
+        this.handoffCache = { at: now, value };
+        return value;
+      }
+      /** The launcher's lookup; a found app stays found for the session, a miss is retried after a minute. */
+      async desktopInstalled() {
+        const now = Date.now();
+        if (this.appFound && (this.appFound.installed || now - this.appFound.at < 6e4)) return this.appFound.installed;
+        const installed = Boolean(await findDesktopApp(this.launcher).catch(() => void 0));
+        this.appFound = { at: now, installed };
+        return installed;
+      }
+      /** Record that this server started the desktop app. */
+      noteLaunch() {
+        this.launchedAt = Date.now();
+      }
+      /** True while an app this server started may still be coming up. */
+      get launchPending() {
+        return this.launchedAt !== void 0 && Date.now() - this.launchedAt < this.desktopWaitMs;
       }
       /** The portable engine ran a tool (it counts as activity for list_hosts' active host). */
       notePortableCall() {
@@ -87228,8 +87631,8 @@ async function createZenviMcpServer(ctx, projectFile, options = {}) {
   server.server.setRequestHandler(ListToolsRequestSchema, async () => {
     const host = state.session.host;
     const engineTools = ctx.registry.list("mcp", host).filter((t) => !extraByName.has(t.name) && !hostOfTool(t.name));
-    const families = await state.hosts.families();
-    listedFamilies = familyKey(families);
+    const [families, handoff2] = await Promise.all([state.hosts.families(), state.handoffDecision()]);
+    listedFamilies = listingKey(families, handoff2);
     return {
       tools: [
         ...engineTools.map((t) => ({
@@ -87239,7 +87642,7 @@ async function createZenviMcpServer(ctx, projectFile, options = {}) {
           inputSchema: t.inputSchema,
           ...t.annotations ? { annotations: { ...t.annotations, title: t.title } } : {}
         })),
-        ...extras.map((t) => ({
+        ...extras.filter((t) => handoff2.listed || !HANDOFF_TOOL_NAMES.has(t.name)).map((t) => ({
           name: t.name,
           title: t.title,
           description: t.description,
@@ -87252,7 +87655,8 @@ async function createZenviMcpServer(ctx, projectFile, options = {}) {
   });
   async function announceFamilyChanges() {
     if (listedFamilies === void 0) return;
-    const key = familyKey(await state.hosts.families());
+    const [families, handoff2] = await Promise.all([state.hosts.families(), state.handoffDecision()]);
+    const key = listingKey(families, handoff2);
     if (key === listedFamilies) return;
     listedFamilies = key;
     await server.server.sendToolListChanged().catch(() => void 0);
@@ -87269,8 +87673,14 @@ async function createZenviMcpServer(ctx, projectFile, options = {}) {
     } : void 0;
     try {
       const extraTool = extraByName.get(name);
+      if (extraTool && HANDOFF_TOOL_NAMES.has(name)) {
+        const handoff2 = await state.handoffDecision();
+        if (!handoff2.listed && handoff2.reason === "ZENVI_MCP_HANDOFF=off") {
+          return toCallResult(refused(name, `Handoff tools are turned off in this server (ZENVI_MCP_HANDOFF=off). ${handoff2.enable ?? ""}`.trim()));
+        }
+      }
       if (extraTool) {
-        const unknown2 = unknownArgumentsMessage(name, args, extraTool.inputSchema);
+        const unknown2 = extraTool.checksOwnArguments ? void 0 : unknownArgumentsMessage(name, args, extraTool.inputSchema);
         if (unknown2) return toCallResult(failed(name, unknown2), void 0, { engine: "portable" });
         const out = await extraTool.run(state, args, { signal: extra.signal, progress });
         const engine = out.engine === void 0 ? "portable" : out.engine;
@@ -87309,6 +87719,7 @@ async function createZenviMcpServer(ctx, projectFile, options = {}) {
     }
   });
   server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: RESOURCES.map((r) => ({ ...r })) }));
+  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({ resourceTemplates: [] }));
   server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const uri = request.params.uri;
     const info = RESOURCES.find((r) => r.uri === uri);
@@ -87354,7 +87765,7 @@ async function runStdioServer(ctx, transport = new StdioServerTransport()) {
   await Promise.race([closed, once2(process.stdin, "end").then(() => void 0)]);
   await close();
 }
-var SERVER_INSTRUCTIONS, familyKey;
+var SERVER_INSTRUCTIONS, listingKey;
 var init_server3 = __esm({
   "src/mcp/server.ts"() {
     "use strict";
@@ -87380,7 +87791,7 @@ var init_server3 = __esm({
       "Taste: omitted arguments take the defaults in zenvi://taste (entrances 0.6 s, exits 0.4 s, smooth easing, nothing that moves is linear, text inside title-safe). Look before you say done: after any visual change capture frames (preview_frame, with grid=true for a 0-1 coordinate grid; ae_capture_frame; premiere_capture_frame) at the first frame, entrance ends, holds and the last frame, check them against the review checklist (prompt edit_review), fix, and look again.",
       'Every tool returns a JSON receipt (contract 3): status applied|unchanged|refused|error (read-only Adobe tools: ok), summary, and what changed (clips, shifted, removedClipIds, createdTracks, undoSteps; Adobe tools: ids in data). Patch your view from receipts instead of re-listing everything. Failures start with "Error:"; refused means nothing changed, so read the summary and adjust. Each Zenvi call is one undo step (undo_tool); edits autosave to the project file with their undo history. Use these tools instead of running ffmpeg yourself: they keep the project editable in Zenvi. Times are seconds.'
     ].join("\n\n");
-    familyKey = (families) => HOST_IDS.filter((host) => families[host].listed).join(",");
+    listingKey = (families, handoff2) => `${HOST_IDS.filter((host) => families[host].listed).join(",")}|handoff:${handoff2.listed}`;
   }
 });
 
@@ -90760,7 +91171,7 @@ init_edit2();
 // src/commands/hosts.ts
 init_src3();
 init_adobe_tools();
-import { writeFile as writeFile6 } from "node:fs/promises";
+import { lstat as lstat2, writeFile as writeFile6 } from "node:fs/promises";
 import path28 from "node:path";
 
 // src/hosts/doctor.ts
@@ -90769,8 +91180,18 @@ init_adobe_tools();
 init_extension();
 init_policy();
 import { spawnSync as spawnSync2 } from "node:child_process";
+var OLDEST_RELEASE = {
+  aftereffects: { year: 2021, version: "18.0" },
+  premiere: { year: 2021, version: "15.0" }
+};
+function tooOldApps(host, folders) {
+  return folders.filter((name) => {
+    const year = Number(/\b(20\d\d)\b/.exec(name)?.[1]);
+    return Number.isFinite(year) && year < OLDEST_RELEASE[host].year;
+  });
+}
 var runCommand = (command, args) => {
-  const result = spawnSync2(command, args, { encoding: "utf8", timeout: 5e3, windowsHide: true });
+  const result = spawnSync2(systemCommand(command), args, { encoding: "utf8", timeout: 5e3, windowsHide: true });
   return { code: result.status ?? 1, stdout: result.stdout ?? "" };
 };
 function debugModeVersions(platform, run) {
@@ -90841,11 +91262,13 @@ async function adobeDoctor(options) {
         ...lacking.length ? { hint: `Zenvi Link there lacks ${lacking.length} tool(s) this zenvi knows (${lacking.slice(0, 4).join(", ")}\u2026): run \`zenvi adobe install\` and restart ${APP_LABEL[host]}.` } : {}
       });
     } else {
+      const old = tooOldApps(host, apps[host]);
+      const supported2 = apps[host].length > old.length;
       checks.push({
         name,
         level: "warn",
         detail: `not connected: ${found.detail}; app: ${installedApp}`,
-        hint: `Open ${APP_LABEL[host]}; Zenvi Link starts with it (Window > Extensions > Zenvi Link shows its panel).`
+        hint: old.length && !supported2 ? `${old.join(", ")} is older than Zenvi Link supports: it loads in ${APP_LABEL[host]} ${OLDEST_RELEASE[host].year} (${OLDEST_RELEASE[host].version}) or newer.` : `Open ${APP_LABEL[host]}; Zenvi Link starts with it (Window > Extensions > Zenvi Link shows its panel).`
       });
     }
   }
@@ -90988,6 +91411,12 @@ ${rows.length} tools. Run one with: zenvi call <tool> key=value \u2026 (After Ef
 }
 
 // src/commands/hosts.ts
+async function pathExists(file3) {
+  return lstat2(file3).then(
+    () => true,
+    () => false
+  );
+}
 function hostRegistry(ctx, project) {
   return new HostRegistry({ config: ctx.config, env: ctx.env, clientVersion: VERSION, portable: () => ({ project: project ?? null }) });
 }
@@ -91104,17 +91533,33 @@ function registerHostCommands(program2, ctx) {
       );
     }
     const plan = planExtensionInstall({ platform, home: ctx.config.home, appData: ctx.env.APPDATA, source: source2?.dir ?? "", uninstall: opts.uninstall, copy: true });
-    const replacingLink = !opts.uninstall && (await findInstalledExtensions(detect)).some((copy) => copy.dir === plan.target && copy.linked);
-    const notes = [...replacingLink ? ["This replaces a development link (npm run install:dev) with the copy that ships with zenvi."] : [], ...plan.notes];
-    if (!opts.dryRun) for (const action of plan.actions) runInstallAction(action);
+    const installed = await findInstalledExtensions(detect);
+    const replacingLink = !opts.uninstall && installed.some((copy) => copy.dir === plan.target && copy.linked);
+    const machineWide = installed.filter((copy) => copy.scope === "system");
+    const present = await pathExists(plan.target);
+    const nothingToRemove = Boolean(opts.uninstall) && !present;
+    const actions = nothingToRemove ? [] : plan.actions;
+    const notes = [
+      ...replacingLink ? ["This replaces a development link (npm run install:dev) with the copy that ships with zenvi."] : [],
+      ...opts.uninstall && machineWide.length ? [`A machine-wide copy stays at ${machineWide.map((copy) => copy.dir).join(", ")} (installed by a ZXP installer; remove it with that installer, with administrator rights).`] : [],
+      ...nothingToRemove ? [] : plan.notes
+    ];
+    if (!opts.dryRun && actions.length) {
+      try {
+        runInstallPlan(actions);
+      } catch (error62) {
+        throw new CliError(`Could not ${opts.uninstall ? "remove" : "install"} Zenvi Link at ${plan.target}: ${error62.message}`, 1, opts.uninstall ? void 0 : "The previous install, if any, is unchanged.");
+      }
+    }
     const verb = opts.uninstall ? "uninstall" : "install";
-    const summary = opts.dryRun ? `Would ${verb} Zenvi Link${source2?.version && !opts.uninstall ? ` ${source2.version}` : ""} at ${plan.target}` : opts.uninstall ? `Removed Zenvi Link from ${plan.target}` : `Installed Zenvi Link${source2?.version ? ` ${source2.version}` : ""} at ${plan.target}`;
+    const summary = nothingToRemove ? `Zenvi Link is not installed at ${plan.target}; nothing to remove` : opts.dryRun ? `Would ${verb} Zenvi Link${source2?.version && !opts.uninstall ? ` ${source2.version}` : ""} at ${plan.target}` : opts.uninstall ? `Removed Zenvi Link from ${plan.target}` : `Installed Zenvi Link${source2?.version ? ` ${source2.version}` : ""} at ${plan.target}`;
+    const changed = !opts.dryRun && actions.length > 0;
     if (ctx.out.json) {
-      ctx.out.data({ status: opts.dryRun ? "unchanged" : "applied", summary, target: plan.target, source: source2?.dir ?? null, version: source2?.version ?? null, actions: plan.actions.map(describeAction), notes, dryRun: Boolean(opts.dryRun) });
+      ctx.out.data({ status: changed ? "applied" : "unchanged", summary, target: plan.target, source: source2?.dir ?? null, version: source2?.version ?? null, actions: actions.map(describeAction), notes, dryRun: Boolean(opts.dryRun) });
       return;
     }
-    ctx.out.line(`${opts.dryRun ? ctx.out.style("\u2022", "dim") : ctx.out.style("\u2713", "green")} ${summary}${opts.dryRun ? ":" : ""}`);
-    if (opts.dryRun) for (const action of plan.actions) ctx.out.line(`  ${describeAction(action)}`);
+    ctx.out.line(`${changed ? ctx.out.style("\u2713", "green") : ctx.out.style("\u2022", "dim")} ${summary}${opts.dryRun && actions.length ? ":" : ""}`);
+    if (opts.dryRun) for (const action of actions) ctx.out.line(`  ${describeAction(action)}`);
     for (const note of notes) ctx.out.line(note);
   });
   adobe.command("doctor").description("check Zenvi Link: the extension, its install, PlayerDebugMode, the apps, the live connections, the MCP tool listing").action(async () => {
@@ -91449,19 +91894,19 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
 
 // src/agents/self-command.ts
 init_src2();
-import { realpathSync } from "node:fs";
+import { realpathSync as realpathSync2 } from "node:fs";
 import path30 from "node:path";
-function real(file3) {
+function real2(file3) {
   try {
-    return realpathSync(file3);
+    return realpathSync2(file3);
   } catch {
     return file3;
   }
 }
 function stableNodePath(env2 = process.env) {
-  const current = real(process.execPath);
+  const current = real2(process.execPath);
   const onPath = whichSync("node", env2);
-  if (onPath && real(onPath) === current) return onPath;
+  if (onPath && real2(onPath) === current) return onPath;
   return process.execPath;
 }
 function selfMcpCommand(env2 = process.env, argv = process.argv) {
@@ -91471,8 +91916,8 @@ function selfMcpCommand(env2 = process.env, argv = process.argv) {
     return { command: parts[0], args: [...parts.slice(1), "mcp"] };
   }
   const entry = argv[1] ? path30.resolve(argv[1]) : "";
-  if (/\.m?js$/.test(entry)) return { command: stableNodePath(env2), args: [real(entry), "mcp"] };
-  return { command: process.execPath, args: [...process.execArgv, real(entry), "mcp"] };
+  if (/\.m?js$/.test(entry)) return { command: stableNodePath(env2), args: [real2(entry), "mcp"] };
+  return { command: process.execPath, args: [...process.execArgv, real2(entry), "mcp"] };
 }
 
 // src/commands/integrations.ts

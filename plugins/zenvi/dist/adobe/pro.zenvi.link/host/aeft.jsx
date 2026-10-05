@@ -1704,9 +1704,31 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
         return path;
     };
 
+    // File() and Folder() read "%XX" in a path as an escape (paths are URIs
+    // to ExtendScript), so a folder really named "Project%20files" is found
+    // only when its % is passed as %25. Platform paths (tool arguments,
+    // fsName, ZenviLink.tempDir / tempFile) go through AE.fileAt /
+    // AE.folderAt; names appended to a fullName (URI notation, already
+    // escaped) go through AE.uriName. Only % is escaped.
+
+    /** The File at a platform path. */
+    AE.fileAt = function (path) {
+        return new File(String(path).replace(/%/g, "%25"));
+    };
+
+    /** The Folder at a platform path. */
+    AE.folderAt = function (path) {
+        return new Folder(String(path).replace(/%/g, "%25"));
+    };
+
+    /** A plain file or folder name, ready to append to a fullName. */
+    AE.uriName = function (name) {
+        return String(name).replace(/%/g, "%25");
+    };
+
     /** Mac and Windows file systems are case-insensitive by default. */
     AE.pathKey = function (path) {
-        var key = new File(path).fsName;
+        var key = AE.fileAt(path).fsName;
         return /^(Macintosh|Windows)/.test(File.fs) ? key.toLowerCase() : key;
     };
 
@@ -1717,7 +1739,7 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
      * uses "/".
      */
     AE.tempFolder = function (name) {
-        var folder = new Folder(new Folder(Z.tempDir()).fullName + "/" + name);
+        var folder = new Folder(AE.folderAt(Z.tempDir()).fullName + "/" + AE.uriName(name));
         if (!folder.exists && !folder.create()) {
             throw Z.fail("HOST_ERROR", "Could not create folder " + folder.fsName);
         }
@@ -3638,7 +3660,7 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
         // After Effects takes resolution factors 1-99.
         factor = Math.min(99, Math.max(1, Math.ceil(comp.width / maxWidth - 1e-9)));
         // Only into Zenvi Link's temp folder: the server deletes a capture there once it has sent it.
-        file = new File(Z.tempFile("capture-" + comp.id + "-" + frame, "png"));
+        file = AE.fileAt(Z.tempFile("capture-" + comp.id + "-" + frame, "png"));
         previous = comp.resolutionFactor;
         changedFactor = previous[0] !== factor || previous[1] !== factor;
         if (changedFactor) {
@@ -4002,7 +4024,7 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
         var i;
         for (i = 0; i < paths.length; i += 1) {
             AE.requireAbsolutePath(paths[i], "paths[" + i + "]");
-            file = new File(paths[i]);
+            file = AE.fileAt(paths[i]);
             if (!file.exists) {
                 missing.push(paths[i]);
                 continue;
@@ -6420,7 +6442,7 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
     }
 
     function fileSize(path) {
-        var file = new File(path);
+        var file = AE.fileAt(path);
         return file.exists ? file.length : null;
     }
 
@@ -6437,7 +6459,7 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
      */
     function stagingFile(target) {
         var parts = splitName(target);
-        return new File(target.parent.fullName + "/" + parts.base + ".zenvi-partial-" + new Date().getTime() + parts.ext);
+        return new File(target.parent.fullName + "/" + AE.uriName(parts.base + ".zenvi-partial-" + new Date().getTime() + parts.ext));
     }
 
     /** Move a finished staging render into place (replacing an old file there). */
@@ -6449,7 +6471,7 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
         if (!staging.rename(File.decode(target.name))) {
             throw Z.fail("HOST_ERROR", "Could not move the render to " + target.fsName + "; it is at " + staging.fsName);
         }
-        return new File(target.fsName);
+        return AE.fileAt(target.fsName);
     }
 
     /** The rendered file, which must exist. */
@@ -6475,10 +6497,10 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
 
     /** folder/base.ext, or base-2.ext, base-3.ext ... when that is taken. */
     function uniqueFile(folder, base, ext) {
-        var file = new File(folder.fullName + "/" + base + "." + ext);
+        var file = new File(folder.fullName + "/" + AE.uriName(base + "." + ext));
         var n;
         for (n = 2; file.exists && n < 1000; n += 1) {
-            file = new File(folder.fullName + "/" + base + "-" + n + "." + ext);
+            file = new File(folder.fullName + "/" + AE.uriName(base + "-" + n + "." + ext));
         }
         return file;
     }
@@ -6598,8 +6620,8 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
         requireIdleQueue();
         queued = queueForRender(title, "Queued \"" + comp.name + "\" for rendering", comp, templateName, function (templates) {
             var picked = chooseTemplate(templates, templateName, preset, ctx);
-            var target = new File(withExtension(output !== null ? output :
-                project.file.parent.fullName + "/Renders/" + AE.safeFileName(comp.name) + "." + (picked.ext || "mov"), picked.ext, ctx));
+            var target = output !== null ? AE.fileAt(withExtension(output, picked.ext, ctx)) :
+                new File(project.file.parent.fullName + "/Renders/" + AE.uriName(AE.safeFileName(comp.name) + "." + (picked.ext || "mov")));
             if (target.exists && !overwrite) {
                 throw Z.refuse("INVALID_ARGUMENT", target.fsName + " already exists; pass overwrite: true or another `output`");
             }
@@ -6713,7 +6735,7 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
                 // Zenvi's own renders folder: a new name per render, never another file.
                 target = uniqueFile(AE.tempFolder("renders"), AE.safeFileName(comp.name) + "-" + comp.id + "-" + AE.fileStamp(now), picked.ext || "mov");
             } else {
-                target = new File(withExtension(output, picked.ext, ctx));
+                target = AE.fileAt(withExtension(output, picked.ext, ctx));
             }
             if (target.exists && !overwrite) {
                 throw Z.refuse("INVALID_ARGUMENT", target.fsName + " already exists; pass overwrite: true or another `output`");
@@ -6837,7 +6859,7 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
             if (!/\.aepx?$/i.test(path)) {
                 throw Z.refuse("INVALID_ARGUMENT", "`path` must end in .aep or .aepx");
             }
-            file = new File(path);
+            file = AE.fileAt(path);
             if (!file.parent.exists) {
                 throw Z.refuse("NOT_FOUND", "Folder " + file.parent.fsName + " does not exist");
             }
@@ -6896,11 +6918,33 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
 
     // ------------------------------------------------------------------
     // ae_run_jsx_file
+    //
+    // A Zenvi export written for people ends with an alert unless
+    // $.global.ZENVI_AE_QUIET is true, and an alert would hold this call
+    // until someone clicks OK in After Effects. The flag is set only around
+    // $.evalFile and cleared afterwards on every path: in finally, and again
+    // after it, so nothing depends on how the engine handles finally (the
+    // flag left set would hide the alert from later File > Scripts runs).
+
+    var QUIET_FLAG = "ZENVI_AE_QUIET";
+
+    function clearQuiet() {
+        try {
+            delete $.global[QUIET_FLAG];
+        } catch (notDeleted) {
+            // Switched off below instead.
+        }
+        if ($.global[QUIET_FLAG] !== undefined) {
+            $.global[QUIET_FLAG] = false;
+        }
+    }
 
     Z.register("ae_run_jsx_file", function (args, ctx) {
         var path = AE.requireAbsolutePath(Z.required(args, "path", "string"), "path");
-        var file = new File(path);
+        var file = AE.fileAt(path);
         var result;
+        var failed = false;
+        var failure;
         var text;
         if (!/\.(jsx|jsxbin|js)$/i.test(path)) {
             throw Z.refuse("INVALID_ARGUMENT", "`path` must be a .jsx, .jsxbin or .js file");
@@ -6909,11 +6953,19 @@ ZenviLink.CATALOG = {"ae_get_state":{"title":"After Effects state","mutating":fa
             throw Z.refuse("NOT_FOUND", "File does not exist: " + path);
         }
         ctx.changed();
+        $.global[QUIET_FLAG] = true;
         try {
             result = $.evalFile(file);
         } catch (error) {
-            throw Z.fail("HOST_ERROR", file.displayName + " failed: " + (error && error.message ? error.message : String(error)) +
-                (error && typeof error.line === "number" ? " (line " + error.line + " of " + file.displayName + ")" : ""));
+            failed = true;
+            failure = error;
+        } finally {
+            clearQuiet();
+        }
+        clearQuiet();
+        if (failed) {
+            throw Z.fail("HOST_ERROR", file.displayName + " failed: " + (failure && failure.message ? failure.message : String(failure)) +
+                (failure && typeof failure.line === "number" ? " (line " + failure.line + " of " + file.displayName + ")" : ""));
         }
         text = result === undefined || result === null ? "" : String(result);
         return Z.applied("Ran " + file.displayName + (text ? ": " + AE.clip(text, 300) : ""), {path: file.fsName, result: text});
