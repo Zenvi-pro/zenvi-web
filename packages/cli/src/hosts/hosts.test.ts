@@ -159,6 +159,18 @@ describe("listHosts (SPEC §3.8)", () => {
     // The portable engine forwards to the desktop while it has the project open, so it is never active then.
     expect(first.hosts.find((h) => h.id === "zenvi-portable")).toMatchObject({ routes_to: "zenvi-desktop" });
     expect((await registry(project, Date.now() + 120_000).list()).active).toBe("after-effects");
+    // ZENVI_MCP_ENGINE=portable: never forwarded, so a newer portable call makes the portable engine active.
+    const portableOnly = new HostRegistry({
+      config: loadConfig(testEnv(home)),
+      env: testEnv(home, { ZENVI_MCP_ENGINE: "portable" }),
+      clientVersion: "test",
+      cacheMs: 0,
+      detect: { ...defaultDetectDeps(home, testEnv(home)), platform: "linux" },
+      portable: () => ({ project, lastCallAt: Date.now() + 120_000 }),
+    });
+    const forced = await portableOnly.list();
+    expect(forced.hosts.find((h) => h.id === "zenvi-portable")!.routes_to).toBeUndefined();
+    expect(forced.active).toBe("zenvi-portable");
     // Another project: the portable engine edits it itself, and a newer call makes it active.
     const other = path.join(home, "other.zvn");
     expect((await registry(other, Date.now() + 120_000).list()).active).toBe("zenvi-portable");

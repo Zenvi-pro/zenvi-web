@@ -368,6 +368,17 @@ describe("bring_from_after_effects", () => {
     ]);
   });
 
+  it("reports increasing progress for its steps", async () => {
+    const file = await projectFile();
+    await ae({ tools: [RENDER_FOR_ZENVI_TOOL], handlers: { ae_render_for_zenvi: () => ({ status: "applied", data: RENDER }) } });
+    await desktopWith(file, { tools: ["import_linked_media_tool"] });
+    const { client } = await connect({ project: file });
+    const seen: Array<{ progress: number; message?: string }> = [];
+    await client.callTool({ name: "bring_from_after_effects", arguments: {} }, undefined, { onprogress: (p) => void seen.push({ progress: p.progress, message: p.message }) });
+    expect(seen.map((p) => p.message)).toEqual(["Rendering in After Effects…", "Adding the render to the Zenvi project…"]);
+    expect(seen.every((p, i) => i === 0 || p.progress > seen[i - 1]!.progress)).toBe(true);
+  });
+
   it("uses Zenvi Link's own link object when it sends one", async () => {
     const file = await projectFile();
     const link = { version: 1, kind: "aftereffects", source: { aep: "/Work/promo.aep", composition: "Logo", composition_key: 4 }, render: { codec: "h264" } };

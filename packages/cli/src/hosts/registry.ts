@@ -187,7 +187,8 @@ export class HostRegistry {
     }
 
     let routesToDesktop = false;
-    if (portable.project) {
+    // ZENVI_MCP_ENGINE=portable: the server never forwards to the desktop app.
+    if (portable.project && this.options.env.ZENVI_MCP_ENGINE !== "portable") {
       for (const endpoint of snap.desktop) {
         if (await hasProjectOpen(endpoint, portable.project)) {
           routesToDesktop = true;

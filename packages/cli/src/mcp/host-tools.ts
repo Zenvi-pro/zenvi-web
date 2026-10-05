@@ -67,7 +67,7 @@ async function ensureDesktop(ctx: CommandContext, state: McpState, tool: string,
     return { ok: false, receipt: refused(tool, `${tool} runs in the Zenvi desktop app, which could not open ${file}: ${message} If Zenvi has unsaved changes in another project, ask the user to save or close it, then try again.`) };
   }
   state.hosts.invalidate();
-  call.progress?.(0, 0, `${summary} Waiting for it to show the project…`);
+  call.progress?.(0.05, 0, `${summary} Waiting for it to show the project…`);
   const deadline = Date.now() + state.desktopWaitMs;
   for (;;) {
     const desktop = await state.desktopExecutor();
@@ -192,7 +192,7 @@ function bringFromAfterEffects(ctx: CommandContext): ExtraTool {
         if (declaredName(schema.properties, ["alpha"])) renderArgs.alpha = args.alpha;
         else if (declaredName(schema.properties, ["codec"])) renderArgs.codec = args.alpha ? "prores4444" : "h264";
       }
-      call.progress?.(0, 0, "Rendering in After Effects…");
+      call.progress?.(0.1, 0, "Rendering in After Effects…");
       const render = await callAdobeTool(state.hosts, "ae_render_for_zenvi", renderArgs, { timeoutMs: ADOBE_RENDER_WAIT_MS });
       if (!isOkHostStatus(render.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "rendering in After Effects", render.receipt), ready.note), engine: "desktop" };
       const media = aeRenderLink(render.receipt.data ?? {}, args.alpha as boolean | undefined);
@@ -202,7 +202,7 @@ function bringFromAfterEffects(ctx: CommandContext): ExtraTool {
           engine: "desktop",
         };
       }
-      call.progress?.(0, 0, "Adding the render to the Zenvi project…");
+      call.progress?.(0.9, 0, "Adding the render to the Zenvi project…");
       const importArgs: Record<string, unknown> = { path: media.path, link: media.link };
       if (args.position !== undefined) importArgs.position = args.position;
       if (args.track !== undefined && args.track !== "") importArgs.track = String(args.track);
@@ -262,7 +262,7 @@ function bringFromPremiere(ctx: CommandContext): ExtraTool {
         if (!key) return { receipt: refused(tool, "this Zenvi Link's premiere_export_xml does not take a sequence; leave sequence out to export the active one"), engine: null };
         exportArgs[key] = args.sequence;
       }
-      call.progress?.(0, 0, "Exporting the sequence from Premiere Pro…");
+      call.progress?.(0.1, 0, "Exporting the sequence from Premiere Pro…");
       const exported = await callAdobeTool(state.hosts, "premiere_export_xml", exportArgs, { timeoutMs: ADOBE_RENDER_WAIT_MS });
       if (!isOkHostStatus(exported.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "exporting from Premiere Pro", exported.receipt), ready.note), engine: "desktop" };
       const xml = exportedXmlPath(exported.receipt.data ?? {});
@@ -272,7 +272,7 @@ function bringFromPremiere(ctx: CommandContext): ExtraTool {
           engine: "desktop",
         };
       }
-      call.progress?.(0, 0, "Importing the sequence into Zenvi…");
+      call.progress?.(0.9, 0, "Importing the sequence into Zenvi…");
       const { receipt: zenvi } = await forward(ready.desktop, "import_timeline_xml_tool", { path: xml, placement: args.placement ?? "new_tracks" }, call);
       const name = String(exported.receipt.data?.sequence_name ?? exported.receipt.data?.name ?? args.sequence ?? "the active sequence");
       const summary =

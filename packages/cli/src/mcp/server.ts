@@ -127,10 +127,15 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
     const name = request.params.name;
     const args = (request.params.arguments ?? {}) as Record<string, unknown>;
     const progressToken = request.params._meta?.progressToken;
+    // MCP progress must increase within a request: steps and relayed progress that do not are dropped.
+    let lastProgress = -Infinity;
     const progress =
       progressToken !== undefined
-        ? (value: number, total: number, message: string) =>
-            void extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress: value, ...(total > 0 ? { total } : {}), message } }).catch(() => undefined)
+        ? (value: number, total: number, message: string) => {
+            if (!(value > lastProgress)) return;
+            lastProgress = value;
+            void extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress: value, ...(total > 0 ? { total } : {}), message } }).catch(() => undefined);
+          }
         : undefined;
     try {
       const extraTool = extraByName.get(name);
