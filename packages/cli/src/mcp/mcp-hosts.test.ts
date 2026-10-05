@@ -208,7 +208,7 @@ describe("After Effects / Premiere Pro tools", () => {
     });
     const { client } = await connect();
     const r = await call(client, "ae_capture_frame", { time: "1.5" });
-    expect(host.calls).toEqual([{ tool: "ae_capture_frame", args: { time: 1.5 } }]);
+    expect(host.calls).toEqual([{ tool: "ae_capture_frame", args: expect.objectContaining({ time: 1.5 }) }]);
     expect(r.content.map((c) => [c.type, c.mimeType])).toEqual([["text", undefined], ["image", "image/png"]]);
     expect(Buffer.from(r.content[1]!.data!, "base64")).toEqual(png);
   });

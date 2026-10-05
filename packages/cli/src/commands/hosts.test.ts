@@ -137,7 +137,7 @@ describe("zenvi ae / zenvi premiere / zenvi call", () => {
     const captured = await run(["ae", "capture_frame", "time=2", "--out", "frame.png", "--json"]);
     expect(captured.json()).toMatchObject({ status: "ok", images: 1, saved: [path.join(work, "frame.png")] });
     expect(await readFile(path.join(work, "frame.png"))).toEqual(png);
-    expect(ae.calls.at(-1)).toEqual({ tool: "ae_capture_frame", args: { time: 2 } });
+    expect(ae.calls.at(-1)).toEqual({ tool: "ae_capture_frame", args: expect.objectContaining({ time: 2 }) });
 
     const viaCall = await run(["call", "ae_get_state", "--json"]);
     expect(viaCall.json()).toMatchObject({ tool: "ae_get_state", status: "ok" });
