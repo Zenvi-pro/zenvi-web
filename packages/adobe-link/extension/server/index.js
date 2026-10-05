@@ -71,6 +71,7 @@ async function boot(options) {
   });
   const startedAt = new Date().toISOString();
   let hostScript = { ok: false, problem: "not checked yet" };
+  let loadedHostScript = false;
   let stopped = false;
 
   await server.start();
@@ -99,11 +100,13 @@ async function boot(options) {
 
   /**
    * CEP loads the manifest's ScriptPath when the extension starts, but that
-   * can fail or race the page; then load the bundled host script directly.
+   * can fail or race the page; then load the bundled host script directly
+   * (once: later checks only look again).
    */
   async function ensureHostScript() {
     await checkHostScript();
-    if (hostScript.ok) return;
+    if (hostScript.ok || loadedHostScript) return;
+    loadedHostScript = true;
     const file = path.join(extensionDir, "host", (host === "aftereffects" ? "aeft" : "ppro") + ".jsx").split(path.sep).join("/");
     log("host script problem: " + hostScript.problem + "; loading " + file);
     await server.evalWhenIdle("$.evalFile(new File(" + scriptLiteral(file) + "))", 30000);

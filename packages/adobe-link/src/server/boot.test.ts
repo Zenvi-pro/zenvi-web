@@ -106,10 +106,16 @@ describe("boot inside CEP (fake __adobe_cep__, real host script on the mock DOM)
     expect(cep.listenerCount(EVENTS.activate)).toBe(0);
   });
 
-  test("a missing host script is reported, the server still starts", async () => {
-    const { link, home } = await bootAe({ evalScript: () => "EvalScript error." });
+  test("a missing host script is reported, loaded from disk once, and the server still starts", async () => {
+    const { link, home, cep } = await bootAe({ evalScript: () => "EvalScript error." });
     expect(link.status().host_script).toEqual({ ok: false, problem: "the host script is not loaded (EvalScript error.)" });
     expect(discoveryJson(home, "aftereffects").project).toBeNull();
+    cep.fire(EVENTS.activate);
+    await tick();
+    cep.fire(EVENTS.activate);
+    await tick();
+    expect(cep.scripts.filter((script) => script.startsWith("$.evalFile(")).length).toBe(1);
+    expect(cep.scripts.filter((script) => script === "ZenviLink.listTools()").length).toBeGreaterThanOrEqual(3);
   });
 
   test("Premiere Pro boots its own server and file", async () => {
