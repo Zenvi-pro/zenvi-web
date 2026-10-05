@@ -4,8 +4,8 @@
 // IDs (SPEC 3.3): items by item.id; layers by layer.id (After Effects 22+)
 // plus comp_id + layer_index for convenience. Times are comp seconds.
 
-(function (Z) {
-    var AE = {};
+(/** @param {ZenviLinkApi} Z */ function (Z) {
+    var AE = /** @type {ZenviAe} */ ({});
     Z.ae = AE;
     Z.host = "aftereffects";
 

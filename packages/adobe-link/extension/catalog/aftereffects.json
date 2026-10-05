@@ -19,6 +19,3766 @@
       },
       "returnsImage": false,
       "timeoutMs": 120000
+    },
+    {
+      "name": "ae_list_items",
+      "title": "List project items",
+      "description": "Project panel items: comps, footage, solids, placeholders and folders with id, name, type, size, duration, fps, file path and parent folder. Use it to find the item id that ae_add_layer, ae_get_comp or ae_render need. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "description": "Only items of this type",
+            "type": "string",
+            "enum": [
+              "comp",
+              "footage",
+              "solid",
+              "placeholder",
+              "folder"
+            ]
+          },
+          "name_contains": {
+            "description": "Only items whose name contains this text (case-insensitive)",
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "default": 200,
+            "description": "Maximum items returned (the receipt says when it truncated)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_get_comp",
+      "title": "Inspect comp",
+      "description": "One comp in depth: settings (size, fps, duration, background, work area, motion blur, frame blending), comp markers and every layer with id, index, name, type, source, timing (start/in/out/stretch), parent, switches, blend mode, track matte, effects and the paths of its animated properties. Default: the active comp. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "max_layers": {
+            "default": 200,
+            "description": "Maximum layers listed (top first)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_get_layer",
+      "title": "Inspect layer",
+      "description": "Deep view of one layer: transform values at `time`, every keyframe of its animated properties (time, value, interpolation, temporal ease), effects with their parameters, the text document of text layers, masks and expressions (with errors). Use it before changing animation so you edit what is there. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "time": {
+            "description": "Comp time for the transform values (default: the comp's current time)",
+            "type": "number",
+            "minimum": 0
+          },
+          "max_keys": {
+            "default": 100,
+            "description": "Maximum keyframes listed per property",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "layer"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_capture_frame",
+      "title": "Capture comp frame",
+      "description": "Render one comp frame to a PNG and return it as an image: your eyes. After any visual change capture the moments that matter (first frame, each entrance end, mid-hold, last frame) and critique them against the taste guide: text inside title-safe and readable, one focal point, nothing ending abruptly. Wide comps are downsampled to `max_width` through the comp's resolution factor, which is restored afterwards. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "time": {
+            "description": "Comp time in seconds (default: the comp's current time); snapped to the frame grid",
+            "type": "number",
+            "minimum": 0
+          },
+          "max_width": {
+            "default": 1280,
+            "description": "Largest width of the returned image in pixels",
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": true,
+      "timeoutMs": 60000
+    },
+    {
+      "name": "ae_create_comp",
+      "title": "Create comp",
+      "description": "Create a composition and open it. Presets: 1080p (1920x1080), 4k (3840x2160), vertical (1080x1920, 9:16 social), square (1080x1080), 720p (1280x720), or pass width and height. Defaults: 30 fps, 10 s, background ink #0B0B0F, square pixels. A taken name gets a number appended.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "default": "Zenvi Comp",
+            "description": "Comp name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "preset": {
+            "description": "Frame size preset (default 1080p unless width and height are given)",
+            "type": "string",
+            "enum": [
+              "1080p",
+              "4k",
+              "vertical",
+              "square",
+              "720p"
+            ]
+          },
+          "width": {
+            "description": "Width in pixels (with height; overrides preset)",
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 30000
+          },
+          "height": {
+            "description": "Height in pixels (with width; overrides preset)",
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 30000
+          },
+          "fps": {
+            "default": 30,
+            "description": "Frame rate (29.97 and 23.976 work)",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 999
+          },
+          "duration": {
+            "default": 10,
+            "description": "Duration in seconds",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10800
+          },
+          "background": {
+            "description": "Background colour (default #0B0B0F)",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Hex colour #RRGGBB"
+              },
+              {
+                "minItems": 3,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "description": "[r, g, b], each 0–1"
+              }
+            ]
+          },
+          "pixel_aspect": {
+            "default": 1,
+            "description": "Pixel aspect ratio",
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 100
+          },
+          "folder": {
+            "description": "Project folder to put it in (created at the root if missing)",
+            "type": "string",
+            "minLength": 1
+          },
+          "open": {
+            "default": true,
+            "description": "Open it in the Composition viewer",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_set_comp",
+      "title": "Change comp settings",
+      "description": "Change a comp: name, duration, fps, size, background, work area, motion blur (switch, shutter angle/phase), frame blending, or open it in the viewer. Only the given settings change; nothing given or nothing different = unchanged.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "name": {
+            "description": "New name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "duration": {
+            "description": "Duration in seconds",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10800
+          },
+          "fps": {
+            "description": "Frame rate",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 999
+          },
+          "width": {
+            "description": "Width in pixels (layers keep their positions)",
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 30000
+          },
+          "height": {
+            "description": "Height in pixels",
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 30000
+          },
+          "background": {
+            "description": "Background colour",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Hex colour #RRGGBB"
+              },
+              {
+                "minItems": 3,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "description": "[r, g, b], each 0–1"
+              }
+            ]
+          },
+          "work_area": {
+            "description": "Work area",
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Work area start in seconds"
+              },
+              "end": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Work area end in seconds (after start, within the comp)"
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ],
+            "additionalProperties": false
+          },
+          "motion_blur": {
+            "description": "Comp motion blur switch (layers also need their own switch)",
+            "type": "boolean"
+          },
+          "shutter_angle": {
+            "description": "Motion blur shutter angle in degrees (After Effects default 180)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 720
+          },
+          "shutter_phase": {
+            "description": "Motion blur shutter phase in degrees (default -90)",
+            "type": "number",
+            "minimum": -360,
+            "maximum": 360
+          },
+          "frame_blending": {
+            "description": "Comp frame blending switch",
+            "type": "boolean"
+          },
+          "open": {
+            "description": "Open the comp in the viewer",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_import_files",
+      "title": "Import files",
+      "description": "Import media files as footage items into a project folder (default \"Zenvi Imports\", created if missing). Paths already in the project are reused, not imported twice (`dedupe`). All paths are checked before anything is imported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)",
+              "description": "Absolute file path"
+            },
+            "description": "Files to import"
+          },
+          "folder": {
+            "default": "Zenvi Imports",
+            "description": "Project folder name",
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "default": false,
+            "description": "Import each path as the first frame of an image sequence",
+            "type": "boolean"
+          },
+          "dedupe": {
+            "default": true,
+            "description": "Reuse items whose file is already imported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_add_layer",
+      "title": "Add layer",
+      "description": "Add a layer at the top of a comp: footage (a project item id or a file path, imported once), solid, adjustment, null, shape (rect or ellipse with fill, stroke and roundness), camera or light; with name, timing, initial transform, parent, blend mode, 3D and label. Solids default to the comp size in ink #0B0B0F; shapes to a centred 30 % rect filled with accent #FF5A36. Text has its own tool (ae_add_text).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "footage",
+              "solid",
+              "adjustment",
+              "null",
+              "shape",
+              "camera",
+              "light"
+            ],
+            "description": "What to add"
+          },
+          "item": {
+            "description": "footage: project item id (footage or comp, from ae_list_items)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "path": {
+            "description": "footage: a media file to import (reused when already imported)",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "name": {
+            "description": "Layer name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "color": {
+            "description": "solid: colour; shape: fill colour",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Hex colour #RRGGBB"
+              },
+              {
+                "minItems": 3,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "description": "[r, g, b], each 0–1"
+              }
+            ]
+          },
+          "width": {
+            "description": "solid: width in pixels (default: the comp width)",
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 30000
+          },
+          "height": {
+            "description": "solid: height in pixels (default: the comp height)",
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 30000
+          },
+          "shape": {
+            "default": "rect",
+            "description": "shape: primitive",
+            "type": "string",
+            "enum": [
+              "rect",
+              "ellipse"
+            ]
+          },
+          "size": {
+            "description": "shape: [width, height] in pixels (default 30 % of the comp)",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "stroke": {
+            "description": "shape: stroke colour (no stroke when omitted)",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Hex colour #RRGGBB"
+              },
+              {
+                "minItems": 3,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "description": "[r, g, b], each 0–1"
+              }
+            ]
+          },
+          "stroke_width": {
+            "description": "shape: stroke width in pixels (default 4 px at 1080p)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "roundness": {
+            "default": 0,
+            "description": "shape rect: corner roundness in pixels",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "light_type": {
+            "default": "point",
+            "description": "light: type",
+            "type": "string",
+            "enum": [
+              "parallel",
+              "spot",
+              "point",
+              "ambient"
+            ]
+          },
+          "start": {
+            "description": "Layer start time in seconds (default 0)",
+            "type": "number",
+            "minimum": 0
+          },
+          "in_point": {
+            "description": "In point in seconds",
+            "type": "number",
+            "minimum": 0
+          },
+          "out_point": {
+            "description": "Out point in seconds",
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "position": {
+            "description": "Position [x, y] or [x, y, z] in comp pixels (default: centre)",
+            "minItems": 2,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "scale": {
+            "description": "Scale % (one number = uniform)",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "minItems": 2,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            ]
+          },
+          "rotation": {
+            "description": "Rotation in degrees",
+            "type": "number"
+          },
+          "opacity": {
+            "description": "Opacity %",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "parent": {
+            "description": "Parent layer",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ]
+          },
+          "blend_mode": {
+            "description": "Blend mode",
+            "type": "string",
+            "enum": [
+              "normal",
+              "dissolve",
+              "dancing-dissolve",
+              "darken",
+              "multiply",
+              "color-burn",
+              "classic-color-burn",
+              "linear-burn",
+              "darker-color",
+              "add",
+              "lighten",
+              "screen",
+              "color-dodge",
+              "classic-color-dodge",
+              "linear-dodge",
+              "lighter-color",
+              "overlay",
+              "soft-light",
+              "hard-light",
+              "linear-light",
+              "vivid-light",
+              "pin-light",
+              "hard-mix",
+              "difference",
+              "classic-difference",
+              "exclusion",
+              "subtract",
+              "divide",
+              "hue",
+              "saturation",
+              "color",
+              "luminosity",
+              "stencil-alpha",
+              "stencil-luma",
+              "silhouette-alpha",
+              "silhouette-luma",
+              "alpha-add",
+              "luminescent-premul"
+            ]
+          },
+          "three_d": {
+            "description": "Make it a 3D layer",
+            "type": "boolean"
+          },
+          "label": {
+            "description": "Label colour index 0-16",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_add_text",
+      "title": "Add text",
+      "description": "Add a text layer that already looks designed. `style` picks the TASTE type scale at 1080p (scaled by the comp's short side): headline 96 px bold, title 72 px bold, subtitle 44 px, lower-third 54 px name (+ 34 px role via `subtitle`), caption 42 px. Fonts fall back Inter > SF Pro Display > Helvetica Neue > Arial. Tracking -15 on headlines, +80 on ALL CAPS; leading 1.1x headlines / 1.3x body. `placement` keeps the text inside title-safe (10 % inset; 9:16 also avoids the top 12 % and bottom 20 %); lower-third sits left at title-safe with its baseline at 80 % (70 % vertical). Lines over 32 characters are broken at balanced word boundaries, too-wide text is scaled down to fit, and a soft shadow is added over footage. Optional `animation` applies a motion preset at the layer's start.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "The text; \\n starts a new line"
+          },
+          "subtitle": {
+            "description": "Second, smaller line as its own layer below (e.g. the role in a lower third)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "name": {
+            "description": "Layer name (default: the text)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "style": {
+            "description": "Type role (default: lower-third for that placement, caption for bottom-center, subtitle for top placements, else title)",
+            "type": "string",
+            "enum": [
+              "headline",
+              "title",
+              "subtitle",
+              "lower-third",
+              "caption"
+            ]
+          },
+          "placement": {
+            "default": "center",
+            "description": "Where the text sits; every placement stays inside title-safe",
+            "type": "string",
+            "enum": [
+              "center",
+              "lower-third",
+              "top-left",
+              "top-center",
+              "bottom-center"
+            ]
+          },
+          "font": {
+            "description": "PostScript font name, e.g. \"Inter-Bold\" (falls back with a warning when missing)",
+            "type": "string",
+            "minLength": 1
+          },
+          "size": {
+            "description": "Font size in pixels (default: the style's TASTE size)",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1296
+          },
+          "fill": {
+            "description": "Fill colour (default paper #F7F7F5)",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Hex colour #RRGGBB"
+              },
+              {
+                "minItems": 3,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "description": "[r, g, b], each 0–1"
+              }
+            ]
+          },
+          "stroke": {
+            "description": "Stroke colour (no stroke when omitted)",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Hex colour #RRGGBB"
+              },
+              {
+                "minItems": 3,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "description": "[r, g, b], each 0–1"
+              }
+            ]
+          },
+          "stroke_width": {
+            "description": "Stroke width in pixels (default 2 px at 1080p when stroke is set)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "tracking": {
+            "description": "Tracking in 1/1000 em (After Effects units)",
+            "type": "number",
+            "minimum": -1000,
+            "maximum": 10000
+          },
+          "leading": {
+            "description": "Line spacing as a multiple of the font size",
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 5
+          },
+          "justification": {
+            "description": "Paragraph alignment (default: from placement)",
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ]
+          },
+          "box": {
+            "description": "Paragraph text box (wraps inside it) instead of point text",
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "minimum": 1,
+                "description": "Box width in pixels"
+              },
+              "height": {
+                "type": "number",
+                "minimum": 1,
+                "description": "Box height in pixels"
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          },
+          "auto_break": {
+            "default": true,
+            "description": "Break lines longer than 32 characters at balanced word boundaries",
+            "type": "boolean"
+          },
+          "shadow": {
+            "description": "Soft drop shadow for contrast (default: on when footage or a precomp is below)",
+            "type": "boolean"
+          },
+          "start": {
+            "description": "Layer start in seconds (default 0)",
+            "type": "number",
+            "minimum": 0
+          },
+          "duration": {
+            "description": "Seconds on screen (default: to the comp end; lower-third 5 s)",
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "animation": {
+            "description": "Entrance preset applied at the layer start (see ae_apply_motion_preset)",
+            "type": "string",
+            "enum": [
+              "fade-in",
+              "slide-in",
+              "scale-pop",
+              "blur-in",
+              "typewriter",
+              "word-cascade",
+              "line-rise"
+            ]
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_set_text",
+      "title": "Change text",
+      "description": "Change an existing text layer's text or style: text, font (with fallback), size, fill, stroke, tracking, leading, justification or paragraph box size. When Source Text is keyframed pass `time` to set the keyframe there. Only the given values change.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "text": {
+            "description": "New text; \\n starts a new line",
+            "type": "string",
+            "maxLength": 5000
+          },
+          "font": {
+            "description": "PostScript font name",
+            "type": "string",
+            "minLength": 1
+          },
+          "size": {
+            "description": "Font size in pixels",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1296
+          },
+          "fill": {
+            "description": "Fill colour",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Hex colour #RRGGBB"
+              },
+              {
+                "minItems": 3,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "description": "[r, g, b], each 0–1"
+              }
+            ]
+          },
+          "stroke": {
+            "description": "Stroke colour; null removes the stroke",
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                    "description": "Hex colour #RRGGBB"
+                  },
+                  {
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "description": "[r, g, b], each 0–1"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stroke_width": {
+            "description": "Stroke width in pixels",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "tracking": {
+            "description": "Tracking in 1/1000 em",
+            "type": "number",
+            "minimum": -1000,
+            "maximum": 10000
+          },
+          "leading": {
+            "description": "Line spacing as a multiple of the font size",
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 5
+          },
+          "justification": {
+            "description": "Paragraph alignment",
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ]
+          },
+          "box": {
+            "description": "Paragraph box size (paragraph text layers only)",
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "minimum": 1,
+                "description": "Box width in pixels"
+              },
+              "height": {
+                "type": "number",
+                "minimum": 1,
+                "description": "Box height in pixels"
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          },
+          "time": {
+            "description": "For keyframed Source Text: set the keyframe at this time",
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "layer"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_set_layer",
+      "title": "Change layer",
+      "description": "Change a layer's timing (start, in, out, stretch), switches (enabled, solo, locked, shy, motion blur, 3D, adjustment, guide, collapse transformations, audio), blend mode, track matte, parent, label, name, comment or quality. Unlock in the same call (locked: false) to change a locked layer. Only the given values change.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "name": {
+            "description": "New layer name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "comment": {
+            "description": "Layer comment",
+            "type": "string",
+            "maxLength": 5000
+          },
+          "start": {
+            "description": "Start time in seconds (moves the layer and its keyframes)",
+            "type": "number",
+            "minimum": -10800,
+            "maximum": 10800
+          },
+          "in_point": {
+            "description": "In point in seconds",
+            "type": "number",
+            "minimum": -10800,
+            "maximum": 10800
+          },
+          "out_point": {
+            "description": "Out point in seconds",
+            "type": "number",
+            "minimum": -10800,
+            "maximum": 10800
+          },
+          "stretch": {
+            "description": "Time stretch % (100 = normal, 200 = half speed, negative = reverse)",
+            "type": "number",
+            "minimum": -10000,
+            "maximum": 10000
+          },
+          "enabled": {
+            "description": "Video switch (eyeball)",
+            "type": "boolean"
+          },
+          "audio_enabled": {
+            "description": "Audio switch",
+            "type": "boolean"
+          },
+          "solo": {
+            "description": "Solo",
+            "type": "boolean"
+          },
+          "locked": {
+            "description": "Lock",
+            "type": "boolean"
+          },
+          "shy": {
+            "description": "Shy",
+            "type": "boolean"
+          },
+          "motion_blur": {
+            "description": "Layer motion blur switch",
+            "type": "boolean"
+          },
+          "three_d": {
+            "description": "3D layer",
+            "type": "boolean"
+          },
+          "adjustment": {
+            "description": "Adjustment layer",
+            "type": "boolean"
+          },
+          "guide": {
+            "description": "Guide layer (not rendered)",
+            "type": "boolean"
+          },
+          "collapse": {
+            "description": "Collapse transformations / continuously rasterize",
+            "type": "boolean"
+          },
+          "blend_mode": {
+            "description": "Blend mode",
+            "type": "string",
+            "enum": [
+              "normal",
+              "dissolve",
+              "dancing-dissolve",
+              "darken",
+              "multiply",
+              "color-burn",
+              "classic-color-burn",
+              "linear-burn",
+              "darker-color",
+              "add",
+              "lighten",
+              "screen",
+              "color-dodge",
+              "classic-color-dodge",
+              "linear-dodge",
+              "lighter-color",
+              "overlay",
+              "soft-light",
+              "hard-light",
+              "linear-light",
+              "vivid-light",
+              "pin-light",
+              "hard-mix",
+              "difference",
+              "classic-difference",
+              "exclusion",
+              "subtract",
+              "divide",
+              "hue",
+              "saturation",
+              "color",
+              "luminosity",
+              "stencil-alpha",
+              "stencil-luma",
+              "silhouette-alpha",
+              "silhouette-luma",
+              "alpha-add",
+              "luminescent-premul"
+            ]
+          },
+          "track_matte": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "alpha",
+                  "alpha-inverted",
+                  "luma",
+                  "luma-inverted",
+                  "none"
+                ],
+                "description": "Matte type; none removes the matte"
+              },
+              "layer": {
+                "description": "Matte layer (After Effects 2023+; default and only choice before 2023: the layer directly above)",
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "index": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991,
+                        "description": "1-based layer index, 1 = top layer"
+                      }
+                    },
+                    "required": [
+                      "index"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Layer by position"
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Exact layer name"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false,
+            "description": "Track matte"
+          },
+          "parent": {
+            "description": "Parent layer; null removes the parent (the layer keeps its place on screen)",
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "index": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991,
+                        "description": "1-based layer index, 1 = top layer"
+                      }
+                    },
+                    "required": [
+                      "index"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Layer by position"
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Exact layer name"
+                  }
+                ],
+                "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "description": "Label colour index 0-16",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "quality": {
+            "description": "Layer quality",
+            "type": "string",
+            "enum": [
+              "best",
+              "draft",
+              "wireframe"
+            ]
+          }
+        },
+        "required": [
+          "layer"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_arrange_layers",
+      "title": "Arrange layers",
+      "description": "Restack, duplicate, delete or split a layer. move: `to` top, bottom, {index}, {before: layer} or {after: layer}. duplicate: copies the layer (keyframes, effects, masks) above itself. delete: removes it (children keep their place). split: cuts it at `time` into two layers, like Edit > Split Layer.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "move",
+              "duplicate",
+              "delete",
+              "split"
+            ],
+            "description": "What to do"
+          },
+          "to": {
+            "description": "move: where the layer goes",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "description": "Top or bottom of the stack"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based index the layer ends up at"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "An index"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "before": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991,
+                        "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "index": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based layer index, 1 = top layer"
+                          }
+                        },
+                        "required": [
+                          "index"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Layer by position"
+                      },
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact layer name"
+                      }
+                    ],
+                    "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+                  }
+                },
+                "required": [
+                  "before"
+                ],
+                "additionalProperties": false,
+                "description": "Right above another layer"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "after": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991,
+                        "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "index": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based layer index, 1 = top layer"
+                          }
+                        },
+                        "required": [
+                          "index"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Layer by position"
+                      },
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact layer name"
+                      }
+                    ],
+                    "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+                  }
+                },
+                "required": [
+                  "after"
+                ],
+                "additionalProperties": false,
+                "description": "Right below another layer"
+              }
+            ]
+          },
+          "time": {
+            "description": "split: cut time in seconds (default: the comp's current time)",
+            "type": "number",
+            "minimum": 0
+          },
+          "name": {
+            "description": "duplicate / split: name for the new layer",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "layer",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_set_property",
+      "title": "Set property",
+      "description": "Set any layer property by path (display or match names): a static value, or a keyframe at `time`. Colours take #RRGGBB, points [x, y], Scale a number for uniform %. Values are checked against the property's range first. For eased motion use ae_animate instead.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "property": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Display or match names separated by '/', e.g. \"Transform/Position\", \"Effects/Gaussian Blur/Blurriness\", \"ADBE Transform Group/ADBE Opacity\""
+              },
+              {
+                "minItems": 1,
+                "maxItems": 12,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The same path as a list of names (use when a name contains '/')"
+              }
+            ],
+            "description": "Property path from the layer. Transform properties may omit the group (\"Position\", \"Scale\", \"Opacity\"); effect parameters may omit \"Effects\" (\"Gaussian Blur/Blurriness\"). Digits select by 1-based index when no property has that name."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "1D value (opacity, rotation, a slider, a menu index from 1, a checkbox 0/1; Scale takes one number as uniform %)"
+              },
+              {
+                "type": "boolean",
+                "description": "Checkbox (true = 1)"
+              },
+              {
+                "type": "string",
+                "description": "Text for Source Text, or a #RRGGBB colour for colour properties"
+              },
+              {
+                "minItems": 1,
+                "maxItems": 4,
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "[x, y] / [x, y, z] for points, [r, g, b] or [r, g, b, a] with 0-1 channels for colours"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "vertices": {
+                    "minItems": 1,
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "description": "[x, y]"
+                    },
+                    "description": "Vertices in layer pixels"
+                  },
+                  "in_tangents": {
+                    "description": "Incoming tangents, relative to each vertex (default: straight)",
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "description": "[x, y]"
+                    }
+                  },
+                  "out_tangents": {
+                    "description": "Outgoing tangents, relative to each vertex (default: straight)",
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "description": "[x, y]"
+                    }
+                  },
+                  "closed": {
+                    "description": "Closed path (default true)",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "vertices"
+                ],
+                "additionalProperties": false,
+                "description": "A Bezier path: {vertices, in_tangents?, out_tangents?, closed?}"
+              }
+            ],
+            "description": "Value in the property's own units"
+          },
+          "time": {
+            "description": "Set a keyframe at this time instead of the static value (required when the property already has keyframes)",
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "layer",
+          "property",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_animate",
+      "title": "Animate property",
+      "description": "Keyframe a property with real eased keyframes. Each segment eases with the TASTE curves (default smooth; out/entrance for arrivals, in/exit for departures, in-out between resting states, snap for punchy pops, linear only for opacity crossfades, loops and tickers, hold for steps) or a custom {x1, y1, x2, y2}, mapped exactly to After Effects speed/influence per dimension (spatial properties along the path). Existing keyframes inside the new time span are replaced (all of them with `replace`). `overshoot` (0-0.06) adds an editable settle keyframe for playful brands only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "property": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Display or match names separated by '/', e.g. \"Transform/Position\", \"Effects/Gaussian Blur/Blurriness\", \"ADBE Transform Group/ADBE Opacity\""
+              },
+              {
+                "minItems": 1,
+                "maxItems": 12,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The same path as a list of names (use when a name contains '/')"
+              }
+            ],
+            "description": "Property path from the layer. Transform properties may omit the group (\"Position\", \"Scale\", \"Opacity\"); effect parameters may omit \"Effects\" (\"Gaussian Blur/Blurriness\"). Digits select by 1-based index when no property has that name."
+          },
+          "keyframes": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Comp time in seconds (snapped to the frame grid)"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "1D value (opacity, rotation, a slider, a menu index from 1, a checkbox 0/1; Scale takes one number as uniform %)"
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "Checkbox (true = 1)"
+                    },
+                    {
+                      "type": "string",
+                      "description": "Text for Source Text, or a #RRGGBB colour for colour properties"
+                    },
+                    {
+                      "minItems": 1,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "description": "[x, y] / [x, y, z] for points, [r, g, b] or [r, g, b, a] with 0-1 channels for colours"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "vertices": {
+                          "minItems": 1,
+                          "maxItems": 1000,
+                          "type": "array",
+                          "items": {
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "description": "[x, y]"
+                          },
+                          "description": "Vertices in layer pixels"
+                        },
+                        "in_tangents": {
+                          "description": "Incoming tangents, relative to each vertex (default: straight)",
+                          "maxItems": 1000,
+                          "type": "array",
+                          "items": {
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "description": "[x, y]"
+                          }
+                        },
+                        "out_tangents": {
+                          "description": "Outgoing tangents, relative to each vertex (default: straight)",
+                          "maxItems": 1000,
+                          "type": "array",
+                          "items": {
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "description": "[x, y]"
+                          }
+                        },
+                        "closed": {
+                          "description": "Closed path (default true)",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "vertices"
+                      ],
+                      "additionalProperties": false,
+                      "description": "A Bezier path: {vertices, in_tangents?, out_tangents?, closed?}"
+                    }
+                  ],
+                  "description": "Value in the property's own units"
+                },
+                "easing": {
+                  "description": "Easing of the segment that leaves this keyframe (default: the call's `easing`)",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "smooth",
+                        "out",
+                        "entrance",
+                        "in",
+                        "exit",
+                        "in-out",
+                        "snap",
+                        "linear",
+                        "hold"
+                      ],
+                      "description": "TASTE easing name"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "x1": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "First control point x, 0–1"
+                        },
+                        "y1": {
+                          "type": "number",
+                          "description": "First control point y (outside 0–1 overshoots)"
+                        },
+                        "x2": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "Second control point x, 0–1"
+                        },
+                        "y2": {
+                          "type": "number",
+                          "description": "Second control point y (outside 0–1 overshoots)"
+                        }
+                      },
+                      "required": [
+                        "x1",
+                        "y1",
+                        "x2",
+                        "y2"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Custom cubic-bezier(x1, y1, x2, y2)"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "time",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Keyframes in time order: [{time, value, easing?}]"
+          },
+          "easing": {
+            "default": "smooth",
+            "description": "Default easing for every segment",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "smooth",
+                  "out",
+                  "entrance",
+                  "in",
+                  "exit",
+                  "in-out",
+                  "snap",
+                  "linear",
+                  "hold"
+                ],
+                "description": "TASTE easing name"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x1": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "First control point x, 0–1"
+                  },
+                  "y1": {
+                    "type": "number",
+                    "description": "First control point y (outside 0–1 overshoots)"
+                  },
+                  "x2": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Second control point x, 0–1"
+                  },
+                  "y2": {
+                    "type": "number",
+                    "description": "Second control point y (outside 0–1 overshoots)"
+                  }
+                },
+                "required": [
+                  "x1",
+                  "y1",
+                  "x2",
+                  "y2"
+                ],
+                "additionalProperties": false,
+                "description": "Custom cubic-bezier(x1, y1, x2, y2)"
+              }
+            ]
+          },
+          "replace": {
+            "default": false,
+            "description": "Remove all existing keyframes of the property first",
+            "type": "boolean"
+          },
+          "spatial": {
+            "default": "auto-bezier",
+            "description": "Spatial interpolation for position-like properties",
+            "type": "string",
+            "enum": [
+              "auto-bezier",
+              "linear"
+            ]
+          },
+          "overshoot": {
+            "default": 0,
+            "description": "Overshoot of the last segment as a fraction of its distance (settles within 0.25 s)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.06
+          }
+        },
+        "required": [
+          "layer",
+          "property",
+          "keyframes"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_apply_motion_preset",
+      "title": "Apply motion preset",
+      "description": "Tasteful, editable animation on a layer. fade-in / fade-out (opacity), slide-in / slide-out (4 % of the frame width with opacity), scale-pop (92 % to 100 %), blur-in, whip-in (a fast push with motion blur), ken-burns (slow scale + pan over the shot, in-out), push-in (100 % to 104 % over the shot), drift (a slow procedural float, an expression); text only: typewriter, word-cascade, line-rise (text animators with a Range Selector, so a human can retime them). Defaults: entrances 0.6 s eased out, exits 0.4 s eased in, pops 0.27 s snap, stagger 0.06 s per word / 0.12 s per line; entrances start at the layer's in point, exits end at its out point. `intensity` 0-1 (0.5 = the TASTE default) scales distance, scale or blur within the TASTE range. Keyframes already in the preset's time range on the same properties are replaced.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "preset": {
+            "type": "string",
+            "enum": [
+              "fade-in",
+              "fade-out",
+              "slide-in",
+              "slide-out",
+              "scale-pop",
+              "blur-in",
+              "typewriter",
+              "word-cascade",
+              "line-rise",
+              "ken-burns",
+              "push-in",
+              "drift",
+              "whip-in"
+            ],
+            "description": "Motion preset"
+          },
+          "start": {
+            "description": "Start time in seconds (default: in point for entrances and holds; out point minus duration for exits)",
+            "type": "number",
+            "minimum": 0
+          },
+          "duration": {
+            "description": "Seconds (default per preset; word-cascade / line-rise: each word or line's entrance; typewriter: the whole text)",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 600
+          },
+          "intensity": {
+            "default": 0.5,
+            "description": "0-1 within the TASTE range; 0.5 = default",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "direction": {
+            "description": "Direction of travel for slide/whip presets (default: slide-in up, slide-out down, whip-in right, ken-burns left)",
+            "type": "string",
+            "enum": [
+              "left",
+              "right",
+              "up",
+              "down"
+            ]
+          },
+          "stagger": {
+            "description": "Text presets: seconds between words/lines/characters",
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 2
+          }
+        },
+        "required": [
+          "layer",
+          "preset"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_add_expression",
+      "title": "Set expression",
+      "description": "Set or clear an expression on a property. The expression is checked by After Effects right away; one that errors is removed again and the call is refused with After Effects' message. An empty string clears the expression. Prefer keyframes for anything a human will retime; expressions suit loops, wiggles and links between properties.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "property": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Display or match names separated by '/', e.g. \"Transform/Position\", \"Effects/Gaussian Blur/Blurriness\", \"ADBE Transform Group/ADBE Opacity\""
+              },
+              {
+                "minItems": 1,
+                "maxItems": 12,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The same path as a list of names (use when a name contains '/')"
+              }
+            ],
+            "description": "Property path from the layer. Transform properties may omit the group (\"Position\", \"Scale\", \"Opacity\"); effect parameters may omit \"Effects\" (\"Gaussian Blur/Blurriness\"). Digits select by 1-based index when no property has that name."
+          },
+          "expression": {
+            "type": "string",
+            "maxLength": 100000,
+            "description": "Expression source; \"\" clears it"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Enable the expression",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "layer",
+          "property",
+          "expression"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_apply_effect",
+      "title": "Apply effect",
+      "description": "Add an effect to a layer by display name or match name (exact first, then a unique fuzzy match on the display name; ae_list_effects lists them), then set parameters and optional eased keyframes. Returns the effect's index and the exact parameter names it set.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "effect": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Effect display name (\"Gaussian Blur\") or match name (\"ADBE Gaussian Blur 2\")"
+          },
+          "name": {
+            "description": "Name for this effect instance",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "params": {
+            "description": "Parameter values [{param, value}]",
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "param": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parameter display name, match name, or \"Section/Name\" for duplicates (e.g. \"Creative/Saturation\")"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Number (sliders, angles, menu index from 1, checkbox 0/1)"
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "Checkbox"
+                    },
+                    {
+                      "type": "string",
+                      "description": "#RRGGBB for colour parameters"
+                    },
+                    {
+                      "minItems": 1,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "description": "[x, y] points or [r, g, b(, a)] colours with 0-1 channels"
+                    }
+                  ],
+                  "description": "Value in the parameter's own units"
+                }
+              },
+              "required": [
+                "param",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "keyframes": {
+            "description": "Animated parameters [{param, keyframes}]",
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "param": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parameter display name or match name"
+                },
+                "keyframes": {
+                  "minItems": 1,
+                  "maxItems": 500,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "time": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "Comp time in seconds (snapped to the frame grid)"
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Number (sliders, angles, menu index from 1, checkbox 0/1)"
+                          },
+                          {
+                            "type": "boolean",
+                            "description": "Checkbox"
+                          },
+                          {
+                            "type": "string",
+                            "description": "#RRGGBB for colour parameters"
+                          },
+                          {
+                            "minItems": 1,
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "description": "[x, y] points or [r, g, b(, a)] colours with 0-1 channels"
+                          }
+                        ],
+                        "description": "Value in the parameter's own units"
+                      },
+                      "easing": {
+                        "description": "Easing of the segment that leaves this keyframe",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "smooth",
+                              "out",
+                              "entrance",
+                              "in",
+                              "exit",
+                              "in-out",
+                              "snap",
+                              "linear",
+                              "hold"
+                            ],
+                            "description": "TASTE easing name"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "x1": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1,
+                                "description": "First control point x, 0–1"
+                              },
+                              "y1": {
+                                "type": "number",
+                                "description": "First control point y (outside 0–1 overshoots)"
+                              },
+                              "x2": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1,
+                                "description": "Second control point x, 0–1"
+                              },
+                              "y2": {
+                                "type": "number",
+                                "description": "Second control point y (outside 0–1 overshoots)"
+                              }
+                            },
+                            "required": [
+                              "x1",
+                              "y1",
+                              "x2",
+                              "y2"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Custom cubic-bezier(x1, y1, x2, y2)"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "time",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "description": "Keyframes [{time, value, easing?}]"
+                }
+              },
+              "required": [
+                "param",
+                "keyframes"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "easing": {
+            "default": "smooth",
+            "description": "Default easing for keyframe segments",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "smooth",
+                  "out",
+                  "entrance",
+                  "in",
+                  "exit",
+                  "in-out",
+                  "snap",
+                  "linear",
+                  "hold"
+                ],
+                "description": "TASTE easing name"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x1": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "First control point x, 0–1"
+                  },
+                  "y1": {
+                    "type": "number",
+                    "description": "First control point y (outside 0–1 overshoots)"
+                  },
+                  "x2": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Second control point x, 0–1"
+                  },
+                  "y2": {
+                    "type": "number",
+                    "description": "Second control point y (outside 0–1 overshoots)"
+                  }
+                },
+                "required": [
+                  "x1",
+                  "y1",
+                  "x2",
+                  "y2"
+                ],
+                "additionalProperties": false,
+                "description": "Custom cubic-bezier(x1, y1, x2, y2)"
+              }
+            ]
+          }
+        },
+        "required": [
+          "layer",
+          "effect"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_set_effect",
+      "title": "Change effect",
+      "description": "Change an effect already on a layer: parameter values, on/off, name, or remove it (destructive). Find effects with ae_get_layer; refer to one by its instance name, match name or 1-based index in the stack.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "1-based index in the layer's effect stack"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Instance name or match name"
+              }
+            ],
+            "description": "Which effect"
+          },
+          "params": {
+            "description": "Parameter values [{param, value}]",
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "param": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parameter display name, match name, or \"Section/Name\" for duplicates (e.g. \"Creative/Saturation\")"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Number (sliders, angles, menu index from 1, checkbox 0/1)"
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "Checkbox"
+                    },
+                    {
+                      "type": "string",
+                      "description": "#RRGGBB for colour parameters"
+                    },
+                    {
+                      "minItems": 1,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "description": "[x, y] points or [r, g, b(, a)] colours with 0-1 channels"
+                    }
+                  ],
+                  "description": "Value in the parameter's own units"
+                }
+              },
+              "required": [
+                "param",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "enabled": {
+            "description": "Effect switch (fx)",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Rename the effect",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "remove": {
+            "default": false,
+            "description": "Delete the effect",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "layer",
+          "effect"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_list_effects",
+      "title": "List installed effects",
+      "description": "Effects installed in this After Effects (`app.effects`): display name, match name and category. Search before ae_apply_effect when unsure of a name; match names work in every language. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "description": "Case-insensitive text matched against display name, match name and category",
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "description": "Only this category (case-insensitive), e.g. \"Blur & Sharpen\"",
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "default": 100,
+            "description": "Maximum effects returned",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_apply_look",
+      "title": "Apply colour look",
+      "description": "Grade with a TASTE look built from Lumetri Color, by default on one adjustment layer (\"Zenvi Look\") over the whole comp that is reused when you try another look. clean: contrast +5, vibrance +5. warm-film: temperature +8, tint +2, faded film 8, saturation -6. teal-orange: Color Balance shadows to teal, highlights to orange, saturation +6. moody: exposure -0.3, contrast +12, saturation -15, vignette -0.8. bw-contrast: saturation 0, contrast +25. `strength` scales every change (default 0.6; keep skin natural); bw-contrast always fully desaturates and scales only its contrast. Lumetri parameters are found by their English names.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "look": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "warm-film",
+              "teal-orange",
+              "moody",
+              "bw-contrast"
+            ],
+            "description": "TASTE look"
+          },
+          "strength": {
+            "default": 0.6,
+            "description": "0-1 multiplier on the look's changes",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "layer": {
+            "description": "Grade this layer instead of an adjustment layer",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ]
+          }
+        },
+        "required": [
+          "look"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_add_mask",
+      "title": "Add mask",
+      "description": "Add a mask to a layer: a rect or ellipse (`bounds` in layer pixels, default the whole layer) or a Bezier `path`, with feather, expansion, opacity, mode and inversion. `animate` eases one mask property from a start value to the set value (default 0.6 s, out) - e.g. expansion from -200 for a soft reveal.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ],
+            "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+          },
+          "shape": {
+            "default": "rect",
+            "description": "Mask shape",
+            "type": "string",
+            "enum": [
+              "rect",
+              "ellipse",
+              "path"
+            ]
+          },
+          "bounds": {
+            "description": "rect/ellipse bounds (default: the layer's bounds)",
+            "type": "object",
+            "properties": {
+              "left": {
+                "type": "number",
+                "description": "Left edge in layer pixels"
+              },
+              "top": {
+                "type": "number",
+                "description": "Top edge in layer pixels"
+              },
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Width in pixels"
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Height in pixels"
+              }
+            },
+            "required": [
+              "left",
+              "top",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          },
+          "path": {
+            "description": "path: the mask path",
+            "type": "object",
+            "properties": {
+              "vertices": {
+                "minItems": 1,
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "[x, y]"
+                },
+                "description": "Vertices in layer pixels"
+              },
+              "in_tangents": {
+                "description": "Incoming tangents, relative to each vertex (default: straight)",
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "[x, y]"
+                }
+              },
+              "out_tangents": {
+                "description": "Outgoing tangents, relative to each vertex (default: straight)",
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "[x, y]"
+                }
+              },
+              "closed": {
+                "description": "Closed path (default true)",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "vertices"
+            ],
+            "additionalProperties": false
+          },
+          "name": {
+            "description": "Mask name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "mode": {
+            "default": "add",
+            "description": "Mask mode",
+            "type": "string",
+            "enum": [
+              "add",
+              "subtract",
+              "intersect",
+              "lighten",
+              "darken",
+              "difference",
+              "none"
+            ]
+          },
+          "inverted": {
+            "default": false,
+            "description": "Invert the mask",
+            "type": "boolean"
+          },
+          "feather": {
+            "default": 0,
+            "description": "Feather in pixels (one number or [x, y])",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "minItems": 2,
+                "maxItems": 2,
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            ]
+          },
+          "expansion": {
+            "default": 0,
+            "description": "Expansion in pixels (negative shrinks)",
+            "type": "number"
+          },
+          "opacity": {
+            "default": 100,
+            "description": "Mask opacity %",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "animate": {
+            "description": "Optional eased animation",
+            "type": "object",
+            "properties": {
+              "property": {
+                "type": "string",
+                "enum": [
+                  "expansion",
+                  "feather",
+                  "opacity"
+                ],
+                "description": "Which mask property to animate"
+              },
+              "from": {
+                "type": "number",
+                "description": "Start value (it animates to the value set by this call)"
+              },
+              "start": {
+                "description": "Start time in seconds (default: the layer's in point)",
+                "type": "number",
+                "minimum": 0
+              },
+              "duration": {
+                "description": "Seconds (default 0.6)",
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 600
+              },
+              "easing": {
+                "description": "Easing (default out)",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "smooth",
+                      "out",
+                      "entrance",
+                      "in",
+                      "exit",
+                      "in-out",
+                      "snap",
+                      "linear",
+                      "hold"
+                    ],
+                    "description": "TASTE easing name"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "x1": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "First control point x, 0–1"
+                      },
+                      "y1": {
+                        "type": "number",
+                        "description": "First control point y (outside 0–1 overshoots)"
+                      },
+                      "x2": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Second control point x, 0–1"
+                      },
+                      "y2": {
+                        "type": "number",
+                        "description": "Second control point y (outside 0–1 overshoots)"
+                      }
+                    },
+                    "required": [
+                      "x1",
+                      "y1",
+                      "x2",
+                      "y2"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Custom cubic-bezier(x1, y1, x2, y2)"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "property",
+              "from"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "layer"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_precompose",
+      "title": "Precompose layers",
+      "description": "Move layers into a new comp (Layer > Pre-compose with \"Move all attributes\"), leaving one precomp layer in their place. Returns the new comp id and the precomp layer.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layers": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991,
+                      "description": "1-based layer index, 1 = top layer"
+                    }
+                  },
+                  "required": [
+                    "index"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Layer by position"
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Exact layer name"
+                }
+              ],
+              "description": "Layer: its id (`layer_id`), {\"index\": n} (1 = top) or exact name"
+            },
+            "description": "Layers to move (any order)"
+          },
+          "name": {
+            "description": "New comp name (default: \"<top layer name> Comp\")",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "move_all_attributes": {
+            "default": true,
+            "description": "Move effects, masks and keyframes into the new comp (false needs exactly one layer)",
+            "type": "boolean"
+          },
+          "open": {
+            "default": false,
+            "description": "Open the new comp in the viewer",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "layers"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_add_marker",
+      "title": "Add marker",
+      "description": "Add a comp marker, or a layer marker when `layer` is given: time, comment, duration, chapter, label colour. Use comp markers for beats and section starts so later edits can align to them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "layer": {
+            "description": "Put the marker on this layer instead of the comp",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based layer index, 1 = top layer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "additionalProperties": false,
+                "description": "Layer by position"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact layer name"
+              }
+            ]
+          },
+          "time": {
+            "description": "Time in seconds (default: the comp's current time); snapped to the frame grid",
+            "type": "number",
+            "minimum": 0
+          },
+          "comment": {
+            "default": "",
+            "description": "Marker comment",
+            "type": "string",
+            "maxLength": 2000
+          },
+          "duration": {
+            "default": 0,
+            "description": "Marker duration in seconds",
+            "type": "number",
+            "minimum": 0
+          },
+          "chapter": {
+            "description": "Chapter name",
+            "type": "string",
+            "maxLength": 500
+          },
+          "url": {
+            "description": "Web link",
+            "type": "string",
+            "maxLength": 2000
+          },
+          "label": {
+            "description": "Label colour index 0-16 (0 = none)",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "protected_region": {
+            "description": "Comp markers: protect this time range when the comp is time-stretched",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_render",
+      "title": "Render comp",
+      "description": "Render a comp through the render queue. preset h264 (After Effects 2023+; falls back to ProRes 422 with a warning), prores-422, prores-4444 (alpha), lossless, lossless-alpha; or an exact output module `template`. mode render_now renders and blocks After Effects until done (default), queue_only adds it to the queue, media_encoder queues it in Adobe Media Encoder. The output defaults to a Renders folder next to the saved project. Existing files are not overwritten unless `overwrite`; render_now replaces one only once the new render is complete.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "output": {
+            "description": "Output file (extension follows the format; default <project folder>/Renders/<comp>.<ext>)",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "preset": {
+            "default": "h264",
+            "description": "Output format",
+            "type": "string",
+            "enum": [
+              "h264",
+              "prores-422",
+              "prores-4444",
+              "lossless",
+              "lossless-alpha"
+            ]
+          },
+          "template": {
+            "description": "Exact output module template name (overrides preset)",
+            "type": "string",
+            "minLength": 1
+          },
+          "render_settings": {
+            "default": "Best Settings",
+            "description": "Render settings template",
+            "type": "string",
+            "minLength": 1
+          },
+          "work_area_only": {
+            "default": false,
+            "description": "Render only the work area",
+            "type": "boolean"
+          },
+          "mode": {
+            "default": "render_now",
+            "description": "How to render",
+            "type": "string",
+            "enum": [
+              "render_now",
+              "queue_only",
+              "media_encoder"
+            ]
+          },
+          "overwrite": {
+            "default": false,
+            "description": "Replace an existing output file",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 1800000
+    },
+    {
+      "name": "ae_save_project",
+      "title": "Save project",
+      "description": "Save the project, or save it as `path` (.aep or .aepx). An untitled project needs a path. Saving is not an undo step.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Save as this file (.aep / .aepx)",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "overwrite": {
+            "default": false,
+            "description": "Replace an existing file at `path`",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_undo",
+      "title": "Undo Zenvi steps",
+      "description": "Undo the last N steps (Edit > Undo), normally Zenvi tool calls: each mutating ae_* call is exactly one undo step. Reports which Zenvi steps it expects to have undone; if someone changed the project by hand since, After Effects undoes that change first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "default": 1,
+            "description": "How many steps to undo",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_run_jsx_file",
+      "title": "Run JSX file",
+      "description": "Run an ExtendScript file with $.evalFile inside one undo step and return the string it returns. Used by the Zenvi -> After Effects handoff (export_to_after_effects_tool writes such a file). Runs arbitrary code: only run files you trust.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)",
+            "description": "The .jsx / .jsxbin file"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 600000
+    },
+    {
+      "name": "ae_run_script",
+      "title": "Run ExtendScript",
+      "description": "Escape hatch: run an ExtendScript (ECMAScript 3) snippet inside one undo step and return JSON of its last expression's value. Use a dedicated ae_* tool when one exists; they validate, ease and report properly. Runs arbitrary code.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200000,
+            "description": "ExtendScript source; the value of its last expression is returned"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "ae_render_for_zenvi",
+      "title": "Render for Zenvi",
+      "description": "Render a comp (default: the active comp) for a Zenvi linked clip and return everything Zenvi needs: path, comp id and name, project, size, fps, duration and a ready `link` object (SPEC 3.6) for the desktop's import_linked_media_tool. alpha: true renders ProRes 4444 with alpha (for overlays over other clips; QuickTime Animation where there is no ProRes 4444 template), else H.264 (before After Effects 2023: ProRes 4444, then QuickTime Animation). Only codecs Zenvi links: h264, prores4444, qtrle. Blocks After Effects while it renders; the render queue item is removed afterwards (two undo steps: queue, tidy). An existing `output` is replaced only with `overwrite`, and only once the new render is complete.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "comp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Comp item id"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact comp name"
+              }
+            ],
+            "description": "Comp id (`comp_id`) or exact name; default: the active comp"
+          },
+          "alpha": {
+            "default": false,
+            "description": "Keep transparency (ProRes 4444) instead of an opaque H.264",
+            "type": "boolean"
+          },
+          "output": {
+            "description": "Output file (default: a unique file in the temp folder's zenvi-link/renders)",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "work_area_only": {
+            "default": false,
+            "description": "Render only the work area",
+            "type": "boolean"
+          },
+          "template": {
+            "description": "Exact output module template name to use instead (H.264, ProRes 4444 or QuickTime Animation)",
+            "type": "string",
+            "minLength": 1
+          },
+          "overwrite": {
+            "default": false,
+            "description": "Replace an existing file at `output` (the default output is always a new file)",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 1800000
     }
   ]
 }

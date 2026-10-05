@@ -220,6 +220,10 @@ export class FolderMock extends FsEntryMock {
 export class ExtendScriptMockState {
   readonly log: string[] = [];
   readonly executed: string[] = [];
+  /** Called on every `$.sleep` (mocks finish asynchronous host work there, e.g. a frame still being written). */
+  readonly sleepHooks: (() => void)[] = [];
+  /** Total milliseconds scripts asked `$.sleep` for. */
+  sleptMs = 0;
   readonly link = new RealmLink();
   readonly tempDir: string;
   readonly homeDir: string;
@@ -280,7 +284,10 @@ export class DollarMock {
     return this.es.options.env?.[name] ?? null;
   }
 
-  sleep(_milliseconds: number): void {}
+  sleep(milliseconds: number): void {
+    this.es.sleptMs += milliseconds;
+    for (const hook of [...this.es.sleepHooks]) hook();
+  }
 
   gc(): void {}
 }
