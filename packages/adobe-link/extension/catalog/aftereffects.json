@@ -3690,7 +3690,7 @@
         "openWorldHint": false
       },
       "returnsImage": false,
-      "timeoutMs": 600000
+      "timeoutMs": 1800000
     },
     {
       "name": "ae_run_script",

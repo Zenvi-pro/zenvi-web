@@ -817,7 +817,8 @@ export const aeRunJsxFile = defineHostTool({
     path: absolutePath.describe("The .jsx / .jsxbin file"),
   }),
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-  timeoutMs: 600_000,
+  // A Zenvi export of a long, heavily keyframed timeline can take many minutes to build in After Effects.
+  timeoutMs: 1_800_000,
 });
 
 export const aeRunScript = defineHostTool({
