@@ -762,14 +762,15 @@ export const aeRenderForZenvi = defineHostTool({
   description:
     "Render a comp (default: the active comp) for a Zenvi linked clip and return everything Zenvi needs: path, comp id and name, " +
     "project, size, fps, duration and a ready `link` object (SPEC 3.6) for the desktop's import_linked_media_tool. alpha: true " +
-    "renders ProRes 4444 with alpha (for overlays over other clips), else H.264 (ProRes 422 before After Effects 2023). Blocks " +
-    "After Effects while it renders; the render queue item is removed afterwards.",
+    "renders ProRes 4444 with alpha (for overlays over other clips; QuickTime Animation where there is no ProRes 4444 template), " +
+    "else H.264 (before After Effects 2023: ProRes 4444, then QuickTime Animation). Only codecs Zenvi links: h264, prores4444, " +
+    "qtrle. Blocks After Effects while it renders; the render queue item is removed afterwards.",
   input: z.strictObject({
     comp: compRef.optional(),
     alpha: z.boolean().default(false).describe("Keep transparency (ProRes 4444) instead of an opaque H.264"),
     output: absolutePath.optional().describe("Output file (default: a unique file in the temp folder's zenvi-link/renders)"),
     work_area_only: z.boolean().default(false).describe("Render only the work area"),
-    template: z.string().min(1).optional().describe("Exact output module template name to use instead"),
+    template: z.string().min(1).optional().describe("Exact output module template name to use instead (H.264, ProRes 4444 or QuickTime Animation)"),
   }),
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   timeoutMs: 1_800_000,

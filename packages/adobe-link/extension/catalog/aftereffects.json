@@ -3723,7 +3723,7 @@
     {
       "name": "ae_render_for_zenvi",
       "title": "Render for Zenvi",
-      "description": "Render a comp (default: the active comp) for a Zenvi linked clip and return everything Zenvi needs: path, comp id and name, project, size, fps, duration and a ready `link` object (SPEC 3.6) for the desktop's import_linked_media_tool. alpha: true renders ProRes 4444 with alpha (for overlays over other clips), else H.264 (ProRes 422 before After Effects 2023). Blocks After Effects while it renders; the render queue item is removed afterwards.",
+      "description": "Render a comp (default: the active comp) for a Zenvi linked clip and return everything Zenvi needs: path, comp id and name, project, size, fps, duration and a ready `link` object (SPEC 3.6) for the desktop's import_linked_media_tool. alpha: true renders ProRes 4444 with alpha (for overlays over other clips; QuickTime Animation where there is no ProRes 4444 template), else H.264 (before After Effects 2023: ProRes 4444, then QuickTime Animation). Only codecs Zenvi links: h264, prores4444, qtrle. Blocks After Effects while it renders; the render queue item is removed afterwards.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3759,7 +3759,7 @@
             "type": "boolean"
           },
           "template": {
-            "description": "Exact output module template name to use instead",
+            "description": "Exact output module template name to use instead (H.264, ProRes 4444 or QuickTime Animation)",
             "type": "string",
             "minLength": 1
           }

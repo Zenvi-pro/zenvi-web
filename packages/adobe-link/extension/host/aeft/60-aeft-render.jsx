@@ -6,6 +6,8 @@
 // older versions have "Lossless" / "Lossless with Alpha" (QuickTime
 // Animation). Templates are matched by name with fallbacks, and a render only
 // renders its own queue item (others are unchecked and restored).
+// ae_render_for_zenvi falls back only to codecs Zenvi links: H.264, ProRes
+// 4444 and QuickTime Animation (qtrle).
 
 (/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
@@ -203,21 +205,55 @@
         return probedTemplates;
     }
 
-    /** Pick the template before changing anything. */
-    function templatesFor(comp, templateName, preset, ctx) {
+    /** The output module template names, read before changing anything. */
+    function templateNames(comp, templateName) {
         var queue = app.project.renderQueue;
         var remembered = probedTemplates !== null;
         var templates;
         if (queue.numItems > 0) {
-            templates = templateList(queue.item(1).outputModule(1));
-        } else {
-            templates = remembered ? probedTemplates : probeTemplates(comp);
-            if (remembered && templateName && templates.indexOf(templateName) < 0) {
-                // A template saved since the last probe.
-                templates = probeTemplates(comp);
+            return templateList(queue.item(1).outputModule(1));
+        }
+        templates = remembered ? probedTemplates : probeTemplates(comp);
+        if (remembered && templateName && templates.indexOf(templateName) < 0) {
+            // A template saved since the last probe.
+            templates = probeTemplates(comp);
+        }
+        return templates;
+    }
+
+    function templatesFor(comp, templateName, preset, ctx) {
+        return chooseTemplate(templateNames(comp, templateName), templateName, preset, ctx);
+    }
+
+    // Zenvi links only these codecs (SPEC 3.6; the desktop refuses others), so
+    // ae_render_for_zenvi never falls back to ProRes 422.
+    var ZENVI_CODECS = ["h264", "prores4444", "qtrle"];
+    var ZENVI_CHAINS = {
+        alpha: ["prores-4444", "lossless-alpha"],
+        opaque: ["h264", "prores-4444", "lossless", "lossless-alpha"]
+    };
+
+    /** The first available template along `presets`; warns when it is not the first choice. */
+    function zenviTemplate(templates, alpha, ctx) {
+        var presets = alpha ? ZENVI_CHAINS.alpha : ZENVI_CHAINS.opaque;
+        var found;
+        var i;
+        var j;
+        for (i = 0; i < presets.length; i += 1) {
+            for (j = 0; j < CHAINS[presets[i]].length; j += 1) {
+                found = firstMatch(templates, CHAINS[presets[i]][j]);
+                if (!found) {
+                    continue;
+                }
+                if (i > 0) {
+                    ctx.warn("This After Effects has no " + presets[0] + " output template; rendered " + presets[i] + " (\"" + found + "\")" +
+                        (!alpha && CHAINS[presets[i]][j].codec !== "h264" ? "; transparent areas of the comp stay transparent in Zenvi" : ""));
+                }
+                return {template: found, codec: CHAINS[presets[i]][j].codec, ext: CHAINS[presets[i]][j].ext, preset: presets[i]};
             }
         }
-        return chooseTemplate(templates, templateName, preset, ctx);
+        throw Z.refuse("UNSUPPORTED", "No output module template renders a codec Zenvi can link (" + ZENVI_CODECS.join(", ") + "); this After Effects has: " +
+            templates.join(", ") + "; pass `template`");
     }
 
     function fileSize(path) {
@@ -325,9 +361,17 @@
             AE.requireAbsolutePath(output, "output");
         }
         requireIdleQueue();
-        choice = templatesFor(comp, templateName, alpha ? "prores-4444" : "h264", ctx);
-        if (alpha && choice.codec !== "prores4444" && choice.codec !== "qtrle") {
-            ctx.warn("alpha: true asked for transparency, but template \"" + choice.template + "\" may not keep it");
+        if (templateName) {
+            choice = chooseTemplate(templateNames(comp, templateName), templateName, null, ctx);
+            if (ZENVI_CODECS.indexOf(choice.codec) < 0) {
+                throw Z.refuse("INVALID_ARGUMENT", "Template \"" + templateName + "\" renders " + choice.codec + "; Zenvi links only " + ZENVI_CODECS.join(", ") +
+                    " (an H.264, ProRes 4444 or QuickTime Animation template)");
+            }
+            if (alpha && choice.codec === "h264") {
+                ctx.warn("alpha: true asked for transparency, but H.264 template \"" + templateName + "\" has none");
+            }
+        } else {
+            choice = zenviTemplate(templateNames(comp, null), alpha, ctx);
         }
         if (output === null) {
             output = AE.tempFolder("renders").fullName + "/" + AE.safeFileName(comp.name) + "-" + comp.id + "-" + AE.fileStamp(now) + "." + (choice.ext || "mov");

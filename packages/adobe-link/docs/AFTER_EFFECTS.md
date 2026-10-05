@@ -279,7 +279,19 @@ it changed). Render settings default to "Best Settings". `ae_render` writes to
 `<project folder>/Renders/<comp>.<ext>` unless `output` is given (an untitled
 project needs `output`) and refuses to overwrite unless `overwrite`.
 
-`ae_render_for_zenvi` renders H.264 (or ProRes 4444 with `alpha: true`) into
+`ae_render_for_zenvi` reports only codecs Zenvi links (SPEC §3.6: `h264`,
+`prores4444`, `qtrle`; the desktop refuses others), so it has its own
+fallbacks and never renders ProRes 422:
+
+| Request | AE 2023+ | AE 2022 | AE 2021 and older |
+| --- | --- | --- | --- |
+| opaque (default) | H.264 (40 Mbps, else 15) | ProRes 4444 "High Quality with Alpha" | "Lossless" (QuickTime Animation), else "Lossless with Alpha" |
+| `alpha: true` | ProRes 4444 "High Quality with Alpha" | ProRes 4444 | "Lossless with Alpha" (QuickTime Animation) |
+
+Every fallback warns (an opaque request rendered with alpha keeps the comp's
+transparent areas transparent in Zenvi). An explicit `template` must be an
+H.264, ProRes 4444 or QuickTime Animation template; anything else is refused,
+and so is a version with no linkable template at all. The render goes into
 `<temp>/zenvi-link/renders/<comp>-<id>-<date>-<time>.<ext>`, removes its queue
 item after a successful render (a failed one stays for inspection), and
 returns `path`, `comp_id`, `comp_name`, `project`, `width`, `height`, `fps`,
@@ -303,7 +315,8 @@ returns `path`, `comp_id`, `comp_name`, `project`, `width`, `height`, `fps`,
 
 `extension/panel/send-to-zenvi-aftereffects.js`: when the Zenvi desktop app is
 running (`~/.openshot_qt/gui_mcp.json`, pid alive), the panel's *Send to
-Zenvi* renders the active comp with `ae_render_for_zenvi` (30 min budget) and
+Zenvi* renders the active comp with `ae_render_for_zenvi` (30 min budget; H.264,
+or ProRes 4444 / QuickTime Animation before After Effects 2023) and
 calls the desktop's `import_linked_media_tool` with `{path, link, name}`. It
 shows After Effects' or Zenvi's own message when either refuses, says so when
 Zenvi is not running (before rendering), and reminds to save an untitled
@@ -364,9 +377,10 @@ Effects (the manual plan covers them):
 7. **ae_undo** cannot read the undo history (no API) and uses command 16 when
    `findMenuCommandId("Undo")` finds nothing (the item is renamed after each
    action). Its journal resets when the host script reloads.
-8. **Codec labels**: ProRes 422 renders report `prores422`, which SPEC §3.6's
-   list (`prores4444 | h264 | qtrle`) does not have (only when H.264 is not
-   available, i.e. AE 2022, or asked for).
+8. **Codec labels** come from template names ("High Quality with Alpha" and
+   any name with 4444: `prores4444`; "Lossless", "Lossless with Alpha":
+   `qtrle`, assumed to be QuickTime Animation as in a fresh install). A
+   renamed or localized template may need `template`.
 9. **Temp folders**: captures and renders go under ExtendScript's
    `Folder.temp`; the server deletes captures only inside the OS temp folder,
    assumed to be the same folder (true on macOS; check on Windows).

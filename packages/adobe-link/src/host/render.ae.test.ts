@@ -149,6 +149,41 @@ describe("ae_render_for_zenvi", () => {
     expect(h.mock.project.renderQueue.numItems).toBe(0);
   });
 
+  test.each([
+    ["2023+, opaque: H.264", "26.3x12", undefined, false, "H.264 - Match Render Settings - 40 Mbps", "h264", null],
+    ["2023+, alpha: ProRes 4444", "26.3x12", undefined, true, "High Quality with Alpha", "prores4444", null],
+    ["2022, opaque: no H.264, so ProRes 4444", "22.6x1", undefined, false, "High Quality with Alpha", "prores4444", "no h264 output template; rendered prores-4444"],
+    ["2022, alpha: ProRes 4444", "22.6x1", undefined, true, "High Quality with Alpha", "prores4444", null],
+    ["2021, opaque: QuickTime Animation", "18.4x2", undefined, false, "Lossless", "qtrle", "no h264 output template; rendered lossless"],
+    ["2021, alpha: QuickTime Animation with alpha", "18.4x2", undefined, true, "Lossless with Alpha", "qtrle", "no prores-4444 output template; rendered lossless-alpha"],
+    ["opaque with only Lossless with Alpha left", "18.4x2", ["Lossless with Alpha", "Photoshop"], false, "Lossless with Alpha", "qtrle", "rendered lossless-alpha"],
+  ] as const)("only codecs Zenvi links: %s", (_label, version, templates, alpha, template, codec, warning) => {
+    const h = aeHarness(templates ? { version, outputTemplates: [...templates] } : { version });
+    h.mock.addComp({ name: "Main", duration: 1 });
+    const receipt = h.callValidated("ae_render_for_zenvi", { alpha });
+    expect(receipt.status).toBe("applied");
+    expect(receipt.data).toMatchObject({ template, codec, alpha });
+    expect((receipt.data.link as { render: { codec: string } }).render.codec).toBe(codec);
+    expect(["h264", "prores4444", "qtrle"]).toContain(codec);
+    if (warning) expect(receipt.warnings.join(" ")).toContain(warning);
+    else expect(receipt.warnings.filter((w) => w.includes("output template"))).toEqual([]);
+  });
+
+  test("never ProRes 422: refuses when no linkable template exists, and an explicit ProRes 422 template", () => {
+    const none = aeHarness({ outputTemplates: ["High Quality", "Photoshop", "AIFF 48kHz"] });
+    none.mock.addComp();
+    const refused = none.callValidated("ae_render_for_zenvi");
+    expect(refused).toMatchObject({ status: "refused", undoSteps: 0, error: { code: "UNSUPPORTED" } });
+    expect(refused.summary).toContain("h264, prores4444, qtrle");
+    expect(none.mock.project.renderQueue.numItems).toBe(0);
+
+    const h = aeHarness();
+    h.mock.addComp();
+    expect(h.callValidated("ae_render_for_zenvi", { template: "High Quality" })).toMatchObject({ status: "refused", error: { code: "INVALID_ARGUMENT" } });
+    expect(h.callValidated("ae_render_for_zenvi", { template: "H.264 - Match Render Settings - 15 Mbps" }).data).toMatchObject({ codec: "h264" });
+    expect(h.mock.project.renderQueue.numItems).toBe(0);
+  });
+
   test("work area only; a failed render is an error and stays in the queue for inspection", () => {
     const { h, comp } = saved();
     comp.workAreaStart = 1;
