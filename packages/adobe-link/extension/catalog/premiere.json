@@ -110,6 +110,35 @@
       "timeoutMs": 120000
     },
     {
+      "name": "premiere_capture_frame",
+      "title": "Capture a frame",
+      "description": "Render one frame of a sequence to PNG and return it as an image: your eyes on the edit. Use it after every visual change at the moments that matter (first frame, entrance end, mid-hold, last frame) and critique it against TASTE: title-safe text, contrast, one focal point. Default time: the playhead; the time is snapped to a frame. Uses the QE DOM's exportFramePNG at the sequence's frame size; a sequence that is not active is opened first. Changes nothing in the project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "description": "Sequence time to capture, in seconds; default: the playhead",
+            "type": "number",
+            "minimum": 0
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": true,
+      "timeoutMs": 60000
+    },
+    {
       "name": "premiere_import_files",
       "title": "Import media",
       "description": "Import files (video, audio, stills, .srt, .mogrt) into a bin, \"Zenvi Imports\" by default, created if missing. Files already in the project are not imported twice (`dedupe`): their existing items are returned instead. Returns the nodeId of every item for premiere_place_clip. Missing files are refused before anything is imported. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
@@ -1036,6 +1065,117 @@
       "timeoutMs": 120000
     },
     {
+      "name": "premiere_add_text",
+      "title": "Add a title",
+      "description": "Add a title to the sequence on a free video track above the footage. Premiere's scripting API cannot type text into its own title templates, so the title comes from `image` (a transparent PNG title, e.g. rendered by Zenvi; scaled to the frame width) or from `mogrt` (an After Effects-authored Essential Graphics template whose text control is set to `text`, plus its size and colour controls when it exposes them). Defaults (TASTE §1, §4): `style` title 72 px at 1080p (headline 96, subtitle 44, lower-third 54, caption 42), colour #F7F7F5, placement inside title-safe, on screen for 1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). Without `image` or `mogrt` the call is refused with what to pass. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The words; keep lines under 32 characters and break on phrases (TASTE §4)"
+          },
+          "style": {
+            "default": "title",
+            "description": "Type scale step",
+            "type": "string",
+            "enum": [
+              "headline",
+              "title",
+              "subtitle",
+              "lower-third",
+              "caption"
+            ]
+          },
+          "font_size": {
+            "description": "Override the style's size, in pixels at the sequence's size",
+            "type": "number",
+            "minimum": 6,
+            "maximum": 1000
+          },
+          "color": {
+            "default": "#F7F7F5",
+            "description": "Text colour, #RRGGBB or [r, g, b] 0-1",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Hex colour #RRGGBB"
+              },
+              {
+                "minItems": 3,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "description": "[r, g, b], each 0–1"
+              }
+            ]
+          },
+          "placement": {
+            "description": "Where the title sits, inside title-safe; default: lower-third for that style, bottom-center for captions, else center",
+            "type": "string",
+            "enum": [
+              "center",
+              "lower-third",
+              "top-left",
+              "top-center",
+              "bottom-center"
+            ]
+          },
+          "time": {
+            "description": "Sequence time of the title's first frame; default: the playhead",
+            "type": "number",
+            "minimum": 0
+          },
+          "duration": {
+            "description": "Seconds on screen; default: reading time",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 3600
+          },
+          "track": {
+            "description": "Video track index (0 = V1); default: the lowest track above V1 that is free for the whole duration",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 98
+          },
+          "mogrt": {
+            "description": "An After Effects-authored .mogrt with a text control",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "image": {
+            "description": "A transparent PNG title to place",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
       "name": "premiere_add_marker",
       "title": "Add a marker",
       "description": "Add a sequence marker, or with `clip` a clip marker (Premiere keeps those on the clip's source item, so every use of that media shows it). Name, comment, duration (0 = a point), colour, type (comment, chapter, segmentation). Default time: the playhead. Use markers to leave notes for the editor and to mark beats and chapters. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
@@ -1111,6 +1251,353 @@
       "timeoutMs": 120000
     },
     {
+      "name": "premiere_add_captions",
+      "title": "Add captions from SRT",
+      "description": "Import an .srt file and turn it into a caption track on the sequence, starting at `time` (default 0). Format subtitle (default) or a broadcast standard. Style captions in Premiere's Essential Graphics panel; keep them inside title-safe and readable at phone size. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "srt": {
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)",
+            "description": "Absolute path to a .srt subtitle file"
+          },
+          "time": {
+            "default": 0,
+            "description": "Sequence time where the file's 00:00:00,000 lands",
+            "type": "number",
+            "minimum": 0
+          },
+          "format": {
+            "default": "subtitle",
+            "description": "Caption format of the new track",
+            "type": "string",
+            "enum": [
+              "subtitle",
+              "cea-608",
+              "cea-708",
+              "teletext",
+              "ebu",
+              "op42",
+              "op47"
+            ]
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "srt"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_auto_reframe",
+      "title": "Auto Reframe",
+      "description": "Make a reframed copy of a sequence for another aspect ratio with Premiere's Auto Reframe (Premiere Pro 2020 / 14.0 or later): 9:16 (default, social vertical 1080x1920 from 1080p), 1:1, 4:5, 16:9. The copy keeps the source's short side and is opened. The original is untouched. Check the result with premiere_capture_frame: faces in the upper third, text inside the vertical safe area. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "aspect": {
+            "default": "9:16",
+            "description": "Target aspect ratio",
+            "type": "string",
+            "enum": [
+              "9:16",
+              "1:1",
+              "4:5",
+              "16:9"
+            ]
+          },
+          "motion": {
+            "default": "default",
+            "description": "How quickly the framing follows the action",
+            "type": "string",
+            "enum": [
+              "default",
+              "slower",
+              "faster"
+            ]
+          },
+          "name": {
+            "description": "Name of the new sequence; default: \"<sequence> 9x16\"",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "nest": {
+            "default": false,
+            "description": "Nest clips before reframing",
+            "type": "boolean"
+          },
+          "open": {
+            "default": true,
+            "description": "Open the new sequence",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 1800000
+    },
+    {
+      "name": "premiere_scene_detect",
+      "title": "Scene edit detection",
+      "description": "Find the camera cuts inside long clips with Premiere's Scene Edit Detection and either razor them (`action` cuts, default, linked audio too) or mark them (markers land on the source items). Runs on every clip of a track (default V1) or on `clips`. Premiere is blocked while it analyses; long media takes minutes. The previous selection is restored. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "track": {
+            "default": {
+              "kind": "video",
+              "index": 0
+            },
+            "description": "Video track to analyse, {kind, index} 0-based; default V1",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "video",
+                  "audio"
+                ],
+                "description": "Track kind"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "0-based track index as in the Premiere DOM: V1 / A1 = 0"
+              }
+            },
+            "required": [
+              "kind",
+              "index"
+            ],
+            "additionalProperties": false
+          },
+          "clips": {
+            "description": "Only these clips of the track",
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+            }
+          },
+          "action": {
+            "default": "cuts",
+            "description": "cuts = razor at each detected scene change; markers = add markers",
+            "type": "string",
+            "enum": [
+              "cuts",
+              "markers"
+            ]
+          },
+          "sensitivity": {
+            "default": "medium",
+            "description": "Detection sensitivity",
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "include_linked_audio": {
+            "default": true,
+            "description": "cuts: also cut the linked audio",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 1800000
+    },
+    {
+      "name": "premiere_export",
+      "title": "Export a sequence",
+      "description": "Render a sequence to a file. `preset`: h264-high (default, H.264 matching the source at a high bitrate), h264-social-vertical (the same for a 9:16 sequence; others are refused, run premiere_auto_reframe first), prores-422, or the path of an .epr. Presets are found among the installed Premiere / Media Encoder presets. `range` entire, in-out or work-area. `via` media_encoder (default: queued in Adobe Media Encoder and started, returns the job id at once) or direct (Premiere renders now and blocks until done). Existing files are refused unless `overwrite`. Changes nothing in the project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "default": "h264-high",
+            "description": "Export preset",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "h264-high",
+                  "h264-social-vertical",
+                  "prores-422"
+                ],
+                "description": "A named preset"
+              },
+              {
+                "type": "string",
+                "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)",
+                "description": "Absolute path to an .epr export preset"
+              }
+            ]
+          },
+          "output": {
+            "description": "Output file; its extension comes from the preset when missing; default: \"Zenvi Exports/<sequence>.<ext>\" next to the project",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "range": {
+            "default": "entire",
+            "description": "What to render",
+            "type": "string",
+            "enum": [
+              "entire",
+              "in-out",
+              "work-area"
+            ]
+          },
+          "via": {
+            "default": "media_encoder",
+            "description": "Queue in Media Encoder, or render inside Premiere now",
+            "type": "string",
+            "enum": [
+              "media_encoder",
+              "direct"
+            ]
+          },
+          "overwrite": {
+            "default": false,
+            "description": "Replace an existing output file",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 3600000
+    },
+    {
+      "name": "premiere_export_xml",
+      "title": "Export FCP XML",
+      "description": "Write a sequence (default: the active one) as Final Cut Pro 7 XML (xmeml), Premiere's own exchange format, with warnings dialogs suppressed. Zenvi reads this file to bring a Premiere edit back (import_timeline_xml_tool). Default output: a new file in the system temp folder. Changes nothing in the project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "output": {
+            "description": "Where to write the .xml; default: a new file in the temp folder",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "overwrite": {
+            "default": false,
+            "description": "Replace an existing file",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 300000
+    },
+    {
+      "name": "premiere_import_xml",
+      "title": "Import FCP XML",
+      "description": "Import a Final Cut Pro 7 XML (e.g. a Zenvi export) into a bin (\"Zenvi Imports\" by default) and open the sequence it contains. Returns the new sequence ids. Media referenced by the XML must exist at its paths or Premiere marks it offline. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)",
+            "description": "The .xml file"
+          },
+          "bin": {
+            "default": "Zenvi Imports",
+            "description": "Bin to import into, created if missing; \"/\" is the project root",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "open": {
+            "default": true,
+            "description": "Open the first imported sequence",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 600000
+    },
+    {
       "name": "premiere_save_project",
       "title": "Save the project",
       "description": "Save the project in place, or with `path` save it as a new .prproj and keep working in that copy (Premiere's Save As closes the original). Save after a batch of edits the user wants to keep. Changes nothing in the project's content; saving is not an undo step.",
@@ -1133,6 +1620,34 @@
       },
       "returnsImage": false,
       "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_run_script",
+      "title": "Run ExtendScript",
+      "description": "Escape hatch: run an ExtendScript (ECMAScript 3) snippet in Premiere and return its completion value as JSON. `app`, `qe` (QE DOM, enabled) and `ZenviLink` are in scope. Use only when no premiere_* tool covers the job; the snippet can change or delete anything. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200000,
+            "description": "ExtendScript source; the value of its last statement is returned"
+          }
+        },
+        "required": [
+          "script"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 600000
     }
   ]
 }
