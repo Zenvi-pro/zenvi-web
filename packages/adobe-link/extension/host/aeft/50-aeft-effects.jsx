@@ -236,6 +236,7 @@
         var spec = TASTE.color.looks[look];
         var layer = target || findLookLayer(comp);
         var created = false;
+        var found;
         var adjustment;
         var lumetri;
         var balance;
@@ -273,6 +274,7 @@
             layer.name = "Zenvi Look (" + look + ")";
         }
         lumetri = AE.addEffect(layer, "ADBE Lumetri", LOOK_EFFECT);
+        found = 0;
         for (i = 0; i < keys.length; i += 1) {
             if (!Z.has(LUMETRI, keys[i])) {
                 continue;
@@ -287,6 +289,16 @@
             value = clampToProperty(property, Math.round(value * 1000) / 1000);
             property.setValue(value);
             values.push({param: LUMETRI[keys[i]].param, value: value});
+            found += 1;
+        }
+        if (!found) {
+            // Lumetri's parameters are found by their English names; take the look off again.
+            AE.removeEffectsNamed(layer, LOOK_EFFECT);
+            if (created) {
+                layer.remove();
+            }
+            throw Z.refuse("UNSUPPORTED", "Found none of Lumetri Color's parameters by their English names (a non-English After Effects?); " +
+                "set them with ae_apply_effect and match names instead");
         }
         if (look === "teal-orange") {
             balance = AE.addEffect(layer, "ADBE Color Balance 2", SPLIT_TONE_EFFECT);

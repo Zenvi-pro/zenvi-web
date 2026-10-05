@@ -149,6 +149,19 @@ describe("ae_apply_look", () => {
     expect(lookLayer(comp)).toHaveLength(0);
   });
 
+  test("a non-English After Effects (no English Lumetri names) is refused and the look taken off again", () => {
+    const h = aeHarness();
+    const comp = h.mock.addComp();
+    // This mock only: a copy of Lumetri whose parameters have other names.
+    const index = h.mock.state.effects.findIndex((fx) => fx.matchName === "ADBE Lumetri");
+    const lumetri = h.mock.state.effects[index] as (typeof h.mock.state.effects)[number];
+    h.mock.state.effects[index] = { ...lumetri, params: lumetri.params.map((param) => ({ ...param, name: `${param.name} (de)` })) };
+    const receipt = h.callValidated("ae_apply_look", { look: "clean" });
+    expect(receipt).toMatchObject({ status: "refused", error: { code: "UNSUPPORTED" } });
+    expect(receipt.summary).toContain("ae_apply_effect and match names");
+    expect(comp.numLayers).toBe(0);
+  });
+
   test("refuses when Lumetri is not installed", () => {
     const h = aeHarness();
     h.mock.addComp();
