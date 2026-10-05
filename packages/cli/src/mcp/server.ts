@@ -140,7 +140,7 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
     try {
       const extraTool = extraByName.get(name);
       if (extraTool) {
-        const unknown = unknownArgumentsMessage(name, args, extraTool.inputSchema as { properties?: Record<string, unknown> });
+        const unknown = extraTool.checksOwnArguments ? undefined : unknownArgumentsMessage(name, args, extraTool.inputSchema as { properties?: Record<string, unknown> });
         if (unknown) return toCallResult(failed(name, unknown), undefined, { engine: "portable" });
         const out = await extraTool.run(state, args, { signal: extra.signal, progress });
         const engine = out.engine === undefined ? "portable" : out.engine;

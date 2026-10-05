@@ -18,7 +18,11 @@ import path from "node:path";
 /** The extension bundle id, also its folder name in the CEP extensions folder. */
 export const BUNDLE_ID = "pro.zenvi.link";
 
-/** CSXS versions whose PlayerDebugMode lets unsigned extensions load (CEP 9-12: After Effects / Premiere 2019+). */
+/**
+ * CSXS versions whose PlayerDebugMode lets unsigned extensions load (CEP 9-12).
+ * Zenvi Link itself loads only in After Effects 18.0+ and Premiere Pro 15.0+
+ * (the 2021 releases; CSXS/manifest.xml HostList).
+ */
 export const CSXS_VERSIONS: readonly number[] = [9, 10, 11, 12];
 
 export type InstallAction =

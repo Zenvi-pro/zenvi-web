@@ -138,6 +138,14 @@ describe("zenvi ae / zenvi premiere / zenvi call", () => {
     expect(await readFile(path.join(work, "frame.png"))).toEqual(png);
     expect(ae.calls.at(-1)).toEqual({ tool: "ae_capture_frame", args: expect.objectContaining({ time: 2 }) });
 
+    // Command-line text: digits are ids (also inside a nullable layer ref), "null" removes, "" clears.
+    expect((await run(["ae", "set_layer", "layer=3", "parent=5"])).code).toBe(0);
+    expect(ae.calls.at(-1)!.args).toMatchObject({ layer: 3, parent: 5 });
+    expect((await run(["ae", "set_layer", "layer=3", "parent=null"])).code).toBe(0);
+    expect(ae.calls.at(-1)!.args).toMatchObject({ layer: 3, parent: null });
+    expect((await run(["ae", "add_expression", "layer=1", "property=Transform/Position", "expression="])).code).toBe(0);
+    expect(ae.calls.at(-1)!.args).toMatchObject({ layer: 1, expression: "" });
+
     const viaCall = await run(["call", "ae_get_state", "--json"]);
     expect(viaCall.json()).toMatchObject({ tool: "ae_get_state", status: "ok" });
 

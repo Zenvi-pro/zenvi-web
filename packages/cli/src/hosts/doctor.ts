@@ -14,6 +14,20 @@ import { APP_LABEL, decideFamilies } from "./policy.js";
 
 export type RunCommand = (command: string, args: string[]) => { code: number; stdout: string };
 
+/** The oldest release Zenvi Link loads in (CSXS/manifest.xml HostList: AEFT 18.0, PPRO 15.0). */
+export const OLDEST_RELEASE: { readonly [H in HostId]: { year: number; version: string } } = {
+  aftereffects: { year: 2021, version: "18.0" },
+  premiere: { year: 2021, version: "15.0" },
+};
+
+/** App folders ("Adobe After Effects 2020", "… CC 2019") older than Zenvi Link supports. */
+export function tooOldApps(host: HostId, folders: readonly string[]): string[] {
+  return folders.filter((name) => {
+    const year = Number(/\b(20\d\d)\b/.exec(name)?.[1]);
+    return Number.isFinite(year) && year < OLDEST_RELEASE[host].year;
+  });
+}
+
 export const runCommand: RunCommand = (command, args) => {
   const result = spawnSync(command, args, { encoding: "utf8", timeout: 5000, windowsHide: true });
   return { code: result.status ?? 1, stdout: result.stdout ?? "" };
@@ -101,11 +115,16 @@ export async function adobeDoctor(options: AdobeDoctorOptions): Promise<DoctorCh
         ...(lacking.length ? { hint: `Zenvi Link there lacks ${lacking.length} tool(s) this zenvi knows (${lacking.slice(0, 4).join(", ")}…): run \`zenvi adobe install\` and restart ${APP_LABEL[host]}.` } : {}),
       });
     } else {
+      const old = tooOldApps(host, apps[host]);
+      const supported = apps[host].length > old.length;
       checks.push({
         name,
         level: "warn",
         detail: `not connected: ${found.detail}; app: ${installedApp}`,
-        hint: `Open ${APP_LABEL[host]}; Zenvi Link starts with it (Window > Extensions > Zenvi Link shows its panel).`,
+        hint:
+          old.length && !supported
+            ? `${old.join(", ")} is older than Zenvi Link supports: it loads in ${APP_LABEL[host]} ${OLDEST_RELEASE[host].year} (${OLDEST_RELEASE[host].version}) or newer.`
+            : `Open ${APP_LABEL[host]}; Zenvi Link starts with it (Window > Extensions > Zenvi Link shows its panel).`,
       });
     }
   }

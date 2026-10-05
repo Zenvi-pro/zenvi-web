@@ -159,6 +159,16 @@ export async function probeEndpoint(url: string, token: string, options: Discove
   }
 }
 
+/** True when `<desktopDir>/<kind>_mcp.json` names a process that is alive (answering or not). */
+export async function desktopProcessAlive(config: ZenviConfig, kind: "gui" | "headless" = "gui"): Promise<boolean> {
+  try {
+    const data = JSON.parse(await readFile(path.join(config.desktopDir, `${kind}_mcp.json`), "utf8")) as DiscoveryFile;
+    return pidAlive(Number(data.pid));
+  } catch {
+    return false;
+  }
+}
+
 /** Live desktop MCP endpoints, GUI first. */
 export async function discoverDesktop(config: ZenviConfig, options: DiscoverOptions = {}): Promise<DesktopEndpoint[]> {
   const found: DesktopEndpoint[] = [];

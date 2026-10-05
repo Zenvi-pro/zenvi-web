@@ -22,6 +22,9 @@ import { VERSION } from "../version.js";
 /** How long handoff tools wait for the desktop app to show the project after opening it. */
 export const DESKTOP_WAIT_MS = 120_000;
 
+/** While an orchestration waits on a long step, a progress message this often keeps clients from giving up. */
+export const KEEP_ALIVE_MS = 15_000;
+
 export interface McpStateOptions {
   /** Finding and starting the desktop app (tests pass fakes). Default: this machine, with the server's environment. */
   launcher?: LauncherDeps;
@@ -29,6 +32,8 @@ export interface McpStateOptions {
   desktopWaitMs?: number;
   /** File checks for the Adobe listing policy (tests pass fakes). */
   detect?: DetectDeps;
+  /** Default {@link KEEP_ALIVE_MS}. */
+  keepAliveMs?: number;
 }
 
 /** The launcher, with the server's environment (ZENVI_DESKTOP_CMD) and home. */
@@ -41,6 +46,11 @@ export class McpState {
   readonly hosts: HostRegistry;
   readonly launcher: LauncherDeps;
   readonly desktopWaitMs: number;
+  readonly keepAliveMs: number;
+  /** When this server last started the desktop app (a second call waits for it instead of starting another). */
+  private launchedAt: number | undefined;
+  /** The open / launch in flight: concurrent handoffs share it instead of opening the app twice. */
+  private opening: Promise<unknown> | undefined;
   private desktop: DesktopExecutor | undefined;
   private desktopKey: string | undefined;
   private lastPortableCall: number | undefined;
@@ -53,6 +63,7 @@ export class McpState {
     this.session = session;
     this.launcher = options.launcher ?? launcherDeps(ctx);
     this.desktopWaitMs = options.desktopWaitMs ?? DESKTOP_WAIT_MS;
+    this.keepAliveMs = options.keepAliveMs ?? KEEP_ALIVE_MS;
     this.hosts = new HostRegistry({
       config: ctx.config,
       env: ctx.env,
@@ -71,6 +82,33 @@ export class McpState {
   async switchTo(file: string, project?: Project): Promise<void> {
     await this.session.switchTo(file, project);
     await this.dropDesktop();
+  }
+
+  /**
+   * Run `open` unless one is in flight, and share its result. The check and
+   * the registration happen without an await in between, so two calls that
+   * arrive together cannot both open (or start) the app.
+   */
+  openOnce<T>(open: () => Promise<T>): Promise<T> {
+    if (!this.opening) {
+      const running = open();
+      this.opening = running;
+      void running.then(
+        () => this.opening === running && (this.opening = undefined),
+        () => this.opening === running && (this.opening = undefined),
+      );
+    }
+    return this.opening as Promise<T>;
+  }
+
+  /** Record that this server started the desktop app. */
+  noteLaunch(): void {
+    this.launchedAt = Date.now();
+  }
+
+  /** True while an app this server started may still be coming up. */
+  get launchPending(): boolean {
+    return this.launchedAt !== undefined && Date.now() - this.launchedAt < this.desktopWaitMs;
   }
 
   /** The portable engine ran a tool (it counts as activity for list_hosts' active host). */

@@ -4,16 +4,16 @@
  * live app through Zenvi Link. Shared by `zenvi mcp` and `zenvi ae` /
  * `zenvi premiere` / `zenvi call`.
  *
- * Before a call: unknown argument names are refused, string values are
- * coerced by the catalog schema (the same coercion as every other Zenvi tool:
- * engine `normalizeArgs`), and an app that is not connected gives a
- * `refused` receipt saying how to connect it. Zenvi Link itself validates
- * types, enums and ranges and fills the TASTE defaults.
+ * Before a call: unknown argument names are refused, text values (from a
+ * command line, or a client that sends strings) are converted to what the
+ * tool's schema takes (coerceHostArgs), and an app that is not connected
+ * gives a `refused` receipt saying how to connect it. Zenvi Link itself
+ * validates types, enums and ranges, handles nulls and fills the TASTE
+ * defaults.
  */
 
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { HOST_IDS, HOST_TOOL_PREFIX, catalogFor, toCatalogJson, type CatalogToolJson, type HostId, type HostImage, type HostReceipt } from "@zenvi/adobe-link";
-import { normalizeArgs, type JsonSchemaObject } from "@zenvi/engine/tools";
 import { unknownArgumentsMessage } from "../util/unknown-args.js";
 import { APP_LABEL } from "./policy.js";
 import { howToConnect, type HostRegistry } from "./registry.js";
@@ -78,30 +78,88 @@ function hostFailure(host: HostId, tool: string, code: string, message: string):
   return receipt(host, tool, "error", code, message);
 }
 
-/** Branch types of an anyOf / oneOf property. */
-function branchTypes(prop: unknown): Set<string> {
-  const out = new Set<string>();
-  const branches = (prop as { anyOf?: unknown[]; oneOf?: unknown[] } | undefined)?.anyOf ?? (prop as { oneOf?: unknown[] } | undefined)?.oneOf ?? [];
-  for (const branch of branches) {
-    const type = (branch as { type?: unknown }).type;
-    for (const t of Array.isArray(type) ? type : [type]) if (typeof t === "string") out.add(t);
+/** The JSON Schema subset the host catalogs use (zod's output). */
+interface SchemaNode {
+  type?: string | string[];
+  anyOf?: SchemaNode[];
+  oneOf?: SchemaNode[];
+  enum?: unknown[];
+  properties?: Record<string, SchemaNode>;
+  items?: SchemaNode;
+}
+
+/** A property's alternatives, through nested anyOf / oneOf (`layerRef.nullable()` nests one union in another). */
+function leaves(schema: SchemaNode | undefined, out: SchemaNode[] = []): SchemaNode[] {
+  if (!schema || typeof schema !== "object") return out;
+  const branches = schema.anyOf ?? schema.oneOf;
+  if (!branches) {
+    out.push(schema);
+    return out;
   }
+  for (const branch of branches) leaves(branch, out);
   return out;
 }
 
+function typesOf(leaf: SchemaNode): string[] {
+  if (typeof leaf.type === "string") return [leaf.type];
+  if (Array.isArray(leaf.type)) return leaf.type;
+  return (leaf.enum ?? []).map((v) => (v === null ? "null" : typeof v === "number" ? (Number.isInteger(v) ? "integer" : "number") : typeof v));
+}
+
+const NUMBER_TEXT = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
 /**
- * Text arguments (`zenvi ae … layer=12`) for fields that take an id or a name
- * (`layer`, `comp`: anyOf integer | string): all digits means the id. The
- * engine's coercion leaves anyOf fields alone, like the desktop.
+ * One argument against its schema. Text becomes what the schema takes:
+ * digits are an id wherever an integer is accepted (also next to a name:
+ * `layer=12`, `parent=5`, `{"before": "7"}`), numbers, booleans, JSON for
+ * arrays and objects, `null` where null is allowed. Typed values, `null` and
+ * `""` pass unchanged: Zenvi Link reads `null` as "remove" (`parent: null`,
+ * `stroke: null`) and `""` as "clear" (`expression: ""`).
  */
-export function preferIds(schema: { properties?: Record<string, unknown> } | undefined, args: Record<string, unknown>): Record<string, unknown> {
-  const out = { ...args };
-  for (const [key, value] of Object.entries(args)) {
-    if (typeof value !== "string" || !/^\d+$/.test(value.trim())) continue;
-    const types = branchTypes(schema?.properties?.[key]);
-    if (types.has("integer") && types.has("string")) out[key] = Number.parseInt(value.trim(), 10);
+export function coerceHostValue(value: unknown, schema: SchemaNode | undefined): unknown {
+  if (value === null || value === undefined || !schema) return value;
+  const options = leaves(schema);
+  const types = new Set(options.flatMap(typesOf));
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (text === "") return value;
+    if (text === "null" && types.has("null")) return null;
+    if (types.has("integer") && /^\d+$/.test(text)) return Number.parseInt(text, 10);
+    if (types.has("string")) return value;
+    if (types.has("integer") && /^-\d+$/.test(text)) return Number.parseInt(text, 10);
+    if (types.has("number") && NUMBER_TEXT.test(text)) return Number(text);
+    if (types.has("boolean")) {
+      const low = text.toLowerCase();
+      if (["true", "1", "yes", "on"].includes(low)) return true;
+      if (["false", "0", "no", "off"].includes(low)) return false;
+    }
+    if ((types.has("array") || types.has("object")) && /^[[{]/.test(text)) {
+      try {
+        return coerceHostValue(JSON.parse(text), schema);
+      } catch {
+        return value;
+      }
+    }
+    return value;
   }
-  return out;
+  if (Array.isArray(value)) {
+    const lists = options.filter((leaf) => typesOf(leaf).includes("array") && leaf.items);
+    return lists.length === 1 ? value.map((item) => coerceHostValue(item, lists[0]!.items)) : value;
+  }
+  if (typeof value === "object") {
+    const keys = Object.keys(value);
+    // The object branch whose properties name every key (`{before}` vs `{after}` vs `{index}`).
+    const shape = options.find((leaf) => typesOf(leaf).includes("object") && leaf.properties && keys.every((key) => key in leaf.properties!));
+    if (!shape?.properties) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, coerceHostValue(item, shape.properties![key])]));
+  }
+  return value;
+}
+
+/** Every argument against the tool's input schema (unknown names were refused before). */
+export function coerceHostArgs(schema: { properties?: Record<string, unknown> } | undefined, args: Record<string, unknown>): Record<string, unknown> {
+  const properties = (schema?.properties ?? {}) as Record<string, SchemaNode>;
+  return Object.fromEntries(Object.entries(args).map(([key, value]) => [key, coerceHostValue(value, properties[key])]));
 }
 
 export function isOkHostStatus(status: string): boolean {
@@ -150,7 +208,7 @@ export async function callAdobeTool(registry: HostRegistry, name: string, rawArg
     const unknown = unknownArgumentsMessage(name, rawArgs, schema);
     if (unknown) return { receipt: hostRefusal(host, name, "INVALID_ARGUMENT", unknown), images: [] };
   }
-  const args = preferIds(schema, normalizeArgs(schema as unknown as JsonSchemaObject, rawArgs) as Record<string, unknown>);
+  const args = coerceHostArgs(schema, rawArgs);
   try {
     const result = await connection.client.callTool(name, args, options.timeoutMs ? { timeoutMs: options.timeoutMs } : {});
     const got =

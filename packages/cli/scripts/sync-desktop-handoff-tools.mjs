@@ -42,16 +42,42 @@ export const HANDOFF_TOOLS = [
   "unlink_clip_tool",
 ];
 
+/**
+ * Annotation exceptions, with the reason. zenvi-core's `read_only` means "does
+ * not change the project"; MCP's readOnlyHint means "does not change the
+ * environment", so tools that run project code or start other programs are
+ * not read-only even when the project stays untouched.
+ */
+export const ANNOTATION_OVERRIDES = {
+  list_remotion_compositions_tool: { readOnlyHint: false, why: "runs the Remotion project's own code (bundler, headless Chrome) to read its compositions" },
+  open_linked_source_tool: { readOnlyHint: false, why: "starts a code editor, Remotion Studio, a HyperFrames preview or After Effects" },
+};
+
+/**
+ * MCP annotations for a desktop tool:
+ * - readOnlyHint (and idempotentHint): the desktop's read_only, but never for
+ *   tools that write files (export_to_*, send_to_*) or are listed above;
+ * - destructiveHint: the tool can replace existing files or edits (an
+ *   `overwrite` or `replace_edits` argument);
+ * - openWorldHint: always (the desktop app, Node toolchains, Adobe apps).
+ */
+export function annotationsFor(row) {
+  const override = ANNOTATION_OVERRIDES[row.name] ?? {};
+  const properties = Object.keys(row.input_schema?.properties ?? {});
+  const writesFiles = /^(export_to_|send_to_)/.test(row.name);
+  const readOnly = override.readOnlyHint ?? (Boolean(row.read_only) && !writesFiles);
+  const destructive = override.destructiveHint ?? (properties.includes("overwrite") || properties.includes("replace_edits"));
+  return { readOnlyHint: readOnly, destructiveHint: destructive, idempotentHint: readOnly, openWorldHint: true };
+}
+
 /** An MCP tool entry from a manifest row (`{name, label, description, input_schema, read_only}`). */
 export function fromManifest(row) {
-  const readOnly = Boolean(row.read_only);
   return {
     name: row.name,
     title: row.label,
     description: row.description,
     inputSchema: row.input_schema,
-    // Every handoff tool acts through the desktop app (and often Node, ffmpeg or an Adobe app).
-    annotations: { readOnlyHint: readOnly, destructiveHint: false, idempotentHint: readOnly, openWorldHint: true },
+    annotations: annotationsFor(row),
     source: "zenvi-core",
   };
 }

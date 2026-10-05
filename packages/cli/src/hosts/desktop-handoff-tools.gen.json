@@ -3,7 +3,7 @@
   "manifest": {
     "source": "zenvi-core src/classes/editor_tools",
     "manifest_version": 1,
-    "label": "zenvi-core jashan/handoff-integration d933eafc5"
+    "label": "zenvi-core jashan/handoff-integration 80493cc26"
   },
   "tools": [
     {
@@ -89,7 +89,7 @@
       },
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false,
         "openWorldHint": true
       },
@@ -115,7 +115,7 @@
     {
       "name": "import_timeline_xml_tool",
       "title": "Import Premiere / FCP XML",
-      "description": "Bring a Premiere Pro / Final Cut Pro 7 XML sequence into this project on new tracks, as one undo step (File > Import Project > Premiere Pro XML).\n\nUse for \"bring my Premiere edit back\", \"import this XML\". Clips keep their\ntiming, trims, speed / reverse, motion, opacity and volume keyframes;\ndisabled clips come in hidden or muted; Cross Dissolves become fades,\naudio cross fades volume ramps; markers keep names and colours; nested\nsequences are flattened onto extra tracks. Media not already in Project\nFiles is added; media that cannot be found is skipped and listed\n(missing_media). Generators, titles made in Premiere and effects Zenvi\nlacks are listed in warnings. One undo step removes everything it added.\nExample: {\"path\": \"/Users/me/Desktop/Edit.xml\"}.",
+      "description": "Bring a Premiere Pro / Final Cut Pro 7 XML sequence into this project on new tracks, as one undo step (File > Import Project > Premiere Pro XML).\n\nUse for \"bring my Premiere edit back\", \"import this XML\". Clips keep their\ntiming, trims, speed / reverse, motion, opacity and volume keyframes;\ndisabled clips come in hidden or muted; Cross Dissolves become fades,\naudio cross fades volume ramps; markers keep names and colours; nested\nsequences are flattened onto extra tracks. Media not already in Project\nFiles is added; media that cannot be found is skipped and listed\n(missing_media). Generators, titles made in Premiere, image sequences and\neffects Zenvi lacks are listed in warnings, as are the other sequences of a\nmulti-sequence XML (import one of them with sequence). One undo step\nremoves everything it added. Example: {\"path\": \"/Users/me/Desktop/Edit.xml\"}.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -130,6 +130,11 @@
               "new_tracks",
               "at_playhead"
             ],
+            "type": "string"
+          },
+          "sequence": {
+            "default": "",
+            "description": "Which sequence to import when the XML holds several (its name, as listed in the warnings). Empty = the first top-level sequence.",
             "type": "string"
           }
         },
@@ -164,9 +169,9 @@
         "type": "object"
       },
       "annotations": {
-        "readOnlyHint": true,
+        "readOnlyHint": false,
         "destructiveHint": false,
-        "idempotentHint": true,
+        "idempotentHint": false,
         "openWorldHint": true
       },
       "source": "zenvi-core"
@@ -275,7 +280,7 @@
       },
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false,
         "openWorldHint": true
       },
@@ -284,7 +289,7 @@
     {
       "name": "import_hyperframes_project_tool",
       "title": "Import HyperFrames project",
-      "description": "Bring a HyperFrames (HTML video) project into the timeline as one undo step: media as editable clips, compositions as linked clips.\n\nUse for \"open this HyperFrames project in Zenvi\", \"import my hyperframes\nfolder\", \"bring the HyperFrames video back\". Zenvi reads HyperFrames' own\nresolved timeline (`hyperframes timeline --json`), then: <video>/<img>/\n<audio> primitives become native clips on tracks from data-track-index\n(CSS position and size, GSAP opacity/x/y/scale/rotation tweens as\nkeyframes, data-volume and fades as volume keyframes); each nested\ncomposition (data-composition-src or inline) becomes a linked clip\nrendered on its own with transparency; titles and other scripted DOM of\nthe root become one linked graphics layer. Linked clips keep their\nvariables as props (update_linked_clip_tool), open their code or the\nHyperFrames Studio (open_linked_source_tool) and re-render when the code\nchanges. A Zenvi export comes back natively and losslessly, with timing\nedits made in HyperFrames applied. Renders take seconds to minutes; a\nfailed or cancelled render adds nothing. Needs Node.js 22+ for renders.\nThe receipt lists every clip with its kind (native / linked / restored),\nthe mode used and why, and what could not be rebuilt exactly.\nExample: {\"project_dir\": \"/Users/me/videos/launch\", \"mode\": \"auto\"}.",
+      "description": "Bring a HyperFrames (HTML video) project into the timeline as one undo step: media as editable clips, compositions as linked clips.\n\nUse for \"open this HyperFrames project in Zenvi\", \"import my hyperframes\nfolder\", \"bring the HyperFrames video back\". Zenvi reads HyperFrames' own\nresolved timeline (`hyperframes timeline --json`), then: <video>/<img>/\n<audio> primitives become native clips on tracks from data-track-index\n(CSS position and size, GSAP opacity/x/y/scale/rotation tweens as\nkeyframes, data-volume and fades as volume keyframes); each nested\ncomposition (data-composition-src or inline) becomes a linked clip\nrendered on its own with transparency; titles and other scripted DOM of\nthe root become one linked graphics layer. Linked clips read their\nvariables from the HTML at every render (so edits made in HyperFrames\ncome through); update_linked_clip_tool's props override them. They open\ntheir code or the HyperFrames Studio (open_linked_source_tool) and\nre-render when the code changes. A Zenvi export comes back natively and\nlosslessly, with timing edits, splits and duplicates made in HyperFrames\napplied. Renders take seconds to minutes and run the project's HTML and\nscripts in a headless browser (import projects the user trusts); a\nfailed or cancelled render adds nothing. Needs Node.js 22+ for renders.\nThe receipt lists every clip with its kind (native / linked / restored),\nthe mode used and why, and what could not be rebuilt exactly.\nExample: {\"project_dir\": \"/Users/me/videos/launch\", \"mode\": \"auto\"}.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -333,7 +338,7 @@
     {
       "name": "export_to_hyperframes_tool",
       "title": "Export to HyperFrames",
-      "description": "Write the timeline as a HyperFrames project that previews, lints and renders, and comes back to Zenvi losslessly.\n\nUse for \"export this edit to HyperFrames\", \"make a HyperFrames project\nfrom my timeline\", \"hand this to HyperFrames / Framey\". Every clip becomes\na HyperFrames primitive (<video>/<img>/<audio>; titles as <img> SVG) with\nits timing, track, placement (CSS from libopenshot's own geometry),\nkeyframes (a GSAP timeline whose eases match Zenvi frame for frame),\nopacity transitions, constant speed (data-playback-rate) and audio levels.\nThe Zenvi project is embedded in index.html, so\nimport_hyperframes_project_tool on the folder restores the clips natively.\nEffects, rounded corners, blend modes, reversed / ramped speed and wipe\ntransitions do not translate; the receipt and README.md list each one.\nWhen the HyperFrames CLI is available the result is linted and the lint\nfindings come back in the receipt. Changes nothing in the Zenvi project.\nExample: {\"output_dir\": \"/Users/me/exports/launch-hyperframes\"}.",
+      "description": "Write the timeline as a HyperFrames project that previews, lints and renders, and comes back to Zenvi losslessly.\n\nUse for \"export this edit to HyperFrames\", \"make a HyperFrames project\nfrom my timeline\", \"hand this to HyperFrames / Framey\". Every clip becomes\na HyperFrames primitive (<video>/<img>/<audio>; titles as <img> SVG) with\nits timing, track, placement (CSS from libopenshot's own geometry),\nkeyframes (a GSAP timeline whose eases match Zenvi frame for frame),\nopacity transitions, constant speed (data-playback-rate) and audio levels.\nThe Zenvi project is embedded in index.html, so\nimport_hyperframes_project_tool on the folder restores the clips natively.\nEffects, rounded corners, blend modes, reversed / ramped speed and wipe\ntransitions do not translate; the receipt and README.md list each one.\nWhen the HyperFrames CLI is available the result is linted and the lint\nfindings come back in the receipt. Exporting again into the same folder\nreplaces only Zenvi's own files, all together; it stops when they were\nedited there since (replace_edits replaces them). Writes files only:\nchanges nothing in the Zenvi project (no undo step).\nExample: {\"output_dir\": \"/Users/me/exports/launch-hyperframes\"}.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -345,6 +350,11 @@
           "output_dir": {
             "description": "A new or empty folder for the HyperFrames project (an earlier Zenvi export there is updated in place; other files in it are kept).",
             "type": "string"
+          },
+          "replace_edits": {
+            "default": false,
+            "description": "output_dir is an earlier Zenvi export whose files were edited since (in HyperFrames: index.html, package.json, a media copy): replace those edits anyway. Only when the user agreed to lose them; otherwise import that folder first, or pick a new folder.",
+            "type": "boolean"
           }
         },
         "required": [
@@ -353,9 +363,9 @@
         "type": "object"
       },
       "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
         "openWorldHint": true
       },
       "source": "zenvi-core"
@@ -532,9 +542,9 @@
         "type": "object"
       },
       "annotations": {
-        "readOnlyHint": true,
+        "readOnlyHint": false,
         "destructiveHint": false,
-        "idempotentHint": true,
+        "idempotentHint": false,
         "openWorldHint": true
       },
       "source": "zenvi-core"

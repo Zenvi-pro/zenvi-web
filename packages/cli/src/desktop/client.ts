@@ -59,12 +59,13 @@ export class DesktopClient {
   }
 
   /** `onprogress` relays the app's progress notifications (long renders); the wait restarts on each one. */
-  async callTool(name: string, args: Record<string, unknown>, options: { onprogress?: (progress: Progress) => void } = {}): Promise<DesktopToolResult> {
+  async callTool(name: string, args: Record<string, unknown>, options: { onprogress?: (progress: Progress) => void; signal?: AbortSignal } = {}): Promise<DesktopToolResult> {
     const client = await this.connected();
     const result = await client.callTool({ name, arguments: args }, undefined, {
       timeout: CALL_TIMEOUT_MS,
       resetTimeoutOnProgress: true,
       ...(options.onprogress ? { onprogress: options.onprogress } : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
     });
     const content = Array.isArray(result.content) ? (result.content as Array<Record<string, unknown>>) : [];
     const texts = content.filter((c) => c.type === "text").map((c) => String(c.text ?? ""));

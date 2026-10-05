@@ -40,6 +40,8 @@ export interface ExtraTool {
   description: string;
   inputSchema: JsonSchemaObject;
   annotations: { readOnlyHint: boolean; destructiveHint: boolean; openWorldHint: boolean; idempotentHint?: boolean };
+  /** The tool checks argument names itself (forwarded desktop tools use the desktop's own schema). */
+  checksOwnArguments?: boolean;
   run(state: McpState, args: Record<string, unknown>, call: ExtraCallContext): Promise<ExtraToolResult>;
 }
 

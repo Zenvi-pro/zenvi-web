@@ -6,6 +6,7 @@ import { loadConfig } from "../config.js";
 import { fakeLinkHost, type FakeLinkHost } from "../test-support/adobe.js";
 import { fakeDesktop, testEnv, writeDiscovery, type FakeDesktop } from "../test-support/harness.js";
 import { bundledExtension, defaultDetectDeps, findAdobeApps, findInstalledExtensions, manifestVersion, type DetectDeps } from "./extension.js";
+import { adobeDoctor, tooOldApps } from "./doctor.js";
 import { decideFamilies } from "./policy.js";
 import { HostRegistry, describeHosts } from "./registry.js";
 
@@ -99,6 +100,19 @@ describe("Zenvi Link on disk", () => {
     const found = await findAdobeApps(fakeDetect("darwin", { "/Applications/Adobe Premiere Pro 2026/a": "", "/Applications/Adobe Premiere Pro (Beta)/b": "", "/Applications/Other/c": "" }));
     expect(found).toEqual({ apps: { aftereffects: [], premiere: ["Adobe Premiere Pro 2026", "Adobe Premiere Pro (Beta)"] }, looked: true });
     expect((await findAdobeApps(fakeDetect("linux", {}))).looked).toBe(false);
+  });
+});
+
+describe("adobe doctor", () => {
+  it("flags an app older than the 2021 releases Zenvi Link loads in", async () => {
+    // Review W2-1 #6: the manifest loads only After Effects 18.0+ / Premiere Pro 15.0+.
+    const detect = fakeDetect("darwin", { "/Applications/Adobe After Effects 2020/Adobe After Effects 2020.app": "", "/Applications/Adobe Premiere Pro 2026/x": "" });
+    const checks = await adobeDoctor({ desktopDir, detect, run: () => ({ code: 1, stdout: "" }) });
+    expect(checks.find((c) => c.name === "after effects")!.hint).toBe(
+      "Adobe After Effects 2020 is older than Zenvi Link supports: it loads in After Effects 2021 (18.0) or newer.",
+    );
+    expect(checks.find((c) => c.name === "premiere pro")!.hint).toMatch(/^Open Premiere Pro/);
+    expect(tooOldApps("aftereffects", ["Adobe After Effects CC 2019", "Adobe After Effects 2021", "Adobe After Effects (Beta)"])).toEqual(["Adobe After Effects CC 2019"]);
   });
 });
 

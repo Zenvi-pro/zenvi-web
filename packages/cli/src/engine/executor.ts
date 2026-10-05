@@ -8,7 +8,7 @@ import type { Progress } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolImage } from "@zenvi/engine";
 import { parseReceipt, type ToolReceipt } from "@zenvi/engine/tools";
 import type { ZenviConfig } from "../config.js";
-import { DesktopClient } from "../desktop/client.js";
+import { DesktopClient, type DesktopToolInfo } from "../desktop/client.js";
 import { discoverDesktop, hasProjectOpen, type DesktopEndpoint } from "../desktop/discovery.js";
 import { CliError } from "../output.js";
 import { ProjectSession } from "../project/session.js";
@@ -56,27 +56,35 @@ export class PortableExecutor implements Executor {
 
 export class DesktopExecutor implements Executor {
   readonly engine = "desktop" as const;
-  private toolNames: Promise<Set<string>> | undefined;
+  private tools: Promise<Map<string, DesktopToolInfo>> | undefined;
 
   constructor(
     readonly client: DesktopClient,
     readonly project?: string,
   ) {}
 
-  async call(name: string, args: Record<string, unknown>, _signal?: AbortSignal, options: { onprogress?: (progress: Progress) => void } = {}): Promise<CallOutcome> {
-    const r = await this.client.callTool(name, args, options);
+  async call(name: string, args: Record<string, unknown>, signal?: AbortSignal, options: { onprogress?: (progress: Progress) => void } = {}): Promise<CallOutcome> {
+    const r = await this.client.callTool(name, args, { ...options, ...(signal ? { signal } : {}) });
     return { engine: "desktop", project: this.project ?? this.client.endpoint.project, ok: !r.isError, receipt: r.receipt, text: r.text, images: r.images };
+  }
+
+  private listed(): Promise<Map<string, DesktopToolInfo>> {
+    this.tools ??= this.client.listTools().then((tools) => new Map(tools.map((t) => [t.name, t])));
+    this.tools.catch(() => {
+      this.tools = undefined;
+    });
+    return this.tools;
   }
 
   /** Whether this desktop build has a tool (its tools/list, read once). */
   async hasTool(name: string): Promise<boolean> {
-    this.toolNames ??= this.client.listTools().then((tools) => new Set(tools.map((t) => t.name)));
-    try {
-      return (await this.toolNames).has(name);
-    } catch (error) {
-      this.toolNames = undefined;
-      throw error;
-    }
+    return (await this.listed()).has(name);
+  }
+
+  /** The tool's input schema as this desktop build publishes it, when it lists its properties. */
+  async toolSchema(name: string): Promise<{ properties: Record<string, unknown> } | undefined> {
+    const schema = (await this.listed()).get(name)?.inputSchema as { properties?: Record<string, unknown> } | undefined;
+    return schema?.properties ? { properties: schema.properties } : undefined;
   }
 
   async close(): Promise<void> {

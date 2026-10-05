@@ -73,12 +73,13 @@ function launcher(options: { installed?: boolean; onLaunch?: (project: string) =
   };
 }
 
-async function connect(options: { env?: NodeJS.ProcessEnv; project?: string; launch?: Launcher; desktopWaitMs?: number } = {}): Promise<{ client: Client; server: ZenviMcpServer; notifications: string[] }> {
+async function connect(options: { env?: NodeJS.ProcessEnv; project?: string; launch?: Launcher; desktopWaitMs?: number; keepAliveMs?: number } = {}): Promise<{ client: Client; server: ZenviMcpServer; notifications: string[] }> {
   const env = testEnv(home, { ZENVI_MCP_ADOBE: "auto", ...options.env });
   const ctx = createContext({ env, cwd: work, registry: testRegistry() });
   const server = await createZenviMcpServer(ctx, options.project, {
     launcher: (options.launch ?? launcher()).deps,
     desktopWaitMs: options.desktopWaitMs ?? 5000,
+    keepAliveMs: options.keepAliveMs,
     // Real files in the temp home, but no CEP or app folders: discovery files decide the auto listing.
     detect: { ...defaultDetectDeps(home, env), platform: "linux" },
   });
@@ -237,12 +238,31 @@ describe("After Effects / Premiere Pro tools", () => {
     expect(existsSync(file)).toBe(false);
   });
 
-  it("treats an all-digits string as the id for id-or-name fields (layer=12 from the CLI)", async () => {
+  it("keeps null (remove) and \"\" (clear), and reads digits as ids at any depth", async () => {
+    // Review W2-1 #1: the engine's coercion dropped null / "" and looked one anyOf level deep.
     const host = await ae();
     const { client } = await connect();
-    await call(client, "ae_set_layer", { layer: "12", name: "7" });
-    await call(client, "ae_set_layer", { layer: "Title 2", name: "Title" });
-    expect(host.calls.map((c) => c.args)).toEqual([expect.objectContaining({ layer: 12, name: "7" }), expect.objectContaining({ layer: "Title 2", name: "Title" })]);
+    const sent: Array<[string, Record<string, unknown>]> = [
+      ["ae_set_layer", { layer: 3, parent: null }],
+      ["ae_set_text", { layer: 2, stroke: null }],
+      ["ae_add_expression", { layer: 1, property: "Transform/Position", expression: "" }],
+      ["ae_set_layer", { layer: "3", parent: "5", name: "7", comment: "" }],
+      ["ae_add_layer", { kind: "null", parent: "5" }],
+      ["ae_arrange_layers", { layer: "3", action: "move", to: { before: "7" } }],
+      ["ae_set_layer", { layer: "Title 2", parent: "null" }],
+    ];
+    for (const [tool, args] of sent) {
+      const r = await call(client, tool, args);
+      expect(r.receipt.status, `${tool} ${JSON.stringify(args)}: ${r.receipt.summary}`).toBe("ok");
+    }
+    const got = host.calls.map((c) => c.args);
+    expect(got[0]).toMatchObject({ layer: 3, parent: null });
+    expect(got[1]).toMatchObject({ layer: 2, stroke: null });
+    expect(got[2]).toMatchObject({ expression: "" });
+    expect(got[3]).toMatchObject({ layer: 3, parent: 5, name: "7", comment: "" });
+    expect(got[4]).toMatchObject({ kind: "null", parent: 5 });
+    expect(got[5]).toMatchObject({ layer: 3, to: { before: 7 } });
+    expect(got[6]).toMatchObject({ layer: "Title 2", parent: null });
   });
 
   it("refuses when the app is not connected, with how to connect it", async () => {
@@ -276,6 +296,12 @@ describe("After Effects / Premiere Pro tools", () => {
   });
 });
 
+/** The vendored desktop schema of a handoff tool, as a desktop build publishes it in tools/list. */
+function liveSchema(tool: string, extra: Record<string, unknown> = {}): { type: "object"; properties: Record<string, unknown> } {
+  const def = DESKTOP_HANDOFF_TOOLS.find((t) => t.name === tool)!;
+  return { type: "object", properties: { ...(def.inputSchema.properties as Record<string, unknown>), ...extra } };
+}
+
 describe("desktop handoff tools", () => {
   it("refuse on an untitled session", async () => {
     const desktop = await desktopWith(undefined, { tools: ["export_to_remotion_tool"] });
@@ -290,28 +316,83 @@ describe("desktop handoff tools", () => {
     const file = await projectFile();
     const desktop = await desktopWith(file, {
       tools: ["export_to_remotion_tool"],
+      schemas: { export_to_remotion_tool: liveSchema("export_to_remotion_tool") },
       handlers: { export_to_remotion_tool: (args) => applied("export_to_remotion_tool", `Exported to ${String(args.output_dir)}`, { data: { output_dir: args.output_dir } }, 0) },
     });
     const { client } = await connect({ project: file });
-    const r = await call(client, "export_to_remotion_tool", { output_dir: "remotion-cut", copy_media: false });
+    const r = await call(client, "export_to_remotion_tool", { output_dir: "remotion-cut", copy_media: false, replace_edits: true });
     expect(r.receipt).toMatchObject({ status: "applied", summary: `Exported to ${path.join(work, "remotion-cut")}` });
     expect(r.structured.engine).toBe("desktop");
-    expect(desktop.calls).toEqual([{ tool: "export_to_remotion_tool", args: { output_dir: path.join(work, "remotion-cut"), copy_media: false } }]);
+    expect(desktop.calls).toEqual([{ tool: "export_to_remotion_tool", args: { output_dir: path.join(work, "remotion-cut"), copy_media: false, replace_edits: true } }]);
     const unknown = await call(client, "export_to_remotion_tool", { output: "x" });
     expect(unknown.receipt.summary).toBe("Error: unknown argument for export_to_remotion_tool: output. Accepted: copy_media, install, output_dir, replace_edits.");
+    expect(desktop.calls).toHaveLength(1);
   });
 
-  it("open the session's project in a running app that shows another one, then forward", async () => {
+  it("check argument names against the running desktop's own schema, so a newer desktop's arguments are never blocked", async () => {
+    // Review W2-1 #2: a stale vendored schema refused replace_edits with no way through.
     const file = await projectFile();
-    const desktop = await desktopWith(path.join(work, "elsewhere.zvn"), { tools: ["get_linked_clip_tool"] });
+    const desktop = await desktopWith(file, {
+      tools: ["export_to_hyperframes_tool"],
+      schemas: { export_to_hyperframes_tool: liveSchema("export_to_hyperframes_tool", { brand_new_option: { type: "boolean" } }) },
+    });
     const { client } = await connect({ project: file });
-    const r = await call(client, "get_linked_clip_tool", { clip_id: "C1" });
+    const newer = await call(client, "export_to_hyperframes_tool", { output_dir: "/tmp/hf", brand_new_option: true });
+    expect(newer.receipt.status).toBe("applied");
+    const typo = await call(client, "export_to_hyperframes_tool", { output_dir: "/tmp/hf", replace_edit: true });
+    expect(typo.receipt.summary).toMatch(/^Error: unknown argument for export_to_hyperframes_tool: replace_edit\. Accepted: .*brand_new_option/);
+    expect(desktop.calls.map((c) => c.args)).toEqual([{ output_dir: "/tmp/hf", brand_new_option: true }]);
+  });
+
+  it("refuse an unknown argument before starting the app when none runs", async () => {
+    const file = await projectFile();
+    const launch = launcher();
+    const { client } = await connect({ project: file, launch });
+    const r = await call(client, "export_to_after_effects_tool", { outputdir: "x" });
+    expect(r.receipt.summary).toMatch(/unknown argument for export_to_after_effects_tool: outputdir\..*open the project in it first with launch_editor/);
+    expect(launch.log).toEqual([]);
+  });
+
+  it("open the session's project in a running app that shows another one for tools that act on it", async () => {
+    const file = await projectFile();
+    const desktop = await desktopWith(path.join(work, "elsewhere.zvn"), { tools: ["rerender_linked_clip_tool"] });
+    const { client } = await connect({ project: file });
+    const r = await call(client, "rerender_linked_clip_tool", { clip_id: "C1" });
     expect(r.receipt.status).toBe("applied");
     expect(desktop.calls).toEqual([
       { tool: "open_project_tool", args: { file_path: file } },
-      { tool: "get_linked_clip_tool", args: { clip_id: "C1" } },
+      { tool: "rerender_linked_clip_tool", args: { clip_id: "C1" } },
     ]);
     expect(r.receipt.notes!.join(" ")).toMatch(/Opened .*cut\.zvn in the running Zenvi app\. This session's Zenvi edits now go through the app\./);
+  });
+
+  it("never switch the app's project for tools that only read it or do not need it", async () => {
+    // Review W2-1: get_linked_clip_tool / list_remotion_compositions_tool switched a running desktop away from its project.
+    const file = await projectFile();
+    const elsewhere = path.join(work, "elsewhere.zvn");
+    const desktop = await desktopWith(elsewhere, { tools: ["get_linked_clip_tool", "list_remotion_compositions_tool"] });
+    const { client } = await connect({ project: file });
+    const read = await call(client, "get_linked_clip_tool", { clip_id: "C1" });
+    expect(read.receipt.status).toBe("refused");
+    expect(read.receipt.summary).toMatch(/has .*elsewhere\.zvn open, not .*cut\.zvn\. get_linked_clip_tool reads this session's project there and does not switch projects on its own: call launch_editor/);
+    const free = await call(client, "list_remotion_compositions_tool", { project_dir: "/code/promo" });
+    expect(free.receipt.status).toBe("applied");
+    expect(desktop.calls).toEqual([{ tool: "list_remotion_compositions_tool", args: { project_dir: "/code/promo" } }]);
+    expect(desktop.project).toBe(elsewhere);
+  });
+
+  it("check the Adobe app before opening the desktop for send_to_* tools", async () => {
+    const file = await projectFile();
+    const desktop = await desktopWith(path.join(work, "elsewhere.zvn"), { tools: ["send_to_after_effects_tool"] });
+    const { client } = await connect({ project: file });
+    const r = await call(client, "send_to_after_effects_tool");
+    expect(r.receipt.status).toBe("refused");
+    expect(r.receipt.summary).toMatch(/After Effects is not connected: .*zenvi adobe install/);
+    expect(desktop.calls).toEqual([]);
+    await ae();
+    const sent = await call(client, "send_to_after_effects_tool");
+    expect(sent.receipt.status).toBe("applied");
+    expect(desktop.calls.map((c) => c.tool)).toEqual(["open_project_tool", "send_to_after_effects_tool"]);
   });
 
   it("start the app on the project when it is not running, wait for it, then forward", async () => {
@@ -324,6 +405,20 @@ describe("desktop handoff tools", () => {
     expect(launch.log).toEqual([`spawn zenvi-desktop-test ${file}`]);
     expect(desktop.calls).toEqual([{ tool: "import_hyperframes_project_tool", args: { project_dir: path.join(home, "hf"), mode: "native" } }]);
     expect(r.receipt.notes!.join(" ")).toMatch(/Started Zenvi on .*cut\.zvn/);
+  });
+
+  it("start the app once when calls arrive while it is coming up", async () => {
+    const file = await projectFile();
+    const desktop = await desktopWith(undefined, { tools: ["export_to_premiere_tool"] }, false);
+    const launch = launcher({
+      onLaunch: async (project) => {
+        setTimeout(() => void writeDiscovery(home, desktop, { project }), 400);
+      },
+    });
+    const { client } = await connect({ project: file, launch });
+    const [a, b] = await Promise.all([call(client, "export_to_premiere_tool"), call(client, "export_to_premiere_tool")]);
+    expect([a.receipt.status, b.receipt.status]).toEqual(["applied", "applied"]);
+    expect(launch.log.filter((line) => line.startsWith("spawn"))).toHaveLength(1);
   });
 
   it("say so when the app is not installed, does not show the project in time, lacks the tool, or is turned off", async () => {
@@ -340,9 +435,9 @@ describe("desktop handoff tools", () => {
 
     await desktopWith(file);
     const old = await connect({ project: file });
-    const r3 = await call(old.client, "send_to_premiere_tool");
+    const r3 = await call(old.client, "export_to_premiere_tool");
     expect(r3.receipt).toMatchObject({ status: "refused" });
-    expect(r3.receipt.summary).toMatch(/has no send_to_premiere_tool yet: update Zenvi/);
+    expect(r3.receipt.summary).toMatch(/has no export_to_premiere_tool yet: update Zenvi/);
 
     const portable = await connect({ project: file, env: { ZENVI_MCP_ENGINE: "portable" } });
     const r4 = await call(portable.client, "send_to_premiere_tool");
@@ -394,8 +489,85 @@ describe("bring_from_after_effects", () => {
     const { client } = await connect({ project: file });
     const seen: Array<{ progress: number; message?: string }> = [];
     await client.callTool({ name: "bring_from_after_effects", arguments: {} }, undefined, { onprogress: (p) => void seen.push({ progress: p.progress, message: p.message }) });
-    expect(seen.map((p) => p.message)).toEqual(["Rendering in After Effects…", "Adding the render to the Zenvi project…"]);
+    expect(seen.map((p) => p.message)).toEqual(["Rendering in After Effects…", "Adding it to the Zenvi project…"]);
     expect(seen.every((p, i) => i === 0 || p.progress > seen[i - 1]!.progress)).toBe(true);
+  });
+
+  it("sends keep-alive progress while After Effects renders", async () => {
+    const file = await projectFile();
+    await ae({ handlers: { ae_render_for_zenvi: async () => (await new Promise((r) => setTimeout(r, 400)), { status: "applied", data: RENDER }) } });
+    await desktopWith(file, { tools: ["import_linked_media_tool"] });
+    const { client } = await connect({ project: file, keepAliveMs: 50 });
+    const seen: string[] = [];
+    await client.callTool({ name: "bring_from_after_effects", arguments: {} }, undefined, { onprogress: (p) => void seen.push(String(p.message)) });
+    expect(seen.filter((m) => /^Rendering in After Effects \(\d+ s\)$/.test(m)).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("re-checks the open project before importing: a desktop that switched projects meanwhile gets nothing", async () => {
+    // Review W2-1 #3: the import went to whatever project the desktop showed after the render.
+    const file = await projectFile();
+    const holder: { desktop?: FakeDesktop } = {};
+    await ae({
+      handlers: {
+        ae_render_for_zenvi: async () => {
+          holder.desktop!.project = path.join(work, "other.zvn");
+          await writeDiscovery(home, holder.desktop!);
+          return { status: "applied", summary: "Rendered Promo", data: RENDER };
+        },
+      },
+    });
+    holder.desktop = await desktopWith(file, { tools: ["import_linked_media_tool"] });
+    const { client } = await connect({ project: file });
+    const r = await call(client, "bring_from_after_effects");
+    expect(r.receipt).toMatchObject({ status: "refused", data: { after_effects: { status: "applied" }, retry: { tool: "import_linked_media_tool", arguments: { path: RENDER.path } } } });
+    expect(r.receipt.summary).toMatch(/no longer has .*cut\.zvn open/);
+    expect(holder.desktop.calls.map((c) => c.tool)).not.toContain("import_linked_media_tool");
+  });
+
+  it("does not import after the client cancelled the call", async () => {
+    // Review W2-1 #4: a cancelled intent still added an undo step in Zenvi.
+    const file = await projectFile();
+    let rendered!: () => void;
+    const done = new Promise<void>((resolve) => (rendered = resolve));
+    await ae({
+      handlers: {
+        ae_render_for_zenvi: async () => {
+          await new Promise((r) => setTimeout(r, 500));
+          rendered();
+          return { status: "applied", data: RENDER };
+        },
+      },
+    });
+    const desktop = await desktopWith(file, { tools: ["import_linked_media_tool"] });
+    const { client } = await connect({ project: file });
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new Error("user pressed Esc")), 150);
+    await expect(client.callTool({ name: "bring_from_after_effects", arguments: {} }, undefined, { signal: controller.signal })).rejects.toThrow();
+    await done;
+    await new Promise((r) => setTimeout(r, 300));
+    expect(desktop.calls.map((c) => c.tool)).not.toContain("import_linked_media_tool");
+  });
+
+  it("keeps the After Effects result when the desktop import fails", async () => {
+    // Review W2-1 #5: only "MCP error -32603" came back; the render was orphaned.
+    const file = await projectFile();
+    await ae({ handlers: { ae_render_for_zenvi: () => ({ status: "applied", summary: "Rendered Promo", data: RENDER }) } });
+    await desktopWith(file, {
+      tools: ["import_linked_media_tool"],
+      handlers: {
+        import_linked_media_tool: () => {
+          throw new Error("desktop crashed mid-import");
+        },
+      },
+    });
+    const { client } = await connect({ project: file });
+    const r = await call(client, "bring_from_after_effects");
+    expect(r.result.isError).toBe(true);
+    expect(r.receipt).toMatchObject({
+      status: "error",
+      data: { after_effects: { status: "applied", data: { path: RENDER.path } }, retry: { tool: "import_linked_media_tool", arguments: { path: RENDER.path, link: { kind: "aftereffects" } } } },
+    });
+    expect(r.receipt.summary).toMatch(/rendered "Promo" to .*Promo-1\.mov, but the Zenvi desktop app failed during import_linked_media_tool: .*desktop crashed mid-import/);
   });
 
   it("uses Zenvi Link's own link object when it sends one", async () => {

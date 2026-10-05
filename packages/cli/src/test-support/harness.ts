@@ -75,6 +75,8 @@ export interface FakeDesktop {
 export interface FakeDesktopOptions {
   /** More tool names to list (handoff tools…). */
   tools?: string[];
+  /** Input schemas to publish in tools/list (default `{type: "object"}`, no properties). */
+  schemas?: Record<string, { type: "object"; properties?: Record<string, unknown>; [key: string]: unknown }>;
   /** Receipts for particular tools (default: an applied receipt naming the tool). */
   handlers?: Record<string, (args: Record<string, unknown>) => ToolReceipt | Promise<ToolReceipt>>;
   /** Rewrite `<home>/.openshot_qt/gui_mcp.json` when open_project_tool switches projects, like the real app. */
@@ -87,7 +89,10 @@ export async function fakeDesktop(token: string, project?: string, options: Fake
   const makeServer = () => {
     const server = new Server({ name: "zenvi-editor", version: "1.0.0-test" }, { capabilities: { tools: {} } });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: ["get_project_info_tool", "open_project_tool", "add_marker_tool", "inspect_timeline_tool", ...(options.tools ?? [])].map((name) => ({ name, inputSchema: { type: "object" as const } })),
+      tools: ["get_project_info_tool", "open_project_tool", "add_marker_tool", "inspect_timeline_tool", ...(options.tools ?? [])].map((name) => ({
+        name,
+        inputSchema: options.schemas?.[name] ?? { type: "object" as const },
+      })),
     }));
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const args = (request.params.arguments ?? {}) as Record<string, unknown>;

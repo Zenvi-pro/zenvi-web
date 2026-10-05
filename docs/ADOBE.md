@@ -30,9 +30,10 @@ the tools apply are in [TASTE.md](TASTE.md).
 
 ## Install
 
-Requirements: After Effects or Premiere Pro 2019 or newer (CEP 9-12) on
-macOS or Windows, and the `zenvi` CLI ([CLI.md](CLI.md#install)) or the
-Claude Code plugin (which contains it).
+Requirements: After Effects 2021 (18.0) or newer, or Premiere Pro 2021
+(15.0) or newer (the versions the extension's manifest loads in), on macOS
+or Windows, and the `zenvi` CLI ([CLI.md](CLI.md#install)) or the Claude
+Code plugin (which contains it). `zenvi adobe doctor` flags an older app.
 
 ```bash
 zenvi adobe install --dry-run   # what it will do
