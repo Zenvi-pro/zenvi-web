@@ -12,6 +12,7 @@
     "build": "tsx scripts/build-extension.mjs",
     "gen:catalog": "tsx scripts/gen-catalog.ts",
     "typecheck:jsx": "node scripts/typecheck-jsx.mjs",
+    "typecheck:jsx:ppro": "tsc -p tsconfig.jsx-ppro.json",
     "install:dev": "tsx scripts/install-dev.mjs",
     "package:zxp": "tsx scripts/package-zxp.mjs",
     "typecheck": "tsc -p tsconfig.json"
