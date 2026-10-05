@@ -74,6 +74,25 @@ describe("boot inside CEP (fake __adobe_cep__, real host script on the mock DOM)
     expect(path.basename(file)).toMatch(/^capture-\d+-\d+\.png$/);
   });
 
+  test("a configure call that did not get through at boot is retried on the next refresh", async () => {
+    const temp = mkdtempSync(path.join(os.tmpdir(), "zenvi-link-boot-"));
+    const mock = createAeMock({ tempDir: temp });
+    const host = loadHostScript("aeft", mock.globals);
+    const evaluate = evalInHostScript(host);
+    let refusals = 1;
+    const cep = new FakeCep({
+      appName: "AEFT",
+      appVersion: "26.3.0",
+      extensionDir: EXTENSION_DIR,
+      evalScript: (script) => (script.startsWith("ZenviLink.configure(") && refusals-- > 0 ? "EvalScript error." : evaluate(script)),
+    });
+    const link = await boot({ cep, home: path.join(temp, "home"), tempDir: path.join(temp, "system"), pollMs: 60_000, log: () => undefined });
+    running.push(link);
+    expect(host.evaluate("ZenviLink.state.config.temp_dir")).toBeUndefined();
+    cep.fire(EVENTS.activate);
+    await until(() => host.evaluate("ZenviLink.state.config.temp_dir") === link.server.tempDir);
+  });
+
   test("answers status requests from the first moment, then broadcasts once ready", async () => {
     const temp = mkdtempSync(path.join(os.tmpdir(), "zenvi-link-boot-"));
     const mock = createAeMock({ tempDir: temp });

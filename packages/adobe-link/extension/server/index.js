@@ -191,6 +191,7 @@ async function boot(options) {
     try {
       if (stopped) return;
       if (!hostScript.ok) await ensureHostScript();
+      else if (!configured) await configureHostScript();
       const info = await readHostInfo();
       if (info && !stopped) await discovery.setProject(typeof info.project === "string" && info.project ? info.project : null);
     } catch (error) {
