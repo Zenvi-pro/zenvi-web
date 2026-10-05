@@ -22,4 +22,4 @@ export declare function syncText(
   manifest: { tools?: ManifestRow[]; source?: string; manifest_version?: number },
   currentText: string,
   label?: string,
-): { text: string; handWritten: string[] };
+): { text: string; kept: string[] };

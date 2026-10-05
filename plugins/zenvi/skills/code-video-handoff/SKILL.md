@@ -15,6 +15,13 @@ All of this runs in the Zenvi desktop app on a saved project: call
 `open_project_file` first. The `zenvi` MCP server opens the app on the
 project when a tool needs it. Renders take seconds to minutes.
 
+**Trust first.** Listing a Remotion project's compositions, importing it,
+and importing a HyperFrames project that needs renders run that project's
+own code (its bundler and renderer, in Node.js and headless Chrome). Do it
+only for a project the user trusts; ask when you did not create it and they
+did not say so. Without `node_modules` a Remotion listing shows only ids and
+code locations, and nothing runs.
+
 ## Into Zenvi
 
 **Remotion.**
@@ -23,25 +30,41 @@ project when a tool needs it. Renders take seconds to minutes.
 2. `import_remotion_project_tool {project_dir, compositions, props, codec,
    position, track}`. `codec: "auto"` renders one still first and picks
    ProRes 4444 when any pixel is transparent (overlays), else H.264. Each
-   composition lands as a linked clip.
+   composition lands as a linked clip; they land together at `position`
+   (default: the playhead) on free tracks above the video, transparent ones
+   on top (`track` applies when you import one composition). One undo step.
 3. A project Zenvi generated (it has `src/zenvi/timeline.json`) comes back
    as native, fully editable Zenvi clips (`restore_native`, default true).
 
-**HyperFrames.** `import_hyperframes_project_tool {project_dir, mode}`:
-`<video>`, `<img>` and `<audio>` primitives with `data-start` /
-`data-duration` become native clips; compositions driven by scripts become
-linked clips. `mode: "native"` imports primitives only, `"flatten"` renders
-everything as one linked clip.
+**HyperFrames.** `import_hyperframes_project_tool {project_dir, mode,
+position, track}` reads HyperFrames' own resolved timeline:
+- `mode: "native"`: `<video>`, `<img>` and `<audio>` primitives become
+  native clips (CSS placement; simple GSAP tweens become keyframes). Nested
+  compositions become linked clips rendered with transparency, and titles or
+  other scripted parts of the root become one linked graphics layer.
+- `mode: "auto"` (default): native, except that the whole project becomes
+  one linked clip when the root has no media clips or an animation cannot be
+  rebuilt exactly.
+- `mode: "flatten"`: everything as one linked clip.
+- A project Zenvi exported always comes back natively, with timing edits
+  made in HyperFrames applied (unless `flatten`). Renders need Node.js 22+.
 
 ## Out of Zenvi
 
 - `export_to_remotion_tool {output_dir, copy_media, install}`: a Remotion
-  project with the composition `ZenviTimeline`, the timeline as
-  `src/zenvi/timeline.json` (clips, keyframes with easing, titles,
-  transitions) and a generic renderer. Preview with `npx remotion studio`.
+  project (Remotion 4.0.532 pinned) with the composition `ZenviTimeline`,
+  the timeline as `src/zenvi/timeline.json` (clips, keyframes with easing,
+  titles, transitions) and a generic renderer; wipes play as fades. Preview
+  with `npx remotion studio`. Exporting into an earlier export updates it
+  in place, and refuses when that would discard changes made there: import
+  that folder first, pick another `output_dir`, or pass `replace_edits:
+  true` only when the user agreed to lose those changes.
 - `export_to_hyperframes_tool {output_dir, copy_media}`: `index.html` with
-  primitives and a GSAP timeline, plus an embedded `zenvi-timeline` JSON so
-  the import restores it exactly. Preview with `npx hyperframes preview`.
+  primitives and a GSAP timeline, plus the Zenvi project embedded so the
+  import restores it exactly. Effects, rounded corners, blend modes,
+  reversed or ramped speed and wipes do not translate (the receipt lists
+  them); with the HyperFrames CLI available the result is linted. Preview
+  with `npx hyperframes preview`.
 - Both come back with the import tools above.
 
 ## Working with linked clips

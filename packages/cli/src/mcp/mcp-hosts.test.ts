@@ -146,9 +146,16 @@ describe("listing", () => {
     expect(names).toEqual(expect.arrayContaining(["list_hosts", "bring_from_after_effects", "bring_from_premiere", ...DESKTOP_HANDOFF_TOOLS.map((t) => t.name)]));
     expect(names).not.toContain("list_link_hosts_tool");
     expect(names).not.toContain("call_link_host_tool");
-    const handoff = tools.find((t) => t.name === "import_linked_media_tool")!;
-    expect(handoff.description).toMatch(/^Zenvi desktop app: /);
-    expect(handoff.inputSchema).toEqual(DESKTOP_HANDOFF_TOOLS.find((t) => t.name === "import_linked_media_tool")!.inputSchema);
+    // Every desktop handoff tool is listed with the desktop's own schema (zenvi-core's manifest).
+    for (const def of DESKTOP_HANDOFF_TOOLS) {
+      const listed = tools.find((t) => t.name === def.name)!;
+      expect(listed.description, def.name).toBe(`Zenvi desktop app: ${def.description}`);
+      expect(listed.inputSchema, def.name).toEqual(def.inputSchema);
+      expect(listed.annotations, def.name).toMatchObject({ title: def.title, ...def.annotations });
+    }
+    const remotion = tools.find((t) => t.name === "export_to_remotion_tool")!;
+    expect(Object.keys(remotion.inputSchema.properties ?? {})).toEqual(expect.arrayContaining(["output_dir", "replace_edits"]));
+    expect(Object.keys(tools.find((t) => t.name === "export_to_premiere_tool")!.inputSchema.properties ?? {})).toContain("overwrite");
     expect(client.getServerCapabilities()).toMatchObject({ tools: { listChanged: true }, resources: {}, prompts: {} });
   });
 
@@ -291,7 +298,7 @@ describe("desktop handoff tools", () => {
     expect(r.structured.engine).toBe("desktop");
     expect(desktop.calls).toEqual([{ tool: "export_to_remotion_tool", args: { output_dir: path.join(work, "remotion-cut"), copy_media: false } }]);
     const unknown = await call(client, "export_to_remotion_tool", { output: "x" });
-    expect(unknown.receipt.summary).toMatch(/unknown argument for export_to_remotion_tool: output\. Accepted: output_dir, copy_media, install/);
+    expect(unknown.receipt.summary).toBe("Error: unknown argument for export_to_remotion_tool: output. Accepted: copy_media, install, output_dir, replace_edits.");
   });
 
   it("open the session's project in a running app that shows another one, then forward", async () => {

@@ -53,12 +53,12 @@ handoff needs it (the project must be saved: open_project_file).
 | --- | --- | --- |
 | Zenvi → After Effects | send_to_after_effects_tool (After Effects connected), export_to_after_effects_tool (.jsx file) | footage, layers, timing, transforms with eased keyframes, opacity, audio levels, titles as text layers, mapped effects, transitions, markers; unmapped effects are listed as warnings |
 | After Effects → Zenvi | bring_from_after_effects | the comp as a linked clip, rendered by After Effects and re-renderable |
-| Zenvi → Premiere Pro | send_to_premiere_tool (Premiere connected), export_to_premiere_tool (FCP7 XML) | clips, trims, tracks, Basic Motion and Opacity keyframes, audio levels, cross dissolves, markers; titles as PNG stills |
+| Zenvi → Premiere Pro | send_to_premiere_tool (Premiere connected), export_to_premiere_tool (FCP7 XML) | clips, trims, speed and reverse, motion / opacity / volume keyframes (eases as extra linear keys), cross dissolves, markers, track names and locks; titles as PNG stills |
 | Premiere Pro → Zenvi | bring_from_premiere (premiere_export_xml + import_timeline_xml_tool) | the sequence as native, editable clips |
 | Zenvi → Remotion | export_to_remotion_tool | the timeline as a Remotion project (src/zenvi/timeline.json + a renderer); it comes back as native clips |
-| Remotion → Zenvi | list_remotion_compositions_tool, import_remotion_project_tool | compositions as linked clips; a Zenvi-generated project as native clips |
+| Remotion → Zenvi | list_remotion_compositions_tool, import_remotion_project_tool (both run the project's code) | compositions as linked clips; a Zenvi-generated project as native clips |
 | Zenvi → HyperFrames | export_to_hyperframes_tool | primitives, a GSAP timeline and an embedded zenvi-timeline JSON (lossless on re-import) |
-| HyperFrames → Zenvi | import_hyperframes_project_tool | <video>/<img>/<audio> primitives as native clips; scripted compositions as linked clips |
+| HyperFrames → Zenvi | import_hyperframes_project_tool | <video>/<img>/<audio> primitives as native clips; nested compositions and scripted graphics as linked clips (mode auto flattens to one linked clip when the root has no media or an animation cannot be rebuilt) |
 
 ## Linked clips
 
@@ -78,6 +78,8 @@ never WebM (Zenvi drops VP9 alpha).
 ## Rules of thumb
 
 - After Effects and Premiere Pro steps need the app running with Zenvi Link (list_hosts; \`zenvi adobe install\` installs it).
+- Listing or importing a Remotion project, and HyperFrames renders, run that project's own code (Node.js and headless Chrome): only for projects the user trusts.
+- export_to_remotion_tool updates an earlier export in place and refuses to discard changes made there; pass replace_edits only when the user agreed to lose them.
 - Prefer the native tools of the app the user is working in: ae_* inside After Effects, premiere_* inside Premiere Pro, Zenvi tools on the .zvn project. Hand off when the user wants to continue in another app.
 - After every handoff, look at the result in the destination (ae_capture_frame, premiere_capture_frame, preview_frame) and read the warnings to the user: round trips through other apps are not lossless for everything.
 `;

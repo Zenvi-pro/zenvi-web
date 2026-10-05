@@ -167,7 +167,7 @@ describe("generated files", () => {
     for (const tool of DESKTOP_HANDOFF_TOOLS) {
       expect(tool.inputSchema, tool.name).toMatchObject({ type: "object", additionalProperties: false });
       expect(tool.description.length, tool.name).toBeGreaterThan(80);
-      expect(["zenvi-core", "spec"]).toContain(tool.source);
+      expect(tool.source, tool.name).toBe("zenvi-core");
     }
     // Regenerating from a manifest takes the desktop's entries and keeps hand-written ones for the rest.
     const current = await readFile(GEN_FILE, "utf8");
@@ -176,10 +176,14 @@ describe("generated files", () => {
       source: "zenvi-core src/classes/editor_tools",
       tools: [{ name: "send_to_premiere_tool", label: "Send to Premiere", description: "D".repeat(90), input_schema: { type: "object", properties: {}, additionalProperties: false }, read_only: false }],
     };
-    const { text, handWritten } = syncText(manifest, current, "test");
+    const { text, kept } = syncText(manifest, current, "test");
     const doc = JSON.parse(text) as { tools: Array<{ name: string; title: string; source: string; annotations: Record<string, boolean> }> };
     expect(doc.tools.find((t) => t.name === "send_to_premiere_tool")).toMatchObject({ title: "Send to Premiere", source: "zenvi-core", annotations: { readOnlyHint: false, openWorldHint: true } });
-    expect(handWritten).not.toContain("send_to_premiere_tool");
+    expect(kept).toHaveLength(HANDOFF_TOOLS.length - 1);
+    expect(kept).not.toContain("send_to_premiere_tool");
+    // Tools this manifest lacks keep their current entries exactly (source included).
+    const before = JSON.parse(current) as { tools: Array<{ name: string }> };
+    for (const name of kept) expect(doc.tools.find((t) => t.name === name)).toEqual(before.tools.find((t) => t.name === name));
     expect(doc.tools.map((t) => t.name)).toEqual(HANDOFF_TOOLS);
     expect(await readdir(path.dirname(GEN_FILE))).toContain("desktop-handoff-tools.gen.json");
   });

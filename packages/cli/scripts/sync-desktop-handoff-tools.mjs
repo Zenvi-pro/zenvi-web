@@ -8,8 +8,8 @@
  *   (zenvi-core)  python scripts/export_editor_tool_manifest.py --out /tmp/editor-tools.json
  *   node packages/cli/scripts/sync-desktop-handoff-tools.mjs /tmp/editor-tools.json [--check] [--label "zenvi-core <sha>"]
  *
- * A tool the manifest does not have yet keeps its current entry (written by
- * hand from SPEC §3.5, `"source": "spec"`) and is reported. `--check` exits 1
+ * A tool the manifest does not have keeps its current entry unchanged (one
+ * written by hand from SPEC §3.5 is `"source": "spec"`) and is reported. `--check` exits 1
  * when the file is stale. list_link_hosts_tool and call_link_host_tool are
  * left out on purpose: `zenvi mcp` reaches the Adobe apps directly (list_hosts,
  * ae_* / premiere_*), not through the desktop.
@@ -56,26 +56,27 @@ export function fromManifest(row) {
   };
 }
 
-/** The new file text, plus the names still hand-written. */
+/** The new file text, plus the names the manifest lacks (their current entries are kept as they are). */
 export function syncText(manifest, currentText, label) {
   const current = currentText ? JSON.parse(currentText) : { tools: [] };
   const existing = new Map(current.tools.map((tool) => [tool.name, tool]));
   const rows = new Map((manifest.tools ?? []).map((row) => [row.name, row]));
-  const handWritten = [];
+  const kept = [];
   const tools = HANDOFF_TOOLS.map((name) => {
     const row = rows.get(name);
     if (row) return fromManifest(row);
-    const kept = existing.get(name);
-    if (!kept) throw new Error(`${name} is neither in the manifest nor in ${path.basename(GEN_FILE)}: add its SPEC §3.5 entry by hand ("source": "spec")`);
-    handWritten.push(name);
-    return { ...kept, source: "spec" };
+    const entry = existing.get(name);
+    if (!entry) throw new Error(`${name} is neither in the manifest nor in ${path.basename(GEN_FILE)}: add its SPEC §3.5 entry by hand ("source": "spec")`);
+    // A hand-written entry stays "spec"; one from an earlier manifest stays "zenvi-core".
+    kept.push(name);
+    return entry;
   });
   const doc = {
     generated_by: "packages/cli/scripts/sync-desktop-handoff-tools.mjs",
     manifest: { source: manifest.source ?? null, manifest_version: manifest.manifest_version ?? null, label: label ?? current.manifest?.label ?? null },
     tools,
   };
-  return { text: `${JSON.stringify(doc, null, 2)}\n`, handWritten };
+  return { text: `${JSON.stringify(doc, null, 2)}\n`, kept };
 }
 
 function main(argv) {
@@ -90,8 +91,8 @@ function main(argv) {
   } catch {
     currentText = "";
   }
-  const { text, handWritten } = syncText(manifest, currentText, label);
-  if (handWritten.length) console.warn(`not in the manifest yet (kept the SPEC §3.5 entry): ${handWritten.join(", ")}`);
+  const { text, kept } = syncText(manifest, currentText, label);
+  if (kept.length) console.warn(`not in this manifest (kept the current entry): ${kept.join(", ")}`);
   if (argv.includes("--check")) {
     if (text !== currentText) {
       console.error(`${path.relative(process.cwd(), GEN_FILE)} is stale: run this script without --check`);
@@ -101,7 +102,7 @@ function main(argv) {
     return;
   }
   writeFileSync(GEN_FILE, text);
-  console.log(`wrote ${path.relative(process.cwd(), GEN_FILE)} (${HANDOFF_TOOLS.length - handWritten.length} from the manifest, ${handWritten.length} hand-written)`);
+  console.log(`wrote ${path.relative(process.cwd(), GEN_FILE)} (${HANDOFF_TOOLS.length - kept.length} from the manifest, ${kept.length} kept)`);
 }
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
