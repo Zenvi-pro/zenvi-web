@@ -9,8 +9,11 @@
  *   panel fallback when no service answers:                 boot({cep, window, mode: "panel"})
  *
  * The other Zenvi Link extension in the same app talks to this one through
- * CSXS events: "pro.zenvi.link.status-request" -> "pro.zenvi.link.status",
- * and every finished call is broadcast as "pro.zenvi.link.call".
+ * CSXS events: "pro.zenvi.link.status-request" -> "pro.zenvi.link.status"
+ * (answered from the first moment, with ready: false while booting, and
+ * broadcast again once ready), and every finished call is broadcast as
+ * "pro.zenvi.link.call". A panel never publishes over a live service: boot in
+ * panel mode rejects with code SERVICE_RUNNING instead.
  */
 
 const fs = require("fs");
@@ -44,6 +47,10 @@ function hostOf(environment) {
   return HOSTS[environment && environment.appName] || null;
 }
 
+function serviceRunning() {
+  return Object.assign(new Error("a Zenvi Link service already serves this app"), { code: "SERVICE_RUNNING" });
+}
+
 /**
  * options: {cep | bridge, window?, mode?: "service" | "panel", extensionDir?, home?, linkDir?, pollMs?,
  *   touchIntervalMs?, busyAfterMs?, log?}
@@ -60,7 +67,8 @@ async function boot(options) {
   const catalog = JSON.parse(fs.readFileSync(path.join(extensionDir, "catalog", host + ".json"), "utf8"));
   const appVersion = String(environment.appVersion || "");
   const appName = marketingName(host, appVersion);
-  const discovery = new DiscoveryFile({ host: host, dir: options.linkDir || linkDir(options.home), minIntervalMs: options.touchIntervalMs });
+  const discovery = new DiscoveryFile({ host: host, dir: options.linkDir || linkDir(options.home), minIntervalMs: options.touchIntervalMs, log: log });
+  if (mode === "panel" && discovery.owner() === "other") throw serviceRunning();
   const server = createLinkServer({
     host: host,
     catalog: catalog,
@@ -72,9 +80,44 @@ async function boot(options) {
   const startedAt = new Date().toISOString();
   let hostScript = { ok: false, problem: "not checked yet" };
   let loadedHostScript = false;
+  let ready = false;
   let stopped = false;
 
-  await server.start();
+  function status() {
+    return {
+      mode: mode,
+      ready: ready,
+      host: host,
+      url: ready ? server.url : null,
+      pid: process.pid,
+      app_name: appName,
+      app_version: appVersion,
+      version: catalog.version,
+      started_at: startedAt,
+      tools: catalog.tools.length,
+      host_script: hostScript,
+      discovery: { file: discovery.file, problem: discovery.problem },
+      token_file: discovery.tokenFile,
+      recent: server.recentCalls(),
+    };
+  }
+
+  // First thing: a panel that asks while this service boots must learn that it exists.
+  const onStatusRequest = () => {
+    try {
+      bridge.dispatchEvent(EVENTS.status, status());
+    } catch (error) {
+      log("could not answer a status request: " + error.message);
+    }
+  };
+  bridge.addEventListener(EVENTS.statusRequest, onStatusRequest);
+
+  try {
+    await server.start();
+  } catch (error) {
+    bridge.removeEventListener(EVENTS.statusRequest, onStatusRequest);
+    throw error;
+  }
 
   /** The host script's view of the app (open project); null when busy or not loaded (checkHostScript says why). */
   async function readHostInfo() {
@@ -114,46 +157,44 @@ async function boot(options) {
     if (!hostScript.ok) log("host script still unavailable: " + hostScript.problem);
   }
 
+  /** Best effort, never rejects: runs from timers and app events. */
   async function refreshProject() {
-    if (stopped) return;
-    if (!hostScript.ok) await ensureHostScript();
-    const info = await readHostInfo();
-    if (info && !stopped) discovery.setProject(typeof info.project === "string" && info.project ? info.project : null);
+    try {
+      if (stopped) return;
+      if (!hostScript.ok) await ensureHostScript();
+      const info = await readHostInfo();
+      if (info && !stopped) await discovery.setProject(typeof info.project === "string" && info.project ? info.project : null);
+    } catch (error) {
+      log("refresh failed: " + (error && error.message ? error.message : error));
+    }
   }
 
   await ensureHostScript();
   const first = await readHostInfo();
-  discovery.publish({
-    url: server.url,
-    token: server.token,
-    project: first && typeof first.project === "string" ? first.project : null,
-    version: catalog.version,
-    appName: appName,
-    appVersion: appVersion,
-  });
-
-  function status() {
-    return {
-      mode: mode,
-      host: host,
+  const published = await discovery.publish(
+    {
       url: server.url,
-      pid: process.pid,
-      app_name: appName,
-      app_version: appVersion,
+      token: server.token,
+      project: first && typeof first.project === "string" ? first.project : null,
       version: catalog.version,
-      started_at: startedAt,
-      tools: catalog.tools.length,
-      host_script: hostScript,
-      token_file: discovery.tokenFile,
-      recent: server.recentCalls(),
-    };
+      appName: appName,
+      appVersion: appVersion,
+    },
+    { yieldToLive: mode === "panel" },
+  );
+  if (published === "yielded") {
+    // A service published while this panel was starting: leave the app to it.
+    bridge.removeEventListener(EVENTS.statusRequest, onStatusRequest);
+    discovery.remove();
+    await server.stop();
+    throw serviceRunning();
   }
+  if (published === "failed") log("discovery file not written (" + discovery.problem + "); clients cannot find this server until a refresh succeeds");
 
   const onActivate = () => {
     discovery.touch();
     refreshProject();
   };
-  const onStatusRequest = () => bridge.dispatchEvent(EVENTS.status, status());
   const onCall = (call) => {
     try {
       bridge.dispatchEvent(EVENTS.call, call);
@@ -164,7 +205,6 @@ async function boot(options) {
   };
   server.on("call", onCall);
   bridge.addEventListener(EVENTS.activate, onActivate);
-  bridge.addEventListener(EVENTS.statusRequest, onStatusRequest);
   const poll = setInterval(refreshProject, options.pollMs || 15000);
 
   function stopNow() {
@@ -181,6 +221,8 @@ async function boot(options) {
   const onQuit = () => stopNow();
   bridge.addEventListener(EVENTS.beforeQuit, onQuit);
   if (options.window) options.window.addEventListener("unload", onQuit);
+  ready = true;
+  onStatusRequest();
   log("ready (" + mode + "): " + server.url + ", discovery " + discovery.file);
 
   return {

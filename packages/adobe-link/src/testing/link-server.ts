@@ -83,14 +83,29 @@ export interface DiscoveryFileInstance {
   readonly file: string;
   readonly tokenFile: string;
   readonly pid: number;
-  publish(details: { url: string; token: string; project: string | null; version: string; appName: string; appVersion: string }): void;
-  setProject(project: string | null): boolean;
+  /** The last write failure, or null. */
+  readonly problem: string | null;
+  publish(
+    details: { url: string; token: string; project: string | null; version: string; appName: string; appVersion: string },
+    options?: { yieldToLive?: boolean },
+  ): Promise<"written" | "yielded" | "failed">;
+  setProject(project: string | null): Promise<boolean>;
   touch(): void;
+  settled(): Promise<void>;
+  owner(): "self" | "other" | "none";
   remove(): boolean;
 }
 
 export const discoveryModule = require("../../extension/server/discovery.js") as {
-  DiscoveryFile: new (options: { host: string; dir?: string; pid?: number; now?: () => Date; minIntervalMs?: number }) => DiscoveryFileInstance;
+  DiscoveryFile: new (options: {
+    host: string;
+    dir?: string;
+    pid?: number;
+    now?: () => Date;
+    minIntervalMs?: number;
+    log?: (line: string) => void;
+    isAlive?: (pid: number) => boolean;
+  }) => DiscoveryFileInstance;
   DISCOVERY_KEYS: string[];
   linkDir(home?: string): string;
 };
@@ -99,7 +114,14 @@ export interface BootedLink {
   host: string;
   server: LinkServer;
   discovery: DiscoveryFileInstance;
-  status(): Record<string, unknown> & { mode: string; url: string; host_script: { ok: boolean; problem: string | null }; recent: CallEvent[] };
+  status(): Record<string, unknown> & {
+    mode: string;
+    ready: boolean;
+    url: string | null;
+    host_script: { ok: boolean; problem: string | null };
+    discovery: { file: string; problem: string | null };
+    recent: CallEvent[];
+  };
   stop(): Promise<void>;
 }
 

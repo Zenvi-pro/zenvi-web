@@ -30,7 +30,7 @@ async function publish(dir: string, host: "aftereffects" | "premiere", overrides
     pid: overrides.pid,
     now: overrides.lastActive ? () => new Date(overrides.lastActive as string) : undefined,
   });
-  file.publish({ url: overrides.url ?? server.url, token: overrides.token ?? server.token, project: null, version: "1.0.0", appName: "App", appVersion: "26.0.0" });
+  await file.publish({ url: overrides.url ?? server.url, token: overrides.token ?? server.token, project: null, version: "1.0.0", appName: "App", appVersion: "26.0.0" });
   return { server, file };
 }
 

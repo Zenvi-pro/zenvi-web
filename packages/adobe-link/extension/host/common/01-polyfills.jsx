@@ -1,36 +1,12 @@
-// Zenvi Link: the few ES5 built-ins ExtendScript (ECMAScript 3) lacks and the
-// host scripts use. Each is defined only when missing.
+// Zenvi Link: ES5 statics ExtendScript (ECMAScript 3) lacks and the host
+// scripts use. Each is defined only when missing.
 //
-// Only Array.prototype.indexOf and String.prototype.trim touch a prototype.
-// Every CEP extension in the app shares one ExtendScript engine, and extra
-// enumerable members on Array.prototype show up in other scripts' for-in
-// loops, so iteration helpers live on ZenviLink (each/map/filter) instead of
-// Array.prototype.forEach/map/filter.
-
-if (!Array.prototype.indexOf) {
-    Array.prototype.indexOf = function (search, fromIndex) {
-        var length = this.length >>> 0;
-        var i = fromIndex ? Number(fromIndex) : 0;
-        if (i !== i) {
-            i = 0;
-        }
-        if (i < 0) {
-            i = Math.max(length + i, 0);
-        }
-        for (; i < length; i += 1) {
-            if (i in this && this[i] === search) {
-                return i;
-            }
-        }
-        return -1;
-    };
-}
-
-if (!String.prototype.trim) {
-    String.prototype.trim = function () {
-        return String(this).replace(/^[\s\u00a0\ufeff]+|[\s\u00a0\ufeff]+$/g, "");
-    };
-}
+// Nothing here touches a prototype. Every CEP extension in the app shares one
+// ExtendScript engine, ES3 cannot make a property non-enumerable, and a new
+// member on Array.prototype or String.prototype would show up in every other
+// script's for-in loops (`for (i in comp.selectedLayers)`). Use
+// ZenviLink.indexOf / trim / each / map / filter instead of
+// [].indexOf, "".trim(), forEach, map and filter.
 
 if (!Array.isArray) {
     Array.isArray = function (value) {

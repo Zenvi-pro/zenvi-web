@@ -3,9 +3,15 @@
 //  Public Domain.
 //  NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
 //
-//  Douglas Crockford's json2.js (https://github.com/douglascrockford/JSON-js),
-//  unmodified apart from these header lines. ExtendScript is ECMAScript 3 and
-//  has no JSON object; this file creates one only if it is missing.
+//  Douglas Crockford's json2.js (https://github.com/douglascrockford/JSON-js).
+//  ExtendScript is ECMAScript 3 and has no JSON object; this file creates one
+//  only if it is missing.
+//
+//  Zenvi Link change: json2 adds toJSON to Date, Boolean, Number and String
+//  prototypes. ES3 cannot make those non-enumerable, and every script in the
+//  app's ExtendScript engine would then see them in for-in loops. Here str()
+//  converts Dates (ISO 8601 with milliseconds, like ES5) and boxed primitives
+//  itself instead; the prototypes are left alone.
 
 /*jslint
     eval, for, this
@@ -43,35 +49,27 @@ if (typeof JSON !== "object") {
             : n;
     }
 
-    function this_value() {
-        return this.valueOf();
-    }
-
-    if (typeof Date.prototype.toJSON !== "function") {
-
-        Date.prototype.toJSON = function () {
-
-            return isFinite(this.valueOf())
-                ? (
-                    this.getUTCFullYear()
-                    + "-"
-                    + f(this.getUTCMonth() + 1)
-                    + "-"
-                    + f(this.getUTCDate())
-                    + "T"
-                    + f(this.getUTCHours())
-                    + ":"
-                    + f(this.getUTCMinutes())
-                    + ":"
-                    + f(this.getUTCSeconds())
-                    + "Z"
-                )
-                : null;
-        };
-
-        Boolean.prototype.toJSON = this_value;
-        Number.prototype.toJSON = this_value;
-        String.prototype.toJSON = this_value;
+    function dateJSON(date) {
+        var ms = date.getUTCMilliseconds();
+        return isFinite(date.valueOf())
+            ? (
+                date.getUTCFullYear()
+                + "-"
+                + f(date.getUTCMonth() + 1)
+                + "-"
+                + f(date.getUTCDate())
+                + "T"
+                + f(date.getUTCHours())
+                + ":"
+                + f(date.getUTCMinutes())
+                + ":"
+                + f(date.getUTCSeconds())
+                + "."
+                + (ms < 10 ? "00" : (ms < 100 ? "0" : ""))
+                + ms
+                + "Z"
+            )
+            : null;
     }
 
     var gap;
@@ -119,6 +117,14 @@ if (typeof JSON !== "object") {
             && typeof value.toJSON === "function"
         ) {
             value = value.toJSON(key);
+        } else if (value instanceof Date) {
+            value = dateJSON(value);
+        } else if (
+            value instanceof Boolean
+            || value instanceof Number
+            || value instanceof String
+        ) {
+            value = value.valueOf();
         }
 
 // If we were called with a replacer function, then call the replacer to

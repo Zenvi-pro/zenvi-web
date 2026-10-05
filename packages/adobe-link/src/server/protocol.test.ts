@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { AE_TOOLS } from "../catalog/aftereffects.js";
 import { toCatalogJson, type CatalogJson, type CatalogToolJson } from "../catalog/types.js";
 import { createAeMock } from "../testing/ae-mock.js";
@@ -190,6 +190,26 @@ describe("JSON-RPC methods", () => {
     expect(listed).toEqual(
       catalog.tools.map((tool) => ({ name: tool.name, title: tool.title, description: tool.description, inputSchema: tool.inputSchema, annotations: { title: tool.title, ...tool.annotations } })),
     );
+  });
+});
+
+describe("long calls", () => {
+  test("a call that outlasts Node 12's default socket timeout still gets its response", async () => {
+    // Node 12 creates servers with timeout = 120000; simulate it, scaled down.
+    const create = http.createServer;
+    vi.spyOn(http, "createServer").mockImplementation(((...args: Parameters<typeof http.createServer>) => {
+      const created = create(...args);
+      created.timeout = 100;
+      return created;
+    }) as typeof http.createServer);
+    const ok = JSON.stringify({ contract: 3, status: "applied", tool: "ae_render", host: "aftereffects", summary: "Rendered", data: {}, warnings: [], undoSteps: 1 });
+    const server = await customServer([{ name: "ae_render", timeoutMs: 10_000 }], {
+      evalScript: () => new Promise((resolve) => setTimeout(() => resolve(ok), 400)),
+    });
+    vi.restoreAllMocks();
+    const reply = await request(server, { body: call("ae_render", {}) });
+    expect(reply.status).toBe(200);
+    expect(reply.json.result.structuredContent.summary).toBe("Rendered");
   });
 });
 

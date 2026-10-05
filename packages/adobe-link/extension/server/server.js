@@ -240,7 +240,12 @@ function createLinkServer(options) {
     const tool = tools.get(name);
     let receipt;
     let images = [];
-    onActivity();
+    try {
+      onActivity();
+    } catch (error) {
+      // Discovery refreshes are best effort; they never fail a call.
+      log("activity hook failed: " + (error && error.message ? error.message : error));
+    }
     if (!tool) {
       receipt = failureReceipt(host, name, "refused", "NOT_FOUND", "Unknown tool " + name);
     } else {
@@ -368,6 +373,10 @@ function createLinkServer(options) {
           else res.end();
         });
       });
+      // Node 12 (CEP 10: After Effects 18.0-18.3, Premiere Pro 15.0-15.3) closes
+      // sockets idle for 120 s by default, which drops the response of a long
+      // call. Calls are bounded by the queue's own timeouts instead.
+      server.timeout = 0;
       server.on("connection", (socket) => {
         sockets.add(socket);
         socket.on("close", () => sockets.delete(socket));

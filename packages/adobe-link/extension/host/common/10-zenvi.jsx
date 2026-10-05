@@ -25,11 +25,31 @@
 // ES3 only: no let/const, arrow functions, template strings, trailing commas,
 // getters/setters, or reserved words as property names (write obj["in"]).
 // Sources stay ASCII: use \u escapes for other characters in strings.
+// No prototype polyfills (the engine is shared with other extensions): use
+// ZenviLink.indexOf(list, value) and ZenviLink.trim(text), not [].indexOf
+// or "".trim().
+
+// State that must survive the bundle being evaluated again: CEP evaluates the
+// manifest's ScriptPath again when the panel opens, which rebuilds ZenviLink
+// (fresh registry, same tools). Long-lived data (render jobs, the configured
+// temp folder) lives on ZenviLink.state, which is this global. Re-declaring a
+// global var does not reset it.
+var ZenviLinkState;
+if (!ZenviLinkState || typeof ZenviLinkState !== "object") {
+    ZenviLinkState = {};
+}
 
 var ZenviLink = (function () {
     var Z = {};
     var registry = {};
     var names = [];
+
+    /** Survives re-evaluation of the host script; keep long-lived registries here. */
+    Z.state = ZenviLinkState;
+    Z.state.loads = (Z.state.loads || 0) + 1;
+    if (!Z.state.config) {
+        Z.state.config = {};
+    }
 
     // Set by the build's generated block (src/host-bundle.ts).
     Z.version = "0.0.0-dev";
@@ -61,7 +81,8 @@ var ZenviLink = (function () {
     ];
 
     // ------------------------------------------------------------------
-    // Small utilities (ES3 has no forEach/map/filter; see 01-polyfills.jsx).
+    // Small utilities (ES3 has no indexOf/trim/forEach/map/filter on the
+    // prototypes, and Zenvi Link adds none; see 01-polyfills.jsx).
 
     function has(object, key) {
         return object !== null && object !== undefined && Object.prototype.hasOwnProperty.call(object, key);
@@ -72,8 +93,37 @@ var ZenviLink = (function () {
         return Object.prototype.toString.call(value) === "[object Array]";
     };
 
+    /**
+     * True when a DOM object has member `name`: feature detection that works for
+     * host methods, which ExtendScript may report as typeof "object", so never
+     * test typeof === "function" on DOM members. Reading the member must not throw.
+     */
+    Z.hasMethod = function (object, name) {
+        try {
+            return object !== null && object !== undefined && object[name] !== undefined && object[name] !== null;
+        } catch (error) {
+            return false;
+        }
+    };
+
     Z.isObject = function (value) {
         return value !== null && typeof value === "object" && !Z.isArray(value);
+    };
+
+    /** Index of `value` in an array (===), or -1. */
+    Z.indexOf = function (list, value) {
+        var i;
+        for (i = 0; i < list.length; i += 1) {
+            if (list[i] === value) {
+                return i;
+            }
+        }
+        return -1;
+    };
+
+    /** `text` without leading and trailing whitespace. */
+    Z.trim = function (text) {
+        return String(text).replace(/^[\s\u00a0\ufeff]+|[\s\u00a0\ufeff]+$/g, "");
     };
 
     Z.each = function (list, fn) {
@@ -222,7 +272,7 @@ var ZenviLink = (function () {
 
     /** `value` when it is one of `allowed`. */
     Z.oneOf = function (key, value, allowed) {
-        if (allowed.indexOf(value) < 0) {
+        if (Z.indexOf(allowed, value) < 0) {
             throw Z.refuse("INVALID_ARGUMENT", "`" + key + "` must be one of " + allowed.join(", ") + "; got " + String(value));
         }
         return value;
@@ -320,7 +370,7 @@ var ZenviLink = (function () {
     function failureOutcome(status, code, message) {
         return {
             status: status,
-            code: Z.ERROR_CODES.indexOf(code) >= 0 ? code : "HOST_ERROR",
+            code: Z.indexOf(Z.ERROR_CODES, code) >= 0 ? code : "HOST_ERROR",
             message: String(message)
         };
     }
@@ -476,6 +526,7 @@ var ZenviLink = (function () {
         info.version = Z.version;
         info.protocol = Z.protocol;
         info.tools = names.length;
+        info.loads = Z.state.loads;
         return stringify(info);
     };
 

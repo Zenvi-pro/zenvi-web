@@ -65,18 +65,55 @@ describe.each(HOST_APPS)("%s host script", (app) => {
   });
 });
 
+describe("evaluating the host script again (CEP does when the panel opens)", () => {
+  test.each(HOST_APPS)("%s keeps ZenviLink.state and registers every tool again", (app) => {
+    const host = loadHostScript(app, mockFor(app));
+    host.evaluate('ZenviLink.state.jobs = {render1: {status: "running"}};');
+    const before = host.listTools();
+    expect(host.hostInfo().loads).toBe(1);
+    host.evaluate(host.bundle.text);
+    expect(host.evaluate("ZenviLink.state.jobs.render1.status")).toBe("running");
+    expect(host.listTools()).toEqual(before);
+    expect(host.hostInfo().loads).toBe(2);
+    expect(JSON.parse(host.dispatchRaw(app === "aeft" ? "ae_get_state" : "premiere_get_state", "{}")).contract).toBe(3);
+  });
+});
+
 describe("ES3 realm", () => {
-  test("lacks what ExtendScript lacks, has the polyfills and json2", () => {
+  test("lacks what ExtendScript lacks; Zenvi Link adds only static polyfills and json2", () => {
     const host = loadHostScript("aeft", createAeMock().globals);
-    for (const missing of ["[].map", "[].forEach", "Object.assign", "''.startsWith", "Function.prototype.bind", "Object.create"]) {
+    for (const missing of ["[].map", "[].forEach", "[].indexOf", "''.trim", "Object.assign", "''.startsWith", "Function.prototype.bind", "Object.create"]) {
       expect(host.evaluate(`typeof ${missing}`), missing).toBe("undefined");
     }
-    for (const present of ["[].indexOf", "''.trim", "Object.keys", "Array.isArray", "Date.now", "JSON.parse", "JSON.stringify"]) {
+    for (const present of ["Object.keys", "Array.isArray", "Date.now", "JSON.parse", "JSON.stringify", "ZenviLink.indexOf", "ZenviLink.trim"]) {
       expect(host.evaluate(`typeof ${present}`), present).toBe("function");
     }
-    expect(host.evaluate(`[3, 4, 5].indexOf(4)`)).toBe(1);
-    expect(host.evaluate(`"  x\\u00a0".trim()`)).toBe("x");
-    expect(host.evaluate(`JSON.parse(JSON.stringify({a: [1, "caf\\u00e9", null], b: true})).a[1]`)).toBe("café");
+    expect(host.evaluate(`ZenviLink.indexOf([3, 4, 5], 4)`)).toBe(1);
+    expect(host.evaluate(`ZenviLink.indexOf([3, 4, 5], "4")`)).toBe(-1);
+    expect(host.evaluate(`ZenviLink.trim("  x\\u00a0")`)).toBe("x");
+    expect(host.evaluate(`JSON.parse(JSON.stringify({a: [1, "caf\\u00e9", null], b: true})).a[1]`)).toBe("caf\u00e9");
+  });
+
+  test("built-in prototypes stay untouched, so other scripts' for-in loops see only their own keys", () => {
+    const host = loadHostScript("aeft", createAeMock().globals);
+    expect(
+      host.evaluate(`(function () {
+        var found = [], k;
+        var samples = [[], {}, new String("ab"), new Number(1), new Boolean(true), new Date(0), function () {}, /x/];
+        for (var i = 0; i < samples.length; i += 1) {
+          for (k in samples[i]) { if (!Object.prototype.hasOwnProperty.call(samples[i], k)) { found.push(k); } }
+        }
+        return found.join(",");
+      }())`),
+    ).toBe("");
+    // A typical third-party After Effects loop in the shared engine.
+    expect(host.evaluate(`var names = []; var layers = ["Title", "BG"]; for (var i in layers) { names.push(i); } names.join(",")`)).toBe("0,1");
+  });
+
+  test("json2 writes Dates as ISO 8601 with milliseconds and unboxes primitives", () => {
+    const host = loadHostScript("aeft", createAeMock().globals);
+    expect(host.evaluate("JSON.stringify({d: new Date(Date.UTC(2026, 9, 4, 21, 0, 5, 7))})")).toBe('{"d":"2026-10-04T21:00:05.007Z"}');
+    expect(host.evaluate("JSON.stringify([new String('x'), new Number(2), new Boolean(false), new Date(NaN)])")).toBe('["x",2,false,null]');
   });
 
   test("realm arrays from the mock DOM lack ES5 methods too", () => {

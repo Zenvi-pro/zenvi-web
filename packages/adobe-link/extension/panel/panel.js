@@ -18,8 +18,10 @@
   var host = service.hostOf(environment);
   var sendToZenvi = host ? load("panel/send-to-zenvi-" + host + ".js") : null;
   var SERVICE_WAIT_MS = 3000;
+  // A service that said it is starting gets this long to become ready before the panel hosts.
+  var SERVICE_START_GRACE_MS = 15000;
 
-  var state = { mode: null, url: null, token: null, hosted: null, calls: [], desktop: { running: false } };
+  var state = { mode: null, url: null, token: null, hosted: null, calls: [], desktop: { running: false }, serviceStarting: false };
   var $ = function (id) {
     return document.getElementById(id);
   };
@@ -96,6 +98,11 @@
 
   function adoptService(status) {
     if (!status || status.host !== host || status.mode !== "service") return;
+    if (status.ready === false || !status.url) {
+      // The service is still booting; its ready broadcast follows.
+      state.serviceStarting = true;
+      return;
+    }
     if (state.hosted) {
       // A service came up after this panel started its own server: hand over.
       state.hosted.stop();
@@ -106,6 +113,13 @@
     state.token = readToken(status.token_file);
     state.calls = status.recent || state.calls;
     setNotice(status.host_script && !status.host_script.ok ? "Host script problem: " + status.host_script.problem : "");
+    render();
+  }
+
+  function adoptEndpoint(endpoint) {
+    state.mode = "service";
+    state.url = endpoint.url;
+    state.token = endpoint.token;
     render();
   }
 
@@ -126,10 +140,27 @@
         render();
       })
       .catch(function (error) {
+        if (error && error.code === "SERVICE_RUNNING") {
+          // A service won the race; show it instead.
+          core.findLiveEndpoint({ host: host }).then(function (endpoint) {
+            if (endpoint && !state.url) adoptEndpoint(endpoint);
+          });
+          return;
+        }
         state.mode = "failed";
         setNotice("Zenvi Link could not start: " + error.message);
         render();
       });
+  }
+
+  /** No service has answered: look at the discovery file once more, then host here. */
+  function fallBack() {
+    if (state.url) return;
+    core.findLiveEndpoint({ host: host, appVersion: String(environment.appVersion) }).then(function (endpoint) {
+      if (state.url) return;
+      if (endpoint) adoptEndpoint(endpoint);
+      else hostHere();
+    });
   }
 
   function findServer() {
@@ -146,15 +177,12 @@
     core
       .findLiveEndpoint({ host: host, appVersion: String(environment.appVersion) })
       .then(function (endpoint) {
-        if (endpoint && !state.url) {
-          state.mode = "service";
-          state.url = endpoint.url;
-          state.token = endpoint.token;
-          render();
-        }
+        if (endpoint && !state.url) adoptEndpoint(endpoint);
       });
     setTimeout(function () {
-      if (!state.url) hostHere();
+      if (state.url) return;
+      if (state.serviceStarting) setTimeout(fallBack, SERVICE_START_GRACE_MS);
+      else fallBack();
     }, SERVICE_WAIT_MS);
   }
 
