@@ -6,15 +6,18 @@
  * Effects, Premiere Pro) with what this session last used.
  */
 
+import { stat } from "node:fs/promises";
 import type { Project } from "@zenvi/engine";
 import type { CommandContext } from "../commands/context.js";
 import { hostOptions } from "../commands/context.js";
 import { newProject } from "../commands/project.js";
 import { DesktopClient } from "../desktop/client.js";
 import { discoverDesktop, hasProjectOpen } from "../desktop/discovery.js";
-import { defaultLauncherDeps, type LauncherDeps } from "../desktop/launcher.js";
+import { defaultLauncherDeps, findDesktopApp, type LauncherDeps } from "../desktop/launcher.js";
 import { DesktopExecutor } from "../engine/executor.js";
 import type { DetectDeps } from "../hosts/extension.js";
+import { DESKTOP_HANDOFF_TOOLS } from "../hosts/handoff.js";
+import { decideHandoff, type FamilyDecision } from "../hosts/policy.js";
 import { HostRegistry } from "../hosts/registry.js";
 import { ProjectSession } from "../project/session.js";
 import { VERSION } from "../version.js";
@@ -51,6 +54,8 @@ export class McpState {
   private launchedAt: number | undefined;
   /** The open / launch in flight: concurrent handoffs share it instead of opening the app twice. */
   private opening: Promise<unknown> | undefined;
+  private handoffCache: { at: number; value: Promise<FamilyDecision> } | undefined;
+  private appFound: { at: number; installed: boolean } | undefined;
   private desktop: DesktopExecutor | undefined;
   private desktopKey: string | undefined;
   private lastPortableCall: number | undefined;
@@ -70,6 +75,9 @@ export class McpState {
       clientVersion: VERSION,
       detect: options.detect,
       portable: () => ({ project: this.session.file ?? null, lastCallAt: this.lastPortableCall }),
+      handoff: () => this.handoffDecision(),
+      // The desktop's handoff tools plus bring_from_after_effects / bring_from_premiere.
+      handoffTools: DESKTOP_HANDOFF_TOOLS.length + 2,
     });
   }
 
@@ -99,6 +107,31 @@ export class McpState {
       );
     }
     return this.opening as Promise<T>;
+  }
+
+  /** Whether this server lists the handoff tools (ZENVI_MCP_HANDOFF; reused for 2 s). */
+  handoffDecision(): Promise<FamilyDecision> {
+    const now = Date.now();
+    if (this.handoffCache && now - this.handoffCache.at <= 2000) return this.handoffCache.value;
+    const value = decideHandoff(this.ctx.config.desktopDir, {
+      env: this.ctx.env,
+      exists: (file) => stat(file).then(
+        () => true,
+        () => false,
+      ),
+      appInstalled: () => this.desktopInstalled(),
+    });
+    this.handoffCache = { at: now, value };
+    return value;
+  }
+
+  /** The launcher's lookup; a found app stays found for the session, a miss is retried after a minute. */
+  private async desktopInstalled(): Promise<boolean> {
+    const now = Date.now();
+    if (this.appFound && (this.appFound.installed || now - this.appFound.at < 60_000)) return this.appFound.installed;
+    const installed = Boolean(await findDesktopApp(this.launcher).catch(() => undefined));
+    this.appFound = { at: now, installed };
+    return installed;
   }
 
   /** Record that this server started the desktop app. */

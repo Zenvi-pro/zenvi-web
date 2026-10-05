@@ -118,7 +118,7 @@ On top of the catalog:
 | `push_to_cloud` | Upload to Zenvi Cloud and return a web editor link (needs `zenvi login`). |
 | `list_hosts` | The hosts (see below), which are connected, which is active, and how to connect or enable the others. |
 | `ae_*`, `premiere_*` | After Effects and Premiere Pro tools through Zenvi Link (listed per `ZENVI_MCP_ADOBE`). |
-| handoff tools | The desktop app's `export_to_*` / `send_to_*` / `import_*` tools for After Effects, Premiere Pro, Remotion and HyperFrames, and the linked-clip tools ([HANDOFF.md](HANDOFF.md)). |
+| handoff tools | The desktop app's `export_to_*` / `send_to_*` / `import_*` tools for After Effects, Premiere Pro, Remotion and HyperFrames, and the linked-clip tools ([HANDOFF.md](HANDOFF.md)). Listed per `ZENVI_MCP_HANDOFF` (by default when the desktop app is installed or has run here). |
 | `bring_from_after_effects`, `bring_from_premiere` | An After Effects comp as a linked clip, or a Premiere sequence as native clips, into the Zenvi project in one call. |
 
 Resources: `zenvi://hosts` (the `list_hosts` report), `zenvi://taste` (the
@@ -162,6 +162,10 @@ variable in the server's environment, e.g. for Claude Code:
 Installing and checking Zenvi Link: [ADOBE.md](ADOBE.md) (`zenvi adobe
 install`, `zenvi adobe doctor`, or `/zenvi:adobe-setup` in Claude Code).
 
+The handoff tools (and `bring_from_*`) all run in the Zenvi desktop app, so
+`ZENVI_MCP_HANDOFF=auto` (the default) lists them only when the app is
+installed or has run on this machine; `on` always, `off` never.
+
 ## The desktop app and the agent together
 
 - While the Zenvi desktop app has the same project open, the server sends
@@ -173,8 +177,14 @@ install`, `zenvi adobe doctor`, or `/zenvi:adobe-setup` in Claude Code).
   you review the cut on the real timeline.
 - Handoff tools always run in the desktop app. When it does not have the
   project open, the server focuses it, loads the project into it, or starts
-  it on the project, waits for it to show the project, and then forwards the
-  call (an untitled session is refused: `open_project_file` first).
+  it on the project (once, however many calls arrive while it starts),
+  waits for it to show the project, and then forwards the call (an untitled
+  session is refused: `open_project_file` first). Tools that only read the
+  project there (`get_linked_clip_tool`, `open_linked_source_tool`) never
+  switch an app that shows another project, and
+  `list_remotion_compositions_tool` runs in whatever project it shows.
+  `send_to_after_effects_tool` / `send_to_premiere_tool` check the Adobe app
+  first.
 - The server finds the app only through `~/.openshot_qt/gui_mcp.json` /
   `headless_mcp.json` whose process is alive and whose URL answers; it
   never probes other ports. Adobe apps are found the same way, through

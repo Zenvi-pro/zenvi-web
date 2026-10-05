@@ -5,10 +5,10 @@
  * Link tool, with the same key=value arguments as `zenvi call`).
  */
 
-import { writeFile } from "node:fs/promises";
+import { lstat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
-import { describeAction, HOST_TOOL_PREFIX, planExtensionInstall, runInstallAction, type HostId, type HostImage } from "@zenvi/adobe-link";
+import { describeAction, HOST_TOOL_PREFIX, planExtensionInstall, runInstallPlan, type HostId, type HostImage } from "@zenvi/adobe-link";
 import { callAdobeTool, catalogTools, isOkHostStatus, type CliHostReceipt } from "../hosts/adobe-tools.js";
 import { adobeDoctor } from "../hosts/doctor.js";
 import { bundledExtension, defaultDetectDeps, findInstalledExtensions } from "../hosts/extension.js";
@@ -20,6 +20,13 @@ import { VERSION } from "../version.js";
 import type { CommandContext } from "./context.js";
 import type { DoctorCheck } from "./integrations.js";
 import { parseCallArgs } from "./tools.js";
+
+async function pathExists(file: string): Promise<boolean> {
+  return lstat(file).then(
+    () => true,
+    () => false,
+  );
+}
 
 function hostRegistry(ctx: CommandContext, project: string | undefined): HostRegistry {
   return new HostRegistry({ config: ctx.config, env: ctx.env, clientVersion: VERSION, portable: () => ({ project: project ?? null }) });
@@ -159,21 +166,42 @@ export function registerHostCommands(program: Command, ctx: CommandContext): voi
         );
       }
       const plan = planExtensionInstall({ platform, home: ctx.config.home, appData: ctx.env.APPDATA, source: source?.dir ?? "", uninstall: opts.uninstall, copy: true });
-      const replacingLink = !opts.uninstall && (await findInstalledExtensions(detect)).some((copy) => copy.dir === plan.target && copy.linked);
-      const notes = [...(replacingLink ? ["This replaces a development link (npm run install:dev) with the copy that ships with zenvi."] : []), ...plan.notes];
-      if (!opts.dryRun) for (const action of plan.actions) runInstallAction(action);
+      const installed = await findInstalledExtensions(detect);
+      const replacingLink = !opts.uninstall && installed.some((copy) => copy.dir === plan.target && copy.linked);
+      const machineWide = installed.filter((copy) => copy.scope === "system");
+      const present = await pathExists(plan.target);
+      // Nothing to remove here: say so instead of claiming a removal.
+      const nothingToRemove = Boolean(opts.uninstall) && !present;
+      const actions = nothingToRemove ? [] : plan.actions;
+      const notes = [
+        ...(replacingLink ? ["This replaces a development link (npm run install:dev) with the copy that ships with zenvi."] : []),
+        ...(opts.uninstall && machineWide.length
+          ? [`A machine-wide copy stays at ${machineWide.map((copy) => copy.dir).join(", ")} (installed by a ZXP installer; remove it with that installer, with administrator rights).`]
+          : []),
+        ...(nothingToRemove ? [] : plan.notes),
+      ];
+      if (!opts.dryRun && actions.length) {
+        try {
+          runInstallPlan(actions);
+        } catch (error) {
+          throw new CliError(`Could not ${opts.uninstall ? "remove" : "install"} Zenvi Link at ${plan.target}: ${(error as Error).message}`, 1, opts.uninstall ? undefined : "The previous install, if any, is unchanged.");
+        }
+      }
       const verb = opts.uninstall ? "uninstall" : "install";
-      const summary = opts.dryRun
-        ? `Would ${verb} Zenvi Link${source?.version && !opts.uninstall ? ` ${source.version}` : ""} at ${plan.target}`
-        : opts.uninstall
-          ? `Removed Zenvi Link from ${plan.target}`
-          : `Installed Zenvi Link${source?.version ? ` ${source.version}` : ""} at ${plan.target}`;
+      const summary = nothingToRemove
+        ? `Zenvi Link is not installed at ${plan.target}; nothing to remove`
+        : opts.dryRun
+          ? `Would ${verb} Zenvi Link${source?.version && !opts.uninstall ? ` ${source.version}` : ""} at ${plan.target}`
+          : opts.uninstall
+            ? `Removed Zenvi Link from ${plan.target}`
+            : `Installed Zenvi Link${source?.version ? ` ${source.version}` : ""} at ${plan.target}`;
+      const changed = !opts.dryRun && actions.length > 0;
       if (ctx.out.json) {
-        ctx.out.data({ status: opts.dryRun ? "unchanged" : "applied", summary, target: plan.target, source: source?.dir ?? null, version: source?.version ?? null, actions: plan.actions.map(describeAction), notes, dryRun: Boolean(opts.dryRun) });
+        ctx.out.data({ status: changed ? "applied" : "unchanged", summary, target: plan.target, source: source?.dir ?? null, version: source?.version ?? null, actions: actions.map(describeAction), notes, dryRun: Boolean(opts.dryRun) });
         return;
       }
-      ctx.out.line(`${opts.dryRun ? ctx.out.style("•", "dim") : ctx.out.style("✓", "green")} ${summary}${opts.dryRun ? ":" : ""}`);
-      if (opts.dryRun) for (const action of plan.actions) ctx.out.line(`  ${describeAction(action)}`);
+      ctx.out.line(`${changed ? ctx.out.style("✓", "green") : ctx.out.style("•", "dim")} ${summary}${opts.dryRun && actions.length ? ":" : ""}`);
+      if (opts.dryRun) for (const action of actions) ctx.out.line(`  ${describeAction(action)}`);
       for (const note of notes) ctx.out.line(note);
     });
 

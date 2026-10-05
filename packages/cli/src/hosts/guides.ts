@@ -80,6 +80,7 @@ never WebM (Zenvi drops VP9 alpha).
 - After Effects and Premiere Pro steps need the app running with Zenvi Link (list_hosts; \`zenvi adobe install\` installs it).
 - Listing or importing a Remotion project, and HyperFrames renders, run that project's own code (Node.js and headless Chrome): only for projects the user trusts.
 - export_to_remotion_tool updates an earlier export in place and refuses to discard changes made there; pass replace_edits only when the user agreed to lose them.
+- When bring_from_after_effects / bring_from_premiere could not import (cancelled, the desktop switched projects, the import failed), the receipt keeps the Adobe result and data.retry, the import call that adds it later: do not render again.
 - Prefer the native tools of the app the user is working in: ae_* inside After Effects, premiere_* inside Premiere Pro, Zenvi tools on the .zvn project. Hand off when the user wants to continue in another app.
 - After every handoff, look at the result in the destination (ae_capture_frame, premiere_capture_frame, preview_frame) and read the warnings to the user: round trips through other apps are not lossless for everything.
 `;

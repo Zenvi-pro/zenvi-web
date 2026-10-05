@@ -17,7 +17,7 @@ import { HOST_IDS, HostClient, catalogFor, inspectHost, inspectHosts, linkDirOf,
 import type { ZenviConfig } from "../config.js";
 import { discoverDesktop, hasProjectOpen, type DesktopEndpoint } from "../desktop/discovery.js";
 import { defaultDetectDeps, type DetectDeps } from "./extension.js";
-import { APP_LABEL, decideFamilies, type FamilyDecisions } from "./policy.js";
+import { APP_LABEL, decideFamilies, type FamilyDecision, type FamilyDecisions } from "./policy.js";
 
 export type HostKey = "zenvi-desktop" | "zenvi-portable" | "after-effects" | "premiere-pro";
 
@@ -54,6 +54,10 @@ export interface HostRegistryOptions {
   portable?: () => PortableView;
   detect?: DetectDeps;
   cacheMs?: number;
+  /** Whether the MCP server lists the desktop's handoff tools (zenvi mcp only). */
+  handoff?: () => Promise<FamilyDecision>;
+  /** How many handoff tools that is. */
+  handoffTools?: number;
 }
 
 interface Snapshot {
@@ -68,7 +72,8 @@ interface Cached<T> {
   value: Promise<T>;
 }
 
-export type AdobeConnection = { ok: true; client: HostClient; endpoint: HostEndpoint } | { ok: false; discovery: HostDiscovery };
+/** `switchedFrom`: the pid of the instance the previous call reached, when another one answers now. */
+export type AdobeConnection = { ok: true; client: HostClient; endpoint: HostEndpoint; switchedFrom?: number } | { ok: false; discovery: HostDiscovery };
 
 const PORTABLE_HOW =
   "This server edits the project file itself whenever the Zenvi desktop app does not have it open.";
@@ -105,6 +110,8 @@ export class HostRegistry {
   private familiesCache: Cached<FamilyDecisions> | undefined;
   private readonly clients = new Map<HostId, { key: string; client: HostClient; endpoint: HostEndpoint; tools?: Promise<HostToolInfo[]> }>();
   private readonly desktopCalls = new Map<string, number>();
+  /** The pid of the Zenvi Link instance each app's last connection reached. */
+  private readonly lastPid = new Map<HostId, number>();
   private readonly detect: DetectDeps;
   private readonly cacheMs: number;
 
@@ -161,7 +168,10 @@ export class HostRegistry {
   }
 
   async list(): Promise<HostsReport> {
-    const [snap, families] = await Promise.all([this.snapshot(), this.families()]);
+    const [snap, families, handoff] = await Promise.all([this.snapshot(), this.families(), this.options.handoff?.()]);
+    const handoffListing = handoff
+      ? { tools: this.options.handoffTools ?? 0, tools_listed: handoff.listed, ...(handoff.enable ? { enable_hint: handoff.enable } : {}) }
+      : {};
     const portable = this.options.portable?.() ?? { project: null };
     const hosts: HostEntry[] = [];
     const stamps = new Map<HostKey, number>();
@@ -181,9 +191,10 @@ export class HostRegistry {
         pid: gui.pid ?? null,
         ...(gui.kind === "headless" ? { headless: true } : {}),
         ...(touched > 0 ? { last_active_at: iso(touched) } : {}),
+        ...handoffListing,
       });
     } else {
-      hosts.push({ id: "zenvi-desktop", kind: "zenvi", label: "Zenvi desktop app", connected: false, active: false, how_to_connect: DESKTOP_HOW });
+      hosts.push({ id: "zenvi-desktop", kind: "zenvi", label: "Zenvi desktop app", connected: false, active: false, how_to_connect: DESKTOP_HOW, ...handoffListing });
     }
 
     let routesToDesktop = false;
@@ -289,7 +300,9 @@ export class HostRegistry {
     const endpoint = discovery.endpoint;
     const client = new HostClient(endpoint, this.options.clientVersion);
     this.clients.set(host, { key: `${endpoint.url}|${endpoint.pid}|${endpoint.startedAt}`, client, endpoint });
-    return { ok: true, client, endpoint };
+    const previous = this.lastPid.get(host);
+    this.lastPid.set(host, endpoint.pid);
+    return { ok: true, client, endpoint, ...(previous !== undefined && previous !== endpoint.pid ? { switchedFrom: previous } : {}) };
   }
 
   /** The connected app's own tools/list (read once per server instance). */
@@ -338,7 +351,7 @@ export function describeHosts(report: HostsReport): string {
         .join(", ")}.`,
     );
   }
-  const hidden = report.hosts.filter((h) => h.kind !== "zenvi" && h.tools_listed === false);
-  if (hidden.length) parts.push(`Not listed: ${hidden.map((h) => `${h.label} tools (${String(h.enable_hint ?? "")})`).join(" ")}`);
+  const hidden = report.hosts.filter((h) => h.tools_listed === false);
+  if (hidden.length) parts.push(`Not listed: ${hidden.map((h) => `${h.kind === "zenvi" ? "handoff" : h.label} tools (${String(h.enable_hint ?? "")})`).join(" ")}`);
   return parts.join(" ");
 }

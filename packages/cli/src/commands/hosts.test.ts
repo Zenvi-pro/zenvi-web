@@ -74,13 +74,30 @@ describe("zenvi adobe install", () => {
     expect(r.stdout).toMatch(/Restart After Effects \/ Premiere Pro/);
     expect(existsSync(path.join(home, "Library"))).toBe(false);
 
+    // Review W2-1: --uninstall claimed a removal when nothing was installed.
     const win = await run(["adobe", "install", "--dry-run", "--uninstall", "--platform", "win32", "--json"], { ZENVI_ADOBE_EXTENSION: source, APPDATA: "C:\\Users\\me\\AppData\\Roaming" });
     expect(win.json()).toMatchObject({
       status: "unchanged",
       dryRun: true,
       target: "C:\\Users\\me\\AppData\\Roaming\\Adobe\\CEP\\extensions\\pro.zenvi.link",
-      actions: ["remove C:\\Users\\me\\AppData\\Roaming\\Adobe\\CEP\\extensions\\pro.zenvi.link"],
+      summary: "Zenvi Link is not installed at C:\\Users\\me\\AppData\\Roaming\\Adobe\\CEP\\extensions\\pro.zenvi.link; nothing to remove",
+      actions: [],
     });
+    await mkdir(path.join(target, "CSXS"), { recursive: true });
+    await writeFile(path.join(target, "CSXS", "manifest.xml"), '<ExtensionManifest ExtensionBundleVersion="0.9.0">');
+    const mac = await run(["adobe", "install", "--dry-run", "--uninstall", "--platform", "darwin", "--json"], { ZENVI_ADOBE_EXTENSION: source });
+    expect(mac.json()).toMatchObject({ status: "unchanged", summary: `Would uninstall Zenvi Link at ${target}`, actions: [`remove ${target}`] });
+  });
+
+  it.runIf(process.platform === "darwin")("--uninstall removes the per-user copy and says when there was none (macOS, inside a temp HOME)", async () => {
+    const target = path.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions", "pro.zenvi.link");
+    await mkdir(path.join(target, "CSXS"), { recursive: true });
+    await writeFile(path.join(target, "CSXS", "manifest.xml"), '<ExtensionManifest ExtensionBundleVersion="1.0.0">');
+    const removed = await run(["adobe", "install", "--uninstall", "--json"]);
+    expect(removed.json()).toMatchObject({ status: "applied", summary: `Removed Zenvi Link from ${target}` });
+    expect(existsSync(target)).toBe(false);
+    const again = await run(["adobe", "install", "--uninstall", "--json"]);
+    expect(again.json()).toMatchObject({ status: "unchanged", summary: `Zenvi Link is not installed at ${target}; nothing to remove`, actions: [] });
   });
 
   it("explains a build without the extension, and --platform without --dry-run is a usage error", async () => {

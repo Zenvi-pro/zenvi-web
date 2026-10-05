@@ -11,8 +11,9 @@
  *            reg add HKCU\Software\Adobe\CSXS.<N> /v PlayerDebugMode /t REG_SZ /d 1 /f
  */
 
+import { randomBytes } from "node:crypto";
 import { spawnSync, type StdioOptions } from "node:child_process";
-import { cpSync, lstatSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import { cpSync, lstatSync, mkdirSync, realpathSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import path from "node:path";
 
 /** The extension bundle id, also its folder name in the CEP extensions folder. */
@@ -123,6 +124,18 @@ export function describeAction(action: InstallAction): string {
   }
 }
 
+/**
+ * The absolute path of a system command, so a same-named program in the
+ * current folder is never run (Windows searches the current folder before
+ * PATH): `reg` is %SystemRoot%\\System32\\reg.exe, `defaults` / `mdfind` /
+ * `open` are in /usr/bin on macOS. Other commands are returned unchanged.
+ */
+export function systemCommand(command: string, platform: string = process.platform, env: Record<string, string | undefined> = process.env): string {
+  if (platform === "win32" && command.toLowerCase() === "reg") return path.win32.join(env.SystemRoot ?? env.windir ?? "C:\\Windows", "System32", "reg.exe");
+  if (platform === "darwin" && ["defaults", "mdfind", "open"].includes(command)) return `/usr/bin/${command}`;
+  return command;
+}
+
 function exists(file: string): boolean {
   try {
     lstatSync(file);
@@ -154,12 +167,82 @@ export function runInstallAction(action: InstallAction, options: { stdio?: Stdio
       cpSync(action.from, action.to, { recursive: true });
       return;
     default: {
-      const result = spawnSync(action.command, action.args, { stdio: options.stdio ?? "pipe", windowsHide: true });
+      const result = spawnSync(systemCommand(action.command), action.args, { stdio: options.stdio ?? "pipe", windowsHide: true });
       // `defaults delete` / `reg delete` fail when the value is already gone; that is fine.
       if (result.status !== 0 && !action.args.includes("delete")) {
         const why = result.error ? result.error.message : `exit ${result.status}`;
         throw new Error(`${describeAction(action)} failed (${why})`);
       }
     }
+  }
+}
+
+function real(file: string): string {
+  try {
+    return realpathSync(file);
+  } catch {
+    return path.resolve(file);
+  }
+}
+
+/**
+ * Put `action` (a copy or a link of the built extension) at its target
+ * without a window where nothing is installed: build it next to the target,
+ * move the old copy aside, move the new one in, then delete the old one. A
+ * failure puts the old copy back. Refuses when the source is the target or
+ * inside it (it would delete what it installs).
+ */
+export function replaceInstall(action: Extract<InstallAction, { kind: "copy" | "link" }>): void {
+  // The target's own location (a dev install's link is replaced, never followed).
+  const from = real(action.from);
+  const to = path.join(real(path.dirname(action.to)), path.basename(action.to));
+  const targetIsLink = (() => {
+    try {
+      return lstatSync(action.to).isSymbolicLink();
+    } catch {
+      return false;
+    }
+  })();
+  if (!targetIsLink && (from === to || from.startsWith(to + path.sep))) {
+    throw new Error(`the extension to install (${action.from}) is the installed copy itself (${action.to}); build it somewhere else first`);
+  }
+  mkdirSync(path.dirname(action.to), { recursive: true });
+  const tag = `${process.pid}-${randomBytes(4).toString("hex")}`;
+  const staging = `${action.to}.zenvi-new-${tag}`;
+  const old = `${action.to}.zenvi-old-${tag}`;
+  try {
+    if (action.kind === "copy") cpSync(action.from, staging, { recursive: true });
+    else symlinkSync(action.from, staging, action.type);
+  } catch (error) {
+    rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+  const hadOld = exists(action.to);
+  try {
+    if (hadOld) renameSync(action.to, old);
+    renameSync(staging, action.to);
+  } catch (error) {
+    if (hadOld && !exists(action.to) && exists(old)) renameSync(old, action.to);
+    rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+  if (hadOld) rmSync(old, { recursive: true, force: true });
+}
+
+/**
+ * Run a plan's steps (no `build`): a `remove` of a path followed by a copy
+ * or link to that path is one replaceInstall, so a failed copy leaves the
+ * previous install in place.
+ */
+export function runInstallPlan(actions: readonly InstallAction[], options: { stdio?: StdioOptions } = {}): void {
+  for (let i = 0; i < actions.length; i += 1) {
+    const action = actions[i]!;
+    const next = actions[i + 1];
+    if (action.kind === "remove" && next && (next.kind === "copy" || next.kind === "link") && next.to === action.path) {
+      replaceInstall(next);
+      i += 1;
+      continue;
+    }
+    runInstallAction(action, options);
   }
 }

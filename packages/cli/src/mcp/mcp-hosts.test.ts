@@ -178,6 +178,29 @@ describe("listing", () => {
     expect(turnedOff.receipt.summary).toMatch(/turned off .*ZENVI_MCP_ADOBE=off/);
   });
 
+  it("lists the handoff tools only where the desktop app can run them (ZENVI_MCP_HANDOFF)", async () => {
+    // Review W2-1: ~20 KB of handoff tool definitions were listed even without the desktop app.
+    const handoffNames = [...DESKTOP_HANDOFF_TOOLS.map((t) => t.name), "bring_from_after_effects", "bring_from_premiere"];
+    const listed = async (client: Client) => (await client.listTools()).tools.map((t) => t.name);
+    const none = await connect({ launch: launcher({ installed: false }) });
+    const names = await listed(none.client);
+    expect(names.filter((n) => handoffNames.includes(n))).toEqual([]);
+    expect(names).toContain("launch_editor");
+    const desktop = ((await call(none.client, "list_hosts")).receipt.data!.hosts as Array<Record<string, unknown>>).find((h) => h.id === "zenvi-desktop")!;
+    expect(desktop).toMatchObject({ tools: handoffNames.length, tools_listed: false });
+    expect(String(desktop.enable_hint)).toMatch(/zenvi\.pro\/download.*ZENVI_MCP_HANDOFF=on/);
+
+    const installed = await connect();
+    expect(await listed(installed.client)).toEqual(expect.arrayContaining(handoffNames));
+    const forced = await connect({ launch: launcher({ installed: false }), env: { ZENVI_MCP_HANDOFF: "on" } });
+    expect(await listed(forced.client)).toEqual(expect.arrayContaining(handoffNames));
+    const off = await connect({ env: { ZENVI_MCP_HANDOFF: "off" } });
+    expect((await listed(off.client)).filter((n) => handoffNames.includes(n))).toEqual([]);
+    const refusedOff = await call(off.client, "export_to_remotion_tool", { output_dir: "x" });
+    expect(refusedOff.receipt).toMatchObject({ status: "refused" });
+    expect(refusedOff.receipt.summary).toMatch(/turned off .*ZENVI_MCP_HANDOFF=off/);
+  });
+
   it("tells the client to list tools again when an app with Zenvi Link appears", async () => {
     const { client, server, notifications } = await connect();
     expect((await client.listTools()).tools.some((t) => t.name === "ae_get_state")).toBe(false);
@@ -198,6 +221,19 @@ describe("After Effects / Premiere Pro tools", () => {
     expect(r.receipt).toMatchObject({ contract: 3, status: "ok", tool: "ae_get_state", host: "aftereffects", data: { active_comp: { name: "Promo" } } });
     expect(r.structured).toMatchObject({ host: "aftereffects", status: "ok" });
     expect(host.calls).toEqual([{ tool: "ae_get_state", args: {} }]);
+  });
+
+  it("says which app instance answered, and warns when another one took over", async () => {
+    const first = await ae({ project: "/Work/a.aep" });
+    const { client } = await connect();
+    const a = await call(client, "ae_get_state");
+    expect(a.receipt).toMatchObject({ host_instance: { pid: process.pid, app_version: "26.3.0", project: "/Work/a.aep" } });
+    expect(a.receipt.warnings ?? []).toEqual([]);
+    await first.stop();
+    await ae({ project: "/Work/b.aep", pid: process.ppid });
+    const b = await call(client, "ae_get_state");
+    expect(b.receipt).toMatchObject({ host_instance: { pid: process.ppid, project: "/Work/b.aep" } });
+    expect(b.receipt.warnings!.join(" ")).toMatch(new RegExp(`another instance than the last call \\(pid ${process.pid} -> ${process.ppid}, /Work/b\\.aep\\)`));
   });
 
   it("drives the real After Effects host script (ExtendScript on the mock DOM) end to end", async () => {
@@ -644,6 +680,7 @@ describe("resources and prompts", () => {
     const guide = ((await client.readResource({ uri: "zenvi://handoff" })).contents[0] as { text: string }).text;
     expect(guide).toMatch(/## Linked clips/);
     await expect(client.readResource({ uri: "zenvi://nope" })).rejects.toThrow(/Resource not found/);
+    expect(await client.listResourceTemplates()).toMatchObject({ resourceTemplates: [] });
   });
 
   it("prompts embed the taste guide and the host's own tools; the host defaults to the active one", async () => {

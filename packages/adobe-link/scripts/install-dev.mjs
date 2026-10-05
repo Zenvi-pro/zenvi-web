@@ -22,7 +22,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_OUT, buildExtension } from "./build-extension.mjs";
-import { BUNDLE_ID, CSXS_VERSIONS, describeAction, extensionsDir, planExtensionInstall, runInstallAction } from "../src/install.ts";
+import { BUNDLE_ID, CSXS_VERSIONS, describeAction, extensionsDir, planExtensionInstall, runInstallPlan } from "../src/install.ts";
 
 // The planning lives in src/install.ts (shared with `zenvi adobe install`); this script adds the build.
 export { CSXS_VERSIONS, describeAction, extensionsDir };
@@ -33,9 +33,10 @@ export function planInstall({ platform, home, appData, outDir = DEFAULT_OUT, uni
   return uninstall ? plan : { ...plan, actions: [{ kind: "build", outDir }, ...plan.actions] };
 }
 
-function execute(action) {
-  if (action.kind === "build") buildExtension({ outDir: action.outDir });
-  else runInstallAction(action, { stdio: "inherit" });
+/** Build, then install the build (replace-in-place: a failed copy or link keeps the previous install). */
+function execute(actions) {
+  for (const action of actions) if (action.kind === "build") buildExtension({ outDir: action.outDir });
+  runInstallPlan(actions.filter((action) => action.kind !== "build"), { stdio: "inherit" });
 }
 
 function option(argv, name) {
@@ -51,10 +52,8 @@ function main(argv) {
   const appData = process.env.APPDATA ?? path.win32.join(home, "AppData", "Roaming");
   const plan = planInstall({ platform, home, appData, uninstall: argv.includes("--uninstall"), copy: argv.includes("--copy") });
   console.log(`${dryRun ? "Would" : "Will"} ${argv.includes("--uninstall") ? "uninstall" : "install"} Zenvi Link at ${plan.target}:`);
-  for (const action of plan.actions) {
-    console.log(`  ${describeAction(action)}`);
-    if (!dryRun) execute(action);
-  }
+  for (const action of plan.actions) console.log(`  ${describeAction(action)}`);
+  if (!dryRun) execute(plan.actions);
   for (const note of plan.notes) console.log(note);
 }
 

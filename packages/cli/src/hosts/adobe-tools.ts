@@ -18,8 +18,16 @@ import { unknownArgumentsMessage } from "../util/unknown-args.js";
 import { APP_LABEL } from "./policy.js";
 import { howToConnect, type HostRegistry } from "./registry.js";
 
+/** The app instance that answered a call. */
+export interface HostInstance {
+  pid: number;
+  app_name: string | null;
+  app_version: string | null;
+  project: string | null;
+}
+
 /** A host receipt as the CLI reports it: Zenvi Link's, or one the CLI made (NOT_CONNECTED…). */
-export type CliHostReceipt = Omit<HostReceipt, "error"> & { error?: { code: string; message: string; line?: number } };
+export type CliHostReceipt = Omit<HostReceipt, "error"> & { error?: { code: string; message: string; line?: number }; host_instance?: HostInstance };
 
 export interface HostCallResult {
   receipt: CliHostReceipt;
@@ -223,7 +231,16 @@ export async function callAdobeTool(registry: HostRegistry, name: string, rawArg
         warnings: [],
         undoSteps: null,
       } satisfies CliHostReceipt);
-    return { receipt: got, images: result.images };
+    const endpoint = connection.endpoint;
+    const instance: HostInstance = { pid: endpoint.pid, app_name: endpoint.appName || null, app_version: endpoint.appVersion || null, project: endpoint.project };
+    const warnings =
+      connection.switchedFrom !== undefined
+        ? [
+            ...(got.warnings ?? []),
+            `${app} answered from another instance than the last call (pid ${connection.switchedFrom} -> ${endpoint.pid}${endpoint.project ? `, ${endpoint.project}` : ""}): the newest Zenvi Link took over. Re-read ${STATE_TOOL[host]} before continuing.`,
+          ]
+        : got.warnings;
+    return { receipt: { ...got, warnings, host_instance: instance }, images: result.images };
   } catch (error) {
     if (error instanceof McpError && error.code === ErrorCode.InvalidParams) {
       // The running Zenvi Link does not know this tool: an older extension than this zenvi.

@@ -272,9 +272,12 @@ premiere-pro      not connected  no discovery file (the app is not running, or Z
   is the connected host used most recently.
 - `zenvi adobe install` copies the Zenvi Link that ships with this `zenvi`
   into the per-user CEP extensions folder and turns on PlayerDebugMode
-  (unsigned extensions need it); restart the Adobe apps afterwards.
-  `--dry-run` prints the steps, `--uninstall` removes it, `--platform
-  darwin|win32` (with `--dry-run`) plans for another OS.
+  (unsigned extensions need it); restart the Adobe apps afterwards. The new
+  copy is built next to the old one and swapped in, so a failed copy leaves
+  the previous install working. `--dry-run` prints the steps, `--uninstall`
+  removes it (and says so when nothing was installed there, or when a
+  machine-wide ZXP copy stays), `--platform darwin|win32` (with
+  `--dry-run`) plans for another OS.
 - `zenvi adobe doctor` checks the bundled and installed versions,
   PlayerDebugMode, the apps, the live connections and which tool families
   `zenvi mcp` lists. Exit code 1 when Zenvi Link cannot be installed at all.
@@ -335,6 +338,7 @@ zenvi call premiere_export preset=h264-high output=/Users/me/out/cut.mp4
 | `ZENVI_NO_BROWSER=1` | — | Never open a browser (print links instead). |
 | `ZENVI_MCP_ENGINE=portable` | — | The MCP server never forwards to the desktop app (handoff tools are refused). |
 | `ZENVI_MCP_ADOBE` | `auto` | Which Adobe tool families `zenvi mcp` lists: `auto` (where Zenvi Link can run), `on`, `off`. |
+| `ZENVI_MCP_HANDOFF` | `auto` | Whether `zenvi mcp` lists the desktop's handoff tools and `bring_from_*`: `auto` (the desktop app is installed or has run here), `on`, `off`. |
 | `ZENVI_ADOBE_EXTENSION` | the bundle's `adobe/pro.zenvi.link` | The Zenvi Link build `zenvi adobe install` installs. |
 | `ZENVI_MCP_COMMAND` | — | Command `mcp-config` writes instead of `node <bundle> mcp`. |
 | `ZENVI_DEBUG=1` | — | Stack traces and host logs on stderr. |

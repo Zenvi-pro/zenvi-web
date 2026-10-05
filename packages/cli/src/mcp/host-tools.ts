@@ -541,6 +541,9 @@ function listHostsTool(): ExtraTool {
   };
 }
 
+/** The tools ZENVI_MCP_HANDOFF lists or hides: everything that runs in the desktop app. */
+export const HANDOFF_TOOL_NAMES: ReadonlySet<string> = new Set([...DESKTOP_HANDOFF_TOOLS.map((t) => t.name), "bring_from_after_effects", "bring_from_premiere"]);
+
 /** list_hosts, the desktop's handoff tools, then the orchestrations. */
 export function hostTools(ctx: CommandContext): ExtraTool[] {
   return [listHostsTool(), ...desktopHandoffTools(ctx), bringFromAfterEffects(ctx), bringFromPremiere(ctx)];

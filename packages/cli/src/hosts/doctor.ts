@@ -6,7 +6,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { CSXS_VERSIONS, HOST_IDS, HostClient, inspectHost, LINK_VERSION, type HostId } from "@zenvi/adobe-link";
+import { CSXS_VERSIONS, HOST_IDS, HostClient, inspectHost, LINK_VERSION, systemCommand, type HostId } from "@zenvi/adobe-link";
 import type { DoctorCheck } from "../commands/integrations.js";
 import { catalogTools } from "./adobe-tools.js";
 import { bundledExtension, findAdobeApps, findInstalledExtensions, type DetectDeps } from "./extension.js";
@@ -29,7 +29,7 @@ export function tooOldApps(host: HostId, folders: readonly string[]): string[] {
 }
 
 export const runCommand: RunCommand = (command, args) => {
-  const result = spawnSync(command, args, { encoding: "utf8", timeout: 5000, windowsHide: true });
+  const result = spawnSync(systemCommand(command), args, { encoding: "utf8", timeout: 5000, windowsHide: true });
   return { code: result.status ?? 1, stdout: result.stdout ?? "" };
 };
 

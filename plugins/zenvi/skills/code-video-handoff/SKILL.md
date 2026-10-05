@@ -61,7 +61,9 @@ position, track}` reads HyperFrames' own resolved timeline:
   true` only when the user agreed to lose those changes.
 - `export_to_hyperframes_tool {output_dir, copy_media}`: `index.html` with
   primitives and a GSAP timeline, plus the Zenvi project embedded so the
-  import restores it exactly. Effects, rounded corners, blend modes,
+  import restores it exactly. Like the Remotion export, a second export into
+  the same folder stops when its files were edited there, unless
+  `replace_edits: true` (only with the user's agreement). Effects, rounded corners, blend modes,
   reversed or ramped speed and wipes do not translate (the receipt lists
   them); with the HyperFrames CLI available the result is linted. Preview
   with `npx hyperframes preview`.

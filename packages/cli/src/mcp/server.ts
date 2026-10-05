@@ -29,6 +29,7 @@ import {
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
   ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   McpError,
   ReadResourceRequestSchema,
@@ -36,16 +37,16 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { HOST_IDS } from "@zenvi/adobe-link";
 import type { ToolImage } from "@zenvi/engine";
-import { failed, parseReceipt, type ToolReceipt } from "@zenvi/engine/tools";
+import { failed, parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import type { CommandContext } from "../commands/context.js";
 import { adobeToolDefinitions, callAdobeTool, hostOfTool, hostRefusal, isOkHostStatus } from "../hosts/adobe-tools.js";
 import { HANDOFF_GUIDE, PROMPTS, promptText, RESOURCES, TASTE_MARKDOWN } from "../hosts/guides.js";
-import { APP_LABEL, type FamilyDecisions } from "../hosts/policy.js";
+import { APP_LABEL, type FamilyDecision, type FamilyDecisions } from "../hosts/policy.js";
 import { findProject } from "../project/select.js";
 import { unknownArgumentsMessage } from "../util/unknown-args.js";
 import { VERSION } from "../version.js";
 import { extraTools, type ExtraTool } from "./extra-tools.js";
-import { hostTools } from "./host-tools.js";
+import { HANDOFF_TOOL_NAMES, hostTools } from "./host-tools.js";
 import { McpState, type McpStateOptions } from "./state.js";
 
 export const SERVER_INSTRUCTIONS = [
@@ -75,7 +76,8 @@ export interface ZenviMcpServer {
   close(): Promise<void>;
 }
 
-const familyKey = (families: FamilyDecisions): string => HOST_IDS.filter((host) => families[host].listed).join(",");
+/** What the tool list depends on: the Adobe families and the handoff tools that are listed. */
+const listingKey = (families: FamilyDecisions, handoff: FamilyDecision): string => `${HOST_IDS.filter((host) => families[host].listed).join(",")}|handoff:${handoff.listed}`;
 
 export async function createZenviMcpServer(ctx: CommandContext, projectFile?: string, options: McpStateOptions = {}): Promise<ZenviMcpServer> {
   const state = await McpState.create(ctx, projectFile, options);
@@ -91,8 +93,8 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
   server.server.setRequestHandler(ListToolsRequestSchema, async () => {
     const host = state.session.host;
     const engineTools = ctx.registry.list("mcp", host).filter((t) => !extraByName.has(t.name) && !hostOfTool(t.name));
-    const families = await state.hosts.families();
-    listedFamilies = familyKey(families);
+    const [families, handoff] = await Promise.all([state.hosts.families(), state.handoffDecision()]);
+    listedFamilies = listingKey(families, handoff);
     return {
       tools: [
         ...engineTools.map((t) => ({
@@ -102,7 +104,9 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
           inputSchema: t.inputSchema as unknown as { type: "object"; [key: string]: unknown },
           ...(t.annotations ? { annotations: { ...t.annotations, title: t.title } } : {}),
         })),
-        ...extras.map((t) => ({
+        ...extras
+          .filter((t) => handoff.listed || !HANDOFF_TOOL_NAMES.has(t.name))
+          .map((t) => ({
           name: t.name,
           title: t.title,
           description: t.description,
@@ -117,7 +121,8 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
   /** Tell the client to list tools again when an Adobe family appeared or went away (e.g. after `zenvi adobe install`). */
   async function announceFamilyChanges(): Promise<void> {
     if (listedFamilies === undefined) return;
-    const key = familyKey(await state.hosts.families());
+    const [families, handoff] = await Promise.all([state.hosts.families(), state.handoffDecision()]);
+    const key = listingKey(families, handoff);
     if (key === listedFamilies) return;
     listedFamilies = key;
     await server.server.sendToolListChanged().catch(() => undefined);
@@ -139,6 +144,12 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
         : undefined;
     try {
       const extraTool = extraByName.get(name);
+      if (extraTool && HANDOFF_TOOL_NAMES.has(name)) {
+        const handoff = await state.handoffDecision();
+        if (!handoff.listed && handoff.reason === "ZENVI_MCP_HANDOFF=off") {
+          return toCallResult(refused(name, `Handoff tools are turned off in this server (ZENVI_MCP_HANDOFF=off). ${handoff.enable ?? ""}`.trim()));
+        }
+      }
       if (extraTool) {
         const unknown = extraTool.checksOwnArguments ? undefined : unknownArgumentsMessage(name, args, extraTool.inputSchema as { properties?: Record<string, unknown> });
         if (unknown) return toCallResult(failed(name, unknown), undefined, { engine: "portable" });
@@ -179,6 +190,8 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
   });
 
   server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: RESOURCES.map((r) => ({ ...r })) }));
+  // No parameterised resources; answer instead of -32601 (clients list templates next to resources).
+  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({ resourceTemplates: [] }));
 
   server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const uri = request.params.uri;

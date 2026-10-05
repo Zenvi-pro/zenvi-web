@@ -68,3 +68,38 @@ export async function decideFamilies(desktopDir: string, deps: DetectDeps): Prom
   }
   return decisions;
 }
+
+/**
+ * Whether `zenvi mcp` lists the desktop's handoff tools and bring_from_*
+ * (ZENVI_MCP_HANDOFF = auto (default), on, off). They all run in the Zenvi
+ * desktop app, so `auto` lists them only where it can run: it has run here
+ * (a discovery file) or it is installed.
+ */
+export type HandoffMode = AdobeMode;
+
+export function handoffMode(env: NodeJS.ProcessEnv): HandoffMode {
+  const value = env.ZENVI_MCP_HANDOFF?.trim().toLowerCase();
+  return value === "on" || value === "off" ? value : "auto";
+}
+
+export interface HandoffDeps {
+  env: NodeJS.ProcessEnv;
+  exists(file: string): Promise<boolean>;
+  /** Whether the desktop app is installed (the launcher's lookup). */
+  appInstalled(): Promise<boolean>;
+}
+
+export async function decideHandoff(desktopDir: string, deps: HandoffDeps): Promise<FamilyDecision> {
+  const mode = handoffMode(deps.env);
+  if (mode === "on") return { listed: true, reason: "ZENVI_MCP_HANDOFF=on" };
+  if (mode === "off") return { listed: false, reason: "ZENVI_MCP_HANDOFF=off", enable: "Unset ZENVI_MCP_HANDOFF (or set it to auto or on) in this server's environment." };
+  for (const name of ["gui_mcp.json", "headless_mcp.json"]) {
+    if (await deps.exists(path.join(desktopDir, name))) return { listed: true, reason: "the Zenvi desktop app runs on this machine" };
+  }
+  if (await deps.appInstalled()) return { listed: true, reason: "the Zenvi desktop app is installed" };
+  return {
+    listed: false,
+    reason: "the Zenvi desktop app is not installed",
+    enable: "Install the Zenvi desktop app (https://zenvi.pro/download; a development checkout: set ZENVI_DESKTOP_CMD), or set ZENVI_MCP_HANDOFF=on in this server's environment.",
+  };
+}

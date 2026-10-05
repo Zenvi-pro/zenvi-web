@@ -105,7 +105,7 @@ Desktop: File > Import Project > Remotion Project…  ·  Agent:
 ### Zenvi → HyperFrames
 
 Desktop: File > Export Project > HyperFrames Project…  ·  Agent:
-`export_to_hyperframes_tool {output_dir, copy_media}`
+`export_to_hyperframes_tool {output_dir, copy_media, replace_edits}`
 
 An `index.html` composition that `npx hyperframes preview|lint|render`
 accept: `<video>`, `<img>`, `<audio>` primitives with `data-start`,
@@ -118,8 +118,10 @@ the title SVG, and the Zenvi project embedded
 lossless. Effects, rounded corners, blend modes, reversed or ramped speed
 and wipe transitions do not translate; the receipt and README.md list each
 one. When the HyperFrames CLI is available, the result is linted and the
-findings come back in the receipt. An earlier Zenvi export in `output_dir`
-is updated in place.
+findings come back in the receipt. Exporting again into an earlier Zenvi
+export replaces only Zenvi's own files, all together, and stops when they
+were edited there since, unless `replace_edits` (only when the person
+agreed to lose those edits). It writes files only: no undo step in Zenvi.
 
 ### HyperFrames → Zenvi
 
@@ -212,9 +214,11 @@ reverse, motion, opacity and volume keyframes come along; disabled clips
 come in hidden or muted; Cross Dissolves become fades and audio cross fades
 volume ramps; markers keep names and colours; nested sequences are
 flattened onto extra tracks. `placement`: `new_tracks` (default) or
-`at_playhead`. Media that cannot be found is skipped and listed
-(`missing_media`); generators, titles made in Premiere and effects Zenvi
-lacks are listed in the warnings.
+`at_playhead`. An XML with several sequences imports the first top-level
+one; `sequence` picks another (the warnings list them). Media that cannot
+be found is skipped and listed (`missing_media`); generators, titles made
+in Premiere, image sequences and effects Zenvi lacks are listed in the
+warnings.
 
 ## What survives
 
@@ -301,6 +305,19 @@ Through `zenvi mcp` (Claude Code, Codex, Cursor):
 both apps: the desktop's receipt (new clips, undo steps) with the Adobe
 receipt under `data.after_effects` / `data.premiere` and both apps'
 warnings. A failure in the Adobe step adds nothing to the Zenvi project.
+When the Adobe step worked but nothing was imported (the call was
+cancelled, the desktop switched to another project meanwhile, or the import
+failed), the receipt says so and keeps the Adobe result plus `data.retry`:
+the import call (tool and arguments) that adds it later. Long steps send
+progress every 15 s.
+
+Which project a handoff touches: tools that act on the session's project
+(exports, sends, imports, linked-clip edits) open it in the desktop app;
+`get_linked_clip_tool` and `open_linked_source_tool` never switch an app
+that shows another project (they ask for `launch_editor` instead); and
+`list_remotion_compositions_tool` runs wherever the app is. Argument names
+are checked against the running desktop's own tool list before anything
+is switched or started.
 
 With `ZENVI_MCP_ENGINE=portable` the server never uses the desktop app, so
 handoff tools are refused.

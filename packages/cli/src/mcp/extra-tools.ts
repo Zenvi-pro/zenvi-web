@@ -219,7 +219,8 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         properties: { path: str("Project file (default: this session's project).") },
         additionalProperties: false,
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+      // Not read-only: it starts or focuses the desktop app and can switch its project.
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       async run(state, args) {
         const tool = "launch_editor";
         const file = text(args.path) ? path.resolve(ctx.cwd, text(args.path)!) : state.session.file;

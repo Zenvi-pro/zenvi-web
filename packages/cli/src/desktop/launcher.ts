@@ -21,6 +21,7 @@ import { execFile, spawn } from "node:child_process";
 import { readdir, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { systemCommand } from "@zenvi/adobe-link";
 
 const execFileAsync = promisify(execFile);
 
@@ -67,7 +68,8 @@ export function defaultLauncherDeps(): LauncherDeps {
     listDir: async (dir) => readdir(dir).catch(() => []),
     run: async (command, args) => {
       try {
-        const { stdout } = await execFileAsync(command, args, { timeout: 5000, windowsHide: true, maxBuffer: 1024 * 1024 });
+        // Absolute paths for reg / mdfind / open: Windows would run a same-named program from the current folder first.
+        const { stdout } = await execFileAsync(systemCommand(command), args, { timeout: 5000, windowsHide: true, maxBuffer: 1024 * 1024 });
         return { code: 0, stdout };
       } catch (error) {
         const e = error as { code?: number | string; stdout?: string };
@@ -76,7 +78,7 @@ export function defaultLauncherDeps(): LauncherDeps {
     },
     spawnDetached: (command, args, env) =>
       new Promise((resolve, reject) => {
-        const child = spawn(command, args, { detached: true, stdio: "ignore", windowsHide: false, env: env ?? process.env });
+        const child = spawn(systemCommand(command), args, { detached: true, stdio: "ignore", windowsHide: false, env: env ?? process.env });
         child.once("error", reject);
         child.once("spawn", () => {
           child.unref();

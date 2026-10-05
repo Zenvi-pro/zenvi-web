@@ -47,7 +47,8 @@ In Claude Code: `/zenvi:adobe-setup` walks through the same steps.
 
 1. Copies the Zenvi Link that ships with this `zenvi` (`dist/adobe/pro.zenvi.link`
    next to the CLI bundle) into your CEP extensions folder, replacing an
-   older copy:
+   older copy (the new copy is built next to it and swapped in, so a failed
+   copy leaves the old one working):
    - macOS: `~/Library/Application Support/Adobe/CEP/extensions/pro.zenvi.link`
    - Windows: `%APPDATA%\Adobe\CEP\extensions\pro.zenvi.link` (no admin rights needed)
 2. Turns on `PlayerDebugMode` for CSXS 9-12 (macOS:
@@ -60,8 +61,9 @@ Then quit and reopen After Effects / Premiere Pro. Zenvi Link starts in the
 background when the app starts; its panel is **Window > Extensions >
 Zenvi Link** (status, server URL, recent tool calls, "Copy MCP config").
 
-- `zenvi adobe install --uninstall` removes the extension. PlayerDebugMode
-  stays on; the command prints how to turn it off.
+- `zenvi adobe install --uninstall` removes the per-user copy (it says so
+  when there was none, and names a machine-wide ZXP copy that stays).
+  PlayerDebugMode stays on; the command prints how to turn it off.
 - Developers: `npm run install:dev -w @zenvi/adobe-link` builds from source
   and links the build into the CEP folder, so later builds load after a
   reload. `zenvi adobe install` replaces such a link with a copy (and says so).
@@ -177,6 +179,10 @@ ignore it pick the tools up after a restart.
   enums, ranges: `refused` with `INVALID_ARGUMENT`), and omitted arguments
   get the TASTE defaults. Frame captures are written to Zenvi Link's own
   temp folder (`<system temp>/zenvi-link`), sent as images and deleted.
+  `zenvi` keeps null (`parent: null` removes the parent) and `""`
+  (`expression: ""` clears it) as sent. Each receipt names the instance that
+  answered (`host_instance`: pid, app version, project), with a warning when
+  another instance took over since the previous call.
 - **Receipts** (contract 3): `status` `ok` (read-only) | `applied` |
   `unchanged` | `refused` | `error`, `summary` (`Error: …` on failure),
   `data` (ids: `comp_id`, `layer_id`, `node_id`, …), `warnings` (frame

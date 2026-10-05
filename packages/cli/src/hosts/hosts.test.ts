@@ -7,7 +7,7 @@ import { fakeLinkHost, type FakeLinkHost } from "../test-support/adobe.js";
 import { fakeDesktop, testEnv, writeDiscovery, type FakeDesktop } from "../test-support/harness.js";
 import { bundledExtension, defaultDetectDeps, findAdobeApps, findInstalledExtensions, manifestVersion, type DetectDeps } from "./extension.js";
 import { adobeDoctor, tooOldApps } from "./doctor.js";
-import { decideFamilies } from "./policy.js";
+import { decideFamilies, decideHandoff } from "./policy.js";
 import { HostRegistry, describeHosts } from "./registry.js";
 
 let home: string;
@@ -79,6 +79,22 @@ describe("which Adobe families zenvi mcp lists (ZENVI_MCP_ADOBE)", () => {
     const decided = await decideFamilies(desktopDir, real);
     expect(decided.premiere.listed).toBe(true);
     expect(decided.aftereffects.listed).toBe(false);
+  });
+});
+
+describe("which desktop handoff tools zenvi mcp lists (ZENVI_MCP_HANDOFF)", () => {
+  const deps = (env: NodeJS.ProcessEnv, files: string[], installed: boolean) => ({
+    env,
+    exists: async (f: string) => files.includes(f),
+    appInstalled: async () => installed,
+  });
+
+  it("auto: when the desktop app has run here or is installed; on / off override", async () => {
+    expect(await decideHandoff(desktopDir, deps({}, [], false))).toMatchObject({ listed: false, reason: "the Zenvi desktop app is not installed" });
+    expect(await decideHandoff(desktopDir, deps({}, [], true))).toMatchObject({ listed: true, reason: "the Zenvi desktop app is installed" });
+    expect(await decideHandoff(desktopDir, deps({}, [path.join(desktopDir, "headless_mcp.json")], false))).toMatchObject({ listed: true });
+    expect(await decideHandoff(desktopDir, deps({ ZENVI_MCP_HANDOFF: "on" }, [], false))).toMatchObject({ listed: true });
+    expect(await decideHandoff(desktopDir, deps({ ZENVI_MCP_HANDOFF: "off" }, [], true))).toMatchObject({ listed: false, reason: "ZENVI_MCP_HANDOFF=off" });
   });
 });
 

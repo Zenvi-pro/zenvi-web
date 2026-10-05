@@ -1,8 +1,8 @@
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
-import { BUNDLE_ID, describeAction, planExtensionInstall, runInstallAction, systemExtensionsDirs } from "./install.js";
+import { BUNDLE_ID, describeAction, planExtensionInstall, replaceInstall, runInstallAction, runInstallPlan, systemCommand, systemExtensionsDirs } from "./install.js";
 
 function temp(): string {
   return mkdtempSync(path.join(os.tmpdir(), "zenvi-link-install-"));
@@ -64,4 +64,53 @@ describe("runInstallAction", () => {
     expect(() => runInstallAction({ kind: "run", command: process.execPath, args: ["-e", "process.exit(1)", "delete"] })).not.toThrow();
     expect(() => runInstallAction({ kind: "build", outDir: "/x" })).toThrow(/does not build/);
   });
+});
+
+describe("runInstallPlan (replace in place)", () => {
+  function built(root: string, text: string): string {
+    const dir = path.join(root, `build-${text}`, BUNDLE_ID);
+    mkdirSync(path.join(dir, "CSXS"), { recursive: true });
+    writeFileSync(path.join(dir, "CSXS", "manifest.xml"), text);
+    return dir;
+  }
+
+  test("a new copy replaces the old one, leaving no staging folders", () => {
+    const root = temp();
+    const target = path.join(root, "extensions", BUNDLE_ID);
+    runInstallPlan([{ kind: "remove", path: target }, { kind: "copy", from: built(root, "v1"), to: target }]);
+    runInstallPlan([{ kind: "remove", path: target }, { kind: "copy", from: built(root, "v2"), to: target }]);
+    expect(readFileSync(path.join(target, "CSXS", "manifest.xml"), "utf8")).toBe("v2");
+    expect(readdirSync(path.dirname(target))).toEqual([BUNDLE_ID]);
+  });
+
+  test("a failed copy keeps the previous install (no remove-then-fail)", () => {
+    const root = temp();
+    const target = path.join(root, "extensions", BUNDLE_ID);
+    runInstallPlan([{ kind: "remove", path: target }, { kind: "copy", from: built(root, "v1"), to: target }]);
+    expect(() => runInstallPlan([{ kind: "remove", path: target }, { kind: "copy", from: path.join(root, "missing"), to: target }])).toThrow();
+    expect(readFileSync(path.join(target, "CSXS", "manifest.xml"), "utf8")).toBe("v1");
+    expect(readdirSync(path.dirname(target))).toEqual([BUNDLE_ID]);
+  });
+
+  test("refuses to install the installed copy over itself; a dev link to the build can be replaced", () => {
+    const root = temp();
+    const target = path.join(root, "extensions", BUNDLE_ID);
+    runInstallPlan([{ kind: "remove", path: target }, { kind: "copy", from: built(root, "v1"), to: target }]);
+    expect(() => replaceInstall({ kind: "copy", from: target, to: target })).toThrow(/is the installed copy itself/);
+    expect(readFileSync(path.join(target, "CSXS", "manifest.xml"), "utf8")).toBe("v1");
+    const build = built(root, "dev");
+    runInstallPlan([{ kind: "remove", path: target }, { kind: "link", from: build, to: target, type: "dir" }]);
+    runInstallPlan([{ kind: "remove", path: target }, { kind: "link", from: build, to: target, type: "dir" }]);
+    expect(lstatSync(target).isSymbolicLink()).toBe(true);
+    expect(readFileSync(path.join(build, "CSXS", "manifest.xml"), "utf8")).toBe("dev");
+  });
+});
+
+test("system commands run by absolute path (no same-named program from the current folder)", () => {
+  expect(systemCommand("reg", "win32", { SystemRoot: "D:\\Win" })).toBe("D:\\Win\\System32\\reg.exe");
+  expect(systemCommand("REG", "win32", {})).toBe("C:\\Windows\\System32\\reg.exe");
+  expect(systemCommand("defaults", "darwin")).toBe("/usr/bin/defaults");
+  expect(systemCommand("mdfind", "darwin")).toBe("/usr/bin/mdfind");
+  expect(systemCommand(process.execPath, "win32")).toBe(process.execPath);
+  expect(systemCommand("defaults", "linux")).toBe("defaults");
 });
