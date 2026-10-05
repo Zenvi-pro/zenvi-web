@@ -240,7 +240,12 @@ function createLinkServer(options) {
     const tool = tools.get(name);
     let receipt;
     let images = [];
-    onActivity();
+    try {
+      onActivity();
+    } catch (error) {
+      // Discovery refreshes are best effort; they never fail a call.
+      log("activity hook failed: " + (error && error.message ? error.message : error));
+    }
     if (!tool) {
       receipt = failureReceipt(host, name, "refused", "NOT_FOUND", "Unknown tool " + name);
     } else {

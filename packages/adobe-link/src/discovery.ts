@@ -153,7 +153,8 @@ export async function inspectHost(desktopDir: string, host: HostId, options: Dis
   if (!pidAlive(pid)) {
     if (options.removeStale) {
       await removeQuietly(file);
-      if (path.dirname(tokenPath) === dir && path.basename(tokenPath) === `${host}.token`) await removeQuietly(tokenPath);
+      // Only a Zenvi Link token file in the link folder (`<app>.<pid>.token`, or `<app>.token` from 1.0 builds).
+      if (path.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path.basename(tokenPath))) await removeQuietly(tokenPath);
     }
     return result("dead", `process ${pid} is gone (left over from a crash)`);
   }
