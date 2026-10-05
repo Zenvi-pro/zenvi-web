@@ -34,8 +34,8 @@
         var before;
         var created;
         var steps = 1;
-        P.requireFeature(typeof sequence.autoReframeSequence === "function", "Auto Reframe (Sequence.autoReframeSequence)", "2020 (14.0)");
-        if (typeof sequence.isDoneAnalyzingForVideoEffects === "function" && sequence.isDoneAnalyzingForVideoEffects() === false) {
+        P.requireFeature(Z.hasMethod(sequence, "autoReframeSequence"), "Auto Reframe (Sequence.autoReframeSequence)", "2020 (14.0)");
+        if (Z.hasMethod(sequence, "isDoneAnalyzingForVideoEffects") && sequence.isDoneAnalyzingForVideoEffects() === false) {
             throw Z.refuse("BUSY", "Premiere is still analysing \"" + sequence.name + "\" for video effects; try again in a moment");
         }
         before = P.sequenceIds();
@@ -71,7 +71,7 @@
 
     function selectedIds(sequence) {
         var ids = [];
-        var selection = typeof sequence.getSelection === "function" ? sequence.getSelection() || [] : [];
+        var selection = Z.hasMethod(sequence, "getSelection") ? sequence.getSelection() || [] : [];
         var i;
         for (i = 0; i < selection.length; i += 1) {
             ids.push(selection[i].nodeId);
@@ -89,7 +89,7 @@
             tracks = P.tracksOf(sequence, kinds[k]);
             for (t = 0; t < tracks.numTracks; t += 1) {
                 Z.each(P.clipsOf(tracks[t]), function (clip) {
-                    var want = P.indexOf(ids, clip.nodeId) >= 0;
+                    var want = Z.indexOf(ids, clip.nodeId) >= 0;
                     if (clip.isSelected() !== want) {
                         clip.setSelected(want, true);
                     }
@@ -100,7 +100,7 @@
 
     function markerCount(item) {
         try {
-            return item && typeof item.getMarkers === "function" ? Number(item.getMarkers().numMarkers) : 0;
+            return item && Z.hasMethod(item, "getMarkers") ? Number(item.getMarkers().numMarkers) : 0;
         } catch (error) {
             return 0;
         }
@@ -129,9 +129,9 @@
         }
         track = P.findTrack(sequence, ref);
         P.requireUnlocked(track, ref.kind, ref.index);
-        if (typeof sequence.performSceneEditDetectionOnSelection === "function") {
+        if (Z.hasMethod(sequence, "performSceneEditDetectionOnSelection")) {
             detect = "performSceneEditDetectionOnSelection";
-        } else if (typeof sequence.performCutDetectionOnSelection === "function") {
+        } else if (Z.hasMethod(sequence, "performCutDetectionOnSelection")) {
             // types-for-adobe names it this way; the scripting guide and PProPanel use the name above.
             detect = "performCutDetectionOnSelection";
         }

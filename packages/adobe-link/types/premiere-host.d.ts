@@ -28,8 +28,6 @@ interface ZenviResult {
 interface ZenviLinkRuntime {
   version: string;
   host: string | null;
-  /** The Zenvi-owned temp folder the server passes to the host script (W1a review #6); absent on older runtimes. */
-  tempDir?(): string | null;
   TASTE: any;
   CATALOG: any;
   ppro: any;
@@ -48,6 +46,18 @@ interface ZenviLinkRuntime {
   inRange(key: string, value: number, min: number | null, max: number | null): number;
   snapToFrame(seconds: number, fps: number, ctx: ZenviContext | null, label?: string): number;
   has(object: unknown, key: string): boolean;
+  /** The DOM object has member `name` (host methods may report typeof "object"; never throws). */
+  hasMethod(object: unknown, name: string): boolean;
+  /** Index of `value` in an array (===), or -1: there is no Array.prototype.indexOf. */
+  indexOf(list: ArrayLike<unknown>, value: unknown): number;
+  /** There is no String.prototype.trim. */
+  trim(text: unknown): string;
+  /** Survives the bundle being evaluated again (CEP does that when the panel opens). */
+  state: { loads: number; config: { temp_dir?: string } };
+  configure(json: unknown): string;
+  /** Zenvi Link's temp folder (fsName), created if missing. */
+  tempDir(): string;
+  tempFile(prefix?: string, extension?: string): string;
   isArray(value: unknown): boolean;
   isObject(value: unknown): boolean;
   each<T>(list: ArrayLike<T>, fn: (item: T, index: number) => void): void;

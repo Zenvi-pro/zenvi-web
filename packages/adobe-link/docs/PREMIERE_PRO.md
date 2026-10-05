@@ -150,7 +150,7 @@ says so.
 | QE `setSpeed(multiplier, duration ticks, reverse, pitch, ripple)` | Adobe_Premiere_Pro_MCP | **Unverified**; the result is read back through `getSpeed()` and an error is reported when it did not take |
 | QE `exportFramePNG(timecode, path without extension)` appends `.png` and cuts the name at its first dot | premiere-pro-mcp, live on 25.2 | Community-verified; a temp folder whose path contains a dot is **unverified** |
 | `exportFramePNG` returns before the PNG is written; the capture polls every 100 ms (at most 20 s) until the size is stable and the file has the PNG signature and ends with the IEND chunk (read with `File.seek`) | Zenvi Link review; premiere-pro-mcp only checks that the file exists, since QE's return value is unreliable | Defensive |
-| Feature checks such as `typeof sequence.autoReframeSequence === "function"` see host methods as functions | premiere-pro-mcp's ExtendScript, live on 25.2–26, gates on the same checks | Community-verified (a build where they read "object" would refuse those features as UNSUPPORTED) |
+| Version gates test that a member exists (`ZenviLink.hasMethod(sequence, "autoReframeSequence")`), not `typeof … === "function"`, because ExtendScript may report host methods as "object" | Zenvi Link review; premiere-pro-mcp's live-tested ExtendScript does use `typeof` checks | Defensive; a test keeps `typeof … === "function"` on DOM members out of the scripts |
 | `qe.project.undoStackIndex()` moves by one per undoable step | premiere-pro-mcp on 25.2 | Community-verified; the count is probably capped by the History panel limit (see limits) |
 | Scene Edit Detection is `performSceneEditDetectionOnSelection` (types-for-adobe says `performCutDetectionOnSelection`; both are tried) | Guide, PProPanel | Documented |
 | MOGRT text: After Effects-authored templates expose JSON `textEditValue` through `getMGTComponent()`; Premiere-authored ones (Basic Title) have no MGT component | Adobe forum; premiere-pro-mcp on 25.2 | Community-verified |
@@ -205,9 +205,10 @@ Sources:
 - **Frame capture** writes at the sequence's frame size. A 4K PNG is a large
   image block. A PNG that is not complete after 20 s is an error, and the
   partial file is removed.
-- **Temp files.** Frame captures and XML exports go into the Zenvi-owned temp
-  folder the server gives the host script (`ZenviLink.tempDir()`), or
-  `<system temp>/zenvi-link` on a runtime that does not provide one yet.
+- **Temp files.** Frame captures and XML exports go into
+  `ZenviLink.tempDir()`, the folder the server configured
+  (`<system temp>/zenvi-link` by default). The server deletes a capture only
+  from inside it.
 - **Auto Reframe** refuses while the sequence is still being analysed
   (`BUSY`).
 - **UXP roadmap.** Premiere supports UXP plugins since 25.6. Adobe disables
@@ -228,13 +229,16 @@ npm run gen:catalog -w @zenvi/adobe-link            # after catalog changes
   runtime, json2, `Object.keys`, the QE DOM as used, and missing DOM
   members. It deliberately leaves out `Array.prototype.indexOf` and
   `String.prototype.trim`, so the typecheck rejects them; use
-  `ZenviLink.ppro.indexOf` / `trim`.
+  `ZenviLink.indexOf` / `trim`.
 - The host scripts add nothing to built-in prototypes: every extension in
   Premiere shares one ExtendScript engine, and ES3 cannot hide a prototype
   member from other scripts' `for…in` loops.
 - They keep no state between calls either. Opening the panel evaluates the
-  bundle again, which rebuilds `ZenviLink`. Media Encoder jobs are reported
+  bundle again, which rebuilds `ZenviLink`; only `ZenviLink.state` survives,
+  and the Premiere tools need nothing in it. Media Encoder jobs are reported
   in the receipt, not tracked.
+- DOM feature checks use `ZenviLink.hasMethod(object, name)`, never
+  `typeof … === "function"`.
 - The mock DOM lives in `src/testing/premiere-mock.ts`, `ppro-components.ts`,
   `ppro-qe.ts` and `ppro-time.ts`; fixtures are in `ppro-fixtures.ts`.
 

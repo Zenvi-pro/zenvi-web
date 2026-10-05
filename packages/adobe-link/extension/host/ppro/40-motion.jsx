@@ -92,7 +92,7 @@
                     return P.positionToDom(sequence, value);
                 }
                 if (name === "blend_mode") {
-                    return P.indexOf(P.BLEND_MODES, value);
+                    return Z.indexOf(P.BLEND_MODES, value);
                 }
                 return value;
             },
@@ -410,7 +410,7 @@
         P.requireNormalSpeed(clip, "keyframes");
         target = animatedTarget(found, Z.required(args, "property", "any"));
         param = target.param;
-        if (typeof param.areKeyframesSupported === "function" && param.areKeyframesSupported() === false) {
+        if (Z.hasMethod(param, "areKeyframesSupported") && param.areKeyframesSupported() === false) {
             throw Z.refuse("UNSUPPORTED", target.label + " cannot be keyframed");
         }
 
@@ -465,7 +465,7 @@
             key.mode = setInterpolation(param, key.at, key.mode, state);
             steps += 1;
         });
-        if ((replace || turnedOn) && typeof param.getKeys === "function") {
+        if ((replace || turnedOn) && Z.hasMethod(param, "getKeys")) {
             // Turning animation on can leave a key at the playhead: when this call turned it on (or
             // replaces), only its own keys remain (within half a frame, in case Premiere moved a key onto
             // its own grid).

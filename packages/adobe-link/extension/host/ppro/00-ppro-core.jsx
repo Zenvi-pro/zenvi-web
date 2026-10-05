@@ -25,26 +25,6 @@
     /** Premiere's time unit: 254016000000 ticks per second. */
     P.TICKS_PER_SECOND = 254016000000;
 
-    // No Array.prototype.indexOf / String.prototype.trim: every script in the
-    // app shares one ExtendScript engine, and ES3 has no way to add a
-    // prototype member that stays out of other scripts' for-in loops.
-
-    /** Index of `value` in an array (strict equality), or -1. */
-    P.indexOf = function (list, value) {
-        var i;
-        for (i = 0; list && i < list.length; i += 1) {
-            if (list[i] === value) {
-                return i;
-            }
-        }
-        return -1;
-    };
-
-    /** `text` without leading and trailing whitespace. */
-    P.trim = function (text) {
-        return String(text).replace(/^[\s\u00a0\ufeff]+|[\s\u00a0\ufeff]+$/g, "");
-    };
-
     var qeEnabled = false;
 
     // ------------------------------------------------------------------
@@ -54,7 +34,7 @@
     /** The QE DOM, enabled once. Refuses UNSUPPORTED when this build has none. */
     P.qe = function () {
         if (!qeEnabled) {
-            if (typeof app.enableQE !== "function") {
+            if (!Z.hasMethod(app, "enableQE")) {
                 throw Z.refuse("UNSUPPORTED", "This Premiere Pro build has no QE DOM (app.enableQE)");
             }
             app.enableQE();
@@ -73,14 +53,14 @@
     P.undoIndex = function () {
         var value;
         try {
-            if (typeof app.enableQE !== "function") {
+            if (!Z.hasMethod(app, "enableQE")) {
                 return null;
             }
             if (!qeEnabled) {
                 app.enableQE();
                 qeEnabled = true;
             }
-            if (typeof qe === "undefined" || !qe || !qe.project || typeof qe.project.undoStackIndex !== "function") {
+            if (typeof qe === "undefined" || !qe || !qe.project || !Z.hasMethod(qe.project, "undoStackIndex")) {
                 return null;
             }
             value = Number(qe.project.undoStackIndex());
@@ -164,7 +144,7 @@
     };
 
     P.requireProject = function () {
-        if (!app.project || !app.project.rootItem || (typeof app.isDocumentOpen === "function" && !app.isDocumentOpen())) {
+        if (!app.project || !app.project.rootItem || (Z.hasMethod(app, "isDocumentOpen") && !app.isDocumentOpen())) {
             throw Z.refuse("NO_PROJECT", "No Premiere Pro project is open");
         }
         return app.project;
@@ -245,7 +225,7 @@
     /** Bin path segments from "A/B", "\\A\\B" or "/" (root). */
     function binSegments(path) {
         return Z.filter(String(path).replace(/\\/g, "/").split("/"), function (part) {
-            return P.trim(part).length > 0;
+            return Z.trim(part).length > 0;
         });
     }
 
@@ -314,7 +294,7 @@
     /** Media path of an item, or "" (synthetic items and bins have none). */
     P.mediaPath = function (item) {
         try {
-            return typeof item.getMediaPath === "function" ? String(item.getMediaPath() || "") : "";
+            return Z.hasMethod(item, "getMediaPath") ? String(item.getMediaPath() || "") : "";
         } catch (error) {
             return "";
         }
@@ -508,7 +488,7 @@
         } catch (error) {
             format = null;
         }
-        if (typeof time.getFormatted === "function" && typeof format === "number") {
+        if (Z.hasMethod(time, "getFormatted") && typeof format === "number") {
             try {
                 return String(time.getFormatted(rate, format));
             } catch (error2) {
@@ -549,7 +529,7 @@
 
     P.isLocked = function (track) {
         try {
-            return typeof track.isLocked === "function" && track.isLocked() === true;
+            return Z.hasMethod(track, "isLocked") && track.isLocked() === true;
         } catch (error) {
             return false;
         }
@@ -658,7 +638,7 @@
         var other;
         var i;
         try {
-            linked = typeof clip.getLinkedItems === "function" ? clip.getLinkedItems() : null;
+            linked = Z.hasMethod(clip, "getLinkedItems") ? clip.getLinkedItems() : null;
         } catch (error) {
             linked = null;
         }
@@ -685,10 +665,10 @@
         var speed = 1;
         var reversed = false;
         try {
-            if (typeof clip.getSpeed === "function") {
+            if (Z.hasMethod(clip, "getSpeed")) {
                 speed = Number(clip.getSpeed());
             }
-            if (typeof clip.isSpeedReversed === "function") {
+            if (Z.hasMethod(clip, "isSpeedReversed")) {
                 reversed = Number(clip.isSpeedReversed()) === 1 || clip.isSpeedReversed() === true;
             }
         } catch (error) {
@@ -765,12 +745,12 @@
         var components = P.componentsOf(clip);
         var i;
         for (i = 0; i < components.length; i += 1) {
-            if (P.indexOf(matchNames, String(components[i].matchName)) >= 0) {
+            if (Z.indexOf(matchNames, String(components[i].matchName)) >= 0) {
                 return components[i];
             }
         }
         for (i = 0; i < components.length; i += 1) {
-            if (P.indexOf(displayNames, String(components[i].displayName)) >= 0) {
+            if (Z.indexOf(displayNames, String(components[i].displayName)) >= 0) {
                 return components[i];
             }
         }
@@ -829,7 +809,7 @@
         var wanted = Z.map(names, function (name) { return String(name).toLowerCase(); });
         var i;
         for (i = 0; i < params.length; i += 1) {
-            if (P.indexOf(wanted, String(params[i].displayName).toLowerCase()) >= 0) {
+            if (Z.indexOf(wanted, String(params[i].displayName).toLowerCase()) >= 0) {
                 return params[i];
             }
         }
@@ -844,13 +824,13 @@
         return Z.filter(Z.map(P.paramsOf(component), function (param) {
             return String(param.displayName);
         }), function (name) {
-            return P.trim(name).length > 0;
+            return Z.trim(name).length > 0;
         });
     };
 
     P.isAnimated = function (param) {
         try {
-            return typeof param.isTimeVarying === "function" && param.isTimeVarying() === true;
+            return Z.hasMethod(param, "isTimeVarying") && param.isTimeVarying() === true;
         } catch (error) {
             return false;
         }
@@ -1062,18 +1042,12 @@
     };
 
     /**
-     * The folder for Zenvi Link temp files (created): the Zenvi-owned folder
-     * the server gives the host script (ZenviLink.tempDir()) once it has,
-     * else <system temp>/zenvi-link. The server only deletes images it
-     * returns from inside its own folder.
+     * Zenvi Link's temp folder: ZenviLink.tempDir(), the folder the server
+     * configured (created if missing). The server deletes a frame capture it
+     * has sent only from inside this folder.
      */
     P.tempFolder = function () {
-        var owned = typeof Z.tempDir === "function" ? Z.tempDir() : null;
-        var folder = new Folder(owned ? String(owned) : P.join(Folder.temp.fsName, "zenvi-link"));
-        if (!folder.exists) {
-            folder.create();
-        }
-        return folder;
+        return new Folder(Z.tempDir());
     };
 
     /** Create the parent folder of a file path when missing. */
@@ -1197,11 +1171,11 @@
             ctx.warn("Listed the first " + listed.length + " of " + sequences.length + " sequences");
         }
         if (active) {
-            selection = typeof active.getSelection === "function" ? active.getSelection() || [] : [];
+            selection = Z.hasMethod(active, "getSelection") ? active.getSelection() || [] : [];
             activeData = P.sequenceSummary(active);
             activeData.playhead = Z.round(P.timeToSeconds(active.getPlayerPosition()), 4);
-            activeData.in_point = typeof active.getInPointAsTime === "function" ? Z.round(P.timeToSeconds(active.getInPointAsTime()), 4) : null;
-            activeData.out_point = typeof active.getOutPointAsTime === "function" ? Z.round(P.timeToSeconds(active.getOutPointAsTime()), 4) : null;
+            activeData.in_point = Z.hasMethod(active, "getInPointAsTime") ? Z.round(P.timeToSeconds(active.getInPointAsTime()), 4) : null;
+            activeData.out_point = Z.hasMethod(active, "getOutPointAsTime") ? Z.round(P.timeToSeconds(active.getOutPointAsTime()), 4) : null;
             activeData.selection = Z.map(selection, function (clip) {
                 return P.clipSummary(active, clip);
             });

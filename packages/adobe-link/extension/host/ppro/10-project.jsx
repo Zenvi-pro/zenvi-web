@@ -8,7 +8,7 @@
     function markSeconds(item, getter) {
         var time;
         try {
-            time = typeof item[getter] === "function" ? item[getter]() : null;
+            time = Z.hasMethod(item, getter) ? item[getter]() : null;
         } catch (error) {
             time = null;
         }
@@ -17,7 +17,7 @@
 
     function isOffline(item) {
         try {
-            return typeof item.isOffline === "function" && item.isOffline() === true;
+            return Z.hasMethod(item, "isOffline") && item.isOffline() === true;
         } catch (error) {
             return false;
         }

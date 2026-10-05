@@ -273,7 +273,7 @@ describe("premiere_razor", () => {
     const receipt = fx.call("premiere_razor", { time: 1, sequence: "Main", tracks: [{ kind: "video", index: 0 }] });
     expect(receipt.status).toBe("applied");
     expect(receipt.warnings).toContain('Opened sequence "Main" so the QE DOM can reach it');
-    expect(fx.mock.project.activeSequence).toBe(edit.sequence);
+    expect(fx.mock.project.activeSequence?.sequenceID).toBe(edit.sequence.sequenceID);
   });
 
   test("a sequence QE lists is reached without opening it", () => {
@@ -282,7 +282,7 @@ describe("premiere_razor", () => {
     const other = fx.mock.project.addSequence({ name: "Other" });
     const receipt = fx.call("premiere_razor", { time: 1, sequence: "Main", tracks: [{ kind: "video", index: 0 }] });
     expect(receipt.warnings).toEqual([]);
-    expect(fx.mock.project.activeSequence).toBe(other);
+    expect(fx.mock.project.activeSequence?.sequenceID).toBe(other.sequenceID);
     expect(edit.sequence.videoTrackList[0]?.clipList).toHaveLength(4);
   });
 });

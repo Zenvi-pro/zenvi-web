@@ -69,7 +69,7 @@
             return found;
         }
         try {
-            names = typeof project[lister] === "function" ? qeNames(project[lister]()) : [];
+            names = Z.hasMethod(project, lister) ? qeNames(project[lister]()) : [];
         } catch (error2) {
             names = [];
         }
@@ -125,7 +125,7 @@
 
     Z.register("premiere_apply_effect", function (args, ctx) {
         var found = P.findClip(Z.required(args, "clip", "string"), args.sequence);
-        var name = P.trim(Z.required(args, "effect", "string"));
+        var name = Z.trim(Z.required(args, "effect", "string"));
         var params = Z.optional(args, "params", "array", []);
         var effect;
         var added;
@@ -381,7 +381,7 @@
             label = String(params[i].displayName);
             if (start < 0 && label === section) {
                 start = i;
-            } else if (start >= 0 && P.indexOf(LUMETRI_SECTIONS, label) >= 0) {
+            } else if (start >= 0 && Z.indexOf(LUMETRI_SECTIONS, label) >= 0) {
                 end = i;
                 break;
             }
@@ -428,7 +428,7 @@
             }
             return targets;
         }
-        selection = typeof sequence.getSelection === "function" ? sequence.getSelection() || [] : [];
+        selection = Z.hasMethod(sequence, "getSelection") ? sequence.getSelection() || [] : [];
         Z.each(selection, function (clip) {
             var found = P.refindClip(sequence, clip.nodeId);
             if (found && found.kind === "video") {

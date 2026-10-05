@@ -205,11 +205,11 @@ describe("frame captures wait for a whole PNG", () => {
     expect(readdirSync(path.join(fx.dir, "tmp", "zenvi-link")).filter((name) => name.endsWith(".png"))).toEqual([]);
   });
 
-  test("captures go into the Zenvi-owned temp folder when the runtime names one", () => {
+  test("captures go into the temp folder the server configured", () => {
     const fx = loadPremiere();
     standardEdit(fx);
     const owned = path.join(fx.dir, "owned-tmp");
-    fx.host.evaluate(`ZenviLink.tempDir = function () { return ${JSON.stringify(owned)}; };`);
+    fx.host.evaluate(`ZenviLink.configure(${JSON.stringify(JSON.stringify({ temp_dir: owned }))});`);
     const receipt = fx.call("premiere_capture_frame", {});
     expect(receipt.status).toBe("ok");
     expect(path.dirname(String(receipt.data.image_path))).toBe(owned);

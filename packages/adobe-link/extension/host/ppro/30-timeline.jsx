@@ -224,7 +224,7 @@
         if (Math.abs(Number(clip.start.ticks) - (originalStart + deltaTicks)) < half) {
             return false;
         }
-        if (typeof clip.move === "function") {
+        if (Z.hasMethod(clip, "move")) {
             clip.move(deltaTicks / TPS);
         } else {
             start = Number(clip.start.ticks) + deltaTicks;
@@ -266,7 +266,7 @@
         if (Math.abs(delta) < half) {
             return Z.unchanged("Clip \"" + clip.name + "\" already starts at " + Z.round(target, 4) + " s", {clip: P.clipSummary(sequence, clip)});
         }
-        P.requireFeature(typeof clip.move === "function", "TrackItem.move", "2021 (15.4)");
+        P.requireFeature(Z.hasMethod(clip, "move"), "TrackItem.move", "2021 (15.4)");
         members = withLinked(found, includeLinked);
         requireAllUnlocked(members);
         Z.each(members, function (member) {
@@ -444,7 +444,7 @@
     function renameClip(found, args, ctx) {
         var name = Z.required(args, "name", "string");
         var old = String(found.clip.name);
-        if (P.trim(name).length === 0) {
+        if (Z.trim(name).length === 0) {
             throw Z.refuse("INVALID_ARGUMENT", "`name` must not be blank");
         }
         if (old === name) {
@@ -490,7 +490,7 @@
             }
         }
         qeItem = P.qeItem(P.qeTrack(P.qeSequence(sequence, ctx), found.kind, found.trackIndex), clip, Number(sequence.timebase));
-        if (typeof qeItem.setSpeed !== "function") {
+        if (!Z.hasMethod(qeItem, "setSpeed")) {
             throw Z.refuse("UNSUPPORTED", "This Premiere build's QE DOM has no setSpeed; use Clip > Speed/Duration in Premiere");
         }
         ctx.changed();

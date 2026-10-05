@@ -173,7 +173,7 @@
         var i;
         var beforeIds = P.clipIds(sequence);
         var before = trackSnapshot(sequence.videoTracks[trackIndex], {});
-        P.requireFeature(typeof sequence.importMGT === "function", "Sequence.importMGT", "2019 (13.0)");
+        P.requireFeature(Z.hasMethod(sequence, "importMGT"), "Sequence.importMGT", "2019 (13.0)");
         ctx.changed();
         clip = sequence.importMGT(path, String(startTicks), trackIndex, 0);
         if (!clip) {
@@ -181,7 +181,7 @@
         }
         result.steps += 1;
         requireNeighboursUntouched(sequence, trackIndex, before, beforeIds);
-        mgt = typeof clip.getMGTComponent === "function" ? clip.getMGTComponent() : null;
+        mgt = Z.hasMethod(clip, "getMGTComponent") ? clip.getMGTComponent() : null;
         textParam = mgt ? textParamOf(mgt) : null;
         if (!textParam) {
             clip.remove(false, true);
@@ -196,7 +196,7 @@
             if (!sizeParam && /size/i.test(String(params[i].displayName)) && typeof P.valueOf(params[i]) === "number") {
                 sizeParam = params[i];
             }
-            if (!colorParam && /colou?r/i.test(String(params[i].displayName)) && typeof params[i].setColorValue === "function") {
+            if (!colorParam && /colou?r/i.test(String(params[i].displayName)) && Z.hasMethod(params[i], "setColorValue")) {
                 colorParam = params[i];
             }
         }
@@ -364,7 +364,7 @@
         var freeUntil;
         var actual;
 
-        if (P.trim(text).length === 0) {
+        if (Z.trim(text).length === 0) {
             throw Z.refuse("INVALID_ARGUMENT", "`text` must not be blank");
         }
         Z.oneOf("placement", placement, ["center", "lower-third", "top-left", "top-center", "bottom-center"]);
@@ -472,7 +472,7 @@
         if (!P.isFile(srt)) {
             throw Z.refuse("NOT_FOUND", "No file at " + srt);
         }
-        P.requireFeature(typeof sequence.createCaptionTrack === "function", "Sequence.createCaptionTrack", "2021 (15.0)");
+        P.requireFeature(Z.hasMethod(sequence, "createCaptionTrack"), "Sequence.createCaptionTrack", "2021 (15.0)");
         if (typeof Sequence !== "undefined" && Sequence && typeof Sequence[CAPTION_FORMATS[format]] === "number") {
             constant = Sequence[CAPTION_FORMATS[format]];
         } else if (format !== "subtitle") {

@@ -84,7 +84,7 @@
 
     function markerColorName(marker) {
         var index = safe(function () {
-            return typeof marker.getColorByIndex === "function" ? Number(marker.getColorByIndex()) : null;
+            return Z.hasMethod(marker, "getColorByIndex") ? Number(marker.getColorByIndex()) : null;
         }, null);
         return index !== null && index >= 0 && index < P.MARKER_COLORS.length ? P.MARKER_COLORS[index] : null;
     }
@@ -145,7 +145,7 @@
                     name: String(track.name),
                     muted: safe(function () { return track.isMuted() === true; }, false),
                     locked: P.isLocked(track),
-                    targeted: safe(function () { return typeof track.isTargeted === "function" ? track.isTargeted() === true : null; }, null),
+                    targeted: safe(function () { return Z.hasMethod(track, "isTargeted") ? track.isTargeted() === true : null; }, null),
                     clips: [],
                     transitions: []
                 };
@@ -308,7 +308,7 @@
 
         P.requireProject();
         if (fromClips !== null) {
-            P.requireFeature(typeof app.project.createNewSequenceFromClips === "function", "Project.createNewSequenceFromClips", "2020 (14.0)");
+            P.requireFeature(Z.hasMethod(app.project, "createNewSequenceFromClips"), "Project.createNewSequenceFromClips", "2020 (14.0)");
             items = Z.map(fromClips, function (id, i) {
                 var item;
                 if (typeof id !== "string") {
@@ -321,7 +321,7 @@
                 return item;
             });
         } else {
-            if (typeof app.enableQE !== "function" && typeof app.project.newSequence !== "function") {
+            if (!Z.hasMethod(app, "enableQE") && !Z.hasMethod(app.project, "newSequence")) {
                 throw Z.refuse("UNSUPPORTED", "This Premiere build cannot create a sequence from a preset by script (no QE DOM); pass `from_clips`");
             }
             preset = P.basePreset(target);
@@ -343,7 +343,7 @@
         } else {
             // Never app.project.createNewSequence: it opens the modal New Sequence dialog
             // (PProPanel uses qe.project.newSequence(name, presetPath) for presets).
-            if (typeof app.enableQE === "function") {
+            if (Z.hasMethod(app, "enableQE")) {
                 P.qe().project.newSequence(name, preset.fsName);
             } else {
                 app.project.newSequence(name, preset.fsName);
@@ -358,7 +358,7 @@
         if (!items) {
             steps += P.applyFrame(sequence, target, ctx);
         }
-        if (bin && !items && sequence.projectItem && typeof sequence.projectItem.moveBin === "function") {
+        if (bin && !items && sequence.projectItem && Z.hasMethod(sequence.projectItem, "moveBin")) {
             sequence.projectItem.moveBin(bin);
             steps += 1;
         }
@@ -442,7 +442,7 @@
                 throw Z.refuse("INVALID_ARGUMENT", "Time " + Z.round(time) + " s is outside clip \"" + found.clip.name + "\" (" +
                     Z.round(clipStart) + "-" + Z.round(clipEnd) + " s)");
             }
-            if (!found.clip.projectItem || typeof found.clip.projectItem.getMarkers !== "function") {
+            if (!found.clip.projectItem || !Z.hasMethod(found.clip.projectItem, "getMarkers")) {
                 throw Z.refuse("UNSUPPORTED", "Clip \"" + found.clip.name + "\" has no source item to hold markers");
             }
             if (Math.abs(P.speedOf(found.clip).speed - 1) > 0.0001 || P.speedOf(found.clip).reversed) {
@@ -477,8 +477,8 @@
             marker.setTypeAsSegmentation();
         }
         if (color !== null) {
-            if (typeof marker.setColorByIndex === "function") {
-                marker.setColorByIndex(P.indexOf(P.MARKER_COLORS, color));
+            if (Z.hasMethod(marker, "setColorByIndex")) {
+                marker.setColorByIndex(Z.indexOf(P.MARKER_COLORS, color));
             } else {
                 ctx.warn("This Premiere build cannot colour markers by script (Marker.setColorByIndex); the marker kept its default colour");
             }

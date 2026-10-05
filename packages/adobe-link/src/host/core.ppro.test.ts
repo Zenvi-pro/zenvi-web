@@ -1,4 +1,7 @@
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, test } from "vitest";
+import { HOST_SCRIPT_DIR } from "../host-bundle.js";
 import { loadPremiere, standardEdit } from "../testing/ppro-fixtures.js";
 import { TICKS_PER_SECOND } from "../testing/premiere-mock.js";
 
@@ -119,5 +122,25 @@ describe("review fixes: QE sequence lookup", () => {
     expect(receipt.status).toBe("applied");
     expect(receipt.warnings).toContain('Opened sequence "Main" so the QE DOM can reach it');
     expect(edit.v.c.componentList[2]?.displayName).toBe("Gaussian Blur");
+  });
+});
+
+describe("feature detection of DOM methods", () => {
+  test('ZenviLink.hasMethod, never typeof === "function" on a DOM member (host methods may report "object")', () => {
+    const folder = path.join(HOST_SCRIPT_DIR, "ppro");
+    for (const file of readdirSync(folder).filter((name) => name.endsWith(".jsx"))) {
+      expect(readFileSync(path.join(folder, file), "utf8"), file).not.toMatch(/typeof [\w$]+(\.[\w$]+|\[[^\]]+\])+ *[!=]==? *"function"/);
+    }
+  });
+
+  test('a gated method that reads as typeof "object" passes its version gate', () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    // V8 cannot make a callable "object" the way ExtendScript host methods can; the call then fails, but
+    // the tool must not refuse the feature as missing.
+    (edit.sequence as unknown as Record<string, unknown>).autoReframeSequence = {};
+    const receipt = fx.call("premiere_auto_reframe", {});
+    expect(receipt.status).toBe("error");
+    expect(receipt.error?.code).toBe("HOST_ERROR");
   });
 });

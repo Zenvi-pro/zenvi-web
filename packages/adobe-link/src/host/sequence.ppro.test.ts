@@ -132,7 +132,7 @@ describe("premiere_open_sequence", () => {
     const edit = standardEdit(fx);
     const other = fx.mock.project.addSequence({ name: "Other", active: false });
     expect(fx.call("premiere_open_sequence", { sequence: "Other" })).toMatchObject({ status: "applied", undoSteps: 0, data: { sequence_id: other.sequenceID } });
-    expect(fx.mock.project.activeSequence).toBe(other);
+    expect(fx.mock.project.activeSequence?.sequenceID).toBe(other.sequenceID);
     expect(fx.call("premiere_open_sequence", { sequence: other.sequenceID }).status).toBe("unchanged");
     expect(fx.call("premiere_open_sequence", { sequence: "Nope" }).error?.code).toBe("NOT_FOUND");
     expect(fx.call("premiere_open_sequence", { sequence: edit.sequence.sequenceID }).status).toBe("applied");
@@ -179,7 +179,7 @@ describe("review fixes: create_sequence", () => {
     const receipt = fx.call("premiere_create_sequence", { name: "Side", open: false });
     expect(receipt).toMatchObject({ status: "applied", data: { sequence: { name: "Side" }, active: false } });
     expect(receipt.summary).not.toContain("active sequence");
-    expect(fx.mock.project.activeSequence).toBe(edit.sequence);
+    expect(fx.mock.project.activeSequence?.sequenceID).toBe(edit.sequence.sequenceID);
     const opened = fx.call("premiere_create_sequence", { name: "Next" });
     expect(opened.data.active).toBe(true);
     expect(opened.summary).toContain(", now the active sequence");

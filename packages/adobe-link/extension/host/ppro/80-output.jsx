@@ -31,7 +31,7 @@
         time = time === null ? P.timeToSeconds(sequence.getPlayerPosition()) : Z.inRange("time", time, 0, null);
         time = P.snapTime(sequence, time, ctx, "time");
         qeSequence = P.qeSequence(sequence, ctx);
-        if (typeof qeSequence.exportFramePNG !== "function") {
+        if (!Z.hasMethod(qeSequence, "exportFramePNG")) {
             throw Z.refuse("UNSUPPORTED", "This Premiere build's QE DOM has no exportFramePNG");
         }
         timecode = P.timecode(sequence, time);
@@ -99,7 +99,7 @@
     var WORK_AREA = {entire: 0, "in-out": 1, "work-area": 2};
 
     function normalName(text) {
-        return P.trim(String(text).toLowerCase().replace(/\.epr$/, "").replace(/[^a-z0-9]+/g, " "));
+        return Z.trim(String(text).toLowerCase().replace(/\.epr$/, "").replace(/[^a-z0-9]+/g, " "));
     }
 
     /** Folders holding export presets: Premiere's and Media Encoder's systempresets, and the user's Media Encoder presets. */
@@ -252,9 +252,9 @@
             ctx.warn("The preset writes ." + ext + " files; the output is named " + P.baseName(output));
         }
         if (via === "media_encoder") {
-            P.requireFeature(app.encoder && typeof app.encoder.encodeSequence === "function", "Exporting through Media Encoder (app.encoder)",
+            P.requireFeature(app.encoder && Z.hasMethod(app.encoder, "encodeSequence"), "Exporting through Media Encoder (app.encoder)",
                 "2022 (22.0) on macOS");
-            if (typeof BridgeTalk !== "undefined" && BridgeTalk && typeof BridgeTalk.getStatus === "function") {
+            if (typeof BridgeTalk !== "undefined" && BridgeTalk && Z.hasMethod(BridgeTalk, "getStatus")) {
                 status = String(BridgeTalk.getStatus("ame"));
             }
             if (status === "ISNOTINSTALLED") {
@@ -342,7 +342,7 @@
 
     function isOffline(item) {
         try {
-            return typeof item.isOffline === "function" && item.isOffline() === true;
+            return Z.hasMethod(item, "isOffline") && item.isOffline() === true;
         } catch (error) {
             return false;
         }
