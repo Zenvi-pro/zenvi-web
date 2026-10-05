@@ -341,6 +341,33 @@
         return clip;
     }
 
+    /**
+     * What the Zenvi Link server needs to render a title image for
+     * premiere_add_text without `image` or `mogrt` (extension/server/titles.js):
+     * the target sequence's frame size and id, the project path (titles are
+     * saved next to it), and the TASTE numbers of the layout. A JSON string;
+     * {ok: false} without a project or sequence, so the tool call itself
+     * refuses with the reason.
+     */
+    P.titleFrame = function (argsJson) {
+        var args;
+        var sequence;
+        try {
+            args = argsJson ? JSON.parse(argsJson) : {};
+            sequence = P.findSequence(args.sequence === null ? undefined : args.sequence);
+        } catch (error) {
+            return Z.stringify({ok: false});
+        }
+        return Z.stringify({
+            ok: true,
+            width: sequence.frameSizeHorizontal,
+            height: sequence.frameSizeVertical,
+            sequence_id: sequence.sequenceID,
+            project: P.projectPath(),
+            taste: {type: TASTE.type, layout: TASTE.layout, color: {palette: TASTE.color.palette}}
+        });
+    };
+
     Z.register("premiere_add_text", function (args, ctx) {
         var text = Z.required(args, "text", "string");
         var sequence = P.findSequence(args.sequence);

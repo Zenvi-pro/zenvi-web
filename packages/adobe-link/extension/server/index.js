@@ -21,6 +21,7 @@ const path = require("path");
 const { createCepBridge } = require("./bridge");
 const { DiscoveryFile, linkDir } = require("./discovery");
 const { createLinkServer, scriptLiteral } = require("./server");
+const { createCanvasRenderer, createTitlePreparer } = require("./titles");
 
 const HOSTS = { AEFT: "aftereffects", PPRO: "premiere" };
 const PRODUCT = { aftereffects: "Adobe After Effects", premiere: "Adobe Premiere Pro" };
@@ -79,6 +80,8 @@ function serviceRunning() {
 /**
  * options: {cep | bridge, window?, mode?: "service" | "panel", extensionDir?, home?, linkDir?, pollMs?,
  *   touchIntervalMs?, busyAfterMs?, tempDir? (system temp folder), log?}
+ * With a window whose document can make a canvas, Premiere's premiere_add_text
+ * renders titles itself when given neither image nor mogrt (titles.js).
  * Resolves with {host, server, discovery, status(), stop()}.
  */
 async function boot(options) {
@@ -94,6 +97,8 @@ async function boot(options) {
   const appName = marketingName(host, appVersion);
   const discovery = new DiscoveryFile({ host: host, dir: options.linkDir || linkDir(options.home), minIntervalMs: options.touchIntervalMs, log: log });
   if (mode === "panel" && discovery.owner() === "other") throw serviceRunning();
+  const page = options.window && options.window.document;
+  const titleRenderer = host === "premiere" && page && typeof page.createElement === "function" ? createCanvasRenderer(page) : null;
   const server = createLinkServer({
     host: host,
     catalog: catalog,
@@ -101,6 +106,7 @@ async function boot(options) {
     log: log,
     busyAfterMs: options.busyAfterMs,
     tempDir: options.tempDir,
+    preparers: titleRenderer ? { premiere_add_text: createTitlePreparer({ renderer: titleRenderer }) } : {},
     onActivity: () => discovery.touch(),
   });
   const startedAt = new Date().toISOString();
@@ -122,6 +128,7 @@ async function boot(options) {
       started_at: startedAt,
       tools: catalog.tools.length,
       host_script: hostScript,
+      title_renderer: Boolean(titleRenderer),
       discovery: { file: discovery.file, problem: discovery.problem },
       token_file: discovery.tokenFile,
       recent: server.recentCalls(),

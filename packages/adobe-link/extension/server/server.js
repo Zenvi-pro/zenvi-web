@@ -161,8 +161,12 @@ async function readHead(file, length) {
  * options: {
  *   host: "aftereffects" | "premiere", catalog: {version, tools}, bridge: {evalScript(script) -> Promise<string>},
  *   appName?, appVersion?, token?, busyAfterMs?, tempDir? (system temp), imageLimit?, bodyLimit?,
- *   log?(line), onActivity?()
+ *   log?(line), onActivity?(),
+ *   preparers?: {[tool]: async ({args, evalScript, tempDir}) -> null | {args?, warnings?, data?}}
  * }
+ * A preparer runs inside the call's queue slot before the dispatch: it may ask
+ * the host (evalScript), replace the arguments, and add warnings and data to
+ * a successful receipt (premiere_add_text's title renderer, titles.js).
  */
 function createLinkServer(options) {
   const host = options.host;
@@ -177,6 +181,7 @@ function createLinkServer(options) {
   const bodyLimit = options.bodyLimit || BODY_LIMIT;
   const log = options.log || (() => undefined);
   const onActivity = options.onActivity || (() => undefined);
+  const preparers = options.preparers || {};
   const tools = new Map(catalog.tools.map((tool) => [tool.name, tool]));
   const queue = new CallQueue({ busyAfterMs: options.busyAfterMs });
   const events = new EventEmitter();
@@ -294,8 +299,26 @@ function createLinkServer(options) {
       if (!checked.ok) {
         receipt = failureReceipt(host, name, "refused", "INVALID_ARGUMENT", "Invalid arguments for " + name + ": " + checked.message);
       } else {
-        const outcome = await queue.run(name, tool.timeoutMs || DEFAULT_TIMEOUT_MS, () => bridge.evalScript(dispatchScript(name, checked.args)));
+        const prepare = preparers[name];
+        let extra = null;
+        // One queue slot for the whole call: nothing else runs between preparing and dispatching.
+        const outcome = await queue.run(name, tool.timeoutMs || DEFAULT_TIMEOUT_MS, async () => {
+          let callArgs = checked.args;
+          if (prepare) {
+            try {
+              extra = await prepare({ args: callArgs, evalScript: (script) => bridge.evalScript(script), tempDir: tempDir });
+            } catch (error) {
+              extra = { warnings: ["Could not prepare " + name + ": " + (error && error.message ? error.message : String(error))] };
+            }
+            if (extra && extra.args) callArgs = extra.args;
+          }
+          return bridge.evalScript(dispatchScript(name, callArgs));
+        });
         receipt = receiptFromOutcome(tool, outcome);
+        if (extra) {
+          if (extra.warnings && extra.warnings.length) receipt.warnings = extra.warnings.concat(receipt.warnings);
+          if (extra.data && receipt.status !== "refused" && receipt.status !== "error") Object.assign(receipt.data, extra.data);
+        }
         images = await takeImage(tool, receipt);
       }
     }

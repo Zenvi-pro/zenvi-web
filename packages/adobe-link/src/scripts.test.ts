@@ -57,6 +57,7 @@ describe("build-extension", () => {
       "server/server.js",
       "server/service.html",
       "server/service.js",
+      "server/titles.js",
     ]);
     const manifest = readFileSync(path.join(dir, "CSXS", "manifest.xml"), "utf8");
     expect(manifest).not.toContain("__VERSION__");

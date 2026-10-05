@@ -1067,7 +1067,7 @@
     {
       "name": "premiere_add_text",
       "title": "Add a title",
-      "description": "Add a title to the sequence on a free video track above the footage. Premiere's scripting API cannot type text into its own title templates, so the title comes from `image` (a transparent PNG, e.g. rendered by Zenvi: one with the frame's aspect fills the frame, a smaller graphic sits at `placement` inside title-safe) or from `mogrt` (an After Effects-authored Essential Graphics template whose text control is set to `text`, plus its size and colour controls when it exposes them). Defaults (TASTE §1, §4): `style` title 72 px at 1080p (headline 96, subtitle 44, lower-third 54, caption 42), colour #F7F7F5, placement inside title-safe, on screen for 1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). Without `image` or `mogrt` the call is refused with what to pass. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "description": "Add a title to the sequence on a free video track above the footage. Premiere's scripting API cannot type text into its own title templates. So without `image` or `mogrt`, Zenvi Link renders the title itself: a transparent PNG at the sequence size, drawn with the panel's canvas, placed inside title-safe, and saved next to the project in \"Zenvi Titles\". You can set `font`, `weight`, `color`, `stroke`, the soft `shadow` and a `box`. Lines break at your line breaks and at 32 characters, on word boundaries, never leaving one word alone. `image` places your own transparent PNG: one with the frame's aspect fills the frame, a smaller graphic sits at `placement`. `mogrt` uses an After Effects-authored Essential Graphics template, setting its text control to `text` plus its size and colour controls when it exposes them. Defaults (TASTE §1, §4): `style` title 72 px at 1080p (headline 96, subtitle 44, lower-third 54, caption 42), weight 700 (headline 800, subtitle and caption 500), colour #F7F7F5 with a soft shadow, on screen for 1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1154,6 +1154,109 @@
             "description": "A transparent PNG title: the frame's aspect fills the frame, a smaller graphic keeps its pixel size",
             "type": "string",
             "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "font": {
+            "description": "Rendered titles: font family; default Inter, then SF Pro Display, Helvetica Neue, Arial (TASTE §4)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "weight": {
+            "description": "Rendered titles: font weight; default 800 headline, 700 title and lower-third, 500 subtitle and caption",
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 900
+          },
+          "stroke": {
+            "description": "Rendered titles: an outline around the letters",
+            "type": "object",
+            "properties": {
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                    "description": "Hex colour #RRGGBB"
+                  },
+                  {
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "description": "[r, g, b], each 0–1"
+                  }
+                ],
+                "description": "Outline colour"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 200,
+                "description": "Outline width in pixels at the sequence size"
+              }
+            },
+            "required": [
+              "color",
+              "width"
+            ],
+            "additionalProperties": false
+          },
+          "shadow": {
+            "description": "Rendered titles: the soft drop shadow for contrast over video (TASTE §4: distance 0, softness 16 px at 1080p, 40 %); default true",
+            "type": "boolean"
+          },
+          "box": {
+            "description": "Rendered titles: a bar behind the text, for busy footage",
+            "type": "object",
+            "properties": {
+              "color": {
+                "description": "Bar colour; default ink #0B0B0F",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                    "description": "Hex colour #RRGGBB"
+                  },
+                  {
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "description": "[r, g, b], each 0–1"
+                  }
+                ]
+              },
+              "opacity": {
+                "description": "Bar opacity; default 0.45 (TASTE scrim 35-55 %)",
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "padding": {
+                "description": "Space around the text in pixels; default 0.4 x the font size",
+                "type": "number",
+                "minimum": 0,
+                "maximum": 500
+              }
+            },
+            "additionalProperties": false
+          },
+          "align": {
+            "description": "Rendered titles: line alignment; default left for lower-third and top-left, else center",
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ]
           },
           "sequence": {
             "type": "string",

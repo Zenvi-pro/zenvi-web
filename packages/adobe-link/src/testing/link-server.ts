@@ -34,6 +34,7 @@ export interface LinkServerOptions {
   bodyLimit?: number;
   log?: (line: string) => void;
   onActivity?: () => void;
+  preparers?: Record<string, TitlePreparer>;
 }
 
 export interface LinkServer {
@@ -156,4 +157,51 @@ export const bootModule = require("../../extension/server/index.js") as {
 export const bridgeModule = require("../../extension/server/bridge.js") as {
   createCepBridge(cep: unknown): Bridge & Record<string, (...args: never[]) => unknown>;
   fileUriToPath(uri: string): string;
+};
+
+export interface TitleLine {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+}
+
+export interface TitleLayout {
+  width: number;
+  height: number;
+  style: string;
+  placement: string;
+  align: "left" | "center" | "right";
+  weight: number;
+  family: string;
+  fontSize: number;
+  font: string;
+  tracking: number;
+  lines: TitleLine[];
+  fill: string;
+  stroke: { color: string; width: number } | null;
+  shadow: { color: string; blur: number; offset: number } | null;
+  box: { color: string; x: number; y: number; width: number; height: number } | null;
+  warnings: string[];
+}
+
+export interface TitleRenderer {
+  measure(font: string, text: string): number;
+  render(layout: TitleLayout): Buffer;
+}
+
+export type TitlePreparer = (call: {
+  args: Record<string, unknown>;
+  evalScript(script: string): Promise<string>;
+  tempDir: string;
+}) => Promise<null | { args?: Record<string, unknown>; warnings?: string[]; data?: Record<string, unknown> }>;
+
+export const titlesModule = require("../../extension/server/titles.js") as {
+  layoutTitle(spec: Record<string, unknown>, measure: (font: string, text: string) => number): TitleLayout;
+  drawTitle(canvas: unknown, layout: TitleLayout): void;
+  wrapLines(text: string, maxChars: number): string[];
+  cssColor(value: unknown, alpha?: number): string;
+  createCanvasRenderer(document: unknown): TitleRenderer;
+  createTitlePreparer(options: { renderer: TitleRenderer }): TitlePreparer;
+  titleFileName(text: string, layout: TitleLayout): string;
 };

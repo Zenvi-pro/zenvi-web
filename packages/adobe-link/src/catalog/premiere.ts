@@ -346,13 +346,15 @@ export const premiereAddText = defineHostTool({
   title: "Add a title",
   description:
     "Add a title to the sequence on a free video track above the footage. Premiere's scripting API cannot type text into " +
-    "its own title templates, so the title comes from `image` (a transparent PNG, e.g. rendered by Zenvi: one with the " +
-    "frame's aspect fills the frame, a smaller graphic sits at `placement` inside title-safe) or from `mogrt` (an After " +
-    "Effects-authored Essential Graphics template whose text control is set to " +
-    "`text`, plus its size and colour controls when it exposes them). Defaults (TASTE §1, §4): `style` title 72 px at 1080p " +
-    "(headline 96, subtitle 44, lower-third 54, caption 42), colour #F7F7F5, placement inside title-safe, on screen for " +
-    "1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). Without `image` or `mogrt` the call is " +
-    "refused with what to pass. " + UNDO,
+    "its own title templates. So without `image` or `mogrt`, Zenvi Link renders the title itself: a transparent PNG at " +
+    "the sequence size, drawn with the panel's canvas, placed inside title-safe, and saved next to the project in " +
+    "\"Zenvi Titles\". You can set `font`, `weight`, `color`, `stroke`, the soft `shadow` and a `box`. Lines break at " +
+    "your line breaks and at 32 characters, on word boundaries, never leaving one word alone. `image` places your own " +
+    "transparent PNG: one with the frame's aspect fills the frame, a smaller graphic sits at `placement`. `mogrt` uses an " +
+    "After Effects-authored Essential Graphics template, setting its text control to `text` plus its size and colour " +
+    "controls when it exposes them. Defaults (TASTE §1, §4): `style` title 72 px at 1080p (headline 96, subtitle 44, " +
+    "lower-third 54, caption 42), weight 700 (headline 800, subtitle and caption 500), colour #F7F7F5 with a soft " +
+    "shadow, on screen for 1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). " + UNDO,
   input: z.strictObject({
     text: z.string().min(1).max(500).describe("The words; keep lines under 32 characters and break on phrases (TASTE §4)"),
     style: z.enum(["headline", "title", "subtitle", "lower-third", "caption"]).default("title").describe("Type scale step"),
@@ -366,6 +368,22 @@ export const premiereAddText = defineHostTool({
     track: z.int().min(0).max(98).optional().describe("Video track index (0 = V1); default: the lowest track above V1 that is free for the whole duration"),
     mogrt: absolutePath.optional().describe("An After Effects-authored .mogrt with a text control"),
     image: absolutePath.optional().describe("A transparent PNG title: the frame's aspect fills the frame, a smaller graphic keeps its pixel size"),
+    font: z.string().min(1).max(200).optional().describe("Rendered titles: font family; default Inter, then SF Pro Display, Helvetica Neue, Arial (TASTE §4)"),
+    weight: z.int().min(100).max(900).optional().describe("Rendered titles: font weight; default 800 headline, 700 title and lower-third, 500 subtitle and caption"),
+    stroke: z
+      .strictObject({ color: color.describe("Outline colour"), width: z.number().min(0.5).max(200).describe("Outline width in pixels at the sequence size") })
+      .optional()
+      .describe("Rendered titles: an outline around the letters"),
+    shadow: z.boolean().optional().describe("Rendered titles: the soft drop shadow for contrast over video (TASTE §4: distance 0, softness 16 px at 1080p, 40 %); default true"),
+    box: z
+      .strictObject({
+        color: color.optional().describe("Bar colour; default ink #0B0B0F"),
+        opacity: z.number().min(0).max(1).optional().describe("Bar opacity; default 0.45 (TASTE scrim 35-55 %)"),
+        padding: z.number().min(0).max(500).optional().describe("Space around the text in pixels; default 0.4 x the font size"),
+      })
+      .optional()
+      .describe("Rendered titles: a bar behind the text, for busy footage"),
+    align: z.enum(["left", "center", "right"]).optional().describe("Rendered titles: line alignment; default left for lower-third and top-left, else center"),
     sequence: sequenceRef.optional(),
   }),
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
