@@ -191,13 +191,14 @@
     var context = {
       host: host,
       desktop: state.desktop,
-      callHostTool: function (name, args) {
-        return core.callTool(state.url, state.token, name, args);
+      // timeoutMs: renders take longer than callTool's default.
+      callHostTool: function (name, args, timeoutMs) {
+        return core.callTool(state.url, state.token, name, args, timeoutMs);
       },
-      callDesktopTool: function (name, args) {
+      callDesktopTool: function (name, args, timeoutMs) {
         var desktop = core.desktopStatus();
         if (!desktop.running || !desktop.url || !desktop.token) return Promise.reject(new Error("The Zenvi desktop app is not running."));
-        return core.callTool(desktop.url, desktop.token, name, args);
+        return core.callTool(desktop.url, desktop.token, name, args, timeoutMs);
       },
     };
     Promise.resolve()
