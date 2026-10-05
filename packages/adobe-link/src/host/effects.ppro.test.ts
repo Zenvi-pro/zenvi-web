@@ -53,7 +53,7 @@ describe("premiere_add_transition", () => {
     expect(receipt.status).toBe("applied");
     expect(receipt.summary).toBe('Added 1 transition (Cross Dissolve, 0.5 s) at the end of "a.mov"');
     expect(fx.mock.state.qeCalls).toContain("item.addTransition(Cross Dissolve, false, 00:00:00:15, 0, 0.5, false, true)");
-    expect(receipt.data.transitions).toEqual([{ name: "Cross Dissolve", start: 3.75, end: 4.25, duration: 0.5 }]);
+    expect(receipt.data.transitions).toEqual([{ edge: "end", name: "Cross Dissolve", start: 3.75, end: 4.25, duration: 0.5 }]);
     expect(TASTE.timing.crossDissolve.default).toBe(0.5);
   });
 
@@ -62,8 +62,8 @@ describe("premiere_add_transition", () => {
     const edit = standardEdit(fx);
     const receipt = fx.call("premiere_add_transition", { clip: edit.v.c.nodeId, at: "both", transition: "Dip to Black", duration: 1 });
     expect(receipt.data.transitions).toEqual([
-      { name: "Dip to Black", start: 8.5, end: 9.5, duration: 1 },
-      { name: "Dip to Black", start: 11, end: 12, duration: 1 },
+      { edge: "start", name: "Dip to Black", start: 8.5, end: 9.5, duration: 1 },
+      { edge: "end", name: "Dip to Black", start: 11, end: 12, duration: 1 },
     ]);
     expect(receipt.undoSteps).toBe(2);
   });
@@ -146,5 +146,73 @@ describe("premiere_apply_look", () => {
     expect(edit.v.b.componentList[2]?.param("Saturation").value).toBe(40);
     expect(fx.call("premiere_apply_look", { look: "clean", track: { kind: "audio", index: 0 } }).error?.code).toBe("INVALID_ARGUMENT");
     expect(fx.call("premiere_apply_look", { look: "clean", clips: [edit.audio.a.nodeId] }).error?.code).toBe("INVALID_ARGUMENT");
+  });
+});
+
+describe("review fixes: effects", () => {
+  test("a look refuses before grading anything when a clip still needs Lumetri and Premiere has none", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    fx.call("premiere_apply_effect", { clip: edit.v.a.nodeId, effect: "Lumetri Color" });
+    fx.mock.state.hiddenEffects.add("Lumetri Color");
+    const receipt = fx.call("premiere_apply_look", { look: "moody", clips: [edit.v.a.nodeId, edit.v.b.nodeId] });
+    expect(receipt).toMatchObject({ status: "refused", undoSteps: 0, error: { code: "NOT_FOUND" } });
+    expect(receipt.warnings).toEqual([]);
+    expect(edit.v.a.componentList[2]?.param("Contrast").value).toBe(0);
+  });
+
+  test("replacing a transition at the same span is found and reported", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    fx.call("premiere_add_transition", { clip: edit.v.a.nodeId });
+    const replaced = fx.call("premiere_add_transition", { clip: edit.v.a.nodeId, transition: "Dip to Black" });
+    expect(replaced.status).toBe("applied");
+    expect(replaced.data.transitions).toEqual([{ edge: "end", name: "Dip to Black", start: 3.75, end: 4.25, duration: 0.5 }]);
+    expect(edit.sequence.videoTrackList[0]?.transitionList.map((transition) => transition.name)).toEqual(["Dip to Black"]);
+    const again = fx.call("premiere_add_transition", { clip: edit.v.a.nodeId, transition: "Dip to Black" });
+    expect(again.status).toBe("applied");
+    expect(again.warnings).toContain("A Dip to Black of that length was already there; Premiere replaced it or left it as it was");
+  });
+
+  test("a transition left over under another name does not count as ours", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    edit.sequence.videoTrackList[0]?.addTransition("Film Dissolve", 3.75, 4.25);
+    fx.mock.state.qeTransitionArgs = 0;
+    const receipt = fx.call("premiere_add_transition", { clip: edit.v.a.nodeId });
+    expect(receipt).toMatchObject({ status: "error", error: { code: "HOST_ERROR" } });
+  });
+
+  test("another UI language: a Lumetri without English names stops the look before anything changes", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    fx.mock.state.localizedParams = true;
+    fx.call("premiere_apply_effect", { clip: edit.v.a.nodeId, effect: "Lumetri Color" });
+    const undoBefore = fx.mock.state.undoIndex;
+    const receipt = fx.call("premiere_apply_look", { look: "moody", clips: [edit.v.a.nodeId, edit.v.b.nodeId] });
+    expect(receipt).toMatchObject({ status: "error", undoSteps: 0, error: { code: "UNSUPPORTED" } });
+    expect(receipt.summary).toContain('found by their English names on "a.mov"');
+    expect(receipt.warnings).toEqual([]);
+    expect(fx.mock.state.undoIndex).toBe(undoBefore);
+    expect(edit.v.b.componentList).toHaveLength(2);
+  });
+
+  test("another UI language: Lumetri is added to the first clip only, and the receipt says it changed", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    fx.mock.state.localizedParams = true;
+    const receipt = fx.call("premiere_apply_look", { look: "clean", clips: [edit.v.a.nodeId, edit.v.b.nodeId] });
+    expect(receipt).toMatchObject({ status: "error", undoSteps: 1, error: { code: "UNSUPPORTED" } });
+    expect(receipt.warnings).toHaveLength(1);
+    expect(edit.v.a.componentList.map((component) => component.displayName)).toContain("Lumetri Color");
+    expect(edit.v.b.componentList).toHaveLength(2);
+  });
+
+  test("re-applying a tinting look onto an existing Lumetri says the tint strengthens", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    fx.call("premiere_apply_look", { look: "teal-orange", clips: [edit.v.a.nodeId] });
+    const again = fx.call("premiere_apply_look", { look: "teal-orange", clips: [edit.v.a.nodeId] });
+    expect(again.warnings[0]).toContain("re-applying teal-orange strengthens the tint");
   });
 });

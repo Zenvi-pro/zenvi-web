@@ -399,6 +399,7 @@
         var state = {fallbacks: 0};
         var steps = 0;
         var wanted = [];
+        var turnedOn = false;
         var existing;
         var i;
 
@@ -449,6 +450,7 @@
         }
         if (!P.isAnimated(param)) {
             param.setTimeVarying(true);
+            turnedOn = true;
             steps += 1;
         }
         Z.each(keys, function (key, n) {
@@ -463,9 +465,10 @@
             key.mode = setInterpolation(param, key.at, key.mode, state);
             steps += 1;
         });
-        if (replace && typeof param.getKeys === "function") {
-            // Turning animation on can leave a key at the playhead; with replace only ours remain
-            // (within half a frame, in case Premiere moved a key onto its own grid).
+        if ((replace || turnedOn) && typeof param.getKeys === "function") {
+            // Turning animation on can leave a key at the playhead: when this call turned it on (or
+            // replaces), only its own keys remain (within half a frame, in case Premiere moved a key onto
+            // its own grid).
             existing = param.getKeys() || [];
             for (i = 0; i < existing.length; i += 1) {
                 if (existing[i] && !isWanted(wanted, Number(existing[i].ticks), Number(sequence.timebase) / 2)) {

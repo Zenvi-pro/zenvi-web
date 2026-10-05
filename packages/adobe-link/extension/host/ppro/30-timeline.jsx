@@ -51,6 +51,10 @@
     }
 
     /** Set a project item's in/out marks (seconds, all media types = 4) in an order that keeps in < out. */
+    P.setMarks = function (item, inSeconds, outSeconds) {
+        return setMarks(item, inSeconds, outSeconds);
+    };
+
     function setMarks(item, inSeconds, outSeconds) {
         var currentOut = ticksOf(item.getOutPoint());
         var steps = 0;
@@ -272,6 +276,10 @@
             var start = Number(member.clip.start.ticks) + delta;
             var end = Number(member.clip.end.ticks) + delta;
             var blocking = P.overlapping(member.track, start, end, except);
+            if (start < -half) {
+                throw Z.refuse("INVALID_ARGUMENT", "Linked \"" + member.clip.name + "\" on " + P.trackLabel(member.kind, member.trackIndex) +
+                    " would start at " + Z.round(P.ticksToSeconds(start), 3) + " s, before the start of the sequence");
+            }
             if (blocking.length > 0) {
                 throw Z.refuse("INVALID_ARGUMENT", "Moving \"" + member.clip.name + "\" to " + Z.round(P.ticksToSeconds(start), 3) + " s on " +
                     P.trackLabel(member.kind, member.trackIndex) + " would overlap \"" + blocking[0].name + "\" (" +
@@ -289,9 +297,13 @@
         if (!after) {
             throw Z.fail("HOST_ERROR", "Clip \"" + clip.name + "\" is gone after the move");
         }
-        if (Math.abs(Number(after.clip.start.ticks) - (startTicks + delta)) >= half) {
-            ctx.warn("Premiere put the clip at " + P.sec(after.clip.start) + " s instead of " + Z.round(target, 4) + " s");
-        }
+        Z.each(originals, function (original) {
+            var now = P.refindClip(sequence, original.nodeId);
+            if (now && Math.abs(Number(now.clip.start.ticks) - (original.start + delta)) >= half) {
+                ctx.warn("Premiere put \"" + now.clip.name + "\" (" + P.trackLabel(now.kind, now.trackIndex) + ") at " + P.sec(now.clip.start) +
+                    " s instead of " + Z.round(P.ticksToSeconds(original.start + delta), 4) + " s");
+            }
+        });
         return Z.applied("Moved \"" + clip.name + "\" from " + Z.round(P.ticksToSeconds(startTicks), 4) + " s to " +
             P.sec(after.clip.start) + " s" + (members.length > 1 ? " with its linked " + (members.length === 2 ? "clip" : "clips") : ""), {
             clip: P.clipDetail(sequence, after.clip, after.kind, after.trackIndex, false),
@@ -421,8 +433,9 @@
         Z.each(changing, function (member) {
             member.clip.disabled = !enable;
         });
-        return Z.applied((enable ? "Enabled" : "Disabled") + " \"" + found.clip.name + "\"" +
-            (changing.length > 1 ? " and " + Z.plural(changing.length - 1, "linked clip") : ""), {
+        return Z.applied((enable ? "Enabled " : "Disabled ") + Z.map(changing, function (member) {
+            return "\"" + member.clip.name + "\" (" + P.trackLabel(member.kind, member.trackIndex) + ")";
+        }).join(", "), {
             clips: Z.map(changing, function (member) { return member.clip.nodeId; }),
             enabled: enable
         }, changing.length);
@@ -516,6 +529,9 @@
         var rippled = [];
         var tracksTouched = {};
         var half = Number(sequence.timebase) / 2;
+        var shift;
+        var uneven = false;
+        var plan = [];
         requireAllUnlocked(members);
         Z.each(members, function (member) {
             removed.push({
@@ -541,31 +557,50 @@
             }
         });
         if (ripple) {
+            // One shift for every track, the smallest gap: linked clips with different extents (a J or L
+            // cut) stay in sync, and no track's later clips can run into what is before its gap.
+            shift = null;
+            Z.each(removed, function (entry) {
+                shift = shift === null ? entry.end - entry.start : Math.min(shift, entry.end - entry.start);
+            });
+            Z.each(removed, function (entry) {
+                if (entry.end - entry.start - shift >= half) {
+                    uneven = true;
+                }
+            });
+            // Every touched track's later clips, with their starts, before anything moves: Premiere may
+            // drag a linked partner along, and shiftClip then sees it is already in place.
             Z.each(removed, function (entry) {
                 var key = entry.track.kind + entry.track.index;
-                var gap = entry.end - entry.start;
-                var later;
-                var moved = 0;
                 if (Z.has(tracksTouched, key)) {
                     return;
                 }
                 tracksTouched[key] = true;
-                later = Z.filter(P.clipsOf(P.tracksOf(sequence, entry.track.kind)[entry.track.index]), function (clip) {
-                    return Number(clip.start.ticks) >= entry.end - half;
+                plan.push({
+                    track: entry.track,
+                    later: Z.map(Z.filter(P.clipsOf(P.tracksOf(sequence, entry.track.kind)[entry.track.index]), function (clip) {
+                        return Number(clip.start.ticks) >= entry.end - half;
+                    }), function (clip) {
+                        return {nodeId: clip.nodeId, start: Number(clip.start.ticks)};
+                    })
                 });
-                later = Z.map(later, function (clip) {
-                    return {nodeId: clip.nodeId, start: Number(clip.start.ticks)};
-                });
-                Z.each(later, function (clip) {
-                    if (shiftClip(sequence, clip.nodeId, clip.start, -gap)) {
+            });
+            Z.each(plan, function (entry) {
+                var moved = 0;
+                Z.each(entry.later, function (clip) {
+                    if (shiftClip(sequence, clip.nodeId, clip.start, -shift)) {
                         moved += 1;
                         steps += 1;
                     }
                 });
-                rippled.push({track: entry.track, closed: Z.round(P.ticksToSeconds(gap), 4), moved: moved});
+                rippled.push({track: entry.track, closed: Z.round(P.ticksToSeconds(shift), 4), moved: moved});
             });
             ctx.warn("Ripple closed the gap on " + Z.map(rippled, function (r) { return P.trackLabel(r.track.kind, r.track.index); }).join(", ") +
                 " only; clips on other tracks did not move (Premiere's sync lock is not scriptable)");
+            if (uneven) {
+                ctx.warn("The linked clips had different lengths (a J or L cut); every track closed " +
+                    Z.round(P.ticksToSeconds(shift), 4) + " s to keep them in sync, leaving the rest of the longer gap");
+            }
         }
         Z.each(removed, function (entry) {
             entry.start = Z.round(P.ticksToSeconds(entry.start), 4);
@@ -611,6 +646,7 @@
         var half = Number(sequence.timebase) / 2;
         var refs = Z.optional(args, "tracks", "array", null);
         var targets = [];
+        var seen = {};
         var cuts = [];
         var qeSequence;
         var timecode;
@@ -632,7 +668,12 @@
         if (refs !== null) {
             Z.each(refs, function (ref) {
                 var track = P.findTrack(sequence, ref);
+                var key = ref.kind + ref.index;
                 P.requireUnlocked(track, ref.kind, ref.index);
+                if (Z.has(seen, key)) {
+                    return;
+                }
+                seen[key] = true;
                 if (clipAt(track)) {
                     targets.push({kind: ref.kind, index: ref.index});
                 } else {

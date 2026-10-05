@@ -170,3 +170,19 @@ describe("premiere_add_marker", () => {
     expect(fx.call("premiere_add_marker", { color: "pink" }).error?.code).toBe("INVALID_ARGUMENT");
   });
 });
+
+describe("review fixes: create_sequence", () => {
+  test("open: false puts the previous sequence back and reports the new one as not active", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    fakeInstall(fx, { sequencePresets: { "Digital SLR/1080p/DSLR 1080p30.sqpreset": "1920 1080 30" } });
+    const receipt = fx.call("premiere_create_sequence", { name: "Side", open: false });
+    expect(receipt).toMatchObject({ status: "applied", data: { sequence: { name: "Side" }, active: false } });
+    expect(receipt.summary).not.toContain("active sequence");
+    expect(fx.mock.project.activeSequence).toBe(edit.sequence);
+    const opened = fx.call("premiere_create_sequence", { name: "Next" });
+    expect(opened.data.active).toBe(true);
+    expect(opened.summary).toContain(", now the active sequence");
+    expect(fx.mock.project.activeSequence?.name).toBe("Next");
+  });
+});

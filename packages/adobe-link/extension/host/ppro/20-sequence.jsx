@@ -303,6 +303,8 @@
         var preset = null;
         var steps = 0;
         var how;
+        var previous = P.activeSequence();
+        var active;
 
         P.requireProject();
         if (fromClips !== null) {
@@ -362,15 +364,19 @@
         }
         if (open) {
             P.openSequence(sequence);
+        } else if (previous && P.activeSequence() && P.activeSequence().sequenceID === sequence.sequenceID) {
+            // Creating a sequence opens it; open: false puts the previous one back.
+            P.openSequence(previous);
         }
+        active = P.activeSequence() !== null && P.activeSequence().sequenceID === sequence.sequenceID;
         return Z.applied("Created sequence \"" + sequence.name + "\" (" + sequence.frameSizeHorizontal + "x" +
             sequence.frameSizeVertical + ", " + Z.round(P.fps(sequence), 3) + " fps) " + how +
-            (open ? " and opened it" : ""), {
+            (active ? ", now the active sequence" : ""), {
             sequence: P.sequenceSummary(sequence),
             preset: items ? null : presetName,
             base_preset: preset ? preset.fsName : null,
             created_bins: created,
-            active: open
+            active: active
         }, steps);
     });
 

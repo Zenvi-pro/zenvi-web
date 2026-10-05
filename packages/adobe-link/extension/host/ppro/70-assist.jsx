@@ -119,6 +119,7 @@
         var previous;
         var beforeClips;
         var beforeMarkers = [];
+        var seenItems = {};
         var newClips = 0;
         var newMarkers = 0;
         var afterClips;
@@ -156,8 +157,12 @@
 
         previous = selectedIds(sequence);
         beforeClips = P.clipIds(sequence);
+        // Clips can share a source item (both halves after a razor): count each item's markers once.
         Z.each(targets, function (clip) {
-            beforeMarkers.push({item: clip.projectItem, count: markerCount(clip.projectItem)});
+            if (clip.projectItem && !Z.has(seenItems, clip.projectItem.nodeId)) {
+                seenItems[clip.projectItem.nodeId] = true;
+                beforeMarkers.push({item: clip.projectItem, count: markerCount(clip.projectItem)});
+            }
         });
         ctx.changed();
         try {

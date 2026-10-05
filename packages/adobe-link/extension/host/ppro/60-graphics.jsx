@@ -121,7 +121,8 @@
         var i;
         var value;
         for (i = 0; i < params.length; i += 1) {
-            if (/text/i.test(String(params[i].displayName))) {
+            // A string control named like text ("Source Text", "Name Text"), not "Text Size" or "Text Color".
+            if (/text/i.test(String(params[i].displayName)) && typeof P.valueOf(params[i]) === "string") {
                 return params[i];
             }
         }
@@ -134,6 +135,34 @@
         return null;
     }
 
+    /** "nodeId:start-end" of the clips on a track (except nodeIds in `except`), to detect collateral edits. */
+    function trackSnapshot(track, except) {
+        return Z.map(Z.filter(P.clipsOf(track), function (clip) {
+            return !Z.has(except, clip.nodeId);
+        }), function (clip) {
+            return clip.nodeId + ":" + clip.start.ticks + "-" + clip.end.ticks;
+        }).join(",");
+    }
+
+    /** Fail loudly when placing the title changed any clip that was already on the track. */
+    function requireNeighboursUntouched(sequence, trackIndex, before, beforeIds) {
+        var after = trackSnapshot(sequence.videoTracks[trackIndex], P.newIds(sequence, beforeIds));
+        if (after !== before) {
+            throw Z.fail("HOST_ERROR", "Placing the title changed other clips on V" + (trackIndex + 1) + "; undo the call's steps in Premiere");
+        }
+    }
+
+    /** nodeIds in the sequence that were not in `beforeIds`, as a map. */
+    P.newIds = function (sequence, beforeIds) {
+        var ids = {};
+        Z.each(Object.keys(P.clipIds(sequence)), function (id) {
+            if (!Z.has(beforeIds, id)) {
+                ids[id] = true;
+            }
+        });
+        return ids;
+    };
+
     function placeMogrt(sequence, path, trackIndex, startTicks, endTicks, text, size, rgb, ctx, result) {
         var clip;
         var mgt;
@@ -142,6 +171,8 @@
         var colorParam = null;
         var params;
         var i;
+        var beforeIds = P.clipIds(sequence);
+        var before = trackSnapshot(sequence.videoTracks[trackIndex], {});
         P.requireFeature(typeof sequence.importMGT === "function", "Sequence.importMGT", "2019 (13.0)");
         ctx.changed();
         clip = sequence.importMGT(path, String(startTicks), trackIndex, 0);
@@ -149,6 +180,7 @@
             throw Z.fail("HOST_ERROR", "Premiere did not insert the template " + path);
         }
         result.steps += 1;
+        requireNeighboursUntouched(sequence, trackIndex, before, beforeIds);
         mgt = typeof clip.getMGTComponent === "function" ? clip.getMGTComponent() : null;
         textParam = mgt ? textParamOf(mgt) : null;
         if (!textParam) {
@@ -269,6 +301,9 @@
         var file = P.itemForFile(path, ctx);
         var track = sequence.videoTracks[trackIndex];
         var before = P.clipIds(sequence);
+        var neighbours = trackSnapshot(track, {});
+        var origIn = String(file.item.getInPoint().ticks);
+        var origOut = String(file.item.getOutPoint().ticks);
         /** @type {TrackItem | null} */
         var clip = null;
         var half = Number(sequence.timebase) / 2;
@@ -276,8 +311,20 @@
             result.steps += 1;
         }
         ctx.changed();
-        track.overwriteClip(file.item, P.ticksToSeconds(startTicks));
-        result.steps += 1;
+        // A still lays down its marked range (by default Premiere's still duration), so mark exactly the
+        // title's length first: overwriting more would cut into the next clip on the track.
+        result.steps += P.setMarks(file.item, 0, P.ticksToSeconds(endTicks - startTicks));
+        try {
+            track.overwriteClip(file.item, P.ticksToSeconds(startTicks));
+            result.steps += 1;
+        } finally {
+            try {
+                result.steps += P.setMarks(file.item, P.ticksToSeconds(origIn), P.ticksToSeconds(origOut));
+            } catch (restoreError) {
+                ctx.warn("Could not restore the in/out marks of " + P.baseName(path));
+            }
+        }
+        requireNeighboursUntouched(sequence, trackIndex, neighbours, before);
         Z.each(P.clipsOf(sequence.videoTracks[trackIndex]), function (candidate) {
             if (!Z.has(before, candidate.nodeId) && Math.abs(Number(candidate.start.ticks) - startTicks) < half) {
                 clip = candidate;
@@ -314,6 +361,8 @@
         var clip;
         var longLines;
         var start;
+        var freeUntil;
+        var actual;
 
         if (text.trim().length === 0) {
             throw Z.refuse("INVALID_ARGUMENT", "`text` must not be blank");
@@ -348,18 +397,24 @@
             ctx.warn(Z.plural(longLines.length, "line") + " longer than " + TASTE.type.maxLineChars + " characters; break on phrases (TASTE 4)");
         }
 
+        // A template is laid down at its own length before it is trimmed, so its track must be free
+        // from the title's start onward; an image is marked to the title's length first.
+        freeUntil = mogrt !== null ? Infinity : endTicks;
         if (trackIndex === null) {
-            trackIndex = P.freeVideoTrack(sequence, startTicks, endTicks, 1);
+            trackIndex = P.freeVideoTrack(sequence, startTicks, freeUntil, 1);
             if (trackIndex < 0) {
-                throw Z.refuse("INVALID_ARGUMENT", "No video track above V1 is free from " + Z.round(start, 3) + " to " +
-                    Z.round(P.ticksToSeconds(endTicks), 3) + " s; add a track in Premiere or pass `track`");
+                throw Z.refuse("INVALID_ARGUMENT", "No video track above V1 is free from " + Z.round(start, 3) + " " +
+                    (mogrt !== null ? "onward (a template needs room for its own length)" : "to " + Z.round(P.ticksToSeconds(endTicks), 3) + " s") +
+                    "; add a track in Premiere or pass `track`");
             }
         } else {
             P.findTrack(sequence, {kind: "video", index: trackIndex});
             P.requireUnlocked(sequence.videoTracks[trackIndex], "video", trackIndex);
-            if (P.overlapping(sequence.videoTracks[trackIndex], startTicks, endTicks, {}).length > 0) {
-                throw Z.refuse("INVALID_ARGUMENT", "Track V" + (trackIndex + 1) + " already has a clip between " + Z.round(start, 3) + " and " +
-                    Z.round(P.ticksToSeconds(endTicks), 3) + " s; pick a free track (or omit `track`)");
+            if (P.overlapping(sequence.videoTracks[trackIndex], startTicks, freeUntil, {}).length > 0) {
+                throw Z.refuse("INVALID_ARGUMENT", "Track V" + (trackIndex + 1) + " already has a clip " +
+                    (mogrt !== null ? "after " + Z.round(start, 3) + " s (a template needs room for its own length)" :
+                        "between " + Z.round(start, 3) + " and " + Z.round(P.ticksToSeconds(endTicks), 3) + " s") +
+                    "; pick a free track (or omit `track`)");
             }
         }
 
@@ -368,8 +423,13 @@
         } else {
             clip = placeImage(sequence, image, trackIndex, startTicks, endTicks, placement, ctx, result);
         }
+        actual = P.timeToSeconds(clip.end) - P.timeToSeconds(clip.start);
+        if (Math.abs(actual * P.TICKS_PER_SECOND - (endTicks - startTicks)) >= Number(sequence.timebase) / 2) {
+            ctx.warn("The title runs " + Z.round(actual, 3) + " s, not " + Z.round(P.ticksToSeconds(endTicks - startTicks), 3) +
+                " s (the " + (mogrt !== null ? "template" : "image") + " is shorter)");
+        }
         return Z.applied("Added the title \"" + (text.length > 40 ? text.slice(0, 37) + "..." : text) + "\" on V" + (trackIndex + 1) + " at " +
-            Z.round(start, 3) + " s for " + Z.round(P.ticksToSeconds(endTicks - startTicks), 3) + " s (" + (mogrt !== null ? "template" : "image") + ")", {
+            Z.round(start, 3) + " s for " + Z.round(actual, 3) + " s (" + (mogrt !== null ? "template" : "image") + ")", {
             clip: P.clipDetail(sequence, clip, "video", trackIndex, false),
             source: mogrt !== null ? "mogrt" : "image",
             text: text,

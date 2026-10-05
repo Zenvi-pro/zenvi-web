@@ -15,6 +15,10 @@ export interface ComponentHost {
   readonly link: RealmLink;
   /** Throw on setInterpolationTypeAtKey with the legacy ease modes 1-3 (to test the Bezier fallback). */
   rejectLegacyEase: boolean;
+  /** setTimeVarying(true) leaves a key at time 0. */
+  keyOnAnimate: boolean;
+  /** Effects added from now on get non-English parameter names (as on a German UI). */
+  localizedParams: boolean;
   undoable(label: string): void;
 }
 
@@ -75,8 +79,10 @@ export class MockParam {
 
   setTimeVarying(on: boolean, _updateUI?: boolean): boolean {
     this.calls.push(`setTimeVarying(${on})`);
+    const turningOn = Boolean(on) && !this.timeVarying;
     this.timeVarying = Boolean(on);
     if (!on) this.keys.clear();
+    if (turningOn && this.host.keyOnAnimate) this.keys.set(0, { value: this.value, interpolation: 0 });
     this.host.undoable(`setTimeVarying ${this.displayName}`);
     return true;
   }
@@ -318,6 +324,7 @@ export function createEffect(host: ComponentHost, name: string): MockComponent {
   const component = new MockComponent(host, name, spec.matchName, spec.params);
   for (const param of component.params) {
     if (param.displayName === "Shadow Tint" || param.displayName === "Highlight Tint") param.color = [255, 128, 128, 128];
+    if (host.localizedParams) param.displayName = `${param.displayName} (de)`;
   }
   return component;
 }

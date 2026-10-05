@@ -69,3 +69,17 @@ describe("premiere_scene_detect", () => {
     expect(fx.call("premiere_scene_detect", { track: { kind: "video", index: 2 } }).summary).toContain("has no clips");
   });
 });
+
+describe("review fixes: scene_detect", () => {
+  test("two halves of one source item count that item's new markers once", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    expect(fx.call("premiere_razor", { time: 6, tracks: [{ kind: "video", index: 0 }] }).status).toBe("applied");
+    const halves = edit.sequence.videoTrackList[0]?.clipList.filter((clip) => clip.projectItem === edit.items.b) ?? [];
+    expect(halves).toHaveLength(2);
+    const receipt = fx.call("premiere_scene_detect", { clips: halves.map((clip) => clip.nodeId), action: "markers" });
+    expect(receipt.status).toBe("applied");
+    expect(edit.items.b.markers.numMarkers).toBe(2);
+    expect(receipt.data).toMatchObject({ new_markers: 2, new_clips: 0 });
+  });
+});

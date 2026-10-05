@@ -214,3 +214,23 @@ describe("premiere_animate", () => {
     expect(fx.call("premiere_animate", { clip: edit.v.b.nodeId, property: "volume", keyframes: keys(0, 1) }).summary).toContain("Volume applies to audio clips");
   });
 });
+
+describe("review fixes: keyframes", () => {
+  test("a key Premiere leaves when animation is turned on is removed even with replace: false", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    fx.mock.state.keyOnAnimate = true;
+    fx.call("premiere_animate", { clip: edit.v.b.nodeId, property: "opacity", replace: false, keyframes: [{ time: 0, value: 0 }, { time: 0.6, value: 100 }] });
+    expect(edit.v.b.componentList[0]?.param("Opacity").keyList().map((key) => key.seconds)).toEqual([1, 1.6]);
+  });
+
+  test("replace: false keeps the keys that were already there", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    const opacity = edit.v.b.componentList[0]?.param("Opacity");
+    opacity?.setTimeVarying(true);
+    opacity?.addKey(3);
+    fx.call("premiere_animate", { clip: edit.v.b.nodeId, property: "opacity", replace: false, keyframes: [{ time: 0, value: 0 }, { time: 0.6, value: 100 }] });
+    expect(opacity?.keyList().map((key) => key.seconds)).toEqual([1, 1.6, 3]);
+  });
+});

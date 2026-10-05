@@ -98,6 +98,10 @@ export function createQe(mock: PremiereMockState, app: PremiereApp): Record<stri
           (other) => other !== clip && Math.abs(Number(atStart ? other.end.ticks : other.start.ticks) - edge) < frame / 2,
         );
         const start = neighbour ? edge - length / 2 : atStart ? edge : edge - length;
+        // A transition already at this edge is replaced, as in Premiere.
+        for (const existing of [...track.transitionList]) {
+          if (Number(existing.start.ticks) <= edge && Number(existing.end.ticks) >= edge) track.transitionList.splice(track.transitionList.indexOf(existing), 1);
+        }
         track.addTransition(transition.name, start / TICKS_PER_SECOND, (start + length) / TICKS_PER_SECOND);
         mock.undoable(`addTransition ${transition.name}`);
         return true;
@@ -153,7 +157,7 @@ export function createQe(mock: PremiereMockState, app: PremiereApp): Record<stri
 
   function sequenceObject(sequence: Sequence): Record<string, unknown> {
     const object: Record<string, unknown> = {
-      guid: sequence.sequenceID,
+      guid: sequence.sequenceID + mock.qeGuidSuffix,
       name: sequence.name,
       get numVideoTracks(): number {
         return sequence.videoTrackList.length;
@@ -205,7 +209,7 @@ export function createQe(mock: PremiereMockState, app: PremiereApp): Record<stri
       },
       getVideoEffectByName(name: string): unknown {
         record(`project.getVideoEffectByName(${name})`);
-        return EFFECTS[name]?.kind === "video" ? named("effect", "video", name) : null;
+        return EFFECTS[name]?.kind === "video" && !mock.hiddenEffects.has(name) ? named("effect", "video", name) : null;
       },
       getAudioEffectByName(name: string): unknown {
         record(`project.getAudioEffectByName(${name})`);

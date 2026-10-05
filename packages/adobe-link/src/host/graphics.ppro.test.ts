@@ -144,3 +144,79 @@ describe("premiere_add_captions", () => {
     expect(old.summary).toContain("needs Premiere Pro 2021 (15.0) or later");
   });
 });
+
+describe("premiere_add_text leaves the rest of the track alone", () => {
+  test("an image is marked to the title's length before it is laid down, so the next clip keeps its span", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    const next = edit.sequence.videoTrackList[1]?.addClip(edit.items.c, 5, 8);
+    const png = fx.file("title.png", pngHead(1920, 1080));
+    const receipt = fx.call("premiere_add_text", { text: "Launch day", image: png, time: 1, track: 1 });
+    expect(receipt.status).toBe("applied");
+    expect(next?.span).toMatchObject({ start: 5, end: 8 });
+    expect(edit.sequence.videoTrackList[1]?.clipList.map((clip) => [clip.name, clip.span.start, clip.span.end])).toEqual([
+      ["title.png", 1, 4],
+      ["c.mov", 5, 8],
+    ]);
+    const item = fx.mock.project.findByMediaPath(png);
+    expect(item?.markCalls).toEqual(["in=0@4", "out=3@4", "in=0@4", "out=5@4"]);
+  });
+
+  test("a template needs a track that is free from its start onward", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    const mogrt = fx.file("Lower Third.mogrt");
+    fx.mock.state.mogrts.set(mogrt, { duration: 10, params: [["Name Text", "Name"]] });
+    const later = edit.sequence.videoTrackList[1]?.addClip(edit.items.c, 6, 9);
+    const auto = fx.call("premiere_add_text", { text: "Ada", style: "lower-third", mogrt, time: 0 });
+    expect(auto.status).toBe("applied");
+    expect((auto.data.clip as { track: { index: number } }).track.index).toBe(2);
+    expect(later?.span).toMatchObject({ start: 6, end: 9 });
+    const fx2 = loadPremiere();
+    const edit2 = standardEdit(fx2);
+    fx2.mock.state.mogrts.set(mogrt, { duration: 10, params: [["Name Text", "Name"]] });
+    edit2.sequence.videoTrackList[1]?.addClip(edit2.items.c, 6, 9);
+    const explicit = fx2.call("premiere_add_text", { text: "Ada", mogrt, time: 0, track: 1 });
+    expect(explicit.summary).toContain("already has a clip after 0 s (a template needs room for its own length)");
+  });
+
+  test("if Premiere still changes a neighbour the call fails loudly", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    const track = edit.sequence.videoTrackList[1];
+    track?.addClip(edit.items.c, 5, 8);
+    if (track) {
+      const overwrite = track.overwriteClip.bind(track);
+      track.overwriteClip = (item, time) => {
+        const placed = overwrite(item, time);
+        track.clearRange(5 * 254016000000, 6 * 254016000000);
+        return placed;
+      };
+    }
+    const receipt = fx.call("premiere_add_text", { text: "Hi", image: fx.file("t.png", pngHead(1920, 1080)), time: 1, track: 1 });
+    expect(receipt).toMatchObject({ status: "error", error: { code: "HOST_ERROR" } });
+    expect(receipt.summary).toContain("changed other clips on V2");
+  });
+
+  test("the template's string text control is used, not a control merely named like text", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    const mogrt = fx.file("Card.mogrt");
+    fx.mock.state.mogrts.set(mogrt, { duration: 10, params: [["Text Size", 60], ["Title", "Title"]] });
+    const receipt = fx.call("premiere_add_text", { text: "Ada Lovelace", mogrt, time: 0 });
+    expect(receipt.status).toBe("applied");
+    const clip = edit.sequence.videoTrackList[1]?.clipList[0];
+    expect(clip?.mgt?.param("Title").value).toBe("Ada Lovelace");
+    expect(clip?.mgt?.param("Text Size").value).toBe(72);
+  });
+
+  test("the receipt reports how long the title really runs", () => {
+    const fx = loadPremiere();
+    standardEdit(fx);
+    const mogrt = fx.file("Short.mogrt");
+    fx.mock.state.mogrts.set(mogrt, { duration: 2, params: [["Source Text", "x"]] });
+    const receipt = fx.call("premiere_add_text", { text: "Hello", mogrt, time: 0, duration: 4 });
+    expect(receipt.summary).toContain("for 2 s (template)");
+    expect(receipt.warnings).toContain("The title runs 2 s, not 4 s (the template is shorter)");
+  });
+});

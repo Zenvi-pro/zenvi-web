@@ -85,8 +85,8 @@
     }
 
     /** Add a QE effect to a clip; returns the new component (the last one) or fails. */
-    P.addEffect = function (found, effect, effectName, ctx) {
-        var qeItem = qeItemFor(found, ctx);
+    P.addEffect = function (found, effect, effectName, ctx, resolvedItem) {
+        var qeItem = resolvedItem || qeItemFor(found, ctx);
         var before = P.componentsOf(found.clip).length;
         var again;
         var components;
@@ -182,14 +182,20 @@
 
     var DEFAULT_TRANSITION = {video: "Cross Dissolve", audio: "Constant Power"};
 
-    function transitionKeys(track) {
-        var keys = {};
+    /** The transitions of a track: [{name, start, end (ticks), key}]. */
+    function transitionsOf(track) {
         var list = track.transitions;
+        var out = [];
         var i;
         for (i = 0; list && i < list.numItems; i += 1) {
-            keys[String(list[i].start.ticks) + "-" + String(list[i].end.ticks)] = true;
+            out.push({
+                name: String(list[i].name || ""),
+                start: Number(list[i].start.ticks),
+                end: Number(list[i].end.ticks),
+                key: String(list[i].name || "") + "@" + String(list[i].start.ticks) + "-" + String(list[i].end.ticks)
+            });
         }
-        return keys;
+        return out;
     }
 
     /**
@@ -236,11 +242,11 @@
         var edges = at === "both" ? ["start", "end"] : [at];
         var transition;
         var qeItem;
-        var before;
+        var before = {};
         var added = [];
+        var missing = [];
+        var replaced = 0;
         var list;
-        var i;
-        var key;
         var half = Number(sequence.timebase) / 2;
 
         if (duration <= 0) {
@@ -256,25 +262,49 @@
         P.requireUnlocked(found.track, found.kind, found.trackIndex);
         transition = qeByName(found.kind, "transition", name);
         qeItem = qeItemFor(found, ctx);
-        before = transitionKeys(found.track);
+        Z.each(transitionsOf(found.track), function (entry) {
+            before[entry.key] = true;
+        });
         ctx.changed();
         Z.each(edges, function (edge) {
             addTransitionAt(qeItem, transition, edge === "start", P.timecode(sequence, snapped), ctx);
         });
-        list = P.tracksOf(sequence, found.kind)[found.trackIndex].transitions;
-        for (i = 0; list && i < list.numItems; i += 1) {
-            key = String(list[i].start.ticks) + "-" + String(list[i].end.ticks);
-            if (!Z.has(before, key)) {
-                added.push({
-                    name: String(list[i].name || name),
-                    start: P.sec(list[i].start),
-                    end: P.sec(list[i].end),
-                    duration: Z.round(P.timeToSeconds(list[i].end) - P.timeToSeconds(list[i].start), 4)
-                });
+        // Each requested edge must now be covered by a transition with that name (an unnamed one counts): a
+        // transition replaced at the same span is found too, and one left over from before with another
+        // name is not mistaken for ours.
+        list = transitionsOf(P.tracksOf(sequence, found.kind)[found.trackIndex]);
+        Z.each(edges, function (edge) {
+            var at = Number(edge === "start" ? clip.start.ticks : clip.end.ticks);
+            /** @type {{name: string, start: number, end: number, key: string} | null} */
+            var match = null;
+            Z.each(list, function (entry) {
+                if (!match && entry.start - half <= at && entry.end + half >= at && (!entry.name || entry.name.toLowerCase() === name.toLowerCase())) {
+                    match = entry;
+                }
+            });
+            if (!match) {
+                missing.push(edge);
+                return;
             }
-        }
+            if (Z.has(before, match.key)) {
+                replaced += 1;
+            }
+            added.push({
+                edge: edge,
+                name: match.name || name,
+                start: Z.round(P.ticksToSeconds(match.start), 4),
+                end: Z.round(P.ticksToSeconds(match.end), 4),
+                duration: Z.round(P.ticksToSeconds(match.end - match.start), 4)
+            });
+        });
         if (added.length === 0) {
             throw Z.fail("HOST_ERROR", "Premiere did not add the " + name + " transition (QE addTransition returned without one)");
+        }
+        if (missing.length > 0) {
+            ctx.warn("Premiere added no transition at the " + missing.join(" and ") + " of \"" + clip.name + "\"");
+        }
+        if (replaced > 0) {
+            ctx.warn("A " + name + " of that length was already there; Premiere replaced it or left it as it was");
         }
         Z.each(added, function (entry) {
             if (Math.abs(entry.duration - snapped) * P.TICKS_PER_SECOND > half) {
@@ -417,30 +447,38 @@
         var strength = Z.inRange("strength", Z.optional(args, "strength", "number", TASTE.color.lookStrength), 0, 1);
         var targets = lookTargets(args, ctx);
         var settings = P.lookSettings(look, strength);
+        var hasTints = Z.filter(settings, function (setting) { return Boolean(setting.tint); }).length > 0;
         var graded = [];
         var steps = 0;
         var lumetriEffect = null;
-        var missingEverywhere = true;
+        var anySet = false;
+        var plans;
 
-        Z.each(targets, function (found) {
-            P.requireUnlocked(found.track, found.kind, found.trackIndex);
-        });
-        Z.each(targets, function (found) {
+        // Everything that can refuse happens before the first change: locks, the Lumetri effect, QE items.
+        plans = Z.map(targets, function (found) {
             var lumetri = P.findComponent(found.clip, ["AE.ADBE Lumetri"], ["Lumetri Color"]);
-            var added = false;
+            P.requireUnlocked(found.track, found.kind, found.trackIndex);
+            if (lumetri) {
+                return {found: found, lumetri: lumetri, qeItem: null};
+            }
+            if (lumetriEffect === null) {
+                lumetriEffect = qeByName("video", "effect", "Lumetri Color");
+            }
+            return {found: found, lumetri: null, qeItem: qeItemFor(found, ctx)};
+        });
+
+        Z.each(plans, function (plan) {
+            var found = plan.found;
+            var lumetri = plan.lumetri;
             var set = {};
             var missing = [];
-            var result;
             if (!lumetri) {
-                if (lumetriEffect === null) {
-                    lumetriEffect = qeByName("video", "effect", "Lumetri Color");
-                }
-                result = P.addEffect(found, lumetriEffect, "Lumetri Color", ctx);
-                lumetri = result.component;
-                added = true;
+                lumetri = P.addEffect(found, lumetriEffect, "Lumetri Color", ctx, plan.qeItem).component;
                 steps += 1;
+            } else if (hasTints) {
+                ctx.warn("Lumetri was already on \"" + found.clip.name + "\": its tint wheels moved from their current colours, so re-applying " +
+                    look + " strengthens the tint");
             }
-            ctx.changed();
             Z.each(settings, function (setting) {
                 var param = lumetriParam(lumetri, setting.section, setting.param);
                 var color;
@@ -449,6 +487,7 @@
                     missing.push(setting.param);
                     return;
                 }
+                ctx.changed();
                 if (setting.tint) {
                     color = param.getColorValue();
                     mixed = [];
@@ -461,18 +500,19 @@
                     param.setValue(setting.value, true);
                     set[setting.param] = setting.value;
                 }
-                missingEverywhere = false;
+                anySet = true;
                 steps += 1;
             });
+            if (!anySet) {
+                // Lumetri's names are the same on every clip: stop at the first one instead of adding Lumetri everywhere.
+                throw Z.fail("UNSUPPORTED", "None of the Lumetri parameters (" + Z.map(settings, function (s) { return s.param; }).join(", ") +
+                    ") were found by their English names on \"" + found.clip.name + "\"; Premiere may be running in another language");
+            }
             if (missing.length > 0) {
                 ctx.warn("Lumetri on \"" + found.clip.name + "\" has no " + missing.join(", ") + " (Lumetri names are English; another UI language?)");
             }
-            graded.push({node_id: found.clip.nodeId, name: String(found.clip.name), added_lumetri: added, set: set});
+            graded.push({node_id: found.clip.nodeId, name: String(found.clip.name), added_lumetri: !plan.lumetri, set: set});
         });
-        if (missingEverywhere) {
-            throw Z.fail("UNSUPPORTED", "None of the Lumetri parameters (" + Z.map(settings, function (s) { return s.param; }).join(", ") +
-                ") were found by their English names; Premiere may be running in another language");
-        }
         return Z.applied("Applied the " + look + " look at " + Math.round(strength * 100) + "% to " + Z.plural(graded.length, "clip"), {
             look: look,
             strength: strength,

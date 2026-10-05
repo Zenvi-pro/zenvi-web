@@ -927,9 +927,11 @@
     P.qeSequence = function (sequence, ctx) {
         var project = P.qe().project;
         var candidate = project.getActiveSequence();
+        var active = P.activeSequence();
         var count;
         var i;
-        if (qeMatches(candidate, sequence)) {
+        // QE's active sequence is the DOM's active one, whatever its guid says.
+        if (candidate && (qeMatches(candidate, sequence) || (active && active.sequenceID === sequence.sequenceID))) {
             return candidate;
         }
         try {
@@ -951,7 +953,8 @@
             ctx.warn("Opened sequence \"" + sequence.name + "\" so the QE DOM can reach it");
         }
         candidate = P.qe().project.getActiveSequence();
-        if (qeMatches(candidate, sequence)) {
+        active = P.activeSequence();
+        if (candidate && (qeMatches(candidate, sequence) || (active && active.sequenceID === sequence.sequenceID))) {
             return candidate;
         }
         throw Z.fail("HOST_ERROR", "The QE DOM cannot reach sequence \"" + sequence.name + "\"");

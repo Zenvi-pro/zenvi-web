@@ -106,3 +106,18 @@ describe("premiere_run_script", () => {
     expect(fx.call("premiere_run_script", { script: "   " }).error?.code).toBe("INVALID_ARGUMENT");
   });
 });
+
+describe("review fixes: QE sequence lookup", () => {
+  test("a QE guid that differs from the DOM sequenceID still reaches the active sequence, or the one opened for it", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    fx.mock.state.qeGuidSuffix = "-x";
+    expect(fx.call("premiere_razor", { time: 2, tracks: [{ kind: "video", index: 0 }] }).status).toBe("applied");
+    expect(edit.sequence.videoTrackList[0]?.clipList).toHaveLength(4);
+    fx.mock.project.addSequence({ name: "Other" });
+    const receipt = fx.call("premiere_apply_effect", { clip: edit.v.c.nodeId, effect: "Gaussian Blur" });
+    expect(receipt.status).toBe("applied");
+    expect(receipt.warnings).toContain('Opened sequence "Main" so the QE DOM can reach it');
+    expect(edit.v.c.componentList[2]?.displayName).toBe("Gaussian Blur");
+  });
+});

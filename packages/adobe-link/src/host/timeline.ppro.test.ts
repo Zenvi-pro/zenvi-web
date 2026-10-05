@@ -286,3 +286,58 @@ describe("premiere_razor", () => {
     expect(edit.sequence.videoTrackList[0]?.clipList).toHaveLength(4);
   });
 });
+
+describe("linked clips with different extents (J and L cuts)", () => {
+  const TPS = 254016000000;
+
+  test("ripple delete closes the same amount on every track, so the pair after stays in sync", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    // L cut: b's audio starts half a second before its picture.
+    edit.audio.a.setSpan(0, 3.5 * TPS, 2 * TPS);
+    edit.audio.b.setSpan(3.5 * TPS, 9 * TPS, 0.5 * TPS);
+    const receipt = fx.call("premiere_edit_clip", { clip: edit.v.b.nodeId, action: "delete", ripple: true });
+    expect(receipt.status).toBe("applied");
+    expect(edit.v.c.span).toMatchObject({ start: 4, end: 7 });
+    expect(edit.audio.c.span).toMatchObject({ start: 4, end: 7 });
+    expect(receipt.warnings.join(" ")).toContain("every track closed 5 s to keep them in sync");
+  });
+
+  test("a move that would push a leading linked clip before 0 is refused", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    edit.v.a.remove(false, true);
+    edit.audio.a.remove(false, true);
+    edit.audio.b.setSpan(4 * TPS, 8.5 * TPS, 1 * TPS);
+    edit.audio.c.setSpan(8.5 * TPS, 12 * TPS, 4.5 * TPS);
+    const receipt = fx.call("premiere_edit_clip", { clip: edit.v.c.nodeId, action: "move", to: 0 });
+    expect(receipt.error?.code).toBe("INVALID_ARGUMENT");
+    expect(receipt.summary).toContain('Linked "c.mov" on A1 would start at -0.5 s');
+    expect(edit.v.c.span.start).toBe(9);
+  });
+
+  test("when Premiere drags the linked clip along, it is not moved twice", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    fx.mock.state.moveLinked = true;
+    const receipt = fx.call("premiere_edit_clip", { clip: edit.v.c.nodeId, action: "move", by: 2 });
+    expect(receipt.status).toBe("applied");
+    expect(edit.v.c.span.start).toBe(11);
+    expect(edit.audio.c.span.start).toBe(11);
+    expect(receipt.warnings).toEqual([]);
+    const rippled = fx.call("premiere_edit_clip", { clip: edit.v.a.nodeId, action: "delete", ripple: true });
+    expect(rippled.status).toBe("applied");
+    expect([edit.v.b.span.start, edit.audio.b.span.start, edit.v.c.span.start, edit.audio.c.span.start]).toEqual([0, 0, 7, 7]);
+  });
+});
+
+describe("summaries say what changed", () => {
+  test("enable names the clips it enabled; duplicate razor tracks cut once", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    edit.audio.a.disabled = true;
+    expect(fx.call("premiere_edit_clip", { clip: edit.v.a.nodeId, action: "enable" }).summary).toBe('Enabled "a.mov" (A1)');
+    const receipt = fx.call("premiere_razor", { time: 2, tracks: [{ kind: "video", index: 0 }, { kind: "video", index: 0 }] });
+    expect(receipt.summary).toBe("Cut 1 clip at 2 s (V1)");
+  });
+});

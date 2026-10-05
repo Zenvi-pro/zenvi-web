@@ -91,6 +91,16 @@ export class PremiereMockState implements ComponentHost {
   qeSequenceAtThrows = false;
   /** BridgeTalk.getStatus("ame"). */
   ameStatus = "IDLE";
+  /** TrackItem.move() also moves the clip's linked partners (as Premiere may with linked selection). */
+  moveLinked = false;
+  /** Effects QE cannot find by name (as if not installed). */
+  readonly hiddenEffects = new Set<string>();
+  /** setTimeVarying(true) leaves a key at source time 0, like turning animation on at the playhead. */
+  keyOnAnimate = false;
+  /** Effects added from now on get non-English parameter names (as on a German UI). */
+  localizedParams = false;
+  /** Appended to QE sequence guids, so they differ from the DOM sequenceID. */
+  qeGuidSuffix = "";
   /** Templates by path for Sequence.importMGT. */
   readonly mogrts = new Map<string, MogrtSpec>();
   /** Media durations (seconds) by file name for imports; default 10 s. */
@@ -126,8 +136,7 @@ export class PremiereMockState implements ComponentHost {
   undoable(label: string): void {
     this.undoIndex += 1;
     this.undoLog.push(label);
-  }
-}
+  }}
 
 export class ProjectItemCollection {}
 
@@ -391,11 +400,15 @@ export class TrackItem {
     return 0;
   }
 
-  /** Shift by `seconds` (TrackItem.move, Premiere 15.4+). */
+  /** Shift by `seconds` (TrackItem.move, Premiere 15.4+); with state.moveLinked its partners move too. */
   move(seconds: unknown): boolean {
-    this.shiftTicks(ticksOf(seconds));
+    const delta = ticksOf(seconds);
+    const partners = this.mock.moveLinked && this.linkGroup !== null && this.track ? this.track.sequence.allClips().filter((clip) => clip !== this && clip.linkGroup === this.linkGroup) : [];
+    for (const clip of [this, ...partners]) {
+      clip.shiftTicks(delta);
+      clip.track?.sort();
+    }
     this.mock.undoable(`move ${this.name}`);
-    this.track?.sort();
     return true;
   }
 }
