@@ -1,6 +1,6 @@
 # Zenvi web platform — architecture
 
-Status: living document. Owner: Jashan. Last revised 2026-09-30.
+Status: living document. Owner: Jashan. Last revised 2026-10-04.
 
 This repository takes Zenvi beyond the desktop app. It adds four surfaces that
 share one engine, one project format and one tool catalog:
@@ -9,8 +9,9 @@ share one engine, one project format and one tool catalog:
 | --- | --- | --- | --- |
 | **Web editor** | anyone on zenvi.pro/editor | browser (React) | browser storage (OPFS), or Zenvi Cloud |
 | **`zenvi` CLI** | developers, scripts, coding agents | Node 22+, local ffmpeg | local disk |
-| **Local MCP server** (`zenvi mcp`) | Claude Code, Claude Desktop, Codex, Cursor | same process as the CLI | local disk |
+| **Local MCP server** (`zenvi mcp`) | Claude Code, Claude Desktop, Codex, Cursor | same process as the CLI; also drives the desktop app, After Effects and Premiere Pro (§4) | local disk |
 | **Remote MCP server** | ChatGPT, Claude.ai connectors | Zenvi Cloud (Azure) | Zenvi Cloud |
+| **Zenvi Link** (`pro.zenvi.link`) | After Effects / Premiere Pro users, and every Zenvi surface that drives those apps | a CEP extension inside each Adobe app (loopback MCP server) | the Adobe project |
 
 Plus two that already exist and are extended, not replaced:
 
@@ -64,8 +65,9 @@ packages/render-web    @zenvi/render-web   Mediabunny decode · Canvas2D composi
 packages/render-node   @zenvi/render-node  ffmpeg probe/decode/encode · CPU compositor · resvg-wasm SVG raster
 packages/cli           @zenvi/cli          `zenvi` binary · local MCP (stdio) · cloud client · device login
 packages/cloud         @zenvi/cloud        REST /v1 · remote MCP · OAuth 2.1 AS · render jobs · Azure storage
+packages/adobe-link    @zenvi/adobe-link   Zenvi Link: ae_* / premiere_* catalogs (zod) · ExtendScript tools · CEP server/panel · discovery + client
 apps/editor            @zenvi/editor       React web editor, served at zenvi.pro/editor
-plugins/zenvi          Claude Code plugin  bundled CLI + MCP config + skills + commands
+plugins/zenvi          Claude Code plugin  bundled CLI (+ Zenvi Link) + MCP config + skills + commands
 ```
 
 Internal packages export TypeScript sources (`"exports": "./src/index.ts"`);
@@ -146,7 +148,61 @@ Two families, one registry (`packages/engine/src/tools`):
 Every mutating tool returns a receipt: `{ ok, text, data }` where `data` lists
 created/changed ids, so agents can chain calls without re-reading the timeline.
 
-## 4. Zenvi Cloud (`packages/cloud`)
+## 4. Hosts and handoffs (`zenvi mcp`, Zenvi Link)
+
+`zenvi mcp` drives four **hosts** (contract: the handoff SPEC §3.8):
+
+```
+                 Claude Code / Codex / Cursor (MCP client)
+                                 │ stdio
+                      ┌──────────▼──────────┐   reads discovery files in ~/.openshot_qt/
+                      │  zenvi mcp (Node)   │   gui_mcp.json · headless_mcp.json · link/<app>.json
+                      │  host registry      │   (one initialize per file, never a port scan)
+                      └──┬───────┬───────┬──┘
+     unprefixed tools,   │       │       │  ae_* / premiere_* (catalogs from @zenvi/adobe-link)
+     project open there  │       │       │
+     ┌───────────────────▼┐  ┌───▼───────▼───────────────────┐
+     │ Zenvi desktop app  │  │ Zenvi Link (CEP) per app       │◄─ ExtendScript in After Effects
+     │ (zenvi-core MCP)   │─►│ loopback MCP, bearer token     │◄─ ExtendScript + QE in Premiere
+     │ handoff tools,     │  └────────────────────────────────┘
+     │ linked clips       │──► node + Remotion / HyperFrames CLIs (renders)
+     └────────────────────┘
+     otherwise: the portable engine in the zenvi process edits the .zvn file
+```
+
+- **Registry** (`packages/cli/src/hosts/registry.ts`): `list_hosts` and
+  `zenvi://hosts` (and `zenvi hosts`) report `zenvi-desktop`,
+  `zenvi-portable`, `after-effects`, `premiere-pro`, each connected or not
+  (with how to connect), and the **active** host: the connected one used
+  most recently (an Adobe app's `last_active_at`, the desktop's discovery
+  file or last forwarded call, the portable engine's last call).
+- **Routing**: `ae_*` / `premiere_*` go to that app through one cached
+  `HostClient` per app; unprefixed Zenvi tools go to the desktop app while it
+  has the session's project open, else to the portable engine. The Adobe
+  families are listed per `ZENVI_MCP_ADOBE` (`auto` lists a family only where
+  Zenvi Link can run, because the two cost ~28k tokens of definitions).
+- **Handoffs**: every conversion of the Zenvi format (After Effects `.jsx`,
+  Premiere FCP7 XML, Remotion and HyperFrames projects, all imports, linked
+  clips) is implemented once, in the desktop app. `zenvi mcp` lists the
+  desktop's handoff tools with the desktop's schemas (vendored in
+  `desktop-handoff-tools.gen.json`, regenerated from zenvi-core's editor tool
+  manifest), opens the desktop on the session's project when needed and
+  forwards; `bring_from_after_effects` / `bring_from_premiere` chain the
+  Adobe step and the desktop import into one receipt.
+- **Catalog once**: the `ae_*` / `premiere_*` definitions (names, zod
+  schemas, descriptions with the defaults) live in
+  `packages/adobe-link/src/catalog`; the extension validates against the
+  generated JSON, the CLI lists and checks from the same definitions.
+- **Taste**: `docs/TASTE.md` holds the motion and editing defaults the
+  Adobe tools apply, served as `zenvi://taste`, embedded in the
+  `taste_motion_design` and `edit_review` prompts and in the plugin's
+  skills. Agents look at frames (`preview_frame`, `ae_capture_frame`,
+  `premiere_capture_frame`) before reporting success.
+
+Details: [ADOBE.md](ADOBE.md) (Zenvi Link), [HANDOFF.md](HANDOFF.md) (every
+direction, linked clips).
+
+## 5. Zenvi Cloud (`packages/cloud`)
 
 Node (Hono) service on Azure Container Apps (`zenvi-rg` / `zenvi-env`), image in
 `zenviregistry`. State in a dedicated Azure Storage account:
@@ -183,7 +239,7 @@ POST|GET|DELETE /mcp                remote MCP (Streamable HTTP)
 Consent and device-approval pages live in the web editor (`/editor/connect`,
 `/editor/device`) because it shares the website's origin and Supabase session.
 
-## 5. Flows
+## 6. Flows
 
 **Push from desktop.** File → *Push to Zenvi Cloud*. The desktop signs in with
 its existing Supabase session, hashes each media file (it already stores
@@ -198,8 +254,15 @@ a short-lived signed URL, and decodes by HTTP range requests (no full download).
 folder, rewrite `path` fields to local paths, open.
 
 **Claude Code.** `/plugin marketplace add Zenvi-pro/zenvi-web` then
-`/plugin install zenvi@zenvi`. The plugin starts `zenvi mcp` (stdio) and ships a
-video-editing skill. Everything runs locally; `zenvi push` shares to the cloud.
+`/plugin install zenvi@zenvi`. The plugin starts `zenvi mcp` (stdio) and ships
+skills for video editing, After Effects, Premiere Pro and code-video
+handoffs. Everything runs locally; `zenvi push` shares to the cloud.
+
+**Adobe apps.** `zenvi adobe install` copies Zenvi Link into the CEP
+extensions folder. In After Effects or Premiere Pro it serves `ae_*` /
+`premiere_*` tools on a loopback port and writes its discovery file;
+`zenvi mcp`, the CLI and the desktop app find it there. Edits move between
+the apps through the desktop's handoff tools (§4).
 
 **ChatGPT / Claude.ai.** Add the connector URL (`https://<cloud-host>/mcp`).
 OAuth 2.1 (dynamic client registration, PKCE) signs the user in through
@@ -211,7 +274,7 @@ desktop uses (`wss://api.zenvi.pro/api/v1/chat/ws`), sends `user_message` with t
 Supabase token, executes each `tool_call` with the engine's tool catalog, and
 replies with `tool_result`.
 
-## 6. Deployment
+## 7. Deployment
 
 | Piece | Where | How |
 | --- | --- | --- |
@@ -220,8 +283,9 @@ replies with `tool_result`.
 | Storage | Azure Storage account (Blob + Tables), `zenvi-rg` | `scripts/azure/provision.sh` |
 | CLI | tarball on GitHub releases / zenvi.pro; npm once the org has an npm account | `npm run build -w @zenvi/cli` |
 | Claude Code plugin | this repo's `.claude-plugin/marketplace.json` | plugin bundle built into `plugins/zenvi/dist` |
+| Zenvi Link | inside the CLI bundle (`dist/adobe/pro.zenvi.link`), installed by `zenvi adobe install`; a signed ZXP for distribution | `npm run build -w @zenvi/cli` / `npm run package:zxp -w @zenvi/adobe-link` |
 
-## 7. Out of scope for the first release (tracked in `docs/ROADMAP.md`)
+## 8. Out of scope for the first release (tracked in `docs/ROADMAP.md`)
 
 - OpenCV effects (stabilizer, tracker, object detection/AI masking) in the browser.
 - Blender animated titles.

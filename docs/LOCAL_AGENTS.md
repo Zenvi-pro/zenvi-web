@@ -22,13 +22,20 @@ You need Node.js 22+ and FFmpeg (see [CLI.md](CLI.md#install)). Check with
 /plugin install zenvi@zenvi
 ```
 
-The plugin ships the bundled CLI (no build, no npm install), starts
-`zenvi mcp` for you, and adds:
+The plugin ships the bundled CLI (no build, no npm install) and Zenvi Link
+(the After Effects / Premiere Pro extension), starts `zenvi mcp` for you,
+and adds:
 
-- the `zenvi-video-editing` skill (when to use Zenvi rather than raw
-  ffmpeg, the workflow, verifying edits with frames, the hand-off);
+- skills: `zenvi-video-editing` (when to use Zenvi rather than raw ffmpeg,
+  the workflow, the hosts, verifying edits with frames, the hand-off),
+  `after-effects` and `premiere-pro` (driving the Adobe apps through Zenvi
+  Link with the taste guide and the frame-review loop), and
+  `code-video-handoff` (Remotion and HyperFrames in and out of Zenvi,
+  linked clips);
 - commands: `/zenvi:edit-video <what to make>`, `/zenvi:preview [time]`,
-  `/zenvi:render [file]`, `/zenvi:open-in-zenvi`, `/zenvi:share`.
+  `/zenvi:render [file]`, `/zenvi:open-in-zenvi`, `/zenvi:share`,
+  `/zenvi:send-to-after-effects`, `/zenvi:send-to-premiere`,
+  `/zenvi:open-code-video-in-zenvi <folder>`, `/zenvi:adobe-setup`.
 
 **Without the plugin.** Register the server for your user:
 
@@ -109,12 +116,50 @@ On top of the catalog:
 | `render_video` | Render to mp4/webm/mov/mkv/gif/mp3/wav/png; returns the path, duration and size. Reports progress. |
 | `launch_editor` | Show the project in the Zenvi desktop app. |
 | `push_to_cloud` | Upload to Zenvi Cloud and return a web editor link (needs `zenvi login`). |
+| `list_hosts` | The hosts (see below), which are connected, which is active, and how to connect or enable the others. |
+| `ae_*`, `premiere_*` | After Effects and Premiere Pro tools through Zenvi Link (listed per `ZENVI_MCP_ADOBE`). |
+| handoff tools | The desktop app's `export_to_*` / `send_to_*` / `import_*` tools for After Effects, Premiere Pro, Remotion and HyperFrames, and the linked-clip tools ([HANDOFF.md](HANDOFF.md)). |
+| `bring_from_after_effects`, `bring_from_premiere` | An After Effects comp as a linked clip, or a Premiere sequence as native clips, into the Zenvi project in one call. |
+
+Resources: `zenvi://hosts` (the `list_hosts` report), `zenvi://taste` (the
+motion and editing defaults, [TASTE.md](TASTE.md)) and `zenvi://handoff`
+(what survives each handoff). Prompts: `taste_motion_design {brief, host}`
+and `edit_review {host, focus}`, which carry the taste guide and its review
+checklist with the tool names of the host the work happens in.
 
 Every result is a contract-3 receipt: JSON text content, the same object as
 `structuredContent` (with `engine`), and image content for frames. Failures
 have `isError: true` and a summary starting with `Error:`. Each call is one
 undo step; the project autosaves after every edit, with its undo history,
 so you can open it in the desktop app at any time.
+
+## Hosts: the desktop app, the portable engine, After Effects, Premiere Pro
+
+The server drives four hosts and tells the agent which one is **active**
+(the connected one used most recently):
+
+| Host | What it is | Tools |
+| --- | --- | --- |
+| `zenvi-desktop` | the Zenvi desktop app, while it has the session's project open | the Zenvi tools (forwarded), handoff tools |
+| `zenvi-portable` | the server itself, editing the `.zvn` file with ffmpeg | the Zenvi tools |
+| `after-effects` | After Effects with Zenvi Link | `ae_*` |
+| `premiere-pro` | Premiere Pro with Zenvi Link | `premiere_*` |
+
+The instructions the server sends tell the agent to call `list_hosts` first
+whenever the user mentions an Adobe app, to use `ae_*` / `premiere_*` for
+work inside those apps and the unprefixed tools for the Zenvi project, and
+to look at frames before saying an edit is done.
+
+The Adobe families are large (about 18k tokens of tool definitions for After
+Effects, 10k for Premiere Pro), so by default (`ZENVI_MCP_ADOBE=auto`) a
+family is listed only when Zenvi Link can run it on this machine: the app's
+discovery file exists, or Zenvi Link is installed and the app is installed.
+`ZENVI_MCP_ADOBE=on` lists both, `off` neither. When a family becomes
+available during a session the server sends `tools/list_changed`. Set the
+variable in the server's environment, e.g. for Claude Code:
+`claude mcp add zenvi --env ZENVI_MCP_ADOBE=on -- node /path/to/zenvi.mjs mcp`.
+Installing and checking Zenvi Link: [ADOBE.md](ADOBE.md) (`zenvi adobe
+install`, `zenvi adobe doctor`, or `/zenvi:adobe-setup` in Claude Code).
 
 ## The desktop app and the agent together
 
@@ -125,9 +170,14 @@ so you can open it in the desktop app at any time.
 - `launch_editor` opens the project in the app (or focuses it), so a
   typical session ends with "show me": the agent calls `launch_editor` and
   you review the cut on the real timeline.
+- Handoff tools always run in the desktop app. When it does not have the
+  project open, the server focuses it, loads the project into it, or starts
+  it on the project, waits for it to show the project, and then forwards the
+  call (an untitled session is refused: `open_project_file` first).
 - The server finds the app only through `~/.openshot_qt/gui_mcp.json` /
   `headless_mcp.json` whose process is alive and whose URL answers; it
-  never probes other ports.
+  never probes other ports. Adobe apps are found the same way, through
+  `~/.openshot_qt/link/aftereffects.json` / `premiere.json`.
 
 ## Troubleshooting
 
@@ -142,4 +192,10 @@ so you can open it in the desktop app at any time.
   `ZENVI_DEBUG=1` adds stack traces.
 - **Several `.zvn` files in the folder**: the server starts without a
   project; the agent picks one with `open_project_file`.
+- **No `ae_*` / `premiere_*` tools**: Zenvi Link is not installed (or the
+  app not found) on this machine; `zenvi adobe doctor` says which, and
+  `list_hosts` how to enable the family. After installing, reconnect the
+  server (`/mcp` in Claude Code) if the tools do not appear.
+- **"After Effects is not connected"**: open the app with a project; Zenvi
+  Link starts with it (Window > Extensions > Zenvi Link).
 - `zenvi doctor` shows what is missing.

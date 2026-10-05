@@ -11,6 +11,7 @@ go back and forth between `zenvi`, the desktop app and the web editor.
 - [Commands](#commands)
 - [Rendering](#rendering)
 - [Working with the desktop app](#working-with-the-desktop-app)
+- [Hosts and Adobe apps](#hosts-and-adobe-apps)
 - [Signing in and Zenvi Cloud](#signing-in-and-zenvi-cloud)
 - [Environment variables and files](#environment-variables-and-files)
 
@@ -31,17 +32,19 @@ From this repository:
 
 ```bash
 npm ci
-npm run build -w @zenvi/cli          # → packages/cli/dist/zenvi.mjs (+ resvg.wasm, fonts/, assets/)
+npm run build -w @zenvi/cli          # → packages/cli/dist/zenvi.mjs (+ resvg.wasm, fonts/, assets/, adobe/)
 node packages/cli/dist/zenvi.mjs --version
 ```
 
-The bundle is one file plus its resources; keep the `dist/` folder together.
+The bundle is one file plus its resources (`adobe/pro.zenvi.link` is the
+Zenvi Link extension `zenvi adobe install` copies); keep the `dist/` folder
+together.
 To get a `zenvi` command, link it onto your PATH, e.g.
 `ln -s "$PWD/packages/cli/dist/zenvi.mjs" ~/.local/bin/zenvi`. During
 development you can run the sources directly: `npm run zenvi -- <args>`.
 
 `zenvi doctor` checks ffmpeg, fonts, the renderer, the desktop app, Zenvi
-Cloud and backend reachability, and your sign-in.
+Link, Zenvi Cloud and backend reachability, and your sign-in.
 
 ## Concepts
 
@@ -145,7 +148,8 @@ zenvi call set_keyframes_tool --args '{"timeline_clip_id":"K3J9X0Q2LM","property
 
 Arguments arrive as strings and are coerced by each tool's schema, exactly
 like the Zenvi Assistant's calls; values starting with `[` or `{` are parsed
-as JSON.
+as JSON. `zenvi call ae_*` / `premiere_*` runs the tool in After Effects /
+Premiere Pro (see [Hosts and Adobe apps](#hosts-and-adobe-apps)).
 
 ### Rendering and previews
 
@@ -166,6 +170,9 @@ tools show models.
 | --- | --- |
 | `zenvi open [project] [--web]` | Show the project in the Zenvi desktop app (focus it, load it into the running app, or start the app); `--web` pushes and opens the web editor. |
 | `zenvi mcp` | Run the local MCP server on stdio. |
+| `zenvi hosts [--json]` | The hosts `zenvi mcp` drives (desktop app, portable engine, After Effects, Premiere Pro), connected or not, and the active one. |
+| `zenvi adobe install [--dry-run] [--uninstall]` / `zenvi adobe doctor` | Install Zenvi Link into After Effects / Premiere Pro, or check it. |
+| `zenvi ae <tool> [key=value…]` / `zenvi premiere <tool> […]` | Run one After Effects / Premiere Pro tool through Zenvi Link; without a tool, list them. |
 | `zenvi mcp-config <claude-code\|claude-desktop\|codex\|cursor> [--install] [--scope user\|project] [--name zenvi] [--force]` | Print or install the MCP server config. |
 | `zenvi login [--device] [--no-browser]` / `logout` / `whoami` | Sign in (browser handoff like the desktop, or a device code). |
 | `zenvi push [--name n] [--force] [--no-open]` | Upload to Zenvi Cloud and open the web editor. |
@@ -244,6 +251,48 @@ its `export_video_tool`. On macOS, when the app's export settings name
 the project's export codec to `libx264` with `set_export_setting_tool` (no
 undo step).
 
+## Hosts and Adobe apps
+
+`zenvi mcp` (and these commands) know four **hosts**: the Zenvi desktop app,
+the portable engine (`zenvi` editing the file itself), and After Effects and
+Premiere Pro through **Zenvi Link**, an extension that runs a small MCP
+server inside each app ([ADOBE.md](ADOBE.md)).
+
+```console
+$ zenvi hosts
+host              state          details
+zenvi-desktop     running        /Users/me/trip/trip.zvn · Zenvi 1.2.0 · pid 4120
+zenvi-portable    ready          /Users/me/trip/trip.zvn (edits go to the desktop app)
+after-effects *   connected      Adobe After Effects 2026 26.3.0 · /Users/me/Work/promo.aep · 30 tools
+premiere-pro      not connected  no discovery file (the app is not running, or Zenvi Link is not installed) · 25 tools · `zenvi adobe doctor`
+```
+
+- `--json` prints the report `zenvi mcp` serves as `list_hosts` /
+  `zenvi://hosts`: `{"hosts": [...], "active": "after-effects"}`. **Active**
+  is the connected host used most recently.
+- `zenvi adobe install` copies the Zenvi Link that ships with this `zenvi`
+  into the per-user CEP extensions folder and turns on PlayerDebugMode
+  (unsigned extensions need it); restart the Adobe apps afterwards.
+  `--dry-run` prints the steps, `--uninstall` removes it, `--platform
+  darwin|win32` (with `--dry-run`) plans for another OS.
+- `zenvi adobe doctor` checks the bundled and installed versions,
+  PlayerDebugMode, the apps, the live connections and which tool families
+  `zenvi mcp` lists. Exit code 1 when Zenvi Link cannot be installed at all.
+- `zenvi ae <tool> [key=value…]` and `zenvi premiere <tool> […]` run one
+  tool in the app (`get_state` and `ae_get_state` are the same); arguments
+  work like `zenvi call` and are converted by the tool's schema (`time=2`
+  is a number). `--out file.png` saves frame captures (`zenvi ae
+  capture_frame time=2 --out check.png`). Without a tool they list the
+  family. A refused or failed call exits 1 and says why, e.g. how to
+  connect an app that is not running.
+
+```bash
+zenvi ae add_text text="Launch day" style=lower-third placement=lower-third animation=slide-in
+zenvi ae apply_motion_preset layer=12 preset=fade-out start=5.6
+zenvi premiere add_transition clip=000f4243 at=end
+zenvi call premiere_export preset=h264-high output=/Users/me/out/cut.mp4
+```
+
 ## Signing in and Zenvi Cloud
 
 - `zenvi login` opens `https://zenvi.pro/login?state=…` and waits for the
@@ -284,7 +333,9 @@ undo step).
 | `ZENVI_CONFIG_DIR` | `~/.config/zenvi` (Windows `%APPDATA%\zenvi`) | `auth.json`, `cloud-links.json`. |
 | `ZENVI_CACHE_DIR` | `~/Library/Caches/zenvi`, `%LOCALAPPDATA%\zenvi\Cache`, `~/.cache/zenvi` | Font index cache. |
 | `ZENVI_NO_BROWSER=1` | — | Never open a browser (print links instead). |
-| `ZENVI_MCP_ENGINE=portable` | — | The MCP server never forwards to the desktop app. |
+| `ZENVI_MCP_ENGINE=portable` | — | The MCP server never forwards to the desktop app (handoff tools are refused). |
+| `ZENVI_MCP_ADOBE` | `auto` | Which Adobe tool families `zenvi mcp` lists: `auto` (where Zenvi Link can run), `on`, `off`. |
+| `ZENVI_ADOBE_EXTENSION` | the bundle's `adobe/pro.zenvi.link` | The Zenvi Link build `zenvi adobe install` installs. |
 | `ZENVI_MCP_COMMAND` | — | Command `mcp-config` writes instead of `node <bundle> mcp`. |
 | `ZENVI_DEBUG=1` | — | Stack traces and host logs on stderr. |
 | `ZENVI_RESOURCES_DIR`, `ZENVI_ASSETS_DIR` | next to the bundle | Where `resvg.wasm`, `fonts/` and engine assets are. |
