@@ -2,7 +2,10 @@
  * The ExtendScript globals both Adobe hosts share: `$`, `File` and `Folder`.
  * `File`/`Folder` work on the real file system (tests point them at a
  * `fs.mkdtemp` folder), with ExtendScript's naming: `fsName` is the
- * platform path, `name` and `path` are URI-encoded, `displayName` is not.
+ * platform path; `fullName`, `absoluteURI`, `name` and `path` are
+ * URI-encoded (a literal % is %25); `displayName` is not. Paths given to
+ * File() / Folder() are URI-decoded, as in ExtendScript, so a literal % must
+ * be passed as %25.
  * Both can be called with or without `new`, as in ExtendScript.
  */
 
@@ -22,6 +25,11 @@ export interface ExtendScriptMockOptions {
   env?: Record<string, string>;
 }
 
+/** A platform path as File() / Folder() take it: they URI-decode, so a literal % goes in as %25. */
+export function uriPath(fsPath: string): string {
+  return fsPath.replace(/%/g, "%25");
+}
+
 /** Shared by `File` and `Folder`. */
 export class FsEntryMock {
   readonly fsName: string;
@@ -34,12 +42,13 @@ export class FsEntryMock {
     this.fsName = es.resolve(target);
   }
 
+  /** URI notation: "/" separators, URI-encoded, as ExtendScript gives it. */
   get fullName(): string {
-    return this.fsName.split(path.sep).join("/");
+    return encodeURI(this.fsName.split(path.sep).join("/"));
   }
 
   get absoluteURI(): string {
-    return encodeURI(this.fullName);
+    return this.fullName;
   }
 
   /** URI-encoded base name, as ExtendScript returns it. */
@@ -53,7 +62,7 @@ export class FsEntryMock {
 
   /** URI-encoded parent folder path. */
   get path(): string {
-    return encodeURI(path.dirname(this.fullName));
+    return encodeURI(path.dirname(this.fsName).split(path.sep).join("/"));
   }
 
   get parent(): FolderMock {
@@ -227,9 +236,13 @@ export class ExtendScriptMockState {
   readonly link = new RealmLink();
   readonly tempDir: string;
   readonly homeDir: string;
-  /** Entries created internally (parent, getFiles) come from the realm's own classes, so instanceof File/Folder holds. */
-  makeFile: (target: string) => FileMock = (target) => new FileMock(this, target);
-  makeFolder: (target: string) => FolderMock = (target) => new FolderMock(this, target);
+  /**
+   * Entries created internally (parent, getFiles, Folder.temp) from platform
+   * paths, by the realm's own classes so instanceof File/Folder holds. A
+   * literal % in the path stays one (ExtendScript's own entries keep it).
+   */
+  makeFile: (fsPath: string) => FileMock = (fsPath) => new FileMock(this, uriPath(fsPath));
+  makeFolder: (fsPath: string) => FolderMock = (fsPath) => new FolderMock(this, uriPath(fsPath));
 
   constructor(readonly options: ExtendScriptMockOptions) {
     this.tempDir = options.tempDir ?? os.tmpdir();
@@ -357,24 +370,24 @@ export function createExtendScriptMock(options: ExtendScriptMockOptions = {}): E
       super(state, target ?? ".");
     }
     static get temp(): Folder {
-      return new Folder(state.tempDir);
+      return new Folder(uriPath(state.tempDir));
     }
     static get userData(): Folder {
-      return new Folder(state.homeDir);
+      return new Folder(uriPath(state.homeDir));
     }
     static get myDocuments(): Folder {
-      return new Folder(state.homeDir);
+      return new Folder(uriPath(state.homeDir));
     }
     static get desktop(): Folder {
-      return new Folder(state.homeDir);
+      return new Folder(uriPath(state.homeDir));
     }
     static get current(): Folder {
-      return new Folder(state.tempDir);
+      return new Folder(uriPath(state.tempDir));
     }
   }
 
-  state.makeFile = (target) => new File(target);
-  state.makeFolder = (target) => new Folder(target);
+  state.makeFile = (fsPath) => new File(uriPath(fsPath));
+  state.makeFolder = (fsPath) => new Folder(uriPath(fsPath));
 
   // ExtendScript allows `File(path)` as well as `new File(path)`.
   const callable = <T extends new (target?: string) => unknown>(cls: T): unknown =>
