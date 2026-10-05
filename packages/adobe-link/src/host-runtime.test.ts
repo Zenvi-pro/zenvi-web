@@ -1,3 +1,6 @@
+import { existsSync, mkdtempSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { createAeMock } from "./testing/ae-mock.js";
 import { loadHostScript, type LoadedHostScript } from "./testing/host-script.js";
@@ -122,6 +125,33 @@ describe("After Effects undo groups", () => {
     expect(mock.state.undoDepth).toBe(0);
   });
 
+  test("{mutating: false} keeps a tool out of the undo group; its undoSteps are its own to report", () => {
+    const { mock, host } = loadAe();
+    register(host, "ae_t_save", 'return ZenviLink.applied("Saved", {});', "{mutating: false}");
+    register(host, "ae_t_undo", 'return ZenviLink.applied("Undid 2 steps", {}, -2);', "{mutating: false}");
+    register(host, "ae_t_half", 'ctx.changed(); throw new Error("disk full");', "{mutating: false}");
+    expect(host.dispatch("ae_t_save")).toMatchObject({ status: "applied", undoSteps: null });
+    expect(host.dispatch("ae_t_undo")).toMatchObject({ status: "applied", undoSteps: -2 });
+    const half = host.dispatch("ae_t_half");
+    expect(half).toMatchObject({ status: "error", undoSteps: null });
+    expect(half.warnings.join(" ")).toContain("its own undo step");
+    expect(mock.state.undoCalls).toEqual([]);
+  });
+
+  test("a tool can report its exact undoSteps, on success and on failure (ctx.undoSteps)", () => {
+    const { host } = loadAe();
+    register(host, "ae_t_render", 'ctx.changed(); ctx.undoSteps = 2; throw new Error("render failed");', "{mutating: false}");
+    register(host, "ae_t_grouped", 'ctx.changed(); ctx.undoSteps = 0; throw ZenviLink.fail("HOST_ERROR", "rolled back");', "{mutating: true}");
+    register(host, "ae_t_counted", 'ctx.undoSteps = 3; return ZenviLink.applied("Did three things", {});', "{mutating: false}");
+    register(host, "ae_t_explicit", 'ctx.undoSteps = 3; return ZenviLink.applied("Explicit wins", {}, 1);', "{mutating: false}");
+    register(host, "ae_t_junk", 'ctx.undoSteps = "two"; return ZenviLink.applied("Ignored", {});', "{mutating: false}");
+    expect(host.dispatch("ae_t_render")).toMatchObject({ status: "error", undoSteps: 2 });
+    expect(host.dispatch("ae_t_grouped")).toMatchObject({ status: "error", undoSteps: 0 });
+    expect(host.dispatch("ae_t_counted")).toMatchObject({ status: "applied", undoSteps: 3 });
+    expect(host.dispatch("ae_t_explicit").undoSteps).toBe(1);
+    expect(host.dispatch("ae_t_junk").undoSteps).toBeNull();
+  });
+
   test("unchanged results report no undo step", () => {
     const { host } = loadAe();
     register(host, "ae_t_same", 'return ZenviLink.unchanged("Already so", {});', "{mutating: true}");
@@ -185,5 +215,22 @@ describe("time and colour helpers", () => {
     expect(host.evaluate('ZenviLink.color.toRgb([0, 0.2, 1]).join(",")')).toBe("0,0.2,1");
     register(host, "ae_t_color", 'ZenviLink.color.toRgb(args.c, "fill"); return ZenviLink.ok("x");');
     expect(host.dispatch("ae_t_color", { c: [255, 0, 0] }).error?.message).toContain("`fill` must be");
+  });
+});
+
+describe("temp folder", () => {
+  test("defaults to <Folder.temp>/zenvi-link, follows configure, and survives re-evaluation", () => {
+    const system = mkdtempSync(path.join(os.tmpdir(), "zenvi-link-temp-"));
+    const mock = createAeMock({ tempDir: system });
+    const host = loadHostScript("aeft", mock.globals);
+    expect(host.evaluate("ZenviLink.tempDir()")).toBe(path.join(system, "zenvi-link"));
+    expect(existsSync(path.join(system, "zenvi-link"))).toBe(true);
+    const chosen = path.join(system, "chosen");
+    expect(JSON.parse(String(host.evaluate(`ZenviLink.configure(${JSON.stringify(JSON.stringify({ temp_dir: chosen }))})`)))).toEqual({ ok: true, config: { temp_dir: chosen } });
+    host.evaluate(host.bundle.text);
+    expect(host.evaluate("ZenviLink.tempDir()")).toBe(chosen);
+    const file = String(host.evaluate('ZenviLink.tempFile("capture", "png")'));
+    expect(path.dirname(file)).toBe(chosen);
+    expect(path.basename(file)).toMatch(/^capture-\d+-\d+\.png$/);
   });
 });

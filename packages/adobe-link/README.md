@@ -56,10 +56,11 @@ src/testing/        loadHostScript (ES3 vm realm), createAeMock, createPremiereM
                     FakeCep (window.__adobe_cep__ stand-in), typed loaders for extension/*.js
 extension/catalog/  generated catalog JSON (committed; a test fails when stale)
 extension/host/     ExtendScript: common/* (json2, polyfills, ZenviLink runtime), aeft/*, ppro/*
-extension/server/   loopback MCP server, queue, schema check, discovery files, CEP boot (CommonJS, ES2017)
+extension/server/   loopback MCP server, queue, schema check, discovery files, CEP boot, title renderer (CommonJS, ES2017)
 extension/panel/    the panel (vanilla HTML/CSS/JS), panel-core.js, send-to-zenvi-<app>.js hooks
 extension/CSXS/     manifest.xml (version injected by the build); .debug for remote debugging
-scripts/            gen-catalog, build-extension, install-dev, package-zxp
+scripts/            gen-catalog, build-extension, install-dev, package-zxp, typecheck-jsx
+src/fixtures/       zenvi-export/effects.jsx: a real Zenvi After Effects export (compatibility test)
 ```
 
 ## Develop and install
@@ -82,8 +83,8 @@ npm run install:dev -w @zenvi/adobe-link -- --uninstall
   `reg add HKCU\Software\Adobe\CSXS.<9-12> /v PlayerDebugMode /t REG_SZ /d 1 /f`.
   `install:dev` sets both forms.
 - Restart After Effects or Premiere Pro after installing. The background
-  service starts when the app activates. The panel is under
-  **Window → Extensions → Zenvi Link**.
+  service starts at launch (`ApplicationInitialized`) or when the app activates.
+  The panel is under **Window → Extensions → Zenvi Link**.
 - After changing JSX or server code, run `npm run build` again and reload the
   extension (close and reopen the panel, or restart the app). A symlinked
   install picks up the new build.
@@ -95,8 +96,19 @@ npm run install:dev -w @zenvi/adobe-link -- --uninstall
   panel in After Effects, and 8091 for the panel in Premiere Pro. Server logs
   appear in the console as `[Zenvi Link] …`.
 - **Discovery files.** `~/.openshot_qt/link/aftereffects.json` and
-  `premiere.json` hold the URL, pid and project. The bearer token is in the
-  `*.token` file next to each (mode 0600).
+  `premiere.json` hold the URL, pid and project. Each server instance writes its
+  bearer token to its own `<app>.<pid>.token` (mode 0600); the JSON's
+  `token_file` names it.
+  - When several instances serve one app (the service and a panel fallback, or
+    two installed versions), the newest to publish owns the JSON.
+  - The others leave it alone while the owner's pid lives, and take it back when
+    the owner is gone.
+  - A panel never publishes over a live service.
+  - Writes are best effort and never fail a tool call; a failure shows in the
+    panel status (`discovery.problem`).
+- **Shutdown.** Neither CEP quit event is documented for these apps, so cleanup
+  relies on the page's `unload`. Files left by a crash name a dead pid, and
+  clients ignore them.
 - **Manual call:**
   ```bash
   F=~/.openshot_qt/link/aftereffects.json
@@ -124,9 +136,33 @@ npm run install:dev -w @zenvi/adobe-link -- --uninstall
   is -32601, and an unknown tool name is -32602.
 - **`tools/call` result.** It returns
   `{content: [{type: "text", text: JSON(receipt)}, …images], structuredContent: receipt, isError}`.
-  Arguments are checked against the catalog schema first: unknown keys, types,
-  enums and ranges are refused with `INVALID_ARGUMENT`. Schema defaults are
-  filled before ExtendScript runs.
+  - Arguments are checked against the catalog schema first. Unknown keys, types,
+    enums, ranges, and `__proto__` / `constructor` / `prototype` keys are refused
+    with `INVALID_ARGUMENT`.
+  - Schema defaults, including those inside array items, are filled before
+    ExtendScript runs.
+- **Frame captures.** A tool with `returnsImage` that sets `data.image_path` gets
+  the file attached as an image block, after a PNG/JPEG magic check and a 32 MB
+  cap. The server deletes the file only when it passed the check and sits
+  directly in Zenvi Link's temp folder (`<system temp>/zenvi-link`, what
+  `ZenviLink.tempDir()` returns, where `Z.tempFile()` puts captures).
+  Subfolders (`renders/` for After Effects renders for Zenvi, `titles/`) are
+  never touched.
+- **Titles in Premiere Pro.** `premiere_add_text` without `image` or `mogrt`
+  renders the title itself (`extension/server/titles.js`).
+  - The text is drawn with the page's canvas into a transparent PNG at the
+    sequence size, inside title-safe, with TASTE type sizes, a soft shadow, and
+    optional stroke and box.
+  - The host script then places the PNG as a still.
+  - The PNG is saved next to the project in `Zenvi Titles/`, because a temp file
+    would eventually go offline. An unsaved project gets `<temp>/titles` and a
+    warning.
+  - This runs as a server *preparer*: a per-tool step inside the call's queue
+    slot that may ask the host for facts (`ZenviLink.ppro.titleFrame`) and
+    replace the arguments.
+- **Sockets.** The server never times out idle sockets (Node 12's default of
+  120 s would drop long responses). `HostClient` uses a `node:http` fetch that
+  follows no redirects and has no client-side time limit.
 - **Queue.** Calls run in FIFO order, one at a time. The default timeout is
   120 s, and the catalog's `timeoutMs` can override it. A call that times out
   returns `TIMEOUT`, but the queue waits until ExtendScript actually returns.
@@ -139,6 +175,10 @@ npm run install:dev -w @zenvi/adobe-link -- --uninstall
     `Zenvi: <title>`.
   - Premiere Pro has no undo grouping. `undoSteps` is what the tool reports, or
     `null` when unknown.
+  - A tool registered with `{mutating: false}` (undo, save, render) runs outside
+    any undo group and reports its own `undoSteps` (`null` by default).
+  - A tool that knows its exact count sets `ctx.undoSteps = n`. Dispatch reports
+    it on failure, and on success when `Z.applied()` gives no count.
 
 ## Adding a host tool
 
@@ -149,7 +189,8 @@ npm run install:dev -w @zenvi/adobe-link -- --uninstall
      `absolutePath` and `placement` from `src/catalog/types.ts`.
    - Take defaults from `TASTE`.
    - `readOnlyHint: false` makes dispatch wrap the call in one After Effects
-     undo group.
+     undo group. A tool that must not run inside one (`ae_undo`, saving,
+     rendering) registers with `Z.register(name, fn, {mutating: false})`.
    - Set `returnsImage` / `timeoutMs` when needed.
 2. **Regenerate** with `npm run gen:catalog -w @zenvi/adobe-link`, then commit
    `extension/catalog/*.json`.
@@ -170,9 +211,16 @@ npm run install:dev -w @zenvi/adobe-link -- --uninstall
      or `Z.unchanged(summary, data)`.
    - **Fail.** Refuse with `throw Z.refuse(code, message)`, or fail with
      `throw Z.fail(code, message)`.
-   - **Frame captures** write a PNG to the temp folder and return
-     `data.image_path`. The server attaches the image and deletes the file. To
-     report a path the user should keep, use another key.
+   - **Frame captures** write a PNG to `Z.tempFile("capture", "png")` and return
+     it as `data.image_path`. The server attaches the image and deletes the file
+     (only inside `Z.tempDir()`). To report a path the user should keep, use
+     another key.
+   - **Feature detection** of DOM methods uses `Z.hasMethod(obj, "name")`,
+     never `typeof obj.name === "function"`: ExtendScript may report host
+     methods as `"object"`.
+   - **Long-lived state** (render jobs, caches) goes on `Z.state`. CEP evaluates
+     the host script again when the panel opens, which rebuilds `ZenviLink` and
+     resets closure variables; `Z.state` survives.
 5. **Test it** in `src/host/<area>.test.ts`:
    `const mock = createAeMock()`, `const host = loadHostScript("aeft", mock.globals)`,
    `host.dispatch("ae_x", args)`. Then assert the receipt and the mock
@@ -183,9 +231,16 @@ npm run install:dev -w @zenvi/adobe-link -- --uninstall
    `npx eslint packages/adobe-link` and `npm run typecheck -w @zenvi/adobe-link`.
 
 The test realm is ECMAScript 3, like ExtendScript. `[].map`, `forEach`,
-`Object.assign`, `"".startsWith` and similar methods do not exist there, or in
-the apps. Use `Z.each` / `Z.map` / `Z.filter`, `indexOf` and `trim`
-(polyfilled), and bracket access for reserved words
+`[].indexOf`, `"".trim()`, `Object.assign`, `"".startsWith` and similar methods
+do not exist there, or in the apps.
+
+Zenvi Link adds nothing to built-in prototypes. Every extension shares the app's
+ExtendScript engine, and ES3 cannot hide new prototype members from other
+scripts' `for…in` loops. Only the statics `Array.isArray`, `Object.keys` and
+`Date.now` are polyfilled.
+
+So use `Z.each` / `Z.map` / `Z.filter`, `Z.indexOf(list, value)` and
+`Z.trim(text)`, and bracket access for reserved words
 (`TASTE.timing.audioFade["in"]`).
 
 **Panel "Send to Zenvi".** `extension/panel/send-to-zenvi-aftereffects.js` and
@@ -228,13 +283,14 @@ Automated tests run the real server and host scripts against mock DOMs. They do
 not touch the Adobe apps. With an app installed:
 
 1. **Install.** Run `npm run install:dev -w @zenvi/adobe-link`, then restart
-   After Effects.
-   **Pass:** within a few seconds of the app activating,
-   `~/.openshot_qt/link/aftereffects.json` exists. Its `pid` is alive, and its
-   `app_version` matches *Help → About*.
+   After Effects without clicking into another app.
+   **Pass:** within a few seconds of launch, `~/.openshot_qt/link/aftereffects.json`
+   exists. Its `pid` is alive, its `app_version` matches *Help → About*, and the
+   `aftereffects.<pid>.token` file it names exists.
 2. **Panel.** Open *Window → Extensions → Zenvi Link*.
    **Pass:** it shows "Running", the server URL and "Background service", and
-   its colours follow the app theme.
+   its colours follow the app theme. The discovery file still names the
+   service's pid, and no second token file appears.
 3. **Discovery.** Call `ae_get_state` with the `curl` above (or through
    `zenvi mcp` once it knows the Adobe hosts).
    **Pass:** the receipt shows the open project and the active comp. The panel
@@ -247,7 +303,8 @@ not touch the Adobe apps. With an app installed:
    **Pass:** `project` in the discovery file updates within ~15 s, and
    `last_active_at` updates on activation.
 6. **Quit.** Quit After Effects.
-   **Pass:** the discovery and token files are gone.
+   **Pass:** the discovery and token files are gone. If the quit events never
+   fire, the files may stay, but they name a dead pid and `zenvi` ignores them.
 7. **Panel fallback.** Disable the service, for example by removing its
    `<Extension Id="pro.zenvi.link.service">` dispatch from the installed
    manifest, then restart.

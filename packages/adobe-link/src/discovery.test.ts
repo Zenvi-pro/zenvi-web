@@ -30,7 +30,7 @@ async function publish(dir: string, host: "aftereffects" | "premiere", overrides
     pid: overrides.pid,
     now: overrides.lastActive ? () => new Date(overrides.lastActive as string) : undefined,
   });
-  file.publish({ url: overrides.url ?? server.url, token: overrides.token ?? server.token, project: null, version: "1.0.0", appName: "App", appVersion: "26.0.0" });
+  await file.publish({ url: overrides.url ?? server.url, token: overrides.token ?? server.token, project: null, version: "1.0.0", appName: "App", appVersion: "26.0.0" });
   return { server, file };
 }
 
@@ -95,6 +95,16 @@ describe("inspectHost / discoverHosts", () => {
     const { server } = await publish(dir, "premiere");
     writeFileSync(path.join(dir, "link", "premiere.json"), JSON.stringify({ url: server.url, token_file: path.join(dir, "link", "premiere.token"), pid: process.pid, app: "premiere", protocol: 2 }));
     expect((await inspectHost(dir, "premiere")).detail).toContain("protocol 2");
+  });
+
+  test.each(["null", "[]", "42", '"text"'])("a discovery file holding %s is invalid for that app only", async (content) => {
+    const dir = desktopDir();
+    const { server } = await publish(dir, "aftereffects");
+    writeFileSync(path.join(dir, "link", "premiere.json"), content);
+    const [ae, premiere] = await inspectHosts(dir);
+    expect(premiere).toMatchObject({ host: "premiere", status: "invalid", detail: "the discovery file is not a JSON object" });
+    expect(ae).toMatchObject({ host: "aftereffects", status: "connected" });
+    expect((await discoverHosts(dir)).map((endpoint) => endpoint.url)).toEqual([server.url]);
   });
 
   test("most recently active host first", async () => {

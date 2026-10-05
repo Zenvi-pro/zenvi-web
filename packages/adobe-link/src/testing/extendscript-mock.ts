@@ -109,7 +109,8 @@ export class FileMock extends FsEntryMock {
       this.buffer = "";
       return mode === "e" || mode === "a";
     }
-    this.buffer = readFileSync(this.fsName, "utf8");
+    // encoding "BINARY" keeps one character per byte, as in ExtendScript.
+    this.buffer = readFileSync(this.fsName, /^binary$/i.test(this.encoding) ? "latin1" : "utf8");
     if (mode === "a") this.position = this.buffer.length;
     return true;
   }
@@ -119,6 +120,19 @@ export class FileMock extends FsEntryMock {
     const text = this.buffer.slice(this.position, end);
     this.position = Math.min(end, this.buffer.length);
     return text;
+  }
+
+  /** Move the read position: mode 0 from the start (default), 1 from the current position, 2 from the end. */
+  seek(pos: number, mode = 0): boolean {
+    const base = mode === 1 ? this.position : mode === 2 ? this.buffer.length : 0;
+    const target = base + pos;
+    if (this.mode === undefined || target < 0 || target > this.buffer.length) return false;
+    this.position = target;
+    return true;
+  }
+
+  tell(): number {
+    return this.position;
   }
 
   readln(): string {
@@ -140,7 +154,7 @@ export class FileMock extends FsEntryMock {
   }
 
   close(): boolean {
-    if (this.mode === "w" || this.mode === "e" || this.mode === "a") writeFileSync(this.fsName, this.buffer);
+    if (this.mode === "w" || this.mode === "e" || this.mode === "a") writeFileSync(this.fsName, this.buffer, /^binary$/i.test(this.encoding) ? "latin1" : "utf8");
     this.mode = undefined;
     return true;
   }
@@ -206,6 +220,10 @@ export class FolderMock extends FsEntryMock {
 export class ExtendScriptMockState {
   readonly log: string[] = [];
   readonly executed: string[] = [];
+  /** Called on every `$.sleep` (mocks finish asynchronous host work there, e.g. a frame still being written). */
+  readonly sleepHooks: (() => void)[] = [];
+  /** Total milliseconds scripts asked `$.sleep` for. */
+  sleptMs = 0;
   readonly link = new RealmLink();
   readonly tempDir: string;
   readonly homeDir: string;
@@ -231,6 +249,14 @@ export class ExtendScriptMockState {
   }
 }
 
+/** ExtendScript preprocessor directive lines: #target, #targetengine, #include, #includepath, #strict, #script. */
+const DIRECTIVE_LINE = /^[ \t]*#(?:target|targetengine|include|includepath|strict|script)\b[^\r\n]*/gm;
+
+/** Source with its preprocessor directive lines blanked (line numbers unchanged). */
+export function stripDirectives(source: string): string {
+  return source.replace(DIRECTIVE_LINE, "");
+}
+
 export class DollarMock {
   os: string;
   version = "4.5.5";
@@ -252,10 +278,15 @@ export class DollarMock {
     this.es.log.push(texts.map(String).join(""));
   }
 
-  /** Runs the file in the script realm and returns its completion value, like ExtendScript. */
+  /**
+   * Runs the file in the script realm and returns its completion value, like
+   * ExtendScript. The engine consumes preprocessor directives itself
+   * (`#target aftereffects` opens every Zenvi export), so their lines are
+   * blanked, keeping line numbers. `#include` is not followed here.
+   */
   evalFile(file: string | FsEntryMock, _timeout?: number): unknown {
     const target = typeof file === "string" ? this.es.resolve(file) : file.fsName;
-    return this.es.link.evaluate(readFileSync(target, "utf8"), target);
+    return this.es.link.evaluate(stripDirectives(readFileSync(target, "utf8")), target);
   }
 
   get global(): Record<string, unknown> | undefined {
@@ -266,7 +297,10 @@ export class DollarMock {
     return this.es.options.env?.[name] ?? null;
   }
 
-  sleep(_milliseconds: number): void {}
+  sleep(milliseconds: number): void {
+    this.es.sleptMs += milliseconds;
+    for (const hook of [...this.es.sleepHooks]) hook();
+  }
 
   gc(): void {}
 }

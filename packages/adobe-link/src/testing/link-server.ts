@@ -28,10 +28,13 @@ export interface LinkServerOptions {
   bridge: Bridge;
   token?: string;
   busyAfterMs?: number;
+  /** The system temp folder (Zenvi Link uses <tempDir>/zenvi-link). */
   tempDir?: string;
+  imageLimit?: number;
   bodyLimit?: number;
   log?: (line: string) => void;
   onActivity?: () => void;
+  preparers?: Record<string, TitlePreparer>;
 }
 
 export interface LinkServer {
@@ -39,6 +42,7 @@ export interface LinkServer {
   stop(): Promise<void>;
   callTool(name: string, args: unknown): Promise<{ receipt: HostReceipt; images: { type: "image"; data: string; mimeType: string }[] }>;
   evalWhenIdle(script: string, timeoutMs?: number): Promise<string | null>;
+  tryEval(script: string, timeoutMs?: number): Promise<{ ran: boolean; value: string | null }>;
   on(event: "call", listener: (call: CallEvent) => void): void;
   off(event: "call", listener: (call: CallEvent) => void): void;
   readonly url: string;
@@ -46,6 +50,8 @@ export interface LinkServer {
   readonly token: string;
   readonly host: string;
   readonly version: string;
+  /** Zenvi Link's temp folder. */
+  readonly tempDir: string;
   readonly queue: { idle: boolean };
   recentCalls(): CallEvent[];
 }
@@ -54,7 +60,9 @@ export const serverModule = require("../../extension/server/server.js") as {
   createLinkServer(options: LinkServerOptions): LinkServer;
   dispatchScript(name: string, args: unknown): string;
   scriptLiteral(text: string): string;
+  insideDir(file: string, dir: string): Promise<boolean>;
   PROTOCOL_VERSIONS: string[];
+  TEMP_FOLDER: string;
 };
 
 export interface QueueOutcome {
@@ -83,14 +91,29 @@ export interface DiscoveryFileInstance {
   readonly file: string;
   readonly tokenFile: string;
   readonly pid: number;
-  publish(details: { url: string; token: string; project: string | null; version: string; appName: string; appVersion: string }): void;
-  setProject(project: string | null): boolean;
+  /** The last write failure, or null. */
+  readonly problem: string | null;
+  publish(
+    details: { url: string; token: string; project: string | null; version: string; appName: string; appVersion: string },
+    options?: { yieldToLive?: boolean },
+  ): Promise<"written" | "yielded" | "failed">;
+  setProject(project: string | null): Promise<boolean>;
   touch(): void;
+  settled(): Promise<void>;
+  owner(): "self" | "other" | "none";
   remove(): boolean;
 }
 
 export const discoveryModule = require("../../extension/server/discovery.js") as {
-  DiscoveryFile: new (options: { host: string; dir?: string; pid?: number; now?: () => Date; minIntervalMs?: number }) => DiscoveryFileInstance;
+  DiscoveryFile: new (options: {
+    host: string;
+    dir?: string;
+    pid?: number;
+    now?: () => Date;
+    minIntervalMs?: number;
+    log?: (line: string) => void;
+    isAlive?: (pid: number) => boolean;
+  }) => DiscoveryFileInstance;
   DISCOVERY_KEYS: string[];
   linkDir(home?: string): string;
 };
@@ -99,7 +122,14 @@ export interface BootedLink {
   host: string;
   server: LinkServer;
   discovery: DiscoveryFileInstance;
-  status(): Record<string, unknown> & { mode: string; url: string; host_script: { ok: boolean; problem: string | null }; recent: CallEvent[] };
+  status(): Record<string, unknown> & {
+    mode: string;
+    ready: boolean;
+    url: string | null;
+    host_script: { ok: boolean; problem: string | null };
+    discovery: { file: string; problem: string | null };
+    recent: CallEvent[];
+  };
   stop(): Promise<void>;
 }
 
@@ -115,14 +145,63 @@ export const bootModule = require("../../extension/server/index.js") as {
     pollMs?: number;
     touchIntervalMs?: number;
     busyAfterMs?: number;
+    tempDir?: string;
     log?: (line: string) => void;
   }): Promise<BootedLink>;
   marketingName(host: string, appVersion: string): string;
   hostOf(environment: { appName?: string }): string | null;
-  EVENTS: Record<"activate" | "beforeQuit" | "statusRequest" | "status" | "call", string>;
+  hostScriptLoader(check: () => Promise<boolean | null>, load: () => Promise<boolean>): () => Promise<void>;
+  EVENTS: Record<"activate" | "activateLegacy" | "beforeQuit" | "beforeQuitLegacy" | "statusRequest" | "status" | "call", string>;
 };
 
 export const bridgeModule = require("../../extension/server/bridge.js") as {
   createCepBridge(cep: unknown): Bridge & Record<string, (...args: never[]) => unknown>;
   fileUriToPath(uri: string): string;
+};
+
+export interface TitleLine {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+}
+
+export interface TitleLayout {
+  width: number;
+  height: number;
+  style: string;
+  placement: string;
+  align: "left" | "center" | "right";
+  weight: number;
+  family: string;
+  fontSize: number;
+  font: string;
+  tracking: number;
+  lines: TitleLine[];
+  fill: string;
+  stroke: { color: string; width: number } | null;
+  shadow: { color: string; blur: number; offset: number } | null;
+  box: { color: string; x: number; y: number; width: number; height: number } | null;
+  warnings: string[];
+}
+
+export interface TitleRenderer {
+  measure(font: string, text: string): number;
+  render(layout: TitleLayout): Buffer;
+}
+
+export type TitlePreparer = (call: {
+  args: Record<string, unknown>;
+  evalScript(script: string): Promise<string>;
+  tempDir: string;
+}) => Promise<null | { args?: Record<string, unknown>; warnings?: string[]; data?: Record<string, unknown> }>;
+
+export const titlesModule = require("../../extension/server/titles.js") as {
+  layoutTitle(spec: Record<string, unknown>, measure: (font: string, text: string) => number): TitleLayout;
+  drawTitle(canvas: unknown, layout: TitleLayout): void;
+  wrapLines(text: string, maxChars: number): string[];
+  cssColor(value: unknown, alpha?: number): string;
+  createCanvasRenderer(document: unknown): TitleRenderer;
+  createTitlePreparer(options: { renderer: TitleRenderer }): TitlePreparer;
+  titleFileName(text: string, layout: TitleLayout): string;
 };

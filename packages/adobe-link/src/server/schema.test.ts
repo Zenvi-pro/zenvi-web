@@ -60,6 +60,50 @@ describe("validateArguments", () => {
     expect(validateArguments(schema, args)).toEqual({ ok: false, message });
   });
 
+  test("defaults are filled inside array items too", () => {
+    const withKeys = inputSchemaFor(
+      defineHostTool({
+        name: "ae_keys",
+        title: "Keys",
+        description: "A tool used to test defaults inside array items in the host server.",
+        input: z.strictObject({
+          keyframes: z
+            .array(z.strictObject({ time: seconds.describe("t"), value: z.number().describe("v"), easing: easing.default("smooth").describe("e") }))
+            .min(1)
+            .describe("Keys"),
+          pair: z.tuple([z.strictObject({ a: z.number().default(1).describe("a") }), z.number()]).optional().describe("Pair"),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      }),
+    );
+    expect(validateArguments(withKeys, { keyframes: [{ time: 0, value: 1 }, { time: 1, value: 2, easing: "snap" }], pair: [{}, 3] })).toEqual({
+      ok: true,
+      args: { keyframes: [{ time: 0, value: 1, easing: "smooth" }, { time: 1, value: 2, easing: "snap" }], pair: [{ a: 1 }, 3] },
+    });
+  });
+
+  test.each([
+    ['{"__proto__": {"text": "x"}}', "`__proto__` is not allowed as an argument name"],
+    ['{"text": "x", "box": {"width": 1, "__proto__": {"height": 2}}}', "`box.__proto__` is not allowed as an argument name"],
+    ['{"text": "x", "tags": [{"constructor": 1}]}', "`tags.0.constructor` is not allowed as an argument name"],
+    ['{"text": "x", "prototype": 1}', "`prototype` is not allowed as an argument name"],
+  ])("refuses keys that would reach Object.prototype: %s", (json, message) => {
+    expect(validateArguments(schema, JSON.parse(json))).toEqual({ ok: false, message });
+  });
+
+  test("required properties must be the object's own", () => {
+    const required = { type: "object", properties: { a: { type: "number" } }, required: ["a"], additionalProperties: false };
+    expect(validateArguments(required, Object.create({ a: 1 }))).toEqual({ ok: false, message: "`a` is required" });
+  });
+
+  test("tuples refuse extra items; allOf needs every branch", () => {
+    const tuple = { type: "object", properties: { p: { type: "array", prefixItems: [{ type: "number" }, { type: "number" }], items: false } }, additionalProperties: false };
+    expect(validateArguments(tuple, { p: [1, 2, 3] })).toEqual({ ok: false, message: "`p` takes at most 2 items" });
+    const both = { type: "object", properties: { b: { allOf: [{ type: "number", minimum: 0 }, { type: "number", maximum: 1 }] } }, additionalProperties: false };
+    expect(validateArguments(both, { b: 0.5 }).ok).toBe(true);
+    expect(validateArguments(both, { b: 2 })).toEqual({ ok: false, message: "`b` must be a number <= 1, got 2" });
+  });
+
   test("arguments must be an object; none means {}", () => {
     expect(validateArguments(schema, [1])).toEqual({ ok: false, message: "arguments must be a JSON object, got array" });
     expect(validateArguments({ type: "object", properties: {}, additionalProperties: false }, undefined)).toEqual({ ok: true, args: {} });

@@ -25,11 +25,31 @@
 // ES3 only: no let/const, arrow functions, template strings, trailing commas,
 // getters/setters, or reserved words as property names (write obj["in"]).
 // Sources stay ASCII: use \u escapes for other characters in strings.
+// No prototype polyfills (the engine is shared with other extensions): use
+// ZenviLink.indexOf(list, value) and ZenviLink.trim(text), not [].indexOf
+// or "".trim().
+
+// State that must survive the bundle being evaluated again: CEP evaluates the
+// manifest's ScriptPath again when the panel opens, which rebuilds ZenviLink
+// (fresh registry, same tools). Long-lived data (render jobs, the configured
+// temp folder) lives on ZenviLink.state, which is this global. Re-declaring a
+// global var does not reset it.
+var ZenviLinkState;
+if (!ZenviLinkState || typeof ZenviLinkState !== "object") {
+    ZenviLinkState = {};
+}
 
 var ZenviLink = (function () {
     var Z = {};
     var registry = {};
     var names = [];
+
+    /** Survives re-evaluation of the host script; keep long-lived registries here. */
+    Z.state = ZenviLinkState;
+    Z.state.loads = (Z.state.loads || 0) + 1;
+    if (!Z.state.config) {
+        Z.state.config = {};
+    }
 
     // Set by the build's generated block (src/host-bundle.ts).
     Z.version = "0.0.0-dev";
@@ -61,7 +81,8 @@ var ZenviLink = (function () {
     ];
 
     // ------------------------------------------------------------------
-    // Small utilities (ES3 has no forEach/map/filter; see 01-polyfills.jsx).
+    // Small utilities (ES3 has no indexOf/trim/forEach/map/filter on the
+    // prototypes, and Zenvi Link adds none; see 01-polyfills.jsx).
 
     function has(object, key) {
         return object !== null && object !== undefined && Object.prototype.hasOwnProperty.call(object, key);
@@ -72,8 +93,37 @@ var ZenviLink = (function () {
         return Object.prototype.toString.call(value) === "[object Array]";
     };
 
+    /**
+     * True when a DOM object has member `name`: feature detection that works for
+     * host methods, which ExtendScript may report as typeof "object", so never
+     * test typeof === "function" on DOM members. Reading the member must not throw.
+     */
+    Z.hasMethod = function (object, name) {
+        try {
+            return object !== null && object !== undefined && object[name] !== undefined && object[name] !== null;
+        } catch (error) {
+            return false;
+        }
+    };
+
     Z.isObject = function (value) {
         return value !== null && typeof value === "object" && !Z.isArray(value);
+    };
+
+    /** Index of `value` in an array (===), or -1. */
+    Z.indexOf = function (list, value) {
+        var i;
+        for (i = 0; i < list.length; i += 1) {
+            if (list[i] === value) {
+                return i;
+            }
+        }
+        return -1;
+    };
+
+    /** `text` without leading and trailing whitespace. */
+    Z.trim = function (text) {
+        return String(text).replace(/^[\s\u00a0\ufeff]+|[\s\u00a0\ufeff]+$/g, "");
     };
 
     Z.each = function (list, fn) {
@@ -222,7 +272,7 @@ var ZenviLink = (function () {
 
     /** `value` when it is one of `allowed`. */
     Z.oneOf = function (key, value, allowed) {
-        if (allowed.indexOf(value) < 0) {
+        if (Z.indexOf(allowed, value) < 0) {
             throw Z.refuse("INVALID_ARGUMENT", "`" + key + "` must be one of " + allowed.join(", ") + "; got " + String(value));
         }
         return value;
@@ -288,12 +338,53 @@ var ZenviLink = (function () {
     };
 
     // ------------------------------------------------------------------
+    // Settings from the server, and the temp folder.
+
+    /**
+     * Settings the server passes once the host script is loaded, as a JSON
+     * string: {temp_dir}. Kept on ZenviLink.state (they survive the script
+     * being evaluated again). Returns the settings as a JSON string.
+     */
+    Z.configure = function (json) {
+        var settings = typeof json === "string" ? JSON.parse(json) : json;
+        var key;
+        for (key in settings) {
+            if (has(settings, key)) {
+                Z.state.config[key] = settings[key];
+            }
+        }
+        return stringify({ok: true, config: Z.state.config});
+    };
+
+    /**
+     * Zenvi Link's temp folder (the server's choice, else <Folder.temp>/zenvi-link),
+     * created if missing. Frame captures go here: the server deletes a capture
+     * once it has sent it, and deletes nothing outside this folder.
+     */
+    Z.tempDir = function () {
+        var folder = new Folder(Z.state.config.temp_dir || (Folder.temp.fsName + "/zenvi-link"));
+        if (!folder.exists) {
+            folder.create();
+        }
+        return folder.fsName;
+    };
+
+    /** A new file path in the temp folder: <prefix>-<time>-<random>.<extension>. */
+    Z.tempFile = function (prefix, extension) {
+        return Z.tempDir() + "/" + (prefix || "zenvi") + "-" + new Date().getTime() + "-" +
+            Math.floor(Math.random() * 1000000000) + "." + (extension || "tmp");
+    };
+
+    // ------------------------------------------------------------------
     // Registry and dispatch.
 
     /**
      * Register the implementation of catalog tool `name`. options (rarely
      * needed): {mutating, undoTitle} override the catalog's readOnlyHint and
-     * title.
+     * title. {mutating: false} keeps a tool that changes the project out of the
+     * dispatch undo group, for tools that must not run inside one (After
+     * Effects: undo itself, saving, rendering); such a tool reports its own
+     * undoSteps (null when it does not say).
      */
     Z.register = function (name, fn, options) {
         var meta;
@@ -320,7 +411,7 @@ var ZenviLink = (function () {
     function failureOutcome(status, code, message) {
         return {
             status: status,
-            code: Z.ERROR_CODES.indexOf(code) >= 0 ? code : "HOST_ERROR",
+            code: Z.indexOf(Z.ERROR_CODES, code) >= 0 ? code : "HOST_ERROR",
             message: String(message)
         };
     }
@@ -367,7 +458,9 @@ var ZenviLink = (function () {
     Z.stringify = stringify;
 
     function newContext(name) {
-        var ctx = {tool: name, warnings: [], didChange: false};
+        // undoSteps: a tool that knows how many undo steps it left (also when it
+        // fails, e.g. render tools outside the undo group) sets ctx.undoSteps = n.
+        var ctx = {tool: name, warnings: [], didChange: false, undoSteps: undefined};
         /** Add a warning to the receipt (snapping, fallbacks, partial results). */
         ctx.warn = function (message) {
             ctx.warnings.push(String(message));
@@ -379,8 +472,15 @@ var ZenviLink = (function () {
         return ctx;
     }
 
+    /** ctx.undoSteps when the tool set a number (or null for unknown), else undefined. */
+    function reportedUndoSteps(ctx) {
+        var value = ctx.undoSteps;
+        return value === null || (typeof value === "number" && isFinite(value)) ? value : undefined;
+    }
+
     function finish(ctx, entry, outcome) {
         var failed = outcome.status === "refused" || outcome.status === "error";
+        var reported = reportedUndoSteps(ctx);
         var message;
         var receipt = {
             contract: Z.contract,
@@ -400,11 +500,26 @@ var ZenviLink = (function () {
                 receipt.error.line = outcome.line;
             }
             if (ctx.didChange) {
-                receipt.undoSteps = Z.adapter.undoStepsWhenApplied;
-                receipt.warnings.push(Z.adapter.partialChangeWarning(entry ? entry.title : ctx.tool));
+                if (entry && entry.mutating) {
+                    receipt.undoSteps = Z.adapter.undoStepsWhenApplied;
+                    receipt.warnings.push(Z.adapter.partialChangeWarning(entry.title));
+                } else {
+                    receipt.undoSteps = null;
+                    receipt.warnings.push("The call failed after it had started changing the project; each change it made is its own undo step.");
+                }
+            }
+            if (reported !== undefined) {
+                receipt.undoSteps = reported;
             }
         } else if (outcome.status === "applied") {
-            receipt.undoSteps = outcome.undoSteps !== undefined ? outcome.undoSteps : Z.adapter.undoStepsWhenApplied;
+            // Without an undo group (read-only tools, {mutating: false}) the count is the tool's to say.
+            if (outcome.undoSteps !== undefined) {
+                receipt.undoSteps = outcome.undoSteps;
+            } else if (reported !== undefined) {
+                receipt.undoSteps = reported;
+            } else {
+                receipt.undoSteps = entry && entry.mutating ? Z.adapter.undoStepsWhenApplied : null;
+            }
         }
         return stringify(receipt);
     }
@@ -476,6 +591,7 @@ var ZenviLink = (function () {
         info.version = Z.version;
         info.protocol = Z.protocol;
         info.tools = names.length;
+        info.loads = Z.state.loads;
         return stringify(info);
     };
 

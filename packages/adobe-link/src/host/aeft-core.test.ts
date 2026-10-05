@@ -1,8 +1,9 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { ImportOptions, createAeMock, type AeMockOptions, type FootageItem } from "../testing/ae-mock.js";
+import { HOST_SCRIPT_DIR } from "../host-bundle.js";
 import { loadHostScript, type LoadedHostScript } from "../testing/host-script.js";
 
 function load(options: AeMockOptions = {}) {
@@ -181,3 +182,18 @@ function writeFile(mock: ReturnType<typeof createAeMock>, name: string) {
   file.close();
   return file;
 }
+
+describe("feature detection of DOM methods", () => {
+  test("never relies on typeof === \"function\" (host methods may report \"object\")", () => {
+    const core = readFileSync(path.join(HOST_SCRIPT_DIR, "aeft", "00-aeft-core.jsx"), "utf8");
+    expect(core).not.toMatch(/typeof [^;]*[!=]== "function"/);
+  });
+
+  test("ZenviLink.hasMethod is true for any member, false for missing, null or throwing ones", () => {
+    const { host } = load();
+    host.evaluate(`var probe = {fn: function () {}, hostish: {}, gone: null};`);
+    expect(host.evaluate(`[ZenviLink.hasMethod(probe, "fn"), ZenviLink.hasMethod(probe, "hostish"), ZenviLink.hasMethod(probe, "gone"), ZenviLink.hasMethod(probe, "nope"), ZenviLink.hasMethod(null, "fn")].join()`)).toBe("true,true,false,false,false");
+    host.context.thrower = new Proxy({}, { get: () => { throw new Error("host error"); } });
+    expect(host.evaluate(`ZenviLink.hasMethod(thrower, "x")`)).toBe(false);
+  });
+});

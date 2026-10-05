@@ -4,8 +4,8 @@
 // IDs (SPEC 3.3): items by item.id; layers by layer.id (After Effects 22+)
 // plus comp_id + layer_index for convenience. Times are comp seconds.
 
-(function (Z) {
-    var AE = {};
+(/** @param {ZenviLinkApi} Z */ function (Z) {
+    var AE = /** @type {ZenviAe} */ ({});
     Z.ae = AE;
     Z.host = "aftereffects";
 
@@ -67,7 +67,7 @@
         if (typeof id !== "number" || Math.floor(id) !== id) {
             throw Z.refuse("INVALID_ARGUMENT", "Item ids are integers; got " + String(id));
         }
-        if (typeof project.itemByID === "function") {
+        if (Z.hasMethod(project, "itemByID")) {
             try {
                 item = project.itemByID(id);
             } catch (lookupError) {
@@ -149,7 +149,7 @@
             if (Math.floor(ref) !== ref || ref < 1) {
                 throw Z.refuse("INVALID_ARGUMENT", "Layer ids are positive integers; got " + ref);
             }
-            if (typeof app.project.layerByID !== "function") {
+            if (!Z.hasMethod(app.project, "layerByID")) {
                 throw Z.refuse("UNSUPPORTED", "Layer ids need After Effects 2022 (22.0) or newer; pass {\"index\": n} or the layer name");
             }
             try {

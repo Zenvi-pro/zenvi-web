@@ -1,0 +1,17 @@
+{
+  "//": "Type-checks the Premiere Pro host scripts against types-for-adobe Premiere/24.0 (ES3 lib, no DOM): npm run typecheck:jsx:ppro",
+  "compilerOptions": {
+    "target": "ES5",
+    "noLib": true,
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "types": ["types-for-adobe/Premiere/24.0"]
+  },
+  "files": ["types/premiere-host.d.ts"],
+  "include": ["extension/host/ppro/*.jsx"]
+}

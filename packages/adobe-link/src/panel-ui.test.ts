@@ -10,7 +10,10 @@ import path from "node:path";
 import vm from "node:vm";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { PACKAGE_ROOT } from "./host-bundle.js";
+import { AE_TOOLS } from "./catalog/aftereffects.js";
+import { toCatalogJson } from "./catalog/types.js";
 import { createAeMock } from "./testing/ae-mock.js";
+import { discoveryModule, serverModule, type LinkServer } from "./testing/link-server.js";
 import { FakeCep, evalInHostScript } from "./testing/fake-cep.js";
 import { loadHostScript } from "./testing/host-script.js";
 
@@ -83,8 +86,11 @@ beforeEach(() => {
   process.env.HOME = home;
 });
 
-afterEach(() => {
+const servers: LinkServer[] = [];
+
+afterEach(async () => {
   for (const unload of unloads.splice(0)) unload();
+  await Promise.all(servers.splice(0).map((server) => server.stop()));
   process.env.HOME = savedHome;
 });
 
@@ -179,4 +185,35 @@ test("shows a running Zenvi desktop", () => {
   writeFileSync(path.join(home, ".openshot_qt", "gui_mcp.json"), JSON.stringify({ url: "http://127.0.0.1:7434/mcp", pid: process.pid, project: "/x/trip.zvn" }));
   const { elements } = runPanel();
   expect(elements.get("desktop-state")?.textContent).toBe(`Running (pid ${process.pid}), trip.zvn`);
+});
+
+test("a service that says it is starting gets time to become ready; the panel does not host meanwhile", async () => {
+  const { elements, cep, timers } = runPanel();
+  cep.fire("pro.zenvi.link.status", { mode: "service", ready: false, host: "aftereffects", url: null });
+  timers.find((timer) => timer.ms === 3000)?.run();
+  await tick();
+  expect(timers.map((timer) => timer.ms)).toContain(15000);
+  expect(elements.get("server-mode")?.textContent).toBe("\u2014");
+  const tokenFile = path.join(home, "aftereffects.token");
+  writeFileSync(tokenFile, "tok");
+  cep.fire("pro.zenvi.link.status", { mode: "service", ready: true, host: "aftereffects", url: "http://127.0.0.1:53012/mcp", token_file: tokenFile, recent: [] });
+  expect(elements.get("server-mode")?.textContent).toBe("Background service");
+  timers.find((timer) => timer.ms === 15000)?.run();
+  await tick();
+  expect(elements.get("server-mode")?.textContent).toBe("Background service");
+});
+
+test("before hosting, the panel looks at the discovery file again and adopts a service that appeared", async () => {
+  const { elements, timers } = runPanel();
+  await tick();
+  const server = serverModule.createLinkServer({ host: "aftereffects", catalog: toCatalogJson("aftereffects", AE_TOOLS), bridge: { evalScript: async () => "" } });
+  servers.push(server);
+  await server.start();
+  const discovery = new discoveryModule.DiscoveryFile({ host: "aftereffects", dir: path.join(home, ".openshot_qt", "link") });
+  await discovery.publish({ url: server.url, token: server.token, project: null, version: "1.0.0", appName: "Adobe After Effects 2026", appVersion: "26.3.0" });
+  timers.find((timer) => timer.ms === 3000)?.run();
+  for (let i = 0; i < 50 && elements.get("server-url")?.textContent !== server.url; i += 1) await tick(20);
+  expect(elements.get("server-url")?.textContent).toBe(server.url);
+  expect(elements.get("server-mode")?.textContent).toBe("Background service");
+  expect(JSON.parse(readFileSync(discovery.file, "utf8")).url).toBe(server.url);
 });
