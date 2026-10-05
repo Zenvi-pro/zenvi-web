@@ -12,6 +12,8 @@
  */
 
 import { writeFileSync } from "node:fs";
+import { deflateSync } from "node:zlib";
+import { parse as parseJs } from "acorn";
 import { BIND_REALM, type HostGlobals, type Realm } from "./realm.js";
 import { createExtendScriptMock, type ExtendScriptMock, type ExtendScriptMockOptions, type FileMock } from "./extendscript-mock.js";
 
@@ -36,22 +38,24 @@ export const PropertyValueType = {
   TEXT_DOCUMENT: 6424,
 } as const;
 
-export const PropertyType = { PROPERTY: 6812, INDEXED_GROUP: 6813, NAMED_GROUP: 6814 } as const;
+export const PropertyType = { PROPERTY: 6212, NAMED_GROUP: 6213, INDEXED_GROUP: 6214 } as const;
 
+/** Values as in types-for-adobe AfterEffects/26.0 (SILHOUETE_ALPHA is After Effects' own spelling). */
 export const BlendingMode = {
   NORMAL: 5212,
   DISSOLVE: 5213,
+  DANCING_DISSOLVE: 5214,
   DARKEN: 5215,
   MULTIPLY: 5216,
-  COLOR_BURN: 5217,
-  LINEAR_BURN: 5218,
-  DARKER_COLOR: 5219,
+  LINEAR_BURN: 5217,
+  COLOR_BURN: 5218,
+  CLASSIC_COLOR_BURN: 5219,
   ADD: 5220,
   LIGHTEN: 5221,
   SCREEN: 5222,
-  COLOR_DODGE: 5223,
-  LINEAR_DODGE: 5224,
-  LIGHTER_COLOR: 5225,
+  LINEAR_DODGE: 5223,
+  COLOR_DODGE: 5224,
+  CLASSIC_COLOR_DODGE: 5225,
   OVERLAY: 5226,
   SOFT_LIGHT: 5227,
   HARD_LIGHT: 5228,
@@ -60,18 +64,27 @@ export const BlendingMode = {
   PIN_LIGHT: 5231,
   HARD_MIX: 5232,
   DIFFERENCE: 5233,
-  EXCLUSION: 5234,
-  SUBTRACT: 5235,
-  DIVIDE: 5236,
-  HUE: 5237,
-  SATURATION: 5238,
-  COLOR: 5239,
-  LUMINOSITY: 5240,
+  CLASSIC_DIFFERENCE: 5234,
+  EXCLUSION: 5235,
+  HUE: 5236,
+  SATURATION: 5237,
+  COLOR: 5238,
+  LUMINOSITY: 5239,
+  STENCIL_ALPHA: 5240,
+  STENCIL_LUMA: 5241,
+  SILHOUETE_ALPHA: 5242,
+  SILHOUETTE_LUMA: 5243,
+  ALPHA_ADD: 5244,
+  LUMINESCENT_PREMUL: 5245,
+  LIGHTER_COLOR: 5246,
+  DARKER_COLOR: 5247,
+  SUBTRACT: 5248,
+  DIVIDE: 5249,
 } as const;
 
 export const TrackMatteType = { NO_TRACK_MATTE: 5012, ALPHA: 5013, ALPHA_INVERTED: 5014, LUMA: 5015, LUMA_INVERTED: 5016 } as const;
 
-export const LayerQuality = { BEST: 4812, DRAFT: 4813, WIREFRAME: 4814 } as const;
+export const LayerQuality = { WIREFRAME: 4612, DRAFT: 4613, BEST: 4614 } as const;
 
 export const ImportAsType = { COMP_CROPPED_LAYERS: 3812, FOOTAGE: 3813, COMP: 3814, PROJECT: 3815 } as const;
 
@@ -152,9 +165,9 @@ export class MarkerValue {
 export class TextDocument {
   font = "ArialMT";
   fontSize = 36;
-  fillColor: number[] = [1, 1, 1];
-  strokeColor: number[] = [0, 0, 0];
-  strokeWidth = 0;
+  private fillValue: number[] = [1, 1, 1];
+  private strokeValue: number[] = [0, 0, 0];
+  private strokeWidthValue = 0;
   strokeOverFill = false;
   applyFill = true;
   applyStroke = false;
@@ -175,6 +188,36 @@ export class TextDocument {
   verticalScale = 1;
 
   constructor(public text = "") {}
+
+  /** Throws on read unless applyFill (Scripting Guide); setting it turns applyFill on. */
+  get fillColor(): number[] {
+    if (!this.applyFill) throw new Error("After Effects error: fillColor is unavailable because applyFill is false");
+    return this.fillValue;
+  }
+
+  set fillColor(value: number[]) {
+    this.fillValue = Array.from(value);
+    this.applyFill = true;
+  }
+
+  get strokeColor(): number[] {
+    if (!this.applyStroke) throw new Error("After Effects error: strokeColor is unavailable because applyStroke is false");
+    return this.strokeValue;
+  }
+
+  set strokeColor(value: number[]) {
+    this.strokeValue = Array.from(value);
+    this.applyStroke = true;
+  }
+
+  get strokeWidth(): number {
+    if (!this.applyStroke) throw new Error("After Effects error: strokeWidth is unavailable because applyStroke is false");
+    return this.strokeWidthValue;
+  }
+
+  set strokeWidth(value: number) {
+    this.strokeWidthValue = Math.max(0.01, value);
+  }
 
   resetCharStyle(): void {
     this.font = "ArialMT";
@@ -208,8 +251,13 @@ export class ImportOptions {
     if (file) this.file = file;
   }
 
+  /** Media files import as footage; layered files (PSD, AI) and projects also as comps. */
   canImportAs(type: number): boolean {
-    return type === ImportAsType.FOOTAGE || type === ImportAsType.COMP;
+    const name = this.file ? this.file.displayName : "";
+    if (type === ImportAsType.FOOTAGE) return /\.(mov|mp4|m4v|avi|mxf|webm|wav|mp3|aif|aiff|m4a|png|jpe?g|tiff?|psd|ai|gif|bmp|exr|svg|dpx|tga)$/i.test(name);
+    if (type === ImportAsType.COMP || type === ImportAsType.COMP_CROPPED_LAYERS) return /\.(psd|ai)$/i.test(name);
+    if (type === ImportAsType.PROJECT) return /\.aepx?$/i.test(name);
+    return false;
   }
 }
 
@@ -248,10 +296,20 @@ export class AeMockState {
   readonly undoCalls: UndoCall[] = [];
   /** app.executeCommand ids. */
   readonly commands: number[] = [];
-  /** Files written by CompItem.saveFrameToPng. */
-  readonly savedFrames: { comp: number; time: number; path: string }[] = [];
+  /** Files written by CompItem.saveFrameToPng (size after the comp's resolution factor). */
+  readonly savedFrames: { comp: number; time: number; path: string; width: number; height: number; resolutionFactor: number[] }[] = [];
   /** Effects `addProperty` and `app.effects` know (DEFAULT_EFFECTS plus registerEffect). */
   readonly effects: EffectDef[] = [];
+  /** PostScript names of installed fonts (`app.fonts` in 24+; before 24 other fonts do not take). */
+  readonly fonts = new Set<string>();
+  /** `$.sleep` calls before a saveFrameToPng file has its content (the file exists, empty, before that). */
+  frameWriteDelay = 2;
+  /** The undo depth at each `app.executeCommand` call. */
+  readonly commandDepths: number[] = [];
+  /** `renderQueue.canQueueInAME`. */
+  canQueueInAME = true;
+  /** Output module template names (default: what this version ships). */
+  outputTemplates: string[] = [];
 
   constructor(
     readonly es: ExtendScriptMock,
@@ -296,7 +354,22 @@ export interface MockKey {
   temporalAutoBezier: boolean;
   temporalContinuous: boolean;
   spatialAutoBezier: boolean;
+  spatialContinuous: boolean;
   selected: boolean;
+}
+
+/**
+ * After Effects reports a syntax error in `expressionError` as soon as an
+ * expression is set; the mock checks syntax with acorn (runtime errors such
+ * as unknown functions are not simulated).
+ */
+function expressionSyntaxError(source: string): string {
+  try {
+    parseJs(source, { ecmaVersion: "latest", sourceType: "script", allowReturnOutsideFunction: true });
+    return "";
+  } catch (error) {
+    return `Error: SyntaxError: ${(error as Error).message}`;
+  }
 }
 
 const KEY_TIME_EPSILON = 1e-6;
@@ -357,6 +430,8 @@ export interface PropertyOptions {
   canVaryOverTime?: boolean;
   min?: number;
   max?: number;
+  /** Returns why the property cannot take a value right now (After Effects hides it), or null. */
+  guard?: () => string | null;
 }
 
 export class Property extends PropertyBase {
@@ -368,16 +443,79 @@ export class Property extends PropertyBase {
   readonly hasMax: boolean;
   readonly minValue: number | undefined;
   readonly maxValue: number | undefined;
-  expression = "";
   expressionEnabled = false;
   expressionError = "";
   canSetExpression = true;
   dimensionsSeparated = false;
   readonly keys: MockKey[] = [];
   private staticValue: unknown;
+  private expressionText = "";
+
+  /** Setting an expression enables it and reports syntax errors in expressionError, like After Effects. */
+  get expression(): string {
+    return this.expressionText;
+  }
+
+  set expression(value: string) {
+    if (!this.canSetExpression) throw new Error(`After Effects error: "${this.name}" cannot have an expression`);
+    this.expressionText = String(value);
+    this.expressionEnabled = this.expressionText !== "";
+    this.expressionError = this.expressionText === "" ? "" : expressionSyntaxError(this.expressionText);
+  }
+
+  /** Position is the leader of X/Y/Z Position; when its dimensions are separated only the followers take values. */
+  get isSeparationLeader(): boolean {
+    return this.matchName === "ADBE Position";
+  }
+
+  private checkNotSeparated(): void {
+    if (this.dimensionsSeparated && this.isSeparationLeader) {
+      throw new Error(`After Effects error: "${this.name}" has separated dimensions; set X Position and Y Position instead`);
+    }
+    const hidden = this.options.guard?.();
+    if (hidden) throw new Error(`After Effects error: can't set "${this.name}": ${hidden}`);
+  }
+
+  /** Before After Effects 24 a font that is not installed does not take: the document keeps its font. */
+  private withInstalledFont(value: unknown): unknown {
+    const state = this.mockState;
+    if (!(value instanceof TextDocument) || !state || state.majorVersion >= 24 || state.fonts.has(value.font)) return value;
+    const previous = (this.keys.length ? (this.keys[0] as MockKey).value : this.staticValue) as TextDocument;
+    const copy = copyValue(value);
+    copy.font = previous.font;
+    return copy;
+  }
+
+  /** A deep copy (Layer.duplicate). */
+  clone(): Property {
+    const copy = new Property(this.name, this.matchName, this.staticValue, {
+      ...this.options,
+      valueType: this.propertyValueType,
+      spatial: this.isSpatial,
+      canVaryOverTime: this.canVaryOverTime,
+    });
+    copy.enabled = this.enabled;
+    copy.dimensionsSeparated = this.dimensionsSeparated;
+    copy.canSetExpression = this.canSetExpression;
+    if (this.expressionText) copy.expression = this.expressionText;
+    copy.expressionEnabled = this.expressionEnabled;
+    for (const key of this.keys) copy.keys.push({ ...key, value: copyValue(key.value), inEase: [...key.inEase], outEase: [...key.outEase] });
+    return copy;
+  }
+
+  /** Text, markers and layer/mask references only hold. */
+  isInterpolationTypeValid(type: number): boolean {
+    const holdOnly: number[] = [PropertyValueType.TEXT_DOCUMENT, PropertyValueType.MARKER, PropertyValueType.LAYER_INDEX, PropertyValueType.MASK_INDEX];
+    if (this.propertyValueType === PropertyValueType.NO_VALUE || this.propertyValueType === PropertyValueType.CUSTOM_VALUE) return false;
+    if (holdOnly.includes(this.propertyValueType)) return type === KeyframeInterpolationType.HOLD;
+    return Object.values(KeyframeInterpolationType).includes(type as never);
+  }
+
+  private readonly options: PropertyOptions;
 
   constructor(name: string, matchName: string, value: unknown, options: PropertyOptions = {}) {
     super(name, matchName);
+    this.options = options;
     this.staticValue = copyValue(value);
     this.propertyValueType = options.valueType ?? inferValueType(value);
     this.isSpatial = options.spatial ?? false;
@@ -416,11 +554,12 @@ export class Property extends PropertyBase {
   }
 
   setValue(value: unknown): void {
+    this.checkNotSeparated();
     if (this.keys.length > 0) {
       throw new Error(`After Effects error: can't use setValue on "${this.name}" because it has keyframes; use setValueAtTime or setValueAtKey`);
     }
     this.checkRange(value);
-    this.staticValue = copyValue(value);
+    this.staticValue = copyValue(this.withInstalledFont(value));
   }
 
   private defaultEase(): KeyframeEase[] {
@@ -433,17 +572,18 @@ export class Property extends PropertyBase {
 
   /** Adds or replaces the key at `time`; returns its 1-based index. */
   private putKey(time: number, value: unknown): number {
+    this.checkNotSeparated();
     if (!this.canVaryOverTime) throw new Error(`After Effects error: "${this.name}" can't be keyframed`);
     this.checkRange(value);
     const existing = this.keyAt(time);
     if (existing >= 0) {
       const key = this.keys[existing] as MockKey;
-      key.value = copyValue(value);
+      key.value = copyValue(this.withInstalledFont(value));
       return existing + 1;
     }
     const key: MockKey = {
       time,
-      value: copyValue(value),
+      value: copyValue(this.withInstalledFont(value)),
       inInterpolation: KeyframeInterpolationType.LINEAR,
       outInterpolation: KeyframeInterpolationType.LINEAR,
       inEase: this.defaultEase(),
@@ -451,6 +591,7 @@ export class Property extends PropertyBase {
       temporalAutoBezier: false,
       temporalContinuous: false,
       spatialAutoBezier: this.isSpatial,
+      spatialContinuous: this.isSpatial,
       selected: false,
     };
     this.keys.push(key);
@@ -531,6 +672,9 @@ export class Property extends PropertyBase {
   }
 
   setInterpolationTypeAtKey(index: number, inType: number, outType: number = inType): void {
+    if (!this.isInterpolationTypeValid(inType) || !this.isInterpolationTypeValid(outType)) {
+      throw new Error(`After Effects error: interpolation type ${inType}/${outType} is not valid for "${this.name}"`);
+    }
     const key = this.key(index);
     key.inInterpolation = inType;
     key.outInterpolation = outType;
@@ -555,6 +699,9 @@ export class Property extends PropertyBase {
   }
 
   setTemporalEaseAtKey(index: number, inEase: KeyframeEase[], outEase: KeyframeEase[] = inEase): void {
+    if (!this.isInterpolationTypeValid(KeyframeInterpolationType.BEZIER)) {
+      throw new Error(`After Effects error: "${this.name}" has no temporal ease`);
+    }
     const key = this.key(index);
     key.inEase = this.checkEase(inEase, "in");
     key.outEase = this.checkEase(outEase, "out");
@@ -582,8 +729,41 @@ export class Property extends PropertyBase {
 
   setSpatialTangentsAtKey(index: number, inTangent: number[], outTangent: number[] = inTangent): void {
     const key = this.key(index);
+    const size = this.propertyValueType === PropertyValueType.TwoD_SPATIAL ? 2 : 3;
+    if (!this.isSpatial) throw new Error(`After Effects error: "${this.name}" is not spatial`);
+    if (Array.from(inTangent).length !== size || Array.from(outTangent).length !== size) {
+      throw new Error(`After Effects error: spatial tangents for "${this.name}" need ${size} values`);
+    }
     key.inSpatialTangent = Array.from(inTangent);
     key.outSpatialTangent = Array.from(outTangent);
+  }
+
+  setSpatialContinuousAtKey(index: number, value: boolean): void {
+    this.key(index).spatialContinuous = value;
+  }
+
+  keySpatialContinuous(index: number): boolean {
+    return this.key(index).spatialContinuous;
+  }
+
+  keySpatialAutoBezier(index: number): boolean {
+    return this.key(index).spatialAutoBezier;
+  }
+
+  keyTemporalAutoBezier(index: number): boolean {
+    return this.key(index).temporalAutoBezier;
+  }
+
+  keyTemporalContinuous(index: number): boolean {
+    return this.key(index).temporalContinuous;
+  }
+
+  keyInSpatialTangent(index: number): number[] {
+    return this.exported(this.key(index).inSpatialTangent ?? []);
+  }
+
+  keyOutSpatialTangent(index: number): number[] {
+    return this.exported(this.key(index).outSpatialTangent ?? []);
   }
 
   setSelectedAtKey(index: number, selected: boolean): void {
@@ -610,6 +790,8 @@ function inferValueType(value: unknown): number {
 export interface AddableProperty {
   name: string;
   create: (state: AeMockState) => PropertyBase;
+  /** Name new children "<name> <n>" (Mask 1, Animator 2, Range Selector 1, Group 3). */
+  numbered?: boolean;
 }
 
 export interface PropertyGroupOptions {
@@ -666,8 +848,31 @@ export class PropertyGroup extends PropertyBase {
   addProperty(ref: string): PropertyBase {
     const entry = this.addableFor(ref);
     if (!entry || !this.state) throw new Error(`After Effects error: can't add a property named "${ref}" to "${this.name}"`);
-    return this.add(entry.create(this.state));
+    const child = this.add(entry.create(this.state));
+    if (entry.numbered) child.name = `${entry.name} ${this.children.filter((sibling) => sibling.matchName === child.matchName).length}`;
+    return child;
   }
+
+  /** A deep copy (Layer.duplicate). */
+  clone(): PropertyGroup {
+    const options: PropertyGroupOptions = {
+      indexed: this.propertyType === PropertyType.INDEXED_GROUP,
+      addable: this.addable,
+      isEffect: this.isEffect,
+      isMask: this.isMask,
+    };
+    if (this.state) options.state = this.state;
+    const copy = new PropertyGroup(this.name, this.matchName, options);
+    copy.enabled = this.enabled;
+    for (const child of this.children) copy.add(cloneProperty(child));
+    return copy;
+  }
+}
+
+function cloneProperty(source: PropertyBase): PropertyBase {
+  if (source instanceof MaskPropertyGroup) return source.clone();
+  if (source instanceof PropertyGroup) return source.clone();
+  return (source as Property).clone();
 }
 
 // ---------------------------------------------------------------------------
@@ -720,7 +925,76 @@ export const DEFAULT_EFFECTS: EffectDef[] = [
       { name: "Softness", matchName: "ADBE Drop Shadow-0005", value: 0, options: { min: 0 } },
     ],
   },
+  {
+    displayName: "Slider Control",
+    matchName: "ADBE Slider Control",
+    category: "Expression Controls",
+    params: [{ name: "Slider", matchName: "ADBE Slider Control-0001", value: 0 }],
+  },
+  lumetriColor(),
+  {
+    displayName: "Color Balance",
+    matchName: "ADBE Color Balance 2",
+    category: "Color Correction",
+    params: [
+      ...["Shadow", "Midtone", "Highlight"].flatMap((range, r) =>
+        ["Red", "Green", "Blue"].map((channel, c) => ({
+          name: `${range} ${channel} Balance`,
+          matchName: `ADBE Color Balance 2-${String(r * 3 + c + 1).padStart(4, "0")}`,
+          value: 0,
+          options: { min: -100, max: 100 },
+        })),
+      ),
+      { name: "Preserve Luminosity", matchName: "ADBE Color Balance 2-0010", value: 0, options: { min: 0, max: 1 } },
+    ],
+  },
 ];
+
+/**
+ * Lumetri Color as After Effects lays it out: one flat list in which the
+ * twirl-down sections (Basic Correction, Creative, Vignette...) are NO_VALUE
+ * markers, so two parameters can share a name (Saturation). Match names
+ * here are placeholders; tools find Lumetri parameters by section and name.
+ */
+function lumetriColor(): EffectDef {
+  const marker = (name: string): EffectParamDef => ({ name, matchName: "", value: null, options: { valueType: PropertyValueType.NO_VALUE, canVaryOverTime: false } });
+  const slider = (name: string, value: number, min: number, max: number): EffectParamDef => ({ name, matchName: "", value, options: { min, max } });
+  const params: EffectParamDef[] = [
+    marker("Basic Correction"),
+    marker("White Balance"),
+    slider("Temperature", 0, -100, 100),
+    slider("Tint", 0, -100, 100),
+    marker("Tone"),
+    slider("Exposure", 0, -5, 5),
+    slider("Contrast", 0, -100, 100),
+    slider("Highlights", 0, -100, 100),
+    slider("Shadows", 0, -100, 100),
+    slider("Whites", 0, -100, 100),
+    slider("Blacks", 0, -100, 100),
+    slider("Saturation", 100, 0, 200),
+    marker("Creative"),
+    slider("Intensity", 100, 0, 200),
+    marker("Adjustments"),
+    slider("Faded Film", 0, 0, 100),
+    slider("Sharpen", 0, -100, 100),
+    slider("Vibrance", 0, -100, 100),
+    slider("Saturation", 100, 0, 200),
+    { name: "Shadow Tint", matchName: "", value: [0, 0, 0, 1], options: { valueType: PropertyValueType.COLOR } },
+    { name: "Highlight Tint", matchName: "", value: [0, 0, 0, 1], options: { valueType: PropertyValueType.COLOR } },
+    slider("Tint Balance", 0, -100, 100),
+    marker("Vignette"),
+    slider("Amount", 0, -5, 5),
+    slider("Midpoint", 50, 0, 100),
+    slider("Roundness", 0, -100, 100),
+    slider("Feather", 50, 0, 100),
+  ];
+  return {
+    displayName: "Lumetri Color",
+    matchName: "ADBE Lumetri",
+    category: "Color Correction",
+    params: params.map((param, i) => ({ ...param, matchName: `ADBE Lumetri-${String(i + 1).padStart(4, "0")}` })),
+  };
+}
 
 function addableEffect(def: EffectDef): AddableProperty {
   return {
@@ -735,6 +1009,7 @@ function addableEffect(def: EffectDef): AddableProperty {
 
 const ADDABLE_MASK: AddableProperty = {
   name: "Mask",
+  numbered: true,
   create: (state) => {
     const mask = new MaskPropertyGroup(state);
     mask.add(new Property("Mask Path", "ADBE Mask Shape", new Shape(), { valueType: PropertyValueType.SHAPE }));
@@ -754,6 +1029,13 @@ export class MaskPropertyGroup extends PropertyGroup {
 
   constructor(state: AeMockState) {
     super("Mask 1", "ADBE Mask Atom", { isMask: true, state });
+  }
+
+  override clone(): MaskPropertyGroup {
+    const copy = new MaskPropertyGroup(this.state as AeMockState);
+    Object.assign(copy, { name: this.name, maskMode: this.maskMode, inverted: this.inverted, rotoBezier: this.rotoBezier, locked: this.locked, color: [...this.color] });
+    for (const child of this.children) copy.add(cloneProperty(child));
+    return copy;
   }
 }
 
@@ -903,11 +1185,69 @@ export class CompItem extends AVItem {
     this.project.activeItem = this;
   }
 
-  /** Writes a 1×1 PNG at `file` and records the call (the real app renders the frame there). */
+  /**
+   * Writes a black PNG of the comp's size divided by its resolution factor.
+   * Like After Effects it returns first: the file exists but is empty until
+   * the script has called `$.sleep` `frameWriteDelay` times.
+   */
   saveFrameToPng(time: number, file: FileMock): void {
-    this.mock.savedFrames.push({ comp: this.id, time, path: file.fsName });
-    writeFileSync(file.fsName, Buffer.from(TINY_PNG_BASE64, "base64"));
+    const [fx, fy] = Array.from(this.resolutionFactor) as [number, number];
+    const width = Math.max(1, Math.round(this.width / fx));
+    const height = Math.max(1, Math.round(this.height / fy));
+    this.mock.savedFrames.push({ comp: this.id, time, path: file.fsName, width, height, resolutionFactor: [fx, fy] });
+    const png = blackPng(width, height);
+    const delay = this.mock.frameWriteDelay;
+    if (delay <= 0) {
+      writeFileSync(file.fsName, png);
+      return;
+    }
+    writeFileSync(file.fsName, Buffer.alloc(0));
+    const hooks = this.mock.es.state.sleepHooks;
+    let sleeps = 0;
+    const hook = (): void => {
+      sleeps += 1;
+      if (sleeps < delay) return;
+      writeFileSync(file.fsName, png);
+      hooks.splice(hooks.indexOf(hook), 1);
+    };
+    hooks.push(hook);
   }
+}
+
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+function crc32(bytes: Buffer): number {
+  let c = 0xffffffff;
+  for (const byte of bytes) c = (CRC_TABLE[(c ^ byte) & 0xff] as number) ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([length, body, crc]);
+}
+
+/** A valid all-black 8-bit greyscale PNG. */
+export function blackPng(width: number, height: number): Buffer {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  const rows = Buffer.alloc((width + 1) * height);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(rows)),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
 }
 
 /** The smallest valid PNG (1×1, opaque black). */
@@ -951,6 +1291,10 @@ function transformGroup(comp: CompItem, width: number, height: number): Property
   const group = new PropertyGroup("Transform", "ADBE Transform Group");
   group.add(new Property("Anchor Point", "ADBE Anchor Point", [width / 2, height / 2, 0], { spatial: true, valueType: PropertyValueType.ThreeD_SPATIAL }));
   group.add(new Property("Position", "ADBE Position", [comp.width / 2, comp.height / 2, 0], { spatial: true, valueType: PropertyValueType.ThreeD_SPATIAL }));
+  // Separated dimensions: always in the DOM, used when Position.dimensionsSeparated is true.
+  group.add(new Property("X Position", "ADBE Position_0", comp.width / 2));
+  group.add(new Property("Y Position", "ADBE Position_1", comp.height / 2));
+  group.add(new Property("Z Position", "ADBE Position_2", 0));
   group.add(new Property("Scale", "ADBE Scale", [100, 100, 100], { valueType: PropertyValueType.ThreeD }));
   group.add(new Property("Rotation", "ADBE Rotate Z", 0));
   group.add(new Property("Opacity", "ADBE Opacity", 100, { min: 0, max: 100 }));
@@ -1076,6 +1420,18 @@ export abstract class Layer {
     this.parent = parent;
   }
 
+  /** A copy (properties, keyframes, effects, masks) placed directly above this layer, like After Effects. */
+  duplicate(): Layer {
+    const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as Layer, this);
+    const fields = copy as unknown as { root: PropertyGroup; id?: number };
+    fields.root = this.root.clone();
+    if (this.mock.majorVersion >= 22) fields.id = this.mock.nextLayerId++;
+    else this.mock.nextLayerId++;
+    const list = this.containingComp.layerList;
+    list.splice(list.indexOf(this), 0, copy);
+    return copy;
+  }
+
   activeAtTime(time: number): boolean {
     return this.enabled && time >= this.inPoint && time < this.outPoint;
   }
@@ -1093,10 +1449,24 @@ export class AVLayer extends Layer {
   collapseTransformation = false;
   frameBlending = false;
   preserveTransparency = false;
+  guideLayer = false;
+  /** After Effects 2023+: setTrackMatte / removeTrackMatte / trackMatteLayer (absent before). */
+  setTrackMatte?: (layer: AVLayer | null, type: number) => void;
+  removeTrackMatte?: () => void;
+  private matteLayer: AVLayer | null = null;
 
   constructor(mock: AeMockState, comp: CompItem, name: string, source: AVItem | null, width: number, height: number) {
     super(mock, comp, name, width, height);
     this.source = source;
+    if (mock.majorVersion >= 23) {
+      this.setTrackMatte = (layer, type) => {
+        this.matteLayer = layer;
+        this.trackMatteType = layer ? type : TrackMatteType.NO_TRACK_MATTE;
+      };
+      this.removeTrackMatte = () => {
+        this.matteLayer = null;
+      };
+    }
     this.root.add(new PropertyGroup("Masks", "ADBE Mask Parade", { indexed: true, state: mock, addable: new Map([["ADBE Mask Atom", ADDABLE_MASK]]) }));
     this.root.add(
       new PropertyGroup("Effects", "ADBE Effect Parade", {
@@ -1124,6 +1494,20 @@ export class AVLayer extends Layer {
     return this.trackMatteType !== TrackMatteType.NO_TRACK_MATTE;
   }
 
+  /** After Effects 2023+ only (undefined before). */
+  get trackMatteLayer(): AVLayer | null | undefined {
+    return this.mock.majorVersion >= 23 ? this.matteLayer : undefined;
+  }
+
+  get hasAudio(): boolean {
+    return this.source ? this.source.hasAudio : false;
+  }
+
+  /** Precomps and vector layers (text, shapes) can collapse transformations. */
+  get canSetCollapseTransformation(): boolean {
+    return this.source instanceof CompItem || this instanceof TextLayer || this instanceof ShapeLayer;
+  }
+
   /** Bounds of the layer content (the whole source for footage/solids). */
   sourceRectAtTime(_time: number, _includeExtents: boolean): { top: number; left: number; width: number; height: number } {
     return { top: 0, left: 0, width: this.width, height: this.height };
@@ -1139,26 +1523,159 @@ export class TextLayer extends AVLayer {
     super(mock, comp, text.text || "Text", null, comp.width, comp.height);
     const textGroup = new PropertyGroup("Text", "ADBE Text Properties");
     textGroup.add(new Property("Source Text", "ADBE Text Document", text, { valueType: PropertyValueType.TEXT_DOCUMENT }));
-    textGroup.add(new PropertyGroup("Animators", "ADBE Text Animators", { indexed: true, state: mock }));
+    textGroup.add(new PropertyGroup("Animators", "ADBE Text Animators", { indexed: true, state: mock, addable: new Map([["ADBE Text Animator", ADDABLE_TEXT_ANIMATOR]]) }));
     this.root.children.splice(1, 0, textGroup);
     textGroup.parentProperty = this.root;
   }
 
-  /** A rough box: 0.6 em per character, one line per newline. */
-  override sourceRectAtTime(_time: number, _includeExtents: boolean): { top: number; left: number; width: number; height: number } {
+  /**
+   * A rough box in layer space, the origin at the first baseline: 0.6 em per
+   * character, cap height 0.75 em above the baseline, the leading (or 1.2 em)
+   * per extra line. Centered and right-justified text extend left of the
+   * origin; paragraph text is its box, centred on the origin.
+   */
+  override sourceRectAtTime(time: number, _includeExtents: boolean): { top: number; left: number; width: number; height: number } {
     const doc = (this.property("ADBE Text Properties") as PropertyGroup).property("ADBE Text Document") as Property;
-    const value = doc.value as TextDocument;
+    const value = doc.valueAtTime(time) as TextDocument;
+    if (value.boxText) {
+      const [w, h] = Array.from(value.boxTextSize) as [number, number];
+      return { top: -h / 2, left: -w / 2, width: w, height: h };
+    }
     const lines = value.text.split(/\r|\n/);
     const width = Math.max(...lines.map((line) => line.length)) * value.fontSize * 0.6;
-    const height = lines.length * value.fontSize * 1.2;
-    return { top: -value.fontSize, left: 0, width, height };
+    const lineHeight = value.leading > 0 ? value.leading : value.fontSize * 1.2;
+    const height = value.fontSize + (lines.length - 1) * lineHeight;
+    const left = value.justification === ParagraphJustification.CENTER_JUSTIFY ? -width / 2 : value.justification === ParagraphJustification.RIGHT_JUSTIFY ? -width : 0;
+    return { top: -value.fontSize * 0.75, left, width, height };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Text animators (Scripting Guide match names; Range Selector dropdowns are 1-based)
+
+function rangeSelector(state: AeMockState): PropertyGroup {
+  const selector = new PropertyGroup("Range Selector 1", "ADBE Text Selector", { state });
+  const advanced = new PropertyGroup("Advanced", "ADBE Text Range Advanced", { state });
+  // Percentage and Index values both exist; After Effects only lets scripts set the ones Units reveals.
+  const units = (): number => (advanced.property("ADBE Text Range Units") as Property).value as number;
+  const percent = (): string | null => (units() === 1 ? null : "it is hidden while Units is Index");
+  const index = (): string | null => (units() === 2 ? null : "it is hidden while Units is Percentage");
+  selector.add(new Property("Start", "ADBE Text Percent Start", 0, { min: 0, max: 100, guard: percent }));
+  selector.add(new Property("End", "ADBE Text Percent End", 100, { min: 0, max: 100, guard: percent }));
+  selector.add(new Property("Offset", "ADBE Text Percent Offset", 0, { min: -100, max: 100, guard: percent }));
+  selector.add(new Property("Start", "ADBE Text Index Start", 0, { min: 0, guard: index }));
+  selector.add(new Property("End", "ADBE Text Index End", 1, { min: 0, guard: index }));
+  selector.add(new Property("Offset", "ADBE Text Index Offset", 0, { guard: index }));
+  selector.add(advanced);
+  advanced.add(new Property("Units", "ADBE Text Range Units", 1, { min: 1, max: 2 }));
+  advanced.add(new Property("Based On", "ADBE Text Range Type2", 1, { min: 1, max: 4 }));
+  advanced.add(new Property("Mode", "ADBE Text Selector Mode", 1, { min: 1, max: 6 }));
+  advanced.add(new Property("Amount", "ADBE Text Selector Max Amount", 100, { min: -100, max: 100 }));
+  advanced.add(new Property("Shape", "ADBE Text Range Shape", 1, { min: 1, max: 6 }));
+  advanced.add(new Property("Smoothness", "ADBE Text Selector Smoothness", 100, { min: 0, max: 100 }));
+  advanced.add(new Property("Ease High", "ADBE Text Levels Max Ease", 0, { min: -100, max: 100 }));
+  advanced.add(new Property("Ease Low", "ADBE Text Levels Min Ease", 0, { min: -100, max: 100 }));
+  advanced.add(new Property("Randomize Order", "ADBE Text Randomize Order", 0, { min: 0, max: 1 }));
+  advanced.add(new Property("Random Seed", "ADBE Text Random Seed", 0));
+  return selector;
+}
+
+const TEXT_ANIMATOR_PROPERTIES = new Map<string, AddableProperty>([
+  ["ADBE Text Opacity", { name: "Opacity", create: () => new Property("Opacity", "ADBE Text Opacity", 100, { min: 0, max: 100 }) }],
+  ["ADBE Text Position 3D", { name: "Position", create: () => new Property("Position", "ADBE Text Position 3D", [0, 0, 0], { valueType: PropertyValueType.ThreeD }) }],
+  ["ADBE Text Scale 3D", { name: "Scale", create: () => new Property("Scale", "ADBE Text Scale 3D", [100, 100, 100], { valueType: PropertyValueType.ThreeD }) }],
+  ["ADBE Text Rotation", { name: "Rotation", create: () => new Property("Rotation", "ADBE Text Rotation", 0) }],
+  ["ADBE Text Blur", { name: "Blur", create: () => new Property("Blur", "ADBE Text Blur", [0, 0], { valueType: PropertyValueType.TwoD }) }],
+  ["ADBE Text Tracking Amount", { name: "Tracking Amount", create: () => new Property("Tracking Amount", "ADBE Text Tracking Amount", 0) }],
+  ["ADBE Text Fill Color", { name: "Fill Color", create: () => new Property("Fill Color", "ADBE Text Fill Color", [1, 1, 1, 1], { valueType: PropertyValueType.COLOR }) }],
+]);
+
+const ADDABLE_TEXT_ANIMATOR: AddableProperty = {
+  name: "Animator",
+  numbered: true,
+  create: (state) => {
+    const animator = new PropertyGroup("Animator 1", "ADBE Text Animator", { state });
+    animator.add(
+      new PropertyGroup("Selectors", "ADBE Text Selectors", {
+        indexed: true,
+        state,
+        addable: new Map([["ADBE Text Selector", { name: "Range Selector", numbered: true, create: rangeSelector }]]),
+      }),
+    );
+    animator.add(new PropertyGroup("Properties", "ADBE Text Animator Properties", { state, addable: TEXT_ANIMATOR_PROPERTIES }));
+    return animator;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Shape layer contents
+
+function vectorTransform(state: AeMockState): PropertyGroup {
+  const transform = new PropertyGroup("Transform", "ADBE Vector Transform Group", { state });
+  transform.add(new Property("Anchor Point", "ADBE Vector Anchor", [0, 0], { spatial: true, valueType: PropertyValueType.TwoD_SPATIAL }));
+  transform.add(new Property("Position", "ADBE Vector Position", [0, 0], { spatial: true, valueType: PropertyValueType.TwoD_SPATIAL }));
+  transform.add(new Property("Scale", "ADBE Vector Scale", [100, 100], { valueType: PropertyValueType.TwoD }));
+  transform.add(new Property("Rotation", "ADBE Vector Rotation", 0));
+  transform.add(new Property("Opacity", "ADBE Vector Group Opacity", 100, { min: 0, max: 100 }));
+  return transform;
+}
+
+function shapeItem(name: string, matchName: string, children: (state: AeMockState) => PropertyBase[]): AddableProperty {
+  return {
+    name,
+    numbered: true,
+    create: (state) => {
+      const group = new PropertyGroup(`${name} 1`, matchName, { state });
+      for (const child of children(state)) group.add(child);
+      return group;
+    },
+  };
+}
+
+const SHAPE_ITEMS: Map<string, AddableProperty> = new Map([
+  [
+    "ADBE Vector Group",
+    shapeItem("Group", "ADBE Vector Group", (state) => [
+      new PropertyGroup("Contents", "ADBE Vectors Group", { indexed: true, state, addable: SHAPE_ITEMS }),
+      vectorTransform(state),
+    ]),
+  ],
+  [
+    "ADBE Vector Shape - Rect",
+    shapeItem("Rectangle Path", "ADBE Vector Shape - Rect", () => [
+      new Property("Size", "ADBE Vector Rect Size", [100, 100], { valueType: PropertyValueType.TwoD }),
+      new Property("Position", "ADBE Vector Rect Position", [0, 0], { spatial: true, valueType: PropertyValueType.TwoD_SPATIAL }),
+      new Property("Roundness", "ADBE Vector Rect Roundness", 0, { min: 0 }),
+    ]),
+  ],
+  [
+    "ADBE Vector Shape - Ellipse",
+    shapeItem("Ellipse Path", "ADBE Vector Shape - Ellipse", () => [
+      new Property("Size", "ADBE Vector Ellipse Size", [100, 100], { valueType: PropertyValueType.TwoD }),
+      new Property("Position", "ADBE Vector Ellipse Position", [0, 0], { spatial: true, valueType: PropertyValueType.TwoD_SPATIAL }),
+    ]),
+  ],
+  [
+    "ADBE Vector Graphic - Fill",
+    shapeItem("Fill", "ADBE Vector Graphic - Fill", () => [
+      new Property("Color", "ADBE Vector Fill Color", [1, 0, 0, 1], { valueType: PropertyValueType.COLOR }),
+      new Property("Opacity", "ADBE Vector Fill Opacity", 100, { min: 0, max: 100 }),
+    ]),
+  ],
+  [
+    "ADBE Vector Graphic - Stroke",
+    shapeItem("Stroke", "ADBE Vector Graphic - Stroke", () => [
+      new Property("Color", "ADBE Vector Stroke Color", [1, 1, 1, 1], { valueType: PropertyValueType.COLOR }),
+      new Property("Opacity", "ADBE Vector Stroke Opacity", 100, { min: 0, max: 100 }),
+      new Property("Stroke Width", "ADBE Vector Stroke Width", 2, { min: 0 }),
+    ]),
+  ],
+]);
 
 export class ShapeLayer extends AVLayer {
   constructor(mock: AeMockState, comp: CompItem) {
     super(mock, comp, "Shape Layer 1", null, comp.width, comp.height);
-    const contents = new PropertyGroup("Contents", "ADBE Root Vectors Group", { indexed: true, state: mock });
+    const contents = new PropertyGroup("Contents", "ADBE Root Vectors Group", { indexed: true, state: mock, addable: SHAPE_ITEMS });
     this.root.children.splice(1, 0, contents);
     contents.parentProperty = this.root;
   }
@@ -1266,29 +1783,67 @@ export class LayerCollection {
 // ---------------------------------------------------------------------------
 // Render queue
 
+/** The output module templates a fresh install of each After Effects version ships. */
+export function defaultOutputTemplates(majorVersion: number): string[] {
+  const base = ["Lossless", "Lossless with Alpha", "Alpha Only", "AIFF 48kHz", "Photoshop", "TIFF Sequence with Alpha", "Multi-Machine Sequence"];
+  const highQuality = majorVersion >= 22 ? ["High Quality", "High Quality with Alpha"] : [];
+  const h264 = majorVersion >= 23 ? ["H.264 - Match Render Settings - 15 Mbps", "H.264 - Match Render Settings - 40 Mbps", "H.264 - Match Render Settings - 5 Mbps"] : [];
+  return [...h264, ...highQuality, ...base];
+}
+
+export const RENDER_SETTINGS_TEMPLATES = ["Best Settings", "Current Settings", "DV Settings", "Draft Settings", "Multi-Machine Settings"];
+
 export class OutputModule {
   file: FileMock | null = null;
   templateName = "Lossless";
-  readonly templates = ["Lossless", "Lossless with Alpha", "H.264 - Match Render Settings - 15 Mbps", "High Quality", "High Quality with Alpha"];
+
+  constructor(private readonly mock: AeMockState) {}
+
+  get templates(): string[] {
+    return this.mock.array(this.mock.outputTemplates);
+  }
 
   applyTemplate(name: string): void {
-    if (!this.templates.includes(name)) throw new Error(`After Effects error: no output module template named "${name}"`);
+    if (!this.mock.outputTemplates.includes(name)) throw new Error(`After Effects error: no output module template named "${name}"`);
     this.templateName = name;
   }
 }
 
 export class RenderQueueItem {
   status: number = RQItemStatus.QUEUED;
-  render = true;
-  readonly outputModules: OutputModule[] = [new OutputModule()];
+  readonly outputModules: OutputModule[];
   timeSpanStart = 0;
   timeSpanDuration: number;
+  renderSettings = "Best Settings";
+  private renderFlag = true;
 
   constructor(
     private readonly queue: RenderQueue,
     readonly comp: CompItem,
   ) {
     this.timeSpanDuration = comp.duration;
+    this.outputModules = [new OutputModule(queue.mock)];
+  }
+
+  /** The Render checkbox: unchecking a queued item unqueues it. */
+  get render(): boolean {
+    return this.renderFlag;
+  }
+
+  set render(value: boolean) {
+    this.renderFlag = value;
+    if (this.status === RQItemStatus.QUEUED || this.status === RQItemStatus.UNQUEUED) {
+      this.status = value ? RQItemStatus.QUEUED : RQItemStatus.UNQUEUED;
+    }
+  }
+
+  get templates(): string[] {
+    return this.queue.mock.array(RENDER_SETTINGS_TEMPLATES);
+  }
+
+  applyTemplate(name: string): void {
+    if (!RENDER_SETTINGS_TEMPLATES.includes(name)) throw new Error(`After Effects error: no render settings template named "${name}"`);
+    this.renderSettings = name;
   }
 
   get numOutputModules(): number {
@@ -1327,6 +1882,16 @@ export class RenderQueue {
   /** Comp ids passed to queueInAME. */
   readonly sentToMediaEncoder: number[] = [];
   readonly items: RenderQueueItems = oneBased(new RenderQueueItems(this), () => this.list);
+  /** Comp ids rendered by render(), in order. */
+  readonly rendered: number[] = [];
+  /** Make the next render() stop with ERR_STOPPED (tests). */
+  failNextRender = false;
+
+  constructor(readonly mock: AeMockState) {}
+
+  get canQueueInAME(): boolean {
+    return this.mock.canQueueInAME;
+  }
 
   get numItems(): number {
     return this.list.length;
@@ -1338,16 +1903,19 @@ export class RenderQueue {
     return item;
   }
 
-  /** Marks queued items done and writes an empty file at each output path. */
+  /** Renders queued items with Render checked: writes a small file at each output path and marks them done. */
   render(): void {
     for (const item of this.list) {
-      if (item.status !== RQItemStatus.QUEUED) continue;
-      for (const module of item.outputModules) {
-        if (module.file) {
-          module.file.open("w");
-          module.file.close();
-        }
+      if (item.status !== RQItemStatus.QUEUED || !item.render) continue;
+      if (this.failNextRender) {
+        this.failNextRender = false;
+        item.status = RQItemStatus.ERR_STOPPED;
+        continue;
       }
+      for (const module of item.outputModules) {
+        if (module.file) writeFileSync(module.file.fsName, `rendered ${item.comp.name} with ${module.templateName}`);
+      }
+      this.rendered.push(item.comp.id);
       item.status = RQItemStatus.DONE;
     }
   }
@@ -1368,11 +1936,13 @@ export class Project {
   readonly allItems: Item[] = [];
   readonly items: ItemCollection;
   readonly rootFolder: FolderItem;
-  readonly renderQueue = new RenderQueue();
+  readonly renderQueue: RenderQueue;
+  expressionEngine: "extendscript" | "javascript-1.0" = "javascript-1.0";
   /** After Effects 22+: replaced with undefined for older versions. */
   layerByID?: (id: number) => Layer | null;
 
   constructor(private readonly mock: AeMockState) {
+    this.renderQueue = new RenderQueue(mock);
     this.rootFolder = new FolderItem(mock, "Root", this);
     this.items = oneBased(new ItemCollection(mock, this, null), () => this.allItems);
     if (mock.majorVersion >= 22) {
@@ -1466,6 +2036,16 @@ export class App {
     this.project = new Project(mock);
   }
 
+  /** After Effects 24+: the font list (undefined before 24). */
+  get fonts(): { getFontsByPostScriptName(name: string): { postScriptName: string; familyName: string; isSubstitute: boolean }[] } | undefined {
+    if (this.mock.majorVersion < 24) return undefined;
+    const mock = this.mock;
+    return {
+      getFontsByPostScriptName: (name: string) =>
+        mock.array(mock.fonts.has(name) ? [{ postScriptName: name, familyName: name.split("-")[0] ?? name, isSubstitute: false }] : []),
+    };
+  }
+
   get effects(): { displayName: string; matchName: string; category: string; version: string }[] {
     return this.mock.array(this.mock.effects.map((def) => ({ displayName: def.displayName, matchName: def.matchName, category: def.category, version: "1.0" })));
   }
@@ -1487,6 +2067,7 @@ export class App {
 
   executeCommand(id: number): void {
     this.mock.commands.push(id);
+    this.mock.commandDepths.push(this.mock.undoDepth);
   }
 }
 
@@ -1496,7 +2077,18 @@ export class App {
 export interface AeMockOptions extends ExtendScriptMockOptions {
   /** `app.version` (default "26.3x12"); before 22, layers have no `id` and the project no `layerByID`. */
   version?: string;
+  /** Installed fonts by PostScript name (default: Arial and Helvetica Neue, no Inter). */
+  fonts?: string[];
+  /** `$.sleep` calls before a saved frame has content (default 2; 0 = written at once). */
+  frameWriteDelay?: number;
+  /** `renderQueue.canQueueInAME` (default true). */
+  canQueueInAME?: boolean;
+  /** Output module templates (default: what this version ships). */
+  outputTemplates?: string[];
 }
+
+/** Fonts a stock Mac without extra fonts has. */
+export const DEFAULT_FONTS = ["ArialMT", "Arial-BoldMT", "HelveticaNeue", "HelveticaNeue-Bold"];
 
 export interface CompOptions {
   name?: string;
@@ -1529,6 +2121,10 @@ export function createAeMock(options: AeMockOptions = {}): AeMock {
   const es = createExtendScriptMock(options);
   const state = new AeMockState(es, Number.parseInt(version, 10));
   state.effects.push(...DEFAULT_EFFECTS);
+  for (const font of options.fonts ?? DEFAULT_FONTS) state.fonts.add(font);
+  state.frameWriteDelay = options.frameWriteDelay ?? 2;
+  state.canQueueInAME = options.canQueueInAME ?? true;
+  state.outputTemplates = options.outputTemplates ?? defaultOutputTemplates(state.majorVersion);
   const app = new App(state, version);
   const globals: HostGlobals = {
     app,
