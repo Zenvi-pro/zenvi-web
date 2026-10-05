@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { GENERATED_SECTION, HOST_APPS, HOST_OF_APP, bundleHostScript, hostSources } from "./build/host-bundle.js";
+import { GENERATED_SECTION, HOST_APPS, HOST_OF_APP, bundleHostScript, hostSources } from "./host-bundle.js";
 import { catalogFor } from "./catalog/index.js";
 import { TASTE } from "./taste.js";
 import { LINK_VERSION } from "./version.js";

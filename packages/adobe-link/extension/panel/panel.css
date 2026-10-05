@@ -1,0 +1,145 @@
+/* Colours follow the host app's panel skin (panel-core.js skinVariables). */
+:root {
+  --bg: #232323;
+  --fg: #dedede;
+  --muted: #8e8e8e;
+  --line: #3e3e3e;
+  --field: #171717;
+  --ok: #4caf72;
+  --warn: #d9a33a;
+  --error: #e0574f;
+  --accent: #ff5a36;
+  --font: system-ui, sans-serif;
+  --font-size: 11px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: var(--font-size);
+}
+
+main {
+  padding: 10px 12px 14px;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.3em;
+  font-weight: 600;
+}
+
+h2 {
+  margin: 14px 0 6px;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 0.92em;
+}
+
+.mono {
+  font-family: Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 10px;
+  margin: 0;
+}
+
+dt {
+  color: var(--muted);
+}
+
+dd {
+  margin: 0;
+}
+
+.notice {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border-left: 2px solid var(--warn);
+  background: var(--field);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+button {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--field);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#calls li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+#calls li.empty {
+  display: block;
+  border: 0;
+}
+
+.status-applied,
+.status-ok,
+.status-unchanged {
+  color: var(--ok);
+}
+
+.status-refused {
+  color: var(--warn);
+}
+
+.status-error {
+  color: var(--error);
+}

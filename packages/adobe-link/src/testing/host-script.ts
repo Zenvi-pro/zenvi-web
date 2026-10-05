@@ -1,26 +1,15 @@
 /**
  * Run a host script under Node: `loadHostScript("aeft", createAeMock().globals)`
- * concatenates the JSX exactly like the extension build (src/build/host-bundle.ts)
+ * concatenates the JSX exactly like the extension build (src/host-bundle.ts)
  * and evaluates it in a `vm` realm stripped down to ECMAScript 3 (realm.ts),
  * with the mock DOM as globals.
  */
 
 import vm from "node:vm";
-import { bundleHostScript, locateBundleLine, type HostApp, type HostBundle } from "../build/host-bundle.js";
+import { bundleHostScript, locateBundleLine, type HostApp, type HostBundle } from "../host-bundle.js";
+import type { HostReceipt } from "../receipt.js";
 import { BIND_REALM, ES3_REALM_SCRIPT, type HostGlobals, type Realm } from "./realm.js";
 
-/** The receipt dispatch returns (SPEC §3.3). */
-export interface HostReceiptJson {
-  contract: 3;
-  status: "applied" | "unchanged" | "refused" | "error" | "ok";
-  tool: string;
-  host: "aftereffects" | "premiere";
-  summary: string;
-  data: Record<string, unknown>;
-  warnings: string[];
-  undoSteps: number | null;
-  error?: { code: string; message: string; line?: number };
-}
 
 export interface RegisteredHostTool {
   name: string;
@@ -32,7 +21,7 @@ export interface LoadedHostScript {
   bundle: HostBundle;
   context: vm.Context;
   /** `ZenviLink.dispatch(name, JSON.stringify(args))`, parsed. */
-  dispatch(name: string, args?: Record<string, unknown>): HostReceiptJson;
+  dispatch(name: string, args?: Record<string, unknown>): HostReceipt;
   /** The raw string dispatch returns (what evalScript hands the server). */
   dispatchRaw(name: string, argsJson: string): string;
   listTools(): RegisteredHostTool[];
@@ -48,8 +37,13 @@ export interface LoadHostScriptOptions {
   modernRealm?: boolean;
 }
 
-export function loadHostScript(app: HostApp, globals: HostGlobals = {}, options: LoadHostScriptOptions = {}): LoadedHostScript {
-  const bundle = bundleHostScript(app);
+/** A realm with the mock DOM wired in but no host script loaded (CEP before ScriptPath ran). */
+export interface HostRealm {
+  context: vm.Context;
+  evaluate(code: string, filename?: string): unknown;
+}
+
+export function createHostRealm(globals: HostGlobals = {}, options: LoadHostScriptOptions = {}): HostRealm {
   const context = vm.createContext({});
   if (!options.modernRealm) vm.runInContext(ES3_REALM_SCRIPT, context, { filename: "es3-realm.js" });
   for (const [key, value] of Object.entries(globals)) context[key] = value;
@@ -63,6 +57,12 @@ export function loadHostScript(app: HostApp, globals: HostGlobals = {}, options:
     global: context as Record<string, unknown>,
   };
   globals[BIND_REALM]?.(realm);
+  return { context, evaluate: (code, filename = "evalScript") => vm.runInContext(code, context, { filename }) };
+}
+
+export function loadHostScript(app: HostApp, globals: HostGlobals = {}, options: LoadHostScriptOptions = {}): LoadedHostScript {
+  const bundle = bundleHostScript(app);
+  const { context } = createHostRealm(globals, options);
   vm.runInContext(bundle.text, context, { filename: `${app}.jsx` });
 
   const zenvi = (): Record<string, (...args: unknown[]) => string> => {
@@ -79,7 +79,7 @@ export function loadHostScript(app: HostApp, globals: HostGlobals = {}, options:
     bundle,
     context,
     dispatchRaw,
-    dispatch: (name, args = {}) => JSON.parse(dispatchRaw(name, JSON.stringify(args))) as HostReceiptJson,
+    dispatch: (name, args = {}) => JSON.parse(dispatchRaw(name, JSON.stringify(args))) as HostReceipt,
     listTools: () => JSON.parse(zenvi().listTools?.() ?? "[]") as RegisteredHostTool[],
     hostInfo: () => JSON.parse(zenvi().hostInfo?.() ?? "{}") as Record<string, unknown>,
     evaluate: (code) => vm.runInContext(code, context, { filename: "evalScript" }),

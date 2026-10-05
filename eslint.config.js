@@ -29,4 +29,17 @@ export default tseslint.config(
       "no-empty": ["error", { allowEmptyCatch: false }],
     },
   },
+  {
+    // Zenvi Link's CEP side runs as-is in the Adobe apps' embedded Node and
+    // Chromium: CommonJS, ES2017 at most, no build step.
+    files: ["packages/adobe-link/extension/**/*.js"],
+    languageOptions: { ecmaVersion: 2017, sourceType: "commonjs" },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+    },
+  },
 );

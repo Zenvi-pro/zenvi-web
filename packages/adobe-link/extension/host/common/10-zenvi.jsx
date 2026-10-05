@@ -31,7 +31,7 @@ var ZenviLink = (function () {
     var registry = {};
     var names = [];
 
-    // Set by the build's generated block (src/build/host-bundle.ts).
+    // Set by the build's generated block (src/host-bundle.ts).
     Z.version = "0.0.0-dev";
     Z.TASTE = {};
     Z.CATALOG = {};

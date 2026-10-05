@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Remote debugging (dev installs only; the release build leaves this file out).
+     Open http://localhost:8088 (service in After Effects), 8089 (service in Premiere Pro),
+     8090 (panel in After Effects) or 8091 (panel in Premiere Pro) in Chrome. -->
+<ExtensionList>
+  <Extension Id="pro.zenvi.link.service">
+    <HostList>
+      <Host Name="AEFT" Port="8088" />
+      <Host Name="PPRO" Port="8089" />
+    </HostList>
+  </Extension>
+  <Extension Id="pro.zenvi.link.panel">
+    <HostList>
+      <Host Name="AEFT" Port="8090" />
+      <Host Name="PPRO" Port="8091" />
+    </HostList>
+  </Extension>
+</ExtensionList>
