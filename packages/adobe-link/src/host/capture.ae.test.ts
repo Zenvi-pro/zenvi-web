@@ -23,7 +23,9 @@ describe("ae_capture_frame", () => {
     expect(h.mock.state.savedFrames).toEqual([expect.objectContaining({ comp: comp.id, time: 1.5, resolutionFactor: [2, 2] })]);
     expect(h.mock.es.state.sleptMs).toBeGreaterThan(0);
     expect(comp.resolutionFactor).toEqual([1, 1]);
-    expect(h.mock.state.undoCalls).toEqual([]);
+    // The temporary resolution change and its restore share one (empty) undo group.
+    expect(h.mock.state.undoGroups).toEqual(["Zenvi: Capture comp frame"]);
+    expect(h.mock.state.undoDepth).toBe(0);
   });
 
   test("full resolution when the comp fits; the current time by default; a viewer at half resolution is rendered full and restored", () => {
@@ -34,6 +36,9 @@ describe("ae_capture_frame", () => {
     const receipt = h.callValidated("ae_capture_frame");
     expect(receipt.data).toMatchObject({ width: 1080, height: 1920, time: 2, resolution_factor: 1 });
     expect(comp.resolutionFactor).toEqual([2, 2]);
+    comp.resolutionFactor = [1, 1];
+    h.callValidated("ae_capture_frame");
+    expect(h.mock.state.undoGroups).toEqual(["Zenvi: Capture comp frame"]);
   });
 
   test("snaps to the frame grid and clamps the comp's end to its last frame", () => {

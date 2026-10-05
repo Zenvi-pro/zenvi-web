@@ -57,6 +57,15 @@ describe("ae_apply_motion_preset", () => {
     expect(keys(strong.layer.position)[0]).toEqual([0, [844.8, 540, 0]]);
   });
 
+  test("a layer running past the comp's end exits, and holds end, with the comp", () => {
+    const { h, comp, layer } = setup();
+    layer.outPoint = 14;
+    h.callValidated("ae_apply_motion_preset", { layer: layer.id, preset: "fade-out" });
+    expect(keys(layer.opacity)).toEqual([[9.6, 100], [10, 0]]);
+    h.callValidated("ae_apply_motion_preset", { layer: layer.id, preset: "push-in" });
+    expect(keys(layer.scale).map(([t]) => t)).toEqual([0, comp.duration]);
+  });
+
   test("slide-out moves down and away, eased in, ending at the out point", () => {
     const { h, layer } = setup();
     h.callValidated("ae_apply_motion_preset", { layer: layer.id, preset: "slide-out" });

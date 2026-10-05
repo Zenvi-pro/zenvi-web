@@ -3,7 +3,8 @@
 // CompItem.saveFrameToPng returns before the PNG is on disk (the file first
 // appears empty), so the tool waits until the PNG ends with its IEND chunk.
 // It renders at the comp's resolution factor: wide comps are captured at
-// half, third... resolution and the user's factor is restored afterwards.
+// half, third... resolution and the user's factor is restored afterwards,
+// inside one undo group of its own in case After Effects records the change.
 
 (/** @param {ZenviLinkApi} Z */ function (Z) {
     var AE = Z.ae;
@@ -101,16 +102,22 @@
         factor = Math.max(1, Math.ceil(comp.width / maxWidth - 1e-9));
         file = new File(AE.tempFolder("captures").fullName + "/frame-" + comp.id + "-" + frame + "-" + new Date().getTime() + ".png");
         previous = comp.resolutionFactor;
+        changedFactor = previous[0] !== factor || previous[1] !== factor;
+        if (changedFactor) {
+            // A read-only tool, but After Effects may record resolution changes as undo steps:
+            // keep the change and its restore in one step (no step at all if it records nothing).
+            app.beginUndoGroup("Zenvi: " + (Z.CATALOG.ae_capture_frame ? Z.CATALOG.ae_capture_frame.title : "Capture comp frame"));
+        }
         try {
-            if (previous[0] !== factor || previous[1] !== factor) {
+            if (changedFactor) {
                 comp.resolutionFactor = [factor, factor];
-                changedFactor = true;
             }
             comp.saveFrameToPng(time, file);
             info = AE.waitForPng(file, CAPTURE_TIMEOUT_MS);
         } finally {
             if (changedFactor) {
                 comp.resolutionFactor = [previous[0], previous[1]];
+                app.endUndoGroup();
             }
         }
         width = info.valid ? info.width : Math.round(comp.width / factor);

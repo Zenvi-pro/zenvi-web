@@ -102,8 +102,10 @@ Notes per tool, beyond the catalog descriptions:
   with its IEND chunk, then reads the size from the PNG header. Comps wider
   than `max_width` render at a resolution factor (1920 → 960, 3840 → 1280) that
   is restored afterwards; a comp shown at half resolution is captured at full
-  resolution. The comp's end is clamped to its last frame. `data.image_path`
-  becomes the image block (the server deletes the temp file).
+  resolution. The change and its restore run inside one undo group of their
+  own, so if After Effects records resolution changes they cost at most one
+  (no-op) undo step. The comp's end is clamped to its last frame.
+  `data.image_path` becomes the image block (the server deletes the temp file).
 - `ae_import_files`: every path must exist and be importable before anything
   is imported; files already in the project are reused (`reused: true`), so a
   repeat call is `unchanged`.
@@ -337,8 +339,9 @@ Effects (the manual plan covers them):
 
 1. **saveFrameToPng** is undocumented by Adobe. Assumed: it renders at the
    comp's resolution factor (the tool reads the real size from the PNG either
-   way) and changing `resolutionFactor` from a script does not add an undo
-   step or mark the project dirty.
+   way). Unknown: whether changing `resolutionFactor` from a script adds an
+   undo step (contained to at most one, see `ae_capture_frame`) or marks the
+   project dirty.
 2. **Range Selector timing** assumes After Effects' standard Ramp Up behaviour
    (units past End stay fully selected; Offset −W → 100 % reveals them in
    order). Per-unit timing is approximate; very short texts widen the stagger.
@@ -367,6 +370,9 @@ Effects (the manual plan covers them):
    assumed to be the same folder (true on macOS; check on Windows).
 10. **Blocking renders**: `render_now` and `ae_render_for_zenvi` block After
     Effects until the render finishes (30 min budget per call).
+11. **Exits and holds end with the comp**: a layer that runs past the comp's
+    end exits (and Ken Burns / push-in end) at the comp's end, the last frame a
+    viewer sees.
 
 ## Manual test plan (After Effects 2024–2026)
 

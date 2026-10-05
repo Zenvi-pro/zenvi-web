@@ -381,6 +381,7 @@
         var count;
         var duration;
         var position;
+        var visibleEnd;
         Z.oneOf("preset", name, AE.MOTION_PRESETS);
         spec = PRESETS[name];
         if (!(layer instanceof AVLayer)) {
@@ -409,15 +410,17 @@
         if ((spec.kind === "hold" || spec.kind === "procedural") && (opts.duration === undefined || opts.duration === null)) {
             duration = null;
         }
+        // A layer may run past the comp's end; what is visible ends with the comp.
+        visibleEnd = Math.min(layer.outPoint, comp.duration);
         if (opts.start !== undefined && opts.start !== null) {
             p.start = AE.compTime(comp, Z.inRange("start", opts.start, 0, null), ctx, "start");
         } else if (spec.kind === "exit") {
-            p.start = AE.snapTime(comp, Math.max(layer.inPoint, layer.outPoint - duration), ctx, "start");
+            p.start = AE.snapTime(comp, Math.max(layer.inPoint, visibleEnd - duration), ctx, "start");
         } else {
             p.start = AE.snapTime(comp, Math.max(0, layer.inPoint), ctx, "start");
         }
         if (duration === null) {
-            duration = layer.outPoint - p.start;
+            duration = visibleEnd - p.start;
             if (duration <= 0) {
                 throw Z.refuse("INVALID_ARGUMENT", name + " starts at " + Z.round(p.start) + " s, after layer \"" + layer.name + "\" ends; pass `duration`");
             }
