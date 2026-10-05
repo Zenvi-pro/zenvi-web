@@ -591,7 +591,7 @@ export const aeApplyMotionPreset = defineHostTool({
     layer: layerArg,
     preset: z.enum(AE_MOTION_PRESETS).describe("Motion preset"),
     start: seconds.optional().describe("Start time in seconds (default: in point for entrances and holds; out point minus duration for exits)"),
-    duration: z.number().positive().max(600).optional().describe("Seconds (default per preset; text presets: per word/line entrance)"),
+    duration: z.number().positive().max(600).optional().describe("Seconds (default per preset; word-cascade / line-rise: each word or line's entrance; typewriter: the whole text)"),
     intensity: z.number().min(0).max(1).default(0.5).describe("0-1 within the TASTE range; 0.5 = default"),
     direction: direction.optional().describe("Direction of travel for slide/whip presets (default: slide-in up, slide-out down, whip-in right, ken-burns left)"),
     stagger: z.number().min(0.01).max(2).optional().describe("Text presets: seconds between words/lines/characters"),

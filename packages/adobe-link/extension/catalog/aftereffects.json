@@ -2300,7 +2300,7 @@
             "minimum": 0
           },
           "duration": {
-            "description": "Seconds (default per preset; text presets: per word/line entrance)",
+            "description": "Seconds (default per preset; word-cascade / line-rise: each word or line's entrance; typewriter: the whole text)",
             "type": "number",
             "exclusiveMinimum": 0,
             "maximum": 600

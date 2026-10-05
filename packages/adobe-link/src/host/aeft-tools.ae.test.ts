@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { AE_TOOLS } from "../catalog/aftereffects.js";
-import { hostSources } from "../host-bundle.js";
+import { PACKAGE_ROOT, hostSources } from "../host-bundle.js";
 import { TASTE } from "../taste.js";
 import { aeHarness } from "../testing/ae-harness.js";
 
@@ -58,4 +60,9 @@ describe("every After Effects tool, called bare in an empty project", () => {
       expect(receipt.error?.code).toMatch(/^[A-Z_]+$/);
     }
   });
+});
+
+test("docs/AFTER_EFFECTS.md lists every After Effects tool", () => {
+  const doc = readFileSync(path.join(PACKAGE_ROOT, "docs", "AFTER_EFFECTS.md"), "utf8");
+  for (const def of AE_TOOLS) expect(doc, def.name).toContain(`| \`${def.name}\` | ${def.title} |`);
 });
