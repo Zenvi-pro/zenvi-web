@@ -249,6 +249,14 @@ export class ExtendScriptMockState {
   }
 }
 
+/** ExtendScript preprocessor directive lines: #target, #targetengine, #include, #includepath, #strict, #script. */
+const DIRECTIVE_LINE = /^[ \t]*#(?:target|targetengine|include|includepath|strict|script)\b[^\r\n]*/gm;
+
+/** Source with its preprocessor directive lines blanked (line numbers unchanged). */
+export function stripDirectives(source: string): string {
+  return source.replace(DIRECTIVE_LINE, "");
+}
+
 export class DollarMock {
   os: string;
   version = "4.5.5";
@@ -270,10 +278,15 @@ export class DollarMock {
     this.es.log.push(texts.map(String).join(""));
   }
 
-  /** Runs the file in the script realm and returns its completion value, like ExtendScript. */
+  /**
+   * Runs the file in the script realm and returns its completion value, like
+   * ExtendScript. The engine consumes preprocessor directives itself
+   * (`#target aftereffects` opens every Zenvi export), so their lines are
+   * blanked, keeping line numbers. `#include` is not followed here.
+   */
   evalFile(file: string | FsEntryMock, _timeout?: number): unknown {
     const target = typeof file === "string" ? this.es.resolve(file) : file.fsName;
-    return this.es.link.evaluate(readFileSync(target, "utf8"), target);
+    return this.es.link.evaluate(stripDirectives(readFileSync(target, "utf8")), target);
   }
 
   get global(): Record<string, unknown> | undefined {

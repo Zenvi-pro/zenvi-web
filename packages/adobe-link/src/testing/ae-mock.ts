@@ -910,6 +910,18 @@ export interface EffectDef {
 /** Effects the mock can add (`app.effects` lists them). Tests and tools add more with `mock.registerEffect`. */
 export const DEFAULT_EFFECTS: EffectDef[] = [
   {
+    displayName: "Gradient Wipe",
+    matchName: "ADBE Gradient Wipe",
+    category: "Transition",
+    params: [
+      { name: "Transition Completion", matchName: "ADBE Gradient Wipe-0001", value: 0, options: { min: 0, max: 100 } },
+      { name: "Transition Softness", matchName: "ADBE Gradient Wipe-0002", value: 0, options: { min: 0, max: 100 } },
+      { name: "Gradient Layer", matchName: "ADBE Gradient Wipe-0003", value: 1, options: { valueType: PropertyValueType.LAYER_INDEX } },
+      { name: "Gradient Placement", matchName: "ADBE Gradient Wipe-0004", value: 1 },
+      { name: "Invert Gradient", matchName: "ADBE Gradient Wipe-0005", value: 0 },
+    ],
+  },
+  {
     displayName: "Gaussian Blur",
     matchName: "ADBE Gaussian Blur 2",
     category: "Blur & Sharpen",
@@ -1486,6 +1498,12 @@ export class AVLayer extends Layer {
   constructor(mock: AeMockState, comp: CompItem, name: string, source: AVItem | null, width: number, height: number) {
     super(mock, comp, name, width, height);
     this.source = source;
+    if (source && source.hasAudio) {
+      // Layers of footage with audio have Audio > Audio Levels (dB, left and right).
+      const audio = new PropertyGroup("Audio", "ADBE Audio Group", { state: mock });
+      audio.add(new Property("Audio Levels", "ADBE Audio Levels", [0, 0], { valueType: PropertyValueType.TwoD }));
+      this.root.add(audio);
+    }
     if (mock.majorVersion >= 23) {
       // Scripting Guide, AVLayer: passing NO_TRACK_MATTE "is invalid and will result in no-op";
       // null as the layer removes the matte; removeTrackMatte keeps the type.
@@ -2034,6 +2052,16 @@ export class Project {
   solidsFolder(): FolderItem {
     const existing = this.allItems.find((item): item is FolderItem => item instanceof FolderItem && item.name === "Solids");
     return existing ?? this.items.addFolder("Solids");
+  }
+
+  /** File > Import > Placeholder: a stand-in footage item for missing media, in the root folder. */
+  importPlaceholder(name: string, width: number, height: number, frameRate: number, duration: number): FootageItem {
+    if (!(width >= 4 && width <= 30000 && height >= 4 && height <= 30000)) throw new Error("After Effects error: placeholder size out of range");
+    if (!(frameRate >= 1 && frameRate <= 999 && duration > 0)) throw new Error("After Effects error: placeholder frame rate or duration out of range");
+    const item = new FootageItem(this.mock, name, this, new PlaceholderSource());
+    Object.assign(item, { width, height, frameRate, duration });
+    this.addItem(item, null);
+    return item;
   }
 
   importFile(options: ImportOptions): Item {
