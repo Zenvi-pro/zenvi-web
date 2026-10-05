@@ -124,7 +124,9 @@
 
         broken = autoBreak && !box ? AE.breakLines(text, TASTE.type.maxLineChars) : {text: AE.textValue(text), broke: false};
         if (broken.broke) {
-            ctx.warn("Broke the text into " + broken.lines + " lines of at most " + TASTE.type.maxLineChars + " characters (auto_break: false keeps it as written)");
+            ctx.warn("Broke the text into " + broken.lines + " lines of at most " + TASTE.type.maxLineChars + " characters" +
+                (broken.longest > TASTE.type.maxLineChars ? " (one word is " + broken.longest + " characters, so it has a line of its own)" : "") +
+                " (auto_break: false keeps it as written)");
         }
         spec = AE.textStyle(style);
         spec = {
@@ -287,10 +289,12 @@
         if (property.numKeys > 0 && time === null) {
             throw Z.refuse("INVALID_ARGUMENT", "Source Text of \"" + layer.name + "\" is keyframed; pass `time` to change the keyframe there");
         }
+        if (time !== null) {
+            time = AE.compTime(comp, time, ctx, "time");
+        }
         AE.requireUnlocked(layer);
         ctx.changed();
         if (time !== null && property.numKeys > 0) {
-            time = AE.compTime(comp, time, ctx, "time");
             // Source Text keyframes hold: change the document in effect at `time` and key it there.
             applied = AE.setTextDocument(keyedText(property, time), spec, ctx);
         } else {

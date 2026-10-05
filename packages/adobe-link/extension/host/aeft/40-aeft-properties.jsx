@@ -116,7 +116,8 @@
             if (!Z.has(raw[i], "value") || raw[i].value === null) {
                 throw Z.refuse("INVALID_ARGUMENT", "`keyframes[" + i + "].value` is required");
             }
-            key.value = AE.toValue(property, raw[i].value, "keyframes[" + i + "].value", previous);
+            key.value = AE.toValue(property, raw[i].value, "keyframes[" + i + "].value",
+                property.propertyValueType === PropertyValueType.TEXT_DOCUMENT ? property.valueAtTime(key.time, true) : previous);
             if (keys.length && key.time <= keys[keys.length - 1].time + 1e-6) {
                 throw Z.refuse("INVALID_ARGUMENT", "Keyframe times must increase; keyframes[" + i + "] (" + Z.round(key.time) + " s) is not after the one before" +
                     " (snapped to frames)");
@@ -148,7 +149,7 @@
                 value: overshootValue(previous.value, last.value, overshoot),
                 curve: AE.curve("in-out", "easing")
             };
-            if (key.time <= previous.time + 1e-6) {
+            if (key.time <= previous.time + 1e-6 || key.time >= last.time - 1e-6) {
                 throw Z.refuse("INVALID_ARGUMENT", "The last segment is too short for an overshoot; give it at least " + Z.round(3 / comp.frameRate, 3) + " s");
             }
             keys.splice(keys.length - 1, 0, key);
@@ -192,15 +193,22 @@
         if (expression === "") {
             return Z.applied("Cleared the expression on " + target.path + " of \"" + layer.name + "\"", data);
         }
-        property.expressionEnabled = true;
+        // After Effects evaluates an expression when it is set (a valid one enables itself);
+        // enabling an invalid one throws, so read the error before touching expressionEnabled.
         error = property.expressionError;
         if (error) {
             property.expression = oldExpression;
-            property.expressionEnabled = oldEnabled;
+            if (oldExpression !== "" && property.expressionEnabled !== oldEnabled) {
+                try {
+                    property.expressionEnabled = oldEnabled;
+                } catch (restoreError) {
+                    ctx.warn("Restored the previous expression but could not set its switch back");
+                }
+            }
             throw Z.refuse("INVALID_ARGUMENT", "After Effects rejected the expression on " + target.path + ": " + error + " (the previous expression was restored)");
         }
-        if (!enabled) {
-            property.expressionEnabled = false;
+        if (property.expressionEnabled !== enabled) {
+            property.expressionEnabled = enabled;
         }
         data.value = AE.exportValue(property.valueAtTime(comp.time, false));
         return Z.applied("Set an expression on " + target.path + " of \"" + layer.name + "\"" + (enabled ? "" : " (disabled)"), data);

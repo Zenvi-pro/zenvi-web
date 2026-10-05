@@ -591,13 +591,13 @@
           "width": {
             "description": "solid: width in pixels (default: the comp width)",
             "type": "integer",
-            "minimum": 1,
+            "minimum": 4,
             "maximum": 30000
           },
           "height": {
             "description": "solid: height in pixels (default: the comp height)",
             "type": "integer",
-            "minimum": 1,
+            "minimum": 4,
             "maximum": 30000
           },
           "shape": {

@@ -50,29 +50,36 @@
         return layer.property("ADBE Transform Group").property(matchName);
     }
 
-    function keysBetween(property, start, end) {
-        var times = [];
-        var i;
-        for (i = 1; i <= property.numKeys; i += 1) {
-            if (property.keyTime(i) >= start - 1e-4 && property.keyTime(i) <= end + 1e-4) {
-                times.push(property.keyTime(i));
-            }
-        }
-        return times;
-    }
-
     /**
-     * The value the layer rests at: for an entrance the value at the window's
-     * end (or at the last key already in the window, so re-applying a preset
-     * keeps the old rest), for an exit the value at its start.
+     * The value the layer rests at. Entrance: the value at the window's end;
+     * when a segment runs from inside the window to a key after it (an earlier,
+     * longer preset being re-applied shorter), that key's value. Exit,
+     * mirrored: the value at the window's start, or the key before it whose
+     * segment ends inside the window. Keys outside the window are kept.
      */
     function restValue(property, start, end, entering) {
-        var inside = keysBetween(property, start, end);
-        var time = entering ? end : start;
-        if (inside.length) {
-            time = entering ? Math.max(end, inside[inside.length - 1]) : Math.min(start, inside[0]);
+        var count = property.numKeys;
+        var i;
+        if (entering) {
+            for (i = 1; i <= count; i += 1) {
+                if (property.keyTime(i) > end + 1e-4) {
+                    if (i > 1 && property.keyTime(i - 1) >= start - 1e-4) {
+                        return property.keyValue(i);
+                    }
+                    break;
+                }
+            }
+            return property.valueAtTime(end, true);
         }
-        return property.valueAtTime(time, true);
+        for (i = count; i >= 1; i -= 1) {
+            if (property.keyTime(i) < start - 1e-4) {
+                if (i < count && property.keyTime(i + 1) <= end + 1e-4) {
+                    return property.keyValue(i);
+                }
+                break;
+            }
+        }
+        return property.valueAtTime(start, true);
     }
 
     function animate(property, start, end, from, to, easing, ctx) {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { KeyframeInterpolationType, type Property, type PropertyGroup, type TextDocument } from "../testing/ae-mock.js";
+import { KeyframeInterpolationType, TextDocument, type Property, type PropertyGroup, type TextLayer } from "../testing/ae-mock.js";
 import { aeHarness } from "../testing/ae-harness.js";
 
 /** Rounded, with -0 as 0. */
@@ -11,6 +11,19 @@ function setup() {
   const comp = h.mock.addComp({ name: "Main" });
   const layer = comp.layers.addSolid([1, 0, 0], "Red", 400, 400, 1);
   return { h, comp, layer };
+}
+
+/** A text layer whose Source Text is keyed "Small" (40 px) at 0 s and "Big" (90 px) at 2 s. */
+function keyedText(h: ReturnType<typeof setup>["h"], comp: ReturnType<typeof setup>["comp"]) {
+  const text = comp.layers.addText("A") as TextLayer;
+  const source = (text.property("ADBE Text Properties") as PropertyGroup).property("ADBE Text Document") as Property;
+  const small = new TextDocument("Small");
+  small.fontSize = 40;
+  const big = new TextDocument("Big");
+  big.fontSize = 90;
+  source.setValueAtTime(0, small);
+  source.setValueAtTime(2, big);
+  return { text, source, h };
 }
 
 describe("ae_set_property", () => {
@@ -50,6 +63,25 @@ describe("ae_set_property", () => {
     layer.opacity.removeKey(1);
     expect(h.callValidated("ae_set_property", { layer: layer.id, property: "Opacity", value: 140 }).error?.message).toContain("out of range");
     expect(h.mock.state.undoDepth).toBe(0);
+  });
+
+  test("separated Position: refused with the X/Y Position paths to use instead, which work", () => {
+    const { h, layer } = setup();
+    layer.position.dimensionsSeparated = true;
+    const refused = h.callValidated("ae_set_property", { layer: layer.id, property: "Position", value: [10, 20] });
+    expect(refused).toMatchObject({ status: "refused", undoSteps: 0, error: { code: "INVALID_ARGUMENT" } });
+    expect(refused.summary).toContain('set "Transform/X Position" and "Transform/Y Position"');
+    expect(h.callValidated("ae_animate", { layer: layer.id, property: "Position", keyframes: [{ time: 0, value: [0, 0] }, { time: 1, value: [5, 5] }] })).toMatchObject({ status: "refused" });
+    expect(h.callValidated("ae_set_property", { layer: layer.id, property: "Transform/X Position", value: 10 })).toMatchObject({ status: "applied" });
+    expect(layer.position.numKeys).toBe(0);
+  });
+
+  test("a Source Text keyframe at `time` keeps the style in effect there", () => {
+    const { h, comp } = setup();
+    const { source } = keyedText(h, comp);
+    expect(h.callValidated("ae_set_property", { layer: comp.layer(1).id, property: "Source Text", value: "Bigger", time: 2 })).toMatchObject({ status: "applied" });
+    expect(source.keyValue(2) as TextDocument).toMatchObject({ text: "Bigger", fontSize: 90 });
+    expect(source.keyValue(1) as TextDocument).toMatchObject({ text: "Small", fontSize: 40 });
   });
 });
 
@@ -149,6 +181,23 @@ describe("ae_animate", () => {
     ]);
   });
 
+  test("Source Text keyframes keep the style in effect at their time", () => {
+    const { h, comp } = setup();
+    const { source } = keyedText(h, comp);
+    h.callValidated("ae_animate", { layer: comp.layer(1).id, property: "Source Text", keyframes: [{ time: 2, value: "Late" }, { time: 3, value: "Later" }] });
+    expect(source.keyValue(2) as TextDocument).toMatchObject({ text: "Late", fontSize: 90 });
+    expect(source.keyValue(3) as TextDocument).toMatchObject({ text: "Later", fontSize: 90 });
+    expect(source.keyValue(1) as TextDocument).toMatchObject({ fontSize: 40 });
+  });
+
+  test("an overshoot needs room for its settle keyframe: a one-frame last segment is refused", () => {
+    const { h, layer } = setup();
+    const receipt = h.callValidated("ae_animate", { layer: layer.id, property: "Rotation", overshoot: 0.05, keyframes: [{ time: 0, value: 0 }, { time: 1 / 30, value: 90 }] });
+    expect(receipt).toMatchObject({ status: "refused", undoSteps: 0, error: { code: "INVALID_ARGUMENT" } });
+    expect(receipt.summary).toContain("too short for an overshoot");
+    expect(layer.rotation.numKeys).toBe(0);
+  });
+
   test("Source Text keyframes hold", () => {
     const { h, comp } = setup();
     const text = comp.layers.addText("A");
@@ -186,5 +235,20 @@ describe("ae_add_expression", () => {
     expect(receipt.summary).toContain("SyntaxError");
     expect(layer.rotation.expression).toBe("wiggle(1, 5)");
     expect(receipt.warnings.join(" ")).toContain('Undo "Zenvi: Set expression"');
+  });
+
+  test("a rejected expression restores the previous one with its switch, off stays off; a new one can start disabled", () => {
+    const { h, layer } = setup();
+    layer.rotation.expression = "wiggle(1, 5)";
+    layer.rotation.expressionEnabled = false;
+    expect(h.callValidated("ae_add_expression", { layer: layer.id, property: "Rotation", expression: "wiggle(" })).toMatchObject({ status: "refused" });
+    expect(layer.rotation).toMatchObject({ expression: "wiggle(1, 5)", expressionEnabled: false });
+
+    expect(h.callValidated("ae_add_expression", { layer: layer.id, property: "Opacity", expression: "nope(" })).toMatchObject({ status: "refused" });
+    expect(layer.opacity).toMatchObject({ expression: "", expressionEnabled: false });
+
+    const disabled = h.callValidated("ae_add_expression", { layer: layer.id, property: "Opacity", expression: "50", enabled: false });
+    expect(disabled).toMatchObject({ status: "applied", data: { enabled: false } });
+    expect(layer.opacity).toMatchObject({ expression: "50", expressionEnabled: false });
   });
 });

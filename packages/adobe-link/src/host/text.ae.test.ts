@@ -166,6 +166,10 @@ describe("ae_set_text", () => {
     h.callValidated("ae_set_text", { layer: layer.id, text: "B", time: 2 });
     expect(source.numKeys).toBe(2);
     expect((source.keyValue(2) as TextDocument).text).toBe("B");
+    // A time after the comp is refused before anything changes (no partial-change warning).
+    const late = h.callValidated("ae_set_text", { layer: layer.id, text: "C", time: 99 });
+    expect(late).toMatchObject({ status: "refused", undoSteps: 0, warnings: [] });
+    expect(source.numKeys).toBe(2);
   });
 
   test("refuses a non-text layer and an empty change", () => {
@@ -188,5 +192,19 @@ describe("line breaking", () => {
     expect(three.length).toBe(3);
     for (const line of three) expect(line.length).toBeLessThanOrEqual(32);
     expect(three.every((line: string) => line.includes(" "))).toBe(true);
+  });
+
+  test("a word longer than a line (a URL) gets a line of its own instead of failing", () => {
+    const h = aeHarness();
+    const breakLines = (text: string) => JSON.parse(h.host.evaluate(`JSON.stringify(ZenviLink.ae.breakLines(${JSON.stringify(text)}, 32))`) as string);
+    const url = "https://example.com/campaigns/2026/autumn/launch-film";
+    expect(breakLines(`Watch ${url}`)).toEqual({ text: `Watch\r${url}`, lines: 2, broke: true, longest: url.length });
+    // The rest still shares lines: not one word per line.
+    expect(breakLines(`Watch the film at ${url} today`).text).toBe(`Watch the film at\r${url}\rtoday`);
+    h.mock.addComp();
+    const receipt = h.callValidated("ae_add_text", { text: `Watch the film at ${url} today` });
+    expect(receipt.status).toBe("applied");
+    expect(receipt.data.text).toBe(`Watch the film at\n${url}\ntoday`);
+    expect(receipt.warnings[0]).toContain(`one word is ${url.length} characters`);
   });
 });

@@ -178,6 +178,7 @@ interface ZenviAe {
 
   // 02-aeft-props.jsx
   isLeaf(property: any): boolean;
+  isSeparated(property: Property): boolean;
   childNames(group: PropertyGroup | Layer): string;
   resolveProperty(layer: Layer, path: any): { property: any; path: string; match_path: string };
   resolveLeaf(layer: Layer, path: any): ZenviPropertyTarget;
@@ -205,7 +206,7 @@ interface ZenviAe {
   fontAvailable(postscriptName: string): boolean | null;
   fontCandidates(requested: string | null, bold: boolean): string[];
   setTextDocument(property: { value: TextDocument; setValue(value: TextDocument): void }, spec: { [key: string]: any }, ctx: ZenviContext): { font: string; size: number };
-  breakLines(text: string, maxChars: number): { text: string; lines: number; broke: boolean };
+  breakLines(text: string, maxChars: number): { text: string; lines: number; broke: boolean; longest?: number };
   setPoint(property: Property, x: number, y: number): void;
   fitTextWidth(layer: Layer, property: Property, maxWidth: number, time: number, ctx: ZenviContext): number;
   placeTextBlock(comp: CompItem, layers: Layer[], placement: string, align: string, firstSize: number, time: number, ctx: ZenviContext): { [key: string]: unknown; inside_title_safe: boolean };

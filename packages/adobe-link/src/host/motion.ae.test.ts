@@ -175,6 +175,22 @@ describe("ae_apply_motion_preset", () => {
     expect(animators.numProperties).toBe(1);
   });
 
+  test("re-applied shorter, a preset keeps the rest the longer one reached; keys outside its window stay", () => {
+    const { h, layer } = setup();
+    h.callValidated("ae_apply_motion_preset", { layer: layer.id, preset: "slide-in" });
+    h.callValidated("ae_apply_motion_preset", { layer: layer.id, preset: "slide-in", duration: 0.3 });
+    expect(keys(layer.position)).toEqual([[0, [960, 616.8, 0]], [0.3, [960, 540, 0]], [0.6, [960, 540, 0]]]);
+    expect(keys(layer.opacity)).toEqual([[0, 0], [0.3, 100], [0.6, 100]]);
+
+    // Exits mirror it: a shorter fade-out still starts from the opacity the layer had.
+    const exit = setup();
+    exit.layer.outPoint = 8;
+    exit.layer.opacity.setValue(80);
+    exit.h.callValidated("ae_apply_motion_preset", { layer: exit.layer.id, preset: "fade-out" });
+    exit.h.callValidated("ae_apply_motion_preset", { layer: exit.layer.id, preset: "fade-out", duration: 0.2 });
+    expect(keys(exit.layer.opacity)).toEqual([[7.6, 80], [7.8, 80], [8, 0]]);
+  });
+
   test("separated position dimensions: only the moving axis is keyed", () => {
     const { h, layer } = setup();
     layer.position.dimensionsSeparated = true;

@@ -249,8 +249,10 @@
 
     /**
      * `text` with lines of at most `maxChars` characters, broken at balanced
-     * word boundaries (After Effects' "\r" separates lines). Text that already
-     * has line breaks is left as written. Returns {text, lines, broke}.
+     * word boundaries (After Effects' "\r" separates lines). A word longer
+     * than that (a URL) sets the limit instead, so it gets a line of its own
+     * and the rest still shares lines. Text that already has line breaks is
+     * left as written. Returns {text, lines, broke, longest}.
      */
     AE.breakLines = function (text, maxChars) {
         var normalized = AE.textValue(text);
@@ -258,6 +260,7 @@
         var count;
         var result;
         var lines;
+        var limit;
         var i;
         if (!maxChars || normalized.indexOf("\r") >= 0 || normalized.length <= maxChars) {
             return {text: normalized, lines: normalized.split("\r").length, broke: false};
@@ -266,10 +269,14 @@
         if (words.length < 2) {
             return {text: normalized, lines: 1, broke: false};
         }
-        count = Math.ceil(normalized.length / maxChars);
+        limit = maxChars;
+        for (i = 0; i < words.length; i += 1) {
+            limit = Math.max(limit, words[i].length);
+        }
+        count = Math.min(Math.ceil(normalized.length / limit), words.length);
         for (; count <= words.length; count += 1) {
-            result = balance(words, Math.min(count, words.length));
-            if (result.longest <= maxChars) {
+            result = balance(words, count);
+            if (result.longest <= limit) {
                 break;
             }
         }
@@ -283,13 +290,13 @@
             if (above.length >= 3) {
                 var moved = above.pop();
                 var last = moved + " " + lines[lines.length - 1];
-                if (last.length <= maxChars) {
+                if (last.length <= limit) {
                     lines[lines.length - 2] = above.join(" ");
                     lines[lines.length - 1] = last;
                 }
             }
         }
-        return {text: lines.join("\r"), lines: lines.length, broke: true};
+        return {text: lines.join("\r"), lines: lines.length, broke: true, longest: result.longest};
     };
 
     // ------------------------------------------------------------------

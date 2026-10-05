@@ -445,8 +445,8 @@ export class Property extends PropertyBase {
   readonly hasMax: boolean;
   readonly minValue: number | undefined;
   readonly maxValue: number | undefined;
-  expressionEnabled = false;
   expressionError = "";
+  private expressionOn = false;
   canSetExpression = true;
   dimensionsSeparated = false;
   readonly keys: MockKey[] = [];
@@ -461,8 +461,21 @@ export class Property extends PropertyBase {
   set expression(value: string) {
     if (!this.canSetExpression) throw new Error(`After Effects error: "${this.name}" cannot have an expression`);
     this.expressionText = String(value);
-    this.expressionEnabled = this.expressionText !== "";
     this.expressionError = this.expressionText === "" ? "" : expressionSyntaxError(this.expressionText);
+    // A valid expression enables itself; one with an error stays off.
+    this.expressionOn = this.expressionText !== "" && this.expressionError === "";
+  }
+
+  get expressionEnabled(): boolean {
+    return this.expressionOn;
+  }
+
+  /** Only a valid expression can be switched on (Scripting Guide, Property.expressionEnabled). */
+  set expressionEnabled(value: boolean) {
+    if (value && (this.expressionText === "" || this.expressionError !== "")) {
+      throw new Error(`After Effects error: can't enable the expression on "${this.name}": ${this.expressionError || "it is empty"}`);
+    }
+    this.expressionOn = value;
   }
 
   /** Position is the leader of X/Y/Z Position; when its dimensions are separated only the followers take values. */
@@ -500,7 +513,7 @@ export class Property extends PropertyBase {
     copy.dimensionsSeparated = this.dimensionsSeparated;
     copy.canSetExpression = this.canSetExpression;
     if (this.expressionText) copy.expression = this.expressionText;
-    copy.expressionEnabled = this.expressionEnabled;
+    if (copy.expressionEnabled !== this.expressionEnabled) copy.expressionEnabled = this.expressionEnabled;
     for (const key of this.keys) copy.keys.push({ ...key, value: copyValue(key.value), inEase: [...key.inEase], outEase: [...key.outEase] });
     return copy;
   }
@@ -1157,9 +1170,22 @@ export class CompItem extends AVItem {
   frameBlending = false;
   hideShyLayers = false;
   draft3d = false;
-  resolutionFactor: number[] = [1, 1];
+  private resolution: number[] = [1, 1];
   readonly markerProperty: Property;
   openedInViewer = 0;
+
+  /** Scripting Guide: two integers in the range [1..99]. */
+  get resolutionFactor(): number[] {
+    return this.mock.array([...this.resolution]);
+  }
+
+  set resolutionFactor(value: number[]) {
+    const factors = Array.from(value);
+    if (factors.length !== 2 || !factors.every((f) => Number.isInteger(f) && f >= 1 && f <= 99)) {
+      throw new Error(`After Effects error: resolutionFactor takes two integers in [1, 99], got ${JSON.stringify(factors)}`);
+    }
+    this.resolution = factors;
+  }
 
   constructor(mock: AeMockState, name: string, project: Project) {
     super(mock, name, project);
@@ -1461,9 +1487,12 @@ export class AVLayer extends Layer {
     super(mock, comp, name, width, height);
     this.source = source;
     if (mock.majorVersion >= 23) {
+      // Scripting Guide, AVLayer: passing NO_TRACK_MATTE "is invalid and will result in no-op";
+      // null as the layer removes the matte; removeTrackMatte keeps the type.
       this.setTrackMatte = (layer, type) => {
+        if (type === TrackMatteType.NO_TRACK_MATTE) return;
         this.matteLayer = layer;
-        this.trackMatteType = layer ? type : TrackMatteType.NO_TRACK_MATTE;
+        if (layer) this.trackMatteType = type;
       };
       this.removeTrackMatte = () => {
         this.matteLayer = null;
@@ -1493,6 +1522,7 @@ export class AVLayer extends Layer {
   }
 
   get hasTrackMatte(): boolean {
+    if (this.mock.majorVersion >= 23) return this.matteLayer !== null && this.trackMatteType !== TrackMatteType.NO_TRACK_MATTE;
     return this.trackMatteType !== TrackMatteType.NO_TRACK_MATTE;
   }
 

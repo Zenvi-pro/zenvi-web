@@ -43,6 +43,15 @@ describe("ae_capture_frame", () => {
     expect(h.mock.state.undoGroups).toEqual(["Zenvi: Capture comp frame"]);
   });
 
+  test("a very wide comp gets After Effects' largest resolution factor (99) and a warning that the frame is wider than asked", () => {
+    const h = aeHarness({ frameWriteDelay: 0 });
+    const comp = h.mock.addComp({ width: 30000, height: 1000 });
+    const receipt = h.callValidated("ae_capture_frame", { max_width: 64 });
+    expect(receipt).toMatchObject({ status: "ok", data: { resolution_factor: 99, width: 303, height: 10 } });
+    expect(receipt.warnings.join(" ")).toContain("wider than max_width 64");
+    expect(Array.from(comp.resolutionFactor)).toEqual([1, 1]);
+  });
+
   test("snaps to the frame grid and clamps the comp's end to its last frame", () => {
     const h = aeHarness({ frameWriteDelay: 0 });
     h.mock.addComp({ duration: 2, frameRate: 25 });

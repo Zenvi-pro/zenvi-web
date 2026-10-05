@@ -123,6 +123,7 @@
         var parent = null;
         var blendValue = null;
         var shape = null;
+        var solidColor = null;
         var lightType = null;
         var layer;
         var data;
@@ -170,6 +171,16 @@
         if ((width !== null || height !== null) && kind !== "solid") {
             ctx.warn("`width` and `height` only apply to solids; ignored them");
         }
+        if (kind === "solid") {
+            // LayerCollection.addSolid takes 4-30000 pixels.
+            if (width !== null) {
+                Z.inRange("width", width, 4, 30000);
+            }
+            if (height !== null) {
+                Z.inRange("height", height, 4, 30000);
+            }
+            solidColor = AE.color(color !== null ? color : TASTE.color.palette.ink, "color");
+        }
         if (kind === "light") {
             lightType = AE.lightTypeValue(Z.optional(args, "light_type", "string", "point"));
         }
@@ -205,8 +216,7 @@
             layer = comp.layers.add(source, comp.duration);
             break;
         case "solid":
-            layer = comp.layers.addSolid(color !== null ? AE.color(color, "color") : AE.color(TASTE.color.palette.ink),
-                name || "Solid", width !== null ? width : comp.width, height !== null ? height : comp.height, comp.pixelAspect);
+            layer = comp.layers.addSolid(solidColor, name || "Solid", width !== null ? width : comp.width, height !== null ? height : comp.height, comp.pixelAspect);
             break;
         case "adjustment":
             layer = comp.layers.addSolid([1, 1, 1], name || "Adjustment Layer", comp.width, comp.height, comp.pixelAspect);
@@ -289,6 +299,7 @@
         var value;
         var matte;
         var matteLayer = null;
+        var currentMatte;
         var matteType;
         var parent;
         var number;
@@ -388,15 +399,25 @@
                 }
             }
             if (Z.hasMethod(av, "setTrackMatte")) {
-                if (matte.type !== "none" && !matteLayer) {
-                    if (layer.index === 1) {
-                        throw Z.refuse("INVALID_ARGUMENT", "Layer \"" + layer.name + "\" is the top layer; pass track_matte.layer");
+                if (matte.type === "none") {
+                    // setTrackMatte with NO_TRACK_MATTE is a no-op (Scripting Guide); removeTrackMatte removes it.
+                    if (av.hasTrackMatte) {
+                        step("no track matte", function () { av.removeTrackMatte(); });
                     }
-                    matteLayer = comp.layer(layer.index - 1);
+                } else {
+                    if (!matteLayer) {
+                        if (layer.index === 1) {
+                            throw Z.refuse("INVALID_ARGUMENT", "Layer \"" + layer.name + "\" is the top layer; pass track_matte.layer");
+                        }
+                        matteLayer = comp.layer(layer.index - 1);
+                    }
+                    currentMatte = av.hasTrackMatte ? av.trackMatteLayer : null;
+                    if (!currentMatte || currentMatte.index !== matteLayer.index || av.trackMatteType !== matteType) {
+                        step("track matte " + matte.type + " from \"" + matteLayer.name + "\"", function () {
+                            av.setTrackMatte(/** @type {AVLayer} */ (matteLayer), matteType);
+                        });
+                    }
                 }
-                step("track matte " + matte.type + (matteLayer ? " from \"" + matteLayer.name + "\"" : ""), function () {
-                    av.setTrackMatte(matte.type === "none" ? null : /** @type {AVLayer} */ (matteLayer), matteType);
-                });
             } else {
                 if (matteLayer && matteLayer.index !== layer.index - 1) {
                     throw Z.refuse("UNSUPPORTED", "Before After Effects 2023 the matte must be the layer directly above; move \"" + matteLayer.name +
@@ -405,7 +426,9 @@
                 if (matte.type !== "none" && layer.index === 1) {
                     throw Z.refuse("INVALID_ARGUMENT", "Layer \"" + layer.name + "\" is the top layer; there is no layer above to use as its matte");
                 }
-                step("track matte " + matte.type, function () { av.trackMatteType = matteType; });
+                if (av.trackMatteType !== matteType) {
+                    step("track matte " + matte.type, function () { av.trackMatteType = matteType; });
+                }
             }
         }
         if (Z.has(args, "parent")) {

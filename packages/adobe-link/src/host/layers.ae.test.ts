@@ -107,6 +107,11 @@ describe("ae_add_layer", () => {
     expect(h.callValidated("ae_add_layer", { kind: "footage", item: comp.id })).toMatchObject({ status: "refused", error: { code: "INVALID_ARGUMENT" } });
     expect(h.callValidated("ae_add_layer", { kind: "null", path: h.file("x.mov") })).toMatchObject({ status: "refused" });
     expect(h.callValidated("ae_add_layer", { kind: "camera", blend_mode: "add" })).toMatchObject({ status: "refused" });
+    // Solids take 4-30000 px (LayerCollection.addSolid), and the colour is checked before anything is added.
+    expect(() => h.callValidated("ae_add_layer", { kind: "solid", width: 2 })).toThrow(/catalog schema refused/);
+    expect(h.call("ae_add_layer", { kind: "solid", width: 2 })).toMatchObject({ status: "refused", undoSteps: 0, error: { code: "INVALID_ARGUMENT" } });
+    expect(h.call("ae_add_layer", { kind: "solid", height: 40000 })).toMatchObject({ status: "refused", undoSteps: 0 });
+    expect(h.call("ae_add_layer", { kind: "solid", color: "teal-ish" })).toMatchObject({ status: "refused", undoSteps: 0 });
     expect(comp.numLayers).toBe(0);
     expect(h.mock.state.undoDepth).toBe(0);
   });
@@ -171,6 +176,25 @@ describe("ae_set_layer", () => {
     });
     expect(old.callValidated("ae_set_layer", { layer: oldFill.id, track_matte: { type: "luma" } })).toMatchObject({ status: "applied" });
     expect(oldFill.trackMatteType).toBe(TrackMatteType.LUMA);
+    expect(old.callValidated("ae_set_layer", { layer: oldFill.id, track_matte: { type: "luma" } })).toMatchObject({ status: "unchanged" });
+    expect(old.callValidated("ae_set_layer", { layer: oldFill.id, track_matte: { type: "none" } })).toMatchObject({ status: "applied" });
+    expect(oldFill.hasTrackMatte).toBe(false);
+  });
+
+  test("track matte none on After Effects 2023+ removes the matte (setTrackMatte with NO_TRACK_MATTE does nothing); the same matte again is unchanged", () => {
+    const h = aeHarness();
+    const comp = h.mock.addComp();
+    const fill = comp.layers.addSolid([1, 0, 0], "Fill", 100, 100, 1);
+    const matte = comp.layers.addText("Matte");
+    expect(h.callValidated("ae_set_layer", { layer: fill.id, track_matte: { type: "alpha", layer: matte.id } }).data.changed).toEqual(['track matte alpha from "Matte"']);
+    expect(h.callValidated("ae_set_layer", { layer: fill.id, track_matte: { type: "alpha", layer: matte.id } })).toMatchObject({ status: "unchanged", undoSteps: 0 });
+    expect(h.callValidated("ae_set_layer", { layer: fill.id, track_matte: { type: "alpha" } })).toMatchObject({ status: "unchanged" });
+    expect(h.callValidated("ae_set_layer", { layer: fill.id, track_matte: { type: "luma", layer: matte.id } }).data.changed).toEqual(['track matte luma from "Matte"']);
+    const removed = h.callValidated("ae_set_layer", { layer: fill.id, track_matte: { type: "none" } });
+    expect(removed).toMatchObject({ status: "applied", undoSteps: 1, data: { changed: ["no track matte"] } });
+    expect(fill.hasTrackMatte).toBe(false);
+    expect(fill.trackMatteLayer).toBeNull();
+    expect(h.callValidated("ae_set_layer", { layer: fill.id, track_matte: { type: "none" } })).toMatchObject({ status: "unchanged" });
   });
 
   test("refuses switches a layer type does not have, and parent loops", () => {

@@ -116,11 +116,27 @@
         return {property: node, path: names.join("/"), match_path: matchNames.join("/")};
     };
 
-    /** Like resolveProperty, but the result must be a property with a value. */
+    /** True for a property whose dimensions are separated (Position with X/Y/Z Position in use). */
+    AE.isSeparated = function (property) {
+        try {
+            return property.isSeparationLeader === true && property.dimensionsSeparated === true;
+        } catch (notSeparable) {
+            return false;
+        }
+    };
+
+    /**
+     * Like resolveProperty, but the result must be a property with a value
+     * that can be set: not a group, not a leader whose dimensions are separated.
+     */
     AE.resolveLeaf = function (layer, path) {
         var target = AE.resolveProperty(layer, path);
         if (!AE.isLeaf(target.property)) {
             throw Z.refuse("INVALID_ARGUMENT", "\"" + target.path + "\" is a group; name one of its properties: " + AE.childNames(target.property));
+        }
+        if (AE.isSeparated(target.property)) {
+            throw Z.refuse("INVALID_ARGUMENT", target.path + " of \"" + layer.name + "\" has separated dimensions; set \"Transform/X Position\" and " +
+                "\"Transform/Y Position\" (and \"Transform/Z Position\") instead");
         }
         return target;
     };
@@ -264,7 +280,8 @@
             if (typeof raw !== "string") {
                 throw Z.refuse("INVALID_ARGUMENT", "`" + key + "` must be text for " + path);
             }
-            doc = property.value;
+            // Keep the style of the document in effect where the text goes (a keyframe's, when given).
+            doc = current instanceof TextDocument ? current : property.value;
             doc.text = AE.textValue(raw);
             return doc;
         }
@@ -410,6 +427,25 @@
         return Math.sqrt(sum);
     }
 
+    var PATH_SAMPLES = 24;
+
+    /**
+     * Length of the motion path between two keys, sampled along the curve
+     * After Effects draws (auto-Bezier paths bend through neighbouring keys).
+     */
+    function pathLength(property, t0, t1) {
+        var length = 0;
+        var previous = property.valueAtTime(t0, true);
+        var current;
+        var k;
+        for (k = 1; k <= PATH_SAMPLES; k += 1) {
+            current = property.valueAtTime(t0 + (t1 - t0) * k / PATH_SAMPLES, true);
+            length += distance(previous, current);
+            previous = current;
+        }
+        return length;
+    }
+
     /**
      * Value change per ease dimension between two keyframe values: spatial
      * properties and colours use the distance (one ease), other arrays one
@@ -522,6 +558,9 @@
         var deltas;
         var i;
         var index;
+        if (AE.isSeparated(property)) {
+            throw Z.refuse("INVALID_ARGUMENT", path + " has separated dimensions; animate X Position and Y Position instead");
+        }
         if (!property.canVaryOverTime) {
             throw Z.refuse("UNSUPPORTED", path + " cannot be keyframed");
         }
@@ -554,16 +593,6 @@
                 inType[i] = outType[i];
             }
         }
-        for (i = 0; i < count - 1; i += 1) {
-            segment = keys[i].curve;
-            if (segment.type !== "bezier") {
-                continue;
-            }
-            deltas = changes(property, keys[i].value, keys[i + 1].value);
-            ease = AE.segmentEase(segment, deltas, keys[i + 1].time - keys[i].time, property.isSpatial);
-            outEase[i] = easeList(dims, ease.outSpeed, ease.outInfluence);
-            inEase[i + 1] = easeList(dims, ease.inSpeed, ease.inInfluence);
-        }
         if (!property.isInterpolationTypeValid(KeyframeInterpolationType.BEZIER)) {
             // Source Text and similar only hold.
             for (i = 0; i < count; i += 1) {
@@ -575,18 +604,11 @@
                 return {index: indexes[i2], time: Z.round(key.time, 4), value: AE.exportValue(key.value), easing: i2 < count - 1 ? "hold" : null};
             });
         }
+        // Interpolation and spatial paths first: a spatial ease's speed is along the path they make.
         for (i = 0; i < count; i += 1) {
             property.setInterpolationTypeAtKey(indexes[i], inType[i], outType[i]);
             property.setTemporalContinuousAtKey(indexes[i], false);
             property.setTemporalAutoBezierAtKey(indexes[i], false);
-            if (inType[i] === KeyframeInterpolationType.BEZIER || outType[i] === KeyframeInterpolationType.BEZIER) {
-                property.setTemporalEaseAtKey(indexes[i], inEase[i], outEase[i]);
-                if (inType[i] !== outType[i]) {
-                    // Setting an ease can turn a linear or hold side into Bezier, as the
-                    // Keyframe Velocity dialog does; put the other side back.
-                    property.setInterpolationTypeAtKey(indexes[i], inType[i], outType[i]);
-                }
-            }
             if (property.isSpatial) {
                 if (opts.spatial === "linear") {
                     property.setSpatialAutoBezierAtKey(indexes[i], false);
@@ -594,6 +616,26 @@
                     property.setSpatialTangentsAtKey(indexes[i], zeroTangent(property), zeroTangent(property));
                 } else {
                     property.setSpatialAutoBezierAtKey(indexes[i], true);
+                }
+            }
+        }
+        for (i = 0; i < count - 1; i += 1) {
+            segment = keys[i].curve;
+            if (segment.type !== "bezier") {
+                continue;
+            }
+            deltas = property.isSpatial ? [pathLength(property, keys[i].time, keys[i + 1].time)] : changes(property, keys[i].value, keys[i + 1].value);
+            ease = AE.segmentEase(segment, deltas, keys[i + 1].time - keys[i].time, property.isSpatial);
+            outEase[i] = easeList(dims, ease.outSpeed, ease.outInfluence);
+            inEase[i + 1] = easeList(dims, ease.inSpeed, ease.inInfluence);
+        }
+        for (i = 0; i < count; i += 1) {
+            if (inType[i] === KeyframeInterpolationType.BEZIER || outType[i] === KeyframeInterpolationType.BEZIER) {
+                property.setTemporalEaseAtKey(indexes[i], inEase[i], outEase[i]);
+                if (inType[i] !== outType[i]) {
+                    // Setting an ease can turn a linear or hold side into Bezier, as the
+                    // Keyframe Velocity dialog does; put the other side back.
+                    property.setInterpolationTypeAtKey(indexes[i], inType[i], outType[i]);
                 }
             }
         }
