@@ -272,9 +272,31 @@
         return path;
     };
 
+    // File() and Folder() read "%XX" in a path as an escape (paths are URIs
+    // to ExtendScript), so a folder really named "Project%20files" is found
+    // only when its % is passed as %25. Platform paths (tool arguments,
+    // fsName, ZenviLink.tempDir / tempFile) go through AE.fileAt /
+    // AE.folderAt; names appended to a fullName (URI notation, already
+    // escaped) go through AE.uriName. Only % is escaped.
+
+    /** The File at a platform path. */
+    AE.fileAt = function (path) {
+        return new File(String(path).replace(/%/g, "%25"));
+    };
+
+    /** The Folder at a platform path. */
+    AE.folderAt = function (path) {
+        return new Folder(String(path).replace(/%/g, "%25"));
+    };
+
+    /** A plain file or folder name, ready to append to a fullName. */
+    AE.uriName = function (name) {
+        return String(name).replace(/%/g, "%25");
+    };
+
     /** Mac and Windows file systems are case-insensitive by default. */
     AE.pathKey = function (path) {
-        var key = new File(path).fsName;
+        var key = AE.fileAt(path).fsName;
         return /^(Macintosh|Windows)/.test(File.fs) ? key.toLowerCase() : key;
     };
 
@@ -285,7 +307,7 @@
      * uses "/".
      */
     AE.tempFolder = function (name) {
-        var folder = new Folder(new Folder(Z.tempDir()).fullName + "/" + name);
+        var folder = new Folder(AE.folderAt(Z.tempDir()).fullName + "/" + AE.uriName(name));
         if (!folder.exists && !folder.create()) {
             throw Z.fail("HOST_ERROR", "Could not create folder " + folder.fsName);
         }

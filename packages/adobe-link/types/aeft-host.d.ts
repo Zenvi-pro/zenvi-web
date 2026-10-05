@@ -168,6 +168,9 @@ interface ZenviAe {
   requireUnlocked(layer: Layer): void;
   compTime(comp: CompItem, seconds: number, ctx: ZenviContext | null, label: string): number;
   requireAbsolutePath(path: any, key: string): string;
+  fileAt(path: string): File;
+  folderAt(path: string): Folder;
+  uriName(name: string): string;
   pathKey(path: string): string;
   tempFolder(name: string): Folder;
   safeFileName(name: string): string;

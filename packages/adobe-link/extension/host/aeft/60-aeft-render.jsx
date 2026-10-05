@@ -227,7 +227,7 @@
     }
 
     function fileSize(path) {
-        var file = new File(path);
+        var file = AE.fileAt(path);
         return file.exists ? file.length : null;
     }
 
@@ -244,7 +244,7 @@
      */
     function stagingFile(target) {
         var parts = splitName(target);
-        return new File(target.parent.fullName + "/" + parts.base + ".zenvi-partial-" + new Date().getTime() + parts.ext);
+        return new File(target.parent.fullName + "/" + AE.uriName(parts.base + ".zenvi-partial-" + new Date().getTime() + parts.ext));
     }
 
     /** Move a finished staging render into place (replacing an old file there). */
@@ -256,7 +256,7 @@
         if (!staging.rename(File.decode(target.name))) {
             throw Z.fail("HOST_ERROR", "Could not move the render to " + target.fsName + "; it is at " + staging.fsName);
         }
-        return new File(target.fsName);
+        return AE.fileAt(target.fsName);
     }
 
     /** The rendered file, which must exist. */
@@ -282,10 +282,10 @@
 
     /** folder/base.ext, or base-2.ext, base-3.ext ... when that is taken. */
     function uniqueFile(folder, base, ext) {
-        var file = new File(folder.fullName + "/" + base + "." + ext);
+        var file = new File(folder.fullName + "/" + AE.uriName(base + "." + ext));
         var n;
         for (n = 2; file.exists && n < 1000; n += 1) {
-            file = new File(folder.fullName + "/" + base + "-" + n + "." + ext);
+            file = new File(folder.fullName + "/" + AE.uriName(base + "-" + n + "." + ext));
         }
         return file;
     }
@@ -405,8 +405,8 @@
         requireIdleQueue();
         queued = queueForRender(title, "Queued \"" + comp.name + "\" for rendering", comp, templateName, function (templates) {
             var picked = chooseTemplate(templates, templateName, preset, ctx);
-            var target = new File(withExtension(output !== null ? output :
-                project.file.parent.fullName + "/Renders/" + AE.safeFileName(comp.name) + "." + (picked.ext || "mov"), picked.ext, ctx));
+            var target = output !== null ? AE.fileAt(withExtension(output, picked.ext, ctx)) :
+                new File(project.file.parent.fullName + "/Renders/" + AE.uriName(AE.safeFileName(comp.name) + "." + (picked.ext || "mov")));
             if (target.exists && !overwrite) {
                 throw Z.refuse("INVALID_ARGUMENT", target.fsName + " already exists; pass overwrite: true or another `output`");
             }
@@ -520,7 +520,7 @@
                 // Zenvi's own renders folder: a new name per render, never another file.
                 target = uniqueFile(AE.tempFolder("renders"), AE.safeFileName(comp.name) + "-" + comp.id + "-" + AE.fileStamp(now), picked.ext || "mov");
             } else {
-                target = new File(withExtension(output, picked.ext, ctx));
+                target = AE.fileAt(withExtension(output, picked.ext, ctx));
             }
             if (target.exists && !overwrite) {
                 throw Z.refuse("INVALID_ARGUMENT", target.fsName + " already exists; pass overwrite: true or another `output`");

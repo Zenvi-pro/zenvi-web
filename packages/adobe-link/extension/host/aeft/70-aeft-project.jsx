@@ -48,7 +48,7 @@
             if (!/\.aepx?$/i.test(path)) {
                 throw Z.refuse("INVALID_ARGUMENT", "`path` must end in .aep or .aepx");
             }
-            file = new File(path);
+            file = AE.fileAt(path);
             if (!file.parent.exists) {
                 throw Z.refuse("NOT_FOUND", "Folder " + file.parent.fsName + " does not exist");
             }
@@ -107,11 +107,33 @@
 
     // ------------------------------------------------------------------
     // ae_run_jsx_file
+    //
+    // A Zenvi export written for people ends with an alert unless
+    // $.global.ZENVI_AE_QUIET is true, and an alert would hold this call
+    // until someone clicks OK in After Effects. The flag is set only around
+    // $.evalFile and cleared afterwards on every path: in finally, and again
+    // after it, so nothing depends on how the engine handles finally (the
+    // flag left set would hide the alert from later File > Scripts runs).
+
+    var QUIET_FLAG = "ZENVI_AE_QUIET";
+
+    function clearQuiet() {
+        try {
+            delete $.global[QUIET_FLAG];
+        } catch (notDeleted) {
+            // Switched off below instead.
+        }
+        if ($.global[QUIET_FLAG] !== undefined) {
+            $.global[QUIET_FLAG] = false;
+        }
+    }
 
     Z.register("ae_run_jsx_file", function (args, ctx) {
         var path = AE.requireAbsolutePath(Z.required(args, "path", "string"), "path");
-        var file = new File(path);
+        var file = AE.fileAt(path);
         var result;
+        var failed = false;
+        var failure;
         var text;
         if (!/\.(jsx|jsxbin|js)$/i.test(path)) {
             throw Z.refuse("INVALID_ARGUMENT", "`path` must be a .jsx, .jsxbin or .js file");
@@ -120,11 +142,19 @@
             throw Z.refuse("NOT_FOUND", "File does not exist: " + path);
         }
         ctx.changed();
+        $.global[QUIET_FLAG] = true;
         try {
             result = $.evalFile(file);
         } catch (error) {
-            throw Z.fail("HOST_ERROR", file.displayName + " failed: " + (error && error.message ? error.message : String(error)) +
-                (error && typeof error.line === "number" ? " (line " + error.line + " of " + file.displayName + ")" : ""));
+            failed = true;
+            failure = error;
+        } finally {
+            clearQuiet();
+        }
+        clearQuiet();
+        if (failed) {
+            throw Z.fail("HOST_ERROR", file.displayName + " failed: " + (failure && failure.message ? failure.message : String(failure)) +
+                (failure && typeof failure.line === "number" ? " (line " + failure.line + " of " + file.displayName + ")" : ""));
         }
         text = result === undefined || result === null ? "" : String(result);
         return Z.applied("Ran " + file.displayName + (text ? ": " + AE.clip(text, 300) : ""), {path: file.fsName, result: text});

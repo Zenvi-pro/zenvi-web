@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { RQItemStatus } from "../testing/ae-mock.js";
@@ -134,6 +134,19 @@ describe("ae_render", () => {
     expect(failed.summary).toContain("status err_stopped");
     expect(readFileSync(target, "utf8")).toContain("rendered Main");
     expect(partials(h.dir)).toEqual([]);
+  });
+
+  test("a literal % in the project's folder: the default Renders output lands there, not in a URI-decoded folder", () => {
+    const h = aeHarness();
+    const dir = path.join(h.dir, "Project%20files");
+    mkdirSync(dir);
+    // As After Effects holds it: the File for the real path (its % passed as %25).
+    h.mock.project.save(new h.mock.es.File(path.join(dir, "promo.aep").replace(/%/g, "%25")));
+    h.mock.addComp({ name: "Main" });
+    const receipt = h.callValidated("ae_render");
+    expect(receipt).toMatchObject({ status: "applied", data: { output: path.join(dir, "Renders", "Main.mp4") } });
+    expect(receipt.data.size_bytes).toBeGreaterThan(0);
+    expect(existsSync(path.join(h.dir, "Project files"))).toBe(false);
   });
 
   test("a failed render to a new file removes the partial file", () => {
@@ -295,6 +308,24 @@ describe("ae_render_for_zenvi", () => {
     expect(replaced).toMatchObject({ status: "applied", undoSteps: 2, data: { path: target } });
     expect(readFileSync(target, "utf8")).toContain("rendered Main");
     expect(partials(h.dir)).toEqual([]);
+  });
+
+  test("an output in a folder with a literal % is rendered there, and replaced through a staging file next to it", () => {
+    const { h } = saved();
+    for (const name of ["Project%20files", "100% done"]) {
+      const dir = path.join(h.dir, name);
+      mkdirSync(dir);
+      const target = path.join(dir, "clip.mp4");
+      const first = h.callValidated("ae_render_for_zenvi", { output: target });
+      expect(first, name).toMatchObject({ status: "applied", data: { path: target } });
+      expect(first.data.size_bytes, name).toBeGreaterThan(0);
+      writeFileSync(target, "old");
+      const replaced = h.callValidated("ae_render_for_zenvi", { output: target, overwrite: true });
+      expect(replaced, name).toMatchObject({ status: "applied", data: { path: target } });
+      expect(readFileSync(target, "utf8"), name).toContain("rendered Main");
+      expect(partials(dir), name).toEqual([]);
+    }
+    expect(existsSync(path.join(h.dir, "Project files"))).toBe(false);
   });
 
   test("the default output is always a new file", () => {
