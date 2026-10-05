@@ -93,6 +93,19 @@ var ZenviLink = (function () {
         return Object.prototype.toString.call(value) === "[object Array]";
     };
 
+    /**
+     * True when a DOM object has member `name`: feature detection that works for
+     * host methods, which ExtendScript may report as typeof "object", so never
+     * test typeof === "function" on DOM members. Reading the member must not throw.
+     */
+    Z.hasMethod = function (object, name) {
+        try {
+            return object !== null && object !== undefined && object[name] !== undefined && object[name] !== null;
+        } catch (error) {
+            return false;
+        }
+    };
+
     Z.isObject = function (value) {
         return value !== null && typeof value === "object" && !Z.isArray(value);
     };
