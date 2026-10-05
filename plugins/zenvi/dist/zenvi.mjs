@@ -135,32 +135,32 @@ var init_output = __esm({
         const env2 = options.env ?? process.env;
         this.color = Boolean(this.out.isTTY) && !env2.NO_COLOR && env2.TERM !== "dumb";
       }
-      style(text3, ...styles) {
-        if (!this.color) return text3;
-        return styles.reduce((acc, s) => `\x1B[${CODES[s][0]}m${acc}\x1B[${CODES[s][1]}m`, text3);
+      style(text4, ...styles) {
+        if (!this.color) return text4;
+        return styles.reduce((acc, s) => `\x1B[${CODES[s][0]}m${acc}\x1B[${CODES[s][1]}m`, text4);
       }
       /** A line of human output (suppressed in JSON mode). */
-      line(text3 = "") {
+      line(text4 = "") {
         if (this.json || this.quiet) return;
-        this.out.write(`${text3}
+        this.out.write(`${text4}
 `);
       }
       /** Always-visible diagnostics on stderr (hints, progress, warnings). */
-      info(text3) {
+      info(text4) {
         if (this.quiet) return;
-        this.err.write(`${text3}
+        this.err.write(`${text4}
 `);
       }
-      warn(text3) {
-        this.err.write(`${this.errStyle(`warning: ${text3}`, "yellow")}
+      warn(text4) {
+        this.err.write(`${this.errStyle(`warning: ${text4}`, "yellow")}
 `);
       }
-      error(text3) {
-        this.err.write(`${this.errStyle(`error: ${text3}`, "red")}
+      error(text4) {
+        this.err.write(`${this.errStyle(`error: ${text4}`, "red")}
 `);
       }
-      errStyle(text3, style) {
-        return this.err.isTTY && !process.env.NO_COLOR ? `\x1B[${CODES[style][0]}m${text3}\x1B[${CODES[style][1]}m` : text3;
+      errStyle(text4, style) {
+        return this.err.isTTY && !process.env.NO_COLOR ? `\x1B[${CODES[style][0]}m${text4}\x1B[${CODES[style][1]}m` : text4;
       }
       /** The one JSON document of a `--json` run. */
       data(value) {
@@ -179,9 +179,9 @@ var init_output = __esm({
 `);
       }
       /** Progress on stderr, rewriting one line on a TTY. */
-      progress(text3) {
+      progress(text4) {
         if (this.quiet) return;
-        if (this.err.isTTY) this.err.write(`\r\x1B[2K${text3}`);
+        if (this.err.isTTY) this.err.write(`\r\x1B[2K${text4}`);
       }
       endProgress() {
         if (!this.quiet && this.err.isTTY) this.err.write("\r\x1B[2K");
@@ -504,7 +504,7 @@ var init_client = __esm({
       token;
       fetchImpl;
       userAgent;
-      async request(method, path31, init = {}) {
+      async request(method, path38, init = {}) {
         const token = await this.token();
         if (!token) throw new CliError("You are not signed in to Zenvi.", 1, "Run `zenvi login` (or `zenvi login --device` on a machine without a browser).");
         const headers = { Accept: "application/json", Authorization: `Bearer ${token}`, "User-Agent": this.userAgent, ...init.headers };
@@ -515,14 +515,14 @@ var init_client = __esm({
         }
         let response;
         try {
-          response = await this.fetchImpl(`${this.baseUrl}${path31}`, { method, headers, body, signal: AbortSignal.timeout(12e4) });
+          response = await this.fetchImpl(`${this.baseUrl}${path38}`, { method, headers, body, signal: AbortSignal.timeout(12e4) });
         } catch (error62) {
           throw new CloudError(`Cannot reach Zenvi Cloud at ${this.baseUrl}: ${error62.message}`, 0, void 0, void 0);
         }
-        const text3 = await response.text();
-        let data = text3;
+        const text4 = await response.text();
+        let data = text4;
         try {
-          data = text3 ? JSON.parse(text3) : {};
+          data = text4 ? JSON.parse(text4) : {};
         } catch {
         }
         if (!response.ok && !(init.allowStatus ?? []).includes(response.status)) {
@@ -1356,23 +1356,23 @@ function isRecord(value) {
 function lowerPath(value) {
   return String(value ?? "").toLowerCase();
 }
-function isAudioPath(path31) {
-  const p = lowerPath(path31).split("?")[0];
+function isAudioPath(path38) {
+  const p = lowerPath(path38).split("?")[0];
   return AUDIO_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function isImagePath(path31) {
-  const p = lowerPath(path31);
+function isImagePath(path38) {
+  const p = lowerPath(path38);
   return IMAGE_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function hasExtension(path31) {
-  const base = path31.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
+function hasExtension(path38) {
+  const base = path38.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
   return /\.[a-z0-9]{1,5}$/i.test(base);
 }
 function getMediaType(file3, name) {
-  let path31 = String(file3.path ?? "");
-  if (name && !hasExtension(path31)) path31 = name;
-  if (isAudioPath(path31)) return "audio";
-  const image = isImagePath(path31);
+  let path38 = String(file3.path ?? "");
+  if (name && !hasExtension(path38)) path38 = name;
+  if (isAudioPath(path38)) return "audio";
+  const image = isImagePath(path38);
   if (file3.has_video && !image) return "video";
   if (file3.has_video && image) return "image";
   if (file3.has_audio && !file3.has_video) return "audio";
@@ -1388,8 +1388,8 @@ function isAudioOnlyMedia(file3) {
 function isAudioMedia(source2) {
   const data = isRecord(source2) ? source2 : {};
   if (String(data.media_type ?? "").trim().toLowerCase() === "audio") return true;
-  const path31 = lowerPath(data.path ?? data.file_path ?? "").trim();
-  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path31.endsWith(ext))) return true;
+  const path38 = lowerPath(data.path ?? data.file_path ?? "").trim();
+  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path38.endsWith(ext))) return true;
   return data.has_audio === true && data.has_video === false;
 }
 function isSingleImageMedia(source2) {
@@ -1619,8 +1619,8 @@ function expand(value, id) {
   if (typeof value === "string") return substitute(value, id);
   return value;
 }
-function substitute(text3, id) {
-  return id !== void 0 && text3.includes(ID_PLACEHOLDER) ? text3.split(ID_PLACEHOLDER).join(id) : text3;
+function substitute(text4, id) {
+  return id !== void 0 && text4.includes(ID_PLACEHOLDER) ? text4.split(ID_PLACEHOLDER).join(id) : text4;
 }
 var ID_PLACEHOLDER;
 var init_compact = __esm({
@@ -1721,8 +1721,8 @@ function libopenshotClipDefaults() {
   json2.rotation = libopenshotKeyframe(0);
   return json2;
 }
-function basename(path31) {
-  const clean = path31.split(/[?#]/)[0] ?? path31;
+function basename(path38) {
+  const clean = path38.split(/[?#]/)[0] ?? path38;
   const parts = clean.split(/[\\/]/);
   return parts[parts.length - 1] || clean;
 }
@@ -1847,8 +1847,8 @@ var init_defaults = __esm({
 function fpsFloat(fps) {
   return fps.num / fps.den;
 }
-function frameContaining(seconds, fps) {
-  return Math.floor(seconds * fpsFloat(fps) + 1e-9) + 1;
+function frameContaining(seconds2, fps) {
+  return Math.floor(seconds2 * fpsFloat(fps) + 1e-9) + 1;
 }
 function samplesPerFrame(frame, fps, sampleRate, channels) {
   const fpsRate = fps.den / fps.num;
@@ -2731,9 +2731,9 @@ function windowContains(window, frame) {
 function localFrame(window, frame) {
   return frame - window.startFrame + window.localStartFrame;
 }
-function clipFrameAtTime(item, seconds, fps, clamp2 = true) {
+function clipFrameAtTime(item, seconds2, fps, clamp2 = true) {
   const rate = fpsFloat(fps);
-  const frame = pyRound((seconds - f32(item.position) + f32(item.start)) * rate) + 1;
+  const frame = pyRound((seconds2 - f32(item.position) + f32(item.start)) * rate) + 1;
   if (!clamp2) return frame;
   const min = pyRound(f32(item.start) * rate) + 1;
   const max = pyRound(f32(item.end) * rate);
@@ -2886,11 +2886,11 @@ function scan(xml) {
 function byName(spans, name) {
   return spans.filter((s) => s.name === name);
 }
-function xmlEscapeText(text3) {
-  return text3.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function xmlEscapeText(text4) {
+  return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-function xmlUnescape(text3) {
-  return text3.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (whole, ref) => {
+function xmlUnescape(text4) {
+  return text4.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (whole, ref) => {
     if (!ref.startsWith("#")) return NAMED_ENTITIES[ref];
     const code = ref[1] === "x" || ref[1] === "X" ? Number.parseInt(ref.slice(2), 16) : Number.parseInt(ref.slice(1), 10);
     return code <= 1114111 ? String.fromCodePoint(code) : whole;
@@ -2907,7 +2907,7 @@ function apply(xml, edits) {
   }
   return out;
 }
-function setSvgText(template, text3) {
+function setSvgText(template, text4) {
   const spans = scan(template);
   const tspans = byName(spans, "tspan");
   const targets = tspans.length > 0 ? tspans : byName(spans, "text");
@@ -2930,7 +2930,7 @@ function setSvgText(template, text3) {
   targets.forEach((span, i) => {
     if (covered(span)) return;
     const same = i === 0 || first !== "" && placeholder(span) === first;
-    setContent(span, same ? xmlEscapeText(text3) : "");
+    setContent(span, same ? xmlEscapeText(text4) : "");
   });
   return apply(template, edits);
 }
@@ -2960,12 +2960,12 @@ function matches(item, match) {
   }
   return true;
 }
-function resolveKey(root, path31) {
-  if (path31.length === 0) return void 0;
+function resolveKey(root, path38) {
+  if (path38.length === 0) return void 0;
   let parent = root;
   let slot = "";
   let value = root;
-  for (const part of path31) {
+  for (const part of path38) {
     if (typeof part === "string") {
       if (!isRecord6(value)) return void 0;
       const key = findKey(value, part);
@@ -2984,8 +2984,8 @@ function resolveKey(root, path31) {
   }
   return { parent, slot, value };
 }
-function formatKey(path31) {
-  return path31.map(
+function formatKey(path38) {
+  return path38.map(
     (part) => typeof part === "string" ? part : `{${Object.entries(part).map(([k, v]) => `${k}:${String(v)}`).join(",")}}`
   ).join("/");
 }
@@ -3008,17 +3008,17 @@ function defaultTransactionId() {
   fallbackCounter += 1;
   return `tx-${Date.now().toString(36)}-${fallbackCounter.toString(36)}`;
 }
-function writeThrough(root, path31, mutate) {
-  const resolved = resolveKey(root, path31);
-  if (!resolved) throw new KeyNotFoundError(path31);
+function writeThrough(root, path38, mutate) {
+  const resolved = resolveKey(root, path38);
+  if (!resolved) throw new KeyNotFoundError(path38);
   const newRoot = { ...root };
   let src = root;
   let dst = newRoot;
-  for (let i = 0; i < path31.length; i += 1) {
-    const partial2 = resolveKey(src, [path31[i]]);
-    if (!partial2) throw new KeyNotFoundError(path31);
+  for (let i = 0; i < path38.length; i += 1) {
+    const partial2 = resolveKey(src, [path38[i]]);
+    if (!partial2) throw new KeyNotFoundError(path38);
     const { slot, value } = partial2;
-    if (i === path31.length - 1) {
+    if (i === path38.length - 1) {
       mutate(dst, slot);
       break;
     }
@@ -3463,9 +3463,9 @@ function rateOf(project) {
   const fps = fpsOf(project);
   return fps.num / fps.den;
 }
-function snapSeconds(seconds, project) {
+function snapSeconds(seconds2, project) {
   const rate = rateOf(project);
-  return pyRound(seconds * rate) / rate;
+  return pyRound(seconds2 * rate) / rate;
 }
 function frameSeconds(project) {
   return 1 / rateOf(project);
@@ -3639,8 +3639,8 @@ function topLevelTypes(prop) {
   if (Array.isArray(raw)) return new Set(raw.map(String));
   return /* @__PURE__ */ new Set();
 }
-function parsePythonFloat(text3) {
-  const t = text3.trim();
+function parsePythonFloat(text4) {
+  const t = text4.trim();
   if (!FLOAT_TEXT.test(t)) return null;
   const n = Number(t.replaceAll("_", ""));
   return Number.isFinite(n) ? n : null;
@@ -3675,13 +3675,13 @@ function coerceValue(value, prop) {
     return { keep: true, value };
   }
   if (types.has("array") && typeof value === "string") {
-    const text3 = value.trim();
-    if (!text3) return { keep: false, value };
+    const text4 = value.trim();
+    if (!text4) return { keep: false, value };
     try {
-      return { keep: true, value: JSON.parse(text3) };
+      return { keep: true, value: JSON.parse(text4) };
     } catch {
-      if (text3.includes(",")) {
-        const parts = text3.split(",").map((p) => p.trim()).filter(Boolean);
+      if (text4.includes(",")) {
+        const parts = text4.split(",").map((p) => p.trim()).filter(Boolean);
         if (parts.length > 0 && parts.every((p) => /^\d+$/.test(p))) {
           return { keep: true, value: parts.map((p) => Number.parseInt(p, 10)) };
         }
@@ -3724,9 +3724,9 @@ function pyRepr(value) {
   if (isRecord9(value)) return `{${Object.entries(value).map(([k, v]) => `${pyRepr(k)}: ${pyRepr(v)}`).join(", ")}}`;
   return String(value);
 }
-function valueAt(root, path31) {
+function valueAt(root, path38) {
   let current = root;
-  for (const part of path31) {
+  for (const part of path38) {
     if (Array.isArray(current) && typeof part === "number" && part < current.length) current = current[part];
     else if (isRecord9(current) && typeof part === "string" && part in current) current = current[part];
     else return { found: false, value: void 0 };
@@ -3734,14 +3734,14 @@ function valueAt(root, path31) {
   return { found: true, value: current };
 }
 function formatIssue(issue2, payload) {
-  const path31 = issue2.path.map(String).join(".") || "(root)";
+  const path38 = issue2.path.map(String).join(".") || "(root)";
   const at = valueAt(payload, issue2.path);
   const shown = pyRepr(at.value);
   switch (issue2.code) {
     case "unrecognized_keys": {
       const keys = issue2.keys.map(pyRepr).join(", ");
       const verb = issue2.keys.length === 1 ? "was" : "were";
-      return { message: `Additional properties are not allowed (${keys} ${verb} unexpected)`, path: path31 };
+      return { message: `Additional properties are not allowed (${keys} ${verb} unexpected)`, path: path38 };
     }
     case "invalid_type": {
       if (!at.found && issue2.path.length > 0) {
@@ -3749,27 +3749,27 @@ function formatIssue(issue2, payload) {
         return { message: `${pyRepr(String(issue2.path[issue2.path.length - 1]))} is a required property`, path: parentPath };
       }
       const expected = JSON_TYPE_NAMES[issue2.expected] ?? issue2.expected;
-      return { message: `${shown} is not of type '${expected}'`, path: path31 };
+      return { message: `${shown} is not of type '${expected}'`, path: path38 };
     }
     case "invalid_value":
-      return { message: `${shown} is not one of [${issue2.values.map(pyRepr).join(", ")}]`, path: path31 };
+      return { message: `${shown} is not one of [${issue2.values.map(pyRepr).join(", ")}]`, path: path38 };
     case "invalid_union":
-      return { message: `${shown} is not valid under any of the given schemas`, path: path31 };
+      return { message: `${shown} is not valid under any of the given schemas`, path: path38 };
     case "too_small":
       if (issue2.origin === "array") {
-        return { message: Number(issue2.minimum) <= 1 ? `${shown} should be non-empty` : `${shown} is too short`, path: path31 };
+        return { message: Number(issue2.minimum) <= 1 ? `${shown} should be non-empty` : `${shown} is too short`, path: path38 };
       }
-      return { message: `${shown} is less than ${issue2.inclusive === false ? "or equal to " : ""}the minimum of ${pyRepr(Number(issue2.minimum))}`, path: path31 };
+      return { message: `${shown} is less than ${issue2.inclusive === false ? "or equal to " : ""}the minimum of ${pyRepr(Number(issue2.minimum))}`, path: path38 };
     case "too_big":
-      if (issue2.origin === "array") return { message: `${shown} is too long`, path: path31 };
-      return { message: `${shown} is greater than ${issue2.inclusive === false ? "or equal to " : ""}the maximum of ${pyRepr(Number(issue2.maximum))}`, path: path31 };
+      if (issue2.origin === "array") return { message: `${shown} is too long`, path: path38 };
+      return { message: `${shown} is greater than ${issue2.inclusive === false ? "or equal to " : ""}the maximum of ${pyRepr(Number(issue2.maximum))}`, path: path38 };
     default:
-      return { message: issue2.message, path: path31 };
+      return { message: issue2.message, path: path38 };
   }
 }
 function invalidArgumentsMessage(tool, issue2, payload) {
-  const { message, path: path31 } = formatIssue(issue2, payload);
-  return `Error: Invalid arguments for ${tool}: ${message} (at ${path31}).`;
+  const { message, path: path38 } = formatIssue(issue2, payload);
+  return `Error: Invalid arguments for ${tool}: ${message} (at ${path38}).`;
 }
 var HIDDEN_PARAMS, INTEGER_TEXT, FLOAT_TEXT, JSON_TYPE_NAMES;
 var init_coerce = __esm({
@@ -3819,20 +3819,20 @@ function roundHalfUp(value) {
   const r = value >= 0 ? Math.floor(value + 0.5) : Math.ceil(value - 0.5);
   return r === 0 ? 0 : r;
 }
-function toFrame(seconds, fps) {
-  requireFinite2(seconds, "seconds");
-  return roundHalfUp(seconds * fpsFloat2(fps));
+function toFrame(seconds2, fps) {
+  requireFinite2(seconds2, "seconds");
+  return roundHalfUp(seconds2 * fpsFloat2(fps));
 }
 function toSeconds(frame, fps) {
   requireRate(fps);
   if (!Number.isInteger(frame)) throw new RangeError(`frame must be an int, got ${String(frame)}`);
   return frame * den(fps) / num3(fps);
 }
-function snap(seconds, fps) {
-  return toSeconds(toFrame(seconds, fps), fps);
+function snap(seconds2, fps) {
+  return toSeconds(toFrame(seconds2, fps), fps);
 }
-function keyframeX(seconds, fps) {
-  return toFrame(seconds, fps) + 1;
+function keyframeX(seconds2, fps) {
+  return toFrame(seconds2, fps) + 1;
 }
 function durationFrames(start, end, fps) {
   requireFinite2(start, "start");
@@ -4040,8 +4040,8 @@ function orZero(value) {
 function fileLooksLikeImage(file3) {
   const data = isRecord10(file3) ? file3 : {};
   if (String(data.media_type ?? "").toLowerCase() === "image") return true;
-  const path31 = String(data.path || data.name || "");
-  const ext = path31.includes(".") ? path31.slice(path31.lastIndexOf(".") + 1).toLowerCase() : "";
+  const path38 = String(data.path || data.name || "");
+  const ext = path38.includes(".") ? path38.slice(path38.lastIndexOf(".") + 1).toLowerCase() : "";
   return IMAGE_EXTS.has(ext);
 }
 function quantizePlacementSeconds(start, end, fps) {
@@ -4123,9 +4123,9 @@ function parseSecondsArg(value, fallback, field = "") {
     if (!Number.isFinite(value)) throw new TimeArgError(`${label}=${pyFloat(value)} is not a time in seconds`);
     return value;
   }
-  const text3 = String(value).trim();
-  if (!text3) return fallback;
-  let lowered = text3.toLowerCase().replaceAll(",", "");
+  const text4 = String(value).trim();
+  if (!text4) return fallback;
+  let lowered = text4.toLowerCase().replaceAll(",", "");
   for (const suffix of SECONDS_SUFFIXES) {
     if (lowered.endsWith(suffix) && lowered.length > suffix.length) {
       lowered = lowered.slice(0, -suffix.length).trim();
@@ -4152,8 +4152,8 @@ function placementWatchQuery(file3, query2 = "", extra = "") {
   const data = isRecord10(file3) ? file3 : {};
   const ai = isRecord10(data.ai_metadata) ? data.ai_metadata : {};
   for (const key of ["prompt", "short_summary", "description"]) {
-    const text3 = String(ai[key] ?? "").trim();
-    if (text3) return Array.from(text3).slice(0, 200).join("");
+    const text4 = String(ai[key] ?? "").trim();
+    if (text4) return Array.from(text4).slice(0, 200).join("");
   }
   const extraText = String(extra ?? "").replaceAll("_", " ").trim();
   if (extraText) return Array.from(extraText).slice(0, 200).join("");
@@ -4846,12 +4846,12 @@ function writeKeyframeValue(kf, value, frame, interpolation2, choice = false) {
   }
   return setKeyframeValue(kf, frame, value, choice ? Interpolation.CONSTANT : interpolation2);
 }
-function writeColorKeyframe(color2, value, frame, interpolation2) {
+function writeColorKeyframe(color3, value, frame, interpolation2) {
   const rgba2 = parseColorInput(value);
   const channels = ["red", "green", "blue", "alpha"];
-  const out = { ...color2 ?? {} };
+  const out = { ...color3 ?? {} };
   channels.forEach((channel, i) => {
-    const current = color2?.[channel];
+    const current = color3?.[channel];
     out[channel] = frame === void 0 ? { Points: [openshotPoint(1, rgba2[i], interpolation2 ?? Interpolation.BEZIER)] } : setKeyframeValue(current, frame, rgba2[i], interpolation2);
   });
   return out;
@@ -5295,8 +5295,8 @@ function stem(file3) {
   const dot = file3.lastIndexOf(".");
   return dot > 0 ? file3.slice(0, dot) : file3;
 }
-function capitalize(text3) {
-  return text3.charAt(0).toUpperCase() + text3.slice(1).toLowerCase();
+function capitalize(text4) {
+  return text4.charAt(0).toUpperCase() + text4.slice(1).toLowerCase();
 }
 function transitionDisplayName(file3) {
   return capitalize(stem(file3).replaceAll("_", " "));
@@ -5325,8 +5325,8 @@ function matchTransition(name) {
     return base.includes(search) || search.includes(base);
   });
 }
-function resolveTransitionAsset(path31) {
-  const match = /(?:^@transitions|(?:^|[\\/])transitions)[\\/](common|extra)[\\/]([^\\/]+)$/.exec(path31 ?? "");
+function resolveTransitionAsset(path38) {
+  const match = /(?:^@transitions|(?:^|[\\/])transitions)[\\/](common|extra)[\\/]([^\\/]+)$/.exec(path38 ?? "");
   return match ? BY_LOCATION.get(`${match[1]}/${match[2]}`) : void 0;
 }
 function gcd(a, b) {
@@ -5394,8 +5394,8 @@ function gcd2(a, b) {
   while (y) [x, y] = [y, x % y];
   return x || 1;
 }
-function maskReader(path31, width = 720, height = 576) {
-  const entry = resolveTransitionAsset(path31);
+function maskReader(path38, width = 720, height = 576) {
+  const entry = resolveTransitionAsset(path38);
   if (entry) return transitionReader(entry);
   const divisor = gcd2(width, height);
   const fields = {
@@ -5403,7 +5403,7 @@ function maskReader(path31, width = 720, height = 576) {
     display_ratio: { den: height / divisor, num: width / divisor },
     file_size: width * height * 4,
     height,
-    path: path31,
+    path: path38,
     width
   };
   return Object.fromEntries(Object.keys(fields).sort().map((key) => [key, fields[key]]));
@@ -5422,13 +5422,13 @@ function requireDuration(duration3) {
   if (!(d > 0)) throw invalid(`duration must be > 0 (got ${d}).`);
   return d;
 }
-function resolveMask(maskId, path31) {
-  if (maskId !== void 0 && path31 !== void 0) throw invalid("Give maskId or path, not both.");
-  if (path31 !== void 0) {
-    if (typeof path31 !== "string" || path31 === "") throw invalid("path must be a non-empty string.");
-    const known = resolveTransitionMask(path31);
-    const stem4 = (path31.split(/[\\/]/).pop() ?? path31).replace(/\.[^.]+$/, "");
-    return known ?? { path: path31, title: stem4, width: 720, height: 576 };
+function resolveMask(maskId, path38) {
+  if (maskId !== void 0 && path38 !== void 0) throw invalid("Give maskId or path, not both.");
+  if (path38 !== void 0) {
+    if (typeof path38 !== "string" || path38 === "") throw invalid("path must be a non-empty string.");
+    const known = resolveTransitionMask(path38);
+    const stem4 = (path38.split(/[\\/]/).pop() ?? path38).replace(/\.[^.]+$/, "");
+    return known ?? { path: path38, title: stem4, width: 720, height: 576 };
   }
   if (maskId === void 0) throw invalid("Give maskId or path.");
   const found = resolveTransitionMask(maskId);
@@ -5522,18 +5522,18 @@ function applyTransitionBetween(tx, clipAId, clipBId, name, duration3) {
   const transition2 = toolTransition(tx, mask2, layer2, position, snappedDuration, "in");
   return movedClip.position !== clipB.position ? { transition: transition2, movedClip } : { transition: transition2 };
 }
-function applyTransitionToClip(tx, clipId2, name, placement, duration3) {
+function applyTransitionToClip(tx, clipId2, name, placement2, duration3) {
   const project = tx.project;
   const clip2 = requireClip(project, clipId2);
   requireUnlocked(project, clip2.layer);
-  if (placement !== "start" && placement !== "end") throw invalid(`placement must be start or end.`);
+  if (placement2 !== "start" && placement2 !== "end") throw invalid(`placement must be start or end.`);
   const dur = requireDuration(duration3);
   const mask2 = resolveMask(name, void 0);
   const snappedDuration = snapSeconds(dur, project);
   if (!(snappedDuration > 0)) throw invalid("duration is shorter than one frame.");
-  const raw = placement === "end" ? clip2.position + (clip2.end - clip2.start) - dur : clip2.position;
+  const raw = placement2 === "end" ? clip2.position + (clip2.end - clip2.start) - dur : clip2.position;
   const position = snapSeconds(Math.max(0, raw), project);
-  return toolTransition(tx, mask2, clip2.layer, position, snappedDuration, placement === "end" ? "out" : "in");
+  return toolTransition(tx, mask2, clip2.layer, position, snappedDuration, placement2 === "end" ? "out" : "in");
 }
 function removeTransition(tx, transitionId) {
   const transition2 = requireTransition(tx.project, transitionId);
@@ -6474,15 +6474,15 @@ function withExportOverride(overrides, key, value) {
   if (typeof key !== "string" || key.trim() === "") throw invalid("key is required.");
   const out = { ...overrides ?? {} };
   const k = key.toLowerCase().trim();
-  const text3 = String(value).trim();
+  const text4 = String(value).trim();
   if (INT_EXPORT_KEYS.has(k)) {
-    if (!/^[+-]?\d+$/.test(text3)) throw invalid(`${k} must be an integer (got ${text3}).`);
-    out[k] = Number.parseInt(text3, 10);
-  } else if (k === "video_codec" || k === "vcodec") out.video_codec = text3;
-  else if (k === "audio_codec" || k === "acodec") out.audio_codec = text3;
-  else if (k === "output_path" || k === "path") out.output_path = text3;
-  else if (k === "vformat" || k === "format") out.vformat = text3;
-  else out[k] = text3;
+    if (!/^[+-]?\d+$/.test(text4)) throw invalid(`${k} must be an integer (got ${text4}).`);
+    out[k] = Number.parseInt(text4, 10);
+  } else if (k === "video_codec" || k === "vcodec") out.video_codec = text4;
+  else if (k === "audio_codec" || k === "acodec") out.audio_codec = text4;
+  else if (k === "output_path" || k === "path") out.output_path = text4;
+  else if (k === "vformat" || k === "format") out.vformat = text4;
+  else out[k] = text4;
   return out;
 }
 function setExportSetting(doc, key, value) {
@@ -6713,9 +6713,9 @@ function describeIssues(issues) {
   const more = issues.length > 1 ? ` (and ${issues.length - 1} more)` : "";
   return `Invalid project: ${where}${first.message}${more}`;
 }
-function formatIssuePath(path31) {
+function formatIssuePath(path38) {
   let out = "";
-  for (const part of path31) {
+  for (const part of path38) {
     if (typeof part === "number") out += `[${part}]`;
     else out += out ? `.${String(part)}` : String(part);
   }
@@ -6957,10 +6957,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path31) {
-  if (!path31)
+function getElementAtPath(obj, path38) {
+  if (!path38)
     return obj;
-  return path31.reduce((acc, key) => acc?.[key], obj);
+  return path38.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -7219,11 +7219,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path31, issues) {
+function prefixIssues(path38, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path31);
+    iss.path.unshift(path38);
     return iss;
   });
 }
@@ -7744,16 +7744,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path31 = []) => {
+  const processError = (error63, path38 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path31, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path38, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path31, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path38, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path31, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path38, ...issue2.path]);
       } else {
-        const fullpath = [...path31, ...issue2.path];
+        const fullpath = [...path38, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -7792,17 +7792,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path31 = []) => {
+  const processError = (error63, path38 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path31, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path38, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path31, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path38, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path31, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path38, ...issue2.path]);
       } else {
-        const fullpath = [...path31, ...issue2.path];
+        const fullpath = [...path38, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -7841,8 +7841,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path31 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path31) {
+  const path38 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path38) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -15680,8 +15680,8 @@ var capitalizeFirstCharacter, error33;
 var init_lt = __esm({
   "../../node_modules/zod/v4/locales/lt.js"() {
     init_util();
-    capitalizeFirstCharacter = (text3) => {
-      return text3.charAt(0).toUpperCase() + text3.slice(1);
+    capitalizeFirstCharacter = (text4) => {
+      return text4.charAt(0).toUpperCase() + text4.slice(1);
     };
     error33 = () => {
       const Sizable = {
@@ -25838,13 +25838,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path31 = ref.slice(1).split("/").filter(Boolean);
-  if (path31.length === 0) {
+  const path38 = ref.slice(1).split("/").filter(Boolean);
+  if (path38.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path31[0] === defsKey) {
-    const key = path31[1] === void 0 ? void 0 : decodeJSONPointerSegment(path31[1]);
+  if (path38[0] === defsKey) {
+    const key = path38[1] === void 0 ? void 0 : decodeJSONPointerSegment(path38[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -27100,11 +27100,11 @@ function isRecord12(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function checkKeyframes(value, ctx) {
-  const check2 = (candidate, path31) => {
+  const check2 = (candidate, path38) => {
     const result = keyframe.safeParse(candidate);
     if (result.success) return;
     for (const issue2 of result.error.issues) {
-      ctx.addIssue({ code: "custom", message: issue2.message, path: [...path31, ...issue2.path] });
+      ctx.addIssue({ code: "custom", message: issue2.message, path: [...path38, ...issue2.path] });
     }
   };
   for (const [key, prop] of Object.entries(value)) {
@@ -27518,8 +27518,8 @@ var init_migrate = __esm({
 });
 
 // ../engine/src/io/repair.ts
-function repairProjectText(text3) {
-  let contents = text3;
+function repairProjectText(text4) {
+  let contents = text4;
   DAMAGE_WINDOWS_DRIVES.lastIndex = 0;
   if (DAMAGE_WINDOWS_DRIVES.test(contents) && VERSION_260.test(contents)) {
     contents = contents.replace(DAMAGE_WINDOWS_DRIVES, '$1"$2":');
@@ -27531,25 +27531,25 @@ function repairProjectText(text3) {
   }
   return contents;
 }
-function replaceNonFiniteTokens(text3) {
+function replaceNonFiniteTokens(text4) {
   let out = "";
   let changed = false;
   let i = 0;
   let last = 0;
-  while (i < text3.length) {
-    const ch = text3[i];
+  while (i < text4.length) {
+    const ch = text4[i];
     if (ch === '"') {
       i += 1;
-      while (i < text3.length && text3[i] !== '"') i += text3[i] === "\\" ? 2 : 1;
+      while (i < text4.length && text4[i] !== '"') i += text4[i] === "\\" ? 2 : 1;
       i += 1;
       continue;
     }
     let token = null;
-    if (text3.startsWith("NaN", i)) token = "NaN";
-    else if (text3.startsWith("-Infinity", i)) token = "-Infinity";
-    else if (text3.startsWith("Infinity", i)) token = "Infinity";
+    if (text4.startsWith("NaN", i)) token = "NaN";
+    else if (text4.startsWith("-Infinity", i)) token = "-Infinity";
+    else if (text4.startsWith("Infinity", i)) token = "Infinity";
     if (token) {
-      out += text3.slice(last, i) + "null";
+      out += text4.slice(last, i) + "null";
       i += token.length;
       last = i;
       changed = true;
@@ -27557,7 +27557,7 @@ function replaceNonFiniteTokens(text3) {
     }
     i += 1;
   }
-  return changed ? out + text3.slice(last) : null;
+  return changed ? out + text4.slice(last) : null;
 }
 var VERSION_250, VERSION_260, DAMAGE, DAMAGE_WINDOWS_DRIVES, SLASH_REPAIR;
 var init_repair = __esm({
@@ -27598,8 +27598,8 @@ function parseProject(json2, options = {}) {
   data.version = { ...data.version, ...PROJECT_FORMAT_VERSION };
   return data;
 }
-function parseProjectText(text3, options = {}) {
-  const repaired = repairProjectText(text3);
+function parseProjectText(text4, options = {}) {
+  const repaired = repairProjectText(text4);
   let json2;
   try {
     json2 = JSON.parse(repaired);
@@ -27651,12 +27651,12 @@ var init_parse3 = __esm({
 });
 
 // ../engine/src/io/paths.ts
-function posixNormalize(path31) {
-  if (path31 === "") return ".";
-  let initialSlashes = path31.startsWith("/") ? 1 : 0;
-  if (initialSlashes && path31.startsWith("//") && !path31.startsWith("///")) initialSlashes = 2;
+function posixNormalize(path38) {
+  if (path38 === "") return ".";
+  let initialSlashes = path38.startsWith("/") ? 1 : 0;
+  if (initialSlashes && path38.startsWith("//") && !path38.startsWith("///")) initialSlashes = 2;
   const comps = [];
-  for (const comp of path31.split("/")) {
+  for (const comp of path38.split("/")) {
     if (comp === "" || comp === ".") continue;
     if (comp !== ".." || !initialSlashes && comps.length === 0 || comps.length > 0 && comps[comps.length - 1] === "..") {
       comps.push(comp);
@@ -27701,15 +27701,15 @@ function components(ops, p) {
   const { drive, rest } = ops.splitRoot(ops.normalize(p));
   return { drive, parts: rest.split(ops.sep).filter((part) => part !== "" && part !== ".") };
 }
-function isUnder(ops, path31, root) {
-  const p = components(ops, path31);
+function isUnder(ops, path38, root) {
+  const p = components(ops, path38);
   const r = components(ops, root);
   if (p.drive !== r.drive || r.parts.length > p.parts.length) return false;
   return r.parts.every((part, i) => part === p.parts[i]);
 }
-function relative(ops, start, path31) {
+function relative(ops, start, path38) {
   const s = components(ops, start).parts;
-  const p = components(ops, path31).parts;
+  const p = components(ops, path38).parts;
   let i = 0;
   while (i < s.length && i < p.length && s[i] === p[i]) i += 1;
   const rel = [...Array(s.length - i).fill(".."), ...p.slice(i)];
@@ -27733,11 +27733,11 @@ function matchAlias(p) {
 function requireAbsoluteDir(ops, projectDir) {
   if (!isAbsolute(ops, projectDir)) throw new TypeError(`projectDir must be an absolute path: ${projectDir}`);
 }
-function toStoredPath(path31, projectDir, roots = {}) {
+function toStoredPath(path38, projectDir, roots = {}) {
   const ops = opsFor(projectDir);
   requireAbsoluteDir(ops, projectDir);
-  if (path31 === "" || hasScheme(path31) || matchAlias(path31)) return path31;
-  const abs = ops.normalize(isAbsolute(ops, path31) ? path31 : ops.join(projectDir, path31));
+  if (path38 === "" || hasScheme(path38) || matchAlias(path38)) return path38;
+  const abs = ops.normalize(isAbsolute(ops, path38) ? path38 : ops.join(projectDir, path38));
   const { head: folder, tail: file3 } = split(ops, abs);
   const under = (root) => Boolean(root) && isUnder(ops, folder, root);
   if (under(roots.thumbnails)) return `thumbnail/${file3}`;
@@ -27750,17 +27750,17 @@ function toStoredPath(path31, projectDir, roots = {}) {
   }
   return relative(ops, projectDir, abs);
 }
-function fromStoredPath(path31, projectDir, roots = {}) {
+function fromStoredPath(path38, projectDir, roots = {}) {
   const ops = opsFor(projectDir);
   requireAbsoluteDir(ops, projectDir);
-  if (path31 === "") return "";
-  const alias = matchAlias(path31);
+  if (path38 === "") return "";
+  const alias = matchAlias(path38);
   if (alias) {
     const root = roots[alias.name];
-    return root ? ops.normalize(alias.rest ? ops.join(root, alias.rest) : root) : path31;
+    return root ? ops.normalize(alias.rest ? ops.join(root, alias.rest) : root) : path38;
   }
-  if (hasScheme(path31)) return path31;
-  return ops.normalize(ops.join(projectDir, path31));
+  if (hasScheme(path38)) return path38;
+  return ops.normalize(ops.join(projectDir, path38));
 }
 function setOwn(container, key, value) {
   if (Array.isArray(container)) container[key] = value;
@@ -27810,11 +27810,11 @@ function rewritePaths(root, rewrite2) {
 }
 function toStoredPaths(project, projectDir, roots = {}) {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
-  return rewritePaths(project, (path31) => toStoredPath(path31, projectDir, roots));
+  return rewritePaths(project, (path38) => toStoredPath(path38, projectDir, roots));
 }
 function fromStoredPaths(project, projectDir, roots = {}) {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
-  return rewritePaths(project, (path31) => fromStoredPath(path31, projectDir, roots));
+  return rewritePaths(project, (path38) => fromStoredPath(path38, projectDir, roots));
 }
 function projectAssetsDir(projectFilePath) {
   const ops = opsFor(projectFilePath);
@@ -27848,8 +27848,8 @@ var init_paths = __esm({
       sep: "\\",
       splitRoot: winSplitRoot,
       /** ntpath.normpath. */
-      normalize(path31) {
-        const { drive, root, rest } = winSplitRoot(path31);
+      normalize(path38) {
+        const { drive, root, rest } = winSplitRoot(path38);
         const comps = rest.split("\\");
         let i = 0;
         while (i < comps.length) {
@@ -28097,8 +28097,8 @@ function parseExportRate(value) {
   }
   return { kind: "bitrate", bitsPerSecond: Math.trunc(raw) };
 }
-function isQualityModeRate(text3) {
-  const t = (text3 ?? "").trim().toLowerCase();
+function isQualityModeRate(text4) {
+  const t = (text4 ?? "").trim().toLowerCase();
   return t.includes(" crf") || t.includes(" cqp") || t.includes(" qp");
 }
 function allFormatsBitrate(quality, frame) {
@@ -28554,14 +28554,14 @@ function spawnManaged(binary, args, options = {}) {
     kill,
     spawnError: () => spawnErr,
     failure(what = `${binary} failed`) {
-      const text3 = stderr.toString();
-      const summary = stderrSummary(text3);
+      const text4 = stderr.toString();
+      const summary = stderrSummary(text4);
       return new FfmpegError(
         `${what} (exit ${child.exitCode ?? child.signalCode ?? "?"})${summary ? `: ${summary}` : ""}`,
         binary,
         args,
         child.exitCode,
-        text3
+        text4
       );
     }
   };
@@ -28650,16 +28650,16 @@ var init_process = __esm({
         }
       }
       toString() {
-        const text3 = this.chunks.join("");
-        return text3.length > this.limit ? text3.slice(text3.length - this.limit) : text3;
+        const text4 = this.chunks.join("");
+        return text4.length > this.limit ? text4.slice(text4.length - this.limit) : text4;
       }
     };
   }
 });
 
 // ../render-node/src/ffmpeg/capabilities.ts
-function parseCodecList(text3) {
-  const lines = text3.split(/\r?\n/);
+function parseCodecList(text4) {
+  const lines = text4.split(/\r?\n/);
   const start = lines.findIndex((l) => l.trim().startsWith("------"));
   const entries = [];
   for (const line2 of lines.slice(start + 1)) {
@@ -29979,9 +29979,9 @@ function jpegOrientation(bytes) {
   }
   return 1;
 }
-async function imageOrientation(path31) {
-  if (!/\.(jpe?g|jpe)$/i.test(path31)) return 1;
-  const handle = await open3(path31, "r");
+async function imageOrientation(path38) {
+  if (!/\.(jpe?g|jpe)$/i.test(path38)) return 1;
+  const handle = await open3(path38, "r");
   try {
     const buffer = new Uint8Array(128 * 1024);
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
@@ -30289,9 +30289,9 @@ function reduce(num11, den2) {
   const g = gcd3(num11, den2);
   return g > 0 ? { num: num11 / g, den: den2 / g } : { num: num11, den: den2 };
 }
-function parseRatio(text3, sep = "/") {
-  if (!text3) return void 0;
-  const [a, b] = text3.split(sep);
+function parseRatio(text4, sep = "/") {
+  if (!text4) return void 0;
+  const [a, b] = text4.split(sep);
   const num11 = Number(a);
   const den2 = Number(b);
   return Number.isFinite(num11) && Number.isFinite(den2) ? { num: num11, den: den2 } : void 0;
@@ -30299,9 +30299,9 @@ function parseRatio(text3, sep = "/") {
 function toDouble(f2) {
   return f2.num / f2.den;
 }
-function num5(text3) {
-  if (text3 === void 0 || text3 === "N/A") return void 0;
-  const v = typeof text3 === "number" ? text3 : Number(text3);
+function num5(text4) {
+  if (text4 === void 0 || text4 === "N/A") return void 0;
+  const v = typeof text4 === "number" ? text4 : Number(text4);
   return Number.isFinite(v) ? v : void 0;
 }
 function guessFrameRate(stream) {
@@ -30340,13 +30340,13 @@ function pickDuration(d, strategy) {
 }
 function applyDuration(info, d, strategy) {
   const fps = toDouble(info.fps);
-  const seconds = pickDuration(d, strategy);
-  if (!(seconds > 0) || !(fps > 0)) {
+  const seconds2 = pickDuration(d, strategy);
+  if (!(seconds2 > 0) || !(fps > 0)) {
     info.duration = 0;
     info.video_length = 0;
     return;
   }
-  const frames = Math.round(seconds * fps);
+  const frames = Math.round(seconds2 * fps);
   if (frames <= 0) {
     info.duration = 0;
     info.video_length = 0;
@@ -30408,8 +30408,8 @@ async function readerInfoFromFfprobe(file3, probe2, fileSize) {
   const strategy = "VideoPreferred";
   const formatDuration = num5(probe2.format.duration);
   const formatBitRate = num5(probe2.format.bit_rate) ?? 0;
-  const record5 = (key, seconds) => {
-    if (seconds > 0) durations[key] = Math.max(durations[key], seconds);
+  const record5 = (key, seconds2) => {
+    if (seconds2 > 0) durations[key] = Math.max(durations[key], seconds2);
   };
   if (video) {
     info.video_stream_index = video.index;
@@ -30634,9 +30634,9 @@ var init_probe = __esm({
     init_ffprobe();
     init_pixfmt_gen();
     ProbeError = class extends Error {
-      constructor(message, path31) {
+      constructor(message, path38) {
         super(message);
-        this.path = path31;
+        this.path = path38;
         this.name = "ProbeError";
       }
       path;
@@ -30690,12 +30690,12 @@ var init_probe = __esm({
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { open as open4, stat as stat4 } from "node:fs/promises";
-async function fingerprint(path31) {
-  if (!path31 || path31.includes("%")) return void 0;
+async function fingerprint(path38) {
+  if (!path38 || path38.includes("%")) return void 0;
   let size;
   let mtime;
   try {
-    const st = await stat4(path31);
+    const st = await stat4(path38);
     if (!st.isFile()) return void 0;
     size = st.size;
     mtime = st.mtimeMs / 1e3;
@@ -30704,7 +30704,7 @@ async function fingerprint(path31) {
   }
   const digest = createHash("sha256");
   digest.update(String(size), "ascii");
-  const handle = await open4(path31, "r");
+  const handle = await open4(path38, "r");
   try {
     const head = Buffer.alloc(Math.min(SAMPLE_BYTES, size));
     const { bytesRead } = await handle.read(head, 0, head.length, 0);
@@ -30720,11 +30720,11 @@ async function fingerprint(path31) {
   }
   return { size, mtime, sha256: digest.digest("hex") };
 }
-async function sha256File(path31, options = {}) {
-  const total = (await stat4(path31)).size;
+async function sha256File(path38, options = {}) {
+  const total = (await stat4(path38)).size;
   const digest = createHash("sha256");
   let bytes = 0;
-  const stream = createReadStream(path31, { highWaterMark: 1024 * 1024, signal: options.signal });
+  const stream = createReadStream(path38, { highWaterMark: 1024 * 1024, signal: options.signal });
   for await (const chunk2 of stream) {
     digest.update(chunk2);
     bytes += chunk2.length;
@@ -32189,8 +32189,8 @@ function hexColorRgb(c) {
 function readerPath(params, key) {
   const v = params[key];
   if (!isRecord16(v)) return void 0;
-  const path31 = v.path;
-  return typeof path31 === "string" && path31.length > 0 ? path31 : void 0;
+  const path38 = v.path;
+  return typeof path38 === "string" && path38.length > 0 ? path38 : void 0;
 }
 var init_params = __esm({
   "../engine/src/render/kernels/params.ts"() {
@@ -32199,9 +32199,9 @@ var init_params = __esm({
 });
 
 // ../engine/src/render/kernels/analog-tape.ts
-function utf8(text3) {
+function utf8(text4) {
   const out = [];
-  for (const ch of text3) {
+  for (const ch of text4) {
     const cp = ch.codePointAt(0);
     if (cp < 128) out.push(cp);
     else if (cp < 2048) out.push(192 | cp >> 6, 128 | cp & 63);
@@ -32210,9 +32210,9 @@ function utf8(text3) {
   }
   return out;
 }
-function fnv1aString(text3) {
+function fnv1aString(text4) {
   let h = 2166136261;
-  for (const byte of utf8(text3)) h = Math.imul(h ^ byte, FNV_PRIME) >>> 0;
+  for (const byte of utf8(text4)) h = Math.imul(h ^ byte, FNV_PRIME) >>> 0;
   return h;
 }
 function fnv1aWord(h, d) {
@@ -33074,12 +33074,12 @@ function styleFillAlpha(style) {
   if (style === STYLE_SOFT) return f323(0.74);
   return f323(0.72);
 }
-function setColorAt(stops, pos, color2) {
+function setColorAt(stops, pos, color3) {
   if (pos > 1 || pos < 0) return;
   let index = 0;
   while (index < stops.length && stops[index].pos < pos) index += 1;
-  if (index < stops.length && stops[index].pos === pos) stops[index] = { pos, color: color2 };
-  else stops.splice(index, 0, { pos, color: color2 });
+  if (index < stops.length && stops[index].pos === pos) stops[index] = { pos, color: color3 };
+  else stops.splice(index, 0, { pos, color: color3 });
 }
 function rainbowStops(seed, spread2, alphaScale = 1) {
   const stops = [];
@@ -34230,29 +34230,29 @@ function pointsEqual(x1, y1, x2, y2) {
   const ey = y1 === 0 || y2 === 0 ? fuzzyIsNull(y1 - y2) : fuzzyCompare2(y1, y2);
   return ex && ey;
 }
-function moveTo(path31, x, y) {
-  const n = path31.types.length;
-  if (n > 0 && path31.types[n - 1] === MOVE_TO) {
-    path31.pts[(n - 1) * 2] = x;
-    path31.pts[(n - 1) * 2 + 1] = y;
+function moveTo(path38, x, y) {
+  const n = path38.types.length;
+  if (n > 0 && path38.types[n - 1] === MOVE_TO) {
+    path38.pts[(n - 1) * 2] = x;
+    path38.pts[(n - 1) * 2 + 1] = y;
     return;
   }
-  path31.types.push(MOVE_TO);
-  path31.pts.push(x, y);
+  path38.types.push(MOVE_TO);
+  path38.pts.push(x, y);
 }
-function lineTo(path31, x, y) {
-  const n = path31.types.length;
-  if (n > 0 && pointsEqual(x, y, path31.pts[(n - 1) * 2], path31.pts[(n - 1) * 2 + 1])) return;
-  path31.types.push(LINE_TO);
-  path31.pts.push(x, y);
+function lineTo(path38, x, y) {
+  const n = path38.types.length;
+  if (n > 0 && pointsEqual(x, y, path38.pts[(n - 1) * 2], path38.pts[(n - 1) * 2 + 1])) return;
+  path38.types.push(LINE_TO);
+  path38.pts.push(x, y);
 }
-function cubicTo(path31, c1x, c1y, c2x, c2y, ex, ey) {
-  const n = path31.types.length;
-  const lx = path31.pts[(n - 1) * 2];
-  const ly = path31.pts[(n - 1) * 2 + 1];
+function cubicTo(path38, c1x, c1y, c2x, c2y, ex, ey) {
+  const n = path38.types.length;
+  const lx = path38.pts[(n - 1) * 2];
+  const ly = path38.pts[(n - 1) * 2 + 1];
   if (pointsEqual(lx, ly, c1x, c1y) && pointsEqual(c1x, c1y, c2x, c2y) && pointsEqual(c2x, c2y, ex, ey)) return;
-  path31.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
-  path31.pts.push(c1x, c1y, c2x, c2y, ex, ey);
+  path38.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
+  path38.pts.push(c1x, c1y, c2x, c2y, ex, ey);
 }
 function line(x1, y1, x2, y2) {
   return { x1, y1, x2, y2 };
@@ -34741,17 +34741,17 @@ function curvesForArc(x, y, w, h, startAngle, sweepIn) {
   curves[curves.length - 1] = epy;
   return { sx: spx, sy: spy, curves };
 }
-function strokePath(path31, style, forceOpen) {
+function strokePath(path38, style, forceOpen) {
   const stroker = new Stroker(style.width, style.cap, style.join, forceOpen);
   let els = [];
   const flush = () => {
     if (els.length > 1) stroker.processSubpath(els);
     els = [];
   };
-  for (let i = 0; i < path31.types.length; i += 1) {
-    const type = path31.types[i];
-    const x = path31.pts[i * 2];
-    const y = path31.pts[i * 2 + 1];
+  for (let i = 0; i < path38.types.length; i += 1) {
+    const type = path38.types[i];
+    const x = path38.pts[i * 2];
+    const y = path38.pts[i * 2 + 1];
     if (type === MOVE_TO) {
       flush();
       els.push({ type: MOVE_TO, x, y });
@@ -34760,7 +34760,7 @@ function strokePath(path31, style, forceOpen) {
   flush();
   return stroker.out;
 }
-function flattenPath(path31, device) {
+function flattenPath(path38, device) {
   const contours = [];
   let current = null;
   const close = () => {
@@ -34772,11 +34772,11 @@ function flattenPath(path31, device) {
     current = null;
   };
   const inside = (x, y) => x >= 0 && x <= device.width && y >= 0 && y <= device.height;
-  const count = path31.types.length;
+  const count = path38.types.length;
   for (let i = 0; i < count; i += 1) {
-    const type = path31.types[i];
-    const x = path31.pts[i * 2];
-    const y = path31.pts[i * 2 + 1];
+    const type = path38.types[i];
+    const x = path38.pts[i * 2];
+    const y = path38.pts[i * 2 + 1];
     if (type === MOVE_TO) {
       if (i === count - 1) continue;
       close();
@@ -34787,7 +34787,7 @@ function flattenPath(path31, device) {
     } else if (type === CURVE_TO) {
       current ??= [0, 0];
       const n = current.length;
-      const b = [current[n - 2], current[n - 1], x, y, path31.pts[(i + 1) * 2], path31.pts[(i + 1) * 2 + 1], path31.pts[(i + 2) * 2], path31.pts[(i + 2) * 2 + 1]];
+      const b = [current[n - 2], current[n - 1], x, y, path38.pts[(i + 1) * 2], path38.pts[(i + 1) * 2 + 1], path38.pts[(i + 2) * 2], path38.pts[(i + 2) * 2 + 1]];
       i += 2;
       let outside = false;
       if (!inside(b[6], b[7])) {
@@ -34989,7 +34989,7 @@ var init_audio_visualization_stroke = __esm({
         return { closed: false, tangent };
       }
       processSubpath(els) {
-        const forward = this.strokeSide(els, false);
+        const forward2 = this.strokeSide(els, false);
         const backward = [];
         for (let pos = els.length - 1; pos >= 0; pos -= 1) {
           const ce = els[pos];
@@ -35004,8 +35004,8 @@ var init_audio_visualization_stroke = __esm({
           else if (pe.type === CURVE_TO) type = CURVE_DATA;
           backward.push({ type, x: ce.x, y: ce.y });
         }
-        const back = this.strokeSide(backward, !forward.closed);
-        if (!back.closed && forward.tangent && !lineIsNull(forward.tangent)) this.joinPoints(els[0].x, els[0].y, forward.tangent, this.capMode);
+        const back = this.strokeSide(backward, !forward2.closed);
+        if (!back.closed && forward2.tangent && !lineIsNull(forward2.tangent)) this.joinPoints(els[0].x, els[0].y, forward2.tangent, this.capMode);
       }
     };
   }
@@ -35506,9 +35506,9 @@ var init_audio_visualization_cosmetic = __esm({
         if (implicitClose) this.stroke(px, py, movedX, movedY, 0);
       }
       /** `drawPath` for a path with element types (QPainterPath: lines and cubics). */
-      drawPath(path31) {
-        const types = path31.types;
-        const pts = path31.pts;
+      drawPath(path38) {
+        const types = path38.types;
+        const pts = path38.pts;
         const end = types.length;
         let t = 0;
         while (t < end) {
@@ -35998,22 +35998,22 @@ var init_audio_visualization_paint = __esm({
         if (len <= 0) return;
         const d = this.data;
         const di = (y * this.width + x) * 4;
-        let color2 = p.solid;
+        let color3 = p.solid;
         if (p.rowIndex && p.table) {
           const idx = p.rowIndex(y) * 4;
-          color2 = [p.table[idx], p.table[idx + 1], p.table[idx + 2], p.table[idx + 3]];
+          color3 = [p.table[idx], p.table[idx + 1], p.table[idx + 2], p.table[idx + 3]];
         }
-        if (color2) {
+        if (color3) {
           if (p.opaque) {
             if (coverage === 255) {
-              for (let i = 0; i < len; i += 1) d.set(color2, di + i * 4);
+              for (let i = 0; i < len; i += 1) d.set(color3, di + i * 4);
               return;
             }
             const ia2 = 255 - coverage;
-            const s0 = byteMul(color2[0], coverage);
-            const s1 = byteMul(color2[1], coverage);
-            const s2 = byteMul(color2[2], coverage);
-            const s3 = byteMul(color2[3], coverage);
+            const s0 = byteMul(color3[0], coverage);
+            const s1 = byteMul(color3[1], coverage);
+            const s2 = byteMul(color3[2], coverage);
+            const s3 = byteMul(color3[3], coverage);
             for (let i = 0, o = di; i < len; i += 1, o += 4) {
               d[o] = s0 + byteMul(d[o], ia2);
               d[o + 1] = s1 + byteMul(d[o + 1], ia2);
@@ -36022,10 +36022,10 @@ var init_audio_visualization_paint = __esm({
             }
             return;
           }
-          let c0 = color2[0];
-          let c1 = color2[1];
-          let c2 = color2[2];
-          let c3 = color2[3];
+          let c0 = color3[0];
+          let c1 = color3[1];
+          let c2 = color3[2];
+          let c3 = color3[3];
           if (coverage !== 255) {
             c0 = byteMul(c0, coverage);
             c1 = byteMul(c1, coverage);
@@ -36105,8 +36105,8 @@ var init_audio_visualization_paint = __esm({
        * then qgrayraster (antialiased; its spans are the runs of equal coverage,
        * flushed every 256) or QRasterizer's scan converter (aliased).
        */
-      fillPath(path31, brush, evenOdd) {
-        const contours = flattenPath(path31, this);
+      fillPath(path38, brush, evenOdd) {
+        const contours = flattenPath(path38, this);
         if (contours.length === 0) return;
         const p = prepare2(brush);
         if (this.antialias) {
@@ -36135,21 +36135,21 @@ var init_audio_visualization_paint = __esm({
           this.cosmetic(pen2, (c) => c.drawPolygon(points, false));
           return;
         }
-        const path31 = { types: [], pts: [] };
+        const path38 = { types: [], pts: [] };
         for (let i = 0; i < points.length; i += 2) {
-          path31.types.push(i === 0 ? MOVE_TO : LINE_TO);
-          path31.pts.push(points[i], points[i + 1]);
+          path38.types.push(i === 0 ? MOVE_TO : LINE_TO);
+          path38.pts.push(points[i], points[i + 1]);
         }
-        this.fillPath(strokePath(path31, pen2, true), pen2.brush, false);
+        this.fillPath(strokePath(path38, pen2, true), pen2.brush, false);
       }
       /** `QPainter::drawPath` with no brush. */
-      drawPath(path31, pen2) {
-        if (path31.types.length === 0) return;
+      drawPath(path38, pen2) {
+        if (path38.types.length === 0) return;
         if (pen2.width <= 1) {
-          this.cosmetic(pen2, (c) => c.drawPath(path31));
+          this.cosmetic(pen2, (c) => c.drawPath(path38));
           return;
         }
-        this.fillPath(strokePath(path31, pen2, false), pen2.brush, false);
+        this.fillPath(strokePath(path38, pen2, false), pen2.brush, false);
       }
       /** `QPainter::drawLine(QPointF, QPointF)`. */
       drawLine(x1, y1, x2, y2, pen2) {
@@ -36157,8 +36157,8 @@ var init_audio_visualization_paint = __esm({
           this.cosmetic(pen2, (c) => c.drawLine(x1, y1, x2, y2));
           return;
         }
-        const path31 = { types: [MOVE_TO, LINE_TO], pts: [x1, y1, x2, y2] };
-        this.fillPath(strokePath(path31, pen2, false), pen2.brush, false);
+        const path38 = { types: [MOVE_TO, LINE_TO], pts: [x1, y1, x2, y2] };
+        this.fillPath(strokePath(path38, pen2, false), pen2.brush, false);
       }
       /** `QPainter::drawEllipse(center, rx, ry)` with no pen. */
       fillEllipse(cx, cy, rx, ry, brush) {
@@ -36176,12 +36176,12 @@ var init_audio_visualization_paint = __esm({
         }
         const arc = curvesForArc(x, y, w, h, 0, -360);
         if (arc.curves.length === 0) return;
-        const path31 = { types: [MOVE_TO], pts: [arc.sx, arc.sy] };
+        const path38 = { types: [MOVE_TO], pts: [arc.sx, arc.sy] };
         for (let i = 0; i < arc.curves.length; i += 6) {
-          path31.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
-          path31.pts.push(...arc.curves.slice(i, i + 6));
+          path38.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
+          path38.pts.push(...arc.curves.slice(i, i + 6));
         }
-        this.fillPath(path31, brush, true);
+        this.fillPath(path38, brush, true);
       }
       /** `drawImage(0, 0, image)` with SourceOver (the `qBlendFunctions` fast path). */
       drawImageSourceOver(image) {
@@ -36926,8 +36926,8 @@ function bandEnergy(audio, lowHz, highHz, gain) {
   const rms = f324(Math.sqrt(f324(sumSq / samples)));
   const a = f324(rms * f324(3.6));
   const b = f324(peak * f324(1.15));
-  const combined = a < b ? b : a;
-  return clampf2(f324(gain * combined), 0, 1);
+  const combined2 = a < b ? b : a;
+  return clampf2(f324(gain * combined2), 0, 1);
 }
 function isCurve(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v) && typeof v.enabled === "number" && Array.isArray(v.table);
@@ -37488,18 +37488,18 @@ function clipCoverage(region, x, y, coverage) {
   const t = coverage * c;
   return t + (t >> 8) + 128 >> 8;
 }
-function blendSolidPixel(d, i, color2, cov) {
-  if (cov === 255 && color2[3] === 255) {
-    d[i] = color2[0];
-    d[i + 1] = color2[1];
-    d[i + 2] = color2[2];
+function blendSolidPixel(d, i, color3, cov) {
+  if (cov === 255 && color3[3] === 255) {
+    d[i] = color3[0];
+    d[i + 1] = color3[1];
+    d[i + 2] = color3[2];
     d[i + 3] = 255;
     return;
   }
-  let r = color2[0];
-  let g = color2[1];
-  let b = color2[2];
-  let a = color2[3];
+  let r = color3[0];
+  let g = color3[1];
+  let b = color3[2];
+  let a = color3[3];
   if (cov !== 255) {
     r = byteMul(r, cov);
     g = byteMul(g, cov);
@@ -37581,8 +37581,8 @@ function roundedRectPolygon(x, y, w, h, radius) {
   flattenBezier2(pts, x1, y1 + yr, x1, y1 + k * yr, x1 + k * xr, y1, x1 + xr, y1);
   return pts;
 }
-function fillRoundedRect(image, rect, radius, color2, region) {
-  if (color2[3] === 0 && color2[0] === 0 && color2[1] === 0 && color2[2] === 0) return;
+function fillRoundedRect(image, rect, radius, color3, region) {
+  if (color3[3] === 0 && color3[0] === 0 && color3[1] === 0 && color3[2] === 0) return;
   if (!(rect.width > 0) || !(rect.height > 0)) return;
   const box = regionBox(region);
   if (box.right < box.left || box.bottom < box.top) return;
@@ -37594,7 +37594,7 @@ function fillRoundedRect(image, rect, radius, color2, region) {
     if (y < region.y0 || y >= region.y1) return;
     for (let px = from; px < to; px += 1) {
       const cov = clipCoverage(region, px, y, coverage);
-      if (cov > 0) blendSolidPixel(d, (y * W + px) * 4, color2, cov);
+      if (cov > 0) blendSolidPixel(d, (y * W + px) * 4, color3, cov);
     }
   };
   if (!(radius > 0)) {
@@ -37613,8 +37613,8 @@ function fillRoundedRect(image, rect, radius, color2, region) {
     }
   }
 }
-function drawTextPath(image, raster, text3, x, y, font, ink, fill, stroke, strokeWidth, region) {
-  if (text3.length === 0 || isEmptyRect(ink)) return;
+function drawTextPath(image, raster, text4, x, y, font, ink, fill, stroke, strokeWidth, region) {
+  if (text4.length === 0 || isEmptyRect(ink)) return;
   const margin = Math.ceil(Math.max(0, strokeWidth)) + 2 + Math.ceil(font.pixelSize * 0.25);
   const x0 = Math.max(region.x0, Math.floor(x + ink.x) - margin);
   const y0 = Math.max(region.y0, Math.floor(y + ink.y) - margin);
@@ -37624,7 +37624,7 @@ function drawTextPath(image, raster, text3, x, y, font, ink, fill, stroke, strok
   const lw = x1 - x0;
   const lh = y1 - y0;
   const layer2 = { width: lw, height: lh, data: new Uint8ClampedArray(lw * lh * 4) };
-  raster.drawText(layer2, text3, x - x0, y - y0, font, fill, stroke, stroke ? strokeWidth : 0);
+  raster.drawText(layer2, text4, x - x0, y - y0, font, fill, stroke, stroke ? strokeWidth : 0);
   const src = premultiply(layer2);
   const compose = composerFor(CompositionMode.SourceOver);
   const d = image.data;
@@ -37649,9 +37649,9 @@ function charWidthEm(cp) {
   if (cp < 32 || cp >= 768 && cp <= 879 || cp === 8203 || cp === 65279) return 0;
   return isWide(cp) ? 1 : 0.556;
 }
-function approximateAdvance(text3, font) {
+function approximateAdvance(text4, font) {
   let w = 0;
-  for (const ch of text3) w += charWidthEm(ch.codePointAt(0));
+  for (const ch of text4) w += charWidthEm(ch.codePointAt(0));
   return w * font.pixelSize;
 }
 var F64, U64, KAPPA2, ASCII_WIDTHS, INVISIBLE, TALL, DESCENDER, approximateMetrics;
@@ -37772,16 +37772,16 @@ var init_text_layout = __esm({
         return { ascent: px * 0.93, descent: px * 0.23, lineSpacing: px * 1.16 };
       },
       advance: approximateAdvance,
-      bounds(text3, font) {
+      bounds(text4, font) {
         const px = font.pixelSize;
-        return { x: 0, y: -px * 0.93, width: approximateAdvance(text3, font), height: px * 1.16 };
+        return { x: 0, y: -px * 0.93, width: approximateAdvance(text4, font), height: px * 1.16 };
       },
-      inkBounds(text3, font) {
-        if (INVISIBLE.test(text3)) return { x: 0, y: 0, width: 0, height: 0 };
+      inkBounds(text4, font) {
+        if (INVISIBLE.test(text4)) return { x: 0, y: 0, width: 0, height: 0 };
         const px = font.pixelSize;
-        const top = TALL.test(text3) ? 0.716 : 0.519;
-        const bottom = DESCENDER.test(text3) ? 0.21 : 0.012;
-        const adv = approximateAdvance(text3, font);
+        const top = TALL.test(text4) ? 0.716 : 0.519;
+        const bottom = DESCENDER.test(text4) ? 0.21 : 0.012;
+        const adv = approximateAdvance(text4, font);
         return { x: px * 0.05, y: -top * px, width: Math.max(0, adv - px * 0.1), height: (top + bottom) * px };
       }
     };
@@ -37795,11 +37795,11 @@ function groupValue(g) {
 function fraction2(g) {
   return Number((g ?? "").padEnd(3, "0")) / 1e3;
 }
-function parseCaptions(text3) {
-  const cached3 = cueCache.get(text3);
+function parseCaptions(text4) {
+  const cached3 = cueCache.get(text4);
   if (cached3) return cached3;
-  const nul = text3.indexOf("\0");
-  let prepared = nul >= 0 ? text3.slice(0, nul) : text3;
+  const nul = text4.indexOf("\0");
+  let prepared = nul >= 0 ? text4.slice(0, nul) : text4;
   if (!prepared.endsWith("\n\n")) prepared += "\n\n";
   const cues = [];
   for (const m of prepared.matchAll(CUE_PATTERN)) {
@@ -37809,22 +37809,22 @@ function parseCaptions(text3) {
     cues.push({ start, end, lines });
   }
   if (cueCache.size >= CUE_CACHE_LIMIT) cueCache.delete(cueCache.keys().next().value);
-  cueCache.set(text3, cues);
+  cueCache.set(text4, cues);
   return cues;
 }
 function cueFrameRange(cue, fps) {
   const fpsF = Math.fround(fps.num / fps.den);
   return { first: Math.trunc(cue.start * fpsF) + 1, last: Math.trunc(cue.end * fpsF) };
 }
-function singleLineWidth(measure, font, text3) {
-  const t = text3.replace(/[\r\n\t]/g, " ");
+function singleLineWidth(measure, font, text4) {
+  const t = text4.replace(/[\r\n\t]/g, " ");
   if (t.length === 0) return 0;
   const advance = measure.advance(t, font);
   const ink = measure.inkBounds(t, font);
   return isEmptyRect(ink) ? advance : Math.max(advance, ink.x + ink.width);
 }
-function pathBounds(ink, text3, x, y) {
-  if (text3.length === 0 || isEmptyRect(ink)) return { x: 0, y: 0, width: 0, height: 0 };
+function pathBounds(ink, text4, x, y) {
+  if (text4.length === 0 || isEmptyRect(ink)) return { x: 0, y: 0, width: 0, height: 0 };
   return { x: x + ink.x, y: y + ink.y, width: ink.width, height: ink.height };
 }
 function captionFps(ctx) {
@@ -37891,12 +37891,12 @@ function layoutCaption(params, width, height, frame, fps, measure) {
         for (let wordIndex = words2.length; wordIndex > 0; wordIndex -= 1) {
           const part = words2.slice(0, wordIndex);
           if (measureWidth(part.join(" ")) <= captionAreaWidth) {
-            const text3 = useSpaces ? part.join(" ") : part.join("");
+            const text4 = useSpaces ? part.join(" ") : part.join("");
             const x = Math.trunc(leftMarginX);
             const y = Math.trunc(currentY);
-            const ink = text3.length > 0 ? measure.inkBounds(text3, font) : { x: 0, y: 0, width: 0, height: 0 };
-            const bounds2 = pathBounds(ink, text3, x, y);
-            lines.push({ text: text3, x, y, ink, bounds: bounds2 });
+            const ink = text4.length > 0 ? measure.inkBounds(text4, font) : { x: 0, y: 0, width: 0, height: 0 };
+            const bounds2 = pathBounds(ink, text4, x, y);
+            lines.push({ text: text4, x, y, ink, bounds: bounds2 });
             words2 = words2.slice(wordIndex);
             displayed = true;
             currentY += lineHeight;
@@ -38294,15 +38294,15 @@ function qtToInt(token) {
   const v = Number(s);
   return v >= -2147483648 && v <= 2147483647 ? v : 0;
 }
-function readLines(text3) {
-  let body = text3.charCodeAt(0) === 65279 ? text3.slice(1) : text3;
+function readLines(text4) {
+  let body = text4.charCodeAt(0) === 65279 ? text4.slice(1) : text4;
   body = body.replace(/\r/g, "");
   const lines = body.split("\n");
   if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
   return lines.map(qtTrimmed);
 }
-function parseCubeLut(text3) {
-  const lines = readLines(text3);
+function parseCubeLut(text4) {
+  const lines = readLines(text4);
   const domainMin = [0, 0, 0];
   const domainMax = [1, 1, 1];
   const parseDomainLine = (line2) => {
@@ -38357,15 +38357,15 @@ function parseCubeLut(text3) {
   if (!found) return null;
   return { kind: lut3d ? "3d" : "1d", size: found.size, data: found.data, domainMin, domainMax };
 }
-function cachedCubeLut(text3) {
-  if (CACHE.has(text3)) {
-    const hit = CACHE.get(text3);
-    CACHE.delete(text3);
-    CACHE.set(text3, hit);
+function cachedCubeLut(text4) {
+  if (CACHE.has(text4)) {
+    const hit = CACHE.get(text4);
+    CACHE.delete(text4);
+    CACHE.set(text4, hit);
     return hit;
   }
-  const lut = parseCubeLut(text3);
-  CACHE.set(text3, lut);
+  const lut = parseCubeLut(text4);
+  CACHE.set(text4, lut);
   if (CACHE.size > CACHE_LIMIT) CACHE.delete(CACHE.keys().next().value);
   return lut;
 }
@@ -38488,10 +38488,10 @@ function applyCubeLut(image, lut, intensity, intensityR, intensityG, intensityB)
     d[i + 2] = constrainByte(f328(f328(alpha * fmaf2(lb, tB, f328(bn * keepB))) * 255));
   }
 }
-function lutForPath(ctx, path31) {
-  if (path31 === "") return null;
-  const text3 = ctx.texts?.get(path31);
-  return text3 === void 0 ? null : cachedCubeLut(text3);
+function lutForPath(ctx, path38) {
+  if (path38 === "") return null;
+  const text4 = ctx.texts?.get(path38);
+  return text4 === void 0 ? null : cachedCubeLut(text4);
 }
 var f328, INV_2552, colorMap;
 var init_color_map = __esm({
@@ -38675,9 +38675,9 @@ function curveLut(curve) {
   }
   return lut;
 }
-function lutStage(image, ctx, path31, intensity) {
-  if (path31 === "" || !(intensity > 0)) return;
-  const lut = lutForPath(ctx, path31);
+function lutStage(image, ctx, path38, intensity) {
+  if (path38 === "" || !(intensity > 0)) return;
+  const lut = lutForPath(ctx, path38);
   if (lut) applyCubeLut(image, lut, intensity, 1, 1, 1);
 }
 var f329, INV_2553, EPSILON, LUMA_R, LUMA_G, LUMA_B, TINT_G, TINT_RB, RECOVERY, INV_ALPHA3, EXP2_TABLE, EXP2_C0, EXP2_C1, EXP2_SHIFT, exp2Bits, NAMED_COLORS, namedColors, WHITE, NO_BIAS, identityTable, colorGrade;
@@ -39318,13 +39318,13 @@ function grayTable(brightness2, contrast) {
   return table;
 }
 function displaceKernel(image, params, ctx) {
-  const path31 = displaceMapPath(params);
-  if (!path31) return;
-  const source2 = ctx.images.get(path31);
+  const path38 = displaceMapPath(params);
+  if (!path38) return;
+  const source2 = ctx.images.get(path38);
   const width = image.width;
   const height = image.height;
   if (!source2 || source2.width <= 0 || source2.height <= 0 || width <= 0 || height <= 0) return;
-  const map2 = scaledPremul(source2, width, height, ctx.imageSizes?.[path31]).data;
+  const map2 = scaledPremul(source2, width, height, ctx.imageSizes?.[path38]).data;
   const strength = f3211(num7(params, "strength", 1));
   const xAmount = f3211(f3211(f3211(num7(params, "horizontal", 0.05)) * width) * strength);
   const yAmount = f3211(f3211(f3211(num7(params, "vertical", 0)) * height) * strength);
@@ -39452,9 +39452,9 @@ function mix32(value) {
   v ^= v >>> 16;
   return v >>> 0;
 }
-function utf82(text3) {
+function utf82(text4) {
   const out = [];
-  for (const ch of text3) {
+  for (const ch of text4) {
     let cp = ch.codePointAt(0);
     if (cp >= 55296 && cp <= 57343) cp = 65533;
     if (cp < 128) out.push(cp);
@@ -39464,9 +39464,9 @@ function utf82(text3) {
   }
   return out;
 }
-function fnv1a(text3) {
+function fnv1a(text4) {
   let h = 2166136261;
-  for (const byte of utf82(text3)) h = Math.imul(h ^ byte, 16777619) >>> 0;
+  for (const byte of utf82(text4)) h = Math.imul(h ^ byte, 16777619) >>> 0;
   return h;
 }
 function hashSigned(seed, x, y, t, salt) {
@@ -40609,9 +40609,9 @@ var init_mask = __esm({
       supported: true,
       handlesMask: true,
       run(image, params, ctx) {
-        const path31 = readerPath(params, "mask_reader") ?? readerPath(params, "reader");
-        if (!path31) return;
-        const source2 = ctx.images.get(path31);
+        const path38 = readerPath(params, "mask_reader") ?? readerPath(params, "reader");
+        if (!path38) return;
+        const source2 = ctx.images.get(path38);
         if (!source2) return;
         applyMaskFromSource(image, source2, {
           brightness: num7(params, "brightness", 0),
@@ -41418,9 +41418,9 @@ function timerSeconds(params, ctx, settings = timerSettings(params)) {
 function pad(n, width) {
   return String(n).padStart(width, "0");
 }
-function formatTimecode(seconds, fps) {
-  const negative = seconds < 0;
-  const totalFrames2 = roundHalfAway(Math.abs(seconds) * fps);
+function formatTimecode(seconds2, fps) {
+  const negative = seconds2 < 0;
+  const totalFrames2 = roundHalfAway(Math.abs(seconds2) * fps);
   const roundedFps = Math.max(1, roundHalfAway(fps));
   const frames = totalFrames2 % roundedFps;
   const totalSeconds = Math.floor(totalFrames2 / roundedFps);
@@ -41429,8 +41429,8 @@ function formatTimecode(seconds, fps) {
   const hours = Math.floor(totalSeconds / 3600);
   return `${negative ? "-" : ""}${pad(hours, 2)}:${pad(mins, 2)}:${pad(secs, 2)}:${pad(frames, 2)}`;
 }
-function formatSeconds(seconds, fps, durationStyle, format, clamp2) {
-  let s = seconds;
+function formatSeconds(seconds2, fps, durationStyle, format, clamp2) {
+  let s = seconds2;
   if (durationStyle && clamp2 && s < 0) s = 0;
   const negative = s < 0;
   const totalMs = roundHalfAway(Math.abs(s) * 1e3);
@@ -41461,9 +41461,9 @@ function timerText(params, ctx, settings = timerSettings(params)) {
   } else if (usesTimecode(settings)) {
     value = formatTimecode(timerSeconds(params, ctx, settings), fps);
   } else if (settings.mode === TimerMode.Clock) {
-    let seconds = timerSeconds(params, ctx, settings) % 86400;
-    if (seconds < 0) seconds += 86400;
-    value = formatSeconds(seconds, fps, false, settings.format, settings.clamp);
+    let seconds2 = timerSeconds(params, ctx, settings) % 86400;
+    if (seconds2 < 0) seconds2 += 86400;
+    value = formatSeconds(seconds2, fps, false, settings.format, settings.clamp);
   } else {
     value = formatSeconds(timerSeconds(params, ctx, settings), fps, true, settings.format, settings.clamp);
   }
@@ -41488,7 +41488,7 @@ function layoutTimer(params, width, height, ctx, measure) {
   const strokeWidthValue = Math.max(0, num7(params, "stroke_width", 2) * scale);
   const paddingValue = Math.max(0, num7(params, "background_padding", 14) * scale);
   const cornerValue = Math.max(0, num7(params, "background_corner", 6) * scale);
-  const text3 = timerText(params, ctx, settings);
+  const text4 = timerText(params, ctx, settings);
   const layoutText = timerLayoutText(params, ctx, settings);
   const font = { family: settings.fontName, pixelSize: Math.trunc(fontSizeValue) };
   const tight = (s) => {
@@ -41496,13 +41496,13 @@ function layoutTimer(params, width, height, ctx, measure) {
     if (!isEmptyRect(ink)) return ink;
     return s.length > 0 ? measure.bounds(s, font) : { x: 0, y: 0, width: 0, height: 0 };
   };
-  const textBounds = tight(text3);
+  const textBounds = tight(text4);
   const layoutBounds = tight(layoutText);
   const textWidth2 = Math.max(1, textBounds.width);
   const textHeight = Math.max(1, textBounds.height);
   let digitSlotWidth = 0;
   for (let digit = 0; digit <= 9; digit += 1) digitSlotWidth = Math.max(digitSlotWidth, measure.advance(String(digit), font));
-  const slotLayout = text3.length === layoutText.length && !usesFrames(settings);
+  const slotLayout = text4.length === layoutText.length && !usesFrames(settings);
   const slotWidths = [];
   let layoutWidth = 0;
   if (slotLayout) {
@@ -41537,20 +41537,20 @@ function layoutTimer(params, width, height, ctx, measure) {
   const runs = [];
   if (slotLayout) {
     let cursorX = x + paddingValue;
-    for (let index = 0; index < text3.length; index += 1) {
-      const ch = text3[index];
+    for (let index = 0; index < text4.length; index += 1) {
+      const ch = text4[index];
       const charBounds = tight(ch);
       const charX = roundHalfAway(cursorX);
       runs.push({ text: ch, x: charX - charBounds.x, y: textY, ink: measure.inkBounds(ch, font) });
       cursorX += slotWidths[index];
     }
   } else {
-    runs.push({ text: text3, x: textX, y: textY, ink: text3.length > 0 ? measure.inkBounds(text3, font) : { x: 0, y: 0, width: 0, height: 0 } });
+    runs.push({ text: text4, x: textX, y: textY, ink: text4.length > 0 ? measure.inkBounds(text4, font) : { x: 0, y: 0, width: 0, height: 0 } });
   }
   const fontAlpha = clampAlpha(num7(params, "font_alpha", 1));
   return {
     font,
-    text: text3,
+    text: text4,
     layoutText,
     slotLayout,
     box: { x, y, width: boxWidth, height: boxHeight },
@@ -42156,8 +42156,8 @@ var init_distortion = __esm({
 });
 
 // ../engine/src/render/audio/dynamics.ts
-function attackOrRelease(seconds, inverseSampleRate) {
-  const v = f3220(seconds);
+function attackOrRelease(seconds2, inverseSampleRate) {
+  const v = f3220(seconds2);
   return v === 0 ? 0 : powf(INV_E, f3220(inverseSampleRate / v));
 }
 function mixDown(channels, n, out) {
@@ -42265,12 +42265,12 @@ var init_dynamics = __esm({
 });
 
 // ../engine/src/render/audio/libc-rand.ts
-function fnv1a32(text3) {
+function fnv1a32(text4) {
   let h = 2166136261;
   const add = (b) => {
     h = Math.imul(h ^ b, 16777619) >>> 0;
   };
-  for (const ch of text3) {
+  for (const ch of text4) {
     const cp = ch.codePointAt(0);
     if (cp < 128) add(cp);
     else if (cp < 2048) {
@@ -42963,8 +42963,8 @@ function displaceMapFrame(reader, n, hostFps) {
   const length = intOf(reader.video_length);
   const fps = fraction3(reader.fps);
   if (reader.has_video === false || length <= 0 || !fps) return n;
-  const seconds = Math.max(0, n - 1) / (hostFps.num / hostFps.den);
-  const mapped = Math.floor(seconds * (fps.num / fps.den)) + 1;
+  const seconds2 = Math.max(0, n - 1) / (hostFps.num / hostFps.den);
+  const mapped = Math.floor(seconds2 * (fps.num / fps.den)) + 1;
   return Math.min(Math.max(1, mapped), length);
 }
 function effectResources(effect2, n, hostFps, timelineEffect) {
@@ -43164,9 +43164,9 @@ function scaleSize(w, h, scale, tw, th) {
       return { width: w, height: h };
   }
 }
-function lowerExt(path31) {
-  const dot = path31.lastIndexOf(".");
-  return dot < 0 ? "" : path31.slice(dot + 1).toLowerCase();
+function lowerExt(path38) {
+  const dot = path38.lastIndexOf(".");
+  return dot < 0 ? "" : path38.slice(dot + 1).toLowerCase();
 }
 function sourceKind(reader) {
   if (!reader || typeof reader.path !== "string") return "unsupported";
@@ -44166,7 +44166,7 @@ function flatten(out, b0, threshold) {
     }
   }
 }
-function outlineContours(path31, transform2) {
+function outlineContours(path38, transform2) {
   const scale = transformScale(transform2);
   const threshold = scale === 0 ? 0.25 : 0.25 / scale;
   const contours = [];
@@ -44176,7 +44176,7 @@ function outlineContours(path31, transform2) {
     const n = current.length;
     if (current[n - 2] !== current[0] || current[n - 1] !== current[1]) current.push(current[0], current[1]);
   };
-  const els = path31.elements;
+  const els = path38.elements;
   for (let i = 0; i < els.length; i += 1) {
     const e = els[i];
     if (e.type === MoveTo) {
@@ -44680,16 +44680,16 @@ function drawImage(dst, src, state) {
     const rr = t.mapRect(0, 0, 1, 1);
     const x1 = qRound(rr.x);
     const y1 = qRound(rr.y);
-    const color2 = new Uint8ClampedArray(4);
+    const color3 = new Uint8ClampedArray(4);
     for (let c = 0; c < 4; c += 1) {
       const c16 = src.data[c] * 257 * intOpacity >> 8 >>> 0;
-      color2[c] = c16 - (c16 >> 8) + 128 >> 8;
+      color3[c] = c16 - (c16 >> 8) + 128 >> 8;
     }
     let solid3 = new Uint8ClampedArray(0);
     const fetch3 = (_x, _y, length) => {
       if (solid3.length < length * 4) {
         solid3 = new Uint8ClampedArray(length * 4);
-        for (let i = 0; i < length; i += 1) solid3.set(color2, i * 4);
+        for (let i = 0; i < length; i += 1) solid3.set(color3, i * 4);
       }
       return solid3;
     };
@@ -44719,9 +44719,9 @@ function drawImage(dst, src, state) {
       const width = noShear ? h / w : Math.abs(t.m22 * h / (t.m11 * w));
       rasterizeLine(ax, ay, bx, by, width, state.antialias, rasterizerBox(device, clip2), sink);
     } else if (state.antialias) {
-      const path31 = new PainterPath();
-      path31.addRect(0, 0, w, h);
-      const mask2 = grayRasterize(outlineContours(path31, t), true, dst.width, dst.height);
+      const path38 = new PainterPath();
+      path38.addRect(0, 0, w, h);
+      const mask2 = grayRasterize(outlineContours(path38, t), true, dst.width, dst.height);
       spans = mask2 ? maskSpans2(mask2) : [];
     } else {
       const poly = [];
@@ -44747,9 +44747,9 @@ function drawImage(dst, src, state) {
   deliverSpans(spans, clip2, (chunk2) => handleSpans(chunk2, intOpacity, fetch2, process4));
 }
 function roundedRectClip(w, h, radius, transform2, width, height) {
-  const path31 = new PainterPath();
-  path31.addRoundedRect(0, 0, w, h, radius, radius);
-  return ClipData.fromMask(grayRasterize(outlineContours(path31, transform2), true, width, height));
+  const path38 = new PainterPath();
+  path38.addRoundedRect(0, 0, w, h, radius, radius);
+  return ClipData.fromMask(grayRasterize(outlineContours(path38, transform2), true, width, height));
 }
 var FIXED, HALF;
 var init_draw_image = __esm({
@@ -45055,7 +45055,7 @@ var init_composite_pool = __esm({
         return entry.key;
       }
       /** Composite `plan` with its decoded sources on a worker. */
-      composite(plan, prepared, text3) {
+      composite(plan, prepared, text4) {
         if (this.closed) return Promise.reject(new Error("CompositePool is closed"));
         const ordered = plan.layers.some((layer2) => layer2.effects.length > 0);
         let slot = this.slots[0];
@@ -45081,7 +45081,7 @@ var init_composite_pool = __esm({
           images,
           texts: [...prepared.texts],
           audio: prepared.audio,
-          text: text3,
+          text: text4,
           store,
           evict
         };
@@ -45278,14 +45278,14 @@ var init_opentype = __esm({
 
 // ../render-node/src/svg/text.ts
 import { readFileSync } from "node:fs";
-function esc2(text3) {
-  return text3.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function esc2(text4) {
+  return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-function rgba(color2) {
-  return { rgb: `rgb(${color2[0]},${color2[1]},${color2[2]})`, alpha: (color2[3] / 255).toFixed(4) };
+function rgba(color3) {
+  return { rgb: `rgb(${color3[0]},${color3[1]},${color3[2]})`, alpha: (color3[3] / 255).toFixed(4) };
 }
-function codePoints(text3) {
-  return Array.from(text3, (ch) => ch.codePointAt(0) ?? 0);
+function codePoints(text4) {
+  return Array.from(text4, (ch) => ch.codePointAt(0) ?? 0);
 }
 function nodeTextRasterizer() {
   shared2 ??= Promise.all([sharedFontIndex(), initResvg()]).then(([index]) => new NodeTextRasterizer(index));
@@ -45348,10 +45348,10 @@ var init_text = __esm({
         const descent = -loaded.font.descender * s;
         return { ascent, descent, lineSpacing: ascent + descent + Math.max(0, loaded.font.lineGap) * s };
       }
-      layout(text3, font) {
+      layout(text4, font) {
         const loaded = this.load(font.family);
         const s = this.scale(loaded, font);
-        const glyphs = codePoints(text3).map((cp) => loaded.font.glyphIndex(cp));
+        const glyphs = codePoints(text4).map((cp) => loaded.font.glyphIndex(cp));
         const pens = [];
         let pen2 = 0;
         glyphs.forEach((g, i) => {
@@ -45361,18 +45361,18 @@ var init_text = __esm({
         });
         return { loaded, glyphs, pens, width: pen2 };
       }
-      advance(text3, font) {
-        return this.layout(text3, font).width;
+      advance(text4, font) {
+        return this.layout(text4, font).width;
       }
-      bounds(text3, font) {
+      bounds(text4, font) {
         const m = this.fontMetrics(font);
-        return { x: 0, y: -m.ascent, width: this.advance(text3, font), height: m.ascent + m.descent };
+        return { x: 0, y: -m.ascent, width: this.advance(text4, font), height: m.ascent + m.descent };
       }
-      inkBounds(text3, font) {
-        const key = `${font.family}\0${font.pixelSize}\0${text3}`;
+      inkBounds(text4, font) {
+        const key = `${font.family}\0${font.pixelSize}\0${text4}`;
         const cached3 = this.inkCache.get(key);
         if (cached3) return cached3;
-        const { loaded, glyphs, pens, width } = this.layout(text3, font);
+        const { loaded, glyphs, pens, width } = this.layout(text4, font);
         const s = this.scale(loaded, font);
         let rect;
         if (loaded.font.hasGlyphBoxes) {
@@ -45390,20 +45390,20 @@ var init_text = __esm({
           });
           rect = Number.isFinite(x0) ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : { x: 0, y: 0, width: 0, height: 0 };
         } else {
-          rect = this.rasterInk(text3, font, width);
+          rect = this.rasterInk(text4, font, width);
         }
         if (this.inkCache.size > 512) this.inkCache.clear();
         this.inkCache.set(key, rect);
         return rect;
       }
       /** Ink bounds by drawing the text (CFF outlines have no glyph boxes to read). */
-      rasterInk(text3, font, advance) {
+      rasterInk(text4, font, advance) {
         const px = font.pixelSize;
         const pad2 = Math.ceil(px);
         const w = Math.max(1, Math.ceil(advance + 2 * pad2));
         const h = Math.max(1, Math.ceil(3 * px));
         const baseline = 2 * px;
-        const image = this.render(text3, font, { x: -pad2, y: -baseline, width: w, height: h }, 0, 0, [255, 255, 255, 255], null, 0);
+        const image = this.render(text4, font, { x: -pad2, y: -baseline, width: w, height: h }, 0, 0, [255, 255, 255, 255], null, 0);
         let x0 = Infinity;
         let y0 = Infinity;
         let x1 = -Infinity;
@@ -45422,13 +45422,13 @@ var init_text = __esm({
         return { x: x0 - pad2, y: y0 - baseline, width: x1 - x0, height: y1 - y0 };
       }
       /** Rasterize `text` (baseline at x, y in region coordinates) into a region-sized straight-RGBA image. */
-      render(text3, font, region, x, y, fill, stroke, strokeWidth) {
+      render(text4, font, region, x, y, fill, stroke, strokeWidth) {
         const loaded = this.load(font.family);
         const f2 = rgba(fill);
         const strokeAttrs = stroke && strokeWidth > 0 ? ` stroke="${rgba(stroke).rgb}" stroke-opacity="${rgba(stroke).alpha}" stroke-width="${strokeWidth}" stroke-linecap="square" stroke-linejoin="bevel"` : "";
         const w = Math.max(1, Math.ceil(region.width));
         const h = Math.max(1, Math.ceil(region.height));
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${region.x} ${region.y} ${w} ${h}"><text x="${x}" y="${y}" font-family="${esc2(loaded.family)}" font-size="${font.pixelSize}" fill="${f2.rgb}" fill-opacity="${f2.alpha}"${strokeAttrs} xml:space="preserve">${esc2(text3)}</text></svg>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${region.x} ${region.y} ${w} ${h}"><text x="${x}" y="${y}" font-family="${esc2(loaded.family)}" font-size="${font.pixelSize}" fill="${f2.rgb}" fill-opacity="${f2.alpha}"${strokeAttrs} xml:space="preserve">${esc2(text4)}</text></svg>`;
         const renderer = new Resvg2(svg, {
           font: { fontBuffers: [loaded.bytes], defaultFontFamily: loaded.family, sansSerifFamily: loaded.family },
           textRendering: 2,
@@ -45456,9 +45456,9 @@ var init_text = __esm({
           renderer.free();
         }
       }
-      drawText(target, text3, x, y, font, fill, stroke, strokeWidth, clip2) {
-        if (!text3) return;
-        const ink = this.inkBounds(text3, font);
+      drawText(target, text4, x, y, font, fill, stroke, strokeWidth, clip2) {
+        if (!text4) return;
+        const ink = this.inkBounds(text4, font);
         const pad2 = Math.ceil((stroke ? strokeWidth : 0) + 2);
         let rx0 = Math.floor(x + ink.x - pad2);
         let ry0 = Math.floor(y + ink.y - pad2);
@@ -45469,7 +45469,7 @@ var init_text = __esm({
         rx1 = Math.min(rx1, target.width, clip2 ? Math.ceil(clip2.x + clip2.width) : target.width);
         ry1 = Math.min(ry1, target.height, clip2 ? Math.ceil(clip2.y + clip2.height) : target.height);
         if (rx1 <= rx0 || ry1 <= ry0) return;
-        const layer2 = this.render(text3, font, { x: rx0, y: ry0, width: rx1 - rx0, height: ry1 - ry0 }, x, y, fill, stroke, strokeWidth);
+        const layer2 = this.render(text4, font, { x: rx0, y: ry0, width: rx1 - rx0, height: ry1 - ry0 }, x, y, fill, stroke, strokeWidth);
         const t = target.data;
         const l = layer2.data;
         for (let yy = 0; yy < layer2.height; yy += 1) {
@@ -45595,7 +45595,7 @@ async function renderProject(project, opts) {
       const stdin = encoder.child.stdin;
       const state = engine.createState();
       const needsText = projectNeedsText(project);
-      const text3 = needsText ? await nodeTextRasterizer() : void 0;
+      const text4 = needsText ? await nodeTextRasterizer() : void 0;
       const threads = opts.engine ? 0 : opts.threads ?? compositeThreads(frames);
       pool = await CompositePool.start(threads, opts.log);
       stats.threads = pool?.size ?? 0;
@@ -45654,7 +45654,7 @@ async function renderProject(project, opts) {
             queue.push(composited);
           } else {
             t = performance.now();
-            queue.push(Promise.resolve(engine.compositeFrame(plan, { ...prepared, text: text3, state })));
+            queue.push(Promise.resolve(engine.compositeFrame(plan, { ...prepared, text: text4, state })));
             stats.composite += performance.now() - t;
           }
         }
@@ -45726,9 +45726,9 @@ var init_render_project = __esm({
 });
 
 // ../render-node/src/render/overlay.ts
-function textWidth(text3, size) {
+function textWidth(text4, size) {
   let em = 0;
-  for (const ch of text3) {
+  for (const ch of text4) {
     if (/[0-9]/.test(ch)) em += 0.556;
     else if (ch === "." || ch === " " || ch === ":") em += ch === ":" ? 0.333 : 0.278;
     else if (ch === "f") em += 0.333;
@@ -45736,8 +45736,8 @@ function textWidth(text3, size) {
   }
   return Math.ceil(em * size);
 }
-function esc3(text3) {
-  return text3.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function esc3(text4) {
+  return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 function overlaySvg(width, height, overlay) {
   const w = Math.max(1, Math.round(width));
@@ -45745,17 +45745,17 @@ function overlaySvg(width, height, overlay) {
   const parts = [];
   const fontSize = Math.max(8, Math.min(11, Math.floor(Math.min(w, h) / 42)));
   const th = Math.ceil(fontSize * 1.2);
-  const chip = (text3, x, y) => {
-    const tw = textWidth(text3, fontSize);
+  const chip = (text4, x, y) => {
+    const tw = textWidth(text4, fontSize);
     const ix = Math.trunc(x);
     const iy = Math.trunc(y);
     parts.push(`<rect x="${ix}" y="${iy}" width="${tw + 4}" height="${th + 3}" fill="#000" fill-opacity="${(165 / 255).toFixed(3)}"/>`);
-    parts.push(`<text x="${ix + 2}" y="${iy + th}" fill="#fff">${esc3(text3)}</text>`);
+    parts.push(`<text x="${ix + 2}" y="${iy + th}" fill="#fff">${esc3(text4)}</text>`);
   };
   if (overlay.grid) {
     const ticks = Array.from({ length: 21 }, (_, i) => i / 20);
     const stroke = (lineWidth, gray, alpha, major) => {
-      const color2 = gray === 0 ? "#000" : "#fff";
+      const color3 = gray === 0 ? "#000" : "#fff";
       const lines = [];
       ticks.forEach((t, i) => {
         if (i % 10 === 0 !== major) return;
@@ -45763,7 +45763,7 @@ function overlaySvg(width, height, overlay) {
         const y = Math.trunc(Math.min(Math.max(0.5, t * h), h - 0.5));
         lines.push(`M${x} 0V${h}`, `M0 ${y}H${w}`);
       });
-      parts.push(`<path d="${lines.join("")}" stroke="${color2}" stroke-opacity="${(alpha / 255).toFixed(3)}" stroke-width="${lineWidth}" fill="none"/>`);
+      parts.push(`<path d="${lines.join("")}" stroke="${color3}" stroke-opacity="${(alpha / 255).toFixed(3)}" stroke-width="${lineWidth}" fill="none"/>`);
     };
     stroke(2, 0, 140, false);
     stroke(1, 255, 190, false);
@@ -45805,8 +45805,8 @@ async function applyOverlay(image, overlay) {
   blendOver(out, layer2);
   return out;
 }
-function frameCaption(projectFrame, seconds) {
-  const s = Math.max(0, seconds);
+function frameCaption(projectFrame, seconds2) {
+  const s = Math.max(0, seconds2);
   let whole = Math.trunc(s);
   let cent = Math.round((s - whole) * 100);
   if (cent >= 100) {
@@ -45831,17 +45831,17 @@ function previewSize(project, width) {
   const h = Math.max(16, Math.round(w * project.height / Math.max(1, project.width)));
   return { width: w, height: h };
 }
-async function renderFrameImage(project, seconds, options) {
+async function renderFrameImage(project, seconds2, options) {
   const engine = options.engine ?? await defaultRenderEngine();
   const size = previewSize(project, options.width);
-  const frame = frameContaining(Math.max(0, seconds), project.fps);
+  const frame = frameContaining(Math.max(0, seconds2), project.fps);
   const own2 = options.sources === void 0;
   const sources = options.sources ?? new SourceManager(project, { resolveMedia: options.resolveMedia, quality: options.scaleQuality ?? "export", signal: options.signal });
   try {
     const plan = engine.planFrame(project, frame, size, { preview: true });
     const prepared = await sources.prepare(plan);
-    const text3 = projectNeedsText(project) ? await nodeTextRasterizer() : void 0;
-    const image = engine.compositeFrame(plan, { ...prepared, text: text3, state: engine.createState() });
+    const text4 = projectNeedsText(project) ? await nodeTextRasterizer() : void 0;
+    const image = engine.compositeFrame(plan, { ...prepared, text: text4, state: engine.createState() });
     return await applyOverlay(image, options.overlay);
   } finally {
     if (own2) await sources.close();
@@ -45881,8 +45881,8 @@ async function encodeJpeg(image, quality = 70, signal) {
   );
   return stdout;
 }
-async function renderFrame(project, seconds, options) {
-  const image = await renderFrameImage(project, seconds, options);
+async function renderFrame(project, seconds2, options) {
+  const image = await renderFrameImage(project, seconds2, options);
   return options.format === "jpeg" ? encodeJpeg(image, options.jpegQuality, options.signal) : encodePng(image);
 }
 var init_render_frame = __esm({
@@ -46024,11 +46024,11 @@ function describeParseError(error62) {
   const issues = error62.issues.slice(0, 3).map((i) => i.path ? `${i.path}: ${i.message}` : i.message);
   return `${issues.join("; ")}${error62.issues.length > 3 ? ` (+${error62.issues.length - 3} more)` : ""}`;
 }
-function parseProjectFileText(text3, file3) {
-  if (!text3.trim()) throw new ProjectFileError(`${file3} is empty.`, file3);
+function parseProjectFileText(text4, file3) {
+  if (!text4.trim()) throw new ProjectFileError(`${file3} is empty.`, file3);
   let project;
   try {
-    project = parseProjectText(text3.charCodeAt(0) === 65279 ? text3.slice(1) : text3);
+    project = parseProjectText(text4.charCodeAt(0) === 65279 ? text4.slice(1) : text4);
   } catch (error62) {
     if (error62 instanceof ProjectParseError) throw new ProjectFileError(`${file3} is not a Zenvi project: ${describeParseError(error62)}`, file3);
     throw error62;
@@ -46037,25 +46037,25 @@ function parseProjectFileText(text3, file3) {
 }
 async function readProjectFile(file3) {
   const abs = path14.resolve(file3);
-  let text3;
+  let text4;
   try {
-    text3 = await readFile5(abs, "utf8");
+    text4 = await readFile5(abs, "utf8");
   } catch (error62) {
     const code = error62.code;
     throw new ProjectFileError(code === "ENOENT" ? `Project file not found: ${abs}` : `Cannot read ${abs}: ${error62.message}`, abs);
   }
-  return parseProjectFileText(text3, abs);
+  return parseProjectFileText(text4, abs);
 }
 function serializeProjectFile(project, file3, options = {}) {
   const abs = path14.resolve(file3);
   return serializeProject(toStoredPaths(project, path14.dirname(abs), storeRoots(abs, options.engineAssetsDir)));
 }
-async function writeFileAtomic(file3, text3) {
+async function writeFileAtomic(file3, text4) {
   const dir = path14.dirname(file3);
   const tmp = path14.join(dir, `.${path14.basename(file3)}.${process.pid}.${randomBytes3(4).toString("hex")}.tmp`);
   const handle = await open6(tmp, "w", 420);
   try {
-    await handle.writeFile(text3);
+    await handle.writeFile(text4);
     await handle.sync();
   } finally {
     await handle.close();
@@ -46394,11 +46394,11 @@ function createBackendHost(options) {
         if (init.signal?.aborted) throw error62;
         throw new BackendError(`Cannot reach the Zenvi backend at ${base}: ${error62.message}`, 0, void 0);
       }
-      const text3 = await response.text();
-      let parsed = text3;
-      if (text3) {
+      const text4 = await response.text();
+      let parsed = text4;
+      if (text4) {
         try {
-          parsed = JSON.parse(text3);
+          parsed = JSON.parse(text4);
         } catch {
         }
       }
@@ -46482,9 +46482,9 @@ function createNodeHost(options = {}) {
       }
     },
     frames: {
-      async renderFrame(project, seconds, frameOptions = {}) {
+      async renderFrame(project, seconds2, frameOptions = {}) {
         const format = frameOptions.format ?? "png";
-        const bytes = await renderFrame(project, seconds, {
+        const bytes = await renderFrame(project, seconds2, {
           resolveMedia,
           width: frameOptions.width,
           format,
@@ -46511,10 +46511,10 @@ function createNodeHost(options = {}) {
         if ((await stat8(file3)).size > MAX_TEXT_BYTES) throw new Error(`${file3} is larger than ${MAX_TEXT_BYTES} bytes.`);
         return readFile6(file3, "utf8");
       },
-      async writeText(p, text3) {
+      async writeText(p, text4) {
         const file3 = inProject(p);
         await mkdir5(path16.dirname(file3), { recursive: true });
-        await writeFileAtomic(file3, text3);
+        await writeFileAtomic(file3, text4);
         return file3;
       }
     },
@@ -46715,10 +46715,10 @@ function put(url2, headers, body, length) {
   const client = target.protocol === "http:" ? http : https;
   return new Promise((resolve, reject) => {
     const req = client.request(target, { method: "PUT", headers: { ...headers, "Content-Length": String(length) } }, (res) => {
-      let text3 = "";
+      let text4 = "";
       res.setEncoding("utf8");
-      res.on("data", (c) => text3 += c);
-      res.on("end", () => resolve({ status: res.statusCode ?? 0, text: text3 }));
+      res.on("data", (c) => text4 += c);
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, text: text4 }));
     });
     req.setTimeout(10 * 6e4, () => req.destroy(new Error("upload timed out")));
     req.on("error", reject);
@@ -46819,8 +46819,8 @@ async function setLink(config2, projectFile, link) {
   await writeFileAtomic(linksPath(config2), `${JSON.stringify(links, null, 2)}
 `);
 }
-function textSha256(text3) {
-  return createHash2("sha256").update(text3).digest("hex");
+function textSha256(text4) {
+  return createHash2("sha256").update(text4).digest("hex");
 }
 async function markSynced(config2, projectFile) {
   const link = await getLink(config2, projectFile);
@@ -47282,8 +47282,8 @@ async function probeEndpoint(url2, token, options = {}) {
       await response.body?.cancel().catch(() => void 0);
       return false;
     }
-    const text3 = await response.text();
-    const json2 = text3.trim().startsWith("{") ? text3 : /^data:\s*(\{.*\})\s*$/m.exec(text3)?.[1] ?? "";
+    const text4 = await response.text();
+    const json2 = text4.trim().startsWith("{") ? text4 : /^data:\s*(\{.*\})\s*$/m.exec(text4)?.[1] ?? "";
     const parsed = JSON.parse(json2);
     return parsed.result !== void 0;
   } catch {
@@ -47383,7 +47383,7 @@ function errorSummary(message) {
 }
 function makeReceipt(status, tool, summary, undoSteps, fields = {}) {
   const failed2 = status === "error" || status === "refused";
-  const receipt = {
+  const receipt2 = {
     contract: CONTRACT_VERSION,
     status,
     tool,
@@ -47399,9 +47399,9 @@ function makeReceipt(status, tool, summary, undoSteps, fields = {}) {
     watchSuggested: fields.watchSuggested ?? null,
     undoSteps: failed2 ? 0 : undoSteps
   };
-  if (fields.clipsNote !== void 0) receipt.clipsNote = fields.clipsNote;
-  if (fields.data !== void 0 && fields.data !== null) receipt.data = fields.data;
-  return receipt;
+  if (fields.clipsNote !== void 0) receipt2.clipsNote = fields.clipsNote;
+  if (fields.data !== void 0 && fields.data !== null) receipt2.data = fields.data;
+  return receipt2;
 }
 function applied(tool, summary, fields = {}, undoSteps = 1) {
   return makeReceipt("applied", tool, summary, undoSteps, fields);
@@ -47415,8 +47415,8 @@ function refused(tool, message, fields = {}) {
 function failed(tool, message, fields = {}) {
   return makeReceipt("error", tool, message, 0, fields);
 }
-function fromHandlerText(tool, text3, mutated) {
-  const raw = text3 ?? "";
+function fromHandlerText(tool, text4, mutated) {
+  const raw = text4 ?? "";
   if (raw.startsWith("Error")) return failed(tool, raw);
   if (raw.trim() === "") return unchanged(tool, "No changes.");
   const lower = raw.toLowerCase();
@@ -47426,10 +47426,10 @@ function fromHandlerText(tool, text3, mutated) {
 function isRecord18(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function parseReceipt(text3) {
+function parseReceipt(text4) {
   let payload;
   try {
-    payload = JSON.parse(text3);
+    payload = JSON.parse(text4);
   } catch {
     return null;
   }
@@ -47437,12 +47437,12 @@ function parseReceipt(text3) {
   if (!("status" in payload) || !("summary" in payload)) return null;
   return payload;
 }
-function isErrorResult(text3) {
-  if (!text3) return true;
-  if (text3.startsWith("Error")) return true;
-  const receipt = parseReceipt(text3);
-  if (!receipt) return false;
-  return receipt.status === "error" || receipt.status === "refused" || String(receipt.summary ?? "").startsWith("Error");
+function isErrorResult(text4) {
+  if (!text4) return true;
+  if (text4.startsWith("Error")) return true;
+  const receipt2 = parseReceipt(text4);
+  if (!receipt2) return false;
+  return receipt2.status === "error" || receipt2.status === "refused" || String(receipt2.summary ?? "").startsWith("Error");
 }
 function isOkStatus(status) {
   return status === "applied" || status === "unchanged";
@@ -47460,10 +47460,10 @@ var init_receipt = __esm({
 
 // ../engine/src/tools/wire.ts
 function toAssistantWire(result) {
-  const text3 = result.text ?? "";
-  const receipt = parseReceipt(text3);
-  const failed2 = receipt !== null && (receipt.status === "error" || receipt.status === "refused");
-  const wire = { result: failed2 ? String(receipt.summary || text3) : text3 };
+  const text4 = result.text ?? "";
+  const receipt2 = parseReceipt(text4);
+  const failed2 = receipt2 !== null && (receipt2.status === "error" || receipt2.status === "refused");
+  const wire = { result: failed2 ? String(receipt2.summary || text4) : text4 };
   if (!failed2 && result.images && result.images.length > 0) {
     wire.images = result.images.map((image) => ({ mimeType: image.mimeType, data: image.data }));
   }
@@ -49399,10 +49399,10 @@ function filterTagsForWindow(tags, windowScenes) {
     }
     const kept = [];
     for (const value of values) {
-      const text3 = String(value ?? "").trim();
-      if (!text3) continue;
-      const norm = text3.toLowerCase();
-      if (corpus.includes(norm) || norm.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text3);
+      const text4 = String(value ?? "").trim();
+      if (!text4) continue;
+      const norm = text4.toLowerCase();
+      if (corpus.includes(norm) || norm.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text4);
     }
     filtered[key] = kept;
   }
@@ -49590,14 +49590,14 @@ function isIndexed(meta3) {
   return String(block.status ?? "").toLowerCase() === "ready" && pyText(block.index_id) !== "" && pyText(block.video_id) !== "";
 }
 function tagCorpusSparse(ai) {
-  const combined = `${pyText(ai.short_summary)} ${pyText(ai.description)} ${pyText(ai.transcript)} ${pyText(ai.sounds)}`.trim();
+  const combined2 = `${pyText(ai.short_summary)} ${pyText(ai.description)} ${pyText(ai.transcript)} ${pyText(ai.sounds)}`.trim();
   const chapters = list(ai.chapters);
-  if (Array.from(combined).length < 40 && chapters.length <= 1) return true;
+  if (Array.from(combined2).length < 40 && chapters.length <= 1) return true;
   const tags = isRecord19(ai.tags) ? ai.tags : {};
   const unique = new Set([...list(tags.objects), ...list(tags.scenes), ...list(tags.activities)].filter(Boolean).map((x) => String(x).toLowerCase()));
   const sceneCount = list(ai.scene_descriptions).length;
-  if (unique.size > 0 && unique.size <= 2 && sceneCount <= 2 && Array.from(combined).length < 40) return true;
-  if (unique.size === 0 && !combined && sceneCount <= 2) return true;
+  if (unique.size > 0 && unique.size <= 2 && sceneCount <= 2 && Array.from(combined2).length < 40) return true;
+  if (unique.size === 0 && !combined2 && sceneCount <= 2) return true;
   return false;
 }
 function inferSearchHint(ai, filename = "") {
@@ -49665,18 +49665,18 @@ function trackStackJson(layers) {
   return JSON.stringify(buildTrackStack(layers)).replace(/[\u0080-\uffff]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`);
 }
 function normalizeTrackOrLayerArg(raw, layers) {
-  const text3 = String(raw ?? "").trim();
-  if (!text3) return {};
+  const text4 = String(raw ?? "").trim();
+  if (!text4) return {};
   const all = layers ?? [];
   if (all.length === 0) return { error: "Error: No tracks in project." };
   const stack = buildTrackStack(all);
   const numbers2 = new Set(stack.map((e) => e.layer_number));
-  const parsed = parsePythonFloat(text3);
+  const parsed = parsePythonFloat(text4);
   const n = parsed === null ? null : Math.trunc(parsed);
   if (n !== null && numbers2.has(n)) return { layer: n };
-  const idHits = stack.filter((e) => e.track_id.trim() && e.track_id.trim().toLowerCase() === text3.toLowerCase());
+  const idHits = stack.filter((e) => e.track_id.trim() && e.track_id.trim().toLowerCase() === text4.toLowerCase());
   if (idHits.length === 1) return { layer: idHits[0].layer_number };
-  const low = text3.toLowerCase();
+  const low = text4.toLowerCase();
   const m = /^(?:ui\s*)?track\s*[#:]?\s*(.+)$/i.exec(low);
   const labelQuery = (m ? m[1].trim() : low).trim();
   const labelHits = stack.filter((e) => {
@@ -49686,14 +49686,14 @@ function normalizeTrackOrLayerArg(raw, layers) {
   if (labelHits.length === 1) return { layer: labelHits[0].layer_number };
   if (labelHits.length > 1) {
     return {
-      error: `Error: Ambiguous track label ${pyReprString(text3)} matches multiple layers. Pass layer_number from list_layers_tool / TRACK_STACK_JSON.`
+      error: `Error: Ambiguous track label ${pyReprString(text4)} matches multiple layers. Pass layer_number from list_layers_tool / TRACK_STACK_JSON.`
     };
   }
   const contains = stack.filter((e) => labelQuery && e.label.trim().toLowerCase().includes(labelQuery));
   if (contains.length === 1) return { layer: contains[0].layer_number };
   if (n !== null && n >= 1 && n <= stack.length) return { layer: stack[n - 1].layer_number };
   return {
-    error: `Error: Unknown track or layer ${pyReprString(text3)}. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label.`
+    error: `Error: Unknown track or layer ${pyReprString(text4)}. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label.`
   };
 }
 function formatTrackLabelForLlm(layerNum, layers) {
@@ -49729,14 +49729,14 @@ var init_tracks2 = __esm({
 function isRecord20(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function basename2(path31) {
-  const parts = String(path31 ?? "").split(/[\\/]/);
+function basename2(path38) {
+  const parts = String(path38 ?? "").split(/[\\/]/);
   return parts[parts.length - 1] ?? "";
 }
-function normPath(path31) {
+function normPath(path38) {
   const segments2 = [];
-  const absolute = path31.startsWith("/");
-  for (const part of path31.split("/")) {
+  const absolute = path38.startsWith("/");
+  for (const part of path38.split("/")) {
     if (part === "" || part === ".") continue;
     if (part === ".." && segments2.length > 0 && segments2[segments2.length - 1] !== "..") segments2.pop();
     else segments2.push(part);
@@ -49754,12 +49754,12 @@ function resolveParentFileId(project, fileData, fileId = "") {
   const explicit = String(data.parent_file_id ?? "").trim();
   if (explicit) return explicit;
   if (!data.zenvi_subclip) return fid || String(data.id ?? "");
-  const path31 = String(data.path ?? "");
-  if (path31 && fid) {
+  const path38 = String(data.path ?? "");
+  if (path38 && fid) {
     for (const candidate of project.files ?? []) {
       if (candidate.zenvi_subclip) continue;
       const candPath = String(candidate.path ?? "");
-      if (candPath && normPath(candPath) === normPath(path31)) return String(candidate.id ?? "");
+      if (candPath && normPath(candPath) === normPath(path38)) return String(candidate.id ?? "");
     }
   }
   return fid || String(data.id ?? "");
@@ -49794,12 +49794,12 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
     rebased: true
   });
   const file3 = isRecord20(fileData) ? fileData : void 0;
-  const path31 = file3 ? String(file3.path ?? "") : "";
+  const path38 = file3 ? String(file3.path ?? "") : "";
   const rawLayer = clipData.layer;
   const layerNum = rawLayer === null || rawLayer === void 0 || rawLayer === "" ? null : Math.trunc(Number(rawLayer));
   const layer2 = layerNum !== null && Number.isFinite(layerNum) ? layerNum : null;
   const uiTrack = layer2 !== null ? layerNumberToDisplayIndex(layer2, options.layers ?? []) : null;
-  const fileName2 = String(file3?.name || basename2(path31) || "").trim();
+  const fileName2 = String(file3?.name || basename2(path38) || "").trim();
   const title = String(clipData.title || clipData.label || fileName2 || "Clip").trim();
   let tlMeta = getIndexBlock(parentData ?? {});
   if (Object.keys(tlMeta).length === 0) tlMeta = getIndexBlock(file3 ?? {});
@@ -49815,7 +49815,7 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
     timelineClipId: String(clip2.id ?? clipData.id ?? ""),
     fileId: fid,
     parentFileId: parentId,
-    sourcePath: path31,
+    sourcePath: path38,
     sourceStart,
     sourceEnd,
     timelinePosition,
@@ -50229,17 +50229,17 @@ function timelineSnapshot(project, fps = projectFps(project)) {
     markers
   };
 }
-function clipRow(placement, requestedFrame) {
+function clipRow(placement2, requestedFrame) {
   const row = {
-    id: placement.clipId,
-    track: placement.track,
-    layer: placement.layer,
-    position: placement.position,
-    start: placement.start,
-    end: placement.end,
-    durationFrames: placement.durationFrames,
-    landedFrame: placement.startFrame,
-    title: placement.title
+    id: placement2.clipId,
+    track: placement2.track,
+    layer: placement2.layer,
+    position: placement2.position,
+    start: placement2.start,
+    end: placement2.end,
+    durationFrames: placement2.durationFrames,
+    landedFrame: placement2.startFrame,
+    title: placement2.title
   };
   if (requestedFrame !== void 0) row.requestedFrame = requestedFrame;
   return row;
@@ -50253,11 +50253,11 @@ function timelineDelta(before, after, options = {}) {
   for (const id of touched) if (after.placements.has(id)) changed.add(id);
   for (const id of after.placements.keys()) if (!before.placements.has(id)) changed.add(id);
   const pureShifts = /* @__PURE__ */ new Map();
-  for (const [id, placement] of after.placements) {
+  for (const [id, placement2] of after.placements) {
     const prior = before.placements.get(id);
-    if (!prior || samePlace(prior, placement) || changed.has(id)) continue;
-    if (prior.track === placement.track && prior.durationFrames === placement.durationFrames) {
-      pureShifts.set(id, { from: prior.startFrame, delta: placement.startFrame - prior.startFrame });
+    if (!prior || samePlace(prior, placement2) || changed.has(id)) continue;
+    if (prior.track === placement2.track && prior.durationFrames === placement2.durationFrames) {
+      pureShifts.set(id, { from: prior.startFrame, delta: placement2.startFrame - prior.startFrame });
     } else {
       changed.add(id);
     }
@@ -50341,23 +50341,23 @@ function missingCapabilities(requires, host) {
 function isRecord22(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function resultFor(receipt, images) {
-  const ok = isOkStatus(receipt.status);
-  const result = { ok, text: JSON.stringify(receipt), data: receipt };
+function resultFor(receipt2, images) {
+  const ok = isOkStatus(receipt2.status);
+  const result = { ok, text: JSON.stringify(receipt2), data: receipt2 };
   if (ok && images && images.length > 0) result.images = images;
   return result;
 }
-function fillEmpty(receipt, before, after) {
+function fillEmpty(receipt2, before, after) {
   const delta = timelineDelta(before, after);
-  if (receipt.clips.length === 0 && delta.clips.length > 0) {
-    receipt.clips = delta.clips;
-    if (delta.clipsNote !== void 0 && receipt.clipsNote === void 0) receipt.clipsNote = delta.clipsNote;
+  if (receipt2.clips.length === 0 && delta.clips.length > 0) {
+    receipt2.clips = delta.clips;
+    if (delta.clipsNote !== void 0 && receipt2.clipsNote === void 0) receipt2.clipsNote = delta.clipsNote;
   }
-  if (receipt.shifted.length === 0) receipt.shifted = delta.shifted;
-  if (receipt.removedClipIds.length === 0) receipt.removedClipIds = delta.removedClipIds;
-  if (receipt.createdTracks.length === 0) receipt.createdTracks = delta.createdTracks;
-  if (receipt.markers.length === 0) receipt.markers = delta.markers;
-  if (receipt.removedMarkerIds.length === 0) receipt.removedMarkerIds = delta.removedMarkerIds;
+  if (receipt2.shifted.length === 0) receipt2.shifted = delta.shifted;
+  if (receipt2.removedClipIds.length === 0) receipt2.removedClipIds = delta.removedClipIds;
+  if (receipt2.createdTracks.length === 0) receipt2.createdTracks = delta.createdTracks;
+  if (receipt2.markers.length === 0) receipt2.markers = delta.markers;
+  if (receipt2.removedMarkerIds.length === 0) receipt2.removedMarkerIds = delta.removedMarkerIds;
 }
 function receiptForError(tool, error62, host) {
   if (isOpError(error62)) {
@@ -50411,32 +50411,32 @@ async function executeTool(tool, impl, ctx, rawArgs) {
   const undoSteps = mutated ? state.undoAfter - state.undoBefore : 0;
   if (typeof outcome === "string") {
     if (outcome.startsWith("Error") || isErrorResult(outcome)) return resultFor(fromHandlerText(name, outcome, false));
-    const receipt2 = fromHandlerText(name, outcome, mutated);
-    if (mutated && state.before && state.after && receipt2.status === "applied") {
-      return resultFor(mutationResult(state.before, state.after, name, receipt2.summary, { undoSteps }));
+    const receipt3 = fromHandlerText(name, outcome, mutated);
+    if (mutated && state.before && state.after && receipt3.status === "applied") {
+      return resultFor(mutationResult(state.before, state.after, name, receipt3.summary, { undoSteps }));
     }
-    receipt2.undoSteps = mutated ? undoSteps : 0;
+    receipt3.undoSteps = mutated ? undoSteps : 0;
+    return resultFor(receipt3);
+  }
+  const receipt2 = "receipt" in outcome && !("contract" in outcome) ? outcome.receipt : outcome;
+  const images = "receipt" in outcome && !("contract" in outcome) ? outcome.images : void 0;
+  if (receipt2.status === "error" || receipt2.status === "refused") {
+    receipt2.undoSteps = 0;
+    if (mutated) {
+      ctx.host.log?.(`tool ${name} returned ${receipt2.status} after recording an undo step`);
+    }
     return resultFor(receipt2);
   }
-  const receipt = "receipt" in outcome && !("contract" in outcome) ? outcome.receipt : outcome;
-  const images = "receipt" in outcome && !("contract" in outcome) ? outcome.images : void 0;
-  if (receipt.status === "error" || receipt.status === "refused") {
-    receipt.undoSteps = 0;
-    if (mutated) {
-      ctx.host.log?.(`tool ${name} returned ${receipt.status} after recording an undo step`);
-    }
-    return resultFor(receipt);
-  }
   if (mutated && state.before && state.after) {
-    receipt.undoSteps = undoSteps;
-    fillEmpty(receipt, state.before, state.after);
+    receipt2.undoSteps = undoSteps;
+    fillEmpty(receipt2, state.before, state.after);
   } else {
-    receipt.undoSteps = 0;
-    if (receipt.status === "applied" && receipt.clips.length === 0 && receipt.removedClipIds.length === 0 && !(images && images.length > 0) && receipt.data === void 0 && !receipt.summary.startsWith("Error")) {
-      receipt.status = "unchanged";
+    receipt2.undoSteps = 0;
+    if (receipt2.status === "applied" && receipt2.clips.length === 0 && receipt2.removedClipIds.length === 0 && !(images && images.length > 0) && receipt2.data === void 0 && !receipt2.summary.startsWith("Error")) {
+      receipt2.status = "unchanged";
     }
   }
-  return resultFor(receipt, images);
+  return resultFor(receipt2, images);
 }
 function buildTool(base, impl) {
   const tool = {
@@ -50657,8 +50657,8 @@ function phraseWords(words2, fps, options = {}) {
   flush();
   return cues;
 }
-function tsSrt(seconds) {
-  const ms = Math.round(Math.max(0, seconds) * 1e3);
+function tsSrt(seconds2) {
+  const ms = Math.round(Math.max(0, seconds2) * 1e3);
   const h = Math.floor(ms / 36e5);
   const m = Math.floor(ms % 36e5 / 6e4);
   const s = Math.floor(ms % 6e4 / 1e3);
@@ -50691,8 +50691,8 @@ function parseTs(h, m, s, frac) {
   const milli = Number.parseInt((frac + "000").slice(0, 3), 10);
   return Number(h) * 3600 + Number(m) * 60 + Number(s) + milli / 1e3;
 }
-function parseSrtOrVtt(text3, fps) {
-  let body = text3.replace(/^\uFEFF/, "");
+function parseSrtOrVtt(text4, fps) {
+  let body = text4.replace(/^\uFEFF/, "");
   if (body.trimStart().toUpperCase().startsWith("WEBVTT")) body = body.replace(/^WEBVTT[^\n]*\n/i, "");
   const cues = [];
   for (const block of body.trim().split(/\n\s*\n/)) {
@@ -50747,11 +50747,11 @@ function optionalFloat(value) {
   const n = typeof value === "number" ? value : Number(String(value).trim());
   return Number.isFinite(n) ? n : null;
 }
-function normalizeText(text3) {
-  return String(text3 ?? "").toLowerCase().trim().replace(/\s+/g, " ");
+function normalizeText(text4) {
+  return String(text4 ?? "").toLowerCase().trim().replace(/\s+/g, " ");
 }
-function tokenize(text3) {
-  return (normalizeText(text3).match(/[a-z0-9]+/g) ?? []).filter((t) => t.length > 1);
+function tokenize(text4) {
+  return (normalizeText(text4).match(/[a-z0-9]+/g) ?? []).filter((t) => t.length > 1);
 }
 function metadataCorpus(ai, maxScenes = 8) {
   if (!isRecord23(ai)) return "";
@@ -50782,8 +50782,8 @@ function fmtPositionMmss(pos) {
   const s = Math.floor(pos % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-function basenameOf(path31) {
-  const parts = String(path31 ?? "").split(/[\\/]/);
+function basenameOf(path38) {
+  const parts = String(path38 ?? "").split(/[\\/]/);
   return parts[parts.length - 1] ?? "";
 }
 function scoreContextAgainstQuery(ctx, query2, preferPositionNear = 0) {
@@ -51024,10 +51024,10 @@ var init_resolve = __esm({
 function isRecord24(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-async function backendRequest(backend, path31, init = {}) {
+async function backendRequest(backend, path38, init = {}) {
   if (!backend) return { ok: false, error: "The Zenvi backend is not available on this surface (sign in to Zenvi)." };
   try {
-    const data = await backend.request(path31, init);
+    const data = await backend.request(path38, init);
     return { ok: true, data };
   } catch (error62) {
     return { ok: false, error: error62 instanceof Error ? error62.message : String(error62) };
@@ -51037,11 +51037,11 @@ function query(params) {
   const parts = Object.entries(params).filter(([, v]) => v !== void 0 && v !== "").map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
   return parts.length > 0 ? `?${parts.join("&")}` : "";
 }
-async function searchIndex(call, text3, options = {}) {
+async function searchIndex(call, text4, options = {}) {
   let topK = options.topK ?? 5;
   if (options.pageLimit && options.pageLimit > topK) topK = Math.min(Math.trunc(options.pageLimit), 50);
   topK = Math.min(topK, 50);
-  const body = { query: text3, top_k: topK, for_place: true };
+  const body = { query: text4, top_k: topK, for_place: true };
   if (options.indexId) body.index_id = options.indexId;
   if (options.videoId) body.video_id = options.videoId;
   if (options.pageLimit) body.page_limit = options.pageLimit;
@@ -51210,9 +51210,9 @@ function selectHitsForDisplay(hits, clipStart, clipEnd2, occurrence, topK) {
   }
   return overlapping.slice(0, Math.max(1, topK));
 }
-function snapToSliceGrid(seconds, fpsNum, fpsDen) {
-  if (fpsNum <= 0 || fpsDen <= 0) return seconds;
-  const x = seconds * fpsNum / fpsDen;
+function snapToSliceGrid(seconds2, fpsNum, fpsDen) {
+  if (fpsNum <= 0 || fpsDen <= 0) return seconds2;
+  const x = seconds2 * fpsNum / fpsDen;
   const f2 = Math.floor(x);
   const diff = x - f2;
   const r = diff > 0.5 ? f2 + 1 : diff < 0.5 ? f2 : f2 % 2 === 0 ? f2 : f2 + 1;
@@ -51220,7 +51220,7 @@ function snapToSliceGrid(seconds, fpsNum, fpsDen) {
 }
 function indexSearchForResolver(call) {
   if (!call.host.backend) return void 0;
-  return async (text3, contexts) => {
+  return async (text4, contexts) => {
     if (!await isIndexingConfigured(call)) return [];
     const info = collectProjectIndex(call.doc.project);
     let indexId = info.indexId;
@@ -51235,7 +51235,7 @@ function indexSearchForResolver(call) {
       if (ids2.length === 0) return [];
       indexId = mostCommon(ids2);
     }
-    const res = await searchIndex(call, text3, { topK: 10, pageLimit: 30, indexId });
+    const res = await searchIndex(call, text4, { topK: 10, pageLimit: 30, indexId });
     if (res.error || res.results.length === 0) return [];
     const byVideo = /* @__PURE__ */ new Map();
     for (const ctx of contexts) {
@@ -51350,8 +51350,8 @@ function semanticSearchQuery(query2) {
   const cleaned = kept.join(" ").trim();
   return cleaned || q;
 }
-function fmtMmss(seconds) {
-  const s = Number.isFinite(seconds) ? seconds : 0;
+function fmtMmss(seconds2) {
+  const s = Number.isFinite(seconds2) ? seconds2 : 0;
   const m = Math.floor(s / 60);
   const rest = Math.floor((s % 60 + 60) % 60);
   return `${m}:${String(rest).padStart(2, "0")}`;
@@ -51521,13 +51521,13 @@ function writeVolumePoints(tx, clipId2, points) {
 }
 async function vadWindows(call, entry) {
   const audio = call.host.audio;
-  const path31 = String(entry.clip.reader?.path ?? entry.file?.path ?? "");
-  if (!audio || !path31) return [];
+  const path38 = String(entry.clip.reader?.path ?? entry.file?.path ?? "");
+  if (!audio || !path38) return [];
   try {
-    const envelope = await audio.analyzeAudio(path31, { signal: call.signal });
+    const envelope = await audio.analyzeAudio(path38, { signal: call.signal });
     return speechWindowsFromSource(energyVadWindows(envelope, { minSpeechSec: 0.12, minSilenceSec: 0.35 }), entry.clip);
   } catch (error62) {
-    call.host.log?.(`analyzeAudio(${path31}) failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
+    call.host.log?.(`analyzeAudio(${path38}) failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
     return [];
   }
 }
@@ -52397,8 +52397,8 @@ function positiveIntArg(value) {
   const i = Math.trunc(n);
   return i > 0 ? i : null;
 }
-function stem3(path31) {
-  const base = String(path31 ?? "").split(/[\\/]/).pop() ?? "";
+function stem3(path38) {
+  const base = String(path38 ?? "").split(/[\\/]/).pop() ?? "";
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(0, dot) : base;
 }
@@ -52906,8 +52906,8 @@ var init_export2 = __esm({
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
         run: async (call, input2) => {
           const openUi = !["0", "false", "no"].includes(String(input2.show_dialog ?? "true").toLowerCase().trim());
-          const path31 = text(input2.output_path);
-          if (openUi && !path31 && call.host.ui?.openExportDialog) {
+          const path38 = text(input2.output_path);
+          if (openUi && !path38 && call.host.ui?.openExportDialog) {
             call.host.ui.openExportDialog();
             return "Export video dialog opened.";
           }
@@ -52915,7 +52915,7 @@ var init_export2 = __esm({
           if (!exporter) return unavailable("export_video_tool", "it needs video rendering, which this host does not provide.");
           const project = call.doc.toJSON();
           const settings = getDefaultExportSettings(project);
-          const output2 = path31 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
+          const output2 = path38 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
           if (output2 && (project.files ?? []).some((f2) => f2.path === output2)) {
             return "Error: Export failed: Output path is an input file. Choose a different path.";
           }
@@ -53103,9 +53103,9 @@ var init_generation = __esm({
           if ("error" in res) return `Error: ${res.error}`;
           const bytes = res.audioBase64 ? base64ToBytes(res.audioBase64) : new Uint8Array();
           if (bytes.length === 0) return "Error: TTS returned empty audio.";
-          const path31 = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
-          const info = await call.host.media.probe(path31);
-          const media = { path: path31, info: { ...info, media_type: "audio" }, name: "Narration" };
+          const path38 = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
+          const info = await call.host.media.probe(path38);
+          const media = { path: path38, info: { ...info, media_type: "audio" }, name: "Narration" };
           const clip2 = call.commit((tx) => {
             const file3 = addFile(tx, media, { dedupe: false, mediaType: "audio" });
             return addClip(tx, { fileId: String(file3.id), position, layer: layer2 });
@@ -53155,9 +53155,9 @@ function midBinSeconds(start, end, count) {
   const n = Math.max(1, Math.trunc(count));
   return Array.from({ length: n }, (_, i) => start + span * (i + 0.5) / n);
 }
-function formatTimecode2(seconds) {
-  let whole = Math.trunc(Math.max(0, seconds));
-  let cent = Math.round((Math.max(0, seconds) - whole) * 100);
+function formatTimecode2(seconds2) {
+  let whole = Math.trunc(Math.max(0, seconds2));
+  let cent = Math.round((Math.max(0, seconds2) - whole) * 100);
   if (cent >= 100) {
     whole += 1;
     cent = 0;
@@ -53173,7 +53173,7 @@ function totalFrames(project, fps) {
   for (const c of project.clips ?? []) end = Math.max(end, (Number(c.position) || 0) + Math.max(0, (Number(c.end) || 0) - (Number(c.start) || 0)));
   return Math.max(0, toFrame(end, fps));
 }
-function visibleClipsAt(project, seconds, fps) {
+function visibleClipsAt(project, seconds2, fps) {
   const hidden = new Set(
     (project.layers ?? []).filter((l) => Boolean(l.hidden)).map((l) => Math.trunc(Number(l.number)))
   );
@@ -53187,7 +53187,7 @@ function visibleClipsAt(project, seconds, fps) {
     const start = Number(clip2.start) || 0;
     const end = clip2.end === void 0 || clip2.end === null ? start : Number(clip2.end);
     const duration3 = end - start;
-    if (duration3 < 0 || !(position <= seconds && seconds < position + Math.max(duration3, 1e-9))) continue;
+    if (duration3 < 0 || !(position <= seconds2 && seconds2 < position + Math.max(duration3, 1e-9))) continue;
     const entry = { id: String(clip2.id ?? ""), track: layer2, position, start, end, landedFrame: toFrame(position, fps) };
     const names2 = (clip2.effects ?? []).map((e) => e.class_name || e.type || e.name).filter(Boolean).map(String);
     if (names2.length > 0) entry.effects = names2;
@@ -53220,14 +53220,14 @@ async function renderTimelineFrames(call, project, frames, longestEdge) {
   const rendered = [];
   for (const frame of frames) {
     if (call.signal?.aborted) break;
-    const seconds = toSeconds(frame, fps);
+    const seconds2 = toSeconds(frame, fps);
     try {
-      const image = await call.host.frames.renderFrame(project, seconds, {
+      const image = await call.host.frames.renderFrame(project, seconds2, {
         width,
         format: "jpeg",
-        overlay: { grid: true, caption: `f${frame}  ${formatTimecode2(seconds)}` }
+        overlay: { grid: true, caption: `f${frame}  ${formatTimecode2(seconds2)}` }
       });
-      rendered.push({ frame, seconds, image, clips: visibleClipsAt(project, seconds, fps) });
+      rendered.push({ frame, seconds: seconds2, image, clips: visibleClipsAt(project, seconds2, fps) });
     } catch (error62) {
       call.host.log?.(`inspect frame ${frame} failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
     }
@@ -53334,8 +53334,8 @@ var init_inspect = __esm({
           if (!fileId) return refused(tool, "Error: fileId is required.");
           const file3 = fileById(project, fileId);
           if (!file3) return refused(tool, `Error: Unknown fileId '${fileId}'.`);
-          const path31 = String(file3.path ?? "");
-          if (!path31) return refused(tool, `Error: Media file not on disk: ${fileId}`);
+          const path38 = String(file3.path ?? "");
+          if (!path38) return refused(tool, `Error: Media file not on disk: ${fileId}`);
           const mediaType = String(file3.media_type ?? "").toLowerCase();
           const isImage = mediaType === "image" || mediaType === "photo" || fileLooksLikeImage(file3);
           const isAudio = file3.has_video === false && Boolean(file3.has_audio) || mediaType === "audio";
@@ -53417,8 +53417,8 @@ function importTruthy(value, fallback = false) {
   if (!t) return fallback;
   return ["1", "true", "yes", "y", "on"].includes(t);
 }
-function importMediaKind(path31) {
-  const ext = extOf(path31);
+function importMediaKind(path38) {
+  const ext = extOf(path38);
   if (IMPORT_VIDEO_EXTS.includes(ext)) return "video";
   if (IMPORT_AUDIO_EXTS.includes(ext)) return "audio";
   if (IMPORT_IMAGE_EXTS.includes(ext)) return "image";
@@ -53452,15 +53452,15 @@ function fromFileUrl(entry) {
   const t = entry.trim();
   if (!t.startsWith("file://")) return t;
   try {
-    let path31 = decodeURIComponent(new URL(t).pathname);
-    if (/^\/[A-Za-z]:/.test(path31)) path31 = path31.slice(1);
-    return path31 || t;
+    let path38 = decodeURIComponent(new URL(t).pathname);
+    if (/^\/[A-Za-z]:/.test(path38)) path38 = path38.slice(1);
+    return path38 || t;
   } catch {
     return t;
   }
 }
-function extOf(path31) {
-  const base = path31.split(/[\\/]/).pop() ?? "";
+function extOf(path38) {
+  const base = path38.split(/[\\/]/).pop() ?? "";
   const dot = base.lastIndexOf(".");
   return dot >= 0 ? base.slice(dot).toLowerCase() : "";
 }
@@ -53583,11 +53583,11 @@ var init_media3 = __esm({
           }
           const imported = [];
           const failures = [];
-          for (const path31 of resolved) {
+          for (const path38 of resolved) {
             try {
-              imported.push(await importPath.call(call.host.media, path31));
+              imported.push(await importPath.call(call.host.media, path38));
             } catch (error62) {
-              failures.push(`${path31}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+              failures.push(`${path38}: ${error62 instanceof Error ? error62.message : String(error62)}`);
             }
           }
           if (imported.length === 0) {
@@ -54059,12 +54059,12 @@ function segmentIndex(url2) {
   return m ? Number.parseInt(m[1], 10) : 1e6;
 }
 function mgFileName(url2) {
-  const path31 = url2.split("?")[0].replace(/\/+$/, "");
-  let raw = decodeURIComponent(path31.split("/").pop() || "motion_segment.mp4");
+  const path38 = url2.split("?")[0].replace(/\/+$/, "");
+  let raw = decodeURIComponent(path38.split("/").pop() || "motion_segment.mp4");
   const dot = raw.lastIndexOf(".");
   const ext = dot >= 0 ? raw.slice(dot).toLowerCase() : "";
   if (![".mp4", ".webm", ".mov", ".mkv", ".avi"].includes(ext)) {
-    raw = `${(dot >= 0 ? raw.slice(0, dot) : raw) || "motion_segment"}${path31.toLowerCase().endsWith(".webm") || path31.toLowerCase().includes("/output.webm") ? ".webm" : ".mp4"}`;
+    raw = `${(dot >= 0 ? raw.slice(0, dot) : raw) || "motion_segment"}${path38.toLowerCase().endsWith(".webm") || path38.toLowerCase().includes("/output.webm") ? ".webm" : ".mp4"}`;
   }
   return raw;
 }
@@ -54656,15 +54656,15 @@ var init_playback = __esm({
             startPlaying(call);
             return `Loaded and playing: ${basename2(String(file3.path ?? "")) || fileId}`;
           }
-          const path31 = text(input2.file_path);
-          if (!path31) return "Error: watch_clip_tool needs timeline_clip_id, query, file_id or file_path.";
+          const path38 = text(input2.file_path);
+          if (!path38) return "Error: watch_clip_tool needs timeline_clip_id, query, file_id or file_path.";
           const importPath = call.host.media?.importPath;
           if (!importPath) return unavailable("watch_clip_tool", "it cannot open local file paths; pass file_id or timeline_clip_id.");
           let media;
           try {
-            media = await importPath.call(call.host.media, path31);
+            media = await importPath.call(call.host.media, path38);
           } catch (error62) {
-            return `Error: Could not import file into media bin: ${path31} (${error62 instanceof Error ? error62.message : String(error62)})`;
+            return `Error: Could not import file into media bin: ${path38} (${error62 instanceof Error ? error62.message : String(error62)})`;
           }
           const existing = (call.doc.project.files ?? []).find((f2) => f2.path === media.path);
           if (existing) {
@@ -54676,7 +54676,7 @@ var init_playback = __esm({
           }
           player.seek(timelineStart(call.doc.project));
           startPlaying(call);
-          return `Loaded and playing: ${basename2(path31)}`;
+          return `Loaded and playing: ${basename2(path38)}`;
         }
       })
     ];
@@ -54843,21 +54843,21 @@ var init_project2 = __esm({
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
         requires: ["storage"],
         run: async (call, input2) => {
-          let path31 = text(input2.path) || text(input2.file_path);
-          if (path31 && !PROJECT_EXTS.some((ext) => path31.endsWith(ext))) path31 += ".zvn";
-          const location = await call.host.storage.save(call.doc.toJSON(), path31 || void 0);
-          return `Project saved to ${location || path31}.`;
+          let path38 = text(input2.path) || text(input2.file_path);
+          if (path38 && !PROJECT_EXTS.some((ext) => path38.endsWith(ext))) path38 += ".zvn";
+          const location = await call.host.storage.save(call.doc.toJSON(), path38 || void 0);
+          return `Project saved to ${location || path38}.`;
         }
       }),
       contractTool("open_project_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
         requires: ["storage"],
         run: async (call, input2) => {
-          const path31 = text(input2.file_path);
-          if (!path31) return "Error: file_path is required.";
-          const project = await call.host.storage.open(path31);
+          const path38 = text(input2.file_path);
+          if (!path38) return "Error: file_path is required.";
+          const project = await call.host.storage.open(path38);
           call.doc.load(project);
-          return `Opened project ${path31}.`;
+          return `Opened project ${path38}.`;
         }
       }),
       contractTool("undo_tool", {
@@ -55685,11 +55685,11 @@ function transcriptFromCues(call, input2, tool = "get_transcript_tool") {
     if (targets.length === 0 && (trackIndex === void 0 || trackIndex === null)) {
       const usable = (project.files ?? []).filter((f2) => !["image", "image/sequence", "font"].includes(String(f2.media_type ?? "").toLowerCase()) && f2.path);
       if (usable.length === 1) {
-        const receipt = fileReceipt(tool, usable[0], fps, includeWords, includeCompact, [
+        const receipt2 = fileReceipt(tool, usable[0], fps, includeWords, includeCompact, [
           ...warnings,
           "Timeline had no clips \u2014 transcribed the single media-bin file. Place it on the timeline for clip-scoped word frames."
         ], "(timeline was empty; transcribed the media-bin file.)");
-        return { words: [], receipt };
+        return { words: [], receipt: receipt2 };
       }
       if (usable.length > 1) {
         const ids2 = usable.slice(0, 8).map((f2) => String(f2.id)).join(", ");
@@ -55824,8 +55824,8 @@ var init_speech_tools = __esm({
           const project = call.doc.project;
           const clip2 = (project.clips ?? []).find((c) => String(c.id) === clipId2);
           if (!clip2) return refused(tool, `Error: Unknown clipId '${clipId2}'.`);
-          const path31 = mediaPath(project, clip2);
-          if (!path31) return refused(tool, "Error: Clip has no readable media path.");
+          const path38 = mediaPath(project, clip2);
+          if (!path38) return refused(tool, "Error: Clip has no readable media path.");
           const minPause = input2.minPauseSec ?? 0.4;
           const pad2 = input2.padSec ?? 0.08;
           const maxFrac = input2.maxRemoveFraction ?? 0.85;
@@ -55836,7 +55836,7 @@ var init_speech_tools = __esm({
           if (duration3 <= 0) return unchanged(tool, "Clip has zero duration.");
           let speech;
           try {
-            const envelope = await call.host.audio.analyzeAudio(path31, { signal: call.signal });
+            const envelope = await call.host.audio.analyzeAudio(path38, { signal: call.signal });
             speech = energyVadWindows(envelope, { minSpeechSec: 0.12, minSilenceSec: minPause });
           } catch (error62) {
             return failed(tool, `Error: VAD failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
@@ -55874,8 +55874,8 @@ var init_speech_tools = __esm({
         requires: ["storage"],
         run: async (call, input2) => {
           const tool = "export_captions_tool";
-          const path31 = text(input2.path);
-          if (!path31) return refused(tool, "Error: path is required.");
+          const path38 = text(input2.path);
+          if (!path38) return refused(tool, "Error: path is required.");
           const writeText = call.host.storage.writeText;
           if (!writeText) return unavailable(tool, "this host cannot write files.");
           const transcript = transcriptFromCues(
@@ -55890,13 +55890,13 @@ var init_speech_tools = __esm({
           const body = format === "vtt" ? cuesToVtt(cues, fps) : cuesToSrt(cues, fps);
           let location;
           try {
-            location = await writeText.call(call.host.storage, path31, body, format === "vtt" ? "text/vtt" : "application/x-subrip");
+            location = await writeText.call(call.host.storage, path38, body, format === "vtt" ? "text/vtt" : "application/x-subrip");
           } catch (error62) {
             return failed(tool, `Error: write failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
           }
-          return applied(tool, `Exported ${cues.length} cue(s) to ${location || path31}.`, {
+          return applied(tool, `Exported ${cues.length} cue(s) to ${location || path38}.`, {
             warnings: [ESTIMATED_WARNING],
-            data: { path: location || path31, format, count: cues.length }
+            data: { path: location || path38, format, count: cues.length }
           }, 0);
         }
       }),
@@ -56082,11 +56082,11 @@ var init_timeline2 = __esm({
 });
 
 // ../engine/src/tools/catalog/titles.ts
-function basename3(path31) {
-  return String(path31).split(/[\\/]/).pop() ?? "";
+function basename3(path38) {
+  return String(path38).split(/[\\/]/).pop() ?? "";
 }
-function isAbsolutePath2(path31) {
-  return path31.startsWith("/") || path31.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path31);
+function isAbsolutePath2(path38) {
+  return path38.startsWith("/") || path38.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path38);
 }
 async function loadTitleTemplate(call, template) {
   const tmpl = template.trim();
@@ -56122,19 +56122,19 @@ function titleFileName(body, fileName2) {
 async function prepareTitle(call, template, body, options) {
   const media = call.host.media;
   const name = titleFileName(body, options.fileName);
-  let path31;
+  let path38;
   try {
     const svg = setSvgText(template.svg, body);
-    path31 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path38 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return `Error: failed to write title SVG: ${error62 instanceof Error ? error62.message : String(error62)}`;
   }
   let imported;
   try {
-    const info = await media.probe(path31);
-    imported = { path: path31, info, name };
+    const info = await media.probe(path38);
+    imported = { path: path38, info, name };
   } catch {
-    return `Error: could not import title into media bin: ${path31}`;
+    return `Error: could not import title into media bin: ${path38}`;
   }
   const plan = await planPlacement(call, provisionalFile(imported), {
     position_seconds: options.position,
@@ -56239,11 +56239,11 @@ var init_titles2 = __esm({
             source2 = "srt";
           } else {
             const transcript = transcriptFromCues(call, { clipId: clipId2, trackIndex: input2.trackIndex, includeWords: true }, tool);
-            const receipt = transcript.receipt;
-            if (!isOkStatus(receipt.status)) return receipt;
-            const data = receipt.data ?? {};
-            if (receipt.status === "unchanged") {
-              return unchanged(tool, String(receipt.summary || "No spoken dialogue to caption."), { data });
+            const receipt2 = transcript.receipt;
+            if (!isOkStatus(receipt2.status)) return receipt2;
+            const data = receipt2.data ?? {};
+            if (receipt2.status === "unchanged") {
+              return unchanged(tool, String(receipt2.summary || "No spoken dialogue to caption."), { data });
             }
             source2 = typeof data.transcriptionSource === "string" && data.transcriptionSource ? data.transcriptionSource : "local";
             generation = data.transcriptGeneration ?? null;
@@ -57169,8 +57169,8 @@ var init_parseUtil = __esm({
     init_errors5();
     init_en2();
     makeIssue = (params) => {
-      const { data, path: path31, errorMaps, issueData } = params;
-      const fullPath = [...path31, ...issueData.path || []];
+      const { data, path: path38, errorMaps, issueData } = params;
+      const fullPath = [...path38, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -57454,11 +57454,11 @@ var init_types4 = __esm({
     init_parseUtil();
     init_util2();
     ParseInputLazyPath = class {
-      constructor(parent, value, path31, key) {
+      constructor(parent, value, path38, key) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value;
-        this._path = path31;
+        this._path = path38;
         this._key = key;
       }
       get path() {
@@ -60914,11 +60914,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path31) {
-  if (path31.length === 0) {
+function getDotPath(path38) {
+  if (path38.length === 0) {
     return "object root";
   }
-  return path31.reduce((acc, seg, index) => {
+  return path38.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -64057,7 +64057,7 @@ var init_zodToJsonSchema = __esm({
           };
         }
       }
-      const combined = name === void 0 ? definitions ? {
+      const combined2 = name === void 0 ? definitions ? {
         ...main,
         [refs.definitionPath]: definitions
       } : main : {
@@ -64072,14 +64072,14 @@ var init_zodToJsonSchema = __esm({
         }
       };
       if (refs.target === "jsonSchema7") {
-        combined.$schema = "http://json-schema.org/draft-07/schema#";
+        combined2.$schema = "http://json-schema.org/draft-07/schema#";
       } else if (refs.target === "jsonSchema2019-09" || refs.target === "openAi") {
-        combined.$schema = "https://json-schema.org/draft/2019-09/schema#";
+        combined2.$schema = "https://json-schema.org/draft/2019-09/schema#";
       }
-      if (refs.target === "openAi" && ("anyOf" in combined || "oneOf" in combined || "allOf" in combined || "type" in combined && Array.isArray(combined.type))) {
+      if (refs.target === "openAi" && ("anyOf" in combined2 || "oneOf" in combined2 || "allOf" in combined2 || "type" in combined2 && Array.isArray(combined2.type))) {
         console.warn("Warning: OpenAI may not support schemas with unions as roots! Try wrapping it in an object property.");
       }
-      return combined;
+      return combined2;
     };
   }
 });
@@ -68370,8 +68370,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path31) {
-      let input2 = path31;
+    function removeDotSegments(path38) {
+      let input2 = path38;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -68780,8 +68780,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path31 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path31 && path31 !== "/" ? path31 : void 0;
+        const path38 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path38 && path38 !== "/" ? path38 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -69733,7 +69733,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text3, msg) => text3 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text4, msg) => text4 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -75631,7 +75631,7 @@ var require_core3 = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text3, msg) => text3 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text4, msg) => text4 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -80363,7 +80363,7 @@ var init_streamableHttp = __esm({
             this._sessionId = sessionId;
           }
           if (!response.ok) {
-            const text3 = await response.text().catch(() => null);
+            const text4 = await response.text().catch(() => null);
             if (response.status === 401 && this._authProvider) {
               if (this._hasCompletedAuthFlow) {
                 throw new StreamableHTTPError(401, "Server returned 401 after successful authentication");
@@ -80409,7 +80409,7 @@ var init_streamableHttp = __esm({
                 return this.send(message);
               }
             }
-            throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${text3}`);
+            throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${text4}`);
           }
           this._hasCompletedAuthFlow = false;
           this._lastUpscopingHeader = void 0;
@@ -80543,17 +80543,22 @@ var init_client4 = __esm({
         } while (cursor);
         return tools;
       }
-      async callTool(name, args) {
+      /** `onprogress` relays the app's progress notifications (long renders); the wait restarts on each one. */
+      async callTool(name, args, options = {}) {
         const client = await this.connected();
-        const result = await client.callTool({ name, arguments: args }, void 0, { timeout: CALL_TIMEOUT_MS, resetTimeoutOnProgress: true });
+        const result = await client.callTool({ name, arguments: args }, void 0, {
+          timeout: CALL_TIMEOUT_MS,
+          resetTimeoutOnProgress: true,
+          ...options.onprogress ? { onprogress: options.onprogress } : {}
+        });
         const content = Array.isArray(result.content) ? result.content : [];
         const texts = content.filter((c) => c.type === "text").map((c) => String(c.text ?? ""));
         const images = content.filter((c) => c.type === "image" && typeof c.data === "string").map((c) => ({ mimeType: c.mimeType ?? "image/jpeg", data: c.data }));
-        const text3 = texts.join("\n");
+        const text4 = texts.join("\n");
         const structured = result.structuredContent;
-        const receipt = structured && structured.contract === 3 ? structured : parseReceipt(texts[0] ?? "") ?? void 0;
-        const isError = Boolean(result.isError) || (receipt ? receipt.status === "error" || receipt.status === "refused" : text3.startsWith("Error"));
-        return { receipt, text: text3, images, isError };
+        const receipt2 = structured && structured.contract === 3 ? structured : parseReceipt(texts[0] ?? "") ?? void 0;
+        const isError = Boolean(result.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text4.startsWith("Error"));
+        return { receipt: receipt2, text: text4, images, isError };
       }
       async close() {
         const client = this.client;
@@ -80764,8 +80769,8 @@ var init_executor = __esm({
       }
       async call(name, args, signal) {
         const { result, savedTo } = await this.session.run(name, args, signal);
-        const receipt = result.data ?? parseReceipt(result.text) ?? void 0;
-        return { engine: "portable", project: this.session.file, ok: result.ok, receipt, text: result.text, images: result.images ?? [], savedTo };
+        const receipt2 = result.data ?? parseReceipt(result.text) ?? void 0;
+        return { engine: "portable", project: this.session.file, ok: result.ok, receipt: receipt2, text: result.text, images: result.images ?? [], savedTo };
       }
       async close() {
       }
@@ -80778,9 +80783,20 @@ var init_executor = __esm({
       client;
       project;
       engine = "desktop";
-      async call(name, args) {
-        const r = await this.client.callTool(name, args);
+      toolNames;
+      async call(name, args, _signal, options = {}) {
+        const r = await this.client.callTool(name, args, options);
         return { engine: "desktop", project: this.project ?? this.client.endpoint.project, ok: !r.isError, receipt: r.receipt, text: r.text, images: r.images };
+      }
+      /** Whether this desktop build has a tool (its tools/list, read once). */
+      async hasTool(name) {
+        this.toolNames ??= this.client.listTools().then((tools) => new Set(tools.map((t) => t.name)));
+        try {
+          return (await this.toolNames).has(name);
+        } catch (error62) {
+          this.toolNames = void 0;
+          throw error62;
+        }
       }
       async close() {
         await this.client.close();
@@ -80844,9 +80860,9 @@ function toolArgs(ctx, tool, values) {
   }
   return args;
 }
-function statusMark(ctx, receipt, ok) {
+function statusMark(ctx, receipt2, ok) {
   if (!ok) return ctx.out.style("\u2717", "red");
-  if (receipt?.status === "unchanged") return ctx.out.style("\u2022", "dim");
+  if (receipt2?.status === "unchanged") return ctx.out.style("\u2022", "dim");
   return ctx.out.style("\u2713", "green");
 }
 function printOutcome(ctx, outcome, extra = {}) {
@@ -80856,18 +80872,18 @@ function printOutcome(ctx, outcome, extra = {}) {
     ctx.out.data({ ...body, engine: outcome.engine, project: outcome.project ?? null, ...extra });
     return;
   }
-  const receipt = outcome.receipt;
-  const data = receipt?.data;
-  const summary = outcome.ok && typeof data?.legacy_text === "string" && data.legacy_text ? data.legacy_text : receipt?.summary ?? outcome.text;
+  const receipt2 = outcome.receipt;
+  const data = receipt2?.data;
+  const summary = outcome.ok && typeof data?.legacy_text === "string" && data.legacy_text ? data.legacy_text : receipt2?.summary ?? outcome.text;
   const [first, ...rest] = summary.split("\n");
   if (!outcome.ok) {
     ctx.out.error(summary.replace(/^Error:\s*/, ""));
   } else {
-    ctx.out.line(`${statusMark(ctx, receipt, outcome.ok)} ${first ?? ""}`);
+    ctx.out.line(`${statusMark(ctx, receipt2, outcome.ok)} ${first ?? ""}`);
     for (const line2 of rest) ctx.out.line(line2);
   }
-  for (const w of receipt?.warnings ?? []) ctx.out.warn(w);
-  for (const n of receipt?.notes ?? []) ctx.out.line(ctx.out.style(`  note: ${n}`, "dim"));
+  for (const w of receipt2?.warnings ?? []) ctx.out.warn(w);
+  for (const n of receipt2?.notes ?? []) ctx.out.line(ctx.out.style(`  note: ${n}`, "dim"));
   if (outcome.engine === "desktop") ctx.out.info(ctx.out.style("(ran in the Zenvi desktop app)", "dim"));
 }
 async function runToolCommand(ctx, tool, args, extra) {
@@ -81031,9 +81047,9 @@ var init_account = __esm({
 // src/commands/edit.ts
 import { existsSync as existsSync5 } from "node:fs";
 import path22 from "node:path";
-function parseTime(text3) {
-  if (text3 === void 0) return void 0;
-  const t = text3.trim().toLowerCase();
+function parseTime(text4) {
+  if (text4 === void 0) return void 0;
+  const t = text4.trim().toLowerCase();
   if (!t) return void 0;
   let m = /^(-?\d+(?:\.\d+)?)\s*(s|sec|secs|seconds)?$/.exec(t);
   if (m) return Number(m[1]);
@@ -81041,16 +81057,16 @@ function parseTime(text3) {
   if (m) return Number(m[1]) * 60;
   m = /^(?:(\d+):)?(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/.exec(t);
   if (m) return Number(m[1] ?? 0) * 3600 + Number(m[2]) * 60 + Number(m[3]);
-  throw new CliError(`Not a time: "${text3}" (use seconds like 12.5 or a timecode like 1:05.5).`, 2);
+  throw new CliError(`Not a time: "${text4}" (use seconds like 12.5 or a timecode like 1:05.5).`, 2);
 }
-function parseLevel(text3) {
-  const t = text3.trim().toLowerCase();
+function parseLevel(text4) {
+  const t = text4.trim().toLowerCase();
   let m = /^(-?\d+(?:\.\d+)?)\s*db$/.exec(t);
   if (m) return { db: Number(m[1]) };
   m = /^(\d+(?:\.\d+)?)\s*%$/.exec(t);
   if (m) return { volume: Number(m[1]) / 100 };
   if (/^\d+(?:\.\d+)?$/.test(t)) return { volume: Number(t) };
-  throw new CliError(`Not a volume: "${text3}" (use 0.5, 50% or -6dB).`, 2);
+  throw new CliError(`Not a volume: "${text4}" (use 0.5, 50% or -6dB).`, 2);
 }
 function placementWindow(flags, fileLength2) {
   const { start, end, duration: duration3 } = flags;
@@ -81253,9 +81269,9 @@ function registerEditCommands(program2, ctx) {
       ])
     );
   });
-  program2.command("title").description("add a text title (SVG template) to the timeline").argument("<text>", "title text").option("--template <name>", "title template (e.g. Standard_1)").option("--at <time>", "timeline position").option("--duration <time>", "length").option("-t, --track <track>", "track").action(async (text3, opts) => {
+  program2.command("title").description("add a text title (SVG template) to the timeline").argument("<text>", "title text").option("--template <name>", "title template (e.g. Standard_1)").option("--at <time>", "timeline position").option("--duration <time>", "length").option("-t, --track <track>", "track").action(async (text4, opts) => {
     await runToolCommand(ctx, "add_title_tool", {
-      text: text3,
+      text: text4,
       ...opts.template ? { template: opts.template } : {},
       ...opts.at !== void 0 ? { position_seconds: parseTime(opts.at) } : {},
       ...opts.duration !== void 0 ? { duration_seconds: parseTime(opts.duration) } : {},
@@ -81284,9 +81300,9 @@ function registerEditCommands(program2, ctx) {
         const { position, start } = found;
         points_ = parsed.map((p) => {
           if (p.seconds === void 0) return p;
-          const seconds = p.seconds - position + start;
-          if (seconds < 0) throw new CliError(`${p.seconds}s is before the clip starts on the timeline (${position}s).`, 2);
-          return { seconds: Math.round(seconds * 1e6) / 1e6, value: p.value };
+          const seconds2 = p.seconds - position + start;
+          if (seconds2 < 0) throw new CliError(`${p.seconds}s is before the clip starts on the timeline (${position}s).`, 2);
+          return { seconds: Math.round(seconds2 * 1e6) / 1e6, value: p.value };
         });
       }
       printOutcome(
@@ -81327,10 +81343,998 @@ var init_edit2 = __esm({
   }
 });
 
+// ../adobe-link/src/taste.ts
+var EASING_NAMES;
+var init_taste = __esm({
+  "../adobe-link/src/taste.ts"() {
+    "use strict";
+    EASING_NAMES = ["smooth", "out", "entrance", "in", "exit", "in-out", "snap", "linear", "hold"];
+  }
+});
+
+// ../adobe-link/src/version.ts
+var LINK_VERSION, LINK_PROTOCOL, HOST_RECEIPT_CONTRACT;
+var init_version2 = __esm({
+  "../adobe-link/src/version.ts"() {
+    "use strict";
+    LINK_VERSION = "1.0.0";
+    LINK_PROTOCOL = 1;
+    HOST_RECEIPT_CONTRACT = 3;
+  }
+});
+
+// ../adobe-link/src/catalog/types.ts
+function defineHostTool(def) {
+  return def;
+}
+function inputSchemaFor(def) {
+  const { $schema: _schema, ...json2 } = external_exports.toJSONSchema(def.input, { io: "input" });
+  return { ...json2, type: "object", properties: json2.properties ?? {}, additionalProperties: false };
+}
+function toCatalogJson(host, defs) {
+  return {
+    host,
+    version: LINK_VERSION,
+    tools: defs.map((def) => ({
+      name: def.name,
+      title: def.title,
+      description: def.description,
+      inputSchema: inputSchemaFor(def),
+      annotations: { ...def.annotations },
+      returnsImage: def.returnsImage ?? false,
+      timeoutMs: def.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    }))
+  };
+}
+var HOST_IDS, HOST_TOOL_PREFIX, DEFAULT_TIMEOUT_MS, seconds, easingName, bezierEasing, easing, hexColor2, rgbColor, color2, layerRef, trackRef, ABSOLUTE_PATH_PATTERN, absolutePath, placement;
+var init_types6 = __esm({
+  "../adobe-link/src/catalog/types.ts"() {
+    "use strict";
+    init_zod();
+    init_taste();
+    init_version2();
+    HOST_IDS = ["aftereffects", "premiere"];
+    HOST_TOOL_PREFIX = {
+      aftereffects: "ae_",
+      premiere: "premiere_"
+    };
+    DEFAULT_TIMEOUT_MS = 12e4;
+    seconds = external_exports.number().min(0);
+    easingName = external_exports.enum(EASING_NAMES);
+    bezierEasing = external_exports.strictObject({
+      x1: external_exports.number().min(0).max(1).describe("First control point x, 0\u20131"),
+      y1: external_exports.number().describe("First control point y (outside 0\u20131 overshoots)"),
+      x2: external_exports.number().min(0).max(1).describe("Second control point x, 0\u20131"),
+      y2: external_exports.number().describe("Second control point y (outside 0\u20131 overshoots)")
+    }).describe("Custom cubic-bezier(x1, y1, x2, y2)");
+    easing = external_exports.union([easingName.describe("TASTE easing name"), bezierEasing]);
+    hexColor2 = external_exports.string().regex(/^#[0-9A-Fa-f]{6}$/, "must be #RRGGBB");
+    rgbColor = external_exports.array(external_exports.number().min(0).max(1)).length(3);
+    color2 = external_exports.union([hexColor2.describe("Hex colour #RRGGBB"), rgbColor.describe("[r, g, b], each 0\u20131")]);
+    layerRef = external_exports.union([
+      external_exports.int().min(1).describe("Layer id (`layer_id` from ae_get_comp or a receipt; After Effects 2022+)"),
+      external_exports.strictObject({ index: external_exports.int().min(1).describe("1-based layer index, 1 = top layer") }).describe("Layer by position"),
+      external_exports.string().min(1).describe("Exact layer name")
+    ]);
+    trackRef = external_exports.strictObject({
+      kind: external_exports.enum(["video", "audio"]).describe("Track kind"),
+      index: external_exports.int().min(0).describe("0-based track index as in the Premiere DOM: V1 / A1 = 0")
+    });
+    ABSOLUTE_PATH_PATTERN = /^(\/|[A-Za-z]:[\\/]|\\\\[^\\]+\\)/;
+    absolutePath = external_exports.string().regex(ABSOLUTE_PATH_PATTERN, "must be an absolute path");
+    placement = external_exports.enum(["center", "lower-third", "top-left", "top-center", "bottom-center"]);
+  }
+});
+
+// ../adobe-link/src/catalog/aftereffects.ts
+var aeGetState, AE_TOOLS;
+var init_aftereffects = __esm({
+  "../adobe-link/src/catalog/aftereffects.ts"() {
+    "use strict";
+    init_zod();
+    init_types6();
+    aeGetState = defineHostTool({
+      name: "ae_get_state",
+      title: "After Effects state",
+      description: "Where After Effects is right now: app version, the open project (path, unsaved changes, item count), the active comp (id, size, fps, duration, work area, current time, layer count), the selected project items and layers, and the render queue. Call it first, and again whenever the user may have changed something by hand. Read-only and cheap.",
+      input: external_exports.strictObject({}),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    AE_TOOLS = [aeGetState];
+  }
+});
+
+// ../adobe-link/src/catalog/premiere.ts
+var premiereGetState, PREMIERE_TOOLS;
+var init_premiere = __esm({
+  "../adobe-link/src/catalog/premiere.ts"() {
+    "use strict";
+    init_zod();
+    init_types6();
+    premiereGetState = defineHostTool({
+      name: "premiere_get_state",
+      title: "Premiere Pro state",
+      description: "Where Premiere Pro is right now: app version, the open project (path, name), every sequence (id, name, duration, frame size, fps), the active sequence with its playhead, in/out points and selected clips. Call it first, and again whenever the user may have changed something by hand. Read-only and cheap.",
+      input: external_exports.strictObject({}),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    PREMIERE_TOOLS = [premiereGetState];
+  }
+});
+
+// ../adobe-link/src/catalog/index.ts
+function catalogFor(host) {
+  return host === "aftereffects" ? AE_TOOLS : PREMIERE_TOOLS;
+}
+var init_catalog3 = __esm({
+  "../adobe-link/src/catalog/index.ts"() {
+    "use strict";
+    init_types6();
+    init_aftereffects();
+    init_premiere();
+    init_aftereffects();
+    init_premiere();
+    init_types6();
+  }
+});
+
+// ../adobe-link/src/receipt.ts
+function parseHostReceipt(value) {
+  let candidate = value;
+  if (typeof value === "string") {
+    try {
+      candidate = JSON.parse(value);
+    } catch {
+      return void 0;
+    }
+  }
+  if (!candidate || typeof candidate !== "object") return void 0;
+  const receipt2 = candidate;
+  if (receipt2.contract !== HOST_RECEIPT_CONTRACT || typeof receipt2.status !== "string" || !STATUSES.includes(receipt2.status)) return void 0;
+  if (typeof receipt2.tool !== "string" || typeof receipt2.summary !== "string") return void 0;
+  return receipt2;
+}
+var STATUSES;
+var init_receipt2 = __esm({
+  "../adobe-link/src/receipt.ts"() {
+    "use strict";
+    init_version2();
+    STATUSES = ["applied", "unchanged", "refused", "error", "ok"];
+  }
+});
+
+// ../adobe-link/src/discovery.ts
+import { readFile as readFile9, unlink } from "node:fs/promises";
+import path23 from "node:path";
+function linkDirOf(desktopDir) {
+  return path23.join(desktopDir, "link");
+}
+function pidAlive3(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error62) {
+    return error62.code === "EPERM";
+  }
+}
+function isLinkUrl(value) {
+  try {
+    const url2 = new URL(value);
+    return url2.protocol === "http:" && (url2.hostname === "127.0.0.1" || url2.hostname === "localhost") && url2.port !== "";
+  } catch {
+    return false;
+  }
+}
+async function probeHost(url2, token, host, options = {}) {
+  const doFetch = options.fetchImpl ?? fetch;
+  try {
+    const response = await doFetch(url2, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream"
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "zenvi-cli", version: options.clientVersion ?? "0" } }
+      }),
+      signal: AbortSignal.timeout(options.timeoutMs ?? 1500)
+    });
+    if (response.status !== 200) {
+      await response.body?.cancel().catch(() => void 0);
+      return false;
+    }
+    const message = await response.json();
+    return message.result?.serverInfo?.name === `zenvi-link-${host}`;
+  } catch {
+    return false;
+  }
+}
+function text2(value) {
+  return typeof value === "string" && value !== "" ? value : void 0;
+}
+async function removeQuietly(file3) {
+  await unlink(file3).catch(() => void 0);
+}
+async function inspectHost(desktopDir, host, options = {}) {
+  const dir = linkDirOf(desktopDir);
+  const file3 = path23.join(dir, `${host}.json`);
+  const result = (status, detail2, endpoint2) => ({ host, status, detail: detail2, file: file3, ...endpoint2 ? { endpoint: endpoint2 } : {} });
+  let raw;
+  try {
+    raw = await readFile9(file3, "utf8");
+  } catch {
+    return result("absent", "no discovery file (the app is not running, or Zenvi Link is not installed)");
+  }
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return result("invalid", "the discovery file is not JSON");
+  }
+  const url2 = text2(data.url);
+  const pid = Number(data.pid);
+  if (data.app !== host || !url2 || !Number.isInteger(pid)) return result("invalid", "the discovery file is not a Zenvi Link file for this app");
+  if (typeof data.protocol === "number" && data.protocol > LINK_PROTOCOL) {
+    return result("invalid", `Zenvi Link speaks protocol ${data.protocol}; this client knows ${LINK_PROTOCOL} (update the zenvi CLI)`);
+  }
+  if (!isLinkUrl(url2)) return result("invalid", `refusing a non-loopback URL (${url2})`);
+  const tokenFile = text2(data.token_file);
+  const tokenPath = tokenFile ? path23.isAbsolute(tokenFile) ? tokenFile : path23.join(dir, tokenFile) : path23.join(dir, `${host}.token`);
+  if (!pidAlive3(pid)) {
+    if (options.removeStale) {
+      await removeQuietly(file3);
+      if (path23.dirname(tokenPath) === dir && path23.basename(tokenPath) === `${host}.token`) await removeQuietly(tokenPath);
+    }
+    return result("dead", `process ${pid} is gone (left over from a crash)`);
+  }
+  let token;
+  try {
+    token = (await readFile9(tokenPath, "utf8")).trim();
+  } catch {
+    return result("invalid", `cannot read the token file ${tokenPath}`);
+  }
+  if (!token) return result("invalid", "the token file is empty");
+  const endpoint = {
+    host,
+    url: url2,
+    token,
+    pid,
+    project: text2(data.project) ?? null,
+    version: text2(data.version) ?? "",
+    appName: text2(data.app_name) ?? "",
+    appVersion: text2(data.app_version) ?? "",
+    protocol: typeof data.protocol === "number" ? data.protocol : LINK_PROTOCOL,
+    startedAt: text2(data.started_at) ?? "",
+    lastActiveAt: text2(data.last_active_at) ?? "",
+    source: file3
+  };
+  if (options.verify !== false && !await probeHost(url2, token, host, options)) {
+    return result("unreachable", `the server at ${url2} did not answer as Zenvi Link (process ${pid} is alive)`);
+  }
+  return result("connected", "connected", endpoint);
+}
+function inspectHosts(desktopDir, options = {}) {
+  return Promise.all(HOST_IDS.map((host) => inspectHost(desktopDir, host, options)));
+}
+var init_discovery2 = __esm({
+  "../adobe-link/src/discovery.ts"() {
+    "use strict";
+    init_types6();
+    init_version2();
+  }
+});
+
+// ../adobe-link/src/client.ts
+var RESPONSE_MARGIN_MS, HostClient;
+var init_client5 = __esm({
+  "../adobe-link/src/client.ts"() {
+    "use strict";
+    init_client3();
+    init_streamableHttp();
+    init_catalog3();
+    init_types6();
+    init_receipt2();
+    RESPONSE_MARGIN_MS = 15e3;
+    HostClient = class {
+      constructor(endpoint, clientVersion = "0") {
+        this.endpoint = endpoint;
+        this.clientVersion = clientVersion;
+      }
+      endpoint;
+      clientVersion;
+      client;
+      async connected() {
+        if (this.client) return this.client;
+        const transport = new StreamableHTTPClientTransport(new URL(this.endpoint.url), {
+          requestInit: { headers: { Authorization: `Bearer ${this.endpoint.token}` } }
+        });
+        const client = new Client({ name: "zenvi-cli", version: this.clientVersion }, { capabilities: {} });
+        await client.connect(transport);
+        this.client = client;
+        return client;
+      }
+      async listTools() {
+        const client = await this.connected();
+        const page = await client.listTools();
+        return page.tools.map((tool) => ({ name: tool.name, title: tool.title, description: tool.description, inputSchema: tool.inputSchema }));
+      }
+      /** Call a host tool. `timeoutMs` defaults to the catalog's timeout plus a margin. */
+      async callTool(name, args = {}, options = {}) {
+        const client = await this.connected();
+        const def = catalogFor(this.endpoint.host).find((tool) => tool.name === name);
+        const timeout = options.timeoutMs ?? (def?.timeoutMs ?? DEFAULT_TIMEOUT_MS) + RESPONSE_MARGIN_MS;
+        const result = await client.callTool({ name, arguments: args }, void 0, { timeout });
+        const content = Array.isArray(result.content) ? result.content : [];
+        const text4 = content.filter((block) => block.type === "text").map((block) => String(block.text ?? "")).join("\n");
+        const images = content.filter((block) => block.type === "image" && typeof block.data === "string").map((block) => ({ mimeType: block.mimeType === "image/jpeg" ? "image/jpeg" : "image/png", data: block.data }));
+        const receipt2 = parseHostReceipt(result.structuredContent) ?? parseHostReceipt(content.find((block) => block.type === "text")?.text);
+        const isError = Boolean(result.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text4.startsWith("Error"));
+        return { receipt: receipt2, text: text4, images, isError };
+      }
+      async close() {
+        const client = this.client;
+        this.client = void 0;
+        await client?.close().catch(() => void 0);
+      }
+    };
+  }
+});
+
+// ../adobe-link/src/install.ts
+import { spawnSync } from "node:child_process";
+import { cpSync, lstatSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import path24 from "node:path";
+function extensionsDir({ platform, home, appData }) {
+  if (platform === "darwin") return path24.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions");
+  if (platform === "win32") return path24.win32.join(appData ?? path24.win32.join(home, "AppData", "Roaming"), "Adobe", "CEP", "extensions");
+  throw new Error(`Adobe CEP extensions run on macOS and Windows, not ${platform}`);
+}
+function systemExtensionsDirs(platform, env2 = {}) {
+  if (platform === "darwin") return ["/Library/Application Support/Adobe/CEP/extensions"];
+  if (platform === "win32") {
+    const roots = [env2["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", env2.ProgramFiles ?? "C:\\Program Files"];
+    return [...new Set(roots)].map((root) => path24.win32.join(root, "Common Files", "Adobe", "CEP", "extensions"));
+  }
+  return [];
+}
+function debugModeCommands(platform, enable) {
+  return CSXS_VERSIONS.map(
+    (n) => platform === "darwin" ? enable ? { kind: "run", command: "defaults", args: ["write", `com.adobe.CSXS.${n}`, "PlayerDebugMode", "1"] } : { kind: "run", command: "defaults", args: ["delete", `com.adobe.CSXS.${n}`, "PlayerDebugMode"] } : enable ? { kind: "run", command: "reg", args: ["add", `HKCU\\Software\\Adobe\\CSXS.${n}`, "/v", "PlayerDebugMode", "/t", "REG_SZ", "/d", "1", "/f"] } : { kind: "run", command: "reg", args: ["delete", `HKCU\\Software\\Adobe\\CSXS.${n}`, "/v", "PlayerDebugMode", "/f"] }
+  );
+}
+function planExtensionInstall({ platform, home, appData, source: source2, uninstall = false, copy = false }) {
+  const target = (platform === "win32" ? path24.win32 : path24.posix).join(extensionsDir({ platform, home, appData }), BUNDLE_ID);
+  if (uninstall) {
+    return {
+      target,
+      actions: [{ kind: "remove", path: target }],
+      notes: [
+        "PlayerDebugMode stays on (other unsigned extensions may need it). To turn it off:",
+        ...debugModeCommands(platform, false).map((action) => `  ${action.command} ${action.args.join(" ")}`)
+      ]
+    };
+  }
+  return {
+    target,
+    actions: [
+      { kind: "remove", path: target },
+      copy ? { kind: "copy", from: source2, to: target } : { kind: "link", from: source2, to: target, type: platform === "win32" ? "junction" : "dir" },
+      ...debugModeCommands(platform, true)
+    ],
+    notes: ["Restart After Effects / Premiere Pro, then open Window > Extensions > Zenvi Link."]
+  };
+}
+function describeAction(action) {
+  switch (action.kind) {
+    case "build":
+      return `build ${path24.join(action.outDir, BUNDLE_ID)}`;
+    case "remove":
+      return `remove ${action.path}`;
+    case "link":
+      return `link ${action.to} -> ${action.from} (${action.type})`;
+    case "copy":
+      return `copy ${action.from} -> ${action.to}`;
+    default:
+      return `run ${action.command} ${action.args.join(" ")}`;
+  }
+}
+function exists(file3) {
+  try {
+    lstatSync(file3);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function runInstallAction(action, options = {}) {
+  switch (action.kind) {
+    case "build":
+      throw new Error("runInstallAction does not build; build the extension first");
+    case "remove":
+      if (exists(action.path)) rmSync(action.path, { recursive: true, force: true });
+      return;
+    case "link":
+      mkdirSync(path24.dirname(action.to), { recursive: true });
+      symlinkSync(action.from, action.to, action.type);
+      return;
+    case "copy":
+      mkdirSync(path24.dirname(action.to), { recursive: true });
+      cpSync(action.from, action.to, { recursive: true });
+      return;
+    default: {
+      const result = spawnSync(action.command, action.args, { stdio: options.stdio ?? "pipe", windowsHide: true });
+      if (result.status !== 0 && !action.args.includes("delete")) {
+        const why = result.error ? result.error.message : `exit ${result.status}`;
+        throw new Error(`${describeAction(action)} failed (${why})`);
+      }
+    }
+  }
+}
+var BUNDLE_ID, CSXS_VERSIONS;
+var init_install = __esm({
+  "../adobe-link/src/install.ts"() {
+    "use strict";
+    BUNDLE_ID = "pro.zenvi.link";
+    CSXS_VERSIONS = [9, 10, 11, 12];
+  }
+});
+
+// ../adobe-link/src/index.ts
+var init_src3 = __esm({
+  "../adobe-link/src/index.ts"() {
+    "use strict";
+    init_catalog3();
+    init_taste();
+    init_version2();
+    init_receipt2();
+    init_discovery2();
+    init_client5();
+    init_install();
+  }
+});
+
+// src/util/unknown-args.ts
+function unknownArgumentsMessage(tool, args, schema) {
+  const known = Object.keys(schema?.properties ?? {});
+  const unknown2 = Object.keys(args ?? {}).filter((key) => !known.includes(key));
+  if (unknown2.length === 0) return void 0;
+  return `Error: unknown argument${unknown2.length > 1 ? "s" : ""} for ${tool}: ${unknown2.join(", ")}. Accepted: ${known.join(", ") || "none"}.`;
+}
+var init_unknown_args = __esm({
+  "src/util/unknown-args.ts"() {
+    "use strict";
+  }
+});
+
+// src/hosts/extension.ts
+import { lstat, readdir as readdir5, readFile as readFile10, stat as stat11 } from "node:fs/promises";
+import { createRequire as createRequire2 } from "node:module";
+import path25 from "node:path";
+function defaultDetectDeps(home, env2) {
+  return {
+    platform: process.platform,
+    home,
+    env: env2,
+    exists: async (file3) => {
+      try {
+        await stat11(file3);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    listDir: async (dir) => readdir5(dir).catch(() => void 0),
+    readText: async (file3) => readFile10(file3, "utf8").catch(() => void 0),
+    isLink: async (file3) => (await lstat(file3).catch(() => void 0))?.isSymbolicLink() ?? false
+  };
+}
+function manifestVersion(xml) {
+  return xml ? /\bExtensionBundleVersion\s*=\s*"([^"]+)"/.exec(xml)?.[1] : void 0;
+}
+async function readCopy(deps, dir) {
+  const xml = await deps.readText(path25.join(dir, "CSXS", "manifest.xml"));
+  if (xml === void 0) return void 0;
+  return { dir, version: manifestVersion(xml) };
+}
+async function findInstalledExtensions(deps) {
+  if (deps.platform !== "darwin" && deps.platform !== "win32") return [];
+  const folders = [
+    [extensionsDir({ platform: deps.platform, home: deps.home, appData: deps.env.APPDATA }), "user"],
+    ...systemExtensionsDirs(deps.platform, deps.env).map((dir) => [dir, "system"])
+  ];
+  const join = deps.platform === "win32" ? path25.win32.join : path25.posix.join;
+  const found = [];
+  for (const [folder, scope] of folders) {
+    const dir = join(folder, BUNDLE_ID);
+    const copy = await readCopy(deps, dir);
+    if (copy) found.push({ ...copy, scope, linked: await deps.isLink(dir) });
+  }
+  return found;
+}
+async function bundledExtension(deps) {
+  const candidates = [];
+  const override = deps.env.ZENVI_ADOBE_EXTENSION?.trim();
+  if (override) candidates.push(override);
+  else {
+    const bundle = bundleDir();
+    if (bundle) candidates.push(path25.join(bundle, "adobe", BUNDLE_ID));
+    else {
+      try {
+        const entry = createRequire2(import.meta.url).resolve("@zenvi/adobe-link");
+        candidates.push(path25.join(path25.dirname(path25.dirname(entry)), "dist", BUNDLE_ID));
+      } catch {
+      }
+    }
+  }
+  for (const dir of candidates) {
+    const copy = await readCopy(deps, dir);
+    if (copy) return copy;
+  }
+  return void 0;
+}
+async function findAdobeApps(deps) {
+  const dirs = deps.platform === "darwin" ? ["/Applications", path25.posix.join(deps.home, "Applications")] : deps.platform === "win32" ? [.../* @__PURE__ */ new Set([deps.env.ProgramFiles ?? "C:\\Program Files", deps.env.ProgramW6432 ?? deps.env.ProgramFiles ?? "C:\\Program Files"])].map((root) => path25.win32.join(root, "Adobe")) : [];
+  const apps = { aftereffects: [], premiere: [] };
+  let looked = false;
+  for (const dir of dirs) {
+    const names2 = await deps.listDir(dir);
+    if (!names2) continue;
+    looked = true;
+    for (const host of Object.keys(apps)) {
+      for (const name of names2) if (name.startsWith(APP_PREFIX[host]) && !apps[host].includes(name)) apps[host].push(name);
+    }
+  }
+  return { apps, looked };
+}
+var APP_PREFIX;
+var init_extension = __esm({
+  "src/hosts/extension.ts"() {
+    "use strict";
+    init_src3();
+    init_src2();
+    APP_PREFIX = {
+      aftereffects: "Adobe After Effects",
+      premiere: "Adobe Premiere Pro"
+    };
+  }
+});
+
+// src/hosts/policy.ts
+import path26 from "node:path";
+function adobeMode(env2) {
+  const value = env2.ZENVI_MCP_ADOBE?.trim().toLowerCase();
+  return value === "on" || value === "off" ? value : "auto";
+}
+function enableHint(host) {
+  return `Run \`zenvi adobe install\` and restart ${APP_LABEL[host]} (the ${host === "aftereffects" ? "ae_*" : "premiere_*"} tools then appear; some MCP clients need a restart), or set ZENVI_MCP_ADOBE=on in this server's environment.`;
+}
+async function decideFamilies(desktopDir, deps) {
+  const mode = adobeMode(deps.env);
+  const decisions = {};
+  if (mode !== "auto") {
+    for (const host of HOST_IDS) {
+      decisions[host] = mode === "on" ? { listed: true, reason: "ZENVI_MCP_ADOBE=on" } : { listed: false, reason: "ZENVI_MCP_ADOBE=off", enable: "Unset ZENVI_MCP_ADOBE (or set it to auto or on) in this server's environment." };
+    }
+    return decisions;
+  }
+  const installed = (await findInstalledExtensions(deps)).length > 0;
+  const { apps } = installed ? await findAdobeApps(deps) : { apps: { aftereffects: [], premiere: [] } };
+  const anyApp = HOST_IDS.some((host) => apps[host].length > 0);
+  for (const host of HOST_IDS) {
+    if (await deps.exists(path26.join(linkDirOf(desktopDir), `${host}.json`))) {
+      decisions[host] = { listed: true, reason: `Zenvi Link runs in ${APP_LABEL[host]} on this machine` };
+    } else if (installed && apps[host].length > 0) {
+      decisions[host] = { listed: true, reason: `Zenvi Link and ${apps[host][0]} are installed` };
+    } else if (installed && !anyApp) {
+      decisions[host] = { listed: true, reason: "Zenvi Link is installed (no Adobe app found in the standard folders)" };
+    } else if (installed) {
+      decisions[host] = { listed: false, reason: `Zenvi Link is installed but ${APP_LABEL[host]} was not found`, enable: enableHint(host) };
+    } else {
+      decisions[host] = { listed: false, reason: "Zenvi Link is not installed", enable: enableHint(host) };
+    }
+  }
+  return decisions;
+}
+var APP_LABEL;
+var init_policy = __esm({
+  "src/hosts/policy.ts"() {
+    "use strict";
+    init_src3();
+    init_extension();
+    APP_LABEL = { aftereffects: "After Effects", premiere: "Premiere Pro" };
+  }
+});
+
+// src/hosts/registry.ts
+import { readFile as readFile11, stat as stat12 } from "node:fs/promises";
+import path27 from "node:path";
+function toolCount(host) {
+  return catalogFor(host).length;
+}
+function iso(ms) {
+  return ms === void 0 || !Number.isFinite(ms) ? void 0 : new Date(ms).toISOString();
+}
+function howToConnect(host, discovery) {
+  const app = APP_LABEL[host];
+  const open7 = `Open ${app}: Zenvi Link starts with it (its panel is Window > Extensions > Zenvi Link).`;
+  const install = `If Zenvi Link is not installed, run \`zenvi adobe install\` and restart ${app}; \`zenvi adobe doctor\` shows what is missing.`;
+  switch (discovery?.status) {
+    case "dead":
+      return `${app} quit or crashed (its Zenvi Link file was left behind). ${open7}`;
+    case "unreachable":
+      return `${app} is running but Zenvi Link did not answer. Open Window > Extensions > Zenvi Link to restart it, or restart ${app}. ${install}`;
+    case "invalid":
+      return `${discovery.detail}. ${open7} ${install}`;
+    default:
+      return `${open7} ${install}`;
+  }
+}
+function describeHosts(report2) {
+  const name = (entry) => {
+    const project = typeof entry.project === "string" && entry.project ? ` (${path27.basename(entry.project)})` : "";
+    const version2 = typeof entry.app_version === "string" && entry.app_version ? ` ${entry.app_version}` : "";
+    return `${entry.label}${version2}${project}`;
+  };
+  const connected = report2.hosts.filter((h) => h.connected);
+  const missing = report2.hosts.filter((h) => !h.connected);
+  const active = report2.hosts.find((h) => h.active);
+  const parts = [`Active: ${active ? name(active) : report2.active}.`, `Connected: ${connected.map(name).join(", ")}.`];
+  if (missing.length) {
+    parts.push(
+      `Not connected: ${missing.map((h) => h.kind === "zenvi" ? `${h.label} (launch_editor starts it)` : `${h.label} (${h.status === "absent" ? "not running with Zenvi Link" : String(h.status)})`).join(", ")}.`
+    );
+  }
+  const hidden = report2.hosts.filter((h) => h.kind !== "zenvi" && h.tools_listed === false);
+  if (hidden.length) parts.push(`Not listed: ${hidden.map((h) => `${h.label} tools (${String(h.enable_hint ?? "")})`).join(" ")}`);
+  return parts.join(" ");
+}
+var ADOBE_HOST_KEY, PORTABLE_HOW, DESKTOP_HOW, HostRegistry;
+var init_registry5 = __esm({
+  "src/hosts/registry.ts"() {
+    "use strict";
+    init_src3();
+    init_discovery();
+    init_extension();
+    init_policy();
+    ADOBE_HOST_KEY = { aftereffects: "after-effects", premiere: "premiere-pro" };
+    PORTABLE_HOW = "This server edits the project file itself whenever the Zenvi desktop app does not have it open.";
+    DESKTOP_HOW = "Not running. launch_editor (or `zenvi open`) starts it on this session's project; handoff tools open it themselves. Get Zenvi at https://zenvi.pro/download.";
+    HostRegistry = class {
+      constructor(options) {
+        this.options = options;
+        this.detect = options.detect ?? defaultDetectDeps(options.config.home, options.env);
+        this.cacheMs = options.cacheMs ?? 2e3;
+      }
+      options;
+      snapshotCache;
+      familiesCache;
+      clients = /* @__PURE__ */ new Map();
+      desktopCalls = /* @__PURE__ */ new Map();
+      detect;
+      cacheMs;
+      get desktopDir() {
+        return this.options.config.desktopDir;
+      }
+      /** Forget the cached discovery (after launching an app, for example). */
+      invalidate() {
+        this.snapshotCache = void 0;
+        this.familiesCache = void 0;
+      }
+      cached(slot, make) {
+        const now = Date.now();
+        const hit = this[slot];
+        if (hit && now - hit.at <= this.cacheMs) return hit.value;
+        const value = make();
+        this[slot] = { at: now, value };
+        value.catch(() => {
+          if (this[slot]?.value === value) this[slot] = void 0;
+        });
+        return value;
+      }
+      snapshot() {
+        return this.cached("snapshotCache", async () => {
+          const [desktop, adobe] = await Promise.all([
+            discoverDesktop(this.options.config, { clientVersion: this.options.clientVersion }),
+            inspectHosts(this.desktopDir, { removeStale: true, clientVersion: this.options.clientVersion })
+          ]);
+          const desktopTouched = /* @__PURE__ */ new Map();
+          for (const endpoint of desktop) {
+            const info = await stat12(endpoint.source).catch(() => void 0);
+            if (info) desktopTouched.set(endpoint.source, info.mtimeMs);
+          }
+          return { desktop, desktopTouched, adobe };
+        });
+      }
+      /** Which Adobe tool families the MCP server lists right now (file checks only, no network). */
+      families() {
+        return this.cached("familiesCache", () => decideFamilies(this.desktopDir, this.detect));
+      }
+      /** Record a call the MCP server sent to a desktop endpoint (it counts as activity). */
+      noteDesktopCall(endpoint) {
+        this.desktopCalls.set(endpoint.source, Date.now());
+      }
+      async list() {
+        const [snap2, families] = await Promise.all([this.snapshot(), this.families()]);
+        const portable = this.options.portable?.() ?? { project: null };
+        const hosts = [];
+        const stamps = /* @__PURE__ */ new Map();
+        const gui = snap2.desktop.find((e) => e.kind !== "headless") ?? snap2.desktop[0];
+        if (gui) {
+          const touched = Math.max(snap2.desktopTouched.get(gui.source) ?? 0, this.desktopCalls.get(gui.source) ?? 0);
+          if (touched > 0) stamps.set("zenvi-desktop", touched);
+          hosts.push({
+            id: "zenvi-desktop",
+            kind: "zenvi",
+            label: "Zenvi desktop app",
+            connected: true,
+            active: false,
+            project: gui.project ?? null,
+            version: gui.version ?? null,
+            pid: gui.pid ?? null,
+            ...gui.kind === "headless" ? { headless: true } : {},
+            ...touched > 0 ? { last_active_at: iso(touched) } : {}
+          });
+        } else {
+          hosts.push({ id: "zenvi-desktop", kind: "zenvi", label: "Zenvi desktop app", connected: false, active: false, how_to_connect: DESKTOP_HOW });
+        }
+        let routesToDesktop = false;
+        if (portable.project) {
+          for (const endpoint of snap2.desktop) {
+            if (await hasProjectOpen(endpoint, portable.project)) {
+              routesToDesktop = true;
+              break;
+            }
+          }
+        }
+        if (portable.lastCallAt !== void 0 && !routesToDesktop) stamps.set("zenvi-portable", portable.lastCallAt);
+        hosts.push({
+          id: "zenvi-portable",
+          kind: "zenvi",
+          label: "Portable Zenvi engine",
+          connected: true,
+          active: false,
+          project: portable.project,
+          ...portable.lastCallAt !== void 0 ? { last_active_at: iso(portable.lastCallAt) } : {},
+          ...routesToDesktop ? { routes_to: "zenvi-desktop", note: "The desktop app has this project open: Zenvi tools run there." } : { note: PORTABLE_HOW }
+        });
+        for (const host of HOST_IDS) {
+          const id = ADOBE_HOST_KEY[host];
+          const found = snap2.adobe.find((d) => d.host === host);
+          const family = families[host];
+          const listing = { tools: toolCount(host), tools_listed: family.listed, ...family.enable ? { enable_hint: family.enable } : {} };
+          const endpoint = found?.endpoint;
+          if (endpoint) {
+            const last = Date.parse(endpoint.lastActiveAt || endpoint.startedAt);
+            if (Number.isFinite(last)) stamps.set(id, last);
+            hosts.push({
+              id,
+              kind: host,
+              label: APP_LABEL[host],
+              connected: true,
+              active: false,
+              app_name: endpoint.appName || null,
+              app_version: endpoint.appVersion || null,
+              project: endpoint.project,
+              pid: endpoint.pid,
+              version: endpoint.version || null,
+              ...endpoint.lastActiveAt ? { last_active_at: endpoint.lastActiveAt } : {},
+              ...listing,
+              ...endpoint.version && endpoint.version !== LINK_VERSION ? { update_hint: `Zenvi Link ${endpoint.version} is running; this zenvi ships ${LINK_VERSION}. Run \`zenvi adobe install\` and restart ${APP_LABEL[host]} to match.` } : {}
+            });
+          } else {
+            hosts.push({
+              id,
+              kind: host,
+              label: APP_LABEL[host],
+              connected: false,
+              active: false,
+              status: found?.status ?? "absent",
+              reason: found?.detail ?? "no discovery file",
+              install_hint: "zenvi adobe install",
+              how_to_connect: howToConnect(host, found),
+              ...listing
+            });
+          }
+        }
+        let active = "zenvi-portable";
+        let best = -Infinity;
+        for (const entry of hosts) {
+          const stamp = stamps.get(entry.id);
+          if (entry.connected && stamp !== void 0 && stamp > best) {
+            best = stamp;
+            active = entry.id;
+          }
+        }
+        for (const entry of hosts) entry.active = entry.id === active;
+        return { hosts, active };
+      }
+      /**
+       * A client for a connected Adobe app. The cached client is reused while the
+       * discovery file names the same server (url, pid, start time) and its
+       * process lives; otherwise the file is checked again (one initialize).
+       */
+      async connect(host) {
+        const file3 = path27.join(linkDirOf(this.desktopDir), `${host}.json`);
+        const cached3 = this.clients.get(host);
+        if (cached3) {
+          const raw = await readFile11(file3, "utf8").catch(() => "");
+          let key = "";
+          try {
+            const data = JSON.parse(raw);
+            key = `${String(data.url)}|${String(data.pid)}|${String(data.started_at)}`;
+          } catch {
+            key = "";
+          }
+          if (key === cached3.key && pidAlive3(cached3.endpoint.pid)) return { ok: true, client: cached3.client, endpoint: cached3.endpoint };
+          await this.dropClient(host);
+        }
+        const discovery = await inspectHost(this.desktopDir, host, { removeStale: true, clientVersion: this.options.clientVersion });
+        if (!discovery.endpoint) return { ok: false, discovery };
+        const endpoint = discovery.endpoint;
+        const client = new HostClient(endpoint, this.options.clientVersion);
+        this.clients.set(host, { key: `${endpoint.url}|${endpoint.pid}|${endpoint.startedAt}`, client, endpoint });
+        return { ok: true, client, endpoint };
+      }
+      /** The connected app's own tools/list (read once per server instance). */
+      async liveTools(host) {
+        const connection = await this.connect(host);
+        if (!connection.ok) return void 0;
+        const entry = this.clients.get(host);
+        if (!entry) return void 0;
+        entry.tools ??= connection.client.listTools();
+        try {
+          return await entry.tools;
+        } catch (error62) {
+          entry.tools = void 0;
+          throw error62;
+        }
+      }
+      /** Forget an app's client (after a transport failure). */
+      async dropClient(host) {
+        const cached3 = this.clients.get(host);
+        this.clients.delete(host);
+        this.invalidate();
+        await cached3?.client.close();
+      }
+      async close() {
+        await Promise.all([...this.clients.keys()].map((host) => this.dropClient(host)));
+      }
+    };
+  }
+});
+
+// src/hosts/adobe-tools.ts
+function hostOfTool(name) {
+  return HOST_IDS.find((host) => name.startsWith(HOST_TOOL_PREFIX[host]));
+}
+function catalogTools(host) {
+  let tools = catalogs.get(host);
+  if (!tools) {
+    tools = new Map(toCatalogJson(host, catalogFor(host)).tools.map((tool) => [tool.name, tool]));
+    catalogs.set(host, tools);
+  }
+  return tools;
+}
+function adobeToolDefinitions(host) {
+  return [...catalogTools(host).values()].map((tool) => ({
+    name: tool.name,
+    title: tool.title,
+    description: `${APP_LABEL[host]}: ${tool.description}`,
+    inputSchema: tool.inputSchema,
+    annotations: { title: tool.title, ...tool.annotations }
+  }));
+}
+function receipt(host, tool, status, code, message, data = {}) {
+  const text4 = message.replace(/^Error:\s*/, "");
+  return { contract: 3, status, tool, host, summary: `Error: ${text4}`, data, warnings: [], undoSteps: 0, error: { code, message: text4 } };
+}
+function hostRefusal(host, tool, code, message, data = {}) {
+  return receipt(host, tool, "refused", code, message, data);
+}
+function hostFailure(host, tool, code, message) {
+  return receipt(host, tool, "error", code, message);
+}
+function isOkHostStatus(status) {
+  return status === "applied" || status === "unchanged" || status === "ok";
+}
+async function callAdobeTool(registry2, name, rawArgs, options = {}) {
+  const host = hostOfTool(name);
+  if (!host) throw new Error(`${name} is not an After Effects or Premiere Pro tool`);
+  const app = APP_LABEL[host];
+  const def = catalogTools(host).get(name);
+  if (def) {
+    const unknown2 = unknownArgumentsMessage(name, rawArgs, def.inputSchema);
+    if (unknown2) return { receipt: hostRefusal(host, name, "INVALID_ARGUMENT", unknown2), images: [] };
+  }
+  const connection = await registry2.connect(host);
+  if (!connection.ok) {
+    const { discovery } = connection;
+    return {
+      receipt: hostRefusal(host, name, "NOT_CONNECTED", `${app} is not connected: ${discovery.detail}. ${howToConnect(host, discovery)}`, { status: discovery.status }),
+      images: []
+    };
+  }
+  let schema = def?.inputSchema;
+  if (!def) {
+    let live2;
+    try {
+      live2 = await registry2.liveTools(host);
+    } catch (error62) {
+      await registry2.dropClient(host);
+      return { receipt: hostFailure(host, name, "HOST_ERROR", `could not list ${app}'s tools (${error62 instanceof Error ? error62.message : String(error62)}); check list_hosts and try again`), images: [] };
+    }
+    const found = live2?.find((t) => t.name === name);
+    if (!found) {
+      const known = [.../* @__PURE__ */ new Set([...catalogTools(host).keys(), ...(live2 ?? []).map((t) => t.name)])];
+      return { receipt: hostRefusal(host, name, "NOT_FOUND", `${app} has no tool named ${name}. Its tools: ${known.join(", ") || `none (${HOST_TOOL_PREFIX[host]}*)`}.`), images: [] };
+    }
+    schema = found.inputSchema ?? {};
+    const unknown2 = unknownArgumentsMessage(name, rawArgs, schema);
+    if (unknown2) return { receipt: hostRefusal(host, name, "INVALID_ARGUMENT", unknown2), images: [] };
+  }
+  const args = normalizeArgs(schema, rawArgs);
+  try {
+    const result = await connection.client.callTool(name, args, options.timeoutMs ? { timeoutMs: options.timeoutMs } : {});
+    const got = result.receipt ?? {
+      contract: 3,
+      status: result.isError ? "error" : "ok",
+      tool: name,
+      host,
+      summary: result.isError && !result.text.startsWith("Error") ? `Error: ${result.text}` : result.text || `${name} finished`,
+      data: {},
+      warnings: [],
+      undoSteps: null
+    };
+    return { receipt: got, images: result.images };
+  } catch (error62) {
+    if (error62 instanceof McpError && error62.code === ErrorCode.InvalidParams) {
+      const version2 = connection.endpoint.version ? ` ${connection.endpoint.version}` : "";
+      return {
+        receipt: hostRefusal(host, name, "UNSUPPORTED", `Zenvi Link${version2} in ${app} has no ${name} (${error62.message}). Update it with \`zenvi adobe install\` and restart ${app}.`),
+        images: []
+      };
+    }
+    await registry2.dropClient(host);
+    const message = error62 instanceof Error ? error62.message : String(error62);
+    if (error62 instanceof McpError && error62.code === ErrorCode.RequestTimeout) {
+      return { receipt: hostFailure(host, name, "TIMEOUT", `${app} did not answer ${name} in time (${message}). It may still be working; check ${STATE_TOOL[host]} before retrying.`), images: [] };
+    }
+    return {
+      receipt: hostFailure(host, name, "HOST_ERROR", `lost the connection to ${app} during ${name} (${message}). If it ran, it may have changed the project: check ${STATE_TOOL[host]} and list_hosts before retrying.`),
+      images: []
+    };
+  }
+}
+async function liveToolSchema(registry2, host, tool) {
+  const found = (await registry2.liveTools(host))?.find((t) => t.name === tool);
+  if (!found) return void 0;
+  const schema = found.inputSchema ?? {};
+  return { properties: schema.properties ?? {} };
+}
+var STATE_TOOL, catalogs;
+var init_adobe_tools = __esm({
+  "src/hosts/adobe-tools.ts"() {
+    "use strict";
+    init_types5();
+    init_src3();
+    init_tools();
+    init_unknown_args();
+    init_policy();
+    init_registry5();
+    STATE_TOOL = { aftereffects: "ae_get_state", premiere: "premiere_get_state" };
+    catalogs = /* @__PURE__ */ new Map();
+  }
+});
+
 // src/desktop/launcher.ts
 import { execFile as execFile2, spawn as spawn3 } from "node:child_process";
-import { readdir as readdir5, readFile as readFile10, realpath as realpath3, stat as stat12 } from "node:fs/promises";
-import path25 from "node:path";
+import { readdir as readdir6, readFile as readFile13, realpath as realpath3, stat as stat14 } from "node:fs/promises";
+import path31 from "node:path";
 import { promisify as promisify2 } from "node:util";
 function defaultLauncherDeps() {
   const self = [process.argv[1]].filter((p) => typeof p === "string");
@@ -81340,14 +82344,14 @@ function defaultLauncherDeps() {
     home: process.env.HOME || process.env.USERPROFILE || "",
     exists: async (file3) => {
       try {
-        await stat12(file3);
+        await stat14(file3);
         return true;
       } catch {
         return false;
       }
     },
-    readText: async (file3) => readFile10(file3, "utf8").catch(() => void 0),
-    listDir: async (dir) => readdir5(dir).catch(() => []),
+    readText: async (file3) => readFile13(file3, "utf8").catch(() => void 0),
+    listDir: async (dir) => readdir6(dir).catch(() => []),
     run: async (command, args) => {
       try {
         const { stdout } = await execFileAsync2(command, args, { timeout: 5e3, windowsHide: true, maxBuffer: 1024 * 1024 });
@@ -81368,16 +82372,16 @@ function defaultLauncherDeps() {
     selfPaths: self
   };
 }
-function splitCommand(text3) {
+function splitCommand(text4) {
   const out = [];
   let cur = "";
   let quote = null;
   let has2 = false;
-  for (let i = 0; i < text3.length; i += 1) {
-    const ch = text3[i];
+  for (let i = 0; i < text4.length; i += 1) {
+    const ch = text4[i];
     if (quote) {
       if (ch === quote) quote = null;
-      else if (ch === "\\" && quote === '"' && i + 1 < text3.length && /["\\$`]/.test(text3[i + 1])) cur += text3[++i];
+      else if (ch === "\\" && quote === '"' && i + 1 < text4.length && /["\\$`]/.test(text4[i + 1])) cur += text4[++i];
       else cur += ch;
     } else if (ch === '"' || ch === "'") {
       quote = ch;
@@ -81386,8 +82390,8 @@ function splitCommand(text3) {
       if (has2 || cur) out.push(cur);
       cur = "";
       has2 = false;
-    } else if (ch === "\\" && i + 1 < text3.length && process.platform !== "win32") {
-      cur += text3[++i];
+    } else if (ch === "\\" && i + 1 < text4.length && process.platform !== "win32") {
+      cur += text4[++i];
     } else cur += ch;
   }
   if (has2 || cur) out.push(cur);
@@ -81401,7 +82405,7 @@ async function which(deps, name) {
   const exts = deps.platform === "win32" ? (deps.env.PATHEXT || ".EXE;.CMD;.BAT").split(";") : [""];
   for (const dir of dirs) {
     for (const ext of exts) {
-      const candidate = path25.join(dir, name + ext.toLowerCase());
+      const candidate = path31.join(dir, name + ext.toLowerCase());
       if (await deps.exists(candidate)) return candidate;
     }
   }
@@ -81415,7 +82419,7 @@ async function isSelf(deps, file3) {
   return /^#!.*\bnode\b/.test(head) || /\bzenvi\.mjs\b/.test(real2);
 }
 async function findMac(deps) {
-  const candidates = ["/Applications/Zenvi.app", path25.join(deps.home, "Applications", "Zenvi.app")];
+  const candidates = ["/Applications/Zenvi.app", path31.join(deps.home, "Applications", "Zenvi.app")];
   for (const app2 of candidates) {
     if (await deps.exists(app2)) return { kind: "macos-app", location: app2, command: "open", args: ["-a", app2, "--args"] };
   }
@@ -81440,7 +82444,7 @@ async function findWindows(deps) {
     if (code !== 0) continue;
     const location = regValue(stdout, "InstallLocation");
     if (location) {
-      const file3 = path25.win32.join(location.replace(/^"|"$/g, ""), "zenvi.exe");
+      const file3 = path31.win32.join(location.replace(/^"|"$/g, ""), "zenvi.exe");
       if (await deps.exists(file3)) return exe(file3);
     }
     const icon = regValue(stdout, "DisplayIcon")?.replace(/^"|"$/g, "").replace(/,\d+$/, "");
@@ -81450,40 +82454,40 @@ async function findWindows(deps) {
   const command = /REG_(?:SZ|EXPAND_SZ)\s+(.+?)\s*$/m.exec(assoc.stdout)?.[1];
   const fromAssoc = command ? /^"([^"]+)"/.exec(command)?.[1] ?? command.split(/\s+/)[0] : void 0;
   if (fromAssoc && await deps.exists(fromAssoc)) return exe(fromAssoc);
-  const roots = [deps.env.ProgramFiles, deps.env["ProgramFiles(x86)"], deps.env.LOCALAPPDATA && path25.win32.join(deps.env.LOCALAPPDATA, "Programs")];
+  const roots = [deps.env.ProgramFiles, deps.env["ProgramFiles(x86)"], deps.env.LOCALAPPDATA && path31.win32.join(deps.env.LOCALAPPDATA, "Programs")];
   for (const root of roots) {
     if (!root) continue;
-    const file3 = path25.win32.join(root, "Zenvi", "zenvi.exe");
+    const file3 = path31.win32.join(root, "Zenvi", "zenvi.exe");
     if (await deps.exists(file3)) return exe(file3);
   }
   return void 0;
 }
 function xdgDataDirs(deps) {
-  const home = deps.env.XDG_DATA_HOME || path25.join(deps.home, ".local", "share");
+  const home = deps.env.XDG_DATA_HOME || path31.join(deps.home, ".local", "share");
   const system = (deps.env.XDG_DATA_DIRS || "/usr/local/share:/usr/share").split(":").filter(Boolean);
-  return [home, ...system, "/var/lib/flatpak/exports/share", path25.join(deps.home, ".local", "share", "flatpak", "exports", "share")];
+  return [home, ...system, "/var/lib/flatpak/exports/share", path31.join(deps.home, ".local", "share", "flatpak", "exports", "share")];
 }
 async function findLinux(deps) {
   const bin = await which(deps, "zenvi-desktop");
   if (bin && !await isSelf(deps, bin)) return { kind: "linux-bin", location: bin, command: bin, args: [] };
-  const appImageDirs = [path25.join(deps.home, "Applications"), path25.join(deps.home, ".local", "bin"), path25.join(deps.home, "bin"), "/opt", "/opt/zenvi", "/usr/local/bin"];
+  const appImageDirs = [path31.join(deps.home, "Applications"), path31.join(deps.home, ".local", "bin"), path31.join(deps.home, "bin"), "/opt", "/opt/zenvi", "/usr/local/bin"];
   for (const dir of appImageDirs) {
     const names2 = (await deps.listDir(dir)).filter((n) => /^zenvi.*\.appimage$/i.test(n)).sort().reverse();
     if (names2[0]) {
-      const file3 = path25.join(dir, names2[0]);
+      const file3 = path31.join(dir, names2[0]);
       return { kind: "linux-appimage", location: file3, command: file3, args: [] };
     }
   }
   for (const dataDir of xdgDataDirs(deps)) {
     for (const name of ["org.zenvi.Zenvi.desktop", "zenvi.desktop"]) {
-      const file3 = path25.join(dataDir, "applications", name);
-      const text3 = await deps.readText(file3);
-      const exec = text3 && /^Exec\s*=\s*(.+)$/m.exec(text3)?.[1];
+      const file3 = path31.join(dataDir, "applications", name);
+      const text4 = await deps.readText(file3);
+      const exec = text4 && /^Exec\s*=\s*(.+)$/m.exec(text4)?.[1];
       if (!exec) continue;
       const argv = parseDesktopExec(exec);
       const head = argv[0];
       if (!head) continue;
-      const resolved = path25.isAbsolute(head) ? head : await which(deps, head);
+      const resolved = path31.isAbsolute(head) ? head : await which(deps, head);
       if (!resolved || await isSelf(deps, resolved)) continue;
       return { kind: "linux-desktop-entry", location: file3, command: resolved, args: argv.slice(1) };
     }
@@ -83197,10 +84201,195 @@ var init_stdio2 = __esm({
   }
 });
 
+// src/hosts/taste.gen.ts
+var TASTE_MARKDOWN;
+var init_taste_gen = __esm({
+  "src/hosts/taste.gen.ts"() {
+    "use strict";
+    TASTE_MARKDOWN = '# Zenvi taste guide (motion design + editing)\n\nSource of truth for the defaults baked into Zenvi Link tools (After Effects,\nPremiere Pro), the Zenvi MCP prompts/resources, and the Claude Code skills.\nEvery number here is a *default* an agent may override with a reason. Tools\nmust use these defaults when an argument is omitted, so a lazy call still looks\nprofessional.\n\n## 0. Principles\n\n1. **Intent before effect.** Every move must answer "what should the viewer\n   notice next?" If an animation does not direct attention, cut it.\n2. **Less, but consistent.** One easing family, one type family (two at most),\n   one accent colour per piece. Repetition reads as design; variety reads as\n   accident.\n3. **Motion has weight.** Nothing starts or stops instantly (no linear easing on\n   anything that moves on screen). Things enter fast and settle slowly.\n4. **Respect the frame.** Keep text inside title-safe, keep faces and eyes in\n   the upper third, never let graphics cover the subject\'s mouth.\n5. **Look before you say done.** After any visual change, capture a frame\n   (`ae_capture_frame`, `premiere_capture_frame`, `preview_frame`) at the\n   moments that matter (entrance end, hold, exit start) and critique it against\n   this guide. Fix, then capture again.\n\n## 1. Timing\n\n| Use | Duration | Notes |\n| --- | --- | --- |\n| UI-like micro motion (pop, nudge) | 0.20\u20130.35 s | 6\u201310 frames at 30 fps |\n| Text / element entrance | 0.50\u20130.80 s | default **0.6 s** |\n| Text / element exit | 0.35\u20130.50 s | default **0.4 s** (exits are faster than entrances) |\n| Big moves (full-frame push, logo reveal) | 0.8\u20131.2 s | default **1.0 s** |\n| Stagger between words / lines / items | 0.04\u20130.08 s | default **0.06 s** per word, **0.12 s** per line |\n| Minimum on-screen hold for text | 1.5 s + 0.3 s per word | never shorter than reading time |\n| Lower third total | 4\u20136 s | in 0.6 s, hold, out 0.4 s |\n| Title card | 2.5\u20134 s | |\n| Cross dissolve | 0.5\u20131.0 s | default **0.5 s** for cuts within a scene, **1.0 s** for time/place change |\n| Dip to black/white | 0.6\u20131.2 s | use for chapter breaks only |\n| Audio fade in / out | 0.25 s / 0.5\u20131.5 s | music end fades: **1.5 s** |\n| J/L cut audio lead | 0.25\u20130.75 s | lead the cut with sound |\n\nPrefer frame-exact values: snap every time to the composition/sequence frame\ngrid.\n\n## 2. Easing\n\nNamed easings every tool understands (cubic-bezier control points):\n\n| Name | cubic-bezier | Use |\n| --- | --- | --- |\n| `smooth` (default) | (0.33, 0.00, 0.20, 1.00) | general-purpose moves |\n| `out` / `entrance` | (0.16, 1.00, 0.30, 1.00) | things arriving (expo-out feel) |\n| `in` / `exit` | (0.70, 0.00, 0.84, 0.00) | things leaving |\n| `in-out` | (0.65, 0.00, 0.35, 1.00) | moves between two resting states |\n| `snap` | (0.20, 0.00, 0.00, 1.00) | punchy pops, kinetic type |\n| `linear` | (0, 0, 1, 1) | ONLY opacity crossfades, rotations that loop, tickers |\n| `hold` | \u2014 | step changes |\n\n- Overshoot (`back-out`) only for playful brands; max overshoot **6%** of the\n  distance, settle within 0.25 s. Implement as an extra keyframe, not as an\n  expression, so it is editable.\n- After Effects mapping: for a segment with value change dv over dt, and\n  bezier (x1, y1, x2, y2):\n  outgoing ease of the first key: influence = x1\xB7100 %, speed = (y1/x1)\xB7dv/dt;\n  incoming ease of the second key: influence = (1\u2212x2)\xB7100 %,\n  speed = ((1\u2212y2)/(1\u2212x2))\xB7dv/dt (speed 0 when x1 or 1\u2212x2 is 0). Spatial\n  properties use the path length as dv. Clamp influence to [0.1, 100].\n- Premiere Pro keyframes: use Bezier interpolation with ease-in/ease-out on\n  the resting keyframes (`setInterpolationTypeAtKey` with\n  `KF_Interp_Mode_Bezier`/ease variants); never leave Linear on Motion.\n\n## 3. Space and layout\n\n- **Safe areas:** action-safe 5 % inset, title-safe 10 % inset (of each\n  dimension). Vertical 9:16 social: keep text out of the bottom 20 % (UI) and\n  top 12 % (status/handle) \u2014 i.e. title-safe for 1080\xD71920 is\n  x \u2208 [108, 972], y \u2208 [230, 1536].\n- **Grid:** 12-column grid with a margin equal to the title-safe inset; align\n  text left edges to a column, not "roughly centered".\n- **Lower third:** left-aligned at title-safe x; baseline of the name at\n  ~80 % of the frame height (landscape), ~70 % (vertical). Name / title\n  stacked, gap = 0.25 \xD7 name size.\n- **Movement distance:** entrances travel 3\u20136 % of the frame width (not from\n  off-screen) unless it is a full push. Default slide distance: **4 %**.\n- **Scale moves:** 92 %\u2192100 % on entrance, 100 %\u2192104 % slow push on holds\n  (Ken Burns 3\u20136 % over the shot length, `in-out`).\n\n## 4. Typography\n\n- Default families (in order of availability): Inter, SF Pro Display,\n  Helvetica Neue, Arial. Headlines: weight 700\u2013800; supporting text: 400\u2013500.\n- Type scale at 1080p (landscape): headline 96 px, title 72 px, subtitle\n  44 px, lower-third name 54 px / role 34 px, caption 42 px. Scale linearly\n  with frame height (vertical 1920: multiply by 1.0 using the *width* 1080 as\n  the base, i.e. same pixel sizes).\n- Tracking: headlines \u22121 % to \u22122 %; all-caps labels +6 % to +10 %.\n- Leading: 1.1\xD7 for headlines, 1.3\xD7 for body.\n- Max line length: 32 characters for on-screen text; break lines on phrase\n  boundaries, never leave a single orphan word.\n- Contrast: text over video gets a 35\u201355 % black scrim, a soft drop shadow\n  (distance 0, softness 12\u201320 px, opacity 40 %) or a solid bar \u2014 never bare\n  white text over busy footage. Check WCAG-like contrast \u2265 4.5:1 against the\n  average of the area behind it.\n\n## 5. Colour\n\n- One accent colour + neutrals. Default palette when the brand gives none:\n  ink #0B0B0F, paper #F7F7F5, accent #FF5A36, secondary #2F6BFF.\n- Looks (Lumetri-based in Adobe, Zenvi color tools in Zenvi): `clean` (+5\n  contrast, +5 vibrance), `warm-film` (temp +8, tint +2, fade 8, sat \u22126),\n  `teal-orange` (shadows \u2192 teal, highlights \u2192 orange, sat +6), `moody`\n  (exposure \u22120.3, contrast +12, sat \u221215, vignette \u22120.8), `bw-contrast`\n  (sat 0, contrast +25). Apply at \u2264 60 % strength by default; skin must stay\n  natural.\n\n## 6. Editing rhythm\n\n- Cut on action or on the beat; with music, cut on downbeats (bars), not on\n  every beat.\n- Average shot length: talking head 4\u20138 s; b-roll 1.5\u20133 s; social hooks\n  0.8\u20131.5 s for the first 3 s.\n- First frame matters: no fade-in from black on social; open on motion or a\n  face.\n- End on a deliberate hold (0.5\u20131.0 s) before the final fade.\n- Audio: dialogue \u221212 to \u22126 dBFS peaks (\u2248 \u221216 LUFS integrated for social,\n  \u221223 LUFS broadcast); music under dialogue \u221218 to \u221224 dB below; duck 6\u201310 dB\n  with 0.3 s attack / 0.6 s release.\n\n## 7. Review checklist (agents run this before reporting success)\n\n1. Capture frames at: first frame, every entrance end, mid-hold, last frame.\n2. Is all text inside title-safe and readable at phone size?\n3. Is anything moving with linear easing or ending abruptly?\n4. Are durations within the tables above? Are holds long enough to read?\n5. Does every element align to the grid/edges of its siblings?\n6. Is there exactly one focal point per moment?\n7. Audio: no clipping, music ducked under speech, fades at the end.\nReport what you checked and any deliberate exceptions.\n';
+  }
+});
+
+// src/hosts/guides.ts
+function promptHost(value, report2) {
+  const v = (value ?? "").trim().toLowerCase().replace(/[\s_]+/g, "-");
+  if (["ae", "aftereffects", "after-effects", "aeft"].includes(v)) return "aftereffects";
+  if (["premiere", "premiere-pro", "premierepro", "ppro", "pr"].includes(v)) return "premiere";
+  if (v) return "zenvi";
+  if (report2?.active === "after-effects") return "aftereffects";
+  if (report2?.active === "premiere-pro") return "premiere";
+  return "zenvi";
+}
+function guide() {
+  return `--- Zenvi taste guide (zenvi://taste) ---
+
+${TASTE_MARKDOWN}`;
+}
+function connectStep(host, tools) {
+  return host === "zenvi" ? "1. Call list_hosts to see where Zenvi edits go (the desktop app when it has the project open, else this server's portable engine)." : `1. Call list_hosts and make sure ${tools.label} is connected. If it is not, stop and tell the user how to connect it (the host entry says how).`;
+}
+function promptText(name, args, report2) {
+  const prompt = PROMPTS.find((p) => p.name === name);
+  if (!prompt) throw new Error(`Unknown prompt: ${name}. Prompts: ${PROMPTS.map((p) => p.name).join(", ")}.`);
+  const host = promptHost(args.host, report2);
+  const tools = HOST_TOOLS[host];
+  if (name === "taste_motion_design") {
+    const brief = args.brief?.trim();
+    if (!brief) throw new Error("taste_motion_design needs a brief: what to make.");
+    const text5 = [
+      `Design and build this in ${tools.label}: ${brief}`,
+      "",
+      "Work like a senior motion designer who follows the Zenvi taste guide below. Its numbers are the defaults the tools use when you leave an argument out; override one only with a reason you state.",
+      "",
+      connectStep(host, tools),
+      `2. Read the current state: ${tools.state}.`,
+      "3. Plan before you build. For each moment write: what the viewer should notice next, the element, entrance / hold / exit times from the Timing table, the easing name, and where it sits (title-safe, the 12-column grid). One easing family, one type family, one accent colour.",
+      `4. Build it with ${tools.build}. Use the named easings (smooth, out/entrance, in/exit, in-out, snap); nothing that moves on screen uses linear.`,
+      `5. Look before you say done: capture frames with ${tools.capture} at the first frame, every entrance end, the middle of each hold and the last frame. Check each against the review checklist (\xA77), fix, and capture again.`,
+      "6. Report what you built (elements and timings), the frames you checked, and any deliberate exceptions to the guide.",
+      "",
+      tools.notes,
+      "",
+      guide()
+    ].join("\n");
+    return { description: `Motion design in ${tools.label} with Zenvi taste`, text: text5 };
+  }
+  const focus = args.focus?.trim();
+  const text4 = [
+    `Review the current edit in ${tools.label}${focus ? `, focusing on ${focus}` : ""}. Do not change anything before you have reported.`,
+    "",
+    connectStep(host, tools),
+    `2. Read the state (${tools.state}) and list the moments to check: the first frame, every entrance end, the middle of each hold, every transition and the last frame.`,
+    `3. Capture each moment with ${tools.capture} and look at it.`,
+    "4. Run the review checklist (\xA77) on every frame: text inside title-safe and readable at phone size; no linear easing on moving things and nothing ending abruptly; durations within the Timing table and holds long enough to read (1.5 s + 0.3 s per word); alignment to the grid and to sibling elements; exactly one focal point per moment; audio without clipping, music ducked under speech, fades at the end.",
+    "5. Report a table: time, what you see, the rule it breaks (cite the guide's section), and the fix (tool and arguments). Then list what is already right.",
+    "6. Ask before fixing unless the user asked for fixes. After fixing, capture the same moments again and confirm.",
+    "",
+    tools.notes,
+    "",
+    guide()
+  ].join("\n");
+  return { description: `Review of the edit in ${tools.label}${focus ? ` (${focus})` : ""}`, text: text4 };
+}
+var RESOURCES, HANDOFF_GUIDE, HOST_TOOLS, HOST_ARGUMENT, PROMPTS;
+var init_guides = __esm({
+  "src/hosts/guides.ts"() {
+    "use strict";
+    init_taste_gen();
+    RESOURCES = [
+      {
+        uri: "zenvi://hosts",
+        name: "hosts",
+        title: "Hosts",
+        description: "The apps this server drives (Zenvi desktop, portable engine, After Effects, Premiere Pro), which are connected and which is active. Same as list_hosts.",
+        mimeType: "application/json"
+      },
+      {
+        uri: "zenvi://taste",
+        name: "taste",
+        title: "Zenvi taste guide",
+        description: "Motion design and editing defaults (timing, easing, layout, type, colour, rhythm) and the review checklist. Omitted tool arguments use these values.",
+        mimeType: "text/markdown"
+      },
+      {
+        uri: "zenvi://handoff",
+        name: "handoff",
+        title: "Handoffs and linked clips",
+        description: "How an edit moves between Zenvi, After Effects, Premiere Pro, Remotion and HyperFrames, what survives each direction, and how linked clips work.",
+        mimeType: "text/markdown"
+      }
+    ];
+    HANDOFF_GUIDE = `# Zenvi handoffs and linked clips
+
+An edit can move between Zenvi, After Effects, Premiere Pro, Remotion and
+HyperFrames. Every conversion of the Zenvi project format runs in the Zenvi
+desktop app; \`zenvi mcp\` opens the app on this session's project when a
+handoff needs it (the project must be saved: open_project_file).
+
+| Direction | Tools | What survives |
+| --- | --- | --- |
+| Zenvi \u2192 After Effects | send_to_after_effects_tool (After Effects connected), export_to_after_effects_tool (.jsx file) | footage, layers, timing, transforms with eased keyframes, opacity, audio levels, titles as text layers, mapped effects, transitions, markers; unmapped effects are listed as warnings |
+| After Effects \u2192 Zenvi | bring_from_after_effects | the comp as a linked clip, rendered by After Effects and re-renderable |
+| Zenvi \u2192 Premiere Pro | send_to_premiere_tool (Premiere connected), export_to_premiere_tool (FCP7 XML) | clips, trims, tracks, Basic Motion and Opacity keyframes, audio levels, cross dissolves, markers; titles as PNG stills |
+| Premiere Pro \u2192 Zenvi | bring_from_premiere (premiere_export_xml + import_timeline_xml_tool) | the sequence as native, editable clips |
+| Zenvi \u2192 Remotion | export_to_remotion_tool | the timeline as a Remotion project (src/zenvi/timeline.json + a renderer); it comes back as native clips |
+| Remotion \u2192 Zenvi | list_remotion_compositions_tool, import_remotion_project_tool | compositions as linked clips; a Zenvi-generated project as native clips |
+| Zenvi \u2192 HyperFrames | export_to_hyperframes_tool | primitives, a GSAP timeline and an embedded zenvi-timeline JSON (lossless on re-import) |
+| HyperFrames \u2192 Zenvi | import_hyperframes_project_tool | <video>/<img>/<audio> primitives as native clips; scripted compositions as linked clips |
+
+## Linked clips
+
+A linked clip is rendered media that keeps a live link to its source: a
+Remotion or HyperFrames composition with its props, or an After Effects comp
+in its .aep ("Dynamic Link, but for code").
+
+- get_linked_clip_tool: state fresh | stale | rendering | error | missing_source, and the editable props.
+- update_linked_clip_tool {props}: change props and re-render; the media swap is one undo step.
+- rerender_linked_clip_tool: after the code or the comp changed.
+- open_linked_source_tool {target: code | studio}: the source file at its line in the user's editor, or Remotion Studio / HyperFrames preview / After Effects.
+- unlink_clip_tool: keep the rendered media, drop the link.
+
+Linked renders are ProRes 4444 when any pixel is transparent, else H.264;
+never WebM (Zenvi drops VP9 alpha).
+
+## Rules of thumb
+
+- After Effects and Premiere Pro steps need the app running with Zenvi Link (list_hosts; \`zenvi adobe install\` installs it).
+- Prefer the native tools of the app the user is working in: ae_* inside After Effects, premiere_* inside Premiere Pro, Zenvi tools on the .zvn project. Hand off when the user wants to continue in another app.
+- After every handoff, look at the result in the destination (ae_capture_frame, premiere_capture_frame, preview_frame) and read the warnings to the user: round trips through other apps are not lossless for everything.
+`;
+    HOST_TOOLS = {
+      zenvi: {
+        label: "the Zenvi project (.zvn)",
+        state: "get_timeline_state_tool, list_clips_tool",
+        build: "add_clip_to_timeline_tool, add_title_tool, set_keyframes_tool (keyframes with easing), apply_transition_tool, fade_clip_tool, set_clip_property_tool, add_effect_tool, set_clip_volume_tool",
+        capture: "preview_frame (grid=true adds the 0-1 coordinate grid for placement)",
+        notes: "Each call is one undo step (undo_tool reverts). Times are timeline seconds. Render with render_video; launch_editor shows the cut in the Zenvi desktop app."
+      },
+      aftereffects: {
+        label: "After Effects",
+        state: "ae_get_state, ae_get_comp, ae_get_layer",
+        build: "ae_create_comp (presets 1080p, 4k, vertical, square, 720p), ae_add_text (placement, animation preset), ae_apply_motion_preset (fade-in, slide-in, scale-pop, blur-in, typewriter, word-cascade, line-rise, ken-burns, push-in, drift, whip-in), ae_animate (keyframes with named easing), ae_set_property, ae_add_layer (solid, shape, null, adjustment), ae_apply_look, ae_add_mask",
+        capture: "ae_capture_frame",
+        notes: "Each mutating ae_* call is one undo step (ae_undo reverts). Keep text editable: text animators, not pre-rendered text. Render with ae_render, or bring the comp into the Zenvi project with bring_from_after_effects."
+      },
+      premiere: {
+        label: "Premiere Pro",
+        state: "premiere_get_state, premiere_get_sequence",
+        build: "premiere_place_clip, premiere_edit_clip (move, trim, speed, delete), premiere_razor, premiere_add_transition (Cross Dissolve), premiere_set_clip_properties, premiere_animate (bezier ease on Motion), premiere_add_text, premiere_apply_look, premiere_add_marker",
+        capture: "premiere_capture_frame",
+        notes: "Premiere has no undo grouping: every DOM change is its own undo step, so plan before you change things. Export with premiere_export, or bring the sequence into the Zenvi project with bring_from_premiere."
+      }
+    };
+    HOST_ARGUMENT = {
+      name: "host",
+      description: "Where the work happens: zenvi, aftereffects or premiere. Default: the active host (list_hosts).",
+      required: false
+    };
+    PROMPTS = [
+      {
+        name: "taste_motion_design",
+        title: "Motion design with Zenvi taste",
+        description: "Plan and build motion (titles, lower thirds, logo reveals, kinetic type, transitions) in Zenvi, After Effects or Premiere Pro with the Zenvi taste defaults, then check frames against the review checklist.",
+        arguments: [{ name: "brief", description: 'What to make, e.g. "a 5 s lower third for Ana Ruiz, Head of Design".', required: true }, HOST_ARGUMENT]
+      },
+      {
+        name: "edit_review",
+        title: "Review an edit against the taste guide",
+        description: "Look at the current edit in Zenvi, After Effects or Premiere Pro frame by frame and report what breaks the taste guide (safe areas, easing, timing, alignment, focal point, audio), with fixes.",
+        arguments: [
+          HOST_ARGUMENT,
+          { name: "focus", description: "What to look at most: typography, motion, timing, layout, colour, audio (default: everything).", required: false }
+        ]
+      }
+    ];
+  }
+});
+
 // src/commands/project.ts
 import { existsSync as existsSync6 } from "node:fs";
 import { mkdir as mkdir8 } from "node:fs/promises";
-import path26 from "node:path";
+import path32 from "node:path";
 function newProject(profile) {
   const create = createProject;
   if (!create) throw new CliError("This build's engine cannot create projects (createProject is not exported).");
@@ -83219,18 +84408,18 @@ function registerProjectCommands(program2, ctx) {
       return;
     }
     const named = ctx.flags().project ?? ctx.env.ZENVI_PROJECT?.trim() ?? void 0;
-    const asFile = (value) => path26.resolve(ctx.cwd, isProjectPath(value) ? value : `${value}.zvn`);
+    const asFile = (value) => path32.resolve(ctx.cwd, isProjectPath(value) ? value : `${value}.zvn`);
     if (positional && named && asFile(positional) !== asFile(named)) {
       throw new CliError(`Two different project files given: ${asFile(positional)} and ${asFile(named)} (-p/ZENVI_PROJECT).`, 2, "Pass only one.");
     }
     const file3 = asFile(positional ?? named ?? "untitled.zvn");
     if (existsSync6(file3) && !opts.force) throw new CliError(`${file3} already exists.`, 1, "Pass --force to replace it.");
     const project = newProject(opts.profile);
-    await mkdir8(path26.dirname(file3), { recursive: true });
+    await mkdir8(path32.dirname(file3), { recursive: true });
     const session = ProjectSession.fromProject(project, file3, { registry: ctx.registry, host: hostOptions(ctx) });
     await session.save();
     const info = { project: file3, id: project.id, profile: project.profile, width: project.width, height: project.height, fps: project.fps };
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Created ${path26.basename(file3)}`, engine: "portable", ...info });
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Created ${path32.basename(file3)}`, engine: "portable", ...info });
     else {
       ctx.out.line(`${ctx.out.style("\u2713", "green")} Created ${file3}`);
       ctx.out.line(ctx.out.style(`  ${project.profile}, ${project.width}x${project.height}`, "dim"));
@@ -83260,7 +84449,7 @@ function registerProjectCommands(program2, ctx) {
     });
   }
   program2.command("save").description("save the project (optionally to a new file)").argument("[file]", "save as this file").action(async (file3) => {
-    await runToolCommand(ctx, "save_project_tool", file3 ? { file_path: path26.resolve(ctx.cwd, file3) } : {});
+    await runToolCommand(ctx, "save_project_tool", file3 ? { file_path: path32.resolve(ctx.cwd, file3) } : {});
   });
 }
 var init_project3 = __esm({
@@ -83276,18 +84465,18 @@ var init_project3 = __esm({
 });
 
 // src/commands/render.ts
-import { writeFile as writeFile7 } from "node:fs/promises";
-import path27 from "node:path";
-function parseFps(text3) {
-  if (!text3) return void 0;
-  const m = /^(\d+)(?:\/(\d+))?$/.exec(text3.trim());
+import { writeFile as writeFile8 } from "node:fs/promises";
+import path33 from "node:path";
+function parseFps(text4) {
+  if (!text4) return void 0;
+  const m = /^(\d+)(?:\/(\d+))?$/.exec(text4.trim());
   if (m) return { num: Number(m[1]), den: Number(m[2] ?? 1) };
-  const f2 = Number(text3);
+  const f2 = Number(text4);
   if (Number.isFinite(f2) && f2 > 0) {
     for (const base of [24, 30, 60, 120]) if (Math.abs(f2 - base * 1e3 / 1001) < 0.01) return { num: base * 1e3, den: 1001 };
     return { num: Math.round(f2 * 1e3), den: 1e3 };
   }
-  throw new CliError(`Not a frame rate: ${text3}`, 2);
+  throw new CliError(`Not a frame rate: ${text4}`, 2);
 }
 function exportOptionsFrom(project, output2, flags) {
   const fromPath = output2 ? formatFromPath(output2) : void 0;
@@ -83332,16 +84521,16 @@ async function exportOnDesktop(executor, output2, platform = process.platform) {
   if (platform === "darwin") {
     const settings = await executor.call("get_export_settings_tool", {});
     const data = settings.receipt?.data;
-    const text3 = [settings.text, settings.receipt?.summary, typeof data?.legacy_text === "string" ? data.legacy_text : ""].join("\n");
-    if (settings.ok && /codec\s+h264_videotoolbox/i.test(text3)) {
+    const text4 = [settings.text, settings.receipt?.summary, typeof data?.legacy_text === "string" ? data.legacy_text : ""].join("\n");
+    if (settings.ok && /codec\s+h264_videotoolbox/i.test(text4)) {
       await executor.call("set_export_setting_tool", { key: "video_codec", value: "libx264" });
     }
   }
   return executor.call("export_video_tool", { show_dialog: "false", ...output2 ? { output_path: output2 } : {} });
 }
-function parseBitrate(text3) {
-  const m = /^(\d+(?:\.\d+)?)\s*([kKmM]?)(?:b\/?s|bps)?$/.exec(text3.trim());
-  if (!m) throw new CliError(`Not a bitrate: ${text3} (e.g. 8M, 192k).`, 2);
+function parseBitrate(text4) {
+  const m = /^(\d+(?:\.\d+)?)\s*([kKmM]?)(?:b\/?s|bps)?$/.exec(text4.trim());
+  if (!m) throw new CliError(`Not a bitrate: ${text4} (e.g. 8M, 192k).`, 2);
   const scale = m[2]?.toLowerCase() === "m" ? 1e6 : m[2]?.toLowerCase() === "k" ? 1e3 : 1;
   return Math.round(Number(m[1]) * scale);
 }
@@ -83354,7 +84543,7 @@ function formatBytes(n) {
 function registerRenderCommands(program2, ctx) {
   program2.command("render").description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav) or PNG frames").argument("[output]", "output file (default: <project>.mp4 next to the project)").option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav or png (default: from the file name)").option("--quality <quality>", "low, medium, high or lossless", "high").option("--width <px>", "output width (height follows the project aspect)").option("--height <px>", "output height").option("--fps <rate>", "frame rate, e.g. 30 or 30000/1001 (default: the project's)").option("--start <time>", "render from this timeline time").option("--end <time>", "render up to this timeline time").option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)").option("--audio-bitrate <rate>", "e.g. 192k").option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)").option("--encoder-preset <preset>", "encoder speed: ultrafast \u2026 veryslow (default veryfast; the desktop app encodes at medium)").option("--open", "open the result when done").action(async (outputArg, flags) => {
     await withExecutor(ctx, async (executor) => {
-      const output2 = outputArg ? path27.resolve(ctx.cwd, outputArg) : void 0;
+      const output2 = outputArg ? path33.resolve(ctx.cwd, outputArg) : void 0;
       if (!(executor instanceof PortableExecutor)) {
         printOutcome(ctx, await exportOnDesktop(executor, output2));
         return;
@@ -83368,27 +84557,27 @@ function registerRenderCommands(program2, ctx) {
         ctx.out.progress(`Rendering ${Math.round(fraction4 * 100)}%`);
       });
       ctx.out.endProgress();
-      const seconds = (Date.now() - started) / 1e3;
+      const seconds2 = (Date.now() - started) / 1e3;
       if (ctx.out.json) {
         ctx.out.data({
           status: "applied",
           summary: `Rendered ${result.location}`,
           engine: "portable",
           project: session.file ?? null,
-          output: { ...result, format: options.format, width: options.width, height: options.height, fps: options.fps, seconds }
+          output: { ...result, format: options.format, width: options.width, height: options.height, fps: options.fps, seconds: seconds2 }
         });
       } else {
         ctx.out.line(`${ctx.out.style("\u2713", "green")} Rendered ${result.location}`);
-        ctx.out.line(ctx.out.style(`  ${options.format}, ${options.width}x${options.height}, ${result.durationSeconds.toFixed(2)} s, ${formatBytes(result.bytes)} in ${seconds.toFixed(1)} s`, "dim"));
+        ctx.out.line(ctx.out.style(`  ${options.format}, ${options.width}x${options.height}, ${result.durationSeconds.toFixed(2)} s, ${formatBytes(result.bytes)} in ${seconds2.toFixed(1)} s`, "dim"));
         for (const w of result.warnings) ctx.out.warn(w);
       }
       if (flags.open && options.format !== "png-sequence") await openUrl(result.location);
     });
   });
   program2.command("frame").description("render one timeline frame to an image (PNG or JPEG)").argument("<time>", "timeline time (seconds or timecode)").argument("[output]", "image file (default: frame-<time>.png)").option("--width <px>", "image width", "1280").option("--jpeg", "write JPEG instead of PNG").option("--grid", "draw the 0-1 coordinate grid and a frame caption (what inspect tools show models)").action(async (timeArg, outputArg, flags) => {
-    const seconds = parseTime(timeArg);
+    const seconds2 = parseTime(timeArg);
     const format = flags.jpeg || /\.jpe?g$/i.test(outputArg ?? "") ? "jpeg" : "png";
-    const output2 = path27.resolve(ctx.cwd, outputArg ?? `frame-${seconds.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
+    const output2 = path33.resolve(ctx.cwd, outputArg ?? `frame-${seconds2.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
     await withExecutor(ctx, async (executor) => {
       let data;
       let mimeType;
@@ -83396,15 +84585,15 @@ function registerRenderCommands(program2, ctx) {
         const project = executor.session.doc.project;
         const width = Math.min(Number(flags.width) || 1280, 8192);
         const fps = project.fps.num / project.fps.den;
-        const image = await executor.session.host.frames.renderFrame(project, seconds, {
+        const image = await executor.session.host.frames.renderFrame(project, seconds2, {
           width,
           format,
-          overlay: flags.grid ? { grid: true, caption: frameCaption(Math.floor(seconds * fps + 1e-9), seconds) } : void 0
+          overlay: flags.grid ? { grid: true, caption: frameCaption(Math.floor(seconds2 * fps + 1e-9), seconds2) } : void 0
         });
         data = image.data;
         mimeType = image.mimeType;
       } else {
-        const outcome = await executor.call("inspect_timeline_tool", { start: seconds, end: seconds, maxFrames: 1 });
+        const outcome = await executor.call("inspect_timeline_tool", { start: seconds2, end: seconds2, maxFrames: 1 });
         if (!outcome.ok || outcome.images.length === 0) {
           printOutcome(ctx, outcome);
           ctx.exitCode = 1;
@@ -83413,8 +84602,8 @@ function registerRenderCommands(program2, ctx) {
         data = outcome.images[0].data;
         mimeType = outcome.images[0].mimeType;
       }
-      await writeFile7(output2, Buffer.from(data, "base64"));
-      if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Wrote ${output2}`, engine: executor.engine, project: executor.project ?? null, file: output2, mimeType, seconds });
+      await writeFile8(output2, Buffer.from(data, "base64"));
+      if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Wrote ${output2}`, engine: executor.engine, project: executor.project ?? null, file: output2, mimeType, seconds: seconds2 });
       else ctx.out.line(`${ctx.out.style("\u2713", "green")} Wrote ${output2}`);
     });
   });
@@ -83436,8 +84625,8 @@ var init_render2 = __esm({
 
 // src/mcp/extra-tools.ts
 import { existsSync as existsSync7 } from "node:fs";
-import path28 from "node:path";
-function text2(v) {
+import path34 from "node:path";
+function text3(v) {
   return typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : void 0;
 }
 function projectSummary(state) {
@@ -83472,16 +84661,16 @@ function extraTools(ctx) {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       async run(state, args) {
         const tool = "open_project_file";
-        const raw = text2(args.path);
+        const raw = text3(args.path);
         if (!raw) return { receipt: refused(tool, "path is required") };
-        const file3 = path28.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
+        const file3 = path34.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
         if (existsSync7(file3)) {
           await state.switchTo(file3);
           return { receipt: applied(tool, `Opened ${file3}`, { data: projectSummary(state) }, 0) };
         }
         if (args.create === false || args.create === "false") return { receipt: failed(tool, `${file3} does not exist.`) };
         const keepEdits = !state.session.file && (state.session.doc.canUndo || state.session.doc.project.clips.length > 0 || state.session.doc.project.files.length > 0);
-        const project = keepEdits ? state.session.doc.toJSON() : newProject(text2(args.profile));
+        const project = keepEdits ? state.session.doc.toJSON() : newProject(text3(args.profile));
         await state.switchTo(file3, project);
         return {
           receipt: applied(tool, keepEdits ? `Saved the unsaved project as ${file3}` : `Created ${file3}`, { data: { ...projectSummary(state), created: true } }, 0)
@@ -83511,21 +84700,21 @@ function extraTools(ctx) {
       async run(state, args, call) {
         const tool = "render_video";
         const desktop = await state.desktopExecutor();
-        const requested = text2(args.output) ?? text2(args.output_path);
-        const output2 = requested ? path28.resolve(ctx.cwd, requested) : void 0;
+        const requested = text3(args.output) ?? text3(args.output_path);
+        const output2 = requested ? path34.resolve(ctx.cwd, requested) : void 0;
         if (desktop) {
           const outcome = await exportOnDesktop(desktop, output2);
-          return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)) };
+          return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)), engine: "desktop" };
         }
         const session = state.session;
         const flags = {
-          format: text2(args.format),
-          quality: text2(args.quality),
-          width: text2(args.width),
-          height: text2(args.height),
-          fps: text2(args.fps),
-          start: text2(args.start),
-          end: text2(args.end)
+          format: text3(args.format),
+          quality: text3(args.quality),
+          width: text3(args.width),
+          height: text3(args.height),
+          fps: text3(args.fps),
+          start: text3(args.start),
+          end: text3(args.end)
         };
         let options;
         try {
@@ -83563,31 +84752,31 @@ function extraTools(ctx) {
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
       async run(state, args) {
         const tool = "preview_frame";
-        let seconds;
+        let seconds2;
         try {
-          seconds = parseTime(String(args.seconds ?? "")) ?? NaN;
+          seconds2 = parseTime(String(args.seconds ?? "")) ?? NaN;
         } catch {
-          seconds = NaN;
+          seconds2 = NaN;
         }
-        if (!Number.isFinite(seconds) || seconds < 0) return { receipt: refused(tool, "seconds must be a time \u2265 0") };
+        if (!Number.isFinite(seconds2) || seconds2 < 0) return { receipt: refused(tool, "seconds must be a time \u2265 0") };
         const desktop = await state.desktopExecutor();
         if (desktop) {
-          const outcome = await desktop.call("inspect_timeline_tool", { start: seconds, end: seconds, maxFrames: 1 });
-          return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)), images: outcome.images };
+          const outcome = await desktop.call("inspect_timeline_tool", { start: seconds2, end: seconds2, maxFrames: 1 });
+          return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)), images: outcome.images, engine: "desktop" };
         }
         const project = state.session.doc.project;
         const width = Math.max(64, Math.min(1920, Number(args.width) || 768));
         const format = args.format === "png" ? "png" : "jpeg";
         const fps = project.fps.num / project.fps.den;
-        const frame = Math.floor(seconds * fps + 1e-9);
+        const frame = Math.floor(seconds2 * fps + 1e-9);
         const grid = args.grid === true || args.grid === "true";
-        const image = await state.session.host.frames.renderFrame(project, seconds, {
+        const image = await state.session.host.frames.renderFrame(project, seconds2, {
           width,
           format,
-          overlay: grid ? { grid: true, caption: frameCaption(frame, seconds) } : void 0
+          overlay: grid ? { grid: true, caption: frameCaption(frame, seconds2) } : void 0
         });
         return {
-          receipt: applied(tool, `Frame at ${seconds.toFixed(2)} s (frame ${frame})`, { data: { seconds, frame, width, format } }, 0),
+          receipt: applied(tool, `Frame at ${seconds2.toFixed(2)} s (frame ${frame})`, { data: { seconds: seconds2, frame, width, format } }, 0),
           images: [image]
         };
       }
@@ -83604,11 +84793,11 @@ function extraTools(ctx) {
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
       async run(state, args) {
         const tool = "launch_editor";
-        const file3 = text2(args.path) ? path28.resolve(ctx.cwd, text2(args.path)) : state.session.file;
+        const file3 = text3(args.path) ? path34.resolve(ctx.cwd, text3(args.path)) : state.session.file;
         if (!file3) return { receipt: refused(tool, "This project has no file yet: call open_project_file first.") };
         try {
-          const result = await openInDesktop({ config: ctx.config, project: file3, clientVersion: VERSION });
-          return { receipt: applied(tool, result.summary, { data: { method: result.method, project: file3 } }, 0) };
+          const result = await openInDesktop({ config: ctx.config, project: file3, deps: state.launcher, clientVersion: VERSION });
+          return { receipt: applied(tool, result.summary, { data: { method: result.method, project: file3 } }, 0), engine: null };
         } catch (error62) {
           return { receipt: failed(tool, error62 instanceof CliError && error62.hint ? `${error62.message} ${error62.hint}` : error62.message) };
         }
@@ -83639,7 +84828,7 @@ function extraTools(ctx) {
             client: cloudClient(ctx),
             projectFile: file3,
             project: state.session.doc.toJSON(),
-            name: text2(args.name),
+            name: text3(args.name),
             force: args.force === true || args.force === "true",
             warn: (m) => warnings.push(m)
           });
@@ -83673,8 +84862,957 @@ var init_extra_tools = __esm({
   }
 });
 
+// src/hosts/desktop-handoff-tools.gen.json
+var desktop_handoff_tools_gen_default;
+var init_desktop_handoff_tools_gen = __esm({
+  "src/hosts/desktop-handoff-tools.gen.json"() {
+    desktop_handoff_tools_gen_default = {
+      generated_by: "packages/cli/scripts/sync-desktop-handoff-tools.mjs",
+      manifest: {
+        source: "zenvi-core src/classes/editor_tools",
+        manifest_version: 1,
+        label: "zenvi-core jashan/handoff-core 46db82a57"
+      },
+      tools: [
+        {
+          name: "export_to_after_effects_tool",
+          title: "Export to After Effects",
+          description: "Write the open project as an After Effects script (.jsx) that rebuilds the timeline as one comp.\n\nUse when the user wants to finish or hand off the edit in After Effects. Writes <name>.jsx (footage, layers, timing, transforms with eased keyframes, opacity, audio levels, titles as text layers, mapped effects, transitions, markers), a media/ folder when collect_media is true, and README.txt, into output_dir (default: next to the project file). Returns the paths and warnings for anything After Effects cannot reproduce. Run it with File > Scripts > Run Script File, or use send_to_after_effects_tool while After Effects is connected. Changes nothing in the project.",
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              output_dir: {
+                type: "string",
+                description: "Folder to write into. Empty = next to the project file.",
+                default: ""
+              },
+              collect_media: {
+                type: "boolean",
+                description: "Copy the media into <output_dir>/media so the folder travels on its own (default true).",
+                default: true
+              },
+              open_folder: {
+                type: "boolean",
+                description: "Show the folder in Finder / Explorer afterwards.",
+                default: false
+              }
+            },
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "send_to_after_effects_tool",
+          title: "Send to After Effects",
+          description: 'Rebuild the open project as a comp inside a connected After Effects (export to a temporary .jsx and run it there).\n\nUse for "open this edit in After Effects". After Effects must be running with Zenvi Link (list_hosts); otherwise the call is refused with how to connect it. The script creates a "Zenvi - <project>" folder with the footage and the comp, as one After Effects undo step, and the result names the comp and any warnings. Refine it afterwards with the ae_* tools.',
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              collect_media: {
+                type: "boolean",
+                description: "Copy the media next to the script first (default false: After Effects reads it where it is).",
+                default: false
+              }
+            },
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "export_to_premiere_tool",
+          title: "Export to Premiere Pro",
+          description: "Write the open project as Final Cut Pro 7 XML tuned for Premiere Pro's importer.\n\nUse when the user wants to finish or hand off the edit in Premiere Pro. Keeps clips, trims, tracks, Basic Motion and Opacity keyframes, audio levels, cross dissolves and markers; titles become PNG stills next to the XML. Import it with File > Import in Premiere, or use send_to_premiere_tool while Premiere is connected. Returns the paths and warnings for anything Premiere cannot reproduce. Changes nothing in the project.",
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              output_path: {
+                type: "string",
+                description: "The .xml file to write. Empty = <project name>.xml next to the project file.",
+                default: ""
+              },
+              collect_media: {
+                type: "boolean",
+                description: "Copy the media next to the XML first.",
+                default: false
+              }
+            },
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "send_to_premiere_tool",
+          title: "Send to Premiere Pro",
+          description: 'Open the project in a connected Premiere Pro as a new sequence (export FCP XML to a temporary folder and import it there).\n\nUse for "open this edit in Premiere". Premiere Pro must be running with Zenvi Link (list_hosts); otherwise the call is refused with how to connect it. Refine the sequence afterwards with the premiere_* tools.',
+          inputSchema: {
+            additionalProperties: false,
+            properties: {},
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "import_timeline_xml_tool",
+          title: "Import timeline XML",
+          description: "Bring a Final Cut Pro 7 / Premiere Pro XML timeline into the open project as native, editable clips, as one undo step.\n\nUse for the way back from Premiere: a sequence written by premiere_export_xml (bring_from_premiere does both steps), or any FCP7 XML. placement new_tracks (default) adds the sequence on new tracks; at_playhead places it at the playhead. Media that cannot be found is listed in the result.",
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              path: {
+                type: "string",
+                description: "The .xml file."
+              },
+              placement: {
+                default: "new_tracks",
+                description: "new_tracks = on new tracks from 0 s (default); at_playhead = starting at the playhead.",
+                enum: [
+                  "new_tracks",
+                  "at_playhead"
+                ],
+                type: "string"
+              }
+            },
+            type: "object",
+            required: [
+              "path"
+            ]
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "list_remotion_compositions_tool",
+          title: "List Remotion compositions",
+          description: "List the compositions of a Remotion project: id, width, height, fps, duration, default props and source file.\n\nUse before import_remotion_project_tool to choose compositions and props. Runs the project's own Remotion CLI with Node. Read-only.",
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              project_dir: {
+                type: "string",
+                description: "The Remotion project folder (the one with package.json)."
+              }
+            },
+            type: "object",
+            required: [
+              "project_dir"
+            ]
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "import_remotion_project_tool",
+          title: "Import Remotion project",
+          description: "Render Remotion compositions with the project's own toolchain and place them as linked clips; a project Zenvi generated comes back as native clips.\n\nUse to bring code video into the edit. Each composition renders into the project's links folder (ProRes 4444 when any pixel is transparent, else H.264) and lands as a linked clip that remembers its source: update_linked_clip_tool changes props and re-renders, open_linked_source_tool opens the code, rerender_linked_clip_tool picks up code edits. A project with src/zenvi/timeline.json (from export_to_remotion_tool) restores native clips when restore_native is true. Rendering takes seconds to minutes; the placement is one undo step.",
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              project_dir: {
+                type: "string",
+                description: "The Remotion project folder."
+              },
+              compositions: {
+                description: "Composition ids to import. Empty = the Zenvi timeline when the project has one, else every composition.",
+                items: {
+                  type: "string"
+                },
+                type: "array"
+              },
+              props: {
+                description: 'Input props per composition id, e.g. {"Intro": {"title": "Launch day"}}.',
+                type: "object"
+              },
+              codec: {
+                default: "auto",
+                description: "auto renders one still first and picks prores4444 when any pixel is transparent, else h264; qtrle is the alpha fallback.",
+                enum: [
+                  "auto",
+                  "prores4444",
+                  "h264",
+                  "qtrle"
+                ],
+                type: "string"
+              },
+              position: {
+                description: "Timeline second where the first clip starts. Empty = the playhead.",
+                minimum: 0,
+                nullable: true,
+                type: [
+                  "number",
+                  "null"
+                ]
+              },
+              track: {
+                type: "string",
+                description: "UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video (a new track when none is free).",
+                default: ""
+              },
+              restore_native: {
+                type: "boolean",
+                description: "Restore a Zenvi-generated project as native clips instead of a linked render.",
+                default: true
+              }
+            },
+            type: "object",
+            required: [
+              "project_dir"
+            ]
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "export_to_remotion_tool",
+          title: "Export to Remotion",
+          description: "Generate a Remotion project from the open project so the edit can continue as code.\n\nWrites package.json (a pinned Remotion version), src/Root.tsx with the composition ZenviTimeline, src/zenvi/timeline.json (tracks, clips, keyframes with easing, titles, transitions), a generic renderer and public/zenvi-media when copy_media is true, plus a README. `npx remotion studio` previews it; import_remotion_project_tool brings it back as native clips. install runs npm install. Changes nothing in the project.",
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              output_dir: {
+                type: "string",
+                description: "Folder for the new Remotion project (created; must be empty or missing)."
+              },
+              copy_media: {
+                type: "boolean",
+                description: "Copy the media into public/zenvi-media (default true).",
+                default: true
+              },
+              install: {
+                type: "boolean",
+                description: "Run npm install afterwards (slow; needs the network).",
+                default: false
+              }
+            },
+            type: "object",
+            required: [
+              "output_dir"
+            ]
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "import_hyperframes_project_tool",
+          title: "Import HyperFrames project",
+          description: "Import a HyperFrames project (an HTML video composition) into the open project.\n\n<video>, <img> and <audio> primitives with data-start / data-duration become native, fully editable clips; compositions driven by scripts or animation become linked clips rendered with the project's own HyperFrames CLI. mode auto (default) does both, native imports the primitives only, flatten renders the whole composition as one linked clip. One undo step.",
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              project_dir: {
+                type: "string",
+                description: "The HyperFrames project folder (with index.html)."
+              },
+              mode: {
+                default: "auto",
+                description: "auto = primitives native, the rest linked; native = primitives only; flatten = one linked render of everything.",
+                enum: [
+                  "auto",
+                  "native",
+                  "flatten"
+                ],
+                type: "string"
+              },
+              position: {
+                description: "Timeline second where the first clip starts. Empty = the playhead.",
+                minimum: 0,
+                nullable: true,
+                type: [
+                  "number",
+                  "null"
+                ]
+              },
+              track: {
+                type: "string",
+                description: "UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video (a new track when none is free).",
+                default: ""
+              }
+            },
+            type: "object",
+            required: [
+              "project_dir"
+            ]
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "export_to_hyperframes_tool",
+          title: "Export to HyperFrames",
+          description: "Generate a HyperFrames project (index.html with a GSAP timeline) from the open project.\n\nClips become <video>, <img> and <audio> primitives with data-start / data-duration / data-track-index, keyframes and transitions a GSAP timeline, titles images; an embedded zenvi-timeline JSON lets import_hyperframes_project_tool restore it losslessly. `npx hyperframes preview` shows it. Changes nothing in the project.",
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              output_dir: {
+                type: "string",
+                description: "Folder for the new HyperFrames project (created; must be empty or missing)."
+              },
+              copy_media: {
+                type: "boolean",
+                description: "Copy the media into the project (default true).",
+                default: true
+              }
+            },
+            type: "object",
+            required: [
+              "output_dir"
+            ]
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "spec"
+        },
+        {
+          name: "import_linked_media_tool",
+          title: "Import linked media",
+          description: `Add a rendered file that keeps a live link to its source as a linked clip, as one undo step.
+
+Use for "bring this After Effects comp into Zenvi" after ae_render_for_zenvi
+rendered it, or any render whose source should stay editable (Remotion and
+HyperFrames imports use their own tools). The media is moved (from the temp
+folder) or copied into the project's links folder, added to Project Files
+with the link and placed at position (default the playhead) on the lowest
+free track above the video. Later: get_linked_clip_tool (freshness),
+update_linked_clip_tool / rerender_linked_clip_tool, open_linked_source_tool,
+unlink_clip_tool. One undo step removes the clip and the file.
+Example: {"path": "/tmp/Promo.mov", "link": {"kind": "aftereffects", "source":
+{"aep": "/Users/me/promo.aep", "composition": "Promo", "composition_key": 12}}}.`,
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              link: {
+                description: "The source link (zenvi_link): {kind: 'aftereffects'|'remotion'|'hyperframes', source: {project_dir, entry, composition, composition_key, file, line, aep}, props: {...}, render: {codec, width, height, fps, duration_frames}}. Never use keys named path/image/resource.",
+                type: "object"
+              },
+              name: {
+                default: "",
+                description: "Name in Project Files. Empty = the composition name.",
+                type: "string"
+              },
+              path: {
+                description: "The rendered media file (ProRes 4444 .mov with alpha, H.264 .mp4, qtrle .mov; a WebM is re-encoded to ProRes 4444 because Zenvi drops WebM alpha).",
+                type: "string"
+              },
+              position: {
+                description: "Timeline second where the clip starts. Empty = the playhead.",
+                minimum: 0,
+                nullable: true,
+                type: [
+                  "number",
+                  "null"
+                ]
+              },
+              track: {
+                default: "",
+                description: "UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video (a new 'Linked' track when none is free).",
+                type: "string"
+              }
+            },
+            required: [
+              "path",
+              "link"
+            ],
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "zenvi-core"
+        },
+        {
+          name: "get_linked_clip_tool",
+          title: "Linked clip info",
+          description: `Read a linked clip's source link, props, render settings and whether it is up to date.
+
+Use before editing or re-rendering a linked clip (Remotion / HyperFrames
+composition or After Effects comp) or when the user asks "is this clip up
+to date?". state is fresh (rendered from the current source), stale (the
+code / comp / props changed: rerender_linked_clip_tool), rendering, error
+(the last render failed; detail says why) or missing_source (the project
+folder or .aep is gone). Also lists editable_props with current values and
+the timeline clips that use the file. Read-only.`,
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              clip_id: {
+                default: "",
+                description: "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+                type: "string"
+              },
+              file_id: {
+                default: "",
+                description: "The linked file's Project Files id instead of a clip.",
+                type: "string"
+              }
+            },
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true
+          },
+          source: "zenvi-core"
+        },
+        {
+          name: "update_linked_clip_tool",
+          title: "Update linked clip",
+          description: `Change a linked clip's props (Remotion input props / HyperFrames variables) and re-render it.
+
+Use for "change the title text in the intro to Launch day", "make the
+accent orange" on a clip that came from code. Props merge into the current
+ones; the composition is re-rendered with its own toolchain (seconds to
+minutes) and every clip of the file switches to the new render as one undo
+step (a shorter render shortens clips and says so in warnings). A failed
+render changes nothing. With rerender=false only the props are stored (one
+undo step) and the clip reads stale. Example: {"clip_id": "A1B2", "props":
+{"title": "Launch day"}}.`,
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              clip_id: {
+                default: "",
+                description: "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+                type: "string"
+              },
+              file_id: {
+                default: "",
+                description: "The linked file's Project Files id instead of a clip.",
+                type: "string"
+              },
+              props: {
+                description: "Props to change, merged into the current ones, e.g. {'title': 'Launch day', 'accent': '#FF5A36'}. Names from get_linked_clip_tool editable_props.",
+                type: "object"
+              },
+              rerender: {
+                default: true,
+                description: "Re-render from source now (default). false = only store the props; the clip stays stale until re-rendered.",
+                type: "boolean"
+              }
+            },
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "zenvi-core"
+        },
+        {
+          name: "rerender_linked_clip_tool",
+          title: "Re-render linked clip",
+          description: `Re-render a linked clip from its source after the code, comp or assets changed.
+
+Use when get_linked_clip_tool says stale, or the user says "I edited the
+Remotion composition, update it in Zenvi". Renders with the source's own
+toolchain (Remotion / HyperFrames CLI, or After Effects through Zenvi Link)
+with the stored props, then swaps the media of every clip using the file as
+one undo step. A failed or cancelled render changes nothing (the error is
+reported and get_linked_clip_tool shows it).`,
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              clip_id: {
+                default: "",
+                description: "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+                type: "string"
+              },
+              file_id: {
+                default: "",
+                description: "The linked file's Project Files id instead of a clip.",
+                type: "string"
+              }
+            },
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "zenvi-core"
+        },
+        {
+          name: "open_linked_source_tool",
+          title: "Open linked source",
+          description: `Open a linked clip's source for the user: the code file at its line, or the composition's studio.
+
+Use for "show me the code for this intro", "open it in Remotion Studio",
+"open the After Effects project". Opens an app on the user's screen; the
+project is not changed. After they edit, rerender_linked_clip_tool brings
+the change in.`,
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              clip_id: {
+                default: "",
+                description: "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+                type: "string"
+              },
+              file_id: {
+                default: "",
+                description: "The linked file's Project Files id instead of a clip.",
+                type: "string"
+              },
+              target: {
+                default: "code",
+                description: "code = the source file at its line in the user's code editor (Cursor / VS Code / Preferences > Code Editor); studio = Remotion Studio / HyperFrames preview / After Effects.",
+                enum: [
+                  "code",
+                  "studio"
+                ],
+                type: "string"
+              }
+            },
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true
+          },
+          source: "zenvi-core"
+        },
+        {
+          name: "unlink_clip_tool",
+          title: "Unlink clip",
+          description: `Drop a linked clip's source link and keep its rendered media as an ordinary file.
+
+Use for "stop linking this to the Remotion project", "make it a normal
+clip". Every clip of the file keeps playing the last render; it can no
+longer be re-rendered or opened at its source. Never deletes clips or
+media. One undo step restores the link.`,
+          inputSchema: {
+            additionalProperties: false,
+            properties: {
+              clip_id: {
+                default: "",
+                description: "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+                type: "string"
+              },
+              file_id: {
+                default: "",
+                description: "The linked file's Project Files id instead of a clip.",
+                type: "string"
+              }
+            },
+            type: "object"
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true
+          },
+          source: "zenvi-core"
+        }
+      ]
+    };
+  }
+});
+
+// src/hosts/handoff.ts
+import { homedir as homedir3 } from "node:os";
+import path35 from "node:path";
+function resolvePathArgs(args, cwd, home = homedir3()) {
+  const out = { ...args };
+  for (const [key, value] of Object.entries(args)) {
+    if (!PATH_ARGS.has(key) || typeof value !== "string" || !value.trim()) continue;
+    const text4 = value.trim();
+    const expanded = text4 === "~" ? home : text4.startsWith("~/") || text4.startsWith("~\\") ? path35.join(home, text4.slice(2)) : text4;
+    out[key] = path35.isAbsolute(expanded) || path35.win32.isAbsolute(expanded) ? expanded : path35.resolve(cwd, expanded);
+  }
+  return out;
+}
+function declaredName(properties, candidates) {
+  return candidates.find((name) => Object.prototype.hasOwnProperty.call(properties, name));
+}
+function fpsFraction2(fps) {
+  if (fps && typeof fps === "object") {
+    const { num: num11, den: den2 } = fps;
+    if (typeof num11 === "number" && typeof den2 === "number" && num11 > 0 && den2 > 0) return { num: num11, den: den2 };
+    return void 0;
+  }
+  const value = Number(fps);
+  if (!Number.isFinite(value) || value <= 0) return void 0;
+  if (Number.isInteger(value)) return { num: value, den: 1 };
+  const ntsc = Math.round(value) * 1e3;
+  if (Math.abs(value - ntsc / 1001) < 0.01) return { num: ntsc, den: 1001 };
+  return { num: Math.round(value * 1e3), den: 1e3 };
+}
+function aeRenderLink(data, alpha) {
+  const file3 = typeof data.path === "string" && data.path ? data.path : void 0;
+  if (!file3) return void 0;
+  if (data.link && typeof data.link === "object" && !Array.isArray(data.link)) {
+    return { path: file3, link: { ...data.link, kind: "aftereffects" } };
+  }
+  const fps = fpsFraction2(data.fps);
+  const duration3 = Number(data.duration);
+  const codec2 = typeof data.codec === "string" && CODECS.includes(data.codec) ? data.codec : alpha ? "prores4444" : /\.mp4$/i.test(file3) ? "h264" : void 0;
+  const render2 = {};
+  if (codec2) render2.codec = codec2;
+  if (typeof data.width === "number") render2.width = data.width;
+  if (typeof data.height === "number") render2.height = data.height;
+  if (fps) render2.fps = fps;
+  if (fps && Number.isFinite(duration3) && duration3 > 0) render2.duration_frames = Math.round(duration3 * fps.num / fps.den);
+  return {
+    path: file3,
+    link: {
+      version: 1,
+      kind: "aftereffects",
+      source: {
+        project_dir: null,
+        entry: null,
+        composition: typeof data.comp_name === "string" ? data.comp_name : null,
+        composition_key: typeof data.comp_id === "number" ? data.comp_id : null,
+        file: null,
+        line: null,
+        aep: typeof data.project === "string" ? data.project : null
+      },
+      props: {},
+      render: render2
+    }
+  };
+}
+function exportedXmlPath(data) {
+  for (const key of ["path", "output", "xml", "file"]) {
+    const value = data[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return void 0;
+}
+var DESKTOP_HANDOFF_TOOLS, PATH_ARGS, CODECS;
+var init_handoff = __esm({
+  "src/hosts/handoff.ts"() {
+    "use strict";
+    init_desktop_handoff_tools_gen();
+    DESKTOP_HANDOFF_TOOLS = desktop_handoff_tools_gen_default.tools;
+    PATH_ARGS = /* @__PURE__ */ new Set(["path", "project_dir", "output_dir", "output_path"]);
+    CODECS = ["prores4444", "h264", "qtrle"];
+  }
+});
+
+// src/mcp/host-tools.ts
+function onprogress(call) {
+  return call.progress ? (p) => call.progress?.(p.progress, p.total ?? 0, p.message ?? "") : void 0;
+}
+async function sleep2(ms, signal) {
+  await new Promise((resolve) => {
+    const timer2 = setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => (clearTimeout(timer2), resolve()), { once: true });
+  });
+}
+async function ensureDesktop(ctx, state, tool, call) {
+  const file3 = state.session.file;
+  if (!file3) {
+    return { ok: false, receipt: refused(tool, `${tool} runs in the Zenvi desktop app on a saved project, and this session's project has no file yet: call open_project_file first.`) };
+  }
+  if (ctx.env.ZENVI_MCP_ENGINE === "portable") {
+    return { ok: false, receipt: refused(tool, `${tool} runs in the Zenvi desktop app, but this server never uses the app (ZENVI_MCP_ENGINE=portable). Remove that setting to use handoffs.`) };
+  }
+  const live2 = await state.desktopExecutor();
+  if (live2) return { ok: true, desktop: live2 };
+  const running = (await discoverDesktop(ctx.config)).some((e) => e.kind === "gui");
+  if (!running && !await findDesktopApp(state.launcher).catch(() => void 0)) {
+    return {
+      ok: false,
+      receipt: refused(tool, `${tool} runs in the Zenvi desktop app, which is not installed on this machine. Get it at ${DOWNLOAD_URL} (a development checkout: set ZENVI_DESKTOP_CMD).`)
+    };
+  }
+  let summary;
+  try {
+    summary = (await openInDesktop({ config: ctx.config, project: file3, deps: state.launcher, clientVersion: VERSION })).summary;
+  } catch (error62) {
+    const message = error62 instanceof CliError ? [error62.message, error62.hint].filter(Boolean).join(" ") : error62.message;
+    return { ok: false, receipt: refused(tool, `${tool} runs in the Zenvi desktop app, which could not open ${file3}: ${message} If Zenvi has unsaved changes in another project, ask the user to save or close it, then try again.`) };
+  }
+  state.hosts.invalidate();
+  call.progress?.(0, 0, `${summary} Waiting for it to show the project\u2026`);
+  const deadline = Date.now() + state.desktopWaitMs;
+  for (; ; ) {
+    const desktop = await state.desktopExecutor();
+    if (desktop) return { ok: true, desktop, note: `${summary} This session's Zenvi edits now go through the app.` };
+    if (Date.now() >= deadline || call.signal.aborted) break;
+    await sleep2(Math.min(1e3, Math.max(0, deadline - Date.now())), call.signal);
+  }
+  return {
+    ok: false,
+    receipt: failed(tool, `${summary} But the app did not show ${file3} within ${Math.round(state.desktopWaitMs / 1e3)} s. Try again once Zenvi shows the project.`)
+  };
+}
+async function requireDesktopTool(desktop, tool, forTool) {
+  if (await desktop.hasTool(tool)) return void 0;
+  return refused(forTool, `The Zenvi desktop app running here has no ${tool} yet: update Zenvi (${DOWNLOAD_URL}).`);
+}
+function withNote(receipt2, note) {
+  return note ? { ...receipt2, notes: [...receipt2.notes ?? [], note] } : receipt2;
+}
+async function forward(desktop, tool, args, call) {
+  const outcome = await desktop.call(tool, args, void 0, { onprogress: onprogress(call) });
+  const receipt2 = outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text || `${tool} failed`));
+  return { receipt: receipt2, images: outcome.images };
+}
+function desktopHandoffTools(ctx) {
+  return DESKTOP_HANDOFF_TOOLS.map((def) => ({
+    name: def.name,
+    title: def.title,
+    description: `Zenvi desktop app: ${def.description}`,
+    inputSchema: def.inputSchema,
+    annotations: def.annotations,
+    async run(state, args, call) {
+      const ready2 = await ensureDesktop(ctx, state, def.name, call);
+      if (!ready2.ok) return { receipt: ready2.receipt, engine: null };
+      const missing = await requireDesktopTool(ready2.desktop, def.name, def.name);
+      if (missing) return { receipt: withNote(missing, ready2.note), engine: "desktop" };
+      const { receipt: receipt2, images } = await forward(ready2.desktop, def.name, resolvePathArgs(args, ctx.cwd, ctx.config.home), call);
+      return { receipt: withNote(receipt2, ready2.note), images, engine: "desktop" };
+    }
+  }));
+}
+function adobeStepFailed(tool, step, host) {
+  const make = host.status === "refused" ? refused : failed;
+  return make(tool, `${host.summary.replace(/^Error:\s*/, "")} (${step}; nothing was added to the Zenvi project)`, { data: { [host.host === "aftereffects" ? "after_effects" : "premiere"]: host }, warnings: host.warnings ?? [] });
+}
+function combined(tool, summary, adobeKey, adobe, zenvi, note) {
+  const ok = zenvi.status === "applied" || zenvi.status === "unchanged";
+  const merged = {
+    ...zenvi,
+    tool,
+    summary: ok ? summary : `Error: ${summary}`,
+    warnings: [...adobe.warnings ?? [], ...zenvi.warnings ?? []],
+    data: { [adobeKey]: adobe, zenvi }
+  };
+  return withNote(merged, note);
+}
+function bringFromAfterEffects(ctx) {
+  const inputSchema = {
+    type: "object",
+    properties: {
+      comp: {
+        anyOf: [
+          { type: "integer", minimum: 1, description: "Comp item id (comp_id from ae_get_state or ae_list_items)" },
+          { type: "string", minLength: 1, description: "Exact comp name" }
+        ],
+        description: "The comp to render. Default: the active comp."
+      },
+      alpha: { type: "boolean", description: "Keep transparency (ProRes 4444) for an overlay above other clips. Default false: opaque H.264." },
+      position: { type: "number", minimum: 0, description: "Zenvi timeline second where the clip starts. Default: the playhead." },
+      track: { type: ["string", "integer"], description: "Zenvi track number (1 = bottom) or name. Default: the lowest free track above the video." }
+    },
+    additionalProperties: false
+  };
+  const tool = "bring_from_after_effects";
+  return {
+    name: tool,
+    title: "Bring an After Effects comp into Zenvi",
+    description: "Render an After Effects comp and add it to this session's Zenvi project as a linked clip, in one call: ae_render_for_zenvi in After Effects (ProRes 4444 with alpha when alpha is true, else H.264), then import_linked_media_tool in the Zenvi desktop app (opened on the project when needed). The clip remembers its comp: after changes in After Effects, rerender_linked_clip_tool brings them in. Returns both apps' receipts (data.after_effects, data.zenvi) and the new clip. Needs After Effects connected (list_hosts) and a saved project (open_project_file).",
+    inputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    async run(state, raw, call) {
+      const args = normalizeArgs(inputSchema, raw);
+      if (args.alpha !== void 0 && typeof args.alpha !== "boolean") return { receipt: refused(tool, "alpha must be true or false"), engine: null };
+      if (args.position !== void 0 && (typeof args.position !== "number" || !(args.position >= 0))) return { receipt: refused(tool, "position must be a time in seconds, 0 or more"), engine: null };
+      if (!state.session.file) return { receipt: refused(tool, NO_FILE), engine: null };
+      const connection = await state.hosts.connect("aftereffects");
+      if (!connection.ok) {
+        return { receipt: refused(tool, `After Effects is not connected: ${connection.discovery.detail}. ${howToConnect("aftereffects", connection.discovery)}`), engine: null };
+      }
+      const ready2 = await ensureDesktop(ctx, state, tool, call);
+      if (!ready2.ok) return { receipt: ready2.receipt, engine: null };
+      const missing = await requireDesktopTool(ready2.desktop, "import_linked_media_tool", tool);
+      if (missing) return { receipt: withNote(missing, ready2.note), engine: "desktop" };
+      const schema = await liveToolSchema(state.hosts, "aftereffects", "ae_render_for_zenvi");
+      if (!schema) {
+        return { receipt: refused(tool, "Zenvi Link in After Effects has no ae_render_for_zenvi (an older version): run `zenvi adobe install` and restart After Effects."), engine: null };
+      }
+      const renderArgs = {};
+      if (args.comp !== void 0) {
+        const key = declaredName(schema.properties, typeof args.comp === "number" ? ["comp", "comp_id"] : ["comp", "comp_name"]);
+        if (!key) return { receipt: refused(tool, "this Zenvi Link's ae_render_for_zenvi does not take a comp; leave comp out to render the active comp"), engine: null };
+        renderArgs[key] = args.comp;
+      }
+      if (args.alpha !== void 0) {
+        if (declaredName(schema.properties, ["alpha"])) renderArgs.alpha = args.alpha;
+        else if (declaredName(schema.properties, ["codec"])) renderArgs.codec = args.alpha ? "prores4444" : "h264";
+      }
+      call.progress?.(0, 0, "Rendering in After Effects\u2026");
+      const render2 = await callAdobeTool(state.hosts, "ae_render_for_zenvi", renderArgs, { timeoutMs: ADOBE_RENDER_WAIT_MS });
+      if (!isOkHostStatus(render2.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "rendering in After Effects", render2.receipt), ready2.note), engine: "desktop" };
+      const media = aeRenderLink(render2.receipt.data ?? {}, args.alpha);
+      if (!media) {
+        return {
+          receipt: withNote(failed(tool, "After Effects finished ae_render_for_zenvi without naming the rendered file (data.path); nothing was added to the Zenvi project", { data: { after_effects: render2.receipt } }), ready2.note),
+          engine: "desktop"
+        };
+      }
+      call.progress?.(0, 0, "Adding the render to the Zenvi project\u2026");
+      const importArgs = { path: media.path, link: media.link };
+      if (args.position !== void 0) importArgs.position = args.position;
+      if (args.track !== void 0 && args.track !== "") importArgs.track = String(args.track);
+      const { receipt: zenvi } = await forward(ready2.desktop, "import_linked_media_tool", importArgs, call);
+      const comp = String(media.link.source?.composition ?? render2.receipt.data?.comp_name ?? "the comp");
+      const summary = zenvi.status === "applied" || zenvi.status === "unchanged" ? `Rendered "${comp}" in After Effects and added it to the Zenvi project as a linked clip. ${zenvi.summary}` : `After Effects rendered "${comp}" to ${media.path}, but Zenvi could not add it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
+      return { receipt: combined(tool, summary, "after_effects", render2.receipt, zenvi, ready2.note), engine: "desktop" };
+    }
+  };
+}
+function bringFromPremiere(ctx) {
+  const inputSchema = {
+    type: "object",
+    properties: {
+      sequence: { type: "string", minLength: 1, description: "Sequence id (sequence_id from premiere_get_state) or exact name. Default: the active sequence." },
+      placement: { type: "string", enum: ["new_tracks", "at_playhead"], description: "Where the clips land in Zenvi: new_tracks (default, from 0 s on new tracks) or at_playhead." }
+    },
+    additionalProperties: false
+  };
+  const tool = "bring_from_premiere";
+  return {
+    name: tool,
+    title: "Bring a Premiere Pro sequence into Zenvi",
+    description: "Bring a Premiere Pro sequence back into this session's Zenvi project as native, editable clips, in one call: premiere_export_xml in Premiere (Final Cut Pro 7 XML), then import_timeline_xml_tool in the Zenvi desktop app (opened on the project when needed), as one Zenvi undo step. Clips, trims, tracks, motion/opacity keyframes, audio levels, cross dissolves and markers survive. Returns both apps' receipts (data.premiere, data.zenvi). Needs Premiere Pro connected (list_hosts) and a saved project (open_project_file).",
+    inputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    async run(state, raw, call) {
+      const args = normalizeArgs(inputSchema, raw);
+      if (args.placement !== void 0 && args.placement !== "new_tracks" && args.placement !== "at_playhead") {
+        return { receipt: refused(tool, "placement must be new_tracks or at_playhead"), engine: null };
+      }
+      if (!state.session.file) return { receipt: refused(tool, NO_FILE), engine: null };
+      const connection = await state.hosts.connect("premiere");
+      if (!connection.ok) {
+        return { receipt: refused(tool, `Premiere Pro is not connected: ${connection.discovery.detail}. ${howToConnect("premiere", connection.discovery)}`), engine: null };
+      }
+      const ready2 = await ensureDesktop(ctx, state, tool, call);
+      if (!ready2.ok) return { receipt: ready2.receipt, engine: null };
+      const missing = await requireDesktopTool(ready2.desktop, "import_timeline_xml_tool", tool);
+      if (missing) return { receipt: withNote(missing, ready2.note), engine: "desktop" };
+      const schema = await liveToolSchema(state.hosts, "premiere", "premiere_export_xml");
+      if (!schema) {
+        return { receipt: refused(tool, "Zenvi Link in Premiere Pro has no premiere_export_xml (an older version): run `zenvi adobe install` and restart Premiere Pro."), engine: null };
+      }
+      const exportArgs = {};
+      if (typeof args.sequence === "string" && args.sequence) {
+        const key = declaredName(schema.properties, ["sequence", "sequence_id", "sequence_name"]);
+        if (!key) return { receipt: refused(tool, "this Zenvi Link's premiere_export_xml does not take a sequence; leave sequence out to export the active one"), engine: null };
+        exportArgs[key] = args.sequence;
+      }
+      call.progress?.(0, 0, "Exporting the sequence from Premiere Pro\u2026");
+      const exported = await callAdobeTool(state.hosts, "premiere_export_xml", exportArgs, { timeoutMs: ADOBE_RENDER_WAIT_MS });
+      if (!isOkHostStatus(exported.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "exporting from Premiere Pro", exported.receipt), ready2.note), engine: "desktop" };
+      const xml = exportedXmlPath(exported.receipt.data ?? {});
+      if (!xml) {
+        return {
+          receipt: withNote(failed(tool, "Premiere Pro finished premiere_export_xml without naming the XML file (data.path); nothing was added to the Zenvi project", { data: { premiere: exported.receipt } }), ready2.note),
+          engine: "desktop"
+        };
+      }
+      call.progress?.(0, 0, "Importing the sequence into Zenvi\u2026");
+      const { receipt: zenvi } = await forward(ready2.desktop, "import_timeline_xml_tool", { path: xml, placement: args.placement ?? "new_tracks" }, call);
+      const name = String(exported.receipt.data?.sequence_name ?? exported.receipt.data?.name ?? args.sequence ?? "the active sequence");
+      const summary = zenvi.status === "applied" || zenvi.status === "unchanged" ? `Exported "${name}" from Premiere Pro and imported it into the Zenvi project. ${zenvi.summary}` : `Premiere Pro exported "${name}" to ${xml}, but Zenvi could not import it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
+      return { receipt: combined(tool, summary, "premiere", exported.receipt, zenvi, ready2.note), engine: "desktop" };
+    }
+  };
+}
+function listHostsTool() {
+  return {
+    name: "list_hosts",
+    title: "Which apps Zenvi can drive",
+    description: "List the hosts this server drives and which one is active (used most recently): the Zenvi desktop app, the portable Zenvi engine (this server, editing the .zvn file), After Effects and Premiere Pro (through the Zenvi Link extension), with their open projects, versions and how to connect or enable the missing ones (`zenvi adobe install`). Call it first when the user mentions After Effects or Premiere Pro, and before a handoff. Read-only.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    async run(state) {
+      const report2 = await state.hosts.list();
+      return { receipt: applied("list_hosts", describeHosts(report2), { data: report2 }, 0), engine: null };
+    }
+  };
+}
+function hostTools(ctx) {
+  return [listHostsTool(), ...desktopHandoffTools(ctx), bringFromAfterEffects(ctx), bringFromPremiere(ctx)];
+}
+var ADOBE_RENDER_WAIT_MS, NO_FILE;
+var init_host_tools = __esm({
+  "src/mcp/host-tools.ts"() {
+    "use strict";
+    init_tools();
+    init_discovery();
+    init_launcher();
+    init_open();
+    init_adobe_tools();
+    init_handoff();
+    init_registry5();
+    init_output();
+    init_version();
+    ADOBE_RENDER_WAIT_MS = 3 * 60 * 60 * 1e3;
+    NO_FILE = "this session's project has no file yet: call open_project_file first (the clips go into a saved project in the Zenvi desktop app).";
+  }
+});
+
 // src/mcp/state.ts
-var McpState;
+function launcherDeps(ctx) {
+  return { ...defaultLauncherDeps(), env: ctx.env, home: ctx.config.home };
+}
+var DESKTOP_WAIT_MS, McpState;
 var init_state = __esm({
   "src/mcp/state.ts"() {
     "use strict";
@@ -83682,26 +85820,46 @@ var init_state = __esm({
     init_project3();
     init_client4();
     init_discovery();
+    init_launcher();
     init_executor();
+    init_registry5();
     init_session2();
     init_version();
+    DESKTOP_WAIT_MS = 12e4;
     McpState = class _McpState {
-      constructor(ctx, session) {
+      constructor(ctx, session, options) {
         this.ctx = ctx;
         this.session = session;
+        this.launcher = options.launcher ?? launcherDeps(ctx);
+        this.desktopWaitMs = options.desktopWaitMs ?? DESKTOP_WAIT_MS;
+        this.hosts = new HostRegistry({
+          config: ctx.config,
+          env: ctx.env,
+          clientVersion: VERSION,
+          detect: options.detect,
+          portable: () => ({ project: this.session.file ?? null, lastCallAt: this.lastPortableCall })
+        });
       }
       ctx;
       session;
+      hosts;
+      launcher;
+      desktopWaitMs;
       desktop;
       desktopKey;
-      static async create(ctx, projectFile) {
-        const options = { registry: ctx.registry, host: hostOptions(ctx), surface: "mcp" };
-        const session = projectFile ? await ProjectSession.open(projectFile, options) : ProjectSession.fromProject(newProject(), void 0, options);
-        return new _McpState(ctx, session);
+      lastPortableCall;
+      static async create(ctx, projectFile, options = {}) {
+        const sessionOptions = { registry: ctx.registry, host: hostOptions(ctx), surface: "mcp" };
+        const session = projectFile ? await ProjectSession.open(projectFile, sessionOptions) : ProjectSession.fromProject(newProject(), void 0, sessionOptions);
+        return new _McpState(ctx, session, options);
       }
       async switchTo(file3, project) {
         await this.session.switchTo(file3, project);
         await this.dropDesktop();
+      }
+      /** The portable engine ran a tool (it counts as activity for list_hosts' active host). */
+      notePortableCall() {
+        this.lastPortableCall = Date.now();
       }
       /** The desktop app, when it has this session's project open. */
       async desktopExecutor() {
@@ -83713,6 +85871,7 @@ var init_state = __esm({
         const live2 = await discoverDesktop(this.ctx.config);
         for (const endpoint of live2) {
           if (await hasProjectOpen(endpoint, file3)) {
+            this.hosts.noteDesktopCall(endpoint);
             const key = `${endpoint.url}\0${endpoint.pid ?? ""}`;
             if (this.desktop && this.desktopKey === key) return this.desktop;
             await this.dropDesktop();
@@ -83732,6 +85891,7 @@ var init_state = __esm({
       }
       async close() {
         await this.dropDesktop();
+        await this.hosts.close();
       }
     };
   }
@@ -83745,24 +85905,30 @@ __export(server_exports, {
   runStdioServer: () => runStdioServer
 });
 import { once as once2 } from "node:events";
-function toCallResult(receipt, images = [], engine) {
-  const ok = receipt.status === "applied" || receipt.status === "unchanged";
-  const content = [{ type: "text", text: JSON.stringify(receipt) }];
+function toCallResult(receipt2, images = [], extra = {}) {
+  const ok = isOkHostStatus(receipt2.status);
+  const content = [{ type: "text", text: JSON.stringify(receipt2) }];
   if (ok) for (const image of images) content.push({ type: "image", data: image.data, mimeType: image.mimeType });
   return {
     content,
-    structuredContent: { ...receipt, ...engine ? { engine } : {} },
+    structuredContent: { ...receipt2, ...extra },
     ...ok ? {} : { isError: true }
   };
 }
-async function createZenviMcpServer(ctx, projectFile) {
-  const state = await McpState.create(ctx, projectFile);
-  const extras = extraTools(ctx);
+async function createZenviMcpServer(ctx, projectFile, options = {}) {
+  const state = await McpState.create(ctx, projectFile, options);
+  const extras = [...extraTools(ctx), ...hostTools(ctx)];
   const extraByName = new Map(extras.map((t) => [t.name, t]));
-  const server = new McpServer({ name: "zenvi", title: "Zenvi video editor", version: VERSION }, { capabilities: { tools: { listChanged: false } }, instructions: SERVER_INSTRUCTIONS });
+  const server = new McpServer(
+    { name: "zenvi", title: "Zenvi video editor", version: VERSION },
+    { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} }, instructions: SERVER_INSTRUCTIONS }
+  );
+  let listedFamilies;
   server.server.setRequestHandler(ListToolsRequestSchema, async () => {
     const host = state.session.host;
-    const engineTools = ctx.registry.list("mcp", host).filter((t) => !extraByName.has(t.name));
+    const engineTools = ctx.registry.list("mcp", host).filter((t) => !extraByName.has(t.name) && !hostOfTool(t.name));
+    const families = await state.hosts.families();
+    listedFamilies = familyKey(families);
     return {
       tools: [
         ...engineTools.map((t) => ({
@@ -83778,45 +85944,83 @@ async function createZenviMcpServer(ctx, projectFile) {
           description: t.description,
           inputSchema: t.inputSchema,
           annotations: { title: t.title, ...t.annotations }
-        }))
+        })),
+        ...HOST_IDS.filter((h) => families[h].listed).flatMap((h) => adobeToolDefinitions(h))
       ]
     };
   });
+  async function announceFamilyChanges() {
+    if (listedFamilies === void 0) return;
+    const key = familyKey(await state.hosts.families());
+    if (key === listedFamilies) return;
+    listedFamilies = key;
+    await server.server.sendToolListChanged().catch(() => void 0);
+  }
   server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const name = request.params.name;
     const args = request.params.arguments ?? {};
     const progressToken = request.params._meta?.progressToken;
-    const progress = progressToken !== void 0 ? (value, total, message) => void extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress: value, total, message } }).catch(() => void 0) : void 0;
+    const progress = progressToken !== void 0 ? (value, total, message) => void extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress: value, ...total > 0 ? { total } : {}, message } }).catch(() => void 0) : void 0;
     try {
       const extraTool = extraByName.get(name);
       if (extraTool) {
-        const known = Object.keys(extraTool.inputSchema.properties ?? {});
-        const unknown2 = Object.keys(args ?? {}).filter((key) => !known.includes(key));
-        if (unknown2.length > 0) {
-          return toCallResult(failed(name, `Error: unknown argument${unknown2.length > 1 ? "s" : ""} for ${name}: ${unknown2.join(", ")}. Accepted: ${known.join(", ") || "none"}.`), void 0, "portable");
-        }
+        const unknown2 = unknownArgumentsMessage(name, args, extraTool.inputSchema);
+        if (unknown2) return toCallResult(failed(name, unknown2), void 0, { engine: "portable" });
         const out = await extraTool.run(state, args, { signal: extra.signal, progress });
-        return toCallResult(out.receipt, out.images, "portable");
+        const engine = out.engine === void 0 ? "portable" : out.engine;
+        return toCallResult(out.receipt, out.images, engine ? { engine } : {});
+      }
+      const adobe = hostOfTool(name);
+      if (adobe) {
+        const families = await state.hosts.families();
+        if (!families[adobe].listed && families[adobe].reason === "ZENVI_MCP_ADOBE=off") {
+          return toCallResult(hostRefusal(adobe, name, "UNSUPPORTED", `${APP_LABEL[adobe]} tools are turned off in this server (ZENVI_MCP_ADOBE=off). ${families[adobe].enable ?? ""}`.trim()));
+        }
+        const result2 = await callAdobeTool(state.hosts, name, args);
+        return toCallResult(result2.receipt, result2.images);
       }
       const desktop = await state.desktopExecutor();
       if (desktop) {
         const outcome = await desktop.call(name, args);
-        const receipt2 = outcome.receipt ?? parseReceipt(outcome.text) ?? (outcome.ok ? void 0 : failed(name, outcome.text));
-        if (receipt2) return toCallResult(receipt2, outcome.images, "desktop");
+        const receipt3 = outcome.receipt ?? parseReceipt(outcome.text) ?? (outcome.ok ? void 0 : failed(name, outcome.text));
+        if (receipt3) return toCallResult(receipt3, outcome.images, { engine: "desktop" });
         return { content: [{ type: "text", text: outcome.text }], ...outcome.ok ? {} : { isError: true } };
       }
+      state.notePortableCall();
       const { result } = await state.session.run(name, args, extra.signal);
-      const receipt = result.data ?? parseReceipt(result.text);
-      if (!receipt) return { content: [{ type: "text", text: result.text }], ...result.ok ? {} : { isError: true } };
-      if (!state.session.file && receipt.undoSteps > 0) {
-        receipt.notes = [...receipt.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];
+      const receipt2 = result.data ?? parseReceipt(result.text);
+      if (!receipt2) return { content: [{ type: "text", text: result.text }], ...result.ok ? {} : { isError: true } };
+      if (!state.session.file && receipt2.undoSteps > 0) {
+        receipt2.notes = [...receipt2.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];
       }
-      return toCallResult(receipt, result.images, "portable");
+      return toCallResult(receipt2, result.images, { engine: "portable" });
     } catch (error62) {
       if (ctx.env.ZENVI_DEBUG) process.stderr.write(`[zenvi mcp] ${name} failed: ${error62.stack ?? String(error62)}
 `);
       return toCallResult(failed(name, error62.message || String(error62)));
+    } finally {
+      await announceFamilyChanges().catch(() => void 0);
     }
+  });
+  server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: RESOURCES.map((r) => ({ ...r })) }));
+  server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const uri = request.params.uri;
+    const info = RESOURCES.find((r) => r.uri === uri);
+    if (!info) throw new McpError(-32002, `Resource not found: ${uri}. Resources: ${RESOURCES.map((r) => r.uri).join(", ")}.`);
+    const text4 = uri === "zenvi://hosts" ? JSON.stringify(await state.hosts.list(), null, 2) : uri === "zenvi://taste" ? TASTE_MARKDOWN : HANDOFF_GUIDE;
+    return { contents: [{ uri, mimeType: info.mimeType, text: text4 }] };
+  });
+  server.server.setRequestHandler(ListPromptsRequestSchema, async () => ({ prompts: PROMPTS.map((p) => ({ ...p, arguments: p.arguments.map((a) => ({ ...a })) })) }));
+  server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const args = request.params.arguments ?? {};
+    const report2 = args.host?.trim() ? void 0 : await state.hosts.list().catch(() => void 0);
+    let prompt;
+    try {
+      prompt = promptText(request.params.name, args, report2);
+    } catch (error62) {
+      throw new McpError(ErrorCode.InvalidParams, error62.message);
+    }
+    return { description: prompt.description, messages: [{ role: "user", content: { type: "text", text: prompt.text } }] };
   });
   return {
     server,
@@ -83844,24 +86048,33 @@ async function runStdioServer(ctx, transport = new StdioServerTransport()) {
   await Promise.race([closed, once2(process.stdin, "end").then(() => void 0)]);
   await close();
 }
-var SERVER_INSTRUCTIONS;
+var SERVER_INSTRUCTIONS, familyKey;
 var init_server3 = __esm({
   "src/mcp/server.ts"() {
     "use strict";
     init_mcp();
     init_stdio2();
     init_types5();
+    init_src3();
     init_tools();
+    init_adobe_tools();
+    init_guides();
+    init_policy();
     init_select();
+    init_unknown_args();
     init_version();
     init_extra_tools();
+    init_host_tools();
     init_state();
     SERVER_INSTRUCTIONS = [
-      "Zenvi edits video projects (.zvn, the Zenvi desktop app's format) with the same editing tools as the Zenvi desktop app and web editor. Everything runs on this machine with ffmpeg.",
-      "Workflow: (1) open_project_file with a .zvn path (created if missing; the project in the working folder is opened automatically). (2) import_files_tool with media paths, then add_clip_to_timeline_tool, apply_transition_tool, add_title_tool, set_clip_volume_tool, set_keyframes_tool, delete_from_timeline_tool and the other tools. (3) Before saying an edit is right, look at it: preview_frame returns the composited frame as an image (grid=true adds a 0-1 coordinate grid). (4) render_video exports (mp4 by default). (5) launch_editor shows the project in the Zenvi desktop app; push_to_cloud returns a zenvi.pro web editor link to share.",
-      'Every tool returns a JSON receipt (contract 3): status applied|unchanged|refused|error, summary, clips, shifted, removedClipIds, createdTracks, undoSteps. Patch your view of the timeline from receipts instead of re-listing everything. Failures start with "Error:". Each call is one undo step; undo_tool reverts it. Edits autosave to the project file with their undo history.',
-      "Use these tools for timeline edits instead of running ffmpeg yourself: they keep the project editable in Zenvi. Times are seconds on the timeline. If the Zenvi desktop app has the same project open, edits go through the app so the person sees them live."
+      "Zenvi edits video. This server drives four hosts: the Zenvi desktop app, the portable Zenvi engine (this server, editing the .zvn project file with ffmpeg on this machine), and After Effects and Premiere Pro through the Zenvi Link extension. list_hosts shows which are connected and which is active (used most recently): call it first whenever the user mentions After Effects or Premiere Pro, and before a handoff.",
+      "Picking tools: ae_* tools act inside After Effects and premiere_* tools inside Premiere Pro, on the project open there, with that app's own undo. Unprefixed tools act on the Zenvi project: in the desktop app while it has the project open (the person sees edits live; receipts say engine desktop), otherwise in the portable engine. Never edit a .zvn file or an Adobe project by hand.",
+      "Zenvi workflow: (1) open_project_file with a .zvn path (created if missing; the project in the working folder is opened automatically). (2) import_files_tool with media paths, then add_clip_to_timeline_tool, apply_transition_tool, add_title_tool, set_clip_volume_tool, set_keyframes_tool, delete_from_timeline_tool and the other tools. (3) render_video exports (mp4 by default). (4) launch_editor shows the project in the Zenvi desktop app; push_to_cloud returns a zenvi.pro web editor link to share.",
+      "Handoffs run in the Zenvi desktop app on the saved project, which is opened for you: send_to_after_effects_tool / export_to_after_effects_tool, send_to_premiere_tool / export_to_premiere_tool, import_timeline_xml_tool, the Remotion and HyperFrames import and export tools, and linked clips (get_linked_clip_tool, update_linked_clip_tool, rerender_linked_clip_tool, open_linked_source_tool, unlink_clip_tool). bring_from_after_effects renders a comp into the project as a linked clip; bring_from_premiere brings a sequence back as native clips. zenvi://handoff says what survives each direction.",
+      "Taste: omitted arguments take the defaults in zenvi://taste (entrances 0.6 s, exits 0.4 s, smooth easing, nothing that moves is linear, text inside title-safe). Look before you say done: after any visual change capture frames (preview_frame, with grid=true for a 0-1 coordinate grid; ae_capture_frame; premiere_capture_frame) at the first frame, entrance ends, holds and the last frame, check them against the review checklist (prompt edit_review), fix, and look again.",
+      'Every tool returns a JSON receipt (contract 3): status applied|unchanged|refused|error (read-only Adobe tools: ok), summary, and what changed (clips, shifted, removedClipIds, createdTracks, undoSteps; Adobe tools: ids in data). Patch your view from receipts instead of re-listing everything. Failures start with "Error:"; refused means nothing changed, so read the summary and adjust. Each Zenvi call is one undo step (undo_tool); edits autosave to the project file with their undo history. Use these tools instead of running ffmpeg yourself: they keep the project editable in Zenvi. Times are seconds.'
     ].join("\n\n");
+    familyKey = (families) => HOST_IDS.filter((host) => families[host].listed).join(",");
   }
 });
 
@@ -86976,9 +89189,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [path]
    * @return {(string|null|Command)}
    */
-  executableDir(path31) {
-    if (path31 === void 0) return this._executableDir;
-    this._executableDir = path31;
+  executableDir(path38) {
+    if (path38 === void 0) return this._executableDir;
+    this._executableDir = path38;
     return this;
   }
   /**
@@ -86995,9 +89208,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
       helpWidth: context.helpWidth,
       outputHasColors: context.hasColors
     });
-    const text3 = helper.formatHelp(this, helper);
-    if (context.hasColors) return text3;
-    return this._outputConfiguration.stripColor(text3);
+    const text4 = helper.formatHelp(this, helper);
+    if (context.hasColors) return text4;
+    return this._outputConfiguration.stripColor(text4);
   }
   /**
    * @typedef HelpContext
@@ -87157,7 +89370,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {(string | Function)} text - string to add, or a function returning a string
    * @return {Command} `this` command for chaining
    */
-  addHelpText(position, text3) {
+  addHelpText(position, text4) {
     const allowedValues = ["beforeAll", "before", "after", "afterAll"];
     if (!allowedValues.includes(position)) {
       throw new Error(`Unexpected value for position to addHelpText.
@@ -87166,10 +89379,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
     const helpEvent = `${position}Help`;
     this.on(helpEvent, (context) => {
       let helpStr;
-      if (typeof text3 === "function") {
-        helpStr = text3({ error: context.error, command: context.command });
+      if (typeof text4 === "function") {
+        helpStr = text4({ error: context.error, command: context.command });
       } else {
-        helpStr = text3;
+        helpStr = text4;
       }
       if (helpStr) {
         context.write(`${helpStr}
@@ -87238,17 +89451,402 @@ init_session();
 init_account();
 init_edit2();
 
-// src/commands/integrations.ts
+// src/commands/hosts.ts
+init_src3();
+init_adobe_tools();
+import { writeFile as writeFile6 } from "node:fs/promises";
+import path28 from "node:path";
+
+// src/hosts/doctor.ts
+init_src3();
+init_adobe_tools();
+init_extension();
+init_policy();
+import { spawnSync as spawnSync2 } from "node:child_process";
+var runCommand = (command, args) => {
+  const result = spawnSync2(command, args, { encoding: "utf8", timeout: 5e3, windowsHide: true });
+  return { code: result.status ?? 1, stdout: result.stdout ?? "" };
+};
+function debugModeVersions(platform, run) {
+  return CSXS_VERSIONS.filter((n) => {
+    if (platform === "darwin") {
+      const r2 = run("defaults", ["read", `com.adobe.CSXS.${n}`, "PlayerDebugMode"]);
+      return r2.code === 0 && r2.stdout.trim() === "1";
+    }
+    const r = run("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${n}`, "/v", "PlayerDebugMode"]);
+    return r.code === 0 && /PlayerDebugMode\s+REG_SZ\s+1\b/.test(r.stdout);
+  });
+}
+async function adobeDoctor(options) {
+  const { detect } = options;
+  const run = options.run ?? runCommand;
+  const checks = [];
+  const supported = detect.platform === "darwin" || detect.platform === "win32";
+  if (!supported) {
+    checks.push({ name: "platform", level: "warn", detail: `Zenvi Link runs in After Effects and Premiere Pro on macOS and Windows; this is ${detect.platform}` });
+  }
+  const bundled = await bundledExtension(detect);
+  checks.push(
+    bundled ? { name: "zenvi link", level: "ok", detail: `${bundled.version ?? "?"} ships with this zenvi (${bundled.dir})` } : {
+      name: "zenvi link",
+      level: "fail",
+      detail: "this zenvi build has no Zenvi Link extension to install",
+      hint: "From a checkout: npm run build -w @zenvi/adobe-link (or npm run install:dev -w @zenvi/adobe-link for a linked dev install), or set ZENVI_ADOBE_EXTENSION."
+    }
+  );
+  if (supported) {
+    const installed = await findInstalledExtensions(detect);
+    if (installed.length === 0) {
+      checks.push({ name: "installed", level: "warn", detail: "Zenvi Link is not installed", hint: "Run `zenvi adobe install`, then restart After Effects / Premiere Pro." });
+    }
+    for (const copy of installed) {
+      const want = bundled?.version ?? LINK_VERSION;
+      const stale = copy.version !== want && !copy.linked;
+      checks.push({
+        name: "installed",
+        level: stale ? "warn" : "ok",
+        detail: `${copy.version ?? "?"} (${copy.scope}${copy.linked ? ", development link" : ""}) ${copy.dir}`,
+        ...stale ? { hint: `This zenvi ships ${want}: run \`zenvi adobe install\` and restart the apps.` } : {}
+      });
+    }
+    const debug = debugModeVersions(detect.platform, run);
+    const missing = CSXS_VERSIONS.filter((n) => !debug.includes(n));
+    checks.push({
+      name: "debug mode",
+      level: missing.length === 0 ? "ok" : "warn",
+      detail: missing.length === 0 ? `PlayerDebugMode on for CSXS ${CSXS_VERSIONS.join(", ")}` : `PlayerDebugMode off for CSXS ${missing.join(", ")}`,
+      hint: "Unsigned extensions (zenvi adobe install, install:dev) load only with PlayerDebugMode=1; `zenvi adobe install` sets it. A signed ZXP does not need it."
+    });
+  }
+  const { apps, looked } = await findAdobeApps(detect);
+  for (const host of HOST_IDS) {
+    const name = APP_LABEL[host].toLowerCase();
+    const found = await inspectHost(options.desktopDir, host, { clientVersion: options.clientVersion });
+    const installedApp = apps[host].length ? apps[host].join(", ") : looked ? "not found in the standard folders" : "unknown";
+    if (found.endpoint) {
+      const endpoint = found.endpoint;
+      const live2 = await liveToolNames(endpoint);
+      const expected = [...catalogTools(host).keys()];
+      const lacking = live2 ? expected.filter((tool) => !live2.includes(tool)) : [];
+      checks.push({
+        name,
+        level: lacking.length ? "warn" : "ok",
+        detail: `connected: ${endpoint.appName || APP_LABEL[host]} ${endpoint.appVersion}, Zenvi Link ${endpoint.version}, ${live2 ? `${live2.length} tools` : "tools/list failed"}${endpoint.project ? `, ${endpoint.project}` : ", no saved project"}`,
+        ...lacking.length ? { hint: `Zenvi Link there lacks ${lacking.length} tool(s) this zenvi knows (${lacking.slice(0, 4).join(", ")}\u2026): run \`zenvi adobe install\` and restart ${APP_LABEL[host]}.` } : {}
+      });
+    } else {
+      checks.push({
+        name,
+        level: "warn",
+        detail: `not connected: ${found.detail}; app: ${installedApp}`,
+        hint: `Open ${APP_LABEL[host]}; Zenvi Link starts with it (Window > Extensions > Zenvi Link shows its panel).`
+      });
+    }
+  }
+  const families = await decideFamilies(options.desktopDir, detect);
+  const listed = HOST_IDS.filter((host) => families[host].listed);
+  checks.push({
+    name: "zenvi mcp",
+    level: "ok",
+    detail: `lists ${listed.length ? listed.map((h) => `${h === "aftereffects" ? "ae_*" : "premiere_*"} (${families[h].reason})`).join(", ") : "no Adobe tools"}${listed.length < HOST_IDS.length ? `; not ${HOST_IDS.filter((h) => !families[h].listed).map((h) => `${h === "aftereffects" ? "ae_*" : "premiere_*"} (${families[h].reason})`).join(", ")}` : ""}`,
+    hint: "ZENVI_MCP_ADOBE=on lists both families, off hides them."
+  });
+  return checks;
+}
+async function liveToolNames(endpoint) {
+  const client = new HostClient(endpoint);
+  try {
+    return (await client.listTools()).map((t) => t.name);
+  } catch {
+    return void 0;
+  } finally {
+    await client.close();
+  }
+}
+
+// src/commands/hosts.ts
+init_extension();
+init_policy();
+init_registry5();
+init_output();
+init_select();
+init_version();
+
+// src/commands/tools.ts
 init_src2();
-import { readFile as readFile11 } from "node:fs/promises";
-import path29 from "node:path";
+
+// src/engine/registry.ts
+init_tools();
+function missingCapabilities2(tool, host) {
+  return (tool.requires ?? []).filter((cap) => host[cap] === void 0 || host[cap] === null);
+}
+function unknownToolResult(name) {
+  const summary = `Error: ${name} is not available in this Zenvi surface`;
+  const receipt2 = refused(name, summary);
+  return { ok: false, text: JSON.stringify(receipt2), data: receipt2 };
+}
+function createRegistry(list2, engine = {}) {
+  const byName2 = new Map(list2.map((t) => [t.name, t]));
+  return {
+    tools: list2,
+    get: (name) => byName2.get(name),
+    list(surface, host, options = {}) {
+      if (engine.listTools) return engine.listTools({ surface, host, includeUnavailable: options.includeUnavailable });
+      return list2.filter(
+        (t) => t.surfaces.includes(surface) && !t.deprecated && (options.includeUnavailable || missingCapabilities2(t, host).length === 0)
+      );
+    },
+    async run(ctx, name, args, surface) {
+      if (engine.runTool) return engine.runTool(ctx, name, args ?? {}, surface ? { surface } : {});
+      const tool = byName2.get(name);
+      if (!tool || surface && !tool.surfaces.includes(surface)) return unknownToolResult(name);
+      return tool.run(ctx, args ?? {});
+    }
+  };
+}
+function engineRegistry() {
+  const mod = tools_exports;
+  return createRegistry(mod.allTools ?? [], { runTool: mod.runTool, listTools: mod.listTools });
+}
+
+// src/commands/tools.ts
+init_adobe_tools();
+init_output();
+init_context();
+function parseCallArgs(json2, pairs) {
+  let args = {};
+  if (json2) {
+    try {
+      const parsed = JSON.parse(json2);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("expected an object");
+      args = parsed;
+    } catch (error62) {
+      throw new CliError(`--args is not a JSON object: ${error62.message}`, 2);
+    }
+  }
+  for (const pair of pairs) {
+    const eq = pair.indexOf("=");
+    if (eq <= 0) throw new CliError(`Expected key=value, got "${pair}".`, 2);
+    const key = pair.slice(0, eq);
+    const raw = pair.slice(eq + 1);
+    let value = raw;
+    if (/^[[{]/.test(raw.trim())) {
+      try {
+        value = JSON.parse(raw);
+      } catch {
+        value = raw;
+      }
+    }
+    args[key] = value;
+  }
+  return args;
+}
+function registerToolCommands(program2, ctx) {
+  program2.command("tools").description("list the editing tools (the same catalog the MCP server exposes)").option("-a, --all", "include tools this machine cannot run (and why)").option("--schema", "include each tool's JSON input schema (with --json)").action(async (opts) => {
+    const host = createNodeHost({ ...hostOptions(ctx) });
+    const tools = ctx.registry.list("cli", host, { includeUnavailable: true });
+    const rows = tools.map((t) => ({ tool: t, missing: missingCapabilities2(t, host) })).filter((r) => opts.all || r.missing.length === 0);
+    if (ctx.out.json) {
+      ctx.out.data({
+        tools: rows.map(({ tool, missing }) => ({
+          name: tool.name,
+          title: tool.title,
+          description: tool.description,
+          contract: tool.contract ?? false,
+          available: missing.length === 0,
+          ...missing.length ? { missing } : {},
+          ...opts.schema ? { inputSchema: tool.inputSchema } : {}
+        }))
+      });
+      return;
+    }
+    if (rows.length === 0) {
+      ctx.out.line("No tools in this build.");
+      return;
+    }
+    ctx.out.table(
+      ["tool", "what it does"],
+      rows.map(({ tool, missing }) => [
+        tool.name,
+        `${(tool.description.split(/(?<=\.)\s/)[0] ?? "").slice(0, 90)}${missing.length ? ctx.out.style(` (needs ${missing.join(", ")})`, "dim") : ""}`
+      ])
+    );
+    ctx.out.line(ctx.out.style(`
+${rows.length} tools. Run one with: zenvi call <tool> key=value \u2026 (After Effects / Premiere Pro tools: zenvi ae, zenvi premiere)`, "dim"));
+  });
+  program2.command("call").description("run any tool with raw arguments: zenvi call add_clip_to_timeline_tool file_id=AB12CD34EF position_seconds=4 (ae_* / premiere_* run in After Effects / Premiere Pro)").argument("<tool>", "tool name (see `zenvi tools`)").argument("[pairs...]", "key=value arguments").option("--args <json>", "arguments as a JSON object").action(async (tool, pairs, opts) => {
+    const args = parseCallArgs(opts.args, pairs);
+    if (hostOfTool(tool)) await runHostToolCommand(ctx, tool, args);
+    else await runToolCommand(ctx, tool, args);
+  });
+}
+
+// src/commands/hosts.ts
+function hostRegistry(ctx, project) {
+  return new HostRegistry({ config: ctx.config, env: ctx.env, clientVersion: VERSION, portable: () => ({ project: project ?? null }) });
+}
+function hostState(entry) {
+  if (entry.kind === "zenvi") return entry.id === "zenvi-portable" ? "ready" : entry.connected ? "running" : "not running";
+  return entry.connected ? "connected" : entry.status === "absent" ? "not connected" : String(entry.status);
+}
+function hostDetails(entry) {
+  const project = typeof entry.project === "string" && entry.project ? entry.project : void 0;
+  if (entry.id === "zenvi-portable") return `${project ?? "no project selected"}${entry.routes_to ? " (edits go to the desktop app)" : ""}`;
+  if (entry.id === "zenvi-desktop") {
+    return entry.connected ? [project ?? "untitled project", entry.version ? `Zenvi ${String(entry.version)}` : "", entry.pid ? `pid ${String(entry.pid)}` : ""].filter(Boolean).join(" \xB7 ") : "start it with `zenvi open`";
+  }
+  const count = `${String(entry.tools)} tool${entry.tools === 1 ? "" : "s"}`;
+  const listed = entry.tools_listed ? count : `${count}, not listed by zenvi mcp`;
+  if (entry.connected) {
+    return [`${String(entry.app_name ?? entry.label)} ${String(entry.app_version ?? "")}`.trim(), project ?? "no saved project", listed].join(" \xB7 ");
+  }
+  return `${String(entry.reason)} \xB7 ${listed} \xB7 \`zenvi adobe doctor\``;
+}
+function printChecks(ctx, checks) {
+  for (const c of checks) {
+    const mark = c.level === "ok" ? ctx.out.style("\u2713", "green") : c.level === "warn" ? ctx.out.style("!", "yellow") : ctx.out.style("\u2717", "red");
+    ctx.out.line(`${mark} ${c.name.padEnd(14)} ${c.detail}`);
+    if (c.hint && c.level !== "ok") ctx.out.line(ctx.out.style(`  ${" ".repeat(14)} ${c.hint}`, "dim"));
+  }
+}
+function hostToolName(host, tool) {
+  const prefix = HOST_TOOL_PREFIX[host];
+  return tool.startsWith(prefix) ? tool : `${prefix}${tool}`;
+}
+async function saveImages(ctx, images, out) {
+  if (!out || images.length === 0) return [];
+  const target = path28.resolve(ctx.cwd, out);
+  const ext = path28.extname(target);
+  const saved = [];
+  for (const [i, image] of images.entries()) {
+    const file3 = images.length === 1 ? target : `${target.slice(0, target.length - ext.length)}-${i + 1}${ext}`;
+    await writeFile6(file3, Buffer.from(image.data, "base64"));
+    saved.push(file3);
+  }
+  return saved;
+}
+function printHostReceipt(ctx, receipt2, images, saved) {
+  const ok = isOkHostStatus(receipt2.status);
+  if (!ok) ctx.exitCode = 1;
+  if (ctx.out.json) {
+    ctx.out.data({ ...receipt2, ...images.length ? { images: images.length } : {}, ...saved.length ? { saved } : {} });
+    return;
+  }
+  if (!ok) ctx.out.error(receipt2.summary.replace(/^Error:\s*/, ""));
+  else ctx.out.line(`${receipt2.status === "unchanged" ? ctx.out.style("\u2022", "dim") : ctx.out.style("\u2713", "green")} ${receipt2.summary}`);
+  for (const w of receipt2.warnings ?? []) ctx.out.warn(w);
+  if (ok && receipt2.data && Object.keys(receipt2.data).length) ctx.out.line(ctx.out.style(JSON.stringify(receipt2.data, null, 2), "dim"));
+  for (const file3 of saved) ctx.out.line(`  saved ${file3}`);
+  if (images.length && !saved.length) ctx.out.info(ctx.out.style(`  ${images.length} image(s): pass --out <file.png> to save`, "dim"));
+}
+async function runHostToolCommand(ctx, tool, args, out) {
+  const project = await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env }).catch(() => void 0);
+  const registry2 = hostRegistry(ctx, project);
+  try {
+    const { receipt: receipt2, images } = await callAdobeTool(registry2, tool, args);
+    printHostReceipt(ctx, receipt2, images, isOkHostStatus(receipt2.status) ? await saveImages(ctx, images, out) : []);
+  } finally {
+    await registry2.close();
+  }
+}
+function listFamily(ctx, host, command) {
+  const tools = [...catalogTools(host).values()];
+  if (ctx.out.json) {
+    ctx.out.data({ host, tools: tools.map((t) => ({ name: t.name, title: t.title, description: t.description, inputSchema: t.inputSchema })) });
+    return;
+  }
+  ctx.out.table(
+    ["tool", "what it does"],
+    tools.map((t) => [t.name, (t.description.split(/(?<=\.)\s/)[0] ?? "").slice(0, 90)])
+  );
+  ctx.out.line(ctx.out.style(`
+${tools.length} ${APP_LABEL[host]} tool${tools.length === 1 ? "" : "s"}. Run one with: zenvi ${command} <tool> key=value \u2026 (the prefix is optional)`, "dim"));
+}
+function registerHostCommands(program2, ctx) {
+  program2.command("hosts").description("the apps zenvi can drive: the Zenvi desktop app, the portable engine, After Effects and Premiere Pro (Zenvi Link)").action(async () => {
+    const project = await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env }).catch(() => void 0);
+    const registry2 = hostRegistry(ctx, project);
+    try {
+      const report2 = await registry2.list();
+      if (ctx.out.json) {
+        ctx.out.data(report2);
+        return;
+      }
+      ctx.out.table(
+        ["host", "state", "details"],
+        report2.hosts.map((h) => [`${h.id}${h.active ? " *" : ""}`, hostState(h), hostDetails(h)])
+      );
+      ctx.out.line(ctx.out.style("\n* active: the connected host used most recently. Adobe apps connect through Zenvi Link: `zenvi adobe install`, `zenvi adobe doctor`.", "dim"));
+    } finally {
+      await registry2.close();
+    }
+  });
+  const adobe = program2.command("adobe").description("Zenvi Link, the After Effects / Premiere Pro extension zenvi drives them through: install, uninstall, check");
+  adobe.command("install").description("install Zenvi Link into the CEP extensions folder (and allow unsigned extensions); restart the apps afterwards").option("--dry-run", "print what would happen, change nothing").option("--uninstall", "remove Zenvi Link").option("--platform <platform>", "plan for darwin or win32 (only with --dry-run)").action(async (opts) => {
+    if (opts.platform && !opts.dryRun) throw new CliError("--platform only works with --dry-run.", 2);
+    const platform = opts.platform ?? process.platform;
+    if (platform !== "darwin" && platform !== "win32") {
+      throw new CliError(`Zenvi Link runs in After Effects and Premiere Pro on macOS and Windows; this is ${platform}.`, 1);
+    }
+    const detect = { ...defaultDetectDeps(ctx.config.home, ctx.env), platform };
+    const source2 = await bundledExtension(detect);
+    if (!source2 && !opts.uninstall) {
+      throw new CliError(
+        "This zenvi build has no Zenvi Link extension to install.",
+        1,
+        "From a checkout: npm run build -w @zenvi/adobe-link (or npm run install:dev -w @zenvi/adobe-link for a linked dev install), or set ZENVI_ADOBE_EXTENSION to a built pro.zenvi.link folder."
+      );
+    }
+    const plan = planExtensionInstall({ platform, home: ctx.config.home, appData: ctx.env.APPDATA, source: source2?.dir ?? "", uninstall: opts.uninstall, copy: true });
+    const replacingLink = !opts.uninstall && (await findInstalledExtensions(detect)).some((copy) => copy.dir === plan.target && copy.linked);
+    const notes = [...replacingLink ? ["This replaces a development link (npm run install:dev) with the copy that ships with zenvi."] : [], ...plan.notes];
+    if (!opts.dryRun) for (const action of plan.actions) runInstallAction(action);
+    const verb = opts.uninstall ? "uninstall" : "install";
+    const summary = opts.dryRun ? `Would ${verb} Zenvi Link${source2?.version && !opts.uninstall ? ` ${source2.version}` : ""} at ${plan.target}` : opts.uninstall ? `Removed Zenvi Link from ${plan.target}` : `Installed Zenvi Link${source2?.version ? ` ${source2.version}` : ""} at ${plan.target}`;
+    if (ctx.out.json) {
+      ctx.out.data({ status: opts.dryRun ? "unchanged" : "applied", summary, target: plan.target, source: source2?.dir ?? null, version: source2?.version ?? null, actions: plan.actions.map(describeAction), notes, dryRun: Boolean(opts.dryRun) });
+      return;
+    }
+    ctx.out.line(`${opts.dryRun ? ctx.out.style("\u2022", "dim") : ctx.out.style("\u2713", "green")} ${summary}${opts.dryRun ? ":" : ""}`);
+    if (opts.dryRun) for (const action of plan.actions) ctx.out.line(`  ${describeAction(action)}`);
+    for (const note of notes) ctx.out.line(note);
+  });
+  adobe.command("doctor").description("check Zenvi Link: the extension, its install, PlayerDebugMode, the apps, the live connections, the MCP tool listing").action(async () => {
+    const checks = await adobeDoctor({ desktopDir: ctx.config.desktopDir, detect: defaultDetectDeps(ctx.config.home, ctx.env), clientVersion: VERSION });
+    const failedChecks = checks.filter((c) => c.level === "fail");
+    if (failedChecks.length) ctx.exitCode = 1;
+    if (ctx.out.json) {
+      ctx.out.data({ status: failedChecks.length ? "error" : "applied", summary: failedChecks.length ? `${failedChecks.length} problem(s)` : "No blocking problems", checks });
+      return;
+    }
+    printChecks(ctx, checks);
+  });
+  for (const [command, host] of [
+    ["ae", "aftereffects"],
+    ["premiere", "premiere"]
+  ]) {
+    program2.command(command).description(`run one ${APP_LABEL[host]} tool through Zenvi Link: zenvi ${command} ${host === "aftereffects" ? 'add_text text="Launch day" placement=lower-third' : "get_sequence"}; without a tool, list them`).argument("[tool]", `tool name, with or without the ${HOST_TOOL_PREFIX[host]} prefix`).argument("[pairs...]", "key=value arguments (values that look like JSON are parsed)").option("--args <json>", "arguments as a JSON object").option("-o, --out <file>", "save returned images (frame captures) here").action(async (tool, pairs, opts) => {
+      if (!tool) {
+        listFamily(ctx, host, command);
+        return;
+      }
+      await runHostToolCommand(ctx, hostToolName(host, tool), parseCallArgs(opts.args, pairs), opts.out);
+    });
+  }
+}
+
+// src/commands/integrations.ts
+init_src3();
+init_src2();
+import { readFile as readFile14 } from "node:fs/promises";
+import path36 from "node:path";
 
 // src/agents/mcp-config.ts
 init_src2();
 init_output();
 import { execFile } from "node:child_process";
-import { copyFile as copyFile2, mkdir as mkdir7, readFile as readFile9, rename as rename6, stat as stat11, writeFile as writeFile6 } from "node:fs/promises";
-import path23 from "node:path";
+import { copyFile as copyFile2, mkdir as mkdir7, readFile as readFile12, rename as rename6, stat as stat13, writeFile as writeFile7 } from "node:fs/promises";
+import path29 from "node:path";
 import { promisify } from "node:util";
 
 // src/agents/toml.ts
@@ -87269,23 +89867,23 @@ function parseHeaderName(raw) {
   parts.push(cur.trim());
   return parts.join(".");
 }
-function scanHeaders(text3) {
+function scanHeaders(text4) {
   const headers = [];
   let i = 0;
   let depth = 0;
   let lineStart = true;
-  const n = text3.length;
+  const n = text4.length;
   while (i < n) {
-    const ch = text3[i];
+    const ch = text4[i];
     if (lineStart && depth === 0) {
       let j = i;
-      while (j < n && (text3[j] === " " || text3[j] === "	")) j += 1;
-      if (text3[j] === "[") {
-        const arrayTable = text3[j + 1] === "[";
-        const close = text3.indexOf(arrayTable ? "]]" : "]", j);
-        const eol = text3.indexOf("\n", j);
+      while (j < n && (text4[j] === " " || text4[j] === "	")) j += 1;
+      if (text4[j] === "[") {
+        const arrayTable = text4[j + 1] === "[";
+        const close = text4.indexOf(arrayTable ? "]]" : "]", j);
+        const eol = text4.indexOf("\n", j);
         if (close > 0 && (eol < 0 || close < eol)) {
-          headers.push({ name: parseHeaderName(text3.slice(j + (arrayTable ? 2 : 1), close)), start: i, arrayTable });
+          headers.push({ name: parseHeaderName(text4.slice(j + (arrayTable ? 2 : 1), close)), start: i, arrayTable });
           i = close + (arrayTable ? 2 : 1);
           lineStart = false;
           continue;
@@ -87297,16 +89895,16 @@ function scanHeaders(text3) {
       lineStart = true;
       i += 1;
     } else if (ch === "#") {
-      while (i < n && text3[i] !== "\n") i += 1;
-    } else if (text3.startsWith('"""', i) || text3.startsWith("'''", i)) {
-      const delim = text3.slice(i, i + 3);
-      const end = text3.indexOf(delim, i + 3);
+      while (i < n && text4[i] !== "\n") i += 1;
+    } else if (text4.startsWith('"""', i) || text4.startsWith("'''", i)) {
+      const delim = text4.slice(i, i + 3);
+      const end = text4.indexOf(delim, i + 3);
       if (end < 0) throw new Error("Unterminated multi-line string in TOML.");
       i = end + 3;
     } else if (ch === '"' || ch === "'") {
       let j = i + 1;
-      while (j < n && text3[j] !== ch && text3[j] !== "\n") j += ch === '"' && text3[j] === "\\" ? 2 : 1;
-      if (text3[j] !== ch) throw new Error("Unterminated string in TOML.");
+      while (j < n && text4[j] !== ch && text4[j] !== "\n") j += ch === '"' && text4[j] === "\\" ? 2 : 1;
+      if (text4[j] !== ch) throw new Error("Unterminated string in TOML.");
       i = j + 1;
     } else if (ch === "[" || ch === "{") {
       depth += 1;
@@ -87318,27 +89916,27 @@ function scanHeaders(text3) {
   }
   return headers;
 }
-function tableRanges(text3, name) {
-  const headers = scanHeaders(text3);
+function tableRanges(text4, name) {
+  const headers = scanHeaders(text4);
   const ranges = [];
   headers.forEach((h, idx) => {
     if (h.name === name || h.name.startsWith(`${name}.`)) {
-      const end = idx + 1 < headers.length ? headers[idx + 1].start : text3.length;
+      const end = idx + 1 < headers.length ? headers[idx + 1].start : text4.length;
       ranges.push([h.start, end]);
     }
   });
   return ranges;
 }
-function readTable(text3, name) {
-  const ranges = tableRanges(text3, name);
-  return ranges.length ? ranges.map(([a, b]) => text3.slice(a, b)).join("").trim() : void 0;
+function readTable(text4, name) {
+  const ranges = tableRanges(text4, name);
+  return ranges.length ? ranges.map(([a, b]) => text4.slice(a, b)).join("").trim() : void 0;
 }
-function upsertTable(text3, name, section) {
-  const ranges = tableRanges(text3, name);
+function upsertTable(text4, name, section) {
+  const ranges = tableRanges(text4, name);
   const body = `${section.trim()}
 `;
   if (ranges.length === 0) {
-    const base = text3.length === 0 ? "" : text3.endsWith("\n") ? text3 : `${text3}
+    const base = text4.length === 0 ? "" : text4.endsWith("\n") ? text4 : `${text4}
 `;
     return base ? `${base}
 ${body}` : body;
@@ -87346,11 +89944,11 @@ ${body}` : body;
   let out = "";
   let last = 0;
   ranges.forEach(([a, b], idx) => {
-    out += text3.slice(last, a);
-    if (idx === 0) out += `${body}${b < text3.length ? "\n" : ""}`;
+    out += text4.slice(last, a);
+    if (idx === 0) out += `${body}${b < text4.length ? "\n" : ""}`;
     last = b;
   });
-  out += text3.slice(last);
+  out += text4.slice(last);
   return out.replace(/\n{3,}/g, "\n\n");
 }
 function tomlString(value) {
@@ -87367,12 +89965,12 @@ function shellQuote(arg) {
   return /^[A-Za-z0-9_./:@%+=,-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`;
 }
 function claudeDesktopConfigPath(home, platform, env2) {
-  if (platform === "darwin") return path23.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
-  if (platform === "win32") return path23.join(env2.APPDATA || path23.join(home, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
-  return path23.join(env2.XDG_CONFIG_HOME || path23.join(home, ".config"), "Claude", "claude_desktop_config.json");
+  if (platform === "darwin") return path29.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+  if (platform === "win32") return path29.join(env2.APPDATA || path29.join(home, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
+  return path29.join(env2.XDG_CONFIG_HOME || path29.join(home, ".config"), "Claude", "claude_desktop_config.json");
 }
 function codexConfigPath(home, env2) {
-  return path23.join(env2.CODEX_HOME || path23.join(home, ".codex"), "config.toml");
+  return path29.join(env2.CODEX_HOME || path29.join(home, ".codex"), "config.toml");
 }
 function isZenviStdio(entry) {
   if (!entry || typeof entry !== "object") return false;
@@ -87384,34 +89982,34 @@ function isZenviStdio(entry) {
 function sameJson3(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
-async function exists(file3) {
+async function exists2(file3) {
   try {
-    await stat11(file3);
+    await stat13(file3);
     return true;
   } catch {
     return false;
   }
 }
-async function writeWithBackup(file3, text3, hadFile) {
-  await mkdir7(path23.dirname(file3), { recursive: true });
+async function writeWithBackup(file3, text4, hadFile) {
+  await mkdir7(path29.dirname(file3), { recursive: true });
   let backup;
   if (hadFile) {
     backup = `${file3}.zenvi-backup`;
     await copyFile2(file3, backup);
   }
   const tmp = `${file3}.${process.pid}.tmp`;
-  await writeFile6(tmp, text3);
+  await writeFile7(tmp, text4);
   await rename6(tmp, file3);
   return backup;
 }
 async function mergeJsonServer(file3, name, entry, force) {
-  const hadFile = await exists(file3);
+  const hadFile = await exists2(file3);
   let root = {};
   if (hadFile) {
-    const text3 = await readFile9(file3, "utf8");
-    if (text3.trim()) {
+    const text4 = await readFile12(file3, "utf8");
+    if (text4.trim()) {
       try {
-        const parsed = JSON.parse(text3);
+        const parsed = JSON.parse(text4);
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
         root = parsed;
       } catch (error62) {
@@ -87446,9 +90044,9 @@ function codexSection(name, command) {
   ].join("\n");
 }
 async function defaultRunClaude(env2, home) {
-  const candidates = [whichSync("claude", env2), path23.join(home, ".local", "bin", "claude"), path23.join(home, ".claude", "local", "claude")];
+  const candidates = [whichSync("claude", env2), path29.join(home, ".local", "bin", "claude"), path29.join(home, ".claude", "local", "claude")];
   let claude;
-  for (const c of candidates) if (c && await exists(c)) {
+  for (const c of candidates) if (c && await exists2(c)) {
     claude = c;
     break;
   }
@@ -87477,7 +90075,7 @@ async function mcpConfig(options) {
       const scope = options.scope ?? "user";
       const entry = { type: "stdio", ...stdioEntry, env: {} };
       if (scope === "project") {
-        const file3 = path23.join(cwd, ".mcp.json");
+        const file3 = path29.join(cwd, ".mcp.json");
         const snippet2 = JSON.stringify({ mcpServers: { [name]: entry } }, null, 2);
         if (!options.install) return { ...base, scope, file: file3, snippet: snippet2, message: `Add this to ${file3} (Claude Code asks you to approve project servers).` };
         const { changed, backup } = await mergeJsonServer(file3, name, entry, options.force ?? false);
@@ -87509,7 +90107,7 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
     }
     case "cursor": {
       const scope = options.scope ?? "user";
-      const file3 = scope === "project" ? path23.join(cwd, ".cursor", "mcp.json") : path23.join(options.home, ".cursor", "mcp.json");
+      const file3 = scope === "project" ? path29.join(cwd, ".cursor", "mcp.json") : path29.join(options.home, ".cursor", "mcp.json");
       const snippet = JSON.stringify({ mcpServers: { [name]: stdioEntry } }, null, 2);
       if (!options.install) return { ...base, scope, file: file3, snippet, message: `Merge this into ${file3}.` };
       const { changed, backup } = await mergeJsonServer(file3, name, stdioEntry, options.force ?? false);
@@ -87523,8 +90121,8 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
 
 # or: codex mcp add ${shellQuote(name)} -- ${[command.command, ...command.args].map(shellQuote).join(" ")}`;
       if (!options.install) return { ...base, file: file3, snippet, message: `Add this to ${file3}.` };
-      const hadFile = await exists(file3);
-      const original = hadFile ? await readFile9(file3, "utf8") : "";
+      const hadFile = await exists2(file3);
+      const original = hadFile ? await readFile12(file3, "utf8") : "";
       let current;
       try {
         current = readTable(original, table);
@@ -87546,7 +90144,7 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
 // src/agents/self-command.ts
 init_src2();
 import { realpathSync } from "node:fs";
-import path24 from "node:path";
+import path30 from "node:path";
 function real(file3) {
   try {
     return realpathSync(file3);
@@ -87566,7 +90164,7 @@ function selfMcpCommand(env2 = process.env, argv = process.argv) {
     const parts = override.split(/\s+/);
     return { command: parts[0], args: [...parts.slice(1), "mcp"] };
   }
-  const entry = argv[1] ? path24.resolve(argv[1]) : "";
+  const entry = argv[1] ? path30.resolve(argv[1]) : "";
   if (/\.m?js$/.test(entry)) return { command: stableNodePath(env2), args: [real(entry), "mcp"] };
   return { command: process.execPath, args: [...process.execArgv, real(entry), "mcp"] };
 }
@@ -87575,6 +90173,8 @@ function selfMcpCommand(env2 = process.env, argv = process.argv) {
 init_sync();
 init_discovery();
 init_launcher();
+init_extension();
+init_policy();
 init_open();
 init_output();
 init_select();
@@ -87584,7 +90184,7 @@ init_account();
 init_context();
 function registerIntegrationCommands(program2, ctx) {
   program2.command("open").description("show the project in the Zenvi desktop app (or in the web editor with --web)").argument("[project]", "project file (default: the selected project)").option("--web", "push to Zenvi Cloud and open it in the web editor instead").action(async (projectArg, opts) => {
-    const project = projectArg ? path29.resolve(ctx.cwd, projectArg) : await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env });
+    const project = projectArg ? path36.resolve(ctx.cwd, projectArg) : await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env });
     if (opts.web) {
       if (!project) throw new CliError("No project to open.", 2, "Pass a .zvn file.");
       const session = await openSession(ctx, project);
@@ -87684,8 +90284,8 @@ async function runDoctor(ctx) {
   } catch (error62) {
     checks.push({ name: "titles/fonts", level: "warn", detail: `SVG renderer unavailable: ${error62.message}` });
   }
-  const toolCount = ctx.registry.tools.length;
-  checks.push({ name: "tools", level: toolCount > 0 ? "ok" : "fail", detail: `${toolCount} editing tools in this build` });
+  const toolCount2 = ctx.registry.tools.length;
+  checks.push({ name: "tools", level: toolCount2 > 0 ? "ok" : "fail", detail: `${toolCount2} editing tools in this build` });
   try {
     const { defaultRenderEngine: defaultRenderEngine2 } = await Promise.resolve().then(() => (init_src2(), src_exports));
     await defaultRenderEngine2();
@@ -87701,6 +90301,13 @@ async function runDoctor(ctx) {
     detail: app ? `${app.location}${live2.length ? `, running (${live2.map((e) => e.kind).join(", ")}${live2[0]?.project ? `: ${live2[0].project}` : ""})` : ""}` : "not installed",
     hint: "Optional: `zenvi open` shows projects in it. https://zenvi.pro/download"
   });
+  const installed = await findInstalledExtensions(defaultDetectDeps(ctx.config.home, ctx.env));
+  const adobe = (await inspectHosts(ctx.config.desktopDir, { clientVersion: VERSION })).filter((h) => h.endpoint).map((h) => APP_LABEL[h.host]);
+  checks.push({
+    name: "zenvi link",
+    level: "ok",
+    detail: `${installed.length ? `installed (${installed.map((c) => c.version ?? "?").join(", ")})` : "not installed (optional: After Effects / Premiere Pro tools, `zenvi adobe install`)"}${adobe.length ? `; connected: ${adobe.join(", ")}` : ""}. Details: zenvi adobe doctor`
+  });
   const [cloud, backend] = await Promise.all([probeUrl(`${ctx.config.cloudUrl}/health`), probeUrl(`${ctx.config.backendUrl}/health`)]);
   checks.push({ name: "zenvi cloud", level: cloud.ok ? "ok" : "warn", detail: cloud.ok ? `${ctx.config.cloudUrl} (${cloud.ms} ms)` : `${ctx.config.cloudUrl}: ${cloud.error ?? `HTTP ${cloud.status}`}`, hint: "Needed for push/pull and `zenvi login --device`." });
   checks.push({ name: "zenvi backend", level: backend.ok ? "ok" : "warn", detail: backend.ok ? `${ctx.config.backendUrl} (${backend.ms} ms)` : `${ctx.config.backendUrl}: ${backend.error ?? `HTTP ${backend.status}`}`, hint: "Needed for AI tools (search, generation, voice-over)." });
@@ -87714,12 +90321,12 @@ async function runDoctor(ctx) {
   const configured = [];
   const configFiles = [
     ["claude-desktop", claudeDesktopConfigPath(ctx.config.home, process.platform, ctx.env)],
-    ["cursor", path29.join(ctx.config.home, ".cursor", "mcp.json")],
+    ["cursor", path36.join(ctx.config.home, ".cursor", "mcp.json")],
     ["codex", codexConfigPath(ctx.config.home, ctx.env)]
   ];
   for (const [name, file3] of configFiles) {
-    const text3 = await readFile11(file3, "utf8").catch(() => "");
-    if (/zenvi[^\n]*\bmcp\b|mcp_servers\.zenvi\b|"zenvi"\s*:/.test(text3)) configured.push(name);
+    const text4 = await readFile14(file3, "utf8").catch(() => "");
+    if (/zenvi[^\n]*\bmcp\b|mcp_servers\.zenvi\b|"zenvi"\s*:/.test(text4)) configured.push(name);
   }
   checks.push({ name: "agent configs", level: "ok", detail: configured.length ? `zenvi configured for ${configured.join(", ")}` : "none yet (see `zenvi mcp-config`)" });
   return checks;
@@ -87729,115 +90336,9 @@ async function runDoctor(ctx) {
 init_project3();
 init_render2();
 
-// src/commands/tools.ts
-init_src2();
-
-// src/engine/registry.ts
-init_tools();
-function missingCapabilities2(tool, host) {
-  return (tool.requires ?? []).filter((cap) => host[cap] === void 0 || host[cap] === null);
-}
-function unknownToolResult(name) {
-  const summary = `Error: ${name} is not available in this Zenvi surface`;
-  const receipt = refused(name, summary);
-  return { ok: false, text: JSON.stringify(receipt), data: receipt };
-}
-function createRegistry(list2, engine = {}) {
-  const byName2 = new Map(list2.map((t) => [t.name, t]));
-  return {
-    tools: list2,
-    get: (name) => byName2.get(name),
-    list(surface, host, options = {}) {
-      if (engine.listTools) return engine.listTools({ surface, host, includeUnavailable: options.includeUnavailable });
-      return list2.filter(
-        (t) => t.surfaces.includes(surface) && !t.deprecated && (options.includeUnavailable || missingCapabilities2(t, host).length === 0)
-      );
-    },
-    async run(ctx, name, args, surface) {
-      if (engine.runTool) return engine.runTool(ctx, name, args ?? {}, surface ? { surface } : {});
-      const tool = byName2.get(name);
-      if (!tool || surface && !tool.surfaces.includes(surface)) return unknownToolResult(name);
-      return tool.run(ctx, args ?? {});
-    }
-  };
-}
-function engineRegistry() {
-  const mod = tools_exports;
-  return createRegistry(mod.allTools ?? [], { runTool: mod.runTool, listTools: mod.listTools });
-}
-
-// src/commands/tools.ts
-init_output();
-init_context();
-function parseCallArgs(json2, pairs) {
-  let args = {};
-  if (json2) {
-    try {
-      const parsed = JSON.parse(json2);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("expected an object");
-      args = parsed;
-    } catch (error62) {
-      throw new CliError(`--args is not a JSON object: ${error62.message}`, 2);
-    }
-  }
-  for (const pair of pairs) {
-    const eq = pair.indexOf("=");
-    if (eq <= 0) throw new CliError(`Expected key=value, got "${pair}".`, 2);
-    const key = pair.slice(0, eq);
-    const raw = pair.slice(eq + 1);
-    let value = raw;
-    if (/^[[{]/.test(raw.trim())) {
-      try {
-        value = JSON.parse(raw);
-      } catch {
-        value = raw;
-      }
-    }
-    args[key] = value;
-  }
-  return args;
-}
-function registerToolCommands(program2, ctx) {
-  program2.command("tools").description("list the editing tools (the same catalog the MCP server exposes)").option("-a, --all", "include tools this machine cannot run (and why)").option("--schema", "include each tool's JSON input schema (with --json)").action(async (opts) => {
-    const host = createNodeHost({ ...hostOptions(ctx) });
-    const tools = ctx.registry.list("cli", host, { includeUnavailable: true });
-    const rows = tools.map((t) => ({ tool: t, missing: missingCapabilities2(t, host) })).filter((r) => opts.all || r.missing.length === 0);
-    if (ctx.out.json) {
-      ctx.out.data({
-        tools: rows.map(({ tool, missing }) => ({
-          name: tool.name,
-          title: tool.title,
-          description: tool.description,
-          contract: tool.contract ?? false,
-          available: missing.length === 0,
-          ...missing.length ? { missing } : {},
-          ...opts.schema ? { inputSchema: tool.inputSchema } : {}
-        }))
-      });
-      return;
-    }
-    if (rows.length === 0) {
-      ctx.out.line("No tools in this build.");
-      return;
-    }
-    ctx.out.table(
-      ["tool", "what it does"],
-      rows.map(({ tool, missing }) => [
-        tool.name,
-        `${(tool.description.split(/(?<=\.)\s/)[0] ?? "").slice(0, 90)}${missing.length ? ctx.out.style(` (needs ${missing.join(", ")})`, "dim") : ""}`
-      ])
-    );
-    ctx.out.line(ctx.out.style(`
-${rows.length} tools. Run one with: zenvi call <tool> key=value \u2026`, "dim"));
-  });
-  program2.command("call").description("run any tool with raw arguments: zenvi call add_clip_to_timeline_tool file_id=AB12CD34EF position_seconds=4").argument("<tool>", "tool name (see `zenvi tools`)").argument("[pairs...]", "key=value arguments").option("--args <json>", "arguments as a JSON object").action(async (tool, pairs, opts) => {
-    await runToolCommand(ctx, tool, parseCallArgs(opts.args, pairs));
-  });
-}
-
 // src/config.ts
-import { homedir as homedir3 } from "node:os";
-import path30 from "node:path";
+import { homedir as homedir4 } from "node:os";
+import path37 from "node:path";
 var DEFAULTS = {
   website: "https://zenvi.pro",
   editor: "https://zenvi.pro/editor",
@@ -87855,8 +90356,8 @@ function env(e, ...keys) {
 }
 var trim = (url2) => url2.replace(/\/+$/, "");
 function loadConfig(e = process.env) {
-  const home = e.HOME || e.USERPROFILE || homedir3();
-  const configDir = env(e, "ZENVI_CONFIG_DIR") ?? (process.platform === "win32" ? path30.join(e.APPDATA || path30.join(home, "AppData", "Roaming"), "zenvi") : path30.join(e.XDG_CONFIG_HOME || path30.join(home, ".config"), "zenvi"));
+  const home = e.HOME || e.USERPROFILE || homedir4();
+  const configDir = env(e, "ZENVI_CONFIG_DIR") ?? (process.platform === "win32" ? path37.join(e.APPDATA || path37.join(home, "AppData", "Roaming"), "zenvi") : path37.join(e.XDG_CONFIG_HOME || path37.join(home, ".config"), "zenvi"));
   return {
     websiteUrl: trim(env(e, "ZENVI_WEBSITE", "ZENVI_WEBSITE_URL") ?? DEFAULTS.website),
     editorUrl: trim(env(e, "ZENVI_EDITOR_URL") ?? DEFAULTS.editor),
@@ -87865,7 +90366,7 @@ function loadConfig(e = process.env) {
     supabaseUrl: trim(env(e, "ZENVI_SUPABASE_URL", "SUPABASE_URL") ?? DEFAULTS.supabaseUrl),
     supabaseAnonKey: env(e, "ZENVI_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY") ?? DEFAULTS.supabaseAnonKey,
     configDir,
-    desktopDir: env(e, "ZENVI_DESKTOP_DIR") ?? path30.join(home, ".openshot_qt"),
+    desktopDir: env(e, "ZENVI_DESKTOP_DIR") ?? path37.join(home, ".openshot_qt"),
     home
   };
 }
@@ -87885,7 +90386,9 @@ Examples:
   zenvi split C1A2B3C4D5 --at 4.5 && zenvi transition C1A2B3C4D5 --name fade
   zenvi frame 5 check.png && zenvi render trip.mp4
   zenvi open            # show it in the Zenvi desktop app
-  zenvi mcp-config claude-code --install`
+  zenvi mcp-config claude-code --install
+  zenvi hosts           # the desktop app, After Effects, Premiere Pro: connected?
+  zenvi ae add_text text="Launch day" placement=lower-third`
   );
   registerProjectCommands(program2, ctx);
   registerEditCommands(program2, ctx);
@@ -87893,6 +90396,7 @@ Examples:
   registerToolCommands(program2, ctx);
   registerAccountCommands(program2, ctx);
   registerIntegrationCommands(program2, ctx);
+  registerHostCommands(program2, ctx);
   for (const cmd of program2.commands) {
     cmd.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });
     for (const sub of cmd.commands) sub.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });

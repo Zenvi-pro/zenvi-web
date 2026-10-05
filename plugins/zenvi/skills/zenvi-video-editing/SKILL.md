@@ -1,6 +1,6 @@
 ---
 name: zenvi-video-editing
-description: Edit videos with the Zenvi MCP tools (mcp__zenvi__*) instead of raw ffmpeg whenever the result is an edit a person may want to review or keep changing - cutting and arranging clips, trims, splits, titles, transitions, effects, fades, speed, volume and keyframes, music beds, voice-overs, then rendering. Use it when the user asks to make, cut, assemble or polish a video, a trailer, a reel, a highlight or a slideshow from their footage, or to show the edit in the Zenvi app or share it.
+description: Edit videos with the Zenvi MCP tools (mcp__zenvi__*) instead of raw ffmpeg whenever the result is an edit a person may want to review or keep changing - cutting and arranging clips, trims, splits, titles, transitions, effects, fades, speed, volume and keyframes, music beds, voice-overs, then rendering. Use it when the user asks to make, cut, assemble or polish a video, a trailer, a reel, a highlight or a slideshow from their footage, to show the edit in the Zenvi app or share it, or to move an edit between Zenvi, After Effects, Premiere Pro, Remotion or HyperFrames.
 ---
 
 # Editing video with Zenvi
@@ -9,6 +9,27 @@ Zenvi is a non-destructive video editor. Its MCP tools edit a project file
 (`.zvn`, the Zenvi desktop app's format) on this machine and render with
 ffmpeg. The project stays editable: the person can open it in the Zenvi app
 or the web editor and keep going.
+
+## Hosts: where an edit happens
+
+The `zenvi` server drives four hosts; `list_hosts` shows which are
+connected and which is active (used most recently):
+
+- **Zenvi desktop app**: while it has the session's project open, the Zenvi
+  tools run there and the person watches the edit happen (receipts say
+  `"engine": "desktop"`).
+- **Portable Zenvi engine**: the server itself, editing the `.zvn` file with
+  ffmpeg when the desktop app does not have it open.
+- **After Effects** (`ae_*` tools) and **Premiere Pro** (`premiere_*` tools)
+  through the Zenvi Link extension. Call `list_hosts` first whenever the
+  user mentions either app; the `after-effects` and `premiere-pro` skills
+  cover them, `/zenvi:adobe-setup` installs Zenvi Link.
+
+Unprefixed tools edit the Zenvi project; `ae_*` / `premiere_*` edit the
+project open in that app. Moving an edit between them is a handoff:
+`/zenvi:send-to-after-effects`, `/zenvi:send-to-premiere`,
+`bring_from_after_effects`, `bring_from_premiere`, and for Remotion or
+HyperFrames code the `code-video-handoff` skill.
 
 ## Zenvi or plain ffmpeg?
 
@@ -34,15 +55,27 @@ or the web editor and keep going.
    `get_timeline_state_tool` / `list_clips_tool` describe the timeline.
 4. **Look before you claim it is done.** `preview_frame` returns the
    composited frame at a time as an image. Check positions, titles and
-   transitions at the moments that matter (pass `grid: true` for a 0-1
-   coordinate grid when placing things). If something is off, fix it or
-   `undo_tool`.
+   transitions at the moments that matter (the first frame, every entrance
+   end, mid-hold, the last frame; pass `grid: true` for a 0-1 coordinate
+   grid when placing things) against the review checklist in
+   `zenvi://taste`. If something is off, fix it or `undo_tool`, and look
+   again. The `edit_review` prompt runs this loop.
 5. **Render.** `render_video` (mp4 by default; webm, mov, gif, mp3, wav, png
    frames). It returns the output path, duration and size.
 6. **Hand off.** `launch_editor` opens the project in the Zenvi desktop app
    for the person to watch and fine-tune (later edits then go through the
    app). `push_to_cloud` uploads it and returns a zenvi.pro web editor link
    (needs `zenvi login` once).
+
+## Taste
+
+Omitted arguments already follow the taste guide (`zenvi://taste`, also
+the `taste_motion_design` prompt). When you choose values yourself: titles
+enter in 0.6 s and leave in 0.4 s with eased (never linear) motion, hold at
+least 1.5 s + 0.3 s per word, sit inside title-safe (10 % inset), and use
+one accent colour; cross dissolves are 0.5 s within a scene, 1.0 s for a
+change of time or place; cut on action or on the downbeat; music sits
+18-24 dB under dialogue and fades out over 1.5 s.
 
 ## Conventions
 
@@ -64,4 +97,6 @@ or the web editor and keep going.
 The same engine is available as the `zenvi` CLI (`node
 ${CLAUDE_PLUGIN_ROOT}/dist/zenvi.mjs`): `zenvi new`, `zenvi import`,
 `zenvi add`, `zenvi split`, `zenvi frame 5 check.png`, `zenvi render`,
-`zenvi open`, `zenvi push`. Add `--json` for machine-readable receipts.
+`zenvi open`, `zenvi push`, `zenvi hosts`, `zenvi ae <tool>`,
+`zenvi premiere <tool>`, `zenvi adobe doctor`. Add `--json` for
+machine-readable receipts.

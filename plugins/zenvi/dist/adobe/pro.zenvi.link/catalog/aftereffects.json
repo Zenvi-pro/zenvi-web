@@ -1,0 +1,24 @@
+{
+  "host": "aftereffects",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "ae_get_state",
+      "title": "After Effects state",
+      "description": "Where After Effects is right now: app version, the open project (path, unsaved changes, item count), the active comp (id, size, fps, duration, work area, current time, layer count), the selected project items and layers, and the render queue. Call it first, and again whenever the user may have changed something by hand. Read-only and cheap.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    }
+  ]
+}

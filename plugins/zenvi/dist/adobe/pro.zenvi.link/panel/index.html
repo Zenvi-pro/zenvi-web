@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Zenvi Link</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Zenvi Link</h1>
+        <span id="app" class="muted"></span>
+      </header>
+
+      <section class="status" aria-label="Status">
+        <dl>
+          <dt>Server</dt>
+          <dd id="server-state">Looking for the Zenvi Link service&hellip;</dd>
+          <dt>URL</dt>
+          <dd id="server-url" class="mono">&mdash;</dd>
+          <dt>Runs in</dt>
+          <dd id="server-mode">&mdash;</dd>
+          <dt>Zenvi desktop</dt>
+          <dd id="desktop-state">&mdash;</dd>
+        </dl>
+        <p id="notice" class="notice" hidden></p>
+      </section>
+
+      <section class="actions">
+        <button id="copy-config" type="button" disabled>Copy MCP config</button>
+        <button id="send-to-zenvi" type="button" disabled title="Not available yet">Send to Zenvi</button>
+      </section>
+      <p id="action-result" class="muted small" hidden></p>
+
+      <section class="calls" aria-label="Recent tool calls">
+        <h2>Recent tool calls</h2>
+        <ol id="calls">
+          <li class="muted empty">No calls yet</li>
+        </ol>
+      </section>
+    </main>
+    <script src="panel.js"></script>
+  </body>
+</html>

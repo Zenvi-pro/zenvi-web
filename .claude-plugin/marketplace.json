@@ -10,8 +10,8 @@
     {
       "name": "zenvi",
       "source": "./plugins/zenvi",
-      "description": "Edit videos with Zenvi: import, cut, arrange, titles, transitions, effects, audio, frame previews, rendering, and handoff to the Zenvi app or web editor.",
-      "version": "0.1.0",
+      "description": "Edit videos with Zenvi: import, cut, arrange, titles, transitions, effects, audio, frame previews, rendering, and handoff to the Zenvi app or web editor; drive After Effects and Premiere Pro (Zenvi Link); Remotion and HyperFrames round trips; motion-design taste built in.",
+      "version": "0.2.0",
       "author": {
         "name": "Zenvi"
       },

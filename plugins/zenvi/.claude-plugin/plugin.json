@@ -1,7 +1,7 @@
 {
   "name": "zenvi",
-  "version": "0.1.0",
-  "description": "Edit videos with Zenvi from Claude Code: import footage, cut and arrange it, add titles, transitions, effects and music, look at frames, render, then open the result in the Zenvi app or share a web editor link.",
+  "version": "0.2.0",
+  "description": "Edit videos with Zenvi from Claude Code: import footage, cut and arrange it, add titles, transitions, effects and music, look at frames, render, then open the result in the Zenvi app or share a web editor link. Drives After Effects and Premiere Pro through the Zenvi Link extension, hands edits between Zenvi, Adobe apps, Remotion and HyperFrames, and applies a motion-design taste guide.",
   "author": {
     "name": "Zenvi",
     "url": "https://zenvi.pro"
@@ -9,5 +9,5 @@
   "homepage": "https://zenvi.pro",
   "repository": "https://github.com/Zenvi-pro/zenvi-web",
   "license": "GPL-3.0-or-later",
-  "keywords": ["video", "video-editing", "editor", "ffmpeg", "mcp", "zenvi"]
+  "keywords": ["video", "video-editing", "editor", "ffmpeg", "mcp", "zenvi", "after-effects", "premiere-pro", "remotion", "motion-design"]
 }

@@ -1,0 +1,24 @@
+{
+  "host": "premiere",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "premiere_get_state",
+      "title": "Premiere Pro state",
+      "description": "Where Premiere Pro is right now: app version, the open project (path, name), every sequence (id, name, duration, frame size, fps), the active sequence with its playhead, in/out points and selected clips. Call it first, and again whenever the user may have changed something by hand. Read-only and cheap.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    }
+  ]
+}
