@@ -99,7 +99,7 @@
         }
         frame = Math.round(time * comp.frameRate);
         factor = Math.max(1, Math.ceil(comp.width / maxWidth - 1e-9));
-        file = new File(AE.tempFolder("captures").fsName + "/frame-" + comp.id + "-" + frame + "-" + new Date().getTime() + ".png");
+        file = new File(AE.tempFolder("captures").fullName + "/frame-" + comp.id + "-" + frame + "-" + new Date().getTime() + ".png");
         previous = comp.resolutionFactor;
         try {
             if (previous[0] !== factor || previous[1] !== factor) {

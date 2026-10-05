@@ -579,7 +579,14 @@
             property.setInterpolationTypeAtKey(indexes[i], inType[i], outType[i]);
             property.setTemporalContinuousAtKey(indexes[i], false);
             property.setTemporalAutoBezierAtKey(indexes[i], false);
-            property.setTemporalEaseAtKey(indexes[i], inEase[i], outEase[i]);
+            if (inType[i] === KeyframeInterpolationType.BEZIER || outType[i] === KeyframeInterpolationType.BEZIER) {
+                property.setTemporalEaseAtKey(indexes[i], inEase[i], outEase[i]);
+                if (inType[i] !== outType[i]) {
+                    // Setting an ease can turn a linear or hold side into Bezier, as the
+                    // Keyframe Velocity dialog does; put the other side back.
+                    property.setInterpolationTypeAtKey(indexes[i], inType[i], outType[i]);
+                }
+            }
             if (property.isSpatial) {
                 if (opts.spatial === "linear") {
                     property.setSpatialAutoBezierAtKey(indexes[i], false);

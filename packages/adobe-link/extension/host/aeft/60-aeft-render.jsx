@@ -255,7 +255,7 @@
         requireIdleQueue();
         choice = templatesFor(comp, templateName, preset, ctx);
         if (output === null) {
-            output = project.file.parent.fsName + "/Renders/" + AE.safeFileName(comp.name) + "." + (choice.ext || "mov");
+            output = project.file.parent.fullName + "/Renders/" + AE.safeFileName(comp.name) + "." + (choice.ext || "mov");
         }
         file = new File(withExtension(output, choice.ext, ctx));
         if (file.exists && !overwrite) {
@@ -330,7 +330,7 @@
             ctx.warn("alpha: true asked for transparency, but template \"" + choice.template + "\" may not keep it");
         }
         if (output === null) {
-            output = AE.tempFolder("renders").fsName + "/" + AE.safeFileName(comp.name) + "-" + comp.id + "-" + AE.fileStamp(now) + "." + (choice.ext || "mov");
+            output = AE.tempFolder("renders").fullName + "/" + AE.safeFileName(comp.name) + "-" + comp.id + "-" + AE.fileStamp(now) + "." + (choice.ext || "mov");
         }
         file = new File(withExtension(output, choice.ext, ctx));
         if (!aep) {

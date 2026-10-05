@@ -137,7 +137,8 @@
             leading: leading !== null ? leading : spec.leading,
             justification: AE.justificationValue(justification),
             fonts: AE.fontCandidates(font, spec.bold),
-            requestedFont: font
+            requestedFont: font,
+            reset: true
         };
         if (subtitle !== null) {
             if (!subtitle.trim().length) {
@@ -151,7 +152,8 @@
                 tracking: AE.styleTracking(style === "lower-third" ? "role" : "subtitle", subtitle),
                 leading: subSpec.leading,
                 justification: spec.justification,
-                fonts: AE.fontCandidates(null, false)
+                fonts: AE.fontCandidates(null, false),
+                reset: true
             };
         }
 

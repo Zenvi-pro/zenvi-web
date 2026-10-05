@@ -110,8 +110,10 @@
      * Apply `spec` to a Source Text property and set it: {text, size, fill
      * ([r, g, b]), stroke ([r, g, b] | null = none), strokeWidth, tracking,
      * leading (x size), justification (enum), box ([w, h]), fonts (candidate
-     * PostScript names, first available wins), requestedFont}. Returns the
-     * applied {font, size}.
+     * PostScript names, first available wins), requestedFont, reset (start
+     * from default character and paragraph styles, so nothing left in the
+     * user's Character panel, such as faux bold or baseline shift, leaks
+     * in)}. Returns the applied {font, size}.
      */
     AE.setTextDocument = function (textProperty, spec, ctx) {
         var doc = textProperty.value;
@@ -120,6 +122,10 @@
         var skipped = [];
         var available;
         var i;
+        if (spec.reset) {
+            doc.resetCharStyle();
+            doc.resetParagraphStyle();
+        }
         if (spec.text !== undefined) {
             doc.text = spec.text;
         }

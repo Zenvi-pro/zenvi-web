@@ -248,10 +248,10 @@
         return /^(Macintosh|Windows)/.test(File.fs) ? key.toLowerCase() : key;
     };
 
-    /** A folder under the system temp folder (created when missing). */
+    /** A folder under the system temp folder (created when missing). Paths are joined on fullName, which always uses "/". */
     AE.tempFolder = function (name) {
-        var base = new Folder(Folder.temp.fsName + "/zenvi-link");
-        var folder = new Folder(base.fsName + "/" + name);
+        var base = new Folder(Folder.temp.fullName + "/zenvi-link");
+        var folder = new Folder(base.fullName + "/" + name);
         if (!base.exists) {
             base.create();
         }
