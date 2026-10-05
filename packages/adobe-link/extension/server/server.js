@@ -373,6 +373,10 @@ function createLinkServer(options) {
           else res.end();
         });
       });
+      // Node 12 (CEP 10: After Effects 18.0-18.3, Premiere Pro 15.0-15.3) closes
+      // sockets idle for 120 s by default, which drops the response of a long
+      // call. Calls are bounded by the queue's own timeouts instead.
+      server.timeout = 0;
       server.on("connection", (socket) => {
         sockets.add(socket);
         socket.on("close", () => sockets.delete(socket));
