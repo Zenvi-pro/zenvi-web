@@ -1,9 +1,9 @@
-/// <reference types="types-for-adobe/AfterEffects/26.0" />
 /* eslint-disable @typescript-eslint/no-explicit-any -- tool arguments arrive as untyped JSON, and ExtendScript values are dynamic */
 
 /**
- * Types for `npm run typecheck:jsx`: the After Effects host scripts are
- * checked (checkJs) against types-for-adobe's After Effects 26.0 DOM. This
+ * Types for `npm run typecheck:jsx` (tsconfig.jsx-aeft.json): the After
+ * Effects host scripts are checked (checkJs) against types-for-adobe's After
+ * Effects 26.0 DOM. This
  * file adds only what those typings cannot know: the ES5 members the host
  * scripts get from common/01-polyfills.jsx and common/00-json2.jsx, and our
  * own runtime (ZenviLink, common/10-zenvi.jsx) with the ZenviLink.ae helpers

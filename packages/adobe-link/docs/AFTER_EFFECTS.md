@@ -327,7 +327,9 @@ npm run gen:catalog -w @zenvi/adobe-link        # then commit extension/catalog/
   without applyFill, fonts that do not take before AE 24, saveFrameToPng
   writing late, render-queue templates per version.
 - `typecheck:jsx` checks the scripts with `checkJs` against types-for-adobe
-  (`extension/host/aeft/types/`), so a wrong DOM name (`comp.bgColour`,
+  (`tsconfig.jsx-aeft.json`, with our own globals in `types/aeft-host.d.ts`;
+  `scripts/typecheck-jsx.mjs` runs every `tsconfig.jsx*.json`), so a wrong DOM
+  name (`comp.bgColour`,
   `layers.addSolidLayer`) or a misspelled `ZenviLink.ae` helper fails.
 - A test checks that every literal TASTE path the scripts read exists, and
   that every tool called bare keeps undo groups balanced.

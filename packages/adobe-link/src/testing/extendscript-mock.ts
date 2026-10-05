@@ -84,16 +84,11 @@ export class FsEntryMock {
 }
 
 export class FileMock extends FsEntryMock {
-  /** "BINARY" reads and writes one character per byte, as in ExtendScript. */
   encoding = "UTF-8";
   lineFeed = "Unix";
   private mode: string | undefined;
   private buffer = "";
   private position = 0;
-
-  private get nodeEncoding(): BufferEncoding {
-    return this.encoding.toUpperCase() === "BINARY" ? "latin1" : "utf8";
-  }
 
   get length(): number {
     return this.exists ? statSync(this.fsName).size : 0;
@@ -114,20 +109,10 @@ export class FileMock extends FsEntryMock {
       this.buffer = "";
       return mode === "e" || mode === "a";
     }
-    this.buffer = readFileSync(this.fsName, this.nodeEncoding);
+    // encoding "BINARY" keeps one character per byte, as in ExtendScript.
+    this.buffer = readFileSync(this.fsName, /^binary$/i.test(this.encoding) ? "latin1" : "utf8");
     if (mode === "a") this.position = this.buffer.length;
     return true;
-  }
-
-  /** Move the read position: mode 0 from the start, 1 from the current position, 2 from the end. */
-  seek(pos: number, mode = 0): boolean {
-    const base = mode === 1 ? this.position : mode === 2 ? this.buffer.length : 0;
-    this.position = Math.max(0, Math.min(this.buffer.length, base + pos));
-    return true;
-  }
-
-  tell(): number {
-    return this.position;
   }
 
   read(chars?: number): string {
@@ -145,6 +130,17 @@ export class FileMock extends FsEntryMock {
     return line;
   }
 
+  /** Move the read position: mode 0 from the start, 1 from the current position, 2 from the end. */
+  seek(pos: number, mode = 0): boolean {
+    const base = mode === 1 ? this.position : mode === 2 ? this.buffer.length : 0;
+    this.position = Math.max(0, Math.min(this.buffer.length, base + pos));
+    return true;
+  }
+
+  tell(): number {
+    return this.position;
+  }
+
   write(...texts: unknown[]): boolean {
     if (this.mode === undefined || this.mode === "r") return false;
     this.buffer += texts.map(String).join("");
@@ -156,7 +152,7 @@ export class FileMock extends FsEntryMock {
   }
 
   close(): boolean {
-    if (this.mode === "w" || this.mode === "e" || this.mode === "a") writeFileSync(this.fsName, this.buffer, this.nodeEncoding);
+    if (this.mode === "w" || this.mode === "e" || this.mode === "a") writeFileSync(this.fsName, this.buffer, /^binary$/i.test(this.encoding) ? "latin1" : "utf8");
     this.mode = undefined;
     return true;
   }
