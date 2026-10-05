@@ -122,6 +122,19 @@ export class FileMock extends FsEntryMock {
     return text;
   }
 
+  /** Move the read position: mode 0 from the start (default), 1 from the current position, 2 from the end. */
+  seek(pos: number, mode = 0): boolean {
+    const base = mode === 1 ? this.position : mode === 2 ? this.buffer.length : 0;
+    const target = base + pos;
+    if (this.mode === undefined || target < 0 || target > this.buffer.length) return false;
+    this.position = target;
+    return true;
+  }
+
+  tell(): number {
+    return this.position;
+  }
+
   readln(): string {
     const newline = this.buffer.indexOf("\n", this.position);
     const end = newline < 0 ? this.buffer.length : newline;
