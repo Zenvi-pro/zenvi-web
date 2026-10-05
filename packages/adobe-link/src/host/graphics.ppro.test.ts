@@ -28,7 +28,31 @@ describe("premiere_add_text with a PNG title", () => {
     const title = edit.sequence.videoTrackList[2]?.clipList[0];
     expect(title?.span).toMatchObject({ start: 1, end: 6 });
     expect(title?.componentList[1]?.param("Scale").value).toBe(200);
-    expect(receipt.warnings).toContain("Scaled the 960x540 image to the frame width (200%)");
+    expect(receipt.warnings).toContain("Scaled the 960x540 image to 200%");
+    expect(receipt.data.layout).toEqual({ scale: 200, position: [960, 540] });
+  });
+
+  test("a graphic smaller than the frame keeps its size and sits at its placement inside title-safe", () => {
+    const fx = loadPremiere();
+    const edit = standardEdit(fx);
+    const png = fx.file("name.png", pngHead(600, 120));
+    const receipt = fx.call("premiere_add_text", { text: "Ada Lovelace", style: "lower-third", image: png, time: 0 });
+    // Left edge on title-safe x (10 % of 1920), bottom at 80 % of the height.
+    expect(receipt.data.layout).toEqual({ scale: 100, position: [492, 804] });
+    const motion = edit.sequence.videoTrackList[1]?.clipList[0]?.componentList[1];
+    expect(motion?.param("Position").value).toEqual([492 / 1920, 804 / 1080]);
+    expect(motion?.param("Scale").calls).toEqual([]);
+    expect(receipt.warnings).toEqual([]);
+  });
+
+  test("vertical frames keep graphics clear of the top 12 %; oversized graphics shrink to fit title-safe", () => {
+    const fx = loadPremiere();
+    fx.mock.project.addSequence({ name: "Reel", width: 1080, height: 1920, fps: 30 });
+    const top = fx.call("premiere_add_text", { text: "Hook", image: fx.file("hook.png", pngHead(800, 200)), placement: "top-center", time: 0 });
+    expect(top.data.layout).toEqual({ scale: 100, position: [540, 330.4] });
+    const wide = fx.call("premiere_add_text", { text: "Wide", image: fx.file("wide.png", pngHead(2000, 400)), time: 4 });
+    expect(wide.data.layout).toEqual({ scale: 43.2, position: [540, 960] });
+    expect(wide.warnings).toContain("Scaled the 2000x400 image to 43.2%");
   });
 
   test("vertical sequences keep the 1080-wide type scale; short durations warn about reading time", () => {

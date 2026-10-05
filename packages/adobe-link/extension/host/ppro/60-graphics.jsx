@@ -180,21 +180,97 @@
         } else {
             ctx.warn("The template exposes no colour control; it keeps its own colour");
         }
-        clip = P.refindClip(sequence, clip.nodeId).clip;
+        clip = (P.refindClip(sequence, clip.nodeId) || {clip: clip}).clip;
         P.setTimeProperty(clip, "end", endTicks);
         result.steps += 1;
         return clip;
     }
 
-    function placeImage(sequence, path, trackIndex, startTicks, endTicks, ctx, result) {
+    /**
+     * The title-safe box of a frame (TASTE 3): a 10 % inset, or for 9:16 the
+     * vertical safe area (top 12 %, bottom 20 %, 10 % at the sides).
+     */
+    P.titleSafe = function (width, height) {
+        var layout = TASTE.layout;
+        var vertical = height > width && Math.abs(width / height - 9 / 16) < 0.02;
+        return {
+            left: width * layout.titleSafe,
+            right: width * (1 - layout.titleSafe),
+            top: height * (vertical ? layout.verticalTop : layout.titleSafe),
+            bottom: height * (1 - (vertical ? layout.verticalBottom : layout.titleSafe)),
+            vertical: vertical
+        };
+    };
+
+    /**
+     * Centre (sequence pixels) for a graphic of w x h at a TASTE placement: inside
+     * title-safe, lower thirds left-aligned with their bottom at 80 % of the frame
+     * height (70 % on vertical).
+     */
+    P.placementCenter = function (placement, width, height, w, h) {
+        var safe = P.titleSafe(width, height);
+        var lowerThird = TASTE.layout.lowerThird;
+        switch (placement) {
+        case "lower-third":
+            return [safe.left + w / 2, height * (safe.vertical ? lowerThird.baselineVertical : lowerThird.baselineLandscape) - h / 2];
+        case "top-left":
+            return [safe.left + w / 2, safe.top + h / 2];
+        case "top-center":
+            return [width / 2, safe.top + h / 2];
+        case "bottom-center":
+            return [width / 2, safe.bottom - h / 2];
+        default:
+            return [width / 2, height / 2];
+        }
+    };
+
+    function motionParam(clip, name, index) {
+        var motion = P.motionOf(clip);
+        return motion ? P.findParam(motion, [name], index) : null;
+    }
+
+    /**
+     * A full-frame title image (the frame's aspect ratio) fills the frame; a
+     * smaller graphic keeps its pixel size (scaled down to fit title-safe when
+     * larger) and sits at `placement`.
+     */
+    function layoutImage(sequence, clip, size, placement, ctx, result) {
+        var width = sequence.frameSizeHorizontal;
+        var height = sequence.frameSizeVertical;
+        var safe = P.titleSafe(width, height);
+        var scaleParam = motionParam(clip, "Scale", P.MOTION_PARAMS.scale[1]);
+        var positionParam = motionParam(clip, "Position", P.MOTION_PARAMS.position[1]);
+        var scale;
+        var center;
+        if (!size || size.width <= 0 || size.height <= 0 || !scaleParam || !positionParam) {
+            ctx.warn("Could not read the image size; it is placed as Premiere scales it");
+            return {scale: null, position: null};
+        }
+        if (Math.abs(size.width / size.height - width / height) < 0.01) {
+            scale = width / size.width;
+            center = [width / 2, height / 2];
+        } else {
+            scale = Math.min(1, (safe.right - safe.left) / size.width, (safe.bottom - safe.top) / size.height);
+            center = P.placementCenter(placement, width, height, size.width * scale, size.height * scale);
+        }
+        if (Math.abs(scale - 1) > 0.0001) {
+            scaleParam.setValue(Z.round(scale * 100, 4), true);
+            result.steps += 1;
+            ctx.warn("Scaled the " + size.width + "x" + size.height + " image to " + Z.round(scale * 100, 2) + "%");
+        }
+        if (Math.abs(center[0] - width / 2) > 0.01 || Math.abs(center[1] - height / 2) > 0.01) {
+            positionParam.setValue(P.positionToDom(sequence, center), true);
+            result.steps += 1;
+        }
+        return {scale: Z.round(scale * 100, 4), position: [Z.round(center[0], 2), Z.round(center[1], 2)]};
+    }
+
+    function placeImage(sequence, path, trackIndex, startTicks, endTicks, placement, ctx, result) {
         var file = P.itemForFile(path, ctx);
         var track = sequence.videoTracks[trackIndex];
         var before = P.clipIds(sequence);
         /** @type {TrackItem | null} */
         var clip = null;
-        var size;
-        var motion;
-        var scale;
         var half = Number(sequence.timebase) / 2;
         if (file.imported) {
             result.steps += 1;
@@ -212,18 +288,8 @@
         }
         P.setTimeProperty(clip, "end", endTicks);
         result.steps += 1;
-        clip = P.refindClip(sequence, clip.nodeId).clip;
-        size = P.pngSize(path);
-        if (size && size.width > 0 && size.width !== sequence.frameSizeHorizontal) {
-            motion = P.motionOf(clip);
-            scale = motion ? P.findParam(motion, ["Scale"], P.MOTION_PARAMS.scale[1]) : null;
-            if (scale) {
-                scale.setValue(Z.round(sequence.frameSizeHorizontal / size.width * 100, 4), true);
-                result.steps += 1;
-                ctx.warn("Scaled the " + size.width + "x" + size.height + " image to the frame width (" +
-                    Z.round(sequence.frameSizeHorizontal / size.width * 100, 2) + "%)");
-            }
-        }
+        clip = (P.refindClip(sequence, clip.nodeId) || {clip: clip}).clip;
+        result.layout = layoutImage(sequence, clip, P.pngSize(path), placement, ctx, result);
         result.imported = file.imported;
         return clip;
     }
@@ -244,7 +310,7 @@
         var reading = P.readingTime(text);
         var startTicks;
         var endTicks;
-        var result = {steps: 0, imported: false};
+        var result = {steps: 0, imported: false, layout: null};
         var clip;
         var longLines;
         var start;
@@ -300,7 +366,7 @@
         if (mogrt !== null) {
             clip = placeMogrt(sequence, mogrt, trackIndex, startTicks, endTicks, text, size, rgb, ctx, result);
         } else {
-            clip = placeImage(sequence, image, trackIndex, startTicks, endTicks, ctx, result);
+            clip = placeImage(sequence, image, trackIndex, startTicks, endTicks, placement, ctx, result);
         }
         return Z.applied("Added the title \"" + (text.length > 40 ? text.slice(0, 37) + "..." : text) + "\" on V" + (trackIndex + 1) + " at " +
             Z.round(start, 3) + " s for " + Z.round(P.ticksToSeconds(endTicks - startTicks), 3) + " s (" + (mogrt !== null ? "template" : "image") + ")", {
@@ -311,6 +377,7 @@
             font_size: size,
             color: Z.color.toHex(rgb),
             placement: mogrt !== null ? "template" : placement,
+            layout: result.layout,
             reading_time: Z.round(reading, 2),
             imported: result.imported
         }, result.steps);

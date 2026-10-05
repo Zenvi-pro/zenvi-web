@@ -1067,7 +1067,7 @@
     {
       "name": "premiere_add_text",
       "title": "Add a title",
-      "description": "Add a title to the sequence on a free video track above the footage. Premiere's scripting API cannot type text into its own title templates, so the title comes from `image` (a transparent PNG title, e.g. rendered by Zenvi; scaled to the frame width) or from `mogrt` (an After Effects-authored Essential Graphics template whose text control is set to `text`, plus its size and colour controls when it exposes them). Defaults (TASTE §1, §4): `style` title 72 px at 1080p (headline 96, subtitle 44, lower-third 54, caption 42), colour #F7F7F5, placement inside title-safe, on screen for 1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). Without `image` or `mogrt` the call is refused with what to pass. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "description": "Add a title to the sequence on a free video track above the footage. Premiere's scripting API cannot type text into its own title templates, so the title comes from `image` (a transparent PNG, e.g. rendered by Zenvi: one with the frame's aspect fills the frame, a smaller graphic sits at `placement` inside title-safe) or from `mogrt` (an After Effects-authored Essential Graphics template whose text control is set to `text`, plus its size and colour controls when it exposes them). Defaults (TASTE §1, §4): `style` title 72 px at 1080p (headline 96, subtitle 44, lower-third 54, caption 42), colour #F7F7F5, placement inside title-safe, on screen for 1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). Without `image` or `mogrt` the call is refused with what to pass. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1118,7 +1118,7 @@
             ]
           },
           "placement": {
-            "description": "Where the title sits, inside title-safe; default: lower-third for that style, bottom-center for captions, else center",
+            "description": "Where an image smaller than the frame sits, inside title-safe (9:16: clear of the top 12 % and bottom 20 %); default: lower-third for that style, bottom-center for captions, else center",
             "type": "string",
             "enum": [
               "center",
@@ -1151,7 +1151,7 @@
             "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
           },
           "image": {
-            "description": "A transparent PNG title to place",
+            "description": "A transparent PNG title: the frame's aspect fills the frame, a smaller graphic keeps its pixel size",
             "type": "string",
             "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
           },

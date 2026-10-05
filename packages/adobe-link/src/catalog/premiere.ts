@@ -346,8 +346,9 @@ export const premiereAddText = defineHostTool({
   title: "Add a title",
   description:
     "Add a title to the sequence on a free video track above the footage. Premiere's scripting API cannot type text into " +
-    "its own title templates, so the title comes from `image` (a transparent PNG title, e.g. rendered by Zenvi; scaled to " +
-    "the frame width) or from `mogrt` (an After Effects-authored Essential Graphics template whose text control is set to " +
+    "its own title templates, so the title comes from `image` (a transparent PNG, e.g. rendered by Zenvi: one with the " +
+    "frame's aspect fills the frame, a smaller graphic sits at `placement` inside title-safe) or from `mogrt` (an After " +
+    "Effects-authored Essential Graphics template whose text control is set to " +
     "`text`, plus its size and colour controls when it exposes them). Defaults (TASTE §1, §4): `style` title 72 px at 1080p " +
     "(headline 96, subtitle 44, lower-third 54, caption 42), colour #F7F7F5, placement inside title-safe, on screen for " +
     "1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). Without `image` or `mogrt` the call is " +
@@ -357,12 +358,14 @@ export const premiereAddText = defineHostTool({
     style: z.enum(["headline", "title", "subtitle", "lower-third", "caption"]).default("title").describe("Type scale step"),
     font_size: z.number().min(6).max(1000).optional().describe("Override the style's size, in pixels at the sequence's size"),
     color: color.default(TASTE.color.palette.paper).describe("Text colour, #RRGGBB or [r, g, b] 0-1"),
-    placement: placement.optional().describe("Where the title sits, inside title-safe; default: lower-third for that style, bottom-center for captions, else center"),
+    placement: placement
+      .optional()
+      .describe("Where an image smaller than the frame sits, inside title-safe (9:16: clear of the top 12 % and bottom 20 %); default: lower-third for that style, bottom-center for captions, else center"),
     time: seconds.optional().describe("Sequence time of the title's first frame; default: the playhead"),
     duration: z.number().positive().max(3600).optional().describe("Seconds on screen; default: reading time"),
     track: z.int().min(0).max(98).optional().describe("Video track index (0 = V1); default: the lowest track above V1 that is free for the whole duration"),
     mogrt: absolutePath.optional().describe("An After Effects-authored .mogrt with a text control"),
-    image: absolutePath.optional().describe("A transparent PNG title to place"),
+    image: absolutePath.optional().describe("A transparent PNG title: the frame's aspect fills the frame, a smaller graphic keeps its pixel size"),
     sequence: sequenceRef.optional(),
   }),
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
