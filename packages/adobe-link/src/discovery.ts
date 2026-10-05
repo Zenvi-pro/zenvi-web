@@ -104,6 +104,8 @@ export async function probeHost(url: string, token: string, host: HostId, option
         params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "zenvi-cli", version: options.clientVersion ?? "0" } },
       }),
       signal: AbortSignal.timeout(options.timeoutMs ?? 1500),
+      // Only the exact URL counts: a redirect (to another port, another server) is unreachable.
+      redirect: "manual",
     });
     if (response.status !== 200) {
       await response.body?.cancel().catch(() => undefined);
