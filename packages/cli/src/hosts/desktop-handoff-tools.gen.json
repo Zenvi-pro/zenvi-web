@@ -1,0 +1,557 @@
+{
+  "generated_by": "packages/cli/scripts/sync-desktop-handoff-tools.mjs",
+  "manifest": {
+    "source": "zenvi-core src/classes/editor_tools",
+    "manifest_version": 1,
+    "label": "zenvi-core jashan/handoff-core 46db82a57"
+  },
+  "tools": [
+    {
+      "name": "export_to_after_effects_tool",
+      "title": "Export to After Effects",
+      "description": "Write the open project as an After Effects script (.jsx) that rebuilds the timeline as one comp.\n\nUse when the user wants to finish or hand off the edit in After Effects. Writes <name>.jsx (footage, layers, timing, transforms with eased keyframes, opacity, audio levels, titles as text layers, mapped effects, transitions, markers), a media/ folder when collect_media is true, and README.txt, into output_dir (default: next to the project file). Returns the paths and warnings for anything After Effects cannot reproduce. Run it with File > Scripts > Run Script File, or use send_to_after_effects_tool while After Effects is connected. Changes nothing in the project.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "output_dir": {
+            "type": "string",
+            "description": "Folder to write into. Empty = next to the project file.",
+            "default": ""
+          },
+          "collect_media": {
+            "type": "boolean",
+            "description": "Copy the media into <output_dir>/media so the folder travels on its own (default true).",
+            "default": true
+          },
+          "open_folder": {
+            "type": "boolean",
+            "description": "Show the folder in Finder / Explorer afterwards.",
+            "default": false
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "send_to_after_effects_tool",
+      "title": "Send to After Effects",
+      "description": "Rebuild the open project as a comp inside a connected After Effects (export to a temporary .jsx and run it there).\n\nUse for \"open this edit in After Effects\". After Effects must be running with Zenvi Link (list_hosts); otherwise the call is refused with how to connect it. The script creates a \"Zenvi - <project>\" folder with the footage and the comp, as one After Effects undo step, and the result names the comp and any warnings. Refine it afterwards with the ae_* tools.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "collect_media": {
+            "type": "boolean",
+            "description": "Copy the media next to the script first (default false: After Effects reads it where it is).",
+            "default": false
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "export_to_premiere_tool",
+      "title": "Export to Premiere Pro",
+      "description": "Write the open project as Final Cut Pro 7 XML tuned for Premiere Pro's importer.\n\nUse when the user wants to finish or hand off the edit in Premiere Pro. Keeps clips, trims, tracks, Basic Motion and Opacity keyframes, audio levels, cross dissolves and markers; titles become PNG stills next to the XML. Import it with File > Import in Premiere, or use send_to_premiere_tool while Premiere is connected. Returns the paths and warnings for anything Premiere cannot reproduce. Changes nothing in the project.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "output_path": {
+            "type": "string",
+            "description": "The .xml file to write. Empty = <project name>.xml next to the project file.",
+            "default": ""
+          },
+          "collect_media": {
+            "type": "boolean",
+            "description": "Copy the media next to the XML first.",
+            "default": false
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "send_to_premiere_tool",
+      "title": "Send to Premiere Pro",
+      "description": "Open the project in a connected Premiere Pro as a new sequence (export FCP XML to a temporary folder and import it there).\n\nUse for \"open this edit in Premiere\". Premiere Pro must be running with Zenvi Link (list_hosts); otherwise the call is refused with how to connect it. Refine the sequence afterwards with the premiere_* tools.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "import_timeline_xml_tool",
+      "title": "Import timeline XML",
+      "description": "Bring a Final Cut Pro 7 / Premiere Pro XML timeline into the open project as native, editable clips, as one undo step.\n\nUse for the way back from Premiere: a sequence written by premiere_export_xml (bring_from_premiere does both steps), or any FCP7 XML. placement new_tracks (default) adds the sequence on new tracks; at_playhead places it at the playhead. Media that cannot be found is listed in the result.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "The .xml file."
+          },
+          "placement": {
+            "default": "new_tracks",
+            "description": "new_tracks = on new tracks from 0 s (default); at_playhead = starting at the playhead.",
+            "enum": [
+              "new_tracks",
+              "at_playhead"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "list_remotion_compositions_tool",
+      "title": "List Remotion compositions",
+      "description": "List the compositions of a Remotion project: id, width, height, fps, duration, default props and source file.\n\nUse before import_remotion_project_tool to choose compositions and props. Runs the project's own Remotion CLI with Node. Read-only.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "project_dir": {
+            "type": "string",
+            "description": "The Remotion project folder (the one with package.json)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_dir"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "import_remotion_project_tool",
+      "title": "Import Remotion project",
+      "description": "Render Remotion compositions with the project's own toolchain and place them as linked clips; a project Zenvi generated comes back as native clips.\n\nUse to bring code video into the edit. Each composition renders into the project's links folder (ProRes 4444 when any pixel is transparent, else H.264) and lands as a linked clip that remembers its source: update_linked_clip_tool changes props and re-renders, open_linked_source_tool opens the code, rerender_linked_clip_tool picks up code edits. A project with src/zenvi/timeline.json (from export_to_remotion_tool) restores native clips when restore_native is true. Rendering takes seconds to minutes; the placement is one undo step.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "project_dir": {
+            "type": "string",
+            "description": "The Remotion project folder."
+          },
+          "compositions": {
+            "description": "Composition ids to import. Empty = the Zenvi timeline when the project has one, else every composition.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "props": {
+            "description": "Input props per composition id, e.g. {\"Intro\": {\"title\": \"Launch day\"}}.",
+            "type": "object"
+          },
+          "codec": {
+            "default": "auto",
+            "description": "auto renders one still first and picks prores4444 when any pixel is transparent, else h264; qtrle is the alpha fallback.",
+            "enum": [
+              "auto",
+              "prores4444",
+              "h264",
+              "qtrle"
+            ],
+            "type": "string"
+          },
+          "position": {
+            "description": "Timeline second where the first clip starts. Empty = the playhead.",
+            "minimum": 0,
+            "nullable": true,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "track": {
+            "type": "string",
+            "description": "UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video (a new track when none is free).",
+            "default": ""
+          },
+          "restore_native": {
+            "type": "boolean",
+            "description": "Restore a Zenvi-generated project as native clips instead of a linked render.",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_dir"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "export_to_remotion_tool",
+      "title": "Export to Remotion",
+      "description": "Generate a Remotion project from the open project so the edit can continue as code.\n\nWrites package.json (a pinned Remotion version), src/Root.tsx with the composition ZenviTimeline, src/zenvi/timeline.json (tracks, clips, keyframes with easing, titles, transitions), a generic renderer and public/zenvi-media when copy_media is true, plus a README. `npx remotion studio` previews it; import_remotion_project_tool brings it back as native clips. install runs npm install. Changes nothing in the project.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "output_dir": {
+            "type": "string",
+            "description": "Folder for the new Remotion project (created; must be empty or missing)."
+          },
+          "copy_media": {
+            "type": "boolean",
+            "description": "Copy the media into public/zenvi-media (default true).",
+            "default": true
+          },
+          "install": {
+            "type": "boolean",
+            "description": "Run npm install afterwards (slow; needs the network).",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "output_dir"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "import_hyperframes_project_tool",
+      "title": "Import HyperFrames project",
+      "description": "Import a HyperFrames project (an HTML video composition) into the open project.\n\n<video>, <img> and <audio> primitives with data-start / data-duration become native, fully editable clips; compositions driven by scripts or animation become linked clips rendered with the project's own HyperFrames CLI. mode auto (default) does both, native imports the primitives only, flatten renders the whole composition as one linked clip. One undo step.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "project_dir": {
+            "type": "string",
+            "description": "The HyperFrames project folder (with index.html)."
+          },
+          "mode": {
+            "default": "auto",
+            "description": "auto = primitives native, the rest linked; native = primitives only; flatten = one linked render of everything.",
+            "enum": [
+              "auto",
+              "native",
+              "flatten"
+            ],
+            "type": "string"
+          },
+          "position": {
+            "description": "Timeline second where the first clip starts. Empty = the playhead.",
+            "minimum": 0,
+            "nullable": true,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "track": {
+            "type": "string",
+            "description": "UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video (a new track when none is free).",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_dir"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "export_to_hyperframes_tool",
+      "title": "Export to HyperFrames",
+      "description": "Generate a HyperFrames project (index.html with a GSAP timeline) from the open project.\n\nClips become <video>, <img> and <audio> primitives with data-start / data-duration / data-track-index, keyframes and transitions a GSAP timeline, titles images; an embedded zenvi-timeline JSON lets import_hyperframes_project_tool restore it losslessly. `npx hyperframes preview` shows it. Changes nothing in the project.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "output_dir": {
+            "type": "string",
+            "description": "Folder for the new HyperFrames project (created; must be empty or missing)."
+          },
+          "copy_media": {
+            "type": "boolean",
+            "description": "Copy the media into the project (default true).",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "output_dir"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "spec"
+    },
+    {
+      "name": "import_linked_media_tool",
+      "title": "Import linked media",
+      "description": "Add a rendered file that keeps a live link to its source as a linked clip, as one undo step.\n\nUse for \"bring this After Effects comp into Zenvi\" after ae_render_for_zenvi\nrendered it, or any render whose source should stay editable (Remotion and\nHyperFrames imports use their own tools). The media is moved (from the temp\nfolder) or copied into the project's links folder, added to Project Files\nwith the link and placed at position (default the playhead) on the lowest\nfree track above the video. Later: get_linked_clip_tool (freshness),\nupdate_linked_clip_tool / rerender_linked_clip_tool, open_linked_source_tool,\nunlink_clip_tool. One undo step removes the clip and the file.\nExample: {\"path\": \"/tmp/Promo.mov\", \"link\": {\"kind\": \"aftereffects\", \"source\":\n{\"aep\": \"/Users/me/promo.aep\", \"composition\": \"Promo\", \"composition_key\": 12}}}.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "link": {
+            "description": "The source link (zenvi_link): {kind: 'aftereffects'|'remotion'|'hyperframes', source: {project_dir, entry, composition, composition_key, file, line, aep}, props: {...}, render: {codec, width, height, fps, duration_frames}}. Never use keys named path/image/resource.",
+            "type": "object"
+          },
+          "name": {
+            "default": "",
+            "description": "Name in Project Files. Empty = the composition name.",
+            "type": "string"
+          },
+          "path": {
+            "description": "The rendered media file (ProRes 4444 .mov with alpha, H.264 .mp4, qtrle .mov; a WebM is re-encoded to ProRes 4444 because Zenvi drops WebM alpha).",
+            "type": "string"
+          },
+          "position": {
+            "description": "Timeline second where the clip starts. Empty = the playhead.",
+            "minimum": 0,
+            "nullable": true,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "track": {
+            "default": "",
+            "description": "UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video (a new 'Linked' track when none is free).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "link"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "zenvi-core"
+    },
+    {
+      "name": "get_linked_clip_tool",
+      "title": "Linked clip info",
+      "description": "Read a linked clip's source link, props, render settings and whether it is up to date.\n\nUse before editing or re-rendering a linked clip (Remotion / HyperFrames\ncomposition or After Effects comp) or when the user asks \"is this clip up\nto date?\". state is fresh (rendered from the current source), stale (the\ncode / comp / props changed: rerender_linked_clip_tool), rendering, error\n(the last render failed; detail says why) or missing_source (the project\nfolder or .aep is gone). Also lists editable_props with current values and\nthe timeline clips that use the file. Read-only.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "clip_id": {
+            "default": "",
+            "description": "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+            "type": "string"
+          },
+          "file_id": {
+            "default": "",
+            "description": "The linked file's Project Files id instead of a clip.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "source": "zenvi-core"
+    },
+    {
+      "name": "update_linked_clip_tool",
+      "title": "Update linked clip",
+      "description": "Change a linked clip's props (Remotion input props / HyperFrames variables) and re-render it.\n\nUse for \"change the title text in the intro to Launch day\", \"make the\naccent orange\" on a clip that came from code. Props merge into the current\nones; the composition is re-rendered with its own toolchain (seconds to\nminutes) and every clip of the file switches to the new render as one undo\nstep (a shorter render shortens clips and says so in warnings). A failed\nrender changes nothing. With rerender=false only the props are stored (one\nundo step) and the clip reads stale. Example: {\"clip_id\": \"A1B2\", \"props\":\n{\"title\": \"Launch day\"}}.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "clip_id": {
+            "default": "",
+            "description": "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+            "type": "string"
+          },
+          "file_id": {
+            "default": "",
+            "description": "The linked file's Project Files id instead of a clip.",
+            "type": "string"
+          },
+          "props": {
+            "description": "Props to change, merged into the current ones, e.g. {'title': 'Launch day', 'accent': '#FF5A36'}. Names from get_linked_clip_tool editable_props.",
+            "type": "object"
+          },
+          "rerender": {
+            "default": true,
+            "description": "Re-render from source now (default). false = only store the props; the clip stays stale until re-rendered.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "zenvi-core"
+    },
+    {
+      "name": "rerender_linked_clip_tool",
+      "title": "Re-render linked clip",
+      "description": "Re-render a linked clip from its source after the code, comp or assets changed.\n\nUse when get_linked_clip_tool says stale, or the user says \"I edited the\nRemotion composition, update it in Zenvi\". Renders with the source's own\ntoolchain (Remotion / HyperFrames CLI, or After Effects through Zenvi Link)\nwith the stored props, then swaps the media of every clip using the file as\none undo step. A failed or cancelled render changes nothing (the error is\nreported and get_linked_clip_tool shows it).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "clip_id": {
+            "default": "",
+            "description": "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+            "type": "string"
+          },
+          "file_id": {
+            "default": "",
+            "description": "The linked file's Project Files id instead of a clip.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "zenvi-core"
+    },
+    {
+      "name": "open_linked_source_tool",
+      "title": "Open linked source",
+      "description": "Open a linked clip's source for the user: the code file at its line, or the composition's studio.\n\nUse for \"show me the code for this intro\", \"open it in Remotion Studio\",\n\"open the After Effects project\". Opens an app on the user's screen; the\nproject is not changed. After they edit, rerender_linked_clip_tool brings\nthe change in.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "clip_id": {
+            "default": "",
+            "description": "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+            "type": "string"
+          },
+          "file_id": {
+            "default": "",
+            "description": "The linked file's Project Files id instead of a clip.",
+            "type": "string"
+          },
+          "target": {
+            "default": "code",
+            "description": "code = the source file at its line in the user's code editor (Cursor / VS Code / Preferences > Code Editor); studio = Remotion Studio / HyperFrames preview / After Effects.",
+            "enum": [
+              "code",
+              "studio"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "source": "zenvi-core"
+    },
+    {
+      "name": "unlink_clip_tool",
+      "title": "Unlink clip",
+      "description": "Drop a linked clip's source link and keep its rendered media as an ordinary file.\n\nUse for \"stop linking this to the Remotion project\", \"make it a normal\nclip\". Every clip of the file keeps playing the last render; it can no\nlonger be re-rendered or opened at its source. Never deletes clips or\nmedia. One undo step restores the link.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "clip_id": {
+            "default": "",
+            "description": "A timeline clip of the linked file (timeline_clip_id from get_timeline_state_tool). Give this or file_id.",
+            "type": "string"
+          },
+          "file_id": {
+            "default": "",
+            "description": "The linked file's Project Files id instead of a clip.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "source": "zenvi-core"
+    }
+  ]
+}

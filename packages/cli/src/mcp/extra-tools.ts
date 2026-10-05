@@ -25,6 +25,8 @@ import type { McpState } from "./state.js";
 export interface ExtraToolResult {
   receipt: ToolReceipt;
   images?: ToolImage[];
+  /** Who ran it, reported as structuredContent.engine (default portable; null = not an edit of the project). */
+  engine?: "portable" | "desktop" | null;
 }
 
 export interface ExtraCallContext {
@@ -127,7 +129,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const output = requested ? path.resolve(ctx.cwd, requested) : undefined;
         if (desktop) {
           const outcome = await exportOnDesktop(desktop, output);
-          return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)) };
+          return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)), engine: "desktop" };
         }
         const session = state.session;
         const flags: RenderFlags = {
@@ -186,7 +188,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const desktop = await state.desktopExecutor();
         if (desktop) {
           const outcome = await desktop.call("inspect_timeline_tool", { start: seconds, end: seconds, maxFrames: 1 });
-          return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)), images: outcome.images };
+          return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)), images: outcome.images, engine: "desktop" };
         }
         const project = state.session.doc.project;
         const width = Math.max(64, Math.min(1920, Number(args.width) || 768));
@@ -221,8 +223,8 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const file = text(args.path) ? path.resolve(ctx.cwd, text(args.path)!) : state.session.file;
         if (!file) return { receipt: refused(tool, "This project has no file yet: call open_project_file first.") };
         try {
-          const result = await openInDesktop({ config: ctx.config, project: file, clientVersion: VERSION });
-          return { receipt: applied(tool, result.summary, { data: { method: result.method, project: file } }, 0) };
+          const result = await openInDesktop({ config: ctx.config, project: file, deps: state.launcher, clientVersion: VERSION });
+          return { receipt: applied(tool, result.summary, { data: { method: result.method, project: file } }, 0), engine: null };
         } catch (error) {
           return { receipt: failed(tool, error instanceof CliError && error.hint ? `${error.message} ${error.hint}` : (error as Error).message) };
         }

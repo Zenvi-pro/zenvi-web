@@ -12,7 +12,7 @@ import { PassThrough } from "node:stream";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { applied } from "@zenvi/engine/tools";
+import { applied, type ToolReceipt } from "@zenvi/engine/tools";
 import type { Registry } from "../engine/registry.js";
 import { runCli } from "../program.js";
 
@@ -72,19 +72,34 @@ export interface FakeDesktop {
   close(): Promise<void>;
 }
 
+export interface FakeDesktopOptions {
+  /** More tool names to list (handoff tools…). */
+  tools?: string[];
+  /** Receipts for particular tools (default: an applied receipt naming the tool). */
+  handlers?: Record<string, (args: Record<string, unknown>) => ToolReceipt | Promise<ToolReceipt>>;
+  /** Rewrite `<home>/.openshot_qt/gui_mcp.json` when open_project_tool switches projects, like the real app. */
+  home?: string;
+}
+
 /** A desktop app MCP server answering contract-3 receipts. */
-export async function fakeDesktop(token: string, project?: string): Promise<FakeDesktop> {
+export async function fakeDesktop(token: string, project?: string, options: FakeDesktopOptions = {}): Promise<FakeDesktop> {
   const state: FakeDesktop = { url: "", token, calls: [], rejected: 0, project, close: async () => undefined };
   const makeServer = () => {
     const server = new Server({ name: "zenvi-editor", version: "1.0.0-test" }, { capabilities: { tools: {} } });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: ["get_project_info_tool", "open_project_tool", "add_marker_tool", "inspect_timeline_tool"].map((name) => ({ name, inputSchema: { type: "object" as const } })),
+      tools: ["get_project_info_tool", "open_project_tool", "add_marker_tool", "inspect_timeline_tool", ...(options.tools ?? [])].map((name) => ({ name, inputSchema: { type: "object" as const } })),
     }));
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const args = (request.params.arguments ?? {}) as Record<string, unknown>;
       state.calls.push({ tool: request.params.name, args });
-      if (request.params.name === "open_project_tool") state.project = String(args.file_path);
-      const receipt = applied(request.params.name, `desktop ran ${request.params.name}`, { data: { project: state.project ?? null } }, request.params.name === "add_marker_tool" ? 1 : 0);
+      if (request.params.name === "open_project_tool") {
+        state.project = String(args.file_path);
+        if (options.home) await writeDiscovery(options.home, state);
+      }
+      const handler = options.handlers?.[request.params.name];
+      const receipt = handler
+        ? await handler(args)
+        : applied(request.params.name, `desktop ran ${request.params.name}`, { data: { project: state.project ?? null } }, request.params.name === "add_marker_tool" ? 1 : 0);
       const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [{ type: "text", text: JSON.stringify(receipt) }];
       if (request.params.name === "inspect_timeline_tool") content.push({ type: "image", data: Buffer.from("fake-jpeg").toString("base64"), mimeType: "image/jpeg" });
       return { content };

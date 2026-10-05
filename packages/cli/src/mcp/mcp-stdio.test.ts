@@ -75,6 +75,11 @@ describe("zenvi mcp over stdio (real catalog)", () => {
       expect.arrayContaining(["open_project_file", "import_files_tool", "add_clip_to_timeline_tool", "split_clip_tool", "add_title_tool", "preview_frame", "render_video"]),
     );
     expect(names.length).toBeGreaterThan(60);
+    // Host-aware: list_hosts and the resources over stdio.
+    expect(names).toContain("list_hosts");
+    expect((await client.listResources()).resources.map((r) => r.uri)).toEqual(["zenvi://hosts", "zenvi://taste", "zenvi://handoff"]);
+    const hosts = await call("list_hosts");
+    expect(hosts.receipt.data).toMatchObject({ active: "zenvi-portable" });
 
     const created = await call("open_project_file", { path: "e2e.zvn" });
     expect(created.receipt.status).toBe("applied");

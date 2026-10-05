@@ -6,6 +6,7 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Progress } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolImage } from "@zenvi/engine";
 import { parseReceipt, type ToolReceipt } from "@zenvi/engine/tools";
 import type { DesktopEndpoint } from "./discovery.js";
@@ -57,9 +58,14 @@ export class DesktopClient {
     return tools;
   }
 
-  async callTool(name: string, args: Record<string, unknown>): Promise<DesktopToolResult> {
+  /** `onprogress` relays the app's progress notifications (long renders); the wait restarts on each one. */
+  async callTool(name: string, args: Record<string, unknown>, options: { onprogress?: (progress: Progress) => void } = {}): Promise<DesktopToolResult> {
     const client = await this.connected();
-    const result = await client.callTool({ name, arguments: args }, undefined, { timeout: CALL_TIMEOUT_MS, resetTimeoutOnProgress: true });
+    const result = await client.callTool({ name, arguments: args }, undefined, {
+      timeout: CALL_TIMEOUT_MS,
+      resetTimeoutOnProgress: true,
+      ...(options.onprogress ? { onprogress: options.onprogress } : {}),
+    });
     const content = Array.isArray(result.content) ? (result.content as Array<Record<string, unknown>>) : [];
     const texts = content.filter((c) => c.type === "text").map((c) => String(c.text ?? ""));
     const images: ToolImage[] = content

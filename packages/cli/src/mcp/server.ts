@@ -1,44 +1,70 @@
 /**
  * `zenvi mcp`: the local MCP server (stdio) for Claude Code, Claude Desktop,
- * Codex and Cursor.
+ * Codex and Cursor. It knows four hosts (SPEC §3.8): the Zenvi desktop app,
+ * the portable Zenvi engine (this process), After Effects and Premiere Pro
+ * (Zenvi Link).
  *
- * Tools: the engine catalog for surface `mcp`, with this machine's Node host
- * (local media, ffmpeg renders, frame previews), plus open_project_file,
- * render_video, preview_frame, launch_editor and push_to_cloud. Results
- * follow the desktop's MCP (zenvi-core agent_tools/output.py `mcp_content`):
- * a text block with the contract-3 receipt JSON, image blocks for frames,
- * and the receipt again as `structuredContent`. Arguments are coerced by the
- * engine exactly like the desktop's `validate_input=False` server, so the
- * SDK does not pre-validate them.
+ * Tools: the engine catalog for surface `mcp` with this machine's Node host
+ * (local media, ffmpeg renders, frame previews); open_project_file,
+ * render_video, preview_frame, launch_editor, push_to_cloud; list_hosts, the
+ * desktop's handoff tools and bring_from_after_effects / bring_from_premiere;
+ * and the `ae_*` / `premiere_*` families from the Zenvi Link catalogs
+ * (listed per ZENVI_MCP_ADOBE). Results follow the desktop's MCP (zenvi-core
+ * agent_tools/output.py `mcp_content`): a text block with the contract-3
+ * receipt JSON, image blocks for frames, and the receipt again as
+ * `structuredContent`. Arguments are coerced like the desktop's
+ * `validate_input=False` server, so the SDK does not pre-validate them.
+ *
+ * Resources: zenvi://hosts, zenvi://taste, zenvi://handoff. Prompts:
+ * taste_motion_design, edit_review.
  */
 
 import { once } from "node:events";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  CallToolRequestSchema,
+  ErrorCode,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+  McpError,
+  ReadResourceRequestSchema,
+  type CallToolResult,
+} from "@modelcontextprotocol/sdk/types.js";
+import { HOST_IDS } from "@zenvi/adobe-link";
 import type { ToolImage } from "@zenvi/engine";
 import { failed, parseReceipt, type ToolReceipt } from "@zenvi/engine/tools";
 import type { CommandContext } from "../commands/context.js";
+import { adobeToolDefinitions, callAdobeTool, hostOfTool, hostRefusal, isOkHostStatus } from "../hosts/adobe-tools.js";
+import { HANDOFF_GUIDE, PROMPTS, promptText, RESOURCES, TASTE_MARKDOWN } from "../hosts/guides.js";
+import { APP_LABEL, type FamilyDecisions } from "../hosts/policy.js";
 import { findProject } from "../project/select.js";
+import { unknownArgumentsMessage } from "../util/unknown-args.js";
 import { VERSION } from "../version.js";
 import { extraTools, type ExtraTool } from "./extra-tools.js";
-import { McpState } from "./state.js";
+import { hostTools } from "./host-tools.js";
+import { McpState, type McpStateOptions } from "./state.js";
 
 export const SERVER_INSTRUCTIONS = [
-  "Zenvi edits video projects (.zvn, the Zenvi desktop app's format) with the same editing tools as the Zenvi desktop app and web editor. Everything runs on this machine with ffmpeg.",
-  "Workflow: (1) open_project_file with a .zvn path (created if missing; the project in the working folder is opened automatically). (2) import_files_tool with media paths, then add_clip_to_timeline_tool, apply_transition_tool, add_title_tool, set_clip_volume_tool, set_keyframes_tool, delete_from_timeline_tool and the other tools. (3) Before saying an edit is right, look at it: preview_frame returns the composited frame as an image (grid=true adds a 0-1 coordinate grid). (4) render_video exports (mp4 by default). (5) launch_editor shows the project in the Zenvi desktop app; push_to_cloud returns a zenvi.pro web editor link to share.",
-  "Every tool returns a JSON receipt (contract 3): status applied|unchanged|refused|error, summary, clips, shifted, removedClipIds, createdTracks, undoSteps. Patch your view of the timeline from receipts instead of re-listing everything. Failures start with \"Error:\". Each call is one undo step; undo_tool reverts it. Edits autosave to the project file with their undo history.",
-  "Use these tools for timeline edits instead of running ffmpeg yourself: they keep the project editable in Zenvi. Times are seconds on the timeline. If the Zenvi desktop app has the same project open, edits go through the app so the person sees them live.",
+  "Zenvi edits video. This server drives four hosts: the Zenvi desktop app, the portable Zenvi engine (this server, editing the .zvn project file with ffmpeg on this machine), and After Effects and Premiere Pro through the Zenvi Link extension. list_hosts shows which are connected and which is active (used most recently): call it first whenever the user mentions After Effects or Premiere Pro, and before a handoff.",
+  "Picking tools: ae_* tools act inside After Effects and premiere_* tools inside Premiere Pro, on the project open there, with that app's own undo. Unprefixed tools act on the Zenvi project: in the desktop app while it has the project open (the person sees edits live; receipts say engine desktop), otherwise in the portable engine. Never edit a .zvn file or an Adobe project by hand.",
+  "Zenvi workflow: (1) open_project_file with a .zvn path (created if missing; the project in the working folder is opened automatically). (2) import_files_tool with media paths, then add_clip_to_timeline_tool, apply_transition_tool, add_title_tool, set_clip_volume_tool, set_keyframes_tool, delete_from_timeline_tool and the other tools. (3) render_video exports (mp4 by default). (4) launch_editor shows the project in the Zenvi desktop app; push_to_cloud returns a zenvi.pro web editor link to share.",
+  "Handoffs run in the Zenvi desktop app on the saved project, which is opened for you: send_to_after_effects_tool / export_to_after_effects_tool, send_to_premiere_tool / export_to_premiere_tool, import_timeline_xml_tool, the Remotion and HyperFrames import and export tools, and linked clips (get_linked_clip_tool, update_linked_clip_tool, rerender_linked_clip_tool, open_linked_source_tool, unlink_clip_tool). bring_from_after_effects renders a comp into the project as a linked clip; bring_from_premiere brings a sequence back as native clips. zenvi://handoff says what survives each direction.",
+  "Taste: omitted arguments take the defaults in zenvi://taste (entrances 0.6 s, exits 0.4 s, smooth easing, nothing that moves is linear, text inside title-safe). Look before you say done: after any visual change capture frames (preview_frame, with grid=true for a 0-1 coordinate grid; ae_capture_frame; premiere_capture_frame) at the first frame, entrance ends, holds and the last frame, check them against the review checklist (prompt edit_review), fix, and look again.",
+  "Every tool returns a JSON receipt (contract 3): status applied|unchanged|refused|error (read-only Adobe tools: ok), summary, and what changed (clips, shifted, removedClipIds, createdTracks, undoSteps; Adobe tools: ids in data). Patch your view from receipts instead of re-listing everything. Failures start with \"Error:\"; refused means nothing changed, so read the summary and adjust. Each Zenvi call is one undo step (undo_tool); edits autosave to the project file with their undo history. Use these tools instead of running ffmpeg yourself: they keep the project editable in Zenvi. Times are seconds.",
 ].join("\n\n");
 
-function toCallResult(receipt: ToolReceipt, images: ToolImage[] = [], engine?: string): CallToolResult {
-  const ok = receipt.status === "applied" || receipt.status === "unchanged";
+/** A receipt as MCP content: JSON text (+ images on success), the receipt as structuredContent, isError on failure. */
+function toCallResult(receipt: { status: string }, images: readonly ToolImage[] = [], extra: Record<string, unknown> = {}): CallToolResult {
+  const ok = isOkHostStatus(receipt.status);
   const content: CallToolResult["content"] = [{ type: "text", text: JSON.stringify(receipt) }];
   if (ok) for (const image of images) content.push({ type: "image", data: image.data, mimeType: image.mimeType });
   return {
     content,
-    structuredContent: { ...receipt, ...(engine ? { engine } : {}) } as unknown as Record<string, unknown>,
+    structuredContent: { ...receipt, ...extra } as Record<string, unknown>,
     ...(ok ? {} : { isError: true }),
   };
 }
@@ -49,15 +75,24 @@ export interface ZenviMcpServer {
   close(): Promise<void>;
 }
 
-export async function createZenviMcpServer(ctx: CommandContext, projectFile?: string): Promise<ZenviMcpServer> {
-  const state = await McpState.create(ctx, projectFile);
-  const extras = extraTools(ctx);
+const familyKey = (families: FamilyDecisions): string => HOST_IDS.filter((host) => families[host].listed).join(",");
+
+export async function createZenviMcpServer(ctx: CommandContext, projectFile?: string, options: McpStateOptions = {}): Promise<ZenviMcpServer> {
+  const state = await McpState.create(ctx, projectFile, options);
+  const extras: ExtraTool[] = [...extraTools(ctx), ...hostTools(ctx)];
   const extraByName = new Map<string, ExtraTool>(extras.map((t) => [t.name, t]));
-  const server = new McpServer({ name: "zenvi", title: "Zenvi video editor", version: VERSION }, { capabilities: { tools: { listChanged: false } }, instructions: SERVER_INSTRUCTIONS });
+  const server = new McpServer(
+    { name: "zenvi", title: "Zenvi video editor", version: VERSION },
+    { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} }, instructions: SERVER_INSTRUCTIONS },
+  );
+  /** The Adobe families in the client's last tools/list (undefined until it lists). */
+  let listedFamilies: string | undefined;
 
   server.server.setRequestHandler(ListToolsRequestSchema, async () => {
     const host = state.session.host;
-    const engineTools = ctx.registry.list("mcp", host).filter((t) => !extraByName.has(t.name));
+    const engineTools = ctx.registry.list("mcp", host).filter((t) => !extraByName.has(t.name) && !hostOfTool(t.name));
+    const families = await state.hosts.families();
+    listedFamilies = familyKey(families);
     return {
       tools: [
         ...engineTools.map((t) => ({
@@ -74,9 +109,19 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
           inputSchema: t.inputSchema as unknown as { type: "object"; [key: string]: unknown },
           annotations: { title: t.title, ...t.annotations },
         })),
+        ...HOST_IDS.filter((h) => families[h].listed).flatMap((h) => adobeToolDefinitions(h)),
       ],
     };
   });
+
+  /** Tell the client to list tools again when an Adobe family appeared or went away (e.g. after `zenvi adobe install`). */
+  async function announceFamilyChanges(): Promise<void> {
+    if (listedFamilies === undefined) return;
+    const key = familyKey(await state.hosts.families());
+    if (key === listedFamilies) return;
+    listedFamilies = key;
+    await server.server.sendToolListChanged().catch(() => undefined);
+  }
 
   server.server.setRequestHandler(CallToolRequestSchema, async (request, extra): Promise<CallToolResult> => {
     const name = request.params.name;
@@ -85,40 +130,72 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
     const progress =
       progressToken !== undefined
         ? (value: number, total: number, message: string) =>
-            void extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress: value, total, message } }).catch(() => undefined)
+            void extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress: value, ...(total > 0 ? { total } : {}), message } }).catch(() => undefined)
         : undefined;
     try {
       const extraTool = extraByName.get(name);
       if (extraTool) {
-        // The SDK does not validate raw JSON schemas: refuse unknown arguments
-        // instead of silently dropping them (a model that sends `output_path`
-        // must learn the real name, not get a render somewhere else).
-        const known = Object.keys((extraTool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {});
-        const unknown = Object.keys(args ?? {}).filter((key) => !known.includes(key));
-        if (unknown.length > 0) {
-          return toCallResult(failed(name, `Error: unknown argument${unknown.length > 1 ? "s" : ""} for ${name}: ${unknown.join(", ")}. Accepted: ${known.join(", ") || "none"}.`), undefined, "portable");
-        }
+        const unknown = unknownArgumentsMessage(name, args, extraTool.inputSchema as { properties?: Record<string, unknown> });
+        if (unknown) return toCallResult(failed(name, unknown), undefined, { engine: "portable" });
         const out = await extraTool.run(state, args, { signal: extra.signal, progress });
-        return toCallResult(out.receipt, out.images, "portable");
+        const engine = out.engine === undefined ? "portable" : out.engine;
+        return toCallResult(out.receipt, out.images, engine ? { engine } : {});
+      }
+      const adobe = hostOfTool(name);
+      if (adobe) {
+        const families = await state.hosts.families();
+        if (!families[adobe].listed && families[adobe].reason === "ZENVI_MCP_ADOBE=off") {
+          return toCallResult(hostRefusal(adobe, name, "UNSUPPORTED", `${APP_LABEL[adobe]} tools are turned off in this server (ZENVI_MCP_ADOBE=off). ${families[adobe].enable ?? ""}`.trim()));
+        }
+        const result = await callAdobeTool(state.hosts, name, args);
+        return toCallResult(result.receipt, result.images);
       }
       const desktop = await state.desktopExecutor();
       if (desktop) {
         const outcome = await desktop.call(name, args);
         const receipt = outcome.receipt ?? parseReceipt(outcome.text) ?? (outcome.ok ? undefined : failed(name, outcome.text));
-        if (receipt) return toCallResult(receipt, outcome.images, "desktop");
+        if (receipt) return toCallResult(receipt, outcome.images, { engine: "desktop" });
         return { content: [{ type: "text", text: outcome.text }], ...(outcome.ok ? {} : { isError: true }) };
       }
+      state.notePortableCall();
       const { result } = await state.session.run(name, args, extra.signal);
       const receipt = (result.data as ToolReceipt | undefined) ?? parseReceipt(result.text);
       if (!receipt) return { content: [{ type: "text", text: result.text }], ...(result.ok ? {} : { isError: true }) };
       if (!state.session.file && receipt.undoSteps > 0) {
         receipt.notes = [...receipt.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];
       }
-      return toCallResult(receipt, result.images, "portable");
+      return toCallResult(receipt, result.images, { engine: "portable" });
     } catch (error) {
       if (ctx.env.ZENVI_DEBUG) process.stderr.write(`[zenvi mcp] ${name} failed: ${(error as Error).stack ?? String(error)}\n`);
       return toCallResult(failed(name, (error as Error).message || String(error)));
+    } finally {
+      await announceFamilyChanges().catch(() => undefined);
     }
+  });
+
+  server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: RESOURCES.map((r) => ({ ...r })) }));
+
+  server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const uri = request.params.uri;
+    const info = RESOURCES.find((r) => r.uri === uri);
+    if (!info) throw new McpError(-32002, `Resource not found: ${uri}. Resources: ${RESOURCES.map((r) => r.uri).join(", ")}.`);
+    const text = uri === "zenvi://hosts" ? JSON.stringify(await state.hosts.list(), null, 2) : uri === "zenvi://taste" ? TASTE_MARKDOWN : HANDOFF_GUIDE;
+    return { contents: [{ uri, mimeType: info.mimeType, text }] };
+  });
+
+  server.server.setRequestHandler(ListPromptsRequestSchema, async () => ({ prompts: PROMPTS.map((p) => ({ ...p, arguments: p.arguments.map((a) => ({ ...a })) })) }));
+
+  server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const args = (request.params.arguments ?? {}) as Record<string, string | undefined>;
+    // The host defaults to the active one, so look it up only when the prompt needs it.
+    const report = args.host?.trim() ? undefined : await state.hosts.list().catch(() => undefined);
+    let prompt: { description: string; text: string };
+    try {
+      prompt = promptText(request.params.name, args, report);
+    } catch (error) {
+      throw new McpError(ErrorCode.InvalidParams, (error as Error).message);
+    }
+    return { description: prompt.description, messages: [{ role: "user" as const, content: { type: "text" as const, text: prompt.text } }] };
   });
 
   return {

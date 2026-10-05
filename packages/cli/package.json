@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
+    "@zenvi/adobe-link": "*",
     "@zenvi/engine": "*",
     "@zenvi/render-node": "*",
     "commander": "^15.0.0",

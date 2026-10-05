@@ -4,6 +4,7 @@
  * save cannot overwrite the CLI's edit). Reported as `engine` in `--json`.
  */
 
+import type { Progress } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolImage } from "@zenvi/engine";
 import { parseReceipt, type ToolReceipt } from "@zenvi/engine/tools";
 import type { ZenviConfig } from "../config.js";
@@ -55,14 +56,27 @@ export class PortableExecutor implements Executor {
 
 export class DesktopExecutor implements Executor {
   readonly engine = "desktop" as const;
+  private toolNames: Promise<Set<string>> | undefined;
+
   constructor(
     readonly client: DesktopClient,
     readonly project?: string,
   ) {}
 
-  async call(name: string, args: Record<string, unknown>): Promise<CallOutcome> {
-    const r = await this.client.callTool(name, args);
+  async call(name: string, args: Record<string, unknown>, _signal?: AbortSignal, options: { onprogress?: (progress: Progress) => void } = {}): Promise<CallOutcome> {
+    const r = await this.client.callTool(name, args, options);
     return { engine: "desktop", project: this.project ?? this.client.endpoint.project, ok: !r.isError, receipt: r.receipt, text: r.text, images: r.images };
+  }
+
+  /** Whether this desktop build has a tool (its tools/list, read once). */
+  async hasTool(name: string): Promise<boolean> {
+    this.toolNames ??= this.client.listTools().then((tools) => new Set(tools.map((t) => t.name)));
+    try {
+      return (await this.toolNames).has(name);
+    } catch (error) {
+      this.toolNames = undefined;
+      throw error;
+    }
   }
 
   async close(): Promise<void> {
