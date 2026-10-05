@@ -538,6 +538,11 @@ export const PREMIERE_TOOLS: HostToolDef[] = [
   premierePlaceClip,
   premiereEditClip,
   premiereRazor,
+  premiereSetClipProperties,
+  premiereAnimate,
+  premiereApplyEffect,
+  premiereAddTransition,
+  premiereApplyLook,
   premiereAddMarker,
   premiereSaveProject,
 ];

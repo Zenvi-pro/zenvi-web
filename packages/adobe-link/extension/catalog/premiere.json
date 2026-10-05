@@ -491,6 +491,551 @@
       "timeoutMs": 120000
     },
     {
+      "name": "premiere_set_clip_properties",
+      "title": "Set clip properties",
+      "description": "Static values on a clip's built-in effects: Motion (position in sequence pixels, scale %, rotation, anchor), Opacity (opacity %, blend mode) and audio volume in dB. Only the properties you pass change. An animated property is refused unless `clear_keyframes` (use premiere_animate to change keyframes). Respect the frame: keep faces in the upper third and text inside title-safe (TASTE §3). Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "position": {
+            "description": "Motion > Position [x, y] in sequence pixels from the top-left; [width/2, height/2] is the centre",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "scale": {
+            "description": "Motion > Scale in percent (100 = original size)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rotation": {
+            "description": "Motion > Rotation in degrees, clockwise",
+            "type": "number",
+            "minimum": -36000,
+            "maximum": 36000
+          },
+          "anchor": {
+            "description": "Motion > Anchor Point as fractions of the clip frame [x, y]; [0.5, 0.5] is the centre",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "opacity": {
+            "description": "Opacity in percent",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "blend_mode": {
+            "description": "Opacity > Blend Mode",
+            "type": "string",
+            "enum": [
+              "color",
+              "color-burn",
+              "color-dodge",
+              "darken",
+              "darker-color",
+              "difference",
+              "dissolve",
+              "exclusion",
+              "hard-light",
+              "hard-mix",
+              "hue",
+              "lighten",
+              "lighter-color",
+              "linear-burn",
+              "linear-dodge",
+              "linear-light",
+              "luminosity",
+              "multiply",
+              "normal",
+              "overlay",
+              "pin-light",
+              "saturation",
+              "screen",
+              "soft-light",
+              "vivid-light",
+              "subtract",
+              "divide"
+            ]
+          },
+          "volume_db": {
+            "description": "Audio clips: Volume > Level in dB (0 = as recorded, max +15; -96 = silent)",
+            "type": "number",
+            "minimum": -96,
+            "maximum": 15
+          },
+          "clear_keyframes": {
+            "default": false,
+            "description": "Remove the keyframes of an animated property you set instead of refusing",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_animate",
+      "title": "Animate a property",
+      "description": "Keyframes on a clip's Motion (position, scale, rotation, anchor), opacity, volume, or any parameter of an applied effect (`{effect, param}`). Times count from the clip's first frame; values use the units of premiere_set_clip_properties. TASTE easings map to Premiere interpolation: smooth/in-out/snap ease in and out (Bezier ease), out/entrance arrives softly, in/exit leaves softly, linear (opacity and volume fades only), hold. Defaults: smooth easing, replace existing keyframes. Typical: entrance 0.6 s, exit 0.4 s, scale 92->100 % on entry, Ken Burns 100->104 % over the shot; never linear on Motion. Clips with a speed change are refused. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "property": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "position",
+                  "scale",
+                  "rotation",
+                  "anchor",
+                  "opacity",
+                  "volume"
+                ],
+                "description": "A built-in property"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "effect": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Effect display name as in Effect Controls, e.g. \"Gaussian Blur\""
+                  },
+                  "param": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Parameter display name, e.g. \"Blurriness\""
+                  }
+                },
+                "required": [
+                  "effect",
+                  "param"
+                ],
+                "additionalProperties": false,
+                "description": "A parameter of an effect applied to the clip"
+              }
+            ],
+            "description": "What to animate"
+          },
+          "keyframes": {
+            "minItems": 2,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Seconds from the clip's first frame (0 = where it starts on the timeline)"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "minItems": 2,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  ],
+                  "description": "position [x, y] px, scale %, rotation degrees, anchor fractions, opacity %, volume dB; effect parameters as Premiere shows them"
+                },
+                "easing": {
+                  "description": "Easing of the segment from this keyframe to the next; default: `easing`",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "smooth",
+                        "out",
+                        "entrance",
+                        "in",
+                        "exit",
+                        "in-out",
+                        "snap",
+                        "linear",
+                        "hold"
+                      ],
+                      "description": "TASTE easing name"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "x1": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "First control point x, 0–1"
+                        },
+                        "y1": {
+                          "type": "number",
+                          "description": "First control point y (outside 0–1 overshoots)"
+                        },
+                        "x2": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "Second control point x, 0–1"
+                        },
+                        "y2": {
+                          "type": "number",
+                          "description": "Second control point y (outside 0–1 overshoots)"
+                        }
+                      },
+                      "required": [
+                        "x1",
+                        "y1",
+                        "x2",
+                        "y2"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Custom cubic-bezier(x1, y1, x2, y2)"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "time",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            "description": "At least two keyframes; sorted by time for you"
+          },
+          "easing": {
+            "default": "smooth",
+            "description": "Easing for every segment (TASTE §2): smooth, out/entrance, in/exit, in-out, snap, linear, hold, or {x1, y1, x2, y2}",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "smooth",
+                  "out",
+                  "entrance",
+                  "in",
+                  "exit",
+                  "in-out",
+                  "snap",
+                  "linear",
+                  "hold"
+                ],
+                "description": "TASTE easing name"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x1": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "First control point x, 0–1"
+                  },
+                  "y1": {
+                    "type": "number",
+                    "description": "First control point y (outside 0–1 overshoots)"
+                  },
+                  "x2": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Second control point x, 0–1"
+                  },
+                  "y2": {
+                    "type": "number",
+                    "description": "Second control point y (outside 0–1 overshoots)"
+                  }
+                },
+                "required": [
+                  "x1",
+                  "y1",
+                  "x2",
+                  "y2"
+                ],
+                "additionalProperties": false,
+                "description": "Custom cubic-bezier(x1, y1, x2, y2)"
+              }
+            ]
+          },
+          "replace": {
+            "default": true,
+            "description": "Remove the property's existing keyframes first",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip",
+          "property",
+          "keyframes"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_apply_effect",
+      "title": "Apply an effect",
+      "description": "Add a video or audio effect to a clip by its name in the Effects panel (QE DOM), then set parameters on it through the component API. Unknown effect names are refused with close matches; unknown parameter names are reported with the parameters the effect has. For colour looks prefer premiere_apply_look; for keyframes use premiere_animate with `{effect, param}`. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "effect": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Effect name as in the Effects panel, e.g. \"Gaussian Blur\", \"Lumetri Color\", \"DeNoise\""
+          },
+          "params": {
+            "description": "Parameter values to set once the effect is on the clip",
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parameter display name, e.g. \"Blurriness\""
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "minItems": 2,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  ],
+                  "description": "Number, checkbox, or point/colour array"
+                }
+              },
+              "required": [
+                "name",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip",
+          "effect"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_add_transition",
+      "title": "Add a transition",
+      "description": "Add a transition at a clip's edge (QE DOM): `at` end (default; the cut after the clip, or its tail), start (the cut before it, or its head) or both. Default Cross Dissolve for video (Constant Power for audio), 0.5 s centred on the cut (TASTE: 0.5 s within a scene, 1.0 s for a change of time or place; dips to black for chapter breaks only). Clips without media handles get a shorter or one-sided transition; the receipt reports what Premiere made. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "at": {
+            "default": "end",
+            "description": "Which edge of the clip",
+            "type": "string",
+            "enum": [
+              "end",
+              "start",
+              "both"
+            ]
+          },
+          "transition": {
+            "description": "Transition name as in the Effects panel; default: Cross Dissolve (video) or Constant Power (audio)",
+            "type": "string",
+            "minLength": 1
+          },
+          "duration": {
+            "default": 0.5,
+            "description": "Seconds (snapped to whole frames)",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 30
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_apply_look",
+      "title": "Apply a colour look",
+      "description": "Grade clips with a Lumetri Color look (added when missing, reused when present): clean (+5 contrast, +5 vibrance), warm-film (temperature +8, tint +2, faded film 8, saturation -6), teal-orange (teal shadow tint, orange highlight tint, saturation +6), moody (exposure -0.3, contrast +12, saturation -15, vignette -0.8), bw-contrast (saturation 0, contrast +25), scaled by `strength` (default 0.6: keep skin natural). Targets `clips`, else every clip on `track`, else the selected video clips. Lumetri parameters are found by their English names. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "look": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "warm-film",
+              "teal-orange",
+              "moody",
+              "bw-contrast"
+            ],
+            "description": "The look (TASTE §5)"
+          },
+          "strength": {
+            "default": 0.6,
+            "description": "0-1 share of the look's adjustments",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "clips": {
+            "description": "Video clips to grade",
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+            }
+          },
+          "track": {
+            "description": "Grade every clip on this video track",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "video",
+                  "audio"
+                ],
+                "description": "Track kind"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "0-based track index as in the Premiere DOM: V1 / A1 = 0"
+              }
+            },
+            "required": [
+              "kind",
+              "index"
+            ],
+            "additionalProperties": false
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "look"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
       "name": "premiere_add_marker",
       "title": "Add a marker",
       "description": "Add a sequence marker, or with `clip` a clip marker (Premiere keeps those on the clip's source item, so every use of that media shows it). Name, comment, duration (0 = a point), colour, type (comment, chapter, segmentation). Default time: the playhead. Use markers to leave notes for the editor and to mark beats and chapters. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
