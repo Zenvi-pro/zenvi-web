@@ -22,17 +22,27 @@ const http = require("http");
 const os = require("os");
 const path = require("path");
 const util = require("util");
+const { makeDir } = require("./discovery");
 const { CallQueue } = require("./queue");
 const { validateArguments } = require("./schema");
 
 const readFile = util.promisify(fs.readFile);
 const unlink = util.promisify(fs.unlink);
-const realpath = util.promisify(fs.realpath);
+const openFile = util.promisify(fs.open);
+const readBytes = util.promisify(fs.read);
+const fstat = util.promisify(fs.fstat);
+const closeFile = util.promisify(fs.close);
+// realpath.native resolves Windows 8.3 short names; Node 8 lacks it.
+const realpath = util.promisify(fs.realpath.native || fs.realpath);
 
 const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const BODY_LIMIT = 8 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 120000;
 const RECENT_CALLS = 30;
+/** Frame captures larger than this are not sent (a 4K PNG is ~10-25 MB). */
+const IMAGE_LIMIT = 32 * 1024 * 1024;
+/** Zenvi Link's own folder in the system temp folder: frame captures go here and are deleted once sent. */
+const TEMP_FOLDER = "zenvi-link";
 const APP_LABEL = { aftereffects: "After Effects", premiere: "Premiere Pro" };
 const STATE_TOOL = { aftereffects: "ae_get_state", premiere: "premiere_get_state" };
 
@@ -119,20 +129,39 @@ function imageMimeType(bytes) {
   return null;
 }
 
+/** True when `file` is in `dir` (or below), comparing real paths; case-insensitive where the file system usually is. */
 async function insideDir(file, dir) {
   try {
-    const parent = await realpath(path.dirname(file));
-    const root = await realpath(dir);
+    let parent = await realpath(path.dirname(file));
+    let root = await realpath(dir);
+    if (process.platform === "win32" || process.platform === "darwin") {
+      parent = parent.toLowerCase();
+      root = root.toLowerCase();
+    }
     return parent === root || parent.indexOf(root + path.sep) === 0;
   } catch (_error) {
     return false;
   }
 }
 
+/** The first `length` bytes and the size of a file. */
+async function readHead(file, length) {
+  const fd = await openFile(file, "r");
+  try {
+    const buffer = Buffer.alloc(length);
+    const result = await readBytes(fd, buffer, 0, length, 0);
+    const stats = await fstat(fd);
+    return { bytes: buffer.slice(0, typeof result === "number" ? result : result.bytesRead), size: stats.size };
+  } finally {
+    await closeFile(fd).catch(() => undefined);
+  }
+}
+
 /**
  * options: {
  *   host: "aftereffects" | "premiere", catalog: {version, tools}, bridge: {evalScript(script) -> Promise<string>},
- *   appName?, appVersion?, token?, busyAfterMs?, tempDir?, bodyLimit?, log?(line), onActivity?()
+ *   appName?, appVersion?, token?, busyAfterMs?, tempDir? (system temp), imageLimit?, bodyLimit?,
+ *   log?(line), onActivity?()
  * }
  */
 function createLinkServer(options) {
@@ -143,7 +172,8 @@ function createLinkServer(options) {
   const bridge = options.bridge;
   const version = catalog.version;
   const token = options.token || nodeCrypto.randomBytes(32).toString("hex");
-  const tempDir = options.tempDir || os.tmpdir();
+  const tempDir = path.join(options.tempDir || os.tmpdir(), TEMP_FOLDER);
+  const imageLimit = options.imageLimit || IMAGE_LIMIT;
   const bodyLimit = options.bodyLimit || BODY_LIMIT;
   const log = options.log || (() => undefined);
   const onActivity = options.onActivity || (() => undefined);
@@ -213,24 +243,35 @@ function createLinkServer(options) {
     }
   }
 
-  /** A frame capture's PNG as an image block; the temp file is deleted, `image_path` dropped. */
+  /**
+   * A frame capture as an image block. `image_path` is always dropped from the
+   * receipt. The file is checked (PNG/JPEG magic bytes, size cap) before it is
+   * read, and deleted only when it is in Zenvi Link's temp folder.
+   */
   async function takeImage(tool, receipt) {
     const data = receipt.data;
     if (!tool.returnsImage || typeof data.image_path !== "string") return [];
     const file = data.image_path;
     delete data.image_path;
+    const ours = await insideDir(file, tempDir);
     try {
-      const bytes = await readFile(file);
-      const mimeType = imageMimeType(bytes);
-      if (await insideDir(file, tempDir)) await unlink(file).catch(() => undefined);
+      const head = await readHead(file, 16);
+      const mimeType = imageMimeType(head.bytes);
       if (!mimeType) {
         receipt.warnings.push("The captured frame is not a PNG or JPEG image: " + file);
         return [];
       }
+      if (head.size > imageLimit) {
+        receipt.warnings.push("The captured frame is " + Math.round(head.size / 1048576) + " MB, over the " + Math.round(imageLimit / 1048576) + " MB limit; capture a smaller size");
+        return [];
+      }
+      const bytes = await readFile(file);
       return [{ type: "image", data: bytes.toString("base64"), mimeType: mimeType }];
     } catch (error) {
       receipt.warnings.push("Could not read the captured frame " + file + ": " + error.message);
       return [];
+    } finally {
+      if (ours) await unlink(file).catch(() => undefined);
     }
   }
 
@@ -240,7 +281,12 @@ function createLinkServer(options) {
     const tool = tools.get(name);
     let receipt;
     let images = [];
-    onActivity();
+    try {
+      onActivity();
+    } catch (error) {
+      // Discovery refreshes are best effort; they never fail a call.
+      log("activity hook failed: " + (error && error.message ? error.message : error));
+    }
     if (!tool) {
       receipt = failureReceipt(host, name, "refused", "NOT_FOUND", "Unknown tool " + name);
     } else {
@@ -368,11 +414,20 @@ function createLinkServer(options) {
           else res.end();
         });
       });
+      // Node 12 (CEP 10: After Effects 18.0-18.3, Premiere Pro 15.0-15.3) closes
+      // sockets idle for 120 s by default, which drops the response of a long
+      // call. Calls are bounded by the queue's own timeouts instead.
+      server.timeout = 0;
       server.on("connection", (socket) => {
         sockets.add(socket);
         socket.on("close", () => sockets.delete(socket));
       });
       server.once("error", reject);
+      try {
+        makeDir(tempDir, 0o700);
+      } catch (error) {
+        log("could not create " + tempDir + ": " + error.message);
+      }
       server.listen(0, "127.0.0.1", () => {
         port = server.address().port;
         log("Zenvi Link for " + label + " listening on " + url());
@@ -411,9 +466,11 @@ function createLinkServer(options) {
     token: token,
     host: host,
     version: version,
+    /** Zenvi Link's temp folder; the boot passes it to the host script (ZenviLink.tempDir()). */
+    tempDir: tempDir,
     queue: queue,
     recentCalls: () => recent.slice(),
   };
 }
 
-module.exports = { createLinkServer, dispatchScript, scriptLiteral, PROTOCOL_VERSIONS, DEFAULT_TIMEOUT_MS };
+module.exports = { createLinkServer, dispatchScript, scriptLiteral, insideDir, PROTOCOL_VERSIONS, DEFAULT_TIMEOUT_MS, TEMP_FOLDER };

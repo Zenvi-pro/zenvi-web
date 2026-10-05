@@ -60,7 +60,7 @@ describe("findLiveEndpoint", () => {
     servers.push(server);
     await server.start();
     const file = new discoveryModule.DiscoveryFile({ host: "aftereffects", dir: discoveryModule.linkDir(dir) });
-    file.publish({ url: server.url, token: server.token, project: null, version: "1.0.0", appName: "Adobe After Effects 2026", appVersion });
+    await file.publish({ url: server.url, token: server.token, project: null, version: "1.0.0", appName: "Adobe After Effects 2026", appVersion });
     return { dir, server };
   }
 

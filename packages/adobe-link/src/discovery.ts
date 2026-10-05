@@ -135,12 +135,14 @@ export async function inspectHost(desktopDir: string, host: HostId, options: Dis
   } catch {
     return result("absent", "no discovery file (the app is not running, or Zenvi Link is not installed)");
   }
-  let data: Record<string, unknown>;
+  let parsed: unknown;
   try {
-    data = JSON.parse(raw) as Record<string, unknown>;
+    parsed = JSON.parse(raw);
   } catch {
     return result("invalid", "the discovery file is not JSON");
   }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return result("invalid", "the discovery file is not a JSON object");
+  const data = parsed as Record<string, unknown>;
   const url = text(data.url);
   const pid = Number(data.pid);
   if (data.app !== host || !url || !Number.isInteger(pid)) return result("invalid", "the discovery file is not a Zenvi Link file for this app");
@@ -153,7 +155,8 @@ export async function inspectHost(desktopDir: string, host: HostId, options: Dis
   if (!pidAlive(pid)) {
     if (options.removeStale) {
       await removeQuietly(file);
-      if (path.dirname(tokenPath) === dir && path.basename(tokenPath) === `${host}.token`) await removeQuietly(tokenPath);
+      // Only a Zenvi Link token file in the link folder (`<app>.<pid>.token`, or `<app>.token` from 1.0 builds).
+      if (path.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path.basename(tokenPath))) await removeQuietly(tokenPath);
     }
     return result("dead", `process ${pid} is gone (left over from a crash)`);
   }
@@ -184,9 +187,20 @@ export async function inspectHost(desktopDir: string, host: HostId, options: Dis
   return result("connected", "connected", endpoint);
 }
 
-/** Both apps' discovery state (After Effects, then Premiere Pro). */
+/** Both apps' discovery state (After Effects, then Premiere Pro); one app's broken file never hides the other. */
 export function inspectHosts(desktopDir: string, options: DiscoverHostsOptions = {}): Promise<HostDiscovery[]> {
-  return Promise.all(HOST_IDS.map((host) => inspectHost(desktopDir, host, options)));
+  return Promise.all(
+    HOST_IDS.map((host) =>
+      inspectHost(desktopDir, host, options).catch(
+        (error: unknown): HostDiscovery => ({
+          host,
+          status: "invalid",
+          detail: `could not read the discovery file: ${error instanceof Error ? error.message : String(error)}`,
+          file: path.join(linkDirOf(desktopDir), `${host}.json`),
+        }),
+      ),
+    ),
+  );
 }
 
 /** Connected Zenvi Link servers, most recently active first. */
