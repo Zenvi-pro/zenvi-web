@@ -159,6 +159,7 @@ describe("the premiere_add_text preparer", () => {
     let asked = 0;
     const evalScript = async () => (asked += 1, JSON.stringify({ ok: false }));
     expect(await prepare({ args: { text: "x", image: "/a.png" }, evalScript, tempDir: os.tmpdir() })).toBeNull();
+    expect(await prepare({ args: { text: "  \n " }, evalScript, tempDir: os.tmpdir() })).toBeNull();
     expect(await prepare({ args: { text: "x", mogrt: "/a.mogrt" }, evalScript, tempDir: os.tmpdir() })).toBeNull();
     expect(asked).toBe(0);
     expect(await prepare({ args: { text: "x" }, evalScript, tempDir: os.tmpdir() })).toBeNull();

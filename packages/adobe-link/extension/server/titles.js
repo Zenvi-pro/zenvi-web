@@ -287,7 +287,8 @@ function createTitlePreparer(options) {
   const renderer = options.renderer;
   return async function prepareTitle(call) {
     const args = call.args;
-    if (args.image !== undefined || args.mogrt !== undefined) return null;
+    // Blank text is the host script's to refuse; rendering it would leave an empty PNG behind.
+    if (args.image !== undefined || args.mogrt !== undefined || !String(args.text || "").trim()) return null;
     let frame = null;
     try {
       frame = JSON.parse(await call.evalScript("ZenviLink.ppro.titleFrame(" + scriptLiteral(JSON.stringify({ sequence: args.sequence === undefined ? null : args.sequence })) + ")"));
