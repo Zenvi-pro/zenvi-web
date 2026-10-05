@@ -20,7 +20,7 @@ import { defaultDetectDeps } from "../hosts/extension.js";
 import { DESKTOP_HANDOFF_TOOLS } from "../hosts/handoff.js";
 import { TASTE_MARKDOWN } from "../hosts/guides.js";
 import { createContext } from "../program.js";
-import { CAPTURE_FRAME_TOOL, EXPORT_XML_TOOL, fakeLinkHost, RENDER_FOR_ZENVI_TOOL, type FakeLinkHostOptions } from "../test-support/adobe.js";
+import { CAPTURE_FRAME_TOOL, EXPORT_XML_TOOL, fakeLinkHost, realAfterEffects, RENDER_FOR_ZENVI_TOOL, type FakeLinkHostOptions } from "../test-support/adobe.js";
 import { fakeDesktop, testEnv, writeDiscovery, zenvi, type FakeDesktop, type FakeDesktopOptions } from "../test-support/harness.js";
 import { testRegistry } from "../test-support/registry.js";
 import { createZenviMcpServer, type ZenviMcpServer } from "./server.js";
@@ -189,6 +189,18 @@ describe("After Effects / Premiere Pro tools", () => {
     expect(r.receipt).toMatchObject({ contract: 3, status: "ok", tool: "ae_get_state", host: "aftereffects", data: { active_comp: { name: "Promo" } } });
     expect(r.structured).toMatchObject({ host: "aftereffects", status: "ok" });
     expect(host.calls).toEqual([{ tool: "ae_get_state", args: {} }]);
+  });
+
+  it("drives the real After Effects host script (ExtendScript on the mock DOM) end to end", async () => {
+    const tmp = await makeTempDir("zenvi-real-ae-");
+    cleanup.push(() => removeDir(tmp));
+    const real = await realAfterEffects({ desktopDir, tempDir: tmp });
+    cleanup.push(() => real.stop());
+    const { client } = await connect();
+    expect((await client.listTools()).tools.some((t) => t.name === "ae_get_state")).toBe(true);
+    const r = await call(client, "ae_get_state");
+    expect(r.result.isError).toBeFalsy();
+    expect(r.receipt).toMatchObject({ contract: 3, status: "ok", tool: "ae_get_state", host: "aftereffects", data: { active_comp: { name: "Promo" } } });
   });
 
   it("coerces string arguments by the schema and passes frame captures through as images", async () => {

@@ -140,6 +140,33 @@ export async function fakeLinkHost(options: FakeLinkHostOptions): Promise<FakeLi
   };
 }
 
+/**
+ * Zenvi Link for After Effects running the real host script (the ExtendScript
+ * the extension ships, in adobe-link's ES3 realm) on adobe-link's mock After
+ * Effects DOM with one comp, "Promo".
+ */
+export async function realAfterEffects(options: { desktopDir: string; tempDir: string }): Promise<{ stop(): Promise<void> }> {
+  const testing = (await import(path.join(linkRoot, "src", "testing", "index.ts"))) as {
+    createAeMock(options: { tempDir: string }): { globals: Record<string, unknown>; addComp(comp: { name: string }): unknown };
+    loadHostScript(app: "aeft", globals: Record<string, unknown>): unknown;
+  };
+  const cep = (await import(path.join(linkRoot, "src", "testing", "fake-cep.ts"))) as { evalInHostScript(host: unknown): (script: string) => string };
+  const mock = testing.createAeMock({ tempDir: options.tempDir });
+  mock.addComp({ name: "Promo" });
+  const evaluate = cep.evalInHostScript(testing.loadHostScript("aeft", mock.globals));
+  const catalog = toCatalogJson("aftereffects", catalogFor("aftereffects"));
+  const server = createLinkServer({ host: "aftereffects", catalog, bridge: { evalScript: async (script) => evaluate(script) }, tempDir: options.tempDir });
+  await server.start();
+  const file = new DiscoveryFile({ host: "aftereffects", dir: path.join(options.desktopDir, "link") });
+  file.publish({ url: server.url, token: server.token, project: null, version: catalog.version, appName: "Adobe After Effects 2026", appVersion: "26.3.0" });
+  return {
+    async stop() {
+      file.remove();
+      await server.stop();
+    },
+  };
+}
+
 /** Catalog entries for tools the Zenvi Link catalog may not have yet (the W1b/W1c tools these tests orchestrate). */
 export const RENDER_FOR_ZENVI_TOOL = {
   name: "ae_render_for_zenvi",
