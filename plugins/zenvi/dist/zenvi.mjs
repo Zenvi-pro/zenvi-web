@@ -1713,8 +1713,8 @@ function applyProfileFields(project, profile) {
   project.display_ratio = { num: profile.display_ratio.num, den: profile.display_ratio.den };
   project.pixel_ratio = { num: profile.pixel_ratio.num, den: profile.pixel_ratio.den };
 }
-function createLayer(number4, id, label = "") {
-  return { id, label, number: number4, y: 0, lock: false };
+function createLayer(number4, id, label2 = "") {
+  return { id, label: label2, number: number4, y: 0, lock: false };
 }
 function libopenshotClipDefaults() {
   const json2 = expandCompact(LIBOPENSHOT_CLIP_JSON);
@@ -1791,8 +1791,8 @@ function transitionKeyframes(duration3, fps, startValue = 1, endValue = -1, cont
   return { brightness: { Points: points }, contrast: libopenshotKeyframe(Math.fround(contrastValue)) };
 }
 function createTransition(input2) {
-  const direction = input2.direction ?? "in";
-  const [from, to] = direction === "in" ? [1, -1] : [-1, 1];
+  const direction2 = input2.direction ?? "in";
+  const [from, to] = direction2 === "in" ? [1, -1] : [-1, 1];
   const { brightness: brightness2, contrast } = transitionKeyframes(input2.duration, input2.fps, from, to, 3);
   const transition2 = {
     id: input2.id,
@@ -1976,8 +1976,8 @@ function timePoints(clip2) {
 }
 function timeCurveLengthFrames(points) {
   let maxX = 0;
-  for (const point of points ?? []) {
-    const co = isRecord3(point) ? point.co : void 0;
+  for (const point2 of points ?? []) {
+    const co = isRecord3(point2) ? point2.co : void 0;
     if (!isRecord3(co)) continue;
     const x = roundedInt(co.X);
     if (x !== null) maxX = Math.max(maxX, x);
@@ -1985,15 +1985,15 @@ function timeCurveLengthFrames(points) {
   return maxX || null;
 }
 function clampTimePoints(points, maxFrames) {
-  return points.map((point) => {
-    const co = isRecord3(point) ? point.co : void 0;
-    if (!isRecord3(co)) return point;
+  return points.map((point2) => {
+    const co = isRecord3(point2) ? point2.co : void 0;
+    if (!isRecord3(co)) return point2;
     const next = { ...co };
     const x = roundedInt(co.X);
     if (x !== null) next.X = x;
     const y = roundedInt(co.Y);
     if (y !== null) next.Y = y < 1 ? 1 : y > maxFrames ? maxFrames : y;
-    return { ...point, co: next };
+    return { ...point2, co: next };
   });
 }
 function clampTimingToMedia(clip2, projectFps2, existing) {
@@ -2104,10 +2104,10 @@ function lowerBound(points, target) {
   }
   return lo;
 }
-function addResolvedPoint(points, point) {
-  const at = lowerBound(points, point.x);
-  if (at < points.length && points[at].x === point.x) points[at] = point;
-  else points.splice(at, 0, point);
+function addResolvedPoint(points, point2) {
+  const at = lowerBound(points, point2.x);
+  if (at < points.length && points[at].x === point2.x) points[at] = point2;
+  else points.splice(at, 0, point2);
 }
 function resolvePoints(kf) {
   if (typeof kf === "number") {
@@ -2152,13 +2152,13 @@ var init_points = __esm({
 
 // ../engine/src/keyframe/edit.ts
 function makeKeyframePoint(x, y, interpolation2 = Interpolation.BEZIER, opts = {}) {
-  const point = { co: { X: x, Y: y }, interpolation: interpolation2 };
+  const point2 = { co: { X: x, Y: y }, interpolation: interpolation2 };
   if (interpolation2 === Interpolation.BEZIER) {
-    point.handle_left = { ...opts.handleLeft ?? DEFAULT_HANDLE_LEFT };
-    point.handle_right = { ...opts.handleRight ?? DEFAULT_HANDLE_RIGHT };
-    point.handle_type = opts.handleType ?? HandleType.AUTO;
+    point2.handle_left = { ...opts.handleLeft ?? DEFAULT_HANDLE_LEFT };
+    point2.handle_right = { ...opts.handleRight ?? DEFAULT_HANDLE_RIGHT };
+    point2.handle_type = opts.handleType ?? HandleType.AUTO;
   }
-  return point;
+  return point2;
 }
 function openshotPoint(x, y, interpolation2 = Interpolation.BEZIER) {
   return makeKeyframePoint(Math.fround(x), Math.fround(y), interpolation2);
@@ -2171,24 +2171,24 @@ function pointsOf(kf) {
   if (typeof kf !== "object" || kf === null || !Array.isArray(kf.Points)) return [];
   return kf.Points;
 }
-function xOf(point) {
-  const x = point?.co?.X;
+function xOf(point2) {
+  const x = point2?.co?.X;
   return typeof x === "number" && Number.isFinite(x) ? x : 1;
 }
 function withPoints(kf, points) {
   const base = typeof kf === "object" && kf !== null && !Array.isArray(kf) ? kf : {};
   return { ...base, Points: points };
 }
-function copyPoint(point) {
-  return structuredClone(point);
+function copyPoint(point2) {
+  return structuredClone(point2);
 }
 function normalizeKeyframe(kf) {
   const out = [];
-  for (const point of pointsOf(kf)) insertSorted(out, copyPoint(point));
+  for (const point2 of pointsOf(kf)) insertSorted(out, copyPoint(point2));
   return withPoints(kf, out);
 }
-function insertSorted(points, point) {
-  const x = xOf(point);
+function insertSorted(points, point2) {
+  const x = xOf(point2);
   let lo = 0;
   let hi = points.length;
   while (lo < hi) {
@@ -2196,12 +2196,12 @@ function insertSorted(points, point) {
     if (xOf(points[mid]) < x) lo = mid + 1;
     else hi = mid;
   }
-  if (lo < points.length && xOf(points[lo]) === x) points[lo] = point;
-  else points.splice(lo, 0, point);
+  if (lo < points.length && xOf(points[lo]) === x) points[lo] = point2;
+  else points.splice(lo, 0, point2);
 }
 function setKeyframePoints(kf, points) {
   const next = normalizeKeyframe(kf);
-  for (const point of points) insertSorted(next.Points, copyPoint(point));
+  for (const point2 of points) insertSorted(next.Points, copyPoint(point2));
   return next;
 }
 function setKeyframeValue(kf, frame, value, interpolation2) {
@@ -3130,13 +3130,13 @@ var init_document = __esm({
        * Throws (after rolling back) if `body` throws. Nested calls join the outer
        * transaction, like the desktop's `nested_transaction`.
        */
-      transaction(label, body) {
+      transaction(label2, body) {
         if (this.open) {
           return body(this.recorder(this.open));
         }
         const before = this.current;
         const beforeRevision = this.revision;
-        const open7 = { id: this.newTransactionId(), label, actions: [] };
+        const open7 = { id: this.newTransactionId(), label: label2, actions: [] };
         this.open = open7;
         let result;
         try {
@@ -3149,14 +3149,14 @@ var init_document = __esm({
         }
         this.open = null;
         if (open7.actions.length === 0) return result;
-        this.undoStack.push({ transaction: open7.id, label, actions: open7.actions });
+        this.undoStack.push({ transaction: open7.id, label: label2, actions: open7.actions });
         this.redoStack = [];
         this.emit({
           project: this.current,
           previous: before,
           source: "apply",
           actions: open7.actions.map((a) => a.action),
-          label
+          label: label2
         });
         return result;
       }
@@ -3422,8 +3422,8 @@ function requireClipEffect(project, effectId) {
 function requireUnlocked(project, layer2, what = "Track") {
   const found = findLayer(project, layer2);
   if (found?.lock) {
-    const label = found.label ? ` "${found.label}"` : "";
-    throw new OpError("locked", `${what}${label} (${layer2}) is locked.`, { layer: layer2 });
+    const label2 = found.label ? ` "${found.label}"` : "";
+    throw new OpError("locked", `${what}${label2} (${layer2}) is locked.`, { layer: layer2 });
   }
 }
 var OpError;
@@ -4116,11 +4116,11 @@ function parseTimecodeToken(token) {
   return nums[0] * 3600 + nums[1] * 60 + nums[2];
 }
 function parseSecondsArg(value, fallback, field = "") {
-  const label = field || "value";
+  const label2 = field || "value";
   if (value === null || value === void 0) return fallback;
-  if (typeof value === "boolean") throw new TimeArgError(`${label}=${value ? "True" : "False"} is not a time in seconds`);
+  if (typeof value === "boolean") throw new TimeArgError(`${label2}=${value ? "True" : "False"} is not a time in seconds`);
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new TimeArgError(`${label}=${pyFloat(value)} is not a time in seconds`);
+    if (!Number.isFinite(value)) throw new TimeArgError(`${label2}=${pyFloat(value)} is not a time in seconds`);
     return value;
   }
   const text4 = String(value).trim();
@@ -4135,7 +4135,7 @@ function parseSecondsArg(value, fallback, field = "") {
   const parsed = parseTimecodeToken(lowered);
   if (parsed === null || !Number.isFinite(parsed)) {
     throw new TimeArgError(
-      `${label}=${pyRepr2(value)} is not a time in seconds (use seconds like 12 or 12.5, or a timecode like 0:12)`
+      `${label2}=${pyRepr2(value)} is not a time in seconds (use seconds like 12 or 12.5, or a timecode like 0:12)`
     );
   }
   return parsed;
@@ -4626,10 +4626,10 @@ function buildDuckPoints(clip2, fps, windows, duckGain, env2 = {}) {
     for (const frame of [fs2, fe]) ducked.set(frame, baseAt(frame) * gain);
   }
   const spans = padded.map(([s, e]) => [timelineToSourceFrame(s, data, fps), timelineToSourceFrame(e, data, fps)]);
-  for (const point of existing) {
-    const frame = pyRound(f(point.co.X, 1));
+  for (const point2 of existing) {
+    const frame = pyRound(f(point2.co.X, 1));
     if (ducked.has(frame) || unity.has(frame)) continue;
-    const value = f(point.co.Y, 1);
+    const value = f(point2.co.Y, 1);
     if (spans.some(([fs2, fe]) => fs2 <= frame && frame <= fe)) ducked.set(frame, value * gain);
     else unity.set(frame, value);
   }
@@ -4713,13 +4713,13 @@ function scalePoints(kf, m) {
   if (!Array.isArray(kf.Points)) return kf;
   return {
     ...kf,
-    Points: kf.Points.map((point) => {
-      const x = point?.co?.X;
-      if (typeof x !== "number" || x < m.startX) return point;
+    Points: kf.Points.map((point2) => {
+      const x = point2?.co?.X;
+      if (typeof x !== "number" || x < m.startX) return point2;
       let nx = Math.trunc(pyRound(m.startX + (x - m.startX) * m.scale));
       if (nx < m.startX) nx = m.startX;
       else if (nx > m.newEndX) nx = m.newEndX;
-      return { ...point, co: { ...point.co, X: nx } };
+      return { ...point2, co: { ...point2.co, X: nx } };
     })
   };
 }
@@ -4731,10 +4731,10 @@ function reverseTimePoints(points) {
   if (xs.length === 0) return points;
   const pivot = Math.min(...xs) + Math.max(...xs);
   const orig = [...points].sort((a, b) => xOf2(a) - xOf2(b));
-  const mirrored = orig.map((point) => {
-    const copy = structuredClone(point);
-    if (typeof point?.co?.X === "number") {
-      copy.co.X = pivot - point.co.X;
+  const mirrored = orig.map((point2) => {
+    const copy = structuredClone(point2);
+    if (typeof point2?.co?.X === "number") {
+      copy.co.X = pivot - point2.co.X;
       const hl = copy.handle_left;
       const hr = copy.handle_right;
       delete copy.handle_left;
@@ -4781,7 +4781,7 @@ function finalizeTimePoints(points, startX, newEndX) {
   xs[count - 1] = hi;
   return sorted.map((p, i) => ({ ...p, co: { ...p.co, X: xs[i] } }));
 }
-function retimeClip(clip2, newEnd, fps, direction = 1, newPosition) {
+function retimeClip(clip2, newEnd, fps, direction2 = 1, newPosition) {
   const rate = fps.num / fps.den;
   const m = metrics(clip2, newEnd, rate);
   if (!m) return null;
@@ -4797,7 +4797,7 @@ function retimeClip(clip2, newEnd, fps, direction = 1, newPosition) {
   } else {
     points = timePoints2.map((p) => structuredClone(p));
   }
-  if (direction === -1) points = reverseTimePoints(points);
+  if (direction2 === -1) points = reverseTimePoints(points);
   points = finalizeTimePoints(points, m.startX, m.newEndX);
   const time3 = timePoints2.length < 2 ? { Points: points } : { ...next.time, Points: points };
   const out = { ...next, time: time3, duration: m.newDurS, end: m.newEndS };
@@ -5474,7 +5474,7 @@ function addTransition(tx, input2) {
     throw new OpError("conflict", `A transition with id ${input2.id} already exists.`, { id: input2.id });
   }
   const side = inferDropSide(project.clips, input2.layer, position, duration3);
-  const direction = input2.direction ?? (side === "right" ? "out" : "in");
+  const direction2 = input2.direction ?? (side === "right" ? "out" : "in");
   const transition2 = createTransition({
     id: input2.id ?? ids(project)(),
     layer: input2.layer,
@@ -5482,7 +5482,7 @@ function addTransition(tx, input2) {
     duration: duration3,
     reader: input2.reader ?? maskReader(mask2.path, mask2.width, mask2.height),
     fps: fpsOf(project),
-    direction,
+    direction: direction2,
     title: input2.title ?? "Transition",
     resource: mask2.path,
     fadeAudio: input2.fadeAudio ?? false
@@ -5491,7 +5491,7 @@ function addTransition(tx, input2) {
   tx.insert(["effects"], transition2);
   return requireTransition(tx.project, transition2.id);
 }
-function toolTransition(tx, mask2, layer2, position, duration3, direction) {
+function toolTransition(tx, mask2, layer2, position, duration3, direction2) {
   const transition2 = createTransition({
     id: ids(tx.project)(),
     layer: layer2,
@@ -5499,7 +5499,7 @@ function toolTransition(tx, mask2, layer2, position, duration3, direction) {
     duration: duration3,
     reader: maskReader(mask2.path, mask2.width, mask2.height),
     fps: fpsOf(tx.project),
-    direction,
+    direction: direction2,
     title: mask2.title
   });
   tx.insert(["effects"], transition2);
@@ -6021,10 +6021,10 @@ function setClipSpeed(tx, clipId2, factor, opts = {}) {
   const clip2 = requireEditableClip(project, clipId2);
   const f2 = requireFinite(factor, "factor");
   if (!(f2 >= 1 / 16 && f2 <= 16)) throw invalid(`factor must be between 1/16 and 16 (got ${f2}).`);
-  const direction = opts.direction ?? "forward";
-  if (direction !== "forward" && direction !== "backward") throw invalid(`direction must be forward or backward.`);
+  const direction2 = opts.direction ?? "forward";
+  if (direction2 !== "forward" && direction2 !== "backward") throw invalid(`direction must be forward or backward.`);
   const newEnd = Number(clip2.start) + (Number(clip2.end) - Number(clip2.start)) / f2;
-  const retimed = retimeClip(clip2, newEnd, fpsOf(project), direction === "backward" ? -1 : 1, clip2.position);
+  const retimed = retimeClip(clip2, newEnd, fpsOf(project), direction2 === "backward" ? -1 : 1, clip2.position);
   if (!retimed) throw invalid(`Speed ${f2} leaves clip ${clipId2} empty.`);
   const next = withClampedTiming(retimed, project, clip2);
   return replaceClip(tx, clip2, next);
@@ -6299,9 +6299,9 @@ var init_effects2 = __esm({
 });
 
 // ../engine/src/ops/markers.ts
-function addMarker(tx, position, label, opts = {}) {
+function addMarker(tx, position, label2, opts = {}) {
   requireNonNegative(position, "position");
-  if (label !== void 0 && typeof label !== "string") {
+  if (label2 !== void 0 && typeof label2 !== "string") {
     throw new OpError("invalid_argument", "label must be a string.");
   }
   if (opts.id !== void 0 && findMarker(tx.project, opts.id)) {
@@ -6314,7 +6314,7 @@ function addMarker(tx, position, label, opts = {}) {
     icon: opts.icon ?? "blue.png",
     vector: opts.vector ?? "blue"
   };
-  if (label !== void 0 && label !== "") marker2.label = label;
+  if (label2 !== void 0 && label2 !== "") marker2.label = label2;
   tx.insert(["markers"], marker2);
   return findMarker(tx.project, id);
 }
@@ -9365,8 +9365,8 @@ function handleCodecAResult(result, def, ctx) {
     result.aborted = true;
     return result;
   }
-  const direction = ctx.direction || "forward";
-  if (direction === "forward") {
+  const direction2 = ctx.direction || "forward";
+  if (direction2 === "forward") {
     const transformed = def.transform(result.value, result);
     if (transformed instanceof Promise) {
       return transformed.then((value) => handleCodecTxResult(result, value, def.out, ctx));
@@ -11029,8 +11029,8 @@ var init_schemas = __esm({
       defineLazyInternal(inst, "optout", (zod) => zod.def.out._zod.optout);
       defineLazyInternal(inst, "propValues", (zod) => zod.def.in._zod.propValues);
       inst._zod.parse = (payload, ctx) => {
-        const direction = ctx.direction || "forward";
-        if (direction === "forward") {
+        const direction2 = ctx.direction || "forward";
+        if (direction2 === "forward") {
           const left = def.in._zod.run(payload, ctx);
           if (left instanceof Promise) {
             return left.then((left2) => handleCodecAResult(left2, def, ctx));
@@ -19827,9 +19827,9 @@ function codePointLengthVar(doc, ctx, accessor, inDoubt) {
   doc.write(`const ${v} = typeof ${accessor} === "string" && ${inDoubt} ? ${cpLen}(${accessor}) : ${accessor}.length;`);
   return v;
 }
-function numericOperand(value, label) {
+function numericOperand(value, label2) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new ZodCompileUnsupportedError(`${label} bound of type ${typeof value}`);
+    throw new ZodCompileUnsupportedError(`${label2} bound of type ${typeof value}`);
   }
   return `${value}`;
 }
@@ -27229,8 +27229,8 @@ function isRecord13(value) {
 function records(value) {
   return Array.isArray(value) ? value.filter(isRecord13) : [];
 }
-function pointsOf2(keyframe3) {
-  return isRecord13(keyframe3) ? records(keyframe3.Points) : [];
+function pointsOf2(keyframe4) {
+  return isRecord13(keyframe4) ? records(keyframe4.Points) : [];
 }
 function truthy(value) {
   if (value === null || value === void 0 || value === false || value === 0 || value === "") return false;
@@ -27263,23 +27263,23 @@ function upgradeProjectData(data, options) {
 }
 function flipBetaAlpha(data) {
   for (const clip2 of records(data.clips)) {
-    for (const point of pointsOf2(clip2.alpha)) {
+    for (const point2 of pointsOf2(clip2.alpha)) {
       for (const key of ["co", "handle_left", "handle_right"]) {
-        const coord = point[key];
+        const coord = point2[key];
         if (isRecord13(coord) && typeof coord.Y === "number") coord.Y = 1 - coord.Y;
       }
     }
   }
 }
 function resetHandles(points) {
-  for (const point of points) {
-    if (isRecord13(point.handle_left)) {
-      point.handle_left.X = 0.5;
-      point.handle_left.Y = 1;
+  for (const point2 of points) {
+    if (isRecord13(point2.handle_left)) {
+      point2.handle_left.X = 0.5;
+      point2.handle_left.Y = 1;
     }
-    if (isRecord13(point.handle_right)) {
-      point.handle_right.X = 0.5;
-      point.handle_right.Y = 0;
+    if (isRecord13(point2.handle_right)) {
+      point2.handle_right.X = 0.5;
+      point2.handle_right.Y = 0;
     }
   }
 }
@@ -27299,8 +27299,8 @@ function resetLegacyHandles(data) {
     }
   }
 }
-function isKeyframeChanged(keyframe3, defaultValue) {
-  const points = isRecord13(keyframe3) ? keyframe3.Points : void 0;
+function isKeyframeChanged(keyframe4, defaultValue) {
+  const points = isRecord13(keyframe4) ? keyframe4.Points : void 0;
   if (!Array.isArray(points) || points.length === 0) return false;
   if (points.length > 1) return true;
   const first = points[0];
@@ -27327,8 +27327,8 @@ function migrateLegacyCrop(data, newId) {
     effect2.right = truthy(cropWidth) ? cropWidth : libopenshotKeyframe(1);
     effect2.bottom = truthy(cropHeight) ? cropHeight : libopenshotKeyframe(1);
     for (const prop of ["right", "bottom"]) {
-      for (const point of pointsOf2(effect2[prop])) {
-        const co = isRecord13(point.co) ? point.co : null;
+      for (const point2 of pointsOf2(effect2[prop])) {
+        const co = isRecord13(point2.co) ? point2.co : null;
         if (co) co.Y = 1 - num4(co.Y, 0);
       }
     }
@@ -27337,8 +27337,8 @@ function migrateLegacyCrop(data, newId) {
   }
 }
 function flipPoints(points) {
-  for (const point of points) {
-    const co = point.co;
+  for (const point2 of points) {
+    const co = point2.co;
     if (isRecord13(co)) co.Y = 1 - num4(co.Y, 1);
   }
 }
@@ -27348,8 +27348,8 @@ function migrateTrackedObjectAlpha(data) {
     for (const effect2 of records(clip2.effects)) {
       if (effect2.name !== "Tracker" && effect2.name !== "Object Detector") continue;
       if ("display_box_text" in effect2) {
-        const keyframe3 = effect2.display_box_text;
-        const points = isRecord13(keyframe3) && Array.isArray(keyframe3.Points) ? keyframe3.Points : null;
+        const keyframe4 = effect2.display_box_text;
+        const points = isRecord13(keyframe4) && Array.isArray(keyframe4.Points) ? keyframe4.Points : null;
         if (points) {
           flipPoints(points.filter(isRecord13));
           if (points.length === 0) points.push({ co: { X: 1, Y: 1 }, interpolation: Interpolation.CONSTANT });
@@ -27387,10 +27387,10 @@ function repairAudioOnlyProjectData(data) {
   }
   return repaired;
 }
-function keyframeValue(keyframe3, frame, fallback) {
-  if (!isRecord13(keyframe3)) return fallback;
+function keyframeValue(keyframe4, frame, fallback) {
+  if (!isRecord13(keyframe4)) return fallback;
   if (typeof frame !== "number" || !Number.isFinite(frame)) return fallback;
-  return evaluate(keyframe3, pyRound(frame));
+  return evaluate(keyframe4, pyRound(frame));
 }
 function legacyLocationFactor(value, canvasSize, clipSize, alignment) {
   if (!value || canvasSize <= 0 || clipSize <= 0) return 1;
@@ -27433,8 +27433,8 @@ function migrateLegacyCropLocations(data) {
       { prop: "location_y", canvas: canvasHeight, base: baseHeight, align: alignmentFor(VERTICAL_ALIGNMENT, gravity), scale: "scale_y" }
     ];
     for (const axis2 of axes) {
-      for (const point of pointsOf2(clip2[axis2.prop])) {
-        const co = point.co;
+      for (const point2 of pointsOf2(clip2[axis2.prop])) {
+        const co = point2.co;
         if (!isRecord13(co) || !("Y" in co) || typeof co.Y !== "number") continue;
         const frame = co.X ?? 1;
         const value = co.Y;
@@ -27461,8 +27461,8 @@ function migrate400NonCropLocations(data) {
       { prop: "location_y", canvas: canvasHeight, source: source2.height, align: alignmentFor(VERTICAL_ALIGNMENT, gravity), scale: "scale_y" }
     ];
     for (const axis2 of axes) {
-      for (const point of pointsOf2(clip2[axis2.prop])) {
-        const co = point.co;
+      for (const point2 of pointsOf2(clip2[axis2.prop])) {
+        const co = point2.co;
         if (!isRecord13(co) || !("Y" in co) || typeof co.Y !== "number") continue;
         const frame = co.X ?? 1;
         const value = co.Y;
@@ -31678,9 +31678,9 @@ async function buildAudioGraph(options) {
     if (gain !== "1") filters.push(`asetnsamples=n=${frameSamples}:p=0`, `volume=eval=frame:volume='${gain}'`);
     const delayMs = Math.round((part.cutStart - range.start) * 1e3 * 1e3) / 1e3;
     if (delayMs > 0) filters.push(`adelay=delays=${num6(delayMs, 3)}:all=1`);
-    const label = `a${labels.length}`;
-    labels.push(label);
-    chains.push(`[${index}:a]${filters.join(",")}[${label}]`);
+    const label2 = `a${labels.length}`;
+    labels.push(label2);
+    chains.push(`[${index}:a]${filters.join(",")}[${label2}]`);
   }
   const tail = `apad=whole_dur=${num6(total)},atrim=end=${num6(total)},asetpts=N/SR/TB`;
   let filter;
@@ -43623,8 +43623,8 @@ function planLayer(project, clip2, window, f2, isTop, canvas, fps) {
   const decode3 = { previewWidth: canvas.width, previewHeight: canvas.height, timelineWidth: canvas.timelineWidth };
   for (const e of clipEffects) {
     const instance = effectInstance(e, n, fps, false);
-    const sizes2 = parentedImageSizes(clip2, e, decode3);
-    if (sizes2) instance.imageSizes = sizes2;
+    const sizes3 = parentedImageSizes(clip2, e, decode3);
+    if (sizes3) instance.imageSizes = sizes3;
     (applyBeforeClip(e) ? before : after).effects.push(instance);
   }
   if (isTop) timelineEffects(project, int4(clip2.layer), f2, fps, before, after);
@@ -45771,10 +45771,10 @@ function overlaySvg(width, height, overlay) {
     stroke(1.5, 255, 240, true);
     for (let i = 0; i <= 10; i += 1) {
       const t = i / 10;
-      const label = i === 0 ? "0" : i === 10 ? "1" : t.toFixed(1);
-      const tw = textWidth(label, fontSize);
-      if (i !== 10) chip(label, Math.min(Math.max(0, t * w - tw / 2), w - tw - 2), 2);
-      chip(label, w - tw - 6, Math.min(Math.max(2, t * h - th / 2), h - th - 4));
+      const label2 = i === 0 ? "0" : i === 10 ? "1" : t.toFixed(1);
+      const tw = textWidth(label2, fontSize);
+      if (i !== 10) chip(label2, Math.min(Math.max(0, t * w - tw / 2), w - tw - 2), 2);
+      chip(label2, w - tw - 6, Math.min(Math.max(2, t * h - th / 2), h - th - 4));
     }
   }
   if (overlay.caption) {
@@ -49680,8 +49680,8 @@ function normalizeTrackOrLayerArg(raw, layers) {
   const m = /^(?:ui\s*)?track\s*[#:]?\s*(.+)$/i.exec(low);
   const labelQuery = (m ? m[1].trim() : low).trim();
   const labelHits = stack.filter((e) => {
-    const label = e.label.trim().toLowerCase();
-    return label === labelQuery || label === low;
+    const label2 = e.label.trim().toLowerCase();
+    return label2 === labelQuery || label2 === low;
   });
   if (labelHits.length === 1) return { layer: labelHits[0].layer_number };
   if (labelHits.length > 1) {
@@ -50013,16 +50013,16 @@ function listMarkersText(project) {
 function trackHeading(layerNum, layers, layer2) {
   const ui = layerNumberToDisplayIndex(layerNum, layers);
   let tid = "";
-  let label = "";
+  let label2 = "";
   const source2 = layer2 ?? layers.find((L) => Math.trunc(Number(L.number || 0)) === layerNum);
   if (source2) {
     tid = String(source2.id ?? "");
-    label = String(source2.label || source2.name || "").trim();
+    label2 = String(source2.label || source2.name || "").trim();
   }
   const parts = [`layer_number=${layerNum}`, `z_from_bottom=${ui !== null ? ui - 1 : "?"}`];
   if (ui !== null) parts.push(`ui_track=${ui}`);
   if (tid) parts.push(`track_id=${tid}`);
-  if (label) parts.push(`label=${pyReprString(label)}`);
+  if (label2) parts.push(`label=${pyReprString(label2)}`);
   return parts.join(" | ");
 }
 function timelineStateText(project) {
@@ -50388,12 +50388,12 @@ async function executeTool(tool, impl, ctx, rawArgs) {
     ...ctx,
     tool: name,
     session,
-    commit(body, label) {
+    commit(body, label2) {
       if (state.committed) throw new Error(`${name} committed twice; one tool call must be one undo step`);
       state.committed = true;
       const before = timelineSnapshot(doc.project);
       const undoBefore = doc.undoLabels.length;
-      const result = doc.transaction(label ?? tool.title, body);
+      const result = doc.transaction(label2 ?? tool.title, body);
       state.before = before;
       state.after = timelineSnapshot(doc.project);
       state.undoBefore = undoBefore;
@@ -54050,8 +54050,8 @@ async function overlayIndexBoosts(call, contexts) {
 function normUrl(url2) {
   return url2.trim().split("?")[0].replace(/\/+$/, "");
 }
-function isGeneric(label) {
-  return GENERIC_LABELS.includes(label.trim().toLowerCase());
+function isGeneric(label2) {
+  return GENERIC_LABELS.includes(label2.trim().toLowerCase());
 }
 function segmentIndex(url2) {
   const name = url2.split("?")[0].split("/").pop() ?? "";
@@ -54068,8 +54068,8 @@ function mgFileName(url2) {
   }
   return raw;
 }
-function mgStamp(label, transparent, existing = {}) {
-  let summary = label.trim() || "HyperFrames motion graphic";
+function mgStamp(label2, transparent, existing = {}) {
+  let summary = label2.trim() || "HyperFrames motion graphic";
   const tagsRaw = existing.tags;
   const tags = typeof tagsRaw === "string" ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean) : [];
   if (!tags.includes("motion_graphics")) tags.push("motion_graphics");
@@ -54089,8 +54089,8 @@ async function fetchMotionGraphics(call, input2) {
   const tool = call.tool;
   const importUrl = call.host.media?.importUrl;
   if (!importUrl) return unavailable(tool, "it cannot download media from URLs.");
-  let label = text(input2.label) || "HyperFrames motion graphic";
-  const generic = isGeneric(label);
+  let label2 = text(input2.label) || "HyperFrames motion graphic";
+  const generic = isGeneric(label2);
   const genericWarn = generic ? " \u26A0\uFE0F short_summary is generic \u2014 pass label= from compose suggested_label (or ensure render_job_id is set so job.summary can be recovered)." : "";
   let segs = [];
   const raw = input2.segment_urls;
@@ -54140,7 +54140,7 @@ async function fetchMotionGraphics(call, input2) {
   const files = call.commit(
     (tx) => downloads.map((d) => {
       const file3 = addFile(tx, d.media, { dedupe: true });
-      tx.update(["files", { id: file3.id }], mgStamp(label, d.transparent, file3));
+      tx.update(["files", { id: file3.id }], mgStamp(label2, d.transparent, file3));
       return file3;
     })
   );
@@ -54149,7 +54149,7 @@ async function fetchMotionGraphics(call, input2) {
   const totalMb = downloads.reduce((sum, d) => sum + (Number(d.media.fingerprint?.size ?? d.media.info.file_size ?? 0) || 0), 0) / (1024 * 1024);
   const anyTransparent = downloads.some((d) => d.transparent);
   const alphaNote = anyTransparent ? "Transparent WebM alpha preserved \u2014 place as overlay on a HIGHER track than footage." : "Opaque MP4 \u2014 prefer standalone/mid-layer placement away from hero peaks.";
-  label = label || "HyperFrames motion graphic";
+  label2 = label2 || "HyperFrames motion graphic";
   if (failures.length > 0) {
     const failed2 = failures.map(([i, u, e]) => `  [${i}] ${u} (${e})`).join("\n");
     return `\u26A0\uFE0F Imported ${ids2.length}/${urls.length} motion segments; ${failures.length} failed. Storage was NOT cleaned up so you can retry the failed ones. file_ids: ${pyRepr2(ids2)}
@@ -54287,7 +54287,7 @@ var init_motion = __esm({
           for (let i = 0; i < n; i += 1) {
             const useGap = !preferTr || i === Math.max(1, Math.floor(n / 2)) && gaps.length > 0;
             let pos = null;
-            let label = "";
+            let label2 = "";
             let conf = "medium";
             let avoid = false;
             let prefer = false;
@@ -54299,7 +54299,7 @@ var init_motion = __esm({
                 const g = Math.max(0, Math.min(timelineEnd2, g0));
                 if (used.every((u) => Math.abs(g - u) >= 1)) {
                   pos = g;
-                  label = "gap \u2014 opaque plate candidate";
+                  label2 = "gap \u2014 opaque plate candidate";
                   conf = "high";
                   trackHint = midLayer;
                   isGap = true;
@@ -54309,7 +54309,7 @@ var init_motion = __esm({
               }
             }
             if (pos === null) {
-              [pos, label, conf, avoid, prefer, score] = snapTo(anchors[i]);
+              [pos, label2, conf, avoid, prefer, score] = snapTo(anchors[i]);
               trackHint = overlayLayer;
               isGap = false;
             }
@@ -54321,7 +54321,7 @@ var init_motion = __esm({
               score,
               avoid,
               prefer,
-              scene_label: Array.from(label).slice(0, 80).join(""),
+              scene_label: Array.from(label2).slice(0, 80).join(""),
               track_hint: trackHint,
               confidence: conf,
               suggest_transparent: suggestTr,
@@ -54713,17 +54713,17 @@ function describeGroup(actions) {
   if (Array.isArray(key) && typeof key[0] === "string") summary = `${summary} on ${key[0]}`;
   return summary;
 }
-function originalActions(event, direction) {
-  if (direction === "redo") return event.actions;
+function originalActions(event, direction2) {
+  if (direction2 === "redo") return event.actions;
   const inverse = { insert: "delete", delete: "insert", update: "update", load: "load" };
   return [...event.actions].reverse().map((a) => ({ ...a, type: inverse[a.type] }));
 }
-function undoRedo(call, direction, steps) {
+function undoRedo(call, direction2, steps) {
   const doc = call.doc;
-  const undoing = direction === "undo";
-  const label = direction;
+  const undoing = direction2 === "undo";
+  const label2 = direction2;
   const depth = () => undoing ? doc.undoLabels.length : doc.redoLabels.length;
-  if (depth() === 0) return `Error: nothing to ${label}.`;
+  if (depth() === 0) return `Error: nothing to ${label2}.`;
   const beforeProject = doc.project;
   const signatureBefore = timelineSignature(beforeProject);
   let done = 0;
@@ -54732,7 +54732,7 @@ function undoRedo(call, direction, steps) {
   const labels = [];
   let last = null;
   const unsubscribe = doc.subscribe((event) => {
-    if (event.source === direction) last = event;
+    if (event.source === direction2) last = event;
   });
   try {
     for (let i = 0; i < steps && depth() > 0; i += 1) {
@@ -54742,7 +54742,7 @@ function undoRedo(call, direction, steps) {
       if (depth() >= before || moved.length === 0) break;
       labels.push(...moved);
       const event = last;
-      const group = event ? originalActions(event, direction) : [];
+      const group = event ? originalActions(event, direction2) : [];
       if (described === null) described = describeGroup(group);
       if (group.some((a) => Array.isArray(a.key) && a.key[0] === "clips")) touchedClips = true;
       done += 1;
@@ -54750,12 +54750,12 @@ function undoRedo(call, direction, steps) {
   } finally {
     unsubscribe();
   }
-  if (done === 0) return `Error: nothing to ${label}.`;
+  if (done === 0) return `Error: nothing to ${label2}.`;
   const delta = describeTimelineDelta(signatureBefore, timelineSignature(doc.project));
   if (delta === "" && touchedClips && signatureBefore.size > 0) {
     return failed(
-      `${direction}_tool`,
-      `Error: ${label} applied ${done} history step(s) but the timeline did not change. The edit you meant may span several steps -- check list_clips_tool, then ${label} again with steps=N, or delete the clip directly.`
+      `${direction2}_tool`,
+      `Error: ${label2} applied ${done} history step(s) but the timeline did not change. The edit you meant may span several steps -- check list_clips_tool, then ${label2} again with steps=N, or delete the clip directly.`
     );
   }
   const verb = undoing ? "Undid" : "Redid";
@@ -54765,14 +54765,14 @@ function undoRedo(call, direction, steps) {
   else if (described && done === 1) detail2 = ` (${described})`;
   let summary;
   if (done < steps) {
-    summary = `${verb} ${done} of ${steps} requested${detail2}; nothing left to ${label}.`;
+    summary = `${verb} ${done} of ${steps} requested${detail2}; nothing left to ${label2}.`;
   } else {
     const remaining = depth();
-    const tail = remaining === 1 ? ` 1 ${label} step remains.` : remaining ? ` ${remaining} ${label} steps remain.` : ` Nothing left to ${label}.`;
+    const tail = remaining === 1 ? ` 1 ${label2} step remains.` : remaining ? ` ${remaining} ${label2} steps remain.` : ` Nothing left to ${label2}.`;
     summary = `${verb} ${done} ${noun}${detail2}.${tail}`;
   }
   const changed = timelineDelta(timelineSnapshot(beforeProject), timelineSnapshot(doc.project));
-  return applied(`${direction}_tool`, summary, { ...changed, data: { steps: done, labels } }, 0);
+  return applied(`${direction2}_tool`, summary, { ...changed, data: { steps: done, labels } }, 0);
 }
 var READ3, PROJECT_EXTS, projectTools;
 var init_project2 = __esm({
@@ -55011,11 +55011,11 @@ function fpsParts(project) {
   const fps = record4(project.fps);
   return [Number(fps.num ?? 30) || 30, Number(fps.den ?? 1) || 1];
 }
-function sliceAtSourceCut(call, info, cutSource, label) {
+function sliceAtSourceCut(call, info, cutSource, label2) {
   const project = call.doc.project;
   const [num11, den2] = fpsParts(project);
   let cut2 = cutSource;
-  let what = label;
+  let what = label2;
   const [snappedCut, cue] = snapCutOutOfSpeech(cut2, clipTranscriptCues(project, info.clip));
   if (cue) {
     cut2 = snappedCut;
@@ -55999,10 +55999,10 @@ var init_timeline2 = __esm({
       contractTool("add_track_tool", {
         annotations: ADDITIVE,
         run: (call, input2) => {
-          const label = text(input2.label);
+          const label2 = text(input2.label);
           const selected = selectedTrack(call);
           call.commit(
-            (tx) => addTrack(tx, selected ? { below: Math.trunc(Number(selected.number)), label: label || void 0 } : { label: label || void 0 })
+            (tx) => addTrack(tx, selected ? { below: Math.trunc(Number(selected.number)), label: label2 || void 0 } : { label: label2 || void 0 })
           );
           return "Track added.";
         }
@@ -56017,8 +56017,8 @@ var init_timeline2 = __esm({
             if (error62 instanceof TimeArgError) return `Error: ${error62.message}`;
             throw error62;
           }
-          const label = text(input2.label) || text(input2.text);
-          call.commit((tx) => addMarker(tx, Math.max(0, position), label || void 0));
+          const label2 = text(input2.label) || text(input2.text);
+          call.commit((tx) => addMarker(tx, Math.max(0, position), label2 || void 0));
           return "Marker added.";
         }
       }),
@@ -65560,9 +65560,9 @@ var require_codegen = __commonJS({
       }
     };
     var Label = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
@@ -65570,14 +65570,14 @@ var require_codegen = __commonJS({
       }
     };
     var Break = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
-        const label = this.label ? ` ${this.label}` : "";
-        return `break${label};` + _n;
+        const label2 = this.label ? ` ${this.label}` : "";
+        return `break${label2};` + _n;
       }
     };
     var Throw = class extends Node {
@@ -65989,12 +65989,12 @@ var require_codegen = __commonJS({
         return this._endBlockNode(For);
       }
       // `label` statement
-      label(label) {
-        return this._leafNode(new Label(label));
+      label(label2) {
+        return this._leafNode(new Label(label2));
       }
       // `break` statement
-      break(label) {
-        return this._leafNode(new Break(label));
+      break(label2) {
+        return this._leafNode(new Break(label2));
       }
       // `return` statement
       return(value) {
@@ -68840,7 +68840,7 @@ var require_schemes = __commonJS({
       urnComponent.nss = (uuidComponent.uuid || "").toLowerCase();
       return urnComponent;
     }
-    var http2 = (
+    var http3 = (
       /** @type {SchemeHandler} */
       {
         scheme: "http",
@@ -68853,7 +68853,7 @@ var require_schemes = __commonJS({
       /** @type {SchemeHandler} */
       {
         scheme: "https",
-        domainHost: http2.domainHost,
+        domainHost: http3.domainHost,
         parse: httpParse,
         serialize: httpSerialize
       }
@@ -68897,7 +68897,7 @@ var require_schemes = __commonJS({
     var SCHEMES = (
       /** @type {Record<SchemeName, SchemeHandler>} */
       {
-        http: http2,
+        http: http3,
         https: https2,
         ws,
         wss,
@@ -72612,9 +72612,9 @@ var require_codegen2 = __commonJS({
       }
     };
     var Label = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
@@ -72622,14 +72622,14 @@ var require_codegen2 = __commonJS({
       }
     };
     var Break = class extends Node {
-      constructor(label) {
+      constructor(label2) {
         super();
-        this.label = label;
+        this.label = label2;
         this.names = {};
       }
       render({ _n }) {
-        const label = this.label ? ` ${this.label}` : "";
-        return `break${label};` + _n;
+        const label2 = this.label ? ` ${this.label}` : "";
+        return `break${label2};` + _n;
       }
     };
     var Throw = class extends Node {
@@ -73041,12 +73041,12 @@ var require_codegen2 = __commonJS({
         return this._endBlockNode(For);
       }
       // `label` statement
-      label(label) {
-        return this._leafNode(new Label(label));
+      label(label2) {
+        return this._leafNode(new Label(label2));
       }
       // `break` statement
-      break(label) {
-        return this._leafNode(new Break(label));
+      break(label2) {
+        return this._leafNode(new Break(label2));
       }
       // `return` statement
       return(value) {
@@ -81319,8 +81319,8 @@ function registerEditCommands(program2, ctx) {
     });
   });
   const marker2 = program2.command("marker").description("timeline markers");
-  marker2.command("add").argument("<time>", "timeline time").argument("[label]", "label").action(async (time3, label) => {
-    await runToolCommand(ctx, "add_marker_tool", { position_seconds: parseTime(time3), ...label ? { label } : {} });
+  marker2.command("add").argument("<time>", "timeline time").argument("[label]", "label").action(async (time3, label2) => {
+    await runToolCommand(ctx, "add_marker_tool", { position_seconds: parseTime(time3), ...label2 ? { label: label2 } : {} });
   });
   if (ctx.registry.get("remove_marker_tool")) {
     marker2.command("rm").argument("<marker>", "marker id").action(async (id) => {
@@ -81328,8 +81328,8 @@ function registerEditCommands(program2, ctx) {
     });
   }
   const track2 = program2.command("track").description("tracks");
-  track2.command("add").argument("[label]", "track label").action(async (label) => {
-    await runToolCommand(ctx, "add_track_tool", label ? { label } : {});
+  track2.command("add").argument("[label]", "track label").action(async (label2) => {
+    await runToolCommand(ctx, "add_track_tool", label2 ? { label: label2 } : {});
   });
 }
 var CLIP;
@@ -81344,11 +81344,118 @@ var init_edit2 = __esm({
 });
 
 // ../adobe-link/src/taste.ts
-var EASING_NAMES;
+var EASING_NAMES, EASINGS, DEFAULT_EASING, TASTE, LOOK_NAMES;
 var init_taste = __esm({
   "../adobe-link/src/taste.ts"() {
     "use strict";
     EASING_NAMES = ["smooth", "out", "entrance", "in", "exit", "in-out", "snap", "linear", "hold"];
+    EASINGS = {
+      smooth: [0.33, 0, 0.2, 1],
+      out: [0.16, 1, 0.3, 1],
+      entrance: [0.16, 1, 0.3, 1],
+      in: [0.7, 0, 0.84, 0],
+      exit: [0.7, 0, 0.84, 0],
+      "in-out": [0.65, 0, 0.35, 1],
+      snap: [0.2, 0, 0, 1],
+      linear: [0, 0, 1, 1]
+    };
+    DEFAULT_EASING = "smooth";
+    TASTE = {
+      /** TASTE §1. */
+      timing: {
+        /** UI-like micro motion (pop, nudge): 6–10 frames at 30 fps. */
+        micro: { default: 0.27, range: [0.2, 0.35] },
+        entrance: { default: 0.6, range: [0.5, 0.8] },
+        /** Exits are faster than entrances. */
+        exit: { default: 0.4, range: [0.35, 0.5] },
+        /** Full-frame push, logo reveal. */
+        bigMove: { default: 1, range: [0.8, 1.2] },
+        stagger: { word: 0.06, line: 0.12, range: [0.04, 0.08] },
+        /** Minimum on-screen hold for text: base + perWord × words. */
+        textHold: { base: 1.5, perWord: 0.3 },
+        lowerThird: { default: 5, range: [4, 6] },
+        titleCard: { default: 3, range: [2.5, 4] },
+        /** 0.5 s for cuts within a scene, 1.0 s for a time/place change. */
+        crossDissolve: { default: 0.5, sceneChange: 1, range: [0.5, 1] },
+        /** Dip to black/white: chapter breaks only. */
+        dip: { default: 0.8, range: [0.6, 1.2] },
+        audioFade: { in: 0.25, out: 1, outRange: [0.5, 1.5], musicEnd: 1.5 },
+        /** J/L cut: lead the cut with sound. */
+        jlLead: { default: 0.5, range: [0.25, 0.75] }
+      },
+      /** TASTE §2. */
+      easing: {
+        default: DEFAULT_EASING,
+        curves: EASINGS,
+        /** `back-out` overshoot: playful brands only, as an extra keyframe (not an expression). */
+        overshoot: { max: 0.06, settle: 0.25 },
+        /** After Effects KeyframeEase influence clamp, percent. */
+        aeInfluence: { min: 0.1, max: 100 }
+      },
+      /** TASTE §3. Insets are fractions of each frame dimension. */
+      layout: {
+        actionSafe: 0.05,
+        titleSafe: 0.1,
+        /** 9:16 social: keep text out of the top 12 % (status/handle) and bottom 20 % (UI). */
+        verticalTop: 0.12,
+        verticalBottom: 0.2,
+        gridColumns: 12,
+        lowerThird: { baselineLandscape: 0.8, baselineVertical: 0.7, gapOfNameSize: 0.25 },
+        /** Entrances travel 3–6 % of the frame width, not from off-screen. */
+        slide: { default: 0.04, range: [0.03, 0.06] },
+        scale: { entranceFrom: 0.92, holdPushTo: 1.04 },
+        /** Ken Burns scale change over the shot, eased in-out. */
+        kenBurns: { default: 0.04, range: [0.03, 0.06] }
+      },
+      /** TASTE §4. Pixel sizes are for a 1080-pixel short side; scale by min(width, height) / 1080. */
+      type: {
+        families: ["Inter", "SF Pro Display", "Helvetica Neue", "Arial"],
+        /** PostScript names in order of preference (After Effects `TextDocument.font`). */
+        postscript: {
+          headline: ["Inter-Bold", "SFProDisplay-Bold", "HelveticaNeue-Bold", "Arial-BoldMT"],
+          body: ["Inter-Regular", "SFProDisplay-Regular", "HelveticaNeue", "ArialMT"]
+        },
+        weights: { headline: [700, 800], body: [400, 500] },
+        referenceShortSide: 1080,
+        sizes: { headline: 96, title: 72, subtitle: 44, lowerThirdName: 54, lowerThirdRole: 34, caption: 42 },
+        /** Fractions of an em (After Effects tracking is in 1/1000 em: multiply by 1000). */
+        tracking: { headline: -0.015, headlineRange: [-0.02, -0.01], caps: 0.08, capsRange: [0.06, 0.1] },
+        leading: { headline: 1.1, body: 1.3 },
+        maxLineChars: 32,
+        scrim: { default: 0.45, range: [0.35, 0.55] },
+        shadow: { distance: 0, softness: 16, softnessRange: [12, 20], opacity: 0.4 },
+        minContrast: 4.5
+      },
+      /** TASTE §5. */
+      color: {
+        palette: { ink: "#0B0B0F", paper: "#F7F7F5", accent: "#FF5A36", secondary: "#2F6BFF" },
+        /**
+         * Lumetri-style adjustments, as deltas from neutral in Lumetri slider
+         * units. `bw-contrast` saturation -100 means "saturation 0" (fully desaturated).
+         */
+        looks: {
+          clean: { contrast: 5, vibrance: 5 },
+          "warm-film": { temperature: 8, tint: 2, fade: 8, saturation: -6 },
+          "teal-orange": { shadowTint: "teal", highlightTint: "orange", saturation: 6 },
+          moody: { exposure: -0.3, contrast: 12, saturation: -15, vignette: -0.8 },
+          "bw-contrast": { saturation: -100, contrast: 25 }
+        },
+        /** Looks apply at ≤ 60 % strength by default; skin must stay natural. */
+        lookStrength: 0.6
+      },
+      /** TASTE §6. */
+      editing: {
+        shotLength: { talkingHead: [4, 8], broll: [1.5, 3], socialHook: [0.8, 1.5] },
+        endHold: { default: 0.75, range: [0.5, 1] }
+      },
+      audio: {
+        dialoguePeakDb: [-12, -6],
+        lufs: { social: -16, broadcast: -23 },
+        musicUnderDialogueDb: [-24, -18],
+        duck: { db: 8, dbRange: [6, 10], attack: 0.3, release: 0.6 }
+      }
+    };
+    LOOK_NAMES = ["clean", "warm-film", "teal-orange", "moody", "bw-contrast"];
   }
 });
 
@@ -81427,12 +81534,115 @@ var init_types6 = __esm({
 });
 
 // ../adobe-link/src/catalog/aftereffects.ts
-var aeGetState, AE_TOOLS;
+var T, pct, compRef, layerArg, propertyPath, vec2, shapePath, propertyValue, effectValue2, keyframe3, effectKeyframe, BLEND_MODES, blendMode, label, COMP_PRESETS, AE_MOTION_PRESETS, TEXT_ANIMATIONS, direction, TEXT_STYLES, sizes2, aeGetState, aeListItems, aeGetComp, aeGetLayer, aeListEffects, aeCaptureFrame, aeCreateComp, aeSetComp, aeImportFiles, aePrecompose, aeAddMarker, aeAddLayer, aeAddText, aeSetText, trackMatte, aeSetLayer, aeArrangeLayers, aeSetProperty, aeAnimate, aeApplyMotionPreset, aeAddExpression, effectParam, effectKeyframes, aeApplyEffect, aeSetEffect, aeApplyLook, aeAddMask, RENDER_PRESETS, aeRender, aeRenderForZenvi, aeSaveProject, aeUndo, aeRunJsxFile, aeRunScript, AE_TOOLS;
 var init_aftereffects = __esm({
   "../adobe-link/src/catalog/aftereffects.ts"() {
     "use strict";
     init_zod();
+    init_taste();
     init_types6();
+    T = TASTE.timing;
+    pct = (fraction4) => `${Math.round(fraction4 * 1e3) / 10} %`;
+    compRef = external_exports.union([external_exports.int().min(1).describe("Comp item id"), external_exports.string().min(1).describe("Exact comp name")]).describe("Comp id (`comp_id`) or exact name; default: the active comp");
+    layerArg = layerRef.describe('Layer: its id (`layer_id`), {"index": n} (1 = top) or exact name');
+    propertyPath = external_exports.union([
+      external_exports.string().min(1).describe(`Display or match names separated by '/', e.g. "Transform/Position", "Effects/Gaussian Blur/Blurriness", "ADBE Transform Group/ADBE Opacity"`),
+      external_exports.array(external_exports.string().min(1)).min(1).max(12).describe("The same path as a list of names (use when a name contains '/')")
+    ]).describe(
+      'Property path from the layer. Transform properties may omit the group ("Position", "Scale", "Opacity"); effect parameters may omit "Effects" ("Gaussian Blur/Blurriness"). Digits select by 1-based index when no property has that name.'
+    );
+    vec2 = external_exports.array(external_exports.number()).length(2);
+    shapePath = external_exports.strictObject({
+      vertices: external_exports.array(vec2.describe("[x, y]")).min(1).max(1e3).describe("Vertices in layer pixels"),
+      in_tangents: external_exports.array(vec2.describe("[x, y]")).max(1e3).optional().describe("Incoming tangents, relative to each vertex (default: straight)"),
+      out_tangents: external_exports.array(vec2.describe("[x, y]")).max(1e3).optional().describe("Outgoing tangents, relative to each vertex (default: straight)"),
+      closed: external_exports.boolean().optional().describe("Closed path (default true)")
+    }).describe("A Bezier path: {vertices, in_tangents?, out_tangents?, closed?}");
+    propertyValue = external_exports.union([
+      external_exports.number().describe("1D value (opacity, rotation, a slider, a menu index from 1, a checkbox 0/1; Scale takes one number as uniform %)"),
+      external_exports.boolean().describe("Checkbox (true = 1)"),
+      external_exports.string().describe("Text for Source Text, or a #RRGGBB colour for colour properties"),
+      external_exports.array(external_exports.number()).min(1).max(4).describe("[x, y] / [x, y, z] for points, [r, g, b] or [r, g, b, a] with 0-1 channels for colours"),
+      shapePath
+    ]).describe("Value in the property's own units");
+    effectValue2 = external_exports.union([
+      external_exports.number().describe("Number (sliders, angles, menu index from 1, checkbox 0/1)"),
+      external_exports.boolean().describe("Checkbox"),
+      external_exports.string().describe("#RRGGBB for colour parameters"),
+      external_exports.array(external_exports.number()).min(1).max(4).describe("[x, y] points or [r, g, b(, a)] colours with 0-1 channels")
+    ]).describe("Value in the parameter's own units");
+    keyframe3 = external_exports.strictObject({
+      time: seconds.describe("Comp time in seconds (snapped to the frame grid)"),
+      value: propertyValue,
+      easing: easing.optional().describe("Easing of the segment that leaves this keyframe (default: the call's `easing`)")
+    });
+    effectKeyframe = external_exports.strictObject({
+      time: seconds.describe("Comp time in seconds (snapped to the frame grid)"),
+      value: effectValue2,
+      easing: easing.optional().describe("Easing of the segment that leaves this keyframe")
+    });
+    BLEND_MODES = [
+      "normal",
+      "dissolve",
+      "dancing-dissolve",
+      "darken",
+      "multiply",
+      "color-burn",
+      "classic-color-burn",
+      "linear-burn",
+      "darker-color",
+      "add",
+      "lighten",
+      "screen",
+      "color-dodge",
+      "classic-color-dodge",
+      "linear-dodge",
+      "lighter-color",
+      "overlay",
+      "soft-light",
+      "hard-light",
+      "linear-light",
+      "vivid-light",
+      "pin-light",
+      "hard-mix",
+      "difference",
+      "classic-difference",
+      "exclusion",
+      "subtract",
+      "divide",
+      "hue",
+      "saturation",
+      "color",
+      "luminosity",
+      "stencil-alpha",
+      "stencil-luma",
+      "silhouette-alpha",
+      "silhouette-luma",
+      "alpha-add",
+      "luminescent-premul"
+    ];
+    blendMode = external_exports.enum(BLEND_MODES);
+    label = external_exports.int().min(0).max(16);
+    COMP_PRESETS = ["1080p", "4k", "vertical", "square", "720p"];
+    AE_MOTION_PRESETS = [
+      "fade-in",
+      "fade-out",
+      "slide-in",
+      "slide-out",
+      "scale-pop",
+      "blur-in",
+      "typewriter",
+      "word-cascade",
+      "line-rise",
+      "ken-burns",
+      "push-in",
+      "drift",
+      "whip-in"
+    ];
+    TEXT_ANIMATIONS = ["fade-in", "slide-in", "scale-pop", "blur-in", "typewriter", "word-cascade", "line-rise"];
+    direction = external_exports.enum(["left", "right", "up", "down"]);
+    TEXT_STYLES = ["headline", "title", "subtitle", "lower-third", "caption"];
+    sizes2 = TASTE.type.sizes;
     aeGetState = defineHostTool({
       name: "ae_get_state",
       title: "After Effects state",
@@ -81440,17 +81650,574 @@ var init_aftereffects = __esm({
       input: external_exports.strictObject({}),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     });
-    AE_TOOLS = [aeGetState];
+    aeListItems = defineHostTool({
+      name: "ae_list_items",
+      title: "List project items",
+      description: "Project panel items: comps, footage, solids, placeholders and folders with id, name, type, size, duration, fps, file path and parent folder. Use it to find the item id that ae_add_layer, ae_get_comp or ae_render need. Read-only.",
+      input: external_exports.strictObject({
+        type: external_exports.enum(["comp", "footage", "solid", "placeholder", "folder"]).optional().describe("Only items of this type"),
+        name_contains: external_exports.string().min(1).optional().describe("Only items whose name contains this text (case-insensitive)"),
+        limit: external_exports.int().min(1).max(2e3).default(200).describe("Maximum items returned (the receipt says when it truncated)")
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aeGetComp = defineHostTool({
+      name: "ae_get_comp",
+      title: "Inspect comp",
+      description: "One comp in depth: settings (size, fps, duration, background, work area, motion blur, frame blending), comp markers and every layer with id, index, name, type, source, timing (start/in/out/stretch), parent, switches, blend mode, track matte, effects and the paths of its animated properties. Default: the active comp. Read-only.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        max_layers: external_exports.int().min(1).max(1e3).default(200).describe("Maximum layers listed (top first)")
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aeGetLayer = defineHostTool({
+      name: "ae_get_layer",
+      title: "Inspect layer",
+      description: "Deep view of one layer: transform values at `time`, every keyframe of its animated properties (time, value, interpolation, temporal ease), effects with their parameters, the text document of text layers, masks and expressions (with errors). Use it before changing animation so you edit what is there. Read-only.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        time: seconds.optional().describe("Comp time for the transform values (default: the comp's current time)"),
+        max_keys: external_exports.int().min(0).max(1e3).default(100).describe("Maximum keyframes listed per property")
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aeListEffects = defineHostTool({
+      name: "ae_list_effects",
+      title: "List installed effects",
+      description: "Effects installed in this After Effects (`app.effects`): display name, match name and category. Search before ae_apply_effect when unsure of a name; match names work in every language. Read-only.",
+      input: external_exports.strictObject({
+        search: external_exports.string().min(1).optional().describe("Case-insensitive text matched against display name, match name and category"),
+        category: external_exports.string().min(1).optional().describe('Only this category (case-insensitive), e.g. "Blur & Sharpen"'),
+        limit: external_exports.int().min(1).max(2e3).default(100).describe("Maximum effects returned")
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aeCaptureFrame = defineHostTool({
+      name: "ae_capture_frame",
+      title: "Capture comp frame",
+      description: "Render one comp frame to a PNG and return it as an image: your eyes. After any visual change capture the moments that matter (first frame, each entrance end, mid-hold, last frame) and critique them against the taste guide: text inside title-safe and readable, one focal point, nothing ending abruptly. Wide comps are downsampled to `max_width` through the comp's resolution factor, which is restored afterwards. Read-only.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        time: seconds.optional().describe("Comp time in seconds (default: the comp's current time); snapped to the frame grid"),
+        max_width: external_exports.int().min(64).max(4096).default(1280).describe("Largest width of the returned image in pixels")
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      returnsImage: true,
+      timeoutMs: 6e4
+    });
+    aeCreateComp = defineHostTool({
+      name: "ae_create_comp",
+      title: "Create comp",
+      description: `Create a composition and open it. Presets: 1080p (1920x1080), 4k (3840x2160), vertical (1080x1920, 9:16 social), square (1080x1080), 720p (1280x720), or pass width and height. Defaults: 30 fps, 10 s, background ink ${TASTE.color.palette.ink}, square pixels. A taken name gets a number appended.`,
+      input: external_exports.strictObject({
+        name: external_exports.string().min(1).max(255).default("Zenvi Comp").describe("Comp name"),
+        preset: external_exports.enum(COMP_PRESETS).optional().describe("Frame size preset (default 1080p unless width and height are given)"),
+        width: external_exports.int().min(4).max(3e4).optional().describe("Width in pixels (with height; overrides preset)"),
+        height: external_exports.int().min(4).max(3e4).optional().describe("Height in pixels (with width; overrides preset)"),
+        fps: external_exports.number().min(1).max(999).default(30).describe("Frame rate (29.97 and 23.976 work)"),
+        duration: external_exports.number().positive().max(10800).default(10).describe("Duration in seconds"),
+        background: color2.optional().describe(`Background colour (default ${TASTE.color.palette.ink})`),
+        pixel_aspect: external_exports.number().min(0.01).max(100).default(1).describe("Pixel aspect ratio"),
+        folder: external_exports.string().min(1).optional().describe("Project folder to put it in (created at the root if missing)"),
+        open: external_exports.boolean().default(true).describe("Open it in the Composition viewer")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    aeSetComp = defineHostTool({
+      name: "ae_set_comp",
+      title: "Change comp settings",
+      description: "Change a comp: name, duration, fps, size, background, work area, motion blur (switch, shutter angle/phase), frame blending, or open it in the viewer. Only the given settings change; nothing given or nothing different = unchanged.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        name: external_exports.string().min(1).max(255).optional().describe("New name"),
+        duration: external_exports.number().positive().max(10800).optional().describe("Duration in seconds"),
+        fps: external_exports.number().min(1).max(999).optional().describe("Frame rate"),
+        width: external_exports.int().min(4).max(3e4).optional().describe("Width in pixels (layers keep their positions)"),
+        height: external_exports.int().min(4).max(3e4).optional().describe("Height in pixels"),
+        background: color2.optional().describe("Background colour"),
+        work_area: external_exports.strictObject({
+          start: seconds.describe("Work area start in seconds"),
+          end: external_exports.number().positive().describe("Work area end in seconds (after start, within the comp)")
+        }).optional().describe("Work area"),
+        motion_blur: external_exports.boolean().optional().describe("Comp motion blur switch (layers also need their own switch)"),
+        shutter_angle: external_exports.number().min(0).max(720).optional().describe("Motion blur shutter angle in degrees (After Effects default 180)"),
+        shutter_phase: external_exports.number().min(-360).max(360).optional().describe("Motion blur shutter phase in degrees (default -90)"),
+        frame_blending: external_exports.boolean().optional().describe("Comp frame blending switch"),
+        open: external_exports.boolean().optional().describe("Open the comp in the viewer")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aeImportFiles = defineHostTool({
+      name: "ae_import_files",
+      title: "Import files",
+      description: 'Import media files as footage items into a project folder (default "Zenvi Imports", created if missing). Paths already in the project are reused, not imported twice (`dedupe`). All paths are checked before anything is imported.',
+      input: external_exports.strictObject({
+        paths: external_exports.array(absolutePath.describe("Absolute file path")).min(1).max(500).describe("Files to import"),
+        folder: external_exports.string().min(1).default("Zenvi Imports").describe("Project folder name"),
+        sequence: external_exports.boolean().default(false).describe("Import each path as the first frame of an image sequence"),
+        dedupe: external_exports.boolean().default(true).describe("Reuse items whose file is already imported")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aePrecompose = defineHostTool({
+      name: "ae_precompose",
+      title: "Precompose layers",
+      description: 'Move layers into a new comp (Layer > Pre-compose with "Move all attributes"), leaving one precomp layer in their place. Returns the new comp id and the precomp layer.',
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layers: external_exports.array(layerArg).min(1).max(500).describe("Layers to move (any order)"),
+        name: external_exports.string().min(1).max(255).optional().describe('New comp name (default: "<top layer name> Comp")'),
+        move_all_attributes: external_exports.boolean().default(true).describe("Move effects, masks and keyframes into the new comp (false needs exactly one layer)"),
+        open: external_exports.boolean().default(false).describe("Open the new comp in the viewer")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    aeAddMarker = defineHostTool({
+      name: "ae_add_marker",
+      title: "Add marker",
+      description: "Add a comp marker, or a layer marker when `layer` is given: time, comment, duration, chapter, label colour. Use comp markers for beats and section starts so later edits can align to them.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg.optional().describe("Put the marker on this layer instead of the comp"),
+        time: seconds.optional().describe("Time in seconds (default: the comp's current time); snapped to the frame grid"),
+        comment: external_exports.string().max(2e3).default("").describe("Marker comment"),
+        duration: external_exports.number().min(0).default(0).describe("Marker duration in seconds"),
+        chapter: external_exports.string().max(500).optional().describe("Chapter name"),
+        url: external_exports.string().max(2e3).optional().describe("Web link"),
+        label: label.optional().describe("Label colour index 0-16 (0 = none)"),
+        protected_region: external_exports.boolean().optional().describe("Comp markers: protect this time range when the comp is time-stretched")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    aeAddLayer = defineHostTool({
+      name: "ae_add_layer",
+      title: "Add layer",
+      description: `Add a layer at the top of a comp: footage (a project item id or a file path, imported once), solid, adjustment, null, shape (rect or ellipse with fill, stroke and roundness), camera or light; with name, timing, initial transform, parent, blend mode, 3D and label. Solids default to the comp size in ink ${TASTE.color.palette.ink}; shapes to a centred 30 % rect filled with accent ${TASTE.color.palette.accent}. Text has its own tool (ae_add_text).`,
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        kind: external_exports.enum(["footage", "solid", "adjustment", "null", "shape", "camera", "light"]).describe("What to add"),
+        item: external_exports.int().min(1).optional().describe("footage: project item id (footage or comp, from ae_list_items)"),
+        path: absolutePath.optional().describe("footage: a media file to import (reused when already imported)"),
+        name: external_exports.string().min(1).max(255).optional().describe("Layer name"),
+        color: color2.optional().describe("solid: colour; shape: fill colour"),
+        width: external_exports.int().min(4).max(3e4).optional().describe("solid: width in pixels (default: the comp width)"),
+        height: external_exports.int().min(4).max(3e4).optional().describe("solid: height in pixels (default: the comp height)"),
+        shape: external_exports.enum(["rect", "ellipse"]).default("rect").describe("shape: primitive"),
+        size: vec2.optional().describe("shape: [width, height] in pixels (default 30 % of the comp)"),
+        stroke: color2.optional().describe("shape: stroke colour (no stroke when omitted)"),
+        stroke_width: external_exports.number().min(0).max(1e3).optional().describe("shape: stroke width in pixels (default 4 px at 1080p)"),
+        roundness: external_exports.number().min(0).max(1e4).default(0).describe("shape rect: corner roundness in pixels"),
+        light_type: external_exports.enum(["parallel", "spot", "point", "ambient"]).default("point").describe("light: type"),
+        start: seconds.optional().describe("Layer start time in seconds (default 0)"),
+        in_point: seconds.optional().describe("In point in seconds"),
+        out_point: external_exports.number().positive().optional().describe("Out point in seconds"),
+        position: external_exports.array(external_exports.number()).min(2).max(3).optional().describe("Position [x, y] or [x, y, z] in comp pixels (default: centre)"),
+        scale: external_exports.union([external_exports.number(), external_exports.array(external_exports.number()).min(2).max(3)]).optional().describe("Scale % (one number = uniform)"),
+        rotation: external_exports.number().optional().describe("Rotation in degrees"),
+        opacity: external_exports.number().min(0).max(100).optional().describe("Opacity %"),
+        parent: layerArg.optional().describe("Parent layer"),
+        blend_mode: blendMode.optional().describe("Blend mode"),
+        three_d: external_exports.boolean().optional().describe("Make it a 3D layer"),
+        label: label.optional().describe("Label colour index 0-16")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    aeAddText = defineHostTool({
+      name: "ae_add_text",
+      title: "Add text",
+      description: `Add a text layer that already looks designed. \`style\` picks the TASTE type scale at 1080p (scaled by the comp's short side): headline ${sizes2.headline} px bold, title ${sizes2.title} px bold, subtitle ${sizes2.subtitle} px, lower-third ${sizes2.lowerThirdName} px name (+ ${sizes2.lowerThirdRole} px role via \`subtitle\`), caption ${sizes2.caption} px. Fonts fall back Inter > SF Pro Display > Helvetica Neue > Arial. Tracking ${TASTE.type.tracking.headline * 1e3} on headlines, +${TASTE.type.tracking.caps * 1e3} on ALL CAPS; leading ${TASTE.type.leading.headline}x headlines / ${TASTE.type.leading.body}x body. \`placement\` keeps the text inside title-safe (10 % inset; 9:16 also avoids the top 12 % and bottom 20 %); lower-third sits left at title-safe with its baseline at 80 % (70 % vertical). Lines over ${TASTE.type.maxLineChars} characters are broken at balanced word boundaries, too-wide text is scaled down to fit, and a soft shadow is added over footage. Optional \`animation\` applies a motion preset at the layer's start.`,
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        text: external_exports.string().min(1).max(5e3).describe("The text; \\n starts a new line"),
+        subtitle: external_exports.string().min(1).max(5e3).optional().describe("Second, smaller line as its own layer below (e.g. the role in a lower third)"),
+        name: external_exports.string().min(1).max(255).optional().describe("Layer name (default: the text)"),
+        style: external_exports.enum(TEXT_STYLES).optional().describe("Type role (default: lower-third for that placement, caption for bottom-center, subtitle for top placements, else title)"),
+        placement: placement.default("center").describe("Where the text sits; every placement stays inside title-safe"),
+        font: external_exports.string().min(1).optional().describe('PostScript font name, e.g. "Inter-Bold" (falls back with a warning when missing)'),
+        size: external_exports.number().min(1).max(1296).optional().describe("Font size in pixels (default: the style's TASTE size)"),
+        fill: color2.optional().describe(`Fill colour (default paper ${TASTE.color.palette.paper})`),
+        stroke: color2.optional().describe("Stroke colour (no stroke when omitted)"),
+        stroke_width: external_exports.number().min(0).max(1e3).optional().describe("Stroke width in pixels (default 2 px at 1080p when stroke is set)"),
+        tracking: external_exports.number().min(-1e3).max(1e4).optional().describe("Tracking in 1/1000 em (After Effects units)"),
+        leading: external_exports.number().min(0.5).max(5).optional().describe("Line spacing as a multiple of the font size"),
+        justification: external_exports.enum(["left", "center", "right"]).optional().describe("Paragraph alignment (default: from placement)"),
+        box: external_exports.strictObject({ width: external_exports.number().min(1).describe("Box width in pixels"), height: external_exports.number().min(1).describe("Box height in pixels") }).optional().describe("Paragraph text box (wraps inside it) instead of point text"),
+        auto_break: external_exports.boolean().default(true).describe(`Break lines longer than ${TASTE.type.maxLineChars} characters at balanced word boundaries`),
+        shadow: external_exports.boolean().optional().describe("Soft drop shadow for contrast (default: on when footage or a precomp is below)"),
+        start: seconds.optional().describe("Layer start in seconds (default 0)"),
+        duration: external_exports.number().positive().optional().describe(`Seconds on screen (default: to the comp end; lower-third ${T.lowerThird.default} s)`),
+        animation: external_exports.enum(TEXT_ANIMATIONS).optional().describe("Entrance preset applied at the layer start (see ae_apply_motion_preset)")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    aeSetText = defineHostTool({
+      name: "ae_set_text",
+      title: "Change text",
+      description: "Change an existing text layer's text or style: text, font (with fallback), size, fill, stroke, tracking, leading, justification or paragraph box size. When Source Text is keyframed pass `time` to set the keyframe there. Only the given values change.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        text: external_exports.string().max(5e3).optional().describe("New text; \\n starts a new line"),
+        font: external_exports.string().min(1).optional().describe("PostScript font name"),
+        size: external_exports.number().min(1).max(1296).optional().describe("Font size in pixels"),
+        fill: color2.optional().describe("Fill colour"),
+        stroke: external_exports.union([color2, external_exports.null()]).optional().describe("Stroke colour; null removes the stroke"),
+        stroke_width: external_exports.number().min(0).max(1e3).optional().describe("Stroke width in pixels"),
+        tracking: external_exports.number().min(-1e3).max(1e4).optional().describe("Tracking in 1/1000 em"),
+        leading: external_exports.number().min(0.5).max(5).optional().describe("Line spacing as a multiple of the font size"),
+        justification: external_exports.enum(["left", "center", "right"]).optional().describe("Paragraph alignment"),
+        box: external_exports.strictObject({ width: external_exports.number().min(1).describe("Box width in pixels"), height: external_exports.number().min(1).describe("Box height in pixels") }).optional().describe("Paragraph box size (paragraph text layers only)"),
+        time: seconds.optional().describe("For keyframed Source Text: set the keyframe at this time")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    trackMatte = external_exports.strictObject({
+      type: external_exports.enum(["alpha", "alpha-inverted", "luma", "luma-inverted", "none"]).describe("Matte type; none removes the matte"),
+      layer: layerArg.optional().describe("Matte layer (After Effects 2023+; default and only choice before 2023: the layer directly above)")
+    }).describe("Track matte");
+    aeSetLayer = defineHostTool({
+      name: "ae_set_layer",
+      title: "Change layer",
+      description: "Change a layer's timing (start, in, out, stretch), switches (enabled, solo, locked, shy, motion blur, 3D, adjustment, guide, collapse transformations, audio), blend mode, track matte, parent, label, name, comment or quality. Unlock in the same call (locked: false) to change a locked layer. Only the given values change.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        name: external_exports.string().min(1).max(255).optional().describe("New layer name"),
+        comment: external_exports.string().max(5e3).optional().describe("Layer comment"),
+        start: external_exports.number().min(-10800).max(10800).optional().describe("Start time in seconds (moves the layer and its keyframes)"),
+        in_point: external_exports.number().min(-10800).max(10800).optional().describe("In point in seconds"),
+        out_point: external_exports.number().min(-10800).max(10800).optional().describe("Out point in seconds"),
+        stretch: external_exports.number().min(-1e4).max(1e4).optional().describe("Time stretch % (100 = normal, 200 = half speed, negative = reverse)"),
+        enabled: external_exports.boolean().optional().describe("Video switch (eyeball)"),
+        audio_enabled: external_exports.boolean().optional().describe("Audio switch"),
+        solo: external_exports.boolean().optional().describe("Solo"),
+        locked: external_exports.boolean().optional().describe("Lock"),
+        shy: external_exports.boolean().optional().describe("Shy"),
+        motion_blur: external_exports.boolean().optional().describe("Layer motion blur switch"),
+        three_d: external_exports.boolean().optional().describe("3D layer"),
+        adjustment: external_exports.boolean().optional().describe("Adjustment layer"),
+        guide: external_exports.boolean().optional().describe("Guide layer (not rendered)"),
+        collapse: external_exports.boolean().optional().describe("Collapse transformations / continuously rasterize"),
+        blend_mode: blendMode.optional().describe("Blend mode"),
+        track_matte: trackMatte.optional(),
+        parent: external_exports.union([layerArg, external_exports.null()]).optional().describe("Parent layer; null removes the parent (the layer keeps its place on screen)"),
+        label: label.optional().describe("Label colour index 0-16"),
+        quality: external_exports.enum(["best", "draft", "wireframe"]).optional().describe("Layer quality")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aeArrangeLayers = defineHostTool({
+      name: "ae_arrange_layers",
+      title: "Arrange layers",
+      description: "Restack, duplicate, delete or split a layer. move: `to` top, bottom, {index}, {before: layer} or {after: layer}. duplicate: copies the layer (keyframes, effects, masks) above itself. delete: removes it (children keep their place). split: cuts it at `time` into two layers, like Edit > Split Layer.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        action: external_exports.enum(["move", "duplicate", "delete", "split"]).describe("What to do"),
+        to: external_exports.union([
+          external_exports.enum(["top", "bottom"]).describe("Top or bottom of the stack"),
+          external_exports.strictObject({ index: external_exports.int().min(1).describe("1-based index the layer ends up at") }).describe("An index"),
+          external_exports.strictObject({ before: layerArg }).describe("Right above another layer"),
+          external_exports.strictObject({ after: layerArg }).describe("Right below another layer")
+        ]).optional().describe("move: where the layer goes"),
+        time: seconds.optional().describe("split: cut time in seconds (default: the comp's current time)"),
+        name: external_exports.string().min(1).max(255).optional().describe("duplicate / split: name for the new layer")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }
+    });
+    aeSetProperty = defineHostTool({
+      name: "ae_set_property",
+      title: "Set property",
+      description: "Set any layer property by path (display or match names): a static value, or a keyframe at `time`. Colours take #RRGGBB, points [x, y], Scale a number for uniform %. Values are checked against the property's range first. For eased motion use ae_animate instead.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        property: propertyPath,
+        value: propertyValue,
+        time: seconds.optional().describe("Set a keyframe at this time instead of the static value (required when the property already has keyframes)")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aeAnimate = defineHostTool({
+      name: "ae_animate",
+      title: "Animate property",
+      description: `Keyframe a property with real eased keyframes. Each segment eases with the TASTE curves (default ${TASTE.easing.default}; out/entrance for arrivals, in/exit for departures, in-out between resting states, snap for punchy pops, linear only for opacity crossfades, loops and tickers, hold for steps) or a custom {x1, y1, x2, y2}, mapped exactly to After Effects speed/influence per dimension (spatial properties along the path). Existing keyframes inside the new time span are replaced (all of them with \`replace\`). \`overshoot\` (0-0.06) adds an editable settle keyframe for playful brands only.`,
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        property: propertyPath,
+        keyframes: external_exports.array(keyframe3).min(1).max(500).describe("Keyframes in time order: [{time, value, easing?}]"),
+        easing: easing.default(TASTE.easing.default).describe("Default easing for every segment"),
+        replace: external_exports.boolean().default(false).describe("Remove all existing keyframes of the property first"),
+        spatial: external_exports.enum(["auto-bezier", "linear"]).default("auto-bezier").describe("Spatial interpolation for position-like properties"),
+        overshoot: external_exports.number().min(0).max(TASTE.easing.overshoot.max).default(0).describe("Overshoot of the last segment as a fraction of its distance (settles within 0.25 s)")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    aeApplyMotionPreset = defineHostTool({
+      name: "ae_apply_motion_preset",
+      title: "Apply motion preset",
+      description: `Tasteful, editable animation on a layer. fade-in / fade-out (opacity), slide-in / slide-out (${pct(TASTE.layout.slide.default)} of the frame width with opacity), scale-pop (${TASTE.layout.scale.entranceFrom * 100} % to 100 %), blur-in, whip-in (a fast push with motion blur), ken-burns (slow scale + pan over the shot, in-out), push-in (100 % to ${TASTE.layout.scale.holdPushTo * 100} % over the shot), drift (a slow procedural float, an expression); text only: typewriter, word-cascade, line-rise (text animators with a Range Selector, so a human can retime them). Defaults: entrances ${T.entrance.default} s eased out, exits ${T.exit.default} s eased in, pops ${T.micro.default} s snap, stagger ${T.stagger.word} s per word / ${T.stagger.line} s per line; entrances start at the layer's in point, exits end at its out point. \`intensity\` 0-1 (0.5 = the TASTE default) scales distance, scale or blur within the TASTE range. Keyframes already in the preset's time range on the same properties are replaced.`,
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        preset: external_exports.enum(AE_MOTION_PRESETS).describe("Motion preset"),
+        start: seconds.optional().describe("Start time in seconds (default: in point for entrances and holds; out point minus duration for exits)"),
+        duration: external_exports.number().positive().max(600).optional().describe("Seconds (default per preset; word-cascade / line-rise: each word or line's entrance; typewriter: the whole text)"),
+        intensity: external_exports.number().min(0).max(1).default(0.5).describe("0-1 within the TASTE range; 0.5 = default"),
+        direction: direction.optional().describe("Direction of travel for slide/whip presets (default: slide-in up, slide-out down, whip-in right, ken-burns left)"),
+        stagger: external_exports.number().min(0.01).max(2).optional().describe("Text presets: seconds between words/lines/characters")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    aeAddExpression = defineHostTool({
+      name: "ae_add_expression",
+      title: "Set expression",
+      description: "Set or clear an expression on a property. The expression is checked by After Effects right away; one that errors is removed again and the call is refused with After Effects' message. An empty string clears the expression. Prefer keyframes for anything a human will retime; expressions suit loops, wiggles and links between properties.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        property: propertyPath,
+        expression: external_exports.string().max(1e5).describe('Expression source; "" clears it'),
+        enabled: external_exports.boolean().default(true).describe("Enable the expression")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    effectParam = external_exports.strictObject({
+      param: external_exports.string().min(1).describe('Parameter display name, match name, or "Section/Name" for duplicates (e.g. "Creative/Saturation")'),
+      value: effectValue2
+    });
+    effectKeyframes = external_exports.strictObject({
+      param: external_exports.string().min(1).describe("Parameter display name or match name"),
+      keyframes: external_exports.array(effectKeyframe).min(1).max(500).describe("Keyframes [{time, value, easing?}]")
+    });
+    aeApplyEffect = defineHostTool({
+      name: "ae_apply_effect",
+      title: "Apply effect",
+      description: "Add an effect to a layer by display name or match name (exact first, then a unique fuzzy match on the display name; ae_list_effects lists them), then set parameters and optional eased keyframes. Returns the effect's index and the exact parameter names it set.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        effect: external_exports.string().min(1).describe('Effect display name ("Gaussian Blur") or match name ("ADBE Gaussian Blur 2")'),
+        name: external_exports.string().min(1).max(255).optional().describe("Name for this effect instance"),
+        params: external_exports.array(effectParam).max(200).optional().describe("Parameter values [{param, value}]"),
+        keyframes: external_exports.array(effectKeyframes).max(50).optional().describe("Animated parameters [{param, keyframes}]"),
+        easing: easing.default(TASTE.easing.default).describe("Default easing for keyframe segments")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    aeSetEffect = defineHostTool({
+      name: "ae_set_effect",
+      title: "Change effect",
+      description: "Change an effect already on a layer: parameter values, on/off, name, or remove it (destructive). Find effects with ae_get_layer; refer to one by its instance name, match name or 1-based index in the stack.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        effect: external_exports.union([external_exports.int().min(1).describe("1-based index in the layer's effect stack"), external_exports.string().min(1).describe("Instance name or match name")]).describe("Which effect"),
+        params: external_exports.array(effectParam).max(200).optional().describe("Parameter values [{param, value}]"),
+        enabled: external_exports.boolean().optional().describe("Effect switch (fx)"),
+        name: external_exports.string().min(1).max(255).optional().describe("Rename the effect"),
+        remove: external_exports.boolean().default(false).describe("Delete the effect")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
+    });
+    aeApplyLook = defineHostTool({
+      name: "ae_apply_look",
+      title: "Apply colour look",
+      description: `Grade with a TASTE look built from Lumetri Color, by default on one adjustment layer ("Zenvi Look") over the whole comp that is reused when you try another look. clean: contrast +5, vibrance +5. warm-film: temperature +8, tint +2, faded film 8, saturation -6. teal-orange: Color Balance shadows to teal, highlights to orange, saturation +6. moody: exposure -0.3, contrast +12, saturation -15, vignette -0.8. bw-contrast: saturation 0, contrast +25. \`strength\` scales every change (default ${TASTE.color.lookStrength}; keep skin natural); bw-contrast always fully desaturates and scales only its contrast. Lumetri parameters are found by their English names.`,
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        look: external_exports.enum(LOOK_NAMES).describe("TASTE look"),
+        strength: external_exports.number().min(0).max(1).default(TASTE.color.lookStrength).describe("0-1 multiplier on the look's changes"),
+        layer: layerArg.optional().describe("Grade this layer instead of an adjustment layer")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aeAddMask = defineHostTool({
+      name: "ae_add_mask",
+      title: "Add mask",
+      description: `Add a mask to a layer: a rect or ellipse (\`bounds\` in layer pixels, default the whole layer) or a Bezier \`path\`, with feather, expansion, opacity, mode and inversion. \`animate\` eases one mask property from a start value to the set value (default ${T.entrance.default} s, out) - e.g. expansion from -200 for a soft reveal.`,
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        layer: layerArg,
+        shape: external_exports.enum(["rect", "ellipse", "path"]).default("rect").describe("Mask shape"),
+        bounds: external_exports.strictObject({
+          left: external_exports.number().describe("Left edge in layer pixels"),
+          top: external_exports.number().describe("Top edge in layer pixels"),
+          width: external_exports.number().positive().describe("Width in pixels"),
+          height: external_exports.number().positive().describe("Height in pixels")
+        }).optional().describe("rect/ellipse bounds (default: the layer's bounds)"),
+        path: shapePath.optional().describe("path: the mask path"),
+        name: external_exports.string().min(1).max(255).optional().describe("Mask name"),
+        mode: external_exports.enum(["add", "subtract", "intersect", "lighten", "darken", "difference", "none"]).default("add").describe("Mask mode"),
+        inverted: external_exports.boolean().default(false).describe("Invert the mask"),
+        feather: external_exports.union([external_exports.number().min(0), vec2]).default(0).describe("Feather in pixels (one number or [x, y])"),
+        expansion: external_exports.number().default(0).describe("Expansion in pixels (negative shrinks)"),
+        opacity: external_exports.number().min(0).max(100).default(100).describe("Mask opacity %"),
+        animate: external_exports.strictObject({
+          property: external_exports.enum(["expansion", "feather", "opacity"]).describe("Which mask property to animate"),
+          from: external_exports.number().describe("Start value (it animates to the value set by this call)"),
+          start: seconds.optional().describe("Start time in seconds (default: the layer's in point)"),
+          duration: external_exports.number().positive().max(600).optional().describe(`Seconds (default ${T.entrance.default})`),
+          easing: easing.optional().describe("Easing (default out)")
+        }).optional().describe("Optional eased animation")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    RENDER_PRESETS = ["h264", "prores-422", "prores-4444", "lossless", "lossless-alpha"];
+    aeRender = defineHostTool({
+      name: "ae_render",
+      title: "Render comp",
+      description: "Render a comp through the render queue. preset h264 (After Effects 2023+; falls back to ProRes 422 with a warning), prores-422, prores-4444 (alpha), lossless, lossless-alpha; or an exact output module `template`. mode render_now renders and blocks After Effects until done (default), queue_only adds it to the queue, media_encoder queues it in Adobe Media Encoder. The output defaults to a Renders folder next to the saved project. Existing files are not overwritten unless `overwrite`; render_now replaces one only once the new render is complete.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        output: absolutePath.optional().describe("Output file (extension follows the format; default <project folder>/Renders/<comp>.<ext>)"),
+        preset: external_exports.enum(RENDER_PRESETS).default("h264").describe("Output format"),
+        template: external_exports.string().min(1).optional().describe("Exact output module template name (overrides preset)"),
+        render_settings: external_exports.string().min(1).default("Best Settings").describe("Render settings template"),
+        work_area_only: external_exports.boolean().default(false).describe("Render only the work area"),
+        mode: external_exports.enum(["render_now", "queue_only", "media_encoder"]).default("render_now").describe("How to render"),
+        overwrite: external_exports.boolean().default(false).describe("Replace an existing output file")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      timeoutMs: 18e5
+    });
+    aeRenderForZenvi = defineHostTool({
+      name: "ae_render_for_zenvi",
+      title: "Render for Zenvi",
+      description: "Render a comp (default: the active comp) for a Zenvi linked clip and return everything Zenvi needs: path, comp id and name, project, size, fps, duration and a ready `link` object (SPEC 3.6) for the desktop's import_linked_media_tool. alpha: true renders ProRes 4444 with alpha (for overlays over other clips; QuickTime Animation where there is no ProRes 4444 template), else H.264 (before After Effects 2023: ProRes 4444, then QuickTime Animation). Only codecs Zenvi links: h264, prores4444, qtrle. Blocks After Effects while it renders; the render queue item is removed afterwards (two undo steps: queue, tidy). An existing `output` is replaced only with `overwrite`, and only once the new render is complete.",
+      input: external_exports.strictObject({
+        comp: compRef.optional(),
+        alpha: external_exports.boolean().default(false).describe("Keep transparency (ProRes 4444) instead of an opaque H.264"),
+        output: absolutePath.optional().describe("Output file (default: a unique file in the temp folder's zenvi-link/renders)"),
+        work_area_only: external_exports.boolean().default(false).describe("Render only the work area"),
+        template: external_exports.string().min(1).optional().describe("Exact output module template name to use instead (H.264, ProRes 4444 or QuickTime Animation)"),
+        overwrite: external_exports.boolean().default(false).describe("Replace an existing file at `output` (the default output is always a new file)")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      timeoutMs: 18e5
+    });
+    aeSaveProject = defineHostTool({
+      name: "ae_save_project",
+      title: "Save project",
+      description: "Save the project, or save it as `path` (.aep or .aepx). An untitled project needs a path. Saving is not an undo step.",
+      input: external_exports.strictObject({
+        path: absolutePath.optional().describe("Save as this file (.aep / .aepx)"),
+        overwrite: external_exports.boolean().default(false).describe("Replace an existing file at `path`")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    aeUndo = defineHostTool({
+      name: "ae_undo",
+      title: "Undo Zenvi steps",
+      description: "Undo the last N steps (Edit > Undo), normally Zenvi tool calls: each mutating ae_* call is exactly one undo step. Reports which Zenvi steps it expects to have undone; if someone changed the project by hand since, After Effects undoes that change first.",
+      input: external_exports.strictObject({
+        steps: external_exports.int().min(1).max(50).default(1).describe("How many steps to undo")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }
+    });
+    aeRunJsxFile = defineHostTool({
+      name: "ae_run_jsx_file",
+      title: "Run JSX file",
+      description: "Run an ExtendScript file with $.evalFile inside one undo step and return the string it returns. Used by the Zenvi -> After Effects handoff (export_to_after_effects_tool writes such a file). Runs arbitrary code: only run files you trust.",
+      input: external_exports.strictObject({
+        path: absolutePath.describe("The .jsx / .jsxbin file")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+      timeoutMs: 6e5
+    });
+    aeRunScript = defineHostTool({
+      name: "ae_run_script",
+      title: "Run ExtendScript",
+      description: "Escape hatch: run an ExtendScript (ECMAScript 3) snippet inside one undo step and return JSON of its last expression's value. Use a dedicated ae_* tool when one exists; they validate, ease and report properly. Runs arbitrary code.",
+      input: external_exports.strictObject({
+        code: external_exports.string().min(1).max(2e5).describe("ExtendScript source; the value of its last expression is returned")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }
+    });
+    AE_TOOLS = [
+      aeGetState,
+      aeListItems,
+      aeGetComp,
+      aeGetLayer,
+      aeCaptureFrame,
+      aeCreateComp,
+      aeSetComp,
+      aeImportFiles,
+      aeAddLayer,
+      aeAddText,
+      aeSetText,
+      aeSetLayer,
+      aeArrangeLayers,
+      aeSetProperty,
+      aeAnimate,
+      aeApplyMotionPreset,
+      aeAddExpression,
+      aeApplyEffect,
+      aeSetEffect,
+      aeListEffects,
+      aeApplyLook,
+      aeAddMask,
+      aePrecompose,
+      aeAddMarker,
+      aeRender,
+      aeSaveProject,
+      aeUndo,
+      aeRunJsxFile,
+      aeRunScript,
+      aeRenderForZenvi
+    ];
   }
 });
 
 // ../adobe-link/src/catalog/premiere.ts
-var premiereGetState, PREMIERE_TOOLS;
+var UNDO, sequenceRef, clipRef, itemRef, binPath, point, PREMIERE_SEQUENCE_PRESETS, PREMIERE_BLEND_MODES, PREMIERE_EXPORT_PRESETS, PREMIERE_MARKER_COLORS, premiereGetState, premiereListItems, premiereGetSequence, premiereCaptureFrame, premiereImportFiles, premiereCreateSequence, premiereOpenSequence, premierePlaceClip, premiereEditClip, premiereRazor, premiereSetClipProperties, keyframeValue2, premiereAnimate, premiereApplyEffect, premiereAddTransition, premiereApplyLook, premiereAddText, premiereAddMarker, premiereAddCaptions, premiereAutoReframe, premiereSceneDetect, premiereExport, premiereExportXml, premiereImportXml, premiereSaveProject, premiereRunScript, PREMIERE_TOOLS;
 var init_premiere = __esm({
   "../adobe-link/src/catalog/premiere.ts"() {
     "use strict";
     init_zod();
+    init_taste();
     init_types6();
+    UNDO = "Premiere cannot group undo: each change is its own undo step (undoSteps counts them).";
+    sequenceRef = external_exports.string().min(1).describe("Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence");
+    clipRef = external_exports.string().min(1).describe("Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt");
+    itemRef = external_exports.string().min(1).describe("Project item nodeId: `node_id` from premiere_list_items or premiere_import_files");
+    binPath = external_exports.string().min(1).max(500);
+    point = external_exports.array(external_exports.number()).length(2);
+    PREMIERE_SEQUENCE_PRESETS = ["1080p30", "1080p25", "1080p24", "4k30", "vertical", "square"];
+    PREMIERE_BLEND_MODES = [
+      "color",
+      "color-burn",
+      "color-dodge",
+      "darken",
+      "darker-color",
+      "difference",
+      "dissolve",
+      "exclusion",
+      "hard-light",
+      "hard-mix",
+      "hue",
+      "lighten",
+      "lighter-color",
+      "linear-burn",
+      "linear-dodge",
+      "linear-light",
+      "luminosity",
+      "multiply",
+      "normal",
+      "overlay",
+      "pin-light",
+      "saturation",
+      "screen",
+      "soft-light",
+      "vivid-light",
+      "subtract",
+      "divide"
+    ];
+    PREMIERE_EXPORT_PRESETS = ["h264-high", "h264-social-vertical", "prores-422"];
+    PREMIERE_MARKER_COLORS = ["green", "red", "purple", "orange", "yellow", "white", "blue", "cyan"];
     premiereGetState = defineHostTool({
       name: "premiere_get_state",
       title: "Premiere Pro state",
@@ -81458,7 +82225,384 @@ var init_premiere = __esm({
       input: external_exports.strictObject({}),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     });
-    PREMIERE_TOOLS = [premiereGetState];
+    premiereListItems = defineHostTool({
+      name: "premiere_list_items",
+      title: "List project items",
+      description: "The project's bins and items as a flat list in tree order: nodeId, name, kind (bin, media, sequence, clip), bin path, media path, in/out and duration, offline flag. Use it to find the nodeId of footage before placing it, or to check what is already imported. Filter by `kind`, `name_contains` or a starting `bin`. Read-only.",
+      input: external_exports.strictObject({
+        bin: binPath.optional().describe('Start from this bin: its nodeId or its path from the project root, e.g. "Footage/Day 1"; default: the whole project'),
+        kind: external_exports.enum(["any", "media", "sequence", "bin"]).default("any").describe("Only list this kind: media (items with a file), sequence, bin, or any"),
+        name_contains: external_exports.string().min(1).optional().describe("Only items whose name contains this text (case-insensitive)"),
+        recursive: external_exports.boolean().default(true).describe("Include the contents of nested bins"),
+        limit: external_exports.int().min(1).max(2e3).default(200).describe("Most items to return; the receipt says when more exist")
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    premiereGetSequence = defineHostTool({
+      name: "premiere_get_sequence",
+      title: "Read a sequence",
+      description: "One sequence in detail (default: the active one): settings, playhead, in/out, every track (index, name, muted, locked, targeted) with its clips (nodeId, name, start/end/in/out in seconds, media path, project item, enabled, speed, selected, applied effects, Motion/Opacity or volume values and which properties are animated) and transitions, plus the sequence markers. Call it before editing so you address clips by nodeId. Read-only.",
+      input: external_exports.strictObject({
+        sequence: sequenceRef.optional(),
+        include_properties: external_exports.boolean().default(true).describe("Per clip: effects, Motion/Opacity values (video) or volume (audio), and animated properties"),
+        max_clips: external_exports.int().min(1).max(5e3).default(500).describe("Most clips to list across all tracks; the receipt says when more exist")
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    premiereCaptureFrame = defineHostTool({
+      name: "premiere_capture_frame",
+      title: "Capture a frame",
+      description: "Render one frame of a sequence to PNG and return it as an image: your eyes on the edit. Use it after every visual change at the moments that matter (first frame, entrance end, mid-hold, last frame) and critique it against TASTE: title-safe text, contrast, one focal point. Default time: the playhead; the time is snapped to a frame. Uses the QE DOM's exportFramePNG at the sequence's frame size; a sequence that is not active is opened first. Changes nothing in the project.",
+      input: external_exports.strictObject({
+        time: seconds.optional().describe("Sequence time to capture, in seconds; default: the playhead"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      returnsImage: true,
+      timeoutMs: 6e4
+    });
+    premiereImportFiles = defineHostTool({
+      name: "premiere_import_files",
+      title: "Import media",
+      description: 'Import files (video, audio, stills, .srt, .mogrt) into a bin, "Zenvi Imports" by default, created if missing. Files already in the project are not imported twice (`dedupe`): their existing items are returned instead. Returns the nodeId of every item for premiere_place_clip. Missing files are refused before anything is imported. ' + UNDO,
+      input: external_exports.strictObject({
+        paths: external_exports.array(absolutePath).min(1).max(500).describe("Absolute paths of files on this computer"),
+        bin: binPath.default("Zenvi Imports").describe('Bin to import into, created if missing; "Footage/Day 1" nests bins; "/" is the project root'),
+        dedupe: external_exports.boolean().default(true).describe("Return the existing item for files already in the project instead of importing them again"),
+        image_sequence: external_exports.boolean().default(false).describe("Import numbered stills as one image sequence (pass the first frame)")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      timeoutMs: 6e5
+    });
+    premiereCreateSequence = defineHostTool({
+      name: "premiere_create_sequence",
+      title: "Create a sequence",
+      description: "Create a sequence and make it active. `preset`: 1080p30 (default, 1920x1080 at 30 fps), 1080p25, 1080p24, 4k30 (3840x2160), vertical (1080x1920 at 30, social 9:16), square (1080x1080 at 30). Built from an installed sequence preset (never Premiere's New Sequence dialog) and set to the exact size and rate. Or pass `from_clips` to build it from project items with settings matching the first clip. " + UNDO,
+      input: external_exports.strictObject({
+        name: external_exports.string().min(1).max(200).default("Zenvi Sequence").describe("Sequence name"),
+        preset: external_exports.enum(PREMIERE_SEQUENCE_PRESETS).default("1080p30").describe("Frame size and rate (ignored with from_clips)"),
+        from_clips: external_exports.array(itemRef).min(1).max(200).optional().describe("Build the sequence from these project items, in this order, matching the first clip's settings"),
+        bin: binPath.optional().describe("Bin for the new sequence (path from the project root, created if missing); default: the project root"),
+        open: external_exports.boolean().default(true).describe("Make the new sequence the active one")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    premiereOpenSequence = defineHostTool({
+      name: "premiere_open_sequence",
+      title: "Open a sequence",
+      description: "Open a sequence in the Timeline and make it the active sequence (tools default to the active one). Changes only what Premiere shows, not the project; nothing to undo.",
+      input: external_exports.strictObject({
+        sequence: external_exports.string().min(1).describe("Sequence id (`sequence_id` from premiere_get_state) or exact name")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    premierePlaceClip = defineHostTool({
+      name: "premiere_place_clip",
+      title: "Place a clip",
+      description: "Put a project item on a track at a time, optionally using only part of the source (`source_in`/`source_out`). `mode`: overwrite (default) replaces what is there; insert pushes later clips right. Default time: right after the last clip on the track, so repeated calls build a sequence in order. Video items bring their linked audio. The item's own in/out marks are restored afterwards. Cut on action; keep b-roll shots 1.5-3 s, talking heads 4-8 s (TASTE \xA76). " + UNDO,
+      input: external_exports.strictObject({
+        item: itemRef,
+        track: trackRef.default({ kind: "video", index: 0 }).describe("Target track, {kind, index} with 0-based index (V1 = 0); default V1"),
+        time: seconds.optional().describe("Sequence time of the clip's first frame; default: the end of the last clip on the track"),
+        source_in: seconds.optional().describe("Source in point, seconds from the start of the media; default: the item's in mark"),
+        source_out: seconds.optional().describe("Source out point, seconds from the start of the media; default: the item's out mark"),
+        mode: external_exports.enum(["overwrite", "insert"]).default("overwrite").describe("overwrite replaces what is under it; insert ripples later clips right"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    premiereEditClip = defineHostTool({
+      name: "premiere_edit_clip",
+      title: "Edit a clip",
+      description: "One edit on a clip by `action`: move (`to` a start time or `by` seconds), trim (new timeline `start` and/or `end`; the source in/out moves with the edge), enable / disable, rename (`name`), speed (`speed` 0.5 = half speed, with `reverse`, `maintain_pitch`, `ripple`; QE DOM), delete (`ripple` closes the gap on the clip's tracks). move, trim, enable/disable and delete include the linked audio/video unless `include_linked` is false. Locked tracks, moves onto other clips and trims into a neighbour are refused, as are trims of retimed clips. delete is destructive. " + UNDO,
+      input: external_exports.strictObject({
+        clip: clipRef,
+        action: external_exports.enum(["move", "trim", "enable", "disable", "rename", "speed", "delete"]).describe("What to do"),
+        to: seconds.optional().describe("move: the new start time on the sequence"),
+        by: external_exports.number().optional().describe("move: shift by this many seconds (negative = earlier)"),
+        start: seconds.optional().describe("trim: new start (head) on the sequence; the source in point follows"),
+        end: seconds.optional().describe("trim: new end (tail) on the sequence; the source out point follows"),
+        name: external_exports.string().min(1).max(500).optional().describe("rename: the new clip name"),
+        speed: external_exports.number().min(0.01).max(100).optional().describe("speed: playback rate, 1 = normal, 0.5 = half speed (twice as long), 2 = double"),
+        reverse: external_exports.boolean().default(false).describe("speed: play backwards"),
+        maintain_pitch: external_exports.boolean().default(true).describe("speed: keep the audio pitch"),
+        ripple: external_exports.boolean().default(false).describe("delete: close the gap; speed: push or pull the clips after it"),
+        include_linked: external_exports.boolean().default(true).describe("move, trim, enable/disable, delete: also the clip's linked audio/video"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }
+    });
+    premiereRazor = defineHostTool({
+      name: "premiere_razor",
+      title: "Razor cut",
+      description: "Cut clips at a time, like the Razor tool, so each side can be trimmed, moved or deleted. Default: every unlocked track with a clip at `time`; pass `tracks` to cut only some. Returns the nodeIds of the new right-hand pieces. Uses the QE DOM. " + UNDO,
+      input: external_exports.strictObject({
+        time: seconds.describe("Sequence time to cut at, in seconds (snapped to the frame grid)"),
+        tracks: external_exports.array(trackRef).min(1).max(64).optional().describe("Only these tracks, {kind, index} 0-based; default: every unlocked track with a clip at that time"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    premiereSetClipProperties = defineHostTool({
+      name: "premiere_set_clip_properties",
+      title: "Set clip properties",
+      description: "Static values on a clip's built-in effects: Motion (position in sequence pixels, scale %, rotation, anchor), Opacity (opacity %, blend mode) and audio volume in dB. Only the properties you pass change. An animated property is refused unless `clear_keyframes` (use premiere_animate to change keyframes). Respect the frame: keep faces in the upper third and text inside title-safe (TASTE \xA73). " + UNDO,
+      input: external_exports.strictObject({
+        clip: clipRef,
+        position: point.optional().describe("Motion > Position [x, y] in sequence pixels from the top-left; [width/2, height/2] is the centre"),
+        scale: external_exports.number().min(0).max(1e4).optional().describe("Motion > Scale in percent (100 = original size)"),
+        rotation: external_exports.number().min(-36e3).max(36e3).optional().describe("Motion > Rotation in degrees, clockwise"),
+        anchor: point.optional().describe("Motion > Anchor Point as fractions of the clip frame [x, y]; [0.5, 0.5] is the centre"),
+        opacity: external_exports.number().min(0).max(100).optional().describe("Opacity in percent"),
+        blend_mode: external_exports.enum(PREMIERE_BLEND_MODES).optional().describe("Opacity > Blend Mode"),
+        volume_db: external_exports.number().min(-96).max(15).optional().describe("Audio clips: Volume > Level in dB (0 = as recorded, max +15; -96 = silent)"),
+        clear_keyframes: external_exports.boolean().default(false).describe("Remove the keyframes of an animated property you set instead of refusing"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    keyframeValue2 = external_exports.union([external_exports.number(), external_exports.array(external_exports.number()).min(2).max(4)]);
+    premiereAnimate = defineHostTool({
+      name: "premiere_animate",
+      title: "Animate a property",
+      description: "Keyframes on a clip's Motion (position, scale, rotation, anchor), opacity, volume, or any parameter of an applied effect (`{effect, param}`). Times count from the clip's first frame; values use the units of premiere_set_clip_properties. TASTE easings map to Premiere interpolation: smooth/in-out/snap ease in and out (Bezier ease), out/entrance arrives softly, in/exit leaves softly, linear (opacity and volume fades only), hold. Defaults: smooth easing, replace existing keyframes. Typical: entrance 0.6 s, exit 0.4 s, scale 92->100 % on entry, Ken Burns 100->104 % over the shot; never linear on Motion. Clips with a speed change are refused. " + UNDO,
+      input: external_exports.strictObject({
+        clip: clipRef,
+        property: external_exports.union([
+          external_exports.enum(["position", "scale", "rotation", "anchor", "opacity", "volume"]).describe("A built-in property"),
+          external_exports.strictObject({
+            effect: external_exports.string().min(1).describe('Effect display name as in Effect Controls, e.g. "Gaussian Blur"'),
+            param: external_exports.string().min(1).describe('Parameter display name, e.g. "Blurriness"')
+          }).describe("A parameter of an effect applied to the clip")
+        ]).describe("What to animate"),
+        keyframes: external_exports.array(
+          external_exports.strictObject({
+            time: seconds.describe("Seconds from the clip's first frame (0 = where it starts on the timeline)"),
+            value: keyframeValue2.describe("position [x, y] px, scale %, rotation degrees, anchor fractions, opacity %, volume dB; effect parameters as Premiere shows them"),
+            easing: easing.optional().describe("Easing of the segment from this keyframe to the next; default: `easing`")
+          })
+        ).min(2).max(200).describe("At least two keyframes; sorted by time for you"),
+        easing: easing.default(TASTE.easing.default).describe("Easing for every segment (TASTE \xA72): smooth, out/entrance, in/exit, in-out, snap, linear, hold, or {x1, y1, x2, y2}"),
+        replace: external_exports.boolean().default(true).describe("Remove the property's existing keyframes first"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    premiereApplyEffect = defineHostTool({
+      name: "premiere_apply_effect",
+      title: "Apply an effect",
+      description: "Add a video or audio effect to a clip by its name in the Effects panel (QE DOM), then set parameters on it through the component API. Unknown effect names are refused with close matches; unknown parameter names are reported with the parameters the effect has. For colour looks prefer premiere_apply_look; for keyframes use premiere_animate with `{effect, param}`. " + UNDO,
+      input: external_exports.strictObject({
+        clip: clipRef,
+        effect: external_exports.string().min(1).describe('Effect name as in the Effects panel, e.g. "Gaussian Blur", "Lumetri Color", "DeNoise"'),
+        params: external_exports.array(
+          external_exports.strictObject({
+            name: external_exports.string().min(1).describe('Parameter display name, e.g. "Blurriness"'),
+            value: external_exports.union([external_exports.number(), external_exports.boolean(), external_exports.array(external_exports.number()).min(2).max(4)]).describe("Number, checkbox, or point/colour array")
+          })
+        ).max(50).optional().describe("Parameter values to set once the effect is on the clip"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    premiereAddTransition = defineHostTool({
+      name: "premiere_add_transition",
+      title: "Add a transition",
+      description: "Add a transition at a clip's edge (QE DOM): `at` end (default; the cut after the clip, or its tail), start (the cut before it, or its head) or both. Default Cross Dissolve for video (Constant Power for audio), 0.5 s centred on the cut (TASTE: 0.5 s within a scene, 1.0 s for a change of time or place; dips to black for chapter breaks only). Clips without media handles get a shorter or one-sided transition; the receipt reports what Premiere made. " + UNDO,
+      input: external_exports.strictObject({
+        clip: clipRef,
+        at: external_exports.enum(["end", "start", "both"]).default("end").describe("Which edge of the clip"),
+        transition: external_exports.string().min(1).optional().describe("Transition name as in the Effects panel; default: Cross Dissolve (video) or Constant Power (audio)"),
+        duration: external_exports.number().positive().max(30).default(TASTE.timing.crossDissolve.default).describe("Seconds (snapped to whole frames)"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    premiereApplyLook = defineHostTool({
+      name: "premiere_apply_look",
+      title: "Apply a colour look",
+      description: "Grade clips with a Lumetri Color look (added when missing, reused when present): clean (+5 contrast, +5 vibrance), warm-film (temperature +8, tint +2, faded film 8, saturation -6), teal-orange (teal shadow tint, orange highlight tint, saturation +6), moody (exposure -0.3, contrast +12, saturation -15, vignette -0.8), bw-contrast (saturation 0, contrast +25), scaled by `strength` (default 0.6: keep skin natural). Targets `clips`, else every clip on `track`, else the selected video clips. Lumetri parameters are found by their English names. " + UNDO,
+      input: external_exports.strictObject({
+        look: external_exports.enum(LOOK_NAMES).describe("The look (TASTE \xA75)"),
+        strength: external_exports.number().min(0).max(1).default(TASTE.color.lookStrength).describe("0-1 share of the look's adjustments"),
+        clips: external_exports.array(clipRef).min(1).max(500).optional().describe("Video clips to grade"),
+        track: trackRef.optional().describe("Grade every clip on this video track"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    premiereAddText = defineHostTool({
+      name: "premiere_add_text",
+      title: "Add a title",
+      description: "Add a title to the sequence on a free video track above the footage. Premiere's scripting API cannot type text into its own title templates. So without `image` or `mogrt`, Zenvi Link renders the title itself: a transparent PNG at the sequence size, drawn with the panel's canvas, placed inside title-safe, and saved next to the project in \"Zenvi Titles\". You can set `font`, `weight`, `color`, `stroke`, the soft `shadow` and a `box`. Lines break at your line breaks and at 32 characters, on word boundaries, never leaving one word alone. `image` places your own transparent PNG: one with the frame's aspect fills the frame, a smaller graphic sits at `placement`. `mogrt` uses an After Effects-authored Essential Graphics template, setting its text control to `text` plus its size and colour controls when it exposes them. Defaults (TASTE \xA71, \xA74): `style` title 72 px at 1080p (headline 96, subtitle 44, lower-third 54, caption 42), weight 700 (headline 800, subtitle and caption 500), colour #F7F7F5 with a soft shadow, on screen for 1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). " + UNDO,
+      input: external_exports.strictObject({
+        text: external_exports.string().min(1).max(500).describe("The words; keep lines under 32 characters and break on phrases (TASTE \xA74)"),
+        style: external_exports.enum(["headline", "title", "subtitle", "lower-third", "caption"]).default("title").describe("Type scale step"),
+        font_size: external_exports.number().min(6).max(1e3).optional().describe("Override the style's size, in pixels at the sequence's size"),
+        color: color2.default(TASTE.color.palette.paper).describe("Text colour, #RRGGBB or [r, g, b] 0-1"),
+        placement: placement.optional().describe("Where an image smaller than the frame sits, inside title-safe (9:16: clear of the top 12 % and bottom 20 %); default: lower-third for that style, bottom-center for captions, else center"),
+        time: seconds.optional().describe("Sequence time of the title's first frame; default: the playhead"),
+        duration: external_exports.number().positive().max(3600).optional().describe("Seconds on screen; default: reading time"),
+        track: external_exports.int().min(0).max(98).optional().describe("Video track index (0 = V1); default: the lowest track above V1 that is free for the whole duration"),
+        mogrt: absolutePath.optional().describe("An After Effects-authored .mogrt with a text control"),
+        image: absolutePath.optional().describe("A transparent PNG title: the frame's aspect fills the frame, a smaller graphic keeps its pixel size"),
+        font: external_exports.string().min(1).max(200).optional().describe("Rendered titles: font family; default Inter, then SF Pro Display, Helvetica Neue, Arial (TASTE \xA74)"),
+        weight: external_exports.int().min(100).max(900).optional().describe("Rendered titles: font weight; default 800 headline, 700 title and lower-third, 500 subtitle and caption"),
+        stroke: external_exports.strictObject({ color: color2.describe("Outline colour"), width: external_exports.number().min(0.5).max(200).describe("Outline width in pixels at the sequence size") }).optional().describe("Rendered titles: an outline around the letters"),
+        shadow: external_exports.boolean().optional().describe("Rendered titles: the soft drop shadow for contrast over video (TASTE \xA74: distance 0, softness 16 px at 1080p, 40 %); default true"),
+        box: external_exports.strictObject({
+          color: color2.optional().describe("Bar colour; default ink #0B0B0F"),
+          opacity: external_exports.number().min(0).max(1).optional().describe("Bar opacity; default 0.45 (TASTE scrim 35-55 %)"),
+          padding: external_exports.number().min(0).max(500).optional().describe("Space around the text in pixels; default 0.4 x the font size")
+        }).optional().describe("Rendered titles: a bar behind the text, for busy footage"),
+        align: external_exports.enum(["left", "center", "right"]).optional().describe("Rendered titles: line alignment; default left for lower-third and top-left, else center"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    premiereAddMarker = defineHostTool({
+      name: "premiere_add_marker",
+      title: "Add a marker",
+      description: "Add a sequence marker, or with `clip` a clip marker (Premiere keeps those on the clip's source item, so every use of that media shows it). Name, comment, duration (0 = a point), colour, type (comment, chapter, segmentation). Default time: the playhead. Use markers to leave notes for the editor and to mark beats and chapters. " + UNDO,
+      input: external_exports.strictObject({
+        time: seconds.optional().describe("Sequence time; default: the playhead"),
+        name: external_exports.string().max(500).optional().describe("Marker name"),
+        comment: external_exports.string().max(5e3).optional().describe("Marker comment"),
+        duration: external_exports.number().min(0).max(86400).default(0).describe("Seconds; 0 = a point marker"),
+        color: external_exports.enum(PREMIERE_MARKER_COLORS).optional().describe("Marker colour; default: Premiere's (green)"),
+        type: external_exports.enum(["comment", "chapter", "segmentation"]).default("comment").describe("Marker type"),
+        clip: clipRef.optional().describe("Mark this clip instead of the sequence"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    premiereAddCaptions = defineHostTool({
+      name: "premiere_add_captions",
+      title: "Add captions from SRT",
+      description: "Import an .srt file and turn it into a caption track on the sequence, starting at `time` (default 0). Format subtitle (default) or a broadcast standard. Style captions in Premiere's Essential Graphics panel; keep them inside title-safe and readable at phone size. " + UNDO,
+      input: external_exports.strictObject({
+        srt: absolutePath.describe("Absolute path to a .srt subtitle file"),
+        time: seconds.default(0).describe("Sequence time where the file's 00:00:00,000 lands"),
+        format: external_exports.enum(["subtitle", "cea-608", "cea-708", "teletext", "ebu", "op42", "op47"]).default("subtitle").describe("Caption format of the new track"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    });
+    premiereAutoReframe = defineHostTool({
+      name: "premiere_auto_reframe",
+      title: "Auto Reframe",
+      description: "Make a reframed copy of a sequence for another aspect ratio with Premiere's Auto Reframe (Premiere Pro 2020 / 14.0 or later): 9:16 (default, social vertical 1080x1920 from 1080p), 1:1, 4:5, 16:9. The copy keeps the source's short side and is opened. The original is untouched. Check the result with premiere_capture_frame: faces in the upper third, text inside the vertical safe area. " + UNDO,
+      input: external_exports.strictObject({
+        aspect: external_exports.enum(["9:16", "1:1", "4:5", "16:9"]).default("9:16").describe("Target aspect ratio"),
+        motion: external_exports.enum(["default", "slower", "faster"]).default("default").describe("How quickly the framing follows the action"),
+        name: external_exports.string().min(1).max(200).optional().describe('Name of the new sequence; default: "<sequence> 9x16"'),
+        nest: external_exports.boolean().default(false).describe("Nest clips before reframing"),
+        open: external_exports.boolean().default(true).describe("Open the new sequence"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      timeoutMs: 18e5
+    });
+    premiereSceneDetect = defineHostTool({
+      name: "premiere_scene_detect",
+      title: "Scene edit detection",
+      description: "Find the camera cuts inside long clips with Premiere's Scene Edit Detection and either razor them (`action` cuts, default, linked audio too) or mark them (markers land on the source items). Runs on every clip of a track (default V1) or on `clips`. Premiere is blocked while it analyses; long media takes minutes. The previous selection is restored. " + UNDO,
+      input: external_exports.strictObject({
+        track: trackRef.default({ kind: "video", index: 0 }).describe("Video track to analyse, {kind, index} 0-based; default V1"),
+        clips: external_exports.array(clipRef).min(1).max(500).optional().describe("Only these clips of the track"),
+        action: external_exports.enum(["cuts", "markers"]).default("cuts").describe("cuts = razor at each detected scene change; markers = add markers"),
+        sensitivity: external_exports.enum(["low", "medium", "high"]).default("medium").describe("Detection sensitivity"),
+        include_linked_audio: external_exports.boolean().default(true).describe("cuts: also cut the linked audio"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      timeoutMs: 18e5
+    });
+    premiereExport = defineHostTool({
+      name: "premiere_export",
+      title: "Export a sequence",
+      description: "Render a sequence to a file. `preset`: h264-high (default, H.264 matching the source at a high bitrate), h264-social-vertical (the same for a 9:16 sequence; others are refused, run premiere_auto_reframe first), prores-422, or the path of an .epr. Presets are found among the installed Premiere / Media Encoder presets. `range` entire, in-out or work-area. `via` media_encoder (default: queued in Adobe Media Encoder and started, returns the job id at once) or direct (Premiere renders now and blocks until done). Existing files are refused unless `overwrite`. Changes nothing in the project.",
+      input: external_exports.strictObject({
+        preset: external_exports.union([external_exports.enum(PREMIERE_EXPORT_PRESETS).describe("A named preset"), absolutePath.describe("Absolute path to an .epr export preset")]).default("h264-high").describe("Export preset"),
+        output: absolutePath.optional().describe('Output file; its extension comes from the preset when missing; default: "Zenvi Exports/<sequence>.<ext>" next to the project'),
+        range: external_exports.enum(["entire", "in-out", "work-area"]).default("entire").describe("What to render"),
+        via: external_exports.enum(["media_encoder", "direct"]).default("media_encoder").describe("Queue in Media Encoder, or render inside Premiere now"),
+        overwrite: external_exports.boolean().default(false).describe("Replace an existing output file"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      timeoutMs: 36e5
+    });
+    premiereExportXml = defineHostTool({
+      name: "premiere_export_xml",
+      title: "Export FCP XML",
+      description: "Write a sequence (default: the active one) as Final Cut Pro 7 XML (xmeml), Premiere's own exchange format, with warnings dialogs suppressed. Zenvi reads this file to bring a Premiere edit back (import_timeline_xml_tool). Default output: a new file in the system temp folder. Changes nothing in the project.",
+      input: external_exports.strictObject({
+        output: absolutePath.optional().describe("Where to write the .xml; default: a new file in the temp folder"),
+        overwrite: external_exports.boolean().default(false).describe("Replace an existing file"),
+        sequence: sequenceRef.optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      timeoutMs: 3e5
+    });
+    premiereImportXml = defineHostTool({
+      name: "premiere_import_xml",
+      title: "Import FCP XML",
+      description: 'Import a Final Cut Pro 7 XML (e.g. a Zenvi export) into a bin ("Zenvi Imports" by default) and open the sequence it contains. Returns the new sequence ids. Media referenced by the XML must exist at its paths or Premiere marks it offline. ' + UNDO,
+      input: external_exports.strictObject({
+        path: absolutePath.describe("The .xml file"),
+        bin: binPath.default("Zenvi Imports").describe('Bin to import into, created if missing; "/" is the project root'),
+        open: external_exports.boolean().default(true).describe("Open the first imported sequence")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      timeoutMs: 6e5
+    });
+    premiereSaveProject = defineHostTool({
+      name: "premiere_save_project",
+      title: "Save the project",
+      description: "Save the project in place, or with `path` save it as a new .prproj and keep working in that copy (Premiere's Save As closes the original). Save after a batch of edits the user wants to keep. Changes nothing in the project's content; saving is not an undo step.",
+      input: external_exports.strictObject({
+        path: absolutePath.optional().describe("Save As this .prproj path; default: save in place")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    });
+    premiereRunScript = defineHostTool({
+      name: "premiere_run_script",
+      title: "Run ExtendScript",
+      description: "Escape hatch: run an ExtendScript (ECMAScript 3) snippet in Premiere and return its completion value as JSON. `app`, `qe` (QE DOM, enabled) and `ZenviLink` are in scope. Use only when no premiere_* tool covers the job; the snippet can change or delete anything. " + UNDO,
+      input: external_exports.strictObject({
+        script: external_exports.string().min(1).max(2e5).describe("ExtendScript source; the value of its last statement is returned")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+      timeoutMs: 6e5
+    });
+    PREMIERE_TOOLS = [
+      premiereGetState,
+      premiereListItems,
+      premiereGetSequence,
+      premiereCaptureFrame,
+      premiereImportFiles,
+      premiereCreateSequence,
+      premiereOpenSequence,
+      premierePlaceClip,
+      premiereEditClip,
+      premiereRazor,
+      premiereSetClipProperties,
+      premiereAnimate,
+      premiereApplyEffect,
+      premiereAddTransition,
+      premiereApplyLook,
+      premiereAddText,
+      premiereAddMarker,
+      premiereAddCaptions,
+      premiereAutoReframe,
+      premiereSceneDetect,
+      premiereExport,
+      premiereExportXml,
+      premiereImportXml,
+      premiereSaveProject,
+      premiereRunScript
+    ];
   }
 });
 
@@ -81542,7 +82686,9 @@ async function probeHost(url2, token, host, options = {}) {
         method: "initialize",
         params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "zenvi-cli", version: options.clientVersion ?? "0" } }
       }),
-      signal: AbortSignal.timeout(options.timeoutMs ?? 1500)
+      signal: AbortSignal.timeout(options.timeoutMs ?? 1500),
+      // Only the exact URL counts: a redirect (to another port, another server) is unreachable.
+      redirect: "manual"
     });
     if (response.status !== 200) {
       await response.body?.cancel().catch(() => void 0);
@@ -81570,12 +82716,14 @@ async function inspectHost(desktopDir, host, options = {}) {
   } catch {
     return result("absent", "no discovery file (the app is not running, or Zenvi Link is not installed)");
   }
-  let data;
+  let parsed;
   try {
-    data = JSON.parse(raw);
+    parsed = JSON.parse(raw);
   } catch {
     return result("invalid", "the discovery file is not JSON");
   }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return result("invalid", "the discovery file is not a JSON object");
+  const data = parsed;
   const url2 = text2(data.url);
   const pid = Number(data.pid);
   if (data.app !== host || !url2 || !Number.isInteger(pid)) return result("invalid", "the discovery file is not a Zenvi Link file for this app");
@@ -81588,7 +82736,7 @@ async function inspectHost(desktopDir, host, options = {}) {
   if (!pidAlive3(pid)) {
     if (options.removeStale) {
       await removeQuietly(file3);
-      if (path23.dirname(tokenPath) === dir && path23.basename(tokenPath) === `${host}.token`) await removeQuietly(tokenPath);
+      if (path23.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path23.basename(tokenPath))) await removeQuietly(tokenPath);
     }
     return result("dead", `process ${pid} is gone (left over from a crash)`);
   }
@@ -81619,7 +82767,18 @@ async function inspectHost(desktopDir, host, options = {}) {
   return result("connected", "connected", endpoint);
 }
 function inspectHosts(desktopDir, options = {}) {
-  return Promise.all(HOST_IDS.map((host) => inspectHost(desktopDir, host, options)));
+  return Promise.all(
+    HOST_IDS.map(
+      (host) => inspectHost(desktopDir, host, options).catch(
+        (error62) => ({
+          host,
+          status: "invalid",
+          detail: `could not read the discovery file: ${error62 instanceof Error ? error62.message : String(error62)}`,
+          file: path23.join(linkDirOf(desktopDir), `${host}.json`)
+        })
+      )
+    )
+  );
 }
 var init_discovery2 = __esm({
   "../adobe-link/src/discovery.ts"() {
@@ -81630,6 +82789,40 @@ var init_discovery2 = __esm({
 });
 
 // ../adobe-link/src/client.ts
+import http2 from "node:http";
+import { Readable as Readable3 } from "node:stream";
+function loopbackFetch(input2, init = {}) {
+  return new Promise((resolve, reject) => {
+    const url2 = new URL(String(input2));
+    const signal = init.signal;
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    if (init.body !== void 0 && init.body !== null && typeof init.body !== "string") {
+      reject(new TypeError("loopbackFetch sends string bodies only"));
+      return;
+    }
+    const method = (init.method ?? "GET").toUpperCase();
+    const request = http2.request(
+      { hostname: url2.hostname, port: url2.port, path: `${url2.pathname}${url2.search}`, method, headers: Object.fromEntries(new Headers(init.headers)) },
+      (response) => {
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(response.headers)) {
+          if (Array.isArray(value)) for (const item of value) headers.append(name, item);
+          else if (value !== void 0) headers.set(name, value);
+        }
+        const status = response.statusCode ?? 502;
+        const empty = method === "HEAD" || status === 204 || status === 205 || status === 304;
+        if (empty) response.resume();
+        resolve(new Response(empty ? null : Readable3.toWeb(response), { status, statusText: response.statusMessage, headers }));
+      }
+    );
+    request.on("error", reject);
+    signal?.addEventListener("abort", () => request.destroy(signal.reason instanceof Error ? signal.reason : new Error("aborted")), { once: true });
+    request.end(init.body ?? void 0);
+  });
+}
 var RESPONSE_MARGIN_MS, HostClient;
 var init_client5 = __esm({
   "../adobe-link/src/client.ts"() {
@@ -81651,7 +82844,8 @@ var init_client5 = __esm({
       async connected() {
         if (this.client) return this.client;
         const transport = new StreamableHTTPClientTransport(new URL(this.endpoint.url), {
-          requestInit: { headers: { Authorization: `Bearer ${this.endpoint.token}` } }
+          requestInit: { headers: { Authorization: `Bearer ${this.endpoint.token}` } },
+          fetch: loopbackFetch
         });
         const client = new Client({ name: "zenvi-cli", version: this.clientVersion }, { capabilities: {} });
         await client.connect(transport);

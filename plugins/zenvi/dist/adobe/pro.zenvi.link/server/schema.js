@@ -4,8 +4,10 @@
  * Tool arguments against the catalog's JSON Schema: the subset zod's
  * toJSONSchema emits for host tools (type, enum, const, ranges, lengths,
  * pattern, items/prefixItems, properties/required/additionalProperties,
- * anyOf/oneOf). Every host tool refuses bad arguments the same way, before
- * any ExtendScript runs, and omitted arguments get the schema `default`.
+ * anyOf/oneOf/allOf). Every host tool refuses bad arguments the same way,
+ * before any ExtendScript runs, and omitted arguments get the schema
+ * `default`, inside objects and array items too. Keys that would reach
+ * Object.prototype (__proto__, constructor, prototype) are refused.
  */
 
 function typeOf(value) {
@@ -19,6 +21,9 @@ function matchesType(value, type) {
   const actual = typeOf(value);
   return type === "number" ? actual === "number" || actual === "integer" : actual === type;
 }
+
+/** Never valid argument names: assigning them would change an object's prototype. */
+const FORBIDDEN_KEYS = ["__proto__", "constructor", "prototype"];
 
 function label(path) {
   return path.length ? "`" + path.join(".") + "`" : "arguments";
@@ -48,6 +53,12 @@ function describe(schema) {
 
 /** First problem with `value` against `schema`, as a sentence, or null. */
 function check(schema, value, path) {
+  if (schema.allOf) {
+    for (const branch of schema.allOf) {
+      const problem = check(branch, value, path);
+      if (problem) return problem;
+    }
+  }
   const branches = schema.anyOf || schema.oneOf;
   if (branches) {
     const passing = branches.filter((branch) => check(branch, value, path) === null).length;
@@ -85,6 +96,7 @@ function check(schema, value, path) {
     if (schema.minItems !== undefined && value.length < schema.minItems) return label(path) + " needs at least " + schema.minItems + " items";
     if (schema.maxItems !== undefined && value.length > schema.maxItems) return label(path) + " takes at most " + schema.maxItems + " items";
     const prefix = schema.prefixItems || [];
+    if (schema.items === false && value.length > prefix.length) return label(path) + " takes at most " + prefix.length + " items";
     for (let i = 0; i < value.length; i += 1) {
       const itemSchema = i < prefix.length ? prefix[i] : schema.items;
       if (itemSchema && typeof itemSchema === "object") {
@@ -96,7 +108,7 @@ function check(schema, value, path) {
   if (typeOf(value) === "object") {
     const properties = schema.properties || {};
     for (const key of schema.required || []) {
-      if (value[key] === undefined) return label(path.concat(key)) + " is required";
+      if (!Object.prototype.hasOwnProperty.call(value, key) || value[key] === undefined) return label(path.concat(key)) + " is required";
     }
     for (const key of Object.keys(value)) {
       if (Object.prototype.hasOwnProperty.call(properties, key)) {
@@ -118,8 +130,32 @@ function copy(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
-/** `value` with schema defaults filled in for omitted properties (nested objects too, not inside anyOf). */
+/** The path of the first forbidden key anywhere in `value`, or null. */
+function forbiddenKey(value, path) {
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i += 1) {
+      const found = forbiddenKey(value[i], path.concat(String(i)));
+      if (found) return found;
+    }
+  } else if (typeOf(value) === "object") {
+    for (const key of Object.keys(value)) {
+      if (FORBIDDEN_KEYS.indexOf(key) >= 0) return path.concat(key);
+      const found = forbiddenKey(value[key], path.concat(key));
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/** `value` with schema defaults filled in for omitted properties: nested objects and array items too, not inside anyOf. */
 function withDefaults(schema, value) {
+  if (Array.isArray(value)) {
+    const prefix = schema.prefixItems || [];
+    return value.map((item, i) => {
+      const itemSchema = i < prefix.length ? prefix[i] : schema.items;
+      return itemSchema && typeof itemSchema === "object" ? withDefaults(itemSchema, item) : item;
+    });
+  }
   if (typeOf(value) !== "object" || !schema.properties) return value;
   const out = Object.assign({}, value);
   for (const key of Object.keys(schema.properties)) {
@@ -144,6 +180,9 @@ function acceptsNull(schema) {
  */
 function validateArguments(schema, raw) {
   if (raw !== undefined && raw !== null && typeOf(raw) !== "object") return { ok: false, message: "arguments must be a JSON object, got " + typeOf(raw) };
+  // Before anything is copied: assigning such a key would set a prototype.
+  const forbidden = forbiddenKey(raw, []);
+  if (forbidden) return { ok: false, message: label(forbidden) + " is not allowed as an argument name" };
   const properties = schema.properties || {};
   const args = {};
   for (const key of Object.keys(raw || {})) {
