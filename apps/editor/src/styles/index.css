@@ -1,0 +1,295 @@
+@import "tailwindcss";
+
+/*
+ * Zenvi editor design tokens.
+ *
+ * Visual language of zenvi.pro: near-black surfaces, white text at stepped
+ * opacities, hairline borders, one electric-blue accent. Every color is a CSS
+ * variable (Tailwind's default palette is reset) so a future light theme only
+ * remaps these values.
+ */
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Surfaces, darkest to lightest. */
+  --color-canvas: #000000;
+  --color-base: #0a0a0a;
+  --color-raised: #0d0d0d;
+  --color-elevated: #141414;
+  --color-overlay: #1a1a1a;
+  --color-highlight: #232323;
+
+  /* Text. */
+  --color-fg: #ffffff;
+  --color-fg-muted: rgb(255 255 255 / 0.7);
+  --color-fg-subtle: rgb(255 255 255 / 0.48);
+  --color-fg-faint: rgb(255 255 255 / 0.3);
+
+  /* Hairlines. */
+  --color-line: rgb(255 255 255 / 0.07);
+  --color-line-strong: rgb(255 255 255 / 0.12);
+  --color-line-bright: rgb(255 255 255 / 0.22);
+
+  /* The one accent. */
+  --color-accent: #3275f8;
+  --color-accent-hover: #4a87fa;
+  --color-accent-press: #2863d8;
+  --color-accent-fg: #ffffff;
+  --color-accent-soft: rgb(50 117 248 / 0.15);
+  --color-accent-line: rgb(50 117 248 / 0.5);
+
+  /* Status. */
+  --color-danger: #f04848;
+  --color-danger-soft: rgb(240 72 72 / 0.14);
+  --color-warning: #f5a524;
+  --color-warning-soft: rgb(245 165 36 / 0.14);
+  --color-success: #2fbf71;
+  --color-success-soft: rgb(47 191 113 / 0.14);
+
+  /* Timeline. */
+  --color-clip-video: #1d3f82;
+  --color-clip-video-head: #2c5bb8;
+  --color-clip-video-edge: #4a7fe0;
+  --color-clip-audio: #144d35;
+  --color-clip-audio-head: #1f7a52;
+  --color-clip-audio-edge: #36a872;
+  --color-clip-image: #3f2d7a;
+  --color-clip-image-head: #5b43ad;
+  --color-clip-image-edge: #8267dc;
+  --color-clip-wave: rgb(255 255 255 / 0.62);
+  --color-transition: rgb(255 255 255 / 0.1);
+  --color-transition-edge: rgb(255 255 255 / 0.5);
+  --color-track: #0b0b0b;
+  --color-track-alt: #0e0e0e;
+  --color-snap: #ffd43b;
+  --color-razor: #ff5d5d;
+  --color-playhead: #3275f8;
+  --color-keyframe: #ffd43b;
+
+  /* Marker colors (desktop marker `vector` names). */
+  --color-marker-blue: #5b9bff;
+  --color-marker-green: #3ccf7e;
+  --color-marker-red: #ff5d5d;
+  --color-marker-yellow: #ffd43b;
+  --color-marker-purple: #a585ff;
+  --color-marker-orange: #ff9a3c;
+  --color-marker-cyan: #3cd3e6;
+  --color-marker-pink: #ff6fb5;
+
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-serif: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+
+  --text-2xs: 10px;
+  --text-2xs--line-height: 14px;
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-sm: 12px;
+  --text-sm--line-height: 18px;
+  --text-base: 13px;
+  --text-base--line-height: 20px;
+  --text-md: 14px;
+  --text-md--line-height: 22px;
+  --text-lg: 16px;
+  --text-lg--line-height: 24px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 28px;
+  --text-2xl--line-height: 34px;
+  --text-3xl: 40px;
+  --text-3xl--line-height: 44px;
+  --text-4xl: 56px;
+  --text-4xl--line-height: 60px;
+
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  --shadow-menu: 0 12px 32px -4px rgb(0 0 0 / 0.72), 0 0 0 1px var(--color-line-strong);
+  --shadow-dialog: 0 24px 80px -12px rgb(0 0 0 / 0.85), 0 0 0 1px var(--color-line-strong);
+  --shadow-clip: 0 1px 0 rgb(0 0 0 / 0.5);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-pop-in: pop-in 140ms var(--ease-out);
+  --animate-fade-in: fade-in 160ms var(--ease-out);
+  --animate-rise-in: rise-in 220ms var(--ease-out);
+  --animate-slide-up: slide-up 240ms var(--ease-out);
+  --animate-spin: spin 0.9s linear infinite;
+  --animate-pulse-soft: pulse-soft 1.6s ease-in-out infinite;
+
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    color-scheme: dark;
+    background: var(--color-canvas);
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-line);
+  }
+
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+
+  button {
+    cursor: default;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Minimal scrollbars, like zenvi.pro. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 0.14);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(255 255 255 / 0.26);
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Checkerboard for transparent previews (title thumbnails, alpha). */
+@utility checker {
+  background-color: #151515;
+  background-image:
+    linear-gradient(45deg, #1d1d1d 25%, transparent 25%),
+    linear-gradient(-45deg, #1d1d1d 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1d1d1d 75%),
+    linear-gradient(-45deg, transparent 75%, #1d1d1d 75%);
+  background-size: 12px 12px;
+  background-position:
+    0 0,
+    0 6px,
+    6px -6px,
+    -6px 0;
+}

@@ -1,0 +1,1756 @@
+{
+  "host": "premiere",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "premiere_get_state",
+      "title": "Premiere Pro state",
+      "description": "Where Premiere Pro is right now: app version, the open project (path, name), every sequence (id, name, duration, frame size, fps), the active sequence with its playhead, in/out points and selected clips. Call it first, and again whenever the user may have changed something by hand. Read-only and cheap.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_list_items",
+      "title": "List project items",
+      "description": "The project's bins and items as a flat list in tree order: nodeId, name, kind (bin, media, sequence, clip), bin path, media path, in/out and duration, offline flag. Use it to find the nodeId of footage before placing it, or to check what is already imported. Filter by `kind`, `name_contains` or a starting `bin`. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bin": {
+            "description": "Start from this bin: its nodeId or its path from the project root, e.g. \"Footage/Day 1\"; default: the whole project",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "kind": {
+            "default": "any",
+            "description": "Only list this kind: media (items with a file), sequence, bin, or any",
+            "type": "string",
+            "enum": [
+              "any",
+              "media",
+              "sequence",
+              "bin"
+            ]
+          },
+          "name_contains": {
+            "description": "Only items whose name contains this text (case-insensitive)",
+            "type": "string",
+            "minLength": 1
+          },
+          "recursive": {
+            "default": true,
+            "description": "Include the contents of nested bins",
+            "type": "boolean"
+          },
+          "limit": {
+            "default": 200,
+            "description": "Most items to return; the receipt says when more exist",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_get_sequence",
+      "title": "Read a sequence",
+      "description": "One sequence in detail (default: the active one): settings, playhead, in/out, every track (index, name, muted, locked, targeted) with its clips (nodeId, name, start/end/in/out in seconds, media path, project item, enabled, speed, selected, applied effects, Motion/Opacity or volume values and which properties are animated) and transitions, plus the sequence markers. Call it before editing so you address clips by nodeId. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          },
+          "include_properties": {
+            "default": true,
+            "description": "Per clip: effects, Motion/Opacity values (video) or volume (audio), and animated properties",
+            "type": "boolean"
+          },
+          "max_clips": {
+            "default": 500,
+            "description": "Most clips to list across all tracks; the receipt says when more exist",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_capture_frame",
+      "title": "Capture a frame",
+      "description": "Render one frame of a sequence to PNG and return it as an image: your eyes on the edit. Use it after every visual change at the moments that matter (first frame, entrance end, mid-hold, last frame) and critique it against TASTE: title-safe text, contrast, one focal point. Default time: the playhead; the time is snapped to a frame. Uses the QE DOM's exportFramePNG at the sequence's frame size; a sequence that is not active is opened first. Changes nothing in the project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "description": "Sequence time to capture, in seconds; default: the playhead",
+            "type": "number",
+            "minimum": 0
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": true,
+      "timeoutMs": 60000
+    },
+    {
+      "name": "premiere_import_files",
+      "title": "Import media",
+      "description": "Import files (video, audio, stills, .srt, .mogrt) into a bin, \"Zenvi Imports\" by default, created if missing. Files already in the project are not imported twice (`dedupe`): their existing items are returned instead. Returns the nodeId of every item for premiere_place_clip. Missing files are refused before anything is imported. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+            },
+            "description": "Absolute paths of files on this computer"
+          },
+          "bin": {
+            "default": "Zenvi Imports",
+            "description": "Bin to import into, created if missing; \"Footage/Day 1\" nests bins; \"/\" is the project root",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "dedupe": {
+            "default": true,
+            "description": "Return the existing item for files already in the project instead of importing them again",
+            "type": "boolean"
+          },
+          "image_sequence": {
+            "default": false,
+            "description": "Import numbered stills as one image sequence (pass the first frame)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 600000
+    },
+    {
+      "name": "premiere_create_sequence",
+      "title": "Create a sequence",
+      "description": "Create a sequence and make it active. `preset`: 1080p30 (default, 1920x1080 at 30 fps), 1080p25, 1080p24, 4k30 (3840x2160), vertical (1080x1920 at 30, social 9:16), square (1080x1080 at 30). Built from an installed sequence preset (never Premiere's New Sequence dialog) and set to the exact size and rate. Or pass `from_clips` to build it from project items with settings matching the first clip. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "default": "Zenvi Sequence",
+            "description": "Sequence name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "preset": {
+            "default": "1080p30",
+            "description": "Frame size and rate (ignored with from_clips)",
+            "type": "string",
+            "enum": [
+              "1080p30",
+              "1080p25",
+              "1080p24",
+              "4k30",
+              "vertical",
+              "square"
+            ]
+          },
+          "from_clips": {
+            "description": "Build the sequence from these project items, in this order, matching the first clip's settings",
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project item nodeId: `node_id` from premiere_list_items or premiere_import_files"
+            }
+          },
+          "bin": {
+            "description": "Bin for the new sequence (path from the project root, created if missing); default: the project root",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "open": {
+            "default": true,
+            "description": "Make the new sequence the active one",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_open_sequence",
+      "title": "Open a sequence",
+      "description": "Open a sequence in the Timeline and make it the active sequence (tools default to the active one). Changes only what Premiere shows, not the project; nothing to undo.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name"
+          }
+        },
+        "required": [
+          "sequence"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_place_clip",
+      "title": "Place a clip",
+      "description": "Put a project item on a track at a time, optionally using only part of the source (`source_in`/`source_out`). `mode`: overwrite (default) replaces what is there; insert pushes later clips right. Default time: right after the last clip on the track, so repeated calls build a sequence in order. Video items bring their linked audio. The item's own in/out marks are restored afterwards. Cut on action; keep b-roll shots 1.5-3 s, talking heads 4-8 s (TASTE §6). Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project item nodeId: `node_id` from premiere_list_items or premiere_import_files"
+          },
+          "track": {
+            "default": {
+              "kind": "video",
+              "index": 0
+            },
+            "description": "Target track, {kind, index} with 0-based index (V1 = 0); default V1",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "video",
+                  "audio"
+                ],
+                "description": "Track kind"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "0-based track index as in the Premiere DOM: V1 / A1 = 0"
+              }
+            },
+            "required": [
+              "kind",
+              "index"
+            ],
+            "additionalProperties": false
+          },
+          "time": {
+            "description": "Sequence time of the clip's first frame; default: the end of the last clip on the track",
+            "type": "number",
+            "minimum": 0
+          },
+          "source_in": {
+            "description": "Source in point, seconds from the start of the media; default: the item's in mark",
+            "type": "number",
+            "minimum": 0
+          },
+          "source_out": {
+            "description": "Source out point, seconds from the start of the media; default: the item's out mark",
+            "type": "number",
+            "minimum": 0
+          },
+          "mode": {
+            "default": "overwrite",
+            "description": "overwrite replaces what is under it; insert ripples later clips right",
+            "type": "string",
+            "enum": [
+              "overwrite",
+              "insert"
+            ]
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_edit_clip",
+      "title": "Edit a clip",
+      "description": "One edit on a clip by `action`: move (`to` a start time or `by` seconds), trim (new timeline `start` and/or `end`; the source in/out moves with the edge), enable / disable, rename (`name`), speed (`speed` 0.5 = half speed, with `reverse`, `maintain_pitch`, `ripple`; QE DOM), delete (`ripple` closes the gap on the clip's tracks). move, trim, enable/disable and delete include the linked audio/video unless `include_linked` is false. Locked tracks, moves onto other clips and trims into a neighbour are refused, as are trims of retimed clips. delete is destructive. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "move",
+              "trim",
+              "enable",
+              "disable",
+              "rename",
+              "speed",
+              "delete"
+            ],
+            "description": "What to do"
+          },
+          "to": {
+            "description": "move: the new start time on the sequence",
+            "type": "number",
+            "minimum": 0
+          },
+          "by": {
+            "description": "move: shift by this many seconds (negative = earlier)",
+            "type": "number"
+          },
+          "start": {
+            "description": "trim: new start (head) on the sequence; the source in point follows",
+            "type": "number",
+            "minimum": 0
+          },
+          "end": {
+            "description": "trim: new end (tail) on the sequence; the source out point follows",
+            "type": "number",
+            "minimum": 0
+          },
+          "name": {
+            "description": "rename: the new clip name",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "speed": {
+            "description": "speed: playback rate, 1 = normal, 0.5 = half speed (twice as long), 2 = double",
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 100
+          },
+          "reverse": {
+            "default": false,
+            "description": "speed: play backwards",
+            "type": "boolean"
+          },
+          "maintain_pitch": {
+            "default": true,
+            "description": "speed: keep the audio pitch",
+            "type": "boolean"
+          },
+          "ripple": {
+            "default": false,
+            "description": "delete: close the gap; speed: push or pull the clips after it",
+            "type": "boolean"
+          },
+          "include_linked": {
+            "default": true,
+            "description": "move, trim, enable/disable, delete: also the clip's linked audio/video",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_razor",
+      "title": "Razor cut",
+      "description": "Cut clips at a time, like the Razor tool, so each side can be trimmed, moved or deleted. Default: every unlocked track with a clip at `time`; pass `tracks` to cut only some. Returns the nodeIds of the new right-hand pieces. Uses the QE DOM. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Sequence time to cut at, in seconds (snapped to the frame grid)"
+          },
+          "tracks": {
+            "description": "Only these tracks, {kind, index} 0-based; default: every unlocked track with a clip at that time",
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "video",
+                    "audio"
+                  ],
+                  "description": "Track kind"
+                },
+                "index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "0-based track index as in the Premiere DOM: V1 / A1 = 0"
+                }
+              },
+              "required": [
+                "kind",
+                "index"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "time"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_set_clip_properties",
+      "title": "Set clip properties",
+      "description": "Static values on a clip's built-in effects: Motion (position in sequence pixels, scale %, rotation, anchor), Opacity (opacity %, blend mode) and audio volume in dB. Only the properties you pass change. An animated property is refused unless `clear_keyframes` (use premiere_animate to change keyframes). Respect the frame: keep faces in the upper third and text inside title-safe (TASTE §3). Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "position": {
+            "description": "Motion > Position [x, y] in sequence pixels from the top-left; [width/2, height/2] is the centre",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "scale": {
+            "description": "Motion > Scale in percent (100 = original size)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rotation": {
+            "description": "Motion > Rotation in degrees, clockwise",
+            "type": "number",
+            "minimum": -36000,
+            "maximum": 36000
+          },
+          "anchor": {
+            "description": "Motion > Anchor Point as fractions of the clip frame [x, y]; [0.5, 0.5] is the centre",
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "opacity": {
+            "description": "Opacity in percent",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "blend_mode": {
+            "description": "Opacity > Blend Mode",
+            "type": "string",
+            "enum": [
+              "color",
+              "color-burn",
+              "color-dodge",
+              "darken",
+              "darker-color",
+              "difference",
+              "dissolve",
+              "exclusion",
+              "hard-light",
+              "hard-mix",
+              "hue",
+              "lighten",
+              "lighter-color",
+              "linear-burn",
+              "linear-dodge",
+              "linear-light",
+              "luminosity",
+              "multiply",
+              "normal",
+              "overlay",
+              "pin-light",
+              "saturation",
+              "screen",
+              "soft-light",
+              "vivid-light",
+              "subtract",
+              "divide"
+            ]
+          },
+          "volume_db": {
+            "description": "Audio clips: Volume > Level in dB (0 = as recorded, max +15; -96 = silent)",
+            "type": "number",
+            "minimum": -96,
+            "maximum": 15
+          },
+          "clear_keyframes": {
+            "default": false,
+            "description": "Remove the keyframes of an animated property you set instead of refusing",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_animate",
+      "title": "Animate a property",
+      "description": "Keyframes on a clip's Motion (position, scale, rotation, anchor), opacity, volume, or any parameter of an applied effect (`{effect, param}`). Times count from the clip's first frame; values use the units of premiere_set_clip_properties. TASTE easings map to Premiere interpolation: smooth/in-out/snap ease in and out (Bezier ease), out/entrance arrives softly, in/exit leaves softly, linear (opacity and volume fades only), hold. Defaults: smooth easing, replace existing keyframes. Typical: entrance 0.6 s, exit 0.4 s, scale 92->100 % on entry, Ken Burns 100->104 % over the shot; never linear on Motion. Clips with a speed change are refused. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "property": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "position",
+                  "scale",
+                  "rotation",
+                  "anchor",
+                  "opacity",
+                  "volume"
+                ],
+                "description": "A built-in property"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "effect": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Effect display name as in Effect Controls, e.g. \"Gaussian Blur\""
+                  },
+                  "param": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Parameter display name, e.g. \"Blurriness\""
+                  }
+                },
+                "required": [
+                  "effect",
+                  "param"
+                ],
+                "additionalProperties": false,
+                "description": "A parameter of an effect applied to the clip"
+              }
+            ],
+            "description": "What to animate"
+          },
+          "keyframes": {
+            "minItems": 2,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Seconds from the clip's first frame (0 = where it starts on the timeline)"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "minItems": 2,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  ],
+                  "description": "position [x, y] px, scale %, rotation degrees, anchor fractions, opacity %, volume dB; effect parameters as Premiere shows them"
+                },
+                "easing": {
+                  "description": "Easing of the segment from this keyframe to the next; default: `easing`",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "smooth",
+                        "out",
+                        "entrance",
+                        "in",
+                        "exit",
+                        "in-out",
+                        "snap",
+                        "linear",
+                        "hold"
+                      ],
+                      "description": "TASTE easing name"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "x1": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "First control point x, 0–1"
+                        },
+                        "y1": {
+                          "type": "number",
+                          "description": "First control point y (outside 0–1 overshoots)"
+                        },
+                        "x2": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "Second control point x, 0–1"
+                        },
+                        "y2": {
+                          "type": "number",
+                          "description": "Second control point y (outside 0–1 overshoots)"
+                        }
+                      },
+                      "required": [
+                        "x1",
+                        "y1",
+                        "x2",
+                        "y2"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Custom cubic-bezier(x1, y1, x2, y2)"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "time",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            "description": "At least two keyframes; sorted by time for you"
+          },
+          "easing": {
+            "default": "smooth",
+            "description": "Easing for every segment (TASTE §2): smooth, out/entrance, in/exit, in-out, snap, linear, hold, or {x1, y1, x2, y2}",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "smooth",
+                  "out",
+                  "entrance",
+                  "in",
+                  "exit",
+                  "in-out",
+                  "snap",
+                  "linear",
+                  "hold"
+                ],
+                "description": "TASTE easing name"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x1": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "First control point x, 0–1"
+                  },
+                  "y1": {
+                    "type": "number",
+                    "description": "First control point y (outside 0–1 overshoots)"
+                  },
+                  "x2": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Second control point x, 0–1"
+                  },
+                  "y2": {
+                    "type": "number",
+                    "description": "Second control point y (outside 0–1 overshoots)"
+                  }
+                },
+                "required": [
+                  "x1",
+                  "y1",
+                  "x2",
+                  "y2"
+                ],
+                "additionalProperties": false,
+                "description": "Custom cubic-bezier(x1, y1, x2, y2)"
+              }
+            ]
+          },
+          "replace": {
+            "default": true,
+            "description": "Remove the property's existing keyframes first",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip",
+          "property",
+          "keyframes"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_apply_effect",
+      "title": "Apply an effect",
+      "description": "Add a video or audio effect to a clip by its name in the Effects panel (QE DOM), then set parameters on it through the component API. Unknown effect names are refused with close matches; unknown parameter names are reported with the parameters the effect has. For colour looks prefer premiere_apply_look; for keyframes use premiere_animate with `{effect, param}`. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "effect": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Effect name as in the Effects panel, e.g. \"Gaussian Blur\", \"Lumetri Color\", \"DeNoise\""
+          },
+          "params": {
+            "description": "Parameter values to set once the effect is on the clip",
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parameter display name, e.g. \"Blurriness\""
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "minItems": 2,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  ],
+                  "description": "Number, checkbox, or point/colour array"
+                }
+              },
+              "required": [
+                "name",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip",
+          "effect"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_add_transition",
+      "title": "Add a transition",
+      "description": "Add a transition at a clip's edge (QE DOM): `at` end (default; the cut after the clip, or its tail), start (the cut before it, or its head) or both. Default Cross Dissolve for video (Constant Power for audio), 0.5 s centred on the cut (TASTE: 0.5 s within a scene, 1.0 s for a change of time or place; dips to black for chapter breaks only). Clips without media handles get a shorter or one-sided transition; the receipt reports what Premiere made. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+          },
+          "at": {
+            "default": "end",
+            "description": "Which edge of the clip",
+            "type": "string",
+            "enum": [
+              "end",
+              "start",
+              "both"
+            ]
+          },
+          "transition": {
+            "description": "Transition name as in the Effects panel; default: Cross Dissolve (video) or Constant Power (audio)",
+            "type": "string",
+            "minLength": 1
+          },
+          "duration": {
+            "default": 0.5,
+            "description": "Seconds (snapped to whole frames)",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 30
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "clip"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_apply_look",
+      "title": "Apply a colour look",
+      "description": "Grade clips with a Lumetri Color look (added when missing, reused when present): clean (+5 contrast, +5 vibrance), warm-film (temperature +8, tint +2, faded film 8, saturation -6), teal-orange (teal shadow tint, orange highlight tint, saturation +6), moody (exposure -0.3, contrast +12, saturation -15, vignette -0.8), bw-contrast (saturation 0, contrast +25), scaled by `strength` (default 0.6: keep skin natural). Targets `clips`, else every clip on `track`, else the selected video clips. Lumetri parameters are found by their English names. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "look": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "warm-film",
+              "teal-orange",
+              "moody",
+              "bw-contrast"
+            ],
+            "description": "The look (TASTE §5)"
+          },
+          "strength": {
+            "default": 0.6,
+            "description": "0-1 share of the look's adjustments",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "clips": {
+            "description": "Video clips to grade",
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+            }
+          },
+          "track": {
+            "description": "Grade every clip on this video track",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "video",
+                  "audio"
+                ],
+                "description": "Track kind"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "0-based track index as in the Premiere DOM: V1 / A1 = 0"
+              }
+            },
+            "required": [
+              "kind",
+              "index"
+            ],
+            "additionalProperties": false
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "look"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_add_text",
+      "title": "Add a title",
+      "description": "Add a title to the sequence on a free video track above the footage. Premiere's scripting API cannot type text into its own title templates. So without `image` or `mogrt`, Zenvi Link renders the title itself: a transparent PNG at the sequence size, drawn with the panel's canvas, placed inside title-safe, and saved next to the project in \"Zenvi Titles\". You can set `font`, `weight`, `color`, `stroke`, the soft `shadow` and a `box`. Lines break at your line breaks and at 32 characters, on word boundaries, never leaving one word alone. `image` places your own transparent PNG: one with the frame's aspect fills the frame, a smaller graphic sits at `placement`. `mogrt` uses an After Effects-authored Essential Graphics template, setting its text control to `text` plus its size and colour controls when it exposes them. Defaults (TASTE §1, §4): `style` title 72 px at 1080p (headline 96, subtitle 44, lower-third 54, caption 42), weight 700 (headline 800, subtitle and caption 500), colour #F7F7F5 with a soft shadow, on screen for 1.5 s + 0.3 s per word (at least 3 s for titles, 5 s for lower thirds). Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The words; keep lines under 32 characters and break on phrases (TASTE §4)"
+          },
+          "style": {
+            "default": "title",
+            "description": "Type scale step",
+            "type": "string",
+            "enum": [
+              "headline",
+              "title",
+              "subtitle",
+              "lower-third",
+              "caption"
+            ]
+          },
+          "font_size": {
+            "description": "Override the style's size, in pixels at the sequence's size",
+            "type": "number",
+            "minimum": 6,
+            "maximum": 1000
+          },
+          "color": {
+            "default": "#F7F7F5",
+            "description": "Text colour, #RRGGBB or [r, g, b] 0-1",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Hex colour #RRGGBB"
+              },
+              {
+                "minItems": 3,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "description": "[r, g, b], each 0–1"
+              }
+            ]
+          },
+          "placement": {
+            "description": "Where an image smaller than the frame sits, inside title-safe (9:16: clear of the top 12 % and bottom 20 %); default: lower-third for that style, bottom-center for captions, else center",
+            "type": "string",
+            "enum": [
+              "center",
+              "lower-third",
+              "top-left",
+              "top-center",
+              "bottom-center"
+            ]
+          },
+          "time": {
+            "description": "Sequence time of the title's first frame; default: the playhead",
+            "type": "number",
+            "minimum": 0
+          },
+          "duration": {
+            "description": "Seconds on screen; default: reading time",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 3600
+          },
+          "track": {
+            "description": "Video track index (0 = V1); default: the lowest track above V1 that is free for the whole duration",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 98
+          },
+          "mogrt": {
+            "description": "An After Effects-authored .mogrt with a text control",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "image": {
+            "description": "A transparent PNG title: the frame's aspect fills the frame, a smaller graphic keeps its pixel size",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "font": {
+            "description": "Rendered titles: font family; default Inter, then SF Pro Display, Helvetica Neue, Arial (TASTE §4)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "weight": {
+            "description": "Rendered titles: font weight; default 800 headline, 700 title and lower-third, 500 subtitle and caption",
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 900
+          },
+          "stroke": {
+            "description": "Rendered titles: an outline around the letters",
+            "type": "object",
+            "properties": {
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                    "description": "Hex colour #RRGGBB"
+                  },
+                  {
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "description": "[r, g, b], each 0–1"
+                  }
+                ],
+                "description": "Outline colour"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 200,
+                "description": "Outline width in pixels at the sequence size"
+              }
+            },
+            "required": [
+              "color",
+              "width"
+            ],
+            "additionalProperties": false
+          },
+          "shadow": {
+            "description": "Rendered titles: the soft drop shadow for contrast over video (TASTE §4: distance 0, softness 16 px at 1080p, 40 %); default true",
+            "type": "boolean"
+          },
+          "box": {
+            "description": "Rendered titles: a bar behind the text, for busy footage",
+            "type": "object",
+            "properties": {
+              "color": {
+                "description": "Bar colour; default ink #0B0B0F",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                    "description": "Hex colour #RRGGBB"
+                  },
+                  {
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "description": "[r, g, b], each 0–1"
+                  }
+                ]
+              },
+              "opacity": {
+                "description": "Bar opacity; default 0.45 (TASTE scrim 35-55 %)",
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "padding": {
+                "description": "Space around the text in pixels; default 0.4 x the font size",
+                "type": "number",
+                "minimum": 0,
+                "maximum": 500
+              }
+            },
+            "additionalProperties": false
+          },
+          "align": {
+            "description": "Rendered titles: line alignment; default left for lower-third and top-left, else center",
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ]
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_add_marker",
+      "title": "Add a marker",
+      "description": "Add a sequence marker, or with `clip` a clip marker (Premiere keeps those on the clip's source item, so every use of that media shows it). Name, comment, duration (0 = a point), colour, type (comment, chapter, segmentation). Default time: the playhead. Use markers to leave notes for the editor and to mark beats and chapters. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "description": "Sequence time; default: the playhead",
+            "type": "number",
+            "minimum": 0
+          },
+          "name": {
+            "description": "Marker name",
+            "type": "string",
+            "maxLength": 500
+          },
+          "comment": {
+            "description": "Marker comment",
+            "type": "string",
+            "maxLength": 5000
+          },
+          "duration": {
+            "default": 0,
+            "description": "Seconds; 0 = a point marker",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 86400
+          },
+          "color": {
+            "description": "Marker colour; default: Premiere's (green)",
+            "type": "string",
+            "enum": [
+              "green",
+              "red",
+              "purple",
+              "orange",
+              "yellow",
+              "white",
+              "blue",
+              "cyan"
+            ]
+          },
+          "type": {
+            "default": "comment",
+            "description": "Marker type",
+            "type": "string",
+            "enum": [
+              "comment",
+              "chapter",
+              "segmentation"
+            ]
+          },
+          "clip": {
+            "description": "Mark this clip instead of the sequence",
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_add_captions",
+      "title": "Add captions from SRT",
+      "description": "Import an .srt file and turn it into a caption track on the sequence, starting at `time` (default 0). Format subtitle (default) or a broadcast standard. Style captions in Premiere's Essential Graphics panel; keep them inside title-safe and readable at phone size. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "srt": {
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)",
+            "description": "Absolute path to a .srt subtitle file"
+          },
+          "time": {
+            "default": 0,
+            "description": "Sequence time where the file's 00:00:00,000 lands",
+            "type": "number",
+            "minimum": 0
+          },
+          "format": {
+            "default": "subtitle",
+            "description": "Caption format of the new track",
+            "type": "string",
+            "enum": [
+              "subtitle",
+              "cea-608",
+              "cea-708",
+              "teletext",
+              "ebu",
+              "op42",
+              "op47"
+            ]
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "required": [
+          "srt"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_auto_reframe",
+      "title": "Auto Reframe",
+      "description": "Make a reframed copy of a sequence for another aspect ratio with Premiere's Auto Reframe (Premiere Pro 2020 / 14.0 or later): 9:16 (default, social vertical 1080x1920 from 1080p), 1:1, 4:5, 16:9. The copy keeps the source's short side and is opened. The original is untouched. Check the result with premiere_capture_frame: faces in the upper third, text inside the vertical safe area. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "aspect": {
+            "default": "9:16",
+            "description": "Target aspect ratio",
+            "type": "string",
+            "enum": [
+              "9:16",
+              "1:1",
+              "4:5",
+              "16:9"
+            ]
+          },
+          "motion": {
+            "default": "default",
+            "description": "How quickly the framing follows the action",
+            "type": "string",
+            "enum": [
+              "default",
+              "slower",
+              "faster"
+            ]
+          },
+          "name": {
+            "description": "Name of the new sequence; default: \"<sequence> 9x16\"",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "nest": {
+            "default": false,
+            "description": "Nest clips before reframing",
+            "type": "boolean"
+          },
+          "open": {
+            "default": true,
+            "description": "Open the new sequence",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 1800000
+    },
+    {
+      "name": "premiere_scene_detect",
+      "title": "Scene edit detection",
+      "description": "Find the camera cuts inside long clips with Premiere's Scene Edit Detection and either razor them (`action` cuts, default, linked audio too) or mark them (markers land on the source items). Runs on every clip of a track (default V1) or on `clips`. Premiere is blocked while it analyses; long media takes minutes. The previous selection is restored. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "track": {
+            "default": {
+              "kind": "video",
+              "index": 0
+            },
+            "description": "Video track to analyse, {kind, index} 0-based; default V1",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "video",
+                  "audio"
+                ],
+                "description": "Track kind"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "0-based track index as in the Premiere DOM: V1 / A1 = 0"
+              }
+            },
+            "required": [
+              "kind",
+              "index"
+            ],
+            "additionalProperties": false
+          },
+          "clips": {
+            "description": "Only these clips of the track",
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt"
+            }
+          },
+          "action": {
+            "default": "cuts",
+            "description": "cuts = razor at each detected scene change; markers = add markers",
+            "type": "string",
+            "enum": [
+              "cuts",
+              "markers"
+            ]
+          },
+          "sensitivity": {
+            "default": "medium",
+            "description": "Detection sensitivity",
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "include_linked_audio": {
+            "default": true,
+            "description": "cuts: also cut the linked audio",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 1800000
+    },
+    {
+      "name": "premiere_export",
+      "title": "Export a sequence",
+      "description": "Render a sequence to a file. `preset`: h264-high (default, H.264 matching the source at a high bitrate), h264-social-vertical (the same for a 9:16 sequence; others are refused, run premiere_auto_reframe first), prores-422, or the path of an .epr. Presets are found among the installed Premiere / Media Encoder presets. `range` entire, in-out or work-area. `via` media_encoder (default: queued in Adobe Media Encoder and started, returns the job id at once) or direct (Premiere renders now and blocks until done). Existing files are refused unless `overwrite`. Changes nothing in the project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "default": "h264-high",
+            "description": "Export preset",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "h264-high",
+                  "h264-social-vertical",
+                  "prores-422"
+                ],
+                "description": "A named preset"
+              },
+              {
+                "type": "string",
+                "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)",
+                "description": "Absolute path to an .epr export preset"
+              }
+            ]
+          },
+          "output": {
+            "description": "Output file; its extension comes from the preset when missing; default: \"Zenvi Exports/<sequence>.<ext>\" next to the project",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "range": {
+            "default": "entire",
+            "description": "What to render",
+            "type": "string",
+            "enum": [
+              "entire",
+              "in-out",
+              "work-area"
+            ]
+          },
+          "via": {
+            "default": "media_encoder",
+            "description": "Queue in Media Encoder, or render inside Premiere now",
+            "type": "string",
+            "enum": [
+              "media_encoder",
+              "direct"
+            ]
+          },
+          "overwrite": {
+            "default": false,
+            "description": "Replace an existing output file",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 3600000
+    },
+    {
+      "name": "premiere_export_xml",
+      "title": "Export FCP XML",
+      "description": "Write a sequence (default: the active one) as Final Cut Pro 7 XML (xmeml), Premiere's own exchange format, with warnings dialogs suppressed. Zenvi reads this file to bring a Premiere edit back (import_timeline_xml_tool). Default output: a new file in the system temp folder. Changes nothing in the project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "output": {
+            "description": "Where to write the .xml; default: a new file in the temp folder",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          },
+          "overwrite": {
+            "default": false,
+            "description": "Replace an existing file",
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequence id (`sequence_id` from premiere_get_state) or exact name; default: the active sequence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 300000
+    },
+    {
+      "name": "premiere_import_xml",
+      "title": "Import FCP XML",
+      "description": "Import a Final Cut Pro 7 XML (e.g. a Zenvi export) into a bin (\"Zenvi Imports\" by default) and open the sequence it contains. Returns the new sequence ids. Media referenced by the XML must exist at its paths or Premiere marks it offline. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)",
+            "description": "The .xml file"
+          },
+          "bin": {
+            "default": "Zenvi Imports",
+            "description": "Bin to import into, created if missing; \"/\" is the project root",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "open": {
+            "default": true,
+            "description": "Open the first imported sequence",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 600000
+    },
+    {
+      "name": "premiere_save_project",
+      "title": "Save the project",
+      "description": "Save the project in place, or with `path` save it as a new .prproj and keep working in that copy (Premiere's Save As closes the original). Save after a batch of edits the user wants to keep. Changes nothing in the project's content; saving is not an undo step.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Save As this .prproj path; default: save in place",
+            "type": "string",
+            "pattern": "^(\\/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "premiere_run_script",
+      "title": "Run ExtendScript",
+      "description": "Escape hatch: run an ExtendScript (ECMAScript 3) snippet in Premiere and return its completion value as JSON. `app`, `qe` (QE DOM, enabled) and `ZenviLink` are in scope. Use only when no premiere_* tool covers the job; the snippet can change or delete anything. Premiere cannot group undo: each change is its own undo step (undoSteps counts them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200000,
+            "description": "ExtendScript source; the value of its last statement is returned"
+          }
+        },
+        "required": [
+          "script"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "returnsImage": false,
+      "timeoutMs": 600000
+    }
+  ]
+}

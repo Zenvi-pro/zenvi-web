@@ -1,0 +1,1254 @@
+{
+ "generator": "packages/engine/scripts/gen-title-readers.py",
+ "templates": [
+  {
+   "name": "Bar_1.svg",
+   "sha256": "2a9fb59bbbaed90489f83084edfe09120be1865a249f7c0b3702ffd83cd69ef8",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Bar_2.svg",
+   "sha256": "0f663549b882362c4ccba4047e6881128ac0841b4948a34a47930f054a8a6bb3",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#b8cee1",
+    "alphaF": 1.0,
+    "button": "background-color: #b8cee1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Bar_3.svg",
+   "sha256": "3b3526abc8fc67382f151a074c14528d6c28ed27c5bd332f05e6a33db677bd17",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 82,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#dcaa38",
+    "alphaF": 1.0,
+    "button": "background-color: #dcaa38; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Box.svg",
+   "sha256": "bd60ab89313f47890442370260213f193f0b944aba398e1e79313f66f8d3ff6c",
+   "font": null,
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Bubbles_1.svg",
+   "sha256": "b1037779fe35f7982d779b80658cbace75ea53eb6a0f710ca8f0658c96ced832",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Bubbles_2.svg",
+   "sha256": "c6dfee587791d302c654b52c3eeccf130d8477cde8cb0d3feed29b4f4159820e",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Camera_Border.svg",
+   "sha256": "a5bc82435e450ea9230b3485d0c480a0f13022bac313c06ba4486c1d22147fbf",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 96,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Cloud_1.svg",
+   "sha256": "8a6924e1e50f25b711e4312b4e8a785a03fa20f30630ab14d46380393ee4de66",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 139,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Cloud_2.svg",
+   "sha256": "5a1ff2dfc14783ff94c87b7bb061d314c74d5ba668586b17960bbee562a58ca8",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 90,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Creative_Commons_1.svg",
+   "sha256": "477bd2c3301fcd0f98354c7a674e89ef528e56f82b593989ec4f5a9f0d6b755b",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": false,
+    "pixelSize": 69,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Creative_Commons_2.svg",
+   "sha256": "68f2fb442c8d3d40488cdc9c5817d209cbad149930964accc87dcd38cf70f2b3",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": false,
+    "pixelSize": 69,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Film_Rating_1.svg",
+   "sha256": "97bfc6ea0b8867588e5b007221d97e5ddc6f63c75a9d0465ee5270ad63c7b86d",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": false,
+    "pixelSize": 50,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#006900",
+    "alphaF": 1.0,
+    "button": "background-color: #006900; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Film_Rating_2.svg",
+   "sha256": "410dfe1acf0d1886ef3a2515145852bc8bcc559ebe0786955c7de7c8376db4ec",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": false,
+    "pixelSize": 50,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#006900",
+    "alphaF": 1.0,
+    "button": "background-color: #006900; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Film_Rating_3.svg",
+   "sha256": "b740baafaa3500f64a1d4729d42949c8db343882234748bb090bc2022e70ee1a",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": false,
+    "pixelSize": 50,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#006900",
+    "alphaF": 1.0,
+    "button": "background-color: #006900; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Film_Rating_4.svg",
+   "sha256": "bba82b7d9848d63671eda3b5377ab50b899de1489ad4e08f7abf854162228752",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": false,
+    "pixelSize": 50,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#006900",
+    "alphaF": 1.0,
+    "button": "background-color: #006900; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Flames.svg",
+   "sha256": "ed639addc63fc8b079cb23e8b031accafa5ab6e936fd7d622416161bc4c1b6a9",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Flare.svg",
+   "sha256": "57bcd9bc31677bea6c853e5c2c1cab42cbcbc76a3d28f2837cdcf4db1eb62748",
+   "font": null,
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Footer_1.svg",
+   "sha256": "c3cc2091dcaf03729bc673772328d8126466b959bc5f52da0a137489d49a6eb5",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 81,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Footer_2.svg",
+   "sha256": "2ed5a5d1ec14aa1273a313ca1b4cec78c4a41b33bc9b8f63b72b3ddc470194e9",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 81,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Footer_3.svg",
+   "sha256": "172ba8a23425f33e2409f6a7f213a29f382b8931406cbf98ed671f05040632bb",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 81,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Gold_1.svg",
+   "sha256": "65885e57e76d599919ac4e1089125c8c4f4a5dd6d3cdcb04524c83a9cf73cade",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 82,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#dcaa38",
+    "alphaF": 1.0,
+    "button": "background-color: #dcaa38; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Gold_2.svg",
+   "sha256": "981178ebe444ecd5719497f5d584e17fd1095268db2b53e8af4cef468b979506",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 82,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#dea436",
+    "alphaF": 1.0,
+    "button": "background-color: #dea436; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Gold_Bottom.svg",
+   "sha256": "8107c1bad824c5e8358a044e928c55a88452e9c4d71711abeca43c3993848e82",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 82,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#dcaa38",
+    "alphaF": 1.0,
+    "button": "background-color: #dcaa38; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Gold_Top.svg",
+   "sha256": "80b649023143a54d0a112a43d55a5b1af84f4614f71ac632ec76a723270e83af",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 82,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#dcaa38",
+    "alphaF": 1.0,
+    "button": "background-color: #dcaa38; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Gray_Box_1.svg",
+   "sha256": "5eb0edf34657cfbb64d68f190776037fff47cf4317bdc9e63bad9bdd44857c49",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Gray_Box_2.svg",
+   "sha256": "5894a132c4aab001200de4606a6e4d35c68efd8dd49e92b684ff7736e63e9c03",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Gray_Box_3.svg",
+   "sha256": "32b1befc7ec7758a7e02f2406a02153de2d1530ccefd6a423a442ed3bda670d5",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Gray_Box_4.svg",
+   "sha256": "a2e57db88301595034b6fedf943866079a96105f1f59ce2ac08df5285c76e3a2",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Header_1.svg",
+   "sha256": "07473a9446ed7710f93c9610388157dc8d75efb534baaddcf5c8a29ed724e686",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 81,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Header_2.svg",
+   "sha256": "8c15a3145662c0d7c5390c341db542b6c47124fcf9ed8e1288b5c55332306bf2",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 81,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Header_3.svg",
+   "sha256": "b5fc3f79c797bb22b8e1572f89e498f17b9bd1b6ec7cb9d88c17a675b5b24a52",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 81,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "OpenShot.svg",
+   "sha256": "f985cd3e8a37ca3bdfb0b6118589ab526df2264cfb6170f113633f5985205ed9",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": false,
+    "pixelSize": null,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Oval_1.svg",
+   "sha256": "64c06d497dbf4f398c23f00ca267ea78f21b31c561ff9ebff750507dce63786e",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Oval_2.svg",
+   "sha256": "49ad86370865625821eea95a32ce363932add9ae65ac3e988a9012dae722beb7",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Oval_3.svg",
+   "sha256": "380fd7db3b8c1bcf3abcd28046d8c2eb4477df62554198c31482f6f6ea3c94bb",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Oval_4.svg",
+   "sha256": "6bfe51935853367e83bc68fc2efdd8f3d4250fc613f16095537c79513c9c673f",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Post_it.svg",
+   "sha256": "338a08d7c5c56fd51e0c84013dfbb193d6aa906254047b2cf04c5bd2baeae52e",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 82,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#ffe681",
+    "alphaF": 1.0,
+    "button": "background-color: #ffe681; opacity: 1; color: #000000;"
+   }
+  },
+  {
+   "name": "Ribbon_1.svg",
+   "sha256": "e1fa55a144825d3c61ae005543fcb02b30301532b35ffa99d13de38a6dbd26d8",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 81,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Ribbon_2.svg",
+   "sha256": "49fcd8fa168f9ff685789004140f6f61d98bcb16871dcf8ac8ede5a015306099",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 81,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Ribbon_3.svg",
+   "sha256": "8b74d205796156519b349f8c07983ba8358b72b05893b096ecdbfcd25c62f2a2",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Smoke_1.svg",
+   "sha256": "0f9bfd582cb1d37bc31d7b6a6b1c76de0e2b780db77bee83b55b42ed49016e56",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Smoke_2.svg",
+   "sha256": "31086624a10a3e840109078ecf543f47ef05b8afb3161697005689afe7109e2c",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Smoke_3.svg",
+   "sha256": "598f0c37c16afe12877f8b27fad6a8904e0ae6a9f7623c532936632bbb4741b6",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Solid_Color.svg",
+   "sha256": "0c2cfeb80f774ea272022c02f5fce310009e3671235938cb9eaa4137005eb663",
+   "font": null,
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": null
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Standard_1.svg",
+   "sha256": "01460f0f428e1e73049c2f994282c0780904ffc0c2cc4186696566f72fda1eaa",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Standard_2.svg",
+   "sha256": "e4fc79ad525d9eb54536e0710f73a03a216224762e0123bcecd716eebc1d732e",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 131,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#324da7",
+    "alphaF": 1.0,
+    "button": "background-color: #324da7; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Standard_3.svg",
+   "sha256": "7d23aa39a6f244da99efaf975bbdf06f3fcef5384228a441922bb2f3f3450974",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 90,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Standard_4.svg",
+   "sha256": "875a74bfbaa1e5d77af507003768208bf9a0c946a061ab4e8573b00008d81fd0",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 90,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#6f82c1",
+    "alphaF": 1.0,
+    "button": "background-color: #6f82c1; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "Sunset.svg",
+   "sha256": "add4dd110690b2a0c6646dd0c3d8e5680574f0bb0ddf6e3b2a119a79cf85547d",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 82,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#faed18",
+    "alphaF": 1.0,
+    "button": "background-color: #faed18; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "TV_Rating.svg",
+   "sha256": "68adadbfb9f6a274d5be72de971245ec32fb565072dfbad86a6e1daf4b1e4ea0",
+   "font": {
+    "family": "DejaVu Sans",
+    "italic": false,
+    "bold": true,
+    "pixelSize": 56,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  }
+ ],
+ "synthetic": [
+  {
+   "name": "no-text",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><rect style=\"fill:#123456\"/></svg>",
+   "font": null,
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": null
+   },
+   "background": {
+    "color": "#123456",
+    "alphaF": 1.0,
+    "button": "background-color: #123456; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "defaults",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"1\"/><text><tspan>A</tspan></text></svg>",
+   "font": null,
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "last-node-wins",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text style=\"fill:#ff0000;opacity:0.25\"><tspan style=\"fill:#00ff00;opacity:0.5\">A</tspan><tspan style=\"fill:blue\">B</tspan></text><rect style=\"fill:yellow;opacity:0.75\"/><rect style=\"fill:#000\"/></svg>",
+   "font": null,
+   "text": {
+    "color": "#0000ff",
+    "alphaF": 1.0,
+    "button": "background-color: #0000ff; opacity: 1; color: #ffffff;"
+   },
+   "background": {
+    "color": "#ffff00",
+    "alphaF": 0.7499961852445258,
+    "button": "background-color: #ffff00; opacity: 1; color: #000000;"
+   }
+  },
+  {
+   "name": "gradient-href",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><defs><linearGradient id=\"base\"><stop offset=\"0\" style=\"stop-color:#c0ffee;stop-opacity:1\"/></linearGradient><linearGradient id=\"ref\" xlink:href=\"#base\"/><linearGradient id=\"plain\" href=\"#base\"/></defs><text><tspan style=\"fill:url(#ref)\">A</tspan></text></svg>",
+   "font": null,
+   "text": {
+    "color": "#c0ffee",
+    "alphaF": 1.0,
+    "button": "background-color: #c0ffee; opacity: 1; color: #000000;"
+   },
+   "background": null
+  },
+  {
+   "name": "gradient-plain-href",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><defs><linearGradient id=\"base\"><stop offset=\"0\" stop-color=\"#ffffff\"/><stop offset=\"1\" style=\"stop-color:#abcdef\"/></linearGradient><linearGradient id=\"plain\" href=\"#base\"/></defs><text><tspan style=\"fill:url(#plain);opacity:2\">A</tspan></text></svg>",
+   "font": null,
+   "text": {
+    "color": "#abcdef",
+    "alphaF": 1.0,
+    "button": "background-color: #abcdef; opacity: 1; color: #000000;"
+   },
+   "background": null
+  },
+  {
+   "name": "gradient-missing",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><defs><linearGradient id=\"g\"/></defs><text><tspan style=\"fill:url(#nope)\">A</tspan></text></svg>",
+   "font": null,
+   "text": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   },
+   "background": null
+  },
+  {
+   "name": "gradient-two-defs",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><defs><linearGradient id=\"g\"><stop style=\"stop-color:#ff0000\"/></linearGradient></defs><defs/><text><tspan style=\"fill:url(#g)\">A</tspan></text></svg>",
+   "font": null,
+   "text": {
+    "color": "#000000",
+    "alphaF": 1.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   },
+   "background": null
+  },
+  {
+   "name": "gradient-nested-stop",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><defs><g><linearGradient id=\"g\"><stop style=\"stop-color:#ff0000\"/></linearGradient></g><radialGradient id=\"r\">\n  <stop style=\"stop-opacity:1\"/>\n  <stop style=\"stop-color:#336699\"/></radialGradient></defs><text style=\"fill:url(#g)\"><tspan style=\"fill:url(#r);opacity:-1\">A</tspan></text></svg>",
+   "font": null,
+   "text": {
+    "color": "#336699",
+    "alphaF": 0.0,
+    "button": "background-color: #336699; opacity: 1; color: #ffffff;"
+   },
+   "background": null
+  },
+  {
+   "name": "named-and-invalid",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text><tspan style=\"fill:Light Blue\">A</tspan></text><rect style=\"fill:none;opacity:0\"/></svg>",
+   "font": null,
+   "text": {
+    "color": "#add8e6",
+    "alphaF": 1.0,
+    "button": "background-color: #add8e6; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.0,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  },
+  {
+   "name": "font-styles",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text style=\"font-family:Ignored\"><tspan>no style</tspan><tspan style=\"font-family:'';font-size:20px\">empty family</tspan><tspan style=\"font-family:&quot;Open Sans&quot;;font-style:italic;font-weight:bold;font-size:41.6px\">A</tspan><tspan style=\"font-family:Second\">B</tspan></text></svg>",
+   "font": {
+    "family": "Open Sans",
+    "italic": true,
+    "bold": true,
+    "pixelSize": 41,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": null
+  },
+  {
+   "name": "font-points",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text><tspan style=\"font-family:Serif;font-weight:700;font-style:oblique;font-size:13.5pt\">A</tspan></text></svg>",
+   "font": {
+    "family": "Serif",
+    "italic": false,
+    "bold": false,
+    "pixelSize": null,
+    "pointSize": 13.5
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": null
+  },
+  {
+   "name": "font-other-units",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text><tspan style=\"font-family:Serif;font-size:2em\">A</tspan></text></svg>",
+   "font": {
+    "family": "Serif",
+    "italic": false,
+    "bold": false,
+    "pixelSize": null,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": null
+  },
+  {
+   "name": "font-tiny",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text><tspan style=\"font-family:Serif;font-size:0.5px\">A</tspan></text></svg>",
+   "font": {
+    "family": "Serif",
+    "italic": false,
+    "bold": false,
+    "pixelSize": null,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": null
+  },
+  {
+   "name": "font-none",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text style=\"font-family:Sans\"><tspan>A</tspan></text></svg>",
+   "font": null,
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 1.0,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": null
+  },
+  {
+   "name": "attribute-whitespace",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text><tspan style=\"font-family:Serif;\n  fill:#00ff00;opacity:&#48;.5\">A</tspan></text><rect style=\"opacity:0.5;&#10;fill:#ff0000\"/></svg>",
+   "font": {
+    "family": "Serif",
+    "italic": false,
+    "bold": false,
+    "pixelSize": null,
+    "pointSize": null
+   },
+   "text": {
+    "color": "#ffffff",
+    "alphaF": 0.5000076295109483,
+    "button": "background-color: #ffffff; opacity: 1; color: #000000;"
+   },
+   "background": {
+    "color": "#000000",
+    "alphaF": 0.5000076295109483,
+    "button": "background-color: #000000; opacity: 1; color: #ffffff;"
+   }
+  }
+ ]
+}

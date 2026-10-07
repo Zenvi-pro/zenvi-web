@@ -1,0 +1,751 @@
+{
+ "id": "WH4QMV104K",
+ "fps": {
+  "num": 30,
+  "den": 1
+ },
+ "display_ratio": {
+  "num": 16,
+  "den": 9
+ },
+ "pixel_ratio": {
+  "num": 1,
+  "den": 1
+ },
+ "width": 1280,
+ "height": 720,
+ "sample_rate": 48000,
+ "channels": 2,
+ "channel_layout": 3,
+ "settings": {},
+ "clips": [],
+ "effects": [],
+ "files": [
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback_P6L13C6REQ.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "P6L13C6REQ",
+   "image": "thumbnail/P6L13C6REQ.png",
+   "start": 31.286,
+   "end": 47.286,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 01",
+   "zenvi_subclip": true,
+   "zenvi_watch_confirmed": true,
+   "zenvi_watch_confidence": 0.9,
+   "zenvi_watch_sparse": false
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "VHZI64FZCX",
+   "image": "thumbnail/VHZI64FZCX.png",
+   "start": 31.286,
+   "end": 47.286,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 02",
+   "zenvi_subclip": true,
+   "zenvi_watch_confirmed": true,
+   "zenvi_watch_confidence": 0.95,
+   "zenvi_watch_sparse": false
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "INY4QYISFK",
+   "image": "thumbnail/INY4QYISFK.png",
+   "start": 0.0,
+   "end": 31.43,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 03",
+   "zenvi_subclip": true
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "9BPDV4XM9N",
+   "image": "thumbnail/9BPDV4XM9N.png",
+   "start": 47.14,
+   "end": 98.21,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 04",
+   "zenvi_subclip": true
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "DLQFKSB7PR",
+   "image": "thumbnail/DLQFKSB7PR.png",
+   "start": 158.0,
+   "end": 163.0,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 05",
+   "zenvi_subclip": true
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "C2UAJJ2DIE",
+   "image": "thumbnail/C2UAJJ2DIE.png",
+   "start": 110.0,
+   "end": 130.0,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 06",
+   "zenvi_subclip": true
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "MXRNWTVJEZ",
+   "image": "thumbnail/MXRNWTVJEZ.png",
+   "start": 140.0,
+   "end": 145.0,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 07",
+   "zenvi_subclip": true
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "EBYC0G4MQ1",
+   "image": "thumbnail/EBYC0G4MQ1.png",
+   "start": 178.0,
+   "end": 187.0,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 08",
+   "zenvi_subclip": true
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "LVJO530W1K",
+   "image": "thumbnail/LVJO530W1K.png",
+   "start": 199.0,
+   "end": 211.0,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 09",
+   "zenvi_subclip": true
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "NKREGJWESN",
+   "image": "thumbnail/NKREGJWESN.png",
+   "start": 26.0,
+   "end": 229.371,
+   "parent_file_id": "K7L871SPFU",
+   "name": "Subclip 10",
+   "zenvi_subclip": true
+  },
+  {
+   "acodec": "aac",
+   "audio_bit_rate": 96010,
+   "audio_stream_index": 1,
+   "audio_timebase": {
+    "den": 44100,
+    "num": 1
+   },
+   "channel_layout": 3,
+   "channels": 2,
+   "display_ratio": {
+    "den": 1,
+    "num": 2
+   },
+   "duration": 229.36000061035156,
+   "duration_strategy": "VideoPreferred",
+   "file_size": 10228359,
+   "fps": {
+    "den": 1,
+    "num": 25
+   },
+   "has_audio": true,
+   "has_single_image": false,
+   "has_video": true,
+   "height": 320,
+   "interlaced_frame": false,
+   "metadata": {
+    "compatible_brands": "isommp41mp42",
+    "creation_time": "2026-09-05T02:08:47.000000Z",
+    "handler_name": "Core Media Audio",
+    "language": "eng",
+    "major_brand": "mp42",
+    "minor_version": "1"
+   },
+   "path": "@assets/media/videoplayback_SEGAD6NGDN.mp4",
+   "pixel_format": 0,
+   "pixel_ratio": {
+    "den": 1,
+    "num": 1
+   },
+   "sample_rate": 44100,
+   "top_field_first": true,
+   "type": "FFmpegReader",
+   "vcodec": "h264",
+   "video_bit_rate": 44593,
+   "video_length": 5734,
+   "video_stream_index": 0,
+   "video_timebase": {
+    "den": 12800,
+    "num": 1
+   },
+   "width": 640,
+   "media_type": "video",
+   "id": "SEGAD6NGDN",
+   "image": "thumbnail/SEGAD6NGDN.png"
+  }
+ ],
+ "duration": 300,
+ "scale": 21.3418314366245,
+ "tick_pixels": 100,
+ "playhead_position": 0,
+ "profile": "HD 720p 30 fps",
+ "export_settings": null,
+ "export_overrides": {},
+ "layers": [
+  {
+   "id": "L1",
+   "label": "",
+   "number": 1000000,
+   "y": 0,
+   "lock": false
+  },
+  {
+   "id": "L2",
+   "label": "",
+   "number": 2000000,
+   "y": 0,
+   "lock": false
+  },
+  {
+   "id": "L3",
+   "label": "",
+   "number": 3000000,
+   "y": 0,
+   "lock": false
+  },
+  {
+   "id": "L4",
+   "label": "",
+   "number": 4000000,
+   "y": 0,
+   "lock": false
+  },
+  {
+   "id": "L5",
+   "label": "",
+   "number": 5000000,
+   "y": 0,
+   "lock": false
+  }
+ ],
+ "markers": [],
+ "progress": [],
+ "history": {
+  "undo": [],
+  "redo": []
+ },
+ "version": {
+  "openshot-qt": "1.0.188",
+  "libopenshot": "0.5.0"
+ }
+}

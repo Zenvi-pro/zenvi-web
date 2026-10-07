@@ -1,0 +1,359 @@
+{
+ "generator": "packages/engine/scripts/gen-title-readers.py",
+ "cases": [
+  {
+   "input": "#fff",
+   "valid": true,
+   "name": "#ffffff",
+   "rgbF": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "input": "#FFF",
+   "valid": true,
+   "name": "#ffffff",
+   "rgbF": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "input": "#abc",
+   "valid": true,
+   "name": "#aabbcc",
+   "rgbF": [
+    0.6666666666666666,
+    0.7333333333333333,
+    0.8,
+    1.0
+   ]
+  },
+  {
+   "input": "#AbC",
+   "valid": true,
+   "name": "#aabbcc",
+   "rgbF": [
+    0.6666666666666666,
+    0.7333333333333333,
+    0.8,
+    1.0
+   ]
+  },
+  {
+   "input": "#000",
+   "valid": true,
+   "name": "#000000",
+   "rgbF": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ]
+  },
+  {
+   "input": "#1g3",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "#ffffff",
+   "valid": true,
+   "name": "#ffffff",
+   "rgbF": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "input": "#FFD700",
+   "valid": true,
+   "name": "#ffd700",
+   "rgbF": [
+    1.0,
+    0.8431372549019608,
+    0.0,
+    1.0
+   ]
+  },
+  {
+   "input": "#80ff0000",
+   "valid": true,
+   "name": "#ff0000",
+   "rgbF": [
+    1.0,
+    0.0,
+    0.0,
+    0.5019607843137255
+   ]
+  },
+  {
+   "input": "#00000000",
+   "valid": true,
+   "name": "#000000",
+   "rgbF": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "input": "#fffffffff",
+   "valid": true,
+   "name": "#ffffff",
+   "rgbF": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "input": "#123456789",
+   "valid": true,
+   "name": "#124578",
+   "rgbF": [
+    0.07106126497291523,
+    0.2710612649729152,
+    0.47106126497291523,
+    1.0
+   ]
+  },
+  {
+   "input": "#ffffffffffff",
+   "valid": true,
+   "name": "#ffffff",
+   "rgbF": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "input": "#123456789abc",
+   "valid": true,
+   "name": "#12569a",
+   "rgbF": [
+    0.07110704203860532,
+    0.337773708705272,
+    0.6044403753719386,
+    1.0
+   ]
+  },
+  {
+   "input": "#0000000000000",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "#ffff",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "#ggg",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "#12",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "#1234567",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "#",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": " #fff",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "#fff ",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "White",
+   "valid": true,
+   "name": "#ffffff",
+   "rgbF": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "input": "white",
+   "valid": true,
+   "name": "#ffffff",
+   "rgbF": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "input": "light blue",
+   "valid": true,
+   "name": "#add8e6",
+   "rgbF": [
+    0.6784313725490196,
+    0.8470588235294118,
+    0.9019607843137255,
+    1.0
+   ]
+  },
+  {
+   "input": "LIGHTBLUE",
+   "valid": true,
+   "name": "#add8e6",
+   "rgbF": [
+    0.6784313725490196,
+    0.8470588235294118,
+    0.9019607843137255,
+    1.0
+   ]
+  },
+  {
+   "input": "Dark Slate Gray",
+   "valid": true,
+   "name": "#2f4f4f",
+   "rgbF": [
+    0.1843137254901961,
+    0.30980392156862746,
+    0.30980392156862746,
+    1.0
+   ]
+  },
+  {
+   "input": "\twhite",
+   "valid": true,
+   "name": "#ffffff",
+   "rgbF": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "input": "white\n",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": " white ",
+   "valid": true,
+   "name": "#ffffff",
+   "rgbF": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "input": "grey",
+   "valid": true,
+   "name": "#808080",
+   "rgbF": [
+    0.5019607843137255,
+    0.5019607843137255,
+    0.5019607843137255,
+    1.0
+   ]
+  },
+  {
+   "input": "gray",
+   "valid": true,
+   "name": "#808080",
+   "rgbF": [
+    0.5019607843137255,
+    0.5019607843137255,
+    0.5019607843137255,
+    1.0
+   ]
+  },
+  {
+   "input": "transparent",
+   "valid": true,
+   "name": "#000000",
+   "rgbF": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "input": "Transparent",
+   "valid": true,
+   "name": "#000000",
+   "rgbF": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "input": "none",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "url(#x)",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "rgb(1,2,3)",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  },
+  {
+   "input": "currentColor",
+   "valid": false,
+   "name": "#000000",
+   "rgbF": null
+  }
+ ]
+}

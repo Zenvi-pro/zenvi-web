@@ -1,0 +1,28 @@
+{
+  "name": "@zenvi/adobe-link",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Zenvi Link: the CEP extension that makes After Effects and Premiere Pro loopback MCP hosts Zenvi can drive, its tool catalog, and the client the CLI uses to reach it.",
+  "license": "GPL-3.0-or-later",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsx scripts/build-extension.mjs",
+    "gen:catalog": "tsx scripts/gen-catalog.ts",
+    "typecheck:jsx": "node scripts/typecheck-jsx.mjs",
+    "typecheck:jsx:ppro": "tsc -p tsconfig.jsx-ppro.json",
+    "install:dev": "tsx scripts/install-dev.mjs",
+    "package:zxp": "tsx scripts/package-zxp.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "zod": "^4.6.0"
+  },
+  "devDependencies": {
+    "acorn": "^8.15.0",
+    "types-for-adobe": "^7.2.6"
+  }
+}

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.*
+!.env.example
+.vercel/
+playwright-report/
+test-results/
+.cache/
+*.log
+.npm-install.lock/
+# The Claude Code plugin bundle is committed (marketplace installs do not build)
+!plugins/zenvi/dist/
