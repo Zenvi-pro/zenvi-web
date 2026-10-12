@@ -22,6 +22,9 @@ BLOB_CONTAINER="${BLOB_CONTAINER:-zenvi}"
 ENV_FILE="${ENV_FILE:-$HOME/.config/zenvi-dev/cloud.env}"
 EDITOR_URL="${ZENVI_EDITOR_URL:-https://zenvi.pro/editor}"
 SUPABASE="${SUPABASE_URL:-https://xktarhzbrdnxkaovtdxj.supabase.co}"
+# Publishable client key (same value the CLI ships). Not a secret.
+ANON="${SUPABASE_ANON_KEY:-sb_publishable_2-FCBkJ96Ss35jqL9krVEQ_otR5iGmA}"
+BACKEND="${ZENVI_BACKEND_URL:-https://api.zenvi.pro}"
 CORS="${CORS_ORIGINS:-https://zenvi.pro,https://www.zenvi.pro,https://*.vercel.app,http://localhost:*,http://127.0.0.1:*}"
 ALIASES="${PUBLIC_BASE_URL_ALIASES:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
@@ -38,7 +41,7 @@ CONN="$(sed -n 's/^AZURE_STORAGE_CONNECTION_STRING=//p' "$ENV_FILE" | head -n 1)
 
 step "Storage: blob container '$BLOB_CONTAINER' (private) and tables"
 az storage container create --name "$BLOB_CONTAINER" --public-access off --connection-string "$CONN" -o none
-for table in tokens oauthclients oauthcodes devicecodes renders; do
+for table in tokens oauthclients oauthcodes devicecodes renders backendsessions generations; do
   az storage table create --name "$table" --connection-string "$CONN" -o none
 done
 
@@ -54,6 +57,8 @@ ENV_VARS=(
   "PUBLIC_BASE_URL=$PUBLIC_BASE_URL"
   "ZENVI_EDITOR_URL=$EDITOR_URL"
   "SUPABASE_URL=$SUPABASE"
+  "SUPABASE_ANON_KEY=$ANON"
+  "ZENVI_BACKEND_URL=$BACKEND"
   "CORS_ORIGINS=$CORS"
   "NODE_ENV=production"
   "LOG_LEVEL=info"

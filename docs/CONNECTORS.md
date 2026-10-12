@@ -40,11 +40,23 @@ Media: attach a video, audio or image file in the chat and ask Zenvi to use
 it (ChatGPT hands the file to `import_attached_file`), give a direct https
 link, or ask for an upload link to drop files in the web editor.
 
-Notes: ChatGPT gives each tool call about a minute, so renders run in the
-background — ChatGPT calls `render_project`, then `get_render_status` until
-the download link is ready. Write tools ask for confirmation unless you
-allow them. Frame previews come back as a link (and an image where the host
-shows images) and in the Zenvi preview panel.
+Allow also keeps a Zenvi sign-in on the server (never shown to ChatGPT) so
+search, stock footage, catalog, and narration run as that account and spend
+that account's credits. Disconnecting the last connected app removes it.
+Search and narration answer in the same turn. AI video does not: ChatGPT
+calls `generate_video`, then `get_generation_status` until the clip is on
+the timeline.
+
+Notes: ChatGPT gives each tool call about a minute, so renders and AI video
+run in the background — `render_project` then `get_render_status`, or
+`generate_video` then `get_generation_status`. Write tools ask for
+confirmation unless you allow them. Frame previews come back as a link (and
+an image where the host shows images) and in the Zenvi preview panel.
+
+These stay on the desktop app, because they need on-device speech, beat
+tracking, or the desktop's ffmpeg splice: transcribe, remove words, detect
+beats, diarize, local visual search, modify a clip with AI, and morph
+transitions. Playback and timeline zoom stay in the web editor.
 
 ## 2. Claude (claude.ai, Claude Desktop, Claude mobile)
 
@@ -214,6 +226,7 @@ egress: `openai.com/chatgpt-connectors.json`; Claude: `160.79.104.0/21`).
 | 401 right after connecting on a new domain | Tokens are bound to the URL they were issued for; reconnect with the URL you now use. |
 | 403 `forbidden_origin` | A browser-based client from an origin not in `MCP_ALLOWED_ORIGINS`; add it and re-run provision. |
 | Tools say rendering or previews are not available | That Zenvi Cloud build has no renderer yet; `GET /health` shows `renderer` / `frames`. |
+| Search, stock, narration or AI video says to reconnect and Allow | That connection was approved before this was stored, or the Zenvi sign-in expired. Remove the connector and add it again, then choose Allow. |
 | "… is not in Zenvi Cloud" when rendering | A clip's media was never uploaded; use `get_upload_link` or `import_media_from_url`. |
 | `import_media_from_url` refuses a link | Only direct https links to public hosts, up to 512 MB, video/audio/image types. |
 | 429 | Rate limits (registration 30/h/IP, device codes 30/h/IP, token 120/min/IP, imports 30/h/user). |

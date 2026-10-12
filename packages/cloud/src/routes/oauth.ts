@@ -6,7 +6,7 @@
  *   POST /oauth/register                               RFC 7591 (public clients)
  *   GET  /oauth/authorize                              → 302 to the editor's consent page
  *   GET  /oauth/consent-info?request=                  public request details for that page
- *   POST /oauth/consent {request, approve}             Supabase session → {redirect}
+ *   POST /oauth/consent {request, approve, refresh_token?}  Supabase session → {redirect}
  *   POST /oauth/token                                  authorization_code | refresh_token
  *   POST /oauth/revoke                                 RFC 7009
  */
@@ -103,10 +103,18 @@ export function oauthRoutes(services: Services): Hono<AppEnv> {
   app.get("/consent-info", async (c) => c.json(await oauth.consentInfo(c.req.query("request") ?? "")));
 
   app.post("/consent", requireAuth(services.auth, { allow: ["supabase"] }), async (c) => {
-    const body = await parseJson(c, z.object({ request: z.string().min(1).max(100), approve: z.boolean() }));
+    const body = await parseJson(
+      c,
+      z.object({
+        request: z.string().min(1).max(100),
+        approve: z.boolean(),
+        refresh_token: z.string().min(1).max(4096).optional(),
+      }),
+    );
     const principal = c.get("principal");
     const result = await oauth.consent(body.request, { userId: principal.userId, email: principal.email }, body.approve);
-    log.info("oauth consent", { user: principal.userId, approved: body.approve });
+    if (body.approve && body.refresh_token) await services.backendSessions.save(principal.userId, body.refresh_token);
+    log.info("oauth consent", { user: principal.userId, approved: body.approve, backendSession: Boolean(body.approve && body.refresh_token) });
     return c.json(result);
   });
 

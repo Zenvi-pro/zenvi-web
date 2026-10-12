@@ -36,6 +36,10 @@ export interface Config {
   /** Web editor base, e.g. https://zenvi.pro/editor (no trailing slash). */
   editorUrl: string;
   supabaseUrl: string;
+  /** Public Supabase anon key, used only to refresh a connector's stored session. */
+  supabaseAnonKey: string;
+  /** Zenvi backend (`https://api.zenvi.pro`). Empty disables search, stock, TTS and AI video. */
+  backendUrl: string;
   storage: { kind: "azure"; connectionString: string; container: string } | { kind: "memory" };
   /** Origins allowed for browser CORS on /v1 (patterns with `*`). */
   corsOrigins: string[];
@@ -90,6 +94,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const aliases = list(env.PUBLIC_BASE_URL_ALIASES, []).map((value) => origin.parse(value));
   const editorUrl = origin.parse(env.ZENVI_EDITOR_URL ?? "https://zenvi.pro/editor");
   const supabaseUrl = origin.parse(env.SUPABASE_URL ?? "https://xktarhzbrdnxkaovtdxj.supabase.co");
+  // The publishable key is the same public client value the CLI ships. An explicit empty
+  // value turns the connector's backend session off (tests).
+  const supabaseAnonKey = env.SUPABASE_ANON_KEY === "" ? "" : (env.SUPABASE_ANON_KEY ?? "sb_publishable_2-FCBkJ96Ss35jqL9krVEQ_otR5iGmA").trim();
+  const backendUrl = env.ZENVI_BACKEND_URL === "" ? "" : origin.parse(env.ZENVI_BACKEND_URL ?? "https://api.zenvi.pro");
 
   const storageKind = (env.STORAGE ?? "azure").toLowerCase();
   let storage: Config["storage"];
@@ -122,6 +130,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     publicBaseUrlAliases: aliases,
     editorUrl,
     supabaseUrl,
+    supabaseAnonKey,
+    backendUrl,
     storage,
     corsOrigins,
     mcpAllowedOrigins,

@@ -12,14 +12,14 @@ Every call returns a contract-3 receipt (`{contract: 3, status, tool, summary, c
 | --- | --- | --- | --- | --- |
 | Web editor (Zenvi Assistant, command palette) | `apps/editor/src/features/editor/assistant/host.ts` | 65 | 6 | 14 |
 | CLI and local MCP server (zenvi, zenvi mcp) | `packages/render-node/src/host/node-host.ts` | 63 | 5 | 17 |
-| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 46 | 9 | 30 |
+| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 57 | 7 | 21 |
 | Zenvi desktop | zenvi-core | 73 | 0 | 12 (direct tools are web-only) |
 
 Availability follows each tool's required host capabilities and the host methods it calls at run time; the hosts are described in `SURFACE_PROFILES` (packages/engine/src/tools/availability.ts). Capabilities a session may lack (signed out of Zenvi, no WebCodecs export) are noted per tool.
 
 - **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage; methods media.importUrl, media.pickFiles, media.writeGenerated, ui.openExportDialog; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
 - **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, storage.open, storage.readText, storage.writeText; only sometimes: backend (signed in with zenvi login).
-- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames; methods media.importUrl; only sometimes: frames (when the render worker is configured); hides 12 local-app tools.
+- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend; methods media.importUrl, media.writeGenerated, storage.readText, storage.writeText; only sometimes: frames (when the render worker is configured), media (when ffprobe is available), assets (when title templates are bundled), audio (when ffmpeg is available), backend (after the person allows the connector); hides 13 local-app tools.
 
 ## Matrix
 
@@ -34,7 +34,7 @@ Availability follows each tool's required host capabilities and the host methods
 | [`save_project_tool`](#save_project_tool) | assistant, mcp, cli, editor | yes | yes | — | yes |
 | [`open_project_tool`](#open_project_tool) | assistant, mcp, cli, editor | — | yes | — | yes |
 | [`watch_clip_tool`](#watch_clip_tool) | assistant, mcp, cli, editor | partial | — | — | yes |
-| [`watch_clip_window_tool`](#watch_clip_window_tool) | assistant, mcp, cli, editor | yes | yes | — | yes |
+| [`watch_clip_window_tool`](#watch_clip_window_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`play_tool`](#play_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
 | [`go_to_start_tool`](#go_to_start_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
 | [`go_to_end_tool`](#go_to_end_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
@@ -47,7 +47,7 @@ Availability follows each tool's required host capabilities and the host methods
 | `delete_clips_on_track_tool` (deprecated) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`analyze_timeline_audio_tool`](#analyze_timeline_audio_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`set_clip_volume_tool`](#set_clip_volume_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
-| [`duck_under_speech_tool`](#duck_under_speech_tool) | assistant, mcp, cli, editor | partial | yes | partial | yes |
+| [`duck_under_speech_tool`](#duck_under_speech_tool) | assistant, mcp, cli, editor | partial | yes | yes | yes |
 | [`zoom_in_tool`](#zoom_in_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
 | [`zoom_out_tool`](#zoom_out_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
 | [`center_on_playhead_tool`](#center_on_playhead_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
@@ -57,14 +57,14 @@ Availability follows each tool's required host capabilities and the host methods
 | [`get_export_settings_tool`](#get_export_settings_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`set_export_setting_tool`](#set_export_setting_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`get_file_info_tool`](#get_file_info_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
-| [`split_file_add_clip_tool`](#split_file_add_clip_tool) | mcp, cli, editor | yes | yes | partial | yes |
-| [`add_clip_to_timeline_tool`](#add_clip_to_timeline_tool) | assistant, mcp, cli, editor | yes | yes | partial | yes |
+| [`split_file_add_clip_tool`](#split_file_add_clip_tool) | mcp, cli, editor | yes | yes | yes | yes |
+| [`add_clip_to_timeline_tool`](#add_clip_to_timeline_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`import_video_url_and_add_to_timeline_tool`](#import_video_url_and_add_to_timeline_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`slice_clip_at_playhead_tool`](#slice_clip_at_playhead_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
-| [`search_clips_tool`](#search_clips_tool) | assistant, mcp, cli, editor | yes | yes | — | yes |
-| [`search_clip_scenes_tool`](#search_clip_scenes_tool) | assistant, mcp, cli, editor | yes | yes | partial | yes |
-| [`get_project_catalog_tool`](#get_project_catalog_tool) | assistant, mcp, cli, editor | yes | yes | — | yes |
-| [`slice_clip_at_best_match_tool`](#slice_clip_at_best_match_tool) | assistant, mcp, cli, editor | yes | yes | partial | yes |
+| [`search_clips_tool`](#search_clips_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
+| [`search_clip_scenes_tool`](#search_clip_scenes_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
+| [`get_project_catalog_tool`](#get_project_catalog_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
+| [`slice_clip_at_best_match_tool`](#slice_clip_at_best_match_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | `suggest_motion_graphics_placements_tool` (deprecated) | assistant, mcp, cli, editor | — | — | — | yes |
 | [`propose_overlay_windows_tool`](#propose_overlay_windows_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`place_motion_graphic_tool`](#place_motion_graphic_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
@@ -76,15 +76,15 @@ Availability follows each tool's required host capabilities and the host methods
 | [`list_transitions_tool`](#list_transitions_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`search_transitions_tool`](#search_transitions_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`apply_transition_tool`](#apply_transition_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
-| [`generate_tts_and_add_to_timeline_tool`](#generate_tts_and_add_to_timeline_tool) | assistant, mcp, cli, editor | yes | yes | — | yes |
+| [`generate_tts_and_add_to_timeline_tool`](#generate_tts_and_add_to_timeline_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`import_stock_media_tool`](#import_stock_media_tool) | assistant, mcp, cli, editor | partial | yes | partial | yes |
-| [`resummarize_project_file_tool`](#resummarize_project_file_tool) | assistant, mcp, cli, editor | yes | yes | — | yes |
+| [`resummarize_project_file_tool`](#resummarize_project_file_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`reindex_project_file_tool`](#reindex_project_file_tool) | assistant, mcp, cli, editor | partial | partial | partial | yes |
 | [`get_clips_with_full_metadata_tool`](#get_clips_with_full_metadata_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`get_timeline_placements_metadata_tool`](#get_timeline_placements_metadata_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`get_timeline_state_tool`](#get_timeline_state_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`add_effect_tool`](#add_effect_tool) | mcp, cli, editor | yes | yes | yes | yes |
-| [`add_title_tool`](#add_title_tool) | mcp, cli, editor | — | — | — | yes |
+| [`add_title_tool`](#add_title_tool) | mcp, cli, editor | — | — | yes | yes |
 | [`set_keyframes_tool`](#set_keyframes_tool) | mcp, cli, editor | yes | yes | yes | yes |
 | [`set_project_setting_tool`](#set_project_setting_tool) | mcp, cli, editor | yes | yes | yes | yes |
 | [`inspect_timeline_tool`](#inspect_timeline_tool) | mcp, cli, editor | yes | yes | yes | yes |
@@ -92,9 +92,9 @@ Availability follows each tool's required host capabilities and the host methods
 | [`get_transcript_tool`](#get_transcript_tool) | mcp, cli, editor | partial | partial | partial | yes |
 | [`transcribe_media_tool`](#transcribe_media_tool) | mcp, cli, editor | — | — | — | yes |
 | [`remove_words_tool`](#remove_words_tool) | mcp, cli, editor | — | — | — | yes |
-| [`remove_silence_tool`](#remove_silence_tool) | mcp, cli, editor | — | partial | — | yes |
-| [`add_captions_tool`](#add_captions_tool) | mcp, cli, editor | — | — | — | yes |
-| [`export_captions_tool`](#export_captions_tool) | mcp, cli, editor | — | partial | — | yes |
+| [`remove_silence_tool`](#remove_silence_tool) | mcp, cli, editor | — | partial | partial | yes |
+| [`add_captions_tool`](#add_captions_tool) | mcp, cli, editor | — | — | partial | yes |
+| [`export_captions_tool`](#export_captions_tool) | mcp, cli, editor | — | partial | partial | yes |
 | [`detect_beats_tool`](#detect_beats_tool) | mcp, cli, editor | — | — | — | yes |
 | [`diarize_media_tool`](#diarize_media_tool) | mcp, cli, editor | — | — | — | yes |
 | [`search_media_local_tool`](#search_media_local_tool) | mcp, cli, editor | — | — | — | yes |
@@ -222,7 +222,7 @@ Availability: editor partial (file_path needs local file access); cli — (needs
 
 Surfaces: assistant, mcp, cli, editor. read-only, open world. Needs: frames, backend.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud — (needs the Zenvi backend (sign in to Zenvi)); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when when the render worker is configured and after the person allows the connector); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -406,7 +406,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: assistant, mcp, cli, editor. edits, destructive.
 
-Availability: editor partial (without audio analysis only indexed transcript cues find the speech); cli yes; cloud partial (without audio analysis only indexed transcript cues find the speech); desktop yes.
+Availability: editor partial (without audio analysis only indexed transcript cues find the speech); cli yes; cloud yes; desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -535,7 +535,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: mcp, cli, editor. edits.
 
-Availability: editor yes; cli yes; cloud partial (without frame rendering and the Zenvi backend, windows are not vision-checked); desktop yes.
+Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -554,7 +554,7 @@ Availability: editor yes; cli yes; cloud partial (without frame rendering and th
 
 Surfaces: assistant, mcp, cli, editor. edits.
 
-Availability: editor yes; cli yes; cloud partial (without frame rendering and the Zenvi backend, windows are not vision-checked); desktop yes.
+Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -573,7 +573,7 @@ Availability: editor yes; cli yes; cloud partial (without frame rendering and th
 
 Surfaces: assistant, mcp, cli, editor. edits, open world. Needs: media.
 
-Availability: editor yes; cli yes; cloud yes; desktop yes.
+Availability: editor yes; cli yes; cloud yes (only when when ffprobe is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -602,7 +602,7 @@ No arguments.
 
 Surfaces: assistant, mcp, cli, editor. read-only, open world. Needs: backend.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud — (needs the Zenvi backend (sign in to Zenvi)); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when after the person allows the connector); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -616,7 +616,7 @@ Availability: editor yes (only when signed in to Zenvi); cli yes (only when sign
 
 Surfaces: assistant, mcp, cli, editor. read-only, open world.
 
-Availability: editor yes; cli yes; cloud partial (without the Zenvi backend only chapter and scene descriptions are searched); desktop yes.
+Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -634,7 +634,7 @@ Availability: editor yes; cli yes; cloud partial (without the Zenvi backend only
 
 Surfaces: assistant, mcp, cli, editor. read-only, open world. Needs: backend.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud — (needs the Zenvi backend (sign in to Zenvi)); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when after the person allows the connector); desktop yes.
 
 No arguments.
 
@@ -644,7 +644,7 @@ No arguments.
 
 Surfaces: assistant, mcp, cli, editor. edits, open world.
 
-Availability: editor yes; cli yes; cloud partial (without the Zenvi backend only explicit times and scene descriptions work); desktop yes.
+Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -738,7 +738,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: assistant, mcp, cli, editor. edits, open world. Needs: backend, media.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud — (needs the Zenvi backend (sign in to Zenvi)); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud — (hidden: belongs to a local app); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -830,7 +830,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: assistant, mcp, cli, editor. edits, open world. Needs: backend, media.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud — (needs the Zenvi backend (sign in to Zenvi) and storing generated media); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when after the person allows the connector and when ffprobe is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -847,7 +847,7 @@ Availability: editor yes (only when signed in to Zenvi); cli yes (only when sign
 
 Surfaces: assistant, mcp, cli, editor. edits, open world. Needs: media.
 
-Availability: editor partial (search needs the Zenvi backend; local_path needs local file access); cli yes; cloud partial (search needs the Zenvi backend; local_path needs local file access); desktop yes.
+Availability: editor partial (search needs the Zenvi backend; local_path needs local file access); cli yes; cloud partial (search needs the Zenvi backend; local_path needs local file access; only when when ffprobe is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -869,7 +869,7 @@ Availability: editor partial (search needs the Zenvi backend; local_path needs l
 
 Surfaces: assistant, mcp, cli, editor. edits, destructive, open world. Needs: backend.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud — (needs the Zenvi backend (sign in to Zenvi)); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when after the person allows the connector); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -948,7 +948,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: mcp, cli, editor. edits. Needs: media, assets.
 
-Availability: editor — (needs the bundled title templates); cli — (needs the bundled title templates); cloud — (needs the bundled title templates and storing generated media); desktop yes.
+Availability: editor — (needs the bundled title templates); cli — (needs the bundled title templates); cloud yes (only when when ffprobe is available and when title templates are bundled); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1094,7 +1094,7 @@ Availability: editor — (needs word timings from on-device speech recognition (
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: audio.
 
-Availability: editor — (needs audio analysis); cli partial (energy VAD on the host's audio analysis); cloud — (needs audio analysis); desktop yes.
+Availability: editor — (needs audio analysis); cli partial (energy VAD on the host's audio analysis); cloud partial (energy VAD on the host's audio analysis; only when when ffmpeg is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1110,7 +1110,7 @@ Availability: editor — (needs audio analysis); cli partial (energy VAD on the 
 
 Surfaces: mcp, cli, editor. edits. Needs: media, assets.
 
-Availability: editor — (needs the bundled title templates); cli — (needs the bundled title templates); cloud — (needs the bundled title templates and storing generated media); desktop yes.
+Availability: editor — (needs the bundled title templates); cli — (needs the bundled title templates); cloud partial (captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device; only when when ffprobe is available and when title templates are bundled); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1130,7 +1130,7 @@ Availability: editor — (needs the bundled title templates); cli — (needs the
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: storage.
 
-Availability: editor — (needs writing files); cli partial (captions come from indexed transcripts (no on-device ASR)); cloud — (needs project storage and writing files); desktop yes.
+Availability: editor — (needs writing files); cli partial (captions come from indexed transcripts (no on-device ASR)); cloud partial (captions come from indexed transcripts (no on-device ASR)); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1353,7 +1353,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 Surfaces: mcp, cli, editor. read-only. Needs: media.
 
-Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool).
+Availability: editor yes; cli yes; cloud yes (only when when ffprobe is available); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |

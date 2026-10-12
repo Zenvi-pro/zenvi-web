@@ -13,6 +13,7 @@ export function ConnectPage() {
   const requestId = params.get("request") ?? "";
   const status = useAuth((s) => s.status);
   const email = useAuth((s) => s.user?.email);
+  const refreshToken = useAuth((s) => s.session?.refresh_token);
   const [info, setInfo] = useState<ConsentInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"approve" | "deny" | null>(null);
@@ -37,7 +38,7 @@ export function ConnectPage() {
     setError(null);
     setBusy(approve ? "approve" : "deny");
     try {
-      const { redirect } = await cloudClient().consent(requestId, approve);
+      const { redirect } = await cloudClient().consent(requestId, approve, approve ? refreshToken : undefined);
       window.location.assign(redirect);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

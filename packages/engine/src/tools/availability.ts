@@ -127,9 +127,15 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
-    capabilities: ["media", "frames"],
-    methods: ["media.importUrl"],
-    conditional: { frames: "when the render worker is configured" },
+    capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
+    methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText"],
+    conditional: {
+      frames: "when the render worker is configured",
+      media: "when ffprobe is available",
+      assets: "when title templates are bundled",
+      audio: "when ffmpeg is available",
+      backend: "after the person allows the connector",
+    },
     hidden: [
       "new_project_tool",
       "open_project_tool",
@@ -143,6 +149,8 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "zoom_out_tool",
       "center_on_playhead_tool",
       "watch_clip_tool",
+      // Slower than a ChatGPT tool call. The cloud server starts generate_video instead.
+      "generate_video_and_add_to_timeline_tool",
     ],
   },
 };

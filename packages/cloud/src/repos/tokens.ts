@@ -160,6 +160,8 @@ export class TokenRepo {
   private readonly cache = new Map<string, { record: TokenRecord; until: number }>();
   private readonly grantCache = new Map<string, { revoked: boolean; until: number }>();
   private readonly touched = new Map<string, number>();
+  /** Called after a grant is revoked (the account page, or a reused refresh token). */
+  onGrantRevoked?: (userId: string) => Promise<void>;
 
   constructor(
     private readonly tables: TableStore,
@@ -347,6 +349,7 @@ export class TokenRepo {
     if (!row.revoked) {
       await this.tables.update<IndexRow>(TABLE, { partitionKey: row.partitionKey, rowKey: row.rowKey, revoked: true } as IndexRow);
     }
+    await this.onGrantRevoked?.(userId);
     return true;
   }
 

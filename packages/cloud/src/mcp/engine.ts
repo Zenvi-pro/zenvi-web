@@ -41,6 +41,8 @@ export const HIDDEN_ENGINE_TOOLS = new Set([
   "zoom_out_tool",
   "center_on_playhead_tool",
   "watch_clip_tool",
+  // Kling is slower than ChatGPT's tool budget. generate_video starts a job instead.
+  "generate_video_and_add_to_timeline_tool",
 ]);
 
 const PROJECT_ID_PROPERTY = {

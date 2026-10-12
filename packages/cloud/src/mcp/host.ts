@@ -11,7 +11,9 @@
  *   audio   loudness envelopes of project media (remove_silence_tool);
  *   storage readText of project media, writeText to a downloadable export
  *           (export_captions_tool). Cloud projects save themselves, so
- *           save/open are refused.
+ *           save/open are refused;
+ *   backend api.zenvi.pro as the person who allowed the connector (search,
+ *           stock, catalog, TTS). AI video is a cloud job, not this host.
  */
 
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -44,6 +46,7 @@ export function cloudCapabilities(services: Services): Set<HostCapability> {
   if (services.frames.available) caps.add("frames");
   if (services.assets) caps.add("assets");
   if (services.analyzeAudio) caps.add("audio");
+  if (services.backendSessions.enabled) caps.add("backend");
   return caps;
 }
 
@@ -141,6 +144,13 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
   if (analyze) {
     host.audio = {
       analyzeAudio: async (path, options) => analyze(await localCopy(path), { ...options, signal: options?.signal ?? ctx.signal }),
+    };
+  }
+
+  if (caps.has("backend")) {
+    host.backend = {
+      baseUrl: services.config.backendUrl,
+      request: (path, init) => services.backendSessions.request(userId, path, { ...init, signal: init?.signal ?? ctx.signal }),
     };
   }
 

@@ -5,6 +5,7 @@
  */
 
 import { join } from "node:path";
+import { BackendSessions } from "./auth/backend-session.js";
 import { Authenticator } from "./auth/principal.js";
 import type { SupabaseVerifier } from "./auth/supabase.js";
 import type { Config } from "./config.js";
@@ -17,6 +18,7 @@ import { fetchJson } from "./net/fetch.js";
 import type { Resolver, UrlPolicy } from "./net/ssrf.js";
 import { CIMD_FETCH_LIMIT, ClientRegistry, type JsonFetcher } from "./oauth/clients.js";
 import { OAuthService } from "./oauth/service.js";
+import { GenerationService } from "./generation/service.js";
 import { MediaCache } from "./render/cache.js";
 import type { AssetSource, AudioAnalyzer, MediaProber, Renderer } from "./render/renderer.js";
 import { unavailableProber, unavailableRenderer } from "./render/renderer.js";
@@ -71,6 +73,8 @@ export interface Services {
   devices: DeviceService;
   clients: ClientRegistry;
   oauth: OAuthService;
+  backendSessions: BackendSessions;
+  generations: GenerationService;
   sessions: SessionStore;
   importer: MediaImporter;
   frames: FrameService;
@@ -106,6 +110,24 @@ export function createServices(deps: Dependencies): Services {
       }));
   const clients = new ClientRegistry(tables, clock, fetchClientDocument);
   const cache = new MediaCache(join(config.renderTmpDir, "zenvi-media-cache"), config.limits.mediaCacheBytes, media);
+  const backendSessions = new BackendSessions(tables, clock, {
+    supabaseUrl: config.supabaseUrl,
+    anonKey: config.supabaseAnonKey,
+    backendUrl: config.backendUrl,
+  });
+  tokens.onGrantRevoked = async (userId) => {
+    const { grants } = await tokens.listForUser(userId);
+    if (grants.length === 0) await backendSessions.delete(userId);
+  };
+  const importer = new MediaImporter({
+    media,
+    prober,
+    tmpDir: config.renderTmpDir,
+    maxBytes: Math.min(config.limits.importMaxBytes, config.limits.maxFileBytes),
+    policy: deps.network?.policy,
+    resolver: deps.network?.resolver,
+  });
+  const generations = new GenerationService({ tables, projects, importer, sessions: backendSessions, clock, log });
   return {
     config,
     clock,
@@ -131,6 +153,8 @@ export function createServices(deps: Dependencies): Services {
     }),
     devices: new DeviceService(tables, tokens, clock, config.editorUrl, config.tokens.devicePatDays),
     clients,
+    backendSessions,
+    generations,
     oauth: new OAuthService({
       tables,
       clients,
@@ -142,14 +166,7 @@ export function createServices(deps: Dependencies): Services {
       documentationUrl: DOCUMENTATION_URL,
     }),
     sessions: new SessionStore(blobs, clock),
-    importer: new MediaImporter({
-      media,
-      prober,
-      tmpDir: config.renderTmpDir,
-      maxBytes: Math.min(config.limits.importMaxBytes, config.limits.maxFileBytes),
-      policy: deps.network?.policy,
-      resolver: deps.network?.resolver,
-    }),
+    importer,
     frames: new FrameService(renderer, cache, blobs, clock, deps.resolveAsset),
     prober,
     mediaCache: cache,
