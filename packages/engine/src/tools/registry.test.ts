@@ -157,7 +157,7 @@ describe("availability matrix", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage"],
       cli: ["media", "exporter", "frames", "audio", "storage", "backend"],
-      cloud: ["media", "frames"],
+      cloud: ["media", "frames", "storage", "assets", "audio", "backend"],
     };
     for (const tool of allTools) {
       const a = toolAvailability(tool);
