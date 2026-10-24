@@ -1,8 +1,9 @@
 /**
- * Zenvi backend REST (`https://api.zenvi.pro/api/v1/*`), reached through the
- * same-origin proxy `/editor/api/zenvi/*` because production CORS only allows
- * zenvi.pro. Like the desktop, REST calls carry no Authorization header unless
- * asked to (`auth: true`).
+ * Zenvi backend REST (`https://api.zenvi.pro/api/v1/*`). Production calls it
+ * directly from zenvi.pro (the only origin its CORS allows); elsewhere it goes
+ * through the same-origin proxy `/editor/api/zenvi/*` (`config.backendRestBase`).
+ * Like the desktop, REST calls carry no Authorization header unless asked to
+ * (`auth: true`).
  */
 import { getAccessToken } from "./auth";
 import { config } from "./env";

@@ -5,7 +5,7 @@ import { normalizeHex } from "@/ui/ColorField";
 import { clampValue, parseNumberInput, roundTo } from "@/ui/NumberField";
 import { safeNext } from "./auth";
 import { backendPath, fetchModelCatalog } from "./backend";
-import { chatSocketUrl, config, oauthRedirectUrl, websiteCallbackFor } from "./env";
+import { backendRestBaseFor, chatSocketUrl, config, oauthRedirectUrl, websiteCallbackFor } from "./env";
 import { formatBytes, formatDuration, formatFps, formatRelativeTime, formatResolution } from "./format";
 import { cleanFileName, COMMON_PRESETS, presetProfile, safeFileName } from "./projectFactory";
 
@@ -122,6 +122,15 @@ describe("project factory", () => {
     expect(safeFileName('My: "Trip"/2026', "zvn")).toBe("My Trip 2026.zvn");
     expect(safeFileName("   ", "mp4")).toBe("Untitled.mp4");
     expect(cleanFileName("a\u0001b", "_")).toBe("a_b");
+  });
+});
+
+describe("backend REST base", () => {
+  it("calls a configured backend directly, else the same-origin proxy", () => {
+    expect(backendRestBaseFor("https://api.zenvi.pro/api/v1/", "/editor")).toBe("https://api.zenvi.pro/api/v1");
+    expect(backendRestBaseFor("", "/editor")).toBe("/editor/api/zenvi");
+    expect(backendRestBaseFor(undefined, "/editor")).toBe("/editor/api/zenvi");
+    expect(backendRestBaseFor("  ", "")).toBe("/api/zenvi");
   });
 });
 

@@ -1,0 +1,26 @@
+name: Deploy zenvi.pro
+
+# The web editor ships inside the website's Azure Static Web App: once CI
+# passes on main, rebuild and deploy zenvi.pro with this commit's editor.
+# The build itself lives in Zenvi-pro/zenvi-pro (`azure-deploy.yml`).
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    uses: Zenvi-pro/zenvi-pro/.github/workflows/azure-deploy.yml@main
+    with:
+      editor_ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+    secrets:
+      AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
