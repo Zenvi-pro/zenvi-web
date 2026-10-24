@@ -279,7 +279,7 @@ replies with `tool_result`.
 
 | Piece | Where | How |
 | --- | --- | --- |
-| Web editor | Vercel project `zenvi-editor`, mounted at zenvi.pro/editor by a rewrite in the website | `vercel deploy` / GitHub Action |
+| Web editor | Azure Static Web App `zenvi-site` (`zenvi-rg`), copied into the website's deployment at zenvi.pro/editor | `.github/workflows/deploy-site.yml` on push to `main` (calls the website's `azure-deploy.yml`), or `scripts/deploy-editor.sh` |
 | Zenvi Cloud | Azure Container App `zenvi-cloud` in `zenvi-env` | `az acr build` + `az containerapp update` |
 | Storage | Azure Storage account (Blob + Tables), `zenvi-rg` | `scripts/azure/provision.sh` |
 | CLI | tarball on GitHub releases / zenvi.pro; npm once the org has an npm account | `npm run build -w @zenvi/cli` |

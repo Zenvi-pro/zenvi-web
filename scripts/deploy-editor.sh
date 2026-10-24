@@ -1,40 +1,24 @@
 #!/usr/bin/env bash
-# Build the web editor locally and deploy the static output to the Vercel
-# project `zenvi-editor` (mounted at zenvi.pro/editor by the website rewrite).
+# Deploy the web editor to zenvi.pro/editor by hand.
 #
-#   scripts/deploy-editor.sh           # preview deployment, prints its URL
-#   scripts/deploy-editor.sh --prod    # production (zenvi-editor.vercel.app)
+# The editor ships inside the website's Azure Static Web App (`zenvi-site`):
+# Zenvi-pro/zenvi-pro's `azure-deploy.yml` builds both and uploads them
+# together. A push to main here deploys on its own once CI passes
+# (`.github/workflows/deploy-site.yml`); use this to ship another pushed ref.
 #
-# Build-time settings come from apps/editor/.env.local (or the environment):
-# VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, VITE_ZENVI_BACKEND_URL,
-# VITE_ZENVI_CLOUD_URL. All of them are public; Vite inlines them.
+#   scripts/deploy-editor.sh --prod          # main
+#   scripts/deploy-editor.sh --prod <ref>    # a pushed branch, tag or SHA
 #
-# Vercel only serves files here: the monorepo is built on this machine (or in
-# CI), so Vercel never needs npm workspaces or build minutes.
+# There are no previews: the backend's CORS only allows zenvi.pro. Try changes
+# locally with `npm run dev -w @zenvi/editor`. Needs the GitHub CLI signed in.
 set -euo pipefail
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
-project="${ZENVI_EDITOR_VERCEL_PROJECT:-zenvi-editor}"
-prod=""
-if [[ "${1:-}" == "--prod" ]]; then prod="--prod"; fi
+if [[ "${1:-}" != "--prod" ]]; then
+  sed -n '2,13p' "$0" | sed -E 's/^# ?//'
+  exit 2
+fi
+ref="${2:-main}"
 
-cd "$root"
-npm run build -w @zenvi/editor
-
-out="$(mktemp -d)"
-trap 'rm -rf "$out"' EXIT
-cp -R apps/editor/dist/editor "$out/editor"
-
-# Same routing/headers as apps/editor/vercel.json, minus the build settings.
-node -e '
-  const fs = require("fs");
-  const cfg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  for (const k of ["buildCommand", "outputDirectory", "installCommand", "devCommand"]) delete cfg[k];
-  cfg.framework = null;
-  fs.writeFileSync(process.argv[2], JSON.stringify(cfg, null, 2) + "\n");
-' apps/editor/vercel.json "$out/vercel.json"
-
-cd "$out"
-vercel link --yes --project "$project" >/dev/null
-url="$(vercel deploy --yes $prod)"
-echo "$url"
+gh workflow run azure-deploy.yml -R Zenvi-pro/zenvi-pro -f editor_ref="$ref"
+echo "Deploying $ref to zenvi.pro. Follow it with:"
+echo "  gh run list -R Zenvi-pro/zenvi-pro -w azure-deploy.yml -L 1"

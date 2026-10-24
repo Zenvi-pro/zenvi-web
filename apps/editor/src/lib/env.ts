@@ -15,7 +15,7 @@ export interface EditorConfig {
   supabaseKey: string;
   /** Zenvi backend origin; the chat WebSocket connects here directly. */
   backendUrl: string;
-  /** Same-origin proxy prefix for backend REST (`/api/v1` on the backend). */
+  /** Backend REST base (`/api/v1` on the backend): see `backendRestBaseFor`. */
   backendRestBase: string;
   /** Zenvi Cloud origin, or "" when cloud features are off. */
   cloudUrl: string;
@@ -33,12 +33,22 @@ export const config: EditorConfig = {
   supabaseUrl: clean(import.meta.env.VITE_SUPABASE_URL),
   supabaseKey: (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "").trim(),
   backendUrl: clean(import.meta.env.VITE_ZENVI_BACKEND_URL) || "https://api.zenvi.pro",
-  backendRestBase: `${base}/api/zenvi`,
+  backendRestBase: backendRestBaseFor(import.meta.env.VITE_ZENVI_BACKEND_REST_URL, base),
   cloudUrl: clean(import.meta.env.VITE_ZENVI_CLOUD_URL),
   basename: base,
   websiteCallback: (import.meta.env.VITE_ZENVI_WEBSITE_CALLBACK ?? "").trim(),
   oauthOutsideWebsite: /^(1|true|yes)$/i.test((import.meta.env.VITE_ENABLE_OAUTH ?? "").trim()),
 };
+
+/**
+ * Backend REST base: `VITE_ZENVI_BACKEND_REST_URL` when set (production calls
+ * `https://api.zenvi.pro/api/v1` directly; the backend's CORS allows
+ * zenvi.pro), else the same-origin proxy `<basename>/api/zenvi` that the Vite
+ * dev server forwards to the backend.
+ */
+export function backendRestBaseFor(configured: string | undefined, basename: string): string {
+  return clean(configured) || `${basename}/api/zenvi`;
+}
 
 /** Origins where the editor is mounted at /editor under zenvi.pro (the website owns /auth/callback there). */
 const WEBSITE_ORIGINS = ["https://zenvi.pro", "https://www.zenvi.pro"];

@@ -6,12 +6,13 @@ import tailwindcss from "@tailwindcss/vite";
 const root = fileURLToPath(new URL(".", import.meta.url));
 
 /**
- * The editor is its own Vercel project, mounted at zenvi.pro/editor by an
- * external rewrite from the website, so every asset and API path lives under
- * `/editor/`. Backend REST goes through a same-origin proxy
- * (`/editor/api/zenvi/*` → `<backend>/api/v1/*`) because the production
- * backend only allows CORS from zenvi.pro; `vercel.json` does the same in
- * production. The chat WebSocket goes direct (no CORS for WebSockets).
+ * The editor is served at zenvi.pro/editor (copied into the website's Azure
+ * Static Web App by the website's deploy workflow), so every asset and API
+ * path lives under `/editor/`. In dev, backend REST goes through this
+ * same-origin proxy (`/editor/api/zenvi/*` → `<backend>/api/v1/*`) because
+ * the production backend only allows CORS from zenvi.pro; production builds
+ * set `VITE_ZENVI_BACKEND_REST_URL` and call the backend directly. The chat
+ * WebSocket goes direct (no CORS for WebSockets).
  */
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, root, "");
