@@ -3,6 +3,10 @@ name: Deploy zenvi.pro
 # The web editor ships inside the website's Azure Static Web App: once CI
 # passes on main, rebuild and deploy zenvi.pro with this commit's editor.
 # The build itself lives in Zenvi-pro/zenvi-pro (`azure-deploy.yml`).
+#
+# An older commit can't deploy after a newer one: CI cancels an in-progress
+# run on main when the next push arrives (`cancel-in-progress`), so only the
+# newest push's CI can succeed, and deploys queue one at a time.
 
 on:
   workflow_run:
