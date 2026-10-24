@@ -19,7 +19,7 @@ Availability follows each tool's required host capabilities and the host methods
 
 - **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage; methods media.importUrl, media.pickFiles, media.writeGenerated, ui.openExportDialog; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
 - **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, storage.open, storage.readText, storage.writeText; only sometimes: backend (signed in with zenvi login).
-- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend; methods media.importUrl, media.writeGenerated, storage.readText, storage.writeText; only sometimes: frames (when the render worker is configured), media (when ffprobe is available), assets (when title templates are bundled), audio (when ffmpeg is available), backend (after the person allows the connector); hides 13 local-app tools.
+- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend; methods media.importUrl, media.writeGenerated, storage.readText, storage.writeText; only sometimes: frames (the render worker is configured), media (ffprobe is available), assets (title templates are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend); hides 13 local-app tools.
 
 ## Matrix
 
@@ -222,7 +222,7 @@ Availability: editor partial (file_path needs local file access); cli — (needs
 
 Surfaces: assistant, mcp, cli, editor. read-only, open world. Needs: frames, backend.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when when the render worker is configured and after the person allows the connector); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when the render worker is configured and the server is set up to call the Zenvi backend); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -573,7 +573,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: assistant, mcp, cli, editor. edits, open world. Needs: media.
 
-Availability: editor yes; cli yes; cloud yes (only when when ffprobe is available); desktop yes.
+Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -602,7 +602,7 @@ No arguments.
 
 Surfaces: assistant, mcp, cli, editor. read-only, open world. Needs: backend.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when after the person allows the connector); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when the server is set up to call the Zenvi backend); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -634,7 +634,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: assistant, mcp, cli, editor. read-only, open world. Needs: backend.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when after the person allows the connector); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when the server is set up to call the Zenvi backend); desktop yes.
 
 No arguments.
 
@@ -830,7 +830,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: assistant, mcp, cli, editor. edits, open world. Needs: backend, media.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when after the person allows the connector and when ffprobe is available); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when the server is set up to call the Zenvi backend and ffprobe is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -847,7 +847,7 @@ Availability: editor yes (only when signed in to Zenvi); cli yes (only when sign
 
 Surfaces: assistant, mcp, cli, editor. edits, open world. Needs: media.
 
-Availability: editor partial (search needs the Zenvi backend; local_path needs local file access); cli yes; cloud partial (search needs the Zenvi backend; local_path needs local file access; only when when ffprobe is available); desktop yes.
+Availability: editor partial (search needs the Zenvi backend; local_path needs local file access); cli yes; cloud partial (search needs the Zenvi backend; local_path needs local file access; only when ffprobe is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -869,7 +869,7 @@ Availability: editor partial (search needs the Zenvi backend; local_path needs l
 
 Surfaces: assistant, mcp, cli, editor. edits, destructive, open world. Needs: backend.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when after the person allows the connector); desktop yes.
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when the server is set up to call the Zenvi backend); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -948,7 +948,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: mcp, cli, editor. edits. Needs: media, assets.
 
-Availability: editor — (needs the bundled title templates); cli — (needs the bundled title templates); cloud yes (only when when ffprobe is available and when title templates are bundled); desktop yes.
+Availability: editor — (needs the bundled title templates); cli — (needs the bundled title templates); cloud yes (only when ffprobe is available and title templates are bundled); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1000,7 +1000,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: mcp, cli, editor. read-only. Needs: frames.
 
-Availability: editor yes; cli yes; cloud yes (only when when the render worker is configured); desktop yes.
+Availability: editor yes; cli yes; cloud yes (only when the render worker is configured); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1018,7 +1018,7 @@ Availability: editor yes; cli yes; cloud yes (only when when the render worker i
 
 Surfaces: mcp, cli, editor. read-only. Needs: frames.
 
-Availability: editor yes; cli yes; cloud yes (only when when the render worker is configured); desktop yes.
+Availability: editor yes; cli yes; cloud yes (only when the render worker is configured); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1094,7 +1094,7 @@ Availability: editor — (needs word timings from on-device speech recognition (
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: audio.
 
-Availability: editor — (needs audio analysis); cli partial (energy VAD on the host's audio analysis); cloud partial (energy VAD on the host's audio analysis; only when when ffmpeg is available); desktop yes.
+Availability: editor — (needs audio analysis); cli partial (energy VAD on the host's audio analysis); cloud partial (energy VAD on the host's audio analysis; only when ffmpeg is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1110,7 +1110,7 @@ Availability: editor — (needs audio analysis); cli partial (energy VAD on the 
 
 Surfaces: mcp, cli, editor. edits. Needs: media, assets.
 
-Availability: editor — (needs the bundled title templates); cli — (needs the bundled title templates); cloud partial (captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device; only when when ffprobe is available and when title templates are bundled); desktop yes.
+Availability: editor — (needs the bundled title templates); cli — (needs the bundled title templates); cloud partial (captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device; only when ffprobe is available and title templates are bundled); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1353,7 +1353,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 Surfaces: mcp, cli, editor. read-only. Needs: media.
 
-Availability: editor yes; cli yes; cloud yes (only when when ffprobe is available); desktop — (web-only direct tool).
+Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |

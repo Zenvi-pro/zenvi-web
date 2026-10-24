@@ -112,8 +112,8 @@ export function createServices(deps: Dependencies): Services {
   const cache = new MediaCache(join(config.renderTmpDir, "zenvi-media-cache"), config.limits.mediaCacheBytes, media);
   const backendSessions = new BackendSessions(tables, clock, {
     supabaseUrl: config.supabaseUrl,
-    anonKey: config.supabaseAnonKey,
     backendUrl: config.backendUrl,
+    auth: config.backendAuth,
   });
   tokens.onGrantRevoked = async (userId) => {
     const { grants } = await tokens.listForUser(userId);

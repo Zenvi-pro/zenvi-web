@@ -12,8 +12,8 @@
  *   storage readText of project media, writeText to a downloadable export
  *           (export_captions_tool). Cloud projects save themselves, so
  *           save/open are refused;
- *   backend api.zenvi.pro as the person who allowed the connector (search,
- *           stock, catalog, TTS). AI video is a cloud job, not this host.
+ *   backend api.zenvi.pro as the connected person (search, stock, catalog,
+ *           TTS; auth/backend-session.ts). AI video is a cloud job, not this host.
  */
 
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";

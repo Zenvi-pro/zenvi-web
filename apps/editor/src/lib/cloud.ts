@@ -131,7 +131,7 @@ export interface CloudClient {
   /** Approve (or deny) a CLI / desktop sign-in. Returns the client's name. */
   approveDevice(userCode: string, approve?: boolean): Promise<{ clientName: string }>;
   consentInfo(requestId: string): Promise<ConsentInfo>;
-  consent(requestId: string, approve: boolean, refreshToken?: string): Promise<{ redirect: string }>;
+  consent(requestId: string, approve: boolean): Promise<{ redirect: string }>;
 }
 
 type TokenProvider = () => Promise<string | null>;
@@ -361,11 +361,8 @@ export class HttpCloudClient implements CloudClient {
     };
   }
 
-  async consent(requestId: string, approve: boolean, refreshToken?: string): Promise<{ redirect: string }> {
-    const { data } = await this.request<Record<string, unknown>>("/oauth/consent", {
-      method: "POST",
-      body: { request: requestId, approve, ...(approve && refreshToken ? { refresh_token: refreshToken } : {}) },
-    });
+  async consent(requestId: string, approve: boolean): Promise<{ redirect: string }> {
+    const { data } = await this.request<Record<string, unknown>>("/oauth/consent", { method: "POST", body: { request: requestId, approve } });
     const redirect = pick<string>(data ?? {}, "redirect", "redirect_uri", "redirectUrl");
     if (!redirect) throw new CloudError("Zenvi Cloud returned no redirect.", 500, data);
     return { redirect };

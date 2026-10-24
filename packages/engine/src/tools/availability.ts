@@ -130,11 +130,11 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
     capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
     methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText"],
     conditional: {
-      frames: "when the render worker is configured",
-      media: "when ffprobe is available",
-      assets: "when title templates are bundled",
-      audio: "when ffmpeg is available",
-      backend: "after the person allows the connector",
+      frames: "the render worker is configured",
+      media: "ffprobe is available",
+      assets: "title templates are bundled",
+      audio: "ffmpeg is available",
+      backend: "the server is set up to call the Zenvi backend",
     },
     hidden: [
       "new_project_tool",
