@@ -5100,6 +5100,7 @@ var LAST_FRAME = "BeatSync.lastFrame";
 var beatSync = {
   type: "BeatSync",
   supported: true,
+  sequential: true,
   run(image, params, ctx) {
     const frame = ctx.frame;
     let width = Math.max(1, image.width);
@@ -7211,6 +7212,7 @@ function resetHistory(h) {
 var denoiseImage = {
   type: "DenoiseImage",
   supported: true,
+  sequential: true,
   run(image, params, ctx) {
     const state2 = history(ctx);
     const strength = clamp013(f329(num(params, "strength", 0.78)));
@@ -9379,7 +9381,7 @@ function sphericalKernel(image, params, ctx) {
   }
   return result;
 }
-var sphericalProjection = { type: "SphericalProjection", supported: true, run: sphericalKernel };
+var sphericalProjection = { type: "SphericalProjection", supported: true, sequential: true, run: sphericalKernel };
 
 // ../engine/src/render/kernels/timer.ts
 var TimerMode = { CountUp: 0, CountDown: 1, Clock: 2, Timecode: 3, FrameNumber: 4 };

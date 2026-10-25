@@ -44554,6 +44554,7 @@ var init_beat_sync = __esm({
     beatSync = {
       type: "BeatSync",
       supported: true,
+      sequential: true,
       run(image, params, ctx) {
         const frame = ctx.frame;
         let width = Math.max(1, image.width);
@@ -46751,6 +46752,7 @@ var init_denoise = __esm({
     denoiseImage = {
       type: "DenoiseImage",
       supported: true,
+      sequential: true,
       run(image, params, ctx) {
         const state = history(ctx);
         const strength = clamp013(f3210(num8(params, "strength", 0.78)));
@@ -49034,7 +49036,7 @@ var init_spherical = __esm({
     STATE_KEY2 = "SphericalProjection.uv";
     NEAR_BOUNDARY = 1e-7;
     TAPS = new Int32Array(8);
-    sphericalProjection = { type: "SphericalProjection", supported: true, run: sphericalKernel };
+    sphericalProjection = { type: "SphericalProjection", supported: true, sequential: true, run: sphericalKernel };
   }
 });
 
@@ -49281,6 +49283,9 @@ function unsupported(type) {
 }
 function registerKernels(specs) {
   for (const spec of specs) BY_TYPE.set(spec.type, spec);
+}
+function isSequentialEffect(type) {
+  return BY_TYPE.get(type)?.sequential === true;
 }
 function processEffect(image, effect3, ctx) {
   const spec = BY_TYPE.get(effect3.type);
@@ -52560,6 +52565,7 @@ var init_compositor = __esm({
 var init_render = __esm({
   "../engine/src/render/index.ts"() {
     "use strict";
+    init_registry2();
     init_audio2();
     init_frame_plan();
     init_audio_plan();
@@ -52623,6 +52629,7 @@ var CACHE_BYTES, WORKER_OVERHEAD_BYTES, WORKER_MEMORY_SHARE, MIN_POOL_FRAMES, MA
 var init_composite_pool = __esm({
   "../render-node/src/render/composite-pool.ts"() {
     "use strict";
+    init_render();
     init_limits();
     init_resources();
     CACHE_BYTES = 128 * 1024 * 1024;
@@ -52727,7 +52734,7 @@ var init_composite_pool = __esm({
       /** Composite `plan` with its decoded sources on a worker. */
       composite(plan, prepared, text5) {
         if (this.closed) return Promise.reject(new Error("CompositePool is closed"));
-        const ordered = plan.layers.some((layer2) => layer2.effects.length > 0);
+        const ordered = plan.layers.some((layer2) => layer2.effects.some((effect3) => isSequentialEffect(effect3.type)));
         let slot = this.slots[0];
         if (!ordered) {
           for (const candidate of this.slots) if (candidate.pending.size < slot.pending.size) slot = candidate;
