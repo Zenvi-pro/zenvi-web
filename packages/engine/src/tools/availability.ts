@@ -38,7 +38,18 @@ export type HostMethod =
   | "ui.setSelection"
   | "ui.timelineView"
   | "ui.showTimelineRange"
-  | "ui.setTimelineMode";
+  | "ui.setTimelineMode"
+  | "ui.layout"
+  | "ui.preferences"
+  | "ui.clearPlaybackCache"
+  | "storage.writeBytes"
+  | "storage.exportMedia"
+  | "storage.currentPath"
+  | "storage.recentProjects"
+  | "storage.recoveryCopies"
+  | "storage.customProfiles"
+  | "media.collect"
+  | "exporter.supports";
 
 export interface ToolNeeds {
   /** All of these, or the tool refuses. */
@@ -178,6 +189,71 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   },
   import_image_sequence_tool: { methods: ["media.listPaths"] },
   manage_optimized_previews_tool: { desktopOnly: "the optimized previews (proxies) Zenvi desktop builds and plays" },
+  // Project and export (editor_tools/project_export*.py): each surface's own projects, files and settings.
+  list_recent_projects_tool: {
+    methods: ["storage.recentProjects"],
+    webNote: "the CLI lists Zenvi desktop's recent projects (its File > Recent Projects on this computer); the web editor the projects in this browser; Zenvi Cloud the person's cloud projects",
+  },
+  forget_recent_projects_tool: { desktopOnly: "its own recent projects list (File > Recent Projects)" },
+  list_recovery_versions_tool: {
+    methods: ["storage.recoveryCopies", "storage.currentPath"],
+    webNote: "the copies Zenvi desktop zips each time it saves the project; the CLI's own saves make none",
+  },
+  restore_recovery_version_tool: {
+    methods: ["storage.recoveryCopies", "storage.currentPath"],
+    webNote: "the copies Zenvi desktop zips each time it saves the project; the CLI's own saves make none",
+  },
+  import_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
+  export_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
+  consolidate_project_media_tool: { methods: ["media.collect", "storage.currentPath"] },
+  reset_caches_and_history_tool: {
+    optional: ["ui.clearPlaybackCache"],
+    partialNote: "target=playback_cache has nothing to clear: every frame is rendered from the project",
+  },
+  get_editor_layout_tool: {
+    methods: ["ui.layout"],
+    webNote: "the web editor's panels; it has no Color Grade or Recording view, scopes, saved custom views, floating panels or hidden toolbar",
+  },
+  set_editor_layout_tool: {
+    methods: ["ui.layout"],
+    webNote: "the web editor's panels; it has no Color Grade or Recording view, scopes, saved custom views, floating panels or hidden toolbar, and fullscreen needs a click",
+  },
+  get_preferences_tool: {
+    methods: ["ui.preferences"],
+    webNote: "the web editor's own settings (timeline snapping; autosave, undo depth, backend and shortcuts are read-only), not Zenvi desktop's Preferences",
+  },
+  set_preference_tool: {
+    methods: ["ui.preferences"],
+    webNote: "the web editor's own settings (timeline snapping; autosave, undo depth, backend and shortcuts are read-only), not Zenvi desktop's Preferences",
+  },
+  list_project_profiles_tool: {
+    optional: ["storage.customProfiles"],
+    partialNote: "the built-in profiles only: custom profiles live in Zenvi desktop's profiles folder (Zenvi desktop and the zenvi CLI)",
+  },
+  set_project_profile_tool: {
+    optional: ["storage.customProfiles"],
+    partialNote: "a size or frame rate no built-in profile has needs a custom profile, which only Zenvi desktop and the zenvi CLI keep",
+  },
+  manage_custom_profiles_tool: {
+    methods: ["storage.customProfiles"],
+    webNote: "Zenvi desktop's profiles folder on this computer; set_default is refused (the default profile is a Zenvi desktop preference)",
+  },
+  list_export_presets_tool: {
+    optional: ["exporter.supports"],
+    partialNote: "without a codec check, every preset whose container the engine's exporters write counts as available",
+    webNote: "export_video_tool takes a preset only in Zenvi desktop so far; the web editor's Export dialog offers them",
+  },
+  save_frame_image_tool: {
+    optional: ["storage.writeBytes"],
+    partialNote: "without file saving the frame is attached to the result",
+    webNote: "the CLI writes the file (a relative path starts at the project's folder, the desktop's default is its export folder); the web editor downloads it; Zenvi Cloud answers with a download link and renders PNG only",
+  },
+  export_files_to_folder_tool: {
+    methods: ["storage.exportMedia"],
+    optional: ["exporter"],
+    partialNote: "sub-clips and image sequences are rendered to MP4, which needs video rendering",
+    webNote: "the CLI copies into the folder (relative to the project's folder; default the project's folder); the web editor downloads each file; Zenvi Cloud answers with download links",
+  },
 };
 
 export interface SurfaceProfile {
@@ -204,6 +280,11 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.writeGenerated",
       "media.missing",
       "storage.readText",
+      "storage.writeText",
+      "storage.writeBytes",
+      "storage.exportMedia",
+      "storage.currentPath",
+      "storage.recentProjects",
       "ui.openExportDialog",
       "audio.decodePcm",
       "audio.transcribe",
@@ -212,6 +293,10 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "ui.timelineView",
       "ui.showTimelineRange",
       "ui.setTimelineMode",
+      "ui.layout",
+      "ui.preferences",
+      "ui.clearPlaybackCache",
+      "exporter.supports",
     ],
     conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" },
   },
@@ -228,8 +313,16 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.open",
       "storage.readText",
       "storage.writeText",
+      "storage.writeBytes",
+      "storage.exportMedia",
+      "storage.currentPath",
+      "storage.recentProjects",
+      "storage.recoveryCopies",
+      "storage.customProfiles",
+      "media.collect",
       "audio.decodePcm",
       "audio.transcribe",
+      "exporter.supports",
     ],
     conditional: { backend: "signed in with zenvi login" },
   },
@@ -237,7 +330,19 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
     capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
-    methods: ["media.importUrl", "media.writeGenerated", "media.missing", "storage.readText", "storage.writeText", "audio.decodePcm", "audio.transcribe"],
+    methods: [
+      "media.importUrl",
+      "media.writeGenerated",
+      "media.missing",
+      "storage.readText",
+      "storage.writeText",
+      "storage.writeBytes",
+      "storage.exportMedia",
+      "storage.currentPath",
+      "storage.recentProjects",
+      "audio.decodePcm",
+      "audio.transcribe",
+    ],
     conditional: {
       frames: "the render worker is configured",
       media: "ffprobe is available",
@@ -258,6 +363,10 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "zoom_out_tool",
       "center_on_playhead_tool",
       "watch_clip_tool",
+      "get_editor_layout_tool",
+      "set_editor_layout_tool",
+      "get_preferences_tool",
+      "set_preference_tool",
       // Slower than a ChatGPT tool call. The cloud server starts generate_video instead.
       "generate_video_and_add_to_timeline_tool",
     ],
@@ -297,6 +406,17 @@ function needName(need: HostCapability | HostMethod): string {
     "ui.timelineView": "reading the timeline view",
     "ui.showTimelineRange": "zooming the timeline to a range",
     "ui.setTimelineMode": "the timeline toolbar's modes",
+    "ui.layout": "an editor window's panels",
+    "ui.preferences": "an editor's settings",
+    "ui.clearPlaybackCache": "a playback cache",
+    "storage.writeBytes": "saving files (images)",
+    "storage.exportMedia": "copying media out (to a folder, a download or a link)",
+    "storage.currentPath": "knowing where the project is saved",
+    "storage.recentProjects": "a list of recent projects",
+    "storage.recoveryCopies": "Zenvi desktop's recovery copies",
+    "storage.customProfiles": "Zenvi desktop's custom profiles folder",
+    "media.collect": "copying media into the project's folder",
+    "exporter.supports": "checking which codecs it can encode",
   };
   return names[need as HostMethod];
 }

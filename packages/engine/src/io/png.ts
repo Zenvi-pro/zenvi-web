@@ -442,10 +442,15 @@ export function decodePng(bytes: Uint8Array): RgbaImage {
   return { width, height, data: out };
 }
 
-/** `decodePng` of base64 text (a `ToolImage.data`). */
-export function decodePngBase64(base64: string): RgbaImage {
+/** The bytes of base64 text (a `ToolImage.data`). */
+export function bytesFromBase64(base64: string): Uint8Array {
   const binary = globalThis.atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return decodePng(bytes);
+  return bytes;
+}
+
+/** `decodePng` of base64 text (a `ToolImage.data`). */
+export function decodePngBase64(base64: string): RgbaImage {
+  return decodePng(bytesFromBase64(base64));
 }

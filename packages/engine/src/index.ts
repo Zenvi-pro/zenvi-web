@@ -4,6 +4,7 @@ export * from "./model/types.js";
 export * from "./model/ids.js";
 export * from "./model/query.js";
 export * from "./model/profiles.js";
+export * from "./model/profile-requests.js";
 export * from "./model/rounding.js";
 export * from "./model/fma.js";
 export * from "./model/media.js";

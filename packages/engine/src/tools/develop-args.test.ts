@@ -165,8 +165,31 @@ describe("save_first", () => {
     );
   });
 
-  it("open_project_tool asks for file_path (recent_index is not ported)", async () => {
+  it("open_project_tool asks for file_path or recent_index, and opens a recent project by index", async () => {
     expect(await summary(fixtureDoc(), fakeHost(), "open_project_tool", {})).toBe("Error: give file_path (a .zvn project) or recent_index.");
+    const host = fakeHost({
+      recent: [
+        { path: "/films/new.zvn", name: "new", exists: true, modifiedAt: null },
+        { path: "/films/old.zvn", name: "old", exists: true, modifiedAt: null },
+      ],
+    });
+    host.storage!.open = async (path) => ({ ...fixtureDoc().project, id: "RECENT0001", name: path });
+    const doc = fixtureDoc();
+    expect(await summary(doc, host, "open_project_tool", { recent_index: "1" })).toBe("Opened project /films/new.zvn.");
+    expect(doc.project.id).toBe("RECENT0001");
+    expect(await summary(fixtureDoc(), host, "open_project_tool", { recent_index: "3" })).toBe("Error: there are only 2 recent projects");
+    expect(await summary(fixtureDoc(), fakeHost({ omit: ["storage.recentProjects"] }), "open_project_tool", { recent_index: "1" })).toMatch(/^Error: recent_index needs a list of recent projects/);
+  });
+
+  it("new_project_tool takes a profile or social preset, and refuses an unknown one before anything changes", async () => {
+    const doc = fixtureDoc();
+    expect(await summary(doc, fakeHost(), "new_project_tool", { profile: "tiktok", discard_unsaved: "true" })).toBe("New project created (FHD Vertical 1080p 30 fps, 1080x1920).");
+    expect([doc.project.width, doc.project.height, doc.project.clips]).toEqual([1080, 1920, []]);
+    const kept = fixtureDoc();
+    const host = fakeHost();
+    expect(await summary(kept, host, "new_project_tool", { profile: "no such format zz", save_first: "true" })).toMatch(/^Error: no profile or social preset matches 'no such format zz'/);
+    expect(kept.project.clips).toHaveLength(5);
+    expect(host.calls).toEqual([]);
   });
 });
 

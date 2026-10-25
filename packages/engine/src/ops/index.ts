@@ -38,3 +38,5 @@ export * from "./sequence.js";
 export * from "./add-to-timeline.js";
 export { timeCurveIsReversed } from "./retime.js";
 export * from "./project-files.js";
+export * from "./waveforms.js";
+export * from "./media-collect.js";

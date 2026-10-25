@@ -14,6 +14,7 @@ import type { ReceiptStatus, ToolReceipt } from "./receipt.js";
 import { allTools, runTool } from "./registry.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "./test-support/fake-host.js";
 import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf } from "./test-support/fixture.js";
+import { createProject } from "../model/defaults.js";
 import { addClip } from "../ops/clips.js";
 import { addFile } from "../ops/files.js";
 import { addTransition } from "../ops/transitions.js";
@@ -1006,6 +1007,101 @@ const SPECS: Record<string, Spec> = {
       summary: /^Error: Freesound search failed: backend down$/,
     },
   },
+  // --- project and export (zenvi-core develop editor_tools/project_export*.py) ---------------
+  list_recent_projects_tool: {
+    happy: { host: { recent: [{ path: "/films/trip.zvn", name: "trip", exists: true, modifiedAt: 1_790_000_000 }] }, summary: /^1 recent project\(s\); most recent: trip\.$/ },
+    failure: { host: { omit: ["storage.recentProjects"] }, status: "refused", summary: /not available in this Zenvi surface: this surface keeps no list of recent projects/ },
+  },
+  forget_recent_projects_tool: {
+    happy: { args: { missing_only: "true" }, status: "refused", summary: /not available in this Zenvi surface: the recent projects listed here are the projects themselves/ },
+    failure: null,
+  },
+  list_recovery_versions_tool: {
+    happy: { host: { recovery: [{ path: "/rec/1-current.zip", savedAt: Date.now() / 1000 - 120, sizeBytes: 10, project: createProject() }] }, summary: /^1 recovery version\(s\); newest saved \d+\.\d min ago\.$/ },
+    failure: { host: { omit: ["storage.recoveryCopies"] }, status: "refused", summary: /keeps no recovery copies/ },
+  },
+  restore_recovery_version_tool: {
+    happy: {
+      host: { recovery: [{ path: "/rec/1-current.zip", savedAt: Date.now() / 1000 - 60, sizeBytes: 10, project: createProject() }] },
+      summary: /^Restored the version saved \d+\.\d min ago \(0 clips\); the previous file was kept as current-1-backup\.zvn\.$/,
+      check: ({ doc }) => expect(doc.project.clips).toEqual([]),
+    },
+    failure: {
+      args: { version: "3" },
+      host: { recovery: [{ path: "/rec/1-current.zip", savedAt: 1, sizeBytes: 10, project: createProject() }] },
+      status: "error",
+      summary: /^Error: there are only 1 recovery versions$/,
+    },
+  },
+  import_project_file_tool: { happy: { args: { file_path: "/in/cut.edl" }, status: "refused", summary: /not available in this Zenvi surface: Zenvi desktop converts timelines to and from EDL/ }, failure: null },
+  export_project_file_tool: { happy: { args: { format: "edl" }, status: "refused", summary: /not available in this Zenvi surface: Zenvi desktop converts timelines to and from EDL/ }, failure: null },
+  consolidate_project_media_tool: {
+    happy: {
+      args: { action: "collect" },
+      host: { projectPath: "/proj/film.zvn" },
+      summary: /^Copied 4 file\(s\); skipped 0\.$/,
+      check: ({ doc }) => expect(doc.project.files.find((f) => f.id === IDS.broll)).toMatchObject({ path: "/proj/film_assets/media/broll.mp4", original_path: "/media/broll.mp4" }),
+    },
+    failure: { args: { action: "collect" }, host: { projectPath: null }, status: "error", summary: /^Error: save the project first/ },
+  },
+  reset_caches_and_history_tool: {
+    happy: {
+      setup: (doc) => doc.transaction("ui", (tx) => tx.update(["files", { id: IDS.music }], { ui: { audio_data: [0.1, 0.4] } })),
+      args: { target: "waveforms" },
+      summary: /^Dropped waveform data from 1 file\(s\) and 0 clip\(s\)\.$/,
+    },
+    failure: { args: { target: "undo_history" }, status: "error", summary: /^Error: clearing the undo history cannot be undone; ask the user, then pass confirm=true$/ },
+  },
+  get_editor_layout_tool: {
+    happy: { summary: /^View 'simple' with 4 open panel\(s\)\.$/ },
+    failure: { host: { omit: ["ui.layout"] }, status: "refused", summary: /not available in this Zenvi surface: there is no editor window here/ },
+  },
+  set_editor_layout_tool: {
+    happy: { args: { show_panels: "Effects" }, summary: /^Layout: opened Effects\.$/, check: ({ host }) => expect(host.calls).toContain('layout {"show":["Effects"],"hide":[]}') },
+    failure: { args: { view: "color" }, status: "error", summary: /^Error: this editor has no Color Grade view/ },
+  },
+  get_preferences_tool: {
+    happy: { host: { preferences: [{ key: "snapping", title: "Snapping", tab: "Timeline", type: "bool", value: true, default: true }] }, args: { key: "Snapping" }, summary: /^Snapping = True \(default True\)\.$/ },
+    failure: { host: { omit: ["ui.preferences"] }, status: "refused", summary: /no editor window here/ },
+  },
+  set_preference_tool: {
+    happy: { host: { preferences: [{ key: "snapping", title: "Snapping", tab: "Timeline", type: "bool", value: true, default: true }] }, args: { key: "snapping", value: "off" }, summary: /^Set Snapping to False \(was True\)\.$/ },
+    failure: {
+      host: { preferences: [{ key: "snapping", title: "Snapping", tab: "Timeline", type: "bool", value: true, default: true }] },
+      args: { key: "snapping", value: "maybe" },
+      status: "error",
+      summary: /^Error: snapping is on\/off: give true or false$/,
+    },
+  },
+  list_export_presets_tool: {
+    happy: { args: { query: "gif" }, summary: /^1 export preset\(s\)\.$/ },
+    failure: { host: { without: ["exporter"] }, status: "refused", summary: /it needs video rendering/ },
+  },
+  list_project_profiles_tool: { happy: { args: { query: "FHD Vertical 1080p", fps: "30" }, summary: /^1 profile\(s\) match\.$/ }, failure: null },
+  set_project_profile_tool: {
+    happy: {
+      args: { profile: "instagram_reel", reframe: "fill" },
+      summary: /^Project is now FHD Vertical 1080p 30 fps \(1080x1920 9:16, 30\.0 fps\); 4 clip\(s\) set to crop-to-fill\.$/,
+      check: ({ doc }) => expect([doc.project.width, doc.project.height, doc.project.clips.find((c) => c.id === IDS.clipA)?.scale]).toEqual([1080, 1920, 0]),
+    },
+    failure: { args: { profile: "hologram" }, status: "error", summary: /^Error: no profile or social preset matches 'hologram'/ },
+  },
+  manage_custom_profiles_tool: {
+    happy: {
+      args: { action: "create", name: "Phone", width: "720", height: "1280", fps: "24" },
+      summary: /^Created custom profile 'Phone' \(720x1280, 24 fps\)\.$/,
+      check: ({ host }) => expect(Object.keys(host.profiles)).toEqual(["00720x1280p0024_09-16"]),
+    },
+    failure: { args: { action: "edit", profile: "HD 720p 30 fps", width: "10" }, status: "error", summary: /built-in profile; duplicate it/ },
+  },
+  save_frame_image_tool: {
+    happy: { args: { time: "2", file_path: "/exports/still.png" }, summary: /^Saved frame 61 \(2\.000s\) as \/exports\/still\.png\.$/ },
+    failure: { args: { time: "99" }, status: "error", summary: /^Error: 99\.000s is after the end of the last clip \(19\.000s\)$/ },
+  },
+  export_files_to_folder_tool: {
+    happy: { args: { file_ids: IDS.broll, folder: "/handoff" }, summary: /^Exported 1 file\(s\) to \/handoff\.$/ },
+    failure: { args: { file_ids: ["NOPE"] }, status: "error", summary: /^Error: no project file with id='NOPE'$/ },
+  },
 };
 
 const pexelsVideo = (id: number, width: number, height: number, duration: number, user: string) => ({
@@ -1108,7 +1204,7 @@ for (const [name, spec] of Object.entries(SPECS)) {
         const undoneLabels = doc.undo();
         expect(undoneLabels).toHaveLength(1);
         expect(withoutTranscripts(snapshotOf(doc.project))).toEqual(before);
-      } else if (!["undo_tool", "redo_tool", "new_project_tool", "open_project_tool"].includes(name)) {
+      } else if (!["undo_tool", "redo_tool", "new_project_tool", "open_project_tool", "restore_recovery_version_tool"].includes(name)) {
         // No undo step: nothing tracked changed (untracked export overrides and kept transcripts aside).
         const after = withoutTranscripts(snapshotOf(doc.project)) as Record<string, unknown>;
         const { export_overrides: _a, ...restAfter } = after;

@@ -67,8 +67,8 @@ describe("the desktop contract", () => {
 
   it("splits into ported tools and pending tools (no older direct tool keeps a desktop name)", () => {
     const ported = contractNames.filter((name) => getTool(name)?.contract === true);
-    expect(ported).toHaveLength(137);
-    expect(PENDING_DESKTOP_TOOLS.size).toBe(32);
+    expect(ported).toHaveLength(155);
+    expect(PENDING_DESKTOP_TOOLS.size).toBe(14);
     expect(DESKTOP_NAMES_ON_DIRECT_TOOLS.size).toBe(0);
     expect(ported.length + PENDING_DESKTOP_TOOLS.size + DESKTOP_NAMES_ON_DIRECT_TOOLS.size).toBe(CONTRACT_TOOL_NAMES.length);
     for (const name of CONTRACT_TOOL_NAMES) {
@@ -92,17 +92,17 @@ describe("pending desktop tools", () => {
     for (const name of PENDING_DESKTOP_TOOLS) expect(listed.has(name), name).toBe(false);
   });
 
-  it("leave the listings as they were: 137 ported tools and 13 direct tools", () => {
-    expect(allTools).toHaveLength(150);
-    expect(listTools({ includeDeprecated: true })).toHaveLength(150);
+  it("leave the listings as they were: 155 ported tools and 13 direct tools", () => {
+    expect(allTools).toHaveLength(168);
+    expect(listTools({ includeDeprecated: true })).toHaveLength(168);
     // Hidden by default: remove_clip_tool, delete_clips_on_track_tool, suggest_motion_graphics_placements_tool,
     // fetch_remotion_video_from_supabase_tool (deprecated).
-    expect(listTools({ surface: "editor" })).toHaveLength(146);
+    expect(listTools({ surface: "editor" })).toHaveLength(164);
     expect(listTools({ surface: "assistant", includeDeprecated: true }).every((t) => t.contract)).toBe(true);
   });
 
   it("are answered with the standard not-available refusal, and history is untouched", async () => {
-    for (const name of ["cancel_comfyui_job_tool", "get_editor_layout_tool", "mcp_health_tool", "wait_for_editor_job_tool"]) {
+    for (const name of ["cancel_comfyui_job_tool", "prepare_recording_tool", "mcp_health_tool", "wait_for_editor_job_tool"]) {
       const doc = fixtureDoc();
       const before = snapshotOf(doc.project);
       const result = await runTool({ doc, host: fakeHost() }, name, {});
