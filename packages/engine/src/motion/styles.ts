@@ -34,7 +34,10 @@ export function isMotionStyleId(value: string): value is MotionStyleId {
 export interface MotionStyle {
   id: MotionStyleId;
   name: string;
+  /** What it looks like, for people (the editor's style cards) and tools alike. */
   summary: string;
+  /** How a tool call drives it (`labels`, `words`): appended to the tool descriptions only. */
+  hint?: string;
   defaultSeconds: number;
   /** Tempo of the grid without music. */
   defaultBpm: number;
@@ -50,7 +53,8 @@ export const MOTION_STYLES: Readonly<Record<MotionStyleId, MotionStyle>> = {
     id: "ui_promo",
     name: "UI promo",
     summary:
-      "Motion-designed product promo for apps and tools: a search bar types the hook, footage rises in rounded UI cards and a pointer clicks, a word list scrolls in a selection box, a logo end card. Give `words` for the word list.",
+      "Motion-designed product promo for apps and tools: a search bar types the hook, footage rises in rounded UI cards and a pointer clicks, a word list scrolls in a selection box, a logo end card.",
+    hint: "Give `words` for the word list.",
     defaultSeconds: 16,
     defaultBpm: 116,
     media: 3,
@@ -72,7 +76,8 @@ export const MOTION_STYLES: Readonly<Record<MotionStyleId, MotionStyle>> = {
     id: "product_callout",
     name: "Product callout",
     summary:
-      "Technical product reveal: each product shot on a dark field with a soft glow, an 'ANATOMY: NAME' heading, leader lines drawing out to feature labels, one per beat, then a closing card. Give `words` as features ('Foam core: 212 g').",
+      "Technical product reveal: each product shot on a dark field with a soft glow, an 'ANATOMY: NAME' heading, leader lines drawing out to feature labels, one per beat, then a closing card.",
+    hint: "Give `words` as features ('Foam core: 212 g').",
     defaultSeconds: 12,
     defaultBpm: 120,
     media: 2,
@@ -83,7 +88,8 @@ export const MOTION_STYLES: Readonly<Record<MotionStyleId, MotionStyle>> = {
     id: "tutorial",
     name: "Tutorial cards",
     summary:
-      "A how-to in steps (9:16 first): the hook on grid paper, then one step per label (the footage in a bordered card, a numbered caption from `labels`, a label box with an arrow from `words`, one word per step; clips that share a label are one step), ending on 'Save this'.",
+      "A how-to in steps: the hook on grid paper, then each step's footage in a bordered card with a numbered caption and a label box with an arrow, ending on 'Save this'.",
+    hint: "9:16 first. One step per label: the caption from `labels` (clips that share a label are one step), the arrow's box from `words`, one word per step.",
     defaultSeconds: 20,
     defaultBpm: 100,
     media: 4,

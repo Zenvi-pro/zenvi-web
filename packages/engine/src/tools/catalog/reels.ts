@@ -41,7 +41,10 @@ const FLASH_SPACING_SECONDS = 3;
 const TRACKS = ["music", "video", "flash", "labels", "titles"] as const;
 type TrackRole = (typeof TRACKS)[number];
 
-const STYLE_LINES = [...REEL_STYLE_IDS.map((id) => `${id}: ${REEL_STYLES[id].summary}`), ...MOTION_STYLE_IDS.map((id) => `${id}: ${MOTION_STYLES[id].summary}`)].join(" ");
+const STYLE_LINES = [
+  ...REEL_STYLE_IDS.map((id) => `${id}: ${REEL_STYLES[id].summary}`),
+  ...MOTION_STYLE_IDS.map((id) => `${id}: ${MOTION_STYLES[id].summary}${MOTION_STYLES[id].hint ? ` ${MOTION_STYLES[id].hint}` : ""}`),
+].join(" ");
 /** Footage styles cut shots; motion styles lay motion templates on the beat grid (motion/styles.ts). */
 const ALL_STYLE_IDS = [...REEL_STYLE_IDS, ...MOTION_STYLE_IDS] as const;
 
