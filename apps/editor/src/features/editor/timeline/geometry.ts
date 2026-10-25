@@ -7,6 +7,8 @@ import type { Fraction } from "@zenvi/engine";
 import { MAX_PX_PER_SECOND, MIN_PX_PER_SECOND } from "../session/uiStore";
 
 export const HEADER_WIDTH = 176;
+/** The track-name column on a phone-width editor (the embed in a chat app). */
+export const NARROW_HEADER_WIDTH = 84;
 export const RULER_HEIGHT = 28;
 /** Room after the last item so there is always somewhere to drop. */
 export const TRAILING_SECONDS = 30;

@@ -152,7 +152,7 @@ export function SaveStatus() {
           className={cn("inline-flex items-center gap-1 rounded-sm text-xs outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent", tone)}
         >
           {icon}
-          {text}
+          <span className="max-sm:sr-only">{text}</span>
         </button>
       </Tooltip>
     );
@@ -161,7 +161,7 @@ export function SaveStatus() {
     <Tooltip label={detail}>
       <span role="status" className={cn("inline-flex items-center gap-1 text-xs", tone)}>
         {icon}
-        {text}
+        <span className="max-sm:sr-only">{text}</span>
       </span>
     </Tooltip>
   );

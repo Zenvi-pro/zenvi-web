@@ -89,7 +89,7 @@ export function EmbedTopBar({ bridge, cloud, projectId, full }: { bridge: EmbedB
           </Button>
         )}
         {openUrl ? (
-          <IconButton label="Open in Zenvi (full editor)" onClick={() => bridge.openExternal(openUrl)}>
+          <IconButton label="Open in Zenvi (full editor)" onClick={() => bridge.openExternal(openUrl)} className="max-sm:hidden">
             <ExternalLink size={15} />
           </IconButton>
         ) : null}

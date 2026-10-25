@@ -39,7 +39,8 @@ import { fileDisplayName } from "../session/media";
 import { clickSelect, EMPTY_SELECTION, type Selection } from "../session/uiStore";
 import { ClipView, TransitionView, type ClipGeometry } from "./ClipView";
 import { computeMove, computeTrim, edgeAt, marqueeHits, normalizeRect, type Box, type DragItem, type MoveResult, type Rect, type SnapSettings, type TrimResult, type TrimSubject } from "./dragMath";
-import { anchoredScroll, clampZoom, contentWidth, fittedTrackHeight, HEADER_WIDTH, RULER_HEIGHT, trackIndexAt, zoomStep, zoomToFit } from "./geometry";
+import { anchoredScroll, clampZoom, contentWidth, fittedTrackHeight, HEADER_WIDTH, NARROW_HEADER_WIDTH, RULER_HEIGHT, trackIndexAt, zoomStep, zoomToFit } from "./geometry";
+import { useMediaQuery } from "../layout/useMediaQuery";
 import { clipMenu, emptyAreaMenu, markerMenu, transitionMenu } from "./menus";
 import { Ruler, type RulerHandle } from "./Ruler";
 import { TrackHeaders } from "./TrackHeaders";
@@ -77,6 +78,7 @@ export function TimelineBody() {
   const project = useProject();
   const pps = useUi((s) => s.pxPerSecond);
   const trackHeight = useUi((s) => s.trackHeight);
+  const narrow = useMediaQuery("(max-width: 639px)");
   const selection = useUi((s) => s.selection);
   const tool = useUi((s) => s.tool);
   const mediaStatus = useStore(session.media.status);
@@ -815,7 +817,7 @@ export function TimelineBody() {
   return (
     <div className="flex min-h-0 flex-1">
       {/* Track headers */}
-      <div className="flex shrink-0 flex-col border-r border-line bg-raised" style={{ width: HEADER_WIDTH }}>
+      <div className="flex shrink-0 flex-col border-r border-line bg-raised" style={{ width: narrow ? NARROW_HEADER_WIDTH : HEADER_WIDTH }}>
         <div className="flex shrink-0 items-center border-b border-line px-3 text-2xs font-medium uppercase tracking-wider text-fg-faint" style={{ height: RULER_HEIGHT }}>
           Tracks
         </div>
