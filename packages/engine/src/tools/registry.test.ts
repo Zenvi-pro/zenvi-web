@@ -23,6 +23,8 @@ const DIRECT_TOOLS = [
   "add_transition_tool",
   "probe_media_tool",
   "build_reel_tool",
+  "search_pexels_videos_tool",
+  "search_freesound_music_tool",
 ];
 
 /** A valid string form of a scalar property, the way the Assistant backend sends arguments. */

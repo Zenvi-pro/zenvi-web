@@ -27,6 +27,7 @@ import { projectTools } from "./catalog/project.js";
 import { reelTools } from "./catalog/reels.js";
 import { searchTools } from "./catalog/search.js";
 import { speechTools } from "./catalog/speech-tools.js";
+import { stockTools } from "./catalog/stock.js";
 import { timelineTools } from "./catalog/timeline.js";
 import { titleTools } from "./catalog/titles.js";
 import { transitionTools } from "./catalog/transitions.js";
@@ -60,7 +61,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...titleTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...reelTools]) {
+  for (const tool of [...implemented, ...directTools, ...reelTools, ...stockTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -68,7 +69,7 @@ function buildCatalog(): readonly CatalogTool[] {
   if (missing.length > 0) throw new Error(`tool catalog: contract tools without an implementation: ${missing.join(", ")}`);
   const extra = implemented.filter((tool) => !tool.contract);
   if (extra.length > 0) throw new Error(`tool catalog: non-contract tools outside the direct list: ${extra.map((t) => t.name).join(", ")}`);
-  return [...CONTRACT_TOOL_NAMES.map((name) => byName.get(name)!), ...directTools, ...reelTools];
+  return [...CONTRACT_TOOL_NAMES.map((name) => byName.get(name)!), ...directTools, ...reelTools, ...stockTools];
 }
 
 /** Every tool: the 73 contract tools (TOOL_SCHEMAS order), then the direct tools. */

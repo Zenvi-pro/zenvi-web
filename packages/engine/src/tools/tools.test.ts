@@ -534,6 +534,75 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
   },
+
+  // --- stock search (web) -------------------------------------------------------------
+  search_pexels_videos_tool: {
+    happy: {
+      args: { query: "coffee pour", count: "2" },
+      host: { routes: { "/api/v1/pexels/search": () => PEXELS } },
+      // The landscape project gets landscape footage first, each with the smallest rendition that covers most of the frame.
+      summary: /^Pexels results for 'coffee pour' \(3 total\):\n {2}id=11 {2}duration=0:12 {2}res=1280×720 {2}landscape {2}user=Ana {2}link=https:\/\/cdn\.test\/11-720\.mp4\n {2}id=12 /,
+      check: ({ host, receipt }) => {
+        expect(host.backendCalls[0]?.path).toBe("/api/v1/pexels/search?query=coffee%20pour&per_page=4&page=1");
+        expect((receipt.data as { results: unknown[] }).results).toHaveLength(2);
+      },
+    },
+    failure: { args: { query: "coffee" }, host: { routes: { "/api/v1/pexels/search": () => ({ error: "Pexels is not configured" }) } }, status: "refused", summary: /^Error: Pexels search failed: Pexels is not configured$/ },
+  },
+  search_freesound_music_tool: {
+    happy: {
+      args: { query: "lofi", count: "2", min_seconds: "20" },
+      host: { routes: { "/api/v1/freesound/search": () => FREESOUND } },
+      // Open licences first (CC0, then CC BY), non-commercial last; sounds without a preview are left out.
+      summary: /^Freesound results for 'lofi' \(4 total\):\n {2}id=22 {2}duration=1:30 {2}licence=CC0 .*\n {2}id=21 {2}duration=2:00 {2}licence=CC BY 4\.0 /,
+      check: ({ host }) => expect(host.backendCalls[0]?.path).toBe("/api/v1/freesound/search?query=lofi&page_size=4&min_duration=20"),
+    },
+    failure: {
+      args: { query: "lofi" },
+      host: {
+        routes: {
+          "/api/v1/freesound/search": () => {
+            throw new Error("backend down");
+          },
+        },
+      },
+      status: "refused",
+      summary: /^Error: Freesound search failed: backend down$/,
+    },
+  },
+};
+
+const pexelsVideo = (id: number, width: number, height: number, duration: number, user: string) => ({
+  id,
+  width,
+  height,
+  duration,
+  user_name: user,
+  url: `https://www.pexels.com/video/${id}/`,
+  video_files: [
+    { quality: "uhd", file_type: "video/mp4", width, height, link: `https://cdn.test/${id}-full.mp4` },
+    { quality: "hd", file_type: "video/mp4", width: width > height ? 1280 : 720, height: width > height ? 720 : 1280, link: `https://cdn.test/${id}-720.mp4` },
+    { quality: "sd", file_type: "video/mp4", width: width > height ? 640 : 360, height: width > height ? 360 : 640, link: `https://cdn.test/${id}-360.mp4` },
+  ],
+});
+const PEXELS = { total_results: 3, videos: [pexelsVideo(10, 1080, 1920, 9, "Bo"), pexelsVideo(11, 1920, 1080, 12, "Ana"), pexelsVideo(12, 3840, 2160, 20, "Cy")] };
+const freesoundSound = (id: number, duration: number, license: string, preview = true) => ({
+  id,
+  name: `track ${id}`,
+  duration,
+  username: `user${id}`,
+  license,
+  tags: ["lofi", "beat"],
+  previews: preview ? { hq_mp3: `https://cdn.freesound.test/${id}-hq.mp3` } : {},
+});
+const FREESOUND = {
+  count: 4,
+  sounds: [
+    freesoundSound(20, 180, "http://creativecommons.org/licenses/by-nc/4.0/"),
+    freesoundSound(21, 120, "http://creativecommons.org/licenses/by/4.0/"),
+    freesoundSound(22, 90, "http://creativecommons.org/publicdomain/zero/1.0/"),
+    freesoundSound(23, 200, "http://creativecommons.org/publicdomain/zero/1.0/", false),
+  ],
 };
 
 /** Fill an arg that needs the setup's ids (set_effect_property_tool / remove_effect_tool). */

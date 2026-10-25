@@ -16,7 +16,7 @@
  * arrived in time is used, the rest is reported.
  */
 
-import { REEL_STYLE_IDS, REEL_STYLES, type Project } from "@zenvi/engine";
+import { pickMusic, pickStockFile, pickStockVideo, REEL_STYLE_IDS, REEL_STYLES, type FreesoundSound, type PexelsVideo, type Project } from "@zenvi/engine";
 import { z } from "zod";
 import { SCOPE_WRITE } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
@@ -35,59 +35,6 @@ import type { McpTool } from "./types.js";
 const FETCH_DEADLINE_MS = 32_000;
 const PARALLEL_FETCHES = 3;
 const MAX_SOURCES = 10;
-
-interface PexelsFile {
-  quality?: string;
-  file_type?: string;
-  width?: number | null;
-  height?: number | null;
-  link?: string;
-}
-interface PexelsVideo {
-  id: number;
-  width: number;
-  height: number;
-  duration: number;
-  url?: string;
-  user_name?: string;
-  video_files?: PexelsFile[];
-}
-interface FreesoundSound {
-  id: number;
-  name: string;
-  duration: number;
-  username?: string;
-  license?: string;
-  previews?: { hq_mp3?: string; lq_mp3?: string };
-}
-
-/** A stock video that suits the frame: the right orientation, long enough, not used yet. */
-export function pickStockVideo(videos: readonly PexelsVideo[], portrait: boolean, used: ReadonlySet<number>, minSeconds = 4): PexelsVideo | undefined {
-  const usable = videos.filter((v) => !used.has(v.id) && v.duration >= minSeconds && (v.video_files ?? []).some((f) => f.link));
-  return usable.find((v) => (portrait ? v.height > v.width : v.width >= v.height)) ?? usable[0];
-}
-
-/** The MP4 rendition closest to the frame's width (at least most of it), so cuts stay sharp without huge downloads. */
-export function pickStockFile(video: PexelsVideo, frameWidth: number, portrait: boolean): string | undefined {
-  const files = (video.video_files ?? []).filter((f) => f.link && (f.file_type ?? "video/mp4") === "video/mp4");
-  if (files.length === 0) return undefined;
-  const side = (f: PexelsFile) => Number((portrait ? Math.min(f.width ?? 0, f.height ?? 0) : f.width) ?? 0) || 0;
-  const big = files.filter((f) => side(f) >= frameWidth * 0.75).sort((a, b) => side(a) - side(b));
-  return (big[0] ?? [...files].sort((a, b) => side(b) - side(a))[0])!.link;
-}
-
-/**
- * Music for a reel: among the most relevant results, open licences first
- * (CC0, then CC BY, non-commercial last), then the shortest track that is
- * long enough (the whole track downloads; stock CDNs can be slow).
- */
-export function pickMusic(sounds: readonly FreesoundSound[], seconds: number): FreesoundSound | undefined {
-  const usable = sounds
-    .slice(0, 8)
-    .filter((s) => s.duration >= Math.min(seconds + 6, 30) && s.duration <= 360 && (s.previews?.hq_mp3 || s.previews?.lq_mp3));
-  const rank = (s: FreesoundSound) => (/zero|cc0/i.test(s.license ?? "") ? 0 : /noncommercial|by-nc|\bnc\b/i.test(s.license ?? "") ? 2 : 1);
-  return [...usable].sort((a, b) => rank(a) - rank(b) || a.duration - b.duration)[0];
-}
 
 /**
  * How many stock clips to take per search: about one clip for every two
@@ -295,7 +242,7 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
             const clips: { video: PexelsVideo; link: string }[] = [];
             for (let n = 0; n < perQuery; n += 1) {
               const video = pickStockVideo(result.value.videos ?? [], portrait, used);
-              const link = video ? pickStockFile(video, frameWidth, portrait) : undefined;
+              const link = video ? pickStockFile(video, frameWidth, portrait)?.link : undefined;
               if (!video || !link) break;
               used.add(video.id);
               clips.push({ video, link });

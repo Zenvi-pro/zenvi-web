@@ -35,12 +35,19 @@ importing (`set_project_setting_tool`: 1080×1920 for 9:16, 1080×1080 for
 - The person's files: `import_files_tool` (paths, folders, globs). Keep
   their order; the last file closes the reel, so put the payoff (the goal,
   the reveal, the product) last.
-- Stock: the cloud connector's `create_reel` searches stock for you; locally
-  use footage you can legally use (the person's, or free-licence stock they
-  approve) and say where it came from.
-- One music track: an audio file in the bin. `build_reel_tool` finds its
-  tempo and starts it on a downbeat of its loudest stretch. Prefer music
-  with a clear beat; credit the artist when the licence asks for it.
+- Stock: the cloud connector's `create_reel` searches stock for you.
+  Otherwise `search_pexels_videos_tool` (one search per beat of the story,
+  e.g. "barista pouring espresso close up") gives video ids and MP4 links
+  sized for the frame; add each with `import_stock_media_tool`
+  (`source: "pexels"`, `video_id`, `link`). Pexels footage is free to use;
+  say where it came from.
+- One music track: an audio file in the bin (`search_freesound_music_tool`
+  with `min_seconds` a little over the reel's length, then
+  `import_stock_media_tool` with `source: "freesound"`, `sound_id`,
+  `preview_url`). `build_reel_tool` finds its tempo and starts it on a
+  downbeat of its loudest stretch. Prefer music with a clear beat and an
+  open licence (CC0, then CC BY); credit CC BY artists, and avoid
+  non-commercial tracks for anything that earns money.
 - Motion graphics (kinetic type, UI mockups, product callouts, charts) come
   from HyperFrames or Remotion (the `code-video-handoff` skill): render them
   and import them like footage, or place them on a top track after the cut.
