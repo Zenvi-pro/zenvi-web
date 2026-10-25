@@ -4,6 +4,7 @@ import { createProject, parseProjectText, PROJECT_FORMAT_VERSION } from "@zenvi/
 import { makeTempDir, makeVideo, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { placementWindow } from "./commands/edit.js";
+import { engineRegistry } from "./engine/registry.js";
 import { exportOptionsFrom } from "./commands/render.js";
 import { testEnv, zenvi } from "./test-support/harness.js";
 import { testRegistry } from "./test-support/registry.js";
@@ -84,6 +85,32 @@ describe("zenvi CLI", () => {
     expect(unknown.json()).toMatchObject({ status: "refused", summary: "Error: no_such_tool is not available in this Zenvi surface" });
     const badArgs = await run(["call", "add_marker_tool", "--args", "[1]"]);
     expect(badArgs.code).toBe(2);
+  });
+
+  it("places `keyframe` points at timeline times (or source times with --clip-time) on a trimmed clip", async () => {
+    // The real tool catalog, in a folder of its own: the tests around this one use the work folder's only project.
+    const dir = path.join(work, "keys");
+    await makeVideo(dir, "keys.mp4", { duration: 3, width: 160, height: 90 });
+    const engine = engineRegistry();
+    const step = async (args: string[]) => {
+      const r = await zenvi(args, { cwd: dir, env: testEnv(home), registry: engine });
+      expect(r.code, `${args.join(" ")}: ${r.stderr}${r.stdout}`).toBe(0);
+      return r;
+    };
+    await step(["new", "keys.zvn", "--profile", "HD 1080p 30 fps"]);
+    // At 1 s on the timeline, playing the source from 0.5 s (a clip trimmed by half a second).
+    const clip = (await step(["add", "keys.mp4", "--at", "1", "--start", "0.5", "--end", "3", "--json"])).json<{ clips: Array<{ id: string }> }>().clips[0]!;
+    const saved = async () =>
+      (JSON.parse(await readFile(path.join(dir, "keys.zvn"), "utf8")) as { clips: Array<{ id: string; position: number; start: number; alpha: { Points: Array<{ co: { X: number } }> } }> }).clips.find(
+        (c) => c.id === clip.id,
+      )!;
+    expect([(await saved()).position, (await saved()).start]).toEqual([1, 0.5]);
+    const alphaX = async () => (await saved()).alpha.Points.map((p) => p.co.X);
+    // Timeline 1 s is the clip's first visible frame: source 0.5 s, keyframe X 16 at 30 fps; timeline 2 s is source 1.5 s.
+    await step(["keyframe", clip.id, "alpha", "1=0", "2=1"]);
+    expect(await alphaX()).toEqual([16, 46]);
+    await step(["keyframe", clip.id, "alpha", "--clip-time", "0.5=0", "2=1", "f31=0.5"]);
+    expect(await alphaX()).toEqual([16, 31, 61]);
   });
 
   it("removes a marker by name with `marker rm`", async () => {
