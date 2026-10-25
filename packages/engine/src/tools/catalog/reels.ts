@@ -23,6 +23,9 @@ import { addTrack } from "../../ops/tracks.js";
 import { removeTransition } from "../../ops/transitions.js";
 import { planReel, type MusicBeats, type PlannedShot, type ReelMedia, type ReelPlan } from "../../reels/plan.js";
 import { REEL_STYLE_IDS, REEL_STYLES, type ReelStyle } from "../../reels/styles.js";
+import { MOTION_STYLE_IDS, MOTION_STYLES, isMotionStyleId } from "../../motion/styles.js";
+import { buildMotionReel } from "./motion-reels.js";
+import { placeMusicBed } from "./music-bed.js";
 import { cardSvg, flashSvg, type CardRole } from "../../reels/typography.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
@@ -38,10 +41,12 @@ const FLASH_SPACING_SECONDS = 3;
 const TRACKS = ["music", "video", "flash", "labels", "titles"] as const;
 type TrackRole = (typeof TRACKS)[number];
 
-const STYLE_LINES = REEL_STYLE_IDS.map((id) => `${id}: ${REEL_STYLES[id].summary}`).join(" ");
+const STYLE_LINES = [...REEL_STYLE_IDS.map((id) => `${id}: ${REEL_STYLES[id].summary}`), ...MOTION_STYLE_IDS.map((id) => `${id}: ${MOTION_STYLES[id].summary}`)].join(" ");
+/** Footage styles cut shots; motion styles lay motion templates on the beat grid (motion/styles.ts). */
+const ALL_STYLE_IDS = [...REEL_STYLE_IDS, ...MOTION_STYLE_IDS] as const;
 
 const input = z.strictObject({
-  style: z.enum(REEL_STYLE_IDS).optional().describe(`How the reel is cut and looks (default hype). ${STYLE_LINES}`),
+  style: z.enum(ALL_STYLE_IDS).optional().describe(`How the reel is cut and looks (default hype). ${STYLE_LINES}`),
   file_ids: z
     .array(z.string().min(1))
     .min(1)
@@ -53,7 +58,16 @@ const input = z.strictObject({
   hook: z.string().max(80).optional().describe("Opening title over the first shots: 2-6 punchy words."),
   end_card: z.string().max(80).optional().describe("Closing title over the last shot (a call to action, a name, a date)."),
   end_card_subtitle: z.string().max(80).optional().describe("A smaller line under the end card."),
-  labels: z.array(z.string().max(40)).max(60).optional().describe("Small labels shown on each file's shots, in file_ids order (\"\" for none)."),
+  labels: z
+    .array(z.string().max(40))
+    .max(60)
+    .optional()
+    .describe("Small labels shown on each file's shots, in file_ids order (\"\" for none). Motion styles: the card captions (ui_promo), crop labels (editorial_motion), step captions (tutorial)."),
+  words: z
+    .array(z.string().min(1).max(48))
+    .max(12)
+    .optional()
+    .describe("Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial)."),
   beats: z
     .array(z.number().min(0))
     .max(4000)
@@ -192,7 +206,7 @@ export const reelTools: CatalogTool[] = [
     requires: ["media"],
     run: async (call, args: Input) => {
       const project = call.doc.project;
-      const style = REEL_STYLES[args.style ?? "hype"];
+      const styleId = args.style ?? "hype";
       const files = new Map(project.files.map((f) => [String(f.id), f]));
       const names = new Map([...files].map(([id, f]) => [id, displayName(f)]));
 
@@ -247,6 +261,13 @@ export const reelTools: CatalogTool[] = [
         }
       }
 
+      if (isMotionStyleId(styleId)) {
+        if (args.labels && args.labels.length > ids.length) warnings.push("More labels than files: the extra labels are not used.");
+        return buildMotionReel(call, { style: styleId, ids, music: music ?? null, beats, names, warnings, args });
+      }
+      if (args.words) warnings.push("words are for the motion styles (ui_promo, editorial_motion, product_callout, tutorial); this style does not use them.");
+      const style = REEL_STYLES[styleId];
+
       let plan: ReelPlan;
       try {
         const fps = Number(project.fps?.num) / Number(project.fps?.den || 1);
@@ -283,17 +304,7 @@ export const reelTools: CatalogTool[] = [
         }
         const track = reelTracks(tx);
 
-        if (music) {
-          const start = plan.musicStart ?? 0;
-          const bed = addClip(tx, { fileId: String(music.id), position: 0, layer: track.music, start, end: start + plan.duration, title: names.get(String(music.id)) });
-          const out = Math.min(1.2, plan.duration / 4);
-          setClipKeyframes(tx, bed.id, "volume", [
-            { time: 0, value: start > 0 ? 0 : 1, interpolation: Interpolation.LINEAR },
-            ...(start > 0 ? [{ time: 0.12, value: 1, interpolation: Interpolation.LINEAR }] : []),
-            { time: plan.duration - out, value: 1, interpolation: Interpolation.LINEAR },
-            { time: plan.duration, value: 0, interpolation: Interpolation.LINEAR },
-          ]);
-        }
+        if (music) placeMusicBed(tx, String(music.id), plan.musicStart, plan.duration, track.music, names.get(String(music.id)));
 
         // The end card comes in just after the last cut.
         const last = plan.shots[plan.shots.length - 1]!;

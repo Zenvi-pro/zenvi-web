@@ -40,6 +40,7 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   add_captions_tool: { clipId: IDS.clipA },
   add_emoji_tool: { emoji: "fire" },
   import_image_sequence_tool: { path: "/frames" },
+  add_motion_template_tool: { template: "end_card", text: "Zenvi" },
 };
 
 async function expectNotAvailable(name: string, args: Record<string, unknown>, host: FakeHostOptions): Promise<void> {

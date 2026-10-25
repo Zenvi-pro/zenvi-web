@@ -1,6 +1,6 @@
 ---
 name: zenvi-reels
-description: Make a finished short-form video (Instagram Reel, TikTok, YouTube Short, ad, teaser, montage, highlight reel) from one short ask with the Zenvi MCP tools - write a brief, gather the footage and the music, then cut it on the beat in a style with build_reel_tool, check the frames and render. Use it whenever the user wants a reel, short, edit "on the beat", hype video, montage, highlight reel or social ad, even from a one-line prompt.
+description: Make a finished short-form video (Instagram Reel, TikTok, YouTube Short, ad, teaser, montage, highlight reel, app promo, product reveal, how-to) from one short ask with the Zenvi MCP tools - write a brief, gather the footage and the music, then cut it on the beat in a style with build_reel_tool (footage-led or motion-designed), check the frames and render. Use it whenever the user wants a reel, short, edit "on the beat", hype video, montage, highlight reel, social ad, motion-graphics promo or tutorial, even from a one-line prompt.
 ---
 
 # One-shot reels with Zenvi
@@ -48,9 +48,11 @@ importing (`set_project_setting_tool`: 1080×1920 for 9:16, 1080×1080 for
   downbeat of its loudest stretch. Prefer music with a clear beat and an
   open licence (CC0, then CC BY); credit CC BY artists, and avoid
   non-commercial tracks for anything that earns money.
-- Motion graphics (kinetic type, UI mockups, product callouts, charts) come
-  from HyperFrames or Remotion (the `code-video-handoff` skill): render them
-  and import them like footage, or place them on a top track after the cut.
+- Motion graphics: the motion-led styles below (and `add_motion_template_tool`)
+  draw UI cards, typing search bars, kinetic type, product callouts and step
+  cards on the beat inside Zenvi. For anything else (charts, 3D, bespoke
+  animation) use HyperFrames or Remotion (the `code-video-handoff` skill):
+  render it and import it like footage, or place it on a top track after the cut.
 
 ## 4. Cut it
 
@@ -79,6 +81,34 @@ build_reel_tool {
 Words: the hook is 2-6 concrete words that make someone stay ("Morning
 ritual", not "Welcome to our video"); the end card is a call to action, a
 name or a date. Labels (editorial) are one or two words per shot.
+
+### Motion-led styles: when the graphics carry the video
+
+Pick one of these when the ask is an app or product promo, a design-y
+brand piece, a product reveal or a how-to, i.e. when the picture should be
+mostly graphics laid out and animated on the beat with the footage inside
+them, rather than a montage of shots. The same `build_reel_tool` call, the
+same music handling; scenes change on the bar and every entrance lands on a
+beat.
+
+| style | suits | what it builds | give it |
+| --- | --- | --- | --- |
+| `ui_promo` | apps, tools, SaaS, launches | a search bar types the hook and its suggestions drop open, the footage rises in rounded UI cards and a pointer clicks one, a word list scrolls in a selection box, a logo end card | `hook` (the search phrase), `labels` (card captions, also the suggestions), `words` (3-6 words for the list), `end_card` (the brand) |
+| `editorial_motion` | fashion, design, food, objects | the hook as big grotesk type on a gridded sheet with a letter swapped for an image tile, labelled crop boxes over the first shot that lift into a row, kinetic words, a closing card | `hook`, `words` (a short phrase), `labels` (crop names), `end_card` |
+| `product_callout` | one or two products | each product shot on a dark field with a glow, an ANATOMY: NAME heading, leader lines drawing out to its features, labelled details | `hook` (the product name), `words` as features `"Name: value"` (2-4 per product) |
+| `tutorial` | how-tos, tips, before/after (9:16) | the hook on grid paper, one step per clip (the footage in a bordered card, a numbered caption, a label box with an arrow), ending on "Save this" | `hook`, `labels` (one caption per step), `words` (one label per step), `end_card_subtitle` |
+
+The footage still matters: three clear clips for `ui_promo`, one striking
+close shot first for `editorial_motion` (its crops are cut from it), clean
+product shots on plain backgrounds for `product_callout`, one clip per step
+for `tutorial`. Use original or invented names in the copy, never a real
+brand you were not asked to use.
+
+To add a single piece of motion design to an existing edit (a search that
+types, cards, a callout, kinetic type, a step card, an end card, a grid
+background), use `add_motion_template_tool`: it places one template on the
+lowest free tracks above the video, in one undo step, timed to the music on
+the timeline (or `beats` / `bpm`).
 
 The receipt has `data.brief`, `data.beats` (the timeline's beat grid: put
 anything else that should land on the beat there) and `data.shots`.

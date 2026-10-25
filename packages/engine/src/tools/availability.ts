@@ -152,7 +152,13 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   detect_beats_tool: { methods: ["audio.decodePcm"] },
   build_reel_tool: {
     optional: ["audio.decodePcm", "media.writeGenerated"],
-    partialNote: "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes",
+    partialNote:
+      "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes, and the motion styles (ui_promo, editorial_motion, product_callout, tutorial) are refused",
+  },
+  add_motion_template_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.decodePcm"],
+    partialNote: "without audio decoding the entrances follow `beats` or `bpm` (default 120 BPM), not the music on the timeline",
   },
   diarize_media_tool: { desktopOnly: "on-device speaker diarization" },
   search_media_local_tool: { desktopOnly: "the on-device visual index" },
