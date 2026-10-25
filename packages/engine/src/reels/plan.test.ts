@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chooseMusicStart, cutBeats, MIN_SHOT_SECONDS, planReel, type MusicBeats, type ReelMedia } from "./plan.js";
-import { REEL_STYLES } from "./styles.js";
+import { REEL_STYLE_IDS, REEL_STYLES } from "./styles.js";
 
 /** 120 BPM from 1 s for 60 s; quiet for the first 8 bars, loud after. */
 function music(): MusicBeats {
@@ -106,5 +106,14 @@ describe("planReel", () => {
 
   it("refuses an empty media list", () => {
     expect(() => planReel({ style: REEL_STYLES.hype, media: [], music: null })).toThrow(/at least one/);
+  });
+});
+
+describe("reel styles", () => {
+  it("use at most one look preset per family (a second colour preset would replace the first)", () => {
+    for (const id of REEL_STYLE_IDS) {
+      const families = REEL_STYLES[id].looks.map((look) => look.split(".")[0]);
+      expect(new Set(families).size, id).toBe(families.length);
+    }
   });
 });
