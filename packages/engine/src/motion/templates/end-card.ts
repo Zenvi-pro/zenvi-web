@@ -7,11 +7,15 @@
  *   save   a bookmark drops in, "Save this" (or the text) lands on the next
  *          beat while a highlighter swipes behind it, the subtitle rises
  *   plain  an optional tag pops, the title rises, the subtitle follows
+ *
+ * On 9:16 each group is centred on the safe area's optical centre and kept
+ * inside it (layout.ts); titles are headings, subtitles body text.
  */
 
 import { backdrop, cued, drawing, enter, key, pose, textBox, textElement, type TextBlock } from "../elements.js";
 import { bookmark } from "../shapes.js";
-import { fitBlock, fitSize, textWidth } from "../text.js";
+import { centredWidth, fitType, opticalCentre, typeSize } from "../layout.js";
+import { clampText, fitSize, textWidth } from "../text.js";
 import { refuse, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
 import type { Element, Key, Pose } from "../types.js";
 
@@ -46,7 +50,7 @@ export const endCard: TemplateSpec = {
   beats: () => 8,
   build(input: TemplateInput): TemplateOutput {
     const { content, palette, layout, frames, beats } = input;
-    const { W, H, u, m, portrait } = layout;
+    const { W, H, u, m, portrait, tall, safe } = layout;
     const variant = content.variant ?? (palette.name === "tutorial" ? "save" : palette.name.startsWith("ui") ? "logo" : "plain");
     if (!(END_VARIANTS as readonly string[]).includes(variant)) refuse(`end_card variant must be one of ${END_VARIANTS.join(", ")} (got ${variant})`);
     const title = (content.text ?? (variant === "save" ? "Save this" : "")).replace(/\s+/g, " ").trim();
@@ -55,26 +59,32 @@ export const endCard: TemplateSpec = {
     const elements: Element[] = [];
     if (content.backdrop !== false) elements.push(backdrop("end-backdrop", 0, 0, frames, layout, (d) => d.rect(0, 0, W, H, { fill: palette.background })));
     const [e0, e1, e2] = beats.entrances(3, frames, 14) as [number, number, number];
-    const subSize = Math.round((portrait ? 50 : 42) * u);
+    const centredW = portrait ? centredWidth(layout) : W - 2 * m;
+    const subSize = typeSize(layout, "body", (portrait ? 50 : 42) * u);
+    const heading = { font: "sans" as const, bold: true, tracking: -0.02 };
     /** The subtitle, its first baseline at `y`, rising in at `at`. */
     const addSubtitle = (at: number, y: number, x = W / 2, anchor: TextBlock["anchor"] = "middle") => {
       if (!subtitle) return;
-      const block: TextBlock = { lines: [subtitle], size: fitSize([subtitle], { font: "sans" }, (W - 2 * m) / 1.1, subSize, 20 * u), font: "sans", fill: palette.muted, anchor };
+      const fitted = fitType(layout, "body", subtitle, { font: "sans" }, { width: (anchor === "middle" ? centredW : safe.right - x) / 1.1, max: subSize });
+      const block: TextBlock = { lines: fitted.lines, size: fitted.size, font: "sans", fill: palette.muted, anchor };
       const box = textBox(block, x, y);
       elements.push(textElement("end-subtitle", 4, at, frames, block, box, enter(pose(box.x, box.y), at, { dy: 22 * u, frames: 12 })));
     };
+    /** Where a group spanning `top`..`bottom` around a reference point goes: centred in the safe area on 9:16, else at `fallback`. */
+    const place = (fallback: number, top: number, bottom: number) => (tall ? opticalCentre(layout) - (top + bottom) / 2 : fallback);
 
     if (variant === "logo") {
       const S = Math.round((portrait ? 250 : 184) * u);
       const letter = (title.match(/[\p{L}\p{N}]/u)?.[0] ?? title[0]!).toUpperCase();
       const gap = Math.round(46 * u);
       const maxT = Math.round((portrait ? 176 : 156) * u);
-      const T = portrait
-        ? fitSize([title], { font: "sans", bold: true, tracking: -0.02 }, W - 2 * m, maxT, 40 * u)
-        : fitSize([title], { font: "sans", bold: true, tracking: -0.02 }, W - 4 * m - S - gap, maxT, 40 * u);
-      const word: TextBlock = { lines: [title], size: T, font: "sans", bold: true, tracking: -0.02, fill: palette.ink, anchor: portrait ? "middle" : "start" };
-      const textW = textWidth(title, word);
-      const cy = H * (portrait ? 0.4 : 0.46);
+      const room = portrait ? centredW : W - 4 * m - S - gap;
+      const T = typeSize(layout, "heading", fitSize([title], heading, room, maxT));
+      const name = clampText(title, { ...heading, size: T }, room);
+      const word: TextBlock = { lines: [name], size: T, ...heading, fill: palette.ink, anchor: portrait ? "middle" : "start" };
+      const textW = textWidth(name, word);
+      const below = S / 2 + 56 * u + 0.72 * T;
+      const cy = portrait ? place(H * 0.4, -S / 2, below + (subtitle ? 96 * u + 0.28 * subSize : 0.28 * T)) : H * 0.46;
       const markX = portrait ? W / 2 : (W - (S + gap + textW)) / 2 + S / 2;
       const markY = cy;
       elements.push(
@@ -91,22 +101,23 @@ export const endCard: TemplateSpec = {
           enter(pose(markX, markY), e0, { s: 0.35, rotation: -16, frames: 12, ease: "out_back" }),
         ),
       );
-      const wordBox = portrait ? textBox(word, W / 2, cy + S / 2 + 56 * u + 0.72 * T) : textBox(word, markX + S / 2 + gap, cy + 0.36 * T);
+      const wordBox = portrait ? textBox(word, W / 2, cy + below) : textBox(word, markX + S / 2 + gap, cy + 0.36 * T);
       const wordIn = portrait ? { dy: 34 * u, frames: 14, ease: "out_strong" as const } : { dx: -44 * u, frames: 14, ease: "out_strong" as const };
       elements.push(textElement("end-name", 2, e1, frames, word, wordBox, enter(pose(wordBox.x, wordBox.y), e1, wordIn)));
-      addSubtitle(e2, portrait ? cy + S / 2 + 56 * u + 0.72 * T + 96 * u : cy + S / 2 + 84 * u);
+      addSubtitle(e2, portrait ? cy + below + 96 * u : cy + S / 2 + 84 * u);
     } else if (variant === "save") {
       const bw = Math.round((portrait ? 116 : 96) * u);
       const bh = Math.round(bw * 1.3);
-      const iconY = H * (portrait ? 0.35 : 0.3);
+      const fitted = fitType(layout, "heading", title, heading, { width: W - 2.4 * m, height: H * 0.24, max: Math.round((portrait ? 150 : 132) * u), maxLines: 2, leading: 1.02 });
+      const T = fitted.size;
+      const below = bh / 2 + 70 * u + 0.72 * T + (fitted.lines.length - 1) * 1.02 * T;
+      const iconY = place(H * (portrait ? 0.35 : 0.3), -bh / 2, below + (subtitle ? 96 * u + 0.28 * subSize : 0.28 * T));
       elements.push(
         drawing("end-bookmark", 1, e0, frames, { width: bw + 8 * u, height: bh + 8 * u }, (d) => bookmark(d, 4 * u, 4 * u, bw, bh, { fill: palette.accent, stroke: palette.ink, strokeWidth: 5 * u }), [
           ...enter(pose(W / 2, iconY, { rotation: -6 }), e0, { dy: -80 * u, s: 0.7, rotation: -18, frames: 12, ease: "out_back" }),
         ]),
       );
-      const fitted = fitBlock(title, { font: "sans", bold: true, tracking: -0.02 }, W - 2.4 * m, H * 0.24, Math.round((portrait ? 150 : 132) * u), 2, 1.02);
-      const T = fitted.size;
-      const block: TextBlock = { lines: fitted.lines, size: T, font: "sans", bold: true, tracking: -0.02, fill: palette.ink, anchor: "middle", leading: 1.02 };
+      const block: TextBlock = { lines: fitted.lines, size: T, ...heading, fill: palette.ink, anchor: "middle", leading: 1.02 };
       const firstBase = iconY + bh / 2 + 70 * u + 0.72 * T;
       const box = textBox(block, W / 2, firstBase);
       const lastBase = firstBase + (fitted.lines.length - 1) * 1.02 * T;
@@ -126,12 +137,13 @@ export const endCard: TemplateSpec = {
       const align = content.align ?? (palette.name === "editorial" ? "left" : "center");
       const anchor = align === "left" ? "start" : "middle";
       const x = align === "left" ? m * 1.6 : W / 2;
-      const fitted = fitBlock(title, { font: "sans", bold: true, tracking: -0.025 }, (W - 3.2 * m) / 1.04, H * (portrait ? 0.3 : 0.42), Math.round((portrait ? 140 : 150) * u), 3, 0.98);
+      const room = tall ? (align === "left" ? safe.right - x : centredW) : W - 3.2 * m;
+      const fitted = fitType(layout, "heading", title, { ...heading, tracking: -0.025 }, { width: room / 1.04, height: H * (portrait ? 0.3 : 0.42), max: Math.round((portrait ? 140 : 150) * u), maxLines: 3, leading: 0.98 });
       const T = fitted.size;
-      const block: TextBlock = { lines: fitted.lines, size: T, font: "sans", bold: true, tracking: -0.025, fill: palette.ink, anchor, leading: 0.98 };
-      const tagSize = Math.round(24 * u);
+      const block: TextBlock = { lines: fitted.lines, size: T, ...heading, tracking: -0.025, fill: palette.ink, anchor, leading: 0.98 };
+      const tagSize = typeSize(layout, "label", 30 * u);
       const blockH = (content.tag ? tagSize * 1.9 + 34 * u : 0) + fitted.lines.length * 0.98 * T + (subtitle ? 90 * u : 0);
-      let y = H * (portrait ? 0.45 : 0.5) - blockH / 2;
+      let y = (tall ? opticalCentre(layout) : H * (portrait ? 0.45 : 0.5)) - blockH / 2;
       if (content.tag?.trim()) {
         const tag = content.tag.trim();
         const tagW = textWidth(tag.toUpperCase(), { size: tagSize, font: "mono", tracking: 0.06 }) + tagSize * 1.5;

@@ -1,30 +1,16 @@
 /**
- * Building blocks the templates share: the frame's layout units, poses and
- * keys, entrances, and the two element kinds (a drawing, a media card).
+ * Building blocks the templates share: poses and keys, entrances, a group's
+ * glide, and the two element kinds (a drawing, a media card). The frame's
+ * layout rules (units, safe area, type floors) are in layout.ts.
  */
 
+import { evaluate } from "../keyframe/evaluate.js";
+import { keyframeThrough } from "./keyframes.js";
+import type { Layout } from "./layout.js";
+import type { NormPoint } from "./template.js";
 import { Drawing, type TextRun } from "./svg.js";
 import { ROOMY, textWidth } from "./text.js";
-import type { Ease, Element, Key, MediaSource, MotionFrame, MotionMedia, Pose } from "./types.js";
-
-/** Layout units of a frame: `u` is 1 px at 1080 on the short side; margins and type scale with it. */
-export interface Layout {
-  W: number;
-  H: number;
-  u: number;
-  /** Outer margin, px. */
-  m: number;
-  portrait: boolean;
-  /** Width / height. */
-  aspect: number;
-}
-
-export function layoutOf(frame: MotionFrame): Layout {
-  const W = frame.width;
-  const H = frame.height;
-  const u = Math.min(W, H) / 1080;
-  return { W, H, u, m: Math.round(64 * u), portrait: H > W * 1.05, aspect: W / H };
-}
+import type { Ease, Element, Key, MediaSource, MotionMedia, Pose } from "./types.js";
 
 export function pose(x: number, y: number, extra: Partial<Omit<Pose, "x" | "y">> = {}): Pose {
   return { x, y, s: extra.s ?? 1, alpha: extra.alpha ?? 1, rotation: extra.rotation ?? 0, ...(extra.sx !== undefined ? { sx: extra.sx } : {}) };
@@ -58,6 +44,41 @@ export function enter(rest: Pose, at: number, e: Entrance): Key[] {
     ...(e.sx !== undefined ? { sx: e.sx } : rest.sx !== undefined ? { sx: rest.sx } : {}),
   };
   return [key(at, from), key(at + Math.max(1, Math.round(e.frames)), rest, e.ease ?? "out")];
+}
+
+/**
+ * Keys of an element in a group that sits `dy` px lower until `at`, then
+ * glides to its place by `at + frames` with `ease` (the search field rising
+ * as its suggestions open). `keys` are the element's poses in the group's
+ * final place; the glide's offset is added to each, and a still element on
+ * screen at the glide's ends gets keys there, so every element of the group
+ * moves as one. An element entering at `at` moves exactly with the group
+ * when its entrance lasts `frames` with the same ease.
+ */
+export function glide(el: Element, at: number, frames: number, dy: number, ease: Ease = "in_out"): Element {
+  if (Math.abs(dy) < 0.5) return el;
+  const end = at + frames;
+  const share = keyframeThrough([1, 1 + frames], [1, 0], ["smooth", ease]);
+  const offset = (f: number) => (f <= at ? dy : f >= end ? 0 : dy * evaluate(share, 1 + f - at));
+  const keys = [...el.keys].sort((a, b) => a.frame - b.frame);
+  const moved = keys.map((k) => ({ ...k, pose: { ...k.pose, y: k.pose.y + offset(k.frame) } }));
+  for (const [f, e] of [
+    [at, "smooth"],
+    [end, ease],
+  ] as const) {
+    if (f <= keys[0]!.frame || f >= el.to || keys.some((k) => k.frame === f)) continue;
+    const p = poseAt(keys, f);
+    // Only where the element is still: a moving element's own keys carry the offset.
+    const next = keys.find((k) => k.frame > f);
+    if (next && !samePose(p, next.pose)) continue;
+    moved.push(key(f, { ...p, y: p.y + offset(f) }, e));
+  }
+  return { ...el, keys: moved.sort((a, b) => a.frame - b.frame) };
+}
+
+function samePose(a: Pose, b: Pose): boolean {
+  const near = (x: number, y: number) => Math.abs(x - y) < 1e-6;
+  return near(a.x, b.x) && near(a.y, b.y) && near(a.s, b.s) && near(a.alpha, b.alpha) && near(a.rotation, b.rotation) && near(a.sx ?? 1, b.sx ?? 1);
 }
 
 /** The pose `p` seen through a camera zoomed by `z` about the frame centre. */
@@ -172,16 +193,30 @@ export function mediaFill(name: string, track: number, from: number, to: number,
   };
 }
 
-/** A centred crop window that gives a picture the aspect `aspect` (w / h), or none when it already has it. */
-export function cropToAspect(media: MotionMedia, aspect: number): MediaSource["crop"] | undefined {
+/**
+ * A crop window that gives a picture the aspect `aspect` (w / h), centred on
+ * `focus` (0-1 on the picture) as far as the picture allows, else centred;
+ * none when the picture already has the aspect.
+ */
+export function cropToAspect(media: MotionMedia, aspect: number, focus?: NormPoint): MediaSource["crop"] | undefined {
   const own = media.width / media.height;
   if (Math.abs(own / aspect - 1) < 0.01) return undefined;
+  const place = (keep: number, at: number) => Math.max(0, Math.min(1 - keep, at - keep / 2));
   if (own > aspect) {
-    const cut = (1 - aspect / own) / 2;
-    return { left: cut, right: cut, top: 0, bottom: 0 };
+    const keep = aspect / own;
+    const left = place(keep, focus?.x ?? 0.5);
+    return { left, right: 1 - keep - left, top: 0, bottom: 0 };
   }
-  const cut = (1 - own / aspect) / 2;
-  return { left: 0, right: 0, top: cut, bottom: cut };
+  const keep = own / aspect;
+  const top = place(keep, focus?.y ?? 0.5);
+  return { left: 0, right: 0, top, bottom: 1 - keep - top };
+}
+
+/** A point on a picture (0-1) as a point on its crop window (0-1), kept `inset` inside the window. */
+export function inWindow(p: NormPoint, crop: MediaSource["crop"] | undefined, inset = 0.04): NormPoint {
+  if (!crop) return p;
+  const inside = (v: number) => Math.max(inset, Math.min(1 - inset, v));
+  return { x: inside((p.x - crop.left) / (1 - crop.left - crop.right)), y: inside((p.y - crop.top) / (1 - crop.top - crop.bottom)) };
 }
 
 /** A block of text: its lines, look and how it hangs from its anchor point. */

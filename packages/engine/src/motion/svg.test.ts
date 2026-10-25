@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { elementsByTagName, getAttr, parseXml, type XmlElement } from "../titles/xml.js";
 import { Drawing, num } from "./svg.js";
-import { balanceLines, clampText, fitBlock, fitSize, textWidth } from "./text.js";
+import { balanceLines, clampText, fitSize, textWidth } from "./text.js";
 
 /** Every element of a drawing, depth first. */
 function allElements(root: XmlElement): XmlElement[] {
@@ -59,8 +59,6 @@ describe("text metrics", () => {
     const size = fitSize(["WIDE HEADLINE"], { font: "sans", bold: true }, 500, 400);
     expect(textWidth("WIDE HEADLINE", { size, font: "sans", bold: true })).toBeLessThanOrEqual(500);
     expect(balanceLines("one two three four", 2)).toEqual(["one two", "three four"]);
-    const block = fitBlock("Film better reels at home", { font: "sans", bold: true }, 900, 600, 200, 3);
-    for (const line of block.lines) expect(textWidth(line, { size: block.size, font: "sans", bold: true })).toBeLessThanOrEqual(900);
     expect(clampText("A very long label indeed", { size: 20, font: "mono" }, 120)).toMatch(/…$/);
   });
 });

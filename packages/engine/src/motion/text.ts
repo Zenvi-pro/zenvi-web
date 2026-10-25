@@ -77,32 +77,6 @@ export function balanceLines(text: string, maxLines: number): string[] {
   return out;
 }
 
-/**
- * The line breaks (up to `maxLines`) and size that make `text` biggest inside
- * `maxWidth` × `maxHeight` (line height `leading` × size). An extra line is
- * only taken for clearly bigger type.
- */
-export function fitBlock(
-  text: string,
-  style: Omit<TextStyle, "size">,
-  maxWidth: number,
-  maxHeight: number,
-  maxSize: number,
-  maxLines = 3,
-  leading = 1.0,
-): { lines: string[]; size: number } {
-  let best = { lines: [text], size: 0 };
-  for (let n = 1; n <= maxLines; n += 1) {
-    const lines = balanceLines(text, n);
-    if (lines.length < n && n > 1) break;
-    const byWidth = fitSize(lines, style, maxWidth, maxSize);
-    const byHeight = maxHeight / (lines.length * leading);
-    const size = Math.floor(Math.min(byWidth, byHeight, maxSize));
-    if (size > best.size * 1.12) best = { lines, size };
-  }
-  return best;
-}
-
 /** `text` cut to fit `maxWidth` with an ellipsis (labels that must stay on one line). */
 export function clampText(text: string, style: TextStyle, maxWidth: number): string {
   if (textWidth(text, style) <= maxWidth) return text;

@@ -34,12 +34,47 @@
  *              letter-spacing: Qt may draw tracked text a few % wider or
  *              narrower; boxes and tile gaps leave room for it.
  *   text       text.ts: Helvetica advance widths, boxes 10 % roomy.
+ *   type       layout.ts: every word at its role's floor or larger, a share
+ *              of the frame's short side in either orientation: label 3 %,
+ *              body 4 %, heading 7.5 % (33 / 44 / 81 px at 1080). Text that
+ *              cannot fit at its floor takes more lines (`fitType`: balanced;
+ *              `fitWrapped`: greedy, a text box), then is cut with an
+ *              ellipsis, or refused where a cut would lose meaning (the typed
+ *              phrase). Type on a card that ends smaller (a fan's side card)
+ *              is set larger by that scale.
+ *   safe area  layout.ts: 9:16 and taller frames keep words, and the button a
+ *              pointer clicks, out of the platform bands: top 8 %, bottom 15 %,
+ *              right 11 % (left: the margin). Pictures may run under them.
+ *              Groups stay on the frame's vertical axis (a centred line is at
+ *              most `centredWidth`) and centre on the safe area's middle
+ *              (`opticalCentre`, 0.465 H on 9:16). Other frames: the margin.
+ *   portrait   9:16 layouts per template: type_search stacks brand, prompt
+ *              and field centred (the phrase on up to three lines of up to
+ *              84u; two in landscape) and the whole group glides up (0.3 s,
+ *              in_out; elements.ts `glide`) as the suggestions open, so field
+ *              and list end centred; callout puts the prefix as a kicker over
+ *              the name (heading size), fills the room with the product (4:5
+ *              widening to square, at most 0.84 W) and gives each label a slot
+ *              above or below it, standing on a rule its leader rises or
+ *              drops to; crop_labels keeps boxes and tags in the safe area and
+ *              lifts the crops into a column of tiles, labels beside them;
+ *              step_card stacks the header (top safe line), a 4:5 card with
+ *              the label box on its top edge and the caption down to the
+ *              bottom safe line; ui_cards' cascade, word_scroll's selected
+ *              line, kinetic_type (center) and the end cards centre on
+ *              `opticalCentre`; the editorial sheet's corner labels sit on the
+ *              safe area's top and bottom lines. A crop to a card's shape
+ *              centres on the points given on the footage (step_card's arrow,
+ *              callout's anchors: `cropToAspect` focus, `inWindow`), so they
+ *              stay in view. 16:9 keeps its layouts: only the type floors, the
+ *              search group's centring and the callout product (cropped
+ *              squarer beside the wider labels) change it.
  *   tracks     `MotionPlan.tracks` stacked on the lowest free tracks above the
  *              video (add_motion_template_tool); a reel puts its music bed
  *              lowest and the scenes above it (build_reel_tool).
  */
 
-import { layoutOf } from "./elements.js";
+import { layoutOf } from "./layout.js";
 import { TemplateBeats } from "./grid.js";
 import { planOf } from "./keyframes.js";
 import { TEMPLATES } from "./templates/index.js";

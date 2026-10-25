@@ -31427,13 +31427,13 @@ function normalize(x) {
   return x;
 }
 function autocorrelation(env2, maxLag) {
-  let mean = 0;
-  for (const v of env2) mean += v;
-  mean /= env2.length || 1;
+  let mean2 = 0;
+  for (const v of env2) mean2 += v;
+  mean2 /= env2.length || 1;
   const ac = new Float64Array(maxLag + 2);
   for (let lag = 0; lag <= maxLag + 1; lag += 1) {
     let s = 0;
-    for (let i = 0; i + lag < env2.length; i += 1) s += (env2[i] - mean) * (env2[i + lag] - mean);
+    for (let i = 0; i + lag < env2.length; i += 1) s += (env2[i] - mean2) * (env2[i + lag] - mean2);
     ac[lag] = s;
   }
   return ac;
@@ -32442,165 +32442,6 @@ var init_types4 = __esm({
   }
 });
 
-// ../engine/src/motion/svg.ts
-function escapeXml(text5) {
-  return text5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-}
-function num5(value) {
-  if (!Number.isFinite(value)) throw new Error(`not a finite number: ${value}`);
-  const fixed = (Math.round(value * 100) / 100).toFixed(2);
-  return fixed.replace(/\.?0+$/, "") || "0";
-}
-var SANS, MONO, Drawing;
-var init_svg2 = __esm({
-  "../engine/src/motion/svg.ts"() {
-    "use strict";
-    SANS = "'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif";
-    MONO = "Menlo, 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace";
-    Drawing = class {
-      constructor(width, height, k = 1) {
-        this.width = width;
-        this.height = height;
-        this.k = k;
-        if (!(width > 0 && height > 0 && k > 0)) throw new Error(`bad drawing size ${width}x${height} at ${k}`);
-      }
-      width;
-      height;
-      k;
-      parts = [];
-      /** Pixel size of the SVG document (whole pixels: every host reads the size from these attributes). */
-      get pixelWidth() {
-        return Math.max(1, Math.ceil(this.width * this.k - 1e-6));
-      }
-      get pixelHeight() {
-        return Math.max(1, Math.ceil(this.height * this.k - 1e-6));
-      }
-      n(value) {
-        return num5(value * this.k);
-      }
-      paint(p) {
-        const out = [];
-        out.push(`fill="${p.fill ?? "none"}"`);
-        if (p.fill && p.fill !== "none" && p.fillOpacity !== void 0 && p.fillOpacity < 1) out.push(`fill-opacity="${num5(Math.max(0, p.fillOpacity))}"`);
-        if (p.fillRule) out.push(`fill-rule="${p.fillRule}"`);
-        if (p.stroke) {
-          out.push(`stroke="${p.stroke}"`, `stroke-width="${this.n(p.strokeWidth ?? 1)}"`);
-          if (p.strokeOpacity !== void 0 && p.strokeOpacity < 1) out.push(`stroke-opacity="${num5(Math.max(0, p.strokeOpacity))}"`);
-          if (p.linecap) out.push(`stroke-linecap="${p.linecap}"`);
-          if (p.linejoin) out.push(`stroke-linejoin="${p.linejoin}"`);
-        }
-        return out.join(" ");
-      }
-      rect(x, y, w, h, p) {
-        if (w <= 0 || h <= 0) return this;
-        const rx = p.rx ? ` rx="${this.n(Math.min(p.rx, w / 2, h / 2))}"` : "";
-        this.parts.push(`<rect x="${this.n(x)}" y="${this.n(y)}" width="${this.n(w)}" height="${this.n(h)}"${rx} ${this.paint(p)}/>`);
-        return this;
-      }
-      line(x1, y1, x2, y2, p) {
-        this.parts.push(`<line x1="${this.n(x1)}" y1="${this.n(y1)}" x2="${this.n(x2)}" y2="${this.n(y2)}" ${this.paint({ ...p, fill: void 0 })}/>`);
-        return this;
-      }
-      polyline(points2, p) {
-        const pts = points2.map(([x, y]) => `${this.n(x)},${this.n(y)}`).join(" ");
-        this.parts.push(`<polyline points="${pts}" ${this.paint(p)}/>`);
-        return this;
-      }
-      circle(cx, cy, r, p) {
-        if (r <= 0) return this;
-        this.parts.push(`<circle cx="${this.n(cx)}" cy="${this.n(cy)}" r="${this.n(r)}" ${this.paint(p)}/>`);
-        return this;
-      }
-      /** A path from commands in frame px: numbers are scaled, letters kept (arcs: use `arc`). */
-      path(commands, p) {
-        const d = commands.map((c) => typeof c === "number" ? this.n(c) : c).join(" ");
-        this.parts.push(`<path d="${d}" ${this.paint(p)}/>`);
-        return this;
-      }
-      /** Commands of a rounded rectangle (clockwise), for paths with several shapes. */
-      static roundedRect(x, y, w, h, r) {
-        const rr = Math.max(0, Math.min(r, w / 2, h / 2));
-        if (rr <= 0) return ["M", x, y, "H", x + w, "V", y + h, "H", x, "Z"].map((c2) => c2);
-        const c = rr * 0.4477;
-        return [
-          "M",
-          x + rr,
-          y,
-          "H",
-          x + w - rr,
-          "C",
-          x + w - c,
-          y,
-          x + w,
-          y + c,
-          x + w,
-          y + rr,
-          "V",
-          y + h - rr,
-          "C",
-          x + w,
-          y + h - c,
-          x + w - c,
-          y + h,
-          x + w - rr,
-          y + h,
-          "H",
-          x + rr,
-          "C",
-          x + c,
-          y + h,
-          x,
-          y + h - c,
-          x,
-          y + h - rr,
-          "V",
-          y + rr,
-          "C",
-          x,
-          y + c,
-          x + c,
-          y,
-          x + rr,
-          y,
-          "Z"
-        ];
-      }
-      text(x, y, content, o) {
-        const runs = typeof content === "string" ? [{ text: content }] : content;
-        const attrs = [
-          `x="${this.n(x)}"`,
-          `y="${this.n(y)}"`,
-          `font-family="${o.font === "mono" ? MONO : SANS}"`,
-          `font-size="${this.n(o.size)}"`,
-          `font-weight="${o.bold ? "bold" : "normal"}"`,
-          `text-anchor="${o.anchor ?? "start"}"`,
-          o.tracking ? `letter-spacing="${this.n(o.tracking * o.size)}"` : "",
-          `fill="${o.fill}"`,
-          o.opacity !== void 0 && o.opacity < 1 ? `fill-opacity="${num5(o.opacity)}"` : ""
-        ].filter(Boolean).join(" ");
-        const body = runs.map((run3) => {
-          const own2 = [
-            run3.fill ? `fill="${run3.fill}"` : "",
-            run3.opacity !== void 0 ? `fill-opacity="${num5(run3.opacity)}"` : "",
-            run3.bold !== void 0 ? `font-weight="${run3.bold ? "bold" : "normal"}"` : ""
-          ].filter(Boolean).join(" ");
-          return own2 ? `<tspan ${own2}>${escapeXml(run3.text)}</tspan>` : escapeXml(run3.text);
-        }).join("");
-        this.parts.push(`<text ${attrs}>${body}</text>`);
-        return this;
-      }
-      /** The SVG document. */
-      svg() {
-        const w = this.pixelWidth;
-        const h = this.pixelHeight;
-        return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${this.parts.join("")}</svg>
-`;
-      }
-    };
-  }
-});
-
 // ../engine/src/motion/text.ts
 function textWidth(text5, style) {
   const chars = [...text5];
@@ -32637,18 +32478,6 @@ function balanceLines(text5, maxLines) {
   }
   if (line2.length > 0) out.push(line2.join(" "));
   return out;
-}
-function fitBlock(text5, style, maxWidth, maxHeight, maxSize, maxLines = 3, leading = 1) {
-  let best = { lines: [text5], size: 0 };
-  for (let n = 1; n <= maxLines; n += 1) {
-    const lines2 = balanceLines(text5, n);
-    if (lines2.length < n && n > 1) break;
-    const byWidth = fitSize(lines2, style, maxWidth, maxSize);
-    const byHeight = maxHeight / (lines2.length * leading);
-    const size = Math.floor(Math.min(byWidth, byHeight, maxSize));
-    if (size > best.size * 1.12) best = { lines: lines2, size };
-  }
-  return best;
 }
 function clampText(text5, style, maxWidth) {
   if (textWidth(text5, style) <= maxWidth) return text5;
@@ -32859,176 +32688,80 @@ var init_text = __esm({
   }
 });
 
-// ../engine/src/motion/elements.ts
+// ../engine/src/motion/layout.ts
 function layoutOf(frame) {
   const W = frame.width;
   const H = frame.height;
-  const u = Math.min(W, H) / 1080;
-  return { W, H, u, m: Math.round(64 * u), portrait: H > W * 1.05, aspect: W / H };
+  const short2 = Math.min(W, H);
+  const u = short2 / 1080;
+  const m = Math.round(64 * u);
+  const tall = H >= W * TALL;
+  const safe2 = tall ? { left: m, top: Math.round(H * PLATFORM_BANDS.top), right: W - Math.max(m, Math.round(W * PLATFORM_BANDS.right)), bottom: H - Math.round(H * PLATFORM_BANDS.bottom) } : { left: m, top: m, right: W - m, bottom: H - m };
+  const type = { label: Math.ceil(short2 * TYPE_FLOOR.label), body: Math.ceil(short2 * TYPE_FLOOR.body), heading: Math.ceil(short2 * TYPE_FLOOR.heading) };
+  return { W, H, u, m, portrait: H > W * 1.05, tall, aspect: W / H, safe: safe2, type };
 }
-function pose(x, y, extra = {}) {
-  return { x, y, s: extra.s ?? 1, alpha: extra.alpha ?? 1, rotation: extra.rotation ?? 0, ...extra.sx !== void 0 ? { sx: extra.sx } : {} };
+function typeSize(layout, role, wanted = 0) {
+  return Math.max(layout.type[role], Math.round(wanted));
 }
-function key(frame, p, ease = "out") {
-  return { frame: Math.round(frame), pose: p, ease };
+function opticalCentre(layout) {
+  return (layout.safe.top + layout.safe.bottom) / 2;
 }
-function enter(rest, at, e) {
-  const from = {
-    x: rest.x + (e.dx ?? 0),
-    y: rest.y + (e.dy ?? 0),
-    s: rest.s * (e.s ?? 1),
-    alpha: e.alpha ?? 0,
-    rotation: rest.rotation + (e.rotation ?? 0),
-    ...e.sx !== void 0 ? { sx: e.sx } : rest.sx !== void 0 ? { sx: rest.sx } : {}
-  };
-  return [key(at, from), key(at + Math.max(1, Math.round(e.frames)), rest, e.ease ?? "out")];
+function centredWidth(layout) {
+  return 2 * Math.min(layout.W / 2 - layout.safe.left, layout.safe.right - layout.W / 2);
 }
-function zoomed(p, z2, layout) {
-  return { ...p, x: layout.W / 2 + (p.x - layout.W / 2) * z2, y: layout.H / 2 + (p.y - layout.H / 2) * z2, s: p.s * z2 };
-}
-function drawing(name, track2, from, to, box, paint2, keys) {
-  const width = Math.max(1, Math.ceil(box.width));
-  const height = Math.max(1, Math.ceil(box.height));
-  return {
-    name,
-    track: track2,
-    from,
-    to,
-    source: {
-      kind: "svg",
-      name,
-      width,
-      height,
-      cx: box.cx ?? width / 2,
-      cy: box.cy ?? height / 2,
-      draw: (k) => {
-        const d = new Drawing(width, height, k);
-        paint2(d);
-        return d;
-      }
-    },
-    keys
-  };
-}
-function backdrop(name, track2, from, to, layout, paint2, keys) {
-  return drawing(name, track2, from, to, { width: layout.W, height: layout.H }, paint2, keys ?? [key(from, pose(layout.W / 2, layout.H / 2))]);
-}
-function mediaWindow(media, seconds2) {
-  if (media.kind === "image") return { start: 0, speed: 1, seconds: seconds2 };
-  const usable = media.duration > 3 ? [0.2, media.duration - 0.1] : [0, media.duration];
-  const length = usable[1] - usable[0];
-  if (length >= seconds2) return { start: usable[0] + (length - seconds2) * 0.3, speed: 1, seconds: seconds2 };
-  const speed = Math.max(MIN_SPEED2, length / seconds2);
-  return { start: usable[0], speed, seconds: Math.min(seconds2, length / speed) };
-}
-function mediaCard(name, track2, from, to, media, fps2, o, keys) {
-  const win = o.start !== void 0 && media.kind === "video" ? pinnedWindow(media, o.start, (to - from) / fps2) : mediaWindow(media, (to - from) / fps2);
-  const end = Math.min(to, from + Math.max(1, Math.floor(win.seconds * fps2 + 1e-6)));
-  return {
-    name,
-    track: track2,
-    from,
-    to: end,
-    source: { kind: "media", media, mode: "fit", width: o.width, radius: o.radius, ...o.crop ? { crop: o.crop } : {}, start: win.start, speed: win.speed },
-    keys
-  };
-}
-function pinnedWindow(media, start, seconds2) {
-  const from = Math.max(0, Math.min(start, media.duration));
-  return { start: from, speed: 1, seconds: Math.min(seconds2, Math.max(0, media.duration - from)) };
-}
-function mediaFill(name, track2, from, to, media, fps2, layout, keys) {
-  const win = mediaWindow(media, (to - from) / fps2);
-  const end = Math.min(to, from + Math.max(1, Math.floor(win.seconds * fps2 + 1e-6)));
-  return {
-    name,
-    track: track2,
-    from,
-    to: end,
-    source: { kind: "media", media, mode: "fill", width: layout.W, radius: 0, start: win.start, speed: win.speed },
-    keys: keys ?? [key(from, pose(layout.W / 2, layout.H / 2))]
-  };
-}
-function cropToAspect(media, aspect) {
-  const own2 = media.width / media.height;
-  if (Math.abs(own2 / aspect - 1) < 0.01) return void 0;
-  if (own2 > aspect) {
-    const cut3 = (1 - aspect / own2) / 2;
-    return { left: cut3, right: cut3, top: 0, bottom: 0 };
+function fitType(layout, role, text5, style, o) {
+  const floor = layout.type[role];
+  const max = Math.max(floor, o.max);
+  const maxLines = Math.max(1, o.maxLines ?? 1);
+  const leading = o.leading ?? 1.08;
+  let best = null;
+  for (let n = 1; n <= maxLines; n += 1) {
+    const lines2 = balanceLines(text5, n);
+    if (n > 1 && lines2.length < n) break;
+    const byHeight = o.height === void 0 ? max : o.height / (lines2.length * leading);
+    const size = Math.floor(Math.min(fitSize(lines2, style, o.width, max), byHeight, max));
+    if (size < floor) continue;
+    if (!best || size > best.size * 1.12) best = { lines: lines2, size };
   }
-  const cut2 = (1 - own2 / aspect) / 2;
-  return { left: 0, right: 0, top: cut2, bottom: cut2 };
+  return best ?? { lines: wrapLines(text5, { ...style, size: floor }, o.width, maxLines), size: floor };
 }
-function textBox(block, x, y) {
-  const pad3 = Math.ceil(block.size * 0.18);
-  const widest = Math.max(...block.lines.map((line2) => textWidth(line2, block)), 1);
-  const width = Math.ceil(widest * (block.font === "mono" ? 1.02 : ROOMY) + 2 * pad3);
-  const lead = (block.leading ?? 1.08) * block.size;
-  const height = Math.ceil((block.lines.length - 1) * lead + (ASCENT + DESCENT) * block.size + 2 * pad3);
-  const left = block.anchor === "start" ? x - pad3 : block.anchor === "middle" ? x - width / 2 : x - width + pad3;
-  const top = y - pad3 - ASCENT * block.size;
-  return { left, top, width, height, x: left + width / 2, y: top + height / 2 };
+function fitWrapped(layout, role, text5, style, o) {
+  const floor = layout.type[role];
+  let best = null;
+  for (let n = 1; n <= o.maxLines; n += 1) {
+    for (let size = Math.floor(Math.max(floor, o.max)); size >= floor; size -= 1) {
+      const lines2 = wrapLines(text5, { ...style, size }, o.width, Number.POSITIVE_INFINITY);
+      if (lines2.length > n || lines2.some((line2) => textWidth(line2, { ...style, size }) > o.width)) continue;
+      if (!best || size > best.size * 1.12) best = { lines: lines2, size };
+      break;
+    }
+  }
+  return best;
 }
-function paintText(d, block, box, runs) {
-  const pad3 = Math.ceil(block.size * 0.18);
-  const x = block.anchor === "start" ? pad3 : block.anchor === "middle" ? box.width / 2 : box.width - pad3;
-  const lead = (block.leading ?? 1.08) * block.size;
-  block.lines.forEach((line2, i) => {
-    d.text(x, pad3 + ASCENT * block.size + i * lead, runs ? runs(line2, i) : line2, {
-      size: block.size,
-      font: block.font,
-      bold: block.bold,
-      tracking: block.tracking,
-      fill: block.fill,
-      opacity: block.opacity,
-      anchor: block.anchor
-    });
-  });
+function wrapLines(text5, style, width, maxLines) {
+  const words3 = text5.split(/\s+/).filter(Boolean);
+  const lines2 = [];
+  let line2 = "";
+  for (const word of words3) {
+    const next = line2 ? `${line2} ${word}` : word;
+    if (line2 && textWidth(next, style) > width && lines2.length < maxLines - 1) {
+      lines2.push(line2);
+      line2 = word;
+    } else {
+      line2 = next;
+    }
+  }
+  lines2.push(line2);
+  return Number.isFinite(maxLines) ? lines2.map((l) => clampText(l, style, width)) : lines2;
 }
-function textElement(name, track2, from, to, block, box, keys) {
-  return drawing(name, track2, from, to, { width: box.width, height: box.height }, (d) => paintText(d, block, box), keys ?? [key(from, pose(box.x, box.y))]);
-}
-function poseAt(keys, frame) {
-  let out = keys[0].pose;
-  for (const k of keys) if (k.frame <= frame) out = k.pose;
-  return out;
-}
-function cued(el, cue) {
-  return { ...el, cue };
-}
-var MIN_SPEED2, ASCENT, DESCENT, Motion;
-var init_elements = __esm({
-  "../engine/src/motion/elements.ts"() {
+var TYPE_FLOOR, PLATFORM_BANDS, TALL;
+var init_layout = __esm({
+  "../engine/src/motion/layout.ts"() {
     "use strict";
-    init_svg2();
     init_text();
-    MIN_SPEED2 = 0.5;
-    ASCENT = 0.95;
-    DESCENT = 0.28;
-    Motion = class {
-      keys;
-      constructor(first) {
-        this.keys = Array.isArray(first) ? [...first] : [first];
-        if (this.keys.length === 0) throw new Error("a motion needs a first key");
-      }
-      get pose() {
-        return this.keys[this.keys.length - 1].pose;
-      }
-      get frame() {
-        return this.keys[this.keys.length - 1].frame;
-      }
-      to(frame, p, ease = "out") {
-        const k = key(frame, p, ease);
-        while (this.keys.length > 1 && k.frame <= this.frame) this.keys.pop();
-        if (k.frame <= this.frame) this.keys[this.keys.length - 1] = { ...k, frame: this.frame };
-        else this.keys.push(k);
-        return this;
-      }
-      stay(frame) {
-        if (Math.round(frame) > this.frame) this.keys.push(key(frame, this.pose, "smooth"));
-        return this;
-      }
-    };
+    TYPE_FLOOR = { label: 0.03, body: 0.04, heading: 0.075 };
+    PLATFORM_BANDS = { top: 0.08, bottom: 0.15, right: 0.11 };
+    TALL = 1.6;
   }
 });
 
@@ -33331,6 +33064,365 @@ var init_keyframes2 = __esm({
   }
 });
 
+// ../engine/src/motion/svg.ts
+function escapeXml(text5) {
+  return text5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+function num5(value) {
+  if (!Number.isFinite(value)) throw new Error(`not a finite number: ${value}`);
+  const fixed = (Math.round(value * 100) / 100).toFixed(2);
+  return fixed.replace(/\.?0+$/, "") || "0";
+}
+var SANS, MONO, Drawing;
+var init_svg2 = __esm({
+  "../engine/src/motion/svg.ts"() {
+    "use strict";
+    SANS = "'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif";
+    MONO = "Menlo, 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace";
+    Drawing = class {
+      constructor(width, height, k = 1) {
+        this.width = width;
+        this.height = height;
+        this.k = k;
+        if (!(width > 0 && height > 0 && k > 0)) throw new Error(`bad drawing size ${width}x${height} at ${k}`);
+      }
+      width;
+      height;
+      k;
+      parts = [];
+      /** Pixel size of the SVG document (whole pixels: every host reads the size from these attributes). */
+      get pixelWidth() {
+        return Math.max(1, Math.ceil(this.width * this.k - 1e-6));
+      }
+      get pixelHeight() {
+        return Math.max(1, Math.ceil(this.height * this.k - 1e-6));
+      }
+      n(value) {
+        return num5(value * this.k);
+      }
+      paint(p) {
+        const out = [];
+        out.push(`fill="${p.fill ?? "none"}"`);
+        if (p.fill && p.fill !== "none" && p.fillOpacity !== void 0 && p.fillOpacity < 1) out.push(`fill-opacity="${num5(Math.max(0, p.fillOpacity))}"`);
+        if (p.fillRule) out.push(`fill-rule="${p.fillRule}"`);
+        if (p.stroke) {
+          out.push(`stroke="${p.stroke}"`, `stroke-width="${this.n(p.strokeWidth ?? 1)}"`);
+          if (p.strokeOpacity !== void 0 && p.strokeOpacity < 1) out.push(`stroke-opacity="${num5(Math.max(0, p.strokeOpacity))}"`);
+          if (p.linecap) out.push(`stroke-linecap="${p.linecap}"`);
+          if (p.linejoin) out.push(`stroke-linejoin="${p.linejoin}"`);
+        }
+        return out.join(" ");
+      }
+      rect(x, y, w, h, p) {
+        if (w <= 0 || h <= 0) return this;
+        const rx = p.rx ? ` rx="${this.n(Math.min(p.rx, w / 2, h / 2))}"` : "";
+        this.parts.push(`<rect x="${this.n(x)}" y="${this.n(y)}" width="${this.n(w)}" height="${this.n(h)}"${rx} ${this.paint(p)}/>`);
+        return this;
+      }
+      line(x1, y1, x2, y2, p) {
+        this.parts.push(`<line x1="${this.n(x1)}" y1="${this.n(y1)}" x2="${this.n(x2)}" y2="${this.n(y2)}" ${this.paint({ ...p, fill: void 0 })}/>`);
+        return this;
+      }
+      polyline(points2, p) {
+        const pts = points2.map(([x, y]) => `${this.n(x)},${this.n(y)}`).join(" ");
+        this.parts.push(`<polyline points="${pts}" ${this.paint(p)}/>`);
+        return this;
+      }
+      circle(cx, cy, r, p) {
+        if (r <= 0) return this;
+        this.parts.push(`<circle cx="${this.n(cx)}" cy="${this.n(cy)}" r="${this.n(r)}" ${this.paint(p)}/>`);
+        return this;
+      }
+      /** A path from commands in frame px: numbers are scaled, letters kept (arcs: use `arc`). */
+      path(commands, p) {
+        const d = commands.map((c) => typeof c === "number" ? this.n(c) : c).join(" ");
+        this.parts.push(`<path d="${d}" ${this.paint(p)}/>`);
+        return this;
+      }
+      /** Commands of a rounded rectangle (clockwise), for paths with several shapes. */
+      static roundedRect(x, y, w, h, r) {
+        const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+        if (rr <= 0) return ["M", x, y, "H", x + w, "V", y + h, "H", x, "Z"].map((c2) => c2);
+        const c = rr * 0.4477;
+        return [
+          "M",
+          x + rr,
+          y,
+          "H",
+          x + w - rr,
+          "C",
+          x + w - c,
+          y,
+          x + w,
+          y + c,
+          x + w,
+          y + rr,
+          "V",
+          y + h - rr,
+          "C",
+          x + w,
+          y + h - c,
+          x + w - c,
+          y + h,
+          x + w - rr,
+          y + h,
+          "H",
+          x + rr,
+          "C",
+          x + c,
+          y + h,
+          x,
+          y + h - c,
+          x,
+          y + h - rr,
+          "V",
+          y + rr,
+          "C",
+          x,
+          y + c,
+          x + c,
+          y,
+          x + rr,
+          y,
+          "Z"
+        ];
+      }
+      text(x, y, content, o) {
+        const runs = typeof content === "string" ? [{ text: content }] : content;
+        const attrs = [
+          `x="${this.n(x)}"`,
+          `y="${this.n(y)}"`,
+          `font-family="${o.font === "mono" ? MONO : SANS}"`,
+          `font-size="${this.n(o.size)}"`,
+          `font-weight="${o.bold ? "bold" : "normal"}"`,
+          `text-anchor="${o.anchor ?? "start"}"`,
+          o.tracking ? `letter-spacing="${this.n(o.tracking * o.size)}"` : "",
+          `fill="${o.fill}"`,
+          o.opacity !== void 0 && o.opacity < 1 ? `fill-opacity="${num5(o.opacity)}"` : ""
+        ].filter(Boolean).join(" ");
+        const body = runs.map((run3) => {
+          const own2 = [
+            run3.fill ? `fill="${run3.fill}"` : "",
+            run3.opacity !== void 0 ? `fill-opacity="${num5(run3.opacity)}"` : "",
+            run3.bold !== void 0 ? `font-weight="${run3.bold ? "bold" : "normal"}"` : ""
+          ].filter(Boolean).join(" ");
+          return own2 ? `<tspan ${own2}>${escapeXml(run3.text)}</tspan>` : escapeXml(run3.text);
+        }).join("");
+        this.parts.push(`<text ${attrs}>${body}</text>`);
+        return this;
+      }
+      /** The SVG document. */
+      svg() {
+        const w = this.pixelWidth;
+        const h = this.pixelHeight;
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${this.parts.join("")}</svg>
+`;
+      }
+    };
+  }
+});
+
+// ../engine/src/motion/elements.ts
+function pose(x, y, extra = {}) {
+  return { x, y, s: extra.s ?? 1, alpha: extra.alpha ?? 1, rotation: extra.rotation ?? 0, ...extra.sx !== void 0 ? { sx: extra.sx } : {} };
+}
+function key(frame, p, ease = "out") {
+  return { frame: Math.round(frame), pose: p, ease };
+}
+function enter(rest, at, e) {
+  const from = {
+    x: rest.x + (e.dx ?? 0),
+    y: rest.y + (e.dy ?? 0),
+    s: rest.s * (e.s ?? 1),
+    alpha: e.alpha ?? 0,
+    rotation: rest.rotation + (e.rotation ?? 0),
+    ...e.sx !== void 0 ? { sx: e.sx } : rest.sx !== void 0 ? { sx: rest.sx } : {}
+  };
+  return [key(at, from), key(at + Math.max(1, Math.round(e.frames)), rest, e.ease ?? "out")];
+}
+function glide(el, at, frames, dy, ease = "in_out") {
+  if (Math.abs(dy) < 0.5) return el;
+  const end = at + frames;
+  const share = keyframeThrough([1, 1 + frames], [1, 0], ["smooth", ease]);
+  const offset = (f3) => f3 <= at ? dy : f3 >= end ? 0 : dy * evaluate(share, 1 + f3 - at);
+  const keys = [...el.keys].sort((a, b) => a.frame - b.frame);
+  const moved = keys.map((k) => ({ ...k, pose: { ...k.pose, y: k.pose.y + offset(k.frame) } }));
+  for (const [f3, e] of [
+    [at, "smooth"],
+    [end, ease]
+  ]) {
+    if (f3 <= keys[0].frame || f3 >= el.to || keys.some((k) => k.frame === f3)) continue;
+    const p = poseAt(keys, f3);
+    const next = keys.find((k) => k.frame > f3);
+    if (next && !samePose(p, next.pose)) continue;
+    moved.push(key(f3, { ...p, y: p.y + offset(f3) }, e));
+  }
+  return { ...el, keys: moved.sort((a, b) => a.frame - b.frame) };
+}
+function samePose(a, b) {
+  const near = (x, y) => Math.abs(x - y) < 1e-6;
+  return near(a.x, b.x) && near(a.y, b.y) && near(a.s, b.s) && near(a.alpha, b.alpha) && near(a.rotation, b.rotation) && near(a.sx ?? 1, b.sx ?? 1);
+}
+function zoomed(p, z2, layout) {
+  return { ...p, x: layout.W / 2 + (p.x - layout.W / 2) * z2, y: layout.H / 2 + (p.y - layout.H / 2) * z2, s: p.s * z2 };
+}
+function drawing(name, track2, from, to, box, paint2, keys) {
+  const width = Math.max(1, Math.ceil(box.width));
+  const height = Math.max(1, Math.ceil(box.height));
+  return {
+    name,
+    track: track2,
+    from,
+    to,
+    source: {
+      kind: "svg",
+      name,
+      width,
+      height,
+      cx: box.cx ?? width / 2,
+      cy: box.cy ?? height / 2,
+      draw: (k) => {
+        const d = new Drawing(width, height, k);
+        paint2(d);
+        return d;
+      }
+    },
+    keys
+  };
+}
+function backdrop(name, track2, from, to, layout, paint2, keys) {
+  return drawing(name, track2, from, to, { width: layout.W, height: layout.H }, paint2, keys ?? [key(from, pose(layout.W / 2, layout.H / 2))]);
+}
+function mediaWindow(media, seconds2) {
+  if (media.kind === "image") return { start: 0, speed: 1, seconds: seconds2 };
+  const usable = media.duration > 3 ? [0.2, media.duration - 0.1] : [0, media.duration];
+  const length = usable[1] - usable[0];
+  if (length >= seconds2) return { start: usable[0] + (length - seconds2) * 0.3, speed: 1, seconds: seconds2 };
+  const speed = Math.max(MIN_SPEED2, length / seconds2);
+  return { start: usable[0], speed, seconds: Math.min(seconds2, length / speed) };
+}
+function mediaCard(name, track2, from, to, media, fps2, o, keys) {
+  const win = o.start !== void 0 && media.kind === "video" ? pinnedWindow(media, o.start, (to - from) / fps2) : mediaWindow(media, (to - from) / fps2);
+  const end = Math.min(to, from + Math.max(1, Math.floor(win.seconds * fps2 + 1e-6)));
+  return {
+    name,
+    track: track2,
+    from,
+    to: end,
+    source: { kind: "media", media, mode: "fit", width: o.width, radius: o.radius, ...o.crop ? { crop: o.crop } : {}, start: win.start, speed: win.speed },
+    keys
+  };
+}
+function pinnedWindow(media, start, seconds2) {
+  const from = Math.max(0, Math.min(start, media.duration));
+  return { start: from, speed: 1, seconds: Math.min(seconds2, Math.max(0, media.duration - from)) };
+}
+function mediaFill(name, track2, from, to, media, fps2, layout, keys) {
+  const win = mediaWindow(media, (to - from) / fps2);
+  const end = Math.min(to, from + Math.max(1, Math.floor(win.seconds * fps2 + 1e-6)));
+  return {
+    name,
+    track: track2,
+    from,
+    to: end,
+    source: { kind: "media", media, mode: "fill", width: layout.W, radius: 0, start: win.start, speed: win.speed },
+    keys: keys ?? [key(from, pose(layout.W / 2, layout.H / 2))]
+  };
+}
+function cropToAspect(media, aspect, focus) {
+  const own2 = media.width / media.height;
+  if (Math.abs(own2 / aspect - 1) < 0.01) return void 0;
+  const place = (keep3, at) => Math.max(0, Math.min(1 - keep3, at - keep3 / 2));
+  if (own2 > aspect) {
+    const keep3 = aspect / own2;
+    const left = place(keep3, focus?.x ?? 0.5);
+    return { left, right: 1 - keep3 - left, top: 0, bottom: 0 };
+  }
+  const keep2 = own2 / aspect;
+  const top = place(keep2, focus?.y ?? 0.5);
+  return { left: 0, right: 0, top, bottom: 1 - keep2 - top };
+}
+function inWindow(p, crop2, inset = 0.04) {
+  if (!crop2) return p;
+  const inside = (v) => Math.max(inset, Math.min(1 - inset, v));
+  return { x: inside((p.x - crop2.left) / (1 - crop2.left - crop2.right)), y: inside((p.y - crop2.top) / (1 - crop2.top - crop2.bottom)) };
+}
+function textBox(block, x, y) {
+  const pad3 = Math.ceil(block.size * 0.18);
+  const widest = Math.max(...block.lines.map((line2) => textWidth(line2, block)), 1);
+  const width = Math.ceil(widest * (block.font === "mono" ? 1.02 : ROOMY) + 2 * pad3);
+  const lead = (block.leading ?? 1.08) * block.size;
+  const height = Math.ceil((block.lines.length - 1) * lead + (ASCENT + DESCENT) * block.size + 2 * pad3);
+  const left = block.anchor === "start" ? x - pad3 : block.anchor === "middle" ? x - width / 2 : x - width + pad3;
+  const top = y - pad3 - ASCENT * block.size;
+  return { left, top, width, height, x: left + width / 2, y: top + height / 2 };
+}
+function paintText(d, block, box, runs) {
+  const pad3 = Math.ceil(block.size * 0.18);
+  const x = block.anchor === "start" ? pad3 : block.anchor === "middle" ? box.width / 2 : box.width - pad3;
+  const lead = (block.leading ?? 1.08) * block.size;
+  block.lines.forEach((line2, i) => {
+    d.text(x, pad3 + ASCENT * block.size + i * lead, runs ? runs(line2, i) : line2, {
+      size: block.size,
+      font: block.font,
+      bold: block.bold,
+      tracking: block.tracking,
+      fill: block.fill,
+      opacity: block.opacity,
+      anchor: block.anchor
+    });
+  });
+}
+function textElement(name, track2, from, to, block, box, keys) {
+  return drawing(name, track2, from, to, { width: box.width, height: box.height }, (d) => paintText(d, block, box), keys ?? [key(from, pose(box.x, box.y))]);
+}
+function poseAt(keys, frame) {
+  let out = keys[0].pose;
+  for (const k of keys) if (k.frame <= frame) out = k.pose;
+  return out;
+}
+function cued(el, cue) {
+  return { ...el, cue };
+}
+var MIN_SPEED2, ASCENT, DESCENT, Motion;
+var init_elements = __esm({
+  "../engine/src/motion/elements.ts"() {
+    "use strict";
+    init_evaluate();
+    init_keyframes2();
+    init_svg2();
+    init_text();
+    MIN_SPEED2 = 0.5;
+    ASCENT = 0.95;
+    DESCENT = 0.28;
+    Motion = class {
+      keys;
+      constructor(first) {
+        this.keys = Array.isArray(first) ? [...first] : [first];
+        if (this.keys.length === 0) throw new Error("a motion needs a first key");
+      }
+      get pose() {
+        return this.keys[this.keys.length - 1].pose;
+      }
+      get frame() {
+        return this.keys[this.keys.length - 1].frame;
+      }
+      to(frame, p, ease = "out") {
+        const k = key(frame, p, ease);
+        while (this.keys.length > 1 && k.frame <= this.frame) this.keys.pop();
+        if (k.frame <= this.frame) this.keys[this.keys.length - 1] = { ...k, frame: this.frame };
+        else this.keys.push(k);
+        return this;
+      }
+      stay(frame) {
+        if (Math.round(frame) > this.frame) this.keys.push(key(frame, this.pose, "smooth"));
+        return this;
+      }
+    };
+  }
+});
+
 // ../engine/src/motion/shapes.ts
 function pointer(d, x, y, size, fill, stroke) {
   const k = size / 40;
@@ -33457,12 +33549,15 @@ function paintGrid(d, variant, palette, layout, labels) {
     ]) {
       registrationMark(d, x, y, r, palette.ink, 1.6 * u);
     }
-    const size = 17 * u;
+    const size = typeSize(layout, "label", 17 * u);
+    const { safe: safe2, tall } = layout;
+    const right = Math.min(W - m - colW * 0.12, safe2.right);
+    const [topY, bottomY] = tall ? [safe2.top + size * 0.95, safe2.bottom - size * 0.35] : [m - 16 * u, H - m + 30 * u];
     const corners = [
-      [m + colW * 0.12, m - 16 * u, "start"],
-      [W - m - colW * 0.12, m - 16 * u, "end"],
-      [m + colW * 0.12, H - m + 30 * u, "start"],
-      [W - m - colW * 0.12, H - m + 30 * u, "end"]
+      [m + colW * 0.12, topY, "start"],
+      [right, topY, "end"],
+      [m + colW * 0.12, bottomY, "start"],
+      [right, bottomY, "end"]
     ];
     labels.slice(0, 4).forEach((label2, i) => {
       const [x, y, anchor2] = corners[i];
@@ -33478,6 +33573,7 @@ var init_backgrounds = __esm({
   "../engine/src/motion/templates/backgrounds.ts"() {
     "use strict";
     init_elements();
+    init_layout();
     init_shapes();
     init_template();
     GRID_VARIANTS = ["paper", "editorial", "dots", "plain"];
@@ -33515,19 +33611,43 @@ function segment(name, track2, from, to, x1, y1, x2, y2, at, frames, palette, u)
   return drawing(name, track2, from, to, { width: len + 2 * pad3, height: 2 * pad3, cx: pad3, cy: pad3 }, (d) => {
     d.line(pad3, pad3, pad3 + len, pad3, { stroke: palette.accent, strokeWidth: halo, strokeOpacity: 0.16, linecap: "round" });
     d.line(pad3, pad3, pad3 + len, pad3, { stroke: palette.accent, strokeWidth: thick, linecap: "round" });
-  }, [key(at, pose(x1, y1, { rotation: angle, sx: 0 })), key(Math.min(frames - 1, at + Math.max(3, Math.round(len / (40 * u)))), pose(x1, y1, { rotation: angle }), "out")]);
+  }, [key(at, pose(x1, y1, { rotation: angle, sx: 0 })), key(Math.min(frames - 1, at + drawFrames(len, u)), pose(x1, y1, { rotation: angle }), "out")]);
 }
-function productBox(layout, media) {
-  const { W, H, portrait } = layout;
-  const maxW = W * (portrait ? 0.84 : 0.46);
-  const maxH = H * (portrait ? 0.44 : 0.62);
-  const crop2 = portrait && media.width / media.height > 1.2 ? cropToAspect(media, 1.1) : void 0;
+function productBox(media, maxW, maxH, cx, cy, aspect, focus) {
+  const crop2 = aspect !== void 0 ? cropToAspect(media, aspect, focus) : void 0;
   const w0 = crop2 ? media.width * (1 - crop2.left - crop2.right) : media.width;
   const h0 = crop2 ? media.height * (1 - crop2.top - crop2.bottom) : media.height;
   const fit = fittedSize(w0, h0, { width: maxW, height: maxH, fps: 30 });
-  return { cx: W / 2, cy: H * (portrait ? 0.5 : 0.56), w: fit.width, h: fit.height, ...crop2 ? { crop: crop2 } : {} };
+  return { cx, cy, w: fit.width, h: fit.height, ...crop2 ? { crop: crop2 } : {} };
 }
-var MAX_CALLOUTS, DEFAULT_POINTS, callout;
+function headingOf(layout, prefix, name, width, max) {
+  const floor = layout.type.heading;
+  const one = name ? `${prefix}: ${name}` : prefix;
+  const single3 = Math.floor(fitSize([one], HEAD, width, max));
+  const kickerSize = typeSize(layout, "body", 46 * layout.u);
+  if (!name || single3 >= floor) {
+    const size = Math.max(floor, single3);
+    return { inline: true, kicker: "", kickerSize, lines: [clampText(one, { ...HEAD, size }, width)], size };
+  }
+  const stacked = fitType(layout, "heading", name, HEAD, { width, max, maxLines: 2 });
+  return { inline: false, kicker: clampText(`${prefix}:`, { ...HEAD, size: kickerSize }, width), kickerSize, lines: stacked.lines, size: stacked.size };
+}
+function labelType(layout, labels, values, width, maxName, maxValue) {
+  const index = (i) => String(i + 1).padStart(2, "0");
+  const full = labels.map((l, i) => `${index(i)}  ${l}`);
+  const nameSize = Math.max(layout.type.body, Math.min(Math.floor(maxName), Math.floor(fitSize(full, NAME, width, maxName))));
+  const indent = textWidth("00  ", { ...NAME, size: nameSize });
+  const shown = values.filter(Boolean);
+  const valueSize = shown.length > 0 ? Math.max(layout.type.label, Math.min(Math.floor(maxValue), Math.floor(fitSize(shown, VALUE, width - indent, maxValue)))) : layout.type.label;
+  const items = labels.map((l, i) => {
+    const name = textWidth(full[i], { ...NAME, size: nameSize }) <= width ? [l] : wrapLines(l, { ...NAME, size: nameSize }, width - indent, 2);
+    const v = values[i] ?? "";
+    const value = !v ? [] : textWidth(v, { ...VALUE, size: valueSize }) <= width - indent ? [v] : wrapLines(v, { ...VALUE, size: valueSize }, width - indent, 2);
+    return { i, index: index(i), name, value };
+  });
+  return { nameSize, valueSize, items };
+}
+var MAX_CALLOUTS, DEFAULT_POINTS, TALLEST_FRAME, HEAD, mean, NAME, VALUE, drawFrames, callout;
 var init_callout = __esm({
   "../engine/src/motion/templates/callout.ts"() {
     "use strict";
@@ -33535,6 +33655,7 @@ var init_callout = __esm({
     init_edit();
     init_elements();
     init_keyframes2();
+    init_layout();
     init_text();
     init_template();
     MAX_CALLOUTS = 4;
@@ -33544,28 +33665,151 @@ var init_callout = __esm({
       { x: 0.68, y: 0.72 },
       { x: 0.3, y: 0.7 }
     ];
+    TALLEST_FRAME = 4 / 5;
+    HEAD = { font: "mono", bold: true, tracking: 0.04 };
+    mean = (values) => values.reduce((a, b) => a + b, 0) / values.length;
+    NAME = { font: "mono", bold: true };
+    VALUE = { font: "mono" };
+    drawFrames = (len, u) => Math.max(3, Math.round(len / (40 * u)));
     callout = {
       id: "callout",
-      summary: "A product shot on a dark field with a soft halo and a glowing 'ANATOMY: NAME' heading over a rule that draws on; then one callout per beat: a dot pops on the product, a leader line draws out and a label (index, name, value) slides in.",
-      reads: "file_ids (the product: the first file), text (the product name), tag (the heading's prefix, default ANATOMY), labels (callout names, 1-4), values (their second lines), points (anchors on the product picture, 0-1)",
+      summary: "A product shot on a dark field with a soft halo and a glowing 'ANATOMY: NAME' heading over a rule that draws on; then one callout per beat: a dot pops on the product, a leader line draws out and a label (index, name, value) slides in. On vertical video the heading stacks over a tall product frame and the labels sit above and below it.",
+      reads: "file_ids (the product: the first file), text (the product name), tag (the heading's prefix, default ANATOMY), labels (callout names, 1-4), values (their second lines), points (anchors on the product picture, 0-1; its crop keeps them in view)",
       media: "required",
       beats: (content) => Math.max(1, content.labels?.length ?? 3) + 3,
       build(input4) {
         const { content, palette, layout, frames, beats, media, frame } = input4;
-        const { W, H, u, m, portrait } = layout;
+        const { W, H, u, m, portrait, safe: safe2 } = layout;
         const file3 = content.fileIds?.[0];
         if (!file3) refuse("callout needs file_ids: the product shot");
         const labels = (content.labels ?? []).map((l) => l.replace(/\s+/g, " ").trim().toUpperCase()).filter(Boolean);
         if (labels.length === 0) refuse("callout needs labels: 1 to 4 callout names");
         if (labels.length > MAX_CALLOUTS) refuse(`callout draws at most ${MAX_CALLOUTS} callouts`);
-        const points2 = content.points && content.points.length > 0 ? content.points : DEFAULT_POINTS;
-        if (points2.length < labels.length) refuse("callout needs a point for every label (or no points, for the default spread)");
+        const given = content.points && content.points.length > 0 ? content.points : null;
+        if (given && given.length < labels.length) refuse("callout needs a point for every label (or no points, for the default spread)");
+        const focus = given ? { x: mean(given.slice(0, labels.length).map((p) => p.x)), y: mean(given.slice(0, labels.length).map((p) => p.y)) } : void 0;
+        const anchorsOn = (crop2) => labels.map((_, i) => given ? inWindow(given[i], crop2) : DEFAULT_POINTS[i]);
+        const values = labels.map((_, i) => content.values?.[i]?.replace(/\s+/g, " ").trim().toUpperCase() ?? "");
         const product = media.get(file3);
-        const box = productBox(layout, product);
-        const left = box.cx - box.w / 2;
-        const top = box.cy - box.h / 2;
         const e0 = beats.frame(0);
         const elements = [];
+        const name = (content.text ?? "").replace(/\s+/g, " ").trim().toUpperCase();
+        const prefix = (content.tag?.trim() || "ANATOMY").toUpperCase().replace(/:$/, "");
+        const hx = portrait ? safe2.left : m * 1.2;
+        const head = headingOf(layout, prefix, name, (portrait ? safe2.right : W - m * 1.2) - hx, (portrait ? 92 : 84) * u);
+        const capTop = portrait ? safe2.top : m * 1.2;
+        const kickerBase = capTop + 0.75 * head.kickerSize;
+        const firstBase = head.inline ? capTop + 0.75 * head.size : kickerBase + 0.28 * head.kickerSize + 16 * u + 0.75 * head.size;
+        const lastBase = firstBase + (head.lines.length - 1) * 1.06 * head.size;
+        const headPad = Math.ceil(head.size * 0.18);
+        const headW = Math.max(...head.lines.map((line2) => textWidth(line2, { ...HEAD, size: head.size })), head.inline ? 0 : textWidth(head.kicker, { ...HEAD, size: head.kickerSize })) * 1.02 + 2 * headPad;
+        const headTop = capTop - 0.25 * (head.inline ? head.size : head.kickerSize) - headPad;
+        const headH = lastBase + 0.28 * head.size + headPad - headTop;
+        const headEl = drawing("callout-heading", 3, e0, frames, { width: headW, height: headH }, (d) => {
+          if (!head.inline) d.text(headPad, kickerBase - headTop, head.kicker, { size: head.kickerSize, ...HEAD, fill: palette.accent });
+          head.lines.forEach((line2, i) => {
+            const runs = head.inline && name ? [{ text: `${prefix}:`, fill: palette.accent }, { text: line2.slice(prefix.length + 1), fill: palette.ink }] : [{ text: line2, fill: head.inline ? palette.accent : palette.ink }];
+            d.text(headPad, firstBase - headTop + i * 1.06 * head.size, runs, { size: head.size, ...HEAD, fill: palette.ink });
+          });
+        }, enter(pose(hx - headPad + headW / 2, headTop + headH / 2), e0 + 2, { dx: -26 * u, frames: 12, ease: "out_strong" }));
+        headEl.effects = [glow(palette)];
+        elements.push(headEl);
+        const ruleY = lastBase + 0.28 * head.size + 22 * u;
+        const ruleW = W - 2 * hx;
+        const ruleAt = e0 + 6;
+        elements.push(
+          cued(drawing("callout-rule", 4, ruleAt, frames, { width: ruleW, height: 6 * u, cx: 0, cy: 3 * u }, (d) => d.line(0, 3 * u, ruleW, 3 * u, { stroke: palette.line, strokeWidth: 2 * u }), [
+            key(ruleAt, pose(hx, ruleY, { sx: 0 })),
+            key(Math.min(frames - 1, ruleAt + 16), pose(hx, ruleY), "out")
+          ]), e0)
+        );
+        const colGap = 40 * u;
+        const colW = portrait ? (safe2.right - safe2.left - colGap) / 2 : W * 0.24;
+        const type = labelType(layout, labels, values, colW, (portrait ? 48 : 46) * u, (portrait ? 36 : 34) * u);
+        const nameLead = type.nameSize * 1.12;
+        const indent = textWidth("00  ", { ...NAME, size: type.nameSize });
+        const valueLead = type.valueSize * 1.2;
+        const blockH = (l) => 0.95 * type.nameSize + (l.name.length - 1) * nameLead + (l.value.length > 0 ? 1.3 * type.valueSize + (l.value.length - 1) * valueLead + 0.28 * type.valueSize : 0.28 * type.nameSize);
+        const blockW = (l) => Math.max(...[...l.name.map((line2) => textWidth(line2, { ...NAME, size: type.nameSize })), ...l.value.map((line2) => textWidth(line2, { ...VALUE, size: type.valueSize }))].map((w) => indent + w));
+        const tick = 22 * u;
+        const fpad = 16 * u;
+        let box;
+        let placed;
+        if (portrait) {
+          const slotsFor = (anchors2) => {
+            const taken = /* @__PURE__ */ new Set();
+            return type.items.map((l) => {
+              const up = anchors2[l.i].y < 0.5;
+              const lt = anchors2[l.i].x < 0.5;
+              const pick2 = [
+                [up, lt],
+                [!up, lt],
+                [up, !lt],
+                [!up, !lt]
+              ].find(([a, b]) => !taken.has(`${a}${b}`));
+              taken.add(`${pick2[0]}${pick2[1]}`);
+              return { above: pick2[0], leftSide: pick2[1] };
+            });
+          };
+          const reach = fpad + tick + 14 * u;
+          const ruleGap = 14 * u;
+          const room = { top: ruleY + 40 * u, bottom: safe2.bottom };
+          const maxW = W * 0.84;
+          const boxFor = (slots3) => {
+            const zone = (above) => {
+              const hs = type.items.filter((_, k) => slots3[k].above === above).map(blockH);
+              return hs.length > 0 ? reach + ruleGap + Math.max(...hs) : 0;
+            };
+            const zones = zone(true) + zone(false);
+            const maxH = room.bottom - room.top - zones;
+            const b = productBox(product, maxW, maxH, W / 2, 0, Math.max(TALLEST_FRAME, Math.min(1, maxW / maxH)), focus);
+            b.cy = room.top + (room.bottom - room.top - zones - b.h) / 2 + zone(true) + b.h / 2;
+            return b;
+          };
+          const rows = (slots3) => slots3.map((x) => x.above).join();
+          const first = slotsFor(anchorsOn(cropToAspect(product, TALLEST_FRAME, focus)));
+          box = boxFor(first);
+          let anchors = anchorsOn(box.crop);
+          const slots2 = slotsFor(anchors);
+          if (rows(slots2) !== rows(first)) {
+            box = boxFor(slots2);
+            anchors = anchorsOn(box.crop);
+          }
+          const top = box.cy - box.h / 2;
+          const bottom = box.cy + box.h / 2;
+          placed = type.items.map((l, k) => {
+            const { above, leftSide } = slots2[k];
+            const p = anchors[l.i];
+            const rule = above ? top - reach : bottom + reach;
+            const firstBase2 = above ? rule - ruleGap - blockH(l) + 0.95 * type.nameSize : rule + ruleGap + 0.95 * type.nameSize;
+            return { label: l, anchor: { x: box.cx - box.w / 2 + p.x * box.w, y: top + p.y * box.h }, leftSide, above, x: leftSide ? safe2.left : safe2.right, y: firstBase2, rule };
+          });
+        } else {
+          const widest = Math.max(...type.items.map(blockW));
+          const maxW = Math.min(W * 0.46, W - 2 * (m + widest + 24 * u + 0.03 * W));
+          const own2 = product.width / product.height;
+          const roomTop = ruleY + 40 * u;
+          const maxH = Math.min(H * 0.62, H - m - roomTop);
+          box = productBox(product, maxW, maxH, W / 2, 0, own2 > maxW / maxH ? Math.max(1, maxW / maxH) : void 0, focus);
+          box.cy = Math.max(H * 0.56, roomTop + box.h / 2);
+          const anchors = anchorsOn(box.crop);
+          const left2 = box.cx - box.w / 2;
+          const top = box.cy - box.h / 2;
+          const slots2 = { 1: [0.18], 2: [0.12, 0.88], 3: [0.06, 0.5, 0.94], 4: [0.04, 0.36, 0.68, 0.98] };
+          placed = type.items.map((l) => {
+            const p = anchors[l.i];
+            return { label: l, anchor: { x: left2 + p.x * box.w, y: top + p.y * box.h }, leftSide: p.x < 0.5, above: false, x: 0, y: 0, rule: 0 };
+          });
+          for (const leftSide of [true, false]) {
+            const side = placed.filter((q) => q.leftSide === leftSide).sort((a, b) => a.anchor.y - b.anchor.y);
+            const at = slots2[side.length] ?? [];
+            side.forEach((q, k) => {
+              q.y = Math.max(ruleY + 24 * u + type.nameSize, Math.min(H - m - blockH(q.label) + type.nameSize * 0.95, top + at[k] * box.h));
+              q.x = leftSide ? left2 - 0.03 * W - 24 * u : left2 + box.w + 0.03 * W + 24 * u;
+            });
+          }
+        }
+        const left = box.cx - box.w / 2;
         const R = Math.max(box.w, box.h) * 0.78;
         elements.push(
           drawing("callout-halo", 0, e0, frames, { width: 2 * R, height: 2 * R }, (d) => {
@@ -33573,8 +33817,6 @@ var init_callout = __esm({
           }, enter(pose(box.cx, box.cy), e0, { s: 0.75, frames: 16, ease: "out" }))
         );
         elements.push(mediaCard("callout-product", 1, e0, frames, product, frame.fps, { width: box.w, radius: 6 * u, ...box.crop ? { crop: box.crop } : {} }, enter(pose(box.cx, box.cy), e0, { s: 1.06, frames: 14, ease: "out" })));
-        const tick = 22 * u;
-        const fpad = 16 * u;
         elements.push(
           drawing("callout-frame", 2, e0, frames, { width: box.w + 2 * fpad + 2 * tick, height: box.h + 2 * fpad + 2 * tick }, (d) => {
             const x0 = tick;
@@ -33599,105 +33841,57 @@ var init_callout = __esm({
             }
           }, enter(pose(box.cx, box.cy), e0 + 4, { s: 1.03, frames: 10, ease: "out" }))
         );
-        const name = (content.text ?? "").replace(/\s+/g, " ").trim().toUpperCase();
-        const prefix = (content.tag?.trim() || "ANATOMY").toUpperCase().replace(/:$/, "");
-        const headSize = Math.round((portrait ? 46 : 42) * u);
-        const head = name ? `${prefix}: ${name}` : prefix;
-        const headW = textWidth(head, { size: headSize, font: "mono", bold: true, tracking: 0.04 });
-        const hx = m * 1.2;
-        const hy = m * 1.2 + headSize;
-        const headEl = drawing("callout-heading", 3, e0, frames, { width: headW + 40 * u, height: headSize * 1.8, cx: 20 * u, cy: headSize * 0.9 }, (d) => {
-          d.text(20 * u, headSize * 0.9 + headSize * 0.36, [{ text: name ? `${prefix}:` : prefix, fill: palette.accent }, ...name ? [{ text: ` ${name}`, fill: palette.ink }] : []], {
-            size: headSize,
-            font: "mono",
-            bold: true,
-            fill: palette.ink,
-            tracking: 0.04
-          });
-        }, enter(pose(hx, hy - headSize * 0.36), e0 + 2, { dx: -26 * u, frames: 12, ease: "out_strong" }));
-        headEl.effects = [glow(palette)];
-        elements.push(headEl);
-        const ruleW = W - 2 * hx;
-        const ruleAt = e0 + 6;
-        elements.push(
-          cued(drawing("callout-rule", 4, ruleAt, frames, { width: ruleW, height: 6 * u, cx: 0, cy: 3 * u }, (d) => d.line(0, 3 * u, ruleW, 3 * u, { stroke: palette.line, strokeWidth: 2 * u }), [
-            key(ruleAt, pose(hx, hy + 24 * u, { sx: 0 })),
-            key(Math.min(frames - 1, ruleAt + 16), pose(hx, hy + 24 * u), "out")
-          ]), e0)
-        );
-        const nameSize = Math.round((portrait ? 32 : 30) * u);
-        const valueSize = Math.round((portrait ? 26 : 24) * u);
-        const lineH = nameSize * 1.25 + valueSize * 1.3;
-        const anchors = labels.map((_, i) => ({ x: left + points2[i].x * box.w, y: top + points2[i].y * box.h, i }));
-        const place = anchors.map((a) => {
-          if (portrait) {
-            const above = points2[a.i].y < 0.5;
-            const leftSide2 = points2[a.i].x < 0.5;
-            return { a, leftSide: leftSide2, y: above ? top - 70 * u : box.cy + box.h / 2 + 70 * u, above };
-          }
-          const leftSide = points2[a.i].x < 0.5;
-          return { a, leftSide, y: a.y, above: false };
-        });
-        if (portrait) {
-          for (const above of [true, false]) {
-            for (const leftSide of [true, false]) {
-              place.filter((p) => p.above === above && p.leftSide === leftSide).forEach((p, k) => p.y += (above ? -1 : 1) * k * lineH * 1.25);
-            }
-          }
-        } else {
-          const slots2 = { 1: [0.18], 2: [0.12, 0.88], 3: [0.06, 0.5, 0.94], 4: [0.04, 0.36, 0.68, 0.98] };
-          for (const leftSide of [true, false]) {
-            const side = place.filter((p) => p.leftSide === leftSide).sort((p, q) => p.a.y - q.a.y);
-            const at = slots2[side.length] ?? [];
-            side.forEach((p, k) => p.y = Math.max(H * 0.22, Math.min(H * 0.9, top + at[k] * box.h)));
-          }
-        }
         const enters = beats.entrances(labels.length, frames, 18, 1);
         const cues = [e0, ...enters];
-        place.forEach((p, i) => {
+        placed.forEach((q, i) => {
           const at = enters[i];
           if (at >= frames) return;
-          const side = p.leftSide ? -1 : 1;
-          const values = content.values ?? [];
-          const value = values[p.a.i]?.replace(/\s+/g, " ").trim().toUpperCase() ?? "";
-          const index = String(p.a.i + 1).padStart(2, "0");
-          const labelW = Math.max(textWidth(`${index}  ${labels[p.a.i]}`, { size: nameSize, font: "mono", bold: true }), value ? textWidth(value, { size: valueSize, font: "mono" }) : 0);
+          const l = q.label;
+          const { x: ax, y: ay } = q.anchor;
+          const w = blockW(l);
+          const anchorEnd = portrait ? !q.leftSide : q.leftSide;
           let elbow;
-          let labelX;
-          let labelY;
+          const runs = [];
           if (portrait) {
-            labelY = p.y;
-            elbow = { x: p.a.x, y: labelY };
-            labelX = p.leftSide ? Math.max(m, p.a.x - labelW - 60 * u) : Math.min(W - m - labelW, p.a.x + 60 * u);
+            elbow = { x: ax, y: q.rule };
+            const [x0, x1] = q.leftSide ? [q.x, Math.max(q.x + w, ax)] : [Math.min(q.x - w, ax), q.x];
+            runs.push([ax, x0], [ax, x1]);
           } else {
-            labelY = p.y;
-            const edge = side < 0 ? left - 0.03 * W : left + box.w + 0.03 * W;
-            elbow = { x: edge, y: labelY };
-            labelX = side < 0 ? edge - 24 * u - labelW : edge + 24 * u;
+            const edge = q.leftSide ? left - 0.03 * W : left + box.w + 0.03 * W;
+            elbow = { x: edge, y: q.y - type.nameSize * 0.36 };
+            runs.push([edge, q.leftSide ? q.x + 10 * u : q.x - 10 * u]);
           }
-          const runEnd = portrait ? p.leftSide ? labelX + labelW + 16 * u : labelX - 16 * u : side < 0 ? labelX + labelW + 14 * u : labelX - 14 * u;
           const r = 8 * u;
           elements.push(
-            drawing(`callout-dot-${i + 1}`, 5 + i * 4, at, frames, { width: 56 * u, height: 56 * u }, (d) => {
+            drawing(`callout-dot-${i + 1}`, 5 + i * 5, at, frames, { width: 56 * u, height: 56 * u }, (d) => {
               d.circle(28 * u, 28 * u, 24 * u, { fill: palette.accent, fillOpacity: 0.18 });
               d.circle(28 * u, 28 * u, 15 * u, { stroke: palette.accent, strokeWidth: 2.5 * u });
               d.circle(28 * u, 28 * u, r, { fill: palette.ink });
-            }, enter(pose(p.a.x, p.a.y), at, { s: 0.2, frames: 7, ease: "out_back" }))
+            }, enter(pose(ax, ay), at, { s: 0.2, frames: 7, ease: "out_back" }))
           );
-          elements.push(cued(segment(`callout-lead-${i + 1}`, 6 + i * 4, at + 2, frames, p.a.x, p.a.y, elbow.x, elbow.y, at + 2, frames, palette, u), at));
-          const runAt = at + 2 + Math.max(3, Math.round(Math.hypot(elbow.x - p.a.x, elbow.y - p.a.y) / (40 * u)));
-          if (runAt < frames) elements.push(cued(segment(`callout-run-${i + 1}`, 7 + i * 4, runAt, frames, elbow.x, elbow.y, runEnd, elbow.y, runAt, frames, palette, u), at));
+          elements.push(cued(segment(`callout-lead-${i + 1}`, 6 + i * 5, at + 2, frames, ax, ay, elbow.x, elbow.y, at + 2, frames, palette, u), at));
+          const runAt = at + 2 + drawFrames(Math.hypot(elbow.x - ax, elbow.y - ay), u);
+          runs.filter(([x0, x1]) => Math.abs(x1 - x0) >= 2 * u).forEach(([x0, x1], k) => {
+            if (runAt < frames) elements.push(cued(segment(`callout-run-${i + 1}${k > 0 ? "b" : ""}`, 7 + i * 5 + k, runAt, frames, x0, elbow.y, x1, elbow.y, runAt, frames, palette, u), at));
+          });
           const labelAt = Math.min(frames - 2, runAt + 3);
-          const lw = labelW + 30 * u;
-          const lh = lineH + 20 * u;
-          const anchorRight = portrait ? p.leftSide : side < 0;
+          const pad3 = Math.ceil(type.nameSize * 0.3);
+          const lw = Math.ceil(w * 1.02 + 2 * pad3);
+          const lh = Math.ceil(blockH(l) + 2 * pad3);
+          const drawLeft = anchorEnd ? q.x - lw + pad3 : q.x - pad3;
+          const drawTop = q.y - 0.95 * type.nameSize - pad3;
+          const tx = anchorEnd ? lw - pad3 : pad3;
+          const anchor2 = anchorEnd ? "end" : "start";
           elements.push(
-            cued(drawing(`callout-label-${i + 1}`, 8 + i * 4, labelAt, frames, { width: lw, height: lh }, (d) => {
-              const x = anchorRight ? lw - 10 * u : 10 * u;
-              const anchor2 = anchorRight ? "end" : "start";
-              d.text(x, 10 * u + nameSize * 0.95, [{ text: `${index}  `, fill: palette.accent }, { text: labels[p.a.i], fill: palette.ink }], { size: nameSize, font: "mono", bold: true, fill: palette.ink, anchor: anchor2 });
-              if (value) d.text(x, 10 * u + nameSize * 1.25 + valueSize * 1.05, value, { size: valueSize, font: "mono", fill: palette.muted, anchor: anchor2 });
-            }, enter(pose(labelX + labelW / 2, labelY + (portrait ? p.above ? -lineH / 2 + nameSize * 0.4 : lineH / 2 - nameSize * 0.2 : lineH / 2 - nameSize * 0.6)), labelAt, { dx: side * 18 * u, frames: 8, ease: "out_strong" })), at)
+            cued(drawing(`callout-label-${i + 1}`, 9 + i * 5, labelAt, frames, { width: lw, height: lh }, (d) => {
+              l.name.forEach((line2, k) => {
+                const runsOf = k === 0 ? [{ text: `${l.index}  `, fill: palette.accent }, { text: line2, fill: palette.ink }] : [{ text: line2, fill: palette.ink }];
+                d.text(tx + (k > 0 && !anchorEnd ? indent : 0), pad3 + 0.95 * type.nameSize + k * nameLead, runsOf, { size: type.nameSize, ...NAME, fill: palette.ink, anchor: anchor2 });
+              });
+              l.value.forEach((line2, k) => {
+                d.text(tx + (anchorEnd ? 0 : indent), pad3 + 0.95 * type.nameSize + (l.name.length - 1) * nameLead + 1.3 * type.valueSize + k * valueLead, line2, { size: type.valueSize, ...VALUE, fill: palette.muted, anchor: anchor2 });
+              });
+            }, enter(pose(drawLeft + lw / 2, drawTop + lh / 2), labelAt, { dx: (q.leftSide ? -1 : 1) * 18 * u, frames: 8, ease: "out_strong" })), at)
           );
         });
         return { elements, cues };
@@ -33707,18 +33901,17 @@ var init_callout = __esm({
 });
 
 // ../engine/src/motion/templates/crop-labels.ts
-function defaultBoxes(layout, count2) {
-  const { W, H, portrait } = layout;
+function defaultBoxes(layout, count2, tag) {
+  const { W, H, portrait, safe: safe2 } = layout;
   const side = Math.min(W, H) * (portrait ? 0.34 : 0.3);
   const w = side / W;
   const h = side / H;
-  const spots = portrait ? [
-    [0.3, 0.3],
-    [0.68, 0.46],
-    [0.34, 0.63],
-    [0.7, 0.75],
-    [0.5, 0.18]
-  ] : [
+  if (portrait) {
+    const first = (safe2.top + tag + side / 2) / H;
+    const last = (safe2.bottom - side / 2) / H;
+    return Array.from({ length: count2 }, (_, k) => ({ x: k % 2 === 0 ? 0.32 : 0.68, y: count2 === 1 ? (first + last) / 2 : first + k * (last - first) / (count2 - 1), w, h }));
+  }
+  const spots = [
     [0.27, 0.38],
     [0.55, 0.64],
     [0.78, 0.33],
@@ -33742,30 +33935,35 @@ var init_crop_labels = __esm({
   "../engine/src/motion/templates/crop-labels.ts"() {
     "use strict";
     init_elements();
+    init_layout();
     init_text();
     init_template();
     MAX_BOXES = 5;
     PUSH = 1.06;
     cropLabels = {
       id: "crop_labels",
-      summary: "A shot fills the frame and pushes in; labelled crop boxes snap onto it one per beat; then a paper scrim covers it and the crops lift out of the shot into a row of labelled tiles.",
+      summary: "A shot fills the frame and pushes in; labelled crop boxes snap onto it one per beat; then a paper scrim covers it and the crops lift out of the shot into labelled tiles: a row, or a column of big tiles on vertical video.",
       reads: "file_ids (the shot: the first file), boxes (frame boxes, 0-1; default a spread), labels (one per box; default DETAIL 01\u2026), tag (the default labels' prefix), variant (boxes: no row)",
       media: "required",
       beats: (content) => (content.boxes?.length ?? Math.max(3, content.labels?.length ?? 3)) + (content.variant === "boxes" ? 2 : 5),
       build(input4) {
         const { content, palette, layout, frames, beats, media, frame } = input4;
-        const { W, H, u, m, portrait } = layout;
+        const { W, H, u, portrait, safe: safe2 } = layout;
         const file3 = content.fileIds?.[0];
         if (!file3) refuse("crop_labels needs file_ids: the shot to label");
         if (content.variant !== void 0 && content.variant !== "boxes" && content.variant !== "row") refuse("crop_labels variant is boxes or row");
         const shot = media.get(file3);
         const count2 = content.boxes?.length ?? Math.min(MAX_BOXES, Math.max(3, content.labels?.length ?? 3));
         if (count2 > MAX_BOXES) refuse(`crop_labels draws at most ${MAX_BOXES} boxes`);
-        const boxes = (content.boxes ?? defaultBoxes(layout, count2)).map((b) => {
-          const w = Math.min(b.w * W, W - 2 * m);
-          const h = Math.min(b.h * H, H - 2 * m);
-          const x0 = Math.max(m, Math.min(W - m - w, b.x * W - w / 2));
-          const y0 = Math.max(m * 1.6, Math.min(H - m - h, b.y * H - h / 2));
+        const stroke = Math.max(2, 3 * u);
+        const tagSize = typeSize(layout, "label", (portrait ? 38 : 34) * u);
+        const tagH = tagSize * 1.7;
+        const tagRoom = tagH + stroke * 2;
+        const boxes = (content.boxes ?? defaultBoxes(layout, count2, tagRoom)).map((b) => {
+          const w = Math.min(b.w * W, safe2.right - safe2.left);
+          const h = Math.min(b.h * H, safe2.bottom - safe2.top - tagRoom);
+          const x0 = Math.max(safe2.left, Math.min(safe2.right - w, b.x * W - w / 2));
+          const y0 = Math.max(safe2.top + tagRoom, Math.min(safe2.bottom - h, b.y * H - h / 2));
           return { x0, y0, w, h };
         });
         const prefix = (content.tag?.trim() || "DETAIL").toUpperCase().replace(/\s+/g, " ");
@@ -33780,14 +33978,13 @@ var init_crop_labels = __esm({
         const rowAt = beats.frame(rowBeat);
         const lift = Math.max(8, Math.min(16, beats.span(rowBeat, beats.step) - 2));
         const row = content.variant !== "boxes" && rowAt + lift + 10 <= frames;
-        const stroke = Math.max(2, 3 * u);
-        const tagSize = Math.round(24 * u);
         boxes.forEach((b, i) => {
           const from = enters[i];
           if (from >= frames) return;
           const to = row ? Math.min(frames, rowAt + 5) : frames;
-          const tagW = textWidth(labels[i], { size: tagSize, font: "mono", tracking: 0.04 }) + tagSize * 1.2;
-          const tagH = tagSize * 1.7;
+          const tagStyle = { size: tagSize, font: "mono", bold: true, tracking: 0.04 };
+          const tag = clampText(labels[i], tagStyle, Math.max(b.w, safe2.right - b.x0) - tagSize * 1.2);
+          const tagW = textWidth(tag, tagStyle) + tagSize * 1.2;
           const tick = Math.min(b.w, b.h) * 0.14;
           const pad3 = tagH + 8 * u;
           const dw = Math.max(b.w + 2 * pad3, tagW + pad3);
@@ -33816,32 +34013,89 @@ var init_crop_labels = __esm({
                 );
               }
               d.rect(ox - stroke, oy - tagH - stroke * 2, tagW, tagH, { fill: palette.accent });
-              d.text(ox - stroke + tagSize * 0.6, oy - stroke * 2 - tagH / 2 + tagSize * 0.36, labels[i], { size: tagSize, font: "mono", bold: true, fill: palette.accentInk, tracking: 0.04 });
+              d.text(ox - stroke + tagSize * 0.6, oy - stroke * 2 - tagH / 2 + tagSize * 0.36, tag, { ...tagStyle, fill: palette.accentInk });
             }, keys)
           );
         });
         const cues = [...enters];
         if (row) {
           elements.push(backdrop("crops-scrim", 1, rowAt, frames, layout, (d) => d.rect(0, 0, W, H, { fill: palette.background, fillOpacity: 0.94 }), enter(pose(W / 2, H / 2), rowAt, { frames: 8, ease: "out" })));
-          const gap = W * (portrait ? 0.035 : 0.03);
           const aspects = boxes.map((b) => b.w / b.h);
-          const sum = aspects.reduce((a, b) => a + b, 0);
-          const tileH = Math.min((W - 2 * m - gap * (boxes.length - 1)) / sum, H * (portrait ? 0.24 : 0.36), W * (portrait ? 0.34 : 0.24));
-          const rowW = sum * tileH + gap * (boxes.length - 1);
-          const rowY = H * (portrait ? 0.46 : 0.46);
-          let x = (W - rowW) / 2;
+          const mono = (size, bold = false) => ({ size, font: "mono", bold, tracking: 0.02 });
+          const indexes = boxes.map((_, i) => String(i + 1).padStart(2, "0"));
+          let slots2;
+          let indexSize;
+          let nameSize;
+          let labelsDrawing;
+          if (portrait) {
+            const gap = 36 * u;
+            const sideGap = 40 * u;
+            const safeW = safe2.right - safe2.left;
+            const tileH = Math.min((safe2.bottom - safe2.top - 80 * u - gap * (boxes.length - 1)) / boxes.length, ...aspects.map((a) => safeW * 0.6 / a));
+            const widest = Math.max(...aspects) * tileH;
+            const room = safeW - widest - sideGap;
+            nameSize = typeSize(layout, "body", Math.min(60 * u, fitSize(labels, mono(1), room / 1.02, 60 * u)));
+            indexSize = Math.round(nameSize * 1.35);
+            const shownW = Math.min(room, Math.max(...labels.map((l) => textWidth(l, mono(nameSize))), ...indexes.map((x) => textWidth(x, mono(indexSize, true)))) * 1.02);
+            const left = safe2.left + (safeW - (widest + sideGap + shownW)) / 2;
+            const columnH = boxes.length * tileH + gap * (boxes.length - 1);
+            const top = (safe2.top + safe2.bottom) / 2 - columnH / 2;
+            slots2 = boxes.map((_, i) => ({ x: left + aspects[i] * tileH / 2, y: top + i * (tileH + gap) + tileH / 2, w: aspects[i] * tileH, h: tileH }));
+            const lx = left + widest + sideGap;
+            labelsDrawing = {
+              width: shownW + 8 * u,
+              height: columnH,
+              x: lx + (shownW + 8 * u) / 2,
+              y: top + columnH / 2,
+              paint: (d) => {
+                slots2.forEach((slot, i) => {
+                  const y0 = slot.y - slot.h / 2 - top;
+                  d.line(0, y0 + 2 * u, shownW, y0 + 2 * u, { stroke: palette.ink, strokeWidth: 2 * u });
+                  d.text(0, y0 + 2 * u + 18 * u + indexSize * 0.75, indexes[i], { ...mono(indexSize, true), fill: palette.accent });
+                  d.text(0, y0 + 2 * u + 18 * u + indexSize * 0.75 + nameSize * 1.35, clampText(labels[i], mono(nameSize), shownW), { ...mono(nameSize), fill: palette.ink });
+                });
+              }
+            };
+          } else {
+            indexSize = typeSize(layout, "body", 34 * u);
+            nameSize = typeSize(layout, "label", 30 * u);
+            const gap = W * 0.03;
+            const m = safe2.left;
+            const sum = aspects.reduce((a, b) => a + b, 0);
+            const tileH = Math.min((W - 2 * m - gap * (boxes.length - 1)) / sum, H * 0.36, W * 0.24);
+            const rowW = sum * tileH + gap * (boxes.length - 1);
+            const rowY = H * 0.46;
+            let x = (W - rowW) / 2;
+            slots2 = boxes.map((_, i) => {
+              const tw = aspects[i] * tileH;
+              const slot = { x: x + tw / 2, y: rowY, w: tw, h: tileH };
+              x += tw + gap;
+              return slot;
+            });
+            const labelTop = rowY + tileH / 2 + 22 * u;
+            labelsDrawing = {
+              width: W,
+              height: indexSize * 2.4,
+              x: W / 2,
+              y: labelTop + indexSize * 1.2,
+              paint: (d) => {
+                slots2.forEach((slot, i) => {
+                  const index = indexes[i];
+                  d.line(slot.x - slot.w / 2, 2 * u, slot.x + slot.w / 2, 2 * u, { stroke: palette.ink, strokeWidth: 2 * u });
+                  d.text(slot.x - slot.w / 2, indexSize * 1.4, index, { ...mono(indexSize, true), fill: palette.accent });
+                  const room = slot.w - textWidth(index, mono(indexSize, true)) - indexSize * 0.6;
+                  d.text(slot.x + slot.w / 2, indexSize * 1.4, clampText(labels[i], mono(nameSize), room), { ...mono(nameSize), fill: palette.ink, anchor: "end" });
+                });
+              }
+            };
+          }
           const z2 = zoomAt(rowAt);
           const shotStart = shotEl.source.kind === "media" ? shotEl.source.start + rowAt / frame.fps * shotEl.source.speed : 0;
-          const labelSize = Math.round(27 * u);
-          const slots2 = [];
           boxes.forEach((b, i) => {
-            const tw = aspects[i] * tileH;
-            const slotX = x + tw / 2;
-            slots2.push({ x: slotX, w: tw });
-            x += tw + gap;
+            const slot = slots2[i];
             const crop2 = windowUnder(shot, layout, b, z2);
             const rest = pose(b.x0 + b.w / 2, b.y0 + b.h / 2);
-            const moved = pose(slotX, rowY, { s: tw / b.w });
+            const moved = pose(slot.x, slot.y, { s: slot.w / b.w });
             elements.push(
               mediaCard(`crops-tile-${i + 1}`, 2 + boxes.length + i, rowAt, frames, shot, frame.fps, { width: b.w, radius: 0, crop: crop2, start: shotStart }, [
                 key(rowAt, rest),
@@ -33850,15 +34104,9 @@ var init_crop_labels = __esm({
             );
           });
           const labelsAt = Math.min(frames - 1, rowAt + lift);
-          const labelTop = rowY + tileH / 2 + 22 * u;
+          const ld = labelsDrawing;
           elements.push(
-            cued(drawing("crops-row-labels", 2 + 2 * boxes.length, labelsAt, frames, { width: W, height: labelSize * 4 }, (d) => {
-              slots2.forEach((slot, i) => {
-                d.line(slot.x - slot.w / 2, 2 * u, slot.x + slot.w / 2, 2 * u, { stroke: palette.ink, strokeWidth: 2 * u });
-                d.text(slot.x - slot.w / 2, labelSize * 1.6, String(i + 1).padStart(2, "0"), { size: labelSize, font: "mono", bold: true, fill: palette.accent });
-                d.text(slot.x + slot.w / 2, labelSize * 1.6, labels[i], { size: labelSize * 0.86, font: "mono", fill: palette.ink, anchor: "end", tracking: 0.02 });
-              });
-            }, enter(pose(W / 2, labelTop + labelSize * 2), labelsAt, { dy: 14 * u, frames: 8 })), rowAt)
+            cued(drawing("crops-row-labels", 2 + 2 * boxes.length, labelsAt, frames, { width: ld.width, height: ld.height }, ld.paint, enter(pose(ld.x, ld.y), labelsAt, portrait ? { dx: 18 * u, frames: 8 } : { dy: 14 * u, frames: 8 })), rowAt)
           );
           cues.push(rowAt);
         }
@@ -33893,6 +34141,7 @@ var init_end_card = __esm({
     "use strict";
     init_elements();
     init_shapes();
+    init_layout();
     init_text();
     init_template();
     END_VARIANTS = ["logo", "save", "plain"];
@@ -33904,7 +34153,7 @@ var init_end_card = __esm({
       beats: () => 8,
       build(input4) {
         const { content, palette, layout, frames, beats } = input4;
-        const { W, H, u, m, portrait } = layout;
+        const { W, H, u, m, portrait, tall, safe: safe2 } = layout;
         const variant = content.variant ?? (palette.name === "tutorial" ? "save" : palette.name.startsWith("ui") ? "logo" : "plain");
         if (!END_VARIANTS.includes(variant)) refuse(`end_card variant must be one of ${END_VARIANTS.join(", ")} (got ${variant})`);
         const title = (content.text ?? (variant === "save" ? "Save this" : "")).replace(/\s+/g, " ").trim();
@@ -33913,22 +34162,29 @@ var init_end_card = __esm({
         const elements = [];
         if (content.backdrop !== false) elements.push(backdrop("end-backdrop", 0, 0, frames, layout, (d) => d.rect(0, 0, W, H, { fill: palette.background })));
         const [e0, e1, e2] = beats.entrances(3, frames, 14);
-        const subSize = Math.round((portrait ? 50 : 42) * u);
+        const centredW = portrait ? centredWidth(layout) : W - 2 * m;
+        const subSize = typeSize(layout, "body", (portrait ? 50 : 42) * u);
+        const heading = { font: "sans", bold: true, tracking: -0.02 };
         const addSubtitle = (at, y, x = W / 2, anchor2 = "middle") => {
           if (!subtitle) return;
-          const block = { lines: [subtitle], size: fitSize([subtitle], { font: "sans" }, (W - 2 * m) / 1.1, subSize, 20 * u), font: "sans", fill: palette.muted, anchor: anchor2 };
+          const fitted = fitType(layout, "body", subtitle, { font: "sans" }, { width: (anchor2 === "middle" ? centredW : safe2.right - x) / 1.1, max: subSize });
+          const block = { lines: fitted.lines, size: fitted.size, font: "sans", fill: palette.muted, anchor: anchor2 };
           const box = textBox(block, x, y);
           elements.push(textElement("end-subtitle", 4, at, frames, block, box, enter(pose(box.x, box.y), at, { dy: 22 * u, frames: 12 })));
         };
+        const place = (fallback, top, bottom) => tall ? opticalCentre(layout) - (top + bottom) / 2 : fallback;
         if (variant === "logo") {
           const S = Math.round((portrait ? 250 : 184) * u);
           const letter = (title.match(/[\p{L}\p{N}]/u)?.[0] ?? title[0]).toUpperCase();
           const gap = Math.round(46 * u);
           const maxT = Math.round((portrait ? 176 : 156) * u);
-          const T2 = portrait ? fitSize([title], { font: "sans", bold: true, tracking: -0.02 }, W - 2 * m, maxT, 40 * u) : fitSize([title], { font: "sans", bold: true, tracking: -0.02 }, W - 4 * m - S - gap, maxT, 40 * u);
-          const word = { lines: [title], size: T2, font: "sans", bold: true, tracking: -0.02, fill: palette.ink, anchor: portrait ? "middle" : "start" };
-          const textW = textWidth(title, word);
-          const cy = H * (portrait ? 0.4 : 0.46);
+          const room = portrait ? centredW : W - 4 * m - S - gap;
+          const T2 = typeSize(layout, "heading", fitSize([title], heading, room, maxT));
+          const name = clampText(title, { ...heading, size: T2 }, room);
+          const word = { lines: [name], size: T2, ...heading, fill: palette.ink, anchor: portrait ? "middle" : "start" };
+          const textW = textWidth(name, word);
+          const below = S / 2 + 56 * u + 0.72 * T2;
+          const cy = portrait ? place(H * 0.4, -S / 2, below + (subtitle ? 96 * u + 0.28 * subSize : 0.28 * T2)) : H * 0.46;
           const markX = portrait ? W / 2 : (W - (S + gap + textW)) / 2 + S / 2;
           const markY = cy;
           elements.push(
@@ -33945,22 +34201,23 @@ var init_end_card = __esm({
               enter(pose(markX, markY), e0, { s: 0.35, rotation: -16, frames: 12, ease: "out_back" })
             )
           );
-          const wordBox = portrait ? textBox(word, W / 2, cy + S / 2 + 56 * u + 0.72 * T2) : textBox(word, markX + S / 2 + gap, cy + 0.36 * T2);
+          const wordBox = portrait ? textBox(word, W / 2, cy + below) : textBox(word, markX + S / 2 + gap, cy + 0.36 * T2);
           const wordIn = portrait ? { dy: 34 * u, frames: 14, ease: "out_strong" } : { dx: -44 * u, frames: 14, ease: "out_strong" };
           elements.push(textElement("end-name", 2, e1, frames, word, wordBox, enter(pose(wordBox.x, wordBox.y), e1, wordIn)));
-          addSubtitle(e2, portrait ? cy + S / 2 + 56 * u + 0.72 * T2 + 96 * u : cy + S / 2 + 84 * u);
+          addSubtitle(e2, portrait ? cy + below + 96 * u : cy + S / 2 + 84 * u);
         } else if (variant === "save") {
           const bw = Math.round((portrait ? 116 : 96) * u);
           const bh = Math.round(bw * 1.3);
-          const iconY = H * (portrait ? 0.35 : 0.3);
+          const fitted = fitType(layout, "heading", title, heading, { width: W - 2.4 * m, height: H * 0.24, max: Math.round((portrait ? 150 : 132) * u), maxLines: 2, leading: 1.02 });
+          const T2 = fitted.size;
+          const below = bh / 2 + 70 * u + 0.72 * T2 + (fitted.lines.length - 1) * 1.02 * T2;
+          const iconY = place(H * (portrait ? 0.35 : 0.3), -bh / 2, below + (subtitle ? 96 * u + 0.28 * subSize : 0.28 * T2));
           elements.push(
             drawing("end-bookmark", 1, e0, frames, { width: bw + 8 * u, height: bh + 8 * u }, (d) => bookmark(d, 4 * u, 4 * u, bw, bh, { fill: palette.accent, stroke: palette.ink, strokeWidth: 5 * u }), [
               ...enter(pose(W / 2, iconY, { rotation: -6 }), e0, { dy: -80 * u, s: 0.7, rotation: -18, frames: 12, ease: "out_back" })
             ])
           );
-          const fitted = fitBlock(title, { font: "sans", bold: true, tracking: -0.02 }, W - 2.4 * m, H * 0.24, Math.round((portrait ? 150 : 132) * u), 2, 1.02);
-          const T2 = fitted.size;
-          const block = { lines: fitted.lines, size: T2, font: "sans", bold: true, tracking: -0.02, fill: palette.ink, anchor: "middle", leading: 1.02 };
+          const block = { lines: fitted.lines, size: T2, ...heading, fill: palette.ink, anchor: "middle", leading: 1.02 };
           const firstBase = iconY + bh / 2 + 70 * u + 0.72 * T2;
           const box = textBox(block, W / 2, firstBase);
           const lastBase = firstBase + (fitted.lines.length - 1) * 1.02 * T2;
@@ -33980,12 +34237,13 @@ var init_end_card = __esm({
           const align = content.align ?? (palette.name === "editorial" ? "left" : "center");
           const anchor2 = align === "left" ? "start" : "middle";
           const x = align === "left" ? m * 1.6 : W / 2;
-          const fitted = fitBlock(title, { font: "sans", bold: true, tracking: -0.025 }, (W - 3.2 * m) / 1.04, H * (portrait ? 0.3 : 0.42), Math.round((portrait ? 140 : 150) * u), 3, 0.98);
+          const room = tall ? align === "left" ? safe2.right - x : centredW : W - 3.2 * m;
+          const fitted = fitType(layout, "heading", title, { ...heading, tracking: -0.025 }, { width: room / 1.04, height: H * (portrait ? 0.3 : 0.42), max: Math.round((portrait ? 140 : 150) * u), maxLines: 3, leading: 0.98 });
           const T2 = fitted.size;
-          const block = { lines: fitted.lines, size: T2, font: "sans", bold: true, tracking: -0.025, fill: palette.ink, anchor: anchor2, leading: 0.98 };
-          const tagSize = Math.round(24 * u);
+          const block = { lines: fitted.lines, size: T2, ...heading, tracking: -0.025, fill: palette.ink, anchor: anchor2, leading: 0.98 };
+          const tagSize = typeSize(layout, "label", 30 * u);
           const blockH = (content.tag ? tagSize * 1.9 + 34 * u : 0) + fitted.lines.length * 0.98 * T2 + (subtitle ? 90 * u : 0);
-          let y = H * (portrait ? 0.45 : 0.5) - blockH / 2;
+          let y = (tall ? opticalCentre(layout) : H * (portrait ? 0.45 : 0.5)) - blockH / 2;
           if (content.tag?.trim()) {
             const tag = content.tag.trim();
             const tagW = textWidth(tag.toUpperCase(), { size: tagSize, font: "mono", tracking: 0.06 }) + tagSize * 1.5;
@@ -34064,13 +34322,13 @@ function breakLines(words3, n) {
   split2(0, Math.min(n, words3.length), []);
   return best.lines;
 }
-function layoutWords(words3, maxW, maxH, maxSize, maxLines) {
+function layoutWords(words3, maxW, maxH, maxSize, maxLines, floor) {
   let best = { lines: [], size: 0 };
   for (let n = 1; n <= Math.min(maxLines, words3.length); n += 1) {
     const lines2 = breakLines(words3, n);
     const widest = Math.max(...lines2.map(lineWidth));
     const size = Math.floor(Math.min(maxSize, maxW / widest, maxH / lines2.length));
-    if (size > best.size * 1.3 ** (n - best.lines.length)) best = { lines: lines2.map((l) => ({ words: l, width: lineWidth(l) })), size };
+    if (best.size < floor && size > best.size || size > best.size * 1.3 ** (n - best.lines.length)) best = { lines: lines2.map((l) => ({ words: l, width: lineWidth(l) })), size };
   }
   return best;
 }
@@ -34079,6 +34337,7 @@ var init_kinetic_type = __esm({
   "../engine/src/motion/templates/kinetic-type.ts"() {
     "use strict";
     init_elements();
+    init_layout();
     init_text();
     init_template();
     init_end_card();
@@ -34106,14 +34365,19 @@ var init_kinetic_type = __esm({
         if (tileCount > 4) refuse("kinetic_type shows at most 4 image tiles");
         if (content.highlight !== void 0 && content.highlight >= words3.length) refuse(`kinetic_type: highlight is a word index, 0 to ${words3.length - 1}`);
         const align = content.align ?? (palette.name === "editorial" ? "left" : "center");
+        const { safe: safe2, tall } = layout;
         const left = m * 1.3;
-        const maxW = W - 2 * left;
-        const laid = layoutWords(pieces, maxW / 1.04, H * (portrait ? 0.42 : 0.56), Math.round((portrait ? 210 : 200) * u), portrait ? 4 : 3);
+        const maxW = align === "left" ? Math.min(W - left, safe2.right) - left : 2 * Math.min(W / 2 - left, safe2.right - W / 2);
+        const laid = layoutWords(pieces, maxW / 1.04, H * (portrait ? 0.42 : 0.56), Math.round((portrait ? 210 : 200) * u), portrait ? 6 : 3, layout.type.heading);
         const S = laid.size;
         const lead = S * 1;
         const blockH = laid.lines.length * lead;
         const position = content.position ?? "center";
-        const top = position === "top" ? H * (portrait ? 0.12 : 0.13) : position === "bottom" ? H * (portrait ? 0.8 : 0.86) - blockH : (H - blockH) / 2;
+        const tagRoom = content.tag?.trim() ? typeSize(layout, "label", S * 0.2) * 2.6 : 0;
+        const top = Math.max(
+          tall ? safe2.top + tagRoom : 0,
+          position === "top" ? H * (portrait ? 0.12 : 0.13) : position === "bottom" ? Math.min(H * (portrait ? 0.8 : 0.86), safe2.bottom) - blockH : (tall ? opticalCentre(layout) * 2 : H) / 2 - blockH / 2
+        );
         const capH = S * 0.72;
         const tileH = S * 0.78;
         const segments2 = [];
@@ -34211,7 +34475,7 @@ var init_kinetic_type = __esm({
         if (content.tag?.trim()) {
           const tagAt = beats.frame(beats.beatAfter(enters[enters.length - 1]));
           if (tagAt + 6 < frames) {
-            const size = Math.round(Math.max(20, S * 0.2));
+            const size = typeSize(layout, "label", S * 0.2);
             const tagW = textWidth(content.tag.trim().toUpperCase(), { size, font: "mono", tracking: 0.06 }) + size * 1.5;
             const x = align === "left" ? left + tagW / 2 : W / 2;
             const y = top - size * 1.6;
@@ -34232,6 +34496,7 @@ var init_step_card = __esm({
     "use strict";
     init_shapes();
     init_elements();
+    init_layout();
     init_text();
     init_template();
     TALLEST = 4 / 5;
@@ -34239,12 +34504,12 @@ var init_step_card = __esm({
     stepCard = {
       id: "step_card",
       summary: "A tutorial step: the footage rises into a rounded card with an ink border and a hard shadow, a numbered caption pops in under it, then a small label box appears and an arrow draws from it to a point in the footage.",
-      reads: "file_ids (the step's footage: the first file), text (the caption), step (its number, default 1), tag (the label box's text), points (where the arrow points in the footage, 0-1; default the upper right), subtitle (a still header at the top, e.g. the video's hook)",
+      reads: "file_ids (the step's footage: the first file), text (the caption), step (its number, default 1), tag (the label box's text), points (where the arrow points in the footage, 0-1; the card's crop keeps it in view; default the card's upper right), subtitle (a still header at the top, e.g. the video's hook)",
       media: "required",
       beats: (content) => content.tag ? 8 : 6,
       build(input4) {
         const { content, palette, layout, frames, beats, media, frame } = input4;
-        const { W, H, u, m, portrait } = layout;
+        const { W, H, u, m, portrait, safe: safe2 } = layout;
         const file3 = content.fileIds?.[0];
         if (!file3) refuse("step_card needs file_ids: the step's footage");
         const caption2 = (content.text ?? "").replace(/\s+/g, " ").trim();
@@ -34252,21 +34517,58 @@ var init_step_card = __esm({
         const step = content.step ?? 1;
         const m0 = media.get(file3);
         const own2 = m0.width / m0.height;
-        const aspect = Math.max(TALLEST, Math.min(portrait ? 4 / 3 : WIDEST, own2));
-        const crop2 = cropToAspect(m0, aspect);
-        const maxW = portrait ? W * 0.86 : W * 0.5;
-        const maxH = portrait ? H * 0.42 : H * 0.62;
-        const cw = Math.min(maxW, maxH * aspect);
-        const ch = cw / aspect;
-        const cx = portrait ? W / 2 : W * 0.37;
-        const cy = portrait ? H * (ch > H * 0.3 ? 0.47 : 0.45) : H * 0.52;
+        const aspect = portrait ? TALLEST : Math.max(TALLEST, Math.min(WIDEST, own2));
+        const focus = content.points?.[0];
+        const crop2 = cropToAspect(m0, aspect, focus);
+        const e0 = beats.frame(0);
+        const [e1, e2] = [beats.frame(beats.step), beats.frame(2 * beats.step)];
         const radius = 26 * u;
         const border = 5 * u;
         const off = 14 * u;
-        const e0 = beats.frame(0);
-        const [e1, e2] = [beats.frame(beats.step), beats.frame(2 * beats.step)];
-        const rise = enter(pose(cx, cy), e0, { dy: H * 0.3, s: 0.94, rotation: 3, alpha: 1, frames: 14, ease: "out_back" });
         const elements = [];
+        const header = content.subtitle?.replace(/\s+/g, " ").trim();
+        let headerBottom = portrait ? safe2.top - 40 * u : m;
+        if (header) {
+          const style = { font: "sans", bold: true, tracking: -0.02 };
+          const fitted2 = fitType(layout, "heading", header, style, { width: (portrait ? centredWidth(layout) : W - 2.4 * m) / ROOMY, max: (portrait ? 92 : 84) * u, maxLines: 2, leading: 1.04 });
+          const block = { lines: fitted2.lines, size: fitted2.size, ...style, fill: palette.ink, anchor: portrait ? "middle" : "start", leading: 1.04 };
+          const capTop = portrait ? safe2.top : m * 1.2;
+          const box = textBox(block, portrait ? W / 2 : m * 1.2, capTop + 0.75 * fitted2.size);
+          elements.push(textElement("step-header", 7, 0, frames, block, box));
+          headerBottom = capTop + 0.75 * fitted2.size + (fitted2.lines.length - 1) * 1.04 * fitted2.size + 0.28 * fitted2.size;
+        }
+        const capStyle = { font: "sans", bold: true };
+        const capMax = (portrait ? 64 : 46) * u;
+        const badge = typeSize(layout, "body", capMax) * 1.5;
+        const tag = content.tag?.replace(/\s+/g, " ").trim() ?? "";
+        const tagSize = typeSize(layout, "body", (portrait ? 48 : 34) * u);
+        const tagH = tagSize * 2;
+        let cw;
+        let cx;
+        let cy;
+        let capW;
+        if (portrait) {
+          capW = centredWidth(layout);
+          const capFit = fitType(layout, "body", caption2, capStyle, { width: (capW - badge - capMax * 1.6) / ROOMY, max: capMax, maxLines: 2 });
+          const capH = Math.max(badge + capFit.size * 0.5, capFit.lines.length * capFit.size * 1.15 + capFit.size * 0.8) + 8 * u;
+          const tagRow = tag ? tagH * 0.67 + 24 * u : 0;
+          const stageTop = headerBottom + 40 * u;
+          const room = safe2.bottom - stageTop - tagRow - 44 * u - capH;
+          const ch2 = Math.min(room, W * 0.84 / aspect);
+          cw = ch2 * aspect;
+          cx = W / 2;
+          cy = stageTop + (safe2.bottom - stageTop - (tagRow + ch2 + 44 * u + capH)) / 2 + tagRow + ch2 / 2;
+        } else {
+          const tagRow = tag ? tagH + 40 * u : 0;
+          const cardTop = headerBottom + 30 * u + tagRow;
+          const ch2 = Math.min(H * 0.62, H - m - cardTop, W * 0.5 / aspect);
+          cw = ch2 * aspect;
+          cx = W * 0.37;
+          cy = Math.max(H * 0.52, cardTop + ch2 / 2);
+          capW = W - cx - cw / 2 - 2 * m;
+        }
+        const ch = cw / aspect;
+        const rise = enter(pose(cx, cy), e0, { dy: H * 0.3, s: 0.94, rotation: 3, alpha: 1, frames: 14, ease: "out_back" });
         elements.push(
           drawing("step-shadow", 0, e0, frames, { width: cw + 2 * off, height: ch + 2 * off }, (d) => d.rect(2 * off, 2 * off, cw - border, ch - border, { fill: palette.shadow, fillOpacity: palette.shadowOpacity, rx: radius }), rise)
         );
@@ -34275,48 +34577,40 @@ var init_step_card = __esm({
         elements.push(
           drawing("step-border", 2, e0, card.to, { width: cw + 2 * border, height: ch + 2 * border }, (d) => d.rect(border * 1.5, border * 1.5, cw - border, ch - border, { stroke: palette.ink, strokeWidth: border, rx: radius - border / 2 }), rise)
         );
-        const capSize = Math.round((portrait ? 56 : 46) * u);
-        const badge = capSize * 1.5;
-        const labelMax = portrait ? W - 2 * m : W - cx - cw / 2 - 2 * m;
-        const textMax = labelMax - badge - capSize * 1.6;
-        const size = fitSize([caption2], { font: "sans", bold: true }, textMax / ROOMY, capSize, 22 * u);
-        const shown = clampText(caption2, { size, font: "sans", bold: true }, textMax / ROOMY);
-        const tw = textWidth(shown, { size, font: "sans", bold: true }) * ROOMY;
-        const lw = badge + tw + capSize * 1.4;
-        const lh = Math.max(badge + capSize * 0.5, size * 1.9);
+        const textMax = capW - badge - capMax * 1.6;
+        const fitted = fitType(layout, "body", caption2, capStyle, { width: textMax / ROOMY, max: capMax, maxLines: portrait ? 2 : 1 });
+        const size = fitted.size;
+        const shown = fitted.lines.map((line2) => clampText(line2, { ...capStyle, size }, textMax / ROOMY));
+        const tw = Math.max(...shown.map((line2) => textWidth(line2, { ...capStyle, size }))) * ROOMY;
+        const capLead = size * 1.15;
+        const lw = badge + tw + capMax * 1.4;
+        const lh = Math.max(badge + size * 0.5, shown.length * capLead + size * 0.8);
         const lx = portrait ? W / 2 : cx + cw / 2 + m * 0.6 + lw / 2;
-        const ly = portrait ? cy + ch / 2 + 54 * u + lh / 2 : cy - ch * 0.12;
+        const ly = portrait ? cy + ch / 2 + 44 * u + lh / 2 : cy - ch * 0.12;
         const capIn = new Motion(enter(pose(lx, ly), e1, { dy: 34 * u, s: 0.9, frames: 10, ease: "out_back" }));
         elements.push(
           drawing("step-caption", 3, e1, frames, { width: lw + 2 * off, height: lh + 2 * off }, (d) => {
             d.rect(off + 8 * u, off + 8 * u, lw, lh, { fill: palette.ink, rx: 18 * u });
             d.rect(off, off, lw, lh, { fill: palette.surface, stroke: palette.ink, strokeWidth: 4 * u, rx: 18 * u });
-            const bx = off + capSize * 0.45 + badge / 2;
+            const bx = off + capMax * 0.45 + badge / 2;
             const by = off + lh / 2;
+            const badgeSize = badge / 1.5;
             d.circle(bx, by, badge / 2, { fill: palette.accent });
-            d.text(bx, by + capSize * 0.36, String(step), { size: capSize, font: "sans", bold: true, fill: palette.accentInk, anchor: "middle" });
-            d.text(bx + badge / 2 + capSize * 0.45, by + size * 0.36, shown, { size, font: "sans", bold: true, fill: palette.ink });
+            d.text(bx, by + badgeSize * 0.36, String(step), { size: badgeSize, font: "sans", bold: true, fill: palette.accentInk, anchor: "middle" });
+            const first = by - (shown.length - 1) * capLead / 2 + size * 0.36;
+            shown.forEach((line2, k) => d.text(bx + badge / 2 + capMax * 0.45, first + k * capLead, line2, { size, ...capStyle, fill: palette.ink }));
           }, capIn.keys)
         );
-        const header = content.subtitle?.replace(/\s+/g, " ").trim();
-        if (header) {
-          const fitted = fitBlock(header, { font: "sans", bold: true, tracking: -0.02 }, (W - 2 * m) / ROOMY, H * (portrait ? 0.11 : 0.14), Math.round((portrait ? 66 : 54) * u), 2, 1.04);
-          const block = { lines: fitted.lines, size: fitted.size, font: "sans", bold: true, tracking: -0.02, fill: palette.ink, anchor: portrait ? "middle" : "start", leading: 1.04 };
-          const box = textBox(block, portrait ? W / 2 : m * 1.2, H * (portrait ? 0.075 : 0.1) + fitted.size * 0.8);
-          elements.push(textElement("step-header", 7, 0, frames, block, box));
-        }
         const cues = [e0, e1];
-        const tag = content.tag?.replace(/\s+/g, " ").trim();
         if (tag && e2 + 12 <= frames) {
-          const target = content.points?.[0] ?? { x: 0.7, y: 0.32 };
+          const target = focus ? inWindow(focus, crop2) : { x: 0.7, y: 0.32 };
           const tx = cx - cw / 2 + target.x * cw;
           const ty = cy - ch / 2 + target.y * ch;
-          const tagSize = Math.round((portrait ? 38 : 32) * u);
-          const text5 = clampText(tag, { size: tagSize, font: "sans", bold: true }, W * 0.6);
+          const text5 = clampText(tag, { size: tagSize, font: "sans", bold: true }, (safe2.right - safe2.left) * 0.8 - tagSize * 1.4);
           const bw = textWidth(text5, { size: tagSize, font: "sans", bold: true }) * ROOMY + tagSize * 1.4;
-          const bh = tagSize * 2;
-          const bx = Math.max(m + bw / 2, Math.min(W - m - bw / 2, portrait ? tx + (target.x > 0.5 ? -bw * 0.15 : bw * 0.15) : tx + cw * 0.18));
-          const by = portrait ? cy - ch / 2 - 96 * u : Math.max(m + bh, cy - ch / 2 - 70 * u);
+          const bh = tagH;
+          const bx = Math.max(safe2.left + bw / 2, Math.min(safe2.right - bw / 2, portrait ? tx + (target.x > 0.5 ? -bw * 0.15 : bw * 0.15) : tx + cw * 0.18));
+          const by = portrait ? cy - ch / 2 - bh * 0.17 : Math.max(headerBottom + 30 * u + bh / 2, cy - ch / 2 - 70 * u);
           elements.push(
             drawing("step-label", 4, e2, frames, { width: bw + 12 * u, height: bh + 12 * u }, (d) => {
               d.rect(8 * u, 8 * u, bw, bh, { fill: palette.ink, rx: 12 * u });
@@ -34359,20 +34653,22 @@ function typingBeats(chars, bpm) {
   const seconds2 = chars / TYPE_RATE;
   return Math.max(1, Math.ceil(seconds2 / (60 / bpm) - 0.15));
 }
-var TYPE_RATE, MIN_PREFIX_FRAMES, MAX_CHARS, typeSearch;
+var TYPE_RATE, MIN_PREFIX_FRAMES, MAX_CHARS, GLIDE, typeSearch;
 var init_type_search = __esm({
   "../engine/src/motion/templates/type-search.ts"() {
     "use strict";
     init_elements();
+    init_layout();
     init_shapes();
     init_text();
     init_template();
     TYPE_RATE = 15;
     MIN_PREFIX_FRAMES = 2;
     MAX_CHARS = 64;
+    GLIDE = 0.3;
     typeSearch = {
       id: "type_search",
-      summary: "A search field rises in, the phrase types letter by letter with a blinking caret and lands on a beat; suggestions drop open under it a row per half beat; then the button presses (or the first suggestion is selected) and a focus ring lights up.",
+      summary: "A search field rises in, the phrase types letter by letter with a blinking caret and lands on a beat; suggestions drop open under it a row per half beat while the field glides up to make room; then the button presses (or the first suggestion is selected) and a focus ring lights up.",
       reads: "text (the phrase, one line), button (the button label), subtitle (a prompt above the field), tag (a brand row on top: its mark and name), labels (up to 4 suggestions that drop open under the field; the press selects the first), backdrop",
       media: "none",
       beats: (content, bpm) => {
@@ -34389,11 +34685,60 @@ var init_type_search = __esm({
         if ([...text5].length > MAX_CHARS) refuse(`type_search types one line: at most ${MAX_CHARS} characters`);
         const elements = [];
         if (content.backdrop) elements.push(backdrop("search-backdrop", 0, 0, frames, layout, (d) => d.rect(0, 0, W, H, { fill: palette.background })));
-        const fh = Math.round((portrait ? 168 : 150) * u);
-        const fw = Math.round(portrait ? W - 2 * m : Math.min(W - 4 * m, 1400 * u));
+        const rows = (content.labels ?? []).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 4);
+        const button = portrait && rows.length > 0 ? "" : content.button?.replace(/\s+/g, " ").trim() ?? "";
+        const unit2 = Math.round((portrait ? 168 : 150) * u);
+        const fw = Math.round(portrait ? centredWidth(layout) : Math.min(W - 4 * m, 1400 * u));
         const cx = W / 2;
-        const cy = H * (portrait ? 0.42 : 0.44);
         const left = cx - fw / 2;
+        const bh = Math.round(portrait ? unit2 * 0.72 : unit2 - 22 * u);
+        const bSize = typeSize(layout, "body", bh * 0.4);
+        const bw = button ? textWidth(button, { size: bSize, font: "sans", bold: true }) * ROOMY + bh * (portrait ? 1.6 : 0.9) : 0;
+        const textLeft = left + unit2 * 0.92;
+        const textRight = button && !portrait ? left + fw - 11 * u - bw - 26 * u : left + fw - unit2 * 0.45;
+        const fit = fitWrapped(layout, "body", `${text5}|`, { font: "sans" }, { width: (textRight - textLeft) / 1.12, max: portrait ? 84 * u : unit2 * 0.38, maxLines: portrait ? 3 : 2 });
+        if (!fit) refuse("type_search's phrase does not fit the field: shorten it");
+        const size = fit.size;
+        const lines2 = fit.lines.map((line2, i) => i === fit.lines.length - 1 ? line2.slice(0, -1) : line2);
+        const lead = Math.round(size * 1.2);
+        const fh = unit2 + (lines2.length - 1) * lead;
+        const radius = unit2 / 2;
+        const brand = content.tag?.replace(/\s+/g, " ").trim() ?? "";
+        const S = Math.round((portrait ? 124 : 76) * u);
+        const subtitle = content.subtitle?.replace(/\s+/g, " ").trim() ?? "";
+        const promptStyle = { font: "sans", bold: true, tracking: -0.015 };
+        const promptFit = subtitle ? fitType(layout, "heading", subtitle, promptStyle, { width: (portrait ? centredWidth(layout) : W - 2 * m) / 1.1, max: (portrait ? 96 : 84) * u, maxLines: 2, leading: 1.04 }) : null;
+        const promptBlock = promptFit ? { lines: promptFit.lines, size: promptFit.size, ...promptStyle, fill: palette.ink, anchor: "middle", leading: 1.04 } : null;
+        const promptH = promptBlock ? textBox(promptBlock, 0, 0).height : 0;
+        const gap = Math.round((portrait ? 72 : 52) * u);
+        const buttonBelow = portrait && button ? 34 * u + bh : 0;
+        const before = (brand ? S + gap : 0) + (promptBlock ? promptH + gap * 0.75 : 0) + fh + buttonBelow;
+        const inset = 14 * u;
+        const panelGap = 18 * u;
+        const rowSize = typeSize(layout, "body", portrait ? 58 * u : unit2 * 0.74 * 0.405);
+        const rh = rows.length > 0 ? Math.round(Math.max(rowSize * 1.6, Math.min(portrait ? 148 * u : unit2 * 0.74, (layout.safe.bottom - layout.safe.top - before - panelGap - 2 * inset) / rows.length))) : 0;
+        const panelH = rows.length * rh + 2 * inset;
+        const n = [...text5].length;
+        const typeFrom = beats.frame(1);
+        const typeBeats = typingBeats(n, beats.grid.bpm);
+        const typeEnd = beats.frame(1 + typeBeats);
+        const listBeats = rows.length > 0 ? Math.ceil(rows.length / 2) + 1 : 1;
+        const pressAt = beats.frame(1 + typeBeats + listBeats);
+        const pressing = pressAt + 10 <= frames;
+        const listing = rows.length > 0 && typeEnd + 4 < frames;
+        const after = before + (listing ? panelGap + panelH : 0);
+        const centre = opticalCentre(layout);
+        const top = Math.max(layout.safe.top, centre - after / 2);
+        const lift = Math.max(layout.safe.top, centre - before / 2) - top;
+        const glideFrames = Math.max(4, Math.round(GLIDE * input4.frame.fps));
+        let y = top;
+        const brandCy = y + S / 2;
+        if (brand) y += S + gap;
+        const promptTop = y;
+        if (promptBlock) y += promptH + gap * 0.75;
+        const fieldTop = y;
+        const cy = fieldTop + fh / 2;
+        const panelTop = fieldTop + fh + panelGap;
         const shadow2 = { offset: 12 * u };
         const pad3 = Math.ceil(shadow2.offset * 3.4);
         const e0 = beats.frame(0);
@@ -34407,31 +34752,15 @@ var init_type_search = __esm({
               [2.2, 0.2]
             ]) {
               const e = shadow2.offset * spread2;
-              d.rect(pad3 - e, pad3 - e + shadow2.offset, fw + 2 * e, fh + 2 * e, { fill: palette.shadow, fillOpacity: palette.shadowOpacity * alpha * 0.8, rx: fh / 2 + e });
+              d.rect(pad3 - e, pad3 - e + shadow2.offset, fw + 2 * e, fh + 2 * e, { fill: palette.shadow, fillOpacity: palette.shadowOpacity * alpha * 0.8, rx: radius + e });
             }
-            d.rect(pad3, pad3, fw, fh, { fill: palette.surface, rx: fh / 2, stroke: palette.line, strokeWidth: 2 * u });
-            searchGlass(d, pad3 + fh * 0.52, pad3 + fh / 2, fh * 0.34, palette.muted);
+            d.rect(pad3, pad3, fw, fh, { fill: palette.surface, rx: radius, stroke: palette.line, strokeWidth: 2 * u });
+            searchGlass(d, pad3 + unit2 * 0.52, pad3 + unit2 / 2, unit2 * 0.34, palette.muted);
           }, enter(pose(cx, cy), e0, fieldIn))
         );
-        const rows = (content.labels ?? []).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 4);
-        const button = portrait && rows.length > 0 ? "" : content.button?.replace(/\s+/g, " ").trim() ?? "";
-        const bh = portrait ? fh * 0.78 : fh - 22 * u;
-        const bSize = Math.round(bh * 0.4);
-        const bw = button ? textWidth(button, { size: bSize, font: "sans", bold: true }) * ROOMY + bh * (portrait ? 1.6 : 0.9) : 0;
-        const bx = portrait ? cx : left + fw - 11 * u - bw / 2;
-        const by = portrait ? cy + fh / 2 + 34 * u + bh / 2 : cy;
-        const textLeft = left + fh * 0.92;
-        const textRight = button && !portrait ? bx - bw / 2 - 26 * u : left + fw - fh * 0.45;
-        const size = fitSize([`${text5}|`], { font: "sans" }, (textRight - textLeft) / 1.12, Math.round(fh * 0.38), fh * 0.22);
-        if (textWidth(`${text5}|`, { size, font: "sans" }) * 1.12 > textRight - textLeft + 1) refuse("type_search's phrase does not fit the field: shorten it");
-        const n = [...text5].length;
-        const typeFrom = beats.frame(1);
-        const typeBeats = typingBeats(n, beats.grid.bpm);
-        const typeEnd = beats.frame(1 + typeBeats);
-        const listBeats = rows.length > 0 ? Math.ceil(rows.length / 2) + 1 : 1;
-        const pressAt = beats.frame(1 + typeBeats + listBeats);
-        const pressing = pressAt + 10 <= frames;
         if (button) {
+          const bx = portrait ? cx : left + fw - 11 * u - bw / 2;
+          const by = portrait ? fieldTop + fh + 34 * u + bh / 2 : cy;
           const rel = (s, dy) => pose(cx + (bx - cx) * s, cy + dy + (by - cy) * s, { s });
           const keys = [key(e0, { ...rel(fieldIn.s, fieldIn.dy), alpha: 0 }), key(e0 + settle3, rel(1, 0), "out_strong")];
           if (pressing) keys.push(key(pressAt, rel(1, 0), "smooth"), key(pressAt + 4, pose(bx, by, { s: 0.9 }), "out"), key(pressAt + 12, pose(bx, by), "out_back"));
@@ -34442,114 +34771,106 @@ var init_type_search = __esm({
             }, keys)
           );
         }
-        const area = { width: textRight - textLeft + 2, height: fh };
-        const baseline = fh / 2 + size * 0.35;
-        const typed = (name, from, to, shown, caret) => drawing(name, 3, from, to, area, (d) => {
-          const runs = [
-            { text: shown, ...caret === "only" ? { opacity: 0 } : {} },
-            ...caret === "off" ? [] : [{ text: "|", fill: palette.accent, bold: false }]
-          ];
-          d.text(0, baseline, runs, { size, font: "sans", fill: palette.ink, anchor: "start" });
-        }, [key(from, pose(textLeft + area.width / 2, cy))]);
         const chars = [...text5];
+        const starts = lines2.map((_, i) => lines2.slice(0, i).reduce((at, line2) => at + [...line2].length + 1, 0));
+        const area = { width: textRight - textLeft + 2, height: fh };
+        const baseline = unit2 / 2 + size * 0.35;
+        const textAt = pose(textLeft + area.width / 2, cy);
+        const typed = (name, from, to, shown, caret, keys) => drawing(name, 3, from, to, area, (d) => {
+          const last = starts.reduce((k, s, i) => s <= shown ? i : k, 0);
+          for (let i = caret === "only" ? last : 0; i <= last; i += 1) {
+            const visible = chars.slice(starts[i], Math.min(starts[i] + [...lines2[i]].length, shown)).join("");
+            const runs = [{ text: visible, ...caret === "only" ? { opacity: 0 } : {} }, ...i === last && caret !== "off" ? [{ text: "|", fill: palette.accent, bold: false }] : []];
+            if (runs.every((r) => r.text === "")) continue;
+            d.text(0, baseline + i * lead, runs, { size, font: "sans", fill: palette.ink, anchor: "start" });
+          }
+        }, keys ?? [key(from, textAt)]);
         const span4 = Math.max(1, typeEnd - typeFrom);
         const group = Math.max(1, Math.ceil(MIN_PREFIX_FRAMES * n / span4));
         const clips = Math.ceil(n / group);
-        if (typeFrom > e0 + settle3) elements.push(cued(typed("search-caret-0", e0 + settle3, typeFrom, "", "on"), e0));
+        if (typeFrom > e0 + settle3) elements.push(cued(typed("search-caret-0", e0 + settle3, typeFrom, 0, "on"), e0));
         for (let j = 0; j < clips; j += 1) {
           const from = typeFrom + Math.round(j * span4 / clips);
           const to = typeFrom + Math.round((j + 1) * span4 / clips);
           if (to <= from || from >= frames) continue;
-          elements.push(cued(typed(`search-type-${j + 1}`, from, Math.min(to, frames), chars.slice(0, Math.min(n, (j + 1) * group)).join(""), "on"), typeFrom));
+          elements.push(cued(typed(`search-type-${j + 1}`, from, Math.min(to, frames), Math.min(n, (j + 1) * group), "on"), typeFrom));
         }
         if (typeEnd < frames) {
-          elements.push(typed("search-text", typeEnd, frames, text5, "off"));
-          const blink = [];
-          for (let k = 0; ; k += 1) {
+          elements.push(typed("search-text", typeEnd, frames, n, "off"));
+          const blinkFrom = typeEnd + (listing && lift > 0.5 ? glideFrames : 0);
+          const blink = [key(typeEnd, textAt, "hold")];
+          for (let k = 1; ; k += 1) {
             const at = beats.frame(1 + typeBeats + k / 2);
             if (at >= frames) break;
-            blink.push(key(at, pose(textLeft + area.width / 2, cy, { alpha: k % 2 === 0 ? 1 : 0 }), "hold"));
+            if (at > blinkFrom) blink.push(key(at, { ...textAt, alpha: k % 2 === 0 ? 1 : 0 }, "hold"));
           }
-          const caret = typed("search-caret", typeEnd, frames, text5, "only");
+          const caret = typed("search-caret", typeEnd, frames, n, "only", blink);
           caret.track = 4;
-          caret.keys = blink.length > 0 ? blink : caret.keys;
           elements.push(caret);
         }
         if (pressing) {
           const ringPad = Math.ceil(16 * u);
           elements.push(
             drawing("search-ring", 5, pressAt, frames, { width: fw + 2 * ringPad, height: fh + 2 * ringPad }, (d) => {
-              d.rect(ringPad - 9 * u, ringPad - 9 * u, fw + 18 * u, fh + 18 * u, { stroke: palette.accent, strokeWidth: 9 * u, strokeOpacity: 0.18, rx: fh / 2 + 9 * u });
-              d.rect(ringPad - 4 * u, ringPad - 4 * u, fw + 8 * u, fh + 8 * u, { stroke: palette.accent, strokeWidth: 3.5 * u, rx: fh / 2 + 4 * u });
+              d.rect(ringPad - 9 * u, ringPad - 9 * u, fw + 18 * u, fh + 18 * u, { stroke: palette.accent, strokeWidth: 9 * u, strokeOpacity: 0.18, rx: radius + 9 * u });
+              d.rect(ringPad - 4 * u, ringPad - 4 * u, fw + 8 * u, fh + 8 * u, { stroke: palette.accent, strokeWidth: 3.5 * u, rx: radius + 4 * u });
             }, enter(pose(cx, cy), pressAt, { s: 1.03, frames: 8, ease: "out" }))
           );
         }
-        const subtitle = content.subtitle?.replace(/\s+/g, " ").trim();
-        let above = cy - fh / 2 - 64 * u;
-        if (subtitle) {
-          const subSize = fitSize([subtitle], { font: "sans", bold: true }, (W - 2 * m) / 1.1, Math.round((portrait ? 64 : 56) * u), 24 * u);
-          const block = { lines: [subtitle], size: subSize, font: "sans", bold: true, tracking: -0.015, fill: palette.ink, anchor: "middle" };
-          const box = textBox(block, cx, above);
-          elements.push(textElement("search-prompt", 6, e0, frames, block, box, enter(pose(box.x, box.y), e0 + 2, { dy: 20 * u, frames: 12, ease: "out_strong" })));
-          above -= subSize * 1.6;
+        if (promptBlock) {
+          const box = textBox(promptBlock, cx, promptTop - textBox(promptBlock, 0, 0).top);
+          elements.push(textElement("search-prompt", 6, e0, frames, promptBlock, box, enter(pose(box.x, box.y), e0 + 2, { dy: 20 * u, frames: 12, ease: "out_strong" })));
         }
-        const brand = content.tag?.replace(/\s+/g, " ").trim();
         if (brand) {
-          const S = Math.round((portrait ? 92 : 76) * u);
-          const nameSize = Math.round(S * 0.62);
+          const nameSize = typeSize(layout, "body", S * 0.62);
           const nameW = textWidth(brand, { size: nameSize, font: "sans", bold: true, tracking: -0.02 }) * ROOMY;
-          const gap = S * 0.3;
-          const rowW = S + gap + nameW;
+          const brandGap = S * 0.3;
+          const rowW = S + brandGap + nameW;
           const letter = (brand.match(/[\p{L}\p{N}]/u)?.[0] ?? brand[0]).toUpperCase();
           elements.push(
-            drawing("search-brand", 11, e0, frames, { width: rowW, height: S }, (d) => {
+            drawing("search-brand", 13, e0, frames, { width: rowW, height: S }, (d) => {
               d.rect(0, 0, S, S, { fill: palette.accent, rx: S * 0.28 });
               d.text(S / 2, S / 2 + 0.6 * S * 0.36, letter, { size: 0.6 * S, font: "sans", bold: true, fill: palette.accentInk, anchor: "middle" });
-              d.text(S + gap, S / 2 + nameSize * 0.36, brand, { size: nameSize, font: "sans", bold: true, fill: palette.ink, tracking: -0.02 });
-            }, enter(pose(cx, above - S / 2 - (subtitle ? 10 * u : 30 * u)), e0, { dy: -18 * u, frames: 12, ease: "out_strong" }))
+              d.text(S + brandGap, S / 2 + nameSize * 0.36, brand, { size: nameSize, font: "sans", bold: true, fill: palette.ink, tracking: -0.02 });
+            }, enter(pose(cx, brandCy), e0, { dy: -18 * u, frames: 12, ease: "out_strong" }))
           );
         }
         const cues = [e0, typeFrom, typeEnd, ...pressing ? [pressAt] : []];
-        if (rows.length > 0) {
-          const rh = Math.round(fh * 0.74);
-          const rowSize = Math.round(fh * 0.3);
-          const inset = 14 * u;
-          const panelTop = cy + fh / 2 + 18 * u;
-          const panelH = rows.length * rh + 2 * inset;
-          const firstRow = beats.frame(1 + typeBeats);
-          if (firstRow < frames) {
-            elements.push(
-              drawing("search-panel", 7, firstRow, frames, { width: fw + 2 * pad3, height: panelH + 2 * pad3 }, (d) => {
-                for (const [spread2, alpha] of [
-                  [0.6, 0.5],
-                  [1.3, 0.3],
-                  [2.2, 0.2]
-                ]) {
-                  const e = shadow2.offset * spread2;
-                  d.rect(pad3 - e, pad3 - e + shadow2.offset, fw + 2 * e, panelH + 2 * e, { fill: palette.shadow, fillOpacity: palette.shadowOpacity * alpha * 0.8, rx: 28 * u + e });
-                }
-                d.rect(pad3, pad3, fw, panelH, { fill: palette.surface, stroke: palette.line, strokeWidth: 2 * u, rx: 28 * u });
-                for (let i = 1; i < rows.length; i += 1) d.line(pad3 + fh * 0.4, pad3 + inset + i * rh, pad3 + fw - fh * 0.4, pad3 + inset + i * rh, { stroke: palette.line, strokeWidth: 1.5 * u });
-              }, enter(pose(cx, panelTop + panelH / 2), firstRow, { dy: -14 * u, frames: 6, ease: "out" }))
-            );
-          }
+        if (listing) {
+          const rowW = fw - 2 * inset;
+          const rowText = (label2) => clampText(label2, { size: rowSize, font: "sans", bold: true }, (rowW - unit2 * 0.78 - rh * 0.7) / ROOMY);
+          elements.push(
+            drawing("search-panel", 7, typeEnd, frames, { width: fw + 2 * pad3, height: panelH + 2 * pad3 }, (d) => {
+              for (const [spread2, alpha] of [
+                [0.6, 0.5],
+                [1.3, 0.3],
+                [2.2, 0.2]
+              ]) {
+                const e = shadow2.offset * spread2;
+                d.rect(pad3 - e, pad3 - e + shadow2.offset, fw + 2 * e, panelH + 2 * e, { fill: palette.shadow, fillOpacity: palette.shadowOpacity * alpha * 0.8, rx: 28 * u + e });
+              }
+              d.rect(pad3, pad3, fw, panelH, { fill: palette.surface, stroke: palette.line, strokeWidth: 2 * u, rx: 28 * u });
+              for (let i = 1; i < rows.length; i += 1) d.line(pad3 + unit2 * 0.4, pad3 + inset + i * rh, pad3 + fw - unit2 * 0.4, pad3 + inset + i * rh, { stroke: palette.line, strokeWidth: 1.5 * u });
+            }, enter(pose(cx, panelTop + panelH / 2), typeEnd, { dy: -14 * u, frames: glideFrames, ease: "in_out" }))
+          );
           const rowY = (i) => panelTop + inset + i * rh + rh / 2;
-          const paintRow = (text6, selected) => (d) => {
-            const w = fw - 2 * inset;
-            if (selected) d.rect(0, 0, w, rh, { fill: palette.accent, rx: 18 * u });
-            searchGlass(d, fh * 0.42, rh / 2, rh * 0.36, selected ? palette.accentInk : palette.muted);
-            d.text(fh * 0.78, rh / 2 + rowSize * 0.36, text6, { size: rowSize, font: "sans", bold: true, fill: selected ? palette.accentInk : palette.ink });
-            if (selected) d.polyline([[w - rh * 0.55, rh * 0.36], [w - rh * 0.4, rh / 2], [w - rh * 0.55, rh * 0.64]], { stroke: palette.accentInk, strokeWidth: 4 * u, linecap: "round", linejoin: "round" });
+          const paintRow = (label2, selected) => (d) => {
+            if (selected) d.rect(0, 0, rowW, rh, { fill: palette.accent, rx: 18 * u });
+            searchGlass(d, unit2 * 0.42, rh / 2, Math.min(rh, unit2) * 0.36, selected ? palette.accentInk : palette.muted);
+            d.text(unit2 * 0.78, rh / 2 + rowSize * 0.36, rowText(label2), { size: rowSize, font: "sans", bold: true, fill: selected ? palette.accentInk : palette.ink });
+            if (selected) d.polyline([[rowW - rh * 0.55, rh * 0.36], [rowW - rh * 0.4, rh / 2], [rowW - rh * 0.55, rh * 0.64]], { stroke: palette.accentInk, strokeWidth: 4 * u, linecap: "round", linejoin: "round" });
           };
-          rows.forEach((text6, i) => {
+          rows.forEach((label2, i) => {
             const at = beats.frame(1 + typeBeats + i * 0.5);
             if (at + 4 >= frames) return;
-            elements.push(drawing(`search-row-${i + 1}`, 8 + i, at, frames, { width: fw - 2 * inset, height: rh }, paintRow(text6, false), enter(pose(cx, rowY(i)), at, { dy: -12 * u, frames: 6, ease: "out" })));
+            const entrance = at === typeEnd ? { dy: -12 * u, frames: glideFrames, ease: "in_out" } : { dy: -12 * u, frames: 6, ease: "out" };
+            elements.push(drawing(`search-row-${i + 1}`, 8 + i, at, frames, { width: rowW, height: rh }, paintRow(label2, false), enter(pose(cx, rowY(i)), at, entrance)));
             cues.push(at);
           });
-          if (pressing) elements.push(drawing("search-row-selected", 12, pressAt, frames, { width: fw - 2 * inset, height: rh }, paintRow(rows[0], true), enter(pose(cx, rowY(0)), pressAt, { s: 0.97, frames: 5, ease: "out" })));
+          if (pressing) elements.push(drawing("search-row-selected", 12, pressAt, frames, { width: rowW, height: rh }, paintRow(rows[0], true), enter(pose(cx, rowY(0)), pressAt, { s: 0.97, frames: 5, ease: "out" })));
         }
-        return { elements, cues: cues.filter((f3) => f3 < frames) };
+        const placed = listing ? elements.map((el) => el.name === "search-backdrop" ? el : glide(el, typeEnd, glideFrames, lift)) : elements;
+        return { elements: placed, cues: cues.filter((f3) => f3 < frames) };
       }
     };
   }
@@ -34568,7 +34889,8 @@ function cardSize(layout, count2) {
 function slots(layout, count2) {
   const { W, H, portrait } = layout;
   if (portrait) {
-    const ys = count2 === 1 ? [0.47] : count2 === 2 ? [0.36, 0.6] : [0.27, 0.49, 0.71];
+    const mid = opticalCentre(layout) / H;
+    const ys = (count2 === 1 ? [0] : count2 === 2 ? [-0.12, 0.12] : [-0.215, 0, 0.215]).map((dy) => mid + dy);
     const xs = [-0.05, 0.05, -0.03];
     const rots = [-2, 2, -1];
     return ys.map((y, i) => ({ rest: pose(W / 2 + xs[i] * W, y * H, { rotation: count2 === 1 ? 0 : rots[i] }), depth: i }));
@@ -34581,17 +34903,18 @@ function slots(layout, count2) {
     { rest: pose(W / 2 + 0.25 * W, H * 0.53, { s: 0.86, rotation: 5 }), depth: 1 }
   ];
 }
-function paintTextCard(d, pad3, w, h, frame, palette, u, title, line2) {
+function paintTextCard(d, pad3, w, h, frame, palette, layout, scale, title, line2) {
+  const { u } = layout;
   cardFrame(d, pad3, pad3, w, h, { ...frame, border: void 0 });
   d.rect(pad3, pad3, w, h, { fill: palette.surface, rx: frame.radius, stroke: palette.line, strokeWidth: 2 * u });
   const inset = Math.max(28 * u, w * 0.08);
-  const titleSize = Math.min(48 * u, h * 0.12);
+  const titleSize = Math.ceil(typeSize(layout, "body", Math.min(48 * u, h * 0.12)) / scale);
   d.circle(pad3 + inset + 14 * u, pad3 + inset + 14 * u, 14 * u, { fill: palette.accent });
   const titleText = clampText(title, { size: titleSize, font: "sans", bold: true }, (w - 2 * inset) / ROOMY);
   d.text(pad3 + inset, pad3 + inset + 28 * u + 22 * u + titleSize * 0.8, titleText, { size: titleSize, font: "sans", bold: true, fill: palette.ink, tracking: -0.01 });
   let y = pad3 + inset + 50 * u + titleSize * 1.4;
   if (line2) {
-    const lineSize = Math.min(30 * u, h * 0.075);
+    const lineSize = Math.ceil(typeSize(layout, "label", Math.min(30 * u, h * 0.075)) / scale);
     d.text(pad3 + inset, y + lineSize * 0.4, clampText(line2, { size: lineSize, font: "sans" }, (w - 2 * inset) / ROOMY), { size: lineSize, font: "sans", fill: palette.muted });
     y += lineSize * 1.6;
   }
@@ -34607,6 +34930,7 @@ var init_ui_cards = __esm({
   "../engine/src/motion/templates/ui-cards.ts"() {
     "use strict";
     init_elements();
+    init_layout();
     init_shapes();
     init_text();
     init_template();
@@ -34681,17 +35005,19 @@ var init_ui_cards = __esm({
           const file3 = files[i];
           const label2 = labels[i]?.trim() ?? "";
           const from = enters[i];
+          const smallest = Math.min(1, ...keys.filter((k) => k.frame >= from + travel).map((k) => k.pose.s));
           if (file3) {
             const m = media.get(file3);
             const crop2 = cropToAspect(m, w / h);
             const card = mediaCard(`card-${i + 1}`, depth * 3, from, frames, m, frame.fps, { width: w, radius, crop: crop2 }, keys);
             elements.push(card);
-            const chip = label2 ? clampText(label2, { size: 30 * u, font: "sans", bold: true }, w * (i === front && button && !portrait ? 0.5 : 0.8)) : "";
+            const chipSize = Math.ceil(typeSize(layout, "label", 30 * u) / smallest);
+            const chip = label2 ? clampText(label2, { size: chipSize, font: "sans", bold: true }, w * (i === front && button && !portrait ? 0.5 : 0.8)) : "";
             elements.push(
               drawing(`card-${i + 1}-frame`, depth * 3 + 1, from, card.to, { width: w + 2 * pad3, height: h + 2 * pad3 }, (d) => {
                 cardFrame(d, pad3, pad3, w, h, style);
                 if (chip) {
-                  const size = 30 * u;
+                  const size = chipSize;
                   const cw = textWidth(chip, { size, font: "sans", bold: true }) * ROOMY + 2 * size;
                   const ch = size * 2;
                   const inset = 24 * u;
@@ -34703,14 +35029,14 @@ var init_ui_cards = __esm({
             );
           } else {
             elements.push(
-              drawing(`card-${i + 1}`, depth * 3 + 1, from, frames, { width: w + 2 * pad3, height: h + 2 * pad3 }, (d) => paintTextCard(d, pad3, w, h, style, palette, u, label2, content.subtitle?.trim() ?? ""), keys)
+              drawing(`card-${i + 1}`, depth * 3 + 1, from, frames, { width: w + 2 * pad3, height: h + 2 * pad3 }, (d) => paintTextCard(d, pad3, w, h, style, palette, layout, smallest, label2, content.subtitle?.trim() ?? ""), keys)
             );
           }
         }
         const cues = [...enters];
         if (button) {
           const fr = cardMotion[front];
-          const bSize = Math.round(34 * u);
+          const bSize = typeSize(layout, "label", 34 * u);
           const bh = Math.round(bSize * 2.1);
           const bw = textWidth(button, { size: bSize, font: "sans", bold: true }) * ROOMY + bh;
           const inset = 24 * u;
@@ -34781,6 +35107,7 @@ var init_word_scroll = __esm({
   "../engine/src/motion/templates/word-scroll.ts"() {
     "use strict";
     init_elements();
+    init_layout();
     init_text();
     init_template();
     MIN_WORDS = 2;
@@ -34803,15 +35130,19 @@ var init_word_scroll = __esm({
         const lead = content.text?.replace(/\s+/g, " ").trim() ?? "";
         const style = { font: "sans", bold: true, tracking: -0.02 };
         const width = (text5, size) => textWidth(text5, { ...style, size });
-        const longest = words3.reduce((a, b) => width(b, 1) > width(a, 1) ? b : a);
-        const side = lead !== "" && !portrait;
-        const S = fitSize(side ? [`${lead}  ${longest}`] : words3, style, (W - 2.6 * m) / ROOMY, Math.round((portrait ? 138 : 150) * u), 36 * u);
+        const room = (portrait ? centredWidth(layout) : W - 2.6 * m) / ROOMY;
+        const max = Math.round((portrait ? 176 : 150) * u);
+        const sideBy = lead !== "" && !portrait ? Math.floor(fitSize([`${lead}  ${words3.reduce((a, b) => width(b, 1) > width(a, 1) ? b : a)}`], style, room, max)) : 0;
+        const side = sideBy >= layout.type.heading;
+        const S = side ? sideBy : typeSize(layout, "heading", Math.floor(fitSize(words3, style, room, max)));
+        const shown = words3.map((w) => clampText(w, { ...style, size: S }, room));
+        const longest = shown.reduce((a, b) => width(b, 1) > width(a, 1) ? b : a);
         const L = Math.round(S * 1.24);
         const capMid = S * 0.36;
         const gapX = S * 0.36;
         const leadW = side ? width(lead, S) : 0;
         const columnLeft = (W - (leadW + gapX + width(longest, S))) / 2 + leadW + gapX;
-        const cy = H * 0.52;
+        const cy = layout.tall ? opticalCentre(layout) : H * 0.52;
         const wordX = (w) => side ? columnLeft + width(w, S) / 2 : W / 2;
         const pad3 = S * 0.5;
         const listW = width(longest, S) * ROOMY + 2 * pad3;
@@ -34820,7 +35151,7 @@ var init_word_scroll = __esm({
         const listX = side ? columnLeft - pad3 + listW / 2 : W / 2;
         const at = (k) => pose(listX, cy - (firstLine + k * L) + listH / 2);
         const paintList = (d) => {
-          words3.forEach(
+          shown.forEach(
             (w, i) => d.text(side ? pad3 : listW / 2, firstLine + i * L + capMid, w, { size: S, ...style, fill: palette.ink, anchor: side ? "start" : "middle" })
           );
         };
@@ -34846,10 +35177,10 @@ var init_word_scroll = __esm({
         );
         const handle = Math.round(16 * u);
         const stroke = Math.max(2, 4 * u);
-        const readout = Math.round(24 * u);
+        const readout = typeSize(layout, "label", 30 * u);
         const last = landed[landed.length - 1];
         for (const k of landed) {
-          const word = words3[k];
+          const word = shown[k];
           const bw = width(word, S) * 1.06 + S * 0.5;
           const bh = S * 1.12;
           const label2 = `${Math.round(bw)} \xD7 ${Math.round(bh)}`;
@@ -34878,8 +35209,9 @@ var init_word_scroll = __esm({
           );
         }
         if (lead) {
-          const size = side ? S : fitSize([lead], style, (W - 2 * m) / ROOMY, Math.round(S * 0.56), 22 * u);
-          const block = { lines: [lead], size, ...style, fill: palette.muted, anchor: side ? "end" : "middle" };
+          const fitted = side ? { lines: [lead], size: S } : fitType(layout, "body", lead, style, { width: (portrait ? centredWidth(layout) : W - 2 * m) / ROOMY, max: Math.round(S * 0.56) });
+          const size = fitted.size;
+          const block = { lines: fitted.lines, size, ...style, fill: palette.muted, anchor: side ? "end" : "middle" };
           const box = side ? textBox(block, columnLeft - gapX, cy + capMid) : textBox(block, W / 2, cy - gap - S * 0.45);
           elements.push(textElement("scroll-lead", 4, e0, frames, block, box, enter(pose(box.x, box.y), e0, side ? { dx: -24 * u, frames: 10 } : { dy: 16 * u, frames: 10 })));
         }
@@ -34936,7 +35268,7 @@ var MIN_FRAMES;
 var init_build = __esm({
   "../engine/src/motion/build.ts"() {
     "use strict";
-    init_elements();
+    init_layout();
     init_grid();
     init_keyframes2();
     init_templates2();
@@ -44412,7 +44744,7 @@ function approximateAdvance(text5, font) {
   for (const ch of text5) w += charWidthEm(ch.codePointAt(0));
   return w * font.pixelSize;
 }
-var F64, U64, KAPPA2, ASCII_WIDTHS, INVISIBLE, TALL, DESCENDER, approximateMetrics;
+var F64, U64, KAPPA2, ASCII_WIDTHS, INVISIBLE, TALL2, DESCENDER, approximateMetrics;
 var init_text_layout = __esm({
   "../engine/src/render/kernels/text-layout.ts"() {
     "use strict";
@@ -44522,7 +44854,7 @@ var init_text_layout = __esm({
       584
     ];
     INVISIBLE = /^[\s\u200b\ufeff]*$/u;
-    TALL = /[^acegmnopqrsuvwxyz\s.,:;\-_~=+*'"`^]/u;
+    TALL2 = /[^acegmnopqrsuvwxyz\s.,:;\-_~=+*'"`^]/u;
     DESCENDER = /[gjpqyQ,;()[\]{}|@$]/u;
     approximateMetrics = {
       fontMetrics(font) {
@@ -44537,7 +44869,7 @@ var init_text_layout = __esm({
       inkBounds(text5, font) {
         if (INVISIBLE.test(text5)) return { x: 0, y: 0, width: 0, height: 0 };
         const px2 = font.pixelSize;
-        const top = TALL.test(text5) ? 0.716 : 0.519;
+        const top = TALL2.test(text5) ? 0.716 : 0.519;
         const bottom = DESCENDER.test(text5) ? 0.21 : 0.012;
         const adv = approximateAdvance(text5, font);
         return { x: px2 * 0.05, y: -top * px2, width: Math.max(0, adv - px2 * 0.1), height: (top + bottom) * px2 };
@@ -68938,8 +69270,8 @@ function summarizeScopeVideo(video) {
   const hist = video.histogram;
   const means = {};
   for (const channel of ["luma", "red", "green", "blue"]) {
-    const mean = histMean2(hist?.[channel] ?? []);
-    if (mean !== null) means[channel] = roundTo2(mean, 4);
+    const mean2 = histMean2(hist?.[channel] ?? []);
+    if (mean2 !== null) means[channel] = roundTo2(mean2, 4);
   }
   if (Object.keys(means).length > 0) {
     summary.channel_means = means;

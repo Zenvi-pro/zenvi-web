@@ -6,7 +6,7 @@
  * enters; `planOf` (keyframes.ts) turns them into timeline layers.
  */
 
-import type { Layout } from "./elements.js";
+import type { Layout } from "./layout.js";
 import type { TemplateBeats } from "./grid.js";
 import type { Element, MotionFrame, MotionMedia, Palette } from "./types.js";
 

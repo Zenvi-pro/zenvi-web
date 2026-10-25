@@ -4,11 +4,15 @@
  * DETAIL 01, DETAIL 02…). Given time, on the next beat a paper scrim covers
  * the shot and the crops lift out of it, each the picture under its box (the
  * same moment of the same file, cropped with libopenshot's Crop), gliding
- * into a row of labelled tiles.
+ * into labelled tiles: a row across a landscape frame, a column of big tiles
+ * with their labels beside them in portrait. Boxes and tags stay inside the
+ * safe area (layout.ts).
  */
 
-import { backdrop, cued, drawing, enter, key, mediaCard, mediaFill, pose, type Layout } from "../elements.js";
-import { textWidth } from "../text.js";
+import { backdrop, cued, drawing, enter, key, mediaCard, mediaFill, pose } from "../elements.js";
+import { typeSize, type Layout } from "../layout.js";
+import type { Drawing } from "../svg.js";
+import { clampText, fitSize, textWidth } from "../text.js";
 import { refuse, type NormBox, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
 import type { CropWindow, Element, MotionMedia } from "../types.js";
 
@@ -16,27 +20,25 @@ const MAX_BOXES = 5;
 /** The shot's push-in over the template. */
 const PUSH = 1.06;
 
-/** A spread of boxes that keeps clear of the frame's edges and of each other. */
-function defaultBoxes(layout: Layout, count: number): NormBox[] {
-  const { W, H, portrait } = layout;
+/** A spread of boxes that keeps clear of the safe area's edges and of each other (`tag`: room a box's tag takes above it). */
+function defaultBoxes(layout: Layout, count: number, tag: number): NormBox[] {
+  const { W, H, portrait, safe } = layout;
   const side = Math.min(W, H) * (portrait ? 0.34 : 0.3);
   const w = side / W;
   const h = side / H;
-  const spots = portrait
-    ? [
-        [0.3, 0.3],
-        [0.68, 0.46],
-        [0.34, 0.63],
-        [0.7, 0.75],
-        [0.5, 0.18],
-      ]
-    : [
-        [0.27, 0.38],
-        [0.55, 0.64],
-        [0.78, 0.33],
-        [0.42, 0.24],
-        [0.8, 0.72],
-      ];
+  if (portrait) {
+    // Down the safe area, alternating sides.
+    const first = (safe.top + tag + side / 2) / H;
+    const last = (safe.bottom - side / 2) / H;
+    return Array.from({ length: count }, (_, k) => ({ x: k % 2 === 0 ? 0.32 : 0.68, y: count === 1 ? (first + last) / 2 : first + (k * (last - first)) / (count - 1), w, h }));
+  }
+  const spots = [
+    [0.27, 0.38],
+    [0.55, 0.64],
+    [0.78, 0.33],
+    [0.42, 0.24],
+    [0.8, 0.72],
+  ];
   return spots.slice(0, count).map(([x, y]) => ({ x: x!, y: y!, w, h }));
 }
 
@@ -55,24 +57,29 @@ function windowUnder(media: MotionMedia, layout: Layout, box: { x0: number; y0: 
 export const cropLabels: TemplateSpec = {
   id: "crop_labels",
   summary:
-    "A shot fills the frame and pushes in; labelled crop boxes snap onto it one per beat; then a paper scrim covers it and the crops lift out of the shot into a row of labelled tiles.",
+    "A shot fills the frame and pushes in; labelled crop boxes snap onto it one per beat; then a paper scrim covers it and the crops lift out of the shot into labelled tiles: a row, or a column of big tiles on vertical video.",
   reads: "file_ids (the shot: the first file), boxes (frame boxes, 0-1; default a spread), labels (one per box; default DETAIL 01…), tag (the default labels' prefix), variant (boxes: no row)",
   media: "required",
   beats: (content) => (content.boxes?.length ?? Math.max(3, content.labels?.length ?? 3)) + (content.variant === "boxes" ? 2 : 5),
   build(input: TemplateInput): TemplateOutput {
     const { content, palette, layout, frames, beats, media, frame } = input;
-    const { W, H, u, m, portrait } = layout;
+    const { W, H, u, portrait, safe } = layout;
     const file = content.fileIds?.[0];
     if (!file) refuse("crop_labels needs file_ids: the shot to label");
     if (content.variant !== undefined && content.variant !== "boxes" && content.variant !== "row") refuse("crop_labels variant is boxes or row");
     const shot = media.get(file) as MotionMedia;
     const count = content.boxes?.length ?? Math.min(MAX_BOXES, Math.max(3, content.labels?.length ?? 3));
     if (count > MAX_BOXES) refuse(`crop_labels draws at most ${MAX_BOXES} boxes`);
-    const boxes = (content.boxes ?? defaultBoxes(layout, count)).map((b) => {
-      const w = Math.min(b.w * W, W - 2 * m);
-      const h = Math.min(b.h * H, H - 2 * m);
-      const x0 = Math.max(m, Math.min(W - m - w, b.x * W - w / 2));
-      const y0 = Math.max(m * 1.6, Math.min(H - m - h, b.y * H - h / 2));
+    const stroke = Math.max(2, 3 * u);
+    const tagSize = typeSize(layout, "label", (portrait ? 38 : 34) * u);
+    const tagH = tagSize * 1.7;
+    const tagRoom = tagH + stroke * 2;
+    // Boxes inside the safe area, their tags too.
+    const boxes = (content.boxes ?? defaultBoxes(layout, count, tagRoom)).map((b) => {
+      const w = Math.min(b.w * W, safe.right - safe.left);
+      const h = Math.min(b.h * H, safe.bottom - safe.top - tagRoom);
+      const x0 = Math.max(safe.left, Math.min(safe.right - w, b.x * W - w / 2));
+      const y0 = Math.max(safe.top + tagRoom, Math.min(safe.bottom - h, b.y * H - h / 2));
       return { x0, y0, w, h };
     });
     const prefix = (content.tag?.trim() || "DETAIL").toUpperCase().replace(/\s+/g, " ");
@@ -90,15 +97,14 @@ export const cropLabels: TemplateSpec = {
     const lift = Math.max(8, Math.min(16, beats.span(rowBeat, beats.step) - 2));
     const row = content.variant !== "boxes" && rowAt + lift + 10 <= frames;
 
-    // The boxes: a hairline of contrast, the accent box, corner ticks, a tag.
-    const stroke = Math.max(2, 3 * u);
-    const tagSize = Math.round(24 * u);
+    // The boxes: a hairline of contrast, the accent box, corner ticks, a tag (cut to the box when it is narrow).
     boxes.forEach((b, i) => {
       const from = enters[i]!;
       if (from >= frames) return;
       const to = row ? Math.min(frames, rowAt + 5) : frames;
-      const tagW = textWidth(labels[i]!, { size: tagSize, font: "mono", tracking: 0.04 }) + tagSize * 1.2;
-      const tagH = tagSize * 1.7;
+      const tagStyle = { size: tagSize, font: "mono" as const, bold: true, tracking: 0.04 };
+      const tag = clampText(labels[i]!, tagStyle, Math.max(b.w, safe.right - b.x0) - tagSize * 1.2);
+      const tagW = textWidth(tag, tagStyle) + tagSize * 1.2;
       const tick = Math.min(b.w, b.h) * 0.14;
       const pad = tagH + 8 * u;
       const dw = Math.max(b.w + 2 * pad, tagW + pad);
@@ -127,34 +133,94 @@ export const cropLabels: TemplateSpec = {
             );
           }
           d.rect(ox - stroke, oy - tagH - stroke * 2, tagW, tagH, { fill: palette.accent });
-          d.text(ox - stroke + tagSize * 0.6, oy - stroke * 2 - tagH / 2 + tagSize * 0.36, labels[i]!, { size: tagSize, font: "mono", bold: true, fill: palette.accentInk, tracking: 0.04 });
+          d.text(ox - stroke + tagSize * 0.6, oy - stroke * 2 - tagH / 2 + tagSize * 0.36, tag, { ...tagStyle, fill: palette.accentInk });
         }, keys),
       );
     });
 
     const cues = [...enters];
     if (row) {
-      // The scrim, then each crop lifting out of the shot into the row.
+      // The scrim, then each crop lifting out of the shot into its tile.
       elements.push(backdrop("crops-scrim", 1, rowAt, frames, layout, (d) => d.rect(0, 0, W, H, { fill: palette.background, fillOpacity: 0.94 }), enter(pose(W / 2, H / 2), rowAt, { frames: 8, ease: "out" })));
-      const gap = W * (portrait ? 0.035 : 0.03);
       const aspects = boxes.map((b) => b.w / b.h);
-      const sum = aspects.reduce((a, b) => a + b, 0);
-      const tileH = Math.min((W - 2 * m - gap * (boxes.length - 1)) / sum, H * (portrait ? 0.24 : 0.36), W * (portrait ? 0.34 : 0.24));
-      const rowW = sum * tileH + gap * (boxes.length - 1);
-      const rowY = H * (portrait ? 0.46 : 0.46);
-      let x = (W - rowW) / 2;
+      const mono = (size: number, bold = false) => ({ size, font: "mono" as const, bold, tracking: 0.02 });
+      const indexes = boxes.map((_, i) => String(i + 1).padStart(2, "0"));
+      /** Each tile's centre and size on the frame. */
+      let slots: { x: number; y: number; w: number; h: number }[];
+      let indexSize: number;
+      let nameSize: number;
+      let labelsDrawing: { width: number; height: number; x: number; y: number; paint: (d: Drawing) => void };
+      if (portrait) {
+        // A column of tiles down the safe area, each label beside its tile, set as big as the room beside the tiles allows.
+        const gap = 36 * u;
+        const sideGap = 40 * u;
+        const safeW = safe.right - safe.left;
+        const tileH = Math.min((safe.bottom - safe.top - 80 * u - gap * (boxes.length - 1)) / boxes.length, ...aspects.map((a) => (safeW * 0.6) / a));
+        const widest = Math.max(...aspects) * tileH;
+        const room = safeW - widest - sideGap;
+        nameSize = typeSize(layout, "body", Math.min(60 * u, fitSize(labels, mono(1), room / 1.02, 60 * u)));
+        indexSize = Math.round(nameSize * 1.35);
+        const shownW = Math.min(room, Math.max(...labels.map((l) => textWidth(l, mono(nameSize))), ...indexes.map((x) => textWidth(x, mono(indexSize, true)))) * 1.02);
+        const left = safe.left + (safeW - (widest + sideGap + shownW)) / 2;
+        const columnH = boxes.length * tileH + gap * (boxes.length - 1);
+        const top = (safe.top + safe.bottom) / 2 - columnH / 2;
+        slots = boxes.map((_, i) => ({ x: left + (aspects[i]! * tileH) / 2, y: top + i * (tileH + gap) + tileH / 2, w: aspects[i]! * tileH, h: tileH }));
+        const lx = left + widest + sideGap;
+        labelsDrawing = {
+          width: shownW + 8 * u,
+          height: columnH,
+          x: lx + (shownW + 8 * u) / 2,
+          y: top + columnH / 2,
+          paint: (d) => {
+            slots.forEach((slot, i) => {
+              const y0 = slot.y - slot.h / 2 - top;
+              d.line(0, y0 + 2 * u, shownW, y0 + 2 * u, { stroke: palette.ink, strokeWidth: 2 * u });
+              d.text(0, y0 + 2 * u + 18 * u + indexSize * 0.75, indexes[i]!, { ...mono(indexSize, true), fill: palette.accent });
+              d.text(0, y0 + 2 * u + 18 * u + indexSize * 0.75 + nameSize * 1.35, clampText(labels[i]!, mono(nameSize), shownW), { ...mono(nameSize), fill: palette.ink });
+            });
+          },
+        };
+      } else {
+        // A row across the frame, labels under the tiles: index left, name right.
+        indexSize = typeSize(layout, "body", 34 * u);
+        nameSize = typeSize(layout, "label", 30 * u);
+        const gap = W * 0.03;
+        const m = safe.left;
+        const sum = aspects.reduce((a, b) => a + b, 0);
+        const tileH = Math.min((W - 2 * m - gap * (boxes.length - 1)) / sum, H * 0.36, W * 0.24);
+        const rowW = sum * tileH + gap * (boxes.length - 1);
+        const rowY = H * 0.46;
+        let x = (W - rowW) / 2;
+        slots = boxes.map((_, i) => {
+          const tw = aspects[i]! * tileH;
+          const slot = { x: x + tw / 2, y: rowY, w: tw, h: tileH };
+          x += tw + gap;
+          return slot;
+        });
+        const labelTop = rowY + tileH / 2 + 22 * u;
+        labelsDrawing = {
+          width: W,
+          height: indexSize * 2.4,
+          x: W / 2,
+          y: labelTop + indexSize * 1.2,
+          paint: (d) => {
+            slots.forEach((slot, i) => {
+              const index = indexes[i]!;
+              d.line(slot.x - slot.w / 2, 2 * u, slot.x + slot.w / 2, 2 * u, { stroke: palette.ink, strokeWidth: 2 * u });
+              d.text(slot.x - slot.w / 2, indexSize * 1.4, index, { ...mono(indexSize, true), fill: palette.accent });
+              const room = slot.w - textWidth(index, mono(indexSize, true)) - indexSize * 0.6;
+              d.text(slot.x + slot.w / 2, indexSize * 1.4, clampText(labels[i]!, mono(nameSize), room), { ...mono(nameSize), fill: palette.ink, anchor: "end" });
+            });
+          },
+        };
+      }
       const z = zoomAt(rowAt);
       const shotStart = shotEl.source.kind === "media" ? shotEl.source.start + (rowAt / frame.fps) * shotEl.source.speed : 0;
-      const labelSize = Math.round(27 * u);
-      const slots: { x: number; w: number }[] = [];
       boxes.forEach((b, i) => {
-        const tw = aspects[i]! * tileH;
-        const slotX = x + tw / 2;
-        slots.push({ x: slotX, w: tw });
-        x += tw + gap;
+        const slot = slots[i]!;
         const crop = windowUnder(shot, layout, b, z);
         const rest = pose(b.x0 + b.w / 2, b.y0 + b.h / 2);
-        const moved = pose(slotX, rowY, { s: tw / b.w });
+        const moved = pose(slot.x, slot.y, { s: slot.w / b.w });
         elements.push(
           mediaCard(`crops-tile-${i + 1}`, 2 + boxes.length + i, rowAt, frames, shot, frame.fps, { width: b.w, radius: 0, crop, start: shotStart }, [
             key(rowAt, rest),
@@ -162,17 +228,11 @@ export const cropLabels: TemplateSpec = {
           ]),
         );
       });
-      // Labels under the tiles: index and name.
+      // The labels: index and name.
       const labelsAt = Math.min(frames - 1, rowAt + lift);
-      const labelTop = rowY + tileH / 2 + 22 * u;
+      const ld = labelsDrawing;
       elements.push(
-        cued(drawing("crops-row-labels", 2 + 2 * boxes.length, labelsAt, frames, { width: W, height: labelSize * 4 }, (d) => {
-          slots.forEach((slot, i) => {
-            d.line(slot.x - slot.w / 2, 2 * u, slot.x + slot.w / 2, 2 * u, { stroke: palette.ink, strokeWidth: 2 * u });
-            d.text(slot.x - slot.w / 2, labelSize * 1.6, String(i + 1).padStart(2, "0"), { size: labelSize, font: "mono", bold: true, fill: palette.accent });
-            d.text(slot.x + slot.w / 2, labelSize * 1.6, labels[i]!, { size: labelSize * 0.86, font: "mono", fill: palette.ink, anchor: "end", tracking: 0.02 });
-          });
-        }, enter(pose(W / 2, labelTop + labelSize * 2), labelsAt, { dy: 14 * u, frames: 8 })), rowAt),
+        cued(drawing("crops-row-labels", 2 + 2 * boxes.length, labelsAt, frames, { width: ld.width, height: ld.height }, ld.paint, enter(pose(ld.x, ld.y), labelsAt, portrait ? { dx: 18 * u, frames: 8 } : { dy: 14 * u, frames: 8 })), rowAt),
       );
       cues.push(rowAt);
     }
