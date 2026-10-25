@@ -96,6 +96,12 @@ describe("planReel", () => {
       expect(Math.abs(shot.end * fps - Math.round(shot.end * fps))).toBeLessThan(1e-9);
     }
     for (let i = 1; i < plan.shots.length; i += 1) expect(plan.shots[i]!.start).toBe(plan.shots[i - 1]!.end);
+    // Source windows are whole frames, exactly as long as their shots (a rounded in and out point lost one).
+    for (const shot of plan.shots.filter((s) => s.speed === 1)) {
+      // Times are reported to the millisecond: well inside the half frame that decides the rounding.
+      expect(Math.abs(shot.sourceStart * fps - Math.round(shot.sourceStart * fps))).toBeLessThan(0.05);
+      expect(Math.round((shot.sourceEnd - shot.sourceStart) * fps)).toBe(Math.round((shot.end - shot.start) * fps));
+    }
   });
 
   it("refuses an empty media list", () => {
