@@ -64,7 +64,16 @@ async function runSpecs(client: Client, specs: Spec[], outDir: string, height: n
     let status = render.structuredContent as { render_id: string; status: string; progress: number; url?: string; error?: string };
     while (status.status === "queued" || status.status === "running") {
       await new Promise((resolve) => setTimeout(resolve, 3000));
-      const polled = await call("get_render_status", { render_id: status.render_id, wait_seconds: 20 });
+      // A status read is safe to repeat: ride out a dropped connection rather than lose a render that is fine.
+      let polled: CallResult | undefined;
+      for (let attempt = 1; !polled; attempt += 1) {
+        try {
+          polled = await call("get_render_status", { render_id: status.render_id, wait_seconds: 20 });
+        } catch (error) {
+          if (attempt >= 3) throw error;
+          await new Promise((resolve) => setTimeout(resolve, 3000 * attempt));
+        }
+      }
       if (polled.isError || !polled.structuredContent) {
         status = { ...status, status: "error", error: polled.content[0]?.text ?? "no status" };
         break;

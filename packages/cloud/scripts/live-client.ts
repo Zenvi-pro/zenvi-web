@@ -33,6 +33,23 @@ export async function connectCloud(name: string): Promise<LiveCloud> {
   return process.env.ZENVI_CLOUD_URL ? remoteCloud(name, process.env.ZENVI_CLOUD_URL, process.env.ZENVI_TOKEN ?? "") : localCloud(name);
 }
 
+/**
+ * fetch that tries an idempotent request (GET, HEAD, PUT, DELETE) again when the network drops it (a laptop changing
+ * networks mid-run fails reads with EADDRNOTAVAIL). Other methods run once: a tool call may have reached the server.
+ */
+async function idempotentFetch(url: string, init: RequestInit | undefined): Promise<Response> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const attempts = ["GET", "HEAD", "PUT", "DELETE"].includes(method) ? 3 : 1;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      if (attempt >= attempts || !(error instanceof TypeError)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+    }
+  }
+}
+
 function withToken(init: RequestInit | undefined, token: string): RequestInit {
   return { ...init, headers: { ...Object.fromEntries(new Headers(init?.headers).entries()), authorization: `Bearer ${token}` } };
 }
@@ -43,7 +60,7 @@ async function remoteCloud(name: string, url: string, token: string): Promise<Li
   const base = url.replace(/\/+$/, "");
   const client = new Client({ name, version: "1" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
-  return { where: base, client, fetch: (path, init) => fetch(`${base}${path}`, withToken(init, token)) };
+  return { where: base, client, fetch: (path, init) => idempotentFetch(`${base}${path}`, withToken(init, token)) };
 }
 
 /** Zenvi Cloud in this process: real backend and blobs, tokens in memory. */
