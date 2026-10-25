@@ -34,4 +34,13 @@ describe("projectPathResolver", () => {
     await expect(resolve("/Users/me/Videos/desk.mov")).rejects.toThrow('"desk.mov" is not in Zenvi Cloud');
     await expect(resolve("/elsewhere/other.png")).rejects.toThrow('"other.png" is not in Zenvi Cloud');
   });
+
+  it("takes a bin file that points at a bundled emoji from the assets", async () => {
+    const withEmoji = { ...project, files: [...project.files, { id: "F4", path: "@emojis/1F525.svg", media_type: "image", name: "Fire" }] } as unknown as Project;
+    const resolve = projectPathResolver(withEmoji, {
+      fetchFile: async () => "/never",
+      resolveAsset: (p) => (p === "@emojis/1F525.svg" ? "/assets/emojis/1F525.svg" : undefined),
+    });
+    expect(await resolve("@emojis/1F525.svg")).toBe("/assets/emojis/1F525.svg");
+  });
 });

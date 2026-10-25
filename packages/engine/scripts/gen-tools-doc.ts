@@ -58,6 +58,30 @@ const DIVERGENCES: [string, string][] = [
     "Templates are the bundled catalog, read by basename only (the desktop joined a bare template name into its titles folder unchecked, agent_tools/titles.py:81); an absolute .svg path is read through the host's storage.",
   ],
   [
+    "add_animated_title_tool / list_title_templates_tool kind=animated",
+    "The Blender templates are drawn as 2D titles: an SVG title animated with clip keyframes (scale, position, rotation, opacity) and the engine's Glow, Blur and LensFlare effects, so they render the same in the browser, the CLI and the cloud and stay editable. Extrusion, bevel, lighting, particles and 3D camera moves are approximated or dropped. Template names, parameters, defaults, validation and the length (template frames × length_multiplier, remapped for the project frame rate like Blender) are the desktop's; earth, magic_wand, snow and picture_frames_4 are 3D scenes and are refused as desktop-only; spacemovie_intro and colors place three clips in a row; timeout_seconds is accepted and unused. kind=animated lists `renders_here` and `look` per template and a `renderer` block where the desktop reports its Blender setup.",
+  ],
+  [
+    "edit_title_tool",
+    "The edited title is a new Project Files entry that takes the old one's place in every clip and in the bin (scope=all_clips), in the same undo step; the desktop points the same entry at the new SVG and keeps its file_id. Web hosts store media by content and never change the bytes behind a file id. The receipt's file_id is the new entry's.",
+  ],
+  [
+    "titles, captions and timers: fonts",
+    "Fonts are taken as given: the hosts cannot list installed fonts (the browser and resvg each fall back on their own). The desktop checks names against Qt's font database, suggests close matches for an unknown font, replaces a template font that is not installed with the Title Editor's fallback, and drops a caption preset's font (thinning its outline) when that font is missing.",
+  ],
+  [
+    "list_title_templates_tool",
+    "kind=static lists the 50 bundled templates; the web has no user template folder. kind=project reads each title through the host's storage (bundled emoji through the assets).",
+  ],
+  [
+    "add_emoji_tool / search_emojis_tool",
+    "The desktop's 1,239 OpenMoji SVGs ship with the engine (assets/emojis, minified without changing what they draw; scripts/gen-emojis.mjs) and are stored as `@emojis/<file>` like the desktop stores them. There is no user emoji folder (group 'user' finds nothing). duration_seconds 0 is 10 s, the desktop's Default Image Length preference default.",
+  ],
+  [
+    "list_captions_tool / edit_captions_tool / remove_captions_tool",
+    "They work on Caption effects, as on desktop develop (captions made by Zenvi desktop or with the Caption effect); the engine's add_captions_tool still places one title per cue (the earlier desktop behaviour), which these tools do not list. With no target the project's only caption track is used: the web has no effect selection to pick from.",
+  ],
+  [
     "get_transcript_tool, export_captions_tool, add_captions_tool",
     "Transcripts come from the indexed `ai_metadata.transcript_cues`; word timings inside a cue are estimated by character count (`transcriptionSource: \"index_cues\"`, `wordTiming: \"estimated\"`). The desktop runs on-device ASR.",
   ],

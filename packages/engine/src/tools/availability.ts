@@ -77,6 +77,16 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     webNote: "captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device",
   },
   export_captions_tool: { methods: ["storage.writeText"], webNote: "captions come from indexed transcripts (no on-device ASR)" },
+  list_title_templates_tool: { optional: ["storage.readText"], partialNote: "kind=project needs reading project files" },
+  edit_title_tool: {
+    methods: ["media.writeGenerated", "storage.readText"],
+    webNote: "the edited version is a new Project Files entry (new file_id) in every clip; fonts are not checked against installed fonts",
+  },
+  add_animated_title_tool: {
+    methods: ["media.writeGenerated"],
+    webNote: "2D keyframed versions of the Blender templates (no 3D depth or particles); earth, magic_wand, snow and picture_frames_4 need Zenvi desktop",
+  },
+  add_timer_tool: { optional: ["media.writeGenerated"], partialNote: "without storing generated images only timeline_clip_id works" },
   get_transcript_tool: { webNote: "indexed transcript cues with estimated word timings (no on-device ASR)" },
   reindex_project_file_tool: { webNote: "reports files that are already indexed; uploading for indexing runs in Zenvi desktop" },
   wait_until_project_indexed_tool: { webNote: "reports indexing status once; does not wait" },
@@ -111,14 +121,14 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   editor: {
     title: "Web editor (Zenvi Assistant, command palette)",
     host: "apps/editor/src/features/editor/assistant/host.ts",
-    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage"],
-    methods: ["media.importUrl", "media.pickFiles", "media.writeGenerated", "ui.openExportDialog"],
+    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets"],
+    methods: ["media.importUrl", "media.pickFiles", "media.writeGenerated", "storage.readText", "ui.openExportDialog"],
     conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" },
   },
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -138,7 +148,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
     conditional: {
       frames: "the render worker is configured",
       media: "ffprobe is available",
-      assets: "title templates are bundled",
+      assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
       backend: "the server is set up to call the Zenvi backend",
     },

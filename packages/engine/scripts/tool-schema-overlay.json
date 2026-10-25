@@ -347,6 +347,9 @@
         "file_name": {"description": "File name for the generated SVG."}
       }
     },
+    "add_animated_title_tool": {
+      "description": "Add an animated title to the timeline (Title > Animated Title): the text flies toward the camera, spins, slides across, zooms in on a clapboard, glows like neon, dissolves or bursts, or a space-movie opening crawl.\n\nUse for \"animated title\", \"flying title\", \"neon title\", \"space movie intro\". Zenvi desktop renders these templates in 3D with Blender; this surface draws a 2D version of each with keyframes and effects (no Blender needed), on the lowest free track above the video, where it stays editable. earth, magic_wand, snow and picture_frames_4 are 3D scenes only Zenvi desktop renders. list_title_templates_tool kind=animated lists the templates, their parameters and how each looks here. One undo step removes the clips and files.\n\nExample: {\"template\": \"fly_by_1\", \"text\": \"Tokyo Day 1\", \"params\": {\"diffuse_color\": \"#ffcc00\"}, \"position_seconds\": 0}."
+    },
     "set_keyframes_tool": {
       "description": "Animate one clip property (volume, alpha, location_x/y, scale_x/y, rotation) with keyframes. Each point gives one time inside the clip (frame = keyframe X; seconds from the clip's first visible frame; timeline_seconds; or source_seconds) and a value. interpolation: bezier (default), linear or constant, per point or for all; mode: replace (default), merge or replace_range. One undo step.",
       "props": {

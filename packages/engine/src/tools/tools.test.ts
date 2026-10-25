@@ -5,13 +5,18 @@
  * restoring the document after a change.
  */
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { createEffect } from "../effects/registry.js";
 import type { ProjectDocument } from "../history/document.js";
 import type { Project } from "../model/types.js";
 import type { ReceiptStatus, ToolReceipt } from "./receipt.js";
 import { allTools, runTool } from "./registry.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "./test-support/fake-host.js";
-import { IDS, L1, L3, fixtureDoc, snapshotOf } from "./test-support/fixture.js";
+import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf } from "./test-support/fixture.js";
+import { addClip } from "../ops/clips.js";
+import { addFile } from "../ops/files.js";
+import { parseTitleSvg, setFieldText, titleFields, titleSvgText } from "../titles/title-svg.js";
 import type { ToolResult } from "./types.js";
 
 interface Ctx {
@@ -39,6 +44,33 @@ interface Spec {
 }
 
 const SRT = "1\n00:00:01,000 --> 00:00:02,500\nHello there\n\n2\n00:00:03,000 --> 00:00:04,000\nSecond line\n";
+
+/** The engine's bundled assets (title templates, emoji), read on demand. */
+const ENGINE_ASSETS = new Proxy({} as Record<string, string>, {
+  get: (_target, key) => {
+    if (typeof key !== "string") return undefined;
+    try {
+      return readFileSync(new URL(`../../assets/${key}`, import.meta.url), "utf8");
+    } catch {
+      return undefined;
+    }
+  },
+});
+
+/** Standard_1 filled with "Day 1" / "Tokyo", the title the title-editing specs edit. */
+function dayOneTitle(): string {
+  const doc = parseTitleSvg(ENGINE_ASSETS["titles/Standard_1.svg"]!);
+  const [title, sub] = titleFields(doc);
+  setFieldText(title!, "Day 1");
+  setFieldText(sub!, "Tokyo");
+  return titleSvgText(doc);
+}
+
+/** A Caption effect with two cues on the interview clip. */
+function captionInterview(doc: ProjectDocument): void {
+  const text = "00:00:01:000 --> 00:00:02:000\nHello there\n\n00:00:03:000 --> 00:00:04:000\nSecond line\n\n";
+  doc.transaction("captions", (tx) => tx.update(["clips", { id: IDS.clipA }], { effects: [createEffect("Caption", { caption_text: text }, { id: "CAPTION001" })] }));
+}
 
 function clipIds(doc: ProjectDocument): string[] {
   return (doc.project.clips ?? []).map((c) => String(c.id));
@@ -536,6 +568,74 @@ const SPECS: Record<string, Spec> = {
       },
     },
     failure: { args: { srtPath: "/subs/missing.srt" }, summary: /^Error: srtPath not found: \/subs\/missing\.srt$/ },
+  },
+  list_title_templates_tool: {
+    happy: { args: { kind: "static", query: "lower third" }, host: { assets: ENGINE_ASSETS }, summary: /^Found 3 title template\(s\) matching 'lower third'\.$/ },
+    failure: { args: { kind: "sideways" }, status: "refused", summary: /^Error: Invalid arguments for list_title_templates_tool: 'sideways' is not one of/ },
+  },
+  edit_title_tool: {
+    happy: {
+      args: { title_query: "tokyo", text: "Day 2", text_color: "#FFD700" },
+      host: { texts: { "/titles/Day 1.svg": dayOneTitle() } },
+      setup: (doc) => {
+        doc.transaction("title", (tx) => {
+          const file = addFile(tx, media("/titles/Day 1.svg", imageInfo("/titles/Day 1.svg")), { mediaType: "image" });
+          addClip(tx, { fileId: file.id, position: 0, layer: 4_000_000, start: 0, end: 5 });
+        });
+      },
+      summary: /^Updated title 'Day 2 \/ Tokyo' on 1 clip\(s\)\.$/,
+      check: ({ receipt, host }) => {
+        expect(receipt.data).toMatchObject({ scope: "all_clips", text_color: "#ffd700", path: "/generated/Day 1 v2.svg" });
+        expect(new TextDecoder().decode(host.written.get("/generated/Day 1 v2.svg") as Uint8Array)).toContain(">Day 2</tspan>");
+      },
+    },
+    failure: { args: { text: "x" }, summary: /^Error: which title\? pass timeline_clip_id, file_id or title_query \(0 titles in the project/ },
+  },
+  add_animated_title_tool: {
+    happy: {
+      args: { template: "fly_by_1", text: "Chapter One", position_seconds: "2" },
+      summary: /^Added animated title 'Fly Towards Camera' \(a 2D keyframed title, 80 frames\) on track \d at 2\.00-4\.67s\.$/,
+      check: ({ receipt, doc }) => {
+        const clip = doc.project.clips.find((c) => c.id === (receipt.data as { timeline_clip_id: string }).timeline_clip_id);
+        expect(clip?.title).toBe("Fly Towards Camera");
+      },
+    },
+    failure: { args: { template: "earth" }, status: "refused", summary: /^Error: add_animated_title_tool is not available in this Zenvi surface: World Map is a 3D scene/ },
+  },
+  list_captions_tool: {
+    happy: { setup: captionInterview, summary: /^1 caption track\(s\), 2 cue\(s\)\.$/ },
+    failure: { args: { timeline_clip_id: "NOPE" }, summary: /^Error: no timeline clip with id='NOPE'$/ },
+  },
+  edit_captions_tool: {
+    happy: { setup: captionInterview, args: { shift_seconds: "0.5", uppercase: "true" }, summary: /^Updated captions on CLIPINTV01: shifted \+0\.50s, uppercase \(2 cue\(s\)\)\.$/ },
+    failure: { args: { shift_seconds: "1" }, summary: /^Error: there are no captions in the project; add them with add_captions_tool$/ },
+  },
+  remove_captions_tool: {
+    happy: { setup: captionInterview, args: { all_captions: "true" }, summary: /^Removed 1 caption track\(s\) from 1 clip\(s\)\.$/ },
+    failure: { summary: /^Error: there are no captions in the project; add them with add_captions_tool$/ },
+  },
+  add_timer_tool: {
+    happy: {
+      args: { mode: "count_down", countdown_from_seconds: "5" },
+      summary: /^Added a count down timer on track 4 at 0\.00-5\.00s \(bottom center\)\.$/,
+      check: ({ doc, receipt }) => {
+        const clip = doc.project.clips.find((c) => c.id === (receipt.data as { timeline_clip_id: string }).timeline_clip_id);
+        expect(clip?.effects.map((e) => e.class_name)).toEqual(["Timer"]);
+      },
+    },
+    failure: { args: { timeline_clip_id: "NOPE" }, summary: /^Error: no timeline clip with id='NOPE'$/ },
+  },
+  search_emojis_tool: {
+    happy: { args: { query: "fire", limit: "3" }, host: { assets: ENGINE_ASSETS }, summary: /^3 emoji match 'fire': 🔥 Fire, / },
+    failure: { host: { assets: ENGINE_ASSETS }, summary: /^Error: pass a query \(e\.g\. 'fire'\) or a group$/ },
+  },
+  add_emoji_tool: {
+    happy: {
+      args: { emoji: "fire", position_seconds: "6", duration_seconds: "2" },
+      host: { assets: ENGINE_ASSETS },
+      summary: /^Added 🔥 Fire on track \d at 6\.00-8\.00s \(center, size 0\.2\)\.$/,
+    },
+    failure: { args: { emoji: "zzqqxxjj" }, host: { assets: ENGINE_ASSETS }, summary: /^Error: no emoji matches 'zzqqxxjj'; try search_emojis_tool with a simpler word$/ },
   },
 
   // --- direct tools ----------------------------------------------------------------------------------------

@@ -20,7 +20,7 @@ import type { BlobStore, Stored, TableEntity, TableStore } from "../storage/type
 import type { Clock } from "../util/clock.js";
 import { isoAt } from "../util/clock.js";
 import { randomId, sha256Hex } from "../util/crypto.js";
-import { displayName, fileSha256 } from "../projects/model.js";
+import { displayName, fileSha256, isBundledAsset } from "../projects/model.js";
 import type { MediaService } from "../services/media.js";
 import { attachmentDisposition } from "../services/media.js";
 import { renderPath, renderSnapshotPath } from "../services/paths.js";
@@ -426,7 +426,7 @@ export class RenderService {
     const used = new Set(project.clips.map((clip) => clip.file_id));
     let total = 0;
     for (const file of project.files) {
-      if (!used.has(file.id)) continue;
+      if (!used.has(file.id) || isBundledAsset(file)) continue;
       const sha = fileSha256(file);
       const info = sha ? inventory.get(sha) : undefined;
       if (!sha || !info) {

@@ -2,10 +2,11 @@
  * The session's media: where each project file's bytes are, importing new
  * files, and relinking files a desktop project points at.
  *
- * Resolution order for a file: its content hash (`cloud.sha256`) in this
- * browser's media store → a signed Zenvi Cloud URL (the ones the cloud sent
- * with the project, else asked for by hash when signed in) → missing (the
- * relink dialog asks for it).
+ * Resolution order for a file: a bundled engine asset it points at
+ * (`@emojis/…`) → its content hash (`cloud.sha256`) in this browser's media
+ * store → a signed Zenvi Cloud URL (the ones the cloud sent with the project,
+ * else asked for by hash when signed in) → missing (the relink dialog asks
+ * for it).
  */
 import type { ImportedMedia, Project, ProjectFile, ReaderInfo } from "@zenvi/engine";
 import { createStore, type StoreApi } from "zustand/vanilla";
@@ -50,6 +51,8 @@ export interface MediaLibraryOptions {
   cloud?: () => CloudClient | null;
   /** What the cloud said it has for this project's files (signed URLs included). */
   cloudMedia?: readonly CloudMediaEntry[];
+  /** The bytes of a file that points at a bundled engine asset (`@emojis/…`), which needs no storage. */
+  bundled?: (file: ProjectFile) => MediaSourceSpec | undefined;
 }
 
 /**
@@ -220,6 +223,11 @@ export class MediaLibrary {
   }
 
   private async doResolve(file: ProjectFile): Promise<void> {
+    const bundled = this.options.bundled?.(file);
+    if (bundled) {
+      this.attach(file.id, bundled, "local");
+      return;
+    }
     this.setStatus(file.id, { status: "resolving" });
     const sha = fileHash(file);
     try {

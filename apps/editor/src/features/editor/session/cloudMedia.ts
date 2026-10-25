@@ -6,6 +6,7 @@
 import type { Project } from "@zenvi/engine";
 import { uploadToSas, type CloudClient } from "@/lib/cloud";
 import type { MediaStore } from "@/lib/storage/media";
+import { resolveEmojiAsset } from "../catalog";
 import { fileDisplayName, fileHash } from "./media";
 
 export interface MediaUploadProgress {
@@ -48,6 +49,8 @@ export async function uploadMissingMedia(
   const missing: MissingCloudFile[] = [];
   const miss = (file: Project["files"][number]) => missing.push({ fileId: String(file.id), name: fileDisplayName(file) });
   for (const file of project.files) {
+    // Bundled engine assets (emoji) are part of every Zenvi install; there is nothing to upload.
+    if (resolveEmojiAsset(String(file.path ?? ""))) continue;
     const sha = fileHash(file);
     if (!sha) {
       if (!inCloud?.(String(file.id))) miss(file);

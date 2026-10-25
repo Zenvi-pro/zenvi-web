@@ -42,7 +42,7 @@ function stringForm(schema: JsonSchema): string | undefined {
 describe("tool catalog", () => {
   it("registers every ported desktop tool, in the contract's order, then the direct tools", () => {
     const ported = CONTRACT_TOOL_NAMES.filter((name) => !PENDING_DESKTOP_TOOLS.has(name) && !DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name));
-    expect(ported).toHaveLength(86);
+    expect(ported).toHaveLength(95);
     expect(allTools.map((t) => t.name)).toEqual([...ported, ...DIRECT_TOOLS]);
     expect(new Set(allTools.map((t) => t.name)).size).toBe(allTools.length);
     for (const name of ported) expect(getTool(name)?.contract).toBe(true);
@@ -156,8 +156,8 @@ describe("availability matrix", () => {
 
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
-      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend"],
+      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
       cloud: ["media", "frames", "storage", "assets", "audio", "backend"],
     };
     for (const tool of allTools) {

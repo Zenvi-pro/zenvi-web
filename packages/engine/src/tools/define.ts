@@ -91,7 +91,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   backend: "the Zenvi backend (sign in to Zenvi)",
   storage: "project storage",
   audio: "audio analysis",
-  assets: "the bundled title templates",
+  assets: "the bundled title templates and emoji",
 };
 
 /**

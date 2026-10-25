@@ -67,6 +67,16 @@ describe("projects API", () => {
     expect(got.json.missingMedia).toEqual([{ fileId: "F1", name: "c.mp4", reason: "not_in_cloud" }]);
   });
 
+  it("does not list a bundled emoji sticker as missing media", async () => {
+    const h = await harness();
+    const token = await h.userToken(USER_A);
+    const project = sampleProject({ files: [{ id: "E1", path: "@emojis/1F525.svg", media_type: "image", name: "Fire" }] });
+    const created = await h.request("POST", "/v1/projects", { token, json: { name: "Stickers", project } });
+    const got = await h.request("GET", `/v1/projects/${created.json.id}`, { token });
+    expect(got.json.media).toEqual([]);
+    expect(got.json.missingMedia).toEqual([]);
+  });
+
   it("stamps every stored project with the engine's format version (never the 0.0.0 template stamp)", async () => {
     const h = await harness();
     const token = await h.userToken(USER_A);
