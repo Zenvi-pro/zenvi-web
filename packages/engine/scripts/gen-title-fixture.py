@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Expected results of the desktop's title substitutions, for titles/svg.test.ts.
 
-Dev-time only. Reads a few zenvi-core title templates at origin/develop and
+Dev-time only. Reads a few zenvi-core title templates at origin/main and
 applies, with xml.dom.minidom exactly like the desktop:
   - agent_tools/titles.py `_set_svg_text`
   - title_editor.py `txtLine_changed`, `set_font_attributes`,
@@ -24,7 +24,7 @@ TEMPLATES = ["Bar_1.svg", "Standard_1.svg", "Footer_1.svg", "Gold_1.svg", "Oval_
 
 
 def git_show(path):
-    return subprocess.check_output(["git", "-C", REPO, "show", f"origin/develop:{path}"]).decode("utf-8")
+    return subprocess.check_output(["git", "-C", REPO, "show", f"origin/main:{path}"]).decode("utf-8")
 
 
 def style_to_dict(style):

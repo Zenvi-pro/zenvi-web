@@ -1,11 +1,11 @@
-// Read files from the zenvi-core desktop repo at origin/develop without
+// Read files from the zenvi-core desktop repo at origin/main without
 // touching its working tree (another session works there). One `git cat-file
 // --batch` process serves every blob, so reading hundreds of files is fast.
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
 export const DESKTOP_REPO = process.env.ZENVI_DESKTOP_REPO ?? join(process.env.HOME ?? "", "Projects/zenvi");
-export const DESKTOP_REF = process.env.ZENVI_DESKTOP_REF ?? "origin/develop";
+export const DESKTOP_REF = process.env.ZENVI_DESKTOP_REF ?? "origin/main";
 
 function git(args, input) {
   return execFileSync("git", ["-C", DESKTOP_REPO, ...args], {

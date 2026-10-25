@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Copy zenvi-core src/effects/icons/* (origin/develop) to assets/effects/.
+// Copy zenvi-core src/effects/icons/* (origin/main) to assets/effects/.
 // Dev-time only:  node packages/engine/scripts/copy-effect-icons.mjs
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";

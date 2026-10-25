@@ -3,7 +3,7 @@
 
 Dev-time only. Extracts `get_default_export_settings`, `_parse_bitrate_to_bps`
 and `Export.calculate_all_formats_bitrate` from zenvi-core
-src/windows/export.py at origin/develop (with `ast`; the dialog itself needs
+src/windows/export.py at origin/main (with `ast`; the dialog itself needs
 Qt), runs them with stub app/settings objects, and records the results for
 src/presets/export.test.ts.
 
@@ -31,7 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "src", "presets", "__fixtures__", "desktop-export.json")
 FIXTURE = os.path.join(HERE, "..", "fixtures", "projects", "mountain-montage.zvn")
 REPO = os.environ.get("ZENVI_DESKTOP_REPO", os.path.expanduser("~/Projects/zenvi"))
-REF = os.environ.get("ZENVI_DESKTOP_REF", "origin/develop")
+REF = os.environ.get("ZENVI_DESKTOP_REF", "origin/main")
 
 
 def desktop(path):
