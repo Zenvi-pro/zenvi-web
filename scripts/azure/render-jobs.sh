@@ -57,6 +57,8 @@ ENV_VARS=(
   "STORAGE=azure"
   "ZENVI_RENDER_QUEUE=$QUEUE"
   "RENDER_TMP_DIR=/tmp"
+  # The az CLI reads a dash-dash argument as its own option, so this one goes in through the environment.
+  "NODE_OPTIONS=--enable-source-maps"
   "NODE_ENV=production"
   "LOG_LEVEL=info"
 )
@@ -79,7 +81,7 @@ if ! az containerapp job show -g "$RG" -n "$JOB" -o none 2>/dev/null; then
     --cpu "$CPU" --memory "$MEMORY" \
     --secrets "$SECRET_NAME=$CONN" \
     --env-vars "${ENV_VARS[@]}" \
-    --args node --enable-source-maps dist/render-job.mjs \
+    --args node dist/render-job.mjs \
     -o none
 else
   step "Updating job $JOB"
