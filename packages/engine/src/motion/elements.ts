@@ -60,11 +60,6 @@ export function enter(rest: Pose, at: number, e: Entrance): Key[] {
   return [key(at, from), key(at + Math.max(1, Math.round(e.frames)), rest, e.ease ?? "out")];
 }
 
-/** Keys that hold `p` from frame `at` (add after an entrance, before a move). */
-export function hold(p: Pose, at: number): Key {
-  return key(at, p, "smooth");
-}
-
 /** The pose `p` seen through a camera zoomed by `z` about the frame centre. */
 export function zoomed(p: Pose, z: number, layout: Layout): Pose {
   return { ...p, x: layout.W / 2 + (p.x - layout.W / 2) * z, y: layout.H / 2 + (p.y - layout.H / 2) * z, s: p.s * z };
@@ -175,13 +170,6 @@ export function mediaFill(name: string, track: number, from: number, to: number,
     source: { kind: "media", media, mode: "fill", width: layout.W, radius: 0, start: win.start, speed: win.speed },
     keys: keys ?? [key(from, pose(layout.W / 2, layout.H / 2))],
   };
-}
-
-/** The picture's rest height in a card `width` px wide. */
-export function cardHeight(media: MotionMedia, width: number, crop?: MediaSource["crop"]): number {
-  const w = media.width * (crop ? 1 - crop.left - crop.right : 1);
-  const h = media.height * (crop ? 1 - crop.top - crop.bottom : 1);
-  return (width * h) / w;
 }
 
 /** A centred crop window that gives a picture the aspect `aspect` (w / h), or none when it already has it. */

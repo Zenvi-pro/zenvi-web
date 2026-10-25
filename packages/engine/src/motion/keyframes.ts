@@ -114,11 +114,6 @@ export function croppedAspect(source: MediaSource): number {
   return w / h;
 }
 
-/** Rest height of a fit media source shown `source.width` px wide. */
-export function mediaHeight(source: Pick<MediaSource, "media" | "crop" | "width">): number {
-  return source.width / croppedAspect(source as MediaSource);
-}
-
 /** Smallest scale written: a zero scale would make the clip's transform singular. */
 const MIN_SCALE = 0.001;
 

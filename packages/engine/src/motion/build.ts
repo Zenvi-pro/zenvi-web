@@ -30,7 +30,9 @@
  *              should write one installed family (a Helvetica/Arial-metric sans,
  *              a 0.6 em monospace: not Consolas, which is narrower); a word
  *              space rides on the previous word's span (whitespace-only spans
- *              collapse differently per renderer).
+ *              collapse differently per renderer). SVG Tiny 1.2 has no
+ *              letter-spacing: Qt may draw tracked text a few % wider or
+ *              narrower; boxes and tile gaps leave room for it.
  *   text       text.ts: Helvetica advance widths, boxes 10 % roomy.
  *   tracks     `MotionPlan.tracks` stacked on the lowest free tracks above the
  *              video (add_motion_template_tool); a reel puts its music bed
