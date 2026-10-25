@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSvgSize, svgRasterSize } from "./svg.js";
+import { parseSvgSize, svgRasterSize, withGenericFontFallbacks } from "./svg.js";
 
 const svg = (attrs: string) => `<svg xmlns="http://www.w3.org/2000/svg" ${attrs}><rect width="10" height="10"/></svg>`;
 
@@ -36,5 +36,20 @@ describe("svgRasterSize", () => {
   it("fits the document into the box keeping aspect (QSize::scale KeepAspectRatio)", () => {
     expect(svgRasterSize({ width: 720, height: 576 }, { width: 1920, height: 1080 })).toEqual({ width: 1350, height: 1080 });
     expect(svgRasterSize({ width: 1920, height: 1080 }, { width: 640, height: 640 })).toEqual({ width: 640, height: 360 });
+  });
+});
+
+describe("withGenericFontFallbacks", () => {
+  it("ends every font list with the generic family a browser should fall back to", () => {
+    expect(withGenericFontFallbacks(`<text style="font-weight:bold;font-family:'DejaVu Sans';fill:#fff">A</text>`)).toBe(
+      `<text style="font-weight:bold;font-family:'DejaVu Sans', sans-serif;fill:#fff">A</text>`,
+    );
+    expect(withGenericFontFallbacks(`<text font-family="Courier New">A</text>`)).toBe(`<text font-family="Courier New, monospace">A</text>`);
+    expect(withGenericFontFallbacks(`<text style="font-family:Times New Roman">A</text>`)).toBe(`<text style="font-family:Times New Roman, serif">A</text>`);
+  });
+
+  it("leaves lists that already end in a generic family alone", () => {
+    const svg = `<text style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif">A</text>`;
+    expect(withGenericFontFallbacks(svg)).toBe(svg);
   });
 });

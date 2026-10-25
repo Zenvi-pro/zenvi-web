@@ -17,6 +17,7 @@ export * from "./effects/index.js";
 export * from "./keyframe/index.js";
 export * from "./timeline/index.js";
 export * from "./titles/svg.js";
+export { titleLook } from "./titles/title-svg.js";
 export * from "./history/keypath.js";
 export * from "./history/document.js";
 export * from "./ops/index.js";

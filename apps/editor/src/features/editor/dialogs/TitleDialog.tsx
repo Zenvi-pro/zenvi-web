@@ -1,4 +1,5 @@
-import { addTitleClip, buildTitleSvg, titleLines, type TitleFields } from "@zenvi/engine";
+import { addTitleClip, buildTitleSvg, titleLines, titleLook, type TitleFields } from "@zenvi/engine";
+import { withGenericFontFallbacks } from "@zenvi/render-web";
 import { Bold, Italic, Type } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/ui/Button";
@@ -23,6 +24,16 @@ const TITLE_SECONDS = 5;
  * reflection templates (Bar 1) draw the same line twice, mirrored, and both
  * copies must change together.
  */
+/** The template's own colours and font, shown until the person changes them (null for an unreadable template). */
+function templateLook(svg: string | null): ReturnType<typeof titleLook> | null {
+  if (!svg) return null;
+  try {
+    return titleLook(svg);
+  } catch {
+    return null;
+  }
+}
+
 function templateTexts(svg: string): { originals: string[]; fields: string[] } {
   try {
     const originals = titleLines(svg);
@@ -38,8 +49,11 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
   const templates = titleTemplates();
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
-  /** `lines` holds one value per distinct placeholder (`texts.fields`). */
-  const [fields, setFields] = useState<TitleFields & { lines: string[] }>({ lines: [], textColor: "#ffffff", fontFamily: "Sans" });
+  /**
+   * `lines` holds one value per distinct placeholder (`texts.fields`). Style fields stay unset until the person picks
+   * one: a template keeps its own colours and font (and its gradients: a reflection only fades in its own colour).
+   */
+  const [fields, setFields] = useState<TitleFields & { lines: string[] }>({ lines: [] });
   const [texts, setTexts] = useState<{ originals: string[]; fields: string[] }>({ originals: [], fields: [] });
   const [busy, setBusy] = useState(false);
 
@@ -109,6 +123,11 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
   };
 
   const preview = built.svg ?? svg;
+  const look = useMemo(() => templateLook(svg), [svg]);
+  const font = fields.fontFamily ?? (look?.fontFamily || "Sans");
+  const fonts = FONTS.includes(font) ? FONTS : [font, ...FONTS];
+  const bold = fields.bold ?? look?.bold ?? false;
+  const italic = fields.italic ?? look?.italic ?? false;
 
   return (
     <Dialog
@@ -134,7 +153,7 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
         <div className="grid gap-5 sm:grid-cols-[1fr_240px]">
           <div className="space-y-3">
             <div className="checker relative aspect-video overflow-hidden rounded-lg border border-line">
-              {preview ? <img alt="Title preview" className="absolute inset-0 h-full w-full object-contain" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(preview)}`} /> : null}
+              {preview ? <img alt="Title preview" className="absolute inset-0 h-full w-full object-contain" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(withGenericFontFallbacks(preview))}`} /> : null}
             </div>
             {built.error ? <p className="text-xs text-warning">{built.error.replace(/^not implemented: /, "Not available yet: ")}</p> : null}
             <div className="grid max-h-[180px] grid-cols-4 gap-1.5 overflow-y-auto pr-1">
@@ -162,22 +181,22 @@ export function TitleDialog({ open, onClose }: { open: boolean; onClose: () => v
             <label className="block space-y-1">
               <span className="text-xs text-fg-subtle">Font</span>
               <div className="flex gap-1">
-                <Select<string> ariaLabel="Font" value={fields.fontFamily ?? "Sans"} options={FONTS.map((f) => ({ value: f, label: f }))} onChange={(v) => setFields((f) => ({ ...f, fontFamily: v }))} className="min-w-0 flex-1" />
-                <IconButton label="Bold" active={fields.bold} onClick={() => setFields((f) => ({ ...f, bold: !f.bold }))}>
+                <Select<string> ariaLabel="Font" value={font} options={fonts.map((f) => ({ value: f, label: f }))} onChange={(v) => setFields((f) => ({ ...f, fontFamily: v }))} className="min-w-0 flex-1" />
+                <IconButton label="Bold" active={bold} onClick={() => setFields((f) => ({ ...f, bold: !bold }))}>
                   <Bold size={14} />
                 </IconButton>
-                <IconButton label="Italic" active={fields.italic} onClick={() => setFields((f) => ({ ...f, italic: !f.italic }))}>
+                <IconButton label="Italic" active={italic} onClick={() => setFields((f) => ({ ...f, italic: !italic }))}>
                   <Italic size={14} />
                 </IconButton>
               </div>
             </label>
             <label className="block space-y-1">
               <span className="text-xs text-fg-subtle">Text color</span>
-              <ColorField ariaLabel="Text color" value={fields.textColor ?? "#ffffff"} onCommit={(v) => setFields((f) => ({ ...f, textColor: v }))} />
+              <ColorField ariaLabel="Text color" value={fields.textColor ?? (look?.textColor || "#ffffff")} onCommit={(v) => setFields((f) => ({ ...f, textColor: v }))} />
             </label>
             <label className="block space-y-1">
               <span className="text-xs text-fg-subtle">Background</span>
-              <ColorField ariaLabel="Background color" value={fields.backgroundColor ?? "#000000"} onCommit={(v) => setFields((f) => ({ ...f, backgroundColor: v }))} />
+              <ColorField ariaLabel="Background color" value={fields.backgroundColor ?? (look?.backgroundColor || "#000000")} onCommit={(v) => setFields((f) => ({ ...f, backgroundColor: v }))} />
             </label>
           </div>
         </div>

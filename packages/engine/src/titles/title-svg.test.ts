@@ -26,6 +26,7 @@ import {
   uniqueTitleName,
   versionName,
   type TitleDoc,
+  titleLook,
 } from "./title-svg.js";
 import { parseXml, serializeXml } from "./xml.js";
 
@@ -140,5 +141,14 @@ describe("xml", () => {
     const text = '<?xml version="1.0"?>\n<!-- c --><svg a="1 &amp; 2"><!--x--><text>&lt;b&gt;</text><style><![CDATA[a>b]]></style><g/></svg>\n';
     const d = parseXml(text);
     expect(serializeXml(d)).toBe('<?xml version="1.0"?>\n<!-- c --><svg a="1 &amp; 2"><!--x--><text>&lt;b&gt;</text><style><![CDATA[a>b]]></style><g/></svg>\n');
+  });
+});
+
+describe("titleLook", () => {
+  it("reads a template's own colours, font and weight, as the Title Editor shows them before any change", () => {
+    const svg = (name: string) => readFileSync(new URL(`../../assets/titles/${name}.svg`, import.meta.url), "utf8");
+    // Bar 1's full-frame background is transparent; the bar is a shape of its own.
+    expect(titleLook(svg("Bar_1"))).toEqual({ textColor: "#324da7", backgroundColor: "", fontFamily: "DejaVu Sans", bold: true, italic: false });
+    expect(titleLook(svg("Box"))).toMatchObject({ textColor: "#0fffff", backgroundColor: "#5014B4" });
   });
 });

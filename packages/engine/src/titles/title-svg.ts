@@ -280,6 +280,22 @@ export function fontFamily(doc: TitleDoc): string {
   return "";
 }
 
+/** A template's own look, as the Title Editor shows it before any change ("" where it has no background). */
+export function titleLook(svg: string): { textColor: string; backgroundColor: string; fontFamily: string; bold: boolean; italic: boolean } {
+  const doc = parseTitleSvg(svg);
+  const [text] = textColor(doc);
+  const [background, opacity] = backgroundColor(doc);
+  const line = lineNodes(doc)[0];
+  const weight = line ? (nodeProperty(line, "font-weight") ?? "") : "";
+  return {
+    textColor: text,
+    backgroundColor: opacity > 0 ? background : "",
+    fontFamily: fontFamily(doc),
+    bold: weight === "bold" || weight === "bolder" || Number(weight) >= 600,
+    italic: line ? nodeProperty(line, "font-style") === "italic" : false,
+  };
+}
+
 /** `FALLBACK_FONTS`: what the Title Editor falls back to when a template's font is not installed. */
 export const FALLBACK_FONTS = ["DejaVu Sans", "Liberation Sans", "Noto Sans", "FreeSans", "Ubuntu", "Cantarell", "Open Sans", "Sans-serif", "Arial"] as const;
 
