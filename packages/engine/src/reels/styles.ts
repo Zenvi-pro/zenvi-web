@@ -50,6 +50,7 @@ export interface ReelStyle {
   /** White flash frames on cuts. */
   flash: "none" | "downbeats" | "climax_downbeats";
   /** Looks applied to every shot, in order. */
+  /** Look presets for every shot, at most one per family: a clip has one Color Grade, so a second colour preset replaces the first. */
   looks: readonly LookPresetId[];
   /** Share of the shots' own sound kept under the music (0 = music only). */
   clipVolume: number;
@@ -77,7 +78,7 @@ export const REEL_STYLES: Readonly<Record<ReelStyleId, ReelStyle>> = {
     lastBeats: 4,
     motion: { video: "animate.cam_push_in", image: "animate.ken_burns_in" },
     flash: "downbeats",
-    looks: ["color.boost_color", "color.auto_contrast", "film_grain.35mm_fine"],
+    looks: ["color.boost_color", "film_grain.35mm_fine"],
     clipVolume: 0,
     fadeIn: false,
     fadeOut: true,
@@ -117,7 +118,7 @@ export const REEL_STYLES: Readonly<Record<ReelStyleId, ReelStyle>> = {
     lastBeats: 4,
     motion: { video: "animate.cam_push_in", image: "animate.ken_burns_in" },
     flash: "climax_downbeats",
-    looks: ["color.boost_color", "color.auto_contrast"],
+    looks: ["color.boost_color"],
     clipVolume: 0.15,
     fadeIn: false,
     fadeOut: true,

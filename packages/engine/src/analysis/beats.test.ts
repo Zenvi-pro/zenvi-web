@@ -53,6 +53,15 @@ describe("detectBeats", () => {
     expect(result.onsets.length).toBeGreaterThan(10);
   });
 
+  it("times beats on the kicks, not a quarter window early", () => {
+    // Kicks at 0.37 s + n/2 s, off the frame grid.
+    const times = detectBeats(track(120, 20, 0.37), SR).beats.map((b) => b.timeSec);
+    const offsets = times.map((t) => t - (0.37 + Math.round((t - 0.37) * 2) / 2));
+    const mean = offsets.reduce((a, b) => a + b, 0) / offsets.length;
+    expect(Math.abs(mean)).toBeLessThan(0.004);
+    for (const o of offsets) expect(Math.abs(o)).toBeLessThan(0.012);
+  });
+
   it("does not fold an unusual tempo onto the prior", () => {
     const result = detectBeats(track(92, 15), SR);
     expect(Math.abs(result.bpm - 92)).toBeLessThan(1.5);

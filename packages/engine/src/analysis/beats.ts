@@ -43,6 +43,8 @@ export interface BeatAnalysis {
 
 const WIN = 1024;
 const HOP = 256;
+/** Where in a frame's window the transient that peaks its flux sits, samples. */
+const TRANSIENT_AT = (3 * WIN) / 4;
 /** Analysis rate the parameters are tuned for; other rates are fine (seconds scale). */
 export const BEAT_SAMPLE_RATE = 22050;
 
@@ -325,13 +327,14 @@ export function detectBeats(pcm: Float32Array, sampleRate: number, options: Beat
   const loudest = Math.max(...meanRms, 0);
   const beatEnergy = meanRms.map((v) => (loudest > 0 ? Math.round((v / loudest) * 1000) / 1000 : 0));
 
-  // A frame is timed at its window's centre (the transient that raised it sits there).
-  const time = (frame: number) => Math.round(((frame * HOP + WIN / 2) / (frameRate * HOP)) * 1000) / 1000;
+  // A frame is timed three quarters into its window: the Hann window rises most steeply there, so that is where a
+  // transient sits when it raises the flux the most. (Timing at the centre put beats a quarter window, ~12 ms, early.)
+  const time = (frame: number) => Math.round(((frame * HOP + TRANSIENT_AT) / (frameRate * HOP)) * 1000) / 1000;
   return {
     bpm: Math.round(bpm * 10) / 10,
     beats: frames.map((f) => ({ timeSec: time(f), strength: Math.round(onset[f]! * 1000) / 1000 })),
     downbeats: frames.filter((_, i) => i % 4 === phase).map((f) => ({ timeSec: time(f) })),
-    onsets: pickOnsets(onset, frameRate).map((t) => Math.round((t + WIN / 2 / (frameRate * HOP)) * 1000) / 1000),
+    onsets: pickOnsets(onset, frameRate).map((t) => Math.round((t + TRANSIENT_AT / (frameRate * HOP)) * 1000) / 1000),
     beatEnergy,
   };
 }
