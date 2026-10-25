@@ -377,6 +377,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   export_files_to_folder_tool: (c) => ({ file_ids: [c.files.a, c.files.still] }),
   // EDL / Final Cut Pro XML are Zenvi desktop's conversions: refused here.
   export_project_file_tool: () => ({ format: "fcpxml" }),
+  // A short range at 720p (the baseline is vertical 1080p): a render job; get_render_status gives the file.
+  export_video_tool: () => ({ preset: "MP4 (h.264)", quality: "low", start: "1", end: "3", width: "720", height: "1280", file_name: "sweep-export" }),
   fade_clip_tool: (c) => ({ clip_id: c.clips.a, fade_in_seconds: "0.5", fade_out_seconds: "0.5" }),
   // The cloud's recent projects are the projects themselves: refused.
   forget_recent_projects_tool: () => ({ missing_only: true }),
