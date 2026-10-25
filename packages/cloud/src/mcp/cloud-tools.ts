@@ -19,7 +19,7 @@ import { snapKlingDuration, t2vDims } from "../generation/service.js";
 import { PRESET_NAMES, RENDER_FORMATS } from "../render/options.js";
 import type { RenderJobView } from "../render/service.js";
 import { defineTool } from "./define.js";
-import { editProject, resolveProjectId } from "./projects.js";
+import { checkProjectId, editProject, resolveProjectId } from "./projects.js";
 import type { McpCallContext, McpTool } from "./types.js";
 import { EDITOR_META_KEY, editorWidgetToolMeta, type EditorSessionMeta } from "./editor-widget.js";
 import { widgetToolMeta } from "./widget.js";
@@ -324,6 +324,7 @@ export async function editorSession(ctx: McpCallContext, projectId: string): Pro
     // The editor can do what the connection can: a read-only connection opens a read-only editor.
     scopes: [SCOPE_READ, SCOPE_WRITE].filter((scope) => principal.scopes.includes(scope)),
     familyId: principal.kind === "oauth" ? principal.familyId : undefined,
+    parentPatId: principal.kind === "pat" ? principal.tokenId : undefined,
     ttlSeconds: EMBED_TTL_SECONDS,
   });
   return {
@@ -341,7 +342,13 @@ const openInEditor = defineTool({
   description:
     "Show the project in the Zenvi editor right here in the chat, where the person can play it, scrub, trim, add titles, effects and transitions, and export. " +
     "It follows the edits you make with other tools live, so open it once per project (again only if the person asks). Also returns the link to the full editor on zenvi.pro.",
-  input: z.object({ project_id: projectIdArg }),
+  input: z.object({
+    project_id: projectIdArg,
+    refresh: z
+      .boolean()
+      .optional()
+      .describe("Set only by the editor view when it renews its access; it keeps the chat's open project as it is. Leave it out."),
+  }),
   output: z.object({ project_id: z.string(), name: z.string(), url: z.string(), embedded: z.boolean() }),
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   scope: SCOPE_READ,
@@ -349,7 +356,9 @@ const openInEditor = defineTool({
   invoked: "Zenvi editor open",
   meta: editorWidgetToolMeta(),
   async run(ctx, input) {
-    const projectId = await resolveProjectId(ctx, input.project_id);
+    // An editor card renewing its token (perhaps an older one, in a conversation reopened later) must not switch the
+    // project the chat's other tools edit.
+    const projectId = input.refresh && input.project_id ? await checkProjectId(ctx, input.project_id) : await resolveProjectId(ctx, input.project_id);
     const { meta } = await ctx.services.projects.get(ctx.principal.userId, projectId);
     const session = await editorSession(ctx, projectId);
     return {

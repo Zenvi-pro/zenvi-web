@@ -12,19 +12,25 @@ import { isProjectId } from "../services/paths.js";
 import type { LoadedProject } from "../services/projects.js";
 import type { McpCallContext } from "./types.js";
 
+/** A project id the person owns, with resolveProjectId's errors, leaving the connection's open project as it is. */
+export async function checkProjectId(ctx: McpCallContext, id: string): Promise<string> {
+  if (!isProjectId(id)) throw new ApiError(400, "invalid_request", `"${id}" is not a Zenvi Cloud project id (they look like c_…). Call list_projects.`);
+  try {
+    await ctx.services.projects.revision(ctx.principal.userId, id);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      throw new ApiError(404, "not_found", `Project ${id} was not found in your Zenvi Cloud. Call list_projects.`);
+    }
+    throw error;
+  }
+  return id;
+}
+
 export async function resolveProjectId(ctx: McpCallContext, explicit: string | undefined): Promise<string> {
   const { projects, sessions } = ctx.services;
   const userId = ctx.principal.userId;
   if (explicit !== undefined && explicit !== "") {
-    if (!isProjectId(explicit)) throw new ApiError(400, "invalid_request", `"${explicit}" is not a Zenvi Cloud project id (they look like c_…). Call list_projects.`);
-    try {
-      await projects.revision(userId, explicit);
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        throw new ApiError(404, "not_found", `Project ${explicit} was not found in your Zenvi Cloud. Call list_projects.`);
-      }
-      throw error;
-    }
+    await checkProjectId(ctx, explicit);
     await sessions.set(userId, ctx.connection, explicit);
     return explicit;
   }

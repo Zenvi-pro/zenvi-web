@@ -67,7 +67,12 @@ export function editorRoutes(dist: string | null, editorUrl: string): Hono<AppEn
 
   app.get("*", async (c) => {
     const urlPath = c.req.path;
-    const relative = decodeURIComponent(urlPath.replace(/^\/editor\/?/, ""));
+    let relative = "";
+    try {
+      relative = decodeURIComponent(urlPath.replace(/^\/editor\/?/, ""));
+    } catch {
+      // A malformed escape names no file: send it on like any other route.
+    }
     if (urlPath.startsWith(EMBED_PREFIX)) {
       const index = await read("index.html");
       if (!index) return c.text("The editor is not part of this Zenvi Cloud build.", 503);

@@ -26,9 +26,14 @@ function useCloudRender(cloud: CloudClient, projectId: string) {
   const start = async () => {
     setState({ kind: "rendering", progress: 0 });
     try {
-      // Render what is on screen: save local edits to the cloud first.
+      // Render what is on screen: save local edits to the cloud first, and stop if they did not get there (a failed
+      // save is recorded in cloudSync, not thrown: rendering then would export the older cloud copy).
       await session.autosave.flush();
       await session.saveCloud();
+      const sync = session.cloudSync.getState();
+      if (sync.state !== "synced" && sync.state !== "partial") {
+        throw new Error(sync.error ?? "Your latest edits are not saved to Zenvi Cloud yet.");
+      }
       let status = await cloud.startRender(projectId, { preset: "mp4" });
       while (!stopped.current && (status.status === "queued" || status.status === "running")) {
         setState({ kind: "rendering", progress: status.progress ?? 0 });

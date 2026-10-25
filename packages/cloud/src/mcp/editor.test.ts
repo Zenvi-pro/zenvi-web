@@ -103,6 +103,25 @@ describe("open_in_editor (editor embedded in the chat)", () => {
     await client.close();
   });
 
+  it("keeps the chat's open project when an editor card renews its token, and switches it when the model opens another", async () => {
+    const h = await harness();
+    const client = await connect(h, await pat(h));
+    const create = async (name: string) => ((await client.callTool({ name: "create_project", arguments: { name } })) as CallResult).structuredContent?.project_id as string;
+    const open = async (args: Record<string, unknown>) => ((await client.callTool({ name: "open_in_editor", arguments: args })) as CallResult).structuredContent?.project_id as string;
+    const first = await create("First");
+    const second = await create("Second");
+    // An older card for the first project renews its token: the chat keeps editing the second.
+    expect(await open({ project_id: first, refresh: true })).toBe(first);
+    expect(await open({})).toBe(second);
+    // The model opening the first project makes it the open one.
+    expect(await open({ project_id: first })).toBe(first);
+    expect(await open({})).toBe(first);
+    // A refresh still checks the project.
+    const missing = (await client.callTool({ name: "open_in_editor", arguments: { project_id: "c_missing", refresh: true } })) as CallResult;
+    expect(missing.isError).toBe(true);
+    await client.close();
+  });
+
   it("gives a read-only connection a read-only editor", async () => {
     const h = await harness();
     const writer = await connect(h, await pat(h));
@@ -137,6 +156,17 @@ describe("open_in_editor (editor embedded in the chat)", () => {
     await client.close();
   });
 
+  it("ends with the personal token too: revoking it revokes the editor tokens it opened, at once", async () => {
+    const h = await harness();
+    const { token, info } = await h.services.tokens.createPat({ userId: USER_A, name: "chat", scopes: [SCOPE_READ, SCOPE_WRITE], ttlDays: 1 });
+    const client = await connect(h, token);
+    const { projectId, session } = await openEditor(h, client);
+    expect((await h.request("GET", `/v1/projects/${projectId}`, { token: session.token })).status).toBe(200);
+    await h.services.tokens.revokePat(USER_A, info.id);
+    expect((await h.request("GET", `/v1/projects/${projectId}`, { token: session.token })).status).toBe(401);
+    await client.close();
+  });
+
   it("expires after its lifetime", async () => {
     const h = await harness();
     const client = await connect(h, await pat(h));
@@ -155,6 +185,9 @@ describe("open_in_editor (editor embedded in the chat)", () => {
     const content = read.contents[0] as unknown as { text: string; _meta: Record<string, { csp?: { frameDomains: string[] }; frame_domains?: string[] }> };
     expect(content.text).toContain("ui/initialize");
     expect(content.text).toContain('meta["zenvi/editor"]');
+    // A slow editor keeps loading; a link to a tab appears beside it, and goes when the editor reports ready.
+    expect(content.text).toContain("Editor not showing? Open it in a new tab");
+    expect(content.text).toContain("root.insertBefore(a, frame)");
     expect(content._meta.ui?.csp?.frameDomains).toEqual(["https://cloud.test"]);
     expect(content._meta["openai/widgetCSP"]?.frame_domains).toEqual(["https://cloud.test"]);
     await client.close();
@@ -207,6 +240,8 @@ describe("hosted editor build", () => {
     const escape = await h.request("GET", "/editor/..%2F..%2Fetc%2Fpasswd");
     expect(escape.status).toBe(302);
     expect(escape.text).not.toContain("root:");
+    // A malformed percent escape is not a server error.
+    expect((await h.request("GET", "/editor/%E0%A4")).status).toBe(302);
   });
 
   it("says so when the build has no editor", async () => {
