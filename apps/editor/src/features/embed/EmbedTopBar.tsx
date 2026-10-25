@@ -1,4 +1,4 @@
-import { Download, ExternalLink, Maximize2, Minimize2, Redo2, Undo2 } from "lucide-react";
+import { Download, ExternalLink, Maximize2, Minimize2, Redo2, Undo2, WandSparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 import type { CloudClient } from "@/lib/cloud";
@@ -68,6 +68,9 @@ export function EmbedTopBar({ bridge, cloud, projectId, full }: { bridge: EmbedB
         </IconButton>
       </div>
       <div className="ml-auto flex items-center gap-1.5">
+        <IconButton label="Make a reel" onClick={() => session.ui.setState({ dialog: "reel" })}>
+          <WandSparkles size={15} />
+        </IconButton>
         {render.state.kind === "done" ? (
           <Button
             size="sm"

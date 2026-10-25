@@ -276,7 +276,6 @@ export const reelTools: CatalogTool[] = [
         warnings.push("This surface cannot store generated title images: the reel has no titles.");
       }
 
-      const frameAspect = width / height;
       const built = call.commit((tx) => {
         if (tx.project.clips.length > 0) {
           for (const t of [...tx.project.effects]) removeTransition(tx, String(t.id));
@@ -307,9 +306,9 @@ export const reelTools: CatalogTool[] = [
             end: shot.kind === "video" ? shot.sourceEnd : length,
           });
           if (shot.speed < 0.999) setClipSpeed(tx, clip.id, shot.speed);
-          // Fill the frame: landscape footage in a vertical reel is cropped, not letterboxed.
-          const aspect = aspectOf(file);
-          if (aspect !== null && Math.abs(aspect / frameAspect - 1) > 0.03) setClipProperty(tx, clip.id, "scale", ScaleMode.CROP);
+          // Fill the frame: landscape footage in a vertical reel is cropped, not letterboxed, and a
+          // near-match (1080x2048 in 1080x1920) leaves no thin bars. With the same aspect, crop is fit.
+          if (aspectOf(file) !== null) setClipProperty(tx, clip.id, "scale", ScaleMode.CROP);
           const motion = shot.kind === "image" ? style.motion.image : style.motion.video;
           if (motion && motion !== "animate.none") applyClipPreset(tx, clip.id, motion);
           if (file.has_audio) setClipProperty(tx, clip.id, "volume", style.clipVolume);
