@@ -135,32 +135,32 @@ var init_output = __esm({
         const env2 = options.env ?? process.env;
         this.color = Boolean(this.out.isTTY) && !env2.NO_COLOR && env2.TERM !== "dumb";
       }
-      style(text4, ...styles) {
-        if (!this.color) return text4;
-        return styles.reduce((acc, s) => `\x1B[${CODES[s][0]}m${acc}\x1B[${CODES[s][1]}m`, text4);
+      style(text5, ...styles) {
+        if (!this.color) return text5;
+        return styles.reduce((acc, s) => `\x1B[${CODES[s][0]}m${acc}\x1B[${CODES[s][1]}m`, text5);
       }
       /** A line of human output (suppressed in JSON mode). */
-      line(text4 = "") {
+      line(text5 = "") {
         if (this.json || this.quiet) return;
-        this.out.write(`${text4}
+        this.out.write(`${text5}
 `);
       }
       /** Always-visible diagnostics on stderr (hints, progress, warnings). */
-      info(text4) {
+      info(text5) {
         if (this.quiet) return;
-        this.err.write(`${text4}
+        this.err.write(`${text5}
 `);
       }
-      warn(text4) {
-        this.err.write(`${this.errStyle(`warning: ${text4}`, "yellow")}
+      warn(text5) {
+        this.err.write(`${this.errStyle(`warning: ${text5}`, "yellow")}
 `);
       }
-      error(text4) {
-        this.err.write(`${this.errStyle(`error: ${text4}`, "red")}
+      error(text5) {
+        this.err.write(`${this.errStyle(`error: ${text5}`, "red")}
 `);
       }
-      errStyle(text4, style) {
-        return this.err.isTTY && !process.env.NO_COLOR ? `\x1B[${CODES[style][0]}m${text4}\x1B[${CODES[style][1]}m` : text4;
+      errStyle(text5, style) {
+        return this.err.isTTY && !process.env.NO_COLOR ? `\x1B[${CODES[style][0]}m${text5}\x1B[${CODES[style][1]}m` : text5;
       }
       /** The one JSON document of a `--json` run. */
       data(value) {
@@ -179,9 +179,9 @@ var init_output = __esm({
 `);
       }
       /** Progress on stderr, rewriting one line on a TTY. */
-      progress(text4) {
+      progress(text5) {
         if (this.quiet) return;
-        if (this.err.isTTY) this.err.write(`\r\x1B[2K${text4}`);
+        if (this.err.isTTY) this.err.write(`\r\x1B[2K${text5}`);
       }
       endProgress() {
         if (!this.quiet && this.err.isTTY) this.err.write("\r\x1B[2K");
@@ -519,10 +519,10 @@ var init_client = __esm({
         } catch (error62) {
           throw new CloudError(`Cannot reach Zenvi Cloud at ${this.baseUrl}: ${error62.message}`, 0, void 0, void 0);
         }
-        const text4 = await response.text();
-        let data = text4;
+        const text5 = await response.text();
+        let data = text5;
         try {
-          data = text4 ? JSON.parse(text4) : {};
+          data = text5 ? JSON.parse(text5) : {};
         } catch {
         }
         if (!response.ok && !(init.allowStatus ?? []).includes(response.status)) {
@@ -1619,8 +1619,8 @@ function expand(value, id) {
   if (typeof value === "string") return substitute(value, id);
   return value;
 }
-function substitute(text4, id) {
-  return id !== void 0 && text4.includes(ID_PLACEHOLDER) ? text4.split(ID_PLACEHOLDER).join(id) : text4;
+function substitute(text5, id) {
+  return id !== void 0 && text5.includes(ID_PLACEHOLDER) ? text5.split(ID_PLACEHOLDER).join(id) : text5;
 }
 var ID_PLACEHOLDER;
 var init_compact = __esm({
@@ -1735,8 +1735,8 @@ function isStillImage(file3) {
   return file3.media_type === "image" || Boolean(file3.has_single_image);
 }
 function createClip(input2) {
-  const { file: file3, fps } = input2;
-  const rate = fps.num / fps.den;
+  const { file: file3, fps: fps2 } = input2;
+  const rate = fps2.num / fps2.den;
   const snap2 = (t) => pyRound(t * rate) / rate;
   const clip2 = libopenshotClipDefaults();
   clip2.id = input2.id;
@@ -1780,15 +1780,15 @@ function applyAudioOnlyOverrides(clip2, file3) {
   }
   return true;
 }
-function transitionKeyframes(duration3, fps, startValue = 1, endValue = -1, contrastValue = 3) {
-  const rate = fps.num / fps.den;
-  const points = [libopenshotKeyframe(Math.fround(startValue)).Points[0]];
+function transitionKeyframes(duration3, fps2, startValue = 1, endValue = -1, contrastValue = 3) {
+  const rate = fps2.num / fps2.den;
+  const points2 = [libopenshotKeyframe(Math.fround(startValue)).Points[0]];
   if (startValue !== endValue) {
     const last = libopenshotKeyframe(Math.fround(endValue)).Points[0];
     last.co.X = pyRound(Math.max(0, duration3) * rate) + 1;
-    points.push(last);
+    points2.push(last);
   }
-  return { brightness: { Points: points }, contrast: libopenshotKeyframe(Math.fround(contrastValue)) };
+  return { brightness: { Points: points2 }, contrast: libopenshotKeyframe(Math.fround(contrastValue)) };
 }
 function createTransition(input2) {
   const direction2 = input2.direction ?? "in";
@@ -1845,14 +1845,14 @@ var init_defaults = __esm({
 });
 
 // ../engine/src/timeline/time.ts
-function fpsFloat(fps) {
-  return fps.num / fps.den;
+function fpsFloat(fps2) {
+  return fps2.num / fps2.den;
 }
-function frameContaining(seconds2, fps) {
-  return Math.floor(seconds2 * fpsFloat(fps) + 1e-9) + 1;
+function frameContaining(seconds2, fps2) {
+  return Math.floor(seconds2 * fpsFloat(fps2) + 1e-9) + 1;
 }
-function samplesPerFrame(frame, fps, sampleRate, channels) {
-  const fpsRate = fps.den / fps.num;
+function samplesPerFrame(frame, fps2, sampleRate, channels) {
+  const fpsRate = fps2.den / fps2.num;
   let previous = sampleRate * fpsRate * (frame - 1);
   previous -= previous % channels;
   let total = sampleRate * fpsRate * frame;
@@ -1860,8 +1860,8 @@ function samplesPerFrame(frame, fps, sampleRate, channels) {
   const count = roundHalfAway(total - previous);
   return count < 0 ? 0 : count;
 }
-function frameSampleOffset(frame, fps, sampleRate, channels) {
-  let total = sampleRate * (fps.den / fps.num) * (frame - 1);
+function frameSampleOffset(frame, fps2, sampleRate, channels) {
+  let total = sampleRate * (fps2.den / fps2.num) * (frame - 1);
   total -= total % channels;
   return roundHalfAway(total);
 }
@@ -1873,11 +1873,11 @@ function fpsFromRate(rate) {
   return limitDenominator(rate, 1001);
 }
 function limitDenominator(x, maxDen) {
-  const [num11, den2] = exactRatio(x);
+  const [num13, den2] = exactRatio(x);
   const max = BigInt(maxDen);
-  if (den2 <= max) return { num: Number(num11), den: Number(den2) };
+  if (den2 <= max) return { num: Number(num13), den: Number(den2) };
   let p0 = 0n, q0 = 1n, p1 = 1n, q1 = 0n;
-  let n = num11, d = den2;
+  let n = num13, d = den2;
   for (; ; ) {
     const a = n / d;
     const q2 = q0 + a * q1;
@@ -1942,9 +1942,9 @@ function positiveFloat(value) {
 function fpsFraction(value) {
   if (typeof value === "number") return value > 0 ? limitDenominator(value, 1e6) : null;
   if (!isRecord3(value)) return null;
-  const num11 = Math.trunc(Number(value.num));
+  const num13 = Math.trunc(Number(value.num));
   const den2 = Math.trunc(Number(value.den));
-  return Number.isFinite(num11) && Number.isFinite(den2) && num11 !== 0 && den2 !== 0 ? { num: num11, den: den2 } : null;
+  return Number.isFinite(num13) && Number.isFinite(den2) && num13 !== 0 && den2 !== 0 ? { num: num13, den: den2 } : null;
 }
 function videoLengthToProjectFrames(media, projectFps2) {
   const data = isRecord3(media) ? media : {};
@@ -1972,12 +1972,12 @@ function readerBounds(reader, projectFps2) {
 }
 function timePoints(clip2) {
   const time3 = clip2.time;
-  const points = isRecord3(time3) ? time3.Points : void 0;
-  return Array.isArray(points) ? points : null;
+  const points2 = isRecord3(time3) ? time3.Points : void 0;
+  return Array.isArray(points2) ? points2 : null;
 }
-function timeCurveLengthFrames(points) {
+function timeCurveLengthFrames(points2) {
   let maxX = 0;
-  for (const point3 of points ?? []) {
+  for (const point3 of points2 ?? []) {
     const co = isRecord3(point3) ? point3.co : void 0;
     if (!isRecord3(co)) continue;
     const x = roundedInt(co.X);
@@ -1985,8 +1985,8 @@ function timeCurveLengthFrames(points) {
   }
   return maxX || null;
 }
-function clampTimePoints(points, maxFrames) {
-  return points.map((point3) => {
+function clampTimePoints(points2, maxFrames) {
+  return points2.map((point3) => {
     const co = isRecord3(point3) ? point3.co : void 0;
     if (!isRecord3(co)) return point3;
     const next = { ...co };
@@ -2013,12 +2013,12 @@ function clampTimingToMedia(clip2, projectFps2, existing) {
     if (end2 < start2) end2 = start2;
     return { start: start2, end: end2, duration: Math.max(0, end2 - start2) };
   }
-  const points = timePoints(clip2);
+  const points2 = timePoints(clip2);
   const bounds2 = readerBounds(reader, projectFps2);
   const timeObject = isRecord3(clip2.time) ? clip2.time : {};
-  if (points && points.length > 1) {
-    const maxFrames = timeCurveLengthFrames(points) ?? bounds2.frames;
-    const clamped = bounds2.frames ? clampTimePoints(points, bounds2.frames) : void 0;
+  if (points2 && points2.length > 1) {
+    const maxFrames = timeCurveLengthFrames(points2) ?? bounds2.frames;
+    const clamped = bounds2.frames ? clampTimePoints(points2, bounds2.frames) : void 0;
     let maxDuration2 = null;
     if (maxFrames) maxDuration2 = maxFrames / rate;
     else if (bounds2.duration !== null) maxDuration2 = bounds2.duration;
@@ -2045,7 +2045,7 @@ function clampTimingToMedia(clip2, projectFps2, existing) {
   if (maxDuration !== null && end > maxDuration) end = maxDuration;
   if (end < start) start = end;
   const result2 = { start, end, duration: Math.max(0, end - start) };
-  if (bounds2.frames && points) result2.time = { ...timeObject, Points: clampTimePoints(points, bounds2.frames) };
+  if (bounds2.frames && points2) result2.time = { ...timeObject, Points: clampTimePoints(points2, bounds2.frames) };
   return result2;
 }
 function clipTimeBounds(clip2, projectFps2) {
@@ -2056,10 +2056,10 @@ function clipTimeBounds(clip2, projectFps2) {
     const maxFrames2 = duration3 ? Math.max(1, Math.trunc(pyRound(duration3 * rate))) : 1;
     return { maxDuration: duration3, maxFrames: maxFrames2 };
   }
-  const points = timePoints(clip2);
+  const points2 = timePoints(clip2);
   const bounds2 = readerBounds(reader, projectFps2);
-  if (points && points.length > 1) {
-    const maxFrames2 = timeCurveLengthFrames(points) ?? bounds2.frames ?? 1;
+  if (points2 && points2.length > 1) {
+    const maxFrames2 = timeCurveLengthFrames(points2) ?? bounds2.frames ?? 1;
     return { maxDuration: maxFrames2 / rate, maxFrames: maxFrames2 };
   }
   const maxFrames = bounds2.frames ?? 1;
@@ -2113,20 +2113,20 @@ function resolvePoint(raw) {
     rightY: num2(hr.Y) ?? DEFAULT_HANDLE_RIGHT.Y
   };
 }
-function lowerBound(points, target) {
+function lowerBound(points2, target) {
   let lo = 0;
-  let hi = points.length;
+  let hi = points2.length;
   while (lo < hi) {
     const mid = lo + hi >>> 1;
-    if (points[mid].x < target) lo = mid + 1;
+    if (points2[mid].x < target) lo = mid + 1;
     else hi = mid;
   }
   return lo;
 }
-function addResolvedPoint(points, point3) {
-  const at = lowerBound(points, point3.x);
-  if (at < points.length && points[at].x === point3.x) points[at] = point3;
-  else points.splice(at, 0, point3);
+function addResolvedPoint(points2, point3) {
+  const at = lowerBound(points2, point3.x);
+  if (at < points2.length && points2[at].x === point3.x) points2[at] = point3;
+  else points2.splice(at, 0, point3);
 }
 function resolvePoints(kf) {
   if (typeof kf === "number") {
@@ -2194,9 +2194,9 @@ function xOf(point3) {
   const x = point3?.co?.X;
   return typeof x === "number" && Number.isFinite(x) ? x : 1;
 }
-function withPoints(kf, points) {
+function withPoints(kf, points2) {
   const base = typeof kf === "object" && kf !== null && !Array.isArray(kf) ? kf : {};
-  return { ...base, Points: points };
+  return { ...base, Points: points2 };
 }
 function copyPoint(point3) {
   return structuredClone(point3);
@@ -2206,26 +2206,26 @@ function normalizeKeyframe(kf) {
   for (const point3 of pointsOf(kf)) insertSorted(out, copyPoint(point3));
   return withPoints(kf, out);
 }
-function insertSorted(points, point3) {
+function insertSorted(points2, point3) {
   const x = xOf(point3);
   let lo = 0;
-  let hi = points.length;
+  let hi = points2.length;
   while (lo < hi) {
     const mid = lo + hi >>> 1;
-    if (xOf(points[mid]) < x) lo = mid + 1;
+    if (xOf(points2[mid]) < x) lo = mid + 1;
     else hi = mid;
   }
-  if (lo < points.length && xOf(points[lo]) === x) points[lo] = point3;
-  else points.splice(lo, 0, point3);
+  if (lo < points2.length && xOf(points2[lo]) === x) points2[lo] = point3;
+  else points2.splice(lo, 0, point3);
 }
 function setKeyframePoint(kf, point3) {
   const next = normalizeKeyframe(kf);
   insertSorted(next.Points, copyPoint(point3));
   return next;
 }
-function setKeyframePoints(kf, points) {
+function setKeyframePoints(kf, points2) {
   const next = normalizeKeyframe(kf);
-  for (const point3 of points) insertSorted(next.Points, copyPoint(point3));
+  for (const point3 of points2) insertSorted(next.Points, copyPoint(point3));
   return next;
 }
 function setKeyframeValue(kf, frame, value, interpolation2) {
@@ -2257,8 +2257,8 @@ function removeKeyframePointsInRange(kf, from, to) {
   );
 }
 function scaleKeyframe(kf, factor, rule = "desktop") {
-  const points = normalizeKeyframe(kf).Points;
-  const scaled = points.map((p, index) => {
+  const points2 = normalizeKeyframe(kf).Points;
+  const scaled = points2.map((p, index) => {
     const x = xOf(p);
     let nx;
     if (rule === "libopenshot") nx = index === 0 ? x : roundHalfAway(x * factor);
@@ -2330,19 +2330,19 @@ function interpolateBetween(left, right, target, allowedError = BEZIER_ALLOWED_E
       return linear(left, right, target);
   }
 }
-function valueAtResolved(points, x) {
-  if (points.length === 0) return 0;
-  const at = lowerBound(points, x);
-  if (at === points.length) return points[points.length - 1].y;
-  if (at === 0) return points[0].y;
-  const candidate = points[at];
+function valueAtResolved(points2, x) {
+  if (points2.length === 0) return 0;
+  const at = lowerBound(points2, x);
+  if (at === points2.length) return points2[points2.length - 1].y;
+  if (at === 0) return points2[0].y;
+  const candidate = points2[at];
   if (candidate.x === x) return candidate.y;
-  return interpolateBetween(points[at - 1], candidate, x);
+  return interpolateBetween(points2[at - 1], candidate, x);
 }
-function lengthOf(points) {
-  if (points.length === 0) return 0;
-  if (points.length === 1) return 1;
-  return roundHalfAway(points[points.length - 1].x);
+function lengthOf(points2) {
+  if (points2.length === 0) return 0;
+  if (points2.length === 1) return 1;
+  return roundHalfAway(points2[points2.length - 1].x);
 }
 function evaluate(kf, frame, fallback) {
   if ((kf === void 0 || kf === null) && fallback !== void 0) return fallback;
@@ -2714,12 +2714,118 @@ var init_registry = __esm({
   }
 });
 
+// ../engine/src/effects/luts.ts
+function pyTitle(text5) {
+  let out = "";
+  let previousCased = false;
+  for (const ch of text5) {
+    const cased = ch.toLowerCase() !== ch.toUpperCase();
+    out += cased ? previousCased ? ch.toLowerCase() : ch.toUpperCase() : ch;
+    previousCased = cased;
+  }
+  return out;
+}
+function pretty(name) {
+  return pyTitle(name.replace(/\.cube$/i, "").replaceAll("_", " "));
+}
+function listLuts() {
+  return LUTS;
+}
+function builtinLutByRelativePath(relative2) {
+  return BY_RELATIVE.get(relative2.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase());
+}
+function builtinLutForPath(path38) {
+  const normalized = String(path38 ?? "").trim().replaceAll("\\", "/");
+  if (normalized.startsWith(LUT_ALIAS)) return builtinLutByRelativePath(normalized.slice(LUT_ALIAS.length));
+  const at = normalized.toLowerCase().lastIndexOf("/colors/");
+  return at >= 0 ? builtinLutByRelativePath(normalized.slice(at + "/colors/".length)) : void 0;
+}
+function isAbsoluteFilePath(path38) {
+  return path38.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path38) || path38.startsWith("\\\\");
+}
+var BUILTIN_LUTS, LUT_ALIAS, LUTS, BY_RELATIVE;
+var init_luts = __esm({
+  "../engine/src/effects/luts.ts"() {
+    "use strict";
+    BUILTIN_LUTS = [
+      [
+        "cinematic_&_blockbuster",
+        [
+          "bold_red_cinema",
+          "city_neon_cinema",
+          "cool_cinema",
+          "dreamy_cinema",
+          "elegant_dark_cinema",
+          "heroic_cinema",
+          "romantic_cinema",
+          "sunlit_cinema",
+          "teal_&_orange_cinema",
+          "teal_cinema",
+          "warm_cinema"
+        ]
+      ],
+      [
+        "dark_&_moody",
+        [
+          "city_night_film",
+          "cold_shadows",
+          "cool_haze",
+          "dramatic_warmth",
+          "icy_drama",
+          "mystic_emerald_drama",
+          "night_glow",
+          "noir_era",
+          "retro_red_shadows",
+          "spy_night",
+          "teal_horror",
+          "woodland_drama"
+        ]
+      ],
+      [
+        "film_stock_&_vintage",
+        [
+          "classic_film",
+          "dark_orange_film",
+          "emerald_film",
+          "faded_memories",
+          "golden_wood_film",
+          "golden_years_film",
+          "green_film_pop",
+          "low_key_film",
+          "red_film",
+          "standard_film",
+          "vintage_400_film",
+          "vintage_green_film",
+          "warm_roast_film"
+        ]
+      ],
+      ["teal_&_orange_vibes", ["moonlight_orange", "signature_teal_&_orange", "sunset_orange", "teal_punch", "tropical_teal", "western_sunset"]],
+      ["utility_&_correction", ["clean_&_denoise", "protect_highlights", "warm_correction"]],
+      ["vibrant_&_colorful", ["color_pop", "photo_contrast", "valentine_pop", "warm_pop", "warm_to_cool"]]
+    ];
+    LUT_ALIAS = "@colors/";
+    LUTS = BUILTIN_LUTS.flatMap(
+      ([folder, names2]) => names2.map((stem5) => ({
+        id: `${folder}/${stem5}`,
+        name: pretty(stem5),
+        category: pretty(folder),
+        folder,
+        path: `${LUT_ALIAS}${folder}/${stem5}.cube`,
+        assetPath: `colors/${folder}/${stem5}.cube`,
+        builtin: true
+      }))
+    );
+    BY_RELATIVE = new Map(LUTS.map((lut) => [`${lut.folder}/${lut.id.split("/")[1]}.cube`.toLowerCase(), lut]));
+  }
+});
+
 // ../engine/src/effects/index.ts
 var init_effects = __esm({
   "../engine/src/effects/index.ts"() {
     "use strict";
     init_types2();
     init_registry();
+    init_luts();
   }
 });
 
@@ -2738,8 +2844,8 @@ var init_keyframe = __esm({
 function durationF32(item) {
   return f32(f32(item.end) - f32(item.start));
 }
-function frameWindow(item, fps) {
-  const rate = fpsFloat(fps);
+function frameWindow(item, fps2) {
+  const rate = fpsFloat(fps2);
   const position = f32(item.position);
   const start = f32(item.start);
   const endTime = f32(position + durationF32(item));
@@ -2755,10 +2861,13 @@ function windowContains(window, frame) {
 function localFrame(window, frame) {
   return frame - window.startFrame + window.localStartFrame;
 }
-function clipFrameAtTime(item, seconds2, fps, clamp2 = true) {
-  const rate = fpsFloat(fps);
+function timelineFrameOf(window, local) {
+  return local - window.localStartFrame + window.startFrame;
+}
+function clipFrameAtTime(item, seconds2, fps2, clamp3 = true) {
+  const rate = fpsFloat(fps2);
   const frame = pyRound((seconds2 - f32(item.position) + f32(item.start)) * rate) + 1;
-  if (!clamp2) return frame;
+  if (!clamp3) return frame;
   const min = pyRound(f32(item.start) * rate) + 1;
   const max = pyRound(f32(item.end) * rate);
   if (frame < min) return min;
@@ -2800,8 +2909,8 @@ function timelineStart(project) {
   const starts = [...project.clips, ...project.effects].map((i) => i.position);
   return starts.length ? Math.min(...starts) : 0;
 }
-function maxFrame(project, fps = project.fps) {
-  const frames = timelineEnd(project) * (fps.num / fps.den);
+function maxFrame(project, fps2 = project.fps) {
+  const frames = timelineEnd(project) * (fps2.num / fps2.den);
   const epsilon = 1e-4;
   if (frames > 0 && frames < epsilon) return 1;
   const frame = Math.ceil(frames - epsilon);
@@ -2908,7 +3017,7 @@ function scan(xml) {
     const name = nameMatch ? nameMatch[0] : "";
     const selfClosing = xml[tagEnd - 1] === "/";
     const parent = stack[stack.length - 1] ?? null;
-    const span2 = {
+    const span3 = {
       name,
       start: i,
       openEnd: tagEnd + 1,
@@ -2918,9 +3027,9 @@ function scan(xml) {
       parent,
       children: []
     };
-    parent?.children.push(span2);
-    all.push(span2);
-    if (!selfClosing) stack.push(span2);
+    parent?.children.push(span3);
+    all.push(span3);
+    if (!selfClosing) stack.push(span3);
     i = tagEnd + 1;
   }
   return all;
@@ -2928,11 +3037,11 @@ function scan(xml) {
 function byName(spans2, name) {
   return spans2.filter((s) => s.name === name);
 }
-function xmlEscapeText(text4) {
-  return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function xmlEscapeText(text5) {
+  return text5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-function xmlUnescape(text4) {
-  return text4.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (whole, ref) => {
+function xmlUnescape(text5) {
+  return text5.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (whole, ref) => {
     if (!ref.startsWith("#")) return NAMED_ENTITIES[ref];
     const code = ref[1] === "x" || ref[1] === "X" ? Number.parseInt(ref.slice(2), 16) : Number.parseInt(ref.slice(1), 10);
     return code <= 1114111 ? String.fromCodePoint(code) : whole;
@@ -2949,30 +3058,30 @@ function apply(xml, edits) {
   }
   return out;
 }
-function setSvgText(template, text4) {
+function setSvgText(template, text5) {
   const spans2 = scan(template);
   const tspans = byName(spans2, "tspan");
   const targets = tspans.length > 0 ? tspans : byName(spans2, "text");
   if (targets.length === 0) return template;
   const edits = [];
-  const setContent = (span2, content) => {
-    if (span2.selfClosing) {
-      const tag = template.slice(span2.start, span2.openEnd);
-      edits.push({ from: span2.start, to: span2.end, text: `${tag.slice(0, -2).trimEnd()}>${content}</${span2.name}>` });
+  const setContent = (span3, content) => {
+    if (span3.selfClosing) {
+      const tag = template.slice(span3.start, span3.openEnd);
+      edits.push({ from: span3.start, to: span3.end, text: `${tag.slice(0, -2).trimEnd()}>${content}</${span3.name}>` });
     } else {
-      edits.push({ from: span2.openEnd, to: span2.closeStart, text: content });
+      edits.push({ from: span3.openEnd, to: span3.closeStart, text: content });
     }
   };
-  const covered = (span2) => {
-    for (let p = span2.parent; p; p = p.parent) if (targets.includes(p)) return true;
+  const covered = (span3) => {
+    for (let p = span3.parent; p; p = p.parent) if (targets.includes(p)) return true;
     return false;
   };
-  const placeholder = (span2) => span2.selfClosing ? "" : xmlUnescape(template.slice(span2.openEnd, span2.closeStart).replace(/<[^>]*>/g, "")).trim();
+  const placeholder = (span3) => span3.selfClosing ? "" : xmlUnescape(template.slice(span3.openEnd, span3.closeStart).replace(/<[^>]*>/g, "")).trim();
   const first = placeholder(targets[0]);
-  targets.forEach((span2, i) => {
-    if (covered(span2)) return;
-    const same = i === 0 || first !== "" && placeholder(span2) === first;
-    setContent(span2, same ? xmlEscapeText(text4) : "");
+  targets.forEach((span3, i) => {
+    if (covered(span3)) return;
+    const same = i === 0 || first !== "" && placeholder(span3) === first;
+    setContent(span3, same ? xmlEscapeText(text5) : "");
   });
   return apply(template, edits);
 }
@@ -3498,12 +3607,12 @@ function isRecord8(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function fpsOf(project) {
-  const fps = project.fps;
-  return fps && fps.num > 0 && fps.den > 0 ? fps : { num: 30, den: 1 };
+  const fps2 = project.fps;
+  return fps2 && fps2.num > 0 && fps2.den > 0 ? fps2 : { num: 30, den: 1 };
 }
 function rateOf(project) {
-  const fps = fpsOf(project);
-  return fps.num / fps.den;
+  const fps2 = fpsOf(project);
+  return fps2.num / fps2.den;
 }
 function snapSeconds(seconds2, project) {
   const rate = rateOf(project);
@@ -3681,8 +3790,8 @@ function topLevelTypes(prop) {
   if (Array.isArray(raw)) return new Set(raw.map(String));
   return /* @__PURE__ */ new Set();
 }
-function parsePythonFloat(text4) {
-  const t = text4.trim();
+function parsePythonFloat(text5) {
+  const t = text5.trim();
   if (!FLOAT_TEXT.test(t)) return null;
   const n = Number(t.replaceAll("_", ""));
   return Number.isFinite(n) ? n : null;
@@ -3717,13 +3826,13 @@ function coerceValue(value, prop) {
     return { keep: true, value };
   }
   if (types.has("array") && typeof value === "string") {
-    const text4 = value.trim();
-    if (!text4) return { keep: false, value };
+    const text5 = value.trim();
+    if (!text5) return { keep: false, value };
     try {
-      return { keep: true, value: JSON.parse(text4) };
+      return { keep: true, value: JSON.parse(text5) };
     } catch {
-      if (text4.includes(",")) {
-        const parts = text4.split(",").map((p) => p.trim()).filter(Boolean);
+      if (text5.includes(",")) {
+        const parts = text5.split(",").map((p) => p.trim()).filter(Boolean);
         if (parts.length > 0 && parts.every((p) => /^\d+$/.test(p))) {
           return { keep: true, value: parts.map((p) => Number.parseInt(p, 10)) };
         }
@@ -3833,15 +3942,15 @@ var init_coerce = __esm({
 });
 
 // ../engine/src/tools/frame-time.ts
-function num3(fps) {
-  return typeof fps === "number" ? fps : fps.num;
+function num3(fps2) {
+  return typeof fps2 === "number" ? fps2 : fps2.num;
 }
-function den(fps) {
-  return typeof fps === "number" ? 1 : fps.den;
+function den(fps2) {
+  return typeof fps2 === "number" ? 1 : fps2.den;
 }
-function requireRate(fps) {
-  const n = num3(fps);
-  const d = den(fps);
+function requireRate(fps2) {
+  const n = num3(fps2);
+  const d = den(fps2);
   if (!Number.isFinite(n) || !Number.isFinite(d) || n <= 0 || d <= 0) {
     throw new RangeError(`fps must be positive, got ${n}/${d}`);
   }
@@ -3852,46 +3961,46 @@ function requireFinite2(value, name) {
   }
   return value;
 }
-function fpsFloat2(fps) {
-  requireRate(fps);
-  return num3(fps) / den(fps);
+function fpsFloat2(fps2) {
+  requireRate(fps2);
+  return num3(fps2) / den(fps2);
 }
 function roundHalfUp(value) {
   requireFinite2(value, "value");
   const r = value >= 0 ? Math.floor(value + 0.5) : Math.ceil(value - 0.5);
   return r === 0 ? 0 : r;
 }
-function toFrame(seconds2, fps) {
+function toFrame(seconds2, fps2) {
   requireFinite2(seconds2, "seconds");
-  return roundHalfUp(seconds2 * fpsFloat2(fps));
+  return roundHalfUp(seconds2 * fpsFloat2(fps2));
 }
-function toSeconds(frame, fps) {
-  requireRate(fps);
+function toSeconds(frame, fps2) {
+  requireRate(fps2);
   if (!Number.isInteger(frame)) throw new RangeError(`frame must be an int, got ${String(frame)}`);
-  return frame * den(fps) / num3(fps);
+  return frame * den(fps2) / num3(fps2);
 }
-function snap(seconds2, fps) {
-  return toSeconds(toFrame(seconds2, fps), fps);
+function snap(seconds2, fps2) {
+  return toSeconds(toFrame(seconds2, fps2), fps2);
 }
-function durationFrames(start, end, fps) {
+function durationFrames(start, end, fps2) {
   requireFinite2(start, "start");
   requireFinite2(end, "end");
   if (end <= start) {
     if (end === start) return 1;
-    return Math.max(1, toFrame(end, fps) - toFrame(start, fps));
+    return Math.max(1, toFrame(end, fps2) - toFrame(start, fps2));
   }
-  return Math.max(1, roundHalfUp((end - start) * fpsFloat2(fps)));
+  return Math.max(1, roundHalfUp((end - start) * fpsFloat2(fps2)));
 }
-function quantizeSpan(position, start, end, fps) {
-  const posFrame = toFrame(position, fps);
-  const startFrame = toFrame(start, fps);
-  const dur = durationFrames(start, end, fps);
-  return [toSeconds(posFrame, fps), toSeconds(startFrame, fps), toSeconds(startFrame + dur, fps)];
+function quantizeSpan(position, start, end, fps2) {
+  const posFrame = toFrame(position, fps2);
+  const startFrame = toFrame(start, fps2);
+  const dur = durationFrames(start, end, fps2);
+  return [toSeconds(posFrame, fps2), toSeconds(startFrame, fps2), toSeconds(startFrame + dur, fps2)];
 }
 function projectFps(project) {
-  const fps = project?.fps;
-  const n = Math.trunc(Number(fps?.num));
-  const d = Math.trunc(Number(fps?.den));
+  const fps2 = project?.fps;
+  const n = Math.trunc(Number(fps2?.num));
+  const d = Math.trunc(Number(fps2?.den));
   if (Number.isFinite(n) && Number.isFinite(d) && n > 0 && d > 0) return { num: n, den: d };
   return { num: 30, den: 1 };
 }
@@ -3944,12 +4053,12 @@ function pyFixed(x, digits) {
   if (Number.isNaN(x)) return "nan";
   if (!Number.isFinite(x)) return x > 0 ? "inf" : "-inf";
   const { negative, mant, exp } = decompose(x);
-  let num11 = mant * 10n ** BigInt(digits);
+  let num13 = mant * 10n ** BigInt(digits);
   let den2 = 1n;
-  if (exp >= 0) num11 <<= BigInt(exp);
+  if (exp >= 0) num13 <<= BigInt(exp);
   else den2 <<= BigInt(-exp);
-  let q = num11 / den2;
-  const twice = num11 % den2 * 2n;
+  let q = num13 / den2;
+  const twice = num13 % den2 * 2n;
   if (twice > den2 || twice === den2 && (q & 1n) === 1n) q += 1n;
   const s = q.toString().padStart(digits + 1, "0");
   const body = digits > 0 ? `${s.slice(0, s.length - digits)}.${s.slice(s.length - digits)}` : s;
@@ -3993,14 +4102,14 @@ function pyG(x, precision = 6) {
   const { mant, exp } = decompose(Math.abs(x));
   const roundAt = (e102) => {
     const shift2 = p - 1 - e102;
-    let num11 = mant;
+    let num13 = mant;
     let den2 = 1n;
-    if (exp >= 0) num11 <<= BigInt(exp);
+    if (exp >= 0) num13 <<= BigInt(exp);
     else den2 <<= BigInt(-exp);
-    if (shift2 >= 0) num11 *= 10n ** BigInt(shift2);
+    if (shift2 >= 0) num13 *= 10n ** BigInt(shift2);
     else den2 *= 10n ** BigInt(-shift2);
-    let q2 = num11 / den2;
-    const twice = num11 % den2 * 2n;
+    let q2 = num13 / den2;
+    const twice = num13 % den2 * 2n;
     if (twice > den2 || twice === den2 && (q2 & 1n) === 1n) q2 += 1n;
     return q2;
   };
@@ -4083,8 +4192,8 @@ function fileLooksLikeImage(file3) {
   const ext = path38.includes(".") ? path38.slice(path38.lastIndexOf(".") + 1).toLowerCase() : "";
   return IMAGE_EXTS.has(ext);
 }
-function quantizePlacementSeconds(start, end, fps) {
-  const [, s, e] = quantizeSpan(0, start || 0, end || 0, fps);
+function quantizePlacementSeconds(start, end, fps2) {
+  const [, s, e] = quantizeSpan(0, start || 0, end || 0, fps2);
   return [s, e];
 }
 function sourceWindowForFile(file3, eps = 1e-3) {
@@ -4134,8 +4243,8 @@ function endBoundsKeepWindow(trimStart, trimDur, trimEnd, tolerance = KEEP_WINDO
 function blindTrimRejected(options) {
   if (options.watchedStart !== null || options.hasExplicitEnd || options.hasExplicitStart) return false;
   if (options.isAudio || options.isImage || options.isSubclip) return false;
-  const span2 = options.trimDur ?? 0;
-  return Number.isFinite(span2) && span2 > 0;
+  const span3 = options.trimDur ?? 0;
+  return Number.isFinite(span3) && span3 > 0;
 }
 function parseTimecodeToken(token) {
   if (typeof token === "number") return Number.isFinite(token) ? token : null;
@@ -4162,9 +4271,9 @@ function parseSecondsArg(value, fallback, field = "") {
     if (!Number.isFinite(value)) throw new TimeArgError(`${label2}=${pyFloat(value)} is not a time in seconds`);
     return value;
   }
-  const text4 = String(value).trim();
-  if (!text4) return fallback;
-  let lowered = text4.toLowerCase().replaceAll(",", "");
+  const text5 = String(value).trim();
+  if (!text5) return fallback;
+  let lowered = text5.toLowerCase().replaceAll(",", "");
   for (const suffix of SECONDS_SUFFIXES) {
     if (lowered.endsWith(suffix) && lowered.length > suffix.length) {
       lowered = lowered.slice(0, -suffix.length).trim();
@@ -4191,8 +4300,8 @@ function placementWatchQuery(file3, query2 = "", extra = "") {
   const data = isRecord10(file3) ? file3 : {};
   const ai = isRecord10(data.ai_metadata) ? data.ai_metadata : {};
   for (const key of ["prompt", "short_summary", "description"]) {
-    const text4 = String(ai[key] ?? "").trim();
-    if (text4) return Array.from(text4).slice(0, 200).join("");
+    const text5 = String(ai[key] ?? "").trim();
+    if (text5) return Array.from(text5).slice(0, 200).join("");
   }
   const extraText = String(extra ?? "").replaceAll("_", " ").trim();
   if (extraText) return Array.from(extraText).slice(0, 200).join("");
@@ -4201,15 +4310,15 @@ function placementWatchQuery(file3, query2 = "", extra = "") {
   if (typeof tags === "string") tagText = tags.replaceAll(",", " ").trim();
   else if (Array.isArray(tags)) tagText = tags.filter((t) => String(t).trim()).map(String).join(" ").trim();
   if (tagText) return Array.from(tagText).slice(0, 200).join("");
-  const stem4 = basenameStem(String(data.name || data.path || ""));
-  if (stem4) return Array.from(stem4).slice(0, 200).join("");
+  const stem5 = basenameStem(String(data.name || data.path || ""));
+  if (stem5) return Array.from(stem5).slice(0, 200).join("");
   return DEFAULT_WATCH_QUERY;
 }
 function shouldWatchPlacement(options) {
   if (options.isAudio || options.isImage || options.skipExplicitTimes) return false;
   if (options.isAlreadyWatchedSubclip && !options.explicitQuery) return false;
-  const span2 = Number.isFinite(options.windowSec) ? options.windowSec : 0;
-  return span2 > 1e-3 && span2 <= (options.maxWindowSec ?? WATCH_MAX_WINDOW_SEC) + 1e-6;
+  const span3 = Number.isFinite(options.windowSec) ? options.windowSec : 0;
+  return span3 > 1e-3 && span3 <= (options.maxWindowSec ?? WATCH_MAX_WINDOW_SEC) + 1e-6;
 }
 function parseExplicitSourceTimeRange(query2) {
   if (!query2 || typeof query2 !== "string") return null;
@@ -4288,16 +4397,16 @@ function gainToDb(gain) {
   const g = f(gain, 0);
   return g <= 0 ? -120 : 20 * Math.log10(g);
 }
-function fpsFloat3(fps) {
-  if (isRecord11(fps)) {
-    const num11 = f(fps.num, 30);
-    const den2 = f(fps.den, 1);
-    return den2 ? num11 / den2 : 30;
+function fpsFloat3(fps2) {
+  if (isRecord11(fps2)) {
+    const num13 = f(fps2.num, 30);
+    const den2 = f(fps2.den, 1);
+    return den2 ? num13 / den2 : 30;
   }
-  return f(fps, 30) || 30;
+  return f(fps2, 30) || 30;
 }
-function clipSourceFrameRange(clip2, fps) {
-  const rate = fpsFloat3(fps);
+function clipSourceFrameRange(clip2, fps2) {
+  const rate = fpsFloat3(fps2);
   const data = isRecord11(clip2) ? clip2 : {};
   const first = pyRound(f(data.start, 0) * rate) + 1;
   let last = pyRound(f(data.end, 0) * rate) + 1;
@@ -4310,12 +4419,12 @@ function clipTimelineExtent(clip2) {
   const dur = Math.max(0, f(data.end, 0) - f(data.start, 0));
   return [pos, pos + dur];
 }
-function timelineToSourceFrame(tTimeline, clip2, fps) {
+function timelineToSourceFrame(tTimeline, clip2, fps2) {
   const data = isRecord11(clip2) ? clip2 : {};
-  const rate = fpsFloat3(fps);
+  const rate = fpsFloat3(fps2);
   const sourceSeconds = f(tTimeline, 0) - f(data.position, 0) + f(data.start, 0);
   const frame = pyRound(sourceSeconds * rate) + 1;
-  const [first, last] = clipSourceFrameRange(data, fps);
+  const [first, last] = clipSourceFrameRange(data, fps2);
   return Math.max(first, Math.min(last, frame));
 }
 function sourceToTimelineSeconds(tSource, clip2) {
@@ -4448,8 +4557,8 @@ function chapterEdges(aiMetadata) {
   return [...edges].sort((a, b) => a - b);
 }
 function cueCoverage(cues, start, end) {
-  const span2 = f(end, 0) - f(start, 0);
-  if (span2 <= 0) return 0;
+  const span3 = f(end, 0) - f(start, 0);
+  if (span3 <= 0) return 0;
   let covered = 0;
   for (const cue of cues ?? []) {
     if (!isRecord11(cue)) continue;
@@ -4457,7 +4566,7 @@ function cueCoverage(cues, start, end) {
     if (!bounds2) continue;
     covered += Math.max(0, Math.min(bounds2[1], end) - Math.max(bounds2[0], start));
   }
-  return Math.min(1, covered / span2);
+  return Math.min(1, covered / span3);
 }
 function snapCutToPhraseEdge(cut2, cues, preferLater, maxShift = MAX_CUE_SHIFT_SEC) {
   const value = f(cut2, 0);
@@ -4554,13 +4663,13 @@ function speechWindowsFromEnergy(clip2, threshold = DEFAULT_ENERGY_THRESHOLD, mi
   const samples = Array.isArray(ui.audio_data) ? ui.audio_data : [];
   if (samples.length < 2) return [];
   const [tlStart, tlEnd] = clipTimelineExtent(data);
-  const span2 = tlEnd - tlStart;
-  if (span2 <= EPS) return [];
+  const span3 = tlEnd - tlStart;
+  if (span3 <= EPS) return [];
   const values = samples.map((s) => Math.abs(f(s, 0)));
   const peak = Math.max(...values);
   if (peak <= EPS) return [];
   const gate = peak * Math.max(0, f(threshold, DEFAULT_ENERGY_THRESHOLD));
-  const step = span2 / values.length;
+  const step = span3 / values.length;
   const windows = [];
   let runStart = null;
   values.forEach((val, i) => {
@@ -4595,12 +4704,12 @@ function makePoint(x, y, interpolation2 = Interpolation.LINEAR) {
 }
 function curvePoints(clip2) {
   const volume = isRecord11(clip2) ? clip2.volume : void 0;
-  const points = isRecord11(volume) ? volume.Points : void 0;
-  if (!Array.isArray(points)) return [];
-  return points.filter((p) => isRecord11(p) && isRecord11(p.co)).map((p, i) => ({ p, i })).sort((a, b) => f(a.p.co.X, 0) - f(b.p.co.X, 0) || a.i - b.i).map(({ p }) => p);
+  const points2 = isRecord11(volume) ? volume.Points : void 0;
+  if (!Array.isArray(points2)) return [];
+  return points2.filter((p) => isRecord11(p) && isRecord11(p.co)).map((p, i) => ({ p, i })).sort((a, b) => f(a.p.co.X, 0) - f(b.p.co.X, 0) || a.i - b.i).map(({ p }) => p);
 }
-function evaluateVolumeCurve(points, x, fallback = 1) {
-  const pts = (points ?? []).filter((p) => isRecord11(p) && isRecord11(p.co));
+function evaluateVolumeCurve(points2, x, fallback = 1) {
+  const pts = (points2 ?? []).filter((p) => isRecord11(p) && isRecord11(p.co));
   if (pts.length === 0) return f(fallback, 1);
   const sorted = pts.map((p, i) => ({ p, i })).sort((a, b) => f(a.p.co.X, 0) - f(b.p.co.X, 0) || a.i - b.i).map(({ p }) => p);
   const target = f(x, 1);
@@ -4641,11 +4750,11 @@ function duckedWindows(clip2, windows, env2 = {}) {
   const gap = Math.max(0, attack) + Math.max(0, release) + DEFAULT_RESTORE_MARGIN;
   return clampWindows(mergeWindows(padded, gap), tlStart, tlEnd);
 }
-function buildDuckPoints(clip2, fps, windows, duckGain, env2 = {}) {
+function buildDuckPoints(clip2, fps2, windows, duckGain, env2 = {}) {
   const data = isRecord11(clip2) ? clip2 : {};
   const attack = env2.attack ?? DEFAULT_ATTACK;
   const release = env2.release ?? DEFAULT_RELEASE;
-  const [first, last] = clipSourceFrameRange(data, fps);
+  const [first, last] = clipSourceFrameRange(data, fps2);
   const padded = duckedWindows(data, windows, env2);
   if (padded.length === 0) return [];
   const existing = curvePoints(data);
@@ -4654,17 +4763,17 @@ function buildDuckPoints(clip2, fps, windows, duckGain, env2 = {}) {
   const ducked = /* @__PURE__ */ new Map();
   const unity = /* @__PURE__ */ new Map();
   for (const [s, e] of padded) {
-    const fs2 = timelineToSourceFrame(s, data, fps);
-    const fe = timelineToSourceFrame(e, data, fps);
-    let fIn = timelineToSourceFrame(s - Math.max(0, attack), data, fps);
-    let fOut = timelineToSourceFrame(e + Math.max(0, release), data, fps);
+    const fs2 = timelineToSourceFrame(s, data, fps2);
+    const fe = timelineToSourceFrame(e, data, fps2);
+    let fIn = timelineToSourceFrame(s - Math.max(0, attack), data, fps2);
+    let fOut = timelineToSourceFrame(e + Math.max(0, release), data, fps2);
     if (fIn >= fs2 && fs2 > first) fIn = fs2 - 1;
     if (fOut <= fe && fe < last) fOut = fe + 1;
     unity.set(fIn, baseAt(fIn));
     unity.set(fOut, baseAt(fOut));
     for (const frame of [fs2, fe]) ducked.set(frame, baseAt(frame) * gain);
   }
-  const spans2 = padded.map(([s, e]) => [timelineToSourceFrame(s, data, fps), timelineToSourceFrame(e, data, fps)]);
+  const spans2 = padded.map(([s, e]) => [timelineToSourceFrame(s, data, fps2), timelineToSourceFrame(e, data, fps2)]);
   for (const point3 of existing) {
     const frame = pyRound(f(point3.co.X, 1));
     if (ducked.has(frame) || unity.has(frame)) continue;
@@ -4676,9 +4785,9 @@ function buildDuckPoints(clip2, fps, windows, duckGain, env2 = {}) {
   for (const [frame, value] of ducked) merged.set(frame, value);
   return [...merged.keys()].sort((a, b) => a - b).map((frame) => makePoint(frame, merged.get(frame)));
 }
-function buildStaticLevelPoints(clip2, fps, level, options = {}) {
+function buildStaticLevelPoints(clip2, fps2, level, options = {}) {
   const data = isRecord11(clip2) ? clip2 : {};
-  const [first, last] = clipSourceFrameRange(data, fps);
+  const [first, last] = clipSourceFrameRange(data, fps2);
   const target = Math.max(0, Math.min(MAX_LEVEL, f(level, 1)));
   const existing = curvePoints(data);
   const valueAt2 = (frame) => options.scale ? Math.max(0, evaluateVolumeCurve(existing, frame, 1) * target) : target;
@@ -4692,10 +4801,10 @@ function buildStaticLevelPoints(clip2, fps, level, options = {}) {
   if (window.length === 0) return [];
   const [s, e] = window[0];
   const fade = Math.max(0, f(options.fade ?? 0.15, 0));
-  const fs2 = timelineToSourceFrame(s, data, fps);
-  const fe = timelineToSourceFrame(e, data, fps);
-  let fIn = timelineToSourceFrame(s - fade, data, fps);
-  let fOut = timelineToSourceFrame(e + fade, data, fps);
+  const fs2 = timelineToSourceFrame(s, data, fps2);
+  const fe = timelineToSourceFrame(e, data, fps2);
+  let fIn = timelineToSourceFrame(s - fade, data, fps2);
+  let fOut = timelineToSourceFrame(e + fade, data, fps2);
   if (fIn >= fs2 && fs2 > first) fIn = fs2 - 1;
   if (fOut <= fe && fe < last) fOut = fe + 1;
   const frames = /* @__PURE__ */ new Map();
@@ -4765,11 +4874,11 @@ function scalePoints(kf, m) {
 function xOf2(p) {
   return typeof p?.co?.X === "number" ? p.co.X : 0;
 }
-function reverseTimePoints(points) {
-  const xs = points.filter((p) => typeof p?.co?.X === "number").map(xOf2);
-  if (xs.length === 0) return points;
+function reverseTimePoints(points2) {
+  const xs = points2.filter((p) => typeof p?.co?.X === "number").map(xOf2);
+  if (xs.length === 0) return points2;
   const pivot = Math.min(...xs) + Math.max(...xs);
-  const orig = [...points].sort((a, b) => xOf2(a) - xOf2(b));
+  const orig = [...points2].sort((a, b) => xOf2(a) - xOf2(b));
   const mirrored = orig.map((point3) => {
     const copy = structuredClone(point3);
     if (typeof point3?.co?.X === "number") {
@@ -4791,9 +4900,9 @@ function reverseTimePoints(points) {
   }
   return mirrored.sort((a, b) => xOf2(a) - xOf2(b));
 }
-function finalizeTimePoints(points, startX, newEndX) {
-  if (points.length === 0) return points;
-  const sorted = [...points].sort((a, b) => Number(a?.co?.X ?? 0) - Number(b?.co?.X ?? 0));
+function finalizeTimePoints(points2, startX, newEndX) {
+  if (points2.length === 0) return points2;
+  const sorted = [...points2].sort((a, b) => Number(a?.co?.X ?? 0) - Number(b?.co?.X ?? 0));
   const count = sorted.length;
   const lo = Math.trunc(startX);
   const hi = Math.trunc(newEndX);
@@ -4821,33 +4930,33 @@ function finalizeTimePoints(points, startX, newEndX) {
   return sorted.map((p, i) => ({ ...p, co: { ...p.co, X: xs[i] } }));
 }
 function timeCurveIsReversed(time3) {
-  const points = typeof time3 === "object" && time3 !== null ? time3.Points : void 0;
-  if (!Array.isArray(points) || points.length < 2) return false;
-  const ordered = [...points].sort((a, b) => Number(a?.co?.X ?? 0) - Number(b?.co?.X ?? 0));
+  const points2 = typeof time3 === "object" && time3 !== null ? time3.Points : void 0;
+  if (!Array.isArray(points2) || points2.length < 2) return false;
+  const ordered = [...points2].sort((a, b) => Number(a?.co?.X ?? 0) - Number(b?.co?.X ?? 0));
   const first = Number(ordered[0]?.co?.Y ?? 0);
   const last = Number(ordered[ordered.length - 1]?.co?.Y ?? 0);
   if (!Number.isFinite(first) || !Number.isFinite(last)) return false;
   return first > last + 1e-6;
 }
-function retimeClip(clip2, newEnd, fps, direction2 = 1, newPosition) {
-  const rate = fps.num / fps.den;
+function retimeClip(clip2, newEnd, fps2, direction2 = 1, newPosition) {
+  const rate = fps2.num / fps2.den;
   const m = metrics(clip2, newEnd, rate);
   if (!m) return null;
   const next = mapKeyframesDeep(clip2, (kf) => scalePoints(kf, m));
   const timePoints2 = Array.isArray(next.time?.Points) ? next.time.Points : [];
-  let points;
+  let points2;
   if (timePoints2.length < 2) {
     const y1 = Math.trunc(pyRound(m.oldEndS * rate));
-    points = [
+    points2 = [
       openshotPoint(m.startX, m.startX, Interpolation.LINEAR),
       openshotPoint(m.newEndX, y1, Interpolation.LINEAR)
     ];
   } else {
-    points = timePoints2.map((p) => structuredClone(p));
+    points2 = timePoints2.map((p) => structuredClone(p));
   }
-  if (direction2 === -1) points = reverseTimePoints(points);
-  points = finalizeTimePoints(points, m.startX, m.newEndX);
-  const time3 = timePoints2.length < 2 ? { Points: points } : { ...next.time, Points: points };
+  if (direction2 === -1) points2 = reverseTimePoints(points2);
+  points2 = finalizeTimePoints(points2, m.startX, m.newEndX);
+  const time3 = timePoints2.length < 2 ? { Points: points2 } : { ...next.time, Points: points2 };
   const out = { ...next, time: time3, duration: m.newDurS, end: m.newEndS };
   if (newPosition !== void 0) out.position = Math.trunc(pyRound(newPosition * rate)) / rate;
   return out;
@@ -5343,8 +5452,8 @@ function stem(file3) {
   const dot = file3.lastIndexOf(".");
   return dot > 0 ? file3.slice(0, dot) : file3;
 }
-function capitalize(text4) {
-  return text4.charAt(0).toUpperCase() + text4.slice(1).toLowerCase();
+function capitalize(text5) {
+  return text5.charAt(0).toUpperCase() + text5.slice(1).toLowerCase();
 }
 function transitionDisplayName(file3) {
   return capitalize(stem(file3).replaceAll("_", " "));
@@ -5475,8 +5584,8 @@ function resolveMask(maskId, path38) {
   if (path38 !== void 0) {
     if (typeof path38 !== "string" || path38 === "") throw invalid("path must be a non-empty string.");
     const known = resolveTransitionMask(path38);
-    const stem4 = (path38.split(/[\\/]/).pop() ?? path38).replace(/\.[^.]+$/, "");
-    return known ?? { path: path38, title: stem4, width: 720, height: 576 };
+    const stem5 = (path38.split(/[\\/]/).pop() ?? path38).replace(/\.[^.]+$/, "");
+    return known ?? { path: path38, title: stem5, width: 720, height: 576 };
   }
   if (maskId === void 0) throw invalid("Give maskId or path.");
   const found = resolveTransitionMask(maskId);
@@ -5570,18 +5679,18 @@ function applyTransitionBetween(tx, clipAId, clipBId, name, duration3) {
   const transition2 = toolTransition(tx, mask2, layer2, position, snappedDuration, "in");
   return movedClip.position !== clipB.position ? { transition: transition2, movedClip } : { transition: transition2 };
 }
-function applyTransitionToClip(tx, clipId2, name, placement2, duration3) {
+function applyTransitionToClip(tx, clipId2, name, placement3, duration3) {
   const project = tx.project;
   const clip2 = requireClip(project, clipId2);
   requireUnlocked(project, clip2.layer);
-  if (placement2 !== "start" && placement2 !== "end") throw invalid(`placement must be start or end.`);
+  if (placement3 !== "start" && placement3 !== "end") throw invalid(`placement must be start or end.`);
   const dur = requireDuration(duration3);
   const mask2 = resolveMask(name, void 0);
   const snappedDuration = snapSeconds(dur, project);
   if (!(snappedDuration > 0)) throw invalid("duration is shorter than one frame.");
-  const raw = placement2 === "end" ? clip2.position + (clip2.end - clip2.start) - dur : clip2.position;
+  const raw = placement3 === "end" ? clip2.position + (clip2.end - clip2.start) - dur : clip2.position;
   const position = snapSeconds(Math.max(0, raw), project);
-  return toolTransition(tx, mask2, clip2.layer, position, snappedDuration, placement2 === "end" ? "out" : "in");
+  return toolTransition(tx, mask2, clip2.layer, position, snappedDuration, placement3 === "end" ? "out" : "in");
 }
 function moveTransition(tx, transitionId, to) {
   const project = tx.project;
@@ -5858,9 +5967,9 @@ function trimClipEdge(tx, clipId2, edge, timelineSeconds) {
   return patchClip(tx, clipId2, out);
 }
 function slicePoint(project, atSeconds, keep2) {
-  const fps = fpsOf(project);
-  let t = pyRound(atSeconds * fps.num / fps.den) * fps.den / fps.num;
-  if (keep2 === "left") t += fps.den / fps.num;
+  const fps2 = fpsOf(project);
+  let t = pyRound(atSeconds * fps2.num / fps2.den) * fps2.den / fps2.num;
+  if (keep2 === "left") t += fps2.den / fps2.num;
   return t;
 }
 function requireKeep(keep2) {
@@ -6117,14 +6226,14 @@ function pointFromInput(project, clip2, input2, index) {
   if (input2.handleType !== void 0) opts.handleType = input2.handleType;
   return makeKeyframePoint(frame, value, interpolation2, opts);
 }
-function setClipKeyframes(tx, clipId2, prop, points, opts = {}) {
+function setClipKeyframes(tx, clipId2, prop, points2, opts = {}) {
   const project = tx.project;
   const clip2 = requireEditableClip(project, clipId2);
   if (!CLIP_KEYFRAME_KEYS.includes(prop)) throw invalid(`${prop} is not a keyframed clip property.`);
-  if (!Array.isArray(points) || points.length === 0) throw invalid("points must be a non-empty array.");
+  if (!Array.isArray(points2) || points2.length === 0) throw invalid("points must be a non-empty array.");
   const mode = opts.mode ?? "replace";
   if (mode !== "replace" && mode !== "merge" && mode !== "replace_range") throw invalid(`mode must be replace, merge or replace_range.`);
-  const built = points.map((p, i) => pointFromInput(project, clip2, p, i));
+  const built = points2.map((p, i) => pointFromInput(project, clip2, p, i));
   if (prop === "time") for (const p of built) p.co.Y = Math.trunc(p.co.Y);
   const current = clip2[prop];
   let base = { ...current ?? {}, Points: [] };
@@ -6213,17 +6322,17 @@ function setClipVolume(tx, clipId2, opts) {
     throw new OpError("invalid_argument", `Clip ${clipId2} has no audio stream.`);
   }
   const before = currentStaticLevel(clip2);
-  const points = buildStaticLevelPoints(clip2, fpsOf(project), target, {
+  const points2 = buildStaticLevelPoints(clip2, fpsOf(project), target, {
     startSeconds: opts.start ?? null,
     endSeconds: opts.end ?? null,
     fade,
     scale: mode === "scale"
   });
-  if (points.length === 0) {
+  if (points2.length === 0) {
     throw invalid(`The requested window does not overlap clip ${clipId2} (${clip2.position}..${itemEnd(clip2)} s).`);
   }
-  const next = patchClip(tx, clipId2, { volume: { ...clip2.volume ?? {}, Points: points } });
-  return { clip: next, before, target: Math.max(0, Math.min(1.3, target)), points: points.length };
+  const next = patchClip(tx, clipId2, { volume: { ...clip2.volume ?? {}, Points: points2 } });
+  return { clip: next, before, target: Math.max(0, Math.min(1.3, target)), points: points2.length };
 }
 function separateAudio(tx, clipId2, opts = {}) {
   const project = tx.project;
@@ -6358,7 +6467,7 @@ function alignedPositions(items, alignRight, toSeconds2) {
   const out = /* @__PURE__ */ new Map();
   if (spans2.length === 0) return out;
   const target = toSeconds2 !== void 0 ? requireFinite(toSeconds2, "toSeconds") : alignRight ? Math.max(...spans2.map((s) => s.end)) : Math.min(...spans2.map((s) => s.start));
-  for (const span2 of spans2) out.set(span2.id, alignRight ? span2.start + (target - span2.end) : target);
+  for (const span3 of spans2) out.set(span3.id, alignRight ? span3.start + (target - span3.end) : target);
   return out;
 }
 function packTrack(tx, layer2, fromSeconds) {
@@ -6415,10 +6524,18 @@ var init_arrange = __esm({
 });
 
 // ../engine/src/ops/look-presets.data.ts
-var LOOK_EFFECT_PRESETS;
+var FILM_GRAIN_PRESETS, LOOK_EFFECT_PRESETS;
 var init_look_presets_data = __esm({
   "../engine/src/ops/look-presets.data.ts"() {
     "use strict";
+    FILM_GRAIN_PRESETS = {
+      "35mm_fine": { "amount": 0.14, "size": 0.12, "softness": 0.35, "clump": 0.1, "shadows": 0.65, "midtones": 0.7, "highlights": 0.35, "color_amount": 0.08, "color_variation": 0.2, "evolution": 0.45, "coherence": 0.75 },
+      "35mm_classic": { "amount": 0.24, "size": 0.18, "softness": 0.22, "clump": 0.18, "shadows": 0.85, "midtones": 1, "highlights": 0.55, "color_amount": 0.16, "color_variation": 0.3, "evolution": 0.6, "coherence": 0.62 },
+      "35mm_gritty": { "amount": 0.34, "size": 0.32, "softness": 0.28, "clump": 0.3, "shadows": 0.95, "midtones": 1, "highlights": 0.62, "color_amount": 0.2, "color_variation": 0.38, "evolution": 0.66, "coherence": 0.56 },
+      "16mm_classic": { "amount": 0.42, "size": 0.46, "softness": 0.38, "clump": 0.44, "shadows": 1, "midtones": 1, "highlights": 0.7, "color_amount": 0.28, "color_variation": 0.48, "evolution": 0.75, "coherence": 0.45 },
+      "super_8": { "amount": 0.62, "size": 0.72, "softness": 0.5, "clump": 0.7, "shadows": 1, "midtones": 0.95, "highlights": 0.85, "color_amount": 0.42, "color_variation": 0.65, "evolution": 0.88, "coherence": 0.32 },
+      "high_iso": { "amount": 0.52, "size": 0.24, "softness": 0.18, "clump": 0.24, "shadows": 1, "midtones": 0.95, "highlights": 0.42, "color_amount": 0.55, "color_variation": 0.78, "evolution": 0.82, "coherence": 0.38 }
+    };
     LOOK_EFFECT_PRESETS = {
       "AnalogTape": { "none": {}, "subtle": { "bleed": 0.25, "noise": 0.18, "softness": 0.15, "static_bands": 0.05, "stripe": 0.06, "tracking": 0.2 }, "vhs": { "bleed": 0.55, "noise": 0.35, "softness": 0.35, "static_bands": 0.18, "stripe": 0.2, "tracking": 0.45 }, "heavy": { "bleed": 0.85, "noise": 0.6, "softness": 0.55, "static_bands": 0.35, "stripe": 0.4, "tracking": 0.75 } },
       "Blur": { "none": {}, "soft_focus": { "horizontal_radius": 3, "vertical_radius": 3, "sigma": 1.5, "iterations": 2 }, "medium": { "horizontal_radius": 8, "vertical_radius": 8, "sigma": 4, "iterations": 3 }, "heavy": { "horizontal_radius": 20, "vertical_radius": 20, "sigma": 8, "iterations": 4 } },
@@ -6430,12 +6547,177 @@ var init_look_presets_data = __esm({
 });
 
 // ../engine/src/ops/look.ts
-var COLOR_PRESETS, FILM_GRAIN_PRESET_NAMES, LOOK_EFFECT_CLASSES, LOOK_PRESET_IDS;
+function constantProperty(value) {
+  return {
+    Points: [
+      {
+        co: { X: 1, Y: value },
+        handle_left: { X: 0.5, Y: 1 },
+        handle_right: { X: 0.5, Y: 0 },
+        handle_type: 0,
+        interpolation: Interpolation.BEZIER
+      }
+    ]
+  };
+}
+function curveNode(id, x, y) {
+  return {
+    id,
+    x: constantProperty(x),
+    y: constantProperty(y),
+    left_handle_x: constantProperty(0.5),
+    left_handle_y: constantProperty(1),
+    right_handle_x: constantProperty(0.5),
+    right_handle_y: constantProperty(0),
+    interpolation: Interpolation.LINEAR,
+    handle_type: 0
+  };
+}
+function curveData(points2, enabled = true) {
+  return { enabled: constantProperty(enabled ? 1 : 0), nodes: points2.map((p, i) => curveNode(i, p.x, p.y)) };
+}
+function defaultCurveData() {
+  return curveData([
+    { x: 0, y: 0 },
+    { x: 1, y: 1 }
+  ]);
+}
+function colorKeyframes(hex4) {
+  const [r, g, b] = parseHexColor(hex4) ?? [255, 255, 255, 255];
+  return { red: constantProperty(r), green: constantProperty(g), blue: constantProperty(b), alpha: constantProperty(255) };
+}
+function wheelEntry(color3 = "#ffffff", amount = 0, luma3 = 0) {
+  return {
+    color: color3,
+    color_keyframes: colorKeyframes(color3),
+    amount,
+    amount_keyframes: constantProperty(amount),
+    luma: luma3,
+    luma_keyframes: constantProperty(luma3)
+  };
+}
+function defaultWheelsData() {
+  return {
+    enabled_keyframes: constantProperty(1),
+    global: wheelEntry(),
+    shadows: wheelEntry(),
+    midtones: wheelEntry(),
+    highlights: wheelEntry()
+  };
+}
+function neutralColorGrade(effect2) {
+  const payload = structuredClone(effect2 ?? {});
+  for (const [key, value] of Object.entries(NEUTRAL_GRADE_SCALARS)) payload[key] = constantProperty(value);
+  payload.lut_path = "";
+  payload.wheels = defaultWheelsData();
+  payload.curve_all = defaultCurveData();
+  payload.curve_red = defaultCurveData();
+  payload.curve_green = defaultCurveData();
+  payload.curve_blue = defaultCurveData();
+  return payload;
+}
+function isColorGradePreset(value) {
+  return COLOR_GRADE_PRESETS.includes(value);
+}
+function applyColorGradePreset(effect2, preset) {
+  if (!isColorGradePreset(preset)) throw invalid(`Unknown color preset: ${String(preset)}`);
+  const payload = neutralColorGrade(effect2);
+  for (const [key, value] of Object.entries(PRESET_SCALARS[preset])) payload[key] = constantProperty(value);
+  const curve = PRESET_CURVES[preset];
+  if (curve) payload.curve_all = curveData(curve);
+  return payload;
+}
+function applyFilmGrainPreset(effect2, preset) {
+  const values = FILM_GRAIN_PRESETS[preset];
+  if (!values) throw invalid(`Unknown film grain preset: ${String(preset)}`);
+  const payload = structuredClone(effect2 ?? {});
+  for (const [key, value] of Object.entries(values)) payload[key] = constantProperty(value);
+  if (!("seed" in payload)) payload.seed = 1;
+  return payload;
+}
+function isLookManaged(effect2, className) {
+  return isRecord8(effect2) && effect2["ui-menu"] === LOOK_UI_MENU && (className === void 0 || effect2.class_name === className);
+}
+function parseEffectColor(value) {
+  if (typeof value !== "string") return null;
+  let color3 = value.trim();
+  if (color3.startsWith("#")) color3 = color3.slice(1);
+  if (color3.length !== 6 && color3.length !== 8) return null;
+  if (!/^[0-9a-fA-F]+$/.test(color3)) return null;
+  const at = (i) => Number.parseInt(color3.slice(i, i + 2), 16);
+  return { red: at(0), green: at(2), blue: at(4), alpha: color3.length === 8 ? at(6) : 255 };
+}
+function setEffectPropertyValue(effect2, key, value) {
+  const current = effect2[key];
+  const channels = parseEffectColor(value);
+  if (channels && isRecord8(current)) {
+    const next = { ...current };
+    for (const [channel, channelValue] of Object.entries(channels)) {
+      const data = current[channel];
+      if (isRecord8(data) && Array.isArray(data.Points)) next[channel] = { ...data, Points: constantProperty(channelValue).Points };
+    }
+    effect2[key] = next;
+  } else if (isRecord8(current) && Array.isArray(current.Points)) {
+    effect2[key] = { ...current, Points: constantProperty(Number(value)).Points };
+  } else if (key in effect2) {
+    effect2[key] = value;
+  }
+}
+function replaceMatches(effects, matches2, preset) {
+  const next = [...effects];
+  if (matches2.length === 0) return [...next, preset];
+  const existing = next[matches2[0]];
+  if (existing.id) preset.id = existing.id;
+  if ("order" in existing) preset.order = existing.order;
+  next[matches2[0]] = preset;
+  for (const i of [...matches2.slice(1)].reverse()) next.splice(i, 1);
+  return next;
+}
+function lookEffectPresetEffects(effects, className, presetName, create) {
+  const presets = LOOK_EFFECT_PRESETS[className] ?? {};
+  const values = presets[presetName];
+  if (!values) throw invalid(`Unknown ${className} look preset: ${presetName}`);
+  const list2 = [...effects];
+  const matches2 = indexesOf(list2, (e) => isLookManaged(e, className));
+  if (presetName === "none") return matches2.length === 0 ? null : list2.filter((e) => !isLookManaged(e, className));
+  const preset = create(className);
+  preset["ui-menu"] = LOOK_UI_MENU;
+  for (const [key, value] of Object.entries(values)) setEffectPropertyValue(preset, key, value);
+  return replaceMatches(list2, matches2, preset);
+}
+function colorLookPresetEffects(effects, presetName, create) {
+  const list2 = [...effects];
+  const matches2 = indexesOf(list2, (e) => e.class_name === "ColorGrade");
+  if (presetName === "reset") return matches2.length === 0 ? null : list2.filter((e) => !(isRecord8(e) && e.class_name === "ColorGrade"));
+  const preset = applyColorGradePreset(create("ColorGrade"), presetName);
+  return replaceMatches(list2, matches2, preset);
+}
+function filmGrainLookPresetEffects(effects, presetName, create) {
+  const list2 = [...effects];
+  const matches2 = indexesOf(list2, (e) => e.class_name === "FilmGrain");
+  if (presetName === "none") return matches2.length === 0 ? null : list2.filter((e) => !(isRecord8(e) && e.class_name === "FilmGrain"));
+  const source2 = matches2.length > 0 ? list2[matches2[0]] : create("FilmGrain");
+  const preset = applyFilmGrainPreset(structuredClone(source2), presetName);
+  return replaceMatches(list2, matches2, preset);
+}
+function resetLookEffects(effects) {
+  const kept = effects.filter(
+    (e) => !isRecord8(e) || !["ColorGrade", "FilmGrain"].includes(String(e.class_name)) && !isLookManaged(e)
+  );
+  return kept.length === effects.length ? null : kept;
+}
+var LOOK_UI_MENU, COLOR_PRESETS, COLOR_GRADE_PRESETS, FILM_GRAIN_PRESET_NAMES, LOOK_EFFECT_CLASSES, LOOK_PRESET_IDS, NEUTRAL_GRADE_SCALARS, PRESET_SCALARS, PRESET_CURVES, indexesOf;
 var init_look = __esm({
   "../engine/src/ops/look.ts"() {
     "use strict";
+    init_types();
+    init_color();
+    init_errors();
+    init_internal();
     init_look_presets_data();
+    LOOK_UI_MENU = "look";
     COLOR_PRESETS = ["reset", "auto_contrast", "lift_shadows", "warm_up", "boost_color"];
+    COLOR_GRADE_PRESETS = ["auto_contrast", "lift_shadows", "warm_up", "sunny", "gloomy", "boost_color"];
     FILM_GRAIN_PRESET_NAMES = ["none", "35mm_fine", "35mm_classic", "35mm_gritty", "16mm_classic", "super_8", "high_iso"];
     LOOK_EFFECT_CLASSES = {
       analog_tape: "AnalogTape",
@@ -6452,6 +6734,46 @@ var init_look = __esm({
         ([key, cls]) => Object.keys(LOOK_EFFECT_PRESETS[cls] ?? {}).map((name) => `${key}.${name}`)
       )
     ];
+    NEUTRAL_GRADE_SCALARS = {
+      temperature: 0,
+      tint: 0,
+      exposure: 0,
+      contrast: 0,
+      highlights: 0,
+      shadows: 0,
+      saturation: 1,
+      vibrance: 0,
+      mix: 1,
+      lut_intensity: 1
+    };
+    PRESET_SCALARS = {
+      auto_contrast: { contrast: 0.18, highlights: -0.08, shadows: 0.08, vibrance: 0.06 },
+      lift_shadows: { exposure: 0.08, contrast: -0.03, highlights: -0.05, shadows: 0.22 },
+      warm_up: { temperature: 0.18, tint: 0.03, vibrance: 0.1, saturation: 1.08 },
+      sunny: { temperature: 0.12, tint: 0.02, exposure: 0.05, contrast: 0.04, saturation: 1.08, vibrance: 0.08 },
+      gloomy: { temperature: -0.1, exposure: -0.08, contrast: 0.06, highlights: -0.08, saturation: 0.88, vibrance: -0.04 },
+      boost_color: { contrast: 0.08, saturation: 1.18, vibrance: 0.22 }
+    };
+    PRESET_CURVES = {
+      auto_contrast: [
+        { x: 0, y: 0 },
+        { x: 0.25, y: 0.22 },
+        { x: 0.75, y: 0.8 },
+        { x: 1, y: 1 }
+      ],
+      lift_shadows: [
+        { x: 0, y: 0.06 },
+        { x: 0.35, y: 0.4 },
+        { x: 1, y: 1 }
+      ],
+      boost_color: [
+        { x: 0, y: 0 },
+        { x: 0.2, y: 0.16 },
+        { x: 0.8, y: 0.86 },
+        { x: 1, y: 1 }
+      ]
+    };
+    indexesOf = (effects, test) => effects.flatMap((e, i) => isRecord8(e) && test(e) ? [i] : []);
   }
 });
 
@@ -6486,11 +6808,38 @@ function addEffect(tx, clipId2, className, params = {}, opts = {}) {
   patchClip(tx, clipId2, { effects });
   return findClipEffect(tx.project, effect2.id).effect;
 }
-function removeEffect(tx, effectId) {
-  const { clip: clip2 } = requireClipEffect(tx.project, effectId);
+function setClipEffects(tx, clipId2, effects) {
+  requireEditableClip(tx.project, clipId2);
+  patchClip(tx, clipId2, { effects: structuredClone([...effects]) });
+}
+function updateEffectValues(tx, effectId, values) {
+  const { clip: clip2, effect: effect2 } = requireClipEffect(tx.project, effectId);
   requireUnlocked(tx.project, clip2.layer);
-  patchClip(tx, clip2.id, { effects: clip2.effects.filter((e) => e.id !== effectId) });
-  return { clipId: clip2.id, effectId };
+  const changed = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (IMMUTABLE_EFFECT_KEYS.has(key)) throw invalid(`Effect ${key} cannot be changed.`);
+    if (!sameJson(effect2[key], value)) changed[key] = structuredClone(value);
+  }
+  if (Object.keys(changed).length > 0) tx.update(["clips", { id: clip2.id }, "effects", { id: effectId }], changed);
+}
+function assignNewEffectIds(effects, nextId) {
+  for (const effect2 of effects) if (effect2 && typeof effect2 === "object") effect2.id = nextId();
+}
+function mergeEffectsByClass(existing, copied, nextId) {
+  const merged = existing.map((e) => structuredClone(e));
+  const byClass = /* @__PURE__ */ new Map();
+  for (const effect2 of merged) {
+    if (effect2 && typeof effect2 === "object" && effect2.class_name) byClass.set(effect2.class_name, effect2);
+  }
+  for (const effect2 of copied) {
+    if (!effect2 || typeof effect2 !== "object") continue;
+    const copy = structuredClone(effect2);
+    copy.id = nextId();
+    const target = copy.class_name ? byClass.get(copy.class_name) : void 0;
+    if (target) Object.assign(target, copy);
+    else merged.push(copy);
+  }
+  return merged;
 }
 function paramFor(effect2, prop) {
   return getEffect(effect2.class_name)?.params.find((p) => p.key === prop);
@@ -6574,8 +6923,8 @@ var init_markers = __esm({
 });
 
 // ../engine/src/ops/project.ts
-function snapToFrameRate(items, fps) {
-  const frame = fps.den / fps.num;
+function snapToFrameRate(items, fps2) {
+  const frame = fps2.den / fps2.num;
   const snap2 = (t) => pyRound(t / frame) * frame;
   const copies = items.map((item) => {
     const c = { ...item };
@@ -6674,17 +7023,17 @@ function setProjectSettings(tx, patch) {
   const project = tx.project;
   const updates = {};
   const notes = [];
-  let fps;
+  let fps2;
   if (patch.fps !== void 0) {
     if (typeof patch.fps === "number") {
       if (!Number.isFinite(patch.fps) || patch.fps <= 0) throw invalid("fps must be positive.");
-      fps = fpsFromRate(patch.fps);
+      fps2 = fpsFromRate(patch.fps);
     } else if (typeof patch.fps === "object" && patch.fps !== null) {
-      const { num: num11, den: den2 } = patch.fps;
-      if (!Number.isInteger(num11) || !Number.isInteger(den2) || num11 <= 0 || den2 <= 0) {
+      const { num: num13, den: den2 } = patch.fps;
+      if (!Number.isInteger(num13) || !Number.isInteger(den2) || num13 <= 0 || den2 <= 0) {
         throw invalid("fps num/den must be positive integers.");
       }
-      fps = { num: num11, den: den2 };
+      fps2 = { num: num13, den: den2 };
     } else {
       throw invalid("fps must be a number or {num, den}.");
     }
@@ -6692,9 +7041,9 @@ function setProjectSettings(tx, patch) {
   const width = patch.width === void 0 ? void 0 : requireInt(patch.width, "width", 16, 8192);
   const height = patch.height === void 0 ? void 0 : requireInt(patch.height, "height", 16, 8192);
   const sampleRate = patch.sampleRate === void 0 ? void 0 : requireInt(patch.sampleRate, "sample_rate", 8e3, 192e3);
-  if (fps && (project.fps?.num !== fps.num || project.fps?.den !== fps.den)) {
-    updates.fps = fps;
-    notes.push(`fps=${fps.num}/${fps.den}`);
+  if (fps2 && (project.fps?.num !== fps2.num || project.fps?.den !== fps2.den)) {
+    updates.fps = fps2;
+    notes.push(`fps=${fps2.num}/${fps2.den}`);
   }
   if (width !== void 0 && project.width !== width) {
     updates.width = width;
@@ -6720,15 +7069,15 @@ function withExportOverride(overrides, key, value) {
   if (typeof key !== "string" || key.trim() === "") throw invalid("key is required.");
   const out = { ...overrides ?? {} };
   const k = key.toLowerCase().trim();
-  const text4 = String(value).trim();
+  const text5 = String(value).trim();
   if (INT_EXPORT_KEYS.has(k)) {
-    if (!/^[+-]?\d+$/.test(text4)) throw invalid(`${k} must be an integer (got ${text4}).`);
-    out[k] = Number.parseInt(text4, 10);
-  } else if (k === "video_codec" || k === "vcodec") out.video_codec = text4;
-  else if (k === "audio_codec" || k === "acodec") out.audio_codec = text4;
-  else if (k === "output_path" || k === "path") out.output_path = text4;
-  else if (k === "vformat" || k === "format") out.vformat = text4;
-  else out[k] = text4;
+    if (!/^[+-]?\d+$/.test(text5)) throw invalid(`${k} must be an integer (got ${text5}).`);
+    out[k] = Number.parseInt(text5, 10);
+  } else if (k === "video_codec" || k === "vcodec") out.video_codec = text5;
+  else if (k === "audio_codec" || k === "acodec") out.audio_codec = text5;
+  else if (k === "output_path" || k === "path") out.output_path = text5;
+  else if (k === "vformat" || k === "format") out.vformat = text5;
+  else out[k] = text5;
   return out;
 }
 function setExportSetting(doc, key, value) {
@@ -7053,7 +7402,7 @@ function resetRepeat(clip2) {
 }
 function applyTime(tx, clip2, requested, opts) {
   const project = tx.project;
-  const fps = fpsOf(project);
+  const fps2 = fpsOf(project);
   const rate = rateOf(project);
   const preset = requested === "reverse" && timeCurveIsReversed(clip2.time) ? "none" : requested;
   if (preset === "freeze" || preset === "freeze_zoom") return freeze(clip2, preset === "freeze_zoom", opts, rate);
@@ -7065,20 +7414,20 @@ function applyTime(tx, clip2, requested, opts) {
     if (isSingleImageMedia(reader)) duration3 = DEFAULT_IMAGE_LENGTH;
     if (duration3 <= 0) duration3 = 1 / rate;
     const frames = Math.max(1, Math.trunc(pyRound(duration3 * rate)));
-    const retimed2 = retimeClip(base, Number(base.start) + frames / rate, fps, 1, base.position) ?? base;
+    const retimed2 = retimeClip(base, Number(base.start) + frames / rate, fps2, 1, base.position) ?? base;
     return { ...retimed2, time: { Points: [{ co: { X: 1, Y: 1 }, interpolation: Interpolation.LINEAR }] } };
   }
   if (preset === "reverse") {
     let end = Number(clip2.end);
     if (end <= Number(clip2.start)) end = Number(clip2.start) + (Number(clip2.duration) > 0 ? Number(clip2.duration) : 1 / rate);
-    const retimed2 = retimeClip(clip2, end, fps, -1, clip2.position);
+    const retimed2 = retimeClip(clip2, end, fps2, -1, clip2.position);
     if (!retimed2) throw invalid("The clip is too short to reverse.");
     return retimed2;
   }
   const speed = requireFinite(opts.speed, "speed");
   if (!(speed >= 1 / 16 && speed <= 16)) throw invalid(`speed must be between 1/16 and 16 (got ${speed}).`);
   const newEnd = Number(clip2.start) + (Number(clip2.end) - Number(clip2.start)) / speed;
-  const retimed = retimeClip(clip2, newEnd, fps, preset === "backward" ? -1 : 1, clip2.position);
+  const retimed = retimeClip(clip2, newEnd, fps2, preset === "backward" ? -1 : 1, clip2.position);
   if (!retimed) throw invalid("That speed leaves the clip empty.");
   return retimed;
 }
@@ -7147,9 +7496,9 @@ function applyAnimate(tx, original, preset, opts) {
   const clear2 = (prop, from, to) => {
     clip2[prop] = removeKeyframePointsInRange(kfOf(prop), from, to);
   };
-  const add = (prop, ...points) => {
+  const add = (prop, ...points2) => {
     let kf = kfOf(prop);
-    for (const p of points) kf = setKeyframePoint(kf, p);
+    for (const p of points2) kf = setKeyframePoint(kf, p);
     clip2[prop] = kf;
   };
   clip2.gravity = Gravity.CENTER;
@@ -7195,12 +7544,12 @@ function applyAnimate(tx, original, preset, opts) {
     const data = ANIMATION_PRESET_DATA[name];
     if (!data) return;
     const targetDuration = Math.max(1, tEnd - tStart);
-    for (const [prop, points] of Object.entries(data)) {
+    for (const [prop, points2] of Object.entries(data)) {
       if (!(prop in clip2)) continue;
       const b = base(prop, resting);
       clear2(prop, tStart, tEnd);
       add(prop, point(tStart, b), point(tEnd, b));
-      const scaled = points.map(([frame, value, easing2]) => ({
+      const scaled = points2.map(([frame, value, easing2]) => ({
         frame: tStart + pyRound((frame - 1) / 30 * targetDuration),
         value: MULTIPLICATIVE.has(prop) ? value * b : value + b,
         easing: easing2
@@ -7363,26 +7712,26 @@ function repeatIsActive(clip2) {
 }
 function effectiveSpeed(clip2) {
   if (repeatIsActive(clip2)) return { speed: null, direction: "looped" };
-  const points = Array.isArray(clip2.time?.Points) ? [...clip2.time.Points] : [];
-  if (points.length < 2) return { speed: 1, direction: "forward" };
-  points.sort((a, b) => Number(a?.co?.X) - Number(b?.co?.X));
-  const [x0, y0] = [Number(points[0].co?.X), Number(points[0].co?.Y)];
-  const [x1, y1] = [Number(points[points.length - 1].co?.X), Number(points[points.length - 1].co?.Y)];
+  const points2 = Array.isArray(clip2.time?.Points) ? [...clip2.time.Points] : [];
+  if (points2.length < 2) return { speed: 1, direction: "forward" };
+  points2.sort((a, b) => Number(a?.co?.X) - Number(b?.co?.X));
+  const [x0, y0] = [Number(points2[0].co?.X), Number(points2[0].co?.Y)];
+  const [x1, y1] = [Number(points2[points2.length - 1].co?.X), Number(points2[points2.length - 1].co?.Y)];
   if (![x0, y0, x1, y1].every(Number.isFinite) || x1 <= x0) return { speed: 1, direction: "forward" };
   return { speed: (Math.abs(y1 - y0) + 1) / (x1 - x0), direction: y1 < y0 ? "backward" : "forward" };
 }
-function normalizePoints(points) {
-  if (points.length === 0) return [];
-  const sorted = [...points].sort((a, b) => pyRound(a.co?.X ?? 0) - pyRound(b.co?.X ?? 0));
+function normalizePoints(points2) {
+  if (points2.length === 0) return [];
+  const sorted = [...points2].sort((a, b) => pyRound(a.co?.X ?? 0) - pyRound(b.co?.X ?? 0));
   const x0 = pyRound(sorted[0].co.X);
   return sorted.map((p) => ({
     co: { X: pyRound(p.co.X ?? 0) - x0 + 1, Y: p.co.Y },
     interpolation: p.interpolation ?? Interpolation.LINEAR
   }));
 }
-function normalizeToTrim(points, trimStart, trimSpan) {
-  if (points.length === 0 || trimSpan <= 0) return [];
-  const sorted = [...points].sort((a, b) => pyRound(a.co?.X ?? 0) - pyRound(b.co?.X ?? 0));
+function normalizeToTrim(points2, trimStart, trimSpan) {
+  if (points2.length === 0 || trimSpan <= 0) return [];
+  const sorted = [...points2].sort((a, b) => pyRound(a.co?.X ?? 0) - pyRound(b.co?.X ?? 0));
   const xs = sorted.map((p) => pyRound(p.co?.X ?? 0));
   const relative2 = Math.min(...xs) >= 1 && Math.max(...xs) <= trimSpan;
   const out = [];
@@ -7395,15 +7744,15 @@ function normalizeToTrim(points, trimStart, trimSpan) {
   });
   return out;
 }
-function repeatCurve(points, span2, dirSign, passes, delay2, ramp, pattern) {
+function repeatCurve(points2, span3, dirSign, passes, delay2, ramp, pattern) {
   const out = [];
   let base = 0;
   let dir = dirSign;
   for (let k = 0; k < passes; k += 1) {
     const speed = (1 + ramp) ** k;
     const scale = 1 / Math.abs(speed);
-    const dur = Math.max(1, pyRound(span2 * scale));
-    const iter = dir > 0 ? points : [...points].reverse();
+    const dur = Math.max(1, pyRound(span3 * scale));
+    const iter = dir > 0 ? points2 : [...points2].reverse();
     iter.forEach((p, idx) => {
       const x = pyRound(p.co.X ?? 0) - 1;
       const off = Math.min(pyRound(x * scale), dur - 1);
@@ -7474,23 +7823,23 @@ function repeatClip(tx, clipId2, opts) {
   const cache5 = next.repeat_cache;
   for (const [prop, original] of Object.entries(cache5.properties ?? {})) {
     if (prop === "time") continue;
-    let norm = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
-    let span2 = norm.length ? pyRound(norm[norm.length - 1].co.X) : 0;
-    if (!span2) continue;
-    if (span2 !== timeSpan) {
-      const s = timeSpan / span2;
-      const firstX = Number(norm[0].co.X ?? 1);
-      for (const p of norm) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
-      span2 = timeSpan;
+    let norm2 = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
+    let span3 = norm2.length ? pyRound(norm2[norm2.length - 1].co.X) : 0;
+    if (!span3) continue;
+    if (span3 !== timeSpan) {
+      const s = timeSpan / span3;
+      const firstX = Number(norm2[0].co.X ?? 1);
+      for (const p of norm2) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
+      span3 = timeSpan;
     }
     const latest = /* @__PURE__ */ new Map();
-    for (const p of norm) {
+    for (const p of norm2) {
       p.co.X = pyRound(p.co.X ?? 1);
       latest.set(p.co.X, p);
     }
-    norm = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
-    const [points, used] = repeatCurve(norm, span2, dirSign, opts.passes, delay2, ramp, opts.pattern);
-    next[prop] = { Points: points };
+    norm2 = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
+    const [points2, used] = repeatCurve(norm2, span3, dirSign, opts.passes, delay2, ramp, opts.pattern);
+    next[prop] = { Points: points2 };
     total = Math.max(total, used);
   }
   const duration3 = total / rate;
@@ -7858,9 +8207,9 @@ function keyframeX(seconds2, rate) {
 function uniform(random3, a, b) {
   return a + (b - a) * random3();
 }
-function addPoints(kf, points) {
+function addPoints(kf, points2) {
   let next = kf ?? { Points: [] };
-  for (const [x, y] of points) next = setKeyframePoint(next, openshotPoint(x, y, Interpolation.BEZIER));
+  for (const [x, y] of points2) next = setKeyframePoint(next, openshotPoint(x, y, Interpolation.BEZIER));
   return next;
 }
 function placeFiles(tx, entries, startPosition, layer2, opts = {}) {
@@ -7874,8 +8223,8 @@ function placeFiles(tx, entries, startPosition, layer2, opts = {}) {
   const pool = opts.randomTransitions && opts.randomTransitions.length > 0 ? opts.randomTransitions : null;
   const withTransition = Boolean(pool || opts.transition);
   const files = entries.map((entry) => requireFile(project, entry.fileId));
-  const fps = fpsOf(project);
-  const rate = fps.num / fps.den;
+  const fps2 = fpsOf(project);
+  const rate = fps2.num / fps2.den;
   const result2 = { clipIds: [], transitionIds: [] };
   let position = start;
   entries.forEach((entry, index) => {
@@ -7886,7 +8235,7 @@ function placeFiles(tx, entries, startPosition, layer2, opts = {}) {
     if (entry.start !== void 0) startTime = requireFinite(entry.start, "start");
     if (entry.end !== void 0) endTime = requireFinite(entry.end, "end");
     if (isStillImage(file3)) endTime = entry.end ?? imageLength;
-    let clipPosition = toFrame2(position, rate) * fps.den / fps.num;
+    let clipPosition = toFrame2(position, rate) * fps2.den / fps2.num;
     let transition2 = null;
     if (!withTransition && opts.fade) {
       position = Math.max(start, clipPosition - fadeLength);
@@ -7914,16 +8263,16 @@ function placeFiles(tx, entries, startPosition, layer2, opts = {}) {
     result2.clipIds.push(clip2.id);
     const patch = {};
     if (!withTransition && opts.fade) {
-      const points = [];
+      const points2 = [];
       if (opts.fade === "in" || opts.fade === "in_out") {
-        points.push([keyframeX(startTime, rate), 0]);
-        points.push([Math.min(keyframeX(startTime + fadeLength, rate), keyframeX(endTime, rate)), 1]);
+        points2.push([keyframeX(startTime, rate), 0]);
+        points2.push([Math.min(keyframeX(startTime + fadeLength, rate), keyframeX(endTime, rate)), 1]);
       }
       if (opts.fade === "out" || opts.fade === "in_out") {
-        points.push([Math.max(keyframeX(endTime - fadeLength, rate), keyframeX(startTime, rate)), 1]);
-        points.push([keyframeX(endTime, rate), 0]);
+        points2.push([Math.max(keyframeX(endTime - fadeLength, rate), keyframeX(startTime, rate)), 1]);
+        points2.push([keyframeX(endTime, rate), 0]);
       }
-      patch.alpha = addPoints(clip2.alpha, points);
+      patch.alpha = addPoints(clip2.alpha, points2);
     }
     if (opts.zoom) {
       let x = [0, 0];
@@ -12545,9 +12894,9 @@ function cloneIssues(issues) {
   return issues.map((iss) => iss.path ? { ...iss, path: iss.path.slice() } : { ...iss });
 }
 function isRecursive(inst, stack, resolve) {
-  const cached3 = recursive.get(inst);
-  if (cached3 !== void 0)
-    return cached3 ? PROVEN : NONE;
+  const cached4 = recursive.get(inst);
+  if (cached4 !== void 0)
+    return cached4 ? PROVEN : NONE;
   if (stack.has(inst))
     return PROVEN;
   stack.add(inst);
@@ -16992,8 +17341,8 @@ var capitalizeFirstCharacter, error33;
 var init_lt = __esm({
   "../../node_modules/zod/v4/locales/lt.js"() {
     init_util();
-    capitalizeFirstCharacter = (text4) => {
-      return text4.charAt(0).toUpperCase() + text4.slice(1);
+    capitalizeFirstCharacter = (text5) => {
+      return text5.charAt(0).toUpperCase() + text5.slice(1);
     };
     error33 = () => {
       const Sizable = {
@@ -23400,13 +23749,13 @@ function _promise(Class2, innerType) {
 }
 // @__NO_SIDE_EFFECTS__
 function _custom(Class2, fn, _params) {
-  const norm = normalizeParams(_params);
-  norm.abort ?? (norm.abort = true);
+  const norm2 = normalizeParams(_params);
+  norm2.abort ?? (norm2.abort = true);
   const schema = new Class2({
     type: "custom",
     check: "custom",
     fn,
-    ...norm
+    ...norm2
   });
   return schema;
 }
@@ -27877,15 +28226,15 @@ function visit(schema, fnOrHandlers) {
   };
   const cache5 = /* @__PURE__ */ new Map();
   function run(s) {
-    const cached3 = cache5.get(s);
-    if (cached3 === RESOLVING) {
+    const cached4 = cache5.get(s);
+    if (cached4 === RESOLVING) {
       return new $ZodLazy({
         type: "lazy",
         getter: () => cache5.get(s)
       });
     }
-    if (cached3 !== void 0)
-      return cached3;
+    if (cached4 !== void 0)
+      return cached4;
     cache5.set(s, RESOLVING);
     const inner = mapInner(s);
     const mapped = fn(inner, inner !== s);
@@ -28583,8 +28932,8 @@ function flipBetaAlpha(data) {
     }
   }
 }
-function resetHandles(points) {
-  for (const point3 of points) {
+function resetHandles(points2) {
+  for (const point3 of points2) {
     if (isRecord13(point3.handle_left)) {
       point3.handle_left.X = 0.5;
       point3.handle_left.Y = 1;
@@ -28612,10 +28961,10 @@ function resetLegacyHandles(data) {
   }
 }
 function isKeyframeChanged(keyframe4, defaultValue) {
-  const points = isRecord13(keyframe4) ? keyframe4.Points : void 0;
-  if (!Array.isArray(points) || points.length === 0) return false;
-  if (points.length > 1) return true;
-  const first = points[0];
+  const points2 = isRecord13(keyframe4) ? keyframe4.Points : void 0;
+  if (!Array.isArray(points2) || points2.length === 0) return false;
+  if (points2.length > 1) return true;
+  const first = points2[0];
   const co = isRecord13(first) && isRecord13(first.co) ? first.co : {};
   return (co.Y ?? defaultValue) !== defaultValue;
 }
@@ -28648,8 +28997,8 @@ function migrateLegacyCrop(data, newId) {
     clip2.effects.push(effect2);
   }
 }
-function flipPoints(points) {
-  for (const point3 of points) {
+function flipPoints(points2) {
+  for (const point3 of points2) {
     const co = point3.co;
     if (isRecord13(co)) co.Y = 1 - num4(co.Y, 1);
   }
@@ -28661,10 +29010,10 @@ function migrateTrackedObjectAlpha(data) {
       if (effect2.name !== "Tracker" && effect2.name !== "Object Detector") continue;
       if ("display_box_text" in effect2) {
         const keyframe4 = effect2.display_box_text;
-        const points = isRecord13(keyframe4) && Array.isArray(keyframe4.Points) ? keyframe4.Points : null;
-        if (points) {
-          flipPoints(points.filter(isRecord13));
-          if (points.length === 0) points.push({ co: { X: 1, Y: 1 }, interpolation: Interpolation.CONSTANT });
+        const points2 = isRecord13(keyframe4) && Array.isArray(keyframe4.Points) ? keyframe4.Points : null;
+        if (points2) {
+          flipPoints(points2.filter(isRecord13));
+          if (points2.length === 0) points2.push({ co: { X: 1, Y: 1 }, interpolation: Interpolation.CONSTANT });
         }
       }
       const objects = isRecord13(effect2.objects) ? effect2.objects : {};
@@ -28830,8 +29179,8 @@ var init_migrate = __esm({
 });
 
 // ../engine/src/io/repair.ts
-function repairProjectText(text4) {
-  let contents = text4;
+function repairProjectText(text5) {
+  let contents = text5;
   DAMAGE_WINDOWS_DRIVES.lastIndex = 0;
   if (DAMAGE_WINDOWS_DRIVES.test(contents) && VERSION_260.test(contents)) {
     contents = contents.replace(DAMAGE_WINDOWS_DRIVES, '$1"$2":');
@@ -28843,25 +29192,25 @@ function repairProjectText(text4) {
   }
   return contents;
 }
-function replaceNonFiniteTokens(text4) {
+function replaceNonFiniteTokens(text5) {
   let out = "";
   let changed = false;
   let i = 0;
   let last = 0;
-  while (i < text4.length) {
-    const ch = text4[i];
+  while (i < text5.length) {
+    const ch = text5[i];
     if (ch === '"') {
       i += 1;
-      while (i < text4.length && text4[i] !== '"') i += text4[i] === "\\" ? 2 : 1;
+      while (i < text5.length && text5[i] !== '"') i += text5[i] === "\\" ? 2 : 1;
       i += 1;
       continue;
     }
     let token = null;
-    if (text4.startsWith("NaN", i)) token = "NaN";
-    else if (text4.startsWith("-Infinity", i)) token = "-Infinity";
-    else if (text4.startsWith("Infinity", i)) token = "Infinity";
+    if (text5.startsWith("NaN", i)) token = "NaN";
+    else if (text5.startsWith("-Infinity", i)) token = "-Infinity";
+    else if (text5.startsWith("Infinity", i)) token = "Infinity";
     if (token) {
-      out += text4.slice(last, i) + "null";
+      out += text5.slice(last, i) + "null";
       i += token.length;
       last = i;
       changed = true;
@@ -28869,7 +29218,7 @@ function replaceNonFiniteTokens(text4) {
     }
     i += 1;
   }
-  return changed ? out + text4.slice(last) : null;
+  return changed ? out + text5.slice(last) : null;
 }
 var VERSION_250, VERSION_260, DAMAGE, DAMAGE_WINDOWS_DRIVES, SLASH_REPAIR;
 var init_repair = __esm({
@@ -28910,8 +29259,8 @@ function parseProject(json2, options = {}) {
   data.version = { ...data.version, ...PROJECT_FORMAT_VERSION };
   return data;
 }
-function parseProjectText(text4, options = {}) {
-  const repaired = repairProjectText(text4);
+function parseProjectText(text5, options = {}) {
+  const repaired = repairProjectText(text5);
   let json2;
   try {
     json2 = JSON.parse(repaired);
@@ -29133,8 +29482,8 @@ function projectAssetsDir(projectFilePath) {
   const { head: dir, tail: name } = split(ops, projectFilePath);
   const leadingDots = /^\.*/.exec(name)[0].length;
   const dot = name.lastIndexOf(".");
-  const stem4 = dot >= leadingDots ? name.slice(0, dot) : name;
-  const folder = `${Array.from(stem4).slice(0, 248).join("")}_assets`;
+  const stem5 = dot >= leadingDots ? name.slice(0, dot) : name;
+  const folder = `${Array.from(stem5).slice(0, 248).join("")}_assets`;
   return dir ? ops.join(dir, folder) : folder;
 }
 var PATH_KEYS, PATH_KEY_SET, ALIASES, posix, win32;
@@ -29289,8 +29638,8 @@ function getTitleTemplate(template) {
   if (!ref) return DEFAULT_TITLE_TEMPLATE;
   if (isAbsolutePath(ref)) return void 0;
   const base = (ref.split(/[\\/]/).pop() ?? "").toLowerCase();
-  const stem4 = base.endsWith(".svg") ? base.slice(0, -4) : base;
-  return TITLE_TEMPLATES.find((t) => t.id.toLowerCase() === stem4 || t.name.toLowerCase() === base);
+  const stem5 = base.endsWith(".svg") ? base.slice(0, -4) : base;
+  return TITLE_TEMPLATES.find((t) => t.id.toLowerCase() === stem5 || t.name.toLowerCase() === base);
 }
 var DEFAULT_PREFERENCE, defaultFile, TITLE_TEMPLATES, DEFAULT_TITLE_TEMPLATE;
 var init_templates = __esm({
@@ -29409,14 +29758,14 @@ function parseExportRate(value) {
   }
   return { kind: "bitrate", bitsPerSecond: Math.trunc(raw) };
 }
-function isQualityModeRate(text4) {
-  const t = (text4 ?? "").trim().toLowerCase();
+function isQualityModeRate(text5) {
+  const t = (text5 ?? "").trim().toLowerCase();
   return t.includes(" crf") || t.includes(" cqp") || t.includes(" qp");
 }
 function allFormatsBitrate(quality, frame) {
-  const fps = frame.fps.num / (frame.fps.den || 1);
-  if (!frame.width || !frame.height || !fps) return null;
-  const bitsPerSecond = frame.width * frame.height * fps * ALL_FORMATS_BPP[quality];
+  const fps2 = frame.fps.num / (frame.fps.den || 1);
+  if (!frame.width || !frame.height || !fps2) return null;
+  const bitsPerSecond = frame.width * frame.height * fps2 * ALL_FORMATS_BPP[quality];
   return `${pyFixed(bitsPerSecond / 1e6, 2)} Mb/s`;
 }
 function presetRates(preset, quality, frame) {
@@ -29457,11 +29806,11 @@ function joinPath(folder, name) {
   return /[\\/]$/.test(folder) ? folder + name : `${folder}${folder.includes("\\") && !folder.includes("/") ? "\\" : "/"}${name}`;
 }
 function getDefaultExportSettings(project, options = {}) {
-  const fps = isRecord15(project.fps) && Object.keys(project.fps).length > 0 ? project.fps : { num: 30, den: 1 };
+  const fps2 = isRecord15(project.fps) && Object.keys(project.fps).length > 0 ? project.fps : { num: 30, den: 1 };
   const video = {
     vformat: "mp4",
     vcodec: "libx264",
-    fps: { num: typeof fps.num === "number" ? fps.num : 30, den: numberOr(fps.den, 1) },
+    fps: { num: typeof fps2.num === "number" ? fps2.num : 30, den: numberOr(fps2.den, 1) },
     width: numberOr(project.width, 1920),
     height: numberOr(project.height, 1080),
     pixel_ratio: { num: 1, den: 1 },
@@ -29483,7 +29832,7 @@ function getDefaultExportSettings(project, options = {}) {
   };
   let exportType = EXPORT_TYPES[0];
   let defaultPath = joinPath(options.exportFolder ?? "", "export.mp4");
-  const num11 = (set2) => (v) => {
+  const num13 = (set2) => (v) => {
     if (typeof v === "number" && Number.isFinite(v)) set2(v);
   };
   const str3 = (set2) => (v) => {
@@ -29495,24 +29844,24 @@ function getDefaultExportSettings(project, options = {}) {
   const widgets = {
     txtVideoFormat: str3((v) => video.vformat = v),
     txtVideoCodec: str3((v) => video.vcodec = v),
-    txtWidth: num11((v) => video.width = v),
-    txtHeight: num11((v) => video.height = v),
-    txtFrameRateNum: num11((v) => video.fps.num = v),
-    txtFrameRateDen: num11((v) => video.fps.den = v),
-    txtPixelRatioNum: num11((v) => video.pixel_ratio.num = v),
-    txtPixelRatioDen: num11((v) => video.pixel_ratio.den = v),
+    txtWidth: num13((v) => video.width = v),
+    txtHeight: num13((v) => video.height = v),
+    txtFrameRateNum: num13((v) => video.fps.num = v),
+    txtFrameRateDen: num13((v) => video.fps.den = v),
+    txtPixelRatioNum: num13((v) => video.pixel_ratio.num = v),
+    txtPixelRatioDen: num13((v) => video.pixel_ratio.den = v),
     txtVideoBitRate: rate((v) => video.video_bitrate = v),
-    txtStartFrame: num11((v) => video.start_frame = v),
-    txtEndFrame: num11((v) => video.end_frame = v),
+    txtStartFrame: num13((v) => video.start_frame = v),
+    txtEndFrame: num13((v) => video.end_frame = v),
     txtAudioCodec: str3((v) => audio.acodec = v),
-    txtSampleRate: num11((v) => audio.sample_rate = v),
-    txtChannels: num11((v) => audio.channels = v),
+    txtSampleRate: num13((v) => audio.sample_rate = v),
+    txtChannels: num13((v) => audio.channels = v),
     txtAudioBitrate: rate((v) => audio.audio_bitrate = v),
-    cboChannelLayout: num11((v) => {
+    cboChannelLayout: num13((v) => {
       const layout = CHANNEL_LAYOUT_CHOICES[v];
       if (layout !== void 0) audio.channel_layout = layout;
     }),
-    cboExportTo: num11((v) => {
+    cboExportTo: num13((v) => {
       const type = EXPORT_TYPES[v];
       if (Number.isInteger(v) && type) exportType = type;
     })
@@ -29526,14 +29875,14 @@ function getDefaultExportSettings(project, options = {}) {
   }
   const overrides = isRecord15(project.export_overrides) ? project.export_overrides : {};
   for (const [key, value] of Object.entries(overrides)) {
-    if (key === "width" || key === "height" || key === "start_frame" || key === "end_frame") num11((v) => video[key] = v)(value);
-    else if (key === "fps_num") num11((v) => video.fps.num = v)(value);
-    else if (key === "fps_den") num11((v) => video.fps.den = v)(value);
+    if (key === "width" || key === "height" || key === "start_frame" || key === "end_frame") num13((v) => video[key] = v)(value);
+    else if (key === "fps_num") num13((v) => video.fps.num = v)(value);
+    else if (key === "fps_den") num13((v) => video.fps.den = v)(value);
     else if (key === "video_codec" || key === "vcodec") str3((v) => video.vcodec = v)(value);
     else if (key === "vformat" || key === "format") str3((v) => video.vformat = v)(value);
     else if (key === "audio_codec" || key === "acodec") str3((v) => audio.acodec = v)(value);
-    else if (key === "sample_rate") num11((v) => audio.sample_rate = v)(value);
-    else if (key === "channels") num11((v) => audio.channels = v)(value);
+    else if (key === "sample_rate") num13((v) => audio.sample_rate = v)(value);
+    else if (key === "channels") num13((v) => audio.channels = v)(value);
     else if (key === "output_path" || key === "path") str3((v) => defaultPath = v)(value);
   }
   return { video, audio, exportType, defaultPath };
@@ -29593,8 +29942,8 @@ function exportOptionsFromSettings(settings, options = {}) {
   const { video, audio, exportType } = settings;
   const format = exportContainer(video.vformat, exportType);
   if (!format) throw new ExportSettingsError(`The engine exporters cannot write ${exportType} as "${video.vformat}".`);
-  const fps = { num: Math.trunc(video.fps.num), den: Math.trunc(video.fps.den) || 1 };
-  const out = { format, width: Math.trunc(video.width), height: Math.trunc(video.height), fps };
+  const fps2 = { num: Math.trunc(video.fps.num), den: Math.trunc(video.fps.den) || 1 };
+  const out = { format, width: Math.trunc(video.width), height: Math.trunc(video.height), fps: fps2 };
   const hasVideo = exportType !== "Audio Only";
   const hasAudio = exportType === "Video & Audio" || exportType === "Audio Only";
   if (hasVideo && format !== "png-sequence" && format !== "gif" && video.vcodec) out.videoCodec = video.vcodec;
@@ -29612,7 +29961,7 @@ function exportOptionsFromSettings(settings, options = {}) {
     out.channels = 0;
   }
   if (options.useSavedRange) {
-    const rate = fps.num / fps.den;
+    const rate = fps2.num / fps2.den;
     out.range = { start: (Math.max(1, video.start_frame) - 1) / rate, end: video.end_frame / rate };
   }
   return out;
@@ -29866,14 +30215,14 @@ function spawnManaged(binary, args, options = {}) {
     kill,
     spawnError: () => spawnErr,
     failure(what = `${binary} failed`) {
-      const text4 = stderr.toString();
-      const summary = stderrSummary(text4);
+      const text5 = stderr.toString();
+      const summary = stderrSummary(text5);
       return new FfmpegError(
         `${what} (exit ${child.exitCode ?? child.signalCode ?? "?"})${summary ? `: ${summary}` : ""}`,
         binary,
         args,
         child.exitCode,
-        text4
+        text5
       );
     }
   };
@@ -29962,16 +30311,16 @@ var init_process = __esm({
         }
       }
       toString() {
-        const text4 = this.chunks.join("");
-        return text4.length > this.limit ? text4.slice(text4.length - this.limit) : text4;
+        const text5 = this.chunks.join("");
+        return text5.length > this.limit ? text5.slice(text5.length - this.limit) : text5;
       }
     };
   }
 });
 
 // ../render-node/src/ffmpeg/capabilities.ts
-function parseCodecList(text4) {
-  const lines = text4.split(/\r?\n/);
+function parseCodecList(text5) {
+  const lines = text5.split(/\r?\n/);
   const start = lines.findIndex((l) => l.trim().startsWith("------"));
   const entries = [];
   for (const line2 of lines.slice(start + 1)) {
@@ -30683,7 +31032,7 @@ function resizeRgba(src, width, height) {
   const sy = src.height / height;
   const s = src.data;
   const d = out.data;
-  const sample = (x, y, acc2, w) => {
+  const sample2 = (x, y, acc2, w) => {
     const i = (y * src.width + x) * 4;
     const a = s[i + 3] * w;
     acc2[0] += s[i] * a;
@@ -30706,7 +31055,7 @@ function resizeRgba(src, width, height) {
           for (let xx = Math.floor(x0); xx < Math.ceil(x1); xx += 1) {
             const w = (Math.min(xx + 1, x1) - Math.max(xx, x0)) * wy;
             if (w <= 0) continue;
-            sample(xx, yy, acc, w);
+            sample2(xx, yy, acc, w);
             weight += w;
           }
         }
@@ -30719,10 +31068,10 @@ function resizeRgba(src, width, height) {
         const ty = fy - iy;
         const ix1 = Math.min(ix + 1, src.width - 1);
         const iy1 = Math.min(iy + 1, src.height - 1);
-        sample(ix, iy, acc, (1 - tx) * (1 - ty));
-        sample(ix1, iy, acc, tx * (1 - ty));
-        sample(ix, iy1, acc, (1 - tx) * ty);
-        sample(ix1, iy1, acc, tx * ty);
+        sample2(ix, iy, acc, (1 - tx) * (1 - ty));
+        sample2(ix1, iy, acc, tx * (1 - ty));
+        sample2(ix, iy1, acc, (1 - tx) * ty);
+        sample2(ix1, iy1, acc, tx * ty);
         weight = 1;
       }
       const o = (y * width + x) * 4;
@@ -31008,11 +31357,11 @@ var init_fonts = __esm({
         const files = [];
         const walked = {};
         for (const dir of roots) await walk(dir, 4, files, walked, 8e3);
-        const cached3 = new Map((cache5?.faces ?? []).map((f3) => [f3.path, f3]));
+        const cached4 = new Map((cache5?.faces ?? []).map((f3) => [f3.path, f3]));
         const entries = await mapLimit(files, 16, async (file3) => {
           try {
             const st = await stat(file3);
-            const hit = cached3.get(file3);
+            const hit = cached4.get(file3);
             if (hit && hit.size === st.size && hit.mtimeMs === st.mtimeMs) return hit;
             return { path: file3, size: st.size, mtimeMs: st.mtimeMs, families: await readFontFamilies(file3) };
           } catch {
@@ -31597,23 +31946,23 @@ function gcd3(a, b) {
   while (b) [a, b] = [b, a % b];
   return a;
 }
-function reduce(num11, den2) {
-  const g = gcd3(num11, den2);
-  return g > 0 ? { num: num11 / g, den: den2 / g } : { num: num11, den: den2 };
+function reduce(num13, den2) {
+  const g = gcd3(num13, den2);
+  return g > 0 ? { num: num13 / g, den: den2 / g } : { num: num13, den: den2 };
 }
-function parseRatio(text4, sep = "/") {
-  if (!text4) return void 0;
-  const [a, b] = text4.split(sep);
-  const num11 = Number(a);
+function parseRatio(text5, sep = "/") {
+  if (!text5) return void 0;
+  const [a, b] = text5.split(sep);
+  const num13 = Number(a);
   const den2 = Number(b);
-  return Number.isFinite(num11) && Number.isFinite(den2) ? { num: num11, den: den2 } : void 0;
+  return Number.isFinite(num13) && Number.isFinite(den2) ? { num: num13, den: den2 } : void 0;
 }
 function toDouble(f3) {
   return f3.num / f3.den;
 }
-function num5(text4) {
-  if (text4 === void 0 || text4 === "N/A") return void 0;
-  const v = typeof text4 === "number" ? text4 : Number(text4);
+function num5(text5) {
+  if (text5 === void 0 || text5 === "N/A") return void 0;
+  const v = typeof text5 === "number" ? text5 : Number(text5);
   return Number.isFinite(v) ? v : void 0;
 }
 function guessFrameRate(stream) {
@@ -31651,21 +32000,21 @@ function pickDuration(d, strategy) {
   return 0;
 }
 function applyDuration(info, d, strategy) {
-  const fps = toDouble(info.fps);
+  const fps2 = toDouble(info.fps);
   const seconds2 = pickDuration(d, strategy);
-  if (!(seconds2 > 0) || !(fps > 0)) {
+  if (!(seconds2 > 0) || !(fps2 > 0)) {
     info.duration = 0;
     info.video_length = 0;
     return;
   }
-  const frames = Math.round(seconds2 * fps);
+  const frames = Math.round(seconds2 * fps2);
   if (frames <= 0) {
     info.duration = 0;
     info.video_length = 0;
     return;
   }
   info.video_length = frames;
-  info.duration = Math.fround(frames / fps);
+  info.duration = Math.fround(frames / fps2);
 }
 function baseInfo() {
   return {
@@ -32119,16 +32468,16 @@ var init_png = __esm({
 });
 
 // ../render-node/src/decode/video.ts
-function fpsValue(fps) {
-  return fps.num > 0 && fps.den > 0 ? fps.num / fps.den : 30;
+function fpsValue(fps2) {
+  return fps2.num > 0 && fps2.den > 0 ? fps2.num / fps2.den : 30;
 }
 function scaleFlags(quality) {
   return quality === "export" ? "bicubic" : "fast_bilinear";
 }
 function videoDecodeArgs(source2, startFrame, size, quality = "export") {
-  const fps = fpsValue(source2.fps);
-  const delta = 0.25 / fps;
-  const nominal = (source2.videoStart ?? 0) - (source2.formatStart ?? 0) + startFrame / fps;
+  const fps2 = fpsValue(source2.fps);
+  const delta = 0.25 / fps2;
+  const nominal = (source2.videoStart ?? 0) - (source2.formatStart ?? 0) + startFrame / fps2;
   const seek = Math.max(0, nominal - delta);
   const shift2 = nominal - seek;
   const fpsText = `${source2.fps.num > 0 ? source2.fps.num : 30}/${source2.fps.den > 0 ? source2.fps.den : 1}`;
@@ -32285,8 +32634,8 @@ var init_video = __esm({
         const count = this.source.frameCount;
         if (count !== void 0 && count > 0 && target >= count) target = count - 1;
         if (this.endFrame !== void 0 && target >= this.endFrame) target = Math.max(0, this.endFrame - 1);
-        const cached3 = this.cache.get(target);
-        if (cached3) return rgbaView(cached3, this.size.width, this.size.height);
+        const cached4 = this.cache.get(target);
+        if (cached4) return rgbaView(cached4, this.size.width, this.size.height);
         if (!this.stream || target < this.stream.position || target - this.stream.position > this.maxSkip) {
           await this.stream?.close();
           const backward = this.stream !== void 0 && target < this.stream.position;
@@ -32480,14 +32829,14 @@ var init_audio = __esm({
       ended = false;
       /** Next sample index (at `sampleRate`) the stream will deliver. */
       position = -1;
-      start(sample) {
+      start(sample2) {
         void this.child?.kill(200);
         this.buffered = [];
         this.bufferedBytes = 0;
         this.ended = false;
-        this.position = sample;
+        this.position = sample2;
         const anchor2 = (this.starts.videoStart ?? this.starts.audioStart ?? this.starts.formatStart) - this.starts.formatStart;
-        const seek = Math.max(0, anchor2 + sample / this.sampleRate);
+        const seek = Math.max(0, anchor2 + sample2 / this.sampleRate);
         const child = spawnManaged(
           resolveBinary("ffmpeg"),
           ["-hide_banner", "-loglevel", "error", "-nostdin", ...seek > 0 ? ["-ss", seek.toFixed(6)] : [], "-i", this.file, "-map", "0:a:0?", "-vn", "-ac", String(this.channels), "-ar", String(this.sampleRate), "-f", "f32le", "pipe:1"],
@@ -32593,12 +32942,12 @@ var init_sources = __esm({
         if (!entry) {
           const file3 = await this.resolve(source2.path);
           const reader = this.files.get(source2.fileId);
-          const fps = reader?.fps && reader.fps.num > 0 && reader.fps.den > 0 ? reader.fps : { num: 30, den: 1 };
+          const fps2 = reader?.fps && reader.fps.num > 0 && reader.fps.den > 0 ? reader.fps : { num: 30, den: 1 };
           const frameCount = Number(reader?.video_length);
           const starts = await streamStarts(file3, this.options.signal);
           const info = {
             path: file3,
-            fps,
+            fps: fps2,
             videoStart: starts.videoStart,
             formatStart: starts.formatStart,
             frameCount: Number.isFinite(frameCount) && frameCount > 0 ? frameCount : void 0,
@@ -32858,23 +33207,23 @@ function num6(value, digits = 6) {
   const trimmed = fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed;
   return trimmed === "-0" ? "0" : trimmed;
 }
-function simplifyGain(points, tolerance = 1e-4) {
-  const sorted = [...points].filter((p) => Number.isFinite(p.t) && Number.isFinite(p.gain)).sort((a, b) => a.t - b.t);
+function simplifyGain(points2, tolerance = 1e-4) {
+  const sorted = [...points2].filter((p) => Number.isFinite(p.t) && Number.isFinite(p.gain)).sort((a, b) => a.t - b.t);
   if (sorted.length <= 2) return sorted;
   const out = [sorted[0]];
   for (let i = 1; i < sorted.length - 1; i += 1) {
     const prev = out[out.length - 1];
     const cur = sorted[i];
     const next = sorted[i + 1];
-    const span2 = next.t - prev.t;
-    const expected = span2 > 0 ? prev.gain + (next.gain - prev.gain) * (cur.t - prev.t) / span2 : cur.gain;
+    const span3 = next.t - prev.t;
+    const expected = span3 > 0 ? prev.gain + (next.gain - prev.gain) * (cur.t - prev.t) / span3 : cur.gain;
     if (Math.abs(expected - cur.gain) > tolerance || cur.t === prev.t) out.push(cur);
   }
   out.push(sorted[sorted.length - 1]);
   return out;
 }
-function gainExpression(points, shift2 = 0) {
-  const pts = simplifyGain(points).map((p) => ({ t: p.t - shift2, gain: p.gain }));
+function gainExpression(points2, shift2 = 0) {
+  const pts = simplifyGain(points2).map((p) => ({ t: p.t - shift2, gain: p.gain }));
   if (pts.length === 0) return "1";
   if (pts.length === 1 || pts.every((p) => Math.abs(p.gain - pts[0].gain) < 1e-6)) return num6(pts[0].gain);
   const leaf = (i) => {
@@ -32952,14 +33301,14 @@ async function buildAudioGraph(options) {
     const sourceSpan = Math.abs(rate) * part.length;
     const a = segment.sourceStart + rate * part.offset;
     let lo = rate > 0 ? a : a - sourceSpan;
-    let span2 = sourceSpan;
+    let span3 = sourceSpan;
     if (lo < 0) {
-      span2 += lo;
+      span3 += lo;
       lo = 0;
     }
-    if (span2 <= 1e-6) continue;
+    if (span3 <= 1e-6) continue;
     const index = options.firstInput + inputs.length;
-    const source2 = { path: file3, seek: Math.max(0, anchor2 + lo), duration: span2 };
+    const source2 = { path: file3, seek: Math.max(0, anchor2 + lo), duration: span3 };
     const toTimeline = ["asetpts=PTS-STARTPTS", ...rate < 0 ? ["areverse"] : [], ...atempoChain(rate), `aformat=sample_fmts=fltp:sample_rates=${sampleRate}:channel_layouts=${layout}`];
     let filters;
     const { runnable, missing } = options.effects ? splitEffects(segment.effects, options.effects.getKernel) : { runnable: [], missing: segment.effects.map((e) => e.type) };
@@ -33495,8 +33844,8 @@ function getInt2(value) {
   return out === 0 ? 0 : out;
 }
 function hexColorRgb(c) {
-  const clamp2 = (v) => Math.min(255, Math.max(0, getInt2(v)));
-  return [clamp2(c[0]), clamp2(c[1]), clamp2(c[2])];
+  const clamp3 = (v) => Math.min(255, Math.max(0, getInt2(v)));
+  return [clamp3(c[0]), clamp3(c[1]), clamp3(c[2])];
 }
 function readerPath(params, key) {
   const v = params[key];
@@ -33511,9 +33860,9 @@ var init_params = __esm({
 });
 
 // ../engine/src/render/kernels/analog-tape.ts
-function utf8(text4) {
+function utf8(text5) {
   const out = [];
-  for (const ch of text4) {
+  for (const ch of text5) {
     const cp = ch.codePointAt(0);
     if (cp < 128) out.push(cp);
     else if (cp < 2048) out.push(192 | cp >> 6, 128 | cp & 63);
@@ -33522,9 +33871,9 @@ function utf8(text4) {
   }
   return out;
 }
-function fnv1aString(text4) {
+function fnv1aString(text5) {
   let h = 2166136261;
-  for (const byte of utf8(text4)) h = Math.imul(h ^ byte, FNV_PRIME) >>> 0;
+  for (const byte of utf8(text5)) h = Math.imul(h ^ byte, FNV_PRIME) >>> 0;
   return h;
 }
 function fnv1aWord(h, d) {
@@ -36778,25 +37127,25 @@ var init_audio_visualization_cosmetic = __esm({
         this.stroke(x1, y1, x2, y2, this.drawCaps ? CAP_BEGIN | CAP_END : 0);
       }
       /** `drawPath` for a polygon without element types (drawPolyline / implicitly closed polygons). */
-      drawPolygon(points, implicitClose) {
-        const n = points.length >> 1;
+      drawPolygon(points2, implicitClose) {
+        const n = points2.length >> 1;
         if (n === 0) return;
-        let px = points[0];
-        let py = points[1];
+        let px = points2[0];
+        let py = points2[1];
         const movedX = px;
         const movedY = py;
         this.lastX = INT_MIN;
         this.lastY = INT_MIN;
-        const endX = points[(n - 1) * 2];
-        const endY = points[(n - 1) * 2 + 1];
-        const closed = implicitClose || points[0] === endX && points[1] === endY;
+        const endX = points2[(n - 1) * 2];
+        const endY = points2[(n - 1) * 2 + 1];
+        const closed = implicitClose || points2[0] === endX && points2[1] === endY;
         let caps = !closed && this.drawCaps ? CAP_BEGIN : 0;
         if (closed) {
           let p2x;
           let p2y;
-          if (points[0] === endX && points[1] === endY && n > 2) {
-            p2x = points[(n - 2) * 2];
-            p2y = points[(n - 2) * 2 + 1];
+          if (points2[0] === endX && points2[1] === endY && n > 2) {
+            p2x = points2[(n - 2) * 2];
+            p2y = points2[(n - 2) * 2 + 1];
           } else {
             p2x = endX;
             p2y = endY;
@@ -36805,8 +37154,8 @@ var init_audio_visualization_cosmetic = __esm({
         }
         const fastPenAliased = !this.antialiased;
         for (let i = 1; i < n; i += 1) {
-          const qx = points[i * 2];
-          const qy = points[i * 2 + 1];
+          const qx = points2[i * 2];
+          const qy = points2[i * 2 + 1];
           if (!closed && this.drawCaps && i === n - 1) caps |= CAP_END;
           const moveNextStart = this.stroke(px, py, qx, qy, caps);
           if (!fastPenAliased || moveNextStart || i === 1 || i === n - 1) {
@@ -37441,16 +37790,16 @@ var init_audio_visualization_paint = __esm({
         out.end();
       }
       /** `QPainter::drawPolyline`. */
-      drawPolyline(points, pen2) {
-        if (points.length < 4) return;
+      drawPolyline(points2, pen2) {
+        if (points2.length < 4) return;
         if (pen2.width <= 1) {
-          this.cosmetic(pen2, (c) => c.drawPolygon(points, false));
+          this.cosmetic(pen2, (c) => c.drawPolygon(points2, false));
           return;
         }
         const path38 = { types: [], pts: [] };
-        for (let i = 0; i < points.length; i += 2) {
+        for (let i = 0; i < points2.length; i += 2) {
           path38.types.push(i === 0 ? MOVE_TO : LINE_TO);
-          path38.pts.push(points[i], points[i + 1]);
+          path38.pts.push(points2[i], points2[i + 1]);
         }
         this.fillPath(strokePath(path38, pen2, true), pen2.brush, false);
       }
@@ -37574,18 +37923,18 @@ function drawWaveform(p, s) {
       }
       continue;
     }
-    const points = [];
+    const points2 = [];
     for (let i = 0; i < size; i += 1) {
       const x = size <= 1 ? 0 : f323((width - 1) * i / (size - 1));
-      points.push(x, fmaf(-values[i], amplitude, centerY));
+      points2.push(x, fmaf(-values[i], amplitude, centerY));
     }
     const glowWidth = fmaf(styledGlow, 16, lineWidth);
     if (rainbow) {
-      if (styledGlow > GLOW_MIN) p.drawPolyline(points, pen(horizontal(width, rainbowStops(base, spread2, f323(f323(0.88) * alphaScale))), glowWidth, "flat"));
-      p.drawPolyline(points, pen(horizontal(width, rainbowStops(base, spread2, alphaScale)), lineWidth, "flat"));
+      if (styledGlow > GLOW_MIN) p.drawPolyline(points2, pen(horizontal(width, rainbowStops(base, spread2, f323(f323(0.88) * alphaScale))), glowWidth, "flat"));
+      p.drawPolyline(points2, pen(horizontal(width, rainbowStops(base, spread2, alphaScale)), lineWidth, "flat"));
     } else {
-      if (styledGlow > GLOW_MIN) p.drawPolyline(points, pen(solid(alphaColor(lanePalette.glow, f323(f323(0.88) * alphaScale))), glowWidth, "flat"));
-      p.drawPolyline(points, pen(solid(alphaColor(lanePalette.base, alphaScale)), lineWidth, "flat"));
+      if (styledGlow > GLOW_MIN) p.drawPolyline(points2, pen(solid(alphaColor(lanePalette.glow, f323(f323(0.88) * alphaScale))), glowWidth, "flat"));
+      p.drawPolyline(points2, pen(solid(alphaColor(lanePalette.base, alphaScale)), lineWidth, "flat"));
     }
   }
 }
@@ -37744,9 +38093,9 @@ function drawPhaseScope(p, s) {
   const kx = f323(0.38);
   const ky = f323(-0.42);
   for (let i = 0; i < count; i += 1) {
-    const sample = clampi(Math.trunc(i * samples / count), 0, samples - 1);
-    const l = left[sample];
-    const r = right[sample];
+    const sample2 = clampi(Math.trunc(i * samples / count), 0, samples - 1);
+    const l = left[sample2];
+    const r = right[sample2];
     const ax = clampf(f323(f323(f323(l - r) * gain) * f323(0.75)), -1, 1);
     const ay = clampf(f323(f323(f323(l + r) * gain) * f323(0.38)), -1, 1);
     const rawX = fmaf(0.5, width, f323(f323(ax * width) * kx));
@@ -38112,9 +38461,9 @@ function evaluateAnimatedCurve(json2, frame, defaultNodes) {
     if (ax === bx) return a.id - b.id;
     return ax - bx;
   });
-  const points = [];
+  const points2 = [];
   for (const n of nodes) {
-    addResolvedPoint(points, {
+    addResolvedPoint(points2, {
       x: Math.fround(clamp01(valueOf(n.x, frame)) * 255),
       y: Math.fround(clamp01(valueOf(n.y, frame))),
       interpolation: n.interpolation,
@@ -38126,7 +38475,7 @@ function evaluateAnimatedCurve(json2, frame, defaultNodes) {
     });
   }
   const table = [];
-  for (let i = 0; i < 256; i += 1) table.push(clamp01(valueAtResolved(points, i)));
+  for (let i = 0; i < 256; i += 1) table.push(clamp01(valueAtResolved(points2, i)));
   return { enabled, table };
 }
 function sampleCurve(curve, input2) {
@@ -38925,8 +39274,8 @@ function fillRoundedRect(image, rect, radius, color3, region) {
     }
   }
 }
-function drawTextPath(image, raster, text4, x, y, font, ink, fill, stroke, strokeWidth, region) {
-  if (text4.length === 0 || isEmptyRect(ink)) return;
+function drawTextPath(image, raster, text5, x, y, font, ink, fill, stroke, strokeWidth, region) {
+  if (text5.length === 0 || isEmptyRect(ink)) return;
   const margin = Math.ceil(Math.max(0, strokeWidth)) + 2 + Math.ceil(font.pixelSize * 0.25);
   const x0 = Math.max(region.x0, Math.floor(x + ink.x) - margin);
   const y0 = Math.max(region.y0, Math.floor(y + ink.y) - margin);
@@ -38936,7 +39285,7 @@ function drawTextPath(image, raster, text4, x, y, font, ink, fill, stroke, strok
   const lw = x1 - x0;
   const lh = y1 - y0;
   const layer2 = { width: lw, height: lh, data: new Uint8ClampedArray(lw * lh * 4) };
-  raster.drawText(layer2, text4, x - x0, y - y0, font, fill, stroke, stroke ? strokeWidth : 0);
+  raster.drawText(layer2, text5, x - x0, y - y0, font, fill, stroke, stroke ? strokeWidth : 0);
   const src = premultiply(layer2);
   const compose = composerFor(CompositionMode.SourceOver);
   const d = image.data;
@@ -38961,9 +39310,9 @@ function charWidthEm(cp) {
   if (cp < 32 || cp >= 768 && cp <= 879 || cp === 8203 || cp === 65279) return 0;
   return isWide(cp) ? 1 : 0.556;
 }
-function approximateAdvance(text4, font) {
+function approximateAdvance(text5, font) {
   let w = 0;
-  for (const ch of text4) w += charWidthEm(ch.codePointAt(0));
+  for (const ch of text5) w += charWidthEm(ch.codePointAt(0));
   return w * font.pixelSize;
 }
 var F64, U64, KAPPA2, ASCII_WIDTHS, INVISIBLE, TALL, DESCENDER, approximateMetrics;
@@ -39084,16 +39433,16 @@ var init_text_layout = __esm({
         return { ascent: px * 0.93, descent: px * 0.23, lineSpacing: px * 1.16 };
       },
       advance: approximateAdvance,
-      bounds(text4, font) {
+      bounds(text5, font) {
         const px = font.pixelSize;
-        return { x: 0, y: -px * 0.93, width: approximateAdvance(text4, font), height: px * 1.16 };
+        return { x: 0, y: -px * 0.93, width: approximateAdvance(text5, font), height: px * 1.16 };
       },
-      inkBounds(text4, font) {
-        if (INVISIBLE.test(text4)) return { x: 0, y: 0, width: 0, height: 0 };
+      inkBounds(text5, font) {
+        if (INVISIBLE.test(text5)) return { x: 0, y: 0, width: 0, height: 0 };
         const px = font.pixelSize;
-        const top = TALL.test(text4) ? 0.716 : 0.519;
-        const bottom = DESCENDER.test(text4) ? 0.21 : 0.012;
-        const adv = approximateAdvance(text4, font);
+        const top = TALL.test(text5) ? 0.716 : 0.519;
+        const bottom = DESCENDER.test(text5) ? 0.21 : 0.012;
+        const adv = approximateAdvance(text5, font);
         return { x: px * 0.05, y: -top * px, width: Math.max(0, adv - px * 0.1), height: (top + bottom) * px };
       }
     };
@@ -39107,11 +39456,11 @@ function groupValue(g) {
 function fraction2(g) {
   return Number((g ?? "").padEnd(3, "0")) / 1e3;
 }
-function parseCaptions(text4) {
-  const cached3 = cueCache.get(text4);
-  if (cached3) return cached3;
-  const nul = text4.indexOf("\0");
-  let prepared = nul >= 0 ? text4.slice(0, nul) : text4;
+function parseCaptions(text5) {
+  const cached4 = cueCache.get(text5);
+  if (cached4) return cached4;
+  const nul = text5.indexOf("\0");
+  let prepared = nul >= 0 ? text5.slice(0, nul) : text5;
   if (!prepared.endsWith("\n\n")) prepared += "\n\n";
   const cues = [];
   for (const m of prepared.matchAll(CUE_PATTERN)) {
@@ -39121,22 +39470,22 @@ function parseCaptions(text4) {
     cues.push({ start, end, lines });
   }
   if (cueCache.size >= CUE_CACHE_LIMIT) cueCache.delete(cueCache.keys().next().value);
-  cueCache.set(text4, cues);
+  cueCache.set(text5, cues);
   return cues;
 }
-function cueFrameRange(cue, fps) {
-  const fpsF = Math.fround(fps.num / fps.den);
+function cueFrameRange(cue, fps2) {
+  const fpsF = Math.fround(fps2.num / fps2.den);
   return { first: Math.trunc(cue.start * fpsF) + 1, last: Math.trunc(cue.end * fpsF) };
 }
-function singleLineWidth(measure, font, text4) {
-  const t = text4.replace(/[\r\n\t]/g, " ");
+function singleLineWidth(measure2, font, text5) {
+  const t = text5.replace(/[\r\n\t]/g, " ");
   if (t.length === 0) return 0;
-  const advance = measure.advance(t, font);
-  const ink = measure.inkBounds(t, font);
+  const advance = measure2.advance(t, font);
+  const ink = measure2.inkBounds(t, font);
   return isEmptyRect(ink) ? advance : Math.max(advance, ink.x + ink.width);
 }
-function pathBounds(ink, text4, x, y) {
-  if (text4.length === 0 || isEmptyRect(ink)) return { x: 0, y: 0, width: 0, height: 0 };
+function pathBounds(ink, text5, x, y) {
+  if (text5.length === 0 || isEmptyRect(ink)) return { x: 0, y: 0, width: 0, height: 0 };
   return { x: x + ink.x, y: y + ink.y, width: ink.width, height: ink.height };
 }
 function captionFps(ctx) {
@@ -39144,12 +39493,12 @@ function captionFps(ctx) {
   if (ctx.clip && ctx.clip.readerFps > 0) return { num: ctx.clip.readerFps, den: 1 };
   return { num: 1, den: 1 };
 }
-function layoutCaption(params, width, height, frame, fps, measure) {
+function layoutCaption(params, width, height, frame, fps2, measure2) {
   const cues = parseCaptions(str(params, "caption_text", CAPTION_DEFAULT_TEXT));
   const scale = width / 600;
   const fontSizeValue = num7(params, "font_size", 30) * scale;
   const font = { family: str(params, "caption_font", "sans"), pixelSize: Math.trunc(Math.max(fontSizeValue, 1)) };
-  const fpsD = fps.num / fps.den;
+  const fpsD = fps2.num / fps2.den;
   const leftValue = num7(params, "left", 0.1);
   const topValue = num7(params, "top", 0.75);
   const fadeInValue = num7(params, "fade_in", 0) * fpsD;
@@ -39160,7 +39509,7 @@ function layoutCaption(params, width, height, frame, fps, measure) {
   const paddingValue = num7(params, "background_padding", 20) * scale;
   const strokeWidthValue = num7(params, "stroke_width", 0.5) * scale;
   const lineSpacingValue = num7(params, "line_spacing", 1);
-  const metricsLineSpacing = measure.fontMetrics(font).lineSpacing;
+  const metricsLineSpacing = measure2.fontMetrics(font).lineSpacing;
   const leftMarginX = width * leftValue;
   const topMarginY = height * topValue;
   const startingY = topMarginY + metricsLineSpacing;
@@ -39180,18 +39529,18 @@ function layoutCaption(params, width, height, frame, fps, measure) {
   const measureWidth = (s) => {
     let w = widths.get(s);
     if (w === void 0) {
-      w = singleLineWidth(measure, font, s);
+      w = singleLineWidth(measure2, font, s);
       widths.set(s, w);
     }
     return w;
   };
-  const f3225 = Math.fround;
+  const f3226 = Math.fround;
   for (const cue of cues) {
-    const { first, last } = cueFrameRange(cue, fps);
+    const { first, last } = cueFrameRange(cue, fps2);
     if (frame < first || frame > last) continue;
     for (const line2 of cue.lines) {
-      fadeIn = fadeInValue > 0 ? f3225(f3225(frame) - f3225(first)) / fadeInValue : 1;
-      fadeOut = fadeOutValue > 0 ? 1 - (f3225(frame) - (f3225(last) - fadeOutValue)) / fadeOutValue : -1;
+      fadeIn = fadeInValue > 0 ? f3226(f3226(frame) - f3226(first)) / fadeInValue : 1;
+      fadeOut = fadeOutValue > 0 ? 1 - (f3226(frame) - (f3226(last) - fadeOutValue)) / fadeOutValue : -1;
       let words2 = line2.split(" ");
       let useSpaces = true;
       if (line2.length > 20 && words2.length === 1) {
@@ -39203,12 +39552,12 @@ function layoutCaption(params, width, height, frame, fps, measure) {
         for (let wordIndex = words2.length; wordIndex > 0; wordIndex -= 1) {
           const part = words2.slice(0, wordIndex);
           if (measureWidth(part.join(" ")) <= captionAreaWidth) {
-            const text4 = useSpaces ? part.join(" ") : part.join("");
+            const text5 = useSpaces ? part.join(" ") : part.join("");
             const x = Math.trunc(leftMarginX);
             const y = Math.trunc(currentY);
-            const ink = text4.length > 0 ? measure.inkBounds(text4, font) : { x: 0, y: 0, width: 0, height: 0 };
-            const bounds2 = pathBounds(ink, text4, x, y);
-            lines.push({ text: text4, x, y, ink, bounds: bounds2 });
+            const ink = text5.length > 0 ? measure2.inkBounds(text5, font) : { x: 0, y: 0, width: 0, height: 0 };
+            const bounds2 = pathBounds(ink, text5, x, y);
+            lines.push({ text: text5, x, y, ink, bounds: bounds2 });
             words2 = words2.slice(wordIndex);
             displayed = true;
             currentY += lineHeight;
@@ -39606,15 +39955,15 @@ function qtToInt(token) {
   const v = Number(s);
   return v >= -2147483648 && v <= 2147483647 ? v : 0;
 }
-function readLines(text4) {
-  let body = text4.charCodeAt(0) === 65279 ? text4.slice(1) : text4;
+function readLines(text5) {
+  let body = text5.charCodeAt(0) === 65279 ? text5.slice(1) : text5;
   body = body.replace(/\r/g, "");
   const lines = body.split("\n");
   if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
   return lines.map(qtTrimmed);
 }
-function parseCubeLut(text4) {
-  const lines = readLines(text4);
+function parseCubeLut(text5) {
+  const lines = readLines(text5);
   const domainMin = [0, 0, 0];
   const domainMax = [1, 1, 1];
   const parseDomainLine = (line2) => {
@@ -39669,15 +40018,15 @@ function parseCubeLut(text4) {
   if (!found) return null;
   return { kind: lut3d ? "3d" : "1d", size: found.size, data: found.data, domainMin, domainMax };
 }
-function cachedCubeLut(text4) {
-  if (CACHE.has(text4)) {
-    const hit = CACHE.get(text4);
-    CACHE.delete(text4);
-    CACHE.set(text4, hit);
+function cachedCubeLut(text5) {
+  if (CACHE.has(text5)) {
+    const hit = CACHE.get(text5);
+    CACHE.delete(text5);
+    CACHE.set(text5, hit);
     return hit;
   }
-  const lut = parseCubeLut(text4);
-  CACHE.set(text4, lut);
+  const lut = parseCubeLut(text5);
+  CACHE.set(text5, lut);
   if (CACHE.size > CACHE_LIMIT) CACHE.delete(CACHE.keys().next().value);
   return lut;
 }
@@ -39802,8 +40151,8 @@ function applyCubeLut(image, lut, intensity, intensityR, intensityG, intensityB)
 }
 function lutForPath(ctx, path38) {
   if (path38 === "") return null;
-  const text4 = ctx.texts?.get(path38);
-  return text4 === void 0 ? null : cachedCubeLut(text4);
+  const text5 = ctx.texts?.get(path38);
+  return text5 === void 0 ? null : cachedCubeLut(text5);
 }
 var f328, INV_2552, colorMap;
 var init_color_map = __esm({
@@ -40764,9 +41113,9 @@ function mix32(value) {
   v ^= v >>> 16;
   return v >>> 0;
 }
-function utf82(text4) {
+function utf82(text5) {
   const out = [];
-  for (const ch of text4) {
+  for (const ch of text5) {
     let cp = ch.codePointAt(0);
     if (cp >= 55296 && cp <= 57343) cp = 65533;
     if (cp < 128) out.push(cp);
@@ -40776,9 +41125,9 @@ function utf82(text4) {
   }
   return out;
 }
-function fnv1a(text4) {
+function fnv1a(text5) {
   let h = 2166136261;
-  for (const byte of utf82(text4)) h = Math.imul(h ^ byte, 16777619) >>> 0;
+  for (const byte of utf82(text5)) h = Math.imul(h ^ byte, 16777619) >>> 0;
   return h;
 }
 function hashSigned(seed, x, y, t, salt) {
@@ -42571,10 +42920,10 @@ function sphericalKernel(image, params, ctx) {
   const H = image.height;
   if (W <= 0 || H <= 0) return;
   const setup = readSetup(W, H, params);
-  const cached3 = ctx.state?.get(STATE_KEY2);
+  const cached4 = ctx.state?.get(STATE_KEY2);
   let map2;
-  if (cached3 && sameMap(cached3.setup, setup)) {
-    map2 = cached3;
+  if (cached4 && sameMap(cached4.setup, setup)) {
+    map2 = cached4;
   } else {
     map2 = { setup, uv: buildUvMap(setup) };
     ctx.state?.set(STATE_KEY2, map2);
@@ -42721,8 +43070,8 @@ function countdownDuration(params, ctx) {
   return 0;
 }
 function timerSeconds(params, ctx, settings = timerSettings(params)) {
-  const fps = resolveTimerFps(settings.timeSource, ctx);
-  const elapsed = (effectiveTimerFrame(settings.timeSource, ctx) - 1) / fps;
+  const fps2 = resolveTimerFps(settings.timeSource, ctx);
+  const elapsed = (effectiveTimerFrame(settings.timeSource, ctx) - 1) / fps2;
   const start = num7(params, "start_time", 0);
   if (settings.mode === TimerMode.CountDown) return countdownDuration(params, ctx) - start - elapsed;
   return start + elapsed;
@@ -42730,10 +43079,10 @@ function timerSeconds(params, ctx, settings = timerSettings(params)) {
 function pad(n, width) {
   return String(n).padStart(width, "0");
 }
-function formatTimecode(seconds2, fps) {
+function formatTimecode(seconds2, fps2) {
   const negative = seconds2 < 0;
-  const totalFrames2 = roundHalfAway(Math.abs(seconds2) * fps);
-  const roundedFps = Math.max(1, roundHalfAway(fps));
+  const totalFrames2 = roundHalfAway(Math.abs(seconds2) * fps2);
+  const roundedFps = Math.max(1, roundHalfAway(fps2));
   const frames = totalFrames2 % roundedFps;
   const totalSeconds = Math.floor(totalFrames2 / roundedFps);
   const secs = totalSeconds % 60;
@@ -42741,9 +43090,9 @@ function formatTimecode(seconds2, fps) {
   const hours = Math.floor(totalSeconds / 3600);
   return `${negative ? "-" : ""}${pad(hours, 2)}:${pad(mins, 2)}:${pad(secs, 2)}:${pad(frames, 2)}`;
 }
-function formatSeconds(seconds2, fps, durationStyle, format, clamp2) {
+function formatSeconds(seconds2, fps2, durationStyle, format, clamp3) {
   let s = seconds2;
-  if (durationStyle && clamp2 && s < 0) s = 0;
+  if (durationStyle && clamp3 && s < 0) s = 0;
   const negative = s < 0;
   const totalMs = roundHalfAway(Math.abs(s) * 1e3);
   const ms = totalMs % 1e3;
@@ -42754,8 +43103,8 @@ function formatSeconds(seconds2, fps, durationStyle, format, clamp2) {
   const sign = negative ? "-" : "";
   if (format === TimerFormat.HhMmSsMs) return `${sign}${pad(hours, 2)}:${pad(minutes, 2)}:${pad(wholeSeconds, 2)}.${pad(ms, 3)}`;
   if (format === TimerFormat.HhMmSs) return `${sign}${pad(hours, 2)}:${pad(minutes, 2)}:${pad(wholeSeconds, 2)}`;
-  if (format === TimerFormat.Timecode) return sign + formatTimecode(s, fps);
-  if (format === TimerFormat.Frames) return sign + String(roundHalfAway(s * fps));
+  if (format === TimerFormat.Timecode) return sign + formatTimecode(s, fps2);
+  if (format === TimerFormat.Frames) return sign + String(roundHalfAway(s * fps2));
   return `${sign}${pad(hours * 60 + minutes, 2)}:${pad(wholeSeconds, 2)}`;
 }
 function usesFrames(settings) {
@@ -42765,19 +43114,19 @@ function usesTimecode(settings) {
   return settings.mode === TimerMode.Timecode || settings.format === TimerFormat.Timecode;
 }
 function timerText(params, ctx, settings = timerSettings(params)) {
-  const fps = resolveTimerFps(settings.timeSource, ctx);
+  const fps2 = resolveTimerFps(settings.timeSource, ctx);
   let value;
   if (usesFrames(settings)) {
-    const offset = roundHalfAway(num7(params, "start_time", 0) * fps);
+    const offset = roundHalfAway(num7(params, "start_time", 0) * fps2);
     value = String(effectiveTimerFrame(settings.timeSource, ctx) + offset);
   } else if (usesTimecode(settings)) {
-    value = formatTimecode(timerSeconds(params, ctx, settings), fps);
+    value = formatTimecode(timerSeconds(params, ctx, settings), fps2);
   } else if (settings.mode === TimerMode.Clock) {
     let seconds2 = timerSeconds(params, ctx, settings) % 86400;
     if (seconds2 < 0) seconds2 += 86400;
-    value = formatSeconds(seconds2, fps, false, settings.format, settings.clamp);
+    value = formatSeconds(seconds2, fps2, false, settings.format, settings.clamp);
   } else {
-    value = formatSeconds(timerSeconds(params, ctx, settings), fps, true, settings.format, settings.clamp);
+    value = formatSeconds(timerSeconds(params, ctx, settings), fps2, true, settings.format, settings.clamp);
   }
   return settings.prefix + value + settings.suffix;
 }
@@ -42793,34 +43142,34 @@ function clampAlpha(v) {
   const m = v < 1 ? v : 1;
   return 0 < m ? m : 0;
 }
-function layoutTimer(params, width, height, ctx, measure) {
+function layoutTimer(params, width, height, ctx, measure2) {
   const settings = timerSettings(params);
   const scale = width / 600;
   const fontSizeValue = Math.max(1, num7(params, "font_size", 48) * scale);
   const strokeWidthValue = Math.max(0, num7(params, "stroke_width", 2) * scale);
   const paddingValue = Math.max(0, num7(params, "background_padding", 14) * scale);
   const cornerValue = Math.max(0, num7(params, "background_corner", 6) * scale);
-  const text4 = timerText(params, ctx, settings);
+  const text5 = timerText(params, ctx, settings);
   const layoutText = timerLayoutText(params, ctx, settings);
   const font = { family: settings.fontName, pixelSize: Math.trunc(fontSizeValue) };
   const tight = (s) => {
-    const ink = s.length > 0 ? measure.inkBounds(s, font) : { x: 0, y: 0, width: 0, height: 0 };
+    const ink = s.length > 0 ? measure2.inkBounds(s, font) : { x: 0, y: 0, width: 0, height: 0 };
     if (!isEmptyRect(ink)) return ink;
-    return s.length > 0 ? measure.bounds(s, font) : { x: 0, y: 0, width: 0, height: 0 };
+    return s.length > 0 ? measure2.bounds(s, font) : { x: 0, y: 0, width: 0, height: 0 };
   };
-  const textBounds = tight(text4);
+  const textBounds = tight(text5);
   const layoutBounds = tight(layoutText);
   const textWidth2 = Math.max(1, textBounds.width);
   const textHeight = Math.max(1, textBounds.height);
   let digitSlotWidth = 0;
-  for (let digit = 0; digit <= 9; digit += 1) digitSlotWidth = Math.max(digitSlotWidth, measure.advance(String(digit), font));
-  const slotLayout = text4.length === layoutText.length && !usesFrames(settings);
+  for (let digit = 0; digit <= 9; digit += 1) digitSlotWidth = Math.max(digitSlotWidth, measure2.advance(String(digit), font));
+  const slotLayout = text5.length === layoutText.length && !usesFrames(settings);
   const slotWidths = [];
   let layoutWidth = 0;
   if (slotLayout) {
     for (let index = 0; index < layoutText.length; index += 1) {
       const ch = layoutText[index];
-      const slot = DIGIT.test(ch) ? digitSlotWidth : measure.advance(ch, font);
+      const slot = DIGIT.test(ch) ? digitSlotWidth : measure2.advance(ch, font);
       slotWidths.push(slot);
       layoutWidth += slot;
     }
@@ -42849,20 +43198,20 @@ function layoutTimer(params, width, height, ctx, measure) {
   const runs = [];
   if (slotLayout) {
     let cursorX = x + paddingValue;
-    for (let index = 0; index < text4.length; index += 1) {
-      const ch = text4[index];
+    for (let index = 0; index < text5.length; index += 1) {
+      const ch = text5[index];
       const charBounds = tight(ch);
       const charX = roundHalfAway(cursorX);
-      runs.push({ text: ch, x: charX - charBounds.x, y: textY, ink: measure.inkBounds(ch, font) });
+      runs.push({ text: ch, x: charX - charBounds.x, y: textY, ink: measure2.inkBounds(ch, font) });
       cursorX += slotWidths[index];
     }
   } else {
-    runs.push({ text: text4, x: textX, y: textY, ink: text4.length > 0 ? measure.inkBounds(text4, font) : { x: 0, y: 0, width: 0, height: 0 } });
+    runs.push({ text: text5, x: textX, y: textY, ink: text5.length > 0 ? measure2.inkBounds(text5, font) : { x: 0, y: 0, width: 0, height: 0 } });
   }
   const fontAlpha = clampAlpha(num7(params, "font_alpha", 1));
   return {
     font,
-    text: text4,
+    text: text5,
     layoutText,
     slotLayout,
     box: { x, y, width: boxWidth, height: boxHeight },
@@ -43577,12 +43926,12 @@ var init_dynamics = __esm({
 });
 
 // ../engine/src/render/audio/libc-rand.ts
-function fnv1a32(text4) {
+function fnv1a32(text5) {
   let h = 2166136261;
   const add = (b) => {
     h = Math.imul(h ^ b, 16777619) >>> 0;
   };
-  for (const ch of text4) {
+  for (const ch of text5) {
     const cp = ch.codePointAt(0);
     if (cp < 128) add(cp);
     else if (cp < 2048) {
@@ -44273,10 +44622,10 @@ function displaceMapReader(effect2) {
 }
 function displaceMapFrame(reader, n, hostFps) {
   const length = intOf(reader.video_length);
-  const fps = fraction3(reader.fps);
-  if (reader.has_video === false || length <= 0 || !fps) return n;
+  const fps2 = fraction3(reader.fps);
+  if (reader.has_video === false || length <= 0 || !fps2) return n;
   const seconds2 = Math.max(0, n - 1) / (hostFps.num / hostFps.den);
-  const mapped = Math.floor(seconds2 * (fps.num / fps.den)) + 1;
+  const mapped = Math.floor(seconds2 * (fps2.num / fps2.den)) + 1;
   return Math.min(Math.max(1, mapped), length);
 }
 function effectResources(effect2, n, hostFps, timelineEffect) {
@@ -44286,8 +44635,8 @@ function effectResources(effect2, n, hostFps, timelineEffect) {
     if (!refs.images.includes(reader.path)) refs.images.push(reader.path);
     if (reader.type === "FFmpegReader" && !reader.has_single_image) {
       const frame = mapMaskFrame(effect2, reader, n, hostFps, timelineEffect);
-      const fps = fraction3(reader.fps);
-      refs.imageFrames[reader.path] = { frame, time: fps ? (frame - 1) / (fps.num / fps.den) : (frame - 1) / 30 };
+      const fps2 = fraction3(reader.fps);
+      refs.imageFrames[reader.path] = { frame, time: fps2 ? (frame - 1) / (fps2.num / fps2.den) : (frame - 1) / 30 };
     }
   };
   addReader(maskReaderOf(effect2));
@@ -44296,8 +44645,8 @@ function effectResources(effect2, n, hostFps, timelineEffect) {
     if (map2 && !refs.images.includes(map2.path)) refs.images.push(map2.path);
     if (map2 && map2.type === "FFmpegReader" && !map2.has_single_image) {
       const frame = displaceMapFrame(map2, n, hostFps);
-      const fps = fraction3(map2.fps);
-      refs.imageFrames[map2.path] = { frame, time: fps ? (frame - 1) / (fps.num / fps.den) : (frame - 1) / 30 };
+      const fps2 = fraction3(map2.fps);
+      refs.imageFrames[map2.path] = { frame, time: fps2 ? (frame - 1) / (fps2.num / fps2.den) : (frame - 1) / 30 };
     }
   }
   const lut = effect2.lut_path;
@@ -44656,7 +45005,7 @@ function clipKeyframe(clip2, key, n) {
   };
   return clipValue(clip2, key, n, defaults[key] ?? 0, REPAIRED.has(key));
 }
-function clipTransform(clip2, n, srcW, srcH, width, height, fps, parent) {
+function clipTransform(clip2, n, srcW, srcH, width, height, fps2, parent) {
   const margin = Math.max(0, Math.min(0.5, clipKeyframe(clip2, "margin", n)));
   const marginPx = margin * Math.min(width, height);
   const layoutX = marginPx;
@@ -44673,7 +45022,7 @@ function clipTransform(clip2, n, srcW, srcH, width, height, fps, parent) {
   let pShy = 0;
   let pR = 0;
   if (parent) {
-    const offset = Math.trunc(f3222(parent.start) * (fps.num / fps.den));
+    const offset = Math.trunc(f3222(parent.start) * (fps2.num / fps2.den));
     const pf = n + offset;
     pLx = f3222(clipKeyframe(parent, "location_x", pf));
     pLy = f3222(clipKeyframe(parent, "location_y", pf));
@@ -44792,8 +45141,8 @@ function bool2(v, fallback = false) {
 }
 function fractionOf(v, fallback) {
   if (typeof v === "object" && v !== null) {
-    const { num: num11, den: den2 } = v;
-    if (typeof num11 === "number" && typeof den2 === "number" && num11 > 0 && den2 > 0) return { num: num11, den: den2 };
+    const { num: num13, den: den2 } = v;
+    if (typeof num13 === "number" && typeof den2 === "number" && num13 > 0 && den2 > 0) return { num: num13, den: den2 };
   }
   return fallback;
 }
@@ -44814,9 +45163,9 @@ function remappedClipFrame(clip2, n) {
   if (clip2.time && getLength(clip2.time) > 1) frame = Math.max(1, getLong(clip2.time, frame));
   return frame;
 }
-function clipEnd(clip2, fps) {
+function clipEnd(clip2, fps2) {
   if (clip2.time && getCount(clip2.time) > 1) {
-    return f3223(f3223(getLength(clip2.time)) / f3223(f3223(fps.num) / f3223(fps.den)));
+    return f3223(f3223(getLength(clip2.time)) / f3223(f3223(fps2.num) / f3223(fps2.den)));
   }
   return f3223(clip2.end);
 }
@@ -44825,22 +45174,22 @@ function parentOf(clip2, project) {
   if (typeof id !== "string" || id === "" || id === clip2.id) return void 0;
   return project.clips.find((c) => c.id === id);
 }
-function audioRequest(clip2, n, k, project, fps) {
+function audioRequest(clip2, n, k, project, fps2) {
   const reader = clip2.reader;
   if (!reader || reader.has_audio === false) return void 0;
   const rate = int4(project.sample_rate, 48e3) || 48e3;
   const channels = int4(project.channels, 2) || 2;
-  const fpsD = fps.num / fps.den;
+  const fpsD = fps2.num / fps2.den;
   const clipStartFrame = Math.trunc(f3223(clip2.start) * fpsD) + 1;
   const clipStartPosition = Math.trunc(roundHalfAway(f3223(clip2.position) * fpsD)) + 1;
   const c = clipStartPosition - clipStartFrame;
-  const first = frameSampleOffset(1 + c, fps, rate, channels);
-  const start = frameSampleOffset(k + c, fps, rate, channels) - first;
+  const first = frameSampleOffset(1 + c, fps2, rate, channels);
+  const start = frameSampleOffset(k + c, fps2, rate, channels) - first;
   const request = {
     fileId: String(clip2.file_id ?? ""),
     path: String(reader.path ?? ""),
     sourceStart: start / rate,
-    samples: samplesPerFrame(k + c, fps, rate, channels),
+    samples: samplesPerFrame(k + c, fps2, rate, channels),
     sampleRate: rate,
     channels
   };
@@ -44887,11 +45236,11 @@ function parentedImageSizes(clip2, effect2, decode3) {
   }
   return Object.keys(out).length ? out : void 0;
 }
-function timelineEffects(project, layer2, f3, fps, before, after) {
+function timelineEffects(project, layer2, f3, fps2, before, after) {
   for (const raw of sortEffects(project.effects ?? [])) {
     const effect2 = raw;
     if (int4(effect2.layer) !== layer2) continue;
-    const window = frameWindow({ position: Number(effect2.position ?? 0), start: Number(effect2.start ?? 0), end: Number(effect2.end ?? 0) }, fps);
+    const window = frameWindow({ position: Number(effect2.position ?? 0), start: Number(effect2.start ?? 0), end: Number(effect2.end ?? 0) }, fps2);
     if (!windowContains(window, f3)) continue;
     const lf = localFrame(window, f3);
     const stage = applyBeforeClip(effect2) ? before : after;
@@ -44909,18 +45258,18 @@ function timelineEffects(project, layer2, f3, fps, before, after) {
         frame: lf
       };
       if (reader.type === "FFmpegReader" && !reader.has_single_image) {
-        const frame = mapMaskFrame(effect2, reader, lf, fps, true);
+        const frame = mapMaskFrame(effect2, reader, lf, fps2, true);
         const mfps = fractionOf(reader.fps, { num: 30, den: 1 });
         mask2.maskFrame = frame;
         mask2.maskTime = (frame - 1) / (mfps.num / mfps.den);
       }
       stage.masks.push(mask2);
     } else if (VIDEO_EFFECT_TYPES.has(String(effect2.type))) {
-      stage.effects.push(effectInstance(effect2, lf, fps, true));
+      stage.effects.push(effectInstance(effect2, lf, fps2, true));
     }
   }
 }
-function planLayer(project, clip2, window, f3, isTop, canvas, fps) {
+function planLayer(project, clip2, window, f3, isTop, canvas, fps2) {
   const n = localFrame(window, f3);
   const reader = clip2.reader;
   const delivered = deliveredSource(clip2, { previewWidth: canvas.width, previewHeight: canvas.height, timelineWidth: canvas.timelineWidth });
@@ -44929,17 +45278,17 @@ function planLayer(project, clip2, window, f3, isTop, canvas, fps) {
   const hasVideoOverride = clip2.has_video === void 0 || clip2.has_video === null ? -1 : getInt(clip2.has_video, n);
   const readerHasVideo = delivered.kind !== "video" || reader.has_video !== false;
   const visible = hasVideoOverride !== 0 && readerHasVideo;
-  const clipEffects = sortEffects(clip2.effects ?? []).map((e) => resolveParentEffect(e, project)).filter((e) => VIDEO_EFFECT_TYPES.has(String(e.type)));
+  const clipEffects2 = sortEffects(clip2.effects ?? []).map((e) => resolveParentEffect(e, project)).filter((e) => VIDEO_EFFECT_TYPES.has(String(e.type)));
   const before = { effects: [], masks: [] };
   const after = { effects: [], masks: [] };
   const decode3 = { previewWidth: canvas.width, previewHeight: canvas.height, timelineWidth: canvas.timelineWidth };
-  for (const e of clipEffects) {
-    const instance = effectInstance(e, n, fps, false);
+  for (const e of clipEffects2) {
+    const instance = effectInstance(e, n, fps2, false);
     const sizes3 = parentedImageSizes(clip2, e, decode3);
     if (sizes3) instance.imageSizes = sizes3;
     (applyBeforeClip(e) ? before : after).effects.push(instance);
   }
-  if (isTop) timelineEffects(project, int4(clip2.layer), f3, fps, before, after);
+  if (isTop) timelineEffects(project, int4(clip2.layer), f3, fps2, before, after);
   let source2;
   let drawW = delivered.width;
   let drawH = delivered.height;
@@ -44957,7 +45306,7 @@ function planLayer(project, clip2, window, f3, isTop, canvas, fps) {
       drawH = canvas.height;
     }
   } else if (delivered.kind === "video") {
-    const readerFps = fractionOf(reader.fps, fps);
+    const readerFps = fractionOf(reader.fps, fps2);
     const sourceFrame = mappedSourceFrame(
       {
         fps: readerFps,
@@ -44966,7 +45315,7 @@ function planLayer(project, clip2, window, f3, isTop, canvas, fps) {
         hasAudio: reader.has_audio === true,
         hasSingleImage: reader.has_single_image === true
       },
-      fps,
+      fps2,
       k
     );
     source2 = {
@@ -44986,7 +45335,7 @@ function planLayer(project, clip2, window, f3, isTop, canvas, fps) {
     if (e.type === "Crop") ({ width: effW, height: effH } = cropOutputSize(e.params, effW, effH));
     if (effW <= 0 || effH <= 0) return null;
   }
-  let t = clipTransform(clip2, n, effW, effH, canvas.width, canvas.height, fps, parentOf(clip2, project));
+  let t = clipTransform(clip2, n, effW, effH, canvas.width, canvas.height, fps2, parentOf(clip2, project));
   if (effW !== drawW || effH !== drawH) {
     t = new QTransform().scale(effW / drawW, effH / drawH).multiply(t);
   }
@@ -45005,29 +45354,29 @@ function planLayer(project, clip2, window, f3, isTop, canvas, fps) {
     composite: int4(clip2.composite, 0),
     effects: [...before.effects, ...after.effects],
     masks: [...before.masks, ...after.masks],
-    clip: clipContext(clip2, n, fps)
+    clip: clipContext(clip2, n, fps2)
   };
   if (cornerFraction > 0) layer2.cornerRadius = cornerFraction * Math.min(effW, effH) * (drawW / effW);
   if (waveform || layer2.effects.some((e) => AUDIO_REACTIVE.has(e.type))) {
-    const request = audioRequest(clip2, n, k, project, fps);
+    const request = audioRequest(clip2, n, k, project, fps2);
     if (request) layer2.audio = request;
   }
   return layer2;
 }
-function clipContext(clip2, n, fps) {
+function clipContext(clip2, n, fps2) {
   const hasCurve = clip2.time !== void 0 && clip2.time !== null && getLength(clip2.time) > 1;
   return {
     mappedFrame: hasCurve ? Math.max(1, getLong(clip2.time, n)) : n,
-    readerFps: fps.num / fps.den,
-    duration: f3223(clipEnd(clip2, fps) - f3223(clip2.start))
+    readerFps: fps2.num / fps2.den,
+    duration: f3223(clipEnd(clip2, fps2) - f3223(clip2.start))
   };
 }
 function planFrame(project, frame, size, options) {
-  const fps = fractionOf(project.fps, { num: 30, den: 1 });
+  const fps2 = fractionOf(project.fps, { num: 30, den: 1 });
   const f3 = Math.max(1, Math.trunc(frame));
   const canvas = planCanvas(project, size, options);
   const clips = sortClips(project.clips ?? []);
-  const windows = clips.map((c) => frameWindow(c, fps));
+  const windows = clips.map((c) => frameWindow(c, fps2));
   const topByLayer = /* @__PURE__ */ new Map();
   const topStart = /* @__PURE__ */ new Map();
   clips.forEach((clip2, i) => {
@@ -45044,17 +45393,17 @@ function planFrame(project, frame, size, options) {
   clips.forEach((clip2, i) => {
     const w = windows[i];
     if (!windowContains(w, f3)) return;
-    const plan = planLayer(project, clip2, w, f3, topByLayer.get(int4(clip2.layer)) === i, canvas, fps);
+    const plan = planLayer(project, clip2, w, f3, topByLayer.get(int4(clip2.layer)) === i, canvas, fps2);
     if (plan) layers.push(plan);
   });
   return {
     frame: f3,
-    time: (f3 - 1) / (fps.num / fps.den),
+    time: (f3 - 1) / (fps2.num / fps2.den),
     width: canvas.width,
     height: canvas.height,
     background: [...BACKGROUND],
     layers,
-    fps: { num: fps.num, den: fps.den },
+    fps: { num: fps2.num, den: fps2.den },
     timelineWidth: canvas.timelineWidth,
     timelineHeight: canvas.timelineHeight,
     sampleRate: int4(project.sample_rate, 48e3) || 48e3,
@@ -45089,8 +45438,8 @@ function int5(v, fallback = 0) {
 }
 function fractionOf2(v, fallback) {
   if (typeof v === "object" && v !== null) {
-    const { num: num11, den: den2 } = v;
-    if (typeof num11 === "number" && typeof den2 === "number" && num11 > 0 && den2 > 0) return { num: num11, den: den2 };
+    const { num: num13, den: den2 } = v;
+    if (typeof num13 === "number" && typeof den2 === "number" && num13 > 0 && den2 > 0) return { num: num13, den: den2 };
   }
   return fallback;
 }
@@ -45099,8 +45448,8 @@ function keyframe2(value) {
   if (typeof value === "number") return new CompiledKeyframe({ Points: [{ co: { X: 1, Y: value }, interpolation: 1 }] });
   return new CompiledKeyframe(value);
 }
-function clipInfo(clip2, order, fps, project) {
-  const fpsD = fps.num / fps.den;
+function clipInfo(clip2, order, fps2, project) {
+  const fpsD = fps2.num / fps2.den;
   const reader = clip2.reader;
   const hasReader = typeof reader === "object" && reader !== null;
   const audible = hasReader && reader.type === "FFmpegReader" && reader.has_audio !== false && typeof reader.path === "string" && reader.path !== "";
@@ -45110,7 +45459,7 @@ function clipInfo(clip2, order, fps, project) {
     clip: clip2,
     order,
     layer: int5(clip2.layer),
-    window: frameWindow(clip2, fps),
+    window: frameWindow(clip2, fps2),
     hasReader,
     audible,
     volume: keyframe2(clip2.volume),
@@ -45219,31 +45568,31 @@ function timeMappedSpans(info, grid, last) {
 function isOne(v) {
   return Math.abs(v - 1) < 1e-6;
 }
-function simplify(points) {
-  if (points.length <= 2) return points;
-  const out = [points[0]];
-  for (let i = 1; i < points.length - 1; i += 1) {
+function simplify(points2) {
+  if (points2.length <= 2) return points2;
+  const out = [points2[0]];
+  for (let i = 1; i < points2.length - 1; i += 1) {
     const a = out[out.length - 1];
-    const p = points[i];
-    const b = points[i + 1];
+    const p = points2[i];
+    const b = points2[i + 1];
     if (p.t > a.t && b.t > p.t) {
       const expected = a.gain + (b.gain - a.gain) * (p.t - a.t) / (b.t - a.t);
       if (Math.abs(expected - p.gain) <= 1e-7) continue;
     }
     out.push(p);
   }
-  out.push(points[points.length - 1]);
+  out.push(points2[points2.length - 1]);
   return out;
 }
-function segmentOf(info, frames, fps) {
+function segmentOf(info, frames, fps2) {
   const first = frames[0];
   const last = frames[frames.length - 1];
   const start = first.t0;
-  const points = [];
+  const points2 = [];
   for (const fr of frames) {
-    const prev = points[points.length - 1];
-    if (!prev || prev.gain !== fr.pv) points.push({ t: fr.t0 - start, gain: fr.pv });
-    points.push({ t: fr.t1 - start, gain: fr.v });
+    const prev = points2[points2.length - 1];
+    if (!prev || prev.gain !== fr.pv) points2.push({ t: fr.t0 - start, gain: fr.pv });
+    points2.push({ t: fr.t1 - start, gain: fr.v });
   }
   const reader = info.clip.reader;
   const segment = {
@@ -45254,20 +45603,20 @@ function segmentOf(info, frames, fps) {
     sourceStart: first.span.start,
     duration: last.t1 - start,
     rate: first.span.rate,
-    gain: simplify(points),
-    effects: info.audioEffects.map((e) => effectInstance(e, first.n, fps, false))
+    gain: simplify(points2),
+    effects: info.audioEffects.map((e) => effectInstance(e, first.n, fps2, false))
   };
   if (first.filter >= 0) segment.channelFilter = first.filter;
   if (first.mapping >= 0) segment.channelMapping = first.mapping;
   return segment;
 }
 function planAudio(project, range) {
-  const fps = fractionOf2(project.fps, { num: 30, den: 1 });
-  const fpsD = fps.num / fps.den;
+  const fps2 = fractionOf2(project.fps, { num: 30, den: 1 });
+  const fpsD = fps2.num / fps2.den;
   const sampleRate = int5(project.sample_rate, 48e3) || 48e3;
   const channels = int5(project.channels, 2) || 2;
-  const grid = new Grid(fps, sampleRate, channels);
-  const clips = sortClips(project.clips ?? []).map((c, i) => clipInfo(c, i, fps, project));
+  const grid = new Grid(fps2, sampleRate, channels);
+  const clips = sortClips(project.clips ?? []).map((c, i) => clipInfo(c, i, fps2, project));
   let timelineEnd2 = 0;
   for (const c of clips) if (c.window.endFrame >= c.window.startFrame) timelineEnd2 = Math.max(timelineEnd2, grid.time(c.window.endFrame + 1));
   const start = Math.max(0, range?.start ?? 0);
@@ -45287,7 +45636,7 @@ function planAudio(project, range) {
     if (effect2.type !== "Mask" || !(effect2.fade_audio_hint === true || effect2.fade_audio_hint === 1)) continue;
     masks.push({
       layer: int5(effect2.layer),
-      window: frameWindow({ position: Number(effect2.position ?? 0), start: Number(effect2.start ?? 0), end: Number(effect2.end ?? 0) }, fps)
+      window: frameWindow({ position: Number(effect2.position ?? 0), start: Number(effect2.start ?? 0), end: Number(effect2.end ?? 0) }, fps2)
     });
   }
   const perClip = /* @__PURE__ */ new Map();
@@ -45322,10 +45671,10 @@ function planAudio(project, range) {
       if (!list2) continue;
       const n = localFrame(c.window, f3);
       if (hasAudioAt(c, n) === 0) continue;
-      let span2;
-      if (c.time) span2 = spans2.get(c)?.get(n);
-      else if (c.mappedLength === 0 || n <= c.mappedLength) span2 = { start: mappedOffset(c, grid, n) / sampleRate, rate: 1, continues: true };
-      if (!span2) continue;
+      let span3;
+      if (c.time) span3 = spans2.get(c)?.get(n);
+      else if (c.mappedLength === 0 || n <= c.mappedLength) span3 = { start: mappedOffset(c, grid, n) / sampleRate, rate: 1, continues: true };
+      if (!span3) continue;
       const layerClips = here.filter((o) => o.layer === c.layer);
       const [gPrev, gCur] = masks.length ? transitionGains(c, f3, top.get(c.layer) === c, layerClips, masks) : [1, 1];
       let pv = f3224(volumeAt(c, n - 1) * gPrev);
@@ -45338,13 +45687,13 @@ function planAudio(project, range) {
         v = f3224(v * 0.77);
       }
       if (isOne(pv) && isOne(v)) pv = v = 1;
-      const effectsKey = c.audioEffects.length ? JSON.stringify(c.audioEffects.map((e) => effectInstance(e, n, fps, false).params)) : "";
+      const effectsKey = c.audioEffects.length ? JSON.stringify(c.audioEffects.map((e) => effectInstance(e, n, fps2, false).params)) : "";
       list2.push({
         f: f3,
         n,
         t0: grid.time(f3),
         t1: grid.time(f3 + 1),
-        span: span2,
+        span: span3,
         pv,
         v,
         filter: intAt(c.channelFilter, n),
@@ -45358,7 +45707,7 @@ function planAudio(project, range) {
   for (const [c, frames] of perClip) {
     let run = [];
     const flush = () => {
-      if (run.length) segments2.push({ order: c.order, segment: segmentOf(c, run, fps) });
+      if (run.length) segments2.push({ order: c.order, segment: segmentOf(c, run, fps2) });
       run = [];
     };
     for (const fr of frames) {
@@ -45391,8 +45740,8 @@ var init_audio_plan = __esm({
     VOLUME_MIX_REDUCE = 2;
     HALF_PI2 = 1.5707963267948966;
     Grid = class {
-      constructor(fps, rate, channels) {
-        this.fps = fps;
+      constructor(fps2, rate, channels) {
+        this.fps = fps2;
         this.rate = rate;
         this.channels = channels;
       }
@@ -45596,7 +45945,7 @@ var init_path = __esm({
         const h = r.h;
         const h2 = r.h / 2;
         const h2k = h2 * KAPPA3;
-        const points = [
+        const points2 = [
           [x + w, y + h2],
           [x + w, y + h2 + h2k],
           [x + w2 + w2k, y + h],
@@ -45617,7 +45966,7 @@ var init_path = __esm({
         const [sx, sy] = ellipsePoint(r, start);
         const [ex, ey] = ellipsePoint(r, start - 90);
         this.lineTo(sx, sy);
-        this.cubicTo(points[j + 1][0], points[j + 1][1], points[j + 2][0], points[j + 2][1], ex, ey);
+        this.cubicTo(points2[j + 1][0], points2[j + 1][1], points2[j + 2][0], points2[j + 2][1], ex, ey);
       }
       /** `addRoundedRect(QRectF(x, y, w, h), xr, yr, Qt::AbsoluteSize)` (qpainterpath.cpp:3214-3270). */
       addRoundedRect(x0, y0, w0, h0, xRadius, yRadius) {
@@ -46051,9 +46400,9 @@ function drawImage(dst, src, state) {
     }
   }
   const scratch2 = new Uint8ClampedArray(BUFFER_SIZE2 * 4);
-  const sample = state.smooth ? fetchBilinear : fetchNearest;
+  const sample2 = state.smooth ? fetchBilinear : fetchNearest;
   const fetch2 = (x, y, length) => {
-    sample(src, m, x, y, length, scratch2);
+    sample2(src, m, x, y, length, scratch2);
     return scratch2;
   };
   deliverSpans(spans2, clip2, (chunk2) => handleSpans(chunk2, intOpacity, fetch2, process4));
@@ -46367,7 +46716,7 @@ var init_composite_pool = __esm({
         return entry.key;
       }
       /** Composite `plan` with its decoded sources on a worker. */
-      composite(plan, prepared, text4) {
+      composite(plan, prepared, text5) {
         if (this.closed) return Promise.reject(new Error("CompositePool is closed"));
         const ordered = plan.layers.some((layer2) => layer2.effects.length > 0);
         let slot = this.slots[0];
@@ -46393,7 +46742,7 @@ var init_composite_pool = __esm({
           images,
           texts: [...prepared.texts],
           audio: prepared.audio,
-          text: text4,
+          text: text5,
           store,
           evict
         };
@@ -46590,14 +46939,14 @@ var init_opentype = __esm({
 
 // ../render-node/src/svg/text.ts
 import { readFileSync } from "node:fs";
-function esc2(text4) {
-  return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function esc2(text5) {
+  return text5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function rgba(color3) {
   return { rgb: `rgb(${color3[0]},${color3[1]},${color3[2]})`, alpha: (color3[3] / 255).toFixed(4) };
 }
-function codePoints(text4) {
-  return Array.from(text4, (ch) => ch.codePointAt(0) ?? 0);
+function codePoints(text5) {
+  return Array.from(text5, (ch) => ch.codePointAt(0) ?? 0);
 }
 function nodeTextRasterizer() {
   shared2 ??= Promise.all([sharedFontIndex(), initResvg()]).then(([index]) => new NodeTextRasterizer(index));
@@ -46660,10 +47009,10 @@ var init_text = __esm({
         const descent = -loaded.font.descender * s;
         return { ascent, descent, lineSpacing: ascent + descent + Math.max(0, loaded.font.lineGap) * s };
       }
-      layout(text4, font) {
+      layout(text5, font) {
         const loaded = this.load(font.family);
         const s = this.scale(loaded, font);
-        const glyphs = codePoints(text4).map((cp) => loaded.font.glyphIndex(cp));
+        const glyphs = codePoints(text5).map((cp) => loaded.font.glyphIndex(cp));
         const pens = [];
         let pen2 = 0;
         glyphs.forEach((g, i) => {
@@ -46673,18 +47022,18 @@ var init_text = __esm({
         });
         return { loaded, glyphs, pens, width: pen2 };
       }
-      advance(text4, font) {
-        return this.layout(text4, font).width;
+      advance(text5, font) {
+        return this.layout(text5, font).width;
       }
-      bounds(text4, font) {
+      bounds(text5, font) {
         const m = this.fontMetrics(font);
-        return { x: 0, y: -m.ascent, width: this.advance(text4, font), height: m.ascent + m.descent };
+        return { x: 0, y: -m.ascent, width: this.advance(text5, font), height: m.ascent + m.descent };
       }
-      inkBounds(text4, font) {
-        const key = `${font.family}\0${font.pixelSize}\0${text4}`;
-        const cached3 = this.inkCache.get(key);
-        if (cached3) return cached3;
-        const { loaded, glyphs, pens, width } = this.layout(text4, font);
+      inkBounds(text5, font) {
+        const key = `${font.family}\0${font.pixelSize}\0${text5}`;
+        const cached4 = this.inkCache.get(key);
+        if (cached4) return cached4;
+        const { loaded, glyphs, pens, width } = this.layout(text5, font);
         const s = this.scale(loaded, font);
         let rect;
         if (loaded.font.hasGlyphBoxes) {
@@ -46702,20 +47051,20 @@ var init_text = __esm({
           });
           rect = Number.isFinite(x0) ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : { x: 0, y: 0, width: 0, height: 0 };
         } else {
-          rect = this.rasterInk(text4, font, width);
+          rect = this.rasterInk(text5, font, width);
         }
         if (this.inkCache.size > 512) this.inkCache.clear();
         this.inkCache.set(key, rect);
         return rect;
       }
       /** Ink bounds by drawing the text (CFF outlines have no glyph boxes to read). */
-      rasterInk(text4, font, advance) {
+      rasterInk(text5, font, advance) {
         const px = font.pixelSize;
         const pad2 = Math.ceil(px);
         const w = Math.max(1, Math.ceil(advance + 2 * pad2));
         const h = Math.max(1, Math.ceil(3 * px));
         const baseline = 2 * px;
-        const image = this.render(text4, font, { x: -pad2, y: -baseline, width: w, height: h }, 0, 0, [255, 255, 255, 255], null, 0);
+        const image = this.render(text5, font, { x: -pad2, y: -baseline, width: w, height: h }, 0, 0, [255, 255, 255, 255], null, 0);
         let x0 = Infinity;
         let y0 = Infinity;
         let x1 = -Infinity;
@@ -46734,13 +47083,13 @@ var init_text = __esm({
         return { x: x0 - pad2, y: y0 - baseline, width: x1 - x0, height: y1 - y0 };
       }
       /** Rasterize `text` (baseline at x, y in region coordinates) into a region-sized straight-RGBA image. */
-      render(text4, font, region, x, y, fill, stroke, strokeWidth) {
+      render(text5, font, region, x, y, fill, stroke, strokeWidth) {
         const loaded = this.load(font.family);
         const f3 = rgba(fill);
         const strokeAttrs = stroke && strokeWidth > 0 ? ` stroke="${rgba(stroke).rgb}" stroke-opacity="${rgba(stroke).alpha}" stroke-width="${strokeWidth}" stroke-linecap="square" stroke-linejoin="bevel"` : "";
         const w = Math.max(1, Math.ceil(region.width));
         const h = Math.max(1, Math.ceil(region.height));
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${region.x} ${region.y} ${w} ${h}"><text x="${x}" y="${y}" font-family="${esc2(loaded.family)}" font-size="${font.pixelSize}" fill="${f3.rgb}" fill-opacity="${f3.alpha}"${strokeAttrs} xml:space="preserve">${esc2(text4)}</text></svg>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${region.x} ${region.y} ${w} ${h}"><text x="${x}" y="${y}" font-family="${esc2(loaded.family)}" font-size="${font.pixelSize}" fill="${f3.rgb}" fill-opacity="${f3.alpha}"${strokeAttrs} xml:space="preserve">${esc2(text5)}</text></svg>`;
         const renderer = new Resvg2(svg, {
           font: { fontBuffers: [loaded.bytes], defaultFontFamily: loaded.family, sansSerifFamily: loaded.family },
           textRendering: 2,
@@ -46768,9 +47117,9 @@ var init_text = __esm({
           renderer.free();
         }
       }
-      drawText(target, text4, x, y, font, fill, stroke, strokeWidth, clip2) {
-        if (!text4) return;
-        const ink = this.inkBounds(text4, font);
+      drawText(target, text5, x, y, font, fill, stroke, strokeWidth, clip2) {
+        if (!text5) return;
+        const ink = this.inkBounds(text5, font);
         const pad2 = Math.ceil((stroke ? strokeWidth : 0) + 2);
         let rx0 = Math.floor(x + ink.x - pad2);
         let ry0 = Math.floor(y + ink.y - pad2);
@@ -46781,7 +47130,7 @@ var init_text = __esm({
         rx1 = Math.min(rx1, target.width, clip2 ? Math.ceil(clip2.x + clip2.width) : target.width);
         ry1 = Math.min(ry1, target.height, clip2 ? Math.ceil(clip2.y + clip2.height) : target.height);
         if (rx1 <= rx0 || ry1 <= ry0) return;
-        const layer2 = this.render(text4, font, { x: rx0, y: ry0, width: rx1 - rx0, height: ry1 - ry0 }, x, y, fill, stroke, strokeWidth);
+        const layer2 = this.render(text5, font, { x: rx0, y: ry0, width: rx1 - rx0, height: ry1 - ry0 }, x, y, fill, stroke, strokeWidth);
         const t = target.data;
         const l = layer2.data;
         for (let yy = 0; yy < layer2.height; yy += 1) {
@@ -46814,21 +47163,21 @@ import { mkdir as mkdir3, mkdtemp, readdir as readdir2, rename as rename3, rm as
 import { tmpdir } from "node:os";
 import path12 from "node:path";
 import { randomBytes as randomBytes2 } from "node:crypto";
-function validFps(fps, fallback) {
-  return fps && fps.num > 0 && fps.den > 0 ? fps : fallback;
+function validFps(fps2, fallback) {
+  return fps2 && fps2.num > 0 && fps2.den > 0 ? fps2 : fallback;
 }
-function exportFrameRange(project, fps, range) {
-  if (!range) return { first: 1, last: maxFrame(project, fps) };
-  const first = frameContaining(Math.max(0, range.start), fps);
-  const frames = range.end * (fps.num / fps.den);
+function exportFrameRange(project, fps2, range) {
+  if (!range) return { first: 1, last: maxFrame(project, fps2) };
+  const first = frameContaining(Math.max(0, range.start), fps2);
+  const frames = range.end * (fps2.num / fps2.den);
   const last = Math.max(0, Math.ceil(frames - 1e-4));
   return { first, last };
 }
 function pngPattern(output2) {
   if (/%0?\d*d/.test(output2)) return output2;
   const ext = path12.extname(output2);
-  const stem4 = ext ? output2.slice(0, -ext.length) : output2;
-  return `${stem4}_%05d.png`;
+  const stem5 = ext ? output2.slice(0, -ext.length) : output2;
+  return `${stem5}_%05d.png`;
 }
 function ffmpegMajor() {
   versionPromise ??= binaryVersion("ffmpeg").then((v) => ffmpegMajorVersion(v.version)).catch(() => 99);
@@ -46839,16 +47188,16 @@ async function renderProject(project, opts) {
   const format = options.format;
   const info = FORMATS[format];
   if (!info) throw new RenderError(`Unsupported export format: ${String(format)}`);
-  const fps = validFps(options.fps, project.fps);
+  const fps2 = validFps(options.fps, project.fps);
   const width = Math.round(options.width || project.width);
   const height = Math.round(options.height || project.height);
   if (!(width >= 16 && height >= 16 && width <= 16384 && height <= 16384)) {
     throw new RenderError(`Invalid export size ${width}x${height}.`);
   }
-  const { first, last } = exportFrameRange(project, fps, options.range);
+  const { first, last } = exportFrameRange(project, fps2, options.range);
   const frames = last - first + 1;
   if (frames <= 0) throw new RenderError("Nothing to render: the timeline is empty.");
-  const fpsValue2 = fps.num / fps.den;
+  const fpsValue2 = fps2.num / fps2.den;
   const start = (first - 1) / fpsValue2;
   const end = last / fpsValue2;
   const sampleRate = options.sampleRate ?? project.sample_rate ?? 48e3;
@@ -46885,13 +47234,13 @@ async function renderProject(project, opts) {
       firstInput: info.video ? 1 : 0,
       resolve: (p) => sources.resolve(p),
       startsOf: (file3) => streamStarts(file3, signal),
-      effects: engine.getAudioKernel ? { getKernel: engine.getAudioKernel, tempDir: effectsDir, blockSize: Math.max(64, Math.round(sampleRate * fps.den / fps.num)), signal } : void 0
+      effects: engine.getAudioKernel ? { getKernel: engine.getAudioKernel, tempDir: effectsDir, blockSize: Math.max(64, Math.round(sampleRate * fps2.den / fps2.num)), signal } : void 0
     }) : void 0;
     if (audio) warnings.push(...audio.warnings);
     const command = encoderCommand({
       format,
       output: staged,
-      video: info.video ? { width, height, fps } : void 0,
+      video: info.video ? { width, height, fps: fps2 } : void 0,
       audio: audio ? { graph: audio, sampleRate, channels } : void 0,
       options,
       ffmpegMajor: await ffmpegMajor(),
@@ -46907,7 +47256,7 @@ async function renderProject(project, opts) {
       const stdin = encoder.child.stdin;
       const state = engine.createState();
       const needsText = projectNeedsText(project);
-      const text4 = needsText ? await nodeTextRasterizer() : void 0;
+      const text5 = needsText ? await nodeTextRasterizer() : void 0;
       const threads = opts.engine ? 0 : opts.threads ?? compositeThreads(frames);
       pool = await CompositePool.start(threads, opts.log);
       stats.threads = pool?.size ?? 0;
@@ -46966,7 +47315,7 @@ async function renderProject(project, opts) {
             queue.push(composited);
           } else {
             t = performance.now();
-            queue.push(Promise.resolve(engine.compositeFrame(plan, { ...prepared, text: text4, state })));
+            queue.push(Promise.resolve(engine.compositeFrame(plan, { ...prepared, text: text5, state })));
             stats.composite += performance.now() - t;
           }
         }
@@ -47038,9 +47387,9 @@ var init_render_project = __esm({
 });
 
 // ../render-node/src/render/overlay.ts
-function textWidth(text4, size) {
+function textWidth(text5, size) {
   let em = 0;
-  for (const ch of text4) {
+  for (const ch of text5) {
     if (/[0-9]/.test(ch)) em += 0.556;
     else if (ch === "." || ch === " " || ch === ":") em += ch === ":" ? 0.333 : 0.278;
     else if (ch === "f") em += 0.333;
@@ -47048,8 +47397,8 @@ function textWidth(text4, size) {
   }
   return Math.ceil(em * size);
 }
-function esc3(text4) {
-  return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function esc3(text5) {
+  return text5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 function overlaySvg(width, height, overlay) {
   const w = Math.max(1, Math.round(width));
@@ -47057,12 +47406,12 @@ function overlaySvg(width, height, overlay) {
   const parts = [];
   const fontSize = Math.max(8, Math.min(11, Math.floor(Math.min(w, h) / 42)));
   const th = Math.ceil(fontSize * 1.2);
-  const chip = (text4, x, y) => {
-    const tw = textWidth(text4, fontSize);
+  const chip = (text5, x, y) => {
+    const tw = textWidth(text5, fontSize);
     const ix = Math.trunc(x);
     const iy = Math.trunc(y);
     parts.push(`<rect x="${ix}" y="${iy}" width="${tw + 4}" height="${th + 3}" fill="#000" fill-opacity="${(165 / 255).toFixed(3)}"/>`);
-    parts.push(`<text x="${ix + 2}" y="${iy + th}" fill="#fff">${esc3(text4)}</text>`);
+    parts.push(`<text x="${ix + 2}" y="${iy + th}" fill="#fff">${esc3(text5)}</text>`);
   };
   if (overlay.grid) {
     const ticks = Array.from({ length: 21 }, (_, i) => i / 20);
@@ -47152,8 +47501,8 @@ async function renderFrameImage(project, seconds2, options) {
   try {
     const plan = engine.planFrame(project, frame, size, { preview: true });
     const prepared = await sources.prepare(plan);
-    const text4 = projectNeedsText(project) ? await nodeTextRasterizer() : void 0;
-    const image = engine.compositeFrame(plan, { ...prepared, text: text4, state: engine.createState() });
+    const text5 = projectNeedsText(project) ? await nodeTextRasterizer() : void 0;
+    const image = engine.compositeFrame(plan, { ...prepared, text: text5, state: engine.createState() });
     return await applyOverlay(image, options.overlay);
   } finally {
     if (own2) await sources.close();
@@ -47336,11 +47685,11 @@ function describeParseError(error62) {
   const issues = error62.issues.slice(0, 3).map((i) => i.path ? `${i.path}: ${i.message}` : i.message);
   return `${issues.join("; ")}${error62.issues.length > 3 ? ` (+${error62.issues.length - 3} more)` : ""}`;
 }
-function parseProjectFileText(text4, file3) {
-  if (!text4.trim()) throw new ProjectFileError(`${file3} is empty.`, file3);
+function parseProjectFileText(text5, file3) {
+  if (!text5.trim()) throw new ProjectFileError(`${file3} is empty.`, file3);
   let project;
   try {
-    project = parseProjectText(text4.charCodeAt(0) === 65279 ? text4.slice(1) : text4);
+    project = parseProjectText(text5.charCodeAt(0) === 65279 ? text5.slice(1) : text5);
   } catch (error62) {
     if (error62 instanceof ProjectParseError) throw new ProjectFileError(`${file3} is not a Zenvi project: ${describeParseError(error62)}`, file3);
     throw error62;
@@ -47349,25 +47698,25 @@ function parseProjectFileText(text4, file3) {
 }
 async function readProjectFile(file3) {
   const abs = path14.resolve(file3);
-  let text4;
+  let text5;
   try {
-    text4 = await readFile5(abs, "utf8");
+    text5 = await readFile5(abs, "utf8");
   } catch (error62) {
     const code = error62.code;
     throw new ProjectFileError(code === "ENOENT" ? `Project file not found: ${abs}` : `Cannot read ${abs}: ${error62.message}`, abs);
   }
-  return parseProjectFileText(text4, abs);
+  return parseProjectFileText(text5, abs);
 }
 function serializeProjectFile(project, file3, options = {}) {
   const abs = path14.resolve(file3);
   return serializeProject(toStoredPaths(project, path14.dirname(abs), storeRoots(abs, options.engineAssetsDir)));
 }
-async function writeFileAtomic(file3, text4) {
+async function writeFileAtomic(file3, text5) {
   const dir = path14.dirname(file3);
   const tmp = path14.join(dir, `.${path14.basename(file3)}.${process.pid}.${randomBytes3(4).toString("hex")}.tmp`);
   const handle = await open6(tmp, "w", 420);
   try {
-    await handle.writeFile(text4);
+    await handle.writeFile(text5);
     await handle.sync();
   } finally {
     await handle.close();
@@ -47562,9 +47911,9 @@ function safeName(name) {
 }
 async function uniquePath(dir, name) {
   const ext = path15.extname(name);
-  const stem4 = ext ? name.slice(0, -ext.length) : name;
+  const stem5 = ext ? name.slice(0, -ext.length) : name;
   for (let n = 1; n < 1e4; n += 1) {
-    const candidate = path15.join(dir, n === 1 ? name : `${stem4} (${n})${ext}`);
+    const candidate = path15.join(dir, n === 1 ? name : `${stem5} (${n})${ext}`);
     try {
       await stat7(candidate);
     } catch {
@@ -47706,11 +48055,11 @@ function createBackendHost(options) {
         if (init.signal?.aborted) throw error62;
         throw new BackendError(`Cannot reach the Zenvi backend at ${base}: ${error62.message}`, 0, void 0);
       }
-      const text4 = await response.text();
-      let parsed = text4;
-      if (text4) {
+      const text5 = await response.text();
+      let parsed = text5;
+      if (text5) {
         try {
-          parsed = JSON.parse(text4);
+          parsed = JSON.parse(text5);
         } catch {
         }
       }
@@ -47769,8 +48118,8 @@ function createNodeHost(options = {}) {
   const defaultOutput = (options_) => {
     const ext = FORMATS[options_.format]?.extension ?? "mp4";
     const project = current();
-    const stem4 = project ? path16.basename(project, path16.extname(project)) : "zenvi-export";
-    return path16.join(baseDir(), `${stem4}.${ext}`);
+    const stem5 = project ? path16.basename(project, path16.extname(project)) : "zenvi-export";
+    return path16.join(baseDir(), `${stem5}.${ext}`);
   };
   const host = {
     resolveMedia,
@@ -47823,10 +48172,10 @@ function createNodeHost(options = {}) {
         if ((await stat8(file3)).size > MAX_TEXT_BYTES) throw new Error(`${file3} is larger than ${MAX_TEXT_BYTES} bytes.`);
         return readFile6(file3, "utf8");
       },
-      async writeText(p, text4) {
+      async writeText(p, text5) {
         const file3 = inProject(p);
         await mkdir5(path16.dirname(file3), { recursive: true });
-        await writeFileAtomic(file3, text4);
+        await writeFileAtomic(file3, text5);
         return file3;
       }
     },
@@ -48027,10 +48376,10 @@ function put(url2, headers, body, length) {
   const client = target.protocol === "http:" ? http : https;
   return new Promise((resolve, reject) => {
     const req = client.request(target, { method: "PUT", headers: { ...headers, "Content-Length": String(length) } }, (res) => {
-      let text4 = "";
+      let text5 = "";
       res.setEncoding("utf8");
-      res.on("data", (c) => text4 += c);
-      res.on("end", () => resolve({ status: res.statusCode ?? 0, text: text4 }));
+      res.on("data", (c) => text5 += c);
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, text: text5 }));
     });
     req.setTimeout(10 * 6e4, () => req.destroy(new Error("upload timed out")));
     req.on("error", reject);
@@ -48131,8 +48480,8 @@ async function setLink(config2, projectFile, link) {
   await writeFileAtomic(linksPath(config2), `${JSON.stringify(links, null, 2)}
 `);
 }
-function textSha256(text4) {
-  return createHash2("sha256").update(text4).digest("hex");
+function textSha256(text5) {
+  return createHash2("sha256").update(text5).digest("hex");
 }
 async function markSynced(config2, projectFile) {
   const link = await getLink(config2, projectFile);
@@ -48180,9 +48529,9 @@ function reusableHash(file3, size, mtime) {
 }
 function uniqueName(name, taken) {
   const ext = path17.extname(name);
-  const stem4 = ext ? name.slice(0, -ext.length) : name;
+  const stem5 = ext ? name.slice(0, -ext.length) : name;
   let candidate = name;
-  for (let n = 2; taken.has(candidate.toLowerCase()); n += 1) candidate = `${stem4} (${n})${ext}`;
+  for (let n = 2; taken.has(candidate.toLowerCase()); n += 1) candidate = `${stem5} (${n})${ext}`;
   taken.add(candidate.toLowerCase());
   return candidate;
 }
@@ -48594,8 +48943,8 @@ async function probeEndpoint(url2, token, options = {}) {
       await response.body?.cancel().catch(() => void 0);
       return false;
     }
-    const text4 = await response.text();
-    const json2 = text4.trim().startsWith("{") ? text4 : /^data:\s*(\{.*\})\s*$/m.exec(text4)?.[1] ?? "";
+    const text5 = await response.text();
+    const json2 = text5.trim().startsWith("{") ? text5 : /^data:\s*(\{.*\})\s*$/m.exec(text5)?.[1] ?? "";
     const parsed = JSON.parse(json2);
     return parsed.result !== void 0;
   } catch {
@@ -48735,8 +49084,8 @@ function refused(tool, message, fields = {}) {
 function failed(tool, message, fields = {}) {
   return makeReceipt("error", tool, message, 0, fields);
 }
-function fromHandlerText(tool, text4, mutated) {
-  const raw = text4 ?? "";
+function fromHandlerText(tool, text5, mutated) {
+  const raw = text5 ?? "";
   if (raw.startsWith("Error")) return failed(tool, raw);
   if (raw.trim() === "") return unchanged(tool, "No changes.");
   const lower = raw.toLowerCase();
@@ -48746,10 +49095,10 @@ function fromHandlerText(tool, text4, mutated) {
 function isRecord18(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function parseReceipt(text4) {
+function parseReceipt(text5) {
   let payload;
   try {
-    payload = JSON.parse(text4);
+    payload = JSON.parse(text5);
   } catch {
     return null;
   }
@@ -48757,10 +49106,10 @@ function parseReceipt(text4) {
   if (!("status" in payload) || !("summary" in payload)) return null;
   return payload;
 }
-function isErrorResult(text4) {
-  if (!text4) return true;
-  if (text4.startsWith("Error")) return true;
-  const receipt2 = parseReceipt(text4);
+function isErrorResult(text5) {
+  if (!text5) return true;
+  if (text5.startsWith("Error")) return true;
+  const receipt2 = parseReceipt(text5);
   if (!receipt2) return false;
   return receipt2.status === "error" || receipt2.status === "refused" || String(receipt2.summary ?? "").startsWith("Error");
 }
@@ -48780,10 +49129,10 @@ var init_receipt = __esm({
 
 // ../engine/src/tools/wire.ts
 function toAssistantWire(result2) {
-  const text4 = result2.text ?? "";
-  const receipt2 = parseReceipt(text4);
+  const text5 = result2.text ?? "";
+  const receipt2 = parseReceipt(text5);
   const failed2 = receipt2 !== null && (receipt2.status === "error" || receipt2.status === "refused");
-  const wire = { result: failed2 ? String(receipt2.summary || text4) : text4 };
+  const wire = { result: failed2 ? String(receipt2.summary || text5) : text5 };
   if (!failed2 && result2.images && result2.images.length > 0) {
     wire.images = result2.images.map((image) => ({ mimeType: image.mimeType, data: image.data }));
   }
@@ -49781,7 +50130,8 @@ var init_schemas_gen = __esm({
         "effect": external_exports.string().describe("One effect (class or display name) to describe in full, with every property.").optional(),
         "include_properties": external_exports.boolean().describe("Include each listed effect's properties (ranges, defaults, choices).").optional(),
         "kind": external_exports.enum(["all", "video", "audio"]).describe("Only video (picture) or audio (sound) effects.").optional(),
-        "query": external_exports.string().describe("Filter by words in the name or description ('blur', 'color', 'voice').").optional()
+        "query": external_exports.string().describe("Filter by words in the name or description ('blur', 'color', 'voice').").optional(),
+        "category": external_exports.enum(["video", "audio"]).describe("Older name for kind (video or audio).").optional()
       }),
       list_export_presets_tool: external_exports.strictObject({
         "category": external_exports.enum(["", "All Formats", "Web", "Device", "DVD", "Blu-Ray/AVCHD"]).describe("Only this Export dialog 'Profile' group.").optional(),
@@ -49918,7 +50268,8 @@ var init_schemas_gen = __esm({
         "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.").optional(),
         "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
         "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Several timeline clip ids to change in one step.").optional(),
-        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional(),
+        "effect_id": external_exports.string().describe("Older argument: one effect id to remove (added to effect_ids).").optional()
       }),
       remove_files_from_project_tool: external_exports.strictObject({
         "confirm_remove_clips": external_exports.boolean().describe("Required when a chosen file is used on the timeline: its timeline clips are removed with it. Ask the user first.").optional(),
@@ -52663,7 +53014,8 @@ Use this to find the right effect and the exact property names before add_effect
             "effect": { "default": "", "description": "One effect (class or display name) to describe in full, with every property.", "type": "string" },
             "include_properties": { "default": false, "description": "Include each listed effect's properties (ranges, defaults, choices).", "type": "boolean" },
             "kind": { "default": "all", "description": "Only video (picture) or audio (sound) effects.", "enum": ["all", "video", "audio"], "type": "string" },
-            "query": { "default": "", "description": "Filter by words in the name or description ('blur', 'color', 'voice').", "type": "string" }
+            "query": { "default": "", "description": "Filter by words in the name or description ('blur', 'color', 'voice').", "type": "string" },
+            "category": { "type": "string", "enum": ["video", "audio"], "description": "Older name for kind (video or audio)." }
           }
         }
       },
@@ -52996,7 +53348,8 @@ Use for "remove the captions / subtitles". Target one caption track by effect_id
             "scope": { "default": "", "description": "Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.", "enum": ["", "selected", "track", "all"], "type": "string" },
             "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
             "timeline_clip_ids": { "description": "Several timeline clip ids to change in one step.", "items": { "type": "string" }, "type": "array" },
-            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" },
+            "effect_id": { "type": "string", "description": "Older argument: one effect id to remove (added to effect_ids)." }
           }
         }
       },
@@ -53792,19 +54145,11 @@ var init_pending = __esm({
       "add_emoji_tool",
       "add_timer_tool",
       "add_transitions_between_clips_tool",
-      "analyze_frame_colors_tool",
-      "apply_audio_effect_tool",
       "apply_clip_preset_tool",
-      "apply_color_tool",
-      "apply_look_preset_tool",
-      "apply_look_tool",
       "cancel_comfyui_job_tool",
       "capture_editor_screenshot_tool",
-      "chroma_key_clip_tool",
-      "color_grade_clip_tool",
       "consolidate_project_media_tool",
       "copy_clip_keyframes_tool",
-      "copy_effects_tool",
       "copy_transition_tool",
       "create_media_with_comfyui_tool",
       "create_subclips_tool",
@@ -53815,7 +54160,6 @@ var init_pending = __esm({
       "export_project_file_tool",
       "forget_recent_projects_tool",
       "generate_image_and_add_to_timeline_tool",
-      "get_clip_effects_tool",
       "get_clip_properties_tool",
       "get_editor_layout_tool",
       "get_log_paths_tool",
@@ -53824,13 +54168,10 @@ var init_pending = __esm({
       "import_image_sequence_tool",
       "import_project_file_tool",
       "ingest_web_video_tool",
-      "inspect_color_tool",
       "list_captions_tool",
       "list_comfyui_jobs_tool",
       "list_comfyui_templates_tool",
       "list_export_presets_tool",
-      "list_looks_tool",
-      "list_luts_tool",
       "list_project_files_tool",
       "list_project_profiles_tool",
       "list_recent_projects_tool",
@@ -53839,10 +54180,8 @@ var init_pending = __esm({
       "list_title_templates_tool",
       "manage_custom_profiles_tool",
       "manage_optimized_previews_tool",
-      "match_color_to_reference_tool",
       "mcp_health_tool",
       "prepare_recording_tool",
-      "process_clip_effect_tool",
       "remove_captions_tool",
       "remove_files_from_project_tool",
       "remove_keyframes_tool",
@@ -53862,7 +54201,6 @@ var init_pending = __esm({
       "set_preference_tool",
       "set_project_profile_tool",
       "set_timeline_view_tool",
-      "update_effect_tool",
       "update_marker_tool",
       "update_project_files_tool",
       "update_track_tool",
@@ -53931,10 +54269,7 @@ var init_pending = __esm({
       set_keyframes_tool: ["ease"],
       set_project_setting_tool: ["channels", "orientation", "preset", "profile", "reframe", "save_as_default"]
     };
-    DESKTOP_NAMES_ON_DIRECT_TOOLS = /* @__PURE__ */ new Set([
-      "list_effects_tool",
-      "remove_effect_tool"
-    ]);
+    DESKTOP_NAMES_ON_DIRECT_TOOLS = /* @__PURE__ */ new Set([]);
   }
 });
 
@@ -53987,8 +54322,8 @@ function sceneSourceTime(scene, metadata) {
   if (isRecord19(metadata) && isRecord19(metadata.source_window)) {
     const ws = pyNum(metadata.source_window.start);
     const we = pyNum(metadata.source_window.end);
-    const span2 = Math.max(0, we - ws);
-    if (span2 > 0 && t <= span2 + 1) return ws + t;
+    const span3 = Math.max(0, we - ws);
+    if (span3 > 0 && t <= span3 + 1) return ws + t;
   }
   return t;
 }
@@ -54021,10 +54356,10 @@ function filterTagsForWindow(tags, windowScenes) {
     }
     const kept = [];
     for (const value of values) {
-      const text4 = String(value ?? "").trim();
-      if (!text4) continue;
-      const norm = text4.toLowerCase();
-      if (corpus.includes(norm) || norm.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text4);
+      const text5 = String(value ?? "").trim();
+      if (!text5) continue;
+      const norm2 = text5.toLowerCase();
+      if (corpus.includes(norm2) || norm2.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text5);
     }
     filtered[key] = kept;
   }
@@ -54287,18 +54622,18 @@ function trackStackJson(layers) {
   return JSON.stringify(buildTrackStack(layers)).replace(/[\u0080-\uffff]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`);
 }
 function normalizeTrackOrLayerArg(raw, layers) {
-  const text4 = String(raw ?? "").trim();
-  if (!text4) return {};
+  const text5 = String(raw ?? "").trim();
+  if (!text5) return {};
   const all = layers ?? [];
   if (all.length === 0) return { error: "Error: No tracks in project." };
   const stack = buildTrackStack(all);
   const numbers2 = new Set(stack.map((e) => e.layer_number));
-  const parsed = parsePythonFloat(text4);
+  const parsed = parsePythonFloat(text5);
   const n = parsed === null ? null : Math.trunc(parsed);
   if (n !== null && numbers2.has(n)) return { layer: n };
-  const idHits = stack.filter((e) => e.track_id.trim() && e.track_id.trim().toLowerCase() === text4.toLowerCase());
+  const idHits = stack.filter((e) => e.track_id.trim() && e.track_id.trim().toLowerCase() === text5.toLowerCase());
   if (idHits.length === 1) return { layer: idHits[0].layer_number };
-  const low = text4.toLowerCase();
+  const low = text5.toLowerCase();
   const m = /^(?:ui\s*)?track\s*[#:]?\s*(.+)$/i.exec(low);
   const labelQuery = (m ? m[1].trim() : low).trim();
   let uiNumber = n;
@@ -54313,14 +54648,14 @@ function normalizeTrackOrLayerArg(raw, layers) {
   if (labelHits.length === 1) return { layer: labelHits[0].layer_number };
   if (labelHits.length > 1) {
     return {
-      error: `Error: Ambiguous track label ${pyReprString(text4)} matches multiple layers. Pass layer_number from list_layers_tool / TRACK_STACK_JSON.`
+      error: `Error: Ambiguous track label ${pyReprString(text5)} matches multiple layers. Pass layer_number from list_layers_tool / TRACK_STACK_JSON.`
     };
   }
   const contains = stack.filter((e) => labelQuery && uiNumber === null && e.label.trim().toLowerCase().includes(labelQuery));
   if (contains.length === 1) return { layer: contains[0].layer_number };
   if (uiNumber !== null && uiNumber >= 1 && uiNumber <= stack.length) return { layer: stack[uiNumber - 1].layer_number };
   return {
-    error: `Error: Unknown track or layer ${pyReprString(text4)}. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label.`
+    error: `Error: Unknown track or layer ${pyReprString(text5)}. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label.`
   };
 }
 function formatTrackLabelForLlm(layerNum, layers) {
@@ -54496,12 +54831,12 @@ function fileName(file3) {
 }
 function projectInfoText(project) {
   const profile = project.profile || "unknown";
-  const fps = isRecord21(project.fps) ? project.fps : {};
-  const num11 = fps.num ?? "";
-  const den2 = fps.den ?? 1;
+  const fps2 = isRecord21(project.fps) ? project.fps : {};
+  const num13 = fps2.num ?? "";
+  const den2 = fps2.den ?? 1;
   const duration3 = project.duration || 0;
   const scale = project.scale || 0;
-  return `Project: profile=${String(profile)}, fps=${String(num11)}/${String(den2)}, duration=${pyNumber(Number(duration3))}, scale=${scale ? pyFloat(Number(scale)) : "0"}`;
+  return `Project: profile=${String(profile)}, fps=${String(num13)}/${String(den2)}, duration=${pyNumber(Number(duration3))}, scale=${scale ? pyFloat(Number(scale)) : "0"}`;
 }
 function fileSummaryPreview(file3, clip2) {
   return buildSummaryPreview(getEffectiveAiMetadata(file3, clip2, { rebased: true }));
@@ -55003,7 +55338,7 @@ function num9(value, fallback = 0) {
 function samePlace(a, b) {
   return a.track === b.track && a.startFrame === b.startFrame && a.durationFrames === b.durationFrames;
 }
-function timelineSnapshot(project, fps = projectFps(project)) {
+function timelineSnapshot(project, fps2 = projectFps(project)) {
   const layers = [...project.layers ?? []].sort((a, b) => num9(a.number) - num9(b.number));
   const trackIndex = /* @__PURE__ */ new Map();
   layers.forEach((layer2, i) => trackIndex.set(num9(layer2.number), i + 1));
@@ -55018,8 +55353,8 @@ function timelineSnapshot(project, fps = projectFps(project)) {
     placements.set(clipId2, {
       clipId: clipId2,
       track: trackIndex.get(layer2) ?? layer2,
-      startFrame: toFrame(position, fps),
-      durationFrames: durationFrames(start, end, fps),
+      startFrame: toFrame(position, fps2),
+      durationFrames: durationFrames(start, end, fps2),
       position,
       start,
       end,
@@ -55039,17 +55374,17 @@ function timelineSnapshot(project, fps = projectFps(project)) {
     markers
   };
 }
-function clipRow(placement2, requestedFrame) {
+function clipRow(placement3, requestedFrame) {
   const row = {
-    id: placement2.clipId,
-    track: placement2.track,
-    layer: placement2.layer,
-    position: placement2.position,
-    start: placement2.start,
-    end: placement2.end,
-    durationFrames: placement2.durationFrames,
-    landedFrame: placement2.startFrame,
-    title: placement2.title
+    id: placement3.clipId,
+    track: placement3.track,
+    layer: placement3.layer,
+    position: placement3.position,
+    start: placement3.start,
+    end: placement3.end,
+    durationFrames: placement3.durationFrames,
+    landedFrame: placement3.startFrame,
+    title: placement3.title
   };
   if (requestedFrame !== void 0) row.requestedFrame = requestedFrame;
   return row;
@@ -55063,11 +55398,11 @@ function timelineDelta(before, after, options = {}) {
   for (const id of touched) if (after.placements.has(id)) changed.add(id);
   for (const id of after.placements.keys()) if (!before.placements.has(id)) changed.add(id);
   const pureShifts = /* @__PURE__ */ new Map();
-  for (const [id, placement2] of after.placements) {
+  for (const [id, placement3] of after.placements) {
     const prior = before.placements.get(id);
-    if (!prior || samePlace(prior, placement2) || changed.has(id)) continue;
-    if (prior.track === placement2.track && prior.durationFrames === placement2.durationFrames) {
-      pureShifts.set(id, { from: prior.startFrame, delta: placement2.startFrame - prior.startFrame });
+    if (!prior || samePlace(prior, placement3) || changed.has(id)) continue;
+    if (prior.track === placement3.track && prior.durationFrames === placement3.durationFrames) {
+      pureShifts.set(id, { from: prior.startFrame, delta: placement3.startFrame - prior.startFrame });
     } else {
       changed.add(id);
     }
@@ -55375,15 +55710,15 @@ function silenceRangesFromSpeech(speech, duration3, minPauseSec, padSec = 0.05) 
   if (dur - cursor >= minPauseSec) gaps.push([cursor, dur]);
   return gaps;
 }
-function mergeRanges(ranges, fps) {
+function mergeRanges(ranges, fps2) {
   const cleaned = [];
   for (const [a, b] of ranges) {
     const s0 = Number(a);
     const e0 = Number(b);
     if (!Number.isFinite(s0) || !Number.isFinite(e0) || !(e0 > s0)) continue;
-    const s = snap(s0, fps);
-    let e = snap(e0, fps);
-    if (e <= s) e = toSeconds(toFrame(s, fps) + 1, fps);
+    const s = snap(s0, fps2);
+    let e = snap(e0, fps2);
+    if (e <= s) e = toSeconds(toFrame(s, fps2) + 1, fps2);
     cleaned.push([s, e]);
   }
   if (cleaned.length === 0) return [];
@@ -55396,13 +55731,13 @@ function mergeRanges(ranges, fps) {
   }
   return out;
 }
-function compactFragmentsAfterRemove(position, start, end, removeRanges, fps) {
-  const clipStart = snap(start, fps);
-  const clipEnd2 = snap(end, fps);
+function compactFragmentsAfterRemove(position, start, end, removeRanges, fps2) {
+  const clipStart = snap(start, fps2);
+  const clipEnd2 = snap(end, fps2);
   if (clipEnd2 <= clipStart) return { fragments: [], removed: 0 };
   const merged = mergeRanges(
     removeRanges.filter(([a, b]) => b > a).map(([a, b]) => [Math.max(clipStart, a), Math.min(clipEnd2, b)]),
-    fps
+    fps2
   );
   const kept = [];
   let cursor = clipStart;
@@ -55411,21 +55746,21 @@ function compactFragmentsAfterRemove(position, start, end, removeRanges, fps) {
     cursor = Math.max(cursor, e);
   }
   if (cursor < clipEnd2) kept.push([cursor, clipEnd2]);
-  const originalDur = toSeconds(toFrame(clipEnd2, fps) - toFrame(clipStart, fps), fps);
+  const originalDur = toSeconds(toFrame(clipEnd2, fps2) - toFrame(clipStart, fps2), fps2);
   if (kept.length === 0) return { fragments: [], removed: originalDur };
   const fragments = [];
-  let pos = snap(position, fps);
+  let pos = snap(position, fps2);
   let keptDur = 0;
   for (const [s, e] of kept) {
-    if (toFrame(e, fps) <= toFrame(s, fps)) continue;
+    if (toFrame(e, fps2) <= toFrame(s, fps2)) continue;
     fragments.push([pos, s, e]);
-    const dur = toSeconds(toFrame(e, fps) - toFrame(s, fps), fps);
+    const dur = toSeconds(toFrame(e, fps2) - toFrame(s, fps2), fps2);
     keptDur += dur;
-    pos = snap(pos + dur, fps);
+    pos = snap(pos + dur, fps2);
   }
   return { fragments, removed: Math.max(0, originalDur - keptDur) };
 }
-function phraseWords(words2, fps, options = {}) {
+function phraseWords(words2, fps2, options = {}) {
   const maxWords = options.maxWords ?? 8;
   const maxChars = options.maxChars ?? 42;
   const maxGap = options.maxGapSec ?? 0.8;
@@ -55440,15 +55775,15 @@ function phraseWords(words2, fps, options = {}) {
     }
     const first = bucket[0];
     const last = bucket[bucket.length - 1];
-    const startF = first.startFrame !== void 0 && first.startFrame !== null ? Math.trunc(first.startFrame) : toFrame(Number(first.timelineStartSec || first.startSec || 0), fps);
-    let endF = last.endFrame !== void 0 && last.endFrame !== null ? Math.trunc(last.endFrame) : toFrame(Number(last.timelineEndSec || last.endSec || 0), fps);
+    const startF = first.startFrame !== void 0 && first.startFrame !== null ? Math.trunc(first.startFrame) : toFrame(Number(first.timelineStartSec || first.startSec || 0), fps2);
+    let endF = last.endFrame !== void 0 && last.endFrame !== null ? Math.trunc(last.endFrame) : toFrame(Number(last.timelineEndSec || last.endSec || 0), fps2);
     if (endF <= startF) endF = startF + 1;
     cues.push({
       text: body,
       startFrame: startF,
       endFrame: endF,
-      startSec: toSeconds(startF, fps),
-      endSec: toSeconds(endF, fps),
+      startSec: toSeconds(startF, fps2),
+      endSec: toSeconds(endF, fps2),
       wordIndices: bucket.filter((w) => "index" in w).map((w) => Math.trunc(Number(w.index)))
     });
     bucket = [];
@@ -55479,24 +55814,24 @@ function tsSrt(seconds2) {
   const milli = ms % 1e3;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(milli).padStart(3, "0")}`;
 }
-function cueTimes(cue, fps) {
+function cueTimes(cue, fps2) {
   const t0 = cue.startSec;
   let t1 = cue.endSec;
-  if (t1 <= t0) t1 = t0 + toSeconds(1, fps);
+  if (t1 <= t0) t1 = t0 + toSeconds(1, fps2);
   return [t0, t1];
 }
-function cuesToSrt(cues, fps) {
+function cuesToSrt(cues, fps2) {
   const lines = [];
   cues.forEach((cue, i) => {
-    const [t0, t1] = cueTimes(cue, fps);
+    const [t0, t1] = cueTimes(cue, fps2);
     lines.push(String(i + 1), `${tsSrt(t0)} --> ${tsSrt(t1)}`, String(cue.text ?? "").trim(), "");
   });
   return lines.length > 0 ? lines.join("\n").trimEnd() + "\n" : "";
 }
-function cuesToVtt(cues, fps) {
+function cuesToVtt(cues, fps2) {
   const out = ["WEBVTT", ""];
   for (const cue of cues) {
-    const [t0, t1] = cueTimes(cue, fps);
+    const [t0, t1] = cueTimes(cue, fps2);
     out.push(`${tsSrt(t0).replace(",", ".")} --> ${tsSrt(t1).replace(",", ".")}`, String(cue.text ?? "").trim(), "");
   }
   return out.join("\n");
@@ -55505,8 +55840,8 @@ function parseTs(h, m, s, frac) {
   const milli = Number.parseInt((frac + "000").slice(0, 3), 10);
   return Number(h) * 3600 + Number(m) * 60 + Number(s) + milli / 1e3;
 }
-function parseSrtOrVtt(text4, fps) {
-  let body = text4.replace(/^\uFEFF/, "");
+function parseSrtOrVtt(text5, fps2) {
+  let body = text5.replace(/^\uFEFF/, "");
   if (body.trimStart().toUpperCase().startsWith("WEBVTT")) body = body.replace(/^WEBVTT[^\n]*\n/i, "");
   const cues = [];
   for (const block of body.trim().split(/\n\s*\n/)) {
@@ -55515,12 +55850,12 @@ function parseSrtOrVtt(text4, fps) {
     if (/^\d+$/.test(lines[0]) && lines.length >= 2) lines = lines.slice(1);
     const m = TIME_RE.exec(lines[0]);
     if (!m) continue;
-    const t0 = snap(parseTs(m[1], m[2], m[3], m[4]), fps);
-    let t1 = snap(parseTs(m[5], m[6], m[7], m[8]), fps);
-    if (t1 <= t0) t1 = toSeconds(toFrame(t0, fps) + 1, fps);
+    const t0 = snap(parseTs(m[1], m[2], m[3], m[4]), fps2);
+    let t1 = snap(parseTs(m[5], m[6], m[7], m[8]), fps2);
+    if (t1 <= t0) t1 = toSeconds(toFrame(t0, fps2) + 1, fps2);
     const caption2 = lines.slice(1).join(" ").trim();
     if (!caption2) continue;
-    cues.push({ text: caption2, startSec: t0, endSec: t1, startFrame: toFrame(t0, fps), endFrame: toFrame(t1, fps) });
+    cues.push({ text: caption2, startSec: t0, endSec: t1, startFrame: toFrame(t0, fps2), endFrame: toFrame(t1, fps2) });
   }
   return cues;
 }
@@ -55561,11 +55896,11 @@ function optionalFloat(value) {
   const n = typeof value === "number" ? value : Number(String(value).trim());
   return Number.isFinite(n) ? n : null;
 }
-function normalizeText(text4) {
-  return String(text4 ?? "").toLowerCase().trim().replace(/\s+/g, " ");
+function normalizeText(text5) {
+  return String(text5 ?? "").toLowerCase().trim().replace(/\s+/g, " ");
 }
-function tokenize(text4) {
-  return (normalizeText(text4).match(/[a-z0-9]+/g) ?? []).filter((t) => t.length > 1);
+function tokenize(text5) {
+  return (normalizeText(text5).match(/[a-z0-9]+/g) ?? []).filter((t) => t.length > 1);
 }
 function metadataCorpus(ai, maxScenes = 8) {
   if (!isRecord24(ai)) return "";
@@ -55851,11 +56186,11 @@ function query(params) {
   const parts = Object.entries(params).filter(([, v]) => v !== void 0 && v !== "").map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
   return parts.length > 0 ? `?${parts.join("&")}` : "";
 }
-async function searchIndex(call, text4, options = {}) {
+async function searchIndex(call, text5, options = {}) {
   let topK = options.topK ?? 5;
   if (options.pageLimit && options.pageLimit > topK) topK = Math.min(Math.trunc(options.pageLimit), 50);
   topK = Math.min(topK, 50);
-  const body = { query: text4, top_k: topK, for_place: true };
+  const body = { query: text5, top_k: topK, for_place: true };
   if (options.indexId) body.index_id = options.indexId;
   if (options.videoId) body.video_id = options.videoId;
   if (options.pageLimit) body.page_limit = options.pageLimit;
@@ -56034,7 +56369,7 @@ function snapToSliceGrid(seconds2, fpsNum, fpsDen) {
 }
 function indexSearchForResolver(call) {
   if (!call.host.backend) return void 0;
-  return async (text4, contexts) => {
+  return async (text5, contexts) => {
     if (!await isIndexingConfigured(call)) return [];
     const info = collectProjectIndex(call.doc.project);
     let indexId = info.indexId;
@@ -56049,7 +56384,7 @@ function indexSearchForResolver(call) {
       if (ids2.length === 0) return [];
       indexId = mostCommon(ids2);
     }
-    const res = await searchIndex(call, text4, { topK: 10, pageLimit: 30, indexId });
+    const res = await searchIndex(call, text5, { topK: 10, pageLimit: 30, indexId });
     if (res.error || res.results.length === 0) return [];
     const byVideo = /* @__PURE__ */ new Map();
     for (const ctx of contexts) {
@@ -56324,12 +56659,12 @@ function speechOverlaps(entries) {
   });
   return out;
 }
-function writeVolumePoints(tx, clipId2, points) {
+function writeVolumePoints(tx, clipId2, points2) {
   setClipKeyframes(
     tx,
     clipId2,
     "volume",
-    points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })),
+    points2.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })),
     { mode: "replace" }
   );
 }
@@ -56443,13 +56778,13 @@ var init_audio3 = __esm({
           const before = currentStaticLevel(clip2);
           const startS = floatArg(input2.start_seconds, null);
           const endS = floatArg(input2.end_seconds, null);
-          const points = buildStaticLevelPoints(clip2, project.fps, target, {
+          const points2 = buildStaticLevelPoints(clip2, project.fps, target, {
             startSeconds: startS,
             endSeconds: endS,
             fade: Math.max(0, (floatArg(input2.fade_ms, 150) ?? 0) / 1e3),
             scale: String(input2.mode ?? "").trim().toLowerCase() === "scale"
           });
-          if (points.length === 0) {
+          if (points2.length === 0) {
             const [s, e] = clipTimelineExtent(clip2);
             return `Error: the requested window does not overlap timeline clip ${String(clip2.id)} (${pyFixed(s, 2)}s-${pyFixed(e, 2)}s).`;
           }
@@ -56469,7 +56804,7 @@ var init_audio3 = __esm({
             const [tlStart, tlEnd] = clipTimelineExtent(clip2);
             windowText = `${pyFixed(startS ?? tlStart, 2)}s-${pyFixed(endS ?? tlEnd, 2)}s (timeline)`;
           }
-          return `Set volume on timeline_clip_id=${clipId2} (track ${trackLabel}, ${pyReprString(title)}): ${before !== null ? pyFixed(before, 2) : "automated"} -> ${pyFixed(target, 3)} (${signed1(gainToDb(target))} dB) over ${windowText}; ${points.length} volume point(s) written. Track and position unchanged.`;
+          return `Set volume on timeline_clip_id=${clipId2} (track ${trackLabel}, ${pyReprString(title)}): ${before !== null ? pyFixed(before, 2) : "automated"} -> ${pyFixed(target, 3)} (${signed1(gainToDb(target))} dB) over ${windowText}; ${points2.length} volume point(s) written. Track and position unchanged.`;
         }
       }),
       contractTool("duck_under_speech_tool", {
@@ -56568,9 +56903,9 @@ var init_audio3 = __esm({
             const windows = clampWindows(speechWindows2, bed.start, bed.end);
             if (windows.length === 0) continue;
             const gain = fixedGain ?? dbToGain(autoDuckDb(bed.level, speechLevel));
-            const points = buildDuckPoints(bed.clip, project.fps, windows, gain, env2);
-            if (points.length === 0) continue;
-            planned.push({ bed, points, held: duckedWindows(bed.clip, windows, env2), gain });
+            const points2 = buildDuckPoints(bed.clip, project.fps, windows, gain, env2);
+            if (points2.length === 0) continue;
+            planned.push({ bed, points: points2, held: duckedWindows(bed.clip, windows, env2), gain });
           }
           const boostDb = floatArg(input2.boost_speech_db, 0) || 0;
           const boosted = [];
@@ -56588,14 +56923,14 @@ var init_audio3 = __esm({
           const dryRun = boolArg(input2.dry_run);
           const header = `${dryRun ? "Would duck" : "Ducked"} ${planned.length} bed clip(s) under ${speech.length} speech clip(s). ` + (fixedGain === null ? "duck=auto (per bed, from measured levels)" : `duck=${signed1(gainToDb(fixedGain))} dB (gain ${pyFixed(fixedGain, 3)})`);
           const lines = [header, ""];
-          for (const { bed, points, held, gain } of planned) {
+          for (const { bed, points: points2, held, gain } of planned) {
             lines.push(`bed timeline_clip_id=${bed.id} track=${bed.trackLabel} title=${pyReprString(bed.title)}`);
             if (bed.level !== null) {
               lines.push(`  role=${bed.role} base=${pyFixed(bed.level, 2)} -> ${pyFixed(bed.level * gain, 2)} (${signed1(gainToDb(gain))} dB)`);
             } else {
               lines.push(`  role=${bed.role} base=automated (existing curve scaled by ${pyFixed(gain, 3)} under speech)`);
             }
-            lines.push(`  ${held.length} duck window(s), ${points.length} volume points`);
+            lines.push(`  ${held.length} duck window(s), ${points2.length} volume points`);
             lines.push(`  ducked (timeline s): ${fmtWindows(held)}`);
             const gaps = invertWindows(held, bed.start, bed.end);
             if (gaps.length > 0) lines.push(`  restored (timeline s): ${fmtWindows(gaps)}`);
@@ -56617,8 +56952,8 @@ var init_audio3 = __esm({
             return lines.join("\n");
           }
           call.commit((tx) => {
-            for (const { bed, points } of planned) writeVolumePoints(tx, bed.id, points);
-            for (const { entry, points } of boosted) writeVolumePoints(tx, entry.id, points);
+            for (const { bed, points: points2 } of planned) writeVolumePoints(tx, bed.id, points2);
+            for (const { entry, points: points2 } of boosted) writeVolumePoints(tx, entry.id, points2);
           });
           lines.push("", "No clip changed track, position or trim. One undo reverts the whole mix.");
           return lines.join("\n");
@@ -56639,9 +56974,9 @@ function fitSize(width, height, longestEdge = 512) {
 }
 function validFps2(value) {
   if (typeof value !== "object" || value === null) return void 0;
-  const num11 = Math.trunc(Number(value.num));
+  const num13 = Math.trunc(Number(value.num));
   const den2 = Math.trunc(Number(value.den));
-  return num11 > 0 && den2 > 0 && num11 / den2 > 2 ? { num: num11, den: den2 } : void 0;
+  return num13 > 0 && den2 > 0 && num13 / den2 > 2 ? { num: num13, den: den2 } : void 0;
 }
 function singleFileProject(project, file3) {
   const width = Number(file3.width) > 0 ? Number(file3.width) : project.width;
@@ -56724,14 +57059,14 @@ function cueTimes2(cues, winStart, winEnd) {
   return out;
 }
 function planSampleTimes(winStart, winEnd, cues, maxFrames = WATCH_MAX_FRAMES, extraTimes = []) {
-  const span2 = Math.max(0, winEnd - winStart);
-  const sparse = span2 > DENSE_WINDOW_SEC;
+  const span3 = Math.max(0, winEnd - winStart);
+  const sparse = span3 > DENSE_WINDOW_SEC;
   let warning = "";
   let times = [];
   if (sparse) {
-    warning = `Window is ${pyFixed(span2, 1)}s; sparse-scanned (not a dense watch). Narrow the candidate window if the cut looks off.`;
+    warning = `Window is ${pyFixed(span3, 1)}s; sparse-scanned (not a dense watch). Narrow the candidate window if the cut looks off.`;
     const n = Math.max(2, Math.trunc(maxFrames));
-    const step = span2 / Math.max(n - 1, 1);
+    const step = span3 / Math.max(n - 1, 1);
     times = Array.from({ length: n }, (_, i) => winStart + i * step);
   } else {
     for (let t = winStart; t <= winEnd + 1e-6; t += 0.5) times.push(t);
@@ -56750,8 +57085,8 @@ function planSampleTimes(winStart, winEnd, cues, maxFrames = WATCH_MAX_FRAMES, e
   return { times: rounded, warning, sparse };
 }
 function pickDenseSubwindow(winStart, winEnd, extraTimes) {
-  const span2 = Math.max(0, winEnd - winStart);
-  if (span2 <= DENSE_WINDOW_SEC + 1e-6) return [winStart, winEnd];
+  const span3 = Math.max(0, winEnd - winStart);
+  if (span3 <= DENSE_WINDOW_SEC + 1e-6) return [winStart, winEnd];
   const pts = extraTimes.filter((t) => winStart - 1e-3 <= t && t <= winEnd + 1e-3).sort((a, b) => a - b);
   let center = (winStart + winEnd) / 2;
   if (pts.length > 0) {
@@ -56846,18 +57181,18 @@ async function confirmWatchWindow(call, input2) {
   };
   const data = await watchWindowRequest(call, payload);
   if (typeof data.error === "string" && data.error) return soft(data.error, winStart, winEnd, plan.warning, plan.sparse);
-  const clamp2 = (v) => Math.max(winStart, Math.min(v, winEnd));
-  const num11 = (v) => {
+  const clamp3 = (v) => Math.max(winStart, Math.min(v, winEnd));
+  const num13 = (v) => {
     const n = Number(v);
     return v === null || v === void 0 || !Number.isFinite(n) ? null : n;
   };
-  let cut2 = clamp2(num11(data.cut_source) ?? fallback);
+  let cut2 = clamp3(num13(data.cut_source) ?? fallback);
   const matched = Boolean(data.matched);
   const usedFallback = Boolean(data.used_fallback) || !matched;
-  let inS = num11(data.in_source) !== null ? clamp2(num11(data.in_source)) : fbIn;
-  let outS = num11(data.out_source) !== null ? clamp2(num11(data.out_source)) : fbOut;
+  let inS = num13(data.in_source) !== null ? clamp3(num13(data.in_source)) : fbIn;
+  let outS = num13(data.out_source) !== null ? clamp3(num13(data.out_source)) : fbOut;
   if (usedFallback && !matched) {
-    cut2 = clamp2(fallback);
+    cut2 = clamp3(fallback);
     inS = fbIn;
     outS = fbOut;
   }
@@ -56926,12 +57261,12 @@ function lookupWatchMeta(project, fileId, file3) {
   return { file: data, duration: duration3, cues: Array.isArray(ai.transcript_cues) ? ai.transcript_cues : [] };
 }
 function sourceFpsParts(file3) {
-  const fps = record4(file3.fps);
-  let num11 = parseTimecodeToken(fps.num) || 30;
-  let den2 = parseTimecodeToken(fps.den) || 1;
-  if (num11 <= 0) num11 = 30;
+  const fps2 = record4(file3.fps);
+  let num13 = parseTimecodeToken(fps2.num) || 30;
+  let den2 = parseTimecodeToken(fps2.den) || 1;
+  if (num13 <= 0) num13 = 30;
   if (den2 <= 0) den2 = 1;
-  return [Math.trunc(num11), Math.trunc(den2), num11 / den2];
+  return [Math.trunc(num13), Math.trunc(den2), num13 / den2];
 }
 function sourceDurationSeconds(file3) {
   const start = parseTimecodeToken(file3.start) || 0;
@@ -56942,22 +57277,22 @@ function sourceDurationSeconds(file3) {
   const readerDuration = parseTimecodeToken(record4(file3.reader).duration);
   if (readerDuration && readerDuration > 0) return readerDuration;
   const frames = parseTimecodeToken(file3.video_length) || 0;
-  const [, , fpsFloat4] = sourceFpsParts(file3);
-  return frames > 0 && fpsFloat4 > 0 ? frames / fpsFloat4 : 0;
+  const [, , fpsFloat6] = sourceFpsParts(file3);
+  return frames > 0 && fpsFloat6 > 0 ? frames / fpsFloat6 : 0;
 }
 function describeFileForLlm(project, fileId, file3) {
   const data = file3;
-  const [num11, den2, fpsFloat4] = sourceFpsParts(data);
+  const [num13, den2, fpsFloat6] = sourceFpsParts(data);
   const duration3 = sourceDurationSeconds(data);
   const pfps = record4(project.fps);
   const pNum = Math.trunc(parseTimecodeToken(pfps.num) || 30);
   const pDen = Math.trunc(parseTimecodeToken(pfps.den) || 1);
   const mediaType = String(data.media_type || (isAudioOnlyMedia(data) ? "audio" : "video"));
-  let line2 = `file_id=${fileId} path=${String(data.path ?? "")} duration_seconds=${pyFixed(duration3, 2)} source_fps=${num11}/${den2} project_fps=${pNum}/${pDen} media_type=${mediaType}`;
-  const unreliable = isAudioOnlyMedia(data) || fpsFloat4 <= 2 && duration3 > 2;
+  let line2 = `file_id=${fileId} path=${String(data.path ?? "")} duration_seconds=${pyFixed(duration3, 2)} source_fps=${num13}/${den2} project_fps=${pNum}/${pDen} media_type=${mediaType}`;
+  const unreliable = isAudioOnlyMedia(data) || fpsFloat6 <= 2 && duration3 > 2;
   if (unreliable) {
     line2 += `
-NOTE: source_fps is ${num11}/${den2} and cannot be used for frame math. Pass start_seconds/end_seconds (in source seconds) - never frame numbers.`;
+NOTE: source_fps is ${num13}/${den2} and cannot be used for frame math. Pass start_seconds/end_seconds (in source seconds) - never frame numbers.`;
   }
   return line2;
 }
@@ -57088,8 +57423,8 @@ async function planPlacement(call, file3, args) {
     if (resolved.error) return resolved.error;
     layer2 = resolved.layer ?? defaultUnderlayLayerNumber(layers);
   }
-  const fps = projectFps(project);
-  const fpsFloat4 = fps.num / fps.den;
+  const fps2 = projectFps(project);
+  const fpsFloat6 = fps2.num / fps2.den;
   let position;
   if (posArg === null) {
     if (isAudio) position = 0;
@@ -57113,9 +57448,9 @@ async function planPlacement(call, file3, args) {
   };
   const applyTrim = watchedStart !== null || trimDur !== null && trimDur > 0;
   if (applyTrim) {
-    let [start, end] = watchedStart !== null ? [watchedStart, watchedEnd] : computeClipTrimBounds(sourceLen, { trimStart, trimDur, fileStart: srcStart, minDuration: 1 / Math.max(fpsFloat4, 1) });
+    let [start, end] = watchedStart !== null ? [watchedStart, watchedEnd] : computeClipTrimBounds(sourceLen, { trimStart, trimDur, fileStart: srcStart, minDuration: 1 / Math.max(fpsFloat6, 1) });
     const [s, e, snapped] = snapWindowOffBoundaries(fileData, start, end);
-    [start, end] = quantizePlacementSeconds(s, e, fps);
+    [start, end] = quantizePlacementSeconds(s, e, fps2);
     plan.start = start;
     plan.end = end;
     plan.snapped = snapped;
@@ -57197,11 +57532,11 @@ function secondsToTimeParts(secs, fpsNum, fpsDen) {
   let hour = Math.floor(minute / 60);
   minute %= 60;
   hour %= 24;
-  const fpsFloat4 = fpsDen ? fpsNum / fpsDen : 0;
-  const x = milli / 1e3 * fpsFloat4;
+  const fpsFloat6 = fpsDen ? fpsNum / fpsDen : 0;
+  const x = milli / 1e3 * fpsFloat6;
   const f3 = Math.floor(x);
   let frame = x - f3 > 0.5 ? f3 + 1 : x - f3 < 0.5 ? f3 : f3 % 2 === 0 ? f3 : f3 + 1;
-  if (fpsFloat4 > 0) frame = Math.max(0, Math.min(frame, Math.trunc(fpsFloat4) - 1));
+  if (fpsFloat6 > 0) frame = Math.max(0, Math.min(frame, Math.trunc(fpsFloat6) - 1));
   const pad2 = (n) => String(Math.trunc(n)).padStart(2, "0");
   return { hour: pad2(hour), min: pad2(minute), sec: pad2(sec), frame: pad2(frame) };
 }
@@ -57277,8 +57612,8 @@ var init_clips2 = __esm({
           const fpsData = record4(data.fps);
           const fpsNum = Math.trunc(Number(fpsData.num ?? 30));
           const fpsDen = Math.trunc(Number(fpsData.den ?? 1));
-          const fps = fpsDen ? fpsNum / fpsDen : 0;
-          if (!(fps > 0)) return "Error: Invalid fps.";
+          const fps2 = fpsDen ? fpsNum / fpsDen : 0;
+          if (!(fps2 > 0)) return "Error: Invalid fps.";
           const [srcStart, srcEnd] = sourceWindowForFile(data);
           const query2 = text(input2.query);
           let t0Raw = floatArg(input2.start_seconds, null);
@@ -57289,8 +57624,8 @@ var init_clips2 = __esm({
             if (sf === null || ef === null) {
               return "Error: Provide start_seconds+end_seconds (preferred) or start_frame+end_frame (1-based).";
             }
-            t0Raw = srcStart + (sf - 1) / fps;
-            t1Raw = srcStart + ef / fps;
+            t0Raw = srcStart + (sf - 1) / fps2;
+            t1Raw = srcStart + ef / fps2;
           }
           let t0 = Math.min(t0Raw, t1Raw);
           let t1 = Math.max(t0Raw, t1Raw);
@@ -57373,6 +57708,3560 @@ var init_clips2 = __esm({
   }
 });
 
+// ../engine/src/render/frame-scope.ts
+function clampInt2(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+function trunc(v) {
+  return v < 0 ? Math.ceil(v) : Math.floor(v);
+}
+function analyzeFrameScope(image, options = {}) {
+  const width = image.width;
+  const height = image.height;
+  if (width <= 0 || height <= 0) return null;
+  const size = Math.max(1, Math.trunc(options.vectorscopeSize ?? 256));
+  let startX = 0;
+  let endX = width;
+  let startY = 0;
+  let endY = height;
+  const region = options.region;
+  if (region) {
+    const rx = f3225(Math.max(0, Math.min(1, f3225(region.x))));
+    const ry = f3225(Math.max(0, Math.min(1, f3225(region.y))));
+    const rw = f3225(Math.max(0, Math.min(f3225(1 - rx), f3225(region.width))));
+    const rh = f3225(Math.max(0, Math.min(f3225(1 - ry), f3225(region.height))));
+    if (rw > 0 && rh > 0) {
+      startX = clampInt2(Math.floor(f3225(rx * width)), 0, width - 1);
+      startY = clampInt2(Math.floor(f3225(ry * height)), 0, height - 1);
+      endX = clampInt2(Math.ceil(f3225(f3225(rx + rw) * width)), startX + 1, width);
+      endY = clampInt2(Math.ceil(f3225(f3225(ry + rh) * height)), startY + 1, height);
+    }
+  }
+  const luma3 = new Uint32Array(256);
+  const red = new Uint32Array(256);
+  const green = new Uint32Array(256);
+  const blue = new Uint32Array(256);
+  const vectorscope = new Uint32Array(size * size);
+  const center = f3225((size - 1) * 0.5);
+  const scale = center;
+  let lumaSum = 0;
+  let count = 0;
+  let clippedShadows = 0;
+  let clippedHighlights = 0;
+  let clippedRed = 0;
+  let clippedGreen = 0;
+  let clippedBlue = 0;
+  const d = image.data;
+  for (let y = startY; y < endY; y += 1) {
+    for (let x = startX; x < endX; x += 1) {
+      const i = (y * width + x) * 4;
+      const alpha = d[i + 3];
+      if (alpha <= 0) continue;
+      const r = d[i];
+      const g = d[i + 1];
+      const b = d[i + 2];
+      let rf;
+      let gf;
+      let bf;
+      let ri;
+      let gi;
+      let bi;
+      if (alpha === 255) {
+        rf = f3225(r * INV_2556);
+        gf = f3225(g * INV_2556);
+        bf = f3225(b * INV_2556);
+        ri = r;
+        gi = g;
+        bi = b;
+      } else {
+        const invA = INV_ALPHA5[alpha];
+        rf = Math.min(1, f3225(f3225(r * invA) * INV_2556));
+        gf = Math.min(1, f3225(f3225(g * invA) * INV_2556));
+        bf = Math.min(1, f3225(f3225(b * invA) * INV_2556));
+        ri = trunc(f3225(f3225(rf * 255) + 0.5));
+        gi = trunc(f3225(f3225(gf * 255) + 0.5));
+        bi = trunc(f3225(f3225(bf * 255) + 0.5));
+      }
+      const l = f3225(f3225(f3225(K_R * rf) + f3225(K_G * gf)) + f3225(K_B * bf));
+      const li = trunc(f3225(f3225(l * 255) + 0.5));
+      const u = fma3(U_B2, bf, fma3(-U_G2, gf, f3225(U_R2 * rf)));
+      const v = fma3(-V_B2, bf, fma3(-V_G2, gf, f3225(V_R2 * rf)));
+      const nu = f3225(u / U_MAX);
+      const nv = f3225(v / V_MAX);
+      const vx = clampInt2(trunc(f3225(f3225(center + f3225(nu * scale)) + 0.5)), 0, size - 1);
+      const vy = clampInt2(trunc(f3225(f3225(center - f3225(nv * scale)) + 0.5)), 0, size - 1);
+      luma3[li] += 1;
+      red[ri] += 1;
+      green[gi] += 1;
+      blue[bi] += 1;
+      vectorscope[vy * size + vx] += 1;
+      lumaSum += l;
+      count += 1;
+      if (li <= 2) clippedShadows += 1;
+      if (li >= 253) clippedHighlights += 1;
+      if (ri >= 253) clippedRed += 1;
+      if (gi >= 253) clippedGreen += 1;
+      if (bi >= 253) clippedBlue += 1;
+    }
+  }
+  return {
+    width: Math.max(1, endX - startX),
+    height: Math.max(1, endY - startY),
+    luma: luma3,
+    red,
+    green,
+    blue,
+    vectorscope,
+    vectorscopeSize: size,
+    avgLuma: count > 0 ? lumaSum / count : 0,
+    clippedShadows,
+    clippedHighlights,
+    clippedRed,
+    clippedGreen,
+    clippedBlue,
+    pixelCount: count
+  };
+}
+var f3225, fma3, INV_2556, U_MAX, V_MAX, K_R, K_G, K_B, U_R2, U_G2, U_B2, V_R2, V_G2, V_B2, INV_ALPHA5;
+var init_frame_scope = __esm({
+  "../engine/src/render/frame-scope.ts"() {
+    "use strict";
+    f3225 = Math.fround;
+    fma3 = (a, b, c) => f3225(a * b + c);
+    INV_2556 = f3225(1 / 255);
+    U_MAX = f3225(0.436);
+    V_MAX = f3225(0.615);
+    K_R = f3225(0.299);
+    K_G = f3225(0.587);
+    K_B = f3225(0.114);
+    U_R2 = f3225(-0.14713);
+    U_G2 = f3225(0.28886);
+    U_B2 = f3225(0.436);
+    V_R2 = f3225(0.615);
+    V_G2 = f3225(0.51499);
+    V_B2 = f3225(0.10001);
+    INV_ALPHA5 = Float32Array.from({ length: 256 }, (_, i) => i === 0 ? 0 : f3225(255 / i));
+  }
+});
+
+// ../engine/src/io/png.ts
+function buildHuffman(lengths, count) {
+  let maxLen = 0;
+  const lenCount = new Int32Array(16);
+  for (let i = 0; i < count; i += 1) {
+    const len = lengths[i];
+    lenCount[len] += 1;
+    if (len > maxLen) maxLen = len;
+  }
+  if (maxLen === 0) return { table: new Int32Array(1).fill(-1), bits: 1 };
+  lenCount[0] = 0;
+  const next = new Int32Array(16);
+  let code = 0;
+  for (let len = 1; len <= 15; len += 1) {
+    code = code + lenCount[len - 1] << 1;
+    next[len] = code;
+  }
+  const size = 1 << maxLen;
+  const table = new Int32Array(size).fill(-1);
+  for (let symbol2 = 0; symbol2 < count; symbol2 += 1) {
+    const len = lengths[symbol2];
+    if (!len) continue;
+    const c = next[len];
+    next[len] = c + 1;
+    let reversed = 0;
+    for (let i = 0; i < len; i += 1) reversed |= (c >> i & 1) << len - 1 - i;
+    const entry = symbol2 << 4 | len;
+    for (let i = reversed; i < size; i += 1 << len) table[i] = entry;
+  }
+  return { table, bits: maxLen };
+}
+function fixedCodes() {
+  if (!fixedLitLen || !fixedDist) {
+    const lengths = new Uint8Array(288);
+    lengths.fill(8, 0, 144);
+    lengths.fill(9, 144, 256);
+    lengths.fill(7, 256, 280);
+    lengths.fill(8, 280, 288);
+    fixedLitLen = buildHuffman(lengths, 288);
+    fixedDist = buildHuffman(new Uint8Array(30).fill(5), 30);
+  }
+  return [fixedLitLen, fixedDist];
+}
+function zlibInflate(data, sizeHint = 0) {
+  if (data.length < 2) throw new PngDecodeError("compressed image data is empty");
+  const cmf = data[0];
+  const flg = data[1];
+  if ((cmf & 15) !== 8 || (cmf << 8 | flg) % 31 !== 0) throw new PngDecodeError("compressed image data is not zlib/deflate");
+  if (flg & 32) throw new PngDecodeError("compressed image data needs a preset dictionary");
+  return new Inflater(data, 2, sizeHint).run();
+}
+function u322(b, at) {
+  return (b[at] << 24 | b[at + 1] << 16 | b[at + 2] << 8 | b[at + 3]) >>> 0;
+}
+function paeth(a, b, c) {
+  const p = a + b - c;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c);
+  if (pa <= pb && pa <= pc) return a;
+  return pb <= pc ? b : c;
+}
+function unfilter(raw, at, stride, rows, bpp, out) {
+  let prev = null;
+  for (let y = 0; y < rows; y += 1) {
+    if (at >= raw.length) throw new PngDecodeError("image data ends early");
+    const filter = raw[at];
+    const line2 = raw.subarray(at + 1, at + 1 + stride);
+    if (line2.length < stride) throw new PngDecodeError("image data ends early");
+    const row = out.subarray(y * stride, (y + 1) * stride);
+    for (let x = 0; x < stride; x += 1) {
+      const left = x >= bpp ? row[x - bpp] : 0;
+      const up = prev ? prev[x] : 0;
+      const upLeft = prev && x >= bpp ? prev[x - bpp] : 0;
+      let v = line2[x];
+      switch (filter) {
+        case 0:
+          break;
+        case 1:
+          v += left;
+          break;
+        case 2:
+          v += up;
+          break;
+        case 3:
+          v += left + up >> 1;
+          break;
+        case 4:
+          v += paeth(left, up, upLeft);
+          break;
+        default:
+          throw new PngDecodeError(`unknown PNG filter type ${filter}`);
+      }
+      row[x] = v & 255;
+    }
+    prev = row;
+    at += 1 + stride;
+  }
+  return at;
+}
+function sample(row, index, depth, raw = false) {
+  if (depth === 8) return row[index];
+  if (depth === 16) return row[index * 2];
+  const perByte = 8 / depth;
+  const byte = row[Math.floor(index / perByte)];
+  const shift2 = 8 - depth * (index % perByte + 1);
+  const v = byte >> shift2 & (1 << depth) - 1;
+  return raw ? v : Math.round(v * 255 / ((1 << depth) - 1));
+}
+function exactSample(row, index, depth) {
+  if (depth === 16) return row[index * 2] << 8 | row[index * 2 + 1];
+  return sample(row, index, depth, true);
+}
+function decodePng(bytes) {
+  if (bytes.length < 8 || SIGNATURE.some((b, i) => bytes[i] !== b)) throw new PngDecodeError("not a PNG image");
+  let header;
+  let palette;
+  let trns;
+  const idat = [];
+  let at = 8;
+  while (at + 8 <= bytes.length) {
+    const len = u322(bytes, at);
+    const type = String.fromCharCode(bytes[at + 4], bytes[at + 5], bytes[at + 6], bytes[at + 7]);
+    const body = bytes.subarray(at + 8, at + 8 + len);
+    if (body.length < len) throw new PngDecodeError(`PNG chunk ${type} ends early`);
+    if (type === "IHDR") {
+      header = { width: u322(body, 0), height: u322(body, 4), depth: body[8], colorType: body[9], interlace: body[12] };
+    } else if (type === "PLTE") palette = body;
+    else if (type === "tRNS") trns = body;
+    else if (type === "IDAT") idat.push(body);
+    else if (type === "IEND") break;
+    at += 12 + len;
+  }
+  if (!header) throw new PngDecodeError("PNG has no IHDR chunk");
+  const { width, height, depth, colorType, interlace } = header;
+  const channels = CHANNELS[colorType];
+  if (!channels || !ALLOWED_DEPTHS[colorType].includes(depth)) throw new PngDecodeError(`unsupported PNG colour type ${colorType} / depth ${depth}`);
+  if (width <= 0 || height <= 0) throw new PngDecodeError("PNG has no pixels");
+  if (colorType === 3 && !palette) throw new PngDecodeError("palette PNG without a palette");
+  if (interlace > 1) throw new PngDecodeError(`unknown PNG interlace method ${interlace}`);
+  const total = idat.reduce((n, c) => n + c.length, 0);
+  const compressed = new Uint8Array(total);
+  let offset = 0;
+  for (const c of idat) {
+    compressed.set(c, offset);
+    offset += c.length;
+  }
+  const bitsPerPixel = depth * channels;
+  const bpp = Math.max(1, bitsPerPixel >> 3);
+  const strideOf = (w) => Math.ceil(w * bitsPerPixel / 8);
+  const raw = zlibInflate(compressed, (strideOf(width) + 1) * height);
+  const out = new Uint8ClampedArray(width * height * 4);
+  const writeRow = (row, y, x0, dx, count) => {
+    for (let i = 0; i < count; i += 1) {
+      const o = (y * width + x0 + i * dx) * 4;
+      let r;
+      let g;
+      let b;
+      let a = 255;
+      if (colorType === 0) {
+        r = g = b = sample(row, i, depth);
+        if (trns && trns.length >= 2 && exactSample(row, i, depth) === (trns[0] << 8 | trns[1])) a = 0;
+      } else if (colorType === 2) {
+        r = sample(row, i * 3, depth);
+        g = sample(row, i * 3 + 1, depth);
+        b = sample(row, i * 3 + 2, depth);
+        if (trns && trns.length >= 6 && exactSample(row, i * 3, depth) === (trns[0] << 8 | trns[1]) && exactSample(row, i * 3 + 1, depth) === (trns[2] << 8 | trns[3]) && exactSample(row, i * 3 + 2, depth) === (trns[4] << 8 | trns[5])) {
+          a = 0;
+        }
+      } else if (colorType === 3) {
+        const index = sample(row, i, depth, true);
+        if (index * 3 + 2 >= palette.length) throw new PngDecodeError("palette index out of range");
+        r = palette[index * 3];
+        g = palette[index * 3 + 1];
+        b = palette[index * 3 + 2];
+        if (trns && index < trns.length) a = trns[index];
+      } else if (colorType === 4) {
+        r = g = b = sample(row, i * 2, depth);
+        a = sample(row, i * 2 + 1, depth);
+      } else {
+        r = sample(row, i * 4, depth);
+        g = sample(row, i * 4 + 1, depth);
+        b = sample(row, i * 4 + 2, depth);
+        a = sample(row, i * 4 + 3, depth);
+      }
+      out[o] = r;
+      out[o + 1] = g;
+      out[o + 2] = b;
+      out[o + 3] = a;
+    }
+  };
+  if (interlace === 0) {
+    const stride = strideOf(width);
+    const pixels = new Uint8Array(stride * height);
+    unfilter(raw, 0, stride, height, bpp, pixels);
+    for (let y = 0; y < height; y += 1) writeRow(pixels.subarray(y * stride, (y + 1) * stride), y, 0, 1, width);
+  } else {
+    let pos = 0;
+    for (const [x0, y0, dx, dy] of ADAM7) {
+      const pw = Math.ceil((width - x0) / dx);
+      const ph = Math.ceil((height - y0) / dy);
+      if (pw <= 0 || ph <= 0) continue;
+      const stride = strideOf(pw);
+      const pixels = new Uint8Array(stride * ph);
+      pos = unfilter(raw, pos, stride, ph, bpp, pixels);
+      for (let j = 0; j < ph; j += 1) writeRow(pixels.subarray(j * stride, (j + 1) * stride), y0 + j * dy, x0, dx, pw);
+    }
+  }
+  return { width, height, data: out };
+}
+function decodePngBase64(base643) {
+  const binary = globalThis.atob(base643);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return decodePng(bytes);
+}
+var PngDecodeError, LENGTH_BASE, LENGTH_EXTRA, DIST_BASE, DIST_EXTRA, CODE_LENGTH_ORDER, fixedLitLen, fixedDist, Inflater, SIGNATURE, CHANNELS, ALLOWED_DEPTHS, ADAM7;
+var init_png2 = __esm({
+  "../engine/src/io/png.ts"() {
+    "use strict";
+    PngDecodeError = class extends Error {
+      name = "PngDecodeError";
+    };
+    LENGTH_BASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+    LENGTH_EXTRA = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+    DIST_BASE = [
+      1,
+      2,
+      3,
+      4,
+      5,
+      7,
+      9,
+      13,
+      17,
+      25,
+      33,
+      49,
+      65,
+      97,
+      129,
+      193,
+      257,
+      385,
+      513,
+      769,
+      1025,
+      1537,
+      2049,
+      3073,
+      4097,
+      6145,
+      8193,
+      12289,
+      16385,
+      24577
+    ];
+    DIST_EXTRA = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+    CODE_LENGTH_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+    Inflater = class {
+      constructor(src, start, sizeHint) {
+        this.src = src;
+        this.pos = start;
+        this.out = new Uint8Array(Math.max(1024, sizeHint));
+      }
+      src;
+      pos;
+      bitBuf = 0;
+      bitCount = 0;
+      out;
+      outLen = 0;
+      need(n) {
+        while (this.bitCount < n) {
+          if (this.pos >= this.src.length + 4) throw new PngDecodeError("compressed image data ends early");
+          const byte = this.pos < this.src.length ? this.src[this.pos] : 0;
+          this.pos += 1;
+          this.bitBuf |= byte << this.bitCount;
+          this.bitCount += 8;
+        }
+      }
+      bits(n) {
+        if (n === 0) return 0;
+        this.need(n);
+        const v = this.bitBuf & (1 << n) - 1;
+        this.bitBuf >>>= n;
+        this.bitCount -= n;
+        return v;
+      }
+      decode(h) {
+        this.need(h.bits);
+        const entry = h.table[this.bitBuf & (1 << h.bits) - 1];
+        if (entry < 0) throw new PngDecodeError("invalid Huffman code in compressed image data");
+        const len = entry & 15;
+        this.bitBuf >>>= len;
+        this.bitCount -= len;
+        return entry >> 4;
+      }
+      ensure(extra) {
+        if (this.outLen + extra <= this.out.length) return;
+        let size = this.out.length * 2;
+        while (size < this.outLen + extra) size *= 2;
+        const grown = new Uint8Array(size);
+        grown.set(this.out.subarray(0, this.outLen));
+        this.out = grown;
+      }
+      stored() {
+        this.pos -= this.bitCount >> 3;
+        this.bitBuf = 0;
+        this.bitCount = 0;
+        if (this.pos + 4 > this.src.length) throw new PngDecodeError("compressed image data ends early");
+        const len = this.src[this.pos] | this.src[this.pos + 1] << 8;
+        const nlen = this.src[this.pos + 2] | this.src[this.pos + 3] << 8;
+        if ((len ^ 65535) !== nlen) throw new PngDecodeError("corrupt stored block in compressed image data");
+        this.pos += 4;
+        if (this.pos + len > this.src.length) throw new PngDecodeError("compressed image data ends early");
+        this.ensure(len);
+        this.out.set(this.src.subarray(this.pos, this.pos + len), this.outLen);
+        this.outLen += len;
+        this.pos += len;
+      }
+      dynamicCodes() {
+        const nlen = this.bits(5) + 257;
+        const ndist = this.bits(5) + 1;
+        const ncode = this.bits(4) + 4;
+        if (nlen > 286 || ndist > 30) throw new PngDecodeError("bad Huffman table in compressed image data");
+        const codeLengths = new Uint8Array(19);
+        for (let i2 = 0; i2 < ncode; i2 += 1) codeLengths[CODE_LENGTH_ORDER[i2]] = this.bits(3);
+        const codeCode = buildHuffman(codeLengths, 19);
+        const lengths = new Uint8Array(nlen + ndist);
+        let i = 0;
+        while (i < nlen + ndist) {
+          const sym = this.decode(codeCode);
+          if (sym < 16) {
+            lengths[i++] = sym;
+            continue;
+          }
+          let repeat;
+          let value = 0;
+          if (sym === 16) {
+            if (i === 0) throw new PngDecodeError("bad Huffman table in compressed image data");
+            value = lengths[i - 1];
+            repeat = 3 + this.bits(2);
+          } else if (sym === 17) {
+            repeat = 3 + this.bits(3);
+          } else {
+            repeat = 11 + this.bits(7);
+          }
+          if (i + repeat > nlen + ndist) throw new PngDecodeError("bad Huffman table in compressed image data");
+          lengths.fill(value, i, i + repeat);
+          i += repeat;
+        }
+        return [buildHuffman(lengths.subarray(0, nlen), nlen), buildHuffman(lengths.subarray(nlen), ndist)];
+      }
+      codes(litLen, dist) {
+        for (; ; ) {
+          const sym = this.decode(litLen);
+          if (sym < 256) {
+            this.ensure(1);
+            this.out[this.outLen++] = sym;
+            continue;
+          }
+          if (sym === 256) return;
+          const li = sym - 257;
+          if (li >= 29) throw new PngDecodeError("bad length code in compressed image data");
+          const length = LENGTH_BASE[li] + this.bits(LENGTH_EXTRA[li]);
+          const di = this.decode(dist);
+          if (di >= 30) throw new PngDecodeError("bad distance code in compressed image data");
+          const distance = DIST_BASE[di] + this.bits(DIST_EXTRA[di]);
+          if (distance > this.outLen) throw new PngDecodeError("distance too far back in compressed image data");
+          this.ensure(length);
+          const out = this.out;
+          let from = this.outLen - distance;
+          for (let k = 0; k < length; k += 1) out[this.outLen++] = out[from++];
+        }
+      }
+      run() {
+        let last = 0;
+        while (!last) {
+          last = this.bits(1);
+          const type = this.bits(2);
+          if (type === 0) this.stored();
+          else if (type === 1) {
+            const [lit, dist] = fixedCodes();
+            this.codes(lit, dist);
+          } else if (type === 2) {
+            const [lit, dist] = this.dynamicCodes();
+            this.codes(lit, dist);
+          } else {
+            throw new PngDecodeError("bad block type in compressed image data");
+          }
+        }
+        return this.out.subarray(0, this.outLen);
+      }
+    };
+    SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+    CHANNELS = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
+    ALLOWED_DEPTHS = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] };
+    ADAM7 = [
+      [0, 0, 8, 8],
+      [4, 0, 8, 8],
+      [0, 4, 4, 8],
+      [2, 0, 4, 4],
+      [0, 2, 2, 4],
+      [1, 0, 2, 2],
+      [0, 1, 1, 2]
+    ];
+  }
+});
+
+// ../engine/src/tools/color-frames.ts
+function fpsFloat4(project) {
+  const fps2 = projectFps(project);
+  return fps2.num / fps2.den;
+}
+function secondsToFrame(project, seconds2) {
+  return pyRound(Math.max(0, seconds2) * fpsFloat4(project)) + 1;
+}
+function frameStart(project, frame) {
+  return (Math.max(1, frame) - 1) / fpsFloat4(project);
+}
+function scratchProject(project, clips, width, height) {
+  const layers = [...new Set(clips.map((c) => Number(c.layer) || SOLO_LAYER))].map((number4, i) => ({
+    id: `L${i + 1}`,
+    number: number4,
+    label: "",
+    y: 0,
+    lock: false
+  }));
+  return {
+    ...project,
+    width: Math.max(1, Math.round(width)),
+    height: Math.max(1, Math.round(height)),
+    clips,
+    effects: [],
+    layers,
+    markers: [],
+    history: { undo: [], redo: [] }
+  };
+}
+async function renderPixels(call, project, frame, width) {
+  const frames = call.host.frames;
+  if (!frames) throw new FrameRenderError("frame rendering needs the host's renderer");
+  let image;
+  try {
+    image = await frames.renderFrame(project, frameStart(project, frame), { width: Math.max(16, Math.round(width)), format: "png" });
+  } catch (error62) {
+    throw new FrameRenderError(`rendering the frame failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
+  }
+  if (image.mimeType !== "image/png") throw new FrameRenderError(`rendering the frame failed: the host answered ${image.mimeType}, not a PNG`);
+  try {
+    return { image, pixels: premultiply(decodePngBase64(image.data)) };
+  } catch (error62) {
+    if (error62 instanceof PngDecodeError) throw new FrameRenderError(`rendering the frame failed: ${error62.message}`);
+    throw error62;
+  }
+}
+async function renderPreview(call, project, frame, longEdge = 480) {
+  const frames = call.host.frames;
+  if (!frames) return null;
+  const [width] = fitSize(project.width, project.height, longEdge);
+  try {
+    return await frames.renderFrame(project, frameStart(project, frame), { width, format: "jpeg" });
+  } catch (error62) {
+    call.host.log?.(`colour preview failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
+    return null;
+  }
+}
+function stripEffects(clip2, strip) {
+  const effects = Array.isArray(clip2.effects) ? clip2.effects : [];
+  if (strip === "all") return [];
+  if (strip) return effects.filter((e) => !strip.has(String(e.class_name)));
+  return effects.map((e) => structuredClone(e));
+}
+async function renderTimeline(call, seconds2, opts = {}) {
+  const project = call.doc.project;
+  const scratch2 = opts.strip ? { ...project, clips: project.clips.map((c) => ({ ...c, effects: stripEffects(c, opts.strip ?? null) })) } : project;
+  const [width] = fitSize(project.width, project.height, opts.longEdge ?? 960);
+  return renderPixels(call, scratch2, secondsToFrame(project, seconds2), width);
+}
+function alphaProbe(effects) {
+  const nums = (key) => effects.map((e) => Number(e[key]) || 0);
+  return {
+    ...defaultEffectJson("Negate", ALPHA_PROBE_ID),
+    apply_before_clip: false,
+    layer: Math.max(0, ...nums("layer")),
+    position: Math.max(0, ...nums("position")),
+    order: Math.min(0, ...nums("order")) - 1
+  };
+}
+async function renderClipAlone(call, clip2, seconds2, opts = {}) {
+  const project = call.doc.project;
+  const reader = clip2.reader ?? {};
+  const ownWidth = Number(reader.width) > 0 ? Number(reader.width) : project.width;
+  const ownHeight = Number(reader.height) > 0 ? Number(reader.height) : project.height;
+  const solo = { ...structuredClone(clip2), position: 0, layer: SOLO_LAYER, effects: stripEffects(clip2, opts.strip ?? null) };
+  delete solo.composite;
+  const fps2 = projectFps(project);
+  const rate = fps2.num / fps2.den;
+  const local = pyRound((Math.max(0, seconds2 - (Number(clip2.position) || 0)) + (Number(clip2.start) || 0)) * rate) + 1;
+  const window = frameWindow(solo, fps2);
+  let frame = timelineFrameOf(window, local);
+  if (!windowContains(window, frame)) frame = Math.max(window.startFrame, Math.min(window.endFrame, frame));
+  const [width] = fitSize(ownWidth, ownHeight, opts.longEdge ?? 960);
+  const plain = scratchProject(project, [solo], ownWidth, ownHeight);
+  const negated = scratchProject(project, [{ ...solo, effects: [...solo.effects ?? [], alphaProbe(solo.effects ?? [])] }], ownWidth, ownHeight);
+  const [shown, inverse] = await Promise.all([renderPixels(call, plain, frame, width), renderPixels(call, negated, frame, width)]);
+  const a = shown.pixels;
+  const n = inverse.pixels;
+  if (a.width !== n.width || a.height !== n.height) throw new FrameRenderError("rendering the frame failed: the two passes differ in size");
+  const out = createPremul(a.width, a.height);
+  const ad = a.data;
+  const nd = n.data;
+  const od = out.data;
+  for (let i = 0; i < ad.length; i += 4) {
+    const alpha = Math.max(0, Math.min(255, Math.round((ad[i] + nd[i] + ad[i + 1] + nd[i + 1] + ad[i + 2] + nd[i + 2]) / 3)));
+    od[i] = Math.min(ad[i], alpha);
+    od[i + 1] = Math.min(ad[i + 1], alpha);
+    od[i + 2] = Math.min(ad[i + 2], alpha);
+    od[i + 3] = alpha;
+  }
+  return { image: shown.image, pixels: out };
+}
+function editedWhileRendering(call, clip2, keys) {
+  const current = call.doc.project.clips.find((c) => c.id === clip2.id);
+  if (!current) return `clip ${clip2.id} was removed while ${call.tool} rendered frames; nothing changed`;
+  const changed = keys.filter((key) => !sameJson(current[key] ?? null, clip2[key] ?? null));
+  if (changed.length === 0) return null;
+  return `clip ${clip2.id} was edited while ${call.tool} rendered frames (${changed.join(", ")}); nothing changed, call it again`;
+}
+function soloRenderSize(width, height, longEdge = 640) {
+  const w = Math.max(1, Math.trunc(width));
+  const h = Math.max(1, Math.trunc(height));
+  const scale = Math.min(1, longEdge / Math.max(w, h));
+  return [Math.max(1, pyRound(w * scale)), Math.max(1, pyRound(h * scale))];
+}
+function isolatedProject(project, clip2) {
+  const [w, h] = soloRenderSize(project.width, project.height);
+  const solo = { ...structuredClone(clip2), position: 0, layer: SOLO_LAYER };
+  return scratchProject(project, [solo], w, h);
+}
+function mediaFileProject(project, file3, duration3) {
+  const [w, h] = soloRenderSize(project.width, project.height);
+  const base = scratchProject(project, [], w, h);
+  base.layers = [{ id: "L1", number: SOLO_LAYER, label: "", y: 0, lock: false }];
+  base.files = [file3];
+  const doc = new ProjectDocument(base, { historyLimit: 0 });
+  doc.transaction(
+    "profile",
+    (tx) => addClip(tx, { fileId: String(file3.id), position: 0, layer: SOLO_LAYER, start: 0, end: Math.max(duration3, 1 / fpsFloat4(project)) })
+  );
+  return doc.project;
+}
+var FrameRenderError, SOLO_LAYER, ALPHA_PROBE_ID;
+var init_color_frames = __esm({
+  "../engine/src/tools/color-frames.ts"() {
+    "use strict";
+    init_document();
+    init_png2();
+    init_rounding();
+    init_registry();
+    init_clips();
+    init_internal();
+    init_pixels();
+    init_windows();
+    init_frame_time();
+    init_media_frames();
+    FrameRenderError = class extends Error {
+      name = "FrameRenderError";
+    };
+    SOLO_LAYER = 1e6;
+    ALPHA_PROBE_ID = "ZENVIALPHA";
+  }
+});
+
+// ../engine/src/tools/color-stats.ts
+function roundTo(x, digits) {
+  return Number(pyFixed(x, digits));
+}
+function scopeData(frame, region) {
+  const scope = analyzeFrameScope(frame, { vectorscopeSize: 128, ...region ? { region } : {} });
+  if (!scope) throw new AnalysisError("the rendered frame has no picture");
+  const area = region ? region.width * region.height : 1;
+  return {
+    luma: Array.from(scope.luma),
+    red: Array.from(scope.red),
+    green: Array.from(scope.green),
+    blue: Array.from(scope.blue),
+    vectorscope: Array.from(scope.vectorscope),
+    vectorscope_size: scope.vectorscopeSize,
+    clipped_shadows: scope.clippedShadows,
+    clipped_highlights: scope.clippedHighlights,
+    total_pixels: pyRound(frame.width * frame.height * area),
+    width: frame.width,
+    height: frame.height
+  };
+}
+function percentile(hist, q) {
+  const total = hist.reduce((a, b) => a + b, 0);
+  if (total <= 0) return 0;
+  const target = q * total;
+  let run = 0;
+  for (let i = 0; i < hist.length; i += 1) {
+    run += hist[i];
+    if (run >= target) return i / (hist.length - 1);
+  }
+  return 1;
+}
+function histMean(hist) {
+  const total = hist.reduce((a, b) => a + b, 0);
+  if (!total) return 0;
+  let sum = 0;
+  hist.forEach((n, i) => sum += i * n);
+  return sum / total / (hist.length - 1);
+}
+function keepAspect(w, h, tw, th) {
+  if (w === 0 || h === 0) return [tw, th];
+  const rh = Math.trunc(tw * h / w);
+  if (rh <= th) return [tw, rh];
+  return [Math.trunc(th * w / h), th];
+}
+function framePixels(frame, region, targetWidth = 160) {
+  const width = Math.max(1, frame.width);
+  const scale = Math.min(1, targetWidth / width);
+  let image = frame;
+  if (Math.abs(scale) > 1.001 || Math.abs(scale) < 0.999) {
+    const [tw, th] = keepAspect(frame.width, frame.height, Math.trunc(frame.width * scale), Math.trunc(frame.height * scale));
+    if (tw > 0 && th > 0) image = smoothScale(frame, tw, th);
+  }
+  const straight = unpremultiply(image);
+  const w = straight.width;
+  const h = straight.height;
+  let [x0, y0, x1, y1] = [0, 0, w, h];
+  if (region) {
+    x0 = Math.trunc(region.x * w);
+    y0 = Math.trunc(region.y * h);
+    x1 = Math.max(x0 + 1, pyRound((region.x + region.width) * w));
+    y1 = Math.max(y0 + 1, pyRound((region.y + region.height) * h));
+  }
+  const out = [];
+  const d = straight.data;
+  for (let y = y0; y < Math.min(y1, h); y += 1) {
+    for (let x = x0; x < Math.min(x1, w); x += 1) {
+      const o = (y * w + x) * 4;
+      out.push([d[o], d[o + 1], d[o + 2], d[o + 3]]);
+    }
+  }
+  return out;
+}
+function pixelStats(pixels) {
+  const sats = [];
+  const neutral = [0, 0, 0, 0];
+  for (const [r8, g8, b8, a] of pixels) {
+    if (a < 128) continue;
+    const r = r8 / 255;
+    const g = g8 / 255;
+    const b = b8 / 255;
+    const hi = Math.max(r, g, b);
+    const lo = Math.min(r, g, b);
+    const sat = hi > 0 ? (hi - lo) / hi : 0;
+    sats.push(sat);
+    const luma3 = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (luma3 >= 0.25 && luma3 <= 0.92 && sat < 0.25) {
+      neutral[0] += r;
+      neutral[1] += g;
+      neutral[2] += b;
+      neutral[3] += 1;
+    }
+  }
+  if (sats.length === 0) return null;
+  let sum = 0;
+  for (const s of sats) sum += s;
+  sats.sort((a, b) => a - b);
+  const out = {
+    saturation_mean: roundTo(sum / sats.length, 3),
+    saturation_p90: roundTo(sats[Math.min(sats.length - 1, Math.trunc(0.9 * sats.length))], 3),
+    neutral_pct: roundTo(100 * neutral[3] / sats.length, 1)
+  };
+  if (neutral[3] >= Math.max(20, 0.03 * sats.length)) {
+    const [nr, ng, nb] = [neutral[0] / neutral[3], neutral[1] / neutral[3], neutral[2] / neutral[3]];
+    out.neutral_rgb = [roundTo(nr, 3), roundTo(ng, 3), roundTo(nb, 3)];
+    out.neutral_warmth = roundTo(nr - nb, 3);
+    out.neutral_green_magenta = roundTo(ng - (nr + nb) / 2, 3);
+  }
+  return out;
+}
+function computeStats(d, pixels) {
+  const luma3 = d.luma;
+  const counted = luma3.reduce((a, b2) => a + b2, 0);
+  if (counted <= 0) return { transparent_pct: 100, note: "every pixel is transparent" };
+  const pct2 = {};
+  for (const [key, q] of PERCENTILES) pct2[key] = roundTo(percentile(luma3, q), 3);
+  const meanRgb = [d.red, d.green, d.blue].map((h) => roundTo(histMean(h), 3));
+  const [r, g, b] = meanRgb;
+  const warmth = roundTo(r - b, 3);
+  const greenMagenta = roundTo(g - (r + b) / 2, 3);
+  const size = Math.trunc(Number(d.vectorscope_size) || 0);
+  const vec = d.vectorscope ?? [];
+  const chromaHist = new Array(101).fill(0);
+  let nu = 0;
+  let nv = 0;
+  let nn = 0;
+  if (size > 1 && vec.length === size * size) {
+    const c = (size - 1) / 2;
+    vec.forEach((n, idx) => {
+      if (!n) return;
+      const y = Math.floor(idx / size);
+      const x = idx % size;
+      const u = (x - c) / c * U_MAX2;
+      const v = (c - y) / c * V_MAX2;
+      const chroma = Math.hypot(u, v);
+      chromaHist[Math.min(100, Math.trunc(pyRound(chroma / 5e-3)))] += n;
+      if (chroma < 0.06) {
+        nu += u * n;
+        nv += v * n;
+        nn += n;
+      }
+    });
+  }
+  const chromaTotal = chromaHist.reduce((a, x) => a + x, 0);
+  let chromaSum = 0;
+  chromaHist.forEach((n, i) => chromaSum += i * 5e-3 * n);
+  const chromaMean = chromaTotal ? chromaSum / chromaTotal : 0;
+  const gray = chromaTotal ? chromaHist.slice(0, 7).reduce((a, x) => a + x, 0) / chromaTotal : 0;
+  let cast = "neutral";
+  let neutralUv = null;
+  if (pixels && pixels.neutral_warmth !== void 0) {
+    const w = pixels.neutral_warmth;
+    const gm = pixels.neutral_green_magenta;
+    if (Math.max(Math.abs(w), Math.abs(gm)) >= 0.025) {
+      if (Math.abs(w) >= Math.abs(gm)) cast = w > 0 ? "warm (orange)" : "cool (blue)";
+      else cast = gm > 0 ? "green" : "magenta";
+    }
+  } else if (chromaTotal && nn / chromaTotal >= 0.05) {
+    neutralUv = [nu / nn, nv / nn];
+    const [mu, mv] = neutralUv;
+    if (Math.max(Math.abs(mu), Math.abs(mv)) >= 8e-3) {
+      if (Math.abs(mu) >= Math.abs(mv)) cast = mu > 0 ? "cool (blue)" : "warm (orange)";
+      else cast = mv > 0 ? "magenta" : "green";
+    }
+  } else if (Math.abs(warmth) >= 0.04 || Math.abs(greenMagenta) >= 0.04) {
+    if (Math.abs(warmth) >= Math.abs(greenMagenta)) cast = warmth > 0 ? "warm (orange)" : "cool (blue)";
+    else cast = greenMagenta > 0 ? "green" : "magenta";
+  }
+  const total = Math.max(Math.trunc(Number(d.total_pixels) || counted), counted);
+  const stats = {
+    luma: { ...pct2, mean: roundTo(histMean(luma3), 3) },
+    clipped_shadows_pct: roundTo(100 * (d.clipped_shadows ?? 0) / counted, 2),
+    clipped_highlights_pct: roundTo(100 * (d.clipped_highlights ?? 0) / counted, 2),
+    mean_rgb: meanRgb,
+    warmth,
+    green_magenta: greenMagenta,
+    cast,
+    neutral_tint_uv: neutralUv ? [roundTo(neutralUv[0], 4), roundTo(neutralUv[1], 4)] : null,
+    chroma_mean: roundTo(chromaMean, 4),
+    chroma_p90: roundTo(percentile(chromaHist, 0.9) * 0.5, 4),
+    gray_pct: roundTo(100 * gray, 1),
+    transparent_pct: roundTo(100 * (1 - counted / total), 1)
+  };
+  if (pixels) Object.assign(stats, pixels);
+  stats.verdict = verdict(stats);
+  stats.suggested_grade = suggest(stats);
+  return stats;
+}
+function num10(stats, key) {
+  return Number(stats[key]);
+}
+function verdict(s) {
+  const out = [];
+  const luma3 = s.luma;
+  const p50 = luma3.p50;
+  const p95 = luma3.p95;
+  const p5 = luma3.p5;
+  if (p50 < 0.28) out.push(`underexposed (median luma ${pyFixed(p50, 2)})`);
+  else if (p50 > 0.65) out.push(`overexposed (median luma ${pyFixed(p50, 2)})`);
+  else out.push(`exposure ok (median luma ${pyFixed(p50, 2)})`);
+  if (num10(s, "clipped_highlights_pct") > 2) out.push(`highlights clipped (${pyFixed(num10(s, "clipped_highlights_pct"), 1)}%)`);
+  if (num10(s, "clipped_shadows_pct") > 5) out.push(`crushed shadows (${pyFixed(num10(s, "clipped_shadows_pct"), 1)}%)`);
+  if (p95 - p5 < 0.4) out.push(`flat / low contrast (p5-p95 ${pyFixed(p95 - p5, 2)})`);
+  else if (p95 - p5 > 0.9) out.push("very high contrast");
+  const sat = typeof s.saturation_mean === "number" ? s.saturation_mean : null;
+  if (num10(s, "gray_pct") > 97) out.push("black and white");
+  else if (sat !== null && sat < 0.12 || sat === null && num10(s, "chroma_mean") < 0.03) out.push("muted colors");
+  else if (sat !== null && sat > 0.55 || sat === null && num10(s, "chroma_mean") > 0.14) out.push("very saturated");
+  if (s.cast !== "neutral") out.push(`${String(s.cast)} cast`);
+  return out;
+}
+function suggest(s) {
+  const out = {};
+  const p50 = s.luma.p50;
+  if ((p50 < 0.3 || p50 > 0.62) && p50 > 5e-3) out.exposure = roundTo(clamp2(-1.5, 1.5, 0.8 * Math.log2(0.45 / p50)), 2);
+  if (num10(s, "clipped_highlights_pct") > 2) out.highlights = -0.25;
+  if (num10(s, "clipped_shadows_pct") > 5) out.shadows = 0.15;
+  if (s.luma.p95 - s.luma.p5 < 0.4) out.contrast = 0.2;
+  const uv = s.neutral_tint_uv;
+  if (s.neutral_warmth !== void 0) {
+    if (s.cast !== "neutral") {
+      if (Math.abs(num10(s, "neutral_warmth")) >= 0.025) out.temperature = roundTo(clamp2(-0.4, 0.4, -3 * num10(s, "neutral_warmth")), 2);
+      if (Math.abs(num10(s, "neutral_green_magenta")) >= 0.025) out.tint = roundTo(clamp2(-0.4, 0.4, 4 * num10(s, "neutral_green_magenta")), 2);
+    }
+  } else if (uv && s.cast !== "neutral") {
+    if (Math.abs(uv[0]) >= 8e-3) out.temperature = roundTo(clamp2(-0.4, 0.4, 12 * uv[0]), 2);
+    if (Math.abs(uv[1]) >= 8e-3) out.tint = roundTo(clamp2(-0.4, 0.4, -12 * uv[1]), 2);
+  } else if (s.cast !== "neutral") {
+    if (Math.abs(num10(s, "warmth")) >= 0.04) out.temperature = roundTo(clamp2(-0.4, 0.4, -2 * num10(s, "warmth")), 2);
+    if (Math.abs(num10(s, "green_magenta")) >= 0.04) out.tint = roundTo(clamp2(-0.4, 0.4, 3 * num10(s, "green_magenta")), 2);
+  }
+  if ((s.verdict ?? verdict(s)).includes("muted colors")) out.saturation = 1.25;
+  return out;
+}
+function toFloat4(value) {
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "string") return parsePythonFloat(value);
+  return null;
+}
+function regionArg(region) {
+  if (region === null || region === void 0 || region === "" || typeof region === "object" && Object.keys(region).length === 0) {
+    return null;
+  }
+  if (typeof region !== "object" || Array.isArray(region)) {
+    throw new AnalysisError('region is {"x": 0.25, "y": 0.25, "width": 0.5, "height": 0.5} (fractions of the frame)');
+  }
+  const raw = region;
+  const values = ["x", "y", "width", "height"].map((k) => toFloat4(raw[k]));
+  if (values.some((v) => v === null)) throw new AnalysisError("region needs x, y, width, height as fractions 0-1 of the frame");
+  const [x, y, width, height] = values;
+  if (!(x >= 0 && x < 1 && y >= 0 && y < 1 && width > 0 && width <= 1 && height > 0 && height <= 1 && x + width <= 1.0001 && y + height <= 1.0001)) {
+    throw new AnalysisError("region must lie inside the frame (x, y, width, height are fractions 0-1)");
+  }
+  return { x, y, width, height };
+}
+function summed(hists, channel) {
+  const total = new Array(256).fill(0);
+  for (const h of hists) h[channel].forEach((n, i) => total[i] += n);
+  return total;
+}
+function screenColorFromHistograms(hists) {
+  const [r, g, b] = ["red", "green", "blue"].map((c) => pyRound(percentile(summed(hists, c), 0.5) * 255));
+  let kind = null;
+  if (g > 60 && g - Math.max(r, b) >= 30) kind = "green";
+  else if (b > 60 && b - Math.max(r, g) >= 30) kind = "blue";
+  return [`#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`, kind];
+}
+function screenFuzzFromHistograms(hists) {
+  let spread2 = 0;
+  for (const channel of ["red", "green", "blue"]) {
+    const total = summed(hists, channel);
+    spread2 = Math.max(spread2, (percentile(total, 0.9) - percentile(total, 0.1)) * 255);
+  }
+  return Math.max(20, Math.min(80, pyRound(15 + 1.6 * spread2)));
+}
+function screenFromScopes(edges, grid, kind = null) {
+  const [color3, edgeKind] = screenColorFromHistograms(edges);
+  if (edgeKind && (kind === null || kind === edgeKind)) return [color3, `${edgeKind} screen at the frame edges`, screenFuzzFromHistograms(edges)];
+  const cells = { green: [], blue: [] };
+  for (const h of grid) {
+    const cellKind = screenColorFromHistograms([h])[1];
+    if (cellKind) cells[cellKind].push(h);
+  }
+  const found = kind ?? (cells.blue.length > cells.green.length ? "blue" : "green");
+  const screen = cells[found];
+  if (screen.length < MIN_SCREEN_CELLS) return null;
+  const even = [...screen].map((h, i) => ({ h, i, fuzz: screenFuzzFromHistograms([h]) })).sort((a, b) => a.fuzz - b.fuzz || a.i - b.i).slice(0, Math.max(1, Math.floor(screen.length / 2))).map((e) => e.h);
+  const evenColor = screenColorFromHistograms(even)[0];
+  return [evenColor, `${found} screen in ${screen.length} of ${grid.length} frame areas`, screenFuzzFromHistograms(even)];
+}
+var U_MAX2, V_MAX2, AnalysisError, PERCENTILES, clamp2, EDGE_STRIPS, GRID, MIN_SCREEN_CELLS;
+var init_color_stats = __esm({
+  "../engine/src/tools/color-stats.ts"() {
+    "use strict";
+    init_rounding();
+    init_frame_scope();
+    init_pixels();
+    init_smooth_scale();
+    init_coerce();
+    init_pyfmt();
+    U_MAX2 = 0.436;
+    V_MAX2 = 0.615;
+    AnalysisError = class extends Error {
+      name = "AnalysisError";
+    };
+    PERCENTILES = [
+      ["p1", 0.01],
+      ["p5", 0.05],
+      ["p25", 0.25],
+      ["p50", 0.5],
+      ["p75", 0.75],
+      ["p95", 0.95],
+      ["p99", 0.99]
+    ];
+    clamp2 = (lo, hi, x) => Math.max(lo, Math.min(hi, x));
+    EDGE_STRIPS = [
+      { x: 0, y: 0, width: 0.08, height: 1 },
+      { x: 0.92, y: 0, width: 0.08, height: 1 },
+      { x: 0, y: 0, width: 1, height: 0.08 }
+    ];
+    GRID = Array.from({ length: 24 }, (_, i) => {
+      const r = Math.floor(i / 6);
+      const c = i % 6;
+      return { x: c / 6, y: r / 4, width: 1 / 6, height: 1 / 4 };
+    });
+    MIN_SCREEN_CELLS = 3;
+  }
+});
+
+// ../engine/src/tools/color-agent.ts
+function isRecord28(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function lutRelativePath(category, lookId) {
+  return `${category}/${lookId}.cube`;
+}
+function isColorGradeEffect(effect2) {
+  return isRecord28(effect2) && effect2.class_name === COLOR_GRADE_CLASS_NAME;
+}
+function findColorGrade(effects) {
+  if (!Array.isArray(effects)) return null;
+  return effects.find((e) => isColorGradeEffect(e)) ?? null;
+}
+function isFilmGrainEffect(effect2) {
+  return isRecord28(effect2) && effect2.class_name === "FilmGrain";
+}
+function findFilmGrain(effects) {
+  if (!Array.isArray(effects)) return null;
+  return effects.find((e) => isFilmGrainEffect(e)) ?? null;
+}
+function constantProperty2(value) {
+  return {
+    Points: [{ co: { X: 1, Y: Number(value) }, handle_left: { X: 0.5, Y: 1 }, handle_right: { X: 0.5, Y: 0 }, handle_type: 0, interpolation: 0 }]
+  };
+}
+function scalarY(effect2, key, fallback) {
+  const raw = effect2?.[key];
+  if (isRecord28(raw) && Array.isArray(raw.Points) && raw.Points.length > 0) {
+    const co = isRecord28(raw.Points[0]) ? raw.Points[0].co : null;
+    if (isRecord28(co) && "Y" in co) {
+      const y = typeof co.Y === "string" ? parsePythonFloat(co.Y) : typeof co.Y === "number" ? co.Y : null;
+      if (y !== null) return y;
+    }
+  }
+  if (fallback !== void 0) return fallback;
+  return key in SCALAR_DEFAULTS ? SCALAR_DEFAULTS[key] : null;
+}
+function setScalar(effect2, key, value) {
+  effect2[key] = constantProperty2(value);
+}
+function curveNode2(id, x, y) {
+  return {
+    id: Math.trunc(id),
+    x: constantProperty2(x),
+    y: constantProperty2(y),
+    left_handle_x: constantProperty2(0.5),
+    left_handle_y: constantProperty2(1),
+    right_handle_x: constantProperty2(0.5),
+    right_handle_y: constantProperty2(0),
+    interpolation: 1,
+    handle_type: 0
+  };
+}
+function pointsToCurve(points2, enabled = true) {
+  const nodes = points2.map((point3, index) => {
+    let x;
+    let y;
+    if (Array.isArray(point3) && point3.length >= 2) {
+      [x, y] = [toFloat5(point3[0], "curve point"), toFloat5(point3[1], "curve point")];
+    } else if (isRecord28(point3)) {
+      x = toFloat5(point3.x ?? point3.X ?? 0, "curve point");
+      y = toFloat5(point3.y ?? point3.Y ?? 0, "curve point");
+    } else {
+      throw new ColorValueError(`Invalid curve point: ${pyRepr2(point3)}`);
+    }
+    return curveNode2(index, x, y);
+  });
+  if (nodes.length < 2) throw new ColorValueError("Curves need at least two points");
+  return { enabled: constantProperty2(enabled ? 1 : 0), nodes };
+}
+function colorKeyframes2(hex4) {
+  const rgb = hex4.replace(/^#+/, "");
+  if (rgb.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(rgb)) throw new ColorValueError(`Wheel color must be #RRGGBB, got ${pyRepr2(hex4)}`);
+  const at = (i) => Number.parseInt(rgb.slice(i, i + 2), 16);
+  return { red: constantProperty2(at(0)), green: constantProperty2(at(2)), blue: constantProperty2(at(4)), alpha: constantProperty2(255) };
+}
+function wheelEntry2(color3 = "#ffffff", amount = 0, luma3 = 0) {
+  return {
+    color: color3,
+    color_keyframes: colorKeyframes2(color3),
+    amount,
+    amount_keyframes: constantProperty2(amount),
+    luma: luma3,
+    luma_keyframes: constantProperty2(luma3)
+  };
+}
+function defaultWheelsData2() {
+  return {
+    enabled_keyframes: constantProperty2(1),
+    global: wheelEntry2(),
+    shadows: wheelEntry2(),
+    midtones: wheelEntry2(),
+    highlights: wheelEntry2()
+  };
+}
+function parseClipIds(...values) {
+  const collected = [];
+  const extend2 = (raw) => {
+    if (raw === null || raw === void 0 || raw === "") return;
+    if (Array.isArray(raw)) {
+      for (const item of raw) extend2(item);
+      return;
+    }
+    const text5 = String(raw).trim();
+    if (!text5) return;
+    if (text5.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(text5);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) extend2(item);
+          return;
+        }
+      } catch {
+      }
+    }
+    for (const part of text5.split(",")) {
+      const piece = part.trim().replace(/^["']+|["']+$/g, "");
+      if (piece) collected.push(piece);
+    }
+  };
+  for (const value of values) extend2(value);
+  return [...new Set(collected)];
+}
+function toFloat5(value, name) {
+  let out = null;
+  if (typeof value === "number") out = value;
+  else if (typeof value === "boolean") out = value ? 1 : 0;
+  else if (typeof value === "string") out = parsePythonFloat(value);
+  if (out === null || !Number.isFinite(out)) throw new ColorValueError(`${name} must be a finite number`);
+  return out;
+}
+function mergeWheel(existing, patch) {
+  const base = isRecord28(existing) ? structuredClone(existing) : wheelEntry2();
+  const color3 = patch.color || patch.hex;
+  if (color3 !== void 0 && color3 !== null && color3 !== "") {
+    let text5 = String(color3).trim();
+    if (!text5.startsWith("#")) text5 = `#${text5}`;
+    base.color = text5;
+    base.color_keyframes = colorKeyframes2(text5);
+  }
+  if (patch.amount !== void 0 && patch.amount !== null) {
+    const amount = toFloat5(patch.amount, "wheel.amount");
+    base.amount = amount;
+    base.amount_keyframes = constantProperty2(amount);
+  }
+  if (patch.luma !== void 0 && patch.luma !== null) {
+    const luma3 = toFloat5(patch.luma, "wheel.luma");
+    base.luma = luma3;
+    base.luma_keyframes = constantProperty2(luma3);
+  }
+  return base;
+}
+function resolveRelativeDeltas(effect2, patch) {
+  const out = { ...patch };
+  for (const [dkey, target] of Object.entries(DELTA_KEYS)) {
+    if (!(dkey in out) || out[dkey] === null || out[dkey] === void 0 || out[dkey] === "") continue;
+    const delta = toFloat5(out[dkey], dkey);
+    delete out[dkey];
+    if (target in out && out[target] !== null && out[target] !== void 0 && out[target] !== "") {
+      throw new ColorValueError(`pass ${target} or ${dkey}, not both`);
+    }
+    const cur = scalarY(effect2 ?? {}, target) ?? SCALAR_DEFAULTS[target] ?? 0;
+    const [lo, hi] = SCALAR_BOUNDS[target] ?? [-1, 1];
+    out[target] = Math.max(lo, Math.min(hi, cur + delta));
+  }
+  return out;
+}
+function validateColorPatch(patch) {
+  if (!isRecord28(patch)) throw new ColorValueError("color patch must be an object");
+  if (patch.color !== void 0 && patch.color !== null && !isRecord28(patch.color)) throw new ColorValueError("'color' paste object must be a dict");
+  for (const [key, raw] of Object.entries(patch)) {
+    if (key in DELTA_KEYS && raw !== null && raw !== void 0 && typeof raw !== "boolean") {
+      toFloat5(raw, key);
+      continue;
+    }
+    const canon = SCALAR_ALIASES[key] ?? key;
+    if (SCALAR_KEYS.includes(canon) && raw !== null && raw !== void 0 && typeof raw !== "boolean") {
+      const value = toFloat5(raw, canon);
+      if (canon === "saturation" && value < 0.5) throw new ColorValueError(SATURATION_REFUSAL);
+    }
+  }
+  const lut = patch.lut;
+  if (lut !== void 0 && lut !== null) {
+    if (!isRecord28(lut)) throw new ColorValueError("lut must be an object with path and optional strength");
+    if (lut.strength !== void 0 && lut.strength !== null) toFloat5(lut.strength, "lut.strength");
+    if (lut.intensity !== void 0 && lut.intensity !== null) toFloat5(lut.intensity, "lut.intensity");
+  }
+  const wheels = patch.wheels;
+  if (wheels !== void 0 && wheels !== null) {
+    if (!isRecord28(wheels)) throw new ColorValueError("wheels must be an object");
+    for (const [name, wheel] of Object.entries(wheels)) {
+      if (name === "enabled") continue;
+      if (!WHEEL_NAMES.includes(name)) throw new ColorValueError(`Unknown wheel '${name}'`);
+      if (wheel !== null && wheel !== void 0 && !isRecord28(wheel)) throw new ColorValueError(`wheels.${name} must be an object`);
+      if (isRecord28(wheel)) {
+        if (wheel.amount !== void 0 && wheel.amount !== null) toFloat5(wheel.amount, `wheels.${name}.amount`);
+        if (wheel.luma !== void 0 && wheel.luma !== null) toFloat5(wheel.luma, `wheels.${name}.luma`);
+        const color3 = wheel.color || wheel.hex;
+        if (color3 !== void 0 && color3 !== null && color3 !== "") {
+          const rgb = String(color3).replace(/^#+/, "");
+          if (rgb.length !== 6) throw new ColorValueError(`wheels.${name}.color must be #RRGGBB`);
+          if (!/^[0-9a-fA-F]{6}$/.test(rgb)) throw new ColorValueError(`invalid literal for int() with base 16: ${pyRepr2(rgb)}`);
+        }
+      }
+    }
+  }
+  for (const [alias, canon] of [...Object.entries(CURVE_ALIASES), ...CURVE_KEYS.map((k) => [k, k])]) {
+    if (!(alias in patch) && !(canon in patch)) continue;
+    const points2 = alias in patch ? patch[alias] : patch[canon];
+    if (points2 === null || points2 === void 0) continue;
+    if (isRecord28(points2) && "nodes" in points2) continue;
+    if (!Array.isArray(points2) || points2.length < 2) throw new ColorValueError(`${canon} needs a list of at least two [x,y] points`);
+    pointsToCurve(points2);
+  }
+}
+function mergeColorGrade(effect2, rawPatch) {
+  validateColorPatch(rawPatch);
+  let payload = structuredClone(effect2 ?? {});
+  if (!isColorGradeEffect(payload)) payload.class_name = COLOR_GRADE_CLASS_NAME;
+  const patch = resolveRelativeDeltas(payload, rawPatch);
+  const sat = patch.saturation;
+  if (sat !== void 0 && sat !== null && sat !== "") {
+    if (toFloat5(sat, "saturation") < 0.5) throw new ColorValueError(SATURATION_REFUSAL);
+  }
+  const colorObj = patch.color;
+  if (isRecord28(colorObj)) {
+    const keepId = payload.id;
+    const keepOrder = payload.order;
+    payload = structuredClone(colorObj);
+    payload.class_name = COLOR_GRADE_CLASS_NAME;
+    if (keepId) payload.id = keepId;
+    if (keepOrder !== void 0 && keepOrder !== null) payload.order = keepOrder;
+  }
+  for (const [key, raw] of Object.entries(patch)) {
+    if (["color", "lut", "wheels", "reset"].includes(key) || CURVE_KEYS.includes(key) || key in CURVE_ALIASES) continue;
+    const canon = SCALAR_ALIASES[key] ?? key;
+    if (SCALAR_KEYS.includes(canon) && raw !== null && raw !== void 0) setScalar(payload, canon, toFloat5(raw, canon));
+  }
+  if ("lut_path" in patch && patch.lut_path !== null && patch.lut_path !== void 0) payload.lut_path = String(patch.lut_path);
+  const lut = patch.lut;
+  if (isRecord28(lut)) {
+    if (lut.path !== void 0 && lut.path !== null) payload.lut_path = String(lut.path);
+    const strength = lut.strength ?? lut.intensity;
+    if (strength !== void 0 && strength !== null) setScalar(payload, "lut_intensity", toFloat5(strength, "lut.strength"));
+  }
+  const wheelsPatch = patch.wheels;
+  if (isRecord28(wheelsPatch)) {
+    const wheels = isRecord28(payload.wheels) ? structuredClone(payload.wheels) : defaultWheelsData2();
+    for (const name of WHEEL_NAMES) {
+      if (name in wheelsPatch && wheelsPatch[name] !== null && wheelsPatch[name] !== void 0) {
+        wheels[name] = mergeWheel(wheels[name], wheelsPatch[name]);
+      }
+    }
+    payload.wheels = wheels;
+  }
+  for (const [alias, canon] of [...Object.entries(CURVE_ALIASES), ...CURVE_KEYS.map((k) => [k, k])]) {
+    if (!(alias in patch)) continue;
+    const points2 = patch[alias];
+    if (points2 === null || points2 === void 0) continue;
+    payload[canon] = isRecord28(points2) && "nodes" in points2 ? structuredClone(points2) : pointsToCurve(points2);
+  }
+  return payload;
+}
+function summarizeColorGrade(effect2) {
+  if (!isColorGradeEffect(effect2)) return { present: false };
+  const e = effect2;
+  const summary = {
+    present: true,
+    id: e.id ?? null,
+    lut_path: e.lut_path || "",
+    wheels: e.wheels || {},
+    curve_all: e.curve_all || {},
+    curve_red: e.curve_red || {},
+    curve_green: e.curve_green || {},
+    curve_blue: e.curve_blue || {}
+  };
+  for (const key of SCALAR_KEYS) summary[key] = scalarY(e, key);
+  return summary;
+}
+function summarizeFilmGrain(effect2) {
+  if (!isFilmGrainEffect(effect2)) return { present: false };
+  const summary = { present: true, id: effect2.id ?? null };
+  for (const key of GRAIN_SCALAR_KEYS) summary[key] = scalarY(effect2, key);
+  return summary;
+}
+function num11(value, fallback) {
+  return value === null || value === void 0 ? fallback : Number(value);
+}
+function grainMeaningfullyDiffers(subject, reference, eps = 0.03) {
+  const sub = isRecord28(subject) ? subject : {};
+  const ref = isRecord28(reference) ? reference : {};
+  if (Boolean(sub.present) !== Boolean(ref.present)) return true;
+  if (!sub.present) return false;
+  return GRAIN_SCALAR_KEYS.some((key) => Math.abs(num11(sub[key], 0) - num11(ref[key], 0)) >= eps);
+}
+function withoutIdentity(effect2) {
+  const paste = structuredClone(effect2);
+  delete paste.id;
+  delete paste.order;
+  return paste;
+}
+function matchGrainAction(subjectEffect, referenceEffect) {
+  const sub = summarizeFilmGrain(subjectEffect);
+  const ref = summarizeFilmGrain(referenceEffect);
+  if (!grainMeaningfullyDiffers(sub, ref)) return { mode: "noop" };
+  if (!ref.present) return { mode: "reset" };
+  return { mode: "paste", grain: withoutIdentity(referenceEffect) };
+}
+function structureFingerprint(payload) {
+  const sorted = (value) => {
+    if (Array.isArray(value)) return value.map(sorted);
+    if (isRecord28(value)) return Object.fromEntries(Object.keys(value).sort().map((k) => [k, sorted(value[k])]));
+    return value;
+  };
+  return JSON.stringify(
+    sorted({
+      wheels: payload.wheels || {},
+      curve_all: payload.curve_all || {},
+      curve_red: payload.curve_red || {},
+      curve_green: payload.curve_green || {},
+      curve_blue: payload.curve_blue || {}
+    })
+  );
+}
+function gradesMeaningfullyDiffer(subject, reference, eps = 0.02) {
+  const sub = isRecord28(subject) ? subject : {};
+  const ref = isRecord28(reference) ? reference : {};
+  if (Boolean(sub.present) !== Boolean(ref.present)) return true;
+  if (!sub.present) return false;
+  if (String(sub.lut_path || "") !== String(ref.lut_path || "")) return true;
+  for (const key of SCALAR_KEYS) {
+    if (Math.abs(num11(sub[key], SCALAR_DEFAULTS[key]) - num11(ref[key], SCALAR_DEFAULTS[key])) >= eps) return true;
+  }
+  return structureFingerprint(sub) !== structureFingerprint(ref);
+}
+function matchGradeAction(subjectEffect, referenceEffect) {
+  const sub = summarizeColorGrade(subjectEffect);
+  const ref = summarizeColorGrade(referenceEffect);
+  if (!gradesMeaningfullyDiffer(sub, ref)) return { mode: "noop" };
+  if (!ref.present) return { mode: "reset" };
+  return { mode: "paste", color: withoutIdentity(referenceEffect) };
+}
+function histMean2(bins) {
+  if (bins.length === 0) return null;
+  let total = 0;
+  let weighted = 0;
+  const n = bins.length;
+  bins.forEach((count, i) => {
+    total += count;
+    weighted += count * (i / Math.max(n - 1, 1));
+  });
+  return total > 0 ? weighted / total : null;
+}
+function histPercentile(bins, p) {
+  if (bins.length === 0) return null;
+  const q = Math.max(0, Math.min(1, p));
+  const total = bins.reduce((a, b) => a + b, 0);
+  if (total <= 0) return null;
+  const target = total * q;
+  let running = 0;
+  for (let i = 0; i < bins.length; i += 1) {
+    running += bins[i];
+    if (running >= target) return i / Math.max(bins.length - 1, 1);
+  }
+  return 1;
+}
+function summarizeScopeVideo(video) {
+  if (!video || !video.present) return { present: false };
+  const summary = { present: true };
+  const s = video.summary;
+  summary.avg_luma = s?.avg_luma ?? null;
+  summary.clipped_shadows = s?.clipped_shadows ?? null;
+  summary.clipped_highlights = s?.clipped_highlights ?? null;
+  const hist = video.histogram;
+  const means = {};
+  for (const channel of ["luma", "red", "green", "blue"]) {
+    const mean = histMean2(hist?.[channel] ?? []);
+    if (mean !== null) means[channel] = roundTo(mean, 4);
+  }
+  if (Object.keys(means).length > 0) {
+    summary.channel_means = means;
+    const { red: r, green: g, blue: b } = means;
+    if (r !== void 0 && b !== void 0) summary.warm_cool = roundTo(r - b, 4);
+    if (g !== void 0 && r !== void 0 && b !== void 0) summary.green_magenta = roundTo(g - (r + b) / 2, 4);
+  }
+  return summary;
+}
+function finite(value) {
+  if (value === null || value === void 0 || typeof value === "boolean") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+function scopeLookDistance(subject, reference) {
+  if (!isRecord28(subject) || !isRecord28(reference) || !subject.present || !reference.present) return null;
+  const parts = [];
+  for (const [key, weight] of [
+    ["avg_luma", 1],
+    ["warm_cool", 1.2],
+    ["green_magenta", 1]
+  ]) {
+    const a = finite(subject[key]);
+    const b = finite(reference[key]);
+    if (a !== null && b !== null) parts.push(Math.abs(a - b) * weight);
+  }
+  const subCm = isRecord28(subject.channel_means) ? subject.channel_means : {};
+  const refCm = isRecord28(reference.channel_means) ? reference.channel_means : {};
+  for (const ch of ["red", "green", "blue"]) {
+    const a = finite(subCm[ch]);
+    const b = finite(refCm[ch]);
+    if (a !== null && b !== null) parts.push(Math.abs(a - b) * 0.8);
+  }
+  if (parts.length === 0) return null;
+  return roundTo(parts.reduce((x, y) => x + y, 0), 4);
+}
+function referenceGapHints(subject, reference) {
+  const gap = {};
+  const hints = [];
+  if (!subject.present || !reference.present) return { gap, hints };
+  const pair = (key) => {
+    const a = finite(subject[key]);
+    const b = finite(reference[key]);
+    return a !== null && b !== null ? [a, b] : null;
+  };
+  const luma3 = pair("avg_luma");
+  if (luma3) {
+    const delta = luma3[1] - luma3[0];
+    gap.avg_luma = roundTo(delta, 4);
+    if (Math.abs(delta) >= 0.015) hints.push({ exposure: roundTo(Math.max(-0.5, Math.min(0.5, delta * 0.8)), 3), reason: "match average luma" });
+  }
+  const warm = pair("warm_cool");
+  if (warm) {
+    const delta = warm[1] - warm[0];
+    gap.warm_cool = roundTo(delta, 4);
+    if (Math.abs(delta) >= 0.012) hints.push({ temperature: roundTo(Math.max(-0.4, Math.min(0.4, delta * 0.6)), 3), reason: "match warm/cool balance" });
+  }
+  const gm = pair("green_magenta");
+  if (gm) {
+    const delta = gm[1] - gm[0];
+    gap.green_magenta = roundTo(delta, 4);
+    if (Math.abs(delta) >= 0.01) hints.push({ tint: roundTo(Math.max(-0.3, Math.min(0.3, delta * 0.5)), 3), reason: "match green/magenta balance" });
+  }
+  const distance = scopeLookDistance(subject, reference);
+  if (distance !== null) gap.look_distance = distance;
+  return { gap, hints };
+}
+function sampleCountForDuration(duration3) {
+  const d = Number.isFinite(duration3) ? duration3 : 0;
+  if (d <= 0.05) return 1;
+  return Math.max(16, Math.min(96, pyRound(d / 25) + 8));
+}
+function satProxy(means) {
+  const r = finite(means.red);
+  const g = finite(means.green);
+  const b = finite(means.blue);
+  if (r === null || g === null || b === null) return null;
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  if (mx <= 1e-9) return 0;
+  return (mx - mn) / mx;
+}
+function enrichScopeForProfile(scope) {
+  const out = isRecord28(scope) ? { ...scope } : { present: false };
+  if (!out.present) return out;
+  const sat = satProxy(isRecord28(out.channel_means) ? out.channel_means : {});
+  if (sat !== null) out.sat_proxy = roundTo(sat, 4);
+  return out;
+}
+function scopeFromRawVideo(video) {
+  const summary = summarizeScopeVideo(video);
+  if (!summary.present || !video) return summary;
+  const luma3 = video.histogram?.luma ?? [];
+  const p10 = histPercentile(luma3, 0.1);
+  const p90 = histPercentile(luma3, 0.9);
+  if (p10 !== null && p90 !== null) {
+    summary.contrast_span = roundTo(p90 - p10, 4);
+    summary.luma_p10 = roundTo(p10, 4);
+    summary.luma_p90 = roundTo(p90, 4);
+  }
+  return enrichScopeForProfile(summary);
+}
+function median(values) {
+  const clean = values.filter((v) => v !== null).sort((a, b) => a - b);
+  if (clean.length === 0) return null;
+  const mid = Math.floor(clean.length / 2);
+  return clean.length % 2 ? clean[mid] : (clean[mid - 1] + clean[mid]) / 2;
+}
+function percentileList(values, p) {
+  const clean = [...values].sort((a, b) => a - b);
+  if (clean.length === 0) return null;
+  if (clean.length === 1) return clean[0];
+  const idx = Math.max(0, Math.min(clean.length - 1, pyRound((clean.length - 1) * p)));
+  return clean[idx];
+}
+function buildLookProfile(scopes) {
+  let items;
+  if (Array.isArray(scopes)) items = scopes.filter(isRecord28);
+  else if (isRecord28(scopes)) items = [scopes];
+  else return { present: false, samples: 0 };
+  const present = items.filter((s) => s.present).map(enrichScopeForProfile);
+  if (present.length === 0) return { present: false, samples: 0 };
+  const collect = (key) => present.map((s) => finite(s[key])).filter((v) => v !== null);
+  const collectCh = (ch) => present.map((s) => finite(isRecord28(s.channel_means) ? s.channel_means[ch] : null)).filter((v) => v !== null);
+  const profile = {
+    present: true,
+    samples: present.length,
+    avg_luma: median(collect("avg_luma")),
+    warm_cool: median(collect("warm_cool")),
+    green_magenta: median(collect("green_magenta")),
+    sat_proxy: median(collect("sat_proxy")),
+    contrast_span: median(collect("contrast_span")),
+    clipped_shadows: median(collect("clipped_shadows")),
+    clipped_highlights: median(collect("clipped_highlights")),
+    channel_means: {}
+  };
+  for (const ch of ["red", "green", "blue", "luma"]) {
+    const m = median(collectCh(ch));
+    if (m !== null) profile.channel_means[ch] = roundTo(m, 4);
+  }
+  const lumaVals = collect("avg_luma");
+  const warmVals = collect("warm_cool");
+  if (lumaVals.length >= 3) {
+    profile.luma_p10 = percentileList(lumaVals, 0.1);
+    profile.luma_p90 = percentileList(lumaVals, 0.9);
+  }
+  if (warmVals.length >= 3) {
+    profile.warm_p10 = percentileList(warmVals, 0.1);
+    profile.warm_p90 = percentileList(warmVals, 0.9);
+  }
+  for (const key of [
+    "avg_luma",
+    "warm_cool",
+    "green_magenta",
+    "sat_proxy",
+    "contrast_span",
+    "clipped_shadows",
+    "clipped_highlights",
+    "luma_p10",
+    "luma_p90",
+    "warm_p10",
+    "warm_p90"
+  ]) {
+    const v = finite(profile[key]);
+    if (v !== null) profile[key] = roundTo(v, 4);
+  }
+  return profile;
+}
+function lookProfileDistance(subject, reference) {
+  if (!isRecord28(subject) || !isRecord28(reference) || !subject.present || !reference.present) return null;
+  const parts = [];
+  for (const [key, weight] of [
+    ["avg_luma", 1.2],
+    ["warm_cool", 1.4],
+    ["green_magenta", 1],
+    ["sat_proxy", 1.1],
+    ["contrast_span", 1],
+    ["clipped_highlights", 0.9],
+    ["clipped_shadows", 0.6]
+  ]) {
+    const a = finite(subject[key]);
+    const b = finite(reference[key]);
+    if (a !== null && b !== null) parts.push(Math.abs(a - b) * weight);
+  }
+  const subCm = isRecord28(subject.channel_means) ? subject.channel_means : {};
+  const refCm = isRecord28(reference.channel_means) ? reference.channel_means : {};
+  for (const ch of ["red", "green", "blue"]) {
+    const a = finite(subCm[ch]);
+    const b = finite(refCm[ch]);
+    if (a !== null && b !== null) parts.push(Math.abs(a - b) * 0.7);
+  }
+  if (parts.length === 0) return scopeLookDistance(subject, reference);
+  return roundTo(parts.reduce((x, y) => x + y, 0), 4);
+}
+function capColorPatch(patch, scale = 1) {
+  const out = {};
+  const s = Math.max(0.05, Math.min(1, Number.isFinite(scale) ? scale : 1));
+  for (const [key, value] of Object.entries(patch)) {
+    if (!SCALAR_KEYS.includes(key) && !(key in SCALAR_ALIASES)) {
+      if (["lut_path", "lut", "color", "reset", "wheels"].includes(key) || key.startsWith("curve")) out[key] = value;
+      continue;
+    }
+    const canon = SCALAR_ALIASES[key] ?? key;
+    const v = finite(value);
+    if (v === null) continue;
+    const limit = MAX_STEP[canon] ?? 0.35;
+    out[canon] = roundTo(Math.max(-limit, Math.min(limit, v * s)), 4);
+  }
+  return out;
+}
+function solveGradeFromProfiles(subject, reference, scale = 1) {
+  if (!subject.present || !reference.present) return {};
+  const patch = {};
+  const delta = (key) => {
+    const a = finite(subject[key]);
+    const b = finite(reference[key]);
+    return a !== null && b !== null ? b - a : null;
+  };
+  const clampTo = (lo, hi2, x) => Math.max(lo, Math.min(hi2, x));
+  const luma3 = delta("avg_luma");
+  if (luma3 !== null && Math.abs(luma3) >= 0.012) patch.exposure = clampTo(-0.5, 0.5, luma3 * 0.85);
+  const warm = delta("warm_cool");
+  if (warm !== null && Math.abs(warm) >= 0.01) patch.temperature = clampTo(-0.45, 0.45, warm * 0.65);
+  const gm = delta("green_magenta");
+  if (gm !== null && Math.abs(gm) >= 8e-3) patch.tint = clampTo(-0.35, 0.35, gm * 0.55);
+  const sat = delta("sat_proxy");
+  if (sat !== null && Math.abs(sat) >= 0.02) {
+    patch.saturation = clampTo(-0.35, 0.35, sat * 0.9);
+    patch.vibrance = clampTo(-0.3, 0.3, sat * 0.55);
+  }
+  const contrast = delta("contrast_span");
+  if (contrast !== null && Math.abs(contrast) >= 0.015) patch.contrast = clampTo(-0.35, 0.35, contrast * 0.7);
+  const hi = delta("clipped_highlights");
+  if (hi !== null && Math.abs(hi) >= 0.01) patch.highlights = clampTo(-0.4, 0.4, -hi * 1.2);
+  const sh = delta("clipped_shadows");
+  if (sh !== null && Math.abs(sh) >= 0.01) patch.shadows = clampTo(-0.4, 0.4, sh * 0.9);
+  return capColorPatch(patch, scale);
+}
+function assessGradeOutcome(before, after, goal, outdoorBright = false) {
+  const beforeD = lookProfileDistance(before, goal);
+  const afterD = lookProfileDistance(after, goal);
+  let nukeRisk = false;
+  const reasons = [];
+  const f3 = (d, key) => finite(d[key]) ?? 0;
+  const afterHi = f3(after, "clipped_highlights");
+  const beforeHi = f3(before, "clipped_highlights");
+  if (afterHi - beforeHi >= 0.04 || afterHi >= 0.12) {
+    nukeRisk = true;
+    reasons.push("clipped_highlights_spike");
+  }
+  if (outdoorBright && afterHi >= 0.08) {
+    nukeRisk = true;
+    reasons.push("outdoor_highlight_blow");
+  }
+  if (f3(after, "clipped_shadows") - f3(before, "clipped_shadows") >= 0.06) {
+    nukeRisk = true;
+    reasons.push("clipped_shadows_spike");
+  }
+  if (beforeD !== null && afterD !== null && afterD > beforeD + 0.02) {
+    nukeRisk = true;
+    reasons.push("look_distance_worse");
+  }
+  let recovery = {};
+  if (nukeRisk) {
+    recovery = capColorPatch({ exposure: afterHi > beforeHi ? -0.12 : -0.06, highlights: -0.15, contrast: -0.08, vibrance: -0.05 });
+    if (afterHi > beforeHi) {
+      recovery.exposure = -Math.min(0.25, 0.08 + (afterHi - beforeHi));
+      recovery.highlights = -Math.min(0.3, 0.1 + (afterHi - beforeHi));
+    }
+  }
+  const ok2 = !nukeRisk && afterD !== null && afterD <= LOOK_DISTANCE_MATCHED;
+  const closer = beforeD !== null && afterD !== null && afterD < beforeD - 5e-3;
+  const status = ok2 ? "matched" : nukeRisk ? "recovered_needed" : closer ? "closer_not_exact" : "still_far";
+  return {
+    ok: ok2,
+    nuke_risk: nukeRisk,
+    look_distance_before: beforeD,
+    look_distance_after: afterD,
+    status,
+    reasons,
+    suggested_recovery_patch: recovery,
+    outdoor_bright: outdoorBright
+  };
+}
+function isOutdoorBrightProfile(profile) {
+  if (!isRecord28(profile) || !profile.present) return false;
+  const luma3 = finite(profile.avg_luma) ?? 0;
+  const hi = finite(profile.clipped_highlights) ?? 0;
+  return luma3 >= 0.55 || hi >= 0.05;
+}
+function targetProfileForLook(lookId) {
+  const lid = String(lookId ?? "").trim().toLowerCase();
+  if (["horror", "teal_horror", "noir", "noir_era"].includes(lid)) {
+    return {
+      present: true,
+      samples: 0,
+      avg_luma: 0.32,
+      warm_cool: -0.08,
+      green_magenta: 0.04,
+      sat_proxy: 0.14,
+      contrast_span: 0.52,
+      clipped_shadows: 0.08,
+      clipped_highlights: 0.02,
+      channel_means: { red: 0.26, green: 0.34, blue: 0.38, luma: 0.32 }
+    };
+  }
+  if (["teal_orange", "teal_&_orange_cinema", "signature_teal_&_orange"].includes(lid)) {
+    return {
+      present: true,
+      samples: 0,
+      avg_luma: 0.48,
+      warm_cool: 0.04,
+      green_magenta: -0.02,
+      sat_proxy: 0.28,
+      contrast_span: 0.5,
+      clipped_shadows: 0.03,
+      clipped_highlights: 0.03,
+      channel_means: { red: 0.5, green: 0.44, blue: 0.46, luma: 0.48 }
+    };
+  }
+  return PRESET_GOALS[lid] ? structuredClone(PRESET_GOALS[lid]) : null;
+}
+function lookMatches(entry, query2) {
+  if (!query2) return true;
+  const hay = [entry.id, entry.label, entry.description, entry.category, entry.lut_path, (entry.vibe_tags ?? []).join(" ")].map((v) => String(v ?? "")).join(" ").toLowerCase();
+  const tokens = query2.replaceAll(",", " ").split(/\s+/).filter(Boolean);
+  return tokens.every((token) => hay.includes(token) || (LOOK_QUERY_SYNONYMS[token] ?? []).some((syn) => hay.includes(syn)));
+}
+function cmp(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+function listLooksCatalog(query2 = "") {
+  const q = String(query2 ?? "").trim().toLowerCase();
+  const looks = [];
+  for (const [lookId, meta3] of Object.entries(LOOK_PRESET_META)) {
+    const entry = { id: lookId, kind: "color_preset", label: meta3.label, description: meta3.description, vibe_tags: [...meta3.vibe_tags] };
+    if (lookMatches(entry, q)) looks.push(entry);
+  }
+  for (const [category, lookIds] of BUILTIN_LUTS) {
+    const catTags = [...CATEGORY_VIBE_TAGS[category] ?? []];
+    for (const lookId of lookIds) {
+      const entry = {
+        id: lookId,
+        kind: "lut",
+        label: lookId.replaceAll("_", " "),
+        description: `LUT pack ${category}`,
+        category,
+        lut_path: lutRelativePath(category, lookId),
+        vibe_tags: [...catTags, lookId.replaceAll("_", " "), category.replaceAll("_", " ")]
+      };
+      if (lookMatches(entry, q)) looks.push(entry);
+    }
+  }
+  for (const [grainId, meta3] of Object.entries(GRAIN_META)) {
+    const entry = {
+      id: `grain:${grainId}`,
+      kind: "film_grain",
+      grain_id: grainId,
+      label: meta3.label,
+      description: "Film Grain look",
+      vibe_tags: [...meta3.vibe_tags]
+    };
+    if (lookMatches(entry, q)) looks.push(entry);
+  }
+  looks.sort((a, b) => (KIND_RANK[String(a.kind)] ?? 9) - (KIND_RANK[String(b.kind)] ?? 9) || cmp(String(a.id ?? ""), String(b.id ?? "")));
+  return { ok: true, count: looks.length, looks, query: query2 || "" };
+}
+function resolveLookId(lookId) {
+  const raw = String(lookId ?? "").trim();
+  if (!raw) throw new ColorValueError("lookId is required");
+  const lowered = raw.toLowerCase();
+  if (lowered.startsWith("grain:")) {
+    const grainId = raw.split(":").slice(1).join(":").trim();
+    if (!FILM_GRAIN_LOOK_IDS.includes(grainId)) throw new ColorValueError(`Unknown film grain look '${grainId}'`);
+    return { kind: "film_grain", grain_id: grainId, id: `grain:${grainId}` };
+  }
+  if (LOOK_PRESET_IDS2.includes(lowered)) return { kind: "color_preset", preset_name: lowered, id: lowered };
+  if (lowered.endsWith(".cube") || raw.includes("/") || raw.includes("\\") || raw.startsWith("@colors")) return { kind: "lut", lut_path: raw, id: raw };
+  const matches2 = [];
+  for (const [category, ids2] of BUILTIN_LUTS) {
+    for (const lid of ids2) if (lid === raw || lid.toLowerCase() === lowered) matches2.push([category, lid]);
+  }
+  if (matches2.length === 1) {
+    const [category, lid] = matches2[0];
+    return { kind: "lut", id: lid, lut_path: lutRelativePath(category, lid), category };
+  }
+  if (matches2.length > 1) {
+    throw new ColorValueError(`Ambiguous LUT id '${raw}'; use one of: ${matches2.map(([c, i]) => lutRelativePath(c, i)).join(", ")}`);
+  }
+  if (FILM_GRAIN_LOOK_IDS.includes(lowered)) return { kind: "film_grain", grain_id: lowered, id: `grain:${lowered}` };
+  throw new ColorValueError(`Unknown lookId '${raw}'. Call list_looks_tool to see preset, LUT, and grain ids.`);
+}
+function applySoftColorPreset(effect2, presetName) {
+  const name = String(presetName ?? "").trim().toLowerCase();
+  if (name === "reset") throw new ColorValueError("reset removes ColorGrade; do not call apply_soft_color_preset");
+  if (!LOOK_PRESET_IDS2.includes(name) || !isColorGradePreset(name)) throw new ColorValueError(`Unknown color preset: ${presetName}`);
+  const payload = applyColorGradePreset(effect2, name);
+  if (!payload.class_name) payload.class_name = COLOR_GRADE_CLASS_NAME;
+  return payload;
+}
+var ColorValueError, COLOR_GRADE_CLASS_NAME, SCALAR_DEFAULTS, SCALAR_KEYS, SCALAR_BOUNDS, SCALAR_ALIASES, CURVE_KEYS, CURVE_ALIASES, WHEEL_NAMES, LOOK_PRESET_IDS2, FILM_GRAIN_LOOK_IDS, DELTA_KEYS, SATURATION_REFUSAL, GRAIN_SCALAR_KEYS, LOOK_DISTANCE_MATCHED, MAX_STEP, PRESET_GOALS, LOOK_PRESET_META, LOOK_QUERY_SYNONYMS, CATEGORY_VIBE_TAGS, GRAIN_META, KIND_RANK;
+var init_color_agent = __esm({
+  "../engine/src/tools/color-agent.ts"() {
+    "use strict";
+    init_luts();
+    init_look();
+    init_rounding();
+    init_coerce();
+    init_color_stats();
+    init_pyfmt();
+    ColorValueError = class extends Error {
+      name = "ColorValueError";
+    };
+    COLOR_GRADE_CLASS_NAME = "ColorGrade";
+    SCALAR_DEFAULTS = {
+      temperature: 0,
+      tint: 0,
+      exposure: 0,
+      contrast: 0,
+      highlights: 0,
+      shadows: 0,
+      saturation: 1,
+      vibrance: 0,
+      mix: 1,
+      lut_intensity: 1
+    };
+    SCALAR_KEYS = Object.keys(SCALAR_DEFAULTS);
+    SCALAR_BOUNDS = {
+      saturation: [0, 2],
+      mix: [0, 1],
+      lut_intensity: [0, 1]
+    };
+    SCALAR_ALIASES = {
+      temp: "temperature",
+      sat: "saturation",
+      lut_strength: "lut_intensity",
+      lutIntensity: "lut_intensity"
+    };
+    CURVE_KEYS = ["curve_all", "curve_red", "curve_green", "curve_blue"];
+    CURVE_ALIASES = {
+      masterCurve: "curve_all",
+      master_curve: "curve_all",
+      redCurve: "curve_red",
+      red_curve: "curve_red",
+      greenCurve: "curve_green",
+      green_curve: "curve_green",
+      blueCurve: "curve_blue",
+      blue_curve: "curve_blue"
+    };
+    WHEEL_NAMES = ["global", "shadows", "midtones", "highlights"];
+    LOOK_PRESET_IDS2 = ["reset", "auto_contrast", "lift_shadows", "warm_up", "sunny", "gloomy", "boost_color"];
+    FILM_GRAIN_LOOK_IDS = ["none", "35mm_fine", "35mm_classic", "35mm_gritty", "16mm_classic", "super_8", "high_iso"];
+    DELTA_KEYS = {
+      temperature_delta: "temperature",
+      tint_delta: "tint",
+      exposure_delta: "exposure",
+      vibrance_delta: "vibrance",
+      contrast_delta: "contrast",
+      highlights_delta: "highlights",
+      shadows_delta: "shadows",
+      saturation_delta: "saturation"
+    };
+    SATURATION_REFUSAL = "saturation neutral is 1.0 (not 0). Values below 0.5 look grey. For more color use ~1.1\u20131.3, or apply_look_tool lookId='sunny' / 'boost_color'. For less color use ~0.7\u20130.9, never 0.2.";
+    GRAIN_SCALAR_KEYS = [
+      "amount",
+      "size",
+      "softness",
+      "clump",
+      "shadows",
+      "midtones",
+      "highlights",
+      "color_amount",
+      "color_variation",
+      "evolution",
+      "coherence"
+    ];
+    LOOK_DISTANCE_MATCHED = 0.045;
+    MAX_STEP = {
+      exposure: 0.35,
+      contrast: 0.25,
+      highlights: 0.3,
+      shadows: 0.3,
+      temperature: 0.35,
+      tint: 0.25,
+      saturation: 0.25,
+      vibrance: 0.25
+    };
+    PRESET_GOALS = {
+      sunny: {
+        present: true,
+        samples: 0,
+        avg_luma: 0.58,
+        warm_cool: 0.08,
+        green_magenta: 0,
+        sat_proxy: 0.22,
+        contrast_span: 0.45,
+        clipped_shadows: 0.01,
+        clipped_highlights: 0.03,
+        channel_means: { red: 0.55, green: 0.52, blue: 0.47, luma: 0.58 }
+      },
+      gloomy: {
+        present: true,
+        samples: 0,
+        avg_luma: 0.38,
+        warm_cool: -0.06,
+        green_magenta: 0,
+        sat_proxy: 0.1,
+        contrast_span: 0.4,
+        clipped_shadows: 0.04,
+        clipped_highlights: 0.01,
+        channel_means: { red: 0.34, green: 0.36, blue: 0.4, luma: 0.38 }
+      },
+      warm_up: {
+        present: true,
+        samples: 0,
+        avg_luma: 0.5,
+        warm_cool: 0.1,
+        green_magenta: 0.02,
+        sat_proxy: 0.2,
+        contrast_span: 0.42,
+        clipped_shadows: 0.02,
+        clipped_highlights: 0.02,
+        channel_means: { red: 0.52, green: 0.48, blue: 0.42, luma: 0.5 }
+      },
+      boost_color: {
+        present: true,
+        samples: 0,
+        avg_luma: 0.5,
+        warm_cool: 0.02,
+        green_magenta: 0,
+        sat_proxy: 0.32,
+        contrast_span: 0.48,
+        clipped_shadows: 0.02,
+        clipped_highlights: 0.03,
+        channel_means: { red: 0.52, green: 0.48, blue: 0.46, luma: 0.5 }
+      }
+    };
+    LOOK_PRESET_META = {
+      reset: { label: "Reset Color", description: "Remove ColorGrade from the clip", vibe_tags: ["neutral", "reset"] },
+      auto_contrast: { label: "Auto Contrast", description: "Mild S-curve contrast with lifted shadows", vibe_tags: ["contrast", "punchy", "documentary"] },
+      lift_shadows: { label: "Lift Shadows", description: "Open shadows, soft contrast", vibe_tags: ["soft", "interview", "low_contrast"] },
+      warm_up: { label: "Warm Up", description: "Warmer temperature and slight vibrance", vibe_tags: ["warm", "tungsten", "cozy", "golden", "sunny"] },
+      sunny: {
+        label: "Sunny",
+        description: "Bright daylight: warm, lifted exposure, healthy color",
+        vibe_tags: ["sunny", "sun", "bright", "daylight", "golden", "summer", "outdoors"]
+      },
+      gloomy: {
+        label: "Gloomy",
+        description: "Overcast / muted: cooler, slightly darker, less punch",
+        vibe_tags: ["gloomy", "overcast", "grey", "gray", "muted", "cloudy", "dreary"]
+      },
+      boost_color: {
+        label: "Boost Color",
+        description: "Higher saturation and vibrance with mild S-curve",
+        vibe_tags: ["vibrant", "saturated", "pop", "instagram", "candy"]
+      }
+    };
+    LOOK_QUERY_SYNONYMS = {
+      sunny: ["sunny", "sunlit", "sun", "warm", "golden", "daylight", "bright"],
+      sun: ["sunny", "sunlit", "warm", "golden"],
+      bright: ["sunny", "bright", "sunlit", "boost"],
+      gloomy: ["gloomy", "overcast", "muted", "grey", "gray", "cloudy", "dark"],
+      grey: ["gloomy", "muted", "grey", "gray"],
+      gray: ["gloomy", "muted", "grey", "gray"],
+      candy: ["candy", "boost", "vibrant", "pop", "saturated"],
+      horror: ["horror", "teal_horror", "noir", "dark", "moody", "cold"],
+      noir: ["noir", "noir_era", "dark", "moody", "black"],
+      vhs: ["vhs", "vintage", "super8", "retro", "analog", "film_stock"],
+      teal: ["teal", "teal_orange", "teal_horror", "cinematic"],
+      orange: ["teal_orange", "sunset", "warm", "orange"],
+      overcast: ["gloomy", "overcast", "muted", "cloudy"],
+      vintage: ["vintage", "film_stock", "analog", "retro", "vhs", "super8"]
+    };
+    CATEGORY_VIBE_TAGS = {
+      "cinematic_&_blockbuster": ["cinematic", "blockbuster", "film"],
+      "dark_&_moody": ["dark", "moody", "night", "noir", "horror"],
+      "film_stock_&_vintage": ["vintage", "film_stock", "analog", "retro", "vhs"],
+      "teal_&_orange_vibes": ["teal_orange", "cinematic", "hollywood", "teal", "orange"],
+      "utility_&_correction": ["utility", "correction", "neutral"],
+      "vibrant_&_colorful": ["vibrant", "colorful", "pop", "candy"]
+    };
+    GRAIN_META = {
+      none: { label: "No Film Grain", vibe_tags: ["clean"] },
+      "35mm_fine": { label: "35mm Fine", vibe_tags: ["film", "subtle", "35mm"] },
+      "35mm_classic": { label: "35mm Classic", vibe_tags: ["film", "35mm", "cinematic"] },
+      "35mm_gritty": { label: "35mm Gritty", vibe_tags: ["film", "gritty", "35mm"] },
+      "16mm_classic": { label: "16mm Classic", vibe_tags: ["film", "16mm", "documentary"] },
+      super_8: { label: "Super 8", vibe_tags: ["vintage", "super8", "home_movie"] },
+      high_iso: { label: "High ISO", vibe_tags: ["grainy", "night", "high_iso"] }
+    };
+    KIND_RANK = { color_preset: 0, lut: 1, film_grain: 2 };
+  }
+});
+
+// ../engine/src/tools/difflib.ts
+function compareCodePoints(x, y) {
+  const a = Array.from(x);
+  const b = Array.from(y);
+  for (let i = 0; i < Math.min(a.length, b.length); i += 1) {
+    const d = a[i].codePointAt(0) - b[i].codePointAt(0);
+    if (d !== 0) return d;
+  }
+  return a.length - b.length;
+}
+function getCloseMatches(word, possibilities, n = 3, cutoff = 0.6) {
+  if (!(n > 0)) throw new RangeError(`n must be > 0: ${n}`);
+  if (!(cutoff >= 0 && cutoff <= 1)) throw new RangeError(`cutoff must be in [0.0, 1.0]: ${cutoff}`);
+  const result2 = [];
+  for (const x of possibilities) {
+    const s = new SequenceMatcher(x, word);
+    if (s.realQuickRatio() >= cutoff && s.quickRatio() >= cutoff) {
+      const score = s.ratio();
+      if (score >= cutoff) result2.push([score, x]);
+    }
+  }
+  result2.sort((p, q) => q[0] - p[0] || compareCodePoints(q[1], p[1]));
+  return result2.slice(0, n).map(([, x]) => x);
+}
+var SequenceMatcher;
+var init_difflib = __esm({
+  "../engine/src/tools/difflib.ts"() {
+    "use strict";
+    SequenceMatcher = class _SequenceMatcher {
+      a;
+      b;
+      b2j = /* @__PURE__ */ new Map();
+      popular = /* @__PURE__ */ new Set();
+      fullBCount = null;
+      constructor(a, b) {
+        this.a = Array.from(a);
+        this.b = Array.from(b);
+        this.b.forEach((elt, i) => {
+          const list2 = this.b2j.get(elt);
+          if (list2) list2.push(i);
+          else this.b2j.set(elt, [i]);
+        });
+        const n = this.b.length;
+        if (n >= 200) {
+          const ntest = Math.floor(n / 100) + 1;
+          for (const [elt, idxs] of this.b2j) {
+            if (idxs.length > ntest) this.popular.add(elt);
+          }
+          for (const elt of this.popular) this.b2j.delete(elt);
+        }
+      }
+      findLongestMatch(alo, ahi, blo, bhi) {
+        const { a, b } = this;
+        let besti = alo;
+        let bestj = blo;
+        let bestsize = 0;
+        let j2len = /* @__PURE__ */ new Map();
+        for (let i = alo; i < ahi; i += 1) {
+          const newj2len = /* @__PURE__ */ new Map();
+          for (const j of this.b2j.get(a[i]) ?? []) {
+            if (j < blo) continue;
+            if (j >= bhi) break;
+            const k = (j2len.get(j - 1) ?? 0) + 1;
+            newj2len.set(j, k);
+            if (k > bestsize) {
+              besti = i - k + 1;
+              bestj = j - k + 1;
+              bestsize = k;
+            }
+          }
+          j2len = newj2len;
+        }
+        while (besti > alo && bestj > blo && a[besti - 1] === b[bestj - 1]) {
+          besti -= 1;
+          bestj -= 1;
+          bestsize += 1;
+        }
+        while (besti + bestsize < ahi && bestj + bestsize < bhi && a[besti + bestsize] === b[bestj + bestsize]) {
+          bestsize += 1;
+        }
+        return [besti, bestj, bestsize];
+      }
+      matches() {
+        const queue = [[0, this.a.length, 0, this.b.length]];
+        let total = 0;
+        while (queue.length > 0) {
+          const [alo, ahi, blo, bhi] = queue.pop();
+          const [i, j, k] = this.findLongestMatch(alo, ahi, blo, bhi);
+          if (k) {
+            total += k;
+            if (alo < i && blo < j) queue.push([alo, i, blo, j]);
+            if (i + k < ahi && j + k < bhi) queue.push([i + k, ahi, j + k, bhi]);
+          }
+        }
+        return total;
+      }
+      static calculateRatio(matches2, length) {
+        return length ? 2 * matches2 / length : 1;
+      }
+      ratio() {
+        return _SequenceMatcher.calculateRatio(this.matches(), this.a.length + this.b.length);
+      }
+      quickRatio() {
+        if (!this.fullBCount) {
+          this.fullBCount = /* @__PURE__ */ new Map();
+          for (const elt of this.b) this.fullBCount.set(elt, (this.fullBCount.get(elt) ?? 0) + 1);
+        }
+        const avail = /* @__PURE__ */ new Map();
+        let matches2 = 0;
+        for (const elt of this.a) {
+          const numb = avail.has(elt) ? avail.get(elt) : this.fullBCount.get(elt) ?? 0;
+          avail.set(elt, numb - 1);
+          if (numb > 0) matches2 += 1;
+        }
+        return _SequenceMatcher.calculateRatio(matches2, this.a.length + this.b.length);
+      }
+      realQuickRatio() {
+        const la = this.a.length;
+        const lb = this.b.length;
+        return _SequenceMatcher.calculateRatio(Math.min(la, lb), la + lb);
+      }
+    };
+  }
+});
+
+// ../engine/src/tools/luts.ts
+function norm(text5) {
+  return Array.from(String(text5).toLowerCase().replaceAll("&", "and")).filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("");
+}
+function resolveLut(value) {
+  const text5 = String(value ?? "").trim();
+  if (["", "none", "off", "no"].includes(text5.toLowerCase())) return { kind: "none", path: "" };
+  if (text5.startsWith(LUT_ALIAS) || isAbsoluteFilePath(text5)) {
+    const lut = builtinLutForPath(text5);
+    if (lut) return { kind: "builtin", path: lut.path, lut };
+    if (text5.startsWith(LUT_ALIAS) || !text5.toLowerCase().endsWith(".cube")) {
+      throw new LutError(`LUT file not found or not a .cube file: ${text5}`);
+    }
+    return { kind: "file", path: text5 };
+  }
+  const luts = listLuts();
+  const key = norm(text5.toLowerCase().endsWith(".cube") ? text5.slice(0, -5) : text5);
+  for (const field of ["id", "name"]) {
+    for (const lut of luts) {
+      if (norm(lut[field]) === key || norm(stem4(lut)) === key) return { kind: "builtin", path: lut.path, lut };
+    }
+  }
+  const partial2 = luts.filter((lut) => key && norm(lut.id).includes(key));
+  if (partial2.length === 1) return { kind: "builtin", path: partial2[0].path, lut: partial2[0] };
+  const close = getCloseMatches(text5, luts.map((lut) => lut.id), 5, 0.3);
+  const hints = close.length > 0 ? close : partial2.slice(0, 5).map((lut) => lut.id);
+  const hint = hints.length > 0 ? `; closest: ${hints.join(", ")}` : "";
+  throw new LutError(`no LUT named ${pyReprString(text5)}${hint} (list_luts_tool lists them)`);
+}
+function colorAgentLutPath(lutPath) {
+  let raw = String(lutPath ?? "").trim();
+  if (!raw) return { kind: "none", path: "" };
+  if (raw.startsWith(LUT_ALIAS)) raw = raw.slice(LUT_ALIAS.length);
+  if (isAbsoluteFilePath(raw)) {
+    const lut2 = builtinLutForPath(raw);
+    return lut2 ? { kind: "builtin", path: lut2.path, lut: lut2 } : { kind: "file", path: raw };
+  }
+  const lut = builtinLutByRelativePath(raw);
+  return lut ? { kind: "builtin", path: lut.path, lut } : void 0;
+}
+function lutFileUnsupported(call) {
+  if (call.host.media?.importPath && call.host.storage?.readText) return null;
+  return "a .cube file outside the built-in LUTs needs local file access (Zenvi desktop or the zenvi CLI); use a built-in LUT (list_luts_tool)";
+}
+async function checkLutFile(call, path38) {
+  const unsupported2 = lutFileUnsupported(call);
+  if (unsupported2) throw new LutError(unsupported2);
+  let text5;
+  try {
+    text5 = await call.host.storage.readText(path38);
+  } catch {
+    throw new LutError(`LUT file not found or not a .cube file: ${path38}`);
+  }
+  if (!parseCubeLut(text5)) throw new LutError(`${path38} is not a LUT libopenshot can load (no LUT_3D_SIZE / LUT_1D_SIZE table)`);
+}
+async function resolveCheckedLut(call, value) {
+  const resolved = resolveLut(value);
+  if (resolved.kind === "file") await checkLutFile(call, resolved.path);
+  return resolved.path;
+}
+var LutError, stem4;
+var init_luts2 = __esm({
+  "../engine/src/tools/luts.ts"() {
+    "use strict";
+    init_luts();
+    init_cube_lut();
+    init_difflib();
+    init_pyfmt();
+    LutError = class extends Error {
+      name = "LutError";
+    };
+    stem4 = (lut) => lut.id.slice(lut.id.indexOf("/") + 1);
+  }
+});
+
+// ../engine/src/tools/catalog/timeline-edit-common.ts
+function failText(message) {
+  const line2 = String(message).split(/\s+/).filter(Boolean).join(" ");
+  return line2.startsWith("Error") ? line2 : `Error: ${line2}`;
+}
+async function editorRun(body) {
+  try {
+    return await body();
+  } catch (error62) {
+    if (error62 instanceof ToolError) return failText(error62.message);
+    throw error62;
+  }
+}
+function oneLine(summary) {
+  return String(summary).split(/\s+/).filter(Boolean).join(" ");
+}
+function ok(call, summary, data) {
+  return applied(call.tool, oneLine(summary), { data });
+}
+function nothingChanged(call, summary, data) {
+  return unchanged(call.tool, oneLine(summary), { data: { changed: false, ...data } });
+}
+function gridOf(project) {
+  const num13 = Math.trunc(Number(project.fps?.num)) || 30;
+  const den2 = Math.trunc(Number(project.fps?.den)) || 1;
+  const fps2 = num13 / den2;
+  return { fps: fps2, frame: 1 / fps2, tol: 0.5 / fps2, snap: (seconds2) => pyRound(seconds2 * fps2) / fps2 };
+}
+function r3(value) {
+  return Number(pyFixed(Number(value) || 0, 3));
+}
+function f2(value) {
+  return pyFixed(value, 2);
+}
+function spanOf(item) {
+  const position = Number(item.position) || 0;
+  return [position, position + Math.max(0, (Number(item.end) || 0) - (Number(item.start) || 0))];
+}
+function uiTrack(project, layer2) {
+  return layerNumberToDisplayIndex(layer2, project.layers);
+}
+function trackName(project, layer2) {
+  const ui = uiTrack(project, layer2);
+  return ui ? `track ${ui}` : `layer ${layer2}`;
+}
+function resolveLayer(project, track2) {
+  const text5 = track2 === void 0 || track2 === null ? "" : String(track2).trim();
+  if (!text5) throw new ToolError("a track is required (UI track number, name, or layer number)");
+  const resolved = normalizeTrackOrLayerArg(text5, project.layers);
+  if (resolved.error) throw new ToolError(resolved.error);
+  if (resolved.layer === void 0) throw new ToolError(`no track matches ${pyReprString(String(track2))}`);
+  return resolved.layer;
+}
+function requireUnlockedTracks(project, layers, what = "") {
+  const lockedNumbers = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
+  const locked = [...new Set(layers)].filter((n) => lockedNumbers.has(n)).sort((a, b) => a - b);
+  if (locked.length === 0) return;
+  const names2 = locked.map((n) => trackName(project, n)).join(", ");
+  const [verb, pronoun] = locked.length === 1 ? ["is", "it"] : ["are", "them"];
+  throw new ToolError(`${names2} ${verb} locked${what ? ` (${what})` : ""}; unlock ${pronoun} first (Track menu > Unlock Track)`);
+}
+function layersBottomUp(project) {
+  return [...project.layers].map((l) => l.number).sort((a, b) => a - b);
+}
+function isImageClip(clip2) {
+  const reader = clip2.reader;
+  return Boolean(reader?.has_single_image) || reader?.media_type === "image";
+}
+function clipTitle2(clip2) {
+  return String(clip2.title || clip2.id);
+}
+function clipById2(project, id) {
+  return project.clips.find((c) => c.id === id);
+}
+function describeClip(project, clip2) {
+  const [start, end] = spanOf(clip2);
+  return {
+    timeline_clip_id: String(clip2.id),
+    title: String(clip2.title ?? ""),
+    file_id: String(clip2.file_id ?? ""),
+    track: uiTrack(project, clip2.layer),
+    layer: clip2.layer,
+    position: r3(start),
+    end: r3(end),
+    duration: r3(end - start),
+    source_in: r3(Number(clip2.start) || 0),
+    source_out: r3(Number(clip2.end) || 0)
+  };
+}
+function clipsGiven(target) {
+  return (target.timeline_clip_ids?.length ?? 0) > 0 || Boolean(target.clip_query?.trim()) || Boolean(target.scope?.trim());
+}
+async function targetClip(call, target) {
+  const resolved = await resolveClip(call, target);
+  if (!resolved.ok) throw new ToolError(resolved.error || "could not resolve the timeline clip");
+  return resolved.clip;
+}
+function clipsByIds(project, ids2) {
+  return ids2.map((raw) => {
+    const clip2 = clipById2(project, String(raw).trim());
+    if (!clip2) throw new ToolError(`no timeline clip with id=${pyReprString(String(raw))}`);
+    return clip2;
+  });
+}
+function selectedClipIds(call) {
+  const clips = new Set(call.doc.project.clips.map((c) => c.id));
+  return (call.host.ui?.selectedIds?.() ?? []).filter((id) => clips.has(id));
+}
+async function targetClips(call, target) {
+  const project = call.doc.project;
+  const scope = (target.scope ?? "").trim().toLowerCase();
+  let clips;
+  if ((target.timeline_clip_ids?.length ?? 0) > 0) {
+    clips = clipsByIds(project, target.timeline_clip_ids);
+  } else if (scope === "selected") {
+    const ids2 = selectedClipIds(call);
+    if (ids2.length === 0) throw new ToolError("no clips are selected in the timeline");
+    clips = clipsByIds(project, ids2);
+  } else if (scope === "track" || scope === "all") {
+    clips = [...project.clips];
+    if (scope === "track") {
+      const layer2 = resolveLayer(project, target.track);
+      clips = clips.filter((c) => c.layer === layer2);
+    }
+    if (clips.length === 0) throw new ToolError(scope === "all" ? "the timeline has no clips" : `track ${pyStr(target.track ?? "")} has no clips`);
+  } else {
+    clips = [await targetClip(call, { clip_query: target.clip_query, track: target.track })];
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const out = clips.filter((c) => seen.has(c.id) ? false : (seen.add(c.id), true));
+  return out.sort((a, b) => Number(a.position) - Number(b.position) || a.layer - b.layer);
+}
+function overlapRow(project, hit) {
+  return {
+    timeline_clip_id: hit.clipId,
+    title: hit.title,
+    overlaps: hit.overlapsId,
+    overlaps_title: hit.overlapsTitle,
+    track: uiTrack(project, hit.layer),
+    seconds: r3(hit.seconds)
+  };
+}
+function newOverlaps(project, changes, newItems = []) {
+  return plannedOverlaps(project, changes, newItems, gridOf(project).tol).map((hit) => overlapRow(project, hit));
+}
+function checkOverlaps(hits, allowOverlap, what, rippleHint = true) {
+  if (hits.length > 0 && !allowOverlap) {
+    const first = hits[0];
+    const more = hits.length > 1 ? ` (+${hits.length - 1} more)` : "";
+    let options = "pass allow_overlap=true to overlap anyway";
+    if (rippleHint) options = `pass ripple=true to push the later clips along, or ${options}`;
+    throw new ToolError(
+      `${what} would overlap ${pyReprString(first.overlaps_title)} (${first.overlaps}) on track ${pyStr(first.track)} by ${pyFloat(first.seconds)} s${more}; ${options}`
+    );
+  }
+  return hits;
+}
+var ToolError;
+var init_timeline_edit_common = __esm({
+  "../engine/src/tools/catalog/timeline-edit-common.ts"() {
+    "use strict";
+    init_rounding();
+    init_sequence();
+    init_pyfmt();
+    init_receipt();
+    init_tracks2();
+    init_common();
+    ToolError = class extends Error {
+    };
+  }
+});
+
+// ../engine/src/tools/catalog/effect-catalog.ts
+function isRecord29(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isKeyframe2(value) {
+  return isRecord29(value) && Array.isArray(value.Points);
+}
+function isColorValue(value) {
+  return isRecord29(value) && ["red", "green", "blue"].every((c) => isKeyframe2(value[c]));
+}
+function round4(x) {
+  return Number(pyFixed(x, 4));
+}
+function colorHex(value) {
+  if (!isColorValue(value)) return null;
+  const channels = [];
+  for (const c of ["red", "green", "blue", "alpha"]) {
+    const points2 = isKeyframe2(value[c]) ? value[c].Points : [];
+    if (points2.length === 0) {
+      if (c === "alpha") {
+        channels.push(255);
+        continue;
+      }
+      return null;
+    }
+    channels.push(pyRound(Number(points2[0].co.Y)));
+  }
+  return `#${channels.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("")}`;
+}
+function defaultOf(value) {
+  if (isKeyframe2(value)) {
+    const points2 = value.Points;
+    return points2.length > 0 ? Number(points2[0].co.Y) : null;
+  }
+  if (isColorValue(value)) return colorHex(value);
+  if (typeof value === "boolean" || typeof value === "number" || typeof value === "string") return value;
+  return null;
+}
+function buildCatalog() {
+  const out = /* @__PURE__ */ new Map();
+  for (const def of EFFECTS) {
+    const defaults = defaultEffectJson(def.className, "");
+    const meta3 = def.properties;
+    const names2 = [...Object.keys(meta3).filter((k) => isRecord29(meta3[k])), ...Object.keys(defaults).filter((k) => !(k in meta3))];
+    const props = {};
+    for (const pname of names2) {
+      if (HIDDEN_PROPERTIES.has(pname)) continue;
+      const p = isRecord29(meta3[pname]) ? meta3[pname] : {};
+      if (p.readonly) continue;
+      const current = defaults[pname];
+      let ptype = typeof p.type === "string" && p.type ? p.type : "";
+      if (!ptype) {
+        if (isColorValue(current)) ptype = "color";
+        else if (isKeyframe2(current) || typeof current === "number" && !Number.isInteger(current)) ptype = "float";
+        else if (typeof current === "boolean") ptype = "bool";
+        else if (typeof current === "number") ptype = "int";
+        else if (typeof current === "string") ptype = "string";
+        else continue;
+      }
+      const keyframable = isKeyframe2(current) || isColorValue(current) && !COLORS_NOT_FLAGGED_KEYFRAME.has(`${def.className}.${pname}`);
+      const spec = { type: ptype, keyframable };
+      const lo = p.min;
+      const hi = p.max;
+      if ((ptype === "float" || ptype === "int") && typeof lo === "number" && typeof hi === "number" && lo < hi) {
+        spec.min = lo;
+        spec.max = hi;
+      }
+      if (Array.isArray(p.choices) && p.choices.length > 0) {
+        spec.choices = p.choices.map((c) => ({ name: c.name, value: c.value }));
+      }
+      const fallback = defaultOf(current);
+      if (fallback !== null && fallback !== void 0) {
+        spec.default = typeof fallback === "number" ? round4(fallback) : fallback;
+      }
+      props[pname] = spec;
+    }
+    out.set(def.className, {
+      effect: def.className,
+      name: def.name || def.className,
+      description: def.description || "",
+      kind: def.hasAudio && !def.hasVideo ? "audio" : "video",
+      needs_processing: PROCESSING_EFFECTS.includes(def.className),
+      // `info.get("has_tracked_object")`: EffectInfo's entries carry no such key, so the desktop always says false.
+      tracks_objects: false,
+      properties: props
+    });
+  }
+  return out;
+}
+function effectCatalog() {
+  cached3 ??= buildCatalog();
+  return cached3;
+}
+function normName(text5) {
+  return Array.from(String(text5 ?? "").toLowerCase()).filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("");
+}
+function resolveEffectName(name) {
+  const cat = effectCatalog();
+  const key = normName(name);
+  if (!key) throw new ToolError("name the effect (see list_effects_tool)");
+  for (const [cn, spec] of cat) {
+    if (key === normName(cn) || key === normName(spec.name)) return cn;
+  }
+  const alias = ALIASES3[key];
+  if (alias && cat.has(alias)) return alias;
+  for (const [cn, spec] of cat) {
+    if (normName(spec.name).startsWith(key) && key.length >= 4) return cn;
+  }
+  const close = getCloseMatches(String(name), [...cat.keys()], 4, 0.5);
+  const hint = close.length > 0 ? `; did you mean ${close.join(", ")}?` : "";
+  throw new ToolError(`unknown effect ${pyReprString(String(name))}${hint} list_effects_tool lists all ${cat.size} effects`);
+}
+function effectKind(className) {
+  return effectCatalog().get(className)?.kind ?? "video";
+}
+var HIDDEN_PROPERTIES, COMMON_PROPERTIES, PROCESSING_EFFECTS, AUDIO_REACTIVE_EFFECTS, ALIASES3, COLORS_NOT_FLAGGED_KEYFRAME, cached3;
+var init_effect_catalog = __esm({
+  "../engine/src/tools/catalog/effect-catalog.ts"() {
+    "use strict";
+    init_rounding();
+    init_registry();
+    init_difflib();
+    init_pyfmt();
+    init_timeline_edit_common();
+    HIDDEN_PROPERTIES = /* @__PURE__ */ new Set([
+      "id",
+      "position",
+      "layer",
+      "start",
+      "end",
+      "duration",
+      "order",
+      "class_name",
+      "type",
+      "name",
+      "description",
+      "has_audio",
+      "has_video",
+      "has_tracked_object",
+      "objects",
+      "protobuf_data_path",
+      "BaseFPS",
+      "TimeScale",
+      "ui",
+      "ui-menu",
+      "parent_effect_id"
+    ]);
+    COMMON_PROPERTIES = ["apply_before_clip", "mask_invert", "mask_loop_mode", "mask_time_mode", "mask_reader", "mask_source_id"];
+    PROCESSING_EFFECTS = ["Stabilizer", "Tracker", "ObjectDetection", "ObjectMask"];
+    AUDIO_REACTIVE_EFFECTS = /* @__PURE__ */ new Set(["AudioVisualization", "BeatSync"]);
+    ALIASES3 = {
+      greenscreen: "ChromaKey",
+      bluescreen: "ChromaKey",
+      chroma: "ChromaKey",
+      keyer: "ChromaKey",
+      grade: "ColorGrade",
+      colorgrading: "ColorGrade",
+      colorcorrection: "ColorGrade",
+      lut: "ColorMap",
+      lookup: "ColorMap",
+      brightnesscontrast: "Brightness",
+      contrast: "Brightness",
+      grain: "FilmGrain",
+      vhs: "AnalogTape",
+      tape: "AnalogTape",
+      eq: "ParametricEQ",
+      equalizer: "ParametricEQ",
+      equaliser: "ParametricEQ",
+      denoise: "DenoiseImage",
+      stabilize: "Stabilizer",
+      stabilise: "Stabilizer",
+      stabilization: "Stabilizer",
+      track: "Tracker",
+      objecttracker: "Tracker",
+      objectdetector: "ObjectDetection",
+      detection: "ObjectDetection",
+      segmentation: "ObjectMask",
+      invert: "Negate",
+      negative: "Negate",
+      letterbox: "Bars",
+      robot: "Robotization",
+      whisper: "Whisperization",
+      noisegate: "Expander",
+      gate: "Expander",
+      "360": "SphericalProjection",
+      fisheye: "SphericalProjection",
+      flare: "LensFlare",
+      dropshadow: "Shadow",
+      visualizer: "AudioVisualization",
+      waveform: "AudioVisualization"
+    };
+    COLORS_NOT_FLAGGED_KEYFRAME = /* @__PURE__ */ new Set(["ChromaKey.color", "ObjectMask.mask_color", "ObjectMask.stroke_color"]);
+  }
+});
+
+// ../engine/src/tools/catalog/effects-color-common.ts
+function isRecord30(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function readerOf3(clip2) {
+  return isRecord30(clip2.reader) ? clip2.reader : {};
+}
+function clipHasPicture(clip2) {
+  const reader = readerOf3(clip2);
+  if (reader.media_type === "audio") return false;
+  return reader.has_video === void 0 || reader.has_video === null ? true : Boolean(reader.has_video);
+}
+function clipHasSound(clip2) {
+  const reader = readerOf3(clip2);
+  if (reader.media_type === "image") return false;
+  return reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
+}
+function isLocked(project, layer2) {
+  return project.layers.some((l) => Number(l.number) === Number(layer2) && Boolean(l.lock));
+}
+function clipLabel(project, clip2) {
+  return `${clip2.id} (${clip2.title || "clip"}, track ${pyStr(uiTrack(project, Number(clip2.layer) || 0))})`;
+}
+function lockedMessage(project, clip2) {
+  return `clip ${clipLabel(project, clip2)} is on a locked track; unlock the track first`;
+}
+function compatibilityProblem(project, clip2, className) {
+  if (isLocked(project, Number(clip2.layer) || 0)) return lockedMessage(project, clip2);
+  if (effectKind(className) === "audio") {
+    if (!clipHasSound(clip2)) return `${className} is an audio effect and clip ${clipLabel(project, clip2)} has no sound`;
+  } else if (!clipHasPicture(clip2) && !AUDIO_REACTIVE_EFFECTS.has(className)) {
+    return `${className} is a video effect and clip ${clipLabel(project, clip2)} is audio-only`;
+  }
+  return null;
+}
+function resolveClipsList(call, ids2, scope = "", track2 = "") {
+  const project = call.doc.project;
+  const s = scope.trim().toLowerCase();
+  if (ids2 && ids2.length > 0) {
+    return ids2.map((raw) => {
+      const clip2 = clipById2(project, String(raw).trim());
+      if (!clip2) throw new ToolError(`no timeline clip with id=${pyReprString(String(raw))}`);
+      return clip2;
+    });
+  }
+  if (s === "selected") {
+    const selected = selectedClipIds(call);
+    if (selected.length === 0) throw new ToolError("no clips are selected in the timeline");
+    return resolveClipsList(call, selected);
+  }
+  if (s === "track" || s === "all") {
+    let clips = [...project.clips];
+    if (s === "track") {
+      const layer2 = resolveLayer(project, track2);
+      clips = clips.filter((c) => Number(c.layer) === layer2);
+    }
+    clips.sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0) || (Number(a.layer) || 0) - (Number(b.layer) || 0));
+    if (clips.length === 0) throw new ToolError(s === "all" ? "the timeline has no clips" : `track ${track2} has no clips`);
+    return clips;
+  }
+  return [];
+}
+async function resolveOneClip(call, target) {
+  const resolved = await resolveClip(call, target);
+  if (!resolved.ok) throw new ToolError(resolved.error || "could not resolve the timeline clip");
+  return resolved.clip;
+}
+async function targetClips2(call, t) {
+  let ids2 = (t.timeline_clip_ids ?? []).map((i) => String(i).trim()).filter(Boolean);
+  const single2 = String(t.timeline_clip_id ?? "").trim();
+  if (single2) ids2 = [single2, ...ids2.filter((i) => i !== single2)];
+  if (ids2.length > 0) return { clips: resolveClipsList(call, ids2), explicit: true };
+  const scope = String(t.scope ?? "");
+  if (scope) return { clips: resolveClipsList(call, void 0, scope, String(t.track ?? "")), explicit: scope === "selected" };
+  const clip2 = await resolveOneClip(call, {
+    clip_query: t.clip_query ?? "",
+    track: t.track ?? "",
+    occurrence: t.occurrence ?? 0,
+    position_near: t.position_near ?? null
+  });
+  return { clips: [clip2], explicit: true };
+}
+function splitCompatible(project, clips, explicit, className) {
+  const ok2 = [];
+  const skipped = [];
+  for (const clip2 of clips) {
+    const problem = compatibilityProblem(project, clip2, className);
+    if (problem) {
+      if (explicit) throw new ToolError(problem);
+      skipped.push({ timeline_clip_id: clip2.id, reason: problem });
+    } else {
+      ok2.push(clip2);
+    }
+  }
+  if (ok2.length === 0) throw new ToolError(skipped[0]?.reason ?? "no clips to change");
+  return { ok: ok2, skipped };
+}
+function clipEffects(clip2) {
+  return Array.isArray(clip2.effects) ? clip2.effects.filter((e) => isRecord30(e)) : [];
+}
+function findEffect(project, effectId) {
+  const id = String(effectId ?? "").trim();
+  for (const clip2 of project.clips) {
+    for (const effect2 of clipEffects(clip2)) {
+      if (String(effect2.id) === id) return { clip: clip2, effect: effect2 };
+    }
+  }
+  throw new ToolError(`no effect with id=${pyReprString(String(effectId ?? ""))} on the timeline (get_clip_effects_tool lists them)`);
+}
+var init_effects_color_common = __esm({
+  "../engine/src/tools/catalog/effects-color-common.ts"() {
+    "use strict";
+    init_pyfmt();
+    init_effect_catalog();
+    init_timeline_edit_common();
+    init_common();
+  }
+});
+
+// ../engine/src/tools/catalog/color-agent.ts
+function isRecord31(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function text2(value) {
+  if (value === null || value === void 0 || value === false || value === "") return "";
+  if (value === true) return "True";
+  return String(value).trim();
+}
+function toolFlag(values, fallback = false) {
+  for (const value of values) {
+    if (value === null || value === void 0 || value === "") continue;
+    if (typeof value === "boolean") return value;
+    const t = String(value).trim().toLowerCase();
+    if (["1", "true", "yes", "y", "on"].includes(t)) return true;
+    if (["0", "false", "no", "n", "off"].includes(t)) return false;
+  }
+  return fallback;
+}
+function fps(project) {
+  const f3 = project.fps;
+  return f3 && f3.num > 0 && f3.den > 0 ? f3.num / f3.den : 30;
+}
+function allTimelineClipIds(project) {
+  const out = [];
+  for (const clip2 of project.clips) {
+    const id = String(clip2.id ?? "").trim();
+    if (id && !out.includes(id) && !isAudioOnlyMedia(clip2.reader)) out.push(id);
+  }
+  return out;
+}
+function playheadTimelineClipIds(call) {
+  const t = Math.max(0, playheadSeconds(call));
+  const out = [];
+  for (const clip2 of call.doc.project.clips) {
+    const position = Number(clip2.position) || 0;
+    if (position > t || position + ((Number(clip2.end) || 0) - (Number(clip2.start) || 0)) < t) continue;
+    const id = String(clip2.id ?? "").trim();
+    if (id && !out.includes(id) && !isAudioOnlyMedia(clip2.reader)) out.push(id);
+  }
+  return out;
+}
+function resolveColorTargetIds(call, args) {
+  const joined = [args.clip_ids, args.clipIds, args.timeline_clip_id, args.clipId].map(text2).filter(Boolean).join(" ").trim().toLowerCase();
+  let wantAll = Boolean(args.all_clips) || ["all", "*", "both", "every", "everything"].includes(joined);
+  if (!wantAll) {
+    const parsed = parseClipIds(args.clip_ids, args.clipIds, args.timeline_clip_id, args.clipId);
+    if (parsed.length > 0 && parsed.every((p) => ["all", "*", "both"].includes(p.trim().toLowerCase()))) wantAll = true;
+    else if (parsed.length > 0) return parsed;
+  }
+  if (wantAll) return allTimelineClipIds(call.doc.project);
+  const clips = new Set(call.doc.project.clips.map((c) => c.id));
+  const selected = (call.host.ui?.selectedIds?.() ?? []).filter((id) => clips.has(id));
+  if (selected.length > 0) return selected;
+  return playheadTimelineClipIds(call);
+}
+function colorTargetError(project, action) {
+  const available = allTimelineClipIds(project);
+  let avail = available.length > 0 ? available.slice(0, 12).join(", ") : "(none)";
+  if (available.length > 12) avail += ", \u2026";
+  return `Error: ${action} needs a target clip. Select clip(s), park the playhead on a clip, pass timeline_clip_id / clipIds, or clipIds="all" for every timeline clip. On timeline now: ${avail}`;
+}
+function filterUnlocked(project, ids2, warnings) {
+  const kept = [];
+  for (const cid of ids2) {
+    const clip2 = project.clips.find((c) => c.id === cid);
+    if (!clip2) {
+      warnings.push(`clip ${cid} not found`);
+      continue;
+    }
+    if (isLocked(project, Number(clip2.layer) || 0)) {
+      warnings.push(`clip ${cid}: track locked \u2014 skipped`);
+      continue;
+    }
+    kept.push(cid);
+  }
+  return kept;
+}
+async function resolveLutFile(call, raw) {
+  const value = text2(raw);
+  const look = resolveLookId(value);
+  if (look.kind !== "lut") throw new ColorValueError(`'${value}' is a ${look.kind} look, not a LUT; use apply_look_tool`);
+  const resolved = colorAgentLutPath(look.lut_path);
+  if (!resolved || resolved.kind === "none") throw new ColorValueError(`LUT file not found: ${look.lut_path}. Call list_looks_tool for LUT ids.`);
+  if (resolved.kind === "file") {
+    try {
+      await checkLutFile(call, resolved.path);
+    } catch (error62) {
+      if (error62 instanceof LutError) throw new ColorValueError(`LUT file not found: ${look.lut_path}. Call list_looks_tool for LUT ids. (${error62.message})`);
+      throw error62;
+    }
+  }
+  return resolved.path;
+}
+function effectFactory(project) {
+  const nextId = idFactory(project);
+  return (className) => createEffect(className, {}, { id: nextId() });
+}
+function replaceFirstGrade(effects, effect2) {
+  let replaced = false;
+  const out = [];
+  for (const e of effects) {
+    if (isColorGradeEffect(e)) {
+      if (!replaced) {
+        out.push(effect2);
+        replaced = true;
+      }
+    } else {
+      out.push(e);
+    }
+  }
+  if (!replaced) out.push(effect2);
+  return out;
+}
+function mergedGradeEffects(effects, patch, create) {
+  let existing = findColorGrade(effects);
+  let list2 = effects;
+  if (existing === null) {
+    existing = create("ColorGrade");
+    list2 = [...effects, existing];
+  }
+  const merged = mergeColorGrade(existing, patch);
+  return { effects: replaceFirstGrade(list2, merged), merged };
+}
+function clipLocalFrameNumber(clip2, timelineFrame, rate) {
+  const r = Math.max(rate, 1e-6);
+  const pos = Number(clip2.position) || 0;
+  const start = Number(clip2.start) || 0;
+  const end = Number(clip2.end) || start + 1 / r;
+  const duration3 = Math.max(1 / r, end - start);
+  const timelineSec = Math.max(0, (Math.trunc(timelineFrame) - 1) / r);
+  let localSec = timelineSec - pos;
+  if (localSec < 0 || localSec > duration3) localSec = duration3 * 0.5;
+  return Math.max(1, Math.trunc(localSec * rate) + 1);
+}
+function scopesOf(pixels) {
+  const scope = analyzeFrameScope(pixels, { vectorscopeSize: 96 });
+  if (!scope) return { present: false };
+  const area = Math.max(1, pixels.width * pixels.height);
+  return scopeFromRawVideo({
+    present: true,
+    histogram: { luma: Array.from(scope.luma), red: Array.from(scope.red), green: Array.from(scope.green), blue: Array.from(scope.blue) },
+    summary: { avg_luma: scope.avgLuma, clipped_shadows: scope.clippedShadows / area, clipped_highlights: scope.clippedHighlights / area }
+  });
+}
+async function renderClipIsolated(call, clip2, timelineFrame, withPreview) {
+  const project = call.doc.project;
+  const localFrame2 = clipLocalFrameNumber(clip2, timelineFrame, fps(project));
+  const scratch2 = isolatedProject(project, clip2);
+  try {
+    const [width] = soloRenderSize(project.width, project.height);
+    const frame = await renderPixels(call, scratch2, localFrame2, width);
+    const scopes = scopesOf(frame.pixels);
+    scopes.isolated = true;
+    scopes.local_frame = localFrame2;
+    const preview = withPreview ? await renderPreview(call, scratch2, localFrame2) : null;
+    return { scopes, preview, localFrame: localFrame2 };
+  } catch (error62) {
+    const message = error62 instanceof Error ? error62.message : String(error62);
+    return { scopes: { present: false, isolated: false, error: `isolated render failed: ${message}` }, preview: null, localFrame: 0 };
+  }
+}
+function sampleLocalFrames(duration3, rate, count) {
+  const n = Math.max(1, Math.trunc(count || sampleCountForDuration(duration3)));
+  const r = Math.max(rate || 30, 1e-6);
+  const total = Math.max(1, pyRound(Math.max(duration3, 1 / r) * r));
+  if (n === 1) return [Math.max(1, Math.floor(total / 2))];
+  const frames = [];
+  for (let i = 0; i < n; i += 1) {
+    const t = i / Math.max(n - 1, 1);
+    frames.push(Math.max(1, Math.min(total, 1 + pyRound(t * (total - 1)))));
+  }
+  return [...new Set(frames)];
+}
+function clipDurationSeconds(clip2) {
+  const start = Number(clip2.start) || 0;
+  const end = Number(clip2.end) || 0;
+  if (end > start) return end - start;
+  const dur = Number(clip2.reader?.duration) || 0;
+  return dur > 0 ? dur : 1;
+}
+function previewIndex(n) {
+  const picks = [.../* @__PURE__ */ new Set([0, Math.floor(n / 2), n - 1])].sort((a, b) => a - b);
+  return picks[Math.floor(picks.length / 2)];
+}
+async function mapLimit2(items, limit, fn, signal) {
+  const out = new Array(items.length).fill(null);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length && !signal?.aborted) {
+      const i = next;
+      next += 1;
+      out[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+async function profileClipDense(call, clip2, maxSamples) {
+  const rate = fps(call.doc.project);
+  const duration3 = clipDurationSeconds(clip2);
+  let n = sampleCountForDuration(duration3);
+  if (maxSamples !== void 0) n = Math.max(1, Math.min(Math.trunc(maxSamples), n));
+  const frames = sampleLocalFrames(duration3, rate, n);
+  const solo = { ...clip2, position: 0 };
+  const pick2 = previewIndex(frames.length);
+  const rendered = await mapLimit2(frames, RENDER_CONCURRENCY, (localFrame2, i) => renderClipIsolated(call, solo, localFrame2, i === pick2), call.signal);
+  const scopes = rendered.filter((r) => r !== null && Boolean(r.scopes.present)).map((r) => r.scopes);
+  const preview = rendered[pick2]?.preview ?? null;
+  return { profile: buildLookProfile(scopes), scopes_samples: scopes.length, sample_frames: frames, preview, duration_s: duration3 };
+}
+async function profileMediaFile(call, file3) {
+  const project = call.doc.project;
+  const rate = fps(project);
+  const still = Boolean(file3.has_single_image) || String(file3.media_type ?? "") === "image";
+  const duration3 = still ? 0 : Math.max(0, Number(file3.duration) || 0);
+  const n = duration3 <= 0.05 ? 1 : sampleCountForDuration(duration3);
+  const frames = sampleLocalFrames(Math.max(duration3, 1 / rate), rate, n);
+  const scratch2 = mediaFileProject(project, file3, Math.max(duration3, 1 / rate));
+  const [width] = soloRenderSize(project.width, project.height);
+  const pick2 = previewIndex(frames.length);
+  let scopes;
+  let preview;
+  try {
+    const measured = await mapLimit2(frames, RENDER_CONCURRENCY, async (frame) => scopesOf((await renderPixels(call, scratch2, frame, width)).pixels), call.signal);
+    scopes = measured.filter((sc) => sc !== null && Boolean(sc.present));
+    preview = await renderPreview(call, scratch2, frames[pick2]);
+  } catch (error62) {
+    return {
+      profile: { present: false, error: error62 instanceof Error ? error62.message : String(error62) },
+      scopes_samples: 0,
+      sample_frames: frames,
+      preview: null,
+      duration_s: duration3
+    };
+  }
+  return { profile: buildLookProfile(scopes), scopes_samples: scopes.length, sample_frames: frames, preview, duration_s: duration3 };
+}
+async function profileLocalPath(call, path38) {
+  try {
+    const info = await call.host.media.probe(path38);
+    const file3 = { ...info, id: "ZENVIREFIMG", path: path38 };
+    return await profileMediaFile(call, file3);
+  } catch (error62) {
+    const reason = error62 instanceof Error ? error62.message : String(error62);
+    return { profile: { present: false, error: `file not found: ${path38} (${reason})` }, scopes_samples: 0, sample_frames: [], preview: null, duration_s: 0 };
+  }
+}
+function pyIntOr(value, fallback) {
+  if (value === void 0 || value === null || value === "" || value === 0 || value === false) return fallback;
+  if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : fallback;
+  const t = String(value).trim();
+  return /^[+-]?\d+$/.test(t) ? Number.parseInt(t, 10) : fallback;
+}
+function jsonResult(call, result2, previews) {
+  return { receipt: applied(call.tool, JSON.stringify(result2), { data: result2 }, 0), images: previews.images };
+}
+async function colorTool(call, body) {
+  try {
+    return await body();
+  } catch (error62) {
+    if (error62 instanceof ColorValueError) return failed(call.tool, `Error: ${error62.message}`);
+    if (error62 instanceof FrameRenderError) return failed(call.tool, `Error: ${error62.message}`);
+    throw error62;
+  }
+}
+async function afterPreview(call, result2, firstId, warnings, previews) {
+  const clip2 = call.doc.project.clips.find((c) => c.id === firstId);
+  if (!call.host.frames || !clip2) {
+    result2.after_preview_jpeg = "";
+    result2.nuke_risk = false;
+    result2.warnings = [...warnings, `after preview failed: ${call.host.frames ? `clip ${firstId} not found` : "this host does not render frames"}`];
+    return {};
+  }
+  const after = await renderClipIsolated(call, clip2, 1, true);
+  const scopes = after.scopes;
+  result2.after_preview_jpeg = previews.field(after.preview);
+  result2.after_scopes = scopes;
+  return scopes;
+}
+function parseColorPatchKwargs(kwargs) {
+  const patch = {};
+  const json2 = (value, message) => {
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      throw new ColorValueError(message);
+    }
+  };
+  const color3 = kwargs.color;
+  if (color3 !== void 0 && color3 !== null && color3 !== "") {
+    const parsed = json2(color3, "color must be a JSON object");
+    if (!isRecord31(parsed)) throw new ColorValueError("color must be an object");
+    patch.color = parsed;
+  }
+  for (const key of [...SCALAR_KEYS, ...Object.keys(SCALAR_ALIASES), ...Object.keys(DELTA_KEYS)]) {
+    if (key in kwargs && kwargs[key] !== null && kwargs[key] !== void 0 && kwargs[key] !== "") patch[key] = kwargs[key];
+  }
+  if (kwargs.lut_path !== void 0 && kwargs.lut_path !== null && kwargs.lut_path !== "") patch.lut_path = kwargs.lut_path;
+  if (kwargs.lut !== void 0 && kwargs.lut !== null && kwargs.lut !== "") patch.lut = json2(kwargs.lut, "lut must be a JSON object");
+  if (kwargs.wheels !== void 0 && kwargs.wheels !== null && kwargs.wheels !== "") patch.wheels = json2(kwargs.wheels, "wheels must be a JSON object");
+  for (const key of [...CURVE_KEYS, ...Object.keys(CURVE_ALIASES)]) {
+    if (key in kwargs && kwargs[key] !== null && kwargs[key] !== void 0 && kwargs[key] !== "") patch[key] = json2(kwargs[key], `${key} must be JSON points`);
+  }
+  return patch;
+}
+function applyEffectsBatch(state, colorMode, patch, grainAction, firstPass) {
+  for (const [cid, current] of state.effects) {
+    let effects = [...current];
+    let mode = colorMode;
+    let paste = state.pasteColor;
+    let grain = grainAction;
+    if (firstPass && state.refClipId) {
+      const gAct = matchGradeAction(findColorGrade(effects), state.refEffect);
+      grain = matchGrainAction(findFilmGrain(effects), state.refGrain);
+      if (gAct.mode === "reset") {
+        mode = "reset";
+        paste = null;
+      } else if (gAct.mode === "paste") {
+        mode = "paste";
+        paste = gAct.color;
+      } else if (colorMode === "patch") {
+        mode = "patch";
+      } else {
+        mode = "noop";
+      }
+    }
+    if (mode === "reset") {
+      effects = effects.filter((e) => !isColorGradeEffect(e));
+    } else if (mode === "paste" && paste) {
+      effects = mergedGradeEffects(effects, { color: paste }, state.create).effects;
+    } else if (mode === "patch" && Object.keys(patch).length > 0) {
+      const existing = findColorGrade(effects) ?? null;
+      const kwargs = {};
+      for (const [k, v] of Object.entries(patch)) {
+        if (!SCALAR_KEYS.includes(k)) continue;
+        const dkey = `${k}_delta`;
+        if (dkey in DELTA_KEYS) kwargs[dkey] = v;
+        else kwargs[k] = (scalarY(existing ?? {}, k) ?? SCALAR_DEFAULTS[k] ?? 0) + Number(v);
+      }
+      effects = mergedGradeEffects(effects, kwargs, state.create).effects;
+    }
+    if (firstPass && grain.mode === "reset") {
+      effects = effects.filter((e) => !isFilmGrainEffect(e));
+    } else if (firstPass && grain.mode === "paste") {
+      const pasted = isRecord31(grain.grain) ? structuredClone(grain.grain) : {};
+      pasted.class_name = "FilmGrain";
+      const idxs = effects.flatMap((e, i) => isFilmGrainEffect(e) ? [i] : []);
+      if (idxs.length > 0) {
+        const first = effects[idxs[0]];
+        if (first.id) pasted.id = first.id;
+        else if (!pasted.id) pasted.id = state.create("FilmGrain").id;
+        effects = effects.filter((_, i) => !idxs.slice(1).includes(i));
+        effects[idxs[0]] = pasted;
+      } else {
+        if (!pasted.id) pasted.id = state.create("FilmGrain").id;
+        effects = [...effects, pasted];
+      }
+    }
+    state.effects.set(cid, effects);
+  }
+}
+var RENDER_CONCURRENCY, Previews, EDIT, READ, colorAgentTools;
+var init_color_agent2 = __esm({
+  "../engine/src/tools/catalog/color-agent.ts"() {
+    "use strict";
+    init_media();
+    init_rounding();
+    init_registry();
+    init_effects2();
+    init_ids();
+    init_look();
+    init_frame_scope();
+    init_color_frames();
+    init_color_agent();
+    init_define();
+    init_luts2();
+    init_receipt();
+    init_coerce();
+    init_common();
+    init_effects_color_common();
+    RENDER_CONCURRENCY = 4;
+    Previews = class {
+      images = [];
+      field(image) {
+        if (!image) return "";
+        this.images.push(image);
+        return `attached image ${this.images.length}`;
+      }
+    };
+    EDIT = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+    colorAgentTools = [
+      contractTool("apply_color_tool", {
+        annotations: EDIT,
+        run: (call, input2) => colorTool(call, async () => {
+          const project = call.doc.project;
+          const allFlag = toolFlag([input2.allClips, input2.all_clips]);
+          const ids2 = resolveColorTargetIds(call, { clip_ids: input2.clip_ids, clipIds: input2.clipIds, timeline_clip_id: input2.timeline_clip_id, clipId: input2.clipId, all_clips: allFlag });
+          if (ids2.length === 0) return colorTargetError(project, "apply_color");
+          const resetFlag = ["1", "true", "yes", "on"].includes(text2(input2.reset).toLowerCase());
+          const kwargs = {};
+          for (const [key, value] of Object.entries(input2)) {
+            if (!["clipIds", "clip_ids", "timeline_clip_id", "clipId", "all_clips", "allClips", "reset"].includes(key) && value !== null && value !== "") {
+              kwargs[key] = value;
+            }
+          }
+          let patch = {};
+          if (!resetFlag) {
+            patch = parseColorPatchKwargs(kwargs);
+            if (Object.keys(patch).length === 0) {
+              return "Error: apply_color needs reset=true or at least one colour field (exposure, wheels, lut, color, \u2026).";
+            }
+            validateColorPatch(patch);
+            if (patch.lut_path) patch.lut_path = await resolveLutFile(call, patch.lut_path);
+            if (isRecord31(patch.lut) && patch.lut.path) patch.lut = { ...patch.lut, path: await resolveLutFile(call, patch.lut.path) };
+          }
+          const warnings = [];
+          const kept = filterUnlocked(project, ids2, warnings);
+          if (kept.length === 0) return warnings.length > 0 ? `Error: ${warnings.join("; ")}` : colorTargetError(project, "apply_color");
+          const create = effectFactory(project);
+          const receipts = [];
+          const writes = [];
+          for (const cid of kept) {
+            const clip2 = project.clips.find((c) => c.id === cid);
+            const effects = [...clip2.effects ?? []];
+            if (resetFlag) {
+              const next2 = effects.filter((e) => !isColorGradeEffect(e));
+              if (next2.length === effects.length) {
+                receipts.push({ timeline_clip_id: cid, status: "noop", color: { present: false } });
+                continue;
+              }
+              writes.push([cid, next2]);
+              receipts.push({ timeline_clip_id: cid, status: "reset", color: { present: false } });
+              continue;
+            }
+            const { effects: next, merged } = mergedGradeEffects(effects, patch, create);
+            writes.push([cid, next]);
+            receipts.push({ timeline_clip_id: cid, status: "applied", effect_id: merged.id ?? null, color: summarizeColorGrade(merged) });
+          }
+          if (writes.length > 0) {
+            call.commit((tx) => {
+              for (const [cid, effects] of writes) setClipEffects(tx, cid, effects);
+            });
+          }
+          const result2 = { ok: true, clips: receipts, warnings, undo: "one step" };
+          const previews = new Previews();
+          const scopes = await afterPreview(call, result2, String(receipts[0].timeline_clip_id), warnings, previews);
+          if (scopes.present !== void 0) {
+            const outdoor = isOutdoorBrightProfile(scopes.present ? buildLookProfile(scopes) : {});
+            const hi = Number(scopes.clipped_highlights ?? 0) || 0;
+            result2.nuke_risk = hi >= 0.12 || outdoor && hi >= 0.08;
+            result2.outdoor_bright = outdoor;
+          }
+          return jsonResult(call, result2, previews);
+        })
+      }),
+      contractTool("inspect_color_tool", {
+        annotations: READ,
+        requires: ["frames"],
+        run: (call, input2) => colorTool(call, async () => {
+          const project = call.doc.project;
+          const ids2 = resolveColorTargetIds(call, { clipIds: text2(input2.clipId) || text2(input2.clip_id), timeline_clip_id: input2.timeline_clip_id });
+          if (ids2.length === 0) return colorTargetError(project, "inspect_color");
+          const cid = ids2[0];
+          const want = input2.include_preview === void 0 || input2.include_preview === null || input2.include_preview === "" ? "true" : text2(input2.include_preview);
+          const wantJpeg = !["0", "false", "no", "off"].includes(want.toLowerCase());
+          const rate = fps(project);
+          const clip2 = project.clips.find((c) => c.id === cid);
+          if (!clip2) return `Error: clip ${cid} not found.`;
+          const grade = summarizeColorGrade(findColorGrade(clip2.effects));
+          const grain = summarizeFilmGrain(findFilmGrain(clip2.effects));
+          const frameArg = input2.atFrame !== void 0 && input2.atFrame !== null && input2.atFrame !== "" ? input2.atFrame : input2.at_frame;
+          let frameNumber;
+          if (frameArg !== void 0 && frameArg !== null && frameArg !== "") {
+            const f3 = typeof frameArg === "number" ? frameArg : parsePythonFloat(String(frameArg));
+            if (f3 === null || !Number.isFinite(f3)) return "Error: atFrame must be an integer frame number.";
+            frameNumber = Math.max(1, Math.trunc(f3));
+          } else {
+            frameNumber = Math.trunc(Math.max(0, playheadSeconds(call)) * rate + 1e-9) + 1;
+            const pos = Number(clip2.position) || 0;
+            const duration3 = Math.max(0, (Number(clip2.end) || 0) - (Number(clip2.start) || 0));
+            const playheadSec = (frameNumber - 1) / Math.max(rate, 1e-6);
+            if (playheadSec < pos || playheadSec > pos + duration3) frameNumber = Math.max(1, Math.trunc(pos * rate) + 1);
+          }
+          const previews = new Previews();
+          const rendered = await renderClipIsolated(call, clip2, frameNumber, wantJpeg);
+          const scopes = rendered.scopes;
+          const result2 = {
+            ok: true,
+            timeline_clip_id: cid,
+            atFrame: frameNumber,
+            color: grade,
+            film_grain: grain,
+            scopes,
+            preview_jpeg: previews.field(rendered.preview)
+          };
+          const refId = text2(input2.reference) || text2(input2.referenceClipId);
+          if (refId) {
+            const ref = project.clips.find((c) => c.id === refId);
+            if (!ref) {
+              result2.warnings = [`reference clip ${refId} not found`];
+            } else {
+              const rgrade = summarizeColorGrade(findColorGrade(ref.effects));
+              const rgrain = summarizeFilmGrain(findFilmGrain(ref.effects));
+              const pos = Number(ref.position) || 0;
+              const duration3 = Math.max(0, (Number(ref.end) || 0) - (Number(ref.start) || 0));
+              const refFrame = Math.max(1, Math.trunc((pos + duration3 * 0.5) * rate) + 1);
+              const refRendered = await renderClipIsolated(call, ref, refFrame, wantJpeg);
+              result2.reference = { timeline_clip_id: refId, atFrame: refFrame, color: rgrade, film_grain: rgrain, scopes: refRendered.scopes };
+              result2.reference_preview_jpeg = previews.field(refRendered.preview);
+              Object.assign(result2, referenceGapHints(scopes, refRendered.scopes));
+              result2.grades_differ = gradesMeaningfullyDiffer(grade, rgrade);
+              result2.grain_differ = grainMeaningfullyDiffers(grain, rgrain);
+            }
+          }
+          return jsonResult(call, result2, previews);
+        })
+      }),
+      contractTool("list_looks_tool", {
+        annotations: READ,
+        run: (call, input2) => colorTool(call, async () => {
+          const q = [text2(input2.query) ? String(input2.query) : "", text2(input2.vibe) ? String(input2.vibe) : ""].filter(Boolean).join(" ").trim();
+          const catalog = listLooksCatalog(q);
+          return { receipt: applied(call.tool, JSON.stringify(catalog), { data: catalog }, 0), images: [] };
+        })
+      }),
+      contractTool("apply_look_tool", {
+        annotations: EDIT,
+        run: (call, input2) => colorTool(call, async () => {
+          const project = call.doc.project;
+          const allFlag = toolFlag([input2.allClips, input2.all_clips]);
+          const ids2 = resolveColorTargetIds(call, { clip_ids: input2.clip_ids, clipIds: input2.clipIds, timeline_clip_id: input2.timeline_clip_id, clipId: input2.clipId, all_clips: allFlag });
+          if (ids2.length === 0) return colorTargetError(project, "apply_look");
+          const rawLook = text2(input2.lookId) || text2(input2.look_id);
+          const rawLut = text2(input2.lutPath) || text2(input2.lut_path);
+          if (!rawLook && !rawLut) return "Error: apply_look requires lookId or lutPath.";
+          let resolved = rawLook ? resolveLookId(rawLook) : { kind: "lut", lut_path: rawLut, id: rawLut };
+          if (rawLut && resolved.kind !== "lut") return "Error: pass either lookId or lutPath for a LUT, not both conflicting kinds.";
+          if (rawLut) resolved = { kind: "lut", lut_path: rawLut, id: rawLut };
+          const given = (v) => v !== void 0 && v !== null && v !== "";
+          const intensityArg = given(input2.lutIntensity) ? input2.lutIntensity : input2.lut_intensity;
+          const grainArg = [input2.stackGrain, input2.stack_grain, input2.grainPreset, input2.grain_preset].find(given);
+          const lutIntensity = given(intensityArg) ? toFloat5(intensityArg, "lutIntensity") : null;
+          const mix = given(input2.mix) ? toFloat5(input2.mix, "mix") : null;
+          let grainId = null;
+          if (given(grainArg)) {
+            const g = text2(grainArg);
+            if (["1", "true", "yes", "on"].includes(g.toLowerCase())) grainId = "35mm_classic";
+            else {
+              const grainLook = resolveLookId(g.startsWith("grain:") ? g : `grain:${g}`);
+              grainId = grainLook.kind === "film_grain" ? grainLook.grain_id : null;
+            }
+          } else if (resolved.kind === "film_grain") {
+            grainId = resolved.grain_id;
+          }
+          const absLut = resolved.kind === "lut" ? await resolveLutFile(call, resolved.lut_path) : "";
+          const warnings = [];
+          const kept = filterUnlocked(project, ids2, warnings);
+          if (kept.length === 0) return warnings.length > 0 ? `Error: ${warnings.join("; ")}` : colorTargetError(project, "apply_look");
+          const create = effectFactory(project);
+          const receipts = [];
+          const writes = [];
+          for (const cid of kept) {
+            const clip2 = project.clips.find((c) => c.id === cid);
+            let effects = [...clip2.effects ?? []];
+            const receipt2 = { timeline_clip_id: cid, look: resolved.id };
+            if (resolved.kind === "color_preset") {
+              if (resolved.preset_name === "reset") {
+                const next = effects.filter((e) => !isColorGradeEffect(e));
+                if (next.length === effects.length && !grainId) {
+                  receipt2.status = "noop";
+                  receipts.push(receipt2);
+                  continue;
+                }
+                effects = next;
+                receipt2.status = "reset";
+              } else {
+                const existing = findColorGrade(effects);
+                const base = create("ColorGrade");
+                if (existing?.id) base.id = existing.id;
+                if (existing && "order" in existing) base.order = existing.order;
+                const graded = applySoftColorPreset(base, resolved.preset_name);
+                if (mix !== null) setScalar(graded, "mix", mix);
+                effects = replaceFirstGrade(effects, graded);
+                receipt2.status = "preset";
+                receipt2.color = summarizeColorGrade(graded);
+              }
+            } else if (resolved.kind === "lut") {
+              const strength = lutIntensity ?? mix;
+              const lut = { path: absLut };
+              if (strength !== null) lut.strength = strength;
+              const { effects: next, merged } = mergedGradeEffects(effects, { lut }, create);
+              effects = next;
+              receipt2.status = "lut";
+              receipt2.lut_path = merged.lut_path ?? null;
+              receipt2.color = summarizeColorGrade(merged);
+            }
+            const gid = grainId ?? (resolved.kind === "film_grain" ? resolved.grain_id : null);
+            if (gid) {
+              const idxs = effects.flatMap((e, i) => isFilmGrainEffect(e) ? [i] : []);
+              if (gid === "none") {
+                receipt2.grain = "none";
+                if (idxs.length > 0) effects = effects.filter((e) => !isFilmGrainEffect(e));
+                else if (receipt2.status === void 0) {
+                  receipt2.status = "noop";
+                  receipts.push(receipt2);
+                  continue;
+                }
+              } else {
+                const source2 = idxs.length > 0 ? effects[idxs[0]] : create("FilmGrain");
+                const grainEffect = applyFilmGrainPreset(source2, gid);
+                if (idxs.length > 0) {
+                  if (source2.id) grainEffect.id = source2.id;
+                  effects = effects.filter((_, i) => !idxs.slice(1).includes(i));
+                  effects[idxs[0]] = grainEffect;
+                } else {
+                  effects = [...effects, grainEffect];
+                }
+                receipt2.grain = gid;
+              }
+              if (resolved.kind === "film_grain") receipt2.status = receipt2.status ?? "grain";
+            }
+            if (receipt2.status === void 0 && !gid) {
+              receipt2.status = "noop";
+              receipts.push(receipt2);
+              continue;
+            }
+            writes.push([cid, effects]);
+            receipts.push(receipt2);
+          }
+          if (writes.length > 0) {
+            call.commit((tx) => {
+              for (const [cid, effects] of writes) setClipEffects(tx, cid, effects);
+            });
+          }
+          const result2 = { ok: true, clips: receipts, warnings, undo: "one step" };
+          const previews = new Previews();
+          const scopes = await afterPreview(call, result2, String(receipts[0].timeline_clip_id), warnings, previews);
+          if (scopes.present !== void 0) {
+            const hi = Number(scopes.clipped_highlights ?? 0) || 0;
+            result2.nuke_risk = hi >= 0.12;
+            const lookUsed = String(receipts[0].look ?? "");
+            const goal = targetProfileForLook(lookUsed);
+            if (goal && scopes.present) {
+              result2.look_distance_to_vibe = lookProfileDistance(buildLookProfile(scopes), goal);
+              result2.vibe_goal = lookUsed;
+            }
+          }
+          return jsonResult(call, result2, previews);
+        })
+      }),
+      contractTool("match_color_to_reference_tool", {
+        annotations: EDIT,
+        requires: ["frames"],
+        run: (call, input2) => colorTool(call, async () => {
+          const project = call.doc.project;
+          const allFlag = toolFlag([input2.allClips, input2.all_clips]);
+          let ids2 = resolveColorTargetIds(call, {
+            clip_ids: text2(input2.clip_ids) || text2(input2.clip_id) || text2(input2.clipId),
+            clipIds: text2(input2.clipIds) || text2(input2.clipId) || text2(input2.clip_id),
+            timeline_clip_id: input2.timeline_clip_id,
+            clipId: text2(input2.clipId) || text2(input2.clip_id),
+            all_clips: allFlag
+          });
+          if (ids2.length === 0) return colorTargetError(project, "match_color_to_reference");
+          const refClipId = text2(input2.reference) || text2(input2.referenceClipId);
+          const refFileId = text2(input2.referenceFileId);
+          const refImagePath = text2(input2.referenceImagePath);
+          if (!refClipId && !refFileId && !refImagePath) {
+            return "Error: match_color_to_reference requires referenceClipId, referenceFileId, or referenceImagePath.";
+          }
+          if (refClipId && ids2.includes(refClipId)) {
+            if (ids2.length === 1) return "Error: subject and reference are the same clip.";
+            ids2 = ids2.filter((cid) => cid !== refClipId);
+          }
+          if (ids2.length === 0) return colorTargetError(project, "match_color_to_reference");
+          const dry = toolFlag([input2.dryRun, input2.dry_run]);
+          const maxIters = Math.max(1, Math.min(5, pyIntOr(input2.max_iterations, 5)));
+          const warnings = [];
+          ids2 = filterUnlocked(project, ids2, warnings);
+          if (ids2.length === 0) return warnings.length > 0 ? `Error: ${warnings.join("; ")}` : colorTargetError(project, "match_color_to_reference");
+          const refKind = refClipId ? "clip" : refFileId ? "file" : "path";
+          let refEffect = null;
+          let refGrain = null;
+          let refPack;
+          if (refClipId) {
+            const ref = project.clips.find((c) => c.id === refClipId);
+            if (!ref) return `Error: reference clip ${refClipId} not found.`;
+            refPack = await profileClipDense(call, ref);
+            refEffect = findColorGrade(ref.effects);
+            refGrain = findFilmGrain(ref.effects);
+          } else if (refFileId) {
+            const file3 = project.files.find((f3) => String(f3.id) === refFileId);
+            if (!file3) return `Error: media-bin file ${refFileId} not found.`;
+            refPack = await profileMediaFile(call, file3);
+          } else {
+            if (!call.host.media?.importPath) {
+              return "Error: match_color_to_reference_tool is not available in this Zenvi surface: referenceImagePath needs local file access (Zenvi desktop or the zenvi CLI); import the reference and pass referenceFileId.";
+            }
+            refPack = await profileLocalPath(call, refImagePath);
+          }
+          const refProfile = refPack.profile;
+          if (!refProfile.present) {
+            const out = { ok: false, error: "Could not measure reference look", reference_kind: refKind, detail: refProfile.error || "no scopes" };
+            return jsonResult(call, out, new Previews());
+          }
+          const subjects = /* @__PURE__ */ new Map();
+          for (const cid of ids2) {
+            const clip2 = project.clips.find((c) => c.id === cid);
+            if (clip2) subjects.set(cid, clip2);
+          }
+          if (subjects.size === 0) return "Error: no matching timeline clips.";
+          const primaryId = subjects.has(ids2[0]) ? ids2[0] : [...subjects.keys()][0];
+          const primary = subjects.get(primaryId);
+          const beforePack = await profileClipDense(call, primary);
+          let beforeProfile = beforePack.profile;
+          const outdoor = isOutdoorBrightProfile(beforeProfile);
+          const lookDistanceBefore = lookProfileDistance(beforeProfile, refProfile);
+          const gradeAction = refClipId ? matchGradeAction(findColorGrade(primary.effects), refEffect) : { mode: "scopes" };
+          const grainAction = refClipId ? matchGrainAction(findFilmGrain(primary.effects), refGrain) : { mode: "noop" };
+          const solved = solveGradeFromProfiles(beforeProfile, refProfile, 1);
+          let initial;
+          let matchMode;
+          if (gradeAction.mode === "paste" || gradeAction.mode === "reset") {
+            initial = gradeAction;
+            matchMode = String(gradeAction.mode);
+          } else if (Object.keys(solved).length > 0) {
+            initial = { mode: "scopes", patch: solved };
+            matchMode = "look_profile";
+          } else {
+            initial = { mode: "noop" };
+            matchMode = "vision";
+          }
+          const previews = new Previews();
+          const result2 = {
+            ok: true,
+            timeline_clip_ids: [...subjects.keys()],
+            clips_graded: [...subjects.keys()],
+            reference_kind: refKind,
+            reference: refClipId || refFileId || refImagePath,
+            look_distance_before: lookDistanceBefore,
+            match_mode: matchMode,
+            grain_mode: grainAction.mode,
+            samples_used: { subject: beforePack.scopes_samples, reference: refPack.scopes_samples },
+            before_profile: beforeProfile,
+            reference_profile: refProfile,
+            before_preview_jpeg: previews.field(beforePack.preview),
+            reference_preview_jpeg: previews.field(refPack.preview),
+            outdoor_bright: outdoor,
+            vision: "Compare BEFORE vs REFERENCE vs AFTER. Match iterates until look_distance is close or max steps; nuke_risk means recovery ran."
+          };
+          if (initial.mode === "noop" && grainAction.mode === "noop" && (lookDistanceBefore === null || lookDistanceBefore < LOOK_DISTANCE_MATCHED)) {
+            result2.applied = false;
+            result2.status = "matched";
+            result2.message = "Already close to reference look.";
+            return jsonResult(call, result2, previews);
+          }
+          if (dry) {
+            result2.applied = false;
+            result2.proposed_patch = initial.patch ?? (initial.mode === "paste" ? { color: "paste_from_reference" } : {});
+            result2.proposed_grain = grainAction.mode;
+            return jsonResult(call, result2, previews);
+          }
+          const state = {
+            effects: new Map([...subjects].map(([cid, clip2]) => [cid, [...clip2.effects ?? []]])),
+            create: effectFactory(project),
+            refClipId,
+            refEffect,
+            refGrain,
+            pasteColor: initial.mode === "paste" ? initial.color : null
+          };
+          let doReset = initial.mode === "reset";
+          let currentPatch = isRecord31(initial.patch) ? { ...initial.patch } : {};
+          const iterations = [];
+          let recovered = false;
+          let finalStatus = "still_far";
+          let afterProfile = beforeProfile;
+          let afterPreviewImage = null;
+          for (let it = 0; it < maxIters; it += 1) {
+            const colorMode = doReset && it === 0 ? "reset" : state.pasteColor && it === 0 ? "paste" : "patch";
+            const patch = colorMode === "reset" || colorMode === "paste" ? {} : currentPatch;
+            if (it === 0 && colorMode === "patch" && Object.keys(patch).length === 0 && !state.pasteColor && !doReset && grainAction.mode === "noop") {
+              finalStatus = "still_far";
+              break;
+            }
+            applyEffectsBatch(state, colorMode, patch, grainAction, it === 0);
+            const afterPack = await profileClipDense(call, { ...primary, effects: state.effects.get(primaryId) }, Math.min(24, beforePack.scopes_samples || 16));
+            afterProfile = afterPack.profile;
+            afterPreviewImage = afterPack.preview;
+            const outcome = assessGradeOutcome(beforeProfile, afterProfile, refProfile, outdoor);
+            iterations.push({
+              iteration: it + 1,
+              status: outcome.status,
+              look_distance: outcome.look_distance_after,
+              nuke_risk: outcome.nuke_risk,
+              reasons: outcome.reasons ?? []
+            });
+            if (outcome.ok) {
+              finalStatus = "matched";
+              break;
+            }
+            if (outcome.nuke_risk) {
+              recovered = true;
+              currentPatch = isRecord31(outcome.suggested_recovery_patch) ? outcome.suggested_recovery_patch : {};
+              state.pasteColor = null;
+              doReset = false;
+              finalStatus = "recovered_from_nuke";
+              if (Object.keys(currentPatch).length === 0) break;
+              continue;
+            }
+            currentPatch = solveGradeFromProfiles(afterProfile, refProfile, Math.max(0.25, 0.7 ** (it + 1)));
+            state.pasteColor = null;
+            doReset = false;
+            finalStatus = String(outcome.status || "closer_not_exact");
+            if (Object.keys(currentPatch).length === 0) break;
+            beforeProfile = afterProfile;
+          }
+          const writes = [...state.effects].filter(([cid, effects]) => JSON.stringify(effects) !== JSON.stringify(subjects.get(cid).effects ?? []));
+          for (const [cid] of writes) {
+            const stale = editedWhileRendering(call, subjects.get(cid), ["effects"]);
+            if (stale) return `Error: ${stale}`;
+          }
+          if (writes.length > 0) {
+            call.commit((tx) => {
+              for (const [cid, effects] of writes) setClipEffects(tx, cid, effects);
+            });
+          }
+          result2.applied = true;
+          result2.undo = "one step";
+          result2.iterations = iterations;
+          result2.iteration_count = iterations.length;
+          result2.status = finalStatus;
+          result2.recovered_from_nuke = recovered;
+          result2.after_profile = afterProfile;
+          result2.after_preview_jpeg = previews.field(afterPreviewImage);
+          result2.look_distance_after = lookProfileDistance(afterProfile, refProfile);
+          result2.nuke_risk = iterations.some((i) => i.nuke_risk) && finalStatus !== "matched";
+          if (finalStatus === "matched") {
+            result2.message = `Matched look on ${subjects.size} clip(s) in ${iterations.length} iteration(s).`;
+          } else if (recovered) {
+            result2.message = "Look was nuking highlights/shadows; recovered with a softer grade. Inspect AFTER vs REFERENCE \u2014 nudge if still off.";
+          } else {
+            result2.message = `Closer but not exact (status=${finalStatus}). Look at AFTER vs REFERENCE and nudge, or re-run match.`;
+          }
+          return jsonResult(call, result2, previews);
+        })
+      })
+    ];
+  }
+});
+
 // ../engine/src/tools/catalog/direct.ts
 function resolveTrack(project, raw) {
   if (raw === void 0 || String(raw).trim() === "") return {};
@@ -57382,13 +61271,12 @@ function resolveTrack(project, raw) {
 function requireClip2(call, id) {
   return (call.doc.project.clips ?? []).find((c) => String(c.id) === id);
 }
-var EDIT, ADD, READ, clipId, track, interpolation, INTERPOLATIONS, directTools;
+var EDIT2, ADD, READ2, clipId, track, interpolation, INTERPOLATIONS, directTools;
 var init_direct = __esm({
   "../engine/src/tools/catalog/direct.ts"() {
     "use strict";
     init_zod();
     init_types();
-    init_registry();
     init_clips();
     init_effects2();
     init_transitions();
@@ -57397,9 +61285,9 @@ var init_direct = __esm({
     init_frame_time();
     init_receipt();
     init_tracks2();
-    EDIT = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT2 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
-    READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ2 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     clipId = external_exports.string().min(1).describe("Timeline clip id (from describe_project_tool, list_clips_tool or a receipt).");
     track = external_exports.union([external_exports.string(), external_exports.int()]).describe("Track: layer_number (preferred), track id, exact label, or ui_track counted from the bottom (1 = bottom).");
     interpolation = external_exports.enum(["bezier", "linear", "constant"]).describe("Interpolation of a new keyframe point.");
@@ -57410,10 +61298,10 @@ var init_direct = __esm({
         title: "Describe project",
         description: "Compact overview of the whole project for planning edits: settings, tracks bottom to top with their clips (id, file, timeline window, source window, effects), transitions, markers and media-bin files. Use this before editing.",
         input: external_exports.strictObject({}),
-        annotations: READ,
+        annotations: READ2,
         run: (call) => {
           const p = call.doc.project;
-          const fps = projectFps(p);
+          const fps2 = projectFps(p);
           const files = new Map((p.files ?? []).map((f3) => [String(f3.id), f3]));
           const stack = buildTrackStack(p.layers);
           const tracks = stack.map((t) => ({
@@ -57437,7 +61325,7 @@ var init_direct = __esm({
             profile: p.profile,
             width: p.width,
             height: p.height,
-            fps: `${fps.num}/${fps.den}`,
+            fps: `${fps2.num}/${fps2.den}`,
             duration: timelineEnd(p),
             tracks,
             transitions: (p.effects ?? []).map((t) => ({ id: t.id, title: t.title ?? "", layer: t.layer, position: t.position, duration: t.end - t.start })),
@@ -57460,24 +61348,6 @@ var init_direct = __esm({
         }
       }),
       directTool({
-        name: "list_effects_tool",
-        title: "List effects",
-        description: "List the libopenshot effects add_effect_tool accepts (class name, category, whether this surface renders it, parameters).",
-        input: external_exports.strictObject({ category: external_exports.enum(["video", "audio"]).optional().describe("Only video or audio effects.") }),
-        annotations: READ,
-        run: (_call, input2) => {
-          const effects = EFFECTS.filter((e) => !input2.category || e.category === input2.category).map((e) => ({
-            class_name: e.className,
-            name: e.name,
-            category: e.category,
-            renders_on_web: e.supported.web,
-            needs_desktop_dialog: e.needsDialog,
-            params: e.params.filter((prm) => !prm.common && !prm.readonly).map((prm) => ({ key: prm.key, type: prm.type, default: prm.default, min: prm.min, max: prm.max }))
-          }));
-          return applied("list_effects_tool", `${effects.length} effect(s).`, { data: { effects } }, 0);
-        }
-      }),
-      directTool({
         name: "move_clip_tool",
         title: "Move clip",
         description: "Move a clip to a new timeline position and/or another track. Positions snap to the frame grid.",
@@ -57486,7 +61356,7 @@ var init_direct = __esm({
           position_seconds: external_exports.number().min(0).optional().describe("New timeline start, seconds."),
           track: track.optional()
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
           const t = resolveTrack(call.doc.project, input2.track);
@@ -57507,7 +61377,7 @@ var init_direct = __esm({
           edge: external_exports.enum(["left", "right"]).optional().describe("Edge to drag (with at_seconds)."),
           at_seconds: external_exports.number().optional().describe("Timeline seconds to drag the edge to.")
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
           if (input2.edge !== void 0 || input2.at_seconds !== void 0) {
@@ -57530,7 +61400,7 @@ var init_direct = __esm({
           keep: external_exports.enum(["both", "left", "right"]).optional().describe("Which side(s) to keep (default both)."),
           track: track.optional()
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           const keep2 = input2.keep ?? "both";
           if (input2.clip_id) {
@@ -57558,7 +61428,7 @@ var init_direct = __esm({
           frame: external_exports.int().min(1).optional().describe("1-based clip frame of the keyframe."),
           interpolation: interpolation.optional()
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
           if (input2.at_seconds !== void 0 && input2.frame !== void 0) return "Error: Pass at_seconds or frame, not both.";
@@ -57584,7 +61454,7 @@ var init_direct = __esm({
           frame: external_exports.int().min(1).optional().describe("1-based frame of the parent clip."),
           interpolation: interpolation.optional()
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (input2.at_seconds !== void 0 && input2.frame !== void 0) return "Error: Pass at_seconds or frame, not both.";
           call.commit(
@@ -57598,17 +61468,6 @@ var init_direct = __esm({
         }
       }),
       directTool({
-        name: "remove_effect_tool",
-        title: "Remove effect",
-        description: "Remove one effect from its clip.",
-        input: external_exports.strictObject({ effect_id: external_exports.string().min(1).describe("Clip effect id.") }),
-        annotations: EDIT,
-        run: (call, input2) => {
-          const result2 = call.commit((tx) => removeEffect(tx, input2.effect_id));
-          return applied("remove_effect_tool", `Removed effect ${input2.effect_id} from clip ${result2.clipId}.`, { data: result2 });
-        }
-      }),
-      directTool({
         name: "fade_clip_tool",
         title: "Fade clip",
         description: "Fade a clip in and/or out (picture and sound together, like the Fade menu). 0 removes that fade.",
@@ -57619,7 +61478,7 @@ var init_direct = __esm({
           video: external_exports.boolean().optional().describe("Fade the picture (default: when the clip has video)."),
           audio: external_exports.boolean().optional().describe("Fade the sound (default: when the clip has audio).")
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
           if (input2.fade_in_seconds === void 0 && input2.fade_out_seconds === void 0) return "Error: Pass fade_in_seconds and/or fade_out_seconds.";
@@ -57669,18 +61528,1335 @@ var init_direct = __esm({
         title: "Probe media",
         description: "Read a media file's stream info (duration, size, fps, codecs, audio) without importing it.",
         input: external_exports.strictObject({ path: external_exports.string().min(1).describe("Media path or URL the host can read.") }),
-        annotations: READ,
+        annotations: READ2,
         requires: ["media"],
         run: async (call, input2) => {
           const info = await call.host.media.probe(input2.path);
-          const fps = info.fps && info.fps.den ? `${info.fps.num}/${info.fps.den}` : "?";
+          const fps2 = info.fps && info.fps.den ? `${info.fps.num}/${info.fps.den}` : "?";
           return applied(
             "probe_media_tool",
-            `${input2.path}: ${info.has_video ? `${info.width}x${info.height} ${fps} fps` : "no video"}, ${info.has_audio ? `${info.channels} ch ${info.sample_rate} Hz` : "no audio"}, ${Number(info.duration).toFixed(2)}s.`,
+            `${input2.path}: ${info.has_video ? `${info.width}x${info.height} ${fps2} fps` : "no video"}, ${info.has_audio ? `${info.channels} ch ${info.sample_rate} Hz` : "no audio"}, ${Number(info.duration).toFixed(2)}s.`,
             { data: info },
             0
           );
         }
+      })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/effect-values.ts
+function isRecord32(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function pyTruthy(value) {
+  if (value === null || value === void 0 || value === false || value === 0 || value === "") return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (isRecord32(value)) return Object.keys(value).length > 0;
+  return true;
+}
+function pyFloatOf(value) {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") return parsePythonFloat(value);
+  return null;
+}
+function interpolationCode(name) {
+  if (typeof name === "number" && Number.isInteger(name) && [BEZIER, LINEAR, CONSTANT].includes(name)) return name;
+  const key = String(name === null || name === void 0 || name === "" || name === false || name === 0 ? "bezier" : name).trim().toLowerCase();
+  const code = INTERPOLATION_NAMES[key];
+  if (code === void 0) throw new ToolError(`interpolation must be bezier, linear or constant, got ${pyRepr2(name)}`);
+  return code;
+}
+function keyframePoint2(frame, value, interpolation2 = BEZIER) {
+  return {
+    co: { X: Number(frame), Y: Number(value) },
+    interpolation: Math.trunc(interpolation2),
+    handle_type: 0,
+    handle_left: { X: 0.5, Y: 1 },
+    handle_right: { X: 0.5, Y: 0 }
+  };
+}
+function constantKeyframe2(value) {
+  return { Points: [keyframePoint2(1, value, BEZIER)] };
+}
+function keyframeValueAt(kf, frame, fallback = 0) {
+  if (typeof kf === "number") return kf;
+  const points2 = isRecord32(kf) && Array.isArray(kf.Points) ? kf.Points : [];
+  if (points2.length === 0) return fallback;
+  const xy = (p) => {
+    const co = isRecord32(p.co) ? p.co : {};
+    return [Number(co.X), Number(co.Y)];
+  };
+  const sorted = [...points2].sort((a, b) => xy(a)[0] - xy(b)[0]);
+  if (frame <= xy(sorted[0])[0]) return xy(sorted[0])[1];
+  for (let i = 0; i + 1 < sorted.length; i += 1) {
+    const [ax, ay] = xy(sorted[i]);
+    const [bx, by] = xy(sorted[i + 1]);
+    if (ax <= frame && frame <= bx) {
+      if (Number(sorted[i].interpolation ?? BEZIER) === CONSTANT || bx === ax) return ay;
+      return ay + (frame - ax) / (bx - ax) * (by - ay);
+    }
+  }
+  return xy(sorted[sorted.length - 1])[1];
+}
+function fpsFloat5(project) {
+  const fps2 = projectFps(project);
+  return fps2.num / fps2.den;
+}
+function clipExtent(clip2) {
+  const position = Number(clip2.position) || 0;
+  const duration3 = Math.max(0, (Number(clip2.end) || 0) - (Number(clip2.start) || 0));
+  return [position, position + duration3, duration3];
+}
+function clipFrameAt(project, clip2, seconds2) {
+  const fps2 = fpsFloat5(project);
+  const local = Math.max(0, seconds2 - (Number(clip2.position) || 0)) + (Number(clip2.start) || 0);
+  return pyRound(local * fps2) + 1;
+}
+function parseColor(value) {
+  const raw = value === null || value === void 0 || value === false || value === 0 ? "" : String(value);
+  const s = COLOR_NAMES[raw.trim().toLowerCase()] ?? raw.trim();
+  if (s.startsWith("#")) {
+    let h = s.slice(1);
+    if (h.length === 3 || h.length === 4) h = Array.from(h, (ch) => ch + ch).join("");
+    if ((h.length === 6 || h.length === 8) && /^[0-9a-fA-F]+$/.test(h)) {
+      const at = (i) => Number.parseInt(h.slice(i, i + 2), 16);
+      return [at(0), at(2), at(4), h.length === 8 ? at(6) : 255];
+    }
+  }
+  if (s.toLowerCase().startsWith("rgb") && s.includes("(") && s.includes(")")) {
+    const parts = s.slice(s.indexOf("(") + 1, s.lastIndexOf(")")).split(",").map((p) => p.trim());
+    const nums = parts.map((p) => parsePythonFloat(p));
+    if (nums.length >= 3 && nums.every((n) => n !== null)) {
+      const [r, g, b] = nums.slice(0, 3).map((n) => Math.trunc(Math.max(0, Math.min(255, pyRound(n)))));
+      let a = 255;
+      if (nums.length > 3) {
+        const n = nums[3];
+        a = n <= 1 ? Math.trunc(pyRound(n * 255)) : Math.trunc(n);
+      }
+      return [r, g, b, Math.max(0, Math.min(255, a))];
+    }
+  }
+  throw new ToolError(`unrecognised color ${pyRepr2(value ?? "")}; use #RRGGBB, #RRGGBBAA, rgb(r,g,b) or a basic color name`);
+}
+function colorKeyframe(value) {
+  const [r, g, b, a] = parseColor(value);
+  return { red: constantKeyframe2(r), green: constantKeyframe2(g), blue: constantKeyframe2(b), alpha: constantKeyframe2(a) };
+}
+function hex6(r, g, b) {
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+function choiceValue(pname, spec, value) {
+  const choices = spec.choices ?? [];
+  let v = value;
+  if (typeof v === "string") {
+    const key = normName(v);
+    for (const c of choices) if (normName(c.name) === key) return c.value;
+    for (const c of choices) if (key && normName(c.name).startsWith(key)) return c.value;
+    const f3 = parsePythonFloat(v);
+    if (f3 === null) {
+      const names4 = choices.map((c) => String(c.name)).join(", ");
+      throw new ToolError(`${pname} must be one of: ${names4}; got ${pyReprString(v)}`);
+    }
+    v = f3;
+    for (const c of choices) if (Number(c.value) === f3) return c.value;
+    const names3 = choices.map((c) => `${String(c.name)}=${String(c.value)}`).join(", ");
+    throw new ToolError(`${pname} must be one of: ${names3}; got ${pyFloat(f3)}`);
+  }
+  if (typeof v === "boolean") v = v ? 1 : 0;
+  for (const c of choices) if (Number(c.value) === Number(v)) return c.value;
+  const names2 = choices.map((c) => `${String(c.name)}=${String(c.value)}`).join(", ");
+  throw new ToolError(`${pname} must be one of: ${names2}; got ${pyRepr2(v)}`);
+}
+function numberValue(pname, spec, value) {
+  if (spec.choices && spec.choices.length > 0) return Number(choiceValue(pname, spec, value));
+  let n;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "string") {
+    const s = value.trim().toLowerCase();
+    if (["true", "yes", "on"].includes(s)) return 1;
+    if (["false", "no", "off"].includes(s)) return 0;
+    const f3 = parsePythonFloat(s.replace(/[s%]+$/, "").trim());
+    if (f3 === null) throw new ToolError(`${pname} must be a number, got ${pyReprString(value)}`);
+    n = f3;
+  } else if (typeof value === "number" && Number.isFinite(value)) {
+    n = value;
+  } else {
+    throw new ToolError(`${pname} must be a number, got ${pyRepr2(value)}`);
+  }
+  const lo = spec.min;
+  const hi = spec.max;
+  if (lo !== void 0 && hi !== void 0 && !(lo - 1e-9 <= n && n <= hi + 1e-9)) {
+    throw new ToolError(`${pname} must be between ${pyG(lo)} and ${pyG(hi)}, got ${pyG(n)}`);
+  }
+  return n;
+}
+function keyframeList(value) {
+  let v = value;
+  if (isRecord32(v) && "keyframes" in v) v = v.keyframes;
+  if (!Array.isArray(v)) return null;
+  const out = [];
+  for (const item of v) {
+    if (isRecord32(item)) {
+      if (!("time" in item) || !("value" in item)) throw new ToolError('each keyframe needs "time" (timeline seconds) and "value"');
+      out.push([item.time, item.value, item.interpolation]);
+    } else if (Array.isArray(item) && (item.length === 2 || item.length === 3)) {
+      out.push([item[0], item[1], item.length === 3 ? item[2] : void 0]);
+    } else {
+      throw new ToolError('keyframes are [{"time": seconds, "value": v, "interpolation": "linear"}...]');
+    }
+  }
+  if (out.length === 0) throw new ToolError("the keyframe list is empty");
+  return out;
+}
+function keyframeFrame(ctx, clip2, t) {
+  const seconds2 = pyFloatOf(t);
+  if (seconds2 === null) throw new ToolError(`keyframe time must be timeline seconds, got ${pyRepr2(t)}`);
+  const [start, end] = clipExtent(clip2);
+  const slack = 1 / fpsFloat5(ctx.project);
+  if (seconds2 < start - slack || seconds2 > end + slack) {
+    throw new ToolError(`keyframe time ${pyG(seconds2)}s is outside the clip (${pyG(start)}-${pyG(end)}s on the timeline)`);
+  }
+  return clipFrameAt(ctx.project, clip2, Math.min(Math.max(seconds2, start), end));
+}
+function points(ctx, clip2, kfs, defaultInterp, convert) {
+  const byFrame = /* @__PURE__ */ new Map();
+  for (const [t, v, interp] of kfs) {
+    const frame = keyframeFrame(ctx, clip2, t);
+    const code = interp === void 0 || interp === null || interp === "" ? defaultInterp : interpolationCode(interp);
+    byFrame.set(frame, [frame, convert(v), code]);
+  }
+  return [...byFrame.keys()].sort((a, b) => a - b).map((k) => keyframePoint2(...byFrame.get(k)));
+}
+function basename3(path38) {
+  return path38.split(/[\\/]/).pop() ?? path38;
+}
+function fileReader(ctx, value) {
+  const key = value === null || value === void 0 || value === false || value === 0 ? "" : String(value).trim();
+  if (["", "none"].includes(key.toLowerCase())) return { type: "" };
+  const files = ctx.project.files ?? [];
+  let file3 = files.find((f3) => String(f3.id) === key);
+  if (!file3) {
+    file3 = files.find((f3) => {
+      const path38 = String(f3.path ?? "");
+      return basename3(path38).toLowerCase() === key.toLowerCase() || path38 === key;
+    });
+  }
+  if (!file3) throw new ToolError(`no project file ${pyRepr2(value)} for the image/video input (use a file id from list_files_tool)`);
+  return structuredClone(file3);
+}
+function curveValue(pname, value) {
+  if (isRecord32(value) && "nodes" in value) return value;
+  if (value === null || value === void 0 || typeof value === "string" && ["", "reset", "none", "linear"].includes(value)) {
+    return defaultCurveData();
+  }
+  if (!Array.isArray(value) || value.length < 2) {
+    throw new ToolError(`${pname} needs at least 2 points like [[0,0],[0.5,0.6],[1,1]] (x = input, y = output, 0-1)`);
+  }
+  const pts = [];
+  for (const p of value) {
+    let x;
+    let y;
+    if (isRecord32(p)) [x, y] = [p.x, p.y];
+    else if (Array.isArray(p) && p.length === 2) [x, y] = p;
+    else throw new ToolError(`${pname} points are [x, y] pairs in 0-1`);
+    const fx = pyFloatOf(x);
+    const fy = pyFloatOf(y);
+    if (fx === null || fy === null) throw new ToolError(`${pname} points are [x, y] pairs in 0-1`);
+    if (!(fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1)) throw new ToolError(`${pname} point (${pyG(fx)}, ${pyG(fy)}) is outside 0-1`);
+    pts.push({ x: fx, y: fy });
+  }
+  pts.sort((a, b) => a.x - b.x);
+  if (new Set(pts.map((p) => p.x)).size !== pts.length) throw new ToolError(`${pname} has two points with the same x`);
+  if (pts.length > 16) throw new ToolError(`${pname} takes at most 16 points`);
+  return curveData(pts);
+}
+function wheelsValue(value, current) {
+  if (value === null || value === void 0 || typeof value === "string" && ["", "reset", "none"].includes(value)) {
+    return defaultWheelsData();
+  }
+  if (!isRecord32(value)) throw new ToolError('wheels is {"shadows": {"color": "#hex", "amount": 0-1, "luma": -1..1}, ...}');
+  const out = isRecord32(current) && pyTruthy(current.global) ? structuredClone(current) : defaultWheelsData();
+  for (const [name, wheel] of Object.entries(value)) {
+    if (name === "enabled") {
+      out.enabled_keyframes = constantKeyframe2(pyTruthy(wheel) ? 1 : 0);
+      continue;
+    }
+    if (!WHEELS.includes(name)) {
+      throw new ToolError(`unknown color wheel ${pyReprString(name)}; use ${WHEELS.join(", ")}`);
+    }
+    if (!isRecord32(wheel)) throw new ToolError(`wheel ${name} needs {color, amount, luma}`);
+    const prev = isRecord32(out[name]) ? out[name] : {};
+    const color3 = "color" in wheel ? wheel.color : "color" in prev ? prev.color : "#ffffff";
+    const [r, g, b] = parseColor(color3);
+    const amount = pyFloatOf("amount" in wheel ? wheel.amount : "amount" in prev ? prev.amount : 0);
+    const luma3 = pyFloatOf("luma" in wheel ? wheel.luma : "luma" in prev ? prev.luma : 0);
+    if (amount === null || luma3 === null) throw new ToolError(`wheel ${name}: amount and luma are numbers`);
+    if (!(amount >= 0 && amount <= 1)) throw new ToolError(`wheel ${name}: amount must be 0-1, got ${pyG(amount)}`);
+    if (!(luma3 >= -1 && luma3 <= 1)) throw new ToolError(`wheel ${name}: luma must be -1..1, got ${pyG(luma3)}`);
+    out[name] = wheelEntry(hex6(r, g, b), amount, luma3);
+  }
+  return out;
+}
+function propertySpec(className, pname) {
+  const props = effectCatalog().get(className)?.properties ?? {};
+  const spec = props[pname];
+  if (spec) return spec;
+  if (HIDDEN_PROPERTIES.has(pname)) throw new ToolError(`${pname} is not settable on an effect (effects follow their clip)`);
+  const names2 = Object.keys(props).sort();
+  const close = getCloseMatches(pname, names2, 3, 0.5);
+  const hint = close.length > 0 ? ` (did you mean ${close.join(", ")}?)` : "";
+  throw new ToolError(`${className} has no property ${pyReprString(pname)}${hint}; it has: ${names2.join(", ")}`);
+}
+function lutValue(ctx, value) {
+  if (ctx.lutPath !== void 0) return ctx.lutPath;
+  try {
+    const resolved = resolveLut(value);
+    if (resolved.kind === "file") {
+      throw new ToolError("a .cube file outside the built-in LUTs needs local file access (Zenvi desktop or the zenvi CLI); use a built-in LUT (list_luts_tool)");
+    }
+    return resolved.path;
+  } catch (error62) {
+    if (error62 instanceof LutError) throw new ToolError(error62.message);
+    throw error62;
+  }
+}
+function convertProperty(ctx, className, pname, value, effect2, clip2, defaultInterp = BEZIER) {
+  const spec = propertySpec(className, pname);
+  const ptype = spec.type;
+  const current = effect2[pname];
+  const kfs = ptype !== "colorgrade_curve" && ptype !== "colorgrade_wheels" ? keyframeList(value) : null;
+  if (ptype === "color") {
+    if (kfs) {
+      const parsed = kfs.map(([t, v, i]) => [t, parseColor(v), i]);
+      const out = {};
+      ["red", "green", "blue", "alpha"].forEach((channel, idx) => {
+        out[channel] = { Points: points(ctx, clip2, parsed.map(([t, c, i]) => [t, c[idx], i]), defaultInterp, Number) };
+      });
+      return out;
+    }
+    return colorKeyframe(value);
+  }
+  if (ptype === "float" || ptype === "int" || ptype === "bool") {
+    const keyframed = isKeyframe2(current) || (current === void 0 || current === null) && spec.keyframable;
+    if (keyframed) {
+      const interp = spec.choices && spec.choices.length > 0 ? CONSTANT : defaultInterp;
+      if (kfs) return { Points: points(ctx, clip2, kfs, interp, (v) => numberValue(pname, spec, v)) };
+      return { Points: [keyframePoint2(1, numberValue(pname, spec, value), interp)] };
+    }
+    if (kfs) throw new ToolError(`${pname} cannot be keyframed; give one value`);
+    const num13 = numberValue(pname, spec, value);
+    if (typeof current === "boolean" || ptype === "bool") return num13 !== 0;
+    if (ptype === "int") return Math.trunc(pyRound(num13));
+    return num13;
+  }
+  if (kfs) throw new ToolError(`${pname} cannot be keyframed; give one value`);
+  if (ptype === "string") {
+    if (pname === "lut_path") return lutValue(ctx, value);
+    return value === null || value === void 0 ? "" : typeof value === "string" ? value : pyRepr2(value);
+  }
+  if (ptype === "font" || ptype === "caption") return typeof value === "string" ? value : pyRepr2(value);
+  if (ptype === "reader") return fileReader(ctx, value);
+  if (ptype === "colorgrade_curve") return curveValue(pname, value);
+  if (ptype === "colorgrade_wheels") return wheelsValue(value, current);
+  throw new ToolError(`${pname} (${ptype}) is not settable by tools; use the Properties dock`);
+}
+function prepareProperties(ctx, className, properties, effect2, clip2, interpolation2 = "bezier") {
+  if (properties === null || properties === void 0) return {};
+  if (!isRecord32(properties)) throw new ToolError('properties is an object like {"horizontal_radius": 12, "sigma": 4}');
+  const defaultInterp = interpolationCode(interpolation2);
+  const out = {};
+  for (const [key, value] of Object.entries(properties)) {
+    out[key] = convertProperty(ctx, className, key, value, effect2, clip2, defaultInterp);
+  }
+  return out;
+}
+function needsLuts(properties) {
+  return isRecord32(properties) && "lut_path" in properties;
+}
+function richSummary(ptype, value) {
+  if (!isRecord32(value)) return null;
+  if (ptype === "reader") return basename3(String(value.path ?? "")) || null;
+  if (ptype === "colorgrade_curve") {
+    const nodes = Array.isArray(value.nodes) ? value.nodes : [];
+    return nodes.map((n) => [r3(keyframeValueAt(n.x, 1)), r3(keyframeValueAt(n.y, 1))]);
+  }
+  const out = {};
+  for (const w of WHEELS) {
+    const wheel = value[w];
+    if (isRecord32(wheel)) out[w] = { color: wheel.color ?? null, amount: wheel.amount ?? null, luma: wheel.luma ?? null };
+  }
+  return out;
+}
+function effectValueSummary(project, className, effect2, clip2) {
+  const spec = effectCatalog().get(className)?.properties ?? {};
+  const fps2 = fpsFloat5(project);
+  const position = Number(clip2.position) || 0;
+  const start = Number(clip2.start) || 0;
+  const out = {};
+  for (const [pname, pspec] of Object.entries(spec)) {
+    if (COMMON_PROPERTIES.includes(pname) && pname !== "mask_source_id" && pname !== "mask_invert") continue;
+    const value = effect2[pname];
+    if (isKeyframe2(value)) {
+      const pts = value.Points;
+      if (pts.length <= 1) out[pname] = pts.length > 0 ? round4(Number(pts[0].co.Y)) : pspec.default ?? null;
+      else {
+        out[pname] = {
+          keyframes: pts.map((p) => ({ time: r3(position + (Number(p.co.X) - 1) / fps2 - start), value: round4(Number(p.co.Y)) }))
+        };
+      }
+    } else if (isColorValue(value)) {
+      out[pname] = colorHex(value);
+    } else if (pspec.type === "colorgrade_curve" || pspec.type === "colorgrade_wheels" || pspec.type === "reader") {
+      out[pname] = richSummary(pspec.type, value);
+    } else if (["boolean", "number", "string"].includes(typeof value)) {
+      out[pname] = value;
+    }
+  }
+  return out;
+}
+var BEZIER, LINEAR, CONSTANT, INTERPOLATION_NAMES, COLOR_NAMES, WHEELS;
+var init_effect_values = __esm({
+  "../engine/src/tools/catalog/effect-values.ts"() {
+    "use strict";
+    init_rounding();
+    init_look();
+    init_difflib();
+    init_frame_time();
+    init_coerce();
+    init_luts2();
+    init_pyfmt();
+    init_effect_catalog();
+    init_timeline_edit_common();
+    BEZIER = 0;
+    LINEAR = 1;
+    CONSTANT = 2;
+    INTERPOLATION_NAMES = {
+      bezier: BEZIER,
+      ease: BEZIER,
+      smooth: BEZIER,
+      linear: LINEAR,
+      constant: CONSTANT,
+      hold: CONSTANT,
+      step: CONSTANT
+    };
+    COLOR_NAMES = {
+      white: "#ffffff",
+      black: "#000000",
+      red: "#ff0000",
+      green: "#00ff00",
+      blue: "#0000ff",
+      yellow: "#ffff00",
+      cyan: "#00ffff",
+      magenta: "#ff00ff",
+      orange: "#ffa500",
+      purple: "#800080",
+      pink: "#ffc0cb",
+      gray: "#808080",
+      grey: "#808080",
+      transparent: "#00000000"
+    };
+    WHEELS = ["global", "shadows", "midtones", "highlights"];
+  }
+});
+
+// ../engine/src/tools/catalog/effects-color.ts
+function isRecord33(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function newEffectFactory(call) {
+  const nextId = idFactory(call.doc.project);
+  return (className) => createEffect(className, {}, { id: nextId() });
+}
+async function valueContext(call, properties) {
+  const ctx = { project: call.doc.project };
+  if (needsLuts(properties)) ctx.lutPath = await lutArgument(call, properties.lut_path);
+  return ctx;
+}
+async function lutArgument(call, value) {
+  try {
+    return await resolveCheckedLut(call, value);
+  } catch (error62) {
+    if (error62 instanceof LutError) throw new ToolError(error62.message);
+    throw error62;
+  }
+}
+function commonProperties() {
+  const cat = effectCatalog();
+  const sample2 = cat.get("Blur") ?? [...cat.values()][0];
+  const out = {};
+  for (const [key, value] of Object.entries(sample2.properties)) {
+    if (COMMON_PROPERTIES.includes(key)) out[key] = value;
+  }
+  out.mask_source_id = {
+    type: "string",
+    about: "effect id of a Tracker / Object Detector / Object Mask effect: limit this effect to the tracked region (mask_invert=1 for outside it)"
+  };
+  return out;
+}
+function rendersHere(className) {
+  return getEffect(className)?.supported.web ?? true;
+}
+function withRenderNote(row, className) {
+  if (!rendersHere(className)) row.renders_on_web = false;
+  return row;
+}
+function effectSpec(spec) {
+  return withRenderNote({ ...spec, properties: { ...spec.properties } }, spec.effect);
+}
+function changedValues(before, values) {
+  return Object.fromEntries(Object.entries(values).filter(([key, value]) => !sameJson(before[key], value)));
+}
+async function effectsToEdit(call, input2) {
+  const project = call.doc.project;
+  if (input2.effect_id) {
+    const { clip: clip2, effect: effect2 } = findEffect(project, input2.effect_id);
+    if (isLocked(project, clip2.layer)) throw new ToolError(lockedMessage(project, clip2));
+    return { targets: [[clip2, effect2]], skipped: [] };
+  }
+  if (!input2.effect) throw new ToolError("give effect_id (from get_clip_effects_tool), or a clip plus the effect name");
+  const className = resolveEffectName(input2.effect);
+  const { clips, explicit } = await targetClips2(call, {
+    timeline_clip_id: input2.timeline_clip_id,
+    clip_query: input2.clip_query,
+    track: input2.track,
+    timeline_clip_ids: input2.timeline_clip_ids,
+    scope: input2.scope
+  });
+  const out = [];
+  const skipped = [];
+  const occurrence = input2.occurrence ?? 0;
+  for (const clip2 of clips) {
+    if (isLocked(project, clip2.layer)) {
+      const msg = lockedMessage(project, clip2);
+      if (explicit) throw new ToolError(msg);
+      skipped.push({ timeline_clip_id: clip2.id, reason: msg });
+      continue;
+    }
+    const matches2 = clipEffects(clip2).filter((e) => e.class_name === className);
+    if (matches2.length === 0) {
+      const msg = `clip ${clipLabel(project, clip2)} has no ${className} effect (add it with add_effect_tool)`;
+      if (explicit) throw new ToolError(msg);
+      skipped.push({ timeline_clip_id: clip2.id, reason: msg });
+      continue;
+    }
+    if (occurrence && occurrence > matches2.length) throw new ToolError(`clip ${clip2.id} has only ${matches2.length} ${className} effect(s)`);
+    out.push([clip2, matches2[(occurrence || 1) - 1]]);
+  }
+  if (out.length === 0) throw new ToolError(skipped[0]?.reason ?? "no effect to change");
+  return { targets: out, skipped };
+}
+var READ3, EDIT3, effectsColorTools;
+var init_effects_color = __esm({
+  "../engine/src/tools/catalog/effects-color.ts"() {
+    "use strict";
+    init_registry();
+    init_effects2();
+    init_ids();
+    init_internal();
+    init_define();
+    init_luts2();
+    init_pyfmt();
+    init_effect_catalog();
+    init_effect_values();
+    init_effects_color_common();
+    init_timeline_edit_common();
+    READ3 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+    EDIT3 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    effectsColorTools = [
+      contractTool("list_effects_tool", {
+        annotations: READ3,
+        run: (call, input2) => editorRun(() => {
+          const cat = effectCatalog();
+          const kind = (input2.kind ?? "all") === "all" && input2.category ? input2.category : input2.kind ?? "all";
+          const query2 = input2.query ?? "";
+          if (input2.effect) {
+            const cn = resolveEffectName(input2.effect);
+            const spec = cat.get(cn);
+            return ok(call, `${spec.name} (${cn}): ${spec.description}`, { effect: effectSpec(spec), common_properties: commonProperties() });
+          }
+          const q = normName(query2);
+          const words2 = query2.toLowerCase().split(/\s+/).filter(Boolean);
+          const rows = [];
+          const sorted = [...cat.entries()].sort(([a, sa], [b, sb]) => sa.kind < sb.kind ? -1 : sa.kind > sb.kind ? 1 : a < b ? -1 : a > b ? 1 : 0);
+          for (const [cn, spec] of sorted) {
+            if (kind !== "all" && spec.kind !== kind) continue;
+            const hay = `${cn} ${spec.name} ${spec.description}`.toLowerCase();
+            if (q && !(normName(hay).includes(q) || words2.every((w) => hay.includes(w)))) continue;
+            const row = { effect: spec.effect, name: spec.name, description: spec.description, kind: spec.kind };
+            if (spec.needs_processing) row.needs_processing = true;
+            const own2 = Object.entries(spec.properties).filter(([k]) => !COMMON_PROPERTIES.includes(k));
+            if (input2.include_properties) row.properties = Object.fromEntries(own2);
+            else row.property_names = own2.map(([k]) => k);
+            rows.push(withRenderNote(row, cn));
+          }
+          if (rows.length === 0) {
+            throw new ToolError(`no ${kind !== "all" ? kind : ""} effect matches ${pyReprString(query2)}`.replace("  ", " "));
+          }
+          return ok(call, `${rows.length} effect(s)${query2 ? ` matching ${pyReprString(query2)}` : ""}`, {
+            effects: rows,
+            common_properties: input2.include_properties ? commonProperties() : [...COMMON_PROPERTIES]
+          });
+        })
+      }),
+      contractTool("get_clip_effects_tool", {
+        annotations: READ3,
+        run: (call, input2) => editorRun(async () => {
+          const project = call.doc.project;
+          const { clips } = await targetClips2(call, input2);
+          const detail2 = input2.detail ?? "full";
+          const rows = [];
+          let total = 0;
+          for (const clip2 of clips) {
+            const effects = [];
+            for (const e of clipEffects(clip2)) {
+              const cn = String(e.class_name || e.type || "");
+              const row = { effect_id: e.id ?? null, effect: cn, name: e.name || cn, kind: effectKind(cn) };
+              if (e["ui-menu"] === "look") row.look_preset = true;
+              if (detail2 === "full" && effectCatalog().has(cn)) row.values = effectValueSummary(project, cn, e, clip2);
+              effects.push(row);
+            }
+            total += effects.length;
+            rows.push({ timeline_clip_id: clip2.id, title: clip2.title ?? null, track: uiTrack(project, Number(clip2.layer) || 0), effects });
+          }
+          let summary = `${total} effect(s) on ${rows.length} clip(s)`;
+          if (rows.length === 1) {
+            const names2 = rows[0].effects.map((e) => String(e.effect)).join(", ") || "none";
+            summary = `Clip ${String(rows[0].timeline_clip_id)} has ${total} effect(s): ${names2}`;
+          }
+          return ok(call, summary, { clips: rows });
+        })
+      }),
+      contractTool("update_effect_tool", {
+        annotations: EDIT3,
+        run: (call, input2) => editorRun(async () => {
+          const properties = input2.properties;
+          if (!isRecord33(properties) || Object.keys(properties).length === 0) throw new ToolError('properties is required, e.g. {"sigma": 6}');
+          const { targets, skipped } = await effectsToEdit(call, input2);
+          const ctx = await valueContext(call, properties);
+          const changes = [];
+          const rows = [];
+          for (const [clip2, eff] of targets) {
+            const cn = String(eff.class_name || "");
+            if (!effectCatalog().has(cn)) throw new ToolError(`effect ${String(eff.id)} (${cn}) is not in this libopenshot build`);
+            const values = prepareProperties(ctx, cn, properties, eff, clip2, input2.interpolation ?? "bezier");
+            const changed = changedValues(eff, values);
+            rows.push({ timeline_clip_id: clip2.id, effect_id: eff.id ?? null, effect: cn, changed: Object.keys(changed).sort() });
+            if (Object.keys(changed).length > 0) changes.push([clip2.id, String(eff.id), changed]);
+          }
+          if (changes.length === 0) return nothingChanged(call, "Those values are already set; nothing changed.", { effects: rows });
+          call.commit((tx) => {
+            for (const [, eid, values] of changes) updateEffectValues(tx, eid, values);
+          });
+          const names2 = [...new Set(changes.flatMap(([, , v]) => Object.keys(v)))].sort();
+          return ok(call, `Updated ${names2.join(", ")} on ${changes.length} effect(s).`, { changed: true, effects: rows, skipped });
+        })
+      }),
+      contractTool("remove_effect_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        run: (call, input2) => editorRun(async () => {
+          const project = call.doc.project;
+          const perClip = /* @__PURE__ */ new Map();
+          const idList2 = [...input2.effect_ids ?? [], ...input2.effect_id ? [input2.effect_id] : []].map((i) => String(i).trim()).filter(Boolean);
+          if (idList2.length > 0) {
+            for (const eid of idList2) {
+              const { clip: clip2 } = findEffect(project, eid);
+              if (isLocked(project, clip2.layer)) throw new ToolError(lockedMessage(project, clip2));
+              if (!perClip.has(clip2.id)) perClip.set(clip2.id, /* @__PURE__ */ new Set());
+              perClip.get(clip2.id).add(eid);
+            }
+          } else {
+            if (!input2.effect && !input2.all_effects) throw new ToolError("give effect_ids, an effect name with the clip(s), or all_effects=true");
+            const className = input2.effect ? resolveEffectName(input2.effect) : null;
+            const { clips, explicit } = await targetClips2(call, input2);
+            for (const clip2 of clips) {
+              if (isLocked(project, clip2.layer)) {
+                if (explicit) throw new ToolError(lockedMessage(project, clip2));
+                continue;
+              }
+              const hits = new Set(clipEffects(clip2).filter((e) => className === null || e.class_name === className).map((e) => String(e.id)));
+              if (hits.size > 0) perClip.set(clip2.id, hits);
+            }
+          }
+          if (perClip.size === 0) {
+            const what = input2.effect ? `a ${input2.effect} effect` : "effects";
+            return nothingChanged(call, `No clip has ${what} to remove; nothing changed.`, { removed: [] });
+          }
+          const changes = [];
+          const removed = [];
+          for (const [cid, hits] of perClip) {
+            const clip2 = project.clips.find((c) => c.id === cid);
+            const all = clipEffects(clip2);
+            removed.push(...all.filter((e) => hits.has(String(e.id))).map((e) => ({ timeline_clip_id: cid, effect_id: e.id ?? null, effect: e.class_name ?? null })));
+            changes.push([cid, all.filter((e) => !hits.has(String(e.id)))]);
+          }
+          call.commit((tx) => {
+            for (const [cid, effects] of changes) setClipEffects(tx, cid, effects);
+          });
+          return ok(call, `Removed ${removed.length} effect(s) from ${changes.length} clip(s).`, { changed: true, removed });
+        })
+      }),
+      contractTool("copy_effects_tool", {
+        annotations: EDIT3,
+        run: (call, input2) => editorRun(async () => {
+          const project = call.doc.project;
+          const source2 = await resolveOneClip(call, { timeline_clip_id: input2.source_clip_id ?? "", clip_query: input2.source_clip_query ?? "", track: "" });
+          const wanted = (input2.effects ?? []).filter((e) => String(e).trim()).map((e) => resolveEffectName(e));
+          const copied = clipEffects(source2).filter((e) => wanted.length === 0 || wanted.includes(String(e.class_name)));
+          if (copied.length === 0) {
+            const what = wanted.length > 0 ? wanted.join(", ") : "any effects";
+            throw new ToolError(`source clip ${clipLabel(project, source2)} has no ${what} to copy`);
+          }
+          const targetIds = (input2.timeline_clip_ids ?? []).map((i) => String(i).trim()).filter((i) => i && i !== source2.id);
+          let clips;
+          let explicit;
+          if (targetIds.length > 0) {
+            clips = resolveClipsList(call, targetIds);
+            explicit = true;
+          } else if (input2.scope) {
+            clips = resolveClipsList(call, void 0, input2.scope, input2.track ?? "").filter((c) => c.id !== source2.id);
+            explicit = false;
+          } else if (input2.clip_query) {
+            clips = [await resolveOneClip(call, { clip_query: input2.clip_query, track: input2.track ?? "" })];
+            explicit = true;
+          } else {
+            throw new ToolError("name the target clips (timeline_clip_ids, clip_query or scope)");
+          }
+          if (clips.length === 0) throw new ToolError("no target clips other than the source");
+          const classes = [...new Set(copied.map((e) => String(e.class_name)))];
+          const mode = input2.mode ?? "merge";
+          const nextId = idFactory(project);
+          const changes = [];
+          const skipped = [];
+          const rows = [];
+          for (const clip2 of clips) {
+            const problem = classes.map((cn) => compatibilityProblem(project, clip2, cn)).find((p) => p !== null) ?? null;
+            if (problem) {
+              if (explicit) throw new ToolError(problem);
+              skipped.push({ timeline_clip_id: clip2.id, reason: problem });
+              continue;
+            }
+            const current = clipEffects(clip2);
+            let next;
+            if (mode === "merge") {
+              next = mergeEffectsByClass(current, copied, nextId);
+            } else {
+              const fresh = copied.map((e) => structuredClone(e));
+              assignNewEffectIds(fresh, nextId);
+              next = mode === "replace" ? fresh : [...current.map((e) => structuredClone(e)), ...fresh];
+            }
+            changes.push([clip2.id, next]);
+            rows.push({ timeline_clip_id: clip2.id, effects: next.map((e) => e.class_name ?? null) });
+          }
+          if (changes.length === 0) throw new ToolError(skipped[0]?.reason ?? "no target clips");
+          call.commit((tx) => {
+            for (const [cid, effects] of changes) setClipEffects(tx, cid, effects);
+          });
+          return ok(call, `Copied ${copied.length} effect(s) from clip ${source2.id} onto ${changes.length} clip(s) (${mode}).`, {
+            source_clip_id: source2.id,
+            copied: classes.filter(Boolean).sort(),
+            clips: rows,
+            skipped
+          });
+        })
+      }),
+      contractTool("process_clip_effect_tool", {
+        annotations: EDIT3,
+        // effects_color_process.py runs libopenshot's OpenCV ClipProcessingJobs (stabilization, tracking,
+        // YOLO detection, EfficientSAM/Cutie masks) on the clip; no web renderer has OpenCV.
+        run: (call, input2) => unavailable(
+          call.tool,
+          `${input2.effect} analysis (Stabilizer, Tracker, Object Detector, Object Mask) runs on OpenCV inside Zenvi desktop only. Open the project in Zenvi desktop to stabilize, track or detect objects; the effects it adds play back there.`
+        )
+      })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/effects-color-analysis.ts
+async function analysis(body) {
+  try {
+    return await body();
+  } catch (error62) {
+    if (error62 instanceof AnalysisError || error62 instanceof FrameRenderError) throw new ToolError(error62.message);
+    throw error62;
+  }
+}
+function analysisTime(call, clip2, time3) {
+  if (!clip2) return time3 !== null && time3 !== void 0 ? Number(time3) : playheadSeconds(call);
+  const [start, end, duration3] = clipExtent(clip2);
+  if (time3 === null || time3 === void 0) return start + duration3 / 2;
+  const t = Number(time3);
+  if (!(start - 1e-6 <= t && t <= end + 1e-6)) throw new ToolError(`time ${pyG(t)}s is outside the clip (${pyG(start)}-${pyG(end)}s on the timeline)`);
+  return end > start ? Math.min(t, end - 1e-3) : start;
+}
+function render2(call, clip2, t, strip = null) {
+  return clip2 ? renderClipAlone(call, clip2, t, { strip }) : renderTimeline(call, t, { strip });
+}
+function measure(frame, region) {
+  const stats = computeStats(scopeData(frame.pixels, region), pixelStats(framePixels(frame.pixels, region)));
+  return { stats, size: [frame.pixels.width, frame.pixels.height] };
+}
+async function sampleScreenColor(call, clip2, sampleTime, kind = null) {
+  const t = analysisTime(call, clip2, sampleTime);
+  const frame = await analysis(() => renderClipAlone(call, clip2, t, { strip: /* @__PURE__ */ new Set(["ChromaKey"]) }));
+  const edges = EDGE_STRIPS.map((strip) => scopeData(frame.pixels, strip));
+  const grid = GRID.map((cell) => scopeData(frame.pixels, cell));
+  const found = screenFromScopes(edges, grid, kind);
+  if (!found) {
+    const edgeColor = screenColorFromHistograms(edges)[0];
+    if (kind) throw new ToolError(`found no ${kind} screen in clip ${clip2.id} at ${pyFixed(t, 2)}s (its edges are ${edgeColor})`);
+    throw new ToolError(
+      `the edges of clip ${clip2.id} at ${pyFixed(t, 2)}s are ${edgeColor}, not a green or blue screen; pass key_color ('green', 'blue' or #RRGGBB)`
+    );
+  }
+  const [color3, where, fuzz] = found;
+  return [color3, `${where} at ${pyFixed(t, 2)}s, fuzz ${pyG(fuzz)} for its unevenness`, fuzz];
+}
+async function keyedShare(call, clip2, sampleTime) {
+  const t = analysisTime(call, clip2, sampleTime);
+  const frame = await analysis(() => renderClipAlone(call, clip2, t));
+  const d = scopeData(frame.pixels);
+  const counted = d.luma.reduce((a, b) => a + b, 0);
+  const total = Math.max(Math.trunc(d.total_pixels || counted), counted, 1);
+  return roundTo(100 * (1 - counted / total), 1);
+}
+var effectsColorAnalysisTools;
+var init_effects_color_analysis = __esm({
+  "../engine/src/tools/catalog/effects-color-analysis.ts"() {
+    "use strict";
+    init_luts();
+    init_color_frames();
+    init_color_stats();
+    init_define();
+    init_pyfmt();
+    init_receipt();
+    init_common();
+    init_effect_values();
+    init_effects_color_common();
+    init_timeline_edit_common();
+    effectsColorAnalysisTools = [
+      contractTool("analyze_frame_colors_tool", {
+        annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+        requires: ["frames"],
+        run: (call, input2) => editorRun(async () => {
+          let region;
+          try {
+            region = regionArg(input2.region);
+          } catch (error62) {
+            if (error62 instanceof AnalysisError) throw new ToolError(error62.message);
+            throw error62;
+          }
+          let clip2 = null;
+          if (!input2.whole_timeline) {
+            try {
+              clip2 = await resolveOneClip(call, input2);
+            } catch (error62) {
+              if (!(error62 instanceof ToolError) || input2.timeline_clip_id || input2.clip_query) throw error62;
+            }
+          }
+          const t = analysisTime(call, clip2, input2.time);
+          const savePath = input2.save_frame_path ?? "";
+          if (savePath && !isAbsoluteFilePath(savePath)) throw new ToolError("save_frame_path must be an absolute path ending in .png");
+          const frame = await analysis(() => render2(call, clip2, t));
+          const { stats, size } = await analysis(async () => measure(frame, region));
+          const receipt2 = {
+            time: roundTo(t, 3),
+            target: clip2 ? `clip ${clip2.id}` : "timeline",
+            frame_size: size,
+            stats
+          };
+          if (clip2) {
+            receipt2.timeline_clip_id = clip2.id;
+            receipt2.effects = (clip2.effects ?? []).filter((e) => e && typeof e === "object").map((e) => e.class_name ?? null);
+          }
+          if (region) receipt2.region = region;
+          if (input2.compare_without_effects) {
+            const plain = await analysis(() => render2(call, clip2, t, "all"));
+            receipt2.without_effects = (await analysis(async () => measure(plain, region))).stats;
+          }
+          const warnings = [];
+          if (savePath) {
+            receipt2.frame_attached = true;
+            warnings.push(`This Zenvi surface writes no files: the analyzed frame is attached to this result instead of saved to ${savePath}.`);
+          }
+          const where = clip2 ? `clip ${clip2.id}` : "the timeline";
+          const words2 = stats.verdict ?? [String(stats.note ?? "")];
+          const result2 = applied(call.tool, `Frame at ${pyFixed(t, 2)}s of ${where}: ${words2.join("; ")}`, { data: receipt2, warnings });
+          return savePath ? { receipt: result2, images: [frame.image] } : result2;
+        })
+      })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/effects-color-looks.ts
+function isRecord34(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function lookEffects(effects, family, preset, create) {
+  if (family === "color") return colorLookPresetEffects(effects, preset, create);
+  if (family === "film_grain") return filmGrainLookPresetEffects(effects, preset, create);
+  if (family === "reset") return resetLookEffects(effects);
+  return lookEffectPresetEffects(effects, family, preset, create);
+}
+function gradeValues(effect2) {
+  const out = {};
+  for (const p of GRADE_PARAMS) out[p] = roundTo(keyframeValueAt(effect2[p], 1, 0), 4);
+  const lutPath = String(effect2.lut_path || "");
+  out.lut = lutPath ? lutPath.replaceAll("\\", "/").split("/").slice(-2).join("/").slice(0, -5) : "";
+  out.lut_intensity = roundTo(keyframeValueAt(effect2.lut_intensity, 1, 1), 4);
+  return out;
+}
+function span2(clip2) {
+  const start = Number(clip2.position) || 0;
+  return [start, start + Math.max(0, (Number(clip2.end) || 0) - (Number(clip2.start) || 0))];
+}
+function freeOnLayer(project, layer2, start, end, excludeId) {
+  return !project.clips.some((c) => {
+    if (c.id === excludeId || Number(c.layer) !== layer2) return false;
+    const [s, e] = span2(c);
+    return s < end - 1e-6 && e > start + 1e-6;
+  });
+}
+function placement(project, keyed, background, align) {
+  const kDur = Math.max(0, (Number(keyed.end) || 0) - (Number(keyed.start) || 0));
+  let kPos = Number(keyed.position) || 0;
+  const [bPos, bEnd] = span2(background);
+  const overlaps = kPos < bEnd && kPos + kDur > bPos;
+  if (align === "start" || align === "auto" && !overlaps) kPos = bPos;
+  const bLayer = Number(background.layer) || 0;
+  const kLayer = Number(keyed.layer) || 0;
+  if (kLayer > bLayer && freeOnLayer(project, kLayer, kPos, kPos + kDur, keyed.id)) return [kLayer, kPos, null];
+  const numbers2 = project.layers.map((l) => Math.trunc(Number(l.number) || 0));
+  for (const n of numbers2.filter((n2) => n2 > bLayer).sort((a, b) => a - b)) {
+    if (!isLocked(project, n) && freeOnLayer(project, n, kPos, kPos + kDur, keyed.id)) return [n, kPos, null];
+  }
+  const top = Math.max(...numbers2, bLayer);
+  return [top + 1e6, kPos, top + 1e6];
+}
+var EDIT4, READ4, FILM_GRAIN, LOOK_PRESETS, FAMILY_CLASS, GRADE_PARAMS, NAMED_LOOKS, AUDIO_PRESETS, KEY_METHODS, KEY_COLORS, MIN_KEYED_PCT, effectsColorLookTools;
+var init_effects_color_looks = __esm({
+  "../engine/src/tools/catalog/effects-color-looks.ts"() {
+    "use strict";
+    init_luts();
+    init_effects2();
+    init_clips();
+    init_tracks();
+    init_internal();
+    init_look();
+    init_color_frames();
+    init_color_stats();
+    init_define();
+    init_pyfmt();
+    init_effect_catalog();
+    init_effect_values();
+    init_effects_color_analysis();
+    init_effects_color();
+    init_effects_color_common();
+    init_timeline_edit_common();
+    EDIT4 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    READ4 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+    FILM_GRAIN = ["35mm_fine", "35mm_classic", "35mm_gritty", "16mm_classic", "super_8", "high_iso"];
+    LOOK_PRESETS = {
+      ...Object.fromEntries(["auto_contrast", "lift_shadows", "warm_up", "boost_color"].map((p) => [`color_${p}`, ["color", p]])),
+      remove_color: ["color", "reset"],
+      ...Object.fromEntries(FILM_GRAIN.map((p) => [`film_grain_${p}`, ["film_grain", p]])),
+      remove_film_grain: ["film_grain", "none"],
+      ...Object.fromEntries(["subtle", "vhs", "heavy"].map((p) => [`analog_tape_${p}`, ["AnalogTape", p]])),
+      remove_analog_tape: ["AnalogTape", "none"],
+      ...Object.fromEntries(["subtle", "medium", "strong"].map((p) => [`sharpen_${p}`, ["Sharpen", p]])),
+      remove_sharpen: ["Sharpen", "none"],
+      ...Object.fromEntries(["soft_focus", "medium", "heavy"].map((p) => [`blur_${p}`, ["Blur", p]])),
+      remove_blur: ["Blur", "none"],
+      ...Object.fromEntries(["soft_white", "warm", "neon", "inner"].map((p) => [`glow_${p}`, ["Glow", p]])),
+      remove_glow: ["Glow", "none"],
+      ...Object.fromEntries(["subtle", "soft", "strong", "long"].map((p) => [`shadow_${p}`, ["Shadow", p]])),
+      remove_shadow: ["Shadow", "none"],
+      reset_look: ["reset", null]
+    };
+    FAMILY_CLASS = { color: "ColorGrade", film_grain: "FilmGrain", reset: "ColorGrade" };
+    GRADE_PARAMS = ["exposure", "contrast", "highlights", "shadows", "saturation", "vibrance", "temperature", "tint", "mix"];
+    NAMED_LOOKS = {
+      neutral: { base: null, about: "every control neutral, no LUT (undo a grade)" },
+      natural: { base: "auto_contrast", about: "gentle contrast S-curve, a little vibrance" },
+      auto_contrast: { base: "auto_contrast", about: "Look > Color > Auto Contrast" },
+      lift_shadows: { base: "lift_shadows", about: "Look > Color > Lift Shadows (open up dark footage)" },
+      warm_up: { base: "warm_up", about: "Look > Color > Warm Up" },
+      boost_color: { base: "boost_color", about: "Look > Color > Boost Color" },
+      cinematic: {
+        base: "auto_contrast",
+        lut: "cinematic_&_blockbuster/teal_&_orange_cinema",
+        lut_intensity: 0.5,
+        params: { saturation: 0.95, highlights: -0.1, shadows: 0 },
+        about: "blockbuster teal/orange LUT at 50%, contrast curve, slightly muted"
+      },
+      teal_orange: {
+        base: "auto_contrast",
+        lut: "teal_&_orange_vibes/signature_teal_&_orange",
+        lut_intensity: 0.8,
+        params: { vibrance: 0.1 },
+        about: "strong teal shadows / orange skin tones"
+      },
+      warm: { base: "warm_up", params: { temperature: 0.25 }, about: "warmer white balance" },
+      golden_hour: {
+        base: "warm_up",
+        lut: "teal_&_orange_vibes/sunset_orange",
+        lut_intensity: 0.6,
+        params: { temperature: 0.15 },
+        about: "sunset orange glow"
+      },
+      cool: { base: null, params: { temperature: -0.22, tint: -0.03 }, about: "cooler, bluer" },
+      vintage: {
+        base: "lift_shadows",
+        lut: "film_stock_&_vintage/faded_memories",
+        lut_intensity: 0.7,
+        params: { saturation: 0.85, contrast: -0.05 },
+        about: "faded film, lifted blacks"
+      },
+      black_and_white: { base: null, params: { saturation: 0, vibrance: 0, contrast: 0.15 }, about: "monochrome with a little contrast" },
+      film_noir: {
+        base: null,
+        params: { saturation: 0, contrast: 0.35, shadows: -0.12, highlights: 0.05 },
+        about: "hard-contrast black and white"
+      },
+      moody: {
+        base: null,
+        lut: "dark_&_moody/cold_shadows",
+        lut_intensity: 0.6,
+        params: { exposure: -0.15, contrast: 0.2, saturation: 0.8, shadows: -0.15 },
+        about: "darker, desaturated, cold shadows"
+      },
+      vibrant: { base: "boost_color", lut: "vibrant_&_colorful/color_pop", lut_intensity: 0.5, about: "punchy saturated color" },
+      bright_airy: {
+        base: "lift_shadows",
+        params: { exposure: 0.2, contrast: -0.08, saturation: 0.92, highlights: -0.1 },
+        about: "light, soft, lifted"
+      }
+    };
+    AUDIO_PRESETS = {
+      voice_compressor: ["Compressor", { threshold: -18, ratio: 3, attack: 5, release: 120, makeup_gain: 3 }, "even out a voice (gentle 3:1)"],
+      strong_compressor: ["Compressor", { threshold: -28, ratio: 8, attack: 2, release: 80, makeup_gain: 6 }, "podcast/broadcast squash"],
+      noise_gate: ["Expander", { threshold: -45, ratio: 4, attack: 1, release: 100, makeup_gain: 0 }, "quiet the room noise between phrases"],
+      echo: ["Echo", { echo_time: 0.25, feedback: 0.35, mix: 0.35 }, "clear echo"],
+      slapback: ["Echo", { echo_time: 0.09, feedback: 0.15, mix: 0.3 }, "short room slap"],
+      canyon_echo: ["Echo", { echo_time: 0.6, feedback: 0.55, mix: 0.45 }, "long repeating echo"],
+      low_cut: ["ParametricEQ", { filter_type: 1, frequency: 90, q_factor: 0.707, gain: 0 }, "remove rumble / wind below 90 Hz"],
+      high_cut: ["ParametricEQ", { filter_type: 0, frequency: 8e3, q_factor: 0.707, gain: 0 }, "tame hiss above 8 kHz"],
+      bass_boost: ["ParametricEQ", { filter_type: 2, frequency: 120, q_factor: 0.707, gain: 6 }, "+6 dB low shelf at 120 Hz"],
+      treble_boost: ["ParametricEQ", { filter_type: 3, frequency: 6e3, q_factor: 0.707, gain: 5 }, "+5 dB high shelf at 6 kHz"],
+      voice_presence: ["ParametricEQ", { filter_type: 6, frequency: 3e3, q_factor: 1, gain: 4 }, "+4 dB at 3 kHz for clarity"],
+      telephone: ["ParametricEQ", { filter_type: 4, frequency: 1500, q_factor: 1.2, gain: 0 }, "band-pass phone/radio voice"],
+      robot: ["Robotization", { fft_size: 5, hop_size: 1, window_type: 2 }, "robotic voice"],
+      whisper: ["Whisperization", { fft_size: 4, hop_size: 2, window_type: 2 }, "whispering voice"],
+      distortion: ["Distortion", { distortion_type: 1, input_gain: 12, output_gain: -8, tone: 4 }, "soft-clipped grit"],
+      add_noise: ["Noise", { level: 15 }, "white noise bed (15%)"],
+      sync_delay: ["Delay", { delay_time: 0.1 }, "delay the sound (fix A/V sync; set delay_time seconds)"]
+    };
+    KEY_METHODS = {
+      basic_soft: 11,
+      basic: 0,
+      hsv_hue: 1,
+      hsv_saturation: 2,
+      hsl_saturation: 3,
+      hsv_value: 4,
+      hsl_luminance: 5,
+      lch_luminosity: 6,
+      lch_chroma: 7,
+      lch_hue: 8,
+      cie_distance: 9,
+      cbcr_vector: 10
+    };
+    KEY_COLORS = { green: "#00b140", blue: "#0047bb" };
+    MIN_KEYED_PCT = 10;
+    effectsColorLookTools = [
+      contractTool("apply_look_preset_tool", {
+        annotations: EDIT4,
+        run: (call, input2) => editorRun(async () => {
+          const look = input2.look;
+          const entry = LOOK_PRESETS[look];
+          if (!entry) throw new ToolError(`unknown look ${pyReprString(look)}; choose one of ${Object.keys(LOOK_PRESETS).sort().join(", ")}`);
+          const [family, preset] = entry;
+          const checkClass = FAMILY_CLASS[family] ?? family;
+          const { clips: targets, explicit } = await targetClips2(call, input2);
+          const { ok: clips, skipped } = splitCompatible(call.doc.project, targets, explicit, checkClass);
+          const create = newEffectFactory(call);
+          const changes = [];
+          const rows = [];
+          for (const clip2 of clips) {
+            const before = clipEffects(clip2);
+            const after = lookEffects(before, family, preset, create);
+            if (after === null || sameJson(before, after)) {
+              rows.push({ timeline_clip_id: clip2.id, changed: false });
+              continue;
+            }
+            changes.push([clip2.id, after]);
+            rows.push({ timeline_clip_id: clip2.id, changed: true, effects: after.filter(isRecord34).map((e) => e.class_name ?? null) });
+          }
+          const removing = look.startsWith("remove_") || look === "reset_look";
+          if (changes.length === 0) {
+            const state = removing ? "has no such look to remove" : "already has this look";
+            return nothingChanged(call, `Every target clip ${state}; nothing changed.`, { look, clips: rows, skipped });
+          }
+          call.commit((tx) => {
+            for (const [cid, effects] of changes) setClipEffects(tx, cid, effects);
+          });
+          return ok(call, `${removing ? "Removed" : "Applied"} look ${look} on ${changes.length} clip(s).`, { look, changed: true, clips: rows, skipped });
+        })
+      }),
+      contractTool("color_grade_clip_tool", {
+        annotations: EDIT4,
+        run: (call, input2) => editorRun(async () => {
+          const project = call.doc.project;
+          const explicitParams = {};
+          for (const key of GRADE_PARAMS) {
+            const value = input2[key];
+            if (value !== null && value !== void 0) explicitParams[key] = value;
+          }
+          const look = input2.look ?? "";
+          if (look && !NAMED_LOOKS[look]) throw new ToolError(`unknown look ${pyReprString(look)}; choose one of ${Object.keys(NAMED_LOOKS).sort().join(", ")}`);
+          const lut = input2.lut ?? "";
+          const lutIntensity = input2.lut_intensity ?? null;
+          const wheels = input2.wheels;
+          const curves = input2.curves;
+          const hasWheels = isRecord34(wheels) && Object.keys(wheels).length > 0;
+          const hasCurves = isRecord34(curves) && Object.keys(curves).length > 0;
+          if (!(look || Object.keys(explicitParams).length > 0 || lut || lutIntensity !== null || hasWheels || hasCurves || input2.reset)) {
+            throw new ToolError("say what to change: a look, a LUT, or one of exposure/contrast/.../curves");
+          }
+          const { clips: targets, explicit } = await targetClips2(call, input2);
+          const { ok: clips, skipped } = splitCompatible(project, targets, explicit, "ColorGrade");
+          const spec = NAMED_LOOKS[look] ?? {};
+          const lookLut = spec.lut ? await lutArgument(call, spec.lut) : "";
+          const lutPath = lut ? await lutArgument(call, lut) : null;
+          if (curves !== void 0 && curves !== null && !isRecord34(curves)) throw new ToolError('curves is {"all": [[0,0],[1,1]], "red": [...]}');
+          for (const key of Object.keys(curves ?? {})) {
+            if (!["all", "red", "green", "blue"].includes(key)) throw new ToolError(`unknown curve ${pyReprString(key)}; use all, red, green or blue`);
+          }
+          const ctx = { project };
+          const create = newEffectFactory(call);
+          const changes = [];
+          const rows = [];
+          for (const clip2 of clips) {
+            const effects = clipEffects(clip2).map((e) => structuredClone(e));
+            const idxs = effects.flatMap((e, i) => e.class_name === "ColorGrade" ? [i] : []);
+            const existing = idxs.length > 0 ? effects[idxs[0]] : null;
+            let payload;
+            let values;
+            if (look || input2.reset || existing === null) {
+              const fresh = create("ColorGrade");
+              payload = spec.base ? applyColorGradePreset(fresh, spec.base) : neutralColorGrade(fresh);
+              if (existing !== null) {
+                payload.id = "id" in existing ? existing.id : payload.id;
+                if ("order" in existing) payload.order = existing.order;
+                if (existing.ui) payload.ui = existing.ui;
+              }
+              if (lookLut) {
+                payload.lut_path = lookLut;
+                payload.lut_intensity = constantKeyframe2(spec.lut_intensity ?? 1);
+              }
+              values = { ...spec.params ?? {} };
+            } else {
+              payload = structuredClone(existing);
+              values = {};
+            }
+            Object.assign(values, explicitParams);
+            if (lutIntensity !== null) values.lut_intensity = lutIntensity;
+            Object.assign(payload, prepareProperties(ctx, "ColorGrade", values, payload, clip2));
+            if (lutPath !== null) payload.lut_path = lutPath;
+            if (hasWheels) payload.wheels = wheelsValue(wheels, payload.wheels);
+            for (const [key, pts] of Object.entries(curves ?? {})) payload[`curve_${key}`] = curveValue(`curves.${key}`, pts);
+            if (existing !== null && sameJson(payload, existing)) {
+              rows.push({ timeline_clip_id: clip2.id, effect_id: existing.id ?? null, changed: false, grade: gradeValues(payload) });
+              continue;
+            }
+            if (idxs.length > 0) {
+              effects[idxs[0]] = payload;
+              for (const i of idxs.slice(1).reverse()) effects.splice(i, 1);
+            } else {
+              effects.push(payload);
+            }
+            changes.push([clip2.id, effects]);
+            rows.push({ timeline_clip_id: clip2.id, effect_id: payload.id ?? null, changed: true, grade: gradeValues(payload) });
+          }
+          if (changes.length === 0) return nothingChanged(call, "The grade already has these values; nothing changed.", { clips: rows, skipped });
+          call.commit((tx) => {
+            for (const [cid, effects] of changes) setClipEffects(tx, cid, effects);
+          });
+          const what = look ? `look ${look}` : [...Object.keys(explicitParams).sort(), ...lut ? ["lut"] : []].join(", ") || "grade";
+          return ok(call, `Graded ${changes.length} clip(s): ${what}.`, { look, changed: true, clips: rows, skipped });
+        })
+      }),
+      contractTool("list_luts_tool", {
+        annotations: READ4,
+        run: (call, input2) => editorRun(() => {
+          const query2 = input2.query ?? "";
+          const words2 = query2.toLowerCase().replaceAll("&", " ").split(/\s+/).filter(Boolean);
+          const rows = listLuts().filter((lut) => {
+            const hay = `${lut.id} ${lut.name} ${lut.category}`.toLowerCase().replaceAll("_", " ");
+            return words2.length === 0 || words2.every((w) => hay.includes(w));
+          }).map((lut) => ({ id: lut.id, name: lut.name, category: lut.category || "User-Defined", builtin: lut.builtin }));
+          if (rows.length === 0) throw new ToolError(query2 ? `no LUT matches ${pyReprString(query2)}` : "no LUT files were found");
+          return ok(call, `${rows.length} LUT(s)${query2 ? ` matching ${pyReprString(query2)}` : ""}`, { luts: rows });
+        })
+      }),
+      contractTool("apply_audio_effect_tool", {
+        annotations: EDIT4,
+        run: (call, input2) => editorRun(async () => {
+          const preset = input2.preset;
+          const entry = AUDIO_PRESETS[preset];
+          if (!entry) throw new ToolError(`unknown preset ${pyReprString(preset)}; choose one of ${Object.keys(AUDIO_PRESETS).sort().join(", ")}`);
+          const [className, settings] = entry;
+          if (!effectCatalog().has(className)) throw new ToolError(`this libopenshot build has no ${className} effect`);
+          const merged = { ...settings };
+          if (input2.properties && Object.keys(input2.properties).length > 0) {
+            if (!isRecord34(input2.properties)) throw new ToolError('properties is an object like {"ratio": 4}');
+            Object.assign(merged, input2.properties);
+          }
+          const project = call.doc.project;
+          const { clips: targets, explicit } = await targetClips2(call, input2);
+          const { ok: clips, skipped } = splitCompatible(project, targets, explicit, className);
+          const ctx = { project };
+          const create = newEffectFactory(call);
+          const changes = [];
+          const rows = [];
+          for (const clip2 of clips) {
+            const effects = clipEffects(clip2).map((e) => structuredClone(e));
+            const idxs = effects.flatMap((e, i) => e.class_name === className ? [i] : []);
+            const target = idxs.length > 0 ? effects[idxs[0]] : create(className);
+            const props = prepareProperties(ctx, className, merged, target, clip2);
+            const changed = Object.entries(props).filter(([k, v]) => !sameJson(target[k], v));
+            if (idxs.length > 0 && changed.length === 0) {
+              rows.push({ timeline_clip_id: clip2.id, effect_id: target.id ?? null, action: "unchanged" });
+              continue;
+            }
+            Object.assign(target, props);
+            if (idxs.length === 0) effects.push(target);
+            changes.push([clip2.id, effects]);
+            rows.push({ timeline_clip_id: clip2.id, effect_id: target.id ?? null, action: idxs.length > 0 ? "updated" : "added" });
+          }
+          if (changes.length === 0) {
+            return nothingChanged(call, `${preset} is already applied with these settings; nothing changed.`, { clips: rows, skipped });
+          }
+          call.commit((tx) => {
+            for (const [cid, effects] of changes) setClipEffects(tx, cid, effects);
+          });
+          return ok(call, `Applied ${preset} (${className}) to ${changes.length} clip(s).`, {
+            effect: className,
+            preset,
+            settings: merged,
+            changed: true,
+            clips: rows,
+            skipped
+          });
+        })
+      }),
+      contractTool("chroma_key_clip_tool", {
+        annotations: EDIT4,
+        run: (call, input2) => editorRun(async () => {
+          const project = call.doc.project;
+          const clip2 = await resolveOneClip(call, input2);
+          const problem = compatibilityProblem(project, clip2, "ChromaKey");
+          if (problem) throw new ToolError(problem);
+          let background = null;
+          if (input2.background_clip_id || input2.background_query) {
+            background = await resolveOneClip(call, { timeline_clip_id: input2.background_clip_id ?? "", clip_query: input2.background_query ?? "", track: "" });
+            if (background.id === clip2.id) throw new ToolError("the background must be a different clip than the keyed one");
+          }
+          const method = input2.method ?? "basic_soft";
+          if (!(method in KEY_METHODS)) throw new ToolError(`method must be one of ${Object.keys(KEY_METHODS).sort().join(", ")}`);
+          const halo = input2.halo ?? 10;
+          let fuzz = input2.fuzz ?? null;
+          const sampleTime = input2.sample_time ?? null;
+          const canRender = Boolean(call.host.frames);
+          let colorSource = "given";
+          let hexColor3;
+          const key = String(input2.key_color || "auto").trim().toLowerCase();
+          if (key === "auto") {
+            if (!canRender) {
+              throw new ToolError(
+                "key_color='auto' samples the screen from a rendered frame, which this host cannot render; pass key_color ('green', 'blue' or #RRGGBB)"
+              );
+            }
+            const [color3, detail2, suggested] = await sampleScreenColor(call, clip2, sampleTime);
+            hexColor3 = color3;
+            colorSource = `sampled (${detail2})`;
+            if (fuzz === null) fuzz = suggested;
+          } else if (key in KEY_COLORS) {
+            try {
+              if (!canRender) throw new Error("this host does not render frames");
+              const [color3, detail2, suggested] = await sampleScreenColor(call, clip2, sampleTime, key);
+              hexColor3 = color3;
+              colorSource = `sampled (${detail2})`;
+              if (fuzz === null) fuzz = suggested;
+            } catch (error62) {
+              hexColor3 = KEY_COLORS[key];
+              colorSource = `stock ${key}; the screen could not be sampled (${error62 instanceof Error ? error62.message : String(error62)})`;
+            }
+          } else {
+            const [r, g, b] = parseColor(input2.key_color);
+            hexColor3 = hex6(r, g, b);
+          }
+          if (fuzz === null) fuzz = 20;
+          const effects = clipEffects(clip2).map((e) => structuredClone(e));
+          const idxs = effects.flatMap((e, i) => e.class_name === "ChromaKey" ? [i] : []);
+          const target = idxs.length > 0 ? effects[idxs[0]] : newEffectFactory(call)("ChromaKey");
+          const props = prepareProperties({ project }, "ChromaKey", { color: hexColor3, keymethod: KEY_METHODS[method], fuzz, halo }, target, clip2);
+          Object.assign(target, props);
+          if (idxs.length === 0) effects.push(target);
+          let keyedPct = null;
+          if (canRender) {
+            try {
+              keyedPct = await keyedShare(call, { ...clip2, effects }, sampleTime);
+            } catch (error62) {
+              call.host.log?.(`chroma key: could not measure the keyed share: ${error62 instanceof Error ? error62.message : String(error62)}`);
+            }
+          }
+          const stale = editedWhileRendering(call, clip2, ["effects", "layer", "position", "start", "end"]) ?? (background ? editedWhileRendering(call, background, ["layer", "position", "start", "end"]) : null);
+          if (stale) throw new ToolError(stale);
+          let place = null;
+          if (background) {
+            const [layer2, position, newTrack] = placement(call.doc.project, clip2, background, input2.align ?? "auto");
+            place = { layer: layer2, position: roundTo(position, 4), newTrack: newTrack !== null };
+          }
+          call.commit((tx) => {
+            if (place?.newTrack) {
+              const track2 = addTrack(tx);
+              if (track2.number !== place.layer) throw new Error(`chroma key: new track ${track2.number}, expected ${place.layer}`);
+            }
+            setClipEffects(tx, clip2.id, effects);
+            if (place) {
+              const move = {};
+              if ((Number(clip2.layer) || 0) !== place.layer) move.layer = place.layer;
+              if (Math.abs((Number(clip2.position) || 0) - place.position) > 1e-6) move.position = place.position;
+              if (Object.keys(move).length > 0) moveClip(tx, clip2.id, move);
+            }
+          });
+          let summary = `Keyed out ${hexColor3} (${colorSource}, ${method}, fuzz ${pyG(fuzz)}, halo ${pyG(halo)}) on clip ${clip2.id}.`;
+          const receipt2 = {
+            timeline_clip_id: clip2.id,
+            effect_id: target.id ?? null,
+            key_color: hexColor3,
+            key_color_source: colorSource,
+            method,
+            fuzz,
+            halo,
+            keyed_pct: keyedPct
+          };
+          if (keyedPct !== null) {
+            summary += ` ${pyG(keyedPct)}% of the frame is now transparent.`;
+            if (keyedPct < MIN_KEYED_PCT) {
+              summary += " That is too little for a green/blue screen: the key colour probably misses this screen. Call again with key_color='auto' or a #RRGGBB sampled from the screen, or raise fuzz.";
+            }
+          }
+          if (place && background) {
+            const trackNo = uiTrack(call.doc.project, place.layer);
+            summary += ` It now sits on track ${String(trackNo)} above background ${background.id}${place.newTrack ? " (new track)" : ""}, starting at ${pyG(place.position)}s.`;
+            Object.assign(receipt2, { background_clip_id: background.id, track: trackNo, layer: place.layer, position: place.position, new_track: place.newTrack });
+          }
+          return ok(call, summary, receipt2);
+        })
       })
     ];
   }
@@ -57742,11 +62918,11 @@ var init_export2 = __esm({
         run: (call) => {
           const project = call.doc.project;
           const { video, audio, exportType, defaultPath } = getDefaultExportSettings(project);
-          const fps = record4(video.fps);
+          const fps2 = record4(video.fps);
           const lines = [
             `Export type: ${exportType}`,
             `Default path: ${defaultPath}`,
-            `Video: ${String(video.width)}x${String(video.height)}, ${String(fps.num)}/${String(fps.den)} fps, codec ${video.vcodec}, format ${video.vformat}, bitrate ${String(video.video_bitrate)}`,
+            `Video: ${String(video.width)}x${String(video.height)}, ${String(fps2.num)}/${String(fps2.den)} fps, codec ${video.vcodec}, format ${video.vformat}, bitrate ${String(video.video_bitrate)}`,
             `Audio: codec ${audio.acodec}, ${String(audio.sample_rate)} Hz, ${String(audio.channels)} channels, bitrate ${String(audio.audio_bitrate)}`,
             `Frame range: ${String(video.start_frame)} - ${String(video.end_frame)}`
           ];
@@ -57782,8 +62958,8 @@ function t2vDims(width, height) {
   if (aspect < 0.8) return [1080, 1920];
   return [1440, 1440];
 }
-function narrationName(text4) {
-  const words2 = text4.split(/\s+/).filter(Boolean);
+function narrationName(text5) {
+  const words2 = text5.split(/\s+/).filter(Boolean);
   return `Narration - ${words2.slice(0, 6).join(" ")}${words2.length > 6 ? "..." : ""}`;
 }
 function base64ToBytes(b64) {
@@ -57944,16 +63120,16 @@ function clampMaxFrames(raw) {
   return [n, warnings];
 }
 function midBinFrames(start, end, count) {
-  const span2 = Math.trunc(end) - Math.trunc(start);
-  if (span2 <= 0) return [];
-  const n = Math.max(1, Math.min(Math.trunc(count), span2));
-  return Array.from({ length: n }, (_, i) => Math.trunc(start) + Math.trunc(span2 * (i + 0.5) / n));
+  const span3 = Math.trunc(end) - Math.trunc(start);
+  if (span3 <= 0) return [];
+  const n = Math.max(1, Math.min(Math.trunc(count), span3));
+  return Array.from({ length: n }, (_, i) => Math.trunc(start) + Math.trunc(span3 * (i + 0.5) / n));
 }
 function midBinSeconds(start, end, count) {
-  const span2 = end - start;
-  if (span2 <= 0) return [];
+  const span3 = end - start;
+  if (span3 <= 0) return [];
   const n = Math.max(1, Math.trunc(count));
-  return Array.from({ length: n }, (_, i) => start + span2 * (i + 0.5) / n);
+  return Array.from({ length: n }, (_, i) => start + span3 * (i + 0.5) / n);
 }
 function formatTimecode2(seconds2) {
   let whole = Math.trunc(Math.max(0, seconds2));
@@ -57966,14 +63142,14 @@ function formatTimecode2(seconds2) {
   const ss = whole % 60;
   return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}.${String(cent).padStart(2, "0")}`;
 }
-function totalFrames(project, fps) {
+function totalFrames(project, fps2) {
   const duration3 = Number(project.duration);
-  if (project.duration !== void 0 && project.duration !== null && Number.isFinite(duration3)) return Math.max(0, toFrame(duration3, fps));
+  if (project.duration !== void 0 && project.duration !== null && Number.isFinite(duration3)) return Math.max(0, toFrame(duration3, fps2));
   let end = 0;
   for (const c of project.clips ?? []) end = Math.max(end, (Number(c.position) || 0) + Math.max(0, (Number(c.end) || 0) - (Number(c.start) || 0)));
-  return Math.max(0, toFrame(end, fps));
+  return Math.max(0, toFrame(end, fps2));
 }
-function visibleClipsAt(project, seconds2, fps) {
+function visibleClipsAt(project, seconds2, fps2) {
   const hidden = new Set(
     (project.layers ?? []).filter((l) => Boolean(l.hidden)).map((l) => Math.trunc(Number(l.number)))
   );
@@ -57988,7 +63164,7 @@ function visibleClipsAt(project, seconds2, fps) {
     const end = clip2.end === void 0 || clip2.end === null ? start : Number(clip2.end);
     const duration3 = end - start;
     if (duration3 < 0 || !(position <= seconds2 && seconds2 < position + Math.max(duration3, 1e-9))) continue;
-    const entry = { id: String(clip2.id ?? ""), track: layer2, position, start, end, landedFrame: toFrame(position, fps) };
+    const entry = { id: String(clip2.id ?? ""), track: layer2, position, start, end, landedFrame: toFrame(position, fps2) };
     const names2 = (clip2.effects ?? []).map((e) => e.class_name || e.type || e.name).filter(Boolean).map(String);
     if (names2.length > 0) entry.effects = names2;
     out.push([layer2, entry]);
@@ -58015,19 +63191,19 @@ function trimToBudget(images, limit = MAX_IMAGE_BYTES2) {
   return [kept, warnings];
 }
 async function renderTimelineFrames(call, project, frames, longestEdge) {
-  const fps = projectFps(project);
+  const fps2 = projectFps(project);
   const [width] = fitSize(project.width || 1920, project.height || 1080, longestEdge);
   const rendered = [];
   for (const frame of frames) {
     if (call.signal?.aborted) break;
-    const seconds2 = toSeconds(frame, fps);
+    const seconds2 = toSeconds(frame, fps2);
     try {
       const image = await call.host.frames.renderFrame(project, seconds2, {
         width,
         format: "jpeg",
         overlay: { grid: true, caption: `f${frame}  ${formatTimecode2(seconds2)}` }
       });
-      rendered.push({ frame, seconds: seconds2, image, clips: visibleClipsAt(project, seconds2, fps) });
+      rendered.push({ frame, seconds: seconds2, image, clips: visibleClipsAt(project, seconds2, fps2) });
     } catch (error62) {
       call.host.log?.(`inspect frame ${frame} failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
     }
@@ -58058,8 +63234,8 @@ var init_inspect = __esm({
         run: async (call, input2) => {
           const tool = "inspect_timeline_tool";
           const project = call.doc.toJSON();
-          const fps = projectFps(project);
-          const total = totalFrames(project, fps);
+          const fps2 = projectFps(project);
+          const total = totalFrames(project, fps2);
           const warnings = [];
           const overview = Boolean(input2.overview);
           let startFrame = input2.startFrame;
@@ -58073,8 +63249,8 @@ var init_inspect = __esm({
             const t1 = input2.end ?? position + Math.max(0, (Number(clip2.end) || 0) - (Number(clip2.start) || 0));
             if (!Number.isFinite(t0) || !Number.isFinite(t1)) return refused(tool, "Error: Invalid start/end for watchSuggested window.");
             if (t1 <= t0) return refused(tool, "Error: end must be greater than start.");
-            startFrame = toFrame(t0, fps);
-            endFrame = toFrame(t1, fps);
+            startFrame = toFrame(t0, fps2);
+            endFrame = toFrame(t1, fps2);
             if (endFrame <= startFrame) endFrame = startFrame + 1;
           }
           if (startFrame === void 0 && !overview) {
@@ -58113,7 +63289,7 @@ var init_inspect = __esm({
             coordinateGrid: COORDINATE_GRID_NOTE,
             width: w,
             height: h,
-            fps: fps.num / fps.den,
+            fps: fps2.num / fps2.den,
             totalFrames: total,
             mode: overview ? "overview" : "frames",
             requestedFrames: frames,
@@ -58181,14 +63357,14 @@ var init_inspect = __esm({
           if (clipId2) {
             const clip2 = (project.clips ?? []).find((c) => String(c.id) === clipId2);
             if (clip2 && (!clip2.file_id || String(clip2.file_id) === fileId)) {
-              const fps = projectFps(project);
+              const fps2 = projectFps(project);
               const position = Number(clip2.position) || 0;
               const dur = Math.max(0, (Number(clip2.end) || 0) - (Number(clip2.start) || 0));
               data.timelineMapping = {
                 clipId: clipId2,
-                startFrame: toFrame(position, fps),
-                endFrame: toFrame(position + dur, fps),
-                fps: fps.num / fps.den,
+                startFrame: toFrame(position, fps2),
+                endFrame: toFrame(position + dur, fps2),
+                fps: fps2.num / fps2.den,
                 note: "times are project frames (0-index)"
               };
             }
@@ -58373,8 +63549,8 @@ var init_media3 = __esm({
             const mt = String(input2.media_types ?? "all").trim() || "all";
             if (!["all", "*", "any", "media"].includes(mt.toLowerCase())) lines2.push(`media_types=${mt}`);
             lines2.push("sample:");
-            const sample = cappedLines(resolved.map((p) => `  ${p.split(/[\\/]/).pop() ?? p}`));
-            if (sample) lines2.push(sample);
+            const sample2 = cappedLines(resolved.map((p) => `  ${p.split(/[\\/]/).pop() ?? p}`));
+            if (sample2) lines2.push(sample2);
             lines2.push(`skipped_non_media=${skippedNonMedia}`);
             if (missing.length > 0) lines2.push(`not found: ${missing.join(", ")}`);
             if (notes.length > 0) lines2.push("Notes: " + notes.join("; "));
@@ -58591,7 +63767,7 @@ ${placed.text}`;
 });
 
 // ../engine/src/tools/catalog/metadata.ts
-function isRecord28(value) {
+function isRecord35(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function pyStr2(value) {
@@ -58654,7 +63830,7 @@ function fullMetadataText(project, level) {
       const n = level === "full" ? chapters.length : Math.min(3, chapters.length);
       lines.push("    chapter_snippets:");
       for (const raw of chapters.slice(0, n)) {
-        if (!isRecord28(raw) || !(raw.summary || raw.title)) continue;
+        if (!isRecord35(raw) || !(raw.summary || raw.title)) continue;
         const t0 = Number(raw.start) || 0;
         const t1 = Number(raw.end) || t0;
         lines.push(`      [${fmtMmss(t0)}-${fmtMmss(t1)}] ${String(raw.title ?? "")}: ${pySlice(String(raw.summary ?? ""), 0, 160)}`);
@@ -58664,7 +63840,7 @@ function fullMetadataText(project, level) {
       const n = level === "full" ? scenes.length : Math.min(3, scenes.length);
       lines.push("    scene_snippets:");
       for (const raw of scenes.slice(0, n)) {
-        if (!isRecord28(raw) || !raw.description) continue;
+        if (!isRecord35(raw) || !raw.description) continue;
         lines.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
@@ -58703,14 +63879,14 @@ function placementsMetadataText(project, level) {
     if (scenes.length > 0 && limit > 0) {
       lines.push("    effective_scenes:");
       for (const raw of scenes.slice(0, limit)) {
-        if (!isRecord28(raw) || !raw.description) continue;
+        if (!isRecord35(raw) || !raw.description) continue;
         lines.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
   }
   return lines.join("\n");
 }
-var READ2, metadataTools;
+var READ5, metadataTools;
 var init_metadata = __esm({
   "../engine/src/tools/catalog/metadata.ts"() {
     "use strict";
@@ -58721,22 +63897,22 @@ var init_metadata = __esm({
     init_receipt();
     init_reports();
     init_common();
-    READ2 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ5 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     metadataTools = [
       contractTool("get_clips_with_full_metadata_tool", {
-        annotations: READ2,
+        annotations: READ5,
         run: (call, input2) => {
           return fullMetadataText(call.doc.project, (text(input2.detail_level) || "summary").toLowerCase());
         }
       }),
       contractTool("get_timeline_placements_metadata_tool", {
-        annotations: READ2,
+        annotations: READ5,
         run: (call, input2) => {
           return placementsMetadataText(call.doc.project, (text(input2.detail_level) || "summary").toLowerCase());
         }
       }),
       contractTool("get_timeline_state_tool", {
-        annotations: READ2,
+        annotations: READ5,
         run: (call) => {
           const data = timelineStateData(call.doc.project);
           return applied("get_timeline_state_tool", `Timeline: ${data.clips.length} clip(s), ${data.tracks.length} track(s).`, { data }, 0);
@@ -58916,8 +64092,8 @@ async function fetchMotionGraphics(call, input2) {
   const single2 = text(input2.supabase_url) || text(input2.url);
   const urls = segs.length > 0 ? [...segs].map((u, i) => ({ u, i })).sort((a, b) => segmentIndex(a.u) - segmentIndex(b.u) || a.i - b.i).map((x) => x.u) : single2 ? [single2] : [];
   if (urls.length === 0) return "Error: segment_urls or supabase_url is required.";
-  const cached3 = alreadyImported(urls);
-  if (cached3) return cached3;
+  const cached4 = alreadyImported(urls);
+  if (cached4) return cached4;
   const downloads = [];
   const failures = [];
   for (const [i, url2] of urls.entries()) {
@@ -59224,8 +64400,8 @@ var init_motion = __esm({
 });
 
 // ../engine/src/tools/catalog/phase3.ts
-function clipTime(clip2, fps) {
-  const rate = fps.num / fps.den;
+function clipTime(clip2, fps2) {
+  const rate = fps2.num / fps2.den;
   const start = Number(clip2.start) || 0;
   const end = Number(clip2.end) || 0;
   const position = Number(clip2.position) || 0;
@@ -59285,8 +64461,8 @@ var init_phase3 = __esm({
           const resolved = await resolveClip(call, input2);
           if (!resolved.ok) return failed(tool, resolved.error || "Error: could not resolve a timeline clip.");
           if (!def) {
-            const sample = EFFECTS.map((e) => e.className).sort().slice(0, 12).join(", ");
-            return refused(tool, `Error: unknown effect ${pyReprString(name)}. Examples: ${sample}.`);
+            const sample2 = EFFECTS.map((e) => e.className).sort().slice(0, 12).join(", ");
+            return refused(tool, `Error: unknown effect ${pyReprString(name)}. Examples: ${sample2}.`);
           }
           const clipId2 = String(resolved.clip.id);
           const existing = (resolved.clip.effects ?? []).find((e) => e.class_name === def.className);
@@ -59317,8 +64493,8 @@ var init_phase3 = __esm({
           if (!KEYFRAME_PROPERTIES.includes(prop)) {
             return refused(tool, `Error: property must be one of ${pyRepr2([...KEYFRAME_PROPERTIES].sort())} (got ${pyRepr2(input2.property)}).`);
           }
-          const points = input2.points;
-          if (!Array.isArray(points) || points.length === 0) {
+          const points2 = input2.points;
+          if (!Array.isArray(points2) || points2.length === 0) {
             return refused(tool, 'Error: points must list at least one keyframe, e.g. [{"seconds": 0, "value": 1}].');
           }
           const resolved = await resolveClip(call, input2);
@@ -59327,7 +64503,7 @@ var init_phase3 = __esm({
           const time3 = clipTime(resolved.clip, projectFps(call.doc.project));
           const built = [];
           const seen = /* @__PURE__ */ new Map();
-          for (const [i, raw] of points.entries()) {
+          for (const [i, raw] of points2.entries()) {
             const units = TIME_UNITS.filter((unit2) => raw[unit2] !== void 0 && raw[unit2] !== null);
             if (units.length !== 1) return refused(tool, `Error: points[${i}] needs exactly one of frame, seconds, timeline_seconds or source_seconds.`);
             const unit = units[0];
@@ -59360,13 +64536,13 @@ var init_phase3 = __esm({
           const tool = "set_project_setting_tool";
           const project = call.doc.project;
           const patch = {};
-          let fps = null;
+          let fps2 = null;
           if (input2.fps_num != null || input2.fps_den != null) {
-            fps = { num: input2.fps_num ?? 30, den: input2.fps_den ?? 1 };
+            fps2 = { num: input2.fps_num ?? 30, den: input2.fps_den ?? 1 };
           } else if (input2.fps != null) {
-            fps = fpsFromRate(input2.fps);
+            fps2 = fpsFromRate(input2.fps);
           }
-          if (fps) patch.fps = fps;
+          if (fps2) patch.fps = fps2;
           if (input2.width != null) patch.width = input2.width;
           if (input2.height != null) patch.height = input2.height;
           if (input2.sample_rate != null) patch.sampleRate = input2.sample_rate;
@@ -59445,12 +64621,12 @@ var init_playback = __esm({
             player.seek(timelineStart(project));
             return `Stopped: paused at the start (${playheadText(call)}).`;
           }
-          const fps = projectFps(project);
-          const frame = Math.round(player.playhead * fps.num / fps.den) + 1;
+          const fps2 = projectFps(project);
+          const frame = Math.round(player.playhead * fps2.num / fps2.den) + 1;
           const target = Math.max(1, frame + (action === "step_forward" ? frames : -frames));
           if (target === frame) return "Error: already at the first frame; nothing to step back to.";
           player.pause();
-          player.seek((target - 1) * fps.den / fps.num);
+          player.seek((target - 1) * fps2.den / fps2.num);
           return `Stepped to ${playheadText(call)} (frame ${target}), paused.`;
         }
       }),
@@ -59468,9 +64644,9 @@ var init_playback = __esm({
         requires: ["player"],
         run: (call) => {
           const project = call.doc.project;
-          const fps = projectFps(project);
-          const last = maxFrame(project, fps);
-          call.host.player.seek(last > 0 ? (last - 1) * fps.den / fps.num : 0);
+          const fps2 = projectFps(project);
+          const last = maxFrame(project, fps2);
+          call.host.player.seek(last > 0 ? (last - 1) * fps2.den / fps2.num : 0);
           call.host.ui?.centerOnPlayhead();
           return "Seeked to end.";
         }
@@ -59650,7 +64826,7 @@ function undoRedo(call, direction2, steps) {
   const changed = timelineDelta(timelineSnapshot(beforeProject), timelineSnapshot(doc.project));
   return applied(`${direction2}_tool`, summary, { ...changed, data: { steps: done, labels } }, 0);
 }
-var READ3, PROJECT_EXTS, projectTools;
+var READ6, PROJECT_EXTS, projectTools;
 var init_project2 = __esm({
   "../engine/src/tools/catalog/project.ts"() {
     "use strict";
@@ -59661,19 +64837,19 @@ var init_project2 = __esm({
     init_snapshot();
     init_tracks2();
     init_common();
-    READ3 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ6 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     PROJECT_EXTS = [".zvn", ".osp", ".flow"];
     projectTools = [
       contractTool("get_project_info_tool", {
-        annotations: READ3,
+        annotations: READ6,
         run: (call) => projectInfoText(call.doc.project)
       }),
       contractTool("list_files_tool", {
-        annotations: READ3,
+        annotations: READ6,
         run: (call) => listFilesText(call.doc.project)
       }),
       contractTool("list_clips_tool", {
-        annotations: READ3,
+        annotations: READ6,
         run: (call, input2) => {
           const project = call.doc.project;
           let layer2;
@@ -59694,11 +64870,11 @@ var init_project2 = __esm({
         }
       }),
       contractTool("list_layers_tool", {
-        annotations: READ3,
+        annotations: READ6,
         run: (call) => listLayersText(call.doc.project)
       }),
       contractTool("list_markers_tool", {
-        annotations: READ3,
+        annotations: READ6,
         run: (call) => listMarkersText(call.doc.project)
       }),
       contractTool("new_project_tool", {
@@ -59757,7 +64933,7 @@ var init_project2 = __esm({
 });
 
 // ../engine/src/tools/catalog/search.ts
-function isRecord29(value) {
+function isRecord36(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function hitPeak(hit, s, e) {
@@ -59830,7 +65006,7 @@ function clipInfo2(project, clip2) {
   const file3 = fileId ? fileById(project, fileId) : void 0;
   const [clipStart, clipEnd2] = getSourceWindow(clip2, file3);
   const parent = resolveParentFileData(project, file3, fileId);
-  const sourceAi = isRecord29(parent?.ai_metadata) ? parent.ai_metadata : void 0;
+  const sourceAi = isRecord36(parent?.ai_metadata) ? parent.ai_metadata : void 0;
   const block = getIndexBlock(sourceAi ?? {});
   const watchData = parent ?? file3;
   const wai = record4(watchData?.ai_metadata);
@@ -59854,15 +65030,15 @@ function clipInfo2(project, clip2) {
   };
 }
 function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) {
-  const local = isRecord29(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
+  const local = isRecord36(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
   const candidates = [];
   for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-    if (!isRecord29(ch)) continue;
+    if (!isRecord36(ch)) continue;
     const summary = String(ch.summary || ch.title || "").trim();
     if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
   }
   for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-    if (!isRecord29(sc)) continue;
+    if (!isRecord36(sc)) continue;
     const desc = String(sc.description ?? "").trim();
     if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
   }
@@ -59889,15 +65065,15 @@ function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) 
 function clipTranscriptCues(project, clip2) {
   const file3 = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
   const effective = getEffectiveAiMetadata(file3, clip2, { clipAiMetadata: clip2.ai_metadata });
-  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord29) : [];
+  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord36) : [];
 }
 function fpsParts(project) {
-  const fps = record4(project.fps);
-  return [Number(fps.num ?? 30) || 30, Number(fps.den ?? 1) || 1];
+  const fps2 = record4(project.fps);
+  return [Number(fps2.num ?? 30) || 30, Number(fps2.den ?? 1) || 1];
 }
 function sliceAtSourceCut(call, info, cutSource, label2) {
   const project = call.doc.project;
-  const [num11, den2] = fpsParts(project);
+  const [num13, den2] = fpsParts(project);
   let cut2 = cutSource;
   let what = label2;
   const [snappedCut, cue] = snapCutOutOfSpeech(cut2, clipTranscriptCues(project, info.clip));
@@ -59905,8 +65081,8 @@ function sliceAtSourceCut(call, info, cutSource, label2) {
     cut2 = snappedCut;
     what = `${what}, moved off speech`;
   }
-  cut2 = snapToSliceGrid(cut2, num11, den2);
-  const slicePos = snapToSliceGrid(info.clipPos + (cut2 - info.clipStart), num11, den2);
+  cut2 = snapToSliceGrid(cut2, num13, den2);
+  const slicePos = snapToSliceGrid(info.clipPos + (cut2 - info.clipStart), num13, den2);
   const clipTimelineEnd = info.clipPos + (info.clipEnd - info.clipStart);
   if (slicePos <= info.clipPos || slicePos >= clipTimelineEnd) {
     return `Error: Computed slice position (${pyFixed(slicePos, 3)}s) is outside the clip range [${pyFixed(info.clipPos, 3)}s \u2013 ${pyFixed(clipTimelineEnd, 3)}s].`;
@@ -59916,8 +65092,8 @@ function sliceAtSourceCut(call, info, cutSource, label2) {
   return `Sliced at ${fmtMmss(cut2 - info.clipStart)} (${what}).`;
 }
 function sliceAtSourceTimes(call, info, t0, t1) {
-  const [num11, den2] = fpsParts(call.doc.project);
-  const snap2 = (pos) => snapToSliceGrid(pos, num11, den2);
+  const [num13, den2] = fpsParts(call.doc.project);
+  const snap2 = (pos) => snapToSliceGrid(pos, num13, den2);
   const eps = 1e-3;
   const { clipStart, clipEnd: clipEnd2, clipPos } = info;
   const clipTlEnd = clipPos + (clipEnd2 - clipStart);
@@ -60141,12 +65317,12 @@ var init_search = __esm({
           const local = Object.keys(perClip).length > 0 ? perClip : getEffectiveAiMetadata(parent ?? file3, target.clip, { rebased: true });
           const candidates = [];
           for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-            if (!isRecord29(ch)) continue;
+            if (!isRecord36(ch)) continue;
             const summary = String(ch.summary || ch.title || "").trim();
             if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
           }
           for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-            if (!isRecord29(sc)) continue;
+            if (!isRecord36(sc)) continue;
             const desc = String(sc.description ?? "").trim();
             if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
           }
@@ -60413,11 +65589,11 @@ var init_search = __esm({
 });
 
 // ../engine/src/tools/catalog/speech-tools.ts
-function isRecord30(value) {
+function isRecord37(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function wordsFromCues(cues) {
-  const rows = cues.filter(isRecord30).map((c) => ({
+  const rows = cues.filter(isRecord37).map((c) => ({
     text: String(c.text ?? "").trim(),
     start: Number("source_start" in c ? c.source_start : c.start),
     end: Number("source_end" in c ? c.source_end : c.end)
@@ -60436,7 +65612,7 @@ function wordsFromCues(cues) {
   }
   return out;
 }
-function wordsForClip(words2, clip2, fps) {
+function wordsForClip(words2, clip2, fps2) {
   const position = Number(clip2.position) || 0;
   const start = Number(clip2.start) || 0;
   const end = Number(clip2.end) || start;
@@ -60447,8 +65623,8 @@ function wordsForClip(words2, clip2, fps) {
     const s = Math.max(start, w.startSec);
     const e = Math.min(end, w.endSec);
     if (e <= s) continue;
-    const startFrame = toFrame(position + (s - start), fps);
-    let endFrame = toFrame(position + (e - start), fps);
+    const startFrame = toFrame(position + (s - start), fps2);
+    let endFrame = toFrame(position + (e - start), fps2);
     if (endFrame <= startFrame) endFrame = startFrame + 1;
     out.push({
       index,
@@ -60457,8 +65633,8 @@ function wordsForClip(words2, clip2, fps) {
       endFrame,
       startSec: s,
       endSec: e,
-      timelineStartSec: toSeconds(startFrame, fps),
-      timelineEndSec: toSeconds(endFrame, fps),
+      timelineStartSec: toSeconds(startFrame, fps2),
+      timelineEndSec: toSeconds(endFrame, fps2),
       clipId: String(clip2.id),
       transcriptGeneration: 1
     });
@@ -60466,10 +65642,10 @@ function wordsForClip(words2, clip2, fps) {
   }
   return out;
 }
-function fileWords(words2, fps) {
+function fileWords(words2, fps2) {
   return words2.map((w, index) => {
-    const startFrame = toFrame(w.startSec, fps);
-    let endFrame = toFrame(w.endSec, fps);
+    const startFrame = toFrame(w.startSec, fps2);
+    let endFrame = toFrame(w.endSec, fps2);
     if (endFrame <= startFrame) endFrame = startFrame + 1;
     return { index, text: w.text, startFrame, endFrame, startSec: w.startSec, endSec: w.endSec, transcriptGeneration: 1 };
   });
@@ -60532,7 +65708,7 @@ function dataPayload(script, wordCount, clipsOut) {
 }
 function transcriptFromCues(call, input2, tool = "get_transcript_tool") {
   const project = call.doc.project;
-  const fps = projectFps(project);
+  const fps2 = projectFps(project);
   let clipId2 = text(input2.clipId) || text(input2.timeline_clip_id);
   let fileId = text(input2.fileId) || text(input2.file_id);
   const detail2 = text(input2.detail_level).toLowerCase();
@@ -60555,7 +65731,7 @@ function transcriptFromCues(call, input2, tool = "get_transcript_tool") {
   if (fileId && targets.length === 0) {
     const file3 = fileById(project, fileId);
     if (!file3) return { words: [], receipt: refused(tool, `Error: Unknown fileId '${fileId}'.`) };
-    return { words: [], receipt: fileReceipt(tool, file3, fps, includeWords, includeCompact, warnings) };
+    return { words: [], receipt: fileReceipt(tool, file3, fps2, includeWords, includeCompact, warnings) };
   }
   if (targets.length === 0 && !fileId && !clipId2) {
     const trackIndex = input2.trackIndex;
@@ -60569,7 +65745,7 @@ function transcriptFromCues(call, input2, tool = "get_transcript_tool") {
     if (targets.length === 0 && (trackIndex === void 0 || trackIndex === null)) {
       const usable = (project.files ?? []).filter((f3) => !["image", "image/sequence", "font"].includes(String(f3.media_type ?? "").toLowerCase()) && f3.path);
       if (usable.length === 1) {
-        const receipt2 = fileReceipt(tool, usable[0], fps, includeWords, includeCompact, [
+        const receipt2 = fileReceipt(tool, usable[0], fps2, includeWords, includeCompact, [
           ...warnings,
           "Timeline had no clips \u2014 transcribed the single media-bin file. Place it on the timeline for clip-scoped word frames."
         ], "(timeline was empty; transcribed the media-bin file.)");
@@ -60597,7 +65773,7 @@ function transcriptFromCues(call, input2, tool = "get_transcript_tool") {
       warnings.push(`clip ${String(clip2.id)}: not indexed (no transcript cues)`);
       continue;
     }
-    const mapped = wordsForClip(wordsFromCues(cues), clip2, fps);
+    const mapped = wordsForClip(wordsFromCues(cues), clip2, fps2);
     all.push(...mapped);
     clipsOut.push(
       clipPayload(mapped, {
@@ -60618,15 +65794,15 @@ function transcriptFromCues(call, input2, tool = "get_transcript_tool") {
     receipt: applied(tool, summary, { warnings, notes: transcriptNotes(), data: dataPayload(wordsToScript(all), wordCount, clipsOut) }, 0)
   };
 }
-function fileReceipt(tool, file3, fps, includeWords, includeCompact, warnings, suffix = "") {
+function fileReceipt(tool, file3, fps2, includeWords, includeCompact, warnings, suffix = "") {
   const { cues, indexed } = cuesForFile(file3);
   if (!indexed) return unavailable(tool, NO_TRANSCRIPT);
-  const words2 = fileWords(wordsFromCues(cues), fps);
+  const words2 = fileWords(wordsFromCues(cues), fps2);
   const clips = [clipPayload(words2, { fileId: String(file3.id) }, includeWords, includeCompact)];
   const summary = words2.length ? shortSummary(words2.length, [], [String(file3.id)], suffix) : `No spoken dialogue found.${suffix ? ` ${suffix}` : ""}`;
   return applied(tool, summary, { warnings, notes: transcriptNotes(), data: dataPayload(wordsToScript(words2), words2.length, clips) }, 0);
 }
-function applyCompactedFragments(tx, clipId2, fragments, removed, fps) {
+function applyCompactedFragments(tx, clipId2, fragments, removed, fps2) {
   const original = tx.project.clips.find((c) => c.id === clipId2);
   if (!original) throw new Error(`Unknown clipId '${clipId2}'`);
   const layer2 = original.layer;
@@ -60647,11 +65823,11 @@ function applyCompactedFragments(tx, clipId2, fragments, removed, fps) {
   }
   const shifted = [];
   if (removed > 1e-9) {
-    const gap = snap(removed, fps);
+    const gap = snap(removed, fps2);
     for (const other of tx.project.clips.filter((c) => c.layer === layer2)) {
       if (other.id === clipId2 || createdIds.includes(other.id)) continue;
       if (other.position + 1e-9 >= originalEnd) {
-        moveClip(tx, other.id, { position: snap(other.position - gap, fps) });
+        moveClip(tx, other.id, { position: snap(other.position - gap, fps2) });
         shifted.push({ clipId: other.id, deltaSec: -gap });
       }
     }
@@ -60728,8 +65904,8 @@ var init_speech_tools = __esm({
           const clipped = speech.map(([s, e]) => [Math.max(s, start), Math.min(e, end)]).filter(([s, e]) => e > s);
           const gaps = silenceRangesFromSpeech(clipped, end, minPause, pad2).map(([a, b]) => [Math.max(start, a), Math.min(end, b)]).filter(([a, b]) => b > a);
           if (gaps.length === 0) return unchanged(tool, "No removable silence found.");
-          const fps = projectFps(project);
-          const { fragments, removed } = compactFragmentsAfterRemove(pos, start, end, gaps, fps);
+          const fps2 = projectFps(project);
+          const { fragments, removed } = compactFragmentsAfterRemove(pos, start, end, gaps, fps2);
           if (duration3 > 0 && removed / duration3 > maxFrac) {
             return refused(
               tool,
@@ -60739,7 +65915,7 @@ var init_speech_tools = __esm({
           }
           if (removed <= 1e-9) return unchanged(tool, "No silence to remove after padding.");
           if (fragments.length === 0) return refused(tool, "Error: Silence removal would delete the entire clip.");
-          const { createdIds, shifted } = call.commit((tx) => applyCompactedFragments(tx, clipId2, fragments, removed, fps));
+          const { createdIds, shifted } = call.commit((tx) => applyCompactedFragments(tx, clipId2, fragments, removed, fps2));
           return applied(tool, `Removed ${pyFixed(removed, 2)}s silence (${gaps.length} gap(s)).`, {
             shifted,
             data: {
@@ -60768,10 +65944,10 @@ var init_speech_tools = __esm({
             tool
           );
           if (transcript.receipt.status === "error" || transcript.receipt.status === "refused") return transcript.receipt;
-          const fps = projectFps(call.doc.project);
-          const cues = phraseWords(transcript.words, fps);
+          const fps2 = projectFps(call.doc.project);
+          const cues = phraseWords(transcript.words, fps2);
           const format = (text(input2.format) || "srt").toLowerCase();
-          const body = format === "vtt" ? cuesToVtt(cues, fps) : cuesToSrt(cues, fps);
+          const body = format === "vtt" ? cuesToVtt(cues, fps2) : cuesToSrt(cues, fps2);
           let location;
           try {
             location = await writeText.call(call.host.storage, path38, body, format === "vtt" ? "text/vtt" : "application/x-subrip");
@@ -61020,178 +66196,6 @@ var init_timeline2 = __esm({
   }
 });
 
-// ../engine/src/tools/catalog/timeline-edit-common.ts
-function failText(message) {
-  const line2 = String(message).split(/\s+/).filter(Boolean).join(" ");
-  return line2.startsWith("Error") ? line2 : `Error: ${line2}`;
-}
-async function editorRun(body) {
-  try {
-    return await body();
-  } catch (error62) {
-    if (error62 instanceof ToolError) return failText(error62.message);
-    throw error62;
-  }
-}
-function oneLine(summary) {
-  return String(summary).split(/\s+/).filter(Boolean).join(" ");
-}
-function ok(call, summary, data) {
-  return applied(call.tool, oneLine(summary), { data });
-}
-function nothingChanged(call, summary, data) {
-  return unchanged(call.tool, oneLine(summary), { data: { changed: false, ...data } });
-}
-function gridOf(project) {
-  const num11 = Math.trunc(Number(project.fps?.num)) || 30;
-  const den2 = Math.trunc(Number(project.fps?.den)) || 1;
-  const fps = num11 / den2;
-  return { fps, frame: 1 / fps, tol: 0.5 / fps, snap: (seconds2) => pyRound(seconds2 * fps) / fps };
-}
-function r3(value) {
-  return Number(pyFixed(Number(value) || 0, 3));
-}
-function f2(value) {
-  return pyFixed(value, 2);
-}
-function spanOf(item) {
-  const position = Number(item.position) || 0;
-  return [position, position + Math.max(0, (Number(item.end) || 0) - (Number(item.start) || 0))];
-}
-function uiTrack(project, layer2) {
-  return layerNumberToDisplayIndex(layer2, project.layers);
-}
-function trackName(project, layer2) {
-  const ui = uiTrack(project, layer2);
-  return ui ? `track ${ui}` : `layer ${layer2}`;
-}
-function resolveLayer(project, track2) {
-  const text4 = track2 === void 0 || track2 === null ? "" : String(track2).trim();
-  if (!text4) throw new ToolError("a track is required (UI track number, name, or layer number)");
-  const resolved = normalizeTrackOrLayerArg(text4, project.layers);
-  if (resolved.error) throw new ToolError(resolved.error);
-  if (resolved.layer === void 0) throw new ToolError(`no track matches ${pyReprString(String(track2))}`);
-  return resolved.layer;
-}
-function requireUnlockedTracks(project, layers, what = "") {
-  const lockedNumbers = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
-  const locked = [...new Set(layers)].filter((n) => lockedNumbers.has(n)).sort((a, b) => a - b);
-  if (locked.length === 0) return;
-  const names2 = locked.map((n) => trackName(project, n)).join(", ");
-  const [verb, pronoun] = locked.length === 1 ? ["is", "it"] : ["are", "them"];
-  throw new ToolError(`${names2} ${verb} locked${what ? ` (${what})` : ""}; unlock ${pronoun} first (Track menu > Unlock Track)`);
-}
-function layersBottomUp(project) {
-  return [...project.layers].map((l) => l.number).sort((a, b) => a - b);
-}
-function isImageClip(clip2) {
-  const reader = clip2.reader;
-  return Boolean(reader?.has_single_image) || reader?.media_type === "image";
-}
-function clipTitle2(clip2) {
-  return String(clip2.title || clip2.id);
-}
-function clipById2(project, id) {
-  return project.clips.find((c) => c.id === id);
-}
-function describeClip(project, clip2) {
-  const [start, end] = spanOf(clip2);
-  return {
-    timeline_clip_id: String(clip2.id),
-    title: String(clip2.title ?? ""),
-    file_id: String(clip2.file_id ?? ""),
-    track: uiTrack(project, clip2.layer),
-    layer: clip2.layer,
-    position: r3(start),
-    end: r3(end),
-    duration: r3(end - start),
-    source_in: r3(Number(clip2.start) || 0),
-    source_out: r3(Number(clip2.end) || 0)
-  };
-}
-function clipsGiven(target) {
-  return (target.timeline_clip_ids?.length ?? 0) > 0 || Boolean(target.clip_query?.trim()) || Boolean(target.scope?.trim());
-}
-async function targetClip(call, target) {
-  const resolved = await resolveClip(call, target);
-  if (!resolved.ok) throw new ToolError(resolved.error || "could not resolve the timeline clip");
-  return resolved.clip;
-}
-function clipsByIds(project, ids2) {
-  return ids2.map((raw) => {
-    const clip2 = clipById2(project, String(raw).trim());
-    if (!clip2) throw new ToolError(`no timeline clip with id=${pyReprString(String(raw))}`);
-    return clip2;
-  });
-}
-function selectedClipIds(call) {
-  const clips = new Set(call.doc.project.clips.map((c) => c.id));
-  return (call.host.ui?.selectedIds?.() ?? []).filter((id) => clips.has(id));
-}
-async function targetClips(call, target) {
-  const project = call.doc.project;
-  const scope = (target.scope ?? "").trim().toLowerCase();
-  let clips;
-  if ((target.timeline_clip_ids?.length ?? 0) > 0) {
-    clips = clipsByIds(project, target.timeline_clip_ids);
-  } else if (scope === "selected") {
-    const ids2 = selectedClipIds(call);
-    if (ids2.length === 0) throw new ToolError("no clips are selected in the timeline");
-    clips = clipsByIds(project, ids2);
-  } else if (scope === "track" || scope === "all") {
-    clips = [...project.clips];
-    if (scope === "track") {
-      const layer2 = resolveLayer(project, target.track);
-      clips = clips.filter((c) => c.layer === layer2);
-    }
-    if (clips.length === 0) throw new ToolError(scope === "all" ? "the timeline has no clips" : `track ${pyStr(target.track ?? "")} has no clips`);
-  } else {
-    clips = [await targetClip(call, { clip_query: target.clip_query, track: target.track })];
-  }
-  const seen = /* @__PURE__ */ new Set();
-  const out = clips.filter((c) => seen.has(c.id) ? false : (seen.add(c.id), true));
-  return out.sort((a, b) => Number(a.position) - Number(b.position) || a.layer - b.layer);
-}
-function overlapRow(project, hit) {
-  return {
-    timeline_clip_id: hit.clipId,
-    title: hit.title,
-    overlaps: hit.overlapsId,
-    overlaps_title: hit.overlapsTitle,
-    track: uiTrack(project, hit.layer),
-    seconds: r3(hit.seconds)
-  };
-}
-function newOverlaps(project, changes, newItems = []) {
-  return plannedOverlaps(project, changes, newItems, gridOf(project).tol).map((hit) => overlapRow(project, hit));
-}
-function checkOverlaps(hits, allowOverlap, what, rippleHint = true) {
-  if (hits.length > 0 && !allowOverlap) {
-    const first = hits[0];
-    const more = hits.length > 1 ? ` (+${hits.length - 1} more)` : "";
-    let options = "pass allow_overlap=true to overlap anyway";
-    if (rippleHint) options = `pass ripple=true to push the later clips along, or ${options}`;
-    throw new ToolError(
-      `${what} would overlap ${pyReprString(first.overlaps_title)} (${first.overlaps}) on track ${pyStr(first.track)} by ${pyFloat(first.seconds)} s${more}; ${options}`
-    );
-  }
-  return hits;
-}
-var ToolError;
-var init_timeline_edit_common = __esm({
-  "../engine/src/tools/catalog/timeline-edit-common.ts"() {
-    "use strict";
-    init_rounding();
-    init_sequence();
-    init_pyfmt();
-    init_receipt();
-    init_tracks2();
-    init_common();
-    ToolError = class extends Error {
-    };
-  }
-});
-
 // ../engine/src/tools/catalog/timeline-edit.ts
 function timeArg(call, seconds2) {
   return seconds2 === void 0 || seconds2 < 0 ? playheadSeconds(call) : seconds2;
@@ -61213,9 +66217,9 @@ function transitionChoice(name) {
   if (exact) return { mask: exact, label: key };
   const near = [...stems.keys()].filter((s) => s.includes(key)).sort();
   if (near.length === 1) return { mask: stems.get(near[0]), label: near[0] };
-  const sample = (near.length > 0 ? near : [...stems.keys()].sort()).slice(0, 8);
+  const sample2 = (near.length > 0 ? near : [...stems.keys()].sort()).slice(0, 8);
   throw new ToolError(
-    `unknown transition ${pyReprString(name)}; use 'fade' (crossfade), 'random', or a name such as ${sample.join(", ")} (list_transitions_tool lists all)`
+    `unknown transition ${pyReprString(name)}; use 'fade' (crossfade), 'random', or a name such as ${sample2.join(", ")} (list_transitions_tool lists all)`
   );
 }
 function shuffled(items) {
@@ -61326,11 +66330,11 @@ async function addClipsToTimeline(call, input2) {
     position += entry.length;
   });
   checkOverlaps(newOverlaps(project, /* @__PURE__ */ new Map(), planned), input2.allow_overlap ?? false, "Placing these clips", false);
-  const placement2 = entries.map(
+  const placement3 = entries.map(
     (entry) => entry.image ? { fileId: entry.file.id, end: entry.length } : { fileId: entry.file.id, start: entry.start, end: entry.start + entry.length }
   );
   const result2 = call.commit(
-    (tx) => placeFiles(tx, placement2, start, layer2, {
+    (tx) => placeFiles(tx, placement3, start, layer2, {
       ...fade !== "none" ? { fade } : {},
       fadeLength: fadeSeconds,
       ...choice.mask ? { transition: choice.mask } : {},
@@ -61838,7 +66842,7 @@ async function alignClips(call, input2) {
     overlaps: hits
   });
 }
-var EDIT2, ADD2, timelineEditTools;
+var EDIT5, ADD2, timelineEditTools;
 var init_timeline_edit = __esm({
   "../engine/src/tools/catalog/timeline-edit.ts"() {
     "use strict";
@@ -61858,16 +66862,16 @@ var init_timeline_edit = __esm({
     init_tracks2();
     init_common();
     init_timeline_edit_common();
-    EDIT2 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT5 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD2 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     timelineEditTools = [
       contractTool("add_clips_to_timeline_tool", { annotations: ADD2, run: (call, input2) => editorRun(() => addClipsToTimeline(call, input2)) }),
-      contractTool("move_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => moveClips(call, input2)) }),
-      contractTool("trim_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => trimClips(call, input2)) }),
-      contractTool("slice_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => sliceClips(call, input2)) }),
-      contractTool("remove_gaps_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => removeGaps(call, input2)) }),
+      contractTool("move_clips_tool", { annotations: EDIT5, run: (call, input2) => editorRun(() => moveClips(call, input2)) }),
+      contractTool("trim_clips_tool", { annotations: EDIT5, run: (call, input2) => editorRun(() => trimClips(call, input2)) }),
+      contractTool("slice_clips_tool", { annotations: EDIT5, run: (call, input2) => editorRun(() => sliceClips(call, input2)) }),
+      contractTool("remove_gaps_tool", { annotations: EDIT5, run: (call, input2) => editorRun(() => removeGaps(call, input2)) }),
       contractTool("duplicate_clips_tool", { annotations: ADD2, run: (call, input2) => editorRun(() => duplicateClips(call, input2)) }),
-      contractTool("align_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => alignClips(call, input2)) })
+      contractTool("align_clips_tool", { annotations: EDIT5, run: (call, input2) => editorRun(() => alignClips(call, input2)) })
     ];
   }
 });
@@ -61876,25 +66880,25 @@ var init_timeline_edit = __esm({
 function requireTargets(target, verb) {
   if (!clipsGiven(target)) throw new ToolError(`say which clips to ${verb}: timeline_clip_ids, clip_query, or scope`);
 }
-function readerOf3(project, clip2) {
+function readerOf4(project, clip2) {
   const reader = clip2.reader;
   if (reader && typeof reader === "object" && Object.keys(reader).length > 0) return reader;
   const file3 = fileById(project, String(clip2.file_id ?? ""));
   return file3 ? file3 : {};
 }
 function mediaHasAudio(project, clip2) {
-  const reader = readerOf3(project, clip2);
+  const reader = readerOf4(project, clip2);
   const hasAudio = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
   const channels = reader.channels === void 0 || reader.channels === null ? null : Math.trunc(Number(reader.channels));
   return hasAudio && (channels === null || Number.isNaN(channels) || channels > 0);
 }
 function mediaHasVideo(project, clip2) {
-  const reader = readerOf3(project, clip2);
+  const reader = readerOf4(project, clip2);
   return reader.has_video === void 0 || reader.has_video === null ? true : Boolean(reader.has_video);
 }
 function keyframeValue2(kf, fallback = -1) {
-  const points = kf?.Points;
-  const y = Array.isArray(points) && points.length > 0 ? Number(points[0]?.co?.Y) : NaN;
+  const points2 = kf?.Points;
+  const y = Array.isArray(points2) && points2.length > 0 ? Number(points2[0]?.co?.Y) : NaN;
   return Number.isFinite(y) ? y : fallback;
 }
 function wholeFrames(g, seconds2) {
@@ -61904,7 +66908,7 @@ function resetDuration(project, clip2, g) {
   if (isImageClip(clip2)) return DEFAULT_IMAGE_LENGTH;
   const cache5 = repeatIsActive(clip2) ? clip2.repeat_cache : {};
   const start = Number(cache5.start ?? clip2.start) || 0;
-  const source2 = Number(readerOf3(project, clip2).duration) || 0;
+  const source2 = Number(readerOf4(project, clip2).duration) || 0;
   return source2 > 0 ? Math.max(g.frame, source2 - start) : (Number(clip2.end) || 0) - start;
 }
 function timingReceipt(project, clip2, beforeDuration) {
@@ -62106,7 +67110,7 @@ async function separateClipAudio(call, input2) {
   const planned = [];
   for (const clip2 of clips) {
     const [s, e] = spanOf(clip2);
-    const channels = Math.trunc(Number(readerOf3(project, clip2).channels)) || 1;
+    const channels = Math.trunc(Number(readerOf4(project, clip2).channels)) || 1;
     let lanes;
     if (dest !== void 0) lanes = [dest];
     else {
@@ -62209,12 +67213,12 @@ async function reverseClip(call, input2) {
   if (!resolved.ok) return resolved.error || "Error: Could not resolve timeline clip.";
   const clip2 = resolved.clip;
   if (reverse && timeCurveIsReversed(clip2.time)) return `timeline_clip_id=${clip2.id} is already reversed; nothing changed.`;
-  const points = clip2.time?.Points;
-  if (!reverse && (!Array.isArray(points) || points.length <= 1)) return `timeline_clip_id=${clip2.id} already plays forward at 1x; nothing changed.`;
+  const points2 = clip2.time?.Points;
+  if (!reverse && (!Array.isArray(points2) || points2.length <= 1)) return `timeline_clip_id=${clip2.id} already plays forward at 1x; nothing changed.`;
   call.commit((tx) => applyClipPreset(tx, clip2.id, reverse ? "time.reverse" : "time.none"));
   return `${reverse ? "Reversed" : "Reset time on"} timeline_clip_id=${clip2.id}.`;
 }
-var EDIT3, ADD3, MIN_SPEED, MAX_SPEED, AV, timelineTimeTools;
+var EDIT6, ADD3, MIN_SPEED, MAX_SPEED, AV, timelineTimeTools;
 var init_timeline_time = __esm({
   "../engine/src/tools/catalog/timeline-time.ts"() {
     "use strict";
@@ -62229,24 +67233,24 @@ var init_timeline_time = __esm({
     init_pyfmt();
     init_common();
     init_timeline_edit_common();
-    EDIT3 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT6 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD3 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     MIN_SPEED = 0.0625;
     MAX_SPEED = 16;
     AV = { on: 1, off: 0, auto: -1 };
     timelineTimeTools = [
-      contractTool("reverse_clip_tool", { annotations: EDIT3, run: (call, input2) => reverseClip(call, input2) }),
-      contractTool("set_clip_speed_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => setClipSpeed(call, input2)) }),
-      contractTool("repeat_clip_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => repeatClips(call, input2)) }),
-      contractTool("freeze_frame_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => freezeFrame(call, input2)) }),
+      contractTool("reverse_clip_tool", { annotations: EDIT6, run: (call, input2) => reverseClip(call, input2) }),
+      contractTool("set_clip_speed_tool", { annotations: EDIT6, run: (call, input2) => editorRun(() => setClipSpeed(call, input2)) }),
+      contractTool("repeat_clip_tool", { annotations: EDIT6, run: (call, input2) => editorRun(() => repeatClips(call, input2)) }),
+      contractTool("freeze_frame_tool", { annotations: EDIT6, run: (call, input2) => editorRun(() => freezeFrame(call, input2)) }),
       contractTool("separate_clip_audio_tool", { annotations: ADD3, run: (call, input2) => editorRun(() => separateClipAudio(call, input2)) }),
-      contractTool("set_clip_audio_video_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => setClipAudioVideo(call, input2)) })
+      contractTool("set_clip_audio_video_tool", { annotations: EDIT6, run: (call, input2) => editorRun(() => setClipAudioVideo(call, input2)) })
     ];
   }
 });
 
 // ../engine/src/tools/catalog/titles.ts
-function basename3(path38) {
+function basename4(path38) {
   return String(path38).split(/[\\/]/).pop() ?? "";
 }
 function isAbsolutePath2(path38) {
@@ -62259,7 +67263,7 @@ async function loadTitleTemplate(call, template) {
     const storage = call.host.storage;
     if (!tmpl.toLowerCase().endsWith(".svg") || !storage?.readText) return null;
     try {
-      return { file: basename3(tmpl), svg: await storage.readText(tmpl) };
+      return { file: basename4(tmpl), svg: await storage.readText(tmpl) };
     } catch (error62) {
       log(tmpl, error62);
       return null;
@@ -62275,7 +67279,7 @@ async function loadTitleTemplate(call, template) {
   }
 }
 function titleFileName(body, fileName2) {
-  let safe2 = basename3(fileName2.trim());
+  let safe2 = basename4(fileName2.trim());
   if (!safe2) {
     const slug = pySlice(body.replace(/[^A-Za-z0-9_-]+/g, "_"), 0, 40).replace(/^_+|_+$/g, "") || "title";
     safe2 = `${slug}_${generateId().slice(0, 8).toLowerCase()}.svg`;
@@ -62381,7 +67385,7 @@ var init_titles2 = __esm({
           if (!call.host.media.writeGenerated) return unavailable(tool, "it cannot store generated caption images.");
           const clipId2 = text(input2.clipId) || text(input2.timeline_clip_id);
           const srtPath = text(input2.srtPath);
-          const fps = projectFps(call.doc.project);
+          const fps2 = projectFps(call.doc.project);
           const captionGroup = `cap_${generateId().toLowerCase()}`;
           let cues;
           let source2 = "local";
@@ -62396,7 +67400,7 @@ var init_titles2 = __esm({
               return refused(tool, `Error: srtPath not found: ${srtPath}`);
             }
             try {
-              cues = parseSrtOrVtt(raw, fps);
+              cues = parseSrtOrVtt(raw, fps2);
             } catch (error62) {
               return failed(tool, `Error: Failed to parse subtitles: ${error62 instanceof Error ? error62.message : String(error62)}`);
             }
@@ -62417,7 +67421,7 @@ var init_titles2 = __esm({
               if (Array.isArray(list2)) words2.push(...list2);
             }
             if (words2.length === 0) return unchanged(tool, "No words to caption.");
-            cues = phraseWords(words2, fps, { maxWords: input2.maxWords ?? 8, maxChars: input2.maxChars ?? 42 });
+            cues = phraseWords(words2, fps2, { maxWords: input2.maxWords ?? 8, maxChars: input2.maxChars ?? 42 });
           }
           if (cues.length === 0) return unchanged(tool, "No caption cues produced.");
           const template = await loadTitleTemplate(call, "");
@@ -62478,7 +67482,7 @@ function durationArg(value) {
   const n = parsePythonFloat(String(value ?? "").trim());
   return n === null ? 1 : n;
 }
-var READ4, transitionTools;
+var READ7, transitionTools;
 var init_transitions3 = __esm({
   "../engine/src/tools/catalog/transitions.ts"() {
     "use strict";
@@ -62488,10 +67492,10 @@ var init_transitions3 = __esm({
     init_define();
     init_pyfmt();
     init_common();
-    READ4 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+    READ7 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
     transitionTools = [
       contractTool("list_transitions_tool", {
-        annotations: READ4,
+        annotations: READ7,
         run: (_call, input2) => {
           const category = (text(input2.category) || "all").toLowerCase();
           const list2 = category === "all" || category === "common" || category === "extra" ? listTransitions(category) : [];
@@ -62502,7 +67506,7 @@ var init_transitions3 = __esm({
         }
       }),
       contractTool("search_transitions_tool", {
-        annotations: READ4,
+        annotations: READ7,
         run: (_call, input2) => {
           const query2 = String(input2.query ?? "");
           const matches2 = searchTransitions(query2);
@@ -62554,7 +67558,7 @@ ID: ${t.id}, Duration: ${pyFixed(t.end - t.start, 2)}s, Position: ${pyFixed(t.po
 function unknownToolMessage(name) {
   return `Error: ${name} is not available in this Zenvi surface`;
 }
-function buildCatalog() {
+function buildCatalog2() {
   const implemented = [
     ...projectTools,
     ...timelineTools,
@@ -62573,7 +67577,11 @@ function buildCatalog() {
     ...speechTools,
     ...generationTools,
     ...transitionTools,
-    ...titleTools
+    ...titleTools,
+    ...effectsColorTools,
+    ...effectsColorLookTools,
+    ...effectsColorAnalysisTools,
+    ...colorAgentTools
   ];
   const byName2 = /* @__PURE__ */ new Map();
   for (const tool of [...implemented, ...directTools]) {
@@ -62630,7 +67638,11 @@ var init_registry4 = __esm({
     "use strict";
     init_audio3();
     init_clips2();
+    init_color_agent2();
     init_direct();
+    init_effects_color();
+    init_effects_color_analysis();
+    init_effects_color_looks();
     init_export2();
     init_generation();
     init_inspect();
@@ -62651,7 +67663,7 @@ var init_registry4 = __esm({
     init_pending();
     init_receipt();
     init_schemas_gen();
-    allTools = buildCatalog();
+    allTools = buildCatalog2();
     TOOLS_BY_NAME = new Map(allTools.map((tool) => [tool.name, tool]));
   }
 });
@@ -62754,6 +67766,25 @@ var init_availability = __esm({
       set_clip_audio_video_tool: {
         webNote: "waveform=show changes nothing, since the web timeline draws the waveform of every clip with sound; waveform=hide is refused"
       },
+      // Colour: frames rendered by the host; LUT files outside the 50 built-ins need local files.
+      analyze_frame_colors_tool: { webNote: "save_frame_path attaches the frame to the result instead of writing a file; frames are measured at most 960 px wide" },
+      chroma_key_clip_tool: {
+        optional: ["frames"],
+        partialNote: "without frame rendering key_color='auto' is refused, 'green'/'blue' key the stock shade and keyed_pct is not measured"
+      },
+      color_grade_clip_tool: { optional: ["media.importPath"], partialNote: "a .cube file outside the built-in LUTs needs local file access" },
+      update_effect_tool: { optional: ["media.importPath"], partialNote: "a lut_path .cube file outside the built-in LUTs needs local file access" },
+      apply_color_tool: {
+        optional: ["frames", "media.importPath"],
+        partialNote: "without frame rendering there is no after preview; a .cube file outside the built-in LUTs needs local file access"
+      },
+      apply_look_tool: {
+        optional: ["frames", "media.importPath"],
+        partialNote: "without frame rendering there is no after preview; a .cube file outside the built-in LUTs needs local file access"
+      },
+      match_color_to_reference_tool: { optional: ["media.importPath"], partialNote: "referenceImagePath needs local file access" },
+      list_luts_tool: { webNote: "the 50 built-in LUTs; the desktop also lists the user's LUT folder" },
+      process_clip_effect_tool: { desktopOnly: "OpenCV clip analysis (Stabilizer, Tracker, Object Detector, Object Mask)" },
       transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
       remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
       detect_beats_tool: { desktopOnly: "on-device beat tracking" },
@@ -75937,7 +80968,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text4, msg) => text4 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text5, msg) => text5 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -81835,7 +86866,7 @@ var require_core3 = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text4, msg) => text4 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text5, msg) => text5 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -86567,7 +91598,7 @@ var init_streamableHttp = __esm({
             this._sessionId = sessionId;
           }
           if (!response.ok) {
-            const text4 = await response.text().catch(() => null);
+            const text5 = await response.text().catch(() => null);
             if (response.status === 401 && this._authProvider) {
               if (this._hasCompletedAuthFlow) {
                 throw new StreamableHTTPError(401, "Server returned 401 after successful authentication");
@@ -86613,7 +91644,7 @@ var init_streamableHttp = __esm({
                 return this.send(message);
               }
             }
-            throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${text4}`);
+            throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${text5}`);
           }
           this._hasCompletedAuthFlow = false;
           this._lastUpscopingHeader = void 0;
@@ -86759,11 +91790,11 @@ var init_client4 = __esm({
         const content = Array.isArray(result2.content) ? result2.content : [];
         const texts = content.filter((c) => c.type === "text").map((c) => String(c.text ?? ""));
         const images = content.filter((c) => c.type === "image" && typeof c.data === "string").map((c) => ({ mimeType: c.mimeType ?? "image/jpeg", data: c.data }));
-        const text4 = texts.join("\n");
+        const text5 = texts.join("\n");
         const structured = result2.structuredContent;
         const receipt2 = structured && structured.contract === 3 ? structured : parseReceipt(texts[0] ?? "") ?? void 0;
-        const isError = Boolean(result2.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text4.startsWith("Error"));
-        return { receipt: receipt2, text: text4, images, isError };
+        const isError = Boolean(result2.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text5.startsWith("Error"));
+        return { receipt: receipt2, text: text5, images, isError };
       }
       async close() {
         const client = this.client;
@@ -87258,9 +92289,9 @@ var init_account = __esm({
 // src/commands/edit.ts
 import { existsSync as existsSync5 } from "node:fs";
 import path22 from "node:path";
-function parseTime(text4) {
-  if (text4 === void 0) return void 0;
-  const t = text4.trim().toLowerCase();
+function parseTime(text5) {
+  if (text5 === void 0) return void 0;
+  const t = text5.trim().toLowerCase();
   if (!t) return void 0;
   let m = /^(-?\d+(?:\.\d+)?)\s*(s|sec|secs|seconds)?$/.exec(t);
   if (m) return Number(m[1]);
@@ -87268,16 +92299,16 @@ function parseTime(text4) {
   if (m) return Number(m[1]) * 60;
   m = /^(?:(\d+):)?(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/.exec(t);
   if (m) return Number(m[1] ?? 0) * 3600 + Number(m[2]) * 60 + Number(m[3]);
-  throw new CliError(`Not a time: "${text4}" (use seconds like 12.5 or a timecode like 1:05.5).`, 2);
+  throw new CliError(`Not a time: "${text5}" (use seconds like 12.5 or a timecode like 1:05.5).`, 2);
 }
-function parseLevel(text4) {
-  const t = text4.trim().toLowerCase();
+function parseLevel(text5) {
+  const t = text5.trim().toLowerCase();
   let m = /^(-?\d+(?:\.\d+)?)\s*db$/.exec(t);
   if (m) return { db: Number(m[1]) };
   m = /^(\d+(?:\.\d+)?)\s*%$/.exec(t);
   if (m) return { volume: Number(m[1]) / 100 };
   if (/^\d+(?:\.\d+)?$/.test(t)) return { volume: Number(t) };
-  throw new CliError(`Not a volume: "${text4}" (use 0.5, 50% or -6dB).`, 2);
+  throw new CliError(`Not a volume: "${text5}" (use 0.5, 50% or -6dB).`, 2);
 }
 function placementWindow(flags, fileLength2) {
   const { start, end, duration: duration3 } = flags;
@@ -87446,10 +92477,10 @@ function registerEditCommands(program2, ctx) {
     await runToolCommand(ctx, "add_effect_tool", { timeline_clip_id: clip2, effect: name });
   });
   effect2.command("list").description("effects you can add (libopenshot catalog)").option("--audio", "only audio effects").option("--video", "only video effects").action(async (opts) => {
-    await runToolCommand(ctx, "list_effects_tool", opts.audio ? { category: "audio" } : opts.video ? { category: "video" } : {});
+    await runToolCommand(ctx, "list_effects_tool", opts.audio ? { kind: "audio" } : opts.video ? { kind: "video" } : {});
   });
   effect2.command("rm").description("remove an effect (ids are in the clip's receipt or `zenvi clips`)").argument("<effect>", "effect id").action(async (id) => {
-    await runToolCommand(ctx, "remove_effect_tool", toolArgs(ctx, "remove_effect_tool", [[["effect_id", "effect"], id]]));
+    await runToolCommand(ctx, "remove_effect_tool", { effect_ids: [id] });
   });
   effect2.command("set").description("set an effect parameter, optionally as a keyframe at a time").argument("<effect>", "effect id").argument("<assignment>", "property=value").option("--at <time>", "keyframe time (timeline)").action(async (id, assignment, opts) => {
     const eq = assignment.indexOf("=");
@@ -87480,17 +92511,17 @@ function registerEditCommands(program2, ctx) {
       ])
     );
   });
-  program2.command("title").description("add a text title (SVG template) to the timeline").argument("<text>", "title text").option("--template <name>", "title template (e.g. Standard_1)").option("--at <time>", "timeline position").option("--duration <time>", "length").option("-t, --track <track>", "track").action(async (text4, opts) => {
+  program2.command("title").description("add a text title (SVG template) to the timeline").argument("<text>", "title text").option("--template <name>", "title template (e.g. Standard_1)").option("--at <time>", "timeline position").option("--duration <time>", "length").option("-t, --track <track>", "track").action(async (text5, opts) => {
     await runToolCommand(ctx, "add_title_tool", {
-      text: text4,
+      text: text5,
       ...opts.template ? { template: opts.template } : {},
       ...opts.at !== void 0 ? { position_seconds: parseTime(opts.at) } : {},
       ...opts.duration !== void 0 ? { duration_seconds: parseTime(opts.duration) } : {},
       ...opts.track !== void 0 ? { track: opts.track } : {}
     });
   });
-  program2.command("keyframe").description("animate a clip property (volume, alpha, location_x/y, scale_x/y, rotation) with time=value points; replaces its curve").argument("<clip>", "clip id").argument("<property>", "property name").argument("<points...>", "time=value (timeline time), or f<frame>=value (the clip's 1-based source frame)").option("--clip-time", "times are seconds into the clip's source instead of timeline times").action(async (clip2, property, points, opts) => {
-    const parsed = points.map((p) => {
+  program2.command("keyframe").description("animate a clip property (volume, alpha, location_x/y, scale_x/y, rotation) with time=value points; replaces its curve").argument("<clip>", "clip id").argument("<property>", "property name").argument("<points...>", "time=value (timeline time), or f<frame>=value (the clip's 1-based source frame)").option("--clip-time", "times are seconds into the clip's source instead of timeline times").action(async (clip2, property, points2, opts) => {
+    const parsed = points2.map((p) => {
       const eq = p.indexOf("=");
       if (eq <= 0) throw new CliError(`Use time=value, e.g. 0=1 2.5=0 (got "${p}").`, 2);
       const at = p.slice(0, eq);
@@ -87704,7 +92735,7 @@ function toCatalogJson(host, defs) {
     }))
   };
 }
-var HOST_IDS, HOST_TOOL_PREFIX, DEFAULT_TIMEOUT_MS, seconds, easingName, bezierEasing, easing, hexColor2, rgbColor, color2, layerRef, trackRef, ABSOLUTE_PATH_PATTERN, absolutePath, placement;
+var HOST_IDS, HOST_TOOL_PREFIX, DEFAULT_TIMEOUT_MS, seconds, easingName, bezierEasing, easing, hexColor2, rgbColor, color2, layerRef, trackRef, ABSOLUTE_PATH_PATTERN, absolutePath, placement2;
 var init_types6 = __esm({
   "../adobe-link/src/catalog/types.ts"() {
     "use strict";
@@ -87740,7 +92771,7 @@ var init_types6 = __esm({
     });
     ABSOLUTE_PATH_PATTERN = /^(\/|[A-Za-z]:[\\/]|\\\\[^\\]+\\)/;
     absolutePath = external_exports.string().regex(ABSOLUTE_PATH_PATTERN, "must be an absolute path");
-    placement = external_exports.enum(["center", "lower-third", "top-left", "top-center", "bottom-center"]);
+    placement2 = external_exports.enum(["center", "lower-third", "top-left", "top-center", "bottom-center"]);
   }
 });
 
@@ -88045,7 +93076,7 @@ var init_aftereffects = __esm({
         subtitle: external_exports.string().min(1).max(5e3).optional().describe("Second, smaller line as its own layer below (e.g. the role in a lower third)"),
         name: external_exports.string().min(1).max(255).optional().describe("Layer name (default: the text)"),
         style: external_exports.enum(TEXT_STYLES).optional().describe("Type role (default: lower-third for that placement, caption for bottom-center, subtitle for top placements, else title)"),
-        placement: placement.default("center").describe("Where the text sits; every placement stays inside title-safe"),
+        placement: placement2.default("center").describe("Where the text sits; every placement stays inside title-safe"),
         font: external_exports.string().min(1).optional().describe('PostScript font name, e.g. "Inter-Bold" (falls back with a warning when missing)'),
         size: external_exports.number().min(1).max(1296).optional().describe("Font size in pixels (default: the style's TASTE size)"),
         fill: color2.optional().describe(`Fill colour (default paper ${TASTE.color.palette.paper})`),
@@ -88652,7 +93683,7 @@ var init_premiere = __esm({
         style: external_exports.enum(["headline", "title", "subtitle", "lower-third", "caption"]).default("title").describe("Type scale step"),
         font_size: external_exports.number().min(6).max(1e3).optional().describe("Override the style's size, in pixels at the sequence's size"),
         color: color2.default(TASTE.color.palette.paper).describe("Text colour, #RRGGBB or [r, g, b] 0-1"),
-        placement: placement.optional().describe("Where an image smaller than the frame sits, inside title-safe (9:16: clear of the top 12 % and bottom 20 %); default: lower-third for that style, bottom-center for captions, else center"),
+        placement: placement2.optional().describe("Where an image smaller than the frame sits, inside title-safe (9:16: clear of the top 12 % and bottom 20 %); default: lower-third for that style, bottom-center for captions, else center"),
         time: seconds.optional().describe("Sequence time of the title's first frame; default: the playhead"),
         duration: external_exports.number().positive().max(3600).optional().describe("Seconds on screen; default: reading time"),
         track: external_exports.int().min(0).max(98).optional().describe("Video track index (0 = V1); default: the lowest track above V1 that is free for the whole duration"),
@@ -88912,7 +93943,7 @@ async function probeHost(url2, token, host, options = {}) {
     return false;
   }
 }
-function text2(value) {
+function text3(value) {
   return typeof value === "string" && value !== "" ? value : void 0;
 }
 async function removeQuietly(file3) {
@@ -88936,14 +93967,14 @@ async function inspectHost(desktopDir, host, options = {}) {
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return result2("invalid", "the discovery file is not a JSON object");
   const data = parsed;
-  const url2 = text2(data.url);
+  const url2 = text3(data.url);
   const pid = Number(data.pid);
   if (data.app !== host || !url2 || !Number.isInteger(pid)) return result2("invalid", "the discovery file is not a Zenvi Link file for this app");
   if (typeof data.protocol === "number" && data.protocol > LINK_PROTOCOL) {
     return result2("invalid", `Zenvi Link speaks protocol ${data.protocol}; this client knows ${LINK_PROTOCOL} (update the zenvi CLI)`);
   }
   if (!isLinkUrl(url2)) return result2("invalid", `refusing a non-loopback URL (${url2})`);
-  const tokenFile = text2(data.token_file);
+  const tokenFile = text3(data.token_file);
   const tokenPath = tokenFile ? path23.isAbsolute(tokenFile) ? tokenFile : path23.join(dir, tokenFile) : path23.join(dir, `${host}.token`);
   if (!pidAlive3(pid)) {
     if (options.removeStale) {
@@ -88964,13 +93995,13 @@ async function inspectHost(desktopDir, host, options = {}) {
     url: url2,
     token,
     pid,
-    project: text2(data.project) ?? null,
-    version: text2(data.version) ?? "",
-    appName: text2(data.app_name) ?? "",
-    appVersion: text2(data.app_version) ?? "",
+    project: text3(data.project) ?? null,
+    version: text3(data.version) ?? "",
+    appName: text3(data.app_name) ?? "",
+    appVersion: text3(data.app_version) ?? "",
     protocol: typeof data.protocol === "number" ? data.protocol : LINK_PROTOCOL,
-    startedAt: text2(data.started_at) ?? "",
-    lastActiveAt: text2(data.last_active_at) ?? "",
+    startedAt: text3(data.started_at) ?? "",
+    lastActiveAt: text3(data.last_active_at) ?? "",
     source: file3
   };
   if (options.verify !== false && !await probeHost(url2, token, host, options)) {
@@ -89076,11 +94107,11 @@ var init_client5 = __esm({
         const timeout = options.timeoutMs ?? (def?.timeoutMs ?? DEFAULT_TIMEOUT_MS) + RESPONSE_MARGIN_MS;
         const result2 = await client.callTool({ name, arguments: args }, void 0, { timeout });
         const content = Array.isArray(result2.content) ? result2.content : [];
-        const text4 = content.filter((block) => block.type === "text").map((block) => String(block.text ?? "")).join("\n");
+        const text5 = content.filter((block) => block.type === "text").map((block) => String(block.text ?? "")).join("\n");
         const images = content.filter((block) => block.type === "image" && typeof block.data === "string").map((block) => ({ mimeType: block.mimeType === "image/jpeg" ? "image/jpeg" : "image/png", data: block.data }));
         const receipt2 = parseHostReceipt(result2.structuredContent) ?? parseHostReceipt(content.find((block) => block.type === "text")?.text);
-        const isError = Boolean(result2.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text4.startsWith("Error"));
-        return { receipt: receipt2, text: text4, images, isError };
+        const isError = Boolean(result2.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text5.startsWith("Error"));
+        return { receipt: receipt2, text: text5, images, isError };
       }
       async close() {
         const client = this.client;
@@ -89648,8 +94679,8 @@ var init_registry5 = __esm({
        */
       async connect(host) {
         const file3 = path27.join(linkDirOf(this.desktopDir), `${host}.json`);
-        const cached3 = this.clients.get(host);
-        if (cached3) {
+        const cached4 = this.clients.get(host);
+        if (cached4) {
           const raw = await readFile11(file3, "utf8").catch(() => "");
           let key = "";
           try {
@@ -89658,7 +94689,7 @@ var init_registry5 = __esm({
           } catch {
             key = "";
           }
-          if (key === cached3.key && pidAlive3(cached3.endpoint.pid)) return { ok: true, client: cached3.client, endpoint: cached3.endpoint };
+          if (key === cached4.key && pidAlive3(cached4.endpoint.pid)) return { ok: true, client: cached4.client, endpoint: cached4.endpoint };
           await this.dropClient(host);
         }
         const discovery = await inspectHost(this.desktopDir, host, { removeStale: true, clientVersion: this.options.clientVersion });
@@ -89686,10 +94717,10 @@ var init_registry5 = __esm({
       }
       /** Forget an app's client (after a transport failure). */
       async dropClient(host) {
-        const cached3 = this.clients.get(host);
+        const cached4 = this.clients.get(host);
         this.clients.delete(host);
         this.invalidate();
-        await cached3?.client.close();
+        await cached4?.client.close();
       }
       async close() {
         await Promise.all([...this.clients.keys()].map((host) => this.dropClient(host)));
@@ -89720,8 +94751,8 @@ function adobeToolDefinitions(host) {
   }));
 }
 function receipt(host, tool, status, code, message, data = {}) {
-  const text4 = message.replace(/^Error:\s*/, "");
-  return { contract: 3, status, tool, host, summary: `Error: ${text4}`, data, warnings: [], undoSteps: 0, error: { code, message: text4 } };
+  const text5 = message.replace(/^Error:\s*/, "");
+  return { contract: 3, status, tool, host, summary: `Error: ${text5}`, data, warnings: [], undoSteps: 0, error: { code, message: text5 } };
 }
 function hostRefusal(host, tool, code, message, data = {}) {
   return receipt(host, tool, "refused", code, message, data);
@@ -89749,21 +94780,21 @@ function coerceHostValue(value, schema) {
   const options = leaves(schema);
   const types = new Set(options.flatMap(typesOf));
   if (typeof value === "string") {
-    const text4 = value.trim();
-    if (text4 === "") return value;
-    if (text4 === "null" && types.has("null")) return null;
-    if (types.has("integer") && /^\d+$/.test(text4)) return Number.parseInt(text4, 10);
+    const text5 = value.trim();
+    if (text5 === "") return value;
+    if (text5 === "null" && types.has("null")) return null;
+    if (types.has("integer") && /^\d+$/.test(text5)) return Number.parseInt(text5, 10);
     if (types.has("string")) return value;
-    if (types.has("integer") && /^-\d+$/.test(text4)) return Number.parseInt(text4, 10);
-    if (types.has("number") && NUMBER_TEXT.test(text4)) return Number(text4);
+    if (types.has("integer") && /^-\d+$/.test(text5)) return Number.parseInt(text5, 10);
+    if (types.has("number") && NUMBER_TEXT.test(text5)) return Number(text5);
     if (types.has("boolean")) {
-      const low = text4.toLowerCase();
+      const low = text5.toLowerCase();
       if (["true", "1", "yes", "on"].includes(low)) return true;
       if (["false", "0", "no", "off"].includes(low)) return false;
     }
-    if ((types.has("array") || types.has("object")) && /^[[{]/.test(text4)) {
+    if ((types.has("array") || types.has("object")) && /^[[{]/.test(text5)) {
       try {
-        return coerceHostValue(JSON.parse(text4), schema);
+        return coerceHostValue(JSON.parse(text5), schema);
       } catch {
         return value;
       }
@@ -89925,16 +94956,16 @@ function defaultLauncherDeps() {
     selfPaths: self
   };
 }
-function splitCommand(text4) {
+function splitCommand(text5) {
   const out = [];
   let cur = "";
   let quote = null;
   let has2 = false;
-  for (let i = 0; i < text4.length; i += 1) {
-    const ch = text4[i];
+  for (let i = 0; i < text5.length; i += 1) {
+    const ch = text5[i];
     if (quote) {
       if (ch === quote) quote = null;
-      else if (ch === "\\" && quote === '"' && i + 1 < text4.length && /["\\$`]/.test(text4[i + 1])) cur += text4[++i];
+      else if (ch === "\\" && quote === '"' && i + 1 < text5.length && /["\\$`]/.test(text5[i + 1])) cur += text5[++i];
       else cur += ch;
     } else if (ch === '"' || ch === "'") {
       quote = ch;
@@ -89943,8 +94974,8 @@ function splitCommand(text4) {
       if (has2 || cur) out.push(cur);
       cur = "";
       has2 = false;
-    } else if (ch === "\\" && i + 1 < text4.length && process.platform !== "win32") {
-      cur += text4[++i];
+    } else if (ch === "\\" && i + 1 < text5.length && process.platform !== "win32") {
+      cur += text5[++i];
     } else cur += ch;
   }
   if (has2 || cur) out.push(cur);
@@ -90034,8 +95065,8 @@ async function findLinux(deps) {
   for (const dataDir of xdgDataDirs(deps)) {
     for (const name of ["org.zenvi.Zenvi.desktop", "zenvi.desktop"]) {
       const file3 = path31.join(dataDir, "applications", name);
-      const text4 = await deps.readText(file3);
-      const exec = text4 && /^Exec\s*=\s*(.+)$/m.exec(text4)?.[1];
+      const text5 = await deps.readText(file3);
+      const exec = text5 && /^Exec\s*=\s*(.+)$/m.exec(text5)?.[1];
       if (!exec) continue;
       const argv = parseDesktopExec(exec);
       const head = argv[0];
@@ -91790,7 +96821,7 @@ function promptText(name, args, report2) {
   if (name === "taste_motion_design") {
     const brief = args.brief?.trim();
     if (!brief) throw new Error("taste_motion_design needs a brief: what to make.");
-    const text5 = [
+    const text6 = [
       `Design and build this in ${tools.label}: ${brief}`,
       "",
       "Work like a senior motion designer who follows the Zenvi taste guide below. Its numbers are the defaults the tools use when you leave an argument out; override one only with a reason you state.",
@@ -91806,10 +96837,10 @@ function promptText(name, args, report2) {
       "",
       guide()
     ].join("\n");
-    return { description: `Motion design in ${tools.label} with Zenvi taste`, text: text5 };
+    return { description: `Motion design in ${tools.label} with Zenvi taste`, text: text6 };
   }
   const focus = args.focus?.trim();
-  const text4 = [
+  const text5 = [
     `Review the current edit in ${tools.label}${focus ? `, focusing on ${focus}` : ""}. Do not change anything before you have reported.`,
     "",
     connectStep(host, tools),
@@ -91823,7 +96854,7 @@ function promptText(name, args, report2) {
     "",
     guide()
   ].join("\n");
-  return { description: `Review of the edit in ${tools.label}${focus ? ` (${focus})` : ""}`, text: text4 };
+  return { description: `Review of the edit in ${tools.label}${focus ? ` (${focus})` : ""}`, text: text5 };
 }
 var RESOURCES, HANDOFF_GUIDE, HOST_TOOLS, HOST_ARGUMENT, PROMPTS;
 var init_guides = __esm({
@@ -92024,16 +97055,16 @@ var init_project3 = __esm({
 // src/commands/render.ts
 import { writeFile as writeFile8 } from "node:fs/promises";
 import path33 from "node:path";
-function parseFps(text4) {
-  if (!text4) return void 0;
-  const m = /^(\d+)(?:\/(\d+))?$/.exec(text4.trim());
+function parseFps(text5) {
+  if (!text5) return void 0;
+  const m = /^(\d+)(?:\/(\d+))?$/.exec(text5.trim());
   if (m) return { num: Number(m[1]), den: Number(m[2] ?? 1) };
-  const f3 = Number(text4);
+  const f3 = Number(text5);
   if (Number.isFinite(f3) && f3 > 0) {
     for (const base of [24, 30, 60, 120]) if (Math.abs(f3 - base * 1e3 / 1001) < 0.01) return { num: base * 1e3, den: 1001 };
     return { num: Math.round(f3 * 1e3), den: 1e3 };
   }
-  throw new CliError(`Not a frame rate: ${text4}`, 2);
+  throw new CliError(`Not a frame rate: ${text5}`, 2);
 }
 function exportOptionsFrom(project, output2, flags) {
   const fromPath = output2 ? formatFromPath(output2) : void 0;
@@ -92078,16 +97109,16 @@ async function exportOnDesktop(executor, output2, platform = process.platform) {
   if (platform === "darwin") {
     const settings = await executor.call("get_export_settings_tool", {});
     const data = settings.receipt?.data;
-    const text4 = [settings.text, settings.receipt?.summary, typeof data?.legacy_text === "string" ? data.legacy_text : ""].join("\n");
-    if (settings.ok && /codec\s+h264_videotoolbox/i.test(text4)) {
+    const text5 = [settings.text, settings.receipt?.summary, typeof data?.legacy_text === "string" ? data.legacy_text : ""].join("\n");
+    if (settings.ok && /codec\s+h264_videotoolbox/i.test(text5)) {
       await executor.call("set_export_setting_tool", { key: "video_codec", value: "libx264" });
     }
   }
   return executor.call("export_video_tool", { show_dialog: "false", ...output2 ? { output_path: output2 } : {} });
 }
-function parseBitrate(text4) {
-  const m = /^(\d+(?:\.\d+)?)\s*([kKmM]?)(?:b\/?s|bps)?$/.exec(text4.trim());
-  if (!m) throw new CliError(`Not a bitrate: ${text4} (e.g. 8M, 192k).`, 2);
+function parseBitrate(text5) {
+  const m = /^(\d+(?:\.\d+)?)\s*([kKmM]?)(?:b\/?s|bps)?$/.exec(text5.trim());
+  if (!m) throw new CliError(`Not a bitrate: ${text5} (e.g. 8M, 192k).`, 2);
   const scale = m[2]?.toLowerCase() === "m" ? 1e6 : m[2]?.toLowerCase() === "k" ? 1e3 : 1;
   return Math.round(Number(m[1]) * scale);
 }
@@ -92141,11 +97172,11 @@ function registerRenderCommands(program2, ctx) {
       if (executor instanceof PortableExecutor) {
         const project = executor.session.doc.project;
         const width = Math.min(Number(flags.width) || 1280, 8192);
-        const fps = project.fps.num / project.fps.den;
+        const fps2 = project.fps.num / project.fps.den;
         const image = await executor.session.host.frames.renderFrame(project, seconds2, {
           width,
           format,
-          overlay: flags.grid ? { grid: true, caption: frameCaption(Math.floor(seconds2 * fps + 1e-9), seconds2) } : void 0
+          overlay: flags.grid ? { grid: true, caption: frameCaption(Math.floor(seconds2 * fps2 + 1e-9), seconds2) } : void 0
         });
         data = image.data;
         mimeType = image.mimeType;
@@ -92183,7 +97214,7 @@ var init_render2 = __esm({
 // src/mcp/extra-tools.ts
 import { existsSync as existsSync7 } from "node:fs";
 import path34 from "node:path";
-function text3(v) {
+function text4(v) {
   return typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : void 0;
 }
 function projectSummary(state) {
@@ -92218,7 +97249,7 @@ function extraTools(ctx) {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       async run(state, args) {
         const tool = "open_project_file";
-        const raw = text3(args.path);
+        const raw = text4(args.path);
         if (!raw) return { receipt: refused(tool, "path is required") };
         const file3 = path34.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
         if (existsSync7(file3)) {
@@ -92227,7 +97258,7 @@ function extraTools(ctx) {
         }
         if (args.create === false || args.create === "false") return { receipt: failed(tool, `${file3} does not exist.`) };
         const keepEdits = !state.session.file && (state.session.doc.canUndo || state.session.doc.project.clips.length > 0 || state.session.doc.project.files.length > 0);
-        const project = keepEdits ? state.session.doc.toJSON() : newProject(text3(args.profile));
+        const project = keepEdits ? state.session.doc.toJSON() : newProject(text4(args.profile));
         await state.switchTo(file3, project);
         return {
           receipt: applied(tool, keepEdits ? `Saved the unsaved project as ${file3}` : `Created ${file3}`, { data: { ...projectSummary(state), created: true } }, 0)
@@ -92245,11 +97276,11 @@ function extraTools(ctx) {
           output_path: str2("Same as output (the desktop export_video_tool name)."),
           format: { type: "string", enum: ["mp4", "webm", "mov", "mkv", "gif", "mp3", "wav", "png"], description: "Container format (default from the file name, else mp4)." },
           quality: { type: "string", enum: ["low", "medium", "high", "lossless"], description: "Default high." },
-          width: num10("Output width in pixels (height follows the project aspect)."),
-          height: num10("Output height in pixels."),
+          width: num12("Output width in pixels (height follows the project aspect)."),
+          height: num12("Output height in pixels."),
           fps: str2("Frame rate, e.g. 30 or 30000/1001 (default: the project's)."),
-          start: num10("Render from this timeline time (seconds)."),
-          end: num10("Render up to this timeline time (seconds).")
+          start: num12("Render from this timeline time (seconds)."),
+          end: num12("Render up to this timeline time (seconds).")
         },
         additionalProperties: false
       },
@@ -92257,7 +97288,7 @@ function extraTools(ctx) {
       async run(state, args, call) {
         const tool = "render_video";
         const desktop = await state.desktopExecutor();
-        const requested = text3(args.output) ?? text3(args.output_path);
+        const requested = text4(args.output) ?? text4(args.output_path);
         const output2 = requested ? path34.resolve(ctx.cwd, requested) : void 0;
         if (desktop) {
           const outcome = await exportOnDesktop(desktop, output2);
@@ -92265,13 +97296,13 @@ function extraTools(ctx) {
         }
         const session = state.session;
         const flags = {
-          format: text3(args.format),
-          quality: text3(args.quality),
-          width: text3(args.width),
-          height: text3(args.height),
-          fps: text3(args.fps),
-          start: text3(args.start),
-          end: text3(args.end)
+          format: text4(args.format),
+          quality: text4(args.quality),
+          width: text4(args.width),
+          height: text4(args.height),
+          fps: text4(args.fps),
+          start: text4(args.start),
+          end: text4(args.end)
         };
         let options;
         try {
@@ -92298,8 +97329,8 @@ function extraTools(ctx) {
       inputSchema: {
         type: "object",
         properties: {
-          seconds: num10("Timeline time in seconds."),
-          width: num10("Image width in pixels (default 768, max 1920)."),
+          seconds: num12("Timeline time in seconds."),
+          width: num12("Image width in pixels (default 768, max 1920)."),
           grid: bool3("Draw a 0-1 coordinate grid and a frame caption (default false)."),
           format: { type: "string", enum: ["jpeg", "png"], description: "Default jpeg." }
         },
@@ -92324,8 +97355,8 @@ function extraTools(ctx) {
         const project = state.session.doc.project;
         const width = Math.max(64, Math.min(1920, Number(args.width) || 768));
         const format = args.format === "png" ? "png" : "jpeg";
-        const fps = project.fps.num / project.fps.den;
-        const frame = Math.floor(seconds2 * fps + 1e-9);
+        const fps2 = project.fps.num / project.fps.den;
+        const frame = Math.floor(seconds2 * fps2 + 1e-9);
         const grid = args.grid === true || args.grid === "true";
         const image = await state.session.host.frames.renderFrame(project, seconds2, {
           width,
@@ -92351,7 +97382,7 @@ function extraTools(ctx) {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       async run(state, args) {
         const tool = "launch_editor";
-        const file3 = text3(args.path) ? path34.resolve(ctx.cwd, text3(args.path)) : state.session.file;
+        const file3 = text4(args.path) ? path34.resolve(ctx.cwd, text4(args.path)) : state.session.file;
         if (!file3) return { receipt: refused(tool, "This project has no file yet: call open_project_file first.") };
         try {
           const result2 = await openInDesktop({ config: ctx.config, project: file3, deps: state.launcher, clientVersion: VERSION });
@@ -92386,7 +97417,7 @@ function extraTools(ctx) {
             client: cloudClient(ctx),
             projectFile: file3,
             project: state.session.doc.toJSON(),
-            name: text3(args.name),
+            name: text4(args.name),
             force: args.force === true || args.force === "true",
             warn: (m) => warnings.push(m)
           });
@@ -92399,7 +97430,7 @@ function extraTools(ctx) {
     }
   ];
 }
-var str2, num10, bool3;
+var str2, num12, bool3;
 var init_extra_tools = __esm({
   "src/mcp/extra-tools.ts"() {
     "use strict";
@@ -92415,7 +97446,7 @@ var init_extra_tools = __esm({
     init_edit2();
     init_version();
     str2 = (description) => ({ type: "string", description });
-    num10 = (description) => ({ type: "number", description });
+    num12 = (description) => ({ type: "number", description });
     bool3 = (description) => ({ type: "boolean", description });
   }
 });
@@ -93156,8 +98187,8 @@ function resolvePathArgs(args, cwd, home = homedir3()) {
   const out = { ...args };
   for (const [key, value] of Object.entries(args)) {
     if (!PATH_ARGS.has(key) || typeof value !== "string" || !value.trim()) continue;
-    const text4 = value.trim();
-    const expanded = text4 === "~" ? home : text4.startsWith("~/") || text4.startsWith("~\\") ? path35.join(home, text4.slice(2)) : text4;
+    const text5 = value.trim();
+    const expanded = text5 === "~" ? home : text5.startsWith("~/") || text5.startsWith("~\\") ? path35.join(home, text5.slice(2)) : text5;
     out[key] = path35.isAbsolute(expanded) || path35.win32.isAbsolute(expanded) ? expanded : path35.resolve(cwd, expanded);
   }
   return out;
@@ -93165,13 +98196,13 @@ function resolvePathArgs(args, cwd, home = homedir3()) {
 function declaredName(properties, candidates) {
   return candidates.find((name) => Object.prototype.hasOwnProperty.call(properties, name));
 }
-function fpsFraction2(fps) {
-  if (fps && typeof fps === "object") {
-    const { num: num11, den: den2 } = fps;
-    if (typeof num11 === "number" && typeof den2 === "number" && num11 > 0 && den2 > 0) return { num: num11, den: den2 };
+function fpsFraction2(fps2) {
+  if (fps2 && typeof fps2 === "object") {
+    const { num: num13, den: den2 } = fps2;
+    if (typeof num13 === "number" && typeof den2 === "number" && num13 > 0 && den2 > 0) return { num: num13, den: den2 };
     return void 0;
   }
-  const value = Number(fps);
+  const value = Number(fps2);
   if (!Number.isFinite(value) || value <= 0) return void 0;
   if (Number.isInteger(value)) return { num: value, den: 1 };
   const ntsc = Math.round(value) * 1e3;
@@ -93184,15 +98215,15 @@ function aeRenderLink(data, alpha) {
   if (data.link && typeof data.link === "object" && !Array.isArray(data.link)) {
     return { path: file3, link: { ...data.link, kind: "aftereffects" } };
   }
-  const fps = fpsFraction2(data.fps);
+  const fps2 = fpsFraction2(data.fps);
   const duration3 = Number(data.duration);
   const codec2 = typeof data.codec === "string" && CODECS.includes(data.codec) ? data.codec : alpha ? "prores4444" : /\.mp4$/i.test(file3) ? "h264" : void 0;
-  const render2 = {};
-  if (codec2) render2.codec = codec2;
-  if (typeof data.width === "number") render2.width = data.width;
-  if (typeof data.height === "number") render2.height = data.height;
-  if (fps) render2.fps = fps;
-  if (fps && Number.isFinite(duration3) && duration3 > 0) render2.duration_frames = Math.round(duration3 * fps.num / fps.den);
+  const render3 = {};
+  if (codec2) render3.codec = codec2;
+  if (typeof data.width === "number") render3.width = data.width;
+  if (typeof data.height === "number") render3.height = data.height;
+  if (fps2) render3.fps = fps2;
+  if (fps2 && Number.isFinite(duration3) && duration3 > 0) render3.duration_frames = Math.round(duration3 * fps2.num / fps2.den);
   return {
     path: file3,
     link: {
@@ -93208,7 +98239,7 @@ function aeRenderLink(data, alpha) {
         aep: typeof data.project === "string" ? data.project : null
       },
       props: {},
-      render: render2
+      render: render3
     }
   };
 }
@@ -93487,24 +98518,24 @@ function bringFromAfterEffects(ctx) {
         else if (declaredName(schema.properties, ["codec"])) renderArgs.codec = args.alpha ? "prores4444" : "h264";
       }
       if (call.signal.aborted) return { receipt: withNote(refused(tool, "Cancelled before rendering; nothing changed."), ready2.note), engine: null };
-      const render2 = await adobeStep(state, ticker, "Rendering in After Effects", "ae_render_for_zenvi", renderArgs);
-      if (!isOkHostStatus(render2.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "rendering in After Effects", render2.receipt), ready2.note), engine: "desktop" };
-      const media = aeRenderLink(render2.receipt.data ?? {}, args.alpha);
+      const render3 = await adobeStep(state, ticker, "Rendering in After Effects", "ae_render_for_zenvi", renderArgs);
+      if (!isOkHostStatus(render3.receipt.status)) return { receipt: withNote(adobeStepFailed(tool, "rendering in After Effects", render3.receipt), ready2.note), engine: "desktop" };
+      const media = aeRenderLink(render3.receipt.data ?? {}, args.alpha);
       if (!media) {
         return {
-          receipt: withNote(failed(tool, "After Effects finished ae_render_for_zenvi without naming the rendered file (data.path); nothing was added to the Zenvi project", { data: { after_effects: render2.receipt } }), ready2.note),
+          receipt: withNote(failed(tool, "After Effects finished ae_render_for_zenvi without naming the rendered file (data.path); nothing was added to the Zenvi project", { data: { after_effects: render3.receipt } }), ready2.note),
           engine: "desktop"
         };
       }
       const importArgs = { path: media.path, link: media.link };
       if (args.position !== void 0) importArgs.position = args.position;
       if (args.track !== void 0) importArgs.track = String(args.track);
-      const comp = String(media.link.source?.composition ?? render2.receipt.data?.comp_name ?? "the comp");
-      const step = await importStep(state, ticker, call, tool, "import_linked_media_tool", importArgs, "after_effects", render2.receipt, `After Effects rendered "${comp}" to ${media.path}`, ready2.note);
+      const comp = String(media.link.source?.composition ?? render3.receipt.data?.comp_name ?? "the comp");
+      const step = await importStep(state, ticker, call, tool, "import_linked_media_tool", importArgs, "after_effects", render3.receipt, `After Effects rendered "${comp}" to ${media.path}`, ready2.note);
       if (!step.ok) return { receipt: step.receipt, engine: "desktop" };
       const zenvi = step.zenvi;
       const summary = zenvi.status === "applied" || zenvi.status === "unchanged" ? `Rendered "${comp}" in After Effects and added it to the Zenvi project as a linked clip. ${zenvi.summary}` : `After Effects rendered "${comp}" to ${media.path}, but Zenvi could not add it: ${zenvi.summary.replace(/^Error:\s*/, "")}`;
-      return { receipt: combined(tool, summary, "after_effects", render2.receipt, zenvi, step.retry, ready2.note), engine: "desktop" };
+      return { receipt: combined(tool, summary, "after_effects", render3.receipt, zenvi, step.retry, ready2.note), engine: "desktop" };
     }
   };
 }
@@ -93920,8 +98951,8 @@ async function createZenviMcpServer(ctx, projectFile, options = {}) {
     const uri = request.params.uri;
     const info = RESOURCES.find((r) => r.uri === uri);
     if (!info) throw new McpError(-32002, `Resource not found: ${uri}. Resources: ${RESOURCES.map((r) => r.uri).join(", ")}.`);
-    const text4 = uri === "zenvi://hosts" ? JSON.stringify(await state.hosts.list(), null, 2) : uri === "zenvi://taste" ? TASTE_MARKDOWN : HANDOFF_GUIDE;
-    return { contents: [{ uri, mimeType: info.mimeType, text: text4 }] };
+    const text5 = uri === "zenvi://hosts" ? JSON.stringify(await state.hosts.list(), null, 2) : uri === "zenvi://taste" ? TASTE_MARKDOWN : HANDOFF_GUIDE;
+    return { contents: [{ uri, mimeType: info.mimeType, text: text5 }] };
   });
   server.server.setRequestHandler(ListPromptsRequestSchema, async () => ({ prompts: PROMPTS.map((p) => ({ ...p, arguments: p.arguments.map((a) => ({ ...a })) })) }));
   server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
@@ -97121,9 +102152,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
       helpWidth: context.helpWidth,
       outputHasColors: context.hasColors
     });
-    const text4 = helper.formatHelp(this, helper);
-    if (context.hasColors) return text4;
-    return this._outputConfiguration.stripColor(text4);
+    const text5 = helper.formatHelp(this, helper);
+    if (context.hasColors) return text5;
+    return this._outputConfiguration.stripColor(text5);
   }
   /**
    * @typedef HelpContext
@@ -97283,7 +102314,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {(string | Function)} text - string to add, or a function returning a string
    * @return {Command} `this` command for chaining
    */
-  addHelpText(position, text4) {
+  addHelpText(position, text5) {
     const allowedValues = ["beforeAll", "before", "after", "afterAll"];
     if (!allowedValues.includes(position)) {
       throw new Error(`Unexpected value for position to addHelpText.
@@ -97292,10 +102323,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
     const helpEvent = `${position}Help`;
     this.on(helpEvent, (context) => {
       let helpStr;
-      if (typeof text4 === "function") {
-        helpStr = text4({ error: context.error, command: context.command });
+      if (typeof text5 === "function") {
+        helpStr = text5({ error: context.error, command: context.command });
       } else {
-        helpStr = text4;
+        helpStr = text5;
       }
       if (helpStr) {
         context.write(`${helpStr}
@@ -97814,23 +102845,23 @@ function parseHeaderName(raw) {
   parts.push(cur.trim());
   return parts.join(".");
 }
-function scanHeaders(text4) {
+function scanHeaders(text5) {
   const headers = [];
   let i = 0;
   let depth = 0;
   let lineStart = true;
-  const n = text4.length;
+  const n = text5.length;
   while (i < n) {
-    const ch = text4[i];
+    const ch = text5[i];
     if (lineStart && depth === 0) {
       let j = i;
-      while (j < n && (text4[j] === " " || text4[j] === "	")) j += 1;
-      if (text4[j] === "[") {
-        const arrayTable = text4[j + 1] === "[";
-        const close = text4.indexOf(arrayTable ? "]]" : "]", j);
-        const eol = text4.indexOf("\n", j);
+      while (j < n && (text5[j] === " " || text5[j] === "	")) j += 1;
+      if (text5[j] === "[") {
+        const arrayTable = text5[j + 1] === "[";
+        const close = text5.indexOf(arrayTable ? "]]" : "]", j);
+        const eol = text5.indexOf("\n", j);
         if (close > 0 && (eol < 0 || close < eol)) {
-          headers.push({ name: parseHeaderName(text4.slice(j + (arrayTable ? 2 : 1), close)), start: i, arrayTable });
+          headers.push({ name: parseHeaderName(text5.slice(j + (arrayTable ? 2 : 1), close)), start: i, arrayTable });
           i = close + (arrayTable ? 2 : 1);
           lineStart = false;
           continue;
@@ -97842,16 +102873,16 @@ function scanHeaders(text4) {
       lineStart = true;
       i += 1;
     } else if (ch === "#") {
-      while (i < n && text4[i] !== "\n") i += 1;
-    } else if (text4.startsWith('"""', i) || text4.startsWith("'''", i)) {
-      const delim = text4.slice(i, i + 3);
-      const end = text4.indexOf(delim, i + 3);
+      while (i < n && text5[i] !== "\n") i += 1;
+    } else if (text5.startsWith('"""', i) || text5.startsWith("'''", i)) {
+      const delim = text5.slice(i, i + 3);
+      const end = text5.indexOf(delim, i + 3);
       if (end < 0) throw new Error("Unterminated multi-line string in TOML.");
       i = end + 3;
     } else if (ch === '"' || ch === "'") {
       let j = i + 1;
-      while (j < n && text4[j] !== ch && text4[j] !== "\n") j += ch === '"' && text4[j] === "\\" ? 2 : 1;
-      if (text4[j] !== ch) throw new Error("Unterminated string in TOML.");
+      while (j < n && text5[j] !== ch && text5[j] !== "\n") j += ch === '"' && text5[j] === "\\" ? 2 : 1;
+      if (text5[j] !== ch) throw new Error("Unterminated string in TOML.");
       i = j + 1;
     } else if (ch === "[" || ch === "{") {
       depth += 1;
@@ -97863,27 +102894,27 @@ function scanHeaders(text4) {
   }
   return headers;
 }
-function tableRanges(text4, name) {
-  const headers = scanHeaders(text4);
+function tableRanges(text5, name) {
+  const headers = scanHeaders(text5);
   const ranges = [];
   headers.forEach((h, idx) => {
     if (h.name === name || h.name.startsWith(`${name}.`)) {
-      const end = idx + 1 < headers.length ? headers[idx + 1].start : text4.length;
+      const end = idx + 1 < headers.length ? headers[idx + 1].start : text5.length;
       ranges.push([h.start, end]);
     }
   });
   return ranges;
 }
-function readTable(text4, name) {
-  const ranges = tableRanges(text4, name);
-  return ranges.length ? ranges.map(([a, b]) => text4.slice(a, b)).join("").trim() : void 0;
+function readTable(text5, name) {
+  const ranges = tableRanges(text5, name);
+  return ranges.length ? ranges.map(([a, b]) => text5.slice(a, b)).join("").trim() : void 0;
 }
-function upsertTable(text4, name, section) {
-  const ranges = tableRanges(text4, name);
+function upsertTable(text5, name, section) {
+  const ranges = tableRanges(text5, name);
   const body = `${section.trim()}
 `;
   if (ranges.length === 0) {
-    const base = text4.length === 0 ? "" : text4.endsWith("\n") ? text4 : `${text4}
+    const base = text5.length === 0 ? "" : text5.endsWith("\n") ? text5 : `${text5}
 `;
     return base ? `${base}
 ${body}` : body;
@@ -97891,11 +102922,11 @@ ${body}` : body;
   let out = "";
   let last = 0;
   ranges.forEach(([a, b], idx) => {
-    out += text4.slice(last, a);
-    if (idx === 0) out += `${body}${b < text4.length ? "\n" : ""}`;
+    out += text5.slice(last, a);
+    if (idx === 0) out += `${body}${b < text5.length ? "\n" : ""}`;
     last = b;
   });
-  out += text4.slice(last);
+  out += text5.slice(last);
   return out.replace(/\n{3,}/g, "\n\n");
 }
 function tomlString(value) {
@@ -97937,7 +102968,7 @@ async function exists2(file3) {
     return false;
   }
 }
-async function writeWithBackup(file3, text4, hadFile) {
+async function writeWithBackup(file3, text5, hadFile) {
   await mkdir7(path29.dirname(file3), { recursive: true });
   let backup;
   if (hadFile) {
@@ -97945,7 +102976,7 @@ async function writeWithBackup(file3, text4, hadFile) {
     await copyFile2(file3, backup);
   }
   const tmp = `${file3}.${process.pid}.tmp`;
-  await writeFile7(tmp, text4);
+  await writeFile7(tmp, text5);
   await rename6(tmp, file3);
   return backup;
 }
@@ -97953,10 +102984,10 @@ async function mergeJsonServer(file3, name, entry, force) {
   const hadFile = await exists2(file3);
   let root = {};
   if (hadFile) {
-    const text4 = await readFile12(file3, "utf8");
-    if (text4.trim()) {
+    const text5 = await readFile12(file3, "utf8");
+    if (text5.trim()) {
       try {
-        const parsed = JSON.parse(text4);
+        const parsed = JSON.parse(text5);
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
         root = parsed;
       } catch (error62) {
@@ -98272,8 +103303,8 @@ async function runDoctor(ctx) {
     ["codex", codexConfigPath(ctx.config.home, ctx.env)]
   ];
   for (const [name, file3] of configFiles) {
-    const text4 = await readFile14(file3, "utf8").catch(() => "");
-    if (/zenvi[^\n]*\bmcp\b|mcp_servers\.zenvi\b|"zenvi"\s*:/.test(text4)) configured.push(name);
+    const text5 = await readFile14(file3, "utf8").catch(() => "");
+    if (/zenvi[^\n]*\bmcp\b|mcp_servers\.zenvi\b|"zenvi"\s*:/.test(text5)) configured.push(name);
   }
   checks.push({ name: "agent configs", level: "ok", detail: configured.length ? `zenvi configured for ${configured.join(", ")}` : "none yet (see `zenvi mcp-config`)" });
   return checks;

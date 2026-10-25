@@ -983,6 +983,7 @@ export const contractInputs = {
     "include_properties": z.boolean().describe("Include each listed effect's properties (ranges, defaults, choices).").optional(),
     "kind": z.enum(["all", "video", "audio"]).describe("Only video (picture) or audio (sound) effects.").optional(),
     "query": z.string().describe("Filter by words in the name or description ('blur', 'color', 'voice').").optional(),
+    "category": z.enum(["video", "audio"]).describe("Older name for kind (video or audio).").optional(),
   }),
   list_export_presets_tool: z.strictObject({
     "category": z.enum(["", "All Formats", "Web", "Device", "DVD", "Blu-Ray/AVCHD"]).describe("Only this Export dialog 'Profile' group.").optional(),
@@ -1120,6 +1121,7 @@ export const contractInputs = {
     "timeline_clip_id": z.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
     "timeline_clip_ids": z.array(z.string()).describe("Several timeline clip ids to change in one step.").optional(),
     "track": z.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional(),
+    "effect_id": z.string().describe("Older argument: one effect id to remove (added to effect_ids).").optional(),
   }),
   remove_files_from_project_tool: z.strictObject({
     "confirm_remove_clips": z.boolean().describe("Required when a chosen file is used on the timeline: its timeline clips are removed with it. Ask the user first.").optional(),
@@ -3815,6 +3817,7 @@ export const contractMeta: { readonly [N in ContractToolName]: ContractToolMeta 
         "include_properties": {"default": false, "description": "Include each listed effect's properties (ranges, defaults, choices).", "type": "boolean"},
         "kind": {"default": "all", "description": "Only video (picture) or audio (sound) effects.", "enum": ["all", "video", "audio"], "type": "string"},
         "query": {"default": "", "description": "Filter by words in the name or description ('blur', 'color', 'voice').", "type": "string"},
+        "category": {"type": "string", "enum": ["video", "audio"], "description": "Older name for kind (video or audio)."},
       },
     },
   },
@@ -4134,6 +4137,7 @@ export const contractMeta: { readonly [N in ContractToolName]: ContractToolMeta 
         "timeline_clip_id": {"default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string"},
         "timeline_clip_ids": {"description": "Several timeline clip ids to change in one step.", "items": {"type": "string"}, "type": "array"},
         "track": {"default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string"},
+        "effect_id": {"type": "string", "description": "Older argument: one effect id to remove (added to effect_ids)."},
       },
     },
   },

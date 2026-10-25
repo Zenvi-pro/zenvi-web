@@ -67,7 +67,7 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "web-only arguments",
-    "Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, set_clip_speed_tool clip_id/factor/direction (the web's older speed tool: one clip id, speed, backward = reverse), watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).",
+    "Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, set_clip_speed_tool clip_id/factor/direction (the web's older speed tool: one clip id, speed, backward = reverse), list_effects_tool category (older name for kind), remove_effect_tool effect_id (the older tool's one id, added to effect_ids), watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).",
   ],
   [
     "desktop defaults the web does not follow yet",
@@ -104,6 +104,34 @@ const DIVERGENCES: [string, string][] = [
   [
     "reverse_clip_tool",
     "A clip on a locked track is refused; the desktop's handler reverses it anyway (its Time menu skips the lock check).",
+  ],
+  [
+    "colour frames (analyze_frame_colors_tool, chroma_key_clip_tool, inspect_color_tool, match_color_to_reference_tool, the after previews of apply_color_tool / apply_look_tool)",
+    "Frames come from the host's renderer (the one the person sees) and are measured with a port of libopenshot's FrameScope; the desktop renders on a private libopenshot timeline. A clip alone is rendered twice (as is, and with a Negate after its transform) to recover the transparency the host's opaque frames do not carry. analyze_frame_colors_tool measures frames at most 960 px wide (the desktop: the project size). The web editor stays editable while frames render (the desktop renders on its GUI thread), so chroma_key_clip_tool and match_color_to_reference_tool write nothing, and say so, when the clip was edited meanwhile.",
+  ],
+  [
+    "analyze_frame_colors_tool",
+    "save_frame_path is not written (web surfaces write no files): the analyzed frame is attached to the result (`frame_attached: true`, with a warning).",
+  ],
+  [
+    "chroma_key_clip_tool",
+    "Without frame rendering, key_color='auto' is refused, 'green' / 'blue' key the stock shade (the desktop's fallback when sampling fails) and keyed_pct is null.",
+  ],
+  [
+    "LUTs (list_luts_tool, color_grade_clip_tool, update_effect_tool lut_path, apply_color_tool, apply_look_tool)",
+    "The 50 built-in LUTs are bundled with every renderer and stored as `@colors/<category>/<name>.cube`, the alias the desktop writes on save, so they render the same everywhere. A .cube file outside them is accepted where the host reads local files (the CLI) once it parses the way libopenshot loads it, and refused elsewhere. list_luts_tool lists the built-ins (the desktop also lists the user's LUT folder).",
+  ],
+  [
+    "apply_color_tool, apply_look_tool, inspect_color_tool, list_looks_tool, match_color_to_reference_tool",
+    "The result is the desktop's JSON object, as the summary and as `data`. Preview frames are attached as images (MCP image content, the Assistant's image sidecar) and their `*_preview_jpeg` fields name the attachment (`attached image 1`) instead of carrying base64. Scopes give clipped shadows/highlights as shares of the frame (0-1), which the nuke-risk, outdoor and match-loop thresholds expect; the desktop passes FrameScope's pixel counts to them.",
+  ],
+  [
+    "match_color_to_reference_tool",
+    "The grading passes run on a working copy and the final grade is one undo step; a pass the desktop would abort halfway (a merged saturation below 0.5) refuses before anything changes. referenceImagePath needs local file access (the CLI).",
+  ],
+  [
+    "process_clip_effect_tool",
+    "Refused on every web surface: Stabilizer, Tracker, Object Detector and Object Mask run OpenCV analysis (libopenshot ClipProcessingJobs) inside Zenvi desktop. The effects it adds play back there; the web renderers pass them through, and list_effects_tool marks them `renders_on_web: false`.",
   ],
   [
     "summary previews",
@@ -182,9 +210,13 @@ function notPorted(): string[] {
   for (const [area, names] of [...byArea].sort(([a], [b]) => a.localeCompare(b))) {
     out.push(`- **${area}** (${names.length}): ${names.map((n) => `\`${n}\``).join(", ")}`);
   }
+  if (DESKTOP_NAMES_ON_DIRECT_TOOLS.size > 0) {
+    out.push(
+      "",
+      `Desktop tools whose names the web uses for older direct tools with other arguments (the desktop versions are not ported): ${[...DESKTOP_NAMES_ON_DIRECT_TOOLS].map((n) => `\`${n}\``).join(", ")}.`,
+    );
+  }
   out.push(
-    "",
-    `Desktop tools whose names the web uses for older direct tools with other arguments (the desktop versions are not ported): ${[...DESKTOP_NAMES_ON_DIRECT_TOOLS].map((n) => `\`${n}\``).join(", ")}.`,
     "",
     "Arguments of ported tools that only Zenvi desktop takes so far. A call that sets one to anything but its default is refused before anything changes " +
       "(`Error: <tool> cannot use <argument> in this Zenvi surface yet …`, so the Assistant retries without it):",

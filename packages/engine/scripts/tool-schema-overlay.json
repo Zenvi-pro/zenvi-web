@@ -112,6 +112,22 @@
         "detail": {"description": "summary (default) or windows (also list speech windows in timeline seconds)."}
       }
     },
+    "list_effects_tool": {
+      "web_extra_props": {
+        "category": {"type": "string", "enum": ["video", "audio"]}
+      },
+      "props": {
+        "category": {"description": "Older name for kind (video or audio)."}
+      }
+    },
+    "remove_effect_tool": {
+      "web_extra_props": {
+        "effect_id": {"type": "string"}
+      },
+      "props": {
+        "effect_id": {"description": "Older argument: one effect id to remove (added to effect_ids)."}
+      }
+    },
     "set_clip_speed_tool": {
       "web_extra_props": {
         "clip_id": {"type": "string"},

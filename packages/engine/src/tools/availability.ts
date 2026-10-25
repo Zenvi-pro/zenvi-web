@@ -84,6 +84,25 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   set_clip_audio_video_tool: {
     webNote: "waveform=show changes nothing, since the web timeline draws the waveform of every clip with sound; waveform=hide is refused",
   },
+  // Colour: frames rendered by the host; LUT files outside the 50 built-ins need local files.
+  analyze_frame_colors_tool: { webNote: "save_frame_path attaches the frame to the result instead of writing a file; frames are measured at most 960 px wide" },
+  chroma_key_clip_tool: {
+    optional: ["frames"],
+    partialNote: "without frame rendering key_color='auto' is refused, 'green'/'blue' key the stock shade and keyed_pct is not measured",
+  },
+  color_grade_clip_tool: { optional: ["media.importPath"], partialNote: "a .cube file outside the built-in LUTs needs local file access" },
+  update_effect_tool: { optional: ["media.importPath"], partialNote: "a lut_path .cube file outside the built-in LUTs needs local file access" },
+  apply_color_tool: {
+    optional: ["frames", "media.importPath"],
+    partialNote: "without frame rendering there is no after preview; a .cube file outside the built-in LUTs needs local file access",
+  },
+  apply_look_tool: {
+    optional: ["frames", "media.importPath"],
+    partialNote: "without frame rendering there is no after preview; a .cube file outside the built-in LUTs needs local file access",
+  },
+  match_color_to_reference_tool: { optional: ["media.importPath"], partialNote: "referenceImagePath needs local file access" },
+  list_luts_tool: { webNote: "the 50 built-in LUTs; the desktop also lists the user's LUT folder" },
+  process_clip_effect_tool: { desktopOnly: "OpenCV clip analysis (Stabilizer, Tracker, Object Detector, Object Mask)" },
   transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
   remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
   detect_beats_tool: { desktopOnly: "on-device beat tracking" },

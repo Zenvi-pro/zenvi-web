@@ -9,9 +9,8 @@
 import { z } from "zod";
 import type { Project } from "../../model/types.js";
 import { Interpolation } from "../../model/types.js";
-import { EFFECTS } from "../../effects/registry.js";
 import { fadeClip, moveClip, setClipProperty, splitClip, sliceAllAt, trimClip, trimClipEdge } from "../../ops/clips.js";
-import { removeEffect, setEffectProperty } from "../../ops/effects.js";
+import { setEffectProperty } from "../../ops/effects.js";
 import { addTransition } from "../../ops/transitions.js";
 import { timelineEnd } from "../../timeline/queries.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
@@ -99,25 +98,6 @@ export const directTools: CatalogTool[] = [
         { data },
         0,
       );
-    },
-  }),
-
-  directTool({
-    name: "list_effects_tool",
-    title: "List effects",
-    description: "List the libopenshot effects add_effect_tool accepts (class name, category, whether this surface renders it, parameters).",
-    input: z.strictObject({ category: z.enum(["video", "audio"]).optional().describe("Only video or audio effects.") }),
-    annotations: READ,
-    run: (_call, input) => {
-      const effects = EFFECTS.filter((e) => !input.category || e.category === input.category).map((e) => ({
-        class_name: e.className,
-        name: e.name,
-        category: e.category,
-        renders_on_web: e.supported.web,
-        needs_desktop_dialog: e.needsDialog,
-        params: e.params.filter((prm) => !prm.common && !prm.readonly).map((prm) => ({ key: prm.key, type: prm.type, default: prm.default, min: prm.min, max: prm.max })),
-      }));
-      return applied("list_effects_tool", `${effects.length} effect(s).`, { data: { effects } }, 0);
     },
   }),
 
@@ -250,18 +230,6 @@ export const directTools: CatalogTool[] = [
         }),
       );
       return `Set ${input.property} on effect ${input.effect_id}.`;
-    },
-  }),
-
-  directTool({
-    name: "remove_effect_tool",
-    title: "Remove effect",
-    description: "Remove one effect from its clip.",
-    input: z.strictObject({ effect_id: z.string().min(1).describe("Clip effect id.") }),
-    annotations: EDIT,
-    run: (call, input) => {
-      const result = call.commit((tx) => removeEffect(tx, input.effect_id));
-      return applied("remove_effect_tool", `Removed effect ${input.effect_id} from clip ${result.clipId}.`, { data: result });
     },
   }),
 

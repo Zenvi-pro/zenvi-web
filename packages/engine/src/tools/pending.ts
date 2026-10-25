@@ -17,19 +17,11 @@ export const PENDING_DESKTOP_TOOLS: ReadonlySet<ContractToolName> = new Set<Cont
   "add_emoji_tool",
   "add_timer_tool",
   "add_transitions_between_clips_tool",
-  "analyze_frame_colors_tool",
-  "apply_audio_effect_tool",
   "apply_clip_preset_tool",
-  "apply_color_tool",
-  "apply_look_preset_tool",
-  "apply_look_tool",
   "cancel_comfyui_job_tool",
   "capture_editor_screenshot_tool",
-  "chroma_key_clip_tool",
-  "color_grade_clip_tool",
   "consolidate_project_media_tool",
   "copy_clip_keyframes_tool",
-  "copy_effects_tool",
   "copy_transition_tool",
   "create_media_with_comfyui_tool",
   "create_subclips_tool",
@@ -40,7 +32,6 @@ export const PENDING_DESKTOP_TOOLS: ReadonlySet<ContractToolName> = new Set<Cont
   "export_project_file_tool",
   "forget_recent_projects_tool",
   "generate_image_and_add_to_timeline_tool",
-  "get_clip_effects_tool",
   "get_clip_properties_tool",
   "get_editor_layout_tool",
   "get_log_paths_tool",
@@ -49,13 +40,10 @@ export const PENDING_DESKTOP_TOOLS: ReadonlySet<ContractToolName> = new Set<Cont
   "import_image_sequence_tool",
   "import_project_file_tool",
   "ingest_web_video_tool",
-  "inspect_color_tool",
   "list_captions_tool",
   "list_comfyui_jobs_tool",
   "list_comfyui_templates_tool",
   "list_export_presets_tool",
-  "list_looks_tool",
-  "list_luts_tool",
   "list_project_files_tool",
   "list_project_profiles_tool",
   "list_recent_projects_tool",
@@ -64,10 +52,8 @@ export const PENDING_DESKTOP_TOOLS: ReadonlySet<ContractToolName> = new Set<Cont
   "list_title_templates_tool",
   "manage_custom_profiles_tool",
   "manage_optimized_previews_tool",
-  "match_color_to_reference_tool",
   "mcp_health_tool",
   "prepare_recording_tool",
-  "process_clip_effect_tool",
   "remove_captions_tool",
   "remove_files_from_project_tool",
   "remove_keyframes_tool",
@@ -87,7 +73,6 @@ export const PENDING_DESKTOP_TOOLS: ReadonlySet<ContractToolName> = new Set<Cont
   "set_preference_tool",
   "set_project_profile_tool",
   "set_timeline_view_tool",
-  "update_effect_tool",
   "update_marker_tool",
   "update_project_files_tool",
   "update_track_tool",
@@ -195,9 +180,6 @@ export function pendingArgumentIn(tool: string, input: unknown, schema: JsonSche
  * (catalog/direct.ts) with older, different arguments. The name works on
  * every surface, but the desktop's version of the tool is not ported: porting
  * it replaces the direct tool (keep the direct tool's arguments as aliases)
- * and removes the name here.
+ * and removes the name here. All of them are ported now.
  */
-export const DESKTOP_NAMES_ON_DIRECT_TOOLS: ReadonlySet<ContractToolName> = new Set<ContractToolName>([
-  "list_effects_tool",
-  "remove_effect_tool",
-]);
+export const DESKTOP_NAMES_ON_DIRECT_TOOLS: ReadonlySet<ContractToolName> = new Set<ContractToolName>([]);

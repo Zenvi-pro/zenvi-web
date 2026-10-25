@@ -12,13 +12,11 @@ import type { HostCapability } from "./types.js";
 
 const DIRECT_TOOLS = [
   "describe_project_tool",
-  "list_effects_tool",
   "move_clip_tool",
   "trim_clip_tool",
   "split_clip_tool",
   "set_clip_property_tool",
   "set_effect_property_tool",
-  "remove_effect_tool",
   "fade_clip_tool",
   "add_transition_tool",
   "probe_media_tool",
@@ -42,7 +40,7 @@ function stringForm(schema: JsonSchema): string | undefined {
 describe("tool catalog", () => {
   it("registers every ported desktop tool, in the contract's order, then the direct tools", () => {
     const ported = CONTRACT_TOOL_NAMES.filter((name) => !PENDING_DESKTOP_TOOLS.has(name) && !DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name));
-    expect(ported).toHaveLength(86);
+    expect(ported).toHaveLength(103);
     expect(allTools.map((t) => t.name)).toEqual([...ported, ...DIRECT_TOOLS]);
     expect(new Set(allTools.map((t) => t.name)).size).toBe(allTools.length);
     for (const name of ported) expect(getTool(name)?.contract).toBe(true);
@@ -79,7 +77,8 @@ describe("tool catalog", () => {
         const value = stringForm(schema);
         if (value !== undefined) args[key] = value;
       }
-      for (const key of tool.inputSchema.required ?? []) if (!(key in args)) args[key] = key === "points" ? [{ frame: 1, value: 1 }] : "x";
+      const objects: Record<string, unknown> = { points: [{ frame: 1, value: 1 }], properties: { sigma: 1 } };
+      for (const key of tool.inputSchema.required ?? []) if (!(key in args)) args[key] = objects[key] ?? "x";
       const parsed = tool.input.safeParse(normalizeArgs(tool.inputSchema, args));
       expect(parsed.success ? "ok" : `${tool.name}: ${JSON.stringify(parsed.error.issues[0])}`).toBe("ok");
     }

@@ -311,14 +311,15 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .option("--audio", "only audio effects")
     .option("--video", "only video effects")
     .action(async (opts: { audio?: boolean; video?: boolean }) => {
-      await runToolCommand(ctx, "list_effects_tool", opts.audio ? { category: "audio" } : opts.video ? { category: "video" } : {});
+      // The desktop's argument names, which the portable engine and the desktop app both take.
+      await runToolCommand(ctx, "list_effects_tool", opts.audio ? { kind: "audio" } : opts.video ? { kind: "video" } : {});
     });
   effect
     .command("rm")
     .description("remove an effect (ids are in the clip's receipt or `zenvi clips`)")
     .argument("<effect>", "effect id")
     .action(async (id: string) => {
-      await runToolCommand(ctx, "remove_effect_tool", toolArgs(ctx, "remove_effect_tool", [[["effect_id", "effect"], id]]));
+      await runToolCommand(ctx, "remove_effect_tool", { effect_ids: [id] });
     });
   effect
     .command("set")

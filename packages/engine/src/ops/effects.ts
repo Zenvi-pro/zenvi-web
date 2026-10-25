@@ -15,7 +15,7 @@ import { findClipEffect } from "../model/query.js";
 import { EffectParamError, createEffect, effectParamJson, getEffect } from "../effects/registry.js";
 import type { EffectParam } from "../effects/types.js";
 import { OpError, invalid, requireClipEffect, requireUnlocked } from "./errors.js";
-import { ids, patchClip, requireEditableClip, resolveClipFrame } from "./internal.js";
+import { ids, patchClip, requireEditableClip, resolveClipFrame, sameJson } from "./internal.js";
 import { writeColorKeyframe, writeKeyframeValue } from "./values.js";
 import type { ColorInput, KeyframeAt, PropertyValue } from "./types.js";
 
@@ -72,6 +72,60 @@ export function addEffect(
   effects.splice(index, 0, effect);
   patchClip(tx, clipId, { effects });
   return findClipEffect(tx.project, effect.id)!.effect;
+}
+
+/**
+ * Replace a clip's whole effect list in one update (zenvi-core develop
+ * editor_tools/effects_color.py `save_clip_effects`: add, remove, copy,
+ * Look presets and grades all write the list).
+ */
+export function setClipEffects(tx: Transaction, clipId: string, effects: readonly Effect[]): void {
+  requireEditableClip(tx.project, clipId);
+  patchClip(tx, clipId, { effects: structuredClone([...effects]) });
+}
+
+/**
+ * Merge `values` into one effect of a clip (effects_color.py
+ * `save_effect_properties`, the Properties dock's path): only the given keys
+ * change, and keys whose JSON is already equal record nothing.
+ */
+export function updateEffectValues(tx: Transaction, effectId: string, values: Readonly<Record<string, unknown>>): void {
+  const { clip, effect } = requireClipEffect(tx.project, effectId);
+  requireUnlocked(tx.project, clip.layer);
+  const changed: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (IMMUTABLE_EFFECT_KEYS.has(key)) throw invalid(`Effect ${key} cannot be changed.`);
+    if (!sameJson(effect[key], value)) changed[key] = structuredClone(value);
+  }
+  if (Object.keys(changed).length > 0) tx.update(["clips", { id: clip.id }, "effects", { id: effectId }], changed);
+}
+
+/** effect_ops.assign_new_effect_ids: give every effect in the list a new id (in place). */
+export function assignNewEffectIds(effects: Effect[], nextId: () => string): void {
+  for (const effect of effects) if (effect && typeof effect === "object") effect.id = nextId();
+}
+
+/**
+ * effect_ops.merge_effects_by_class: Paste of copied effects onto a clip's
+ * effects. Each copy gets a new id; an effect of the same class is
+ * overwritten by it (keys merged), anything else is appended. The inputs are
+ * not modified.
+ */
+export function mergeEffectsByClass(existing: readonly Effect[], copied: readonly Effect[], nextId: () => string): Effect[] {
+  const merged = existing.map((e) => structuredClone(e));
+  const byClass = new Map<string, Effect>();
+  for (const effect of merged) {
+    if (effect && typeof effect === "object" && effect.class_name) byClass.set(effect.class_name, effect);
+  }
+  for (const effect of copied) {
+    if (!effect || typeof effect !== "object") continue;
+    const copy = structuredClone(effect);
+    copy.id = nextId();
+    const target = copy.class_name ? byClass.get(copy.class_name) : undefined;
+    if (target) Object.assign(target, copy);
+    else merged.push(copy);
+  }
+  return merged;
 }
 
 export interface RemoveEffectResult {
