@@ -23,6 +23,7 @@ and Claude connect to (see [CONNECTORS.md](CONNECTORS.md)).
 | Supabase access token (ES256 JWT, `aud=authenticated`) | web editor, website, desktop (existing Supabase session) | `/v1/*`, `/oauth/consent` (not `/mcp`) |
 | `zvn_pat_…` personal access token | CLI and desktop after device login, account page | `/v1/*` except `/v1/tokens`, and `/mcp` |
 | `zvn_oat_…` OAuth access token (1 h) | MCP connectors | `/mcp` only (audience-bound, RFC 8707) |
+| `zvn_emb_…` embedded-editor token (12 h) | the editor inside a chat (minted by `open_in_editor`, handed to the MCP view in the result's `_meta`) | its one project only: `GET`/`PUT /v1/projects/:id`, `GET …/revision`, renders, and `/v1/media/*`. Another project answers `404`, any other route `403`, `/mcp` `401`. It carries the connection's scopes and ends when the connection's OAuth grant or personal access token is revoked |
 
 Tokens are never accepted in query strings. Zenvi tokens are 32 random bytes
 behind a prefix; only their SHA-256 is stored. Personal tokens carry the scopes
@@ -87,6 +88,7 @@ ETag is the project's **revision**. Unknown keys are preserved.
 | GET | `/v1/projects` | | `{ projects: Summary[] }`, most recently updated first |
 | POST | `/v1/projects` | `{ name?, project? }` | `201 Summary` + `ETag`. No `project` = empty desktop default project (HD 720p 30 fps) |
 | GET | `/v1/projects/:id` | | `Summary & { project, media, missingMedia }` + `ETag` |
+| GET | `/v1/projects/:id/revision` | | `{ id, revision }` + `ETag`: a one-blob-HEAD change check for editors following edits made elsewhere |
 | PUT | `/v1/projects/:id` | project JSON, header `If-Match: <revision>` | `{ id, revision, updatedAt, stats }` + `ETag` |
 | PATCH | `/v1/projects/:id` | `{ name }` | `Summary` |
 | DELETE | `/v1/projects/:id` | | `204`; deletes the project, its renders and frames (media stays: it is shared by hash) |
@@ -347,7 +349,7 @@ the same JSON as text, ChatGPT status strings):
 | `import_media_from_url {url, name?}` | server-side download (https, public addresses only, pinned DNS, redirects re-checked, 512 MB, media types only), content-addressed, added to the bin; idempotent |
 | `import_attached_file {file}` | a file attached in ChatGPT (`openai/fileParams`: `{download_url, file_id, mime_type?, file_name?}`), imported like a URL |
 | `get_upload_link` | `${editor}/p/<id>?upload=1` for files on the person's device |
-| `open_in_editor` | `${editor}/p/<id>` |
+| `open_in_editor` | the Zenvi editor in the chat (MCP Apps view `ui://zenvi/editor-v1.html`, which frames `<origin>/editor/embed/<id>`; the token travels in `_meta["zenvi/editor"]`), plus `${editor}/p/<id>` |
 | `render_project {preset?, format?, height?, quality?, start_seconds?, end_seconds?}` | starts a render, returns `render_id` at once; idempotent |
 | `get_render_status {render_id, wait_seconds?}` | status/progress; download link when done (waits up to 45 s) |
 | `preview_frame {time_seconds, width?}` | PNG of one frame as image content + a 1 h link |

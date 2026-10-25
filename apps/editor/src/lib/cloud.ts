@@ -116,6 +116,8 @@ export interface CloudClient {
   listProjects(signal?: AbortSignal): Promise<CloudProjectSummary[]>;
   createProject(name: string, project?: Project): Promise<{ id: string; revision: string | null }>;
   getProject(id: string, signal?: AbortSignal): Promise<CloudProjectDocument>;
+  /** The cloud copy's current revision (a cheap change check). */
+  projectRevision(id: string, signal?: AbortSignal): Promise<string>;
   /** Save with `If-Match`; throws `CloudConflictError` when the revision moved. */
   saveProject(id: string, project: Project, revision: string | null): Promise<{ revision: string | null }>;
   renameProject(id: string, name: string): Promise<void>;
@@ -247,6 +249,11 @@ export class HttpCloudClient implements CloudClient {
       project,
       media,
     };
+  }
+
+  async projectRevision(id: string, signal?: AbortSignal): Promise<string> {
+    const { data, response } = await this.request<Record<string, unknown>>(`/v1/projects/${encodeURIComponent(id)}/revision`, { signal });
+    return pick<string>(data ?? {}, "revision") ?? response.headers.get("ETag") ?? "";
   }
 
   async saveProject(id: string, project: Project, revision: string | null): Promise<{ revision: string | null }> {
@@ -404,6 +411,7 @@ export class DisabledCloudClient implements CloudClient {
   listProjects = async () => [] as CloudProjectSummary[];
   createProject = async () => disabled();
   getProject = async () => disabled();
+  projectRevision = async () => disabled();
   saveProject = async () => disabled();
   renameProject = async () => disabled();
   deleteProject = async () => disabled();

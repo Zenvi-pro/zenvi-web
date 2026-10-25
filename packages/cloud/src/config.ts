@@ -58,6 +58,8 @@ export interface Config {
     devicePatDays: number;
   };
   renderTmpDir: string;
+  /** The web editor build this service hosts for the editor embedded in chats (`/editor/embed/…`), or null. */
+  editorDist: string | null;
   version: string;
   /** Log verbosity. */
   logLevel: "debug" | "info" | "warn" | "error";
@@ -174,6 +176,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       devicePatDays: 365,
     },
     renderTmpDir: env.RENDER_TMP_DIR ?? tmpdir(),
+    editorDist: env.ZENVI_EDITOR_DIST?.trim() || null,
     version: env.ZENVI_CLOUD_VERSION ?? "dev",
     logLevel,
   };
