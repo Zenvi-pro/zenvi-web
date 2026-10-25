@@ -12,7 +12,7 @@
 import { once } from "node:events";
 import { performance } from "node:perf_hooks";
 import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { frameContaining, maxFrame, type ExportResult, type FramePlan, type Fraction, type Project, type RgbaImage } from "@zenvi/engine";
@@ -23,6 +23,7 @@ import { SourceManager, type MediaResolver } from "../decode/sources.js";
 import type { ScaleQuality } from "../decode/video.js";
 import { streamStarts } from "../probe/starts.js";
 import { buildAudioGraph } from "./audio-graph.js";
+import { processLimits } from "../limits.js";
 import { CompositePool, compositeThreads } from "./composite-pool.js";
 import { encoderCommand, ffmpegMajorVersion, FORMATS, type NodeExportOptions } from "./encoder.js";
 import { nodeTextRasterizer } from "../svg/text.js";
@@ -200,6 +201,11 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
       const needsText = projectNeedsText(project);
       const text = needsText ? await nodeTextRasterizer() : undefined;
       const threads = opts.engine ? 0 : (opts.threads ?? compositeThreads(frames));
+      const limits = processLimits();
+      opts.log?.(
+        `rendering ${frames} frames with ${threads} compositor worker(s); host CPUs ${availableParallelism()}, ` +
+          `container CPUs ${limits.cpus ?? "unlimited"}, memory limit ${limits.memoryBytes ? `${Math.round(limits.memoryBytes / 1048576)} MB` : "unlimited"}`,
+      );
       pool = await CompositePool.start(threads, opts.log);
       stats.threads = pool?.size ?? 0;
       // Frames composited ahead of the encoder (each holds one canvas).

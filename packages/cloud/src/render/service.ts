@@ -385,6 +385,7 @@ export class RenderService {
         output,
         options: job.options,
         signal,
+        log: (message) => this.options.log.info(message, { renderId }),
         onProgress: (fraction) => {
           const now = this.options.clock.now();
           if (now - lastWrite < PROGRESS_WRITE_MS) return;

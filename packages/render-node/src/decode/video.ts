@@ -21,6 +21,7 @@
 import type { Fraction, RgbaImage } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { AbortedError, spawnManaged, type ManagedChild } from "../ffmpeg/process.js";
+import { ffmpegThreads } from "../limits.js";
 import { rgbaView } from "../image/rgba.js";
 
 export type ScaleQuality = "export" | "preview";
@@ -86,6 +87,7 @@ export function videoDecodeArgs(source: VideoSourceInfo, startFrame: number, siz
     "-hide_banner",
     "-loglevel", "error",
     "-nostdin",
+    ...ffmpegThreads("decode"),
     ...(source.autorotate === false ? ["-noautorotate"] : []),
     ...(sequence ? ["-framerate", fpsText] : []),
     ...(seek > 0 ? ["-ss", seek.toFixed(6)] : []),

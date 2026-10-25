@@ -9,6 +9,7 @@
 
 import path from "node:path";
 import { encoderRates, type ContainerFormat, type ExportOptions, type Fraction, type VideoRate } from "@zenvi/engine";
+import { ffmpegThreads } from "../limits.js";
 import type { AudioGraph } from "./audio-graph.js";
 
 export type Quality = NonNullable<ExportOptions["quality"]>;
@@ -242,7 +243,7 @@ export function encoderCommand(job: EncodeJob): EncodeCommand {
   } else if (graph) {
     args.push("-filter_complex", graph);
   }
-  args.push(...maps, ...videoCodec, ...audioCodec);
+  args.push(...maps, ...videoCodec, ...audioCodec, ...(videoCodec.length > 0 ? ffmpegThreads("encode") : []));
   if (info.video && job.video && job.format !== "png-sequence") args.push("-r", `${job.video.fps.num}/${job.video.fps.den}`);
   args.push("-metadata", "comment=Made with Zenvi", ...muxerArgs(job.format), job.output);
   return { args, script };

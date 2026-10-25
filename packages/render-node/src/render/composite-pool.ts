@@ -22,11 +22,16 @@ import path from "node:path";
 import { Worker } from "node:worker_threads";
 import type { FramePlan, RgbaImage } from "@zenvi/engine";
 import type { PreparedFrame } from "../decode/sources.js";
+import { processLimits, type ContainerLimits } from "../limits.js";
 import { bundleDir } from "../resources.js";
 import type { CompositeRequest, CompositeResponse, WireImage } from "./composite-worker.js";
 
 /** Per-worker budget for cached still images (masks, titles, photos). */
 const CACHE_BYTES = 128 * 1024 * 1024;
+/** What one worker costs on top of its still-image cache: its own heap, the compositor and frames in flight. */
+const WORKER_OVERHEAD_BYTES = 96 * 1024 * 1024;
+/** Share of a container's memory limit the workers may take; the rest is the main thread's decode and encode. */
+const WORKER_MEMORY_SHARE = 0.25;
 /** Renders shorter than this composite on the main thread (worker start-up costs more). */
 const MIN_POOL_FRAMES = 60;
 const MAX_THREADS = 4;
@@ -34,16 +39,19 @@ const MAX_THREADS = 4;
 /**
  * Worker threads for a render of `frames` frames: `ZENVI_RENDER_THREADS`
  * when set (0 disables the pool), else up to 4, one core left for the main
- * thread, ffmpeg and the encoder.
+ * thread, ffmpeg and the encoder. In a container the CPU quota and the
+ * memory limit bound it too, so a small one composites on the main thread.
  */
-export function compositeThreads(frames: number, env: NodeJS.ProcessEnv = process.env): number {
+export function compositeThreads(frames: number, env: NodeJS.ProcessEnv = process.env, limits: ContainerLimits = processLimits()): number {
   const forced = env.ZENVI_RENDER_THREADS?.trim();
   if (forced) {
     const n = Number(forced);
     return Number.isInteger(n) && n >= 0 ? Math.min(n, 16) : 0;
   }
   if (frames < MIN_POOL_FRAMES) return 0;
-  return Math.max(0, Math.min(MAX_THREADS, availableParallelism() - 1, Math.ceil(frames / 30)));
+  const cpus = limits.cpus === undefined ? availableParallelism() : Math.min(availableParallelism(), Math.max(1, Math.floor(limits.cpus)));
+  const byMemory = limits.memoryBytes === undefined ? MAX_THREADS : Math.floor((limits.memoryBytes * WORKER_MEMORY_SHARE) / (CACHE_BYTES + WORKER_OVERHEAD_BYTES));
+  return Math.max(0, Math.min(MAX_THREADS, cpus - 1, byMemory, Math.ceil(frames / 30)));
 }
 
 /** The worker script for this build, if one exists. */

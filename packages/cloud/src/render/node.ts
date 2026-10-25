@@ -24,6 +24,7 @@ type RenderProjectFn = (
     options: ExportOptions;
     onProgress?: (progress: number | { fraction: number }) => void;
     signal?: AbortSignal;
+    log?: (message: string) => void;
   },
 ) => Promise<unknown>;
 
@@ -64,6 +65,7 @@ export async function nodeRenderer(): Promise<{ renderer: Renderer; reason?: str
         output: input.output,
         options: input.options,
         signal: input.signal,
+        log: input.log,
         onProgress: (progress) => input.onProgress(typeof progress === "number" ? progress : progress.fraction),
       });
     },

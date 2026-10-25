@@ -25,6 +25,8 @@ export interface RenderInput {
   options: ExportOptions;
   onProgress: (fraction: number) => void;
   signal: AbortSignal;
+  /** The renderer's own notes (how it splits the work), for the service's log. */
+  log?: (message: string) => void;
 }
 
 export interface FrameInput {
