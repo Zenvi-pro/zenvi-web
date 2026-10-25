@@ -81,6 +81,9 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   reindex_project_file_tool: { webNote: "reports files that are already indexed; uploading for indexing runs in Zenvi desktop" },
   wait_until_project_indexed_tool: { webNote: "reports indexing status once; does not wait" },
   remove_silence_tool: { webNote: "energy VAD on the host's audio analysis" },
+  set_clip_audio_video_tool: {
+    webNote: "waveform=show changes nothing, since the web timeline draws the waveform of every clip with sound; waveform=hide is refused",
+  },
   transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
   remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
   detect_beats_tool: { desktopOnly: "on-device beat tracking" },

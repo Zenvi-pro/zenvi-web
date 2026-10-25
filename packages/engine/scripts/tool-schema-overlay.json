@@ -112,6 +112,18 @@
         "detail": {"description": "summary (default) or windows (also list speech windows in timeline seconds)."}
       }
     },
+    "set_clip_speed_tool": {
+      "web_extra_props": {
+        "clip_id": {"type": "string"},
+        "factor": {"type": "number", "minimum": 0, "maximum": 16},
+        "direction": {"type": "string", "enum": ["forward", "backward"]}
+      },
+      "props": {
+        "clip_id": {"description": "Older name: one timeline clip id (added to timeline_clip_ids)."},
+        "factor": {"description": "Older name for speed."},
+        "direction": {"description": "Older argument: backward = reverse=true; forward changes nothing."}
+      }
+    },
     "set_clip_volume_tool": {
       "web_extra_props": {
         "volume": {"oneOf": [{"type": "string"}, {"type": "number"}]},

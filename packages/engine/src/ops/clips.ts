@@ -340,19 +340,60 @@ export function splitClip(
   if (!opts.ripple) return splitAt(tx, clip, at, keep);
   // timeline.py Slice_Triggered(ripple=True): trim, then ripple_delete_gap (position >= cut).
   const originalPosition = Number(clip.position);
-  const start = Number(clip.start);
-  const end = Number(clip.end);
-  const newEdge = start + (at - originalPosition);
-  const removed = keep === "left" ? end - start - (newEdge - start) : end - start - (end - newEdge);
-  const later = (p: number): boolean => p >= at;
+  const removed = removedBySlice(clip, at, keep);
   const result = splitAt(tx, clip, at, keep);
   if (keep === "right") patchClip(tx, clipId, { position: originalPosition });
-  for (const c of tx.project.clips.filter((c) => c.layer === clip.layer && c.id !== clipId && later(Number(c.position)))) {
-    tx.update(["clips", { id: c.id }], { position: Number(c.position) - removed });
+  rippleDeleteGap(tx, clip.layer, at, removed, clipId);
+  return result;
+}
+
+/** Source seconds a keep-left / keep-right slice at `at` drops from an item. */
+function removedBySlice(item: { position: number; start: number; end: number }, at: number, keep: SliceKeep): number {
+  const newEdge = Number(item.start) + (at - Number(item.position));
+  return keep === "left" ? Number(item.end) - newEdge : newEdge - Number(item.start);
+}
+
+/** timeline.py `ripple_delete_gap`: clips and transitions on `layer` starting at/after `from` move left by `gap`. */
+function rippleDeleteGap(tx: Transaction, layer: number, from: number, gap: number, excludeId: string): void {
+  for (const c of tx.project.clips.filter((c) => c.layer === layer && c.id !== excludeId && Number(c.position) >= from)) {
+    tx.update(["clips", { id: c.id }], { position: Number(c.position) - gap });
   }
-  for (const t of tx.project.effects.filter((t) => t.layer === clip.layer && later(Number(t.position)))) {
-    tx.update(["effects", { id: t.id }], { position: Number(t.position) - removed });
+  for (const t of tx.project.effects.filter((t) => t.layer === layer && t.id !== excludeId && Number(t.position) >= from)) {
+    tx.update(["effects", { id: t.id }], { position: Number(t.position) - gap });
   }
+}
+
+/**
+ * Cut a transition at timeline time `atSeconds` (the transition branch of
+ * desktop Slice_Triggered): `both` keeps the original as the left part and
+ * adds a new transition for the right part; `left`/`right` keep one side,
+ * and `ripple` then closes the gap like `splitClip`. The cut snaps to the
+ * frame grid (keep-left includes the frame at the cut) and must fall
+ * strictly inside the transition.
+ */
+export function splitTransition(
+  tx: Transaction,
+  transitionId: string,
+  atSeconds: number,
+  keep: SliceKeep = "both",
+  opts: SplitClipOptions = {},
+): SplitClipResult {
+  const project = tx.project;
+  const transition = findTransition(project, transitionId);
+  if (!transition) throw new OpError("not_found", `No transition with id ${transitionId}.`, { id: transitionId });
+  requireUnlocked(project, transition.layer);
+  requireKeep(keep);
+  if (opts.ripple && keep === "both") throw invalid("A ripple slice keeps one side (left or right).");
+  const at = slicePoint(project, requireFinite(atSeconds, "atSeconds"), keep);
+  if (!(transition.position < at && at < itemEnd(transition))) {
+    throw invalid(`Time ${atSeconds} s is not inside transition ${transitionId} (${transition.position}..${itemEnd(transition)} s).`);
+  }
+  if (!opts.ripple) return sliceTransition(tx, transitionId, at, keep);
+  const originalPosition = Number(transition.position);
+  const removed = removedBySlice(transition, at, keep);
+  const result = sliceTransition(tx, transitionId, at, keep);
+  if (keep === "right") patchTransition(tx, transitionId, { position: originalPosition });
+  rippleDeleteGap(tx, transition.layer, at, removed, transitionId);
   return result;
 }
 
@@ -509,14 +550,27 @@ export function removeGap(tx: Transaction, layer: number, atSeconds: number): nu
   requireUnlocked(project, layer);
   const gap = findGap(project, layer, atSeconds);
   if (!gap) return 0;
-  const size = gap.end - gap.start;
+  closeGap(tx, layer, gap.start, gap.end);
+  return gap.end - gap.start;
+}
+
+/**
+ * zenvi-core develop timeline_ops.close_gap (Remove Gap): every clip and
+ * transition on `layer` that starts after `gapStart` moves left by the gap's
+ * length. Returns the moved ids.
+ */
+export function closeGap(tx: Transaction, layer: number, gapStart: number, gapEnd: number): string[] {
+  const project = tx.project;
+  if (!findLayer(project, layer)) throw new OpError("not_found", `No track with number ${layer}.`, { layer });
+  requireUnlocked(project, layer);
+  const size = requireFinite(gapEnd, "gapEnd") - requireFinite(gapStart, "gapStart");
+  if (!(size > 0)) return [];
   const clipIds = new Set(project.clips.map((c) => c.id));
-  for (const item of itemsOnLayer(project, layer)) {
-    if (item.position > gap.start) {
-      tx.update([clipIds.has(item.id) ? "clips" : "effects", { id: item.id }], { position: item.position - size });
-    }
+  const later = itemsOnLayer(project, layer).filter((item) => item.position > gapStart);
+  for (const item of later) {
+    tx.update([clipIds.has(item.id) ? "clips" : "effects", { id: item.id }], { position: item.position - size });
   }
-  return size;
+  return later.map((item) => item.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -914,6 +968,12 @@ export function setClipVolume(tx: Transaction, clipId: string, opts: SetClipVolu
 export interface SeparateAudioOptions {
   /** One audio clip per channel (desktop Separate Audio ▸ Multiple). Default false (single clip). */
   perChannel?: boolean;
+  /**
+   * Track for the new audio clip of a clip with video (single clip only;
+   * separate_clip_audio_tool `to_track`). Default: the track below, created
+   * when there is none.
+   */
+  layer?: number;
 }
 
 /**
@@ -940,8 +1000,13 @@ export function separateAudio(tx: Transaction, clipId: string, opts: SeparateAud
     throw invalid(`Clip ${clipId} has no audio to separate.`);
   }
   if (opts.perChannel && channelCount === null) throw invalid(`Clip ${clipId} does not report its channel count.`);
+  if (opts.layer !== undefined) {
+    if (opts.perChannel || !hasVideo) throw invalid("A destination track applies to a single audio clip split from a clip with video.");
+    if (!findLayer(project, opts.layer)) throw new OpError("not_found", `No track with number ${opts.layer}.`, { layer: opts.layer });
+    requireUnlocked(project, opts.layer);
+  }
   // Validate before recording: the existing tracks the new clips land on must be unlocked.
-  const needed = hasVideo ? (opts.perChannel ? channelCount! : 1) : opts.perChannel ? channelCount! - 1 : 0;
+  const needed = opts.layer !== undefined ? 0 : hasVideo ? (opts.perChannel ? channelCount! : 1) : opts.perChannel ? channelCount! - 1 : 0;
   for (const layer of project.layers
     .filter((l) => l.number < clip.layer)
     .sort((a, b) => b.number - a.number)
@@ -982,7 +1047,7 @@ export function separateAudio(tx: Transaction, clipId: string, opts: SeparateAud
 
   const base = { ...clip, has_audio: constant(-1.0) } as Record<string, unknown>;
   if (!opts.perChannel) {
-    const layer = trackBelowOrCreate(tx, clip.layer);
+    const layer = opts.layer ?? trackBelowOrCreate(tx, clip.layer);
     insertCopy({
       ...base,
       channel_filter: constant(-1.0),

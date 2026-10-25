@@ -23,7 +23,7 @@ import { openshotPoint, removeKeyframePointsInRange, setKeyframePoint } from "..
 import { createEffect } from "../effects/registry.js";
 import { invalid, requireFinite } from "./errors.js";
 import { fadeTargets, fpsOf, ids, isRecord, rateOf, replaceClip, requireEditableClip, withClampedTiming } from "./internal.js";
-import { retimeClip } from "./retime.js";
+import { retimeClip, timeCurveIsReversed } from "./retime.js";
 import { maskReader } from "./transition-masks.js";
 import { ANIMATION_PRESET_DATA, KEYFRAME_EASING } from "./animation-presets.data.js";
 import { cameraPanKeyframes, kenBurnsKeyframes, pushPullKeyframes, sourceDimensions, type CameraKeyframes, type PanDirection } from "./camera-motion.js";
@@ -248,12 +248,17 @@ function applyLayout(preset: LayoutPreset): Partial<Clip> {
 // Time
 // ---------------------------------------------------------------------------
 
-/** repeat.py `reset_repeat`: restore what a Repeat preset cached on the clip. */
+/**
+ * repeat.py `reset_repeat`: restore what a Repeat preset cached on the clip.
+ * A cache whose in/out the clip no longer has (left behind on the desktop by
+ * an undo or a Reset, `repeatIsActive`) is dropped without restoring it.
+ */
 function resetRepeat(clip: Clip): Clip {
+  if (!("repeat_cache" in clip)) return clip;
   const cache = clip.repeat_cache;
-  if (!isRecord(cache)) return clip;
   const next: Record<string, unknown> = { ...clip };
   delete next.repeat_cache;
+  if (!isRecord(cache) || !repeatIsActive(clip)) return next as Clip;
   next.start = cache.start ?? clip.start;
   next.end = cache.end ?? clip.end;
   next.duration = cache.duration ?? clip.duration;
@@ -263,10 +268,12 @@ function resetRepeat(clip: Clip): Clip {
   return next as Clip;
 }
 
-function applyTime(tx: Transaction, clip: Clip, preset: TimePreset, opts: ClipPresetOptions): Clip {
+function applyTime(tx: Transaction, clip: Clip, requested: TimePreset, opts: ClipPresetOptions): Clip {
   const project = tx.project;
   const fps = fpsOf(project);
   const rate = rateOf(project);
+  // Reverse is a toggle (develop Time_Triggered): reversing a reversed clip resets it.
+  const preset: TimePreset = requested === "reverse" && timeCurveIsReversed(clip.time) ? "none" : requested;
   if (preset === "freeze" || preset === "freeze_zoom") return freeze(clip, preset === "freeze_zoom", opts, rate);
   if (preset === "none") {
     const base = resetRepeat(clip);
@@ -669,6 +676,46 @@ export interface RepeatOptions {
   ramp?: number;
 }
 
+/**
+ * True while Speed ▸ Repeat is applied to a clip (zenvi-core develop
+ * timeline_ops.repeat_is_active). A `repeat_cache` alone is not enough: the
+ * desktop's undo and Reset can leave one behind, but a live repeat always
+ * moved the clip's in/out away from the cached ones.
+ */
+export function repeatIsActive(clip: Partial<Clip>): boolean {
+  const cache = clip.repeat_cache;
+  if (!isRecord(cache) || Object.keys(cache).length === 0) return false;
+  const cachedStart = Number(cache.start ?? 0);
+  const cachedEnd = Number(cache.end ?? 0);
+  const start = Number(clip.start ?? 0);
+  const end = Number(clip.end ?? 0);
+  if (![cachedStart, cachedEnd, start, end].every(Number.isFinite)) return true;
+  return Math.abs(cachedStart - start) > 1e-6 || Math.abs(cachedEnd - end) > 1e-6;
+}
+
+/** How a clip plays relative to its source (`effectiveSpeed`). */
+export interface ClipSpeed {
+  /** Speed factor (2 = twice as fast), or null while the clip is looped. */
+  speed: number | null;
+  direction: "forward" | "backward" | "looped";
+}
+
+/**
+ * A clip's speed and direction from its `time` curve
+ * (timeline_edit_time.effective_speed): the curve maps timeline frames X to
+ * source frames Y, both inclusive, so speed = (|Y1 - Y0| + 1) / (X1 - X0).
+ */
+export function effectiveSpeed(clip: Partial<Clip>): ClipSpeed {
+  if (repeatIsActive(clip)) return { speed: null, direction: "looped" };
+  const points = Array.isArray(clip.time?.Points) ? [...clip.time.Points] : [];
+  if (points.length < 2) return { speed: 1, direction: "forward" };
+  points.sort((a, b) => Number(a?.co?.X) - Number(b?.co?.X));
+  const [x0, y0] = [Number(points[0]!.co?.X), Number(points[0]!.co?.Y)];
+  const [x1, y1] = [Number(points[points.length - 1]!.co?.X), Number(points[points.length - 1]!.co?.Y)];
+  if (![x0, y0, x1, y1].every(Number.isFinite) || x1 <= x0) return { speed: 1, direction: "forward" };
+  return { speed: (Math.abs(y1 - y0) + 1) / (x1 - x0), direction: y1 < y0 ? "backward" : "forward" };
+}
+
 type Pt = { co: { X: number; Y: number }; interpolation: number; [key: string]: unknown };
 
 /** repeat.py `_normalize_points`: integer X starting at 1, Y kept. */
@@ -775,7 +822,8 @@ export function repeatClip(tx: Transaction, clipId: string, opts: RepeatOptions)
     timeSpan = trimSpan;
   }
 
-  if (!("repeat_cache" in next)) {
+  // A cache left behind by an undo or a Reset (desktop projects) is stale: rebuild it.
+  if (!repeatIsActive(clip)) {
     const properties: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(clip)) {
       if (isRecord(value) && Array.isArray(value.Points) && value.Points.length > 1) properties[key] = structuredClone(value);

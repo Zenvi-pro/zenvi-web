@@ -32,3 +32,6 @@ export * from "./project.js";
 export * from "./titles.js";
 export * from "./clipboard.js";
 export * from "./presets.js";
+export * from "./sequence.js";
+export * from "./add-to-timeline.js";
+export { timeCurveIsReversed } from "./retime.js";

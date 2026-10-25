@@ -165,6 +165,69 @@ const SPECS: Record<string, Spec> = {
     failure: null,
   },
 
+  // --- timeline edit (editor_tools/timeline_edit*.py) -------------------------
+  add_clips_to_timeline_tool: {
+    happy: {
+      args: { file_ids: IDS.broll, track: "1" },
+      summary: /^Placed 1 clip\(s\) on track 1 from 19\.00 s to 31\.00 s \(12\.0 s\)\.$/,
+      check: ({ doc }) => expect(doc.project.clips).toHaveLength(6),
+    },
+    failure: { args: { file_ids: "NOPE" }, summary: /^Error: no project file with id='NOPE'/ },
+  },
+  move_clips_tool: {
+    happy: { args: { timeline_clip_ids: IDS.clipLogo, by_seconds: "1" }, summary: /^Moved 1 clip\(s\) to track 3 at 3\.00 s\.$/ },
+    failure: { args: { timeline_clip_ids: IDS.clipLogo }, summary: /^Error: nothing to do/ },
+  },
+  trim_clips_tool: {
+    happy: { args: { timeline_clip_ids: IDS.clipA, trim_start_seconds: "1" }, summary: /^Trimmed 1 clip\(s\): now 1\.00-10\.00 s of the source, 9\.00 s long\.$/ },
+    failure: { args: { timeline_clip_ids: IDS.clipA, trim_end_seconds: "-2" }, summary: /^Error: The trim would overlap 'broll\.mp4' \(CLIPBROL01\)/ },
+  },
+  slice_clips_tool: {
+    happy: { args: { timeline_clip_ids: IDS.clipA, at_seconds: "5" }, summary: /^Sliced 1 clip\(s\) at 5\.00 s, kept both\.$/, check: ({ doc }) => expect(doc.project.clips).toHaveLength(6) },
+    failure: { args: { timeline_clip_ids: IDS.clipA, at_seconds: "50" }, summary: /is not under 50\.00 s; cut inside the clip$/ },
+  },
+  remove_gaps_tool: {
+    happy: { args: { track: "3" }, summary: /^Closed 1 gap\(s\) \(2\.00 s\) on track 3; 1 item\(s\) moved left\.$/ },
+    failure: { args: { track: "Nope" }, summary: /^Error: Unknown track or layer 'Nope'/ },
+  },
+  duplicate_clips_tool: {
+    happy: { args: { timeline_clip_ids: IDS.clipLogo }, summary: /^Made 1 copy of 1 clip\(s\); the first starts at 5\.00 s on track 3\.$/ },
+    failure: { args: { timeline_clip_ids: IDS.clipA }, summary: /^Error: The copies would overlap/ },
+  },
+  align_clips_tool: {
+    happy: { args: { timeline_clip_ids: [IDS.clipLogo, IDS.clipMusic] }, summary: /^Aligned the starts of 2 clip\(s\) at 0\.00 s \(1 moved\)\.$/ },
+    failure: { args: { timeline_clip_ids: [IDS.clipA] }, summary: /^Error: aligning needs at least two clips/ },
+  },
+  set_clip_speed_tool: {
+    // The web's older arguments still work (clip_id, factor, direction).
+    happy: { args: { clip_id: IDS.clipB, factor: "2" }, summary: /^Retimed 1 clip\(s\): 5\.00 s -> 2\.50 s, now 2\.0x forward\.$/ },
+    failure: { args: { timeline_clip_ids: IDS.clipB, speed: "0.5" }, summary: /^Error: The longer clip would overlap 'interview\.mp4' \(CLIPINTV02\)/ },
+  },
+  repeat_clip_tool: {
+    happy: { args: { timeline_clip_ids: IDS.clipTail, times: "2" }, summary: /^Repeated 1 clip\(s\) 2x \(loop\): 4\.00 s -> 8\.00 s\.$/ },
+    failure: { args: { timeline_clip_ids: IDS.clipA, times: "2" }, summary: /^Error: The repeated clip would overlap/ },
+  },
+  freeze_frame_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipTail, frame: "last", hold_seconds: "1" }, summary: /^Froze 'interview\.mp4' at 18\.97 s for 1\.00 s; it now ends at 20\.00 s\.$/ },
+    failure: { args: { timeline_clip_id: IDS.clipA, frame: "last" }, summary: /^Error: The freeze would overlap/ },
+  },
+  separate_clip_audio_tool: {
+    happy: {
+      args: { timeline_clip_ids: IDS.clipB },
+      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) on track\(s\) 1; the originals are muted\.$/,
+      check: ({ receipt }) => expect(receipt.createdTracks).toHaveLength(1),
+    },
+    failure: { args: { timeline_clip_ids: IDS.clipLogo }, summary: /^Error: 'logo\.png' has no audio to separate$/ },
+  },
+  set_clip_audio_video_tool: {
+    happy: { args: { timeline_clip_ids: IDS.clipMusic, audio: "off" }, summary: /^Set audio off on 1 clip\(s\) on track 2\.$/ },
+    failure: { args: { timeline_clip_ids: IDS.clipLogo, audio: "on" }, summary: /^Error: 'logo\.png' has no audio in its media$/ },
+  },
+  reverse_clip_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipB }, summary: /^Reversed timeline_clip_id=CLIPBROL01\.$/ },
+    failure: { args: { timeline_clip_id: IDS.clipB, mode: "sideways" }, summary: /^Error: mode must be 'reverse' or 'reset'\.$/ },
+  },
+
   // --- clips / placement -----------------------------------------------------
   get_file_info_tool: {
     happy: { args: { file_id: IDS.interview }, summary: /^file_id=FILEINTV01 path=\/media\/interview\.mp4 duration_seconds=20\.00 source_fps=30\/1/ },
@@ -513,10 +576,6 @@ const SPECS: Record<string, Spec> = {
       check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipA)?.effects).toHaveLength(0),
     },
     failure: { args: { effect_id: "NOPE" }, summary: /^Error: No effect with id NOPE\.$/ },
-  },
-  set_clip_speed_tool: {
-    happy: { args: { clip_id: IDS.clipB, factor: "2" }, summary: /^Set clip CLIPBROL01 to 2x forward\.$/ },
-    failure: { args: { clip_id: IDS.clipB, factor: "0" }, status: "refused", summary: /^Error: Invalid arguments for set_clip_speed_tool: 0 is less than or equal to the minimum of 0 \(at factor\)\.$/ },
   },
   fade_clip_tool: {
     happy: { args: { clip_id: IDS.clipA, fade_in_seconds: "1", fade_out_seconds: "1" }, summary: /^Faded clip CLIPINTV01\.$/ },

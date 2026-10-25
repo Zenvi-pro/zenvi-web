@@ -67,7 +67,7 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "web-only arguments",
-    "Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).",
+    "Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, set_clip_speed_tool clip_id/factor/direction (the web's older speed tool: one clip id, speed, backward = reverse), watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).",
   ],
   [
     "desktop defaults the web does not follow yet",
@@ -87,7 +87,23 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "argument coercion",
-    "As zenvi-core normalize_args, plus numbers/booleans become strings for string-only properties (MCP clients send typed JSON).",
+    "As zenvi-core normalize_args, plus numbers/booleans become strings for string-only properties (MCP clients send typed JSON). Tools that are editor tools on the desktop coerce like its @editor_tool registry (`_registry.coerce_args`): case-insensitive enums, \"1.5s\", comma-separated or JSON lists, \"y\"/\"n\"; an empty string or null for an argument that cannot hold it means its default where the desktop refuses it, and a value that cannot be coerced is refused in the web's words (`Invalid arguments for …`) rather than the registry's.",
+  ],
+  [
+    "add_clips_to_timeline_tool",
+    "image_seconds=0 and transition_seconds=0 mean the desktop's default Default Image Length (10 s) and Default Transition Length (1 s): the web has no preferences.",
+  ],
+  [
+    "separate_clip_audio_tool",
+    "With to_track the audio clip goes straight there. The desktop first splits it onto the track below (creating a track when the clip is on the bottom one) and then moves it, which can leave that new track empty.",
+  ],
+  [
+    "set_clip_audio_video_tool",
+    "The web timeline draws the waveform of every clip with sound and has no per-clip switch: waveform=show changes nothing and waveform=hide is refused (in words the Assistant retries without it). The desktop stores waveform samples in the clip (`ui.audio_data`).",
+  ],
+  [
+    "reverse_clip_tool",
+    "A clip on a locked track is refused; the desktop's handler reverses it anyway (its Time menu skips the lock check).",
   ],
   [
     "summary previews",

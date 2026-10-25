@@ -1276,18 +1276,18 @@ var init_profiles = __esm({
 function roundHalfAway(x) {
   if (!Number.isFinite(x)) return x;
   const a = Math.abs(x);
-  const f2 = Math.floor(a);
-  const r = a - f2 >= 0.5 ? f2 + 1 : f2;
+  const f3 = Math.floor(a);
+  const r = a - f3 >= 0.5 ? f3 + 1 : f3;
   return x < 0 && r !== 0 ? -r : r;
 }
 function pyRound(x) {
   if (!Number.isFinite(x)) return x;
-  const f2 = Math.floor(x);
-  const diff = x - f2;
+  const f3 = Math.floor(x);
+  const diff = x - f3;
   let r;
-  if (diff > 0.5) r = f2 + 1;
-  else if (diff < 0.5) r = f2;
-  else r = f2 % 2 === 0 ? f2 : f2 + 1;
+  if (diff > 0.5) r = f3 + 1;
+  else if (diff < 0.5) r = f3;
+  else r = f3 % 2 === 0 ? f3 : f3 + 1;
   return r === 0 ? 0 : r;
 }
 function truncInt(x) {
@@ -1812,7 +1812,7 @@ function createTransition(input2) {
   if (input2.fadeAudio) transition2.fade_audio_hint = true;
   return transition2;
 }
-var DEFAULT_IMAGE_LENGTH, DEFAULT_SAMPLE_RATE, ChannelLayout, LAYOUT_FOR_CHANNELS;
+var DEFAULT_IMAGE_LENGTH, DEFAULT_TRANSITION_LENGTH, DEFAULT_SAMPLE_RATE, ChannelLayout, LAYOUT_FOR_CHANNELS;
 var init_defaults = __esm({
   "../engine/src/model/defaults.ts"() {
     "use strict";
@@ -1825,6 +1825,7 @@ var init_defaults = __esm({
     init_media();
     init_versions();
     DEFAULT_IMAGE_LENGTH = 10;
+    DEFAULT_TRANSITION_LENGTH = 1;
     DEFAULT_SAMPLE_RATE = 48e3;
     ChannelLayout = {
       MONO: 4,
@@ -1927,8 +1928,8 @@ function toFloat(value) {
   return null;
 }
 function roundedInt(value) {
-  const f2 = toFloat(value);
-  return f2 === null || !Number.isFinite(f2) ? null : pyRound(f2);
+  const f3 = toFloat(value);
+  return f3 === null || !Number.isFinite(f3) ? null : pyRound(f3);
 }
 function positiveInt(value) {
   const n = roundedInt(value);
@@ -1976,8 +1977,8 @@ function timePoints(clip2) {
 }
 function timeCurveLengthFrames(points) {
   let maxX = 0;
-  for (const point2 of points ?? []) {
-    const co = isRecord3(point2) ? point2.co : void 0;
+  for (const point3 of points ?? []) {
+    const co = isRecord3(point3) ? point3.co : void 0;
     if (!isRecord3(co)) continue;
     const x = roundedInt(co.X);
     if (x !== null) maxX = Math.max(maxX, x);
@@ -1985,23 +1986,23 @@ function timeCurveLengthFrames(points) {
   return maxX || null;
 }
 function clampTimePoints(points, maxFrames) {
-  return points.map((point2) => {
-    const co = isRecord3(point2) ? point2.co : void 0;
-    if (!isRecord3(co)) return point2;
+  return points.map((point3) => {
+    const co = isRecord3(point3) ? point3.co : void 0;
+    if (!isRecord3(co)) return point3;
     const next = { ...co };
     const x = roundedInt(co.X);
     if (x !== null) next.X = x;
     const y = roundedInt(co.Y);
     if (y !== null) next.Y = y < 1 ? 1 : y > maxFrames ? maxFrames : y;
-    return { ...point2, co: next };
+    return { ...point3, co: next };
   });
 }
 function clampTimingToMedia(clip2, projectFps2, existing) {
   const reader = isRecord3(clip2.reader) && Object.keys(clip2.reader).length ? clip2.reader : existing?.reader;
   const pick2 = (key) => clip2[key] === void 0 || clip2[key] === null ? existing?.[key] : clip2[key];
   const rate = projectFps2.num / projectFps2.den;
-  const single = isSingleImageMedia(reader) || isSingleImageMedia(clip2) || isSingleImageMedia(clip2.reader) || isSingleImageMedia(existing) || isSingleImageMedia(existing?.reader);
-  if (single) {
+  const single2 = isSingleImageMedia(reader) || isSingleImageMedia(clip2) || isSingleImageMedia(clip2.reader) || isSingleImageMedia(existing) || isSingleImageMedia(existing?.reader);
+  if (single2) {
     let start2 = toFloat(pick2("start"));
     if (start2 === null || start2 < 0) start2 = 0;
     let end2 = toFloat(pick2("end"));
@@ -2026,9 +2027,9 @@ function clampTimingToMedia(clip2, projectFps2, existing) {
     if (maxDuration2 !== null && start2 > maxDuration2) start2 = maxDuration2;
     const end2 = toFloat(pick2("end")) ?? start2;
     const duration4 = toFloat(pick2("duration")) ?? Math.max(0, end2 - start2);
-    const result2 = { start: start2, end: end2, duration: duration4 };
-    if (clamped) result2.time = { ...timeObject, Points: clamped };
-    return result2;
+    const result3 = { start: start2, end: end2, duration: duration4 };
+    if (clamped) result3.time = { ...timeObject, Points: clamped };
+    return result3;
   }
   const maxDuration = bounds2.duration;
   let start = toFloat(pick2("start"));
@@ -2043,9 +2044,27 @@ function clampTimingToMedia(clip2, projectFps2, existing) {
   }
   if (maxDuration !== null && end > maxDuration) end = maxDuration;
   if (end < start) start = end;
-  const result = { start, end, duration: Math.max(0, end - start) };
-  if (bounds2.frames && points) result.time = { ...timeObject, Points: clampTimePoints(points, bounds2.frames) };
-  return result;
+  const result2 = { start, end, duration: Math.max(0, end - start) };
+  if (bounds2.frames && points) result2.time = { ...timeObject, Points: clampTimePoints(points, bounds2.frames) };
+  return result2;
+}
+function clipTimeBounds(clip2, projectFps2) {
+  const reader = isRecord3(clip2.reader) ? clip2.reader : {};
+  const rate = projectFps2.num / projectFps2.den;
+  if (isSingleImageMedia(reader) || isSingleImageMedia(clip2)) {
+    const duration3 = toFloat(clip2.duration) ?? toFloat(reader.duration) ?? 0;
+    const maxFrames2 = duration3 ? Math.max(1, Math.trunc(pyRound(duration3 * rate))) : 1;
+    return { maxDuration: duration3, maxFrames: maxFrames2 };
+  }
+  const points = timePoints(clip2);
+  const bounds2 = readerBounds(reader, projectFps2);
+  if (points && points.length > 1) {
+    const maxFrames2 = timeCurveLengthFrames(points) ?? bounds2.frames ?? 1;
+    return { maxDuration: maxFrames2 / rate, maxFrames: maxFrames2 };
+  }
+  const maxFrames = bounds2.frames ?? 1;
+  const maxDuration = bounds2.duration ?? maxFrames / rate;
+  return { maxDuration, maxFrames };
 }
 var init_timing = __esm({
   "../engine/src/model/timing.ts"() {
@@ -2104,10 +2123,10 @@ function lowerBound(points, target) {
   }
   return lo;
 }
-function addResolvedPoint(points, point2) {
-  const at = lowerBound(points, point2.x);
-  if (at < points.length && points[at].x === point2.x) points[at] = point2;
-  else points.splice(at, 0, point2);
+function addResolvedPoint(points, point3) {
+  const at = lowerBound(points, point3.x);
+  if (at < points.length && points[at].x === point3.x) points[at] = point3;
+  else points.splice(at, 0, point3);
 }
 function resolvePoints(kf) {
   if (typeof kf === "number") {
@@ -2152,13 +2171,13 @@ var init_points = __esm({
 
 // ../engine/src/keyframe/edit.ts
 function makeKeyframePoint(x, y, interpolation2 = Interpolation.BEZIER, opts = {}) {
-  const point2 = { co: { X: x, Y: y }, interpolation: interpolation2 };
+  const point3 = { co: { X: x, Y: y }, interpolation: interpolation2 };
   if (interpolation2 === Interpolation.BEZIER) {
-    point2.handle_left = { ...opts.handleLeft ?? DEFAULT_HANDLE_LEFT };
-    point2.handle_right = { ...opts.handleRight ?? DEFAULT_HANDLE_RIGHT };
-    point2.handle_type = opts.handleType ?? HandleType.AUTO;
+    point3.handle_left = { ...opts.handleLeft ?? DEFAULT_HANDLE_LEFT };
+    point3.handle_right = { ...opts.handleRight ?? DEFAULT_HANDLE_RIGHT };
+    point3.handle_type = opts.handleType ?? HandleType.AUTO;
   }
-  return point2;
+  return point3;
 }
 function openshotPoint(x, y, interpolation2 = Interpolation.BEZIER) {
   return makeKeyframePoint(Math.fround(x), Math.fround(y), interpolation2);
@@ -2171,24 +2190,24 @@ function pointsOf(kf) {
   if (typeof kf !== "object" || kf === null || !Array.isArray(kf.Points)) return [];
   return kf.Points;
 }
-function xOf(point2) {
-  const x = point2?.co?.X;
+function xOf(point3) {
+  const x = point3?.co?.X;
   return typeof x === "number" && Number.isFinite(x) ? x : 1;
 }
 function withPoints(kf, points) {
   const base = typeof kf === "object" && kf !== null && !Array.isArray(kf) ? kf : {};
   return { ...base, Points: points };
 }
-function copyPoint(point2) {
-  return structuredClone(point2);
+function copyPoint(point3) {
+  return structuredClone(point3);
 }
 function normalizeKeyframe(kf) {
   const out = [];
-  for (const point2 of pointsOf(kf)) insertSorted(out, copyPoint(point2));
+  for (const point3 of pointsOf(kf)) insertSorted(out, copyPoint(point3));
   return withPoints(kf, out);
 }
-function insertSorted(points, point2) {
-  const x = xOf(point2);
+function insertSorted(points, point3) {
+  const x = xOf(point3);
   let lo = 0;
   let hi = points.length;
   while (lo < hi) {
@@ -2196,12 +2215,17 @@ function insertSorted(points, point2) {
     if (xOf(points[mid]) < x) lo = mid + 1;
     else hi = mid;
   }
-  if (lo < points.length && xOf(points[lo]) === x) points[lo] = point2;
-  else points.splice(lo, 0, point2);
+  if (lo < points.length && xOf(points[lo]) === x) points[lo] = point3;
+  else points.splice(lo, 0, point3);
+}
+function setKeyframePoint(kf, point3) {
+  const next = normalizeKeyframe(kf);
+  insertSorted(next.Points, copyPoint(point3));
+  return next;
 }
 function setKeyframePoints(kf, points) {
   const next = normalizeKeyframe(kf);
-  for (const point2 of points) insertSorted(next.Points, copyPoint(point2));
+  for (const point3 of points) insertSorted(next.Points, copyPoint(point3));
   return next;
 }
 function setKeyframeValue(kf, frame, value, interpolation2) {
@@ -2761,6 +2785,11 @@ function sortClips(clips) {
     Math.fround(a.clip.position) - Math.fround(b.clip.position) || a.index - b.index
   ).map((e) => e.clip);
 }
+function itemsOnLayer(project, layer2) {
+  return [...project.clips.filter((c) => c.layer === layer2), ...project.effects.filter((t) => t.layer === layer2)].sort(
+    (a, b) => a.position - b.position
+  );
+}
 function timelineEnd(project) {
   let end = 0;
   for (const clip2 of project.clips) end = Math.max(end, itemEnd(clip2));
@@ -2778,13 +2807,26 @@ function maxFrame(project, fps = project.fps) {
   const frame = Math.ceil(frames - epsilon);
   return frame === 0 ? 0 : frame;
 }
+function listGaps(project, layer2, afterSeconds = 0) {
+  const gaps = [];
+  let foundStart = 0;
+  for (const item of itemsOnLayer(project, layer2)) {
+    const left = item.position;
+    const right = left + Math.max(0, item.end - item.start);
+    if (left > foundStart + GAP_EPSILON && left > afterSeconds) gaps.push({ start: foundStart, end: left });
+    foundStart = Math.max(foundStart, right);
+  }
+  return gaps;
+}
 function sortedLayers(project) {
   return [...project.layers].sort((a, b) => a.number - b.number);
 }
+var GAP_EPSILON;
 var init_queries = __esm({
   "../engine/src/timeline/queries.ts"() {
     "use strict";
     init_windows();
+    GAP_EPSILON = 1e-6;
   }
 });
 
@@ -2866,7 +2908,7 @@ function scan(xml) {
     const name = nameMatch ? nameMatch[0] : "";
     const selfClosing = xml[tagEnd - 1] === "/";
     const parent = stack[stack.length - 1] ?? null;
-    const span = {
+    const span2 = {
       name,
       start: i,
       openEnd: tagEnd + 1,
@@ -2876,15 +2918,15 @@ function scan(xml) {
       parent,
       children: []
     };
-    parent?.children.push(span);
-    all.push(span);
-    if (!selfClosing) stack.push(span);
+    parent?.children.push(span2);
+    all.push(span2);
+    if (!selfClosing) stack.push(span2);
     i = tagEnd + 1;
   }
   return all;
 }
-function byName(spans, name) {
-  return spans.filter((s) => s.name === name);
+function byName(spans2, name) {
+  return spans2.filter((s) => s.name === name);
 }
 function xmlEscapeText(text4) {
   return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -2908,29 +2950,29 @@ function apply(xml, edits) {
   return out;
 }
 function setSvgText(template, text4) {
-  const spans = scan(template);
-  const tspans = byName(spans, "tspan");
-  const targets = tspans.length > 0 ? tspans : byName(spans, "text");
+  const spans2 = scan(template);
+  const tspans = byName(spans2, "tspan");
+  const targets = tspans.length > 0 ? tspans : byName(spans2, "text");
   if (targets.length === 0) return template;
   const edits = [];
-  const setContent = (span, content) => {
-    if (span.selfClosing) {
-      const tag = template.slice(span.start, span.openEnd);
-      edits.push({ from: span.start, to: span.end, text: `${tag.slice(0, -2).trimEnd()}>${content}</${span.name}>` });
+  const setContent = (span2, content) => {
+    if (span2.selfClosing) {
+      const tag = template.slice(span2.start, span2.openEnd);
+      edits.push({ from: span2.start, to: span2.end, text: `${tag.slice(0, -2).trimEnd()}>${content}</${span2.name}>` });
     } else {
-      edits.push({ from: span.openEnd, to: span.closeStart, text: content });
+      edits.push({ from: span2.openEnd, to: span2.closeStart, text: content });
     }
   };
-  const covered = (span) => {
-    for (let p = span.parent; p; p = p.parent) if (targets.includes(p)) return true;
+  const covered = (span2) => {
+    for (let p = span2.parent; p; p = p.parent) if (targets.includes(p)) return true;
     return false;
   };
-  const placeholder = (span) => span.selfClosing ? "" : xmlUnescape(template.slice(span.openEnd, span.closeStart).replace(/<[^>]*>/g, "")).trim();
+  const placeholder = (span2) => span2.selfClosing ? "" : xmlUnescape(template.slice(span2.openEnd, span2.closeStart).replace(/<[^>]*>/g, "")).trim();
   const first = placeholder(targets[0]);
-  targets.forEach((span, i) => {
-    if (covered(span)) return;
-    const same = i === 0 || first !== "" && placeholder(span) === first;
-    setContent(span, same ? xmlEscapeText(text4) : "");
+  targets.forEach((span2, i) => {
+    if (covered(span2)) return;
+    const same = i === 0 || first !== "" && placeholder(span2) === first;
+    setContent(span2, same ? xmlEscapeText(text4) : "");
   });
   return apply(template, edits);
 }
@@ -3138,9 +3180,9 @@ var init_document = __esm({
         const beforeRevision = this.revision;
         const open7 = { id: this.newTransactionId(), label: label2, actions: [] };
         this.open = open7;
-        let result;
+        let result2;
         try {
-          result = body(this.recorder(open7));
+          result2 = body(this.recorder(open7));
         } catch (error62) {
           this.current = before;
           this.revision = beforeRevision;
@@ -3148,7 +3190,7 @@ var init_document = __esm({
           throw error62;
         }
         this.open = null;
-        if (open7.actions.length === 0) return result;
+        if (open7.actions.length === 0) return result2;
         this.undoStack.push({ transaction: open7.id, label: label2, actions: open7.actions });
         this.redoStack = [];
         this.emit({
@@ -3158,7 +3200,7 @@ var init_document = __esm({
           actions: open7.actions.map((a) => a.action),
           label: label2
         });
-        return result;
+        return result2;
       }
       /** Change UI state saved with the project (playhead, zoom) without an undo step. */
       setUntracked(key, value) {
@@ -4092,8 +4134,8 @@ function endBoundsKeepWindow(trimStart, trimDur, trimEnd, tolerance = KEEP_WINDO
 function blindTrimRejected(options) {
   if (options.watchedStart !== null || options.hasExplicitEnd || options.hasExplicitStart) return false;
   if (options.isAudio || options.isImage || options.isSubclip) return false;
-  const span = options.trimDur ?? 0;
-  return Number.isFinite(span) && span > 0;
+  const span2 = options.trimDur ?? 0;
+  return Number.isFinite(span2) && span2 > 0;
 }
 function parseTimecodeToken(token) {
   if (typeof token === "number") return Number.isFinite(token) ? token : null;
@@ -4166,8 +4208,8 @@ function placementWatchQuery(file3, query2 = "", extra = "") {
 function shouldWatchPlacement(options) {
   if (options.isAudio || options.isImage || options.skipExplicitTimes) return false;
   if (options.isAlreadyWatchedSubclip && !options.explicitQuery) return false;
-  const span = Number.isFinite(options.windowSec) ? options.windowSec : 0;
-  return span > 1e-3 && span <= (options.maxWindowSec ?? WATCH_MAX_WINDOW_SEC) + 1e-6;
+  const span2 = Number.isFinite(options.windowSec) ? options.windowSec : 0;
+  return span2 > 1e-3 && span2 <= (options.maxWindowSec ?? WATCH_MAX_WINDOW_SEC) + 1e-6;
 }
 function parseExplicitSourceTimeRange(query2) {
   if (!query2 || typeof query2 !== "string") return null;
@@ -4406,8 +4448,8 @@ function chapterEdges(aiMetadata) {
   return [...edges].sort((a, b) => a - b);
 }
 function cueCoverage(cues, start, end) {
-  const span = f(end, 0) - f(start, 0);
-  if (span <= 0) return 0;
+  const span2 = f(end, 0) - f(start, 0);
+  if (span2 <= 0) return 0;
   let covered = 0;
   for (const cue of cues ?? []) {
     if (!isRecord11(cue)) continue;
@@ -4415,7 +4457,7 @@ function cueCoverage(cues, start, end) {
     if (!bounds2) continue;
     covered += Math.max(0, Math.min(bounds2[1], end) - Math.max(bounds2[0], start));
   }
-  return Math.min(1, covered / span);
+  return Math.min(1, covered / span2);
 }
 function snapCutToPhraseEdge(cut2, cues, preferLater, maxShift = MAX_CUE_SHIFT_SEC) {
   const value = f(cut2, 0);
@@ -4512,13 +4554,13 @@ function speechWindowsFromEnergy(clip2, threshold = DEFAULT_ENERGY_THRESHOLD, mi
   const samples = Array.isArray(ui.audio_data) ? ui.audio_data : [];
   if (samples.length < 2) return [];
   const [tlStart, tlEnd] = clipTimelineExtent(data);
-  const span = tlEnd - tlStart;
-  if (span <= EPS) return [];
+  const span2 = tlEnd - tlStart;
+  if (span2 <= EPS) return [];
   const values = samples.map((s) => Math.abs(f(s, 0)));
   const peak = Math.max(...values);
   if (peak <= EPS) return [];
   const gate = peak * Math.max(0, f(threshold, DEFAULT_ENERGY_THRESHOLD));
-  const step = span / values.length;
+  const step = span2 / values.length;
   const windows = [];
   let runStart = null;
   values.forEach((val, i) => {
@@ -4622,12 +4664,12 @@ function buildDuckPoints(clip2, fps, windows, duckGain, env2 = {}) {
     unity.set(fOut, baseAt(fOut));
     for (const frame of [fs2, fe]) ducked.set(frame, baseAt(frame) * gain);
   }
-  const spans = padded.map(([s, e]) => [timelineToSourceFrame(s, data, fps), timelineToSourceFrame(e, data, fps)]);
-  for (const point2 of existing) {
-    const frame = pyRound(f(point2.co.X, 1));
+  const spans2 = padded.map(([s, e]) => [timelineToSourceFrame(s, data, fps), timelineToSourceFrame(e, data, fps)]);
+  for (const point3 of existing) {
+    const frame = pyRound(f(point3.co.X, 1));
     if (ducked.has(frame) || unity.has(frame)) continue;
-    const value = f(point2.co.Y, 1);
-    if (spans.some(([fs2, fe]) => fs2 <= frame && frame <= fe)) ducked.set(frame, value * gain);
+    const value = f(point3.co.Y, 1);
+    if (spans2.some(([fs2, fe]) => fs2 <= frame && frame <= fe)) ducked.set(frame, value * gain);
     else unity.set(frame, value);
   }
   const merged = new Map(unity);
@@ -4710,13 +4752,13 @@ function scalePoints(kf, m) {
   if (!Array.isArray(kf.Points)) return kf;
   return {
     ...kf,
-    Points: kf.Points.map((point2) => {
-      const x = point2?.co?.X;
-      if (typeof x !== "number" || x < m.startX) return point2;
+    Points: kf.Points.map((point3) => {
+      const x = point3?.co?.X;
+      if (typeof x !== "number" || x < m.startX) return point3;
       let nx = Math.trunc(pyRound(m.startX + (x - m.startX) * m.scale));
       if (nx < m.startX) nx = m.startX;
       else if (nx > m.newEndX) nx = m.newEndX;
-      return { ...point2, co: { ...point2.co, X: nx } };
+      return { ...point3, co: { ...point3.co, X: nx } };
     })
   };
 }
@@ -4728,10 +4770,10 @@ function reverseTimePoints(points) {
   if (xs.length === 0) return points;
   const pivot = Math.min(...xs) + Math.max(...xs);
   const orig = [...points].sort((a, b) => xOf2(a) - xOf2(b));
-  const mirrored = orig.map((point2) => {
-    const copy = structuredClone(point2);
-    if (typeof point2?.co?.X === "number") {
-      copy.co.X = pivot - point2.co.X;
+  const mirrored = orig.map((point3) => {
+    const copy = structuredClone(point3);
+    if (typeof point3?.co?.X === "number") {
+      copy.co.X = pivot - point3.co.X;
       const hl = copy.handle_left;
       const hr = copy.handle_right;
       delete copy.handle_left;
@@ -4777,6 +4819,15 @@ function finalizeTimePoints(points, startX, newEndX) {
   xs[0] = lo;
   xs[count - 1] = hi;
   return sorted.map((p, i) => ({ ...p, co: { ...p.co, X: xs[i] } }));
+}
+function timeCurveIsReversed(time3) {
+  const points = typeof time3 === "object" && time3 !== null ? time3.Points : void 0;
+  if (!Array.isArray(points) || points.length < 2) return false;
+  const ordered = [...points].sort((a, b) => Number(a?.co?.X ?? 0) - Number(b?.co?.X ?? 0));
+  const first = Number(ordered[0]?.co?.Y ?? 0);
+  const last = Number(ordered[ordered.length - 1]?.co?.Y ?? 0);
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return false;
+  return first > last + 1e-6;
 }
 function retimeClip(clip2, newEnd, fps, direction2 = 1, newPosition) {
   const rate = fps.num / fps.den;
@@ -5444,11 +5495,11 @@ function inferDropSide(clips, layer2, position, duration3) {
     if (clipDuration <= 0) continue;
     const clipLeft = clip2.position;
     const clipRight = clipLeft + clipDuration;
-    const overlap = Math.min(right, clipRight) - Math.max(left, clipLeft);
-    if (overlap <= 0) continue;
+    const overlap2 = Math.min(right, clipRight) - Math.max(left, clipLeft);
+    if (overlap2 <= 0) continue;
     const side = mid <= (clipLeft + clipRight) / 2 ? "left" : "right";
     const edgeDist = Math.abs(mid - (side === "left" ? clipLeft : clipRight));
-    const score = [-overlap, edgeDist];
+    const score = [-overlap2, edgeDist];
     if (!best || score[0] < best.score[0] || score[0] === best.score[0] && score[1] < best.score[1]) {
       best = { score, side };
     }
@@ -5531,6 +5582,20 @@ function applyTransitionToClip(tx, clipId2, name, placement2, duration3) {
   const raw = placement2 === "end" ? clip2.position + (clip2.end - clip2.start) - dur : clip2.position;
   const position = snapSeconds(Math.max(0, raw), project);
   return toolTransition(tx, mask2, clip2.layer, position, snappedDuration, placement2 === "end" ? "out" : "in");
+}
+function moveTransition(tx, transitionId, to) {
+  const project = tx.project;
+  const transition2 = requireTransition(project, transitionId);
+  requireUnlocked(project, transition2.layer);
+  if (typeof to !== "object" || to === null) throw invalid("moveTransition needs a target.");
+  const patch = {};
+  if (to.position !== void 0) patch.position = snapSeconds(requireNonNegative(to.position, "position"), project);
+  if (to.layer !== void 0) {
+    if (!findLayer(project, to.layer)) throw new OpError("not_found", `No track with number ${to.layer}.`, { layer: to.layer });
+    requireUnlocked(project, to.layer);
+    patch.layer = to.layer;
+  }
+  return patchTransition(tx, transitionId, patch);
 }
 function removeTransition(tx, transitionId) {
   const transition2 = requireTransition(tx.project, transitionId);
@@ -5661,11 +5726,26 @@ function addTrack(tx, opts = {}) {
   tx.insert(["layers"], layer2);
   return findLayerById(tx.project, id);
 }
+function trackBelowOrCreate(tx, layer2) {
+  const numbers2 = tx.project.layers.map((l) => l.number).filter((n) => n > 0).sort((a, b) => a - b);
+  const index = numbers2.indexOf(layer2);
+  if (index > 0) return numbers2[index - 1];
+  const bottom = numbers2[0];
+  if (bottom === void 0) return addTrack(tx).number;
+  if (bottom > 2) {
+    const number4 = Math.max(1, pyRound(bottom / 2));
+    const id = idFactory(tx.project)();
+    tx.insert(["layers"], { id, number: number4, y: 0, label: "", lock: false });
+    return number4;
+  }
+  return addTrack(tx, { below: bottom }).number;
+}
 var TRACK_STRIDE;
 var init_tracks = __esm({
   "../engine/src/ops/tracks.ts"() {
     "use strict";
     init_ids();
+    init_rounding();
     init_query();
     init_queries();
     init_errors();
@@ -5830,20 +5910,42 @@ function splitClip(tx, clipId2, atSeconds, keep2 = "both", opts = {}) {
   }
   if (!opts.ripple) return splitAt(tx, clip2, at, keep2);
   const originalPosition = Number(clip2.position);
-  const start = Number(clip2.start);
-  const end = Number(clip2.end);
-  const newEdge = start + (at - originalPosition);
-  const removed = keep2 === "left" ? end - start - (newEdge - start) : end - start - (end - newEdge);
-  const later = (p) => p >= at;
-  const result = splitAt(tx, clip2, at, keep2);
+  const removed = removedBySlice(clip2, at, keep2);
+  const result2 = splitAt(tx, clip2, at, keep2);
   if (keep2 === "right") patchClip(tx, clipId2, { position: originalPosition });
-  for (const c of tx.project.clips.filter((c2) => c2.layer === clip2.layer && c2.id !== clipId2 && later(Number(c2.position)))) {
-    tx.update(["clips", { id: c.id }], { position: Number(c.position) - removed });
+  rippleDeleteGap(tx, clip2.layer, at, removed, clipId2);
+  return result2;
+}
+function removedBySlice(item, at, keep2) {
+  const newEdge = Number(item.start) + (at - Number(item.position));
+  return keep2 === "left" ? Number(item.end) - newEdge : newEdge - Number(item.start);
+}
+function rippleDeleteGap(tx, layer2, from, gap, excludeId) {
+  for (const c of tx.project.clips.filter((c2) => c2.layer === layer2 && c2.id !== excludeId && Number(c2.position) >= from)) {
+    tx.update(["clips", { id: c.id }], { position: Number(c.position) - gap });
   }
-  for (const t of tx.project.effects.filter((t2) => t2.layer === clip2.layer && later(Number(t2.position)))) {
-    tx.update(["effects", { id: t.id }], { position: Number(t.position) - removed });
+  for (const t of tx.project.effects.filter((t2) => t2.layer === layer2 && t2.id !== excludeId && Number(t2.position) >= from)) {
+    tx.update(["effects", { id: t.id }], { position: Number(t.position) - gap });
   }
-  return result;
+}
+function splitTransition(tx, transitionId, atSeconds, keep2 = "both", opts = {}) {
+  const project = tx.project;
+  const transition2 = findTransition(project, transitionId);
+  if (!transition2) throw new OpError("not_found", `No transition with id ${transitionId}.`, { id: transitionId });
+  requireUnlocked(project, transition2.layer);
+  requireKeep(keep2);
+  if (opts.ripple && keep2 === "both") throw invalid("A ripple slice keeps one side (left or right).");
+  const at = slicePoint(project, requireFinite(atSeconds, "atSeconds"), keep2);
+  if (!(transition2.position < at && at < itemEnd(transition2))) {
+    throw invalid(`Time ${atSeconds} s is not inside transition ${transitionId} (${transition2.position}..${itemEnd(transition2)} s).`);
+  }
+  if (!opts.ripple) return sliceTransition(tx, transitionId, at, keep2);
+  const originalPosition = Number(transition2.position);
+  const removed = removedBySlice(transition2, at, keep2);
+  const result2 = sliceTransition(tx, transitionId, at, keep2);
+  if (keep2 === "right") patchTransition(tx, transitionId, { position: originalPosition });
+  rippleDeleteGap(tx, transition2.layer, at, removed, transitionId);
+  return result2;
 }
 function sliceAllAt(tx, atSeconds, opts = {}) {
   const project = tx.project;
@@ -5855,10 +5957,10 @@ function sliceAllAt(tx, atSeconds, opts = {}) {
   const eligible = (layer2) => !locked.has(layer2) && (wanted === null || wanted.has(layer2));
   const clipIds = project.clips.filter((c) => eligible(c.layer) && c.position < at && at < itemEnd(c)).map((c) => c.id);
   const transitionIds = project.effects.filter((t) => eligible(t.layer) && t.position < at && at < itemEnd(t)).map((t) => t.id);
-  const result = { clips: [], transitions: [] };
-  for (const id of clipIds) result.clips.push({ clipId: id, ...splitAt(tx, requireClip(tx.project, id), at, keep2) });
-  for (const id of transitionIds) result.transitions.push({ transitionId: id, ...sliceTransition(tx, id, at, keep2) });
-  return result;
+  const result2 = { clips: [], transitions: [] };
+  for (const id of clipIds) result2.clips.push({ clipId: id, ...splitAt(tx, requireClip(tx.project, id), at, keep2) });
+  for (const id of transitionIds) result2.transitions.push({ transitionId: id, ...sliceTransition(tx, id, at, keep2) });
+  return result2;
 }
 function sliceTransition(tx, id, at, keep2) {
   const t = findTransition(tx.project, id);
@@ -5928,6 +6030,19 @@ function duplicateClip(tx, clipId2, opts = {}) {
   reassignEffectIds(copy, nextId);
   tx.insert(["clips"], copy);
   return requireClip(tx.project, copy.id);
+}
+function closeGap(tx, layer2, gapStart, gapEnd) {
+  const project = tx.project;
+  if (!findLayer(project, layer2)) throw new OpError("not_found", `No track with number ${layer2}.`, { layer: layer2 });
+  requireUnlocked(project, layer2);
+  const size = requireFinite(gapEnd, "gapEnd") - requireFinite(gapStart, "gapStart");
+  if (!(size > 0)) return [];
+  const clipIds = new Set(project.clips.map((c) => c.id));
+  const later = itemsOnLayer(project, layer2).filter((item) => item.position > gapStart);
+  for (const item of later) {
+    tx.update([clipIds.has(item.id) ? "clips" : "effects", { id: item.id }], { position: item.position - size });
+  }
+  return later.map((item) => item.id);
 }
 function maxScaleMultiple(project, clip2) {
   const isSvg = String(clip2.reader?.path ?? "").toLowerCase().endsWith("svg");
@@ -6022,19 +6137,6 @@ function setClipKeyframes(tx, clipId2, prop, points, opts = {}) {
   }
   return patchClip(tx, clipId2, { [prop]: setKeyframePoints(base, built) });
 }
-function setClipSpeed(tx, clipId2, factor, opts = {}) {
-  const project = tx.project;
-  const clip2 = requireEditableClip(project, clipId2);
-  const f2 = requireFinite(factor, "factor");
-  if (!(f2 >= 1 / 16 && f2 <= 16)) throw invalid(`factor must be between 1/16 and 16 (got ${f2}).`);
-  const direction2 = opts.direction ?? "forward";
-  if (direction2 !== "forward" && direction2 !== "backward") throw invalid(`direction must be forward or backward.`);
-  const newEnd = Number(clip2.start) + (Number(clip2.end) - Number(clip2.start)) / f2;
-  const retimed = retimeClip(clip2, newEnd, fpsOf(project), direction2 === "backward" ? -1 : 1, clip2.position);
-  if (!retimed) throw invalid(`Speed ${f2} leaves clip ${clipId2} empty.`);
-  const next = withClampedTiming(retimed, project, clip2);
-  return replaceClip(tx, clip2, next);
-}
 function fadeInKeyframe(kf, startOfClip, endOfClip, length, rate) {
   const zoneEnd = Math.min(startOfClip + FADE_ZONE_SECONDS * rate, endOfClip);
   const target = evaluate(kf, Math.trunc(pyRound(zoneEnd)), 1);
@@ -6123,6 +6225,84 @@ function setClipVolume(tx, clipId2, opts) {
   const next = patchClip(tx, clipId2, { volume: { ...clip2.volume ?? {}, Points: points } });
   return { clip: next, before, target: Math.max(0, Math.min(1.3, target)), points: points.length };
 }
+function separateAudio(tx, clipId2, opts = {}) {
+  const project = tx.project;
+  const clip2 = requireEditableClip(project, clipId2);
+  const reader = isRecord8(clip2.reader) ? clip2.reader : {};
+  const hasAudio = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
+  const channelCount = reader.channels === void 0 || reader.channels === null ? null : Math.trunc(Number(reader.channels));
+  const hasVideo = reader.has_video === void 0 || reader.has_video === null ? true : Boolean(reader.has_video);
+  if (!hasAudio || channelCount !== null && !(channelCount > 0)) {
+    throw invalid(`Clip ${clipId2} has no audio to separate.`);
+  }
+  if (opts.perChannel && channelCount === null) throw invalid(`Clip ${clipId2} does not report its channel count.`);
+  if (opts.layer !== void 0) {
+    if (opts.perChannel || !hasVideo) throw invalid("A destination track applies to a single audio clip split from a clip with video.");
+    if (!findLayer(project, opts.layer)) throw new OpError("not_found", `No track with number ${opts.layer}.`, { layer: opts.layer });
+    requireUnlocked(project, opts.layer);
+  }
+  const needed = opts.layer !== void 0 ? 0 : hasVideo ? opts.perChannel ? channelCount : 1 : opts.perChannel ? channelCount - 1 : 0;
+  for (const layer2 of project.layers.filter((l) => l.number < clip2.layer).sort((a, b) => b.number - a.number).slice(0, needed)) {
+    requireUnlocked(project, layer2.number);
+  }
+  const constant = (value) => ({ Points: [openshotPoint(1, value, Interpolation.CONSTANT)] });
+  const title = String(clip2.title ?? "");
+  const nextId = ids(project);
+  const out = [];
+  const insertCopy = (data) => {
+    const copy = structuredClone(data);
+    copy.id = nextId();
+    reassignEffectIds(copy, nextId);
+    tx.insert(["clips"], copy);
+    out.push(requireClip(tx.project, copy.id));
+  };
+  if (!hasVideo) {
+    if (!opts.perChannel) return [patchClip(tx, clipId2, { channel_filter: constant(-1) })];
+    let layer2 = clip2.layer;
+    for (let channel = 0; channel < channelCount; channel += 1) {
+      const fields = {
+        channel_filter: constant(channel),
+        has_video: constant(0),
+        scale: ScaleMode.NONE,
+        title: `${title} (channel ${channel + 1})`
+      };
+      if (channel === 0) {
+        out.push(patchClip(tx, clipId2, fields));
+      } else {
+        layer2 = trackBelowOrCreate(tx, layer2);
+        insertCopy({ ...requireClip(tx.project, clipId2), ...fields, layer: layer2 });
+      }
+    }
+    return out;
+  }
+  const base = { ...clip2, has_audio: constant(-1) };
+  if (!opts.perChannel) {
+    const layer2 = opts.layer ?? trackBelowOrCreate(tx, clip2.layer);
+    insertCopy({
+      ...base,
+      channel_filter: constant(-1),
+      has_video: constant(0),
+      scale: ScaleMode.NONE,
+      layer: layer2,
+      title: `${title} (all channels)`
+    });
+  } else {
+    let layer2 = clip2.layer;
+    for (let channel = 0; channel < channelCount; channel += 1) {
+      layer2 = trackBelowOrCreate(tx, layer2);
+      insertCopy({
+        ...base,
+        channel_filter: constant(channel),
+        has_video: constant(0),
+        scale: ScaleMode.NONE,
+        layer: layer2,
+        title: `${title} (channel ${channel + 1})`
+      });
+    }
+  }
+  patchClip(tx, clipId2, { has_audio: constant(0) });
+  return out;
+}
 var RIPPLE_EPSILON, PLAIN_CLIP_KEYS, TIMING_KEYS, SCALE_CLAMP_KEYS, FADE_ZONE_SECONDS;
 var init_clips = __esm({
   "../engine/src/ops/clips.ts"() {
@@ -6136,12 +6316,13 @@ var init_clips = __esm({
     init_edit();
     init_evaluate();
     init_windows();
+    init_queries();
     init_audio_mix();
     init_errors();
     init_internal();
-    init_retime();
     init_values();
     init_transitions();
+    init_tracks();
     RIPPLE_EPSILON = 1e-6;
     PLAIN_CLIP_KEYS = {
       gravity: "int",
@@ -6169,9 +6350,67 @@ var init_keyframes = __esm({
 });
 
 // ../engine/src/ops/arrange.ts
+function alignedPositions(items, alignRight, toSeconds2) {
+  const spans2 = items.map((item) => {
+    const start = Number(item.position) || 0;
+    return { id: item.id, start, end: start + Math.max(0, (Number(item.end) || 0) - (Number(item.start) || 0)) };
+  });
+  const out = /* @__PURE__ */ new Map();
+  if (spans2.length === 0) return out;
+  const target = toSeconds2 !== void 0 ? requireFinite(toSeconds2, "toSeconds") : alignRight ? Math.max(...spans2.map((s) => s.end)) : Math.min(...spans2.map((s) => s.start));
+  for (const span2 of spans2) out.set(span2.id, alignRight ? span2.start + (target - span2.end) : target);
+  return out;
+}
+function packTrack(tx, layer2, fromSeconds) {
+  const project = tx.project;
+  requireFinite(fromSeconds, "fromSeconds");
+  if (!findLayer(project, layer2)) throw new OpError("not_found", `No track with number ${layer2}.`, { layer: layer2 });
+  requireUnlocked(project, layer2);
+  const items = itemsOnLayer(project, layer2);
+  const clipIds = new Set(project.clips.map((c) => c.id));
+  const groups = [];
+  for (const item of items) {
+    const leftEdge = Number(item.position);
+    const rightEdge = leftEdge + (Number(item.end) - Number(item.start));
+    const current = groups[groups.length - 1];
+    if (current && leftEdge <= current.end) {
+      current.items.push(item);
+      current.end = Math.max(current.end, rightEdge);
+    } else {
+      groups.push({ start: leftEdge, end: rightEdge, items: [item] });
+    }
+  }
+  let lastEnd = fromSeconds;
+  let offset = 0;
+  const moved = [];
+  for (const group of groups) {
+    if (group.end <= fromSeconds) {
+      lastEnd = Math.max(lastEnd, group.end);
+      continue;
+    }
+    const shiftedStart = group.start - offset;
+    if (shiftedStart > lastEnd) offset += shiftedStart - lastEnd;
+    if (offset > EPSILON) {
+      for (const item of group.items) {
+        tx.update([clipIds.has(item.id) ? "clips" : "effects", { id: item.id }], { position: Number(item.position) - offset });
+        moved.push(item.id);
+      }
+    }
+    lastEnd = group.end - offset;
+  }
+  return { removed: offset > EPSILON ? offset : 0, moved };
+}
+function closeAllGaps(tx, layer2, fromSeconds = 0) {
+  return packTrack(tx, layer2, fromSeconds).moved;
+}
+var EPSILON;
 var init_arrange = __esm({
   "../engine/src/ops/arrange.ts"() {
     "use strict";
+    init_query();
+    init_queries();
+    init_errors();
+    EPSILON = 1e-6;
   }
 });
 
@@ -6417,7 +6656,7 @@ function applyFrameRateChange(tx, project, oldFps, newFps, profile) {
     });
     if (Object.keys(patch).length === 0) continue;
     tx.update(["files", { id: file3.id }], patch);
-    const updated = tx.project.files.find((f2) => f2.id === file3.id);
+    const updated = tx.project.files.find((f3) => f3.id === file3.id);
     for (const clip2 of tx.project.clips) {
       if (clip2.reader?.id === file3.id) tx.update(["clips", { id: clip2.id }], { reader: structuredClone(updated) });
     }
@@ -6555,12 +6794,729 @@ var init_clipboard = __esm({
   }
 });
 
+// ../engine/src/ops/animation-presets.data.ts
+var KEYFRAME_EASING, ANIMATION_PRESET_DATA;
+var init_animation_presets_data = __esm({
+  "../engine/src/ops/animation-presets.data.ts"() {
+    "use strict";
+    KEYFRAME_EASING = { "ease_in": [0.42, 0, 1, 1], "ease_in_quint": [0.755, 0.05, 0.855, 0.06], "ease_out": [0, 0, 0.58, 1], "ease_out_cubic": [0.215, 0.61, 0.355, 1] };
+    ANIMATION_PRESET_DATA = {
+      "bounce": { "scale_y": [[1, 1, "ease_out_cubic"], [7, 1, "ease_out_cubic"], [13, 1.1, "ease_in_quint"], [14, 1.1, "ease_in_quint"], [17, 1, "ease_out_cubic"], [22, 1.05, "ease_in_quint"], [25, 0.95], [28, 1.02], [31, 1]], "location_y": [[1, 0, "ease_out_cubic"], [7, 0, "ease_out_cubic"], [13, -0.25, "ease_in_quint"], [14, -0.25, "ease_in_quint"], [17, 0, "ease_out_cubic"], [22, -0.125, "ease_in_quint"], [25, 0], [28, -0.033333, "ease_in_quint"], [31, 0]] },
+      "flash": { "alpha": [[1, 1], [8, 0], [16, 1], [24, 0], [31, 1]] },
+      "pulse": { "scale_x": [[1, 1], [16, 1.05], [31, 1]], "scale_y": [[1, 1], [16, 1.05], [31, 1]] },
+      "rubberBand": { "scale_x": [[1, 1], [10, 1.25], [13, 0.75], [16, 1.15], [20, 0.95], [24, 1.05], [31, 1]], "scale_y": [[1, 1], [10, 0.75], [13, 1.25], [16, 0.85], [20, 1.05], [24, 0.95], [31, 1]] },
+      "shakeX": { "location_x": [[1, 0], [4, -5208e-6], [7, 5208e-6], [10, -5208e-6], [13, 5208e-6], [16, -5208e-6], [19, 5208e-6], [22, -5208e-6], [25, 5208e-6], [28, -5208e-6], [31, 0]] },
+      "shakeY": { "location_y": [[1, 0], [4, -9259e-6], [7, 9259e-6], [10, -9259e-6], [13, 9259e-6], [16, -9259e-6], [19, 9259e-6], [22, -9259e-6], [25, 9259e-6], [28, -9259e-6], [31, 0]] },
+      "swing": { "rotation": [[7, 15], [13, -10], [19, 5], [25, -5], [31, 0]] },
+      "tada": { "scale_x": [[1, 1], [4, 0.9], [7, 0.9], [10, 1.1], [13, 1.1], [16, 1.1], [19, 1.1], [22, 1.1], [25, 1.1], [28, 1.1], [31, 1]], "scale_y": [[1, 1], [4, 0.9], [7, 0.9], [10, 1.1], [13, 1.1], [16, 1.1], [19, 1.1], [22, 1.1], [25, 1.1], [28, 1.1], [31, 1]], "rotation": [[4, -3], [7, -3], [10, 3], [13, -3], [16, 3], [19, -3], [22, 3], [25, -3], [28, 3]] },
+      "wobble": { "rotation": [[6, -5], [10, 3], [14, -3], [19, 2], [24, -1]], "location_x": [[1, 0], [6, -0.25], [10, 0.2], [14, -0.15], [19, 0.1], [24, -0.05], [31, 0]] },
+      "jello": { "shear_x": [[8, -0.277778], [11, 0.138889], [14, -0.069444], [18, 0.034722], [21, -0.017361], [24, 8681e-6], [28, -434e-5]], "shear_y": [[8, -0.277778], [11, 0.138889], [14, -0.069444], [18, 0.034722], [21, -0.017361], [24, 8681e-6], [28, -434e-5]] },
+      "heartBeat": { "scale_x": [[1, 1], [5, 1.3], [9, 1], [14, 1.3], [22, 1]], "scale_y": [[1, 1], [5, 1.3], [9, 1], [14, 1.3], [22, 1]] },
+      "backInDown": { "alpha": [[1, 0.7], [25, 0.7], [31, 1]], "scale_x": [[1, 0.7], [25, 0.7], [31, 1]], "scale_y": [[1, 0.7], [25, 0.7], [31, 1]], "location_y": [[1, -1.5], [25, 0]] },
+      "backInLeft": { "alpha": [[1, 0.7], [25, 0.7], [31, 1]], "scale_x": [[1, 0.7], [25, 0.7], [31, 1]], "scale_y": [[1, 0.7], [25, 0.7], [31, 1]], "location_x": [[1, -1.5], [25, 0]] },
+      "backInRight": { "alpha": [[1, 0.7], [25, 0.7], [31, 1]], "scale_x": [[1, 0.7], [25, 0.7], [31, 1]], "scale_y": [[1, 0.7], [25, 0.7], [31, 1]], "location_x": [[1, 1.5], [25, 0]] },
+      "backInUp": { "alpha": [[1, 0.7], [25, 0.7], [31, 1]], "scale_x": [[1, 0.7], [25, 0.7], [31, 1]], "scale_y": [[1, 0.7], [25, 0.7], [31, 1]], "location_y": [[1, 1.5], [25, 0]] },
+      "backOutDown": { "alpha": [[1, 1], [7, 0.7], [31, 0.7]], "scale_x": [[1, 1], [7, 0.7], [31, 0.7]], "scale_y": [[1, 1], [7, 0.7], [31, 0.7]], "location_y": [[7, 0], [31, 1.5]] },
+      "backOutLeft": { "alpha": [[1, 1], [7, 0.7], [31, 0.7]], "scale_x": [[1, 1], [7, 0.7], [31, 0.7]], "scale_y": [[1, 1], [7, 0.7], [31, 0.7]], "location_x": [[7, 0], [31, -1.5]] },
+      "backOutRight": { "alpha": [[1, 1], [7, 0.7], [31, 0.7]], "scale_x": [[1, 1], [7, 0.7], [31, 0.7]], "scale_y": [[1, 1], [7, 0.7], [31, 0.7]], "location_x": [[7, 0], [31, 1.5]] },
+      "backOutUp": { "alpha": [[1, 1], [7, 0.7], [31, 0.7]], "scale_x": [[1, 1], [7, 0.7], [31, 0.7]], "scale_y": [[1, 1], [7, 0.7], [31, 0.7]], "location_y": [[7, 0], [31, -1.5]] },
+      "bounceIn": { "alpha": [[1, 0, "ease_out_cubic"], [19, 1, "ease_out_cubic"], [31, 1]], "scale_x": [[1, 0.3, "ease_out_cubic"], [7, 1.1, "ease_out_cubic"], [13, 0.9, "ease_out_cubic"], [19, 1.03, "ease_out_cubic"], [25, 0.97, "ease_out_cubic"], [31, 1]], "scale_y": [[1, 0.3, "ease_out_cubic"], [7, 1.1, "ease_out_cubic"], [13, 0.9, "ease_out_cubic"], [19, 1.03, "ease_out_cubic"], [25, 0.97, "ease_out_cubic"], [31, 1]] },
+      "bounceInDown": { "alpha": [[1, 0, "ease_out_cubic"], [19, 1]], "scale_y": [[1, 3, "ease_out_cubic"], [19, 0.9, "ease_out_cubic"], [24, 0.95, "ease_out_cubic"], [28, 0.985]], "location_y": [[1, -3, "ease_out_cubic"], [19, 0.25, "ease_out_cubic"], [24, -0.1, "ease_out_cubic"], [28, 0.05, "ease_out_cubic"], [31, 0]] },
+      "bounceInLeft": { "alpha": [[1, 0, "ease_out_cubic"], [19, 1]], "scale_x": [[1, 3, "ease_out_cubic"], [19, 1, "ease_out_cubic"], [24, 0.98, "ease_out_cubic"], [28, 0.995]], "location_x": [[1, -3, "ease_out_cubic"], [19, 0.25, "ease_out_cubic"], [24, -0.1, "ease_out_cubic"], [28, 0.05, "ease_out_cubic"], [31, 0]] },
+      "bounceInRight": { "alpha": [[1, 0, "ease_out_cubic"], [19, 1]], "scale_x": [[1, 3, "ease_out_cubic"], [19, 1, "ease_out_cubic"], [24, 0.98, "ease_out_cubic"], [28, 0.995]], "location_x": [[1, 3, "ease_out_cubic"], [19, -0.25, "ease_out_cubic"], [24, 0.1, "ease_out_cubic"], [28, -0.05, "ease_out_cubic"], [31, 0]] },
+      "bounceInUp": { "alpha": [[1, 0, "ease_out_cubic"], [19, 1]], "scale_y": [[1, 5, "ease_out_cubic"], [19, 0.9, "ease_out_cubic"], [24, 0.95, "ease_out_cubic"], [28, 0.985]], "location_y": [[1, 3, "ease_out_cubic"], [19, -0.25, "ease_out_cubic"], [24, 0.1, "ease_out_cubic"], [28, -0.05, "ease_out_cubic"], [31, 0]] },
+      "bounceOut": { "alpha": [[16, 1], [18, 1], [31, 0]], "scale_x": [[7, 0.9], [16, 1.1], [18, 1.1], [31, 0.3]], "scale_y": [[7, 0.9], [16, 1.1], [18, 1.1], [31, 0.3]] },
+      "bounceOutDown": { "alpha": [[13, 1], [14, 1], [31, 0]], "scale_y": [[7, 0.985], [13, 0.9], [14, 0.9], [31, 3]], "location_y": [[7, 0.125], [13, -0.25], [14, -0.25], [31, 3]] },
+      "bounceOutLeft": { "alpha": [[7, 1], [31, 0]], "scale_x": [[7, 0.9], [31, 2]], "location_x": [[7, 0.25], [31, -3]] },
+      "bounceOutRight": { "alpha": [[7, 1], [31, 0]], "scale_x": [[7, 0.9], [31, 2]], "location_x": [[7, -0.25], [31, 3]] },
+      "bounceOutUp": { "alpha": [[13, 1], [14, 1], [31, 0]], "scale_y": [[7, 0.985], [13, 0.9], [14, 0.9], [31, 3]], "location_y": [[7, -0.125], [13, 0.25], [14, 0.25], [31, -3]] },
+      "fadeIn": { "alpha": [[1, 0], [31, 1]] },
+      "fadeInDown": { "alpha": [[1, 0], [31, 1]], "location_y": [[1, -1], [31, 0]] },
+      "fadeInDownBig": { "alpha": [[1, 0], [31, 1]], "location_y": [[1, -3], [31, 0]] },
+      "fadeInLeft": { "alpha": [[1, 0], [31, 1]], "location_x": [[1, -1], [31, 0]] },
+      "fadeInLeftBig": { "alpha": [[1, 0], [31, 1]], "location_x": [[1, -3], [31, 0]] },
+      "fadeInRight": { "alpha": [[1, 0], [31, 1]], "location_x": [[1, 1], [31, 0]] },
+      "fadeInRightBig": { "alpha": [[1, 0], [31, 1]], "location_x": [[1, 3], [31, 0]] },
+      "fadeInUp": { "alpha": [[1, 0], [31, 1]], "location_y": [[1, 1], [31, 0]] },
+      "fadeInUpBig": { "alpha": [[1, 0], [31, 1]], "location_y": [[1, 3], [31, 0]] },
+      "fadeInTopLeft": { "alpha": [[1, 0], [31, 1]], "location_x": [[1, -1], [31, 0]], "location_y": [[1, -1], [31, 0]] },
+      "fadeInTopRight": { "alpha": [[1, 0], [31, 1]], "location_x": [[1, 1], [31, 0]], "location_y": [[1, -1], [31, 0]] },
+      "fadeInBottomLeft": { "alpha": [[1, 0], [31, 1]], "location_x": [[1, -1], [31, 0]], "location_y": [[1, 1], [31, 0]] },
+      "fadeInBottomRight": { "alpha": [[1, 0], [31, 1]], "location_x": [[1, 1], [31, 0]], "location_y": [[1, 1], [31, 0]] },
+      "fadeOut": { "alpha": [[1, 1], [31, 0]] },
+      "fadeOutDown": { "alpha": [[1, 1], [31, 0]], "location_y": [[31, 1]] },
+      "fadeOutDownBig": { "alpha": [[1, 1], [31, 0]], "location_y": [[31, 3]] },
+      "fadeOutLeft": { "alpha": [[1, 1], [31, 0]], "location_x": [[31, -1]] },
+      "fadeOutLeftBig": { "alpha": [[1, 1], [31, 0]], "location_x": [[31, -3]] },
+      "fadeOutRight": { "alpha": [[1, 1], [31, 0]], "location_x": [[31, 1]] },
+      "fadeOutRightBig": { "alpha": [[1, 1], [31, 0]], "location_x": [[31, 3]] },
+      "fadeOutUp": { "alpha": [[1, 1], [31, 0]], "location_y": [[31, -1]] },
+      "fadeOutUpBig": { "alpha": [[1, 1], [31, 0]], "location_y": [[31, -3]] },
+      "fadeOutTopLeft": { "alpha": [[1, 1], [31, 0]], "location_x": [[1, 0], [31, -1]], "location_y": [[1, 0], [31, -1]] },
+      "fadeOutTopRight": { "alpha": [[1, 1], [31, 0]], "location_x": [[1, 0], [31, 1]], "location_y": [[1, 0], [31, -1]] },
+      "fadeOutBottomRight": { "alpha": [[1, 1], [31, 0]], "location_x": [[1, 0], [31, 1]], "location_y": [[1, 0], [31, 1]] },
+      "fadeOutBottomLeft": { "alpha": [[1, 1], [31, 0]], "location_x": [[1, 0], [31, -1]], "location_y": [[1, 0], [31, 1]] }
+    };
+  }
+});
+
+// ../engine/src/ops/camera-motion.ts
+function positive(value, fallback) {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+function cropBaseSize(pw, ph, sw, sh) {
+  const w = positive(sw, pw);
+  const h = positive(sh, ph);
+  const projectAspect = pw / ph;
+  const sourceAspect = w / h;
+  return sourceAspect >= projectAspect ? [ph * sourceAspect, ph] : [pw, pw / sourceAspect];
+}
+function safeLocation(canvas, base, scale) {
+  const scaled = Math.max(1e-4, base * Math.max(1e-3, scale));
+  const c = Math.max(1e-4, canvas);
+  if (scaled <= c) return 0;
+  return (scaled - c) / (scaled + c);
+}
+function scaleForSafeLocation(canvas, base, target) {
+  const t = Math.max(0, Math.min(target, 0.9));
+  return Math.max(1e-4, canvas) * (1 + t) / (Math.max(1e-4, base) * (1 - t));
+}
+function axisFor(direction2) {
+  if (["pan_left", "pan_right", "left_to_right", "right_to_left"].includes(direction2)) return "x";
+  if (["pan_up", "pan_down", "top_to_bottom", "bottom_to_top"].includes(direction2)) return "y";
+  return "auto";
+}
+function autoDirection(pw, ph, sw, sh) {
+  const [bw, bh] = cropBaseSize(pw, ph, sw, sh);
+  const x = safeLocation(pw, bw, 1);
+  const y = safeLocation(ph, bh, 1);
+  if (x > y + 0.03) return "left_to_right";
+  if (y > x + 0.03) return "bottom_to_top";
+  return "left_to_right";
+}
+function round6(x) {
+  return Number(Math.max(0, x).toFixed(6));
+}
+function panEndpoints(direction2, magnitude) {
+  const m = round6(magnitude);
+  if (direction2 === "pan_left" || direction2 === "right_to_left") return [-m, m];
+  if (direction2 === "pan_right" || direction2 === "left_to_right") return [m, -m];
+  if (direction2 === "pan_up" || direction2 === "bottom_to_top") return [-m, m];
+  if (direction2 === "pan_down" || direction2 === "top_to_bottom") return [m, -m];
+  return [0, 0];
+}
+function result(axis2, scale, start, end) {
+  return axis2 === "x" ? { scaleX: scale, scaleY: [...scale], locationX: [start, end], locationY: [0, 0] } : { scaleX: scale, scaleY: [...scale], locationX: [0, 0], locationY: [start, end] };
+}
+function cameraPanKeyframes(requested, projectWidth, projectHeight, sourceWidth, sourceHeight, targetPan = 0.18, edgeMargin = 0.995) {
+  const pw = positive(projectWidth, 1920);
+  const ph = positive(projectHeight, 1080);
+  const direction2 = requested === "auto" ? autoDirection(pw, ph, sourceWidth, sourceHeight) : requested;
+  const [bw, bh] = cropBaseSize(pw, ph, sourceWidth, sourceHeight);
+  const axis2 = axisFor(direction2);
+  const canvas = axis2 === "x" ? pw : ph;
+  const base = axis2 === "x" ? bw : bh;
+  const natural = safeLocation(canvas, base, 1);
+  let scale;
+  let magnitude;
+  if (natural >= targetPan) {
+    scale = 1;
+    magnitude = natural * edgeMargin;
+  } else {
+    scale = Math.max(1, scaleForSafeLocation(canvas, base, targetPan));
+    magnitude = safeLocation(canvas, base, scale) * edgeMargin;
+  }
+  const [start, end] = panEndpoints(direction2, magnitude);
+  return result(axis2, [scale, scale], start, end);
+}
+function pushPullKeyframes(zoomIn, zoom = 1.2) {
+  const scale = zoomIn ? [1, zoom] : [zoom, 1];
+  return { scaleX: scale, scaleY: [...scale], locationX: [0, 0], locationY: [0, 0] };
+}
+function kenBurnsKeyframes(zoomIn, requested, projectWidth, projectHeight, sourceWidth, sourceHeight, zoomFactor = 1.22, targetPan = 0.1, maxPan = 0.24) {
+  const pw = positive(projectWidth, 1920);
+  const ph = positive(projectHeight, 1080);
+  const [bw, bh] = cropBaseSize(pw, ph, sourceWidth, sourceHeight);
+  const direction2 = requested === "auto" ? autoDirection(pw, ph, sourceWidth, sourceHeight) : requested;
+  const axis2 = axisFor(direction2);
+  const canvas = axis2 === "x" ? pw : ph;
+  const base = axis2 === "x" ? bw : bh;
+  const zoom = Math.max(zoomFactor, scaleForSafeLocation(canvas, base, targetPan));
+  const [startScale, endScale] = zoomIn ? [1, zoom] : [zoom, 1];
+  const startSafe = Math.min(safeLocation(canvas, base, startScale) * 0.82, maxPan);
+  const endSafe = Math.min(safeLocation(canvas, base, endScale) * 0.82, maxPan);
+  const startMagnitude = Math.max(startSafe, startSafe ? targetPan : 0);
+  const endMagnitude = Math.max(endSafe, endSafe ? targetPan : 0);
+  const start = panEndpoints(direction2, Math.min(startMagnitude, maxPan))[0];
+  const end = panEndpoints(direction2, Math.min(endMagnitude, maxPan))[1];
+  return result(axis2, [startScale, endScale], start, end);
+}
+function sourceDimensions(reader) {
+  if (typeof reader !== "object" || reader === null) return [null, null];
+  const r = reader;
+  const w = Number(r.width || r.display_width);
+  const h = Number(r.height || r.display_height);
+  return Number.isFinite(w) && Number.isFinite(h) ? [w, h] : [null, null];
+}
+var init_camera_motion = __esm({
+  "../engine/src/ops/camera-motion.ts"() {
+    "use strict";
+  }
+});
+
 // ../engine/src/ops/presets.ts
-var FADE_PRESETS, ROTATE_PRESETS, LAYOUT_PRESETS, VOLUME_PRESETS, TIME_PRESETS, ANIMATE_PRESETS, CLIP_PRESET_IDS, LAYOUT_GRAVITY;
+function isClipPresetId(value) {
+  return CLIP_PRESET_IDS.includes(value);
+}
+function spans(clip2, rate) {
+  const s = pyRound(Number(clip2.start) * rate) + 1;
+  const e = pyRound(Number(clip2.end) * rate) + 1;
+  return { s, e };
+}
+function fadeKeyframe(kf, action, range, s, e, rate) {
+  if (action === "none") return single(1);
+  const length = action.endsWith("_fast") ? 1 : 3;
+  let startAnimation = s;
+  let endAnimation = e;
+  if (range === "start") endAnimation = Math.min(s + length * rate, e);
+  else if (range === "end") startAnimation = Math.max(1, e - length * rate);
+  if (action.startsWith("in")) {
+    const zoneEnd = Math.min(s + 3 * rate, e);
+    const target = evaluate(kf, Math.trunc(pyRound(zoneEnd)), 1);
+    const cleared2 = removeKeyframePointsInRange(kf, s, zoneEnd);
+    return setKeyframePoint(setKeyframePoint(cleared2, openshotPoint(startAnimation, 0)), openshotPoint(endAnimation, target));
+  }
+  const zoneStart = Math.max(1, e - 3 * rate);
+  const source2 = evaluate(kf, Math.trunc(pyRound(zoneStart)), 1);
+  const cleared = removeKeyframePointsInRange(kf, zoneStart, e);
+  return setKeyframePoint(setKeyframePoint(cleared, openshotPoint(startAnimation, source2)), openshotPoint(endAnimation, 0));
+}
+function fadeSteps(preset, range) {
+  if (preset === "none") return [["none", range ?? "entire"]];
+  if (preset === "in_out_fast" || preset === "in_out_slow") {
+    const speed = preset.endsWith("fast") ? "fast" : "slow";
+    if ((range ?? "entire") === "entire") return [[`in_${speed}`, "start"], [`out_${speed}`, "end"]];
+    return [];
+  }
+  const action = preset;
+  return [[action, range ?? (action.startsWith("in") ? "start" : "end")]];
+}
+function applyFade(clip2, preset, opts, rate, volumeOnly) {
+  const { s, e } = spans(clip2, rate);
+  const steps = fadeSteps(preset, opts.range);
+  const targets = volumeOnly ? { alpha: false, volume: true } : fadeTargets(clip2);
+  let alpha = clip2.alpha;
+  let volume = clip2.volume;
+  for (const [action, range] of steps) {
+    if (targets.alpha) alpha = fadeKeyframe(alpha, action, range, s, e, rate);
+    if (targets.volume) volume = fadeKeyframe(volume, action, range, s, e, rate);
+  }
+  const patch = {};
+  if (targets.alpha) patch.alpha = alpha;
+  if (targets.volume) patch.volume = volume;
+  return patch;
+}
+function applyLayout(preset) {
+  if (preset === "none") {
+    return {
+      scale: ScaleMode.FIT,
+      gravity: Gravity.CENTER,
+      scale_x: single(1),
+      scale_y: single(1),
+      location_x: single(0),
+      location_y: single(0)
+    };
+  }
+  return {
+    scale: ScaleMode.FIT,
+    gravity: LAYOUT_GRAVITY[preset],
+    scale_x: single(0.5),
+    scale_y: single(0.5),
+    location_x: single(0),
+    location_y: single(0)
+  };
+}
+function resetRepeat(clip2) {
+  if (!("repeat_cache" in clip2)) return clip2;
+  const cache5 = clip2.repeat_cache;
+  const next = { ...clip2 };
+  delete next.repeat_cache;
+  if (!isRecord8(cache5) || !repeatIsActive(clip2)) return next;
+  next.start = cache5.start ?? clip2.start;
+  next.end = cache5.end ?? clip2.end;
+  next.duration = cache5.duration ?? clip2.duration;
+  const props = isRecord8(cache5.properties) ? cache5.properties : {};
+  for (const [key, value] of Object.entries(props)) next[key] = value;
+  if (!("time" in props)) next.time = { Points: [{ co: { X: 1, Y: 1 }, interpolation: Interpolation.LINEAR }] };
+  return next;
+}
+function applyTime(tx, clip2, requested, opts) {
+  const project = tx.project;
+  const fps = fpsOf(project);
+  const rate = rateOf(project);
+  const preset = requested === "reverse" && timeCurveIsReversed(clip2.time) ? "none" : requested;
+  if (preset === "freeze" || preset === "freeze_zoom") return freeze(clip2, preset === "freeze_zoom", opts, rate);
+  if (preset === "none") {
+    const base = resetRepeat(clip2);
+    const reader = isRecord8(base.reader) ? base.reader : {};
+    let duration3 = Number(reader.duration ?? 0) || 0;
+    if (duration3 <= 0) duration3 = Number(base.duration ?? 0) || 0;
+    if (isSingleImageMedia(reader)) duration3 = DEFAULT_IMAGE_LENGTH;
+    if (duration3 <= 0) duration3 = 1 / rate;
+    const frames = Math.max(1, Math.trunc(pyRound(duration3 * rate)));
+    const retimed2 = retimeClip(base, Number(base.start) + frames / rate, fps, 1, base.position) ?? base;
+    return { ...retimed2, time: { Points: [{ co: { X: 1, Y: 1 }, interpolation: Interpolation.LINEAR }] } };
+  }
+  if (preset === "reverse") {
+    let end = Number(clip2.end);
+    if (end <= Number(clip2.start)) end = Number(clip2.start) + (Number(clip2.duration) > 0 ? Number(clip2.duration) : 1 / rate);
+    const retimed2 = retimeClip(clip2, end, fps, -1, clip2.position);
+    if (!retimed2) throw invalid("The clip is too short to reverse.");
+    return retimed2;
+  }
+  const speed = requireFinite(opts.speed, "speed");
+  if (!(speed >= 1 / 16 && speed <= 16)) throw invalid(`speed must be between 1/16 and 16 (got ${speed}).`);
+  const newEnd = Number(clip2.start) + (Number(clip2.end) - Number(clip2.start)) / speed;
+  const retimed = retimeClip(clip2, newEnd, fps, preset === "backward" ? -1 : 1, clip2.position);
+  if (!retimed) throw invalid("That speed leaves the clip empty.");
+  return retimed;
+}
+function freeze(clip2, zoom, opts, rate) {
+  const seconds2 = requireFinite(opts.seconds, "seconds");
+  if (!(seconds2 > 0)) throw invalid("seconds must be > 0.");
+  const playhead = opts.playhead === void 0 ? Number(clip2.position) : requireFinite(opts.playhead, "playhead");
+  const originalEnd = Number(clip2.end);
+  const next = structuredClone(clip2);
+  next.end = originalEnd + seconds2;
+  next.duration = Number(clip2.duration ?? originalEnd - Number(clip2.start)) + seconds2;
+  const startSeconds = Number(clip2.start) + (playhead - Number(clip2.position));
+  const startFrames = pyRound(startSeconds * rate) + 1;
+  let startValue = startFrames;
+  const endFrames = pyRound((startSeconds + seconds2) * rate) + 1;
+  const endOfClipFrames = pyRound(next.end * rate) + 1;
+  const endOfClipValue = pyRound(originalEnd * rate) + 1;
+  let startVolume = 1;
+  if ((clip2.time?.Points?.length ?? 0) > 1) {
+    next.time = { ...next.time, Points: next.time.Points.slice(0, -1) };
+    startValue = getLong(clip2.time, startFrames);
+  }
+  if ((clip2.volume?.Points?.length ?? 0) > 1) startVolume = evaluate(clip2.volume, startFrames, 1);
+  next.time = setKeyframePoint(next.time, point(startFrames, startValue, Interpolation.LINEAR));
+  next.time = setKeyframePoint(next.time, point(endFrames, startValue, Interpolation.LINEAR));
+  next.time = setKeyframePoint(next.time, point(endOfClipFrames, endOfClipValue, Interpolation.LINEAR));
+  let volume = next.volume;
+  volume = setKeyframePoint(volume, point(startFrames - 1, startVolume, Interpolation.LINEAR));
+  volume = setKeyframePoint(volume, point(startFrames, 0, Interpolation.LINEAR));
+  volume = setKeyframePoint(volume, point(endFrames - 1, 0, Interpolation.LINEAR));
+  volume = setKeyframePoint(volume, point(endFrames, startVolume, Interpolation.LINEAR));
+  next.volume = volume;
+  if (zoom) {
+    const half = (endFrames - startFrames) / 2;
+    for (const prop of ["scale_x", "scale_y"]) {
+      let kf = next[prop];
+      kf = setKeyframePoint(kf, openshotPoint(startFrames, 1, Interpolation.BEZIER));
+      kf = setKeyframePoint(kf, openshotPoint(startFrames + half, 1.05, Interpolation.BEZIER));
+      kf = setKeyframePoint(kf, openshotPoint(endFrames, 1, Interpolation.BEZIER));
+      next[prop] = kf;
+    }
+  }
+  return next;
+}
+function applyAnimate(tx, original, preset, opts) {
+  const project = tx.project;
+  const rate = rateOf(project);
+  const { s, e } = spans(original, rate);
+  const zone = Math.max(1, pyRound(rate));
+  const inEnd = Math.min(s + zone, e);
+  const outStart = Math.max(s, e - zone);
+  let emphStart = s;
+  if (opts.playhead !== void 0) {
+    const playhead = requireFinite(opts.playhead, "playhead");
+    const clipPlayhead = pyRound((Number(original.start) + Math.max(0, playhead) - Number(original.position)) * rate) + 1;
+    if (s <= clipPlayhead && clipPlayhead <= e) emphStart = clipPlayhead;
+  }
+  const emphEnd = Math.min(emphStart + zone, e);
+  const nextId = ids(project);
+  const clip2 = structuredClone(original);
+  const base = (prop, frame) => {
+    const kf = original[prop];
+    return kf ? evaluate(kf, Math.trunc(pyRound(frame))) : PROP_IDENTITY[prop] ?? 0;
+  };
+  const kfOf = (prop) => isRecord8(clip2[prop]) ? clip2[prop] : { Points: [] };
+  const clear2 = (prop, from, to) => {
+    clip2[prop] = removeKeyframePointsInRange(kfOf(prop), from, to);
+  };
+  const add = (prop, ...points) => {
+    let kf = kfOf(prop);
+    for (const p of points) kf = setKeyframePoint(kf, p);
+    clip2[prop] = kf;
+  };
+  clip2.gravity = Gravity.CENTER;
+  if (preset === "none") {
+    clip2.scale = ScaleMode.FIT;
+    for (const [prop, value] of [
+      ["scale_x", 1],
+      ["scale_y", 1],
+      ["location_x", 0],
+      ["location_y", 0],
+      ["rotation", 0],
+      ["shear_x", 0],
+      ["shear_y", 0],
+      ["alpha", 1],
+      ["origin_x", 0.5],
+      ["origin_y", 0.5]
+    ]) {
+      clip2[prop] = { Points: [point(s, value)] };
+    }
+    clip2.effects = (clip2.effects ?? []).filter(
+      (fx) => !isRecord8(fx) || !["Blur", "Mask"].includes(String(fx.class_name)) || fx["ui-menu"] === "look"
+    );
+    return clip2;
+  }
+  if (!Array.isArray(clip2.effects)) clip2.effects = [];
+  const blurFx = (tStart, rStart, tEnd, rEnd) => {
+    const fx = createEffect("Blur", {}, { id: nextId() });
+    const radius = { Points: [point(tStart, rStart, Interpolation.LINEAR), point(tEnd, rEnd, Interpolation.LINEAR)] };
+    fx.horizontal_radius = radius;
+    fx.vertical_radius = structuredClone(radius);
+    clip2.effects.push(fx);
+  };
+  const wipeFx = (file3, tStart, tEnd, bStart, bEnd, contrast = 20) => {
+    const fx = createEffect("Mask", {}, { id: nextId() });
+    const reader = maskReader(`@transitions/common/${file3}`);
+    fx.mask_reader = structuredClone(reader);
+    fx.reader = structuredClone(reader);
+    fx.brightness = { Points: [point(tStart, bStart, Interpolation.LINEAR), point(tEnd, bEnd, Interpolation.LINEAR)] };
+    fx.contrast = { Points: [point(tStart, contrast)] };
+    clip2.effects.push(fx);
+  };
+  const jsonPreset = (name, tStart, tEnd, resting) => {
+    const data = ANIMATION_PRESET_DATA[name];
+    if (!data) return;
+    const targetDuration = Math.max(1, tEnd - tStart);
+    for (const [prop, points] of Object.entries(data)) {
+      if (!(prop in clip2)) continue;
+      const b = base(prop, resting);
+      clear2(prop, tStart, tEnd);
+      add(prop, point(tStart, b), point(tEnd, b));
+      const scaled = points.map(([frame, value, easing2]) => ({
+        frame: tStart + pyRound((frame - 1) / 30 * targetDuration),
+        value: MULTIPLICATIVE.has(prop) ? value * b : value + b,
+        easing: easing2
+      }));
+      scaled.forEach((p, i) => {
+        const kp = point(p.frame, p.value);
+        const ease = p.easing ? KEYFRAME_EASING[p.easing] : void 0;
+        if (ease) kp.handle_right = { X: ease[0], Y: ease[1] };
+        const prevEase = i > 0 && scaled[i - 1].easing ? KEYFRAME_EASING[scaled[i - 1].easing] : void 0;
+        if (prevEase) kp.handle_left = { X: prevEase[2], Y: prevEase[3] };
+        add(prop, kp);
+      });
+    }
+  };
+  const camera = (values) => {
+    clip2.scale = ScaleMode.CROP;
+    for (const prop of ["scale_x", "scale_y", "location_x", "location_y"]) clear2(prop, s, e);
+    add("scale_x", point(s, values.scaleX[0]), point(e, values.scaleX[1]));
+    add("scale_y", point(s, values.scaleY[0]), point(e, values.scaleY[1]));
+    add("location_x", point(s, values.locationX[0]), point(e, values.locationX[1]));
+    add("location_y", point(s, values.locationY[0]), point(e, values.locationY[1]));
+  };
+  const cameraContext = () => {
+    const [sw, sh] = sourceDimensions(original.reader);
+    return [project.width, project.height, sw, sh];
+  };
+  const slide = /^slide_(in|out)_(left|right|top|bottom)$/.exec(preset);
+  const wipe = /^(blur_)?wipe_(in|out)_(.+)$/.exec(preset);
+  if (slide) {
+    const [, dir, side] = slide;
+    const prop = side === "left" || side === "right" ? "location_x" : "location_y";
+    const offset = side === "left" || side === "top" ? -1 : 1;
+    if (dir === "in") {
+      const b = base(prop, inEnd);
+      clear2(prop, s, inEnd);
+      add(prop, point(s, b + offset), point(inEnd, b));
+    } else {
+      const b = base(prop, outStart);
+      clear2(prop, outStart, e);
+      add(prop, point(outStart, b), point(e, b + offset));
+    }
+  } else if (preset === "blur_in") {
+    blurFx(s, 50, inEnd, 0);
+    const ba = base("alpha", inEnd);
+    clear2("alpha", s, inEnd);
+    add("alpha", point(s, 0), point(inEnd, ba));
+  } else if (preset === "blur_out") {
+    blurFx(outStart, 0, e, 50);
+    const ba = base("alpha", outStart);
+    clear2("alpha", outStart, e);
+    add("alpha", point(outStart, ba), point(e, 0));
+  } else if (wipe) {
+    const [, blur2, dir, shape2] = wipe;
+    const file3 = WIPE_SVG[shape2];
+    if (file3) {
+      if (dir === "in") {
+        if (blur2) blurFx(s, 50, inEnd, 0);
+        wipeFx(file3, s, inEnd, 1, -1, blur2 ? 10 : 20);
+      } else {
+        if (blur2) blurFx(outStart, 0, e, 50);
+        wipeFx(file3, outStart, e, -1, 1, blur2 ? 10 : 20);
+      }
+    }
+  } else if (preset === "pop_in") {
+    const peak = inEnd - Math.max(1, pyRound(0.2 * (inEnd - s)));
+    const [bsx, bsy, ba] = [base("scale_x", inEnd), base("scale_y", inEnd), base("alpha", inEnd)];
+    for (const prop of ["scale_x", "scale_y", "alpha"]) clear2(prop, s, inEnd);
+    add("scale_x", point(s, 0), point(peak, 1.1 * bsx), point(inEnd, bsx));
+    add("scale_y", point(s, 0), point(peak, 1.1 * bsy), point(inEnd, bsy));
+    add("alpha", point(s, 0), point(inEnd, ba));
+  } else if (preset === "pop_out") {
+    const peak = outStart + Math.max(1, pyRound(0.2 * (e - outStart)));
+    const [bsx, bsy, ba] = [base("scale_x", outStart), base("scale_y", outStart), base("alpha", outStart)];
+    for (const prop of ["scale_x", "scale_y", "alpha"]) clear2(prop, outStart, e);
+    add("scale_x", point(outStart, bsx), point(peak, 1.1 * bsx), point(e, 0));
+    add("scale_y", point(outStart, bsy), point(peak, 1.1 * bsy), point(e, 0));
+    add("alpha", point(outStart, ba), point(e, 0));
+  } else if (preset === "spiral_in") {
+    const [br, bsx, bsy, ba] = [base("rotation", inEnd), base("scale_x", inEnd), base("scale_y", inEnd), base("alpha", inEnd)];
+    for (const prop of ["rotation", "scale_x", "scale_y", "alpha"]) clear2(prop, s, inEnd);
+    add("rotation", point(s, -360 + br), point(inEnd, br));
+    add("scale_x", point(s, 0), point(inEnd, bsx));
+    add("scale_y", point(s, 0), point(inEnd, bsy));
+    add("alpha", point(s, 0), point(inEnd, ba));
+  } else if (preset === "spiral_out") {
+    const [br, bsx, bsy, ba] = [base("rotation", outStart), base("scale_x", outStart), base("scale_y", outStart), base("alpha", outStart)];
+    for (const prop of ["rotation", "scale_x", "scale_y", "alpha"]) clear2(prop, outStart, e);
+    add("rotation", point(outStart, br), point(e, 360 + br));
+    add("scale_x", point(outStart, bsx), point(e, 0));
+    add("scale_y", point(outStart, bsy), point(e, 0));
+    add("alpha", point(outStart, ba), point(e, 0));
+  } else if (JSON_ANIM[preset]) {
+    const name = JSON_ANIM[preset];
+    if (EMPHASIS.has(preset)) jsonPreset(name, emphStart, emphEnd, emphStart);
+    else if (IN_JSON.has(preset)) jsonPreset(name, s, inEnd, inEnd);
+    else jsonPreset(name, outStart, e, outStart);
+  } else if (preset === "cam_push_in" || preset === "cam_pull_out") {
+    camera(pushPullKeyframes(preset === "cam_push_in"));
+  } else if (preset.startsWith("cam_pan_")) {
+    const direction2 = { auto: "auto", left: "pan_left", right: "pan_right", up: "pan_up", down: "pan_down" }[preset.slice("cam_pan_".length)];
+    camera(cameraPanKeyframes(direction2, ...cameraContext()));
+  } else if (preset.startsWith("ken_burns_")) {
+    const zoomIn = preset.startsWith("ken_burns_in");
+    const suffix = preset.replace(/^ken_burns_(in|out)_?/, "");
+    const direction2 = suffix || "auto";
+    camera(kenBurnsKeyframes(zoomIn, direction2, ...cameraContext()));
+  } else if (preset === "credits_up" || preset === "credits_down") {
+    clip2.scale = ScaleMode.CROP;
+    const [from, to] = preset === "credits_up" ? [1, -1] : [-1, 1];
+    add("location_y", point(s, from, Interpolation.LINEAR), point(e, to, Interpolation.LINEAR));
+  }
+  return clip2;
+}
+function applyClipPreset(tx, clipId2, presetId, opts = {}) {
+  const project = tx.project;
+  const clip2 = requireEditableClip(project, clipId2);
+  if (typeof presetId !== "string" || !isClipPresetId(presetId)) throw invalid(`Unknown clip preset: ${String(presetId)}.`);
+  if (opts.range !== void 0 && !["entire", "start", "end"].includes(opts.range)) throw invalid("range must be entire, start or end.");
+  const [family, name] = presetId.split(".");
+  const rate = rateOf(project);
+  let next;
+  switch (family) {
+    case "fade":
+      next = { ...clip2, ...applyFade(clip2, name, opts, rate, false) };
+      break;
+    case "volume":
+      if (name === "level") {
+        const level = requireFinite(opts.level, "level");
+        if (level < 0 || level > 1.3) throw invalid(`level must be between 0 and 1.3 (got ${level}).`);
+        next = { ...clip2, volume: single(level) };
+      } else if (name === "none") {
+        next = { ...clip2, volume: single(1) };
+      } else {
+        next = { ...clip2, ...applyFade(clip2, name.replace(/^fade_/, ""), opts, rate, true) };
+      }
+      break;
+    case "rotate":
+      next = { ...clip2, rotation: single(ROTATIONS[name]) };
+      break;
+    case "layout":
+      next = { ...clip2, ...applyLayout(name) };
+      break;
+    case "time":
+      next = withClampedTiming(applyTime(tx, clip2, name, opts), project, clip2);
+      break;
+    default:
+      next = applyAnimate(tx, clip2, name, opts);
+  }
+  return replaceClip(tx, clip2, next);
+}
+function repeatIsActive(clip2) {
+  const cache5 = clip2.repeat_cache;
+  if (!isRecord8(cache5) || Object.keys(cache5).length === 0) return false;
+  const cachedStart = Number(cache5.start ?? 0);
+  const cachedEnd = Number(cache5.end ?? 0);
+  const start = Number(clip2.start ?? 0);
+  const end = Number(clip2.end ?? 0);
+  if (![cachedStart, cachedEnd, start, end].every(Number.isFinite)) return true;
+  return Math.abs(cachedStart - start) > 1e-6 || Math.abs(cachedEnd - end) > 1e-6;
+}
+function effectiveSpeed(clip2) {
+  if (repeatIsActive(clip2)) return { speed: null, direction: "looped" };
+  const points = Array.isArray(clip2.time?.Points) ? [...clip2.time.Points] : [];
+  if (points.length < 2) return { speed: 1, direction: "forward" };
+  points.sort((a, b) => Number(a?.co?.X) - Number(b?.co?.X));
+  const [x0, y0] = [Number(points[0].co?.X), Number(points[0].co?.Y)];
+  const [x1, y1] = [Number(points[points.length - 1].co?.X), Number(points[points.length - 1].co?.Y)];
+  if (![x0, y0, x1, y1].every(Number.isFinite) || x1 <= x0) return { speed: 1, direction: "forward" };
+  return { speed: (Math.abs(y1 - y0) + 1) / (x1 - x0), direction: y1 < y0 ? "backward" : "forward" };
+}
+function normalizePoints(points) {
+  if (points.length === 0) return [];
+  const sorted = [...points].sort((a, b) => pyRound(a.co?.X ?? 0) - pyRound(b.co?.X ?? 0));
+  const x0 = pyRound(sorted[0].co.X);
+  return sorted.map((p) => ({
+    co: { X: pyRound(p.co.X ?? 0) - x0 + 1, Y: p.co.Y },
+    interpolation: p.interpolation ?? Interpolation.LINEAR
+  }));
+}
+function normalizeToTrim(points, trimStart, trimSpan) {
+  if (points.length === 0 || trimSpan <= 0) return [];
+  const sorted = [...points].sort((a, b) => pyRound(a.co?.X ?? 0) - pyRound(b.co?.X ?? 0));
+  const xs = sorted.map((p) => pyRound(p.co?.X ?? 0));
+  const relative2 = Math.min(...xs) >= 1 && Math.max(...xs) <= trimSpan;
+  const out = [];
+  sorted.forEach((p, i) => {
+    const x = pyRound(relative2 ? xs[i] : xs[i] - trimStart);
+    if (x < 1 || x > trimSpan) return;
+    const copy = structuredClone(p);
+    copy.co = { ...copy.co, X: x };
+    out.push(copy);
+  });
+  return out;
+}
+function repeatCurve(points, span2, dirSign, passes, delay2, ramp, pattern) {
+  const out = [];
+  let base = 0;
+  let dir = dirSign;
+  for (let k = 0; k < passes; k += 1) {
+    const speed = (1 + ramp) ** k;
+    const scale = 1 / Math.abs(speed);
+    const dur = Math.max(1, pyRound(span2 * scale));
+    const iter = dir > 0 ? points : [...points].reverse();
+    iter.forEach((p, idx) => {
+      const x = pyRound(p.co.X ?? 0) - 1;
+      const off = Math.min(pyRound(x * scale), dur - 1);
+      const nx = dir > 0 ? base + off + 1 : base + (dur - off);
+      let interpolation2 = p.interpolation ?? Interpolation.LINEAR;
+      if (pattern === "loop" && k > 0 && idx === 0) interpolation2 = Interpolation.CONSTANT;
+      out.push({ co: { X: nx, Y: p.co.Y }, interpolation: interpolation2 });
+    });
+    base += dur;
+    if (k < passes - 1 && delay2) {
+      const lastY = out[out.length - 1].co.Y;
+      out.push({ co: { X: base, Y: lastY }, interpolation: Interpolation.LINEAR });
+      out.push({ co: { X: base + delay2, Y: lastY }, interpolation: Interpolation.LINEAR });
+      base += delay2;
+    }
+    if (pattern === "pingpong") dir *= -1;
+  }
+  return [out, base];
+}
+function repeatClip(tx, clipId2, opts) {
+  const project = tx.project;
+  const clip2 = requireEditableClip(project, clipId2);
+  if (typeof opts !== "object" || opts === null) throw invalid("repeat options are required.");
+  if (opts.pattern !== "loop" && opts.pattern !== "pingpong") throw invalid("pattern must be loop or pingpong.");
+  if (!Number.isInteger(opts.passes) || opts.passes < 2 || opts.passes > 500) throw invalid("passes must be an integer 2..500.");
+  const delay2 = opts.delayFrames ?? 0;
+  if (!Number.isInteger(delay2) || delay2 < 0) throw invalid("delayFrames must be a non-negative integer.");
+  const ramp = opts.ramp ?? 0;
+  if (!Number.isFinite(ramp) || ramp <= -1) throw invalid("ramp must be > -1.");
+  const rate = rateOf(project);
+  const next = structuredClone(clip2);
+  const trimStart = pyRound(Number(clip2.start ?? 0) * rate);
+  const trimSpan = Math.max(1, pyRound((Number(clip2.end ?? 0) - Number(clip2.start ?? 0)) * rate));
+  const targetStartY = trimStart + 1;
+  const targetEndY = targetStartY + trimSpan;
+  const targetRange = Math.max(1, targetEndY - targetStartY);
+  const origTime = clip2.time?.Points ?? [];
+  let baseTime;
+  if (origTime.length >= 2) {
+    baseTime = normalizePoints(origTime);
+    const yStart = pyRound(baseTime[0].co.Y ?? 0);
+    const yEnd = pyRound(baseTime[baseTime.length - 1].co.Y ?? 0);
+    const yRange = Math.max(1, yEnd - yStart);
+    for (const p of baseTime) p.co.Y = targetStartY + (p.co.Y - yStart) * targetRange / yRange;
+  } else {
+    baseTime = [
+      { co: { X: 1, Y: targetStartY }, interpolation: Interpolation.LINEAR },
+      { co: { X: trimSpan, Y: targetEndY }, interpolation: Interpolation.LINEAR }
+    ];
+  }
+  let timeSpan = Math.max(1, pyRound(baseTime[baseTime.length - 1].co.X));
+  if (timeSpan !== trimSpan) {
+    const s = trimSpan / timeSpan;
+    for (const p of baseTime) p.co.X = Math.max(1, pyRound((p.co.X ?? 1) * s));
+    timeSpan = trimSpan;
+  }
+  if (!repeatIsActive(clip2)) {
+    const properties = {};
+    for (const [key, value] of Object.entries(clip2)) {
+      if (isRecord8(value) && Array.isArray(value.Points) && value.Points.length > 1) properties[key] = structuredClone(value);
+    }
+    next.repeat_cache = { start: clip2.start ?? 0, end: clip2.end, duration: clip2.duration, properties };
+  }
+  const dirSign = (opts.direction ?? 1) >= 0 ? 1 : -1;
+  const [timePoints2, timeTotal] = repeatCurve(baseTime, timeSpan, dirSign, opts.passes, delay2, ramp, opts.pattern);
+  let total = timeTotal;
+  next.time = { Points: timePoints2 };
+  const cache5 = next.repeat_cache;
+  for (const [prop, original] of Object.entries(cache5.properties ?? {})) {
+    if (prop === "time") continue;
+    let norm = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
+    let span2 = norm.length ? pyRound(norm[norm.length - 1].co.X) : 0;
+    if (!span2) continue;
+    if (span2 !== timeSpan) {
+      const s = timeSpan / span2;
+      const firstX = Number(norm[0].co.X ?? 1);
+      for (const p of norm) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
+      span2 = timeSpan;
+    }
+    const latest = /* @__PURE__ */ new Map();
+    for (const p of norm) {
+      p.co.X = pyRound(p.co.X ?? 1);
+      latest.set(p.co.X, p);
+    }
+    norm = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
+    const [points, used] = repeatCurve(norm, span2, dirSign, opts.passes, delay2, ramp, opts.pattern);
+    next[prop] = { Points: points };
+    total = Math.max(total, used);
+  }
+  const duration3 = total / rate;
+  next.start = 0;
+  next.end = duration3;
+  next.duration = duration3;
+  const clamped = withClampedTiming(next, project, clip2);
+  return replaceClip(tx, clip2, clamped);
+}
+var FADE_PRESETS, ROTATE_PRESETS, LAYOUT_PRESETS, VOLUME_PRESETS, TIME_PRESETS, ANIMATE_PRESETS, CLIP_PRESET_IDS, point, single, ROTATIONS, LAYOUT_GRAVITY, JSON_ANIM, EMPHASIS, IN_JSON, WIPE_SVG, PROP_IDENTITY, MULTIPLICATIVE;
 var init_presets = __esm({
   "../engine/src/ops/presets.ts"() {
     "use strict";
     init_types();
+    init_defaults();
+    init_media();
+    init_rounding();
+    init_evaluate();
+    init_edit();
+    init_registry();
+    init_errors();
+    init_internal();
+    init_retime();
+    init_transition_masks();
+    init_animation_presets_data();
+    init_camera_motion();
     FADE_PRESETS = ["none", "in_fast", "in_slow", "out_fast", "out_slow", "in_out_fast", "in_out_slow"];
     ROTATE_PRESETS = ["none", "right_90", "left_90", "flip_180"];
     LAYOUT_PRESETS = ["none", "center", "top_left", "top_right", "bottom_left", "bottom_right"];
@@ -6679,6 +7635,9 @@ var init_presets = __esm({
       ...TIME_PRESETS.map((p) => `time.${p}`),
       ...ANIMATE_PRESETS.map((p) => `animate.${p}`)
     ];
+    point = (frame, value, interpolation2 = Interpolation.BEZIER) => openshotPoint(Math.trunc(frame), value, interpolation2);
+    single = (value) => ({ Points: [openshotPoint(1, value, Interpolation.BEZIER)] });
+    ROTATIONS = { none: 0, right_90: 90, left_90: -90, flip_180: 180 };
     LAYOUT_GRAVITY = {
       center: Gravity.CENTER,
       top_left: Gravity.TOP_LEFT,
@@ -6686,6 +7645,350 @@ var init_presets = __esm({
       bottom_left: Gravity.BOTTOM_LEFT,
       bottom_right: Gravity.BOTTOM_RIGHT
     };
+    JSON_ANIM = {
+      back_in_down: "backInDown",
+      back_in_left: "backInLeft",
+      back_in_right: "backInRight",
+      back_in_up: "backInUp",
+      bounce_in: "bounceIn",
+      bounce_in_down: "bounceInDown",
+      bounce_in_left: "bounceInLeft",
+      bounce_in_right: "bounceInRight",
+      bounce_in_up: "bounceInUp",
+      back_out_down: "backOutDown",
+      back_out_left: "backOutLeft",
+      back_out_right: "backOutRight",
+      back_out_up: "backOutUp",
+      bounce_out: "bounceOut",
+      bounce_out_down: "bounceOutDown",
+      bounce_out_left: "bounceOutLeft",
+      bounce_out_right: "bounceOutRight",
+      bounce_out_up: "bounceOutUp",
+      bounce: "bounce",
+      flash: "flash",
+      pulse: "pulse",
+      rubber_band: "rubberBand",
+      shake_x: "shakeX",
+      shake_y: "shakeY",
+      swing: "swing",
+      tada: "tada",
+      wobble: "wobble",
+      jello: "jello",
+      heart_beat: "heartBeat"
+    };
+    EMPHASIS = /* @__PURE__ */ new Set(["bounce", "flash", "pulse", "rubber_band", "shake_x", "shake_y", "swing", "tada", "wobble", "jello", "heart_beat"]);
+    IN_JSON = /* @__PURE__ */ new Set(["back_in_down", "back_in_left", "back_in_right", "back_in_up", "bounce_in", "bounce_in_down", "bounce_in_left", "bounce_in_right", "bounce_in_up"]);
+    WIPE_SVG = {
+      circle_expand: "circle_in_to_out.svg",
+      circle_shrink: "circle_out_to_in.svg",
+      fade: "fade.svg",
+      left: "wipe_left_to_right.svg",
+      right: "wipe_right_to_left.svg",
+      top: "wipe_top_to_bottom.svg",
+      bottom: "wipe_bottom_to_top.svg"
+    };
+    PROP_IDENTITY = {
+      scale_x: 1,
+      scale_y: 1,
+      location_x: 0,
+      location_y: 0,
+      alpha: 1,
+      rotation: 0,
+      shear_x: 0,
+      shear_y: 0
+    };
+    MULTIPLICATIVE = /* @__PURE__ */ new Set(["scale_x", "scale_y", "alpha"]);
+  }
+});
+
+// ../engine/src/ops/sequence.ts
+function span(item) {
+  const position = Number(item.position) || 0;
+  return [position, position + Math.max(0, (Number(item.end) || 0) - (Number(item.start) || 0))];
+}
+function requireTrack(project, layer2) {
+  if (!findLayer(project, layer2)) throw new OpError("not_found", `No track with number ${layer2}.`, { layer: layer2 });
+  requireUnlocked(project, layer2);
+}
+function moveItem(tx, item, position) {
+  if (tx.project.clips.some((c) => c.id === item.id)) patchClip(tx, item.id, { position });
+  else patchTransition(tx, item.id, { position });
+}
+function trackEnd(project, layer2, excludeIds = /* @__PURE__ */ new Set()) {
+  let end = 0;
+  for (const clip2 of project.clips) {
+    if (clip2.layer === layer2 && !excludeIds.has(clip2.id)) end = Math.max(end, span(clip2)[1]);
+  }
+  return end;
+}
+function shiftAfter(tx, layer2, fromSeconds, amount, excludeIds = /* @__PURE__ */ new Set()) {
+  requireFinite(fromSeconds, "fromSeconds");
+  requireFinite(amount, "amount");
+  if (Math.abs(amount) <= SEQUENCE_EPSILON) return [];
+  requireTrack(tx.project, layer2);
+  const moved = [];
+  for (const item of itemsOnLayer(tx.project, layer2)) {
+    if (excludeIds.has(item.id) || !(item.position >= fromSeconds - SEQUENCE_EPSILON)) continue;
+    moveItem(tx, item, Math.max(0, item.position + amount));
+    moved.push(item.id);
+  }
+  return moved;
+}
+function clipTitle(clip2) {
+  return String(clip2.title || clip2.id);
+}
+function overlap(a0, a1, b0, b1) {
+  return Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+}
+function plannedOverlaps(project, changes, newItems, tolerance) {
+  const before = /* @__PURE__ */ new Map();
+  for (const clip2 of project.clips) {
+    const [start, end] = span(clip2);
+    before.set(clip2.id, { layer: clip2.layer, start, end, title: clipTitle(clip2) });
+  }
+  const after = new Map(before);
+  for (const [id, planned] of changes) {
+    after.set(id, { layer: planned.layer, start: planned.start, end: planned.end, title: before.get(id)?.title ?? id });
+  }
+  const hits = [];
+  const checked = /* @__PURE__ */ new Set();
+  for (const id of changes.keys()) {
+    const row = after.get(id);
+    for (const [otherId, other] of after) {
+      if (otherId === id || other.layer !== row.layer || checked.has(`${otherId}\0${id}`)) continue;
+      checked.add(`${id}\0${otherId}`);
+      const amount = overlap(row.start, row.end, other.start, other.end);
+      if (amount <= tolerance) continue;
+      const was0 = before.get(id);
+      const was1 = before.get(otherId);
+      const was = was0 && was1 && was0.layer === was1.layer ? overlap(was0.start, was0.end, was1.start, was1.end) : 0;
+      if (amount > was + tolerance) {
+        hits.push({ clipId: id, title: row.title, overlapsId: otherId, overlapsTitle: other.title, layer: row.layer, seconds: amount });
+      }
+    }
+  }
+  for (const item of newItems) {
+    for (const [otherId, other] of after) {
+      if (other.layer !== item.layer) continue;
+      const amount = overlap(item.start, item.end, other.start, other.end);
+      if (amount > tolerance) {
+        hits.push({ clipId: item.label, title: item.label, overlapsId: otherId, overlapsTitle: other.title, layer: item.layer, seconds: amount });
+      }
+    }
+  }
+  return hits;
+}
+function transitionsBetween(project, clipIds, tolerance) {
+  const spans2 = clipIds.map((id) => {
+    const clip2 = requireClip(project, id);
+    const [start, end] = span(clip2);
+    return { id, layer: clip2.layer, start, end };
+  });
+  const layers = new Set(spans2.map((s) => s.layer));
+  return project.effects.filter((transition2) => {
+    if (!layers.has(transition2.layer)) return false;
+    const [t0, t1] = span(transition2);
+    const under = spans2.filter((s) => s.layer === transition2.layer && s.start < t1 - tolerance && s.end > t0 + tolerance);
+    return under.length >= 2;
+  });
+}
+function remapLayers(project, sourceLayers, destLayer) {
+  const order = sortedLayers(project).map((l) => l.number);
+  const sources = [...new Set(sourceLayers)].sort((a, b) => a - b);
+  const destIndex = order.indexOf(destLayer);
+  if (sources.length === 0 || destIndex < 0) return null;
+  const top = sources.reduce((best, n) => order.indexOf(n) > order.indexOf(best) ? n : best, sources[0]);
+  const offset = destIndex - order.indexOf(top);
+  const out = /* @__PURE__ */ new Map();
+  for (const n of sources) {
+    const at = order.indexOf(n);
+    const index = at + offset;
+    if (at < 0 || index < 0 || index >= order.length) return null;
+    out.set(n, order[index]);
+  }
+  return out;
+}
+function duplicateItems(tx, input2) {
+  const project = tx.project;
+  const clips = input2.clips.map((p) => ({ item: requireClip(project, p.id), p }));
+  const transitions = (input2.transitions ?? []).map((p) => {
+    const item = findTransition(project, p.id);
+    if (!item) throw new OpError("not_found", `No transition with id ${p.id}.`, { id: p.id });
+    return { item, p };
+  });
+  for (const { item, p } of [...clips, ...transitions]) {
+    if (requireFinite(p.position, "position") < -SEQUENCE_EPSILON) throw invalid(`A copy of ${item.id} would start before 0 s.`);
+    requireTrack(project, p.layer ?? item.layer);
+  }
+  const result2 = { clips: [], transitionIds: [] };
+  for (const { item, p } of clips) {
+    result2.clips.push({ copy: duplicateClip(tx, item.id, { position: Math.max(0, p.position), layer: p.layer ?? item.layer }), of: item.id });
+  }
+  for (const { item, p } of transitions) {
+    const copy = structuredClone(item);
+    copy.id = ids(tx.project)();
+    copy.position = snapSeconds(Math.max(0, p.position), tx.project);
+    copy.layer = p.layer ?? item.layer;
+    tx.insert(["effects"], copy);
+    result2.transitionIds.push(copy.id);
+  }
+  return result2;
+}
+var SEQUENCE_EPSILON;
+var init_sequence = __esm({
+  "../engine/src/ops/sequence.ts"() {
+    "use strict";
+    init_query();
+    init_queries();
+    init_clips();
+    init_errors();
+    init_internal();
+    SEQUENCE_EPSILON = 1e-6;
+  }
+});
+
+// ../engine/src/ops/add-to-timeline.ts
+function toFrame2(seconds2, rate) {
+  const v = seconds2 * rate;
+  return v >= 0 ? Math.floor(v + 0.5) : Math.ceil(v - 0.5);
+}
+function keyframeX(seconds2, rate) {
+  return toFrame2(seconds2, rate) + 1;
+}
+function uniform(random3, a, b) {
+  return a + (b - a) * random3();
+}
+function addPoints(kf, points) {
+  let next = kf ?? { Points: [] };
+  for (const [x, y] of points) next = setKeyframePoint(next, openshotPoint(x, y, Interpolation.BEZIER));
+  return next;
+}
+function placeFiles(tx, entries, startPosition, layer2, opts = {}) {
+  const project = tx.project;
+  if (!Array.isArray(entries) || entries.length === 0) throw invalid("Give at least one file to place.");
+  const start = requireNonNegative(startPosition, "startPosition");
+  const fadeLength = requireNonNegative(opts.fadeLength ?? 2, "fadeLength");
+  const transitionLength = requireNonNegative(opts.transitionLength ?? 2, "transitionLength");
+  const imageLength = requireNonNegative(opts.imageLength ?? 10, "imageLength");
+  const random3 = opts.random ?? Math.random;
+  const pool = opts.randomTransitions && opts.randomTransitions.length > 0 ? opts.randomTransitions : null;
+  const withTransition = Boolean(pool || opts.transition);
+  const files = entries.map((entry) => requireFile(project, entry.fileId));
+  const fps = fpsOf(project);
+  const rate = fps.num / fps.den;
+  const result2 = { clipIds: [], transitionIds: [] };
+  let position = start;
+  entries.forEach((entry, index) => {
+    const file3 = files[index];
+    const own2 = file3;
+    let startTime = typeof own2.start === "number" ? own2.start : 0;
+    let endTime = typeof own2.end === "number" ? own2.end : Number(file3.duration ?? 0);
+    if (entry.start !== void 0) startTime = requireFinite(entry.start, "start");
+    if (entry.end !== void 0) endTime = requireFinite(entry.end, "end");
+    if (isStillImage(file3)) endTime = entry.end ?? imageLength;
+    let clipPosition = toFrame2(position, rate) * fps.den / fps.num;
+    let transition2 = null;
+    if (!withTransition && opts.fade) {
+      position = Math.max(start, clipPosition - fadeLength);
+      clipPosition = position;
+    }
+    if (withTransition && (index > 0 || (opts.transitionFirstClip ?? true))) {
+      const mask2 = pool ? pool[Math.min(pool.length - 1, Math.floor(random3() * pool.length))] : opts.transition;
+      position = Math.max(start, position - transitionLength);
+      clipPosition = position;
+      transition2 = { position, duration: Math.min(transitionLength, endTime - startTime), mask: mask2 };
+    }
+    if (transition2) {
+      result2.transitionIds.push(
+        addTransition(tx, {
+          layer: layer2,
+          position: transition2.position,
+          duration: transition2.duration,
+          maskId: transition2.mask,
+          direction: "in",
+          title: "Transition"
+        }).id
+      );
+    }
+    const clip2 = addClip(tx, { fileId: file3.id, position: clipPosition, layer: layer2, start: startTime, end: endTime });
+    result2.clipIds.push(clip2.id);
+    const patch = {};
+    if (!withTransition && opts.fade) {
+      const points = [];
+      if (opts.fade === "in" || opts.fade === "in_out") {
+        points.push([keyframeX(startTime, rate), 0]);
+        points.push([Math.min(keyframeX(startTime + fadeLength, rate), keyframeX(endTime, rate)), 1]);
+      }
+      if (opts.fade === "out" || opts.fade === "in_out") {
+        points.push([Math.max(keyframeX(endTime - fadeLength, rate), keyframeX(startTime, rate)), 1]);
+        points.push([keyframeX(endTime, rate), 0]);
+      }
+      patch.alpha = addPoints(clip2.alpha, points);
+    }
+    if (opts.zoom) {
+      let x = [0, 0];
+      let y = [0, 0];
+      let scale = opts.zoom === "in" ? [1, 1.25] : [1.25, 1];
+      if (opts.zoom === "random") {
+        x = [uniform(random3, -0.5, 0.5), uniform(random3, -0.15, 0.15)];
+        y = [uniform(random3, -0.5, 0.5), uniform(random3, -0.15, 0.15)];
+        scale = [uniform(random3, 0.5, 1.5), uniform(random3, 0.85, 1.15)];
+      }
+      const first = keyframeX(startTime, rate);
+      const last = keyframeX(endTime, rate);
+      patch.gravity = Gravity.CENTER;
+      patch.scale_x = addPoints(clip2.scale_x, [[first, scale[0]], [last, scale[1]]]);
+      patch.scale_y = addPoints(clip2.scale_y, [[first, scale[0]], [last, scale[1]]]);
+      patch.location_x = addPoints(clip2.location_x, [[first, x[0]], [last, x[1]]]);
+      patch.location_y = addPoints(clip2.location_y, [[first, y[0]], [last, y[1]]]);
+    }
+    if (Object.keys(patch).length > 0) patchClip(tx, clip2.id, patch);
+    position += endTime - startTime;
+  });
+  return result2;
+}
+function fitLengths(durations, fixed, keep2, budget, frame, tolerance) {
+  const flex = durations.map((_, i) => i).filter((i) => !fixed[i]);
+  const fixedSum = durations.reduce((sum2, d, i) => fixed[i] ? sum2 + d : sum2, 0);
+  const totalAt = (cap) => flex.reduce((sum2, i) => sum2 + Math.min(durations[i], Math.max(cap, keep2[i])), fixedSum);
+  if (totalAt(0) > budget + tolerance) return null;
+  let lo = 0;
+  let hi = Math.max(...durations);
+  for (let n = 0; n < 80; n += 1) {
+    const mid = (lo + hi) / 2;
+    if (totalAt(mid) > budget) hi = mid;
+    else lo = mid;
+  }
+  const out = [...durations];
+  for (const i of flex) {
+    const target = Math.min(durations[i], Math.max(lo, keep2[i]));
+    out[i] = target >= durations[i] - 1e-9 ? durations[i] : Math.max(frame, Math.trunc(target / frame) * frame);
+  }
+  const sum = () => out.reduce((a, b) => a + b, 0);
+  const trimmed = flex.filter((i) => out[i] < durations[i] - 1e-9).sort((a, b) => out[b] - out[a]);
+  while (sum() < budget - frame / 2) {
+    let grew = false;
+    for (const i of trimmed) {
+      if (sum() >= budget - frame / 2) break;
+      if (out[i] + frame <= durations[i] + 1e-9) {
+        out[i] = out[i] + frame;
+        grew = true;
+      }
+    }
+    if (!grew) break;
+  }
+  return out;
+}
+var init_add_to_timeline = __esm({
+  "../engine/src/ops/add-to-timeline.ts"() {
+    "use strict";
+    init_types();
+    init_defaults();
+    init_edit();
+    init_clips();
+    init_errors();
+    init_internal();
+    init_transitions();
   }
 });
 
@@ -6709,6 +8012,8 @@ var init_ops = __esm({
     init_titles();
     init_clipboard();
     init_presets();
+    init_sequence();
+    init_add_to_timeline();
   }
 });
 
@@ -7798,7 +9103,7 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
   return fieldErrors;
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
-  const result = { errors: [] };
+  const result2 = { errors: [] };
   const processError = (error63, path38 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
@@ -7811,10 +9116,10 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
       } else {
         const fullpath = [...path38, ...issue2.path];
         if (fullpath.length === 0) {
-          result.errors.push(mapper(issue2));
+          result2.errors.push(mapper(issue2));
           continue;
         }
-        let curr = result;
+        let curr = result2;
         let i = 0;
         while (i < fullpath.length) {
           const el = fullpath[i];
@@ -7844,7 +9149,7 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
     }
   };
   processError(error62);
-  return result;
+  return result2;
 }
 function toDotPath(_path) {
   const segs = [];
@@ -7943,17 +9248,17 @@ function failure(Err, issues, ctx) {
 function validateFallback(schema, value, _ctx) {
   const ctx = _ctx ? { ..._ctx, async: false, abortEarly: true } : { async: false, abortEarly: true };
   const fallbackRun = schema._zod.bag.fallbackRun;
-  let result;
+  let result2;
   if (fallbackRun) {
     ctx[COMPILE_FALLBACK] = true;
-    result = fallbackRun({ value, issues: [] }, ctx);
+    result2 = fallbackRun({ value, issues: [] }, ctx);
   } else {
-    result = schema._zod.run({ value, issues: [] }, ctx);
+    result2 = schema._zod.run({ value, issues: [] }, ctx);
   }
-  if (result instanceof Promise) {
+  if (result2 instanceof Promise) {
     throw new $ZodAsyncError();
   }
-  return result.issues.length === 0;
+  return result2.issues.length === 0;
 }
 var _parse, parse, _parseAsync, parseAsync, _safeParse, safeParse, _safeParseAsync, safeParseAsync, COMPILE_INVALID, COMPILE_FALLBACK, validate, validateAsync, _encode, encode, _decode, decode, _encodeAsync, encodeAsync, _decodeAsync, decodeAsync, _safeEncode, safeEncode, _safeDecode, safeDecode, _safeEncodeAsync, safeEncodeAsync, _safeDecodeAsync, safeDecodeAsync;
 var init_parse = __esm({
@@ -7964,16 +9269,16 @@ var init_parse = __esm({
     _parse = (_Err) => {
       const fn = (schema, value, _ctx, _params) => {
         const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
-        const result = schema._zod.run({ value, issues: [] }, ctx);
-        if (result instanceof Promise) {
+        const result2 = schema._zod.run({ value, issues: [] }, ctx);
+        if (result2 instanceof Promise) {
           throw new $ZodAsyncError();
         }
-        if (result.issues.length) {
-          const e = new (_params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
+        if (result2.issues.length) {
+          const e = new (_params?.Err ?? _Err)(result2.issues.map((iss) => finalizeIssue(iss, ctx, config())));
           captureStackTrace(e, _params?.callee ?? fn);
           throw e;
         }
-        return result.value;
+        return result2.value;
       };
       return fn;
     };
@@ -7981,34 +9286,34 @@ var init_parse = __esm({
     _parseAsync = (_Err) => {
       const fn = async (schema, value, _ctx, params) => {
         const ctx = _ctx ? { ..._ctx, async: true } : { async: true };
-        let result = schema._zod.run({ value, issues: [] }, ctx);
-        if (result instanceof Promise)
-          result = await result;
-        if (result.issues.length) {
-          const e = new (params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
+        let result2 = schema._zod.run({ value, issues: [] }, ctx);
+        if (result2 instanceof Promise)
+          result2 = await result2;
+        if (result2.issues.length) {
+          const e = new (params?.Err ?? _Err)(result2.issues.map((iss) => finalizeIssue(iss, ctx, config())));
           captureStackTrace(e, params?.callee ?? fn);
           throw e;
         }
-        return result.value;
+        return result2.value;
       };
       return fn;
     };
     parseAsync = /* @__PURE__ */ _parseAsync($ZodRealError);
     _safeParse = (_Err) => (schema, value, _ctx) => {
       const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
-      const result = schema._zod.run({ value, issues: [] }, ctx);
-      if (result instanceof Promise) {
+      const result2 = schema._zod.run({ value, issues: [] }, ctx);
+      if (result2 instanceof Promise) {
         throw new $ZodAsyncError();
       }
-      return result.issues.length ? failure(_Err, result.issues, ctx) : { success: true, data: result.value };
+      return result2.issues.length ? failure(_Err, result2.issues, ctx) : { success: true, data: result2.value };
     };
     safeParse = /* @__PURE__ */ _safeParse($ZodRealError);
     _safeParseAsync = (_Err) => async (schema, value, _ctx) => {
       const ctx = _ctx ? { ..._ctx, async: true } : { async: true };
-      let result = schema._zod.run({ value, issues: [] }, ctx);
-      if (result instanceof Promise)
-        result = await result;
-      return result.issues.length ? failure(_Err, result.issues, ctx) : { success: true, data: result.value };
+      let result2 = schema._zod.run({ value, issues: [] }, ctx);
+      if (result2 instanceof Promise)
+        result2 = await result2;
+      return result2.issues.length ? failure(_Err, result2.issues, ctx) : { success: true, data: result2.value };
     };
     safeParseAsync = /* @__PURE__ */ _safeParseAsync($ZodRealError);
     COMPILE_INVALID = /* @__PURE__ */ Symbol.for("zod.compile.invalid");
@@ -8025,10 +9330,10 @@ var init_parse = __esm({
     });
     validateAsync = async (schema, value, _ctx) => {
       const ctx = _ctx ? { ..._ctx, async: true, abortEarly: true } : { async: true, abortEarly: true };
-      let result = schema._zod.run({ value, issues: [] }, ctx);
-      if (result instanceof Promise)
-        result = await result;
-      return result.issues.length === 0;
+      let result2 = schema._zod.run({ value, issues: [] }, ctx);
+      if (result2 instanceof Promise)
+        result2 = await result2;
+      return result2.issues.length === 0;
     };
     _encode = (_Err) => {
       const parse4 = _parse(_Err);
@@ -8264,9 +9569,9 @@ var init_regexes = __esm({
 });
 
 // ../../node_modules/zod/v4/core/checks.js
-function handleCheckPropertyResult(result, payload, property) {
-  if (result.issues.length) {
-    payload.issues.push(...prefixIssues(property, result.issues));
+function handleCheckPropertyResult(result2, payload, property) {
+  if (result2.issues.length) {
+    payload.issues.push(...prefixIssues(property, result2.issues));
   }
 }
 var $ZodCheck, _whenHasSize, _whenHasLength, numericOriginMap, $ZodCheckLessThan, $ZodCheckGreaterThan, $ZodCheckMultipleOf, $ZodCheckNumberFormat, $ZodCheckBigIntFormat, $ZodCheckMaxSize, $ZodCheckMinSize, $ZodCheckSizeEquals, $ZodCheckMaxLength, $ZodCheckMinLength, $ZodCheckLengthEquals, $ZodCheckStringFormat, $ZodCheckRegex, $ZodCheckLowerCase, $ZodCheckUpperCase, $ZodCheckIncludes, $ZodCheckStartsWith, $ZodCheckEndsWith, $ZodCheckProperty, $ZodCheckProperties, $ZodCheckMimeType, $ZodCheckOverwrite;
@@ -8684,14 +9989,14 @@ var init_checks = __esm({
     $ZodCheckProperty = /* @__PURE__ */ $constructor("$ZodCheckProperty", (inst, def) => {
       $ZodCheck.init(inst, def);
       inst._zod.check = (payload) => {
-        const result = def.schema._zod.run({
+        const result2 = def.schema._zod.run({
           value: payload.value[def.property],
           issues: []
         }, {});
-        if (result instanceof Promise) {
-          return result.then((result2) => handleCheckPropertyResult(result2, payload, def.property));
+        if (result2 instanceof Promise) {
+          return result2.then((result3) => handleCheckPropertyResult(result3, payload, def.property));
         }
-        handleCheckPropertyResult(result, payload, def.property);
+        handleCheckPropertyResult(result2, payload, def.property);
         return;
       };
     });
@@ -8710,12 +10015,12 @@ var init_checks = __esm({
         const input2 = payload.value;
         let proms;
         for (const [key, schema] of entries) {
-          const result = schema._zod.run({ value: input2[key], issues: [] }, {});
-          if (result instanceof Promise) {
+          const result2 = schema._zod.run({ value: input2[key], issues: [] }, {});
+          if (result2 instanceof Promise) {
             proms ?? (proms = []);
-            proms.push(result.then((result2) => handleCheckPropertyResult(result2, payload, key)));
+            proms.push(result2.then((result3) => handleCheckPropertyResult(result3, payload, key)));
           } else {
-            handleCheckPropertyResult(result, payload, key);
+            handleCheckPropertyResult(result2, payload, key);
           }
         }
         if (proms)
@@ -8962,26 +10267,26 @@ function isValidJWT(token, algorithm = null) {
     return false;
   }
 }
-function handleArrayResult(result, final, index) {
-  if (result.issues.length) {
-    final.issues.push(...prefixIssues(index, result.issues));
+function handleArrayResult(result2, final, index) {
+  if (result2.issues.length) {
+    final.issues.push(...prefixIssues(index, result2.issues));
   }
-  final.value[index] = result.value;
+  final.value[index] = result2.value;
 }
-function handlePropertyResult(result, final, key, input2, optin, optout) {
+function handlePropertyResult(result2, final, key, input2, optin, optout) {
   const isPresent2 = key in input2;
   const isOptionalOut = optout === "optional";
   if (!isPresent2 && isOptionalOut && optin === "optional") {
     return;
   }
-  if (result.issues.length) {
+  if (result2.issues.length) {
     if (optin !== void 0 && isOptionalOut && !isPresent2) {
       return;
     }
-    final.issues.push(...prefixIssues(key, result.issues));
+    final.issues.push(...prefixIssues(key, result2.issues));
   }
   if (!isPresent2 && optin === void 0) {
-    if (!result.issues.length) {
+    if (!result2.issues.length) {
       final.issues.push({
         code: "invalid_type",
         expected: "nonoptional",
@@ -8991,12 +10296,12 @@ function handlePropertyResult(result, final, key, input2, optin, optout) {
     }
     return;
   }
-  if (result.value === void 0) {
+  if (result2.value === void 0) {
     if (isPresent2 || optin === "defaulted" && !isOptionalOut) {
       final.value[key] = void 0;
     }
   } else {
-    final.value[key] = result.value;
+    final.value[key] = result2.value;
   }
 }
 function normalizeDef(def) {
@@ -9069,9 +10374,9 @@ function handleCatchall(proms, input2, payload, ctx, def, inst, abortEarly) {
   });
 }
 function handleUnionResults(results, final, inst, ctx) {
-  for (const result of results) {
-    if (result.issues.length === 0) {
-      final.value = result.value;
+  for (const result2 of results) {
+    if (result2.issues.length === 0) {
+      final.value = result2.value;
       return final;
     }
   }
@@ -9084,7 +10389,7 @@ function handleUnionResults(results, final, inst, ctx) {
     code: "invalid_union",
     input: final.value,
     inst,
-    errors: results.map((result) => result.issues.map((iss) => finalizeIssue(iss, ctx, config())))
+    errors: results.map((result2) => result2.issues.map((iss) => finalizeIssue(iss, ctx, config())))
   });
   return final;
 }
@@ -9103,7 +10408,7 @@ function handleExclusiveUnionResults(results, final, inst, ctx) {
       code: "invalid_union",
       input: final.value,
       inst,
-      errors: results.map((result) => result.issues.map((iss) => finalizeIssue(iss, ctx, config())))
+      errors: results.map((result2) => result2.issues.map((iss) => finalizeIssue(iss, ctx, config())))
     });
   } else {
     final.issues.push({
@@ -9195,7 +10500,7 @@ function mergeValues(a, b) {
   }
   return { valid: false, mergeErrorPath: [] };
 }
-function handleIntersectionResults(result, left, right) {
+function handleIntersectionResults(result2, left, right) {
   const unrecKeys = /* @__PURE__ */ new Map();
   let unrecIssue;
   const keyIssues = /* @__PURE__ */ new Map();
@@ -9221,30 +10526,30 @@ function handleIntersectionResults(result, left, right) {
   };
   for (const iss of left.issues) {
     if (!collect(iss, "l"))
-      result.issues.push(iss);
+      result2.issues.push(iss);
   }
   for (const iss of right.issues) {
     if (!collect(iss, "r"))
-      result.issues.push(iss);
+      result2.issues.push(iss);
   }
-  const bothKeys = [...unrecKeys].filter(([, f2]) => f2.l && f2.r).map(([k]) => k);
+  const bothKeys = [...unrecKeys].filter(([, f3]) => f3.l && f3.r).map(([k]) => k);
   if (bothKeys.length) {
     const aggregated = unrecIssue ? bothKeys.filter((k) => unrecIssue.keys.includes(k)) : [];
     if (aggregated.length)
-      result.issues.push({ ...unrecIssue, keys: aggregated });
+      result2.issues.push({ ...unrecIssue, keys: aggregated });
     for (const k of bothKeys) {
       if (!aggregated.includes(k) && keyIssues.has(k))
-        result.issues.push(keyIssues.get(k));
+        result2.issues.push(keyIssues.get(k));
     }
   }
   const merged = mergeValues(left.value, right.value);
   if (!merged.valid) {
-    if (aborted(result))
-      return result;
+    if (aborted(result2))
+      return result2;
     throw new Error(`Unmergable intersection. Error path: ${JSON.stringify(merged.mergeErrorPath)}`);
   }
-  result.value = merged.data;
-  return result;
+  result2.value = merged.data;
+  return result2;
 }
 function getTupleOptStart(items, key) {
   for (let i = items.length - 1; i >= 0; i--) {
@@ -9254,11 +10559,11 @@ function getTupleOptStart(items, key) {
   }
   return 0;
 }
-function handleTupleResult(result, final, index) {
-  if (result.issues.length) {
-    final.issues.push(...prefixIssues(index, result.issues));
+function handleTupleResult(result2, final, index) {
+  if (result2.issues.length) {
+    final.issues.push(...prefixIssues(index, result2.issues));
   }
-  final.value[index] = result.value;
+  final.value[index] = result2.value;
 }
 function handleTupleResults(itemResults, final, items, input2, optoutStart) {
   for (let i = 0; i < items.length; i++) {
@@ -9316,14 +10621,14 @@ function handleMapResult(keyResult, valueResult, final, key, input2, inst, ctx) 
   }
   final.value.set(keyResult.value, valueResult.value);
 }
-function handleSetResult(result, final) {
-  if (result.issues.length) {
-    final.issues.push(...result.issues);
+function handleSetResult(result2, final) {
+  if (result2.issues.length) {
+    final.issues.push(...result2.issues);
   }
-  final.value.add(result.value);
+  final.value.add(result2.value);
 }
-function handleOptionalResult(payload, result) {
-  payload.value = result.issues.length ? void 0 : result.value;
+function handleOptionalResult(payload, result2) {
+  payload.value = result2.issues.length ? void 0 : result2.value;
   return payload;
 }
 function handleDefaultResult(payload, def) {
@@ -9343,18 +10648,18 @@ function handleNonOptionalResult(payload, inst) {
   }
   return payload;
 }
-function handleCatchResult(payload, result, def, ctx) {
-  if (!result.issues.length) {
-    payload.value = result.value;
-    if (result.memo)
+function handleCatchResult(payload, result2, def, ctx) {
+  if (!result2.issues.length) {
+    payload.value = result2.value;
+    if (result2.memo)
       payload.memo = true;
     return payload;
   }
   payload.value = def.catchValue({
-    ...result,
+    ...result2,
     value: payload.value,
     error: {
-      issues: result.issues.map((iss) => finalizeIssue(iss, ctx, config()))
+      issues: result2.issues.map((iss) => finalizeIssue(iss, ctx, config()))
     },
     input: payload.value
   });
@@ -9367,24 +10672,24 @@ function handlePipeResult(left, next, ctx) {
   }
   return next._zod.run({ value: left.value, issues: left.issues }, ctx);
 }
-function handleCodecAResult(result, def, ctx) {
-  if (result.issues.length) {
-    result.aborted = true;
-    return result;
+function handleCodecAResult(result2, def, ctx) {
+  if (result2.issues.length) {
+    result2.aborted = true;
+    return result2;
   }
   const direction2 = ctx.direction || "forward";
   if (direction2 === "forward") {
-    const transformed = def.transform(result.value, result);
+    const transformed = def.transform(result2.value, result2);
     if (transformed instanceof Promise) {
-      return transformed.then((value) => handleCodecTxResult(result, value, def.out, ctx));
+      return transformed.then((value) => handleCodecTxResult(result2, value, def.out, ctx));
     }
-    return handleCodecTxResult(result, transformed, def.out, ctx);
+    return handleCodecTxResult(result2, transformed, def.out, ctx);
   } else {
-    const transformed = def.reverseTransform(result.value, result);
+    const transformed = def.reverseTransform(result2.value, result2);
     if (transformed instanceof Promise) {
-      return transformed.then((value) => handleCodecTxResult(result, value, def.in, ctx));
+      return transformed.then((value) => handleCodecTxResult(result2, value, def.in, ctx));
     }
-    return handleCodecTxResult(result, transformed, def.in, ctx);
+    return handleCodecTxResult(result2, transformed, def.in, ctx);
   }
 }
 function handleCodecTxResult(left, value, nextSchema, ctx) {
@@ -9445,8 +10750,8 @@ function partPattern(schema) {
   }
   return leafPattern(schema);
 }
-function handleRefineResult(result, payload, input2, inst) {
-  if (!result) {
+function handleRefineResult(result2, payload, input2, inst) {
+  if (!result2) {
     const _iss = {
       code: "custom",
       input: input2,
@@ -9564,13 +10869,13 @@ var init_schemas = __esm({
             }
             return handleCanaryResult(canary, payload, ctx);
           }
-          const result = inst._zod.parse(payload, ctx);
-          if (result instanceof Promise) {
+          const result2 = inst._zod.parse(payload, ctx);
+          if (result2 instanceof Promise) {
             if (ctx.async === false)
               throw new $ZodAsyncError();
-            return result.then((result2) => runChecks(result2, checks, ctx));
+            return result2.then((result3) => runChecks(result3, checks, ctx));
           }
-          return runChecks(result, checks, ctx);
+          return runChecks(result2, checks, ctx);
         };
       }
     }, {
@@ -10089,15 +11394,15 @@ var init_schemas = __esm({
         const abortEarly = ctx?.abortEarly;
         for (let i = 0; i < input2.length; i++) {
           const item = input2[i];
-          const result = def.element._zod.run({
+          const result2 = def.element._zod.run({
             value: item,
             issues: []
           }, ctx);
-          if (result instanceof Promise) {
-            proms.push(result.then((result2) => handleArrayResult(result2, payload, i)));
+          if (result2 instanceof Promise) {
+            proms.push(result2.then((result3) => handleArrayResult(result3, payload, i)));
           } else {
-            handleArrayResult(result, payload, i);
-            if (abortEarly && result.issues.length !== 0 && aborted(result))
+            handleArrayResult(result2, payload, i);
+            if (abortEarly && result2.issues.length !== 0 && aborted(result2))
               break;
           }
         }
@@ -10338,17 +11643,17 @@ var init_schemas = __esm({
         let async = false;
         const results = [];
         for (const option of def.options) {
-          const result = option._zod.run({
+          const result2 = option._zod.run({
             value: payload.value,
             issues: []
           }, ctx);
-          if (result instanceof Promise) {
-            results.push(result);
+          if (result2 instanceof Promise) {
+            results.push(result2);
             async = true;
           } else {
-            if (result.issues.length === 0)
-              return result;
-            results.push(result);
+            if (result2.issues.length === 0)
+              return result2;
+            results.push(result2);
           }
         }
         if (!async)
@@ -10369,15 +11674,15 @@ var init_schemas = __esm({
         let async = false;
         const results = [];
         for (const option of def.options) {
-          const result = option._zod.run({
+          const result2 = option._zod.run({
             value: payload.value,
             issues: []
           }, ctx);
-          if (result instanceof Promise) {
-            results.push(result);
+          if (result2 instanceof Promise) {
+            results.push(result2);
             async = true;
           } else {
-            results.push(result);
+            results.push(result2);
           }
         }
         if (!async)
@@ -10536,11 +11841,11 @@ var init_schemas = __esm({
               seen = payload.issues.length;
             }
             i++;
-            const result = def.rest._zod.run({ value: el, issues: [] }, ctx);
-            if (result instanceof Promise) {
-              proms.push(result.then((r) => handleTupleResult(r, payload, i)));
+            const result2 = def.rest._zod.run({ value: el, issues: [] }, ctx);
+            if (result2 instanceof Promise) {
+              proms.push(result2.then((r) => handleTupleResult(r, payload, i)));
             } else {
-              handleTupleResult(result, payload, i);
+              handleTupleResult(result2, payload, i);
             }
           }
         }
@@ -10593,19 +11898,19 @@ var init_schemas = __esm({
               const outKey = keyResult.value;
               if (outKey === "__proto__")
                 continue;
-              const result = def.valueType._zod.run({ value: input2[key], issues: [] }, ctx);
-              if (result instanceof Promise) {
-                proms.push(result.then((result2) => {
-                  if (result2.issues.length) {
-                    payload.issues.push(...prefixIssues(key, result2.issues));
+              const result2 = def.valueType._zod.run({ value: input2[key], issues: [] }, ctx);
+              if (result2 instanceof Promise) {
+                proms.push(result2.then((result3) => {
+                  if (result3.issues.length) {
+                    payload.issues.push(...prefixIssues(key, result3.issues));
                   }
-                  payload.value[outKey] = result2.value;
+                  payload.value[outKey] = result3.value;
                 }));
               } else {
-                if (result.issues.length) {
-                  payload.issues.push(...prefixIssues(key, result.issues));
+                if (result2.issues.length) {
+                  payload.issues.push(...prefixIssues(key, result2.issues));
                 }
-                payload.value[outKey] = result.value;
+                payload.value[outKey] = result2.value;
               }
             }
           }
@@ -10674,19 +11979,19 @@ var init_schemas = __esm({
             const outKey = keyResult.value;
             if (outKey === "__proto__")
               continue;
-            const result = def.valueType._zod.run({ value: input2[key], issues: [] }, ctx);
-            if (result instanceof Promise) {
-              proms.push(result.then((result2) => {
-                if (result2.issues.length) {
-                  payload.issues.push(...prefixIssues(key, result2.issues));
+            const result2 = def.valueType._zod.run({ value: input2[key], issues: [] }, ctx);
+            if (result2 instanceof Promise) {
+              proms.push(result2.then((result3) => {
+                if (result3.issues.length) {
+                  payload.issues.push(...prefixIssues(key, result3.issues));
                 }
-                payload.value[outKey] = result2.value;
+                payload.value[outKey] = result3.value;
               }));
             } else {
-              if (result.issues.length) {
-                payload.issues.push(...prefixIssues(key, result.issues));
+              if (result2.issues.length) {
+                payload.issues.push(...prefixIssues(key, result2.issues));
               }
-              payload.value[outKey] = result.value;
+              payload.value[outKey] = result2.value;
             }
           }
           if (unrecognized && unrecognized.length > 0) {
@@ -10770,11 +12075,11 @@ var init_schemas = __esm({
               break;
             seen = payload.issues.length;
           }
-          const result = def.valueType._zod.run({ value: item, issues: [] }, ctx);
-          if (result instanceof Promise) {
-            proms.push(result.then((result2) => handleSetResult(result2, payload)));
+          const result2 = def.valueType._zod.run({ value: item, issues: [] }, ctx);
+          if (result2 instanceof Promise) {
+            proms.push(result2.then((result3) => handleSetResult(result3, payload)));
           } else
-            handleSetResult(result, payload);
+            handleSetResult(result2, payload);
         }
         if (proms.length)
           return Promise.all(proms).then(() => payload);
@@ -10880,10 +12185,10 @@ var init_schemas = __esm({
         if (payload.value === void 0) {
           if (def.innerType._zod.optin !== "defaulted")
             return payload;
-          const result = def.innerType._zod.run({ value: payload.value, issues: [] }, ctx);
-          if (result instanceof Promise)
-            return result.then((result2) => handleOptionalResult(payload, result2));
-          return handleOptionalResult(payload, result);
+          const result2 = def.innerType._zod.run({ value: payload.value, issues: [] }, ctx);
+          if (result2 instanceof Promise)
+            return result2.then((result3) => handleOptionalResult(payload, result3));
+          return handleOptionalResult(payload, result2);
         }
         return def.innerType._zod.run(payload, ctx);
       };
@@ -10925,11 +12230,11 @@ var init_schemas = __esm({
           payload.value = def.defaultValue;
           return payload;
         }
-        const result = def.innerType._zod.run(payload, ctx);
-        if (result instanceof Promise) {
-          return result.then((result2) => handleDefaultResult(result2, def));
+        const result2 = def.innerType._zod.run(payload, ctx);
+        if (result2 instanceof Promise) {
+          return result2.then((result3) => handleDefaultResult(result3, def));
         }
-        return handleDefaultResult(result, def);
+        return handleDefaultResult(result2, def);
       };
     });
     $ZodPrefault = /* @__PURE__ */ $constructor("$ZodPrefault", (inst, def) => {
@@ -10953,11 +12258,11 @@ var init_schemas = __esm({
         return v ? new Set([...v].filter((x) => x !== void 0)) : void 0;
       });
       inst._zod.parse = (payload, ctx) => {
-        const result = def.innerType._zod.run(payload, ctx);
-        if (result instanceof Promise) {
-          return result.then((result2) => handleNonOptionalResult(result2, inst));
+        const result2 = def.innerType._zod.run(payload, ctx);
+        if (result2 instanceof Promise) {
+          return result2.then((result3) => handleNonOptionalResult(result3, inst));
         }
-        return handleNonOptionalResult(result, inst);
+        return handleNonOptionalResult(result2, inst);
       };
     });
     $ZodSuccess = /* @__PURE__ */ $constructor("$ZodSuccess", (inst, def) => {
@@ -10966,14 +12271,14 @@ var init_schemas = __esm({
         if (ctx.direction === "backward") {
           throw new $ZodEncodeError("ZodSuccess");
         }
-        const result = def.innerType._zod.run(payload, ctx);
-        if (result instanceof Promise) {
-          return result.then((result2) => {
-            payload.value = result2.issues.length === 0;
+        const result2 = def.innerType._zod.run(payload, ctx);
+        if (result2 instanceof Promise) {
+          return result2.then((result3) => {
+            payload.value = result3.issues.length === 0;
             return payload;
           });
         }
-        payload.value = result.issues.length === 0;
+        payload.value = result2.issues.length === 0;
         return payload;
       };
     });
@@ -10986,11 +12291,11 @@ var init_schemas = __esm({
         if (ctx.direction === "backward") {
           return def.innerType._zod.run(payload, ctx);
         }
-        const result = def.innerType._zod.run({ value: payload.value, issues: [] }, ctx);
-        if (result instanceof Promise) {
-          return result.then((result2) => handleCatchResult(payload, result2, def, ctx));
+        const result2 = def.innerType._zod.run({ value: payload.value, issues: [] }, ctx);
+        if (result2 instanceof Promise) {
+          return result2.then((result3) => handleCatchResult(payload, result3, def, ctx));
         }
-        return handleCatchResult(payload, result, def, ctx);
+        return handleCatchResult(payload, result2, def, ctx);
       };
     });
     $ZodNaN = /* @__PURE__ */ $constructor("$ZodNaN", (inst, def) => {
@@ -11065,11 +12370,11 @@ var init_schemas = __esm({
         if (ctx.direction === "backward") {
           return def.innerType._zod.run(payload, ctx);
         }
-        const result = def.innerType._zod.run(payload, ctx);
-        if (result instanceof Promise) {
-          return result.then(handleReadonlyResult);
+        const result2 = def.innerType._zod.run(payload, ctx);
+        if (result2 instanceof Promise) {
+          return result2.then(handleReadonlyResult);
         }
-        return handleReadonlyResult(result);
+        return handleReadonlyResult(result2);
       };
     });
     $ZodTemplateLiteral = /* @__PURE__ */ $constructor("$ZodTemplateLiteral", (inst, def) => {
@@ -11123,11 +12428,11 @@ var init_schemas = __esm({
         }
         return Object.defineProperty(function(...args) {
           const parsedArgs = inst._def.input ? parse(inst._def.input, args) : args;
-          const result = Reflect.apply(func, this, parsedArgs);
+          const result2 = Reflect.apply(func, this, parsedArgs);
           if (inst._def.output) {
-            return parse(inst._def.output, result);
+            return parse(inst._def.output, result2);
           }
-          return result;
+          return result2;
         }, "_zod", { value: inst._zod, enumerable: false });
       };
       inst.implementAsync = (func) => {
@@ -11136,11 +12441,11 @@ var init_schemas = __esm({
         }
         return Object.defineProperty(async function(...args) {
           const parsedArgs = inst._def.input ? await parseAsync(inst._def.input, args) : args;
-          const result = await Reflect.apply(func, this, parsedArgs);
+          const result2 = await Reflect.apply(func, this, parsedArgs);
           if (inst._def.output) {
-            return await parseAsync(inst._def.output, result);
+            return await parseAsync(inst._def.output, result2);
           }
-          return result;
+          return result2;
         }, "_zod", { value: inst._zod, enumerable: false });
       };
       inst._zod.parse = (payload, _ctx) => {
@@ -11246,12 +12551,12 @@ function isRecursive(inst, stack, resolve) {
   if (stack.has(inst))
     return PROVEN;
   stack.add(inst);
-  let result = NONE;
+  let result2 = NONE;
   const check2 = (child) => {
-    if (result !== PROVEN && child?._zod) {
+    if (result2 !== PROVEN && child?._zod) {
       const answer = isRecursive(child, stack, resolve);
-      if (answer > result)
-        result = answer;
+      if (answer > result2)
+        result2 = answer;
     }
   };
   const shape2 = (sh, spread2) => {
@@ -11267,8 +12572,8 @@ function isRecursive(inst, stack, resolve) {
     return answer;
   };
   const merge2 = (answer) => {
-    if (answer > result)
-      result = answer;
+    if (answer > result2)
+      result2 = answer;
   };
   const def = inst._zod.def;
   const kind = def.type;
@@ -11369,7 +12674,7 @@ function isRecursive(inst, stack, resolve) {
     }
   }
   stack.delete(inst);
-  return settle(inst, result);
+  return settle(inst, result2);
 }
 function settle(inst, answer) {
   if (answer !== ASSUMED)
@@ -11491,19 +12796,19 @@ var init_memoizer = __esm({
             }
             handoff = bucket;
             const depth = open.length;
-            const result = base(payload, ctx);
+            const result2 = base(payload, ctx);
             handoff = void 0;
             const entry = open.length > depth ? open.pop() : void 0;
-            if (result instanceof Promise) {
-              return result.then((r) => {
+            if (result2 instanceof Promise) {
+              return result2.then((r) => {
                 if (entry)
                   entry.issues = r.issues.length ? cloneIssues(r.issues) : NO_ISSUES;
                 return r;
               });
             }
             if (entry)
-              entry.issues = result.issues.length ? cloneIssues(result.issues) : NO_ISSUES;
-            return result;
+              entry.issues = result2.issues.length ? cloneIssues(result2.issues) : NO_ISSUES;
+            return result2;
           };
           inst._zod.parse = wrapped;
           if (inst._zod.run === base)
@@ -15762,12 +17067,12 @@ var init_lt = __esm({
         }
       };
       function getSizing(origin, unitType, inclusive, targetShouldBe) {
-        const result = Sizable[origin] ?? null;
-        if (result === null)
-          return result;
+        const result2 = Sizable[origin] ?? null;
+        if (result2 === null)
+          return result2;
         return {
-          unit: result.unit[unitType],
-          verb: result.verb[targetShouldBe][inclusive ? "inclusive" : "notInclusive"]
+          unit: result2.unit[unitType],
+          verb: result2.verb[targetShouldBe][inclusive ? "inclusive" : "notInclusive"]
         };
       }
       const FormatDictionary = {
@@ -19564,8 +20869,8 @@ var init_registries = __esm({
         if (p) {
           const pm = { ...this.get(p) ?? {} };
           delete pm.id;
-          const f2 = { ...pm, ...this._map.get(schema) };
-          return Object.keys(f2).length ? f2 : void 0;
+          const f3 = { ...pm, ...this._map.get(schema) };
+          return Object.keys(f3).length ? f3 : void 0;
         }
         return this._map.get(schema);
       }
@@ -19710,10 +21015,10 @@ function newVar(ctx) {
   return `v${ctx.varCounter++}`;
 }
 function runtimeRun(schema, value) {
-  const result = schema._zod.run({ value, issues: [] }, {});
-  if (result && typeof result.then === "function")
+  const result2 = schema._zod.run({ value, issues: [] }, {});
+  if (result2 && typeof result2.then === "function")
     return INVALID;
-  const r = result;
+  const r = result2;
   return r.issues.length === 0 ? r.value : INVALID;
 }
 function compileChild(doc, ctx, schema, accessor, needsValue = true) {
@@ -19977,8 +21282,8 @@ function generateCustomRefineCheck(doc, ctx, check2, accessor) {
     const checkFn = check2._zod.check;
     const helperFn = (value) => {
       const fakePayload = { value, issues: [], addIssue: pushIssue };
-      const result = checkFn(fakePayload);
-      if (result instanceof Promise)
+      const result2 = checkFn(fakePayload);
+      if (result2 instanceof Promise)
         throwAsync();
       return fakePayload.issues.length === 0 ? fakePayload.value : INVALID;
     };
@@ -21042,10 +22347,10 @@ function generatePipeCheck(doc, ctx, schema, accessor) {
     const transformFn = def.transform;
     const helperFn = (value) => {
       const fakePayload = { value, issues: [], addIssue: pushIssue };
-      const result = transformFn(value, fakePayload);
-      if (result instanceof Promise)
+      const result2 = transformFn(value, fakePayload);
+      if (result2 instanceof Promise)
         return INVALID;
-      return fakePayload.issues.length === 0 ? result : INVALID;
+      return fakePayload.issues.length === 0 ? result2 : INVALID;
     };
     const helperConst = addUserConstant(ctx, helperFn);
     const transformedVar = newVar(ctx);
@@ -21077,10 +22382,10 @@ function generateCustomCheck(doc, ctx, schema, accessor) {
   return accessor;
 }
 function runtimeCatch(innerSchema, catchValue, value) {
-  const result = innerSchema._zod.run({ value, issues: [] }, {});
-  if (result && typeof result.then === "function")
+  const result2 = innerSchema._zod.run({ value, issues: [] }, {});
+  if (result2 && typeof result2.then === "function")
     return INVALID;
-  const r = result;
+  const r = result2;
   if (r.issues.length === 0)
     return r.value;
   return catchValue();
@@ -21117,10 +22422,10 @@ function generateTransformCheck(doc, ctx, schema, accessor) {
     const transformFn = def.transform;
     const helperFn = (value) => {
       const fakePayload = { value, issues: [], addIssue: pushIssue };
-      const result = transformFn(value, fakePayload);
-      if (result instanceof Promise)
+      const result2 = transformFn(value, fakePayload);
+      if (result2 instanceof Promise)
         return INVALID;
-      return fakePayload.issues.length === 0 ? result : INVALID;
+      return fakePayload.issues.length === 0 ? result2 : INVALID;
     };
     const helperConst = addUserConstant(ctx, helperFn);
     const outputVar = newVar(ctx);
@@ -22296,12 +23601,12 @@ function initializeContext(params) {
   };
 }
 function handleUnrepresentable(schema, ctx, json2, params, message) {
-  const result = typeof ctx.unrepresentable === "function" ? ctx.unrepresentable({ zodSchema: schema, path: params.path, message }) : ctx.unrepresentable;
-  if (result === "any")
+  const result2 = typeof ctx.unrepresentable === "function" ? ctx.unrepresentable({ zodSchema: schema, path: params.path, message }) : ctx.unrepresentable;
+  if (result2 === "any")
     return false;
-  if (result === void 0 || result === "throw")
+  if (result2 === void 0 || result2 === "throw")
     throw new Error(message);
-  Object.assign(json2, result);
+  Object.assign(json2, result2);
   return true;
 }
 function processSchema(schema, ctx, _params = { path: [], schemaPath: [] }) {
@@ -22316,13 +23621,13 @@ function processSchema(schema, ctx, _params = { path: [], schemaPath: [] }) {
     }
     return seen.schema;
   }
-  const result = { schema: {}, count: 1, cycle: void 0, path: _params.path };
-  ctx.seen.set(schema, result);
+  const result2 = { schema: {}, count: 1, cycle: void 0, path: _params.path };
+  ctx.seen.set(schema, result2);
   ctx.sharedDefsExtractedFor = void 0;
   ctx.sharedEmitDoneFor = void 0;
   const overrideSchema = schema._zod.toJSONSchema?.();
   if (overrideSchema) {
-    result.schema = overrideSchema;
+    result2.schema = overrideSchema;
   } else {
     const params = {
       ..._params,
@@ -22330,9 +23635,9 @@ function processSchema(schema, ctx, _params = { path: [], schemaPath: [] }) {
       path: _params.path
     };
     if (schema._zod.processJSONSchema) {
-      schema._zod.processJSONSchema(ctx, result.schema, params);
+      schema._zod.processJSONSchema(ctx, result2.schema, params);
     } else {
-      const _json = result.schema;
+      const _json = result2.schema;
       const processor = ctx.processors[def.type];
       if (!processor) {
         throw new Error(`[toJSONSchema]: Non-representable type encountered: ${def.type}`);
@@ -22341,22 +23646,22 @@ function processSchema(schema, ctx, _params = { path: [], schemaPath: [] }) {
     }
     const parent = schema._zod.parent;
     if (parent) {
-      if (!result.ref)
-        result.ref = parent;
+      if (!result2.ref)
+        result2.ref = parent;
       processSchema(parent, ctx, params);
       ctx.seen.get(parent).isParent = true;
     }
   }
   const meta3 = ctx.metadataRegistry.get(schema);
   if (meta3)
-    assignProps(result.schema, meta3);
+    assignProps(result2.schema, meta3);
   if (ctx.io === "input" && isTransforming(schema)) {
-    delete result.schema.examples;
-    delete result.schema.default;
+    delete result2.schema.examples;
+    delete result2.schema.default;
   }
-  if (ctx.io === "input" && "_prefault" in result.schema)
-    (_a3 = result.schema).default ?? (_a3.default = result.schema._prefault);
-  delete result.schema._prefault;
+  if (ctx.io === "input" && "_prefault" in result2.schema)
+    (_a3 = result2.schema).default ?? (_a3.default = result2.schema._prefault);
+  delete result2.schema._prefault;
   const _result = ctx.seen.get(schema);
   return _result.schema;
 }
@@ -22659,13 +23964,13 @@ function finalize(ctx, schema) {
       }
     }
   }
-  const result = {};
+  const result2 = {};
   if (ctx.target === "draft-2020-12") {
-    result.$schema = "https://json-schema.org/draft/2020-12/schema";
+    result2.$schema = "https://json-schema.org/draft/2020-12/schema";
   } else if (ctx.target === "draft-07") {
-    result.$schema = "http://json-schema.org/draft-07/schema#";
+    result2.$schema = "http://json-schema.org/draft-07/schema#";
   } else if (ctx.target === "draft-04") {
-    result.$schema = "http://json-schema.org/draft-04/schema#";
+    result2.$schema = "http://json-schema.org/draft-04/schema#";
   } else if (ctx.target === "openapi-3.0") {
   } else {
   }
@@ -22673,12 +23978,12 @@ function finalize(ctx, schema) {
     const id = ctx.external.registry.get(schema)?.id;
     if (!id)
       throw new Error("Schema is missing an `id` property");
-    result.$id = ctx.external.uri(id);
+    result2.$id = ctx.external.uri(id);
   }
-  assignProps(result, root.defId ? root.schema : root.def ?? root.schema);
+  assignProps(result2, root.defId ? root.schema : root.def ?? root.schema);
   const rootMetaId = ctx.metadataRegistry.get(schema)?.id;
-  if (rootMetaId !== void 0 && result.id === rootMetaId)
-    delete result.id;
+  if (rootMetaId !== void 0 && result2.id === rootMetaId)
+    delete result2.id;
   const defs = ctx.external?.defs ?? {};
   if (!ctx.external || ctx.sharedEmitDoneFor !== ctx.external) {
     for (const entry of ctx.seen.entries()) {
@@ -22696,14 +24001,14 @@ function finalize(ctx, schema) {
   } else {
     if (Object.keys(defs).length > 0) {
       if (ctx.target === "draft-2020-12") {
-        result.$defs = defs;
+        result2.$defs = defs;
       } else {
-        result.definitions = defs;
+        result2.definitions = defs;
       }
     }
   }
   try {
-    const finalized = JSON.parse(JSON.stringify(result));
+    const finalized = JSON.parse(JSON.stringify(result2));
     Object.defineProperty(finalized, "~standard", {
       value: {
         ...schema["~standard"],
@@ -23630,8 +24935,8 @@ var init_json_schema_generator = __esm({
         this.ctx.sharedDefsExtractedFor = void 0;
         this.ctx.sharedEmitDoneFor = void 0;
         extractDefs(this.ctx, schema);
-        const result = finalize(this.ctx, schema);
-        const { "~standard": _, ...plainResult } = result;
+        const result2 = finalize(this.ctx, schema);
+        const { "~standard": _, ...plainResult } = result2;
         return plainResult;
       }
     };
@@ -25891,13 +27196,13 @@ function checkObjectGuards(objectSchema, guards) {
     }
     if (guards.keySchema) {
       for (const key of keys) {
-        const result = guards.keySchema.safeParse(key);
-        if (result.success)
+        const result2 = guards.keySchema.safeParse(key);
+        if (result2.success)
           continue;
         payload.issues.push({
           code: "invalid_key",
           origin: "record",
-          issues: result.error.issues,
+          issues: result2.error.issues,
           input: key,
           path: [key],
           continue: true
@@ -26236,11 +27541,11 @@ function convertBaseSchema(schema, ctx) {
         } else if (schemasToIntersect.length === 1) {
           zodSchema = schemasToIntersect[0];
         } else {
-          let result = z.intersection(schemasToIntersect[0], schemasToIntersect[1]);
+          let result2 = z.intersection(schemasToIntersect[0], schemasToIntersect[1]);
           for (let i = 2; i < schemasToIntersect.length; i++) {
-            result = z.intersection(result, schemasToIntersect[i]);
+            result2 = z.intersection(result2, schemasToIntersect[i]);
           }
-          zodSchema = result;
+          zodSchema = result2;
         }
         if (schema.additionalProperties === false) {
           const propertyKeys = Object.keys(shape2);
@@ -26367,12 +27672,12 @@ function convertSchema(schema, ctx) {
     if (schema.allOf.length === 0) {
       baseSchema = hasExplicitType ? baseSchema : z.any();
     } else {
-      let result = hasExplicitType ? baseSchema : convertSchema(schema.allOf[0], ctx);
+      let result2 = hasExplicitType ? baseSchema : convertSchema(schema.allOf[0], ctx);
       const startIdx = hasExplicitType ? 0 : 1;
       for (let i = startIdx; i < schema.allOf.length; i++) {
-        result = z.intersection(result, convertSchema(schema.allOf[i], ctx));
+        result2 = z.intersection(result2, convertSchema(schema.allOf[i], ctx));
       }
-      baseSchema = result;
+      baseSchema = result2;
     }
   }
   if (schema.nullable === true && ctx.version === "openapi-3.0") {
@@ -27108,9 +28413,9 @@ function isRecord12(value) {
 }
 function checkKeyframes(value, ctx) {
   const check2 = (candidate, path38) => {
-    const result = keyframe.safeParse(candidate);
-    if (result.success) return;
-    for (const issue2 of result.error.issues) {
+    const result2 = keyframe.safeParse(candidate);
+    if (result2.success) return;
+    for (const issue2 of result2.error.issues) {
       ctx.addIssue({ code: "custom", message: issue2.message, path: [...path38, ...issue2.path] });
     }
   };
@@ -27127,9 +28432,9 @@ function checkKeyframes(value, ctx) {
 }
 function validateProject(json2) {
   if (!isRecord12(json2)) return [{ path: "", message: "expected a JSON object" }];
-  const result = projectSchema.safeParse(json2);
-  if (result.success) return [];
-  return result.error.issues.map((issue2) => ({ path: formatIssuePath(issue2.path), message: issue2.message }));
+  const result2 = projectSchema.safeParse(json2);
+  if (result2.success) return [];
+  return result2.error.issues.map((issue2) => ({ path: formatIssuePath(issue2.path), message: issue2.message }));
 }
 var record2, coordinate, keyframePoint, keyframe, fraction, effect, file2, clip, transition, layer, marker, projectSchema;
 var init_schema = __esm({
@@ -27270,23 +28575,23 @@ function upgradeProjectData(data, options) {
 }
 function flipBetaAlpha(data) {
   for (const clip2 of records(data.clips)) {
-    for (const point2 of pointsOf2(clip2.alpha)) {
+    for (const point3 of pointsOf2(clip2.alpha)) {
       for (const key of ["co", "handle_left", "handle_right"]) {
-        const coord = point2[key];
+        const coord = point3[key];
         if (isRecord13(coord) && typeof coord.Y === "number") coord.Y = 1 - coord.Y;
       }
     }
   }
 }
 function resetHandles(points) {
-  for (const point2 of points) {
-    if (isRecord13(point2.handle_left)) {
-      point2.handle_left.X = 0.5;
-      point2.handle_left.Y = 1;
+  for (const point3 of points) {
+    if (isRecord13(point3.handle_left)) {
+      point3.handle_left.X = 0.5;
+      point3.handle_left.Y = 1;
     }
-    if (isRecord13(point2.handle_right)) {
-      point2.handle_right.X = 0.5;
-      point2.handle_right.Y = 0;
+    if (isRecord13(point3.handle_right)) {
+      point3.handle_right.X = 0.5;
+      point3.handle_right.Y = 0;
     }
   }
 }
@@ -27334,8 +28639,8 @@ function migrateLegacyCrop(data, newId) {
     effect2.right = truthy(cropWidth) ? cropWidth : libopenshotKeyframe(1);
     effect2.bottom = truthy(cropHeight) ? cropHeight : libopenshotKeyframe(1);
     for (const prop of ["right", "bottom"]) {
-      for (const point2 of pointsOf2(effect2[prop])) {
-        const co = isRecord13(point2.co) ? point2.co : null;
+      for (const point3 of pointsOf2(effect2[prop])) {
+        const co = isRecord13(point3.co) ? point3.co : null;
         if (co) co.Y = 1 - num4(co.Y, 0);
       }
     }
@@ -27344,8 +28649,8 @@ function migrateLegacyCrop(data, newId) {
   }
 }
 function flipPoints(points) {
-  for (const point2 of points) {
-    const co = point2.co;
+  for (const point3 of points) {
+    const co = point3.co;
     if (isRecord13(co)) co.Y = 1 - num4(co.Y, 1);
   }
 }
@@ -27440,8 +28745,8 @@ function migrateLegacyCropLocations(data) {
       { prop: "location_y", canvas: canvasHeight, base: baseHeight, align: alignmentFor(VERTICAL_ALIGNMENT, gravity), scale: "scale_y" }
     ];
     for (const axis2 of axes) {
-      for (const point2 of pointsOf2(clip2[axis2.prop])) {
-        const co = point2.co;
+      for (const point3 of pointsOf2(clip2[axis2.prop])) {
+        const co = point3.co;
         if (!isRecord13(co) || !("Y" in co) || typeof co.Y !== "number") continue;
         const frame = co.X ?? 1;
         const value = co.Y;
@@ -27468,8 +28773,8 @@ function migrate400NonCropLocations(data) {
       { prop: "location_y", canvas: canvasHeight, source: source2.height, align: alignmentFor(VERTICAL_ALIGNMENT, gravity), scale: "scale_y" }
     ];
     for (const axis2 of axes) {
-      for (const point2 of pointsOf2(clip2[axis2.prop])) {
-        const co = point2.co;
+      for (const point3 of pointsOf2(clip2[axis2.prop])) {
+        const co = point3.co;
         if (!isRecord13(co) || !("Y" in co) || typeof co.Y !== "number") continue;
         const frame = co.X ?? 1;
         const value = co.Y;
@@ -27776,7 +29081,7 @@ function setOwn(container, key, value) {
 function rewritePaths(root, rewrite2) {
   if (typeof root !== "object" || root === null) return root;
   const copies = /* @__PURE__ */ new Map();
-  let result = root;
+  let result2 = root;
   const writable = (visit2) => {
     const chain = [];
     for (let up = visit2; up && !copies.has(up.node); up = up.parent) chain.push(up);
@@ -27785,7 +29090,7 @@ function rewritePaths(root, rewrite2) {
       const copy = Array.isArray(v.node) ? [...v.node] : { ...v.node };
       copies.set(v.node, copy);
       if (v.parent) setOwn(copies.get(v.parent.node), v.key, copy);
-      else result = copy;
+      else result2 = copy;
     }
     return copies.get(visit2.node);
   };
@@ -27813,7 +29118,7 @@ function rewritePaths(root, rewrite2) {
       }
     }
   }
-  return result;
+  return result2;
 }
 function toStoredPaths(project, projectDir, roots = {}) {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
@@ -28813,9 +30118,9 @@ function _assertClass(instance, klass) {
   }
   return instance.ptr;
 }
-function handleError(f2, args) {
+function handleError(f3, args) {
   try {
-    return f2.apply(this, args);
+    return f3.apply(this, args);
   } catch (e) {
     wasm.__wbindgen_exn_store(addHeapObject(e));
   }
@@ -28889,13 +30194,13 @@ function __wbg_get_imports() {
     return addHeapObject(ret);
   };
   imports.wbg.__wbg_instanceof_Uint8Array_2b3bbecd033d19f6 = function(arg0) {
-    let result;
+    let result2;
     try {
-      result = getObject(arg0) instanceof Uint8Array;
+      result2 = getObject(arg0) instanceof Uint8Array;
     } catch (_) {
-      result = false;
+      result2 = false;
     }
-    const ret = result;
+    const ret = result2;
     return ret;
   };
   imports.wbg.__wbindgen_string_get = function(arg0, arg1) {
@@ -29634,12 +30939,12 @@ function resolveFonts(index, familyLists) {
   const monospace = firstInstalled(index, DEFAULT_MONO) ?? sansSerif;
   const files = /* @__PURE__ */ new Set();
   const use = (family) => {
-    for (const f2 of index.files(family)) files.add(f2);
+    for (const f3 of index.files(family)) files.add(f3);
   };
   const genericTarget = (g) => g === "serif" ? serif : g === "monospace" ? monospace : sansSerif;
   const fallbackFor = (requested) => {
-    const lowered = requested.map((f2) => f2.toLowerCase());
-    if (lowered.some((f2) => index.has(f2) || GENERIC_FAMILIES.has(f2))) return void 0;
+    const lowered = requested.map((f3) => f3.toLowerCase());
+    if (lowered.some((f3) => index.has(f3) || GENERIC_FAMILIES.has(f3))) return void 0;
     for (const family of lowered) {
       const alias = firstInstalled(index, ALIASES2[family] ?? []);
       if (alias) return alias;
@@ -29647,7 +30952,7 @@ function resolveFonts(index, familyLists) {
     return sansSerif;
   };
   for (const list2 of familyLists) {
-    const lowered = list2.map((f2) => f2.toLowerCase());
+    const lowered = list2.map((f3) => f3.toLowerCase());
     let satisfied = false;
     for (const family of lowered) {
       if (GENERIC_FAMILIES.has(family)) {
@@ -29703,7 +31008,7 @@ var init_fonts = __esm({
         const files = [];
         const walked = {};
         for (const dir of roots) await walk(dir, 4, files, walked, 8e3);
-        const cached3 = new Map((cache5?.faces ?? []).map((f2) => [f2.path, f2]));
+        const cached3 = new Map((cache5?.faces ?? []).map((f3) => [f3.path, f3]));
         const entries = await mapLimit(files, 16, async (file3) => {
           try {
             const st = await stat(file3);
@@ -29728,8 +31033,8 @@ var init_fonts = __esm({
       /** Font files for a family (every style), small files first. */
       files(family) {
         const faces = this.byFamily.get(family.toLowerCase()) ?? [];
-        const small = faces.filter((f2) => f2.size <= MAX_FONT_BYTES);
-        return (small.length > 0 ? small : faces.slice(0, 1)).map((f2) => f2.path);
+        const small = faces.filter((f3) => f3.size <= MAX_FONT_BYTES);
+        return (small.length > 0 ? small : faces.slice(0, 1)).map((f3) => f3.path);
       }
     };
     bufferCache = /* @__PURE__ */ new Map();
@@ -29768,7 +31073,7 @@ async function readSvgFile(file3) {
   return (isGzip ? gunzipSync(bytes) : bytes).toString("utf8");
 }
 function splitFamilies(value) {
-  return value.split(",").map((f2) => f2.trim().replace(/^["']|["']$/g, "").trim()).filter((f2) => f2.length > 0);
+  return value.split(",").map((f3) => f3.trim().replace(/^["']|["']$/g, "").trim()).filter((f3) => f3.length > 0);
 }
 function cssFamily(name, avoidQuote) {
   if (/^[A-Za-z][A-Za-z0-9 _-]*$/.test(name)) return name;
@@ -30303,8 +31608,8 @@ function parseRatio(text4, sep = "/") {
   const den2 = Number(b);
   return Number.isFinite(num11) && Number.isFinite(den2) ? { num: num11, den: den2 } : void 0;
 }
-function toDouble(f2) {
-  return f2.num / f2.den;
+function toDouble(f3) {
+  return f3.num / f3.den;
 }
 function num5(text4) {
   if (text4 === void 0 || text4 === "N/A") return void 0;
@@ -30610,17 +31915,17 @@ async function probe(filePath, options = {}) {
       return finish(qtImageInfo(file3, dims.width, dims.height, dims.width * dims.height * 4));
     }
   }
-  let result;
+  let result2;
   try {
-    result = await ffprobe(file3, options.signal);
+    result2 = await ffprobe(file3, options.signal);
   } catch (error62) {
     if (error62.name === "AbortError" || error62.name === "BinaryNotFoundError") throw error62;
     throw new ProbeError(`FFmpegReader could not open media file: ${error62.message}`, file3);
   }
   if (!FFMPEG_EXTS.has(ext) && !file3.includes("%")) {
-    const streams = result.streams.filter((s) => s.codec_type === "video" || s.codec_type === "audio");
+    const streams = result2.streams.filter((s) => s.codec_type === "video" || s.codec_type === "audio");
     const only = streams.length === 1 ? streams[0] : void 0;
-    const imageDemuxer = /(_pipe|image2)/.test(result.format.format_name ?? "");
+    const imageDemuxer = /(_pipe|image2)/.test(result2.format.format_name ?? "");
     if (only && only.codec_type === "video" && QT_IMAGE_CODECS.has(only.codec_name ?? "") && imageDemuxer) {
       let width = only.width ?? 0;
       let height = only.height ?? 0;
@@ -30628,7 +31933,7 @@ async function probe(filePath, options = {}) {
       return finish(qtImageInfo(file3, width, height, qimageBytes(width, height, only.pix_fmt)));
     }
   }
-  return finish(await readerInfoFromFfprobe(file3, result, size));
+  return finish(await readerInfoFromFfprobe(file3, result2, size));
 }
 var ProbeError, FFMPEG_EXTS, QT_IMAGE_CODECS, CHANNEL_LAYOUTS, DEFAULT_LAYOUTS, LAYOUT_MONO, ONE_HOUR;
 var init_probe = __esm({
@@ -31258,7 +32563,7 @@ var init_sources = __esm({
     SourceManager = class {
       constructor(project, options) {
         this.options = options;
-        this.files = new Map(project.files.map((f2) => [f2.id, f2]));
+        this.files = new Map(project.files.map((f3) => [f3.id, f3]));
       }
       options;
       decoders = /* @__PURE__ */ new Map();
@@ -31561,8 +32866,8 @@ function simplifyGain(points, tolerance = 1e-4) {
     const prev = out[out.length - 1];
     const cur = sorted[i];
     const next = sorted[i + 1];
-    const span = next.t - prev.t;
-    const expected = span > 0 ? prev.gain + (next.gain - prev.gain) * (cur.t - prev.t) / span : cur.gain;
+    const span2 = next.t - prev.t;
+    const expected = span2 > 0 ? prev.gain + (next.gain - prev.gain) * (cur.t - prev.t) / span2 : cur.gain;
     if (Math.abs(expected - cur.gain) > tolerance || cur.t === prev.t) out.push(cur);
   }
   out.push(sorted[sorted.length - 1]);
@@ -31647,14 +32952,14 @@ async function buildAudioGraph(options) {
     const sourceSpan = Math.abs(rate) * part.length;
     const a = segment.sourceStart + rate * part.offset;
     let lo = rate > 0 ? a : a - sourceSpan;
-    let span = sourceSpan;
+    let span2 = sourceSpan;
     if (lo < 0) {
-      span += lo;
+      span2 += lo;
       lo = 0;
     }
-    if (span <= 1e-6) continue;
+    if (span2 <= 1e-6) continue;
     const index = options.firstInput + inputs.length;
-    const source2 = { path: file3, seek: Math.max(0, anchor2 + lo), duration: span };
+    const source2 = { path: file3, seek: Math.max(0, anchor2 + lo), duration: span2 };
     const toTimeline = ["asetpts=PTS-STARTPTS", ...rate < 0 ? ["areverse"] : [], ...atempoChain(rate), `aformat=sample_fmts=fltp:sample_rates=${sampleRate}:channel_layouts=${layout}`];
     let filters;
     const { runnable, missing } = options.effects ? splitEffects(segment.effects, options.effects.getKernel) : { runnable: [], missing: segment.effects.map((e) => e.type) };
@@ -31714,7 +33019,7 @@ function formatFromPath(file3) {
   const ext = path10.extname(file3).slice(1).toLowerCase();
   if (ext === "png") return "png-sequence";
   if (ext === "m4v") return "mp4";
-  return Object.keys(FORMATS).find((f2) => FORMATS[f2].extension === ext);
+  return Object.keys(FORMATS).find((f3) => FORMATS[f3].extension === ext);
 }
 function isEncoderPreset(value) {
   return typeof value === "string" && ENCODER_PRESETS.includes(value);
@@ -32184,8 +33489,8 @@ function numbers(params, key) {
 }
 function getInt2(value) {
   const a = Math.abs(value);
-  const f2 = Math.floor(a);
-  const r = a - f2 >= 0.5 ? f2 + 1 : f2;
+  const f3 = Math.floor(a);
+  const r = a - f3 >= 0.5 ? f3 + 1 : f3;
   const out = value < 0 ? -r : r;
   return out === 0 ? 0 : out;
 }
@@ -32852,10 +34157,10 @@ function bandLevel(bins, start, end) {
 }
 function spectrumBins(audio, bins, gain, smooth2, lowHz, highHz) {
   const size = Math.max(2, bins);
-  const result = new Float32Array(size);
+  const result2 = new Float32Array(size);
   const samples = sampleCount(audio);
   const channels = audio ? audio.channels.length : 0;
-  if (!audio || samples <= 4 || channels <= 0) return result;
+  if (!audio || samples <= 4 || channels <= 0) return result2;
   const sampleRate = Math.max(1, Math.trunc(audio.sampleRate));
   const n = Math.min(samples, 2048);
   const nyquist = f323(sampleRate * 0.5);
@@ -32897,9 +34202,9 @@ function spectrumBins(audio, bins, gain, smooth2, lowHz, highHz) {
   let previous = 0;
   for (let bin = 0; bin < size; bin += 1) {
     previous = fmaf(previous, smooth2, f323(oneMinusSmooth * magnitudes[bin]));
-    result[bin] = previous;
+    result2[bin] = previous;
   }
-  return result;
+  return result2;
 }
 function mt19937Floats(seed, count) {
   const words2 = 397 + count + 1;
@@ -32997,16 +34302,16 @@ function fromHsv(h, s, v, a) {
   const ss = sat16 / 65535;
   const vv = val16 / 65535;
   const i = Math.trunc(hh);
-  const f2 = hh - i;
+  const f3 = hh - i;
   const p = vv * (1 - ss);
   const R = (x) => qRoundPos(x * 65535);
   if (i & 1) {
-    const q = vv * fma2(-ss, f2, 1);
+    const q = vv * fma2(-ss, f3, 1);
     if (i === 1) return { r: R(q), g: R(vv), b: R(p), a: alpha };
     if (i === 3) return { r: R(p), g: R(q), b: R(vv), a: alpha };
     return { r: R(vv), g: R(p), b: R(q), a: alpha };
   }
-  const t = vv * fma2(-ss, 1 - f2, 1);
+  const t = vv * fma2(-ss, 1 - f3, 1);
   if (i === 0) return { r: R(vv), g: R(t), b: R(p), a: alpha };
   if (i === 2) return { r: R(p), g: R(vv), b: R(t), a: alpha };
   return { r: R(t), g: R(p), b: R(vv), a: alpha };
@@ -35642,14 +36947,14 @@ function gradientTable(stopsIn) {
     }
     const firstIndex = qRound3(firstStop * (TABLE - 1));
     const secondIndex = qRound3(secondStop * (TABLE - 1));
-    const f2 = first.map((v) => v * 65536);
+    const f3 = first.map((v) => v * 65536);
     const s = second.map((v) => v * 65536);
     let i = Math.max(0, Math.min(TABLE, firstIndex) + 1);
     putRange(0, i, first);
     if (i < secondIndex) {
       const reciprocal = 1 / (secondIndex - firstIndex);
-      const delta = [0, 1, 2, 3].map((c) => qRound3((s[c] - f2[c]) * reciprocal));
-      const cur = f2.map((v) => v + (1 << 15));
+      const delta = [0, 1, 2, 3].map((c) => qRound3((s[c] - f3[c]) * reciprocal));
+      const cur = f3.map((v) => v + (1 << 15));
       for (; i < Math.min(TABLE, secondIndex); i += 1) {
         for (let c = 0; c < 4; c += 1) cur[c] = cur[c] + delta[c] >>> 0;
         put2(i, [cur[0] >>> 16 & 65535, cur[1] >>> 16 & 65535, cur[2] >>> 16 & 65535, cur[3] >>> 16 & 65535]);
@@ -37445,8 +38750,8 @@ function hexColor(c) {
   const g = getInt2(c[1]);
   const b = getInt2(c[2]);
   const a = getInt2(c[3]);
-  const ok = (v) => v >= 0 && v <= 255;
-  return ok(r) && ok(g) && ok(b) && ok(a) ? [r, g, b] : [0, 0, 0];
+  const ok2 = (v) => v >= 0 && v <= 255;
+  return ok2(r) && ok2(g) && ok2(b) && ok2(a) ? [r, g, b] : [0, 0, 0];
 }
 function alpha16(alphaF) {
   if (Number.isNaN(alphaF)) return 0;
@@ -37549,7 +38854,7 @@ function flattenBezier2(out, x1, y1, x2, y2, x3, y3, x4, y4, threshold = 0.25) {
       out.push(bx4, by4);
       b -= 1;
     } else {
-      const f2 = o + 8;
+      const f3 = o + 8;
       let c = (bx2 + bx3) * 0.5;
       const fx2 = (bx1 + bx2) * 0.5;
       const sx3 = (bx3 + bx4) * 0.5;
@@ -37562,7 +38867,7 @@ function flattenBezier2(out, x1, y1, x2, y2, x3, y3, x4, y4, threshold = 0.25) {
       const fy3 = (fy2 + c) * 0.5;
       const sy2 = (sy3 + c) * 0.5;
       const my = (fy3 + sy2) * 0.5;
-      bz.set([bx1, by1, fx2, fy2, fx3, fy3, mx, my], f2);
+      bz.set([bx1, by1, fx2, fy2, fx3, fy3, mx, my], f3);
       bz.set([mx, my, sx2, sy2, sx3, sy3, bx4, by4], o);
       lvl[b] = lvl[b] - 1;
       lvl[b + 1] = lvl[b];
@@ -38578,13 +39883,13 @@ function div2572(x) {
   return y - (y >> 8) >> 8;
 }
 function hex2int(s, at, n) {
-  let result = 0;
+  let result2 = 0;
   for (let i = at; i < at + n; i += 1) {
     const h = Number.parseInt(s[i], 16);
     if (Number.isNaN(h)) return -1;
-    result = result * 16 + h;
+    result2 = result2 * 16 + h;
   }
-  return result;
+  return result2;
 }
 function qColorFromString(name) {
   if (name.length === 0) return void 0;
@@ -38687,7 +39992,7 @@ function lutStage(image, ctx, path38, intensity) {
   const lut = lutForPath(ctx, path38);
   if (lut) applyCubeLut(image, lut, intensity, 1, 1, 1);
 }
-var f329, INV_2553, EPSILON, LUMA_R, LUMA_G, LUMA_B, TINT_G, TINT_RB, RECOVERY, INV_ALPHA3, EXP2_TABLE, EXP2_C0, EXP2_C1, EXP2_SHIFT, exp2Bits, NAMED_COLORS, namedColors, WHITE, NO_BIAS, identityTable, colorGrade;
+var f329, INV_2553, EPSILON2, LUMA_R, LUMA_G, LUMA_B, TINT_G, TINT_RB, RECOVERY, INV_ALPHA3, EXP2_TABLE, EXP2_C0, EXP2_C1, EXP2_SHIFT, exp2Bits, NAMED_COLORS, namedColors, WHITE, NO_BIAS, identityTable, colorGrade;
 var init_color_grade = __esm({
   "../engine/src/render/kernels/color-grade.ts"() {
     "use strict";
@@ -38697,7 +40002,7 @@ var init_color_grade = __esm({
     init_params();
     f329 = Math.fround;
     INV_2553 = f329(1 / 255);
-    EPSILON = f329(1e-5);
+    EPSILON2 = f329(1e-5);
     LUMA_R = f329(0.299);
     LUMA_G = f329(0.587);
     LUMA_B = f329(0.114);
@@ -38922,20 +40227,20 @@ var init_color_grade = __esm({
             B = f329(B + gB);
             const lo = f329(1 - L);
             let w = f329(lo * lo);
-            if (Math.abs(w) > EPSILON) {
+            if (Math.abs(w) > EPSILON2) {
               R = fmaf3(sR, w, R);
               G = fmaf3(sG, w, G);
               B = fmaf3(sB, w, B);
             }
             const centered = f329(Math.abs(f329(L - 0.5)) * 2);
             w = clamp012(f329(1 - centered * centered));
-            if (w > EPSILON) {
+            if (w > EPSILON2) {
               R = fmaf3(mR, w, R);
               G = fmaf3(mG, w, G);
               B = fmaf3(mB, w, B);
             }
             w = f329(L * L);
-            if (Math.abs(w) > EPSILON) {
+            if (Math.abs(w) > EPSILON2) {
               R = fmaf3(hR, w, R);
               G = fmaf3(hG, w, G);
               B = fmaf3(hB, w, B);
@@ -39483,14 +40788,14 @@ function hashSigned(seed, x, y, t, salt) {
   h ^= Math.imul(t, 3266489909);
   return fmaf4(f3213(mix32(h)), INV_U32_MAX, -1);
 }
-var f3213, INV_2555, EPSILON2, LUMA_R3, LUMA_G3, LUMA_B3, INV_U32_MAX, SOFT_LERP_SPAN, CLUMP_LERP_SPAN, SOFT_LERP_BASE, CLUMP_LERP_BASE, CLUSTER_BASE, CLUSTER_SCALE, INTENSITY_SCALE, SALTS, SOFT_XOR, CLUMP_XOR, INV_ALPHA4, filmGrain;
+var f3213, INV_2555, EPSILON3, LUMA_R3, LUMA_G3, LUMA_B3, INV_U32_MAX, SOFT_LERP_SPAN, CLUMP_LERP_SPAN, SOFT_LERP_BASE, CLUMP_LERP_BASE, CLUSTER_BASE, CLUSTER_SCALE, INTENSITY_SCALE, SALTS, SOFT_XOR, CLUMP_XOR, INV_ALPHA4, filmGrain;
 var init_film_grain = __esm({
   "../engine/src/render/kernels/film-grain.ts"() {
     "use strict";
     init_params();
     f3213 = Math.fround;
     INV_2555 = f3213(1 / 255);
-    EPSILON2 = f3213(1e-5);
+    EPSILON3 = f3213(1e-5);
     LUMA_R3 = f3213(0.299);
     LUMA_G3 = f3213(0.587);
     LUMA_B3 = f3213(0.114);
@@ -39515,7 +40820,7 @@ var init_film_grain = __esm({
       supported: true,
       run(image, params, ctx) {
         const amount = clamp014(f3213(num7(params, "amount", 0.25)));
-        if (amount <= EPSILON2) return;
+        if (amount <= EPSILON3) return;
         const size = clamp014(f3213(num7(params, "size", 0.2)));
         const softness = clamp014(f3213(num7(params, "softness", 0.25)));
         const clump = clamp014(f3213(num7(params, "clump", 0.2)));
@@ -39534,14 +40839,14 @@ var init_film_grain = __esm({
         const temporalPosition = f3213(f3213(ctx.frame) * temporalRate);
         const time0 = Math.floor(temporalPosition);
         const time1 = time0 + 1;
-        const temporalMix = temporalRate <= EPSILON2 ? 0 : clamp014(f3213(temporalPosition - time0));
+        const temporalMix = temporalRate <= EPSILON3 ? 0 : clamp014(f3213(temporalPosition - time0));
         const smoothMix = smooth(temporalMix);
         const baseSeed = (seed >>> 0 ^ mix32(fnv1a(ctx.effectId ?? ""))) >>> 0;
         const intensityScale = f3213(amount * INTENSITY_SCALE);
-        const useTemporal = temporalRate > EPSILON2 && smoothMix > EPSILON2;
-        const useSoft = softness > EPSILON2;
-        const useClump = clump > EPSILON2;
-        const useVariation = colorAmount > EPSILON2 && colorVariation > EPSILON2;
+        const useTemporal = temporalRate > EPSILON3 && smoothMix > EPSILON3;
+        const useSoft = softness > EPSILON3;
+        const useClump = clump > EPSILON3;
+        const useVariation = colorAmount > EPSILON3 && colorVariation > EPSILON3;
         const numTimes = useTemporal ? 2 : 1;
         const numSalts = useVariation ? 4 : 1;
         const buckets = [time0, time1];
@@ -39606,7 +40911,7 @@ var init_film_grain = __esm({
             const centered = f3213(Math.abs(f3213(L - 0.5)) * 2);
             const midtone = clamp014(f3213(1 - centered * centered));
             const tone = fmaf4(f3213(L * L), highlightStrength, fmaf4(f3213(dark * dark), shadowStrength, f3213(midtoneStrength * midtone)));
-            if (tone <= EPSILON2) continue;
+            if (tone <= EPSILON3) continue;
             const refX = f3213(x * scaleX);
             const fineIx = Math.trunc(f3213(refX * fineFrequency));
             if (fineIx !== cachedFineIx) {
@@ -40197,7 +41502,7 @@ var init_transform = __esm({
       /** `QTransform::inverted()`; null when singular. */
       inverted() {
         const inv = new _QTransform();
-        let ok = true;
+        let ok2 = true;
         const type = this.inlineType();
         switch (type) {
           case TxNone:
@@ -40207,8 +41512,8 @@ var init_transform = __esm({
             inv.dy = -this.dy;
             break;
           case TxScale:
-            ok = !fuzzyIsNull2(this.m11) && !fuzzyIsNull2(this.m22);
-            if (ok) {
+            ok2 = !fuzzyIsNull2(this.m11) && !fuzzyIsNull2(this.m22);
+            if (ok2) {
               inv.m11 = 1 / this.m11;
               inv.m22 = 1 / this.m22;
               inv.dx = -this.dx * inv.m11;
@@ -40218,7 +41523,7 @@ var init_transform = __esm({
           default: {
             const dtr = fma2(this.m11, this.m22, -(this.m12 * this.m21));
             if (dtr === 0) {
-              ok = false;
+              ok2 = false;
               break;
             }
             const dinv = 1 / dtr;
@@ -40231,7 +41536,7 @@ var init_transform = __esm({
             break;
           }
         }
-        if (!ok) return null;
+        if (!ok2) return null;
         inv.mType = this.mType;
         inv.mDirty = this.mDirty;
         return inv;
@@ -40321,16 +41626,16 @@ function hsvToRgb(c) {
   const s = c.s / USHRT_MAX;
   const v = c.v / USHRT_MAX;
   const i = Math.trunc(h);
-  const f2 = h - i;
+  const f3 = h - i;
   const p = qRound(v * (1 - s) * USHRT_MAX);
   const vv = qRound(v * USHRT_MAX);
   if (i & 1) {
-    const q = qRound(v * fma2(-s, f2, 1) * USHRT_MAX);
+    const q = qRound(v * fma2(-s, f3, 1) * USHRT_MAX);
     if (i === 1) return { a: c.a, r: q, g: vv, b: p };
     if (i === 3) return { a: c.a, r: p, g: q, b: vv };
     return { a: c.a, r: vv, g: p, b: q };
   }
-  const t = qRound(v * fma2(-s, 1 - f2, 1) * USHRT_MAX);
+  const t = qRound(v * fma2(-s, 1 - f3, 1) * USHRT_MAX);
   if (i === 0) return { a: c.a, r: vv, g: t, b: p };
   if (i === 2) return { a: c.a, r: p, g: vv, b: t };
   return { a: c.a, r: t, g: p, b: vv };
@@ -41342,8 +42647,8 @@ function sphericalKernel(image, params, ctx) {
       }
     }
   }
-  const result = createPremul(W, H);
-  const r = result.data;
+  const result2 = createPremul(W, H);
+  const r = result2.data;
   for (let i = 0; i < out.length; i += 4) {
     const a = out[i + 3];
     if (a === 0) continue;
@@ -41359,7 +42664,7 @@ function sphericalKernel(image, params, ctx) {
     r[i + 2] = byteMul(out[i + 2], a);
     r[i + 3] = a;
   }
-  return result;
+  return result2;
 }
 var DEG, HALF_PI, TWO_PI3, STATE_KEY2, NEAR_BOUNDARY, TAPS, sphericalProjection;
 var init_spherical = __esm({
@@ -42639,9 +43944,9 @@ var init_stft = __esm({
         this.numChannels = channels > 0 ? channels : 1;
       }
       /** `STFT::updateParameters(fft size, overlap, window type)`. */
-      updateParameters(fftSize, overlap, windowType) {
+      updateParameters(fftSize, overlap2, windowType) {
         this.updateFftSize(fftSize);
-        this.updateHopSize(overlap);
+        this.updateHopSize(overlap2);
         this.updateWindow(windowType);
       }
       updateFftSize(size) {
@@ -42659,11 +43964,11 @@ var init_stft = __esm({
         this.outputRead = 0;
         this.sinceLastFft = 0;
       }
-      updateHopSize(overlap) {
-        if (overlap === this.overlap) return;
-        this.overlap = overlap;
-        if (overlap !== 0) {
-          this.hopSize = Math.trunc(this.fftSize / overlap);
+      updateHopSize(overlap2) {
+        if (overlap2 === this.overlap) return;
+        this.overlap = overlap2;
+        if (overlap2 !== 0) {
+          this.hopSize = Math.trunc(this.fftSize / overlap2);
           this.outputWrite = this.hopSize % this.fftSize;
         }
       }
@@ -43073,14 +44378,14 @@ var init_effects3 = __esm({
 });
 
 // ../engine/src/render/plan/frame-mapper.ts
-function toFloat3(f2) {
-  return Math.fround(Math.fround(f2.num) / Math.fround(f2.den));
+function toFloat3(f3) {
+  return Math.fround(Math.fround(f3.num) / Math.fround(f3.den));
 }
-function toInt2(f2) {
-  return Math.trunc(roundHalfAway(f2.num / f2.den));
+function toInt2(f3) {
+  return Math.trunc(roundHalfAway(f3.num / f3.den));
 }
-function isSpecial(f2) {
-  const v = toFloat3(f2);
+function isSpecial(f3) {
+  const v = toFloat3(f3);
   return Math.abs(v - 24) < 1e-7 || Math.abs(v - 25) < 1e-7 || Math.abs(v - 30) < 1e-7;
 }
 function buildFrameMapping(source2, target, videoLength) {
@@ -43117,8 +44422,8 @@ function buildFrameMapping(source2, target, videoLength) {
     const increment = videoLength / newLength;
     let original = 1;
     for (let n = 1; n <= newLength; n += 1) {
-      const f2 = roundHalfAway(original);
-      fields.push(f2, f2);
+      const f3 = roundHalfAway(original);
+      fields.push(f3, f3);
       original += increment;
     }
   }
@@ -43582,13 +44887,13 @@ function parentedImageSizes(clip2, effect2, decode3) {
   }
   return Object.keys(out).length ? out : void 0;
 }
-function timelineEffects(project, layer2, f2, fps, before, after) {
+function timelineEffects(project, layer2, f3, fps, before, after) {
   for (const raw of sortEffects(project.effects ?? [])) {
     const effect2 = raw;
     if (int4(effect2.layer) !== layer2) continue;
     const window = frameWindow({ position: Number(effect2.position ?? 0), start: Number(effect2.start ?? 0), end: Number(effect2.end ?? 0) }, fps);
-    if (!windowContains(window, f2)) continue;
-    const lf = localFrame(window, f2);
+    if (!windowContains(window, f3)) continue;
+    const lf = localFrame(window, f3);
     const stage = applyBeforeClip(effect2) ? before : after;
     if (effect2.type === "Mask") {
       const reader = maskReaderOf(effect2);
@@ -43615,8 +44920,8 @@ function timelineEffects(project, layer2, f2, fps, before, after) {
     }
   }
 }
-function planLayer(project, clip2, window, f2, isTop, canvas, fps) {
-  const n = localFrame(window, f2);
+function planLayer(project, clip2, window, f3, isTop, canvas, fps) {
+  const n = localFrame(window, f3);
   const reader = clip2.reader;
   const delivered = deliveredSource(clip2, { previewWidth: canvas.width, previewHeight: canvas.height, timelineWidth: canvas.timelineWidth });
   if (delivered.kind === "unsupported") return null;
@@ -43634,7 +44939,7 @@ function planLayer(project, clip2, window, f2, isTop, canvas, fps) {
     if (sizes3) instance.imageSizes = sizes3;
     (applyBeforeClip(e) ? before : after).effects.push(instance);
   }
-  if (isTop) timelineEffects(project, int4(clip2.layer), f2, fps, before, after);
+  if (isTop) timelineEffects(project, int4(clip2.layer), f3, fps, before, after);
   let source2;
   let drawW = delivered.width;
   let drawH = delivered.height;
@@ -43719,7 +45024,7 @@ function clipContext(clip2, n, fps) {
 }
 function planFrame(project, frame, size, options) {
   const fps = fractionOf(project.fps, { num: 30, den: 1 });
-  const f2 = Math.max(1, Math.trunc(frame));
+  const f3 = Math.max(1, Math.trunc(frame));
   const canvas = planCanvas(project, size, options);
   const clips = sortClips(project.clips ?? []);
   const windows = clips.map((c) => frameWindow(c, fps));
@@ -43727,7 +45032,7 @@ function planFrame(project, frame, size, options) {
   const topStart = /* @__PURE__ */ new Map();
   clips.forEach((clip2, i) => {
     const w = windows[i];
-    if (!windowContains(w, f2)) return;
+    if (!windowContains(w, f3)) return;
     const layer2 = int4(clip2.layer);
     const best = topStart.get(layer2);
     if (best === void 0 || w.startFrame > best) {
@@ -43738,13 +45043,13 @@ function planFrame(project, frame, size, options) {
   const layers = [];
   clips.forEach((clip2, i) => {
     const w = windows[i];
-    if (!windowContains(w, f2)) return;
-    const plan = planLayer(project, clip2, w, f2, topByLayer.get(int4(clip2.layer)) === i, canvas, fps);
+    if (!windowContains(w, f3)) return;
+    const plan = planLayer(project, clip2, w, f3, topByLayer.get(int4(clip2.layer)) === i, canvas, fps);
     if (plan) layers.push(plan);
   });
   return {
-    frame: f2,
-    time: (f2 - 1) / (fps.num / fps.den),
+    frame: f3,
+    time: (f3 - 1) / (fps.num / fps.den),
     width: canvas.width,
     height: canvas.height,
     background: [...BACKGROUND],
@@ -43830,10 +45135,10 @@ function hasAudioAt(info, n) {
 function intAt(kf, n) {
   return kf ? kf.int(n) : -1;
 }
-function transitionGains(info, f2, isTop, layerClips, masks) {
+function transitionGains(info, f3, isTop, layerClips, masks) {
   let active = null;
   for (const m of masks) {
-    if (m.layer !== info.layer || !windowContains(m.window, f2)) continue;
+    if (m.layer !== info.layer || !windowContains(m.window, f3)) continue;
     if (active) return [1, 1];
     active = m;
   }
@@ -43841,7 +45146,7 @@ function transitionGains(info, f2, isTop, layerClips, masks) {
   const audible = [];
   for (const other of layerClips) {
     if (!other.hasReader) continue;
-    if (hasAudioAt(other, localFrame(other.window, f2)) === 0) continue;
+    if (hasAudioAt(other, localFrame(other.window, f3)) === 0) continue;
     audible.push(other);
     if (audible.length > 2) return [1, 1];
   }
@@ -43860,14 +45165,14 @@ function transitionGains(info, f2, isTop, layerClips, masks) {
     else if (t > 1) t = 1;
     return f3224(fadesIn ? Math.sin(t * HALF_PI2) : Math.cos(t * HALF_PI2));
   };
-  return [gain(f2 - 1), gain(f2)];
+  return [gain(f3 - 1), gain(f3)];
 }
 function mappedOffset(info, grid, k) {
   return grid.offset(k + info.offset) - grid.offset(1 + info.offset);
 }
 function timeMappedSpans(info, grid, last) {
   const time3 = info.time;
-  const spans = /* @__PURE__ */ new Map();
+  const spans2 = /* @__PURE__ */ new Map();
   let prev = { frame: 0, sample: 0 };
   let prevEndedFrame = Number.NaN;
   for (let n = info.window.localStartFrame; n <= last; n += 1) {
@@ -43901,7 +45206,7 @@ function timeMappedSpans(info, grid, last) {
         remaining = 0;
       }
     }
-    spans.set(n, {
+    spans2.set(n, {
       start: startOffset / grid.rate,
       rate: (increasing ? 1 : -1) * source2 / target,
       continues: !reset && prevEndedFrame === n - 1
@@ -43909,7 +45214,7 @@ function timeMappedSpans(info, grid, last) {
     prevEndedFrame = n;
     prev = loc;
   }
-  return spans;
+  return spans2;
 }
 function isOne(v) {
   return Math.abs(v - 1) < 1e-6;
@@ -43986,14 +45291,14 @@ function planAudio(project, range) {
     });
   }
   const perClip = /* @__PURE__ */ new Map();
-  const spans = /* @__PURE__ */ new Map();
+  const spans2 = /* @__PURE__ */ new Map();
   for (const c of relevant) {
     if (!c.audible) continue;
     perClip.set(c, []);
-    if (c.time) spans.set(c, timeMappedSpans(c, grid, localFrame(c.window, Math.min(fB, c.window.endFrame))));
+    if (c.time) spans2.set(c, timeMappedSpans(c, grid, localFrame(c.window, Math.min(fB, c.window.endFrame))));
   }
-  for (let f2 = fA; f2 <= fB; f2 += 1) {
-    const here = relevant.filter((c) => windowContains(c.window, f2));
+  for (let f3 = fA; f3 <= fB; f3 += 1) {
+    const here = relevant.filter((c) => windowContains(c.window, f3));
     if (!here.some((c) => c.audible)) continue;
     const top = /* @__PURE__ */ new Map();
     for (const c of here) {
@@ -44005,7 +45310,7 @@ function planAudio(project, range) {
       if (maxVolume === null) {
         let sum = 0;
         for (const c of here) {
-          const n = localFrame(c.window, f2);
+          const n = localFrame(c.window, f3);
           if (c.hasReader && hasAudioAt(c, n) !== 0) sum = f3224(sum + volumeAt(c, n));
         }
         maxVolume = sum;
@@ -44015,14 +45320,14 @@ function planAudio(project, range) {
     for (const c of here) {
       const list2 = perClip.get(c);
       if (!list2) continue;
-      const n = localFrame(c.window, f2);
+      const n = localFrame(c.window, f3);
       if (hasAudioAt(c, n) === 0) continue;
-      let span;
-      if (c.time) span = spans.get(c)?.get(n);
-      else if (c.mappedLength === 0 || n <= c.mappedLength) span = { start: mappedOffset(c, grid, n) / sampleRate, rate: 1, continues: true };
-      if (!span) continue;
+      let span2;
+      if (c.time) span2 = spans2.get(c)?.get(n);
+      else if (c.mappedLength === 0 || n <= c.mappedLength) span2 = { start: mappedOffset(c, grid, n) / sampleRate, rate: 1, continues: true };
+      if (!span2) continue;
       const layerClips = here.filter((o) => o.layer === c.layer);
-      const [gPrev, gCur] = masks.length ? transitionGains(c, f2, top.get(c.layer) === c, layerClips, masks) : [1, 1];
+      const [gPrev, gCur] = masks.length ? transitionGains(c, f3, top.get(c.layer) === c, layerClips, masks) : [1, 1];
       let pv = f3224(volumeAt(c, n - 1) * gPrev);
       let v = f3224(volumeAt(c, n) * gCur);
       if (c.mixing === VOLUME_MIX_AVERAGE && volumeSum() > 1) {
@@ -44035,11 +45340,11 @@ function planAudio(project, range) {
       if (isOne(pv) && isOne(v)) pv = v = 1;
       const effectsKey = c.audioEffects.length ? JSON.stringify(c.audioEffects.map((e) => effectInstance(e, n, fps, false).params)) : "";
       list2.push({
-        f: f2,
+        f: f3,
         n,
-        t0: grid.time(f2),
-        t1: grid.time(f2 + 1),
-        span,
+        t0: grid.time(f3),
+        t1: grid.time(f3 + 1),
+        span: span2,
         pv,
         v,
         filter: intAt(c.channelFilter, n),
@@ -44353,7 +45658,7 @@ function maskSpans2(mask2) {
   maskSpans(mask2, (x, y, len, coverage) => out.push({ x, y, len, coverage }));
   return out;
 }
-function intersect(clip2, state, spans, start, end, out, available) {
+function intersect(clip2, state, spans2, start, end, out, available) {
   const clipSpans = clip2.spans;
   const clipCount = clipSpans.length;
   let ci = state.current;
@@ -44363,7 +45668,7 @@ function intersect(clip2, state, spans, start, end, out, available) {
       si = end;
       break;
     }
-    const s = spans[si];
+    const s = spans2[si];
     const c = clipSpans[ci];
     if (c.y > s.y) {
       si += 1;
@@ -44398,35 +45703,35 @@ function intersect(clip2, state, spans, start, end, out, available) {
   state.current = ci;
   return si;
 }
-function deliverSpans(spans, clip2, blend) {
-  for (let start = 0; start < spans.length; start += SPAN_BATCH) {
-    const end = Math.min(spans.length, start + SPAN_BATCH);
+function deliverSpans(spans2, clip2, blend) {
+  for (let start = 0; start < spans2.length; start += SPAN_BATCH) {
+    const end = Math.min(spans2.length, start + SPAN_BATCH);
     if (!clip2) {
-      blend(spans.slice(start, end));
+      blend(spans2.slice(start, end));
       continue;
     }
     const state = { current: 0 };
     let si = start;
     while (si < end) {
       const out = [];
-      si = intersect(clip2, state, spans, si, end, out, CLIPPED_BATCH);
+      si = intersect(clip2, state, spans2, si, end, out, CLIPPED_BATCH);
       if (out.length) blend(out);
     }
   }
 }
-function handleSpans(spans, constAlpha, fetch2, process4) {
+function handleSpans(spans2, constAlpha, fetch2, process4) {
   let coverage = 0;
   let i = 0;
-  const count = spans.length;
+  const count = spans2.length;
   while (i < count) {
-    if (!spans[i].len) {
+    if (!spans2[i].len) {
       i += 1;
       continue;
     }
-    let x = spans[i].x;
-    const y = spans[i].y;
-    let right = x + spans[i].len;
-    for (let j = i + 1; j < count && spans[j].y === y && spans[j].x === right; j += 1) right += spans[j].len;
+    let x = spans2[i].x;
+    const y = spans2[i].y;
+    let right = x + spans2[i].len;
+    for (let j = i + 1; j < count && spans2[j].y === y && spans2[j].x === right; j += 1) right += spans2[j].len;
     let length = right - x;
     while (length) {
       let l = Math.min(BUFFER_SIZE2, length);
@@ -44434,7 +45739,7 @@ function handleSpans(spans, constAlpha, fetch2, process4) {
       const src = fetch2(x, y, l);
       let offset = 0;
       while (l > 0) {
-        const s = spans[i];
+        const s = spans2[i];
         if (x === s.x) coverage = s.coverage * constAlpha >> 8;
         const spanRight = s.x + s.len;
         const len = Math.min(l, spanRight - x);
@@ -44455,16 +45760,16 @@ var init_spans = __esm({
     SPAN_BATCH = 256;
     CLIPPED_BATCH = 256;
     ClipData = class _ClipData {
-      constructor(spans) {
-        this.spans = spans;
-        if (spans.length === 0) {
+      constructor(spans2) {
+        this.spans = spans2;
+        if (spans2.length === 0) {
           this.xmin = this.xmax = this.ymin = this.ymax = 0;
           return;
         }
         let xmin = Number.POSITIVE_INFINITY;
         let xmax = 0;
         let y = -1;
-        spans.forEach((s, i) => {
+        spans2.forEach((s, i) => {
           if (s.y !== y) {
             y = s.y;
             this.lines.set(y, i);
@@ -44474,8 +45779,8 @@ var init_spans = __esm({
         });
         this.xmin = xmin;
         this.xmax = xmax;
-        this.ymin = spans[0].y;
-        this.ymax = spans[spans.length - 1].y + 1;
+        this.ymin = spans2[0].y;
+        this.ymax = spans2[spans2.length - 1].y + 1;
       }
       spans;
       lines = /* @__PURE__ */ new Map();
@@ -44502,8 +45807,8 @@ function setupMatrix(t) {
   const inv = delta.multiply(t).inverted();
   if (!inv) return null;
   const f1 = fma2(inv.m11, inv.m11, inv.m21 * inv.m21);
-  const f2 = fma2(inv.m12, inv.m12, inv.m22 * inv.m22);
-  const fast = f1 < 1e4 && f2 < 1e4 && f1 > 1 / 65536 && f2 > 1 / 65536 && Math.abs(inv.dx) < 1e4 && Math.abs(inv.dy) < 1e4;
+  const f22 = fma2(inv.m12, inv.m12, inv.m22 * inv.m22);
+  const fast = f1 < 1e4 && f22 < 1e4 && f1 > 1 / 65536 && f22 > 1 / 65536 && Math.abs(inv.dx) < 1e4 && Math.abs(inv.dy) < 1e4;
   return { m11: inv.m11, m12: inv.m12, m21: inv.m21, m22: inv.m22, dx: inv.dx, dy: inv.dy, fast };
 }
 function sourceX(m, cx, cy) {
@@ -44621,9 +45926,9 @@ function fetchNearest(src, m, x, y, length, out) {
   }
 }
 function rectSpans(x, y, w, h, device, clip2) {
-  const spans = [];
+  const spans2 = [];
   const sink = (sx, sy, len, coverage) => {
-    spans.push({ x: sx, y: sy, len, coverage });
+    spans2.push({ x: sx, y: sy, len, coverage });
   };
   if (clip2) {
     const x1 = Math.max(x, clip2.xmin);
@@ -44631,10 +45936,10 @@ function rectSpans(x, y, w, h, device, clip2) {
     const y1 = Math.max(y, clip2.ymin);
     const y2 = Math.min(y + h, clip2.ymax);
     if (x2 > x1 && y2 > y1) for (let row = y1; row < y2; row += 1) sink(x1, row, x2 - x1, 255);
-    return spans;
+    return spans2;
   }
   fillRectSpans(x, y, w, h, device, sink);
-  return spans;
+  return spans2;
 }
 function rasterizerBox(device, clip2) {
   if (!clip2) return device;
@@ -44700,24 +46005,24 @@ function drawImage(dst, src, state) {
       }
       return solid3;
     };
-    const spans2 = rectSpans(x1, y1, qRound(rr.x + rr.width) - x1, qRound(rr.y + rr.height) - y1, device, clip2);
-    deliverSpans(spans2, clip2, (chunk2) => handleSpans(chunk2, 256, fetch3, process4));
+    const spans3 = rectSpans(x1, y1, qRound(rr.x + rr.width) - x1, qRound(rr.y + rr.height) - y1, device, clip2);
+    deliverSpans(spans3, clip2, (chunk2) => handleSpans(chunk2, 256, fetch3, process4));
     return;
   }
   const m = setupMatrix(t);
   if (!m) return;
-  let spans;
+  let spans2;
   const sink = (x, y, len, coverage) => {
-    spans.push({ x, y, len, coverage });
+    spans2.push({ x, y, len, coverage });
   };
-  spans = [];
+  spans2 = [];
   if (!state.antialias && type === TxScale) {
     const rr = t.mapRect(0, 0, w, h);
     const x1 = qRound(rr.x);
     const y1 = qRound(rr.y);
     const x2 = qRound(rr.x + rr.width);
     const y2 = qRound(rr.y + rr.height);
-    spans = rectSpans(x1, y1, x2 - x1, y2 - y1, device, clip2);
+    spans2 = rectSpans(x1, y1, x2 - x1, y2 - y1, device, clip2);
   } else {
     const noShear = scaleIsUniform(t);
     if (noShear || type === TxScale) {
@@ -44729,7 +46034,7 @@ function drawImage(dst, src, state) {
       const path38 = new PainterPath();
       path38.addRect(0, 0, w, h);
       const mask2 = grayRasterize(outlineContours(path38, t), true, dst.width, dst.height);
-      spans = mask2 ? maskSpans2(mask2) : [];
+      spans2 = mask2 ? maskSpans2(mask2) : [];
     } else {
       const poly = [];
       for (const [px, py] of [
@@ -44751,7 +46056,7 @@ function drawImage(dst, src, state) {
     sample(src, m, x, y, length, scratch2);
     return scratch2;
   };
-  deliverSpans(spans, clip2, (chunk2) => handleSpans(chunk2, intOpacity, fetch2, process4));
+  deliverSpans(spans2, clip2, (chunk2) => handleSpans(chunk2, intOpacity, fetch2, process4));
 }
 function roundedRectClip(w, h, radius, transform2, width, height) {
   const path38 = new PainterPath();
@@ -45330,14 +46635,14 @@ var init_text = __esm({
             let pick2;
             for (const offset of faces) {
               const font = parseOpenType(bytes, offset);
-              if (font.families.some((f2) => f2.toLowerCase() === chosen.toLowerCase())) {
+              if (font.families.some((f3) => f3.toLowerCase() === chosen.toLowerCase())) {
                 pick2 = font;
                 break;
               }
               pick2 ??= font;
             }
             if (!pick2) continue;
-            const loaded = { file: file3, bytes, font: pick2, family: pick2.families.find((f2) => f2.toLowerCase() === chosen.toLowerCase()) ?? pick2.families[0] ?? chosen };
+            const loaded = { file: file3, bytes, font: pick2, family: pick2.families.find((f3) => f3.toLowerCase() === chosen.toLowerCase()) ?? pick2.families[0] ?? chosen };
             this.loaded.set(key, loaded);
             return loaded;
           } catch {
@@ -45431,11 +46736,11 @@ var init_text = __esm({
       /** Rasterize `text` (baseline at x, y in region coordinates) into a region-sized straight-RGBA image. */
       render(text4, font, region, x, y, fill, stroke, strokeWidth) {
         const loaded = this.load(font.family);
-        const f2 = rgba(fill);
+        const f3 = rgba(fill);
         const strokeAttrs = stroke && strokeWidth > 0 ? ` stroke="${rgba(stroke).rgb}" stroke-opacity="${rgba(stroke).alpha}" stroke-width="${strokeWidth}" stroke-linecap="square" stroke-linejoin="bevel"` : "";
         const w = Math.max(1, Math.ceil(region.width));
         const h = Math.max(1, Math.ceil(region.height));
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${region.x} ${region.y} ${w} ${h}"><text x="${x}" y="${y}" font-family="${esc2(loaded.family)}" font-size="${font.pixelSize}" fill="${f2.rgb}" fill-opacity="${f2.alpha}"${strokeAttrs} xml:space="preserve">${esc2(text4)}</text></svg>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${region.x} ${region.y} ${w} ${h}"><text x="${x}" y="${y}" font-family="${esc2(loaded.family)}" font-size="${font.pixelSize}" fill="${f3.rgb}" fill-opacity="${f3.alpha}"${strokeAttrs} xml:space="preserve">${esc2(text4)}</text></svg>`;
         const renderer = new Resvg2(svg, {
           font: { fontBuffers: [loaded.bytes], defaultFontFamily: loaded.family, sansSerifFamily: loaded.family },
           textRendering: 2,
@@ -46243,7 +47548,7 @@ async function listPaths(entry) {
     const pattern = globToRegExp(normalized.slice(base.length));
     const all = [];
     await walkFiles(base.split("/").join(path15.sep) || path15.sep, all);
-    const files = all.filter((f2) => pattern.test(f2.split(path15.sep).join("/").slice(base.length)));
+    const files = all.filter((f3) => pattern.test(f3.split(path15.sep).join("/").slice(base.length)));
     return { kind: "glob", files };
   }
   return { kind: "missing", files: [] };
@@ -46914,7 +48219,7 @@ async function pushProject(options) {
   const media = [];
   const skipped = [];
   const taken = /* @__PURE__ */ new Set();
-  const candidates = project.files.filter((f2) => typeof f2.path === "string" && f2.path && !isPortableAssetPath(f2.path) && !/^https?:/i.test(f2.path));
+  const candidates = project.files.filter((f3) => typeof f3.path === "string" && f3.path && !isPortableAssetPath(f3.path) && !/^https?:/i.test(f3.path));
   let done = 0;
   for (const file3 of candidates) {
     const local = String(file3.path);
@@ -47474,13 +48779,13 @@ var init_receipt = __esm({
 });
 
 // ../engine/src/tools/wire.ts
-function toAssistantWire(result) {
-  const text4 = result.text ?? "";
+function toAssistantWire(result2) {
+  const text4 = result2.text ?? "";
   const receipt2 = parseReceipt(text4);
   const failed2 = receipt2 !== null && (receipt2.status === "error" || receipt2.status === "refused");
   const wire = { result: failed2 ? String(receipt2.summary || text4) : text4 };
-  if (!failed2 && result.images && result.images.length > 0) {
-    wire.images = result.images.map((image) => ({ mimeType: image.mimeType, data: image.data }));
+  if (!failed2 && result2.images && result2.images.length > 0) {
+    wire.images = result2.images.map((image) => ({ mimeType: image.mimeType, data: image.data }));
   }
   return wire;
 }
@@ -48746,7 +50051,10 @@ var init_schemas_gen = __esm({
         "speed": external_exports.number().min(0).max(16).describe("Speed factor relative to how the clip plays now: 2 = twice as fast (half as long), 0.5 = half speed, 1.5, 4... 0 = leave the speed alone.").optional(),
         "target_duration_seconds": external_exports.number().min(0).describe("Retime so the clip lasts exactly this long on the timeline (speeds up or slows down as needed); 0 = unused.").optional(),
         "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on.").optional(),
-        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional(),
+        "clip_id": external_exports.string().describe("Older name: one timeline clip id (added to timeline_clip_ids).").optional(),
+        "factor": external_exports.number().min(0).max(16).describe("Older name for speed.").optional(),
+        "direction": external_exports.enum(["forward", "backward"]).describe("Older argument: backward = reverse=true; forward changes nothing.").optional()
       }),
       set_editor_layout_tool: external_exports.strictObject({
         "delete_view": external_exports.string().describe("Delete this saved custom view (by name). Never touches the project.").optional(),
@@ -52073,7 +53381,10 @@ A slower clip gets longer and may run into the next clip on its track: the tool 
             "speed": { "default": 0, "description": "Speed factor relative to how the clip plays now: 2 = twice as fast (half as long), 0.5 = half speed, 1.5, 4... 0 = leave the speed alone.", "maximum": 16, "minimum": 0, "type": "number" },
             "target_duration_seconds": { "default": 0, "description": "Retime so the clip lasts exactly this long on the timeline (speeds up or slows down as needed); 0 = unused.", "minimum": 0, "type": "number" },
             "timeline_clip_ids": { "default": [], "description": "Timeline clip ids to act on.", "items": { "type": "string" }, "type": "array" },
-            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" },
+            "clip_id": { "type": "string", "description": "Older name: one timeline clip id (added to timeline_clip_ids)." },
+            "factor": { "type": "number", "minimum": 0, "maximum": 16, "description": "Older name for speed." },
+            "direction": { "type": "string", "enum": ["forward", "backward"], "description": "Older argument: backward = reverse=true; forward changes nothing." }
           }
         }
       },
@@ -52478,11 +53789,9 @@ var init_pending = __esm({
     "use strict";
     PENDING_DESKTOP_TOOLS = /* @__PURE__ */ new Set([
       "add_animated_title_tool",
-      "add_clips_to_timeline_tool",
       "add_emoji_tool",
       "add_timer_tool",
       "add_transitions_between_clips_tool",
-      "align_clips_tool",
       "analyze_frame_colors_tool",
       "apply_audio_effect_tool",
       "apply_clip_preset_tool",
@@ -52499,14 +53808,12 @@ var init_pending = __esm({
       "copy_transition_tool",
       "create_media_with_comfyui_tool",
       "create_subclips_tool",
-      "duplicate_clips_tool",
       "edit_captions_tool",
       "edit_title_tool",
       "enhance_file_with_comfyui_tool",
       "export_files_to_folder_tool",
       "export_project_file_tool",
       "forget_recent_projects_tool",
-      "freeze_frame_tool",
       "generate_image_and_add_to_timeline_tool",
       "get_clip_effects_tool",
       "get_clip_properties_tool",
@@ -52534,35 +53841,27 @@ var init_pending = __esm({
       "manage_optimized_previews_tool",
       "match_color_to_reference_tool",
       "mcp_health_tool",
-      "move_clips_tool",
       "prepare_recording_tool",
       "process_clip_effect_tool",
       "remove_captions_tool",
       "remove_files_from_project_tool",
-      "remove_gaps_tool",
       "remove_keyframes_tool",
       "remove_marker_tool",
       "remove_track_tool",
       "remove_transition_tool",
-      "repeat_clip_tool",
       "reset_caches_and_history_tool",
       "restore_recovery_version_tool",
-      "reverse_clip_tool",
       "reverse_transition_tool",
       "save_frame_image_tool",
       "search_emojis_tool",
       "seek_playhead_tool",
       "select_timeline_items_tool",
       "send_assistant_prompt_tool",
-      "separate_clip_audio_tool",
-      "set_clip_audio_video_tool",
       "set_clip_properties_tool",
       "set_editor_layout_tool",
       "set_preference_tool",
       "set_project_profile_tool",
       "set_timeline_view_tool",
-      "slice_clips_tool",
-      "trim_clips_tool",
       "update_effect_tool",
       "update_marker_tool",
       "update_project_files_tool",
@@ -52634,8 +53933,7 @@ var init_pending = __esm({
     };
     DESKTOP_NAMES_ON_DIRECT_TOOLS = /* @__PURE__ */ new Set([
       "list_effects_tool",
-      "remove_effect_tool",
-      "set_clip_speed_tool"
+      "remove_effect_tool"
     ]);
   }
 });
@@ -52689,8 +53987,8 @@ function sceneSourceTime(scene, metadata) {
   if (isRecord19(metadata) && isRecord19(metadata.source_window)) {
     const ws = pyNum(metadata.source_window.start);
     const we = pyNum(metadata.source_window.end);
-    const span = Math.max(0, we - ws);
-    if (span > 0 && t <= span + 1) return ws + t;
+    const span2 = Math.max(0, we - ws);
+    if (span2 > 0 && t <= span2 + 1) return ws + t;
   }
   return t;
 }
@@ -53074,7 +54372,7 @@ function normPath(path38) {
 }
 function findFileData(project, fileId) {
   if (!fileId) return void 0;
-  return (project.files ?? []).find((f2) => String(f2.id) === fileId);
+  return (project.files ?? []).find((f3) => String(f3.id) === fileId);
 }
 function resolveParentFileId(project, fileData, fileId = "") {
   const data = isRecord20(fileData) ? fileData : void 0;
@@ -53127,7 +54425,7 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
   const rawLayer = clipData.layer;
   const layerNum = rawLayer === null || rawLayer === void 0 || rawLayer === "" ? null : Math.trunc(Number(rawLayer));
   const layer2 = layerNum !== null && Number.isFinite(layerNum) ? layerNum : null;
-  const uiTrack = layer2 !== null ? layerNumberToDisplayIndex(layer2, options.layers ?? []) : null;
+  const uiTrack2 = layer2 !== null ? layerNumberToDisplayIndex(layer2, options.layers ?? []) : null;
   const fileName2 = String(file3?.name || basename2(path38) || "").trim();
   const title = String(clipData.title || clipData.label || fileName2 || "Clip").trim();
   let tlMeta = getIndexBlock(parentData ?? {});
@@ -53151,7 +54449,7 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
     timelineDuration,
     timelineEnd: timelinePosition + timelineDuration,
     layer: layer2,
-    uiTrack,
+    uiTrack: uiTrack2,
     title,
     fileName: fileName2,
     effectiveMetadata: effective,
@@ -53209,7 +54507,7 @@ function fileSummaryPreview(file3, clip2) {
   return buildSummaryPreview(getEffectiveAiMetadata(file3, clip2, { rebased: true }));
 }
 function visibleFiles(project) {
-  return (project.files ?? []).filter((f2) => !f2.zenvi_subclip);
+  return (project.files ?? []).filter((f3) => !f3.zenvi_subclip);
 }
 function mediaBinFields(file3) {
   const data = file3;
@@ -53514,6 +54812,189 @@ var init_reports = __esm({
   }
 });
 
+// ../engine/src/tools/editor-args.ts
+function isRecord22(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function kindsOf(schema) {
+  const t = schema.type;
+  if (Array.isArray(t)) {
+    const kinds = t.filter((k) => k !== "null");
+    return kinds.length > 0 ? kinds : ["null"];
+  }
+  if (typeof t === "string") return [t];
+  for (const key of ["anyOf", "oneOf"]) {
+    const branches = schema[key];
+    if (branches) return branches.flatMap((branch) => kindsOf(branch));
+  }
+  return [];
+}
+function acceptsNull(schema) {
+  if (schema.nullable) return true;
+  const t = schema.type;
+  if (t === "null" || Array.isArray(t) && t.includes("null")) return true;
+  return [...schema.anyOf ?? [], ...schema.oneOf ?? []].some(acceptsNull);
+}
+function acceptsEmptyString(schema) {
+  if (schema.enum) return schema.enum.includes("");
+  const fallback = schema.default;
+  return kindsOf(schema).includes("string") && (fallback === void 0 || fallback === null || fallback === "");
+}
+function coerceKind(path38, value, kind, schema) {
+  if (kind === "boolean") {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    const s = String(value).trim().toLowerCase();
+    if (TRUE.has(s)) return true;
+    if (FALSE.has(s)) return false;
+    throw new EditorArgError(`argument '${path38}' must be true or false`);
+  }
+  if (kind === "number" || kind === "integer") {
+    let f3;
+    if (typeof value === "number") f3 = Number.isFinite(value) ? value : null;
+    else if (typeof value === "string") {
+      f3 = parsePythonFloat(value.trim().replace(/s+$/, ""));
+    } else {
+      throw new EditorArgError(`argument '${path38}' must be a number`);
+    }
+    if (f3 === null) throw new EditorArgError(`argument '${path38}' must be a finite number`);
+    if (kind === "integer") {
+      if (!Number.isInteger(f3)) throw new EditorArgError(`argument '${path38}' must be a whole number`);
+    }
+    if (schema.minimum !== void 0 && f3 < schema.minimum) throw new EditorArgError(`argument '${path38}' is below the minimum`);
+    if (schema.maximum !== void 0 && f3 > schema.maximum) throw new EditorArgError(`argument '${path38}' is above the maximum`);
+    return f3;
+  }
+  if (kind === "string") {
+    if (typeof value === "object" && value !== null) return JSON.stringify(value);
+    return String(value);
+  }
+  if (kind === "array") {
+    let list2;
+    if (typeof value === "string") {
+      const s = value.trim();
+      if (!s) list2 = [];
+      else if (s.startsWith("[")) {
+        let parsed;
+        try {
+          parsed = JSON.parse(s);
+        } catch {
+          throw new EditorArgError(`argument '${path38}' is not a valid JSON list`);
+        }
+        list2 = Array.isArray(parsed) ? parsed : [parsed];
+      } else {
+        list2 = s.split(",").map((p) => p.trim()).filter(Boolean);
+      }
+    } else if (Array.isArray(value)) {
+      list2 = value;
+    } else {
+      list2 = [value];
+    }
+    const items = schema.items;
+    if (items && Object.keys(items).length > 0) return list2.map((v, i) => coerceEditorValue(`${path38}[${i}]`, v, items));
+    return list2;
+  }
+  if (kind === "object") {
+    let obj = value;
+    if (typeof value === "string") {
+      const s = value.trim();
+      if (!s) return {};
+      try {
+        obj = JSON.parse(s);
+      } catch {
+        throw new EditorArgError(`argument '${path38}' is not a valid JSON object`);
+      }
+    }
+    if (!isRecord22(obj)) throw new EditorArgError(`argument '${path38}' must be an object`);
+    const props = schema.properties;
+    if (!props || Object.keys(props).length === 0) return obj;
+    const out = {};
+    for (const [key, v] of Object.entries(obj)) {
+      const prop = props[key];
+      if (prop) out[key] = coerceEditorValue(`${path38}.${key}`, v, prop);
+      else if (schema.additionalProperties === false) throw new EditorArgError(`argument '${path38}' has unknown key '${key}'`);
+      else out[key] = v;
+    }
+    for (const key of schema.required ?? []) {
+      if (!(key in out)) throw new EditorArgError(`argument '${path38}' needs key '${key}'`);
+    }
+    return out;
+  }
+  return value;
+}
+function coerceEditorValue(path38, value, schema) {
+  if (value === null || value === void 0) {
+    if (acceptsNull(schema)) return null;
+    throw new EditorArgError(`argument '${path38}' must not be null`);
+  }
+  if (schema.enum) {
+    const choices = schema.enum;
+    if (choices.includes(value)) return value;
+    if (typeof value === "string") {
+      const wanted = value.trim().toLowerCase();
+      const hit = choices.find((c) => typeof c === "string" && c.toLowerCase() === wanted);
+      if (hit !== void 0) return hit;
+    }
+    if (typeof value === "number") {
+      const hit = choices.find((c) => typeof c === "string" && c === String(value));
+      if (hit !== void 0) return hit;
+    }
+    throw new EditorArgError(`argument '${path38}' is not one of the choices`);
+  }
+  const kinds = kindsOf(schema);
+  let last;
+  for (const kind of kinds) {
+    try {
+      return coerceKind(path38, value, kind, schema);
+    } catch (error62) {
+      if (!(error62 instanceof EditorArgError)) throw error62;
+      last = error62;
+    }
+  }
+  if (last) throw last;
+  return value;
+}
+function coerceEditorArgs(schema, args) {
+  if (args === null || args === void 0) return {};
+  if (!isRecord22(args)) return args;
+  const out = {};
+  for (const [key, value] of Object.entries(args)) {
+    if (HIDDEN_PARAMS.has(key)) continue;
+    const prop = schema.properties[key];
+    if (!prop) {
+      if (value !== "" && value !== void 0) out[key] = value;
+      continue;
+    }
+    if (value === void 0) continue;
+    if (value === null) {
+      if (acceptsNull(prop)) out[key] = null;
+      continue;
+    }
+    if (value === "" && !acceptsEmptyString(prop)) continue;
+    try {
+      out[key] = coerceEditorValue(key, value, prop);
+    } catch (error62) {
+      if (!(error62 instanceof EditorArgError)) throw error62;
+      out[key] = value;
+    }
+  }
+  return out;
+}
+function isEditorToolHandler(handler) {
+  return typeof handler === "string" && handler.startsWith("src/classes/editor_tools/");
+}
+var EditorArgError, TRUE, FALSE;
+var init_editor_args = __esm({
+  "../engine/src/tools/editor-args.ts"() {
+    "use strict";
+    init_coerce();
+    EditorArgError = class extends Error {
+    };
+    TRUE = /* @__PURE__ */ new Set(["true", "1", "yes", "y", "on"]);
+    FALSE = /* @__PURE__ */ new Set(["false", "0", "no", "n", "off"]);
+  }
+});
+
 // ../engine/src/tools/snapshot.ts
 function num9(value, fallback = 0) {
   const n = typeof value === "number" ? value : Number(value);
@@ -53667,14 +55148,14 @@ function capabilityName(capability) {
 function missingCapabilities(requires, host) {
   return (requires ?? []).filter((cap) => host[cap] === void 0 || host[cap] === null);
 }
-function isRecord22(value) {
+function isRecord23(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function resultFor(receipt2, images) {
-  const ok = isOkStatus(receipt2.status);
-  const result = { ok, text: JSON.stringify(receipt2), data: receipt2 };
-  if (ok && images && images.length > 0) result.images = images;
-  return result;
+  const ok2 = isOkStatus(receipt2.status);
+  const result2 = { ok: ok2, text: JSON.stringify(receipt2), data: receipt2 };
+  if (ok2 && images && images.length > 0) result2.images = images;
+  return result2;
 }
 function fillEmpty(receipt2, before, after) {
   const delta = timelineDelta(before, after);
@@ -53698,8 +55179,8 @@ function receiptForError(tool, error62, host) {
 }
 async function executeTool(tool, impl, ctx, rawArgs) {
   const name = tool.name;
-  const session = isRecord22(rawArgs) && typeof rawArgs.chat_session_id === "string" && rawArgs.chat_session_id.trim() ? rawArgs.chat_session_id.trim() : "default";
-  const args = normalizeArgs(tool.inputSchema, rawArgs);
+  const session = isRecord23(rawArgs) && typeof rawArgs.chat_session_id === "string" && rawArgs.chat_session_id.trim() ? rawArgs.chat_session_id.trim() : "default";
+  const args = isEditorToolHandler(tool.desktopHandler) ? coerceEditorArgs(tool.inputSchema, rawArgs) : normalizeArgs(tool.inputSchema, rawArgs);
   const parsed = tool.input.safeParse(args);
   if (!parsed.success) {
     const issue2 = parsed.error.issues[0];
@@ -53724,12 +55205,12 @@ async function executeTool(tool, impl, ctx, rawArgs) {
       state.committed = true;
       const before = timelineSnapshot(doc.project);
       const undoBefore = doc.undoLabels.length;
-      const result = doc.transaction(label2 ?? tool.title, body);
+      const result2 = doc.transaction(label2 ?? tool.title, body);
       state.before = before;
       state.after = timelineSnapshot(doc.project);
       state.undoBefore = undoBefore;
       state.undoAfter = doc.undoLabels.length;
-      return result;
+      return result2;
     }
   };
   let outcome;
@@ -53819,6 +55300,7 @@ var init_define = __esm({
     init_errors();
     init_schemas_gen();
     init_coerce();
+    init_editor_args();
     init_pending();
     init_receipt();
     init_snapshot();
@@ -54070,7 +55552,7 @@ var init_speech = __esm({
 });
 
 // ../engine/src/tools/resolve.ts
-function isRecord23(value) {
+function isRecord24(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function optionalFloat(value) {
@@ -54086,21 +55568,21 @@ function tokenize(text4) {
   return (normalizeText(text4).match(/[a-z0-9]+/g) ?? []).filter((t) => t.length > 1);
 }
 function metadataCorpus(ai, maxScenes = 8) {
-  if (!isRecord23(ai)) return "";
+  if (!isRecord24(ai)) return "";
   const parts = [];
   for (const key of ["short_summary", "description", "sounds", "transcript"]) {
     if (ai[key]) parts.push(String(ai[key]));
   }
   for (const ch of (Array.isArray(ai.chapters) ? ai.chapters : []).slice(0, maxScenes)) {
-    if (isRecord23(ch)) {
+    if (isRecord24(ch)) {
       if (ch.title) parts.push(String(ch.title));
       if (ch.summary) parts.push(String(ch.summary));
     }
   }
   for (const sc of (Array.isArray(ai.scene_descriptions) ? ai.scene_descriptions : []).slice(0, maxScenes)) {
-    if (isRecord23(sc) && sc.description) parts.push(String(sc.description));
+    if (isRecord24(sc) && sc.description) parts.push(String(sc.description));
   }
-  const tags = isRecord23(ai.tags) ? ai.tags : {};
+  const tags = isRecord24(ai.tags) ? ai.tags : {};
   for (const key of ["objects", "scenes", "activities", "mood"]) {
     const vals = tags[key];
     if (Array.isArray(vals)) {
@@ -54138,8 +55620,8 @@ function scoreContextAgainstQuery(ctx, query2, preferPositionNear = 0) {
   let score = 0;
   if (corpus.includes(q)) score += 0.45;
   const corpusTokens = new Set(tokenize(corpus));
-  const overlap = [...qTokens].filter((t) => corpusTokens.has(t)).length;
-  if (qTokens.size > 0) score += 0.55 * (overlap / qTokens.size);
+  const overlap2 = [...qTokens].filter((t) => corpusTokens.has(t)).length;
+  if (qTokens.size > 0) score += 0.55 * (overlap2 / qTokens.size);
   if (preferPositionNear > 0) {
     if (ctx.timelinePosition <= preferPositionNear && preferPositionNear <= ctx.timelineEnd) score += 0.15;
     else {
@@ -54353,7 +55835,7 @@ var init_resolve = __esm({
 });
 
 // ../engine/src/tools/backend.ts
-function isRecord24(value) {
+function isRecord25(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function backendRequest(backend, path38, init = {}) {
@@ -54381,7 +55863,7 @@ async function searchIndex(call, text4, options = {}) {
   if (options.lookFor) body.look_for = options.lookFor;
   const res = await backendRequest(call.host.backend, "/api/v1/search", { method: "POST", body, signal: call.signal });
   if (!res.ok) return { results: [], error: res.error };
-  const results = Array.isArray(res.data.results) ? res.data.results.filter(isRecord24) : [];
+  const results = Array.isArray(res.data.results) ? res.data.results.filter(isRecord25) : [];
   const error62 = typeof res.data.error === "string" && res.data.error ? res.data.error : void 0;
   return error62 ? { results, error: error62 } : { results };
 }
@@ -54395,14 +55877,14 @@ async function projectCatalog(call, projectId) {
     signal: call.signal
   });
   if (!res.ok) return { items: [], error: res.error };
-  const items = Array.isArray(res.data.items) ? res.data.items.filter(isRecord24) : [];
+  const items = Array.isArray(res.data.items) ? res.data.items.filter(isRecord25) : [];
   const error62 = typeof res.data.error === "string" && res.data.error ? res.data.error : void 0;
   return error62 ? { items, error: error62 } : { items };
 }
 async function watchWindowRequest(call, payload) {
   const res = await backendRequest(call.host.backend, "/api/v1/indexing/watch-window", { method: "POST", body: payload, signal: call.signal });
   if (!res.ok) return { error: res.error };
-  return isRecord24(res.data) ? res.data : { error: "bad watch-window response" };
+  return isRecord25(res.data) ? res.data : { error: "bad watch-window response" };
 }
 async function summarizeIndexedVideo(call, input2) {
   const body = {
@@ -54413,7 +55895,7 @@ async function summarizeIndexedVideo(call, input2) {
   };
   const res = await backendRequest(call.host.backend, "/api/v1/indexing/summarize", { method: "POST", body, signal: call.signal });
   if (!res.ok) return { ok: false, error: res.error };
-  const meta3 = isRecord24(res.data.ai_metadata) ? res.data.ai_metadata : void 0;
+  const meta3 = isRecord25(res.data.ai_metadata) ? res.data.ai_metadata : void 0;
   if (meta3 && (meta3.analyzed || res.data.success)) return { ok: true, aiMetadata: meta3 };
   return { ok: false, error: String(res.data.error || meta3?.error || "Summarize did not complete") };
 }
@@ -54438,8 +55920,8 @@ async function generateTts(call, input2) {
   return { audioBase64: String(res.data.audio_base64 ?? "") };
 }
 function pickPexelsHdLink(video) {
-  const files = Array.isArray(video.video_files) ? video.video_files.filter(isRecord24) : [];
-  const pick2 = files.find((f2) => f2.quality === "hd") ?? files[0];
+  const files = Array.isArray(video.video_files) ? video.video_files.filter(isRecord25) : [];
+  const pick2 = files.find((f3) => f3.quality === "hd") ?? files[0];
   return String(pick2?.link || "");
 }
 function projectIndexName(projectId) {
@@ -54465,7 +55947,7 @@ function collectProjectIndex(project) {
   const indexNames = [];
   for (const file3 of project.files ?? []) {
     if (file3.zenvi_subclip) continue;
-    const ai = isRecord24(file3.ai_metadata) ? file3.ai_metadata : {};
+    const ai = isRecord25(file3.ai_metadata) ? file3.ai_metadata : {};
     const block = getIndexBlock(ai);
     if (!isIndexed(block)) continue;
     const videoId = String(block.video_id ?? "").trim();
@@ -54545,9 +56027,9 @@ function selectHitsForDisplay(hits, clipStart, clipEnd2, occurrence, topK) {
 function snapToSliceGrid(seconds2, fpsNum, fpsDen) {
   if (fpsNum <= 0 || fpsDen <= 0) return seconds2;
   const x = seconds2 * fpsNum / fpsDen;
-  const f2 = Math.floor(x);
-  const diff = x - f2;
-  const r = diff > 0.5 ? f2 + 1 : diff < 0.5 ? f2 : f2 % 2 === 0 ? f2 : f2 + 1;
+  const f3 = Math.floor(x);
+  const diff = x - f3;
+  const r = diff > 0.5 ? f3 + 1 : diff < 0.5 ? f3 : f3 % 2 === 0 ? f3 : f3 + 1;
   return r * fpsDen / fpsNum;
 }
 function indexSearchForResolver(call) {
@@ -54559,7 +56041,7 @@ function indexSearchForResolver(call) {
     if (!indexId) {
       const ids2 = [];
       for (const ctx of contexts) {
-        const tl = isRecord24(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
+        const tl = isRecord25(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
         if (String(tl.status ?? "").toLowerCase() !== "ready") continue;
         const id = String(tl.index_id ?? "").trim();
         if (id) ids2.push(id);
@@ -54571,7 +56053,7 @@ function indexSearchForResolver(call) {
     if (res.error || res.results.length === 0) return [];
     const byVideo = /* @__PURE__ */ new Map();
     for (const ctx of contexts) {
-      const tl = isRecord24(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
+      const tl = isRecord25(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
       if (String(tl.status ?? "").toLowerCase() !== "ready") continue;
       const vid = String(tl.video_id ?? "").trim();
       if (vid) byVideo.set(vid, [...byVideo.get(vid) ?? [], ctx]);
@@ -54610,7 +56092,7 @@ var init_backend2 = __esm({
 });
 
 // ../engine/src/tools/catalog/common.ts
-function isRecord25(value) {
+function isRecord26(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function text(value) {
@@ -54656,8 +56138,8 @@ function coerceSteps(value) {
     if (/^\d+$/.test(token)) n = Number.parseInt(token, 10);
     else if (token in STEP_WORDS) n = STEP_WORDS[token];
     else {
-      const f2 = parsePythonFloat(token);
-      n = f2 === null ? 1 : Math.trunc(f2);
+      const f3 = parsePythonFloat(token);
+      n = f3 === null ? 1 : Math.trunc(f3);
     }
   }
   return Math.max(1, Math.min(n, MAX_UNDO_STEPS));
@@ -54689,7 +56171,7 @@ function fmtMmss(seconds2) {
   return `${m}:${String(rest).padStart(2, "0")}`;
 }
 function fileById(project, id) {
-  return (project.files ?? []).find((f2) => String(f2.id) === id);
+  return (project.files ?? []).find((f3) => String(f3.id) === id);
 }
 function playheadSeconds(call) {
   const fromPlayer = call.host.player?.playhead;
@@ -54733,7 +56215,7 @@ function forgetFile(call) {
   lastFiles.get(call.doc)?.delete(call.session);
 }
 function record4(value) {
-  return isRecord25(value) ? value : {};
+  return isRecord26(value) ? value : {};
 }
 var MAX_UNDO_STEPS, STEP_WORDS, ORDINALS, lastFiles;
 var init_common = __esm({
@@ -55242,14 +56724,14 @@ function cueTimes2(cues, winStart, winEnd) {
   return out;
 }
 function planSampleTimes(winStart, winEnd, cues, maxFrames = WATCH_MAX_FRAMES, extraTimes = []) {
-  const span = Math.max(0, winEnd - winStart);
-  const sparse = span > DENSE_WINDOW_SEC;
+  const span2 = Math.max(0, winEnd - winStart);
+  const sparse = span2 > DENSE_WINDOW_SEC;
   let warning = "";
   let times = [];
   if (sparse) {
-    warning = `Window is ${pyFixed(span, 1)}s; sparse-scanned (not a dense watch). Narrow the candidate window if the cut looks off.`;
+    warning = `Window is ${pyFixed(span2, 1)}s; sparse-scanned (not a dense watch). Narrow the candidate window if the cut looks off.`;
     const n = Math.max(2, Math.trunc(maxFrames));
-    const step = span / Math.max(n - 1, 1);
+    const step = span2 / Math.max(n - 1, 1);
     times = Array.from({ length: n }, (_, i) => winStart + i * step);
   } else {
     for (let t = winStart; t <= winEnd + 1e-6; t += 0.5) times.push(t);
@@ -55268,8 +56750,8 @@ function planSampleTimes(winStart, winEnd, cues, maxFrames = WATCH_MAX_FRAMES, e
   return { times: rounded, warning, sparse };
 }
 function pickDenseSubwindow(winStart, winEnd, extraTimes) {
-  const span = Math.max(0, winEnd - winStart);
-  if (span <= DENSE_WINDOW_SEC + 1e-6) return [winStart, winEnd];
+  const span2 = Math.max(0, winEnd - winStart);
+  if (span2 <= DENSE_WINDOW_SEC + 1e-6) return [winStart, winEnd];
   const pts = extraTimes.filter((t) => winStart - 1e-3 <= t && t <= winEnd + 1e-3).sort((a, b) => a - b);
   let center = (winStart + winEnd) / 2;
   if (pts.length > 0) {
@@ -55350,12 +56832,12 @@ async function confirmWatchWindow(call, input2) {
     return soft(`No watch frames extracted (${error62 instanceof Error ? error62.message : String(error62)})`, winStart, winEnd, plan.warning, plan.sparse);
   }
   if (frames.length === 0) return soft("No watch frames extracted", winStart, winEnd, plan.warning, plan.sparse);
-  frameTimes = frames.map((f2) => f2.timestamp);
+  frameTimes = frames.map((f3) => f3.timestamp);
   const payload = {
     query: input2.query || "",
     window_start: winStart,
     window_end: winEnd,
-    frames: frames.map((f2) => ({ timestamp: f2.timestamp, image_base64: f2.image.data })),
+    frames: frames.map((f3) => ({ timestamp: f3.timestamp, image_base64: f3.image.data })),
     sparse: plan.sparse,
     orientation_role: false,
     fallback_cut: fallback,
@@ -55421,7 +56903,7 @@ var init_watch = __esm({
 });
 
 // ../engine/src/tools/catalog/clips.ts
-function isRecord26(value) {
+function isRecord27(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function windowIsDialogueDriven(file3, start, end) {
@@ -55439,7 +56921,7 @@ function lookupWatchMeta(project, fileId, file3) {
     const parentId = own2 && own2.parent_file_id ? String(own2.parent_file_id) : "";
     data = parentId && fileById(project, parentId) || own2;
   }
-  const ai = isRecord26(data?.ai_metadata) ? data.ai_metadata : {};
+  const ai = isRecord27(data?.ai_metadata) ? data.ai_metadata : {};
   const duration3 = Number(data?.duration) || 0;
   return { file: data, duration: duration3, cues: Array.isArray(ai.transcript_cues) ? ai.transcript_cues : [] };
 }
@@ -55549,7 +57031,7 @@ async function planPlacement(call, file3, args) {
   });
   if (watchable && !windowIsDialogueDriven(fileData, winS, winE)) {
     const meta3 = lookupWatchMeta(project, String(file3.id), file3);
-    const result = await confirmWatchWindow(call, {
+    const result2 = await confirmWatchWindow(call, {
       file: meta3.file,
       start: winS,
       end: winE,
@@ -55560,22 +57042,22 @@ async function planPlacement(call, file3, args) {
       fallbackIn: winS,
       fallbackOut: Math.min(srcEnd, winS + (trimDur || winE - winS))
     });
-    if (result.ran) {
-      let inS = Math.max(srcStart, Math.min(result.in_source, srcEnd));
-      let outS = Math.max(srcStart, Math.min(result.out_source, srcEnd));
+    if (result2.ran) {
+      let inS = Math.max(srcStart, Math.min(result2.in_source, srcEnd));
+      let outS = Math.max(srcStart, Math.min(result2.out_source, srcEnd));
       if (outS <= inS + 1e-3) {
         inS = winS;
         outS = Math.min(srcEnd, winE);
       }
       if (trimDur && outS - inS > trimDur + 1e-6) {
-        const peak = Math.max(inS, Math.min(result.cut_source || (inS + outS) / 2, outS));
+        const peak = Math.max(inS, Math.min(result2.cut_source || (inS + outS) / 2, outS));
         inS = Math.max(srcStart, peak - trimDur / 2);
         outS = Math.min(srcEnd, inS + trimDur);
         if (outS - inS < trimDur) inS = Math.max(srcStart, outS - trimDur);
       }
       watchedStart = inS;
       watchedEnd = outS;
-      watched = result;
+      watched = result2;
     }
   }
   if (blindTrimRejected({
@@ -55717,8 +57199,8 @@ function secondsToTimeParts(secs, fpsNum, fpsDen) {
   hour %= 24;
   const fpsFloat4 = fpsDen ? fpsNum / fpsDen : 0;
   const x = milli / 1e3 * fpsFloat4;
-  const f2 = Math.floor(x);
-  let frame = x - f2 > 0.5 ? f2 + 1 : x - f2 < 0.5 ? f2 : f2 % 2 === 0 ? f2 : f2 + 1;
+  const f3 = Math.floor(x);
+  let frame = x - f3 > 0.5 ? f3 + 1 : x - f3 < 0.5 ? f3 : f3 % 2 === 0 ? f3 : f3 + 1;
   if (fpsFloat4 > 0) frame = Math.max(0, Math.min(frame, Math.trunc(fpsFloat4) - 1));
   const pad2 = (n) => String(Math.trunc(n)).padStart(2, "0");
   return { hour: pad2(hour), min: pad2(minute), sec: pad2(sec), frame: pad2(frame) };
@@ -55932,7 +57414,7 @@ var init_direct = __esm({
         run: (call) => {
           const p = call.doc.project;
           const fps = projectFps(p);
-          const files = new Map((p.files ?? []).map((f2) => [String(f2.id), f2]));
+          const files = new Map((p.files ?? []).map((f3) => [String(f3.id), f3]));
           const stack = buildTrackStack(p.layers);
           const tracks = stack.map((t) => ({
             layer: t.layer_number,
@@ -55960,12 +57442,12 @@ var init_direct = __esm({
             tracks,
             transitions: (p.effects ?? []).map((t) => ({ id: t.id, title: t.title ?? "", layer: t.layer, position: t.position, duration: t.end - t.start })),
             markers: (p.markers ?? []).map((m) => ({ id: m.id, position: m.position, label: m.label ?? "" })),
-            files: (p.files ?? []).map((f2) => ({
-              id: f2.id,
-              name: String(f2.name || String(f2.path ?? "").split(/[\\/]/).pop() || ""),
-              media_type: f2.media_type,
-              duration: Number(f2.duration) || 0,
-              subclip: Boolean(f2.zenvi_subclip)
+            files: (p.files ?? []).map((f3) => ({
+              id: f3.id,
+              name: String(f3.name || String(f3.path ?? "").split(/[\\/]/).pop() || ""),
+              media_type: f3.media_type,
+              duration: Number(f3.duration) || 0,
+              subclip: Boolean(f3.zenvi_subclip)
             }))
           };
           const clipCount = tracks.reduce((n, t) => n + t.clips.length, 0);
@@ -56053,15 +57535,15 @@ var init_direct = __esm({
           const keep2 = input2.keep ?? "both";
           if (input2.clip_id) {
             if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
-            const result2 = call.commit((tx) => splitClip(tx, input2.clip_id, input2.at_seconds, keep2));
-            return applied("split_clip_tool", `Split clip ${input2.clip_id} at ${input2.at_seconds}s (keep ${keep2}).`, { data: result2 });
+            const result3 = call.commit((tx) => splitClip(tx, input2.clip_id, input2.at_seconds, keep2));
+            return applied("split_clip_tool", `Split clip ${input2.clip_id} at ${input2.at_seconds}s (keep ${keep2}).`, { data: result3 });
           }
           const t = resolveTrack(call.doc.project, input2.track);
           if (t.error) return t.error;
-          const result = call.commit((tx) => sliceAllAt(tx, input2.at_seconds, t.layer !== void 0 ? { keep: keep2, layers: [t.layer] } : { keep: keep2 }));
-          const n = result.clips.length + result.transitions.length;
+          const result2 = call.commit((tx) => sliceAllAt(tx, input2.at_seconds, t.layer !== void 0 ? { keep: keep2, layers: [t.layer] } : { keep: keep2 }));
+          const n = result2.clips.length + result2.transitions.length;
           if (n === 0) return "No clip or transition at that time.";
-          return applied("split_clip_tool", `Split ${n} item(s) at ${input2.at_seconds}s (keep ${keep2}).`, { data: result });
+          return applied("split_clip_tool", `Split ${n} item(s) at ${input2.at_seconds}s (keep ${keep2}).`, { data: result2 });
         }
       }),
       directTool({
@@ -56122,24 +57604,8 @@ var init_direct = __esm({
         input: external_exports.strictObject({ effect_id: external_exports.string().min(1).describe("Clip effect id.") }),
         annotations: EDIT,
         run: (call, input2) => {
-          const result = call.commit((tx) => removeEffect(tx, input2.effect_id));
-          return applied("remove_effect_tool", `Removed effect ${input2.effect_id} from clip ${result.clipId}.`, { data: result });
-        }
-      }),
-      directTool({
-        name: "set_clip_speed_tool",
-        title: "Set clip speed",
-        description: "Play a clip faster or slower like the Time menu: factor 2 = twice as fast (half as long), 0.5 = half speed. direction=backward plays it in reverse. factor 1 forward resets the speed.",
-        input: external_exports.strictObject({
-          clip_id: clipId,
-          factor: external_exports.number().positive().describe("Speed factor."),
-          direction: external_exports.enum(["forward", "backward"]).optional().describe("Default forward.")
-        }),
-        annotations: EDIT,
-        run: (call, input2) => {
-          if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
-          call.commit((tx) => setClipSpeed(tx, input2.clip_id, input2.factor, { direction: input2.direction ?? "forward" }));
-          return `Set clip ${input2.clip_id} to ${input2.factor}x ${input2.direction ?? "forward"}.`;
+          const result2 = call.commit((tx) => removeEffect(tx, input2.effect_id));
+          return applied("remove_effect_tool", `Removed effect ${input2.effect_id} from clip ${result2.clipId}.`, { data: result2 });
         }
       }),
       directTool({
@@ -56248,7 +57714,7 @@ var init_export2 = __esm({
           const project = call.doc.toJSON();
           const settings = getDefaultExportSettings(project);
           const output2 = path38 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
-          if (output2 && (project.files ?? []).some((f2) => f2.path === output2)) {
+          if (output2 && (project.files ?? []).some((f3) => f3.path === output2)) {
             return "Error: Export failed: Output path is an input file. Choose a different path.";
           }
           if (maxFrame(project, projectFps(project)) <= 1) {
@@ -56262,13 +57728,13 @@ var init_export2 = __esm({
             throw error62;
           }
           if (output2) options.output = output2;
-          let result;
+          let result2;
           try {
-            result = await exporter.export(project, options);
+            result2 = await exporter.export(project, options);
           } catch (error62) {
             return `Error: Export failed: ${error62 instanceof Error ? error62.message : String(error62)}`;
           }
-          return applied("export_video_tool", `Exported to ${result.location}.`, { data: { ...result, options } }, 0);
+          return applied("export_video_tool", `Exported to ${result2.location}.`, { data: { ...result2, options } }, 0);
         }
       }),
       contractTool("get_export_settings_tool", {
@@ -56353,12 +57819,12 @@ var init_generation = __esm({
           const project = call.doc.project;
           const [width, height] = t2vDims(project.width, project.height);
           const extra = { width, height, mode: "t2v" };
-          const result = await generateVideo(call, prompt, duration3, extra);
-          if ("error" in result) return `Error: ${result.error}`;
-          if (!result.videoUrl) return "Error: No video URL returned from generation.";
+          const result2 = await generateVideo(call, prompt, duration3, extra);
+          if ("error" in result2) return `Error: ${result2.error}`;
+          if (!result2.videoUrl) return "Error: No video URL returned from generation.";
           let media;
           try {
-            media = await importUrl.call(call.host.media, result.videoUrl, { filename: "generated.mp4", signal: call.signal });
+            media = await importUrl.call(call.host.media, result2.videoUrl, { filename: "generated.mp4", signal: call.signal });
           } catch (error62) {
             return `Error: Download failed: ${error62 instanceof Error ? error62.message : String(error62)}`;
           }
@@ -56478,16 +57944,16 @@ function clampMaxFrames(raw) {
   return [n, warnings];
 }
 function midBinFrames(start, end, count) {
-  const span = Math.trunc(end) - Math.trunc(start);
-  if (span <= 0) return [];
-  const n = Math.max(1, Math.min(Math.trunc(count), span));
-  return Array.from({ length: n }, (_, i) => Math.trunc(start) + Math.trunc(span * (i + 0.5) / n));
+  const span2 = Math.trunc(end) - Math.trunc(start);
+  if (span2 <= 0) return [];
+  const n = Math.max(1, Math.min(Math.trunc(count), span2));
+  return Array.from({ length: n }, (_, i) => Math.trunc(start) + Math.trunc(span2 * (i + 0.5) / n));
 }
 function midBinSeconds(start, end, count) {
-  const span = end - start;
-  if (span <= 0) return [];
+  const span2 = end - start;
+  if (span2 <= 0) return [];
   const n = Math.max(1, Math.trunc(count));
-  return Array.from({ length: n }, (_, i) => start + span * (i + 0.5) / n);
+  return Array.from({ length: n }, (_, i) => start + span2 * (i + 0.5) / n);
 }
 function formatTimecode2(seconds2) {
   let whole = Math.trunc(Math.max(0, seconds2));
@@ -56701,10 +58167,10 @@ var init_inspect = __esm({
             overlay: overview ? void 0 : (t) => ({ grid: true, caption: formatTimecode2(t) })
           });
           if (frames.length === 0) return failed(tool, "Error: Failed to extract frames.");
-          const [images, budgetWarnings] = trimToBudget(frames.map((f2) => f2.image));
+          const [images, budgetWarnings] = trimToBudget(frames.map((f3) => f3.image));
           warnings.push(...budgetWarnings);
           const [w, h] = fitSize(Number(file3.width) || project.width, Number(file3.height) || project.height, overview ? OVERVIEW_EDGE : LONGEST_EDGE);
-          data.frameTimestamps = frames.slice(0, images.length).map((f2) => f2.timestamp);
+          data.frameTimestamps = frames.slice(0, images.length).map((f3) => f3.timestamp);
           data.width = w;
           data.height = h;
           if (overview) {
@@ -56822,14 +58288,14 @@ async function expandImportPaths(call, entries, allowedExts = IMPORT_MEDIA_EXTS)
     }
     let files = listing.files;
     if (listing.kind === "directory") {
-      files = listing.files.filter((f2) => allowedExts.includes(extOf(f2)));
+      files = listing.files.filter((f3) => allowedExts.includes(extOf(f3)));
       skippedNonMedia += listing.files.length - files.length;
     }
     if (listing.kind === "glob" && files.length === 0) notes.push(`No files matched: ${entry}`);
-    for (const f2 of files) {
-      if (!seen.has(f2)) {
-        seen.add(f2);
-        resolved.push(f2);
+    for (const f3 of files) {
+      if (!seen.has(f3)) {
+        seen.add(f3);
+        resolved.push(f3);
       }
     }
   }
@@ -56929,18 +58395,18 @@ var init_media3 = __esm({
             return `Error: Nothing was added to the media bin (${detail2}).`;
           }
           const files = call.commit((tx) => imported.map((media) => addFile(tx, media)));
-          const lines = files.map((f2, i) => `file_id=${f2.id} path=${imported[i].path}`);
+          const lines = files.map((f3, i) => `file_id=${f3.id} path=${imported[i].path}`);
           rememberFile(call, String(files[files.length - 1].id));
           let head = `Imported ${files.length} file(s). indexing_started=false`;
           if (skippedNonMedia > 0) head += ` skipped_non_media=${skippedNonMedia}`;
           if (missing.length > 0) head += ` (not found: ${missing.join(", ")})`;
-          const allNotes = [...notes, ...failures.map((f2) => `Could not open ${f2}`)];
+          const allNotes = [...notes, ...failures.map((f3) => `Could not open ${f3}`)];
           if (allNotes.length > 0) head += "\nNotes: " + allNotes.join("; ");
           return applied(
             "import_files_tool",
             head + "\n" + cappedLines(lines),
             {
-              data: { fileIds: files.map((f2) => String(f2.id)) },
+              data: { fileIds: files.map((f3) => String(f3.id)) },
               notes: ["This Zenvi surface does not run AI indexing; files keep any index they already have."]
             }
           );
@@ -56961,7 +58427,7 @@ var init_media3 = __esm({
           const filename = [".mp4", ".mov", ".webm", ".mkv", ".avi"].includes(extOf(rawName)) ? rawName : `${rawName.replace(/\.[^.]*$/, "") || "video"}.mp4`;
           const media = await importUrlWithFallbacks(call, [url2], filename);
           if (typeof media === "string") return `Error importing video from URL: ${media}`;
-          const existing = (call.doc.project.files ?? []).find((f2) => f2.path === media.path);
+          const existing = (call.doc.project.files ?? []).find((f3) => f3.path === media.path);
           const args = {
             position_seconds: input2.position_seconds,
             track: input2.track,
@@ -57014,7 +58480,7 @@ ${placed.text}`;
             return "Error: source must be 'pexels' or 'freesound' (or pass local_path).";
           }
           const project = call.doc.project;
-          const existing = project.files.find((f2) => f2.path === media.path);
+          const existing = project.files.find((f3) => f3.path === media.path);
           if (existing) {
             rememberFile(call, String(existing.id));
             return `File already in project (file_id=${existing.id}): ${media.path}. IMPORTANT: Call add_clip_to_timeline_tool with file_id='${existing.id}' (or empty file_id to use this just-imported file) to place it on the timeline.`;
@@ -57037,16 +58503,16 @@ ${placed.text}`;
       contractTool("wait_until_project_indexed_tool", {
         annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
         run: (call, input2) => {
-          const targets = (call.doc.project.files ?? []).filter((f2) => !f2.zenvi_subclip);
+          const targets = (call.doc.project.files ?? []).filter((f3) => !f3.zenvi_subclip);
           if (targets.length === 0) return "No project files to index.";
           const done = [];
           const pending = [];
-          for (const f2 of targets) {
-            const ai = record4(f2.ai_metadata);
+          for (const f3 of targets) {
+            const ai = record4(f3.ai_metadata);
             const block = getIndexBlock(ai);
             const status = String(block.status ?? "").toLowerCase();
             const indexed = isIndexed(block) || (status === "" || status === "ready") && Boolean(ai.analyzed);
-            (indexed ? done : pending).push(String(f2.id));
+            (indexed ? done : pending).push(String(f3.id));
           }
           if (pending.length === 0) return `All ${done.length} project file(s) indexed.`;
           const budget = Math.max(30, Math.trunc(Number(input2.timeout_seconds ?? 1800)) || 1800);
@@ -57080,18 +58546,18 @@ ${placed.text}`;
             return `Error: File ${fileId} is not indexed yet. Call reindex_project_file_tool first, then resummarize.`;
           }
           const indexName = String(block.index_name || projectIndexName(String(call.doc.project.id ?? "")));
-          const result = await summarizeIndexedVideo(call, {
+          const result2 = await summarizeIndexedVideo(call, {
             videoId: String(block.video_id),
             fileId,
             indexId: String(block.index_id ?? ""),
             indexName
           });
-          if (!result.ok) return `Error: Summarize failed: ${result.error}`;
+          if (!result2.ok) return `Error: Summarize failed: ${result2.error}`;
           const tl = { status: "ready", index_id: block.index_id ?? "", video_id: block.video_id, index_name: indexName, provider: block.provider ?? "" };
           const summarized = {
-            ...result.aiMetadata,
-            index: { ...record4(result.aiMetadata.index), ...tl },
-            twelvelabs: { ...record4(result.aiMetadata.twelvelabs), ...tl }
+            ...result2.aiMetadata,
+            index: { ...record4(result2.aiMetadata.index), ...tl },
+            twelvelabs: { ...record4(result2.aiMetadata.twelvelabs), ...tl }
           };
           call.commit((tx) => tx.update(["files", { id: fileId }], { ai_metadata: summarized }));
           return `Summarize complete for file ${fileId} (video_id=${String(block.video_id)}, ${String(file3.path ?? "")}).`;
@@ -57125,7 +58591,7 @@ ${placed.text}`;
 });
 
 // ../engine/src/tools/catalog/metadata.ts
-function isRecord27(value) {
+function isRecord28(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function pyStr2(value) {
@@ -57138,8 +58604,8 @@ function fullMetadataText(project, level) {
   const files = project.files ?? [];
   if (files.length === 0) return "No files in project.";
   const lines = ["Project files with full metadata:"];
-  for (const f2 of files) {
-    const d = f2;
+  for (const f3 of files) {
+    const d = f3;
     if (d.zenvi_subclip && level !== "full") continue;
     const dur = Math.trunc(Number(d.duration) || 0);
     const m = Math.floor(dur / 60);
@@ -57151,14 +58617,14 @@ function fullMetadataText(project, level) {
     const desc = pySlice(String(ai.description || ""), 0, 400);
     const sounds = pySlice(String(ai.sounds || ""), 0, 160);
     const transcript = pySlice(String(ai.transcript || ""), 0, 200);
-    const parentId = resolveParentFileId(project, d, String(f2.id || ""));
-    const alias = d.zenvi_subclip && parentId && parentId !== String(f2.id) ? `  alias_of=${parentId}
+    const parentId = resolveParentFileId(project, d, String(f3.id || ""));
+    const alias = d.zenvi_subclip && parentId && parentId !== String(f3.id) ? `  alias_of=${parentId}
 ` : "";
     const chapters = Array.isArray(ai.chapters) ? ai.chapters : [];
     const scenes = Array.isArray(ai.scene_descriptions) ? ai.scene_descriptions : [];
     lines.push(
       `
-  media_bin_file_id=${String(f2.id)}  name=${name}  type=${pyStr2(d.media_type ?? "?")}  duration=${m}:${String(s).padStart(2, "0")}
+  media_bin_file_id=${String(f3.id)}  name=${name}  type=${pyStr2(d.media_type ?? "?")}  duration=${m}:${String(s).padStart(2, "0")}
 ` + alias + `    analyzed=${pyStr2(ai.analyzed ?? false)}  indexed=${pyStr2(isIndexed(tl))}  chapter_count=${chapters.length}  scene_count=${scenes.length}
     tl_search_hint=${inferSearchHint(ai, name)}
     twelvelabs_index_id=${pyStr2(tl.index_id ?? "")}
@@ -57188,7 +58654,7 @@ function fullMetadataText(project, level) {
       const n = level === "full" ? chapters.length : Math.min(3, chapters.length);
       lines.push("    chapter_snippets:");
       for (const raw of chapters.slice(0, n)) {
-        if (!isRecord27(raw) || !(raw.summary || raw.title)) continue;
+        if (!isRecord28(raw) || !(raw.summary || raw.title)) continue;
         const t0 = Number(raw.start) || 0;
         const t1 = Number(raw.end) || t0;
         lines.push(`      [${fmtMmss(t0)}-${fmtMmss(t1)}] ${String(raw.title ?? "")}: ${pySlice(String(raw.summary ?? ""), 0, 160)}`);
@@ -57198,7 +58664,7 @@ function fullMetadataText(project, level) {
       const n = level === "full" ? scenes.length : Math.min(3, scenes.length);
       lines.push("    scene_snippets:");
       for (const raw of scenes.slice(0, n)) {
-        if (!isRecord27(raw) || !raw.description) continue;
+        if (!isRecord28(raw) || !raw.description) continue;
         lines.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
@@ -57237,7 +58703,7 @@ function placementsMetadataText(project, level) {
     if (scenes.length > 0 && limit > 0) {
       lines.push("    effective_scenes:");
       for (const raw of scenes.slice(0, limit)) {
-        if (!isRecord27(raw) || !raw.description) continue;
+        if (!isRecord28(raw) || !raw.description) continue;
         lines.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
@@ -57447,8 +58913,8 @@ async function fetchMotionGraphics(call, input2) {
     if (ids3.length === 0 || ids3.some((id) => !id || !fileById(call.doc.project, id))) return null;
     return `Already imported file_id=${ids3[0]} (file_ids: ${pyRepr2(ids3)}) \u2014 place only if missing. Do NOT re-download these URLs.`;
   };
-  const single = text(input2.supabase_url) || text(input2.url);
-  const urls = segs.length > 0 ? [...segs].map((u, i) => ({ u, i })).sort((a, b) => segmentIndex(a.u) - segmentIndex(b.u) || a.i - b.i).map((x) => x.u) : single ? [single] : [];
+  const single2 = text(input2.supabase_url) || text(input2.url);
+  const urls = segs.length > 0 ? [...segs].map((u, i) => ({ u, i })).sort((a, b) => segmentIndex(a.u) - segmentIndex(b.u) || a.i - b.i).map((x) => x.u) : single2 ? [single2] : [];
   if (urls.length === 0) return "Error: segment_urls or supabase_url is required.";
   const cached3 = alreadyImported(urls);
   if (cached3) return cached3;
@@ -57479,7 +58945,7 @@ async function fetchMotionGraphics(call, input2) {
     })
   );
   downloads.forEach((d, i) => cache5.set(normUrl(d.url), String(files[i].id)));
-  const ids2 = files.map((f2) => String(f2.id));
+  const ids2 = files.map((f3) => String(f3.id));
   const totalMb = downloads.reduce((sum, d) => sum + (Number(d.media.fingerprint?.size ?? d.media.info.file_size ?? 0) || 0), 0) / (1024 * 1024);
   const anyTransparent = downloads.some((d) => d.transparent);
   const alphaNote = anyTransparent ? "Transparent WebM alpha preserved \u2014 place as overlay on a HIGHER track than footage." : "Opaque MP4 \u2014 prefer standalone/mid-layer placement away from hero peaks.";
@@ -57734,14 +59200,14 @@ var init_motion = __esm({
           };
           const clip2 = call.commit((tx) => {
             for (const [id, position] of shifts) moveClip(tx, id, { position });
-            const current = tx.project.files.find((f2) => String(f2.id) === fid);
+            const current = tx.project.files.find((f3) => String(f3.id) === fid);
             const ai = { ...record4(current?.ai_metadata), mg_placement: stamp, ...isTransparent ? {} : { transparent: false } };
             tx.update(["files", { id: fid }], { ai_metadata: ai });
             return applyPlacement(tx, fid, plan);
           });
-          const result = placementText(call.doc.project, plan, clip2);
+          const result2 = placementText(call.doc.project, plan, clip2);
           const trackLabel = formatTrackLabelForLlm(trackNum, layers);
-          return `${result} [mg_place mode=${mode} layout_region=${region || "n/a"} transparent=${isTransparent ? "True" : "False"} track=${trackLabel}]. NEXT: get_timeline_state_tool once to verify, then continue next beat.`;
+          return `${result2} [mg_place mode=${mode} layout_region=${region || "n/a"} transparent=${isTransparent ? "True" : "False"} track=${trackLabel}]. NEXT: get_timeline_state_tool once to verify, then continue next beat.`;
         }
       }),
       contractTool("fetch_motion_graphics_video_tool", {
@@ -57907,11 +59373,11 @@ var init_phase3 = __esm({
           const current = projectFps(project);
           const same = (!patch.fps || typeof patch.fps === "object" && patch.fps.num === current.num && patch.fps.den === current.den) && (patch.width === void 0 || patch.width === project.width) && (patch.height === void 0 || patch.height === project.height) && (patch.sampleRate === void 0 || patch.sampleRate === project.sample_rate);
           if (same) return unchanged(tool, "Settings already matched.", { data: { changed: false } });
-          const result = call.commit((tx) => setProjectSettings(tx, patch));
-          if (!result.changed) return unchanged(tool, "Settings already matched.", { data: { changed: false } });
-          return applied(tool, `Updated project settings: ${result.notes.join(", ")}.`, {
-            data: { changed: true, updates: result.updates },
-            notes: result.notes
+          const result2 = call.commit((tx) => setProjectSettings(tx, patch));
+          if (!result2.changed) return unchanged(tool, "Settings already matched.", { data: { changed: false } });
+          return applied(tool, `Updated project settings: ${result2.notes.join(", ")}.`, {
+            data: { changed: true, updates: result2.updates },
+            notes: result2.notes
           });
         }
       })
@@ -58070,7 +59536,7 @@ var init_playback = __esm({
           } catch (error62) {
             return `Error: Could not import file into media bin: ${path38} (${error62 instanceof Error ? error62.message : String(error62)})`;
           }
-          const existing = (call.doc.project.files ?? []).find((f2) => f2.path === media.path);
+          const existing = (call.doc.project.files ?? []).find((f3) => f3.path === media.path);
           if (existing) {
             const placed = await placeExistingFile(call, existing, { position_seconds: "0" });
             if (!placed.clip) return placed.text;
@@ -58096,10 +59562,10 @@ async function saveCurrent(call, tool) {
 }
 function timelineSignature(project) {
   const out = /* @__PURE__ */ new Map();
-  const r3 = (v) => Math.round((Number(v) || 0) * 1e3) / 1e3;
+  const r32 = (v) => Math.round((Number(v) || 0) * 1e3) / 1e3;
   for (const clip2 of project.clips ?? []) {
     const id = String(clip2.id ?? "");
-    if (id) out.set(id, JSON.stringify([clip2.layer ?? null, r3(clip2.position), r3(clip2.start), r3(clip2.end)]));
+    if (id) out.set(id, JSON.stringify([clip2.layer ?? null, r32(clip2.position), r32(clip2.start), r32(clip2.end)]));
   }
   return out;
 }
@@ -58291,7 +59757,7 @@ var init_project2 = __esm({
 });
 
 // ../engine/src/tools/catalog/search.ts
-function isRecord28(value) {
+function isRecord29(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function hitPeak(hit, s, e) {
@@ -58364,7 +59830,7 @@ function clipInfo2(project, clip2) {
   const file3 = fileId ? fileById(project, fileId) : void 0;
   const [clipStart, clipEnd2] = getSourceWindow(clip2, file3);
   const parent = resolveParentFileData(project, file3, fileId);
-  const sourceAi = isRecord28(parent?.ai_metadata) ? parent.ai_metadata : void 0;
+  const sourceAi = isRecord29(parent?.ai_metadata) ? parent.ai_metadata : void 0;
   const block = getIndexBlock(sourceAi ?? {});
   const watchData = parent ?? file3;
   const wai = record4(watchData?.ai_metadata);
@@ -58388,15 +59854,15 @@ function clipInfo2(project, clip2) {
   };
 }
 function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) {
-  const local = isRecord28(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
+  const local = isRecord29(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
   const candidates = [];
   for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-    if (!isRecord28(ch)) continue;
+    if (!isRecord29(ch)) continue;
     const summary = String(ch.summary || ch.title || "").trim();
     if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
   }
   for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-    if (!isRecord28(sc)) continue;
+    if (!isRecord29(sc)) continue;
     const desc = String(sc.description ?? "").trim();
     if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
   }
@@ -58410,8 +59876,8 @@ function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) 
     else if (q) {
       const qw = new Set(q.split(/\s+/).filter(Boolean));
       const dw = new Set(c.description.toLowerCase().split(/\s+/).filter(Boolean));
-      const overlap = [...qw].filter((w) => dw.has(w)).length;
-      if (overlap) score = overlap / (Math.sqrt(qw.size) * Math.sqrt(dw.size));
+      const overlap2 = [...qw].filter((w) => dw.has(w)).length;
+      if (overlap2) score = overlap2 / (Math.sqrt(qw.size) * Math.sqrt(dw.size));
     } else score = 0.01;
     if (score > 0) scored.push([c.time, score]);
   }
@@ -58423,7 +59889,7 @@ function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) 
 function clipTranscriptCues(project, clip2) {
   const file3 = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
   const effective = getEffectiveAiMetadata(file3, clip2, { clipAiMetadata: clip2.ai_metadata });
-  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord28) : [];
+  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord29) : [];
 }
 function fpsParts(project) {
   const fps = record4(project.fps);
@@ -58675,12 +60141,12 @@ var init_search = __esm({
           const local = Object.keys(perClip).length > 0 ? perClip : getEffectiveAiMetadata(parent ?? file3, target.clip, { rebased: true });
           const candidates = [];
           for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-            if (!isRecord28(ch)) continue;
+            if (!isRecord29(ch)) continue;
             const summary = String(ch.summary || ch.title || "").trim();
             if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
           }
           for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-            if (!isRecord28(sc)) continue;
+            if (!isRecord29(sc)) continue;
             const desc = String(sc.description ?? "").trim();
             if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
           }
@@ -58697,8 +60163,8 @@ var init_search = __esm({
             else {
               const qw = new Set(q.split(/\s+/).filter(Boolean));
               const dw = new Set(c.description.toLowerCase().split(/\s+/).filter(Boolean));
-              const overlap = [...qw].filter((w) => dw.has(w)).length;
-              if (overlap) score = overlap / (Math.sqrt(qw.size) * Math.sqrt(dw.size));
+              const overlap2 = [...qw].filter((w) => dw.has(w)).length;
+              if (overlap2) score = overlap2 / (Math.sqrt(qw.size) * Math.sqrt(dw.size));
             }
             if (score > 0) scored.push({ ...c, score });
           }
@@ -58947,11 +60413,11 @@ var init_search = __esm({
 });
 
 // ../engine/src/tools/catalog/speech-tools.ts
-function isRecord29(value) {
+function isRecord30(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function wordsFromCues(cues) {
-  const rows = cues.filter(isRecord29).map((c) => ({
+  const rows = cues.filter(isRecord30).map((c) => ({
     text: String(c.text ?? "").trim(),
     start: Number("source_start" in c ? c.source_start : c.start),
     end: Number("source_end" in c ? c.source_end : c.end)
@@ -59039,7 +60505,7 @@ function shortSummary(wordCount, clipIds, fileIds, suffix = "") {
     idBit = clipIds.length === 1 ? ` clipId=${clipIds[0]}` : ` clipIds=[${clipIds.map((c) => `'${c}'`).join(", ")}]`;
     action = "Full dialogue in data.script. For word cuts call remove_words_tool next with that clipId + matches=[...] \u2014 do not re-call get_transcript_tool.";
   } else if (fileIds.length > 0) {
-    idBit = fileIds.length === 1 ? ` fileId=${fileIds[0]}` : ` fileIds=[${fileIds.map((f2) => `'${f2}'`).join(", ")}]`;
+    idBit = fileIds.length === 1 ? ` fileId=${fileIds[0]}` : ` fileIds=[${fileIds.map((f3) => `'${f3}'`).join(", ")}]`;
     action = "Full dialogue in data.script. This is a media-bin fileId, NOT a timeline clipId \u2014 place the file on the timeline (or re-call get_transcript_tool with empty args once it is placed) before remove_words_tool.";
   }
   const base = `Transcribed ${wordCount} words (${SOURCE2}).${idBit} ${action}`;
@@ -59101,7 +60567,7 @@ function transcriptFromCues(call, input2, tool = "get_transcript_tool") {
       targets.push(clip2);
     }
     if (targets.length === 0 && (trackIndex === void 0 || trackIndex === null)) {
-      const usable = (project.files ?? []).filter((f2) => !["image", "image/sequence", "font"].includes(String(f2.media_type ?? "").toLowerCase()) && f2.path);
+      const usable = (project.files ?? []).filter((f3) => !["image", "image/sequence", "font"].includes(String(f3.media_type ?? "").toLowerCase()) && f3.path);
       if (usable.length === 1) {
         const receipt2 = fileReceipt(tool, usable[0], fps, includeWords, includeCompact, [
           ...warnings,
@@ -59110,7 +60576,7 @@ function transcriptFromCues(call, input2, tool = "get_transcript_tool") {
         return { words: [], receipt: receipt2 };
       }
       if (usable.length > 1) {
-        const ids2 = usable.slice(0, 8).map((f2) => String(f2.id)).join(", ");
+        const ids2 = usable.slice(0, 8).map((f3) => String(f3.id)).join(", ");
         return { words: [], receipt: refused(tool, `Error: Timeline is empty and multiple media-bin files exist. Pass fileId for one of: ${ids2}`) };
       }
     }
@@ -59554,6 +61020,1231 @@ var init_timeline2 = __esm({
   }
 });
 
+// ../engine/src/tools/catalog/timeline-edit-common.ts
+function failText(message) {
+  const line2 = String(message).split(/\s+/).filter(Boolean).join(" ");
+  return line2.startsWith("Error") ? line2 : `Error: ${line2}`;
+}
+async function editorRun(body) {
+  try {
+    return await body();
+  } catch (error62) {
+    if (error62 instanceof ToolError) return failText(error62.message);
+    throw error62;
+  }
+}
+function oneLine(summary) {
+  return String(summary).split(/\s+/).filter(Boolean).join(" ");
+}
+function ok(call, summary, data) {
+  return applied(call.tool, oneLine(summary), { data });
+}
+function nothingChanged(call, summary, data) {
+  return unchanged(call.tool, oneLine(summary), { data: { changed: false, ...data } });
+}
+function gridOf(project) {
+  const num11 = Math.trunc(Number(project.fps?.num)) || 30;
+  const den2 = Math.trunc(Number(project.fps?.den)) || 1;
+  const fps = num11 / den2;
+  return { fps, frame: 1 / fps, tol: 0.5 / fps, snap: (seconds2) => pyRound(seconds2 * fps) / fps };
+}
+function r3(value) {
+  return Number(pyFixed(Number(value) || 0, 3));
+}
+function f2(value) {
+  return pyFixed(value, 2);
+}
+function spanOf(item) {
+  const position = Number(item.position) || 0;
+  return [position, position + Math.max(0, (Number(item.end) || 0) - (Number(item.start) || 0))];
+}
+function uiTrack(project, layer2) {
+  return layerNumberToDisplayIndex(layer2, project.layers);
+}
+function trackName(project, layer2) {
+  const ui = uiTrack(project, layer2);
+  return ui ? `track ${ui}` : `layer ${layer2}`;
+}
+function resolveLayer(project, track2) {
+  const text4 = track2 === void 0 || track2 === null ? "" : String(track2).trim();
+  if (!text4) throw new ToolError("a track is required (UI track number, name, or layer number)");
+  const resolved = normalizeTrackOrLayerArg(text4, project.layers);
+  if (resolved.error) throw new ToolError(resolved.error);
+  if (resolved.layer === void 0) throw new ToolError(`no track matches ${pyReprString(String(track2))}`);
+  return resolved.layer;
+}
+function requireUnlockedTracks(project, layers, what = "") {
+  const lockedNumbers = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
+  const locked = [...new Set(layers)].filter((n) => lockedNumbers.has(n)).sort((a, b) => a - b);
+  if (locked.length === 0) return;
+  const names2 = locked.map((n) => trackName(project, n)).join(", ");
+  const [verb, pronoun] = locked.length === 1 ? ["is", "it"] : ["are", "them"];
+  throw new ToolError(`${names2} ${verb} locked${what ? ` (${what})` : ""}; unlock ${pronoun} first (Track menu > Unlock Track)`);
+}
+function layersBottomUp(project) {
+  return [...project.layers].map((l) => l.number).sort((a, b) => a - b);
+}
+function isImageClip(clip2) {
+  const reader = clip2.reader;
+  return Boolean(reader?.has_single_image) || reader?.media_type === "image";
+}
+function clipTitle2(clip2) {
+  return String(clip2.title || clip2.id);
+}
+function clipById2(project, id) {
+  return project.clips.find((c) => c.id === id);
+}
+function describeClip(project, clip2) {
+  const [start, end] = spanOf(clip2);
+  return {
+    timeline_clip_id: String(clip2.id),
+    title: String(clip2.title ?? ""),
+    file_id: String(clip2.file_id ?? ""),
+    track: uiTrack(project, clip2.layer),
+    layer: clip2.layer,
+    position: r3(start),
+    end: r3(end),
+    duration: r3(end - start),
+    source_in: r3(Number(clip2.start) || 0),
+    source_out: r3(Number(clip2.end) || 0)
+  };
+}
+function clipsGiven(target) {
+  return (target.timeline_clip_ids?.length ?? 0) > 0 || Boolean(target.clip_query?.trim()) || Boolean(target.scope?.trim());
+}
+async function targetClip(call, target) {
+  const resolved = await resolveClip(call, target);
+  if (!resolved.ok) throw new ToolError(resolved.error || "could not resolve the timeline clip");
+  return resolved.clip;
+}
+function clipsByIds(project, ids2) {
+  return ids2.map((raw) => {
+    const clip2 = clipById2(project, String(raw).trim());
+    if (!clip2) throw new ToolError(`no timeline clip with id=${pyReprString(String(raw))}`);
+    return clip2;
+  });
+}
+function selectedClipIds(call) {
+  const clips = new Set(call.doc.project.clips.map((c) => c.id));
+  return (call.host.ui?.selectedIds?.() ?? []).filter((id) => clips.has(id));
+}
+async function targetClips(call, target) {
+  const project = call.doc.project;
+  const scope = (target.scope ?? "").trim().toLowerCase();
+  let clips;
+  if ((target.timeline_clip_ids?.length ?? 0) > 0) {
+    clips = clipsByIds(project, target.timeline_clip_ids);
+  } else if (scope === "selected") {
+    const ids2 = selectedClipIds(call);
+    if (ids2.length === 0) throw new ToolError("no clips are selected in the timeline");
+    clips = clipsByIds(project, ids2);
+  } else if (scope === "track" || scope === "all") {
+    clips = [...project.clips];
+    if (scope === "track") {
+      const layer2 = resolveLayer(project, target.track);
+      clips = clips.filter((c) => c.layer === layer2);
+    }
+    if (clips.length === 0) throw new ToolError(scope === "all" ? "the timeline has no clips" : `track ${pyStr(target.track ?? "")} has no clips`);
+  } else {
+    clips = [await targetClip(call, { clip_query: target.clip_query, track: target.track })];
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const out = clips.filter((c) => seen.has(c.id) ? false : (seen.add(c.id), true));
+  return out.sort((a, b) => Number(a.position) - Number(b.position) || a.layer - b.layer);
+}
+function overlapRow(project, hit) {
+  return {
+    timeline_clip_id: hit.clipId,
+    title: hit.title,
+    overlaps: hit.overlapsId,
+    overlaps_title: hit.overlapsTitle,
+    track: uiTrack(project, hit.layer),
+    seconds: r3(hit.seconds)
+  };
+}
+function newOverlaps(project, changes, newItems = []) {
+  return plannedOverlaps(project, changes, newItems, gridOf(project).tol).map((hit) => overlapRow(project, hit));
+}
+function checkOverlaps(hits, allowOverlap, what, rippleHint = true) {
+  if (hits.length > 0 && !allowOverlap) {
+    const first = hits[0];
+    const more = hits.length > 1 ? ` (+${hits.length - 1} more)` : "";
+    let options = "pass allow_overlap=true to overlap anyway";
+    if (rippleHint) options = `pass ripple=true to push the later clips along, or ${options}`;
+    throw new ToolError(
+      `${what} would overlap ${pyReprString(first.overlaps_title)} (${first.overlaps}) on track ${pyStr(first.track)} by ${pyFloat(first.seconds)} s${more}; ${options}`
+    );
+  }
+  return hits;
+}
+var ToolError;
+var init_timeline_edit_common = __esm({
+  "../engine/src/tools/catalog/timeline-edit-common.ts"() {
+    "use strict";
+    init_rounding();
+    init_sequence();
+    init_pyfmt();
+    init_receipt();
+    init_tracks2();
+    init_common();
+    ToolError = class extends Error {
+    };
+  }
+});
+
+// ../engine/src/tools/catalog/timeline-edit.ts
+function timeArg(call, seconds2) {
+  return seconds2 === void 0 || seconds2 < 0 ? playheadSeconds(call) : seconds2;
+}
+function stemOf(file3) {
+  const dot = file3.lastIndexOf(".");
+  return dot > 0 ? file3.slice(0, dot) : file3;
+}
+function transitionChoice(name) {
+  let key = name.trim().toLowerCase().replaceAll(" ", "_").replaceAll("-", "_");
+  for (const ext of [".svg", ".png", ".jpg"]) if (key.endsWith(ext)) key = key.slice(0, -ext.length);
+  if (["", "none", "cut", "hard_cut"].includes(key)) return {};
+  if (TRANSITIONS.length === 0) throw new ToolError("no transition images are installed");
+  if (key === "random") return { pool: TRANSITIONS.map((t) => t.id) };
+  if (["crossfade", "cross_fade", "dissolve", "cross_dissolve"].includes(key)) key = "fade";
+  const stems = /* @__PURE__ */ new Map();
+  for (const t of TRANSITIONS) stems.set(stemOf(t.file).toLowerCase(), t.id);
+  const exact = stems.get(key);
+  if (exact) return { mask: exact, label: key };
+  const near = [...stems.keys()].filter((s) => s.includes(key)).sort();
+  if (near.length === 1) return { mask: stems.get(near[0]), label: near[0] };
+  const sample = (near.length > 0 ? near : [...stems.keys()].sort()).slice(0, 8);
+  throw new ToolError(
+    `unknown transition ${pyReprString(name)}; use 'fade' (crossfade), 'random', or a name such as ${sample.join(", ")} (list_transitions_tool lists all)`
+  );
+}
+function shuffled(items) {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+async function addClipsToTimeline(call, input2) {
+  const project = call.doc.project;
+  const g = gridOf(project);
+  const fileIds = input2.file_ids ?? [];
+  const items = input2.items ?? [];
+  if (fileIds.length > 0 && items.length > 0) throw new ToolError("give file_ids (whole files) or items (with in/out points), not both");
+  const specs = fileIds.length > 0 ? fileIds.map((id) => ({ file_id: id })) : items.map((it) => ({ ...it }));
+  if (specs.length === 0) throw new ToolError("say which files to place: file_ids or items (list_files_tool lists the project files)");
+  const fade = input2.fade ?? "none";
+  const transitionName = input2.transition ?? "";
+  if (fade !== "none" && transitionName.trim()) {
+    throw new ToolError("choose a transition or fades, not both (fade applies only without a transition)");
+  }
+  const imageLength = input2.image_seconds || DEFAULT_IMAGE_LENGTH;
+  const choice = transitionChoice(transitionName);
+  const hasTransition = Boolean(choice.mask || choice.pool);
+  const transitionLength = input2.transition_seconds || DEFAULT_TRANSITION_LENGTH;
+  const fadeSeconds = input2.fade_seconds ?? 2;
+  const overlap2 = hasTransition ? transitionLength : fade !== "none" ? fadeSeconds : 0;
+  const minClip = input2.min_clip_seconds ?? 1;
+  const fitTotal = input2.fit_total_seconds ?? 0;
+  let entries = specs.map((spec) => {
+    const fid = String(spec.file_id ?? "").trim();
+    const file3 = fid ? fileById(project, fid) : void 0;
+    if (!file3) throw new ToolError(`no project file with id=${pyReprString(fid)} (list_files_tool lists them)`);
+    const name = String(file3.name || basename(String(file3.path || fid)));
+    const sArg = spec.source_start === void 0 || spec.source_start < 0 ? null : spec.source_start;
+    const eArg = spec.source_end === void 0 || spec.source_end < 0 ? null : spec.source_end;
+    if (file3.media_type === "image" || Boolean(file3.has_single_image)) {
+      const length = eArg !== null ? eArg - (sArg ?? 0) : imageLength;
+      if (length <= g.tol) throw new ToolError(`${name}: an image needs a positive on-screen length`);
+      return { file: file3, name, image: true, start: null, length, fixed: eArg !== null };
+    }
+    const [lo, hi] = sourceWindowForFile(file3);
+    let s = sArg ?? lo;
+    let e = eArg ?? hi;
+    if (s < lo - g.tol || e > hi + g.tol || e - s <= g.tol) {
+      throw new ToolError(`${name}: source range ${f2(s)}-${f2(e)} s is outside the file (${f2(lo)}-${f2(hi)} s)`);
+    }
+    s = Math.max(lo, g.snap(s));
+    e = Math.min(hi, g.snap(e));
+    return { file: file3, name, image: false, start: s, length: e - s, fixed: sArg !== null || eArg !== null };
+  });
+  const order = input2.order ?? "as_given";
+  if (order === "shuffle") entries = shuffled(entries);
+  else if (order === "name") entries = [...entries].sort((a, b) => a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0);
+  const n = entries.length;
+  const keep2 = entries.map((entry, i) => {
+    const sides = n === 1 ? 0 : i === 0 || i === n - 1 ? 1 : 2;
+    const need = sides * overlap2 + g.frame;
+    if (entry.length < need - g.tol) {
+      throw new ToolError(
+        `${entry.name} is ${f2(entry.length)} s, too short for ${f2(overlap2)} s ${hasTransition ? "transitions" : "fades"} on ${sides} side(s); shorten ${hasTransition ? "transition_seconds" : "fade_seconds"} or leave it out`
+      );
+    }
+    return Math.max(minClip, need);
+  });
+  const total = entries.reduce((sum, e) => sum + e.length, 0) - (n - 1) * overlap2;
+  let fitNote = "";
+  const trimmedIds = [];
+  if (fitTotal > 0 && total > fitTotal + g.tol) {
+    const budget = fitTotal + (n - 1) * overlap2;
+    const lengths = fitLengths(
+      entries.map((e) => e.length),
+      entries.map((e) => e.fixed),
+      keep2,
+      budget,
+      g.frame,
+      g.tol
+    );
+    if (!lengths) {
+      const shortest = entries.reduce((sum, e, i) => sum + (e.fixed ? e.length : Math.min(e.length, keep2[i])), 0) - (n - 1) * overlap2;
+      throw new ToolError(
+        `cannot fit ${n} clips into ${pyFixed(fitTotal, 1)} s: with at least ${pyFixed(minClip, 1)} s each (plus transition overlaps) the shortest possible sequence is ${pyFixed(shortest, 1)} s; lower min_clip_seconds, use fewer clips, or raise fit_total_seconds`
+      );
+    }
+    entries.forEach((entry, i) => {
+      const length = lengths[i];
+      if (length < entry.length - 1e-9) {
+        if (!entry.image) entry.start = g.snap(entry.start + (entry.length - length) / 2);
+        entry.length = length;
+        trimmedIds.push(entry.file.id);
+      }
+    });
+    fitNote = `, trimmed ${trimmedIds.length} clip(s) to fit ${pyG(fitTotal)} s`;
+  } else if (fitTotal > 0) {
+    fitNote = `, already within ${pyG(fitTotal)} s so nothing was trimmed`;
+  }
+  const layer2 = input2.track?.trim() ? resolveLayer(project, input2.track) : selectedTrack(call)?.number ?? defaultUnderlayLayerNumber(project.layers);
+  requireUnlockedTracks(project, [layer2]);
+  const startSeconds = input2.start_seconds ?? -1;
+  const start = startSeconds >= 0 ? g.snap(startSeconds) : g.snap(trackEnd(project, layer2));
+  const planned = [];
+  let position = start;
+  entries.forEach((entry, i) => {
+    if (i > 0) position -= overlap2;
+    planned.push({ label: entry.name, layer: layer2, start: position, end: position + entry.length });
+    position += entry.length;
+  });
+  checkOverlaps(newOverlaps(project, /* @__PURE__ */ new Map(), planned), input2.allow_overlap ?? false, "Placing these clips", false);
+  const placement2 = entries.map(
+    (entry) => entry.image ? { fileId: entry.file.id, end: entry.length } : { fileId: entry.file.id, start: entry.start, end: entry.start + entry.length }
+  );
+  const result2 = call.commit(
+    (tx) => placeFiles(tx, placement2, start, layer2, {
+      ...fade !== "none" ? { fade } : {},
+      fadeLength: fadeSeconds,
+      ...choice.mask ? { transition: choice.mask } : {},
+      ...choice.pool ? { randomTransitions: choice.pool } : {},
+      transitionLength,
+      imageLength,
+      ...input2.zoom && input2.zoom !== "none" ? { zoom: input2.zoom } : {},
+      transitionFirstClip: false
+    })
+  );
+  const after = call.doc.project;
+  const placed = result2.clipIds.map((id) => clipById2(after, id)).filter((c) => c !== void 0).map((c) => describeClip(after, c));
+  const end = Math.max(...placed.map((p) => p.end));
+  const how = choice.mask ? `, ${choice.label} transitions` : choice.pool ? ", random transitions" : fade !== "none" ? `, fade ${fade}` : "";
+  return ok(
+    call,
+    `Placed ${placed.length} clip(s) on ${trackName(after, layer2)} from ${f2(start)} s to ${f2(end)} s (${pyFixed(end - start, 1)} s${how}${fitNote}).`,
+    {
+      track: uiTrack(after, layer2),
+      start: r3(start),
+      end: r3(end),
+      total_seconds: r3(end - start),
+      clips: placed,
+      transition_ids: result2.transitionIds,
+      trimmed_file_ids: trimmedIds,
+      overlap_seconds: r3(overlap2)
+    }
+  );
+}
+function isClip(project, item) {
+  return project.clips.some((c) => c.id === item.id);
+}
+function layerMapFor(project, sources, destTrack) {
+  const dest = resolveLayer(project, destTrack);
+  const map2 = remapLayers(project, sources, dest);
+  if (!map2) {
+    throw new ToolError(
+      `moving these clips' ${sources.size} tracks onto ${trackName(project, dest)} needs a track that does not exist; add one first (add_track_tool)`
+    );
+  }
+  return map2;
+}
+async function moveClips(call, input2) {
+  const project = call.doc.project;
+  if (!clipsGiven(input2)) throw new ToolError("say which clips to move: timeline_clip_ids, clip_query, or scope");
+  const clips = await targetClips(call, input2);
+  const ids2 = new Set(clips.map((c) => c.id));
+  const positionSeconds = input2.position_seconds ?? -1;
+  const bySeconds = input2.by_seconds ?? 0;
+  const byFrames = input2.by_frames ?? 0;
+  const afterId = (input2.after_clip_id ?? "").trim();
+  const beforeId = (input2.before_clip_id ?? "").trim();
+  const toTrack = (input2.to_track ?? "").trim();
+  const ripple = input2.ripple ?? false;
+  const allowOverlap = input2.allow_overlap ?? false;
+  const modes = [positionSeconds >= 0, bySeconds !== 0, byFrames !== 0, Boolean(afterId), Boolean(beforeId)].filter(Boolean).length;
+  if (modes > 1) throw new ToolError("give only one of position_seconds, by_seconds, by_frames, after_clip_id, before_clip_id");
+  if (modes === 0 && !toTrack) {
+    throw new ToolError("nothing to do: give position_seconds, by_seconds, by_frames, after_clip_id, before_clip_id or to_track");
+  }
+  let anchor2;
+  if (afterId || beforeId) {
+    const aid = afterId || beforeId;
+    anchor2 = clipById2(project, aid);
+    if (!anchor2) throw new ToolError(`no timeline clip with id=${pyReprString(aid)}`);
+    if (ids2.has(anchor2.id)) throw new ToolError("the anchor clip is one of the clips being moved");
+    if (toTrack) throw new ToolError("after_clip_id/before_clip_id already choose the track (the anchor's); drop to_track");
+  }
+  const srcLayers = new Set(clips.map((c) => c.layer));
+  const layerMap = anchor2 ? layerMapFor(project, srcLayers, String(uiTrack(project, anchor2.layer))) : toTrack ? layerMapFor(project, srcLayers, toTrack) : new Map([...srcLayers].map((n) => [n, n]));
+  requireUnlockedTracks(project, [...srcLayers, ...layerMap.values()]);
+  const g = gridOf(project);
+  const spans2 = new Map(clips.map((c) => [c.id, spanOf(c)]));
+  const gStart = Math.min(...[...spans2.values()].map(([s]) => s));
+  const gEnd = Math.max(...[...spans2.values()].map(([, e]) => e));
+  const length = gEnd - gStart;
+  const before = new Map(clips.map((c) => [c.id, { layer: c.layer, position: spans2.get(c.id)[0] }]));
+  const movedItems = /* @__PURE__ */ new Map();
+  let hits = [];
+  if (!ripple) {
+    let delta = 0;
+    if (positionSeconds >= 0) delta = g.snap(positionSeconds) - gStart;
+    else if (byFrames) delta = byFrames * g.frame;
+    else if (bySeconds) delta = g.snap(gStart + bySeconds) - gStart;
+    else if (anchor2) {
+      const [aStart, aEnd] = spanOf(anchor2);
+      delta = afterId ? aEnd - gStart : aStart - length - gStart;
+    }
+    if (gStart + delta < -g.tol) throw new ToolError(`that would start the clip(s) at ${f2(gStart + delta)} s, before the timeline start`);
+    const changes = /* @__PURE__ */ new Map();
+    for (const c of clips) {
+      const [s, e] = spans2.get(c.id);
+      const newLayer = layerMap.get(c.layer);
+      const p = Math.max(0, s + delta);
+      changes.set(c.id, { layer: newLayer, start: p, end: p + (e - s) });
+      movedItems.set(c.id, [c, p, newLayer]);
+    }
+    if (clips.every((c) => Math.abs(changes.get(c.id).start - spans2.get(c.id)[0]) <= g.tol && changes.get(c.id).layer === c.layer)) {
+      throw new ToolError("the clips are already there; nothing moved");
+    }
+    hits = checkOverlaps(newOverlaps(project, changes), allowOverlap, "Moving the clip(s)");
+  } else {
+    if (srcLayers.size !== 1 || new Set(layerMap.values()).size !== 1) throw new ToolError("ripple moves clips of one track at a time");
+    const src = [...srcLayers][0];
+    const dst = [...layerMap.values()][0];
+    const between = project.clips.filter((c) => c.layer === src && !ids2.has(c.id) && gStart + g.tol < spanOf(c)[0] && spanOf(c)[0] < gEnd - g.tol);
+    if (between.length > 0) {
+      throw new ToolError(`ripple needs one contiguous run of clips; ${pyReprString(clipTitle2(between[0]))} sits between them`);
+    }
+    const inner = transitionsBetween(project, clips.map((c) => c.id), g.tol);
+    const moving = /* @__PURE__ */ new Set([...ids2, ...inner.map((t) => t.id)]);
+    const pos = /* @__PURE__ */ new Map();
+    const objs = /* @__PURE__ */ new Map();
+    for (const item of [...itemsOnLayer(project, src), ...dst !== src ? itemsOnLayer(project, dst) : []]) {
+      objs.set(item.id, item);
+      pos.set(item.id, Number(item.position) || 0);
+    }
+    const later = itemsOnLayer(project, src).filter((i) => !moving.has(i.id) && pos.get(i.id) > gStart + g.tol);
+    const freed = later.length > 0 ? Math.min(length, Math.min(...later.map((i) => pos.get(i.id))) - gStart) : 0;
+    for (const i of later) pos.set(i.id, pos.get(i.id) - freed);
+    const closed = (t) => dst !== src || t <= gStart ? t : Math.max(gStart, t - freed);
+    let insertAt;
+    if (anchor2) {
+      const aStart = pos.get(anchor2.id);
+      const [s0, e0] = spanOf(anchor2);
+      insertAt = afterId ? aStart + (e0 - s0) : aStart;
+    } else if (positionSeconds >= 0) {
+      insertAt = closed(g.snap(positionSeconds));
+    } else if (byFrames || bySeconds) {
+      insertAt = closed(g.snap(gStart + (byFrames ? byFrames * g.frame : bySeconds)));
+    } else if (dst !== src) {
+      insertAt = gStart;
+    } else {
+      throw new ToolError("the clips are already there; nothing moved");
+    }
+    insertAt = Math.max(0, insertAt);
+    for (const item of itemsOnLayer(project, dst).filter((i) => isClip(project, i))) {
+      if (moving.has(item.id)) continue;
+      const s = pos.get(item.id);
+      const [s0, e0] = spanOf(item);
+      const e = s + (e0 - s0);
+      if (s < insertAt - g.tol && e > insertAt + g.tol && !allowOverlap) {
+        throw new ToolError(
+          `${f2(insertAt)} s falls inside ${pyReprString(clipTitle2(item))} (${f2(s)}-${f2(e)} s); insert at its start or end, slice it first (slice_clips_tool), or pass allow_overlap=true`
+        );
+      }
+    }
+    for (const item of itemsOnLayer(project, dst)) {
+      if (!moving.has(item.id) && pos.get(item.id) >= insertAt - g.tol) pos.set(item.id, pos.get(item.id) + length);
+    }
+    for (const item of [...clips, ...inner]) {
+      objs.set(item.id, item);
+      const p = insertAt + (spanOf(item)[0] - gStart);
+      pos.set(item.id, p);
+      movedItems.set(item.id, [item, p, dst]);
+    }
+    for (const [id, item] of objs) {
+      if (movedItems.has(id)) continue;
+      if (Math.abs(pos.get(id) - (Number(item.position) || 0)) > 1e-9) movedItems.set(id, [item, pos.get(id), item.layer]);
+    }
+  }
+  call.commit((tx) => {
+    for (const [id, [item, newPos, newLayer]] of movedItems) {
+      const to = { position: g.snap(newPos), ...item.layer !== newLayer ? { layer: newLayer } : {} };
+      if (isClip(project, item)) moveClip(tx, id, to);
+      else moveTransition(tx, id, to);
+    }
+  });
+  const after = call.doc.project;
+  const moved = [];
+  const shifted = [];
+  for (const [id, [item, newPos, newLayer]] of movedItems) {
+    if (ids2.has(id)) {
+      const was = before.get(id);
+      moved.push({
+        timeline_clip_id: id,
+        title: clipTitle2(item),
+        from: { track: uiTrack(after, was.layer), position: r3(was.position) },
+        to: { track: uiTrack(after, newLayer), position: r3(g.snap(newPos)) }
+      });
+    } else if (isClip(project, item)) {
+      shifted.push(id);
+    }
+  }
+  const first = moved[0]?.to ?? {};
+  const summary = `Moved ${moved.length} clip(s) to ${trackName(after, layerMap.get(clips[0].layer))} at ${f2(first.position ?? 0)} s` + (shifted.length > 0 ? `; ${shifted.length} later clip(s) shifted` : "") + (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") + ".";
+  return ok(call, summary, { moved, shifted: shifted.sort(), overlaps: hits, ripple });
+}
+async function trimClips(call, input2) {
+  const project = call.doc.project;
+  if (!clipsGiven(input2)) throw new ToolError("say which clips to trim: timeline_clip_ids, clip_query, or scope");
+  const trimStart = input2.trim_start_seconds ?? 0;
+  const trimEnd = input2.trim_end_seconds ?? 0;
+  const sourceStart = input2.source_start ?? -1;
+  const sourceEnd = input2.source_end ?? -1;
+  const duration3 = input2.duration_seconds ?? 0;
+  const ripple = input2.ripple ?? false;
+  if (trimStart && sourceStart >= 0) throw new ToolError("give trim_start_seconds or source_start, not both");
+  if ([Boolean(trimEnd), sourceEnd >= 0, duration3 > 0].filter(Boolean).length > 1) {
+    throw new ToolError("give only one of trim_end_seconds, source_end, duration_seconds");
+  }
+  if (!(trimStart || trimEnd || sourceStart >= 0 || sourceEnd >= 0 || duration3 > 0)) {
+    throw new ToolError("nothing to trim: give trim_start_seconds, trim_end_seconds, source_start, source_end or duration_seconds");
+  }
+  const clips = await targetClips(call, input2);
+  requireUnlockedTracks(project, clips.map((c) => c.layer));
+  const g = gridOf(project);
+  let plans = clips.map((clip2) => {
+    const name = clipTitle2(clip2);
+    const s = Number(clip2.start) || 0;
+    const e = Number(clip2.end) || 0;
+    const pos = Number(clip2.position) || 0;
+    let ns = sourceStart >= 0 ? sourceStart : s + trimStart;
+    let ne = sourceEnd >= 0 ? sourceEnd : duration3 > 0 ? ns + duration3 : e - trimEnd;
+    ns = g.snap(ns);
+    ne = g.snap(ne);
+    if (ns < -g.tol) {
+      throw new ToolError(`${name}: there are only ${f2(s)} s of source before its in point, so the start can be extended by at most ${f2(s)} s`);
+    }
+    ns = Math.max(0, ns);
+    if (!isImageClip(clip2)) {
+      const maxLen = clipTimeBounds(clip2, project.fps).maxDuration;
+      if (maxLen && ne > maxLen + g.tol) {
+        throw new ToolError(`${name}: the source is ${f2(maxLen)} s long, so its out point can be at most ${f2(maxLen)} s (it is ${f2(e)} s now)`);
+      }
+      if (maxLen) ne = Math.min(ne, maxLen);
+    }
+    if (ne - ns < g.frame - g.tol) {
+      throw new ToolError(
+        `${name}: that leaves ${pyFixed(Math.max(0, ne - ns), 3)} s; a clip needs at least one frame (delete it with delete_from_timeline_tool instead)`
+      );
+    }
+    const np = ripple ? pos : pos + (ns - s);
+    if (np < -g.tol) {
+      throw new ToolError(`${name}: extending its start by ${f2(s - ns)} s would put it before 0 s on the timeline; move it later first or pass ripple=true`);
+    }
+    return { clip: clip2, s, e, pos, ns, ne, np: Math.max(0, np) };
+  });
+  plans = plans.filter((p) => Math.abs(p.ns - p.s) > 1e-9 || Math.abs(p.ne - p.e) > 1e-9);
+  if (plans.length === 0) return nothingChanged(call, "Nothing changed: the clips already have those in/out points.", { clips: [] });
+  let hits = [];
+  if (!ripple) {
+    const changes = new Map(plans.map((p) => [p.clip.id, { layer: p.clip.layer, start: p.np, end: p.np + (p.ne - p.ns) }]));
+    hits = checkOverlaps(newOverlaps(project, changes), input2.allow_overlap ?? false, "The trim");
+  }
+  const ordered = [...plans].sort((a, b) => b.pos - a.pos);
+  const shifted = call.commit((tx) => {
+    const moved = [];
+    for (const p of ordered) {
+      trimClip(tx, p.clip.id, { start: p.ns, end: p.ne });
+      moveClip(tx, p.clip.id, { position: g.snap(p.np) });
+      if (ripple) moved.push(...shiftAfter(tx, p.clip.layer, p.pos + g.tol, p.ne - p.ns - (p.e - p.s), /* @__PURE__ */ new Set([p.clip.id])));
+    }
+    return moved;
+  });
+  const results = ordered.map((p) => ({
+    timeline_clip_id: p.clip.id,
+    title: clipTitle2(p.clip),
+    before: { position: r3(p.pos), source_in: r3(p.s), source_out: r3(p.e), duration: r3(p.e - p.s) },
+    after: { position: r3(p.np), source_in: r3(p.ns), source_out: r3(p.ne), duration: r3(p.ne - p.ns) }
+  })).reverse();
+  const one = results[0].after;
+  const summary = `Trimmed ${results.length} clip(s)` + (results.length === 1 ? `: now ${f2(one.source_in)}-${f2(one.source_out)} s of the source, ${f2(one.duration)} s long` : "") + (shifted.length > 0 ? `; ${shifted.length} later item(s) rippled` : "") + ".";
+  return ok(call, summary, { clips: results, shifted: [...new Set(shifted)].sort(), overlaps: hits, ripple });
+}
+async function sliceClips(call, input2) {
+  const project = call.doc.project;
+  const keep2 = input2.keep ?? "both";
+  const ripple = input2.ripple ?? false;
+  const includeTransitions = input2.include_transitions ?? true;
+  if (keep2 === "both" && ripple) throw new ToolError("ripple only applies when one side is kept (keep='left' or 'right')");
+  const g = gridOf(project);
+  const t = g.snap(timeArg(call, input2.at_seconds));
+  const inside = (item) => {
+    const [s, e] = spanOf(item);
+    return s + g.tol < t && t < e - g.tol;
+  };
+  const scope = (input2.scope ?? "").trim().toLowerCase();
+  const locked = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
+  const skipped = [];
+  let clips;
+  let transitions = [];
+  if ((input2.timeline_clip_ids?.length ?? 0) > 0 || input2.clip_query?.trim() || scope === "selected") {
+    clips = await targetClips(call, input2);
+    for (const c of clips) {
+      if (!inside(c)) {
+        const [s, e] = spanOf(c);
+        throw new ToolError(`${pyReprString(clipTitle2(c))} (${f2(s)}-${f2(e)} s) is not under ${f2(t)} s; cut inside the clip`);
+      }
+    }
+    requireUnlockedTracks(project, clips.map((c) => c.layer));
+    if (scope === "selected" && includeTransitions) {
+      const selected = new Set(call.host.ui?.selectedIds?.() ?? []);
+      transitions = project.effects.filter((tr) => selected.has(tr.id) && inside(tr));
+    }
+  } else if (scope === "track" || scope === "all") {
+    const wanted = scope === "track" ? /* @__PURE__ */ new Set([resolveLayer(project, input2.track)]) : new Set(project.layers.map((l) => l.number));
+    if (scope === "track") requireUnlockedTracks(project, wanted);
+    clips = project.clips.filter((c) => wanted.has(c.layer) && inside(c));
+    if (includeTransitions) transitions = project.effects.filter((tr) => wanted.has(tr.layer) && inside(tr));
+    for (const c of clips.filter((c2) => locked.has(c2.layer))) {
+      skipped.push({ timeline_clip_id: c.id, title: clipTitle2(c), track: uiTrack(project, c.layer) });
+    }
+    clips = clips.filter((c) => !locked.has(c.layer));
+    transitions = transitions.filter((tr) => !locked.has(tr.layer));
+    if (clips.length === 0 && transitions.length === 0) {
+      const where = scope === "track" ? ` on ${trackName(project, [...wanted][0])}` : "";
+      const extra = skipped.length > 0 ? ` (${skipped.length} clip(s) on locked tracks skipped)` : "";
+      throw new ToolError(`nothing to slice under ${f2(t)} s${where}${extra}`);
+    }
+  } else {
+    throw new ToolError("say what to slice: timeline_clip_ids, clip_query, or scope ('selected', 'track', 'all')");
+  }
+  const cutAt = keep2 === "left" ? t + g.frame : t;
+  const cuts = (item) => {
+    const [s, e] = spanOf(item);
+    return s < cutAt - 1e-9 && cutAt < e - 1e-9;
+  };
+  const pieces = call.commit((tx) => {
+    const out = [];
+    for (const c of clips) {
+      const now = clipById2(tx.project, c.id);
+      let right = null;
+      let changed = false;
+      if (now && cuts(now)) {
+        const result2 = splitClip(tx, c.id, t, keep2, { ripple });
+        right = keep2 === "both" ? result2.rightId : null;
+        changed = true;
+      }
+      out.push({
+        timeline_clip_id: c.id,
+        title: clipTitle2(c),
+        left: keep2 === "both" || keep2 === "left" ? c.id : null,
+        right: keep2 === "both" ? right : keep2 === "right" ? c.id : null,
+        changed
+      });
+    }
+    for (const tr of transitions) {
+      const now = findTransition(tx.project, tr.id);
+      if (now && cuts(now)) splitTransition(tx, tr.id, t, keep2, { ripple });
+    }
+    if (clips.length > 0 && !out.some((p) => p.changed)) throw new ToolError(`the editor did not slice anything at ${f2(t)} s`);
+    return out;
+  });
+  const summary = `Sliced ${clips.length} clip(s)` + (transitions.length > 0 ? ` and ${transitions.length} transition(s)` : "") + ` at ${f2(t)} s, kept ${keep2}` + (ripple ? " and closed the gap" : "") + (skipped.length > 0 ? `; skipped ${skipped.length} on locked tracks` : "") + ".";
+  return ok(call, summary, {
+    at_seconds: r3(t),
+    keep: keep2,
+    pieces,
+    transition_ids: transitions.map((tr) => tr.id),
+    skipped_locked: skipped,
+    ripple
+  });
+}
+function removeGaps(call, input2) {
+  const project = call.doc.project;
+  const from = input2.from_seconds ?? 0;
+  const onlyFirst = input2.only_first ?? false;
+  let todo;
+  if (input2.track?.trim()) {
+    todo = [resolveLayer(project, input2.track)];
+  } else {
+    const used = [...new Set(project.clips.map((c) => c.layer))].sort((a, b) => a - b);
+    todo = used.filter((n) => listGaps(project, n, from).length > 0);
+    if (todo.length > 1) {
+      throw new ToolError(
+        `${todo.map((n) => trackName(project, n)).join(", ")} have gaps; say which track (closing gaps on several tracks at once would pull them out of sync)`
+      );
+    }
+  }
+  requireUnlockedTracks(project, todo);
+  const closed = [];
+  const movedIds = /* @__PURE__ */ new Set();
+  call.commit((tx) => {
+    for (const layer2 of todo) {
+      let gaps = listGaps(tx.project, layer2, from);
+      if (gaps.length === 0) continue;
+      let moved;
+      if (onlyFirst) {
+        gaps = gaps.slice(0, 1);
+        moved = closeGap(tx, layer2, gaps[0].start, gaps[0].end);
+      } else {
+        moved = closeAllGaps(tx, layer2, gaps[0].start);
+      }
+      for (const id of moved) movedIds.add(id);
+      closed.push({
+        track: uiTrack(project, layer2),
+        gaps: gaps.map((gap) => [r3(gap.start), r3(gap.end)]),
+        closed_seconds: r3(gaps.reduce((sum, gap) => sum + (gap.end - gap.start), 0))
+      });
+    }
+  });
+  if (closed.length === 0) {
+    const where = todo.length > 0 ? ` on ${trackName(project, todo[0])}` : "";
+    return nothingChanged(call, `No gaps to remove${where} after ${f2(from)} s.`, { closed: [] });
+  }
+  const total = closed.reduce((sum, c) => sum + c.closed_seconds, 0);
+  const count = closed.reduce((sum, c) => sum + c.gaps.length, 0);
+  return ok(call, `Closed ${count} gap(s) (${f2(total)} s) on track ${closed[0].track}; ${movedIds.size} item(s) moved left.`, {
+    closed,
+    moved: [...movedIds].sort()
+  });
+}
+async function duplicateClips(call, input2) {
+  const project = call.doc.project;
+  if (!clipsGiven(input2)) throw new ToolError("say which clips to duplicate: timeline_clip_ids, clip_query, or scope");
+  const clips = await targetClips(call, input2);
+  const srcLayers = new Set(clips.map((c) => c.layer));
+  const toTrack = (input2.to_track ?? "").trim();
+  const layerMap = toTrack ? layerMapFor(project, srcLayers, toTrack) : new Map([...srcLayers].map((n) => [n, n]));
+  const destLayers = new Set(layerMap.values());
+  requireUnlockedTracks(project, destLayers, "the copies' destination");
+  const g = gridOf(project);
+  const copies = input2.copies ?? 1;
+  const ripple = input2.ripple ?? false;
+  const allowOverlap = input2.allow_overlap ?? false;
+  const spans2 = new Map(clips.map((c) => [c.id, spanOf(c)]));
+  const gStart = Math.min(...[...spans2.values()].map(([s]) => s));
+  const gEnd = Math.max(...[...spans2.values()].map(([, e]) => e));
+  const length = gEnd - gStart;
+  const positionSeconds = input2.position_seconds ?? -1;
+  const base = positionSeconds >= 0 ? g.snap(positionSeconds) : gEnd;
+  const inner = input2.include_transitions ?? true ? transitionsBetween(project, clips.map((c) => c.id), g.tol) : [];
+  const planned = [];
+  for (let k = 0; k < copies; k += 1) {
+    const offset = base + k * length - gStart;
+    for (const c of clips) {
+      const [s, e] = spans2.get(c.id);
+      planned.push({ label: `copy ${k + 1} of ${clipTitle2(c)}`, layer: layerMap.get(c.layer), start: s + offset, end: e + offset });
+    }
+  }
+  let hits = [];
+  if (ripple) {
+    for (const layer2 of destLayers) {
+      for (const item of project.clips.filter((c) => c.layer === layer2).sort((a, b) => a.position - b.position)) {
+        const [s, e] = spanOf(item);
+        if (s < base - g.tol && e > base + g.tol && !allowOverlap) {
+          throw new ToolError(
+            `${f2(base)} s falls inside ${pyReprString(clipTitle2(item))} (${f2(s)}-${f2(e)} s); insert at its start or end, slice it first, or pass allow_overlap=true`
+          );
+        }
+      }
+    }
+  } else {
+    hits = checkOverlaps(newOverlaps(project, /* @__PURE__ */ new Map(), planned), allowOverlap, "The copies");
+  }
+  const { created, transitionIds, shifted } = call.commit((tx) => {
+    const pushed = [];
+    if (ripple) for (const layer2 of destLayers) pushed.push(...shiftAfter(tx, layer2, base, copies * length));
+    const batches = [];
+    const newTransitions = [];
+    for (let k = 0; k < copies; k += 1) {
+      const offset = base + k * length - gStart;
+      const result2 = duplicateItems(tx, {
+        clips: clips.map((c) => ({ id: c.id, position: spans2.get(c.id)[0] + offset, layer: layerMap.get(c.layer) })),
+        transitions: inner.map((t) => ({ id: t.id, position: Number(t.position) + offset, layer: layerMap.get(t.layer) ?? t.layer }))
+      });
+      batches.push(
+        result2.clips.map(({ copy, of }) => ({
+          timeline_clip_id: copy.id,
+          copy_of: of,
+          track: uiTrack(tx.project, copy.layer),
+          position: r3(copy.position),
+          end: r3(spanOf(copy)[1])
+        }))
+      );
+      newTransitions.push(...result2.transitionIds);
+    }
+    return { created: batches, transitionIds: newTransitions, shifted: pushed };
+  });
+  const first = created[0][0];
+  const pushedClips = shifted.filter((id) => project.clips.some((c) => c.id === id)).length;
+  const summary = `Made ${copies} cop${copies === 1 ? "y" : "ies"} of ${clips.length} clip(s); the first starts at ${f2(first.position)} s on track ${first.track}` + (shifted.length > 0 ? `; ${pushedClips} later clip(s) pushed` : "") + (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") + ".";
+  return ok(call, summary, { copies: created, transition_ids: transitionIds, shifted: [...new Set(shifted)].sort(), overlaps: hits });
+}
+async function alignClips(call, input2) {
+  const project = call.doc.project;
+  if (!clipsGiven(input2)) throw new ToolError("say which clips to align: timeline_clip_ids, clip_query, or scope");
+  const clips = await targetClips(call, input2);
+  const toSeconds2 = input2.to_seconds ?? -1;
+  const edge = input2.edge ?? "start";
+  if (clips.length < 2 && toSeconds2 < 0) throw new ToolError("aligning needs at least two clips (or to_seconds to line one clip up with a time)");
+  requireUnlockedTracks(project, clips.map((c) => c.layer));
+  const g = gridOf(project);
+  const positions = alignedPositions(clips, edge === "end", toSeconds2 >= 0 ? g.snap(toSeconds2) : void 0);
+  const changes = /* @__PURE__ */ new Map();
+  for (const c of clips) {
+    const [s, e] = spanOf(c);
+    const p = g.snap(positions.get(c.id));
+    if (p < -g.tol) throw new ToolError(`${pyReprString(clipTitle2(c))} would start at ${f2(p)} s, before the timeline start`);
+    if (Math.abs(p - s) > g.tol) changes.set(c.id, { layer: c.layer, start: Math.max(0, p), end: Math.max(0, p) + (e - s) });
+  }
+  if (changes.size === 0) return nothingChanged(call, `The clips' ${edge}s are already lined up.`, { moved: [] });
+  const hits = checkOverlaps(newOverlaps(project, changes), input2.allow_overlap ?? false, "Aligning", false);
+  call.commit((tx) => {
+    for (const [id, planned] of changes) moveClip(tx, id, { position: planned.start });
+  });
+  const moved = clips.filter((c) => changes.has(c.id)).map((c) => ({ timeline_clip_id: c.id, title: clipTitle2(c), from: r3(spanOf(c)[0]), to: r3(changes.get(c.id).start) }));
+  const firstChange = [...changes.values()][0];
+  const at = edge === "start" ? firstChange.start : firstChange.end;
+  return ok(call, `Aligned the ${edge}s of ${clips.length} clip(s) at ${f2(at)} s (${moved.length} moved).`, {
+    edge,
+    at_seconds: r3(at),
+    moved,
+    overlaps: hits
+  });
+}
+var EDIT2, ADD2, timelineEditTools;
+var init_timeline_edit = __esm({
+  "../engine/src/tools/catalog/timeline-edit.ts"() {
+    "use strict";
+    init_defaults();
+    init_query();
+    init_arrange();
+    init_clips();
+    init_add_to_timeline();
+    init_sequence();
+    init_transitions();
+    init_timing();
+    init_queries();
+    init_catalog();
+    init_define();
+    init_placement();
+    init_pyfmt();
+    init_tracks2();
+    init_common();
+    init_timeline_edit_common();
+    EDIT2 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    ADD2 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    timelineEditTools = [
+      contractTool("add_clips_to_timeline_tool", { annotations: ADD2, run: (call, input2) => editorRun(() => addClipsToTimeline(call, input2)) }),
+      contractTool("move_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => moveClips(call, input2)) }),
+      contractTool("trim_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => trimClips(call, input2)) }),
+      contractTool("slice_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => sliceClips(call, input2)) }),
+      contractTool("remove_gaps_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => removeGaps(call, input2)) }),
+      contractTool("duplicate_clips_tool", { annotations: ADD2, run: (call, input2) => editorRun(() => duplicateClips(call, input2)) }),
+      contractTool("align_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => alignClips(call, input2)) })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/timeline-time.ts
+function requireTargets(target, verb) {
+  if (!clipsGiven(target)) throw new ToolError(`say which clips to ${verb}: timeline_clip_ids, clip_query, or scope`);
+}
+function readerOf3(project, clip2) {
+  const reader = clip2.reader;
+  if (reader && typeof reader === "object" && Object.keys(reader).length > 0) return reader;
+  const file3 = fileById(project, String(clip2.file_id ?? ""));
+  return file3 ? file3 : {};
+}
+function mediaHasAudio(project, clip2) {
+  const reader = readerOf3(project, clip2);
+  const hasAudio = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
+  const channels = reader.channels === void 0 || reader.channels === null ? null : Math.trunc(Number(reader.channels));
+  return hasAudio && (channels === null || Number.isNaN(channels) || channels > 0);
+}
+function mediaHasVideo(project, clip2) {
+  const reader = readerOf3(project, clip2);
+  return reader.has_video === void 0 || reader.has_video === null ? true : Boolean(reader.has_video);
+}
+function keyframeValue2(kf, fallback = -1) {
+  const points = kf?.Points;
+  const y = Array.isArray(points) && points.length > 0 ? Number(points[0]?.co?.Y) : NaN;
+  return Number.isFinite(y) ? y : fallback;
+}
+function wholeFrames(g, seconds2) {
+  return Math.max(1, pyRound(seconds2 * g.fps)) / g.fps;
+}
+function resetDuration(project, clip2, g) {
+  if (isImageClip(clip2)) return DEFAULT_IMAGE_LENGTH;
+  const cache5 = repeatIsActive(clip2) ? clip2.repeat_cache : {};
+  const start = Number(cache5.start ?? clip2.start) || 0;
+  const source2 = Number(readerOf3(project, clip2).duration) || 0;
+  return source2 > 0 ? Math.max(g.frame, source2 - start) : (Number(clip2.end) || 0) - start;
+}
+function timingReceipt(project, clip2, beforeDuration) {
+  const now = clipById2(project, clip2.id) ?? clip2;
+  const [start, end] = spanOf(now);
+  const { speed, direction: direction2 } = effectiveSpeed(now);
+  return {
+    timeline_clip_id: clip2.id,
+    title: clipTitle2(clip2),
+    duration_before: r3(beforeDuration),
+    duration_after: r3(end - start),
+    effective_speed: speed === null ? null : r3(speed),
+    direction: direction2,
+    position: r3(start),
+    end: r3(end)
+  };
+}
+function rippleAfter(tx, clip2, start, oldDuration, g) {
+  const [s, e] = spanOf(clipById2(tx.project, clip2.id) ?? clip2);
+  return shiftAfter(tx, clip2.layer, start + g.tol, e - s - oldDuration, /* @__PURE__ */ new Set([clip2.id]));
+}
+function uniqueSorted(ids2) {
+  return [...new Set(ids2)].sort();
+}
+async function setClipSpeed(call, input2) {
+  const project = call.doc.project;
+  const ids2 = [...input2.timeline_clip_ids ?? []];
+  const aliasId = text(input2.clip_id);
+  if (aliasId && !ids2.includes(aliasId)) ids2.push(aliasId);
+  let speed = input2.speed ?? 0;
+  if (input2.factor !== void 0) {
+    if (speed && speed !== input2.factor) throw new ToolError("give speed or factor (its older name), not both");
+    speed = input2.factor;
+  }
+  const reverse = (input2.reverse ?? false) || input2.direction === "backward";
+  const target = { ...input2, timeline_clip_ids: ids2 };
+  const absolute = input2.absolute ?? false;
+  const targetDuration = input2.target_duration_seconds ?? 0;
+  const reset = input2.reset ?? false;
+  const ripple = input2.ripple ?? false;
+  requireTargets(target, "retime");
+  if (speed && targetDuration) throw new ToolError("give speed or target_duration_seconds, not both");
+  if (absolute && !speed) throw new ToolError("absolute=true needs a speed (1 = normal speed)");
+  if (!(speed || targetDuration || reverse || reset)) throw new ToolError("nothing to change: give speed, target_duration_seconds, reverse or reset");
+  const clips = await targetClips(call, target);
+  requireUnlockedTracks(project, clips.map((c) => c.layer));
+  const g = gridOf(project);
+  const plans = clips.map((clip2) => {
+    const name = pyReprString(clipTitle2(clip2));
+    const [s, e] = spanOf(clip2);
+    const duration3 = e - s;
+    const eff = effectiveSpeed(clip2).speed;
+    if ((speed || targetDuration) && eff === null && !reset) {
+      throw new ToolError(`${name} is looped (repeat_clip_tool); pass reset=true to clear the loop before changing its speed`);
+    }
+    const baseDuration = reset ? resetDuration(project, clip2, g) : duration3;
+    const baseSpeed = reset ? 1 : eff;
+    let factor = null;
+    if (speed) factor = absolute ? speed / baseSpeed : speed;
+    else if (targetDuration) factor = baseDuration / targetDuration;
+    if (factor !== null) {
+      if (Math.abs(factor - 1) < 1e-6) factor = null;
+      else if (!(MIN_SPEED - 1e-9 <= factor && factor <= MAX_SPEED + 1e-9)) {
+        throw new ToolError(`${name}: that is a ${pyG(factor, 3)}x change; speed changes go from 1/16x to 16x per call`);
+      }
+    }
+    if (factor === null && !reverse && !reset) throw new ToolError(`${name} already plays at that speed; nothing to change`);
+    const newDuration = factor ? wholeFrames(g, baseDuration / factor) : baseDuration;
+    return { clip: clip2, start: s, duration: duration3, newDuration, factor };
+  });
+  let hits = [];
+  if (!ripple) {
+    const changes = new Map(
+      plans.filter((p) => p.newDuration > p.duration + g.tol).map((p) => [p.clip.id, { layer: p.clip.layer, start: p.start, end: p.start + p.newDuration }])
+    );
+    hits = checkOverlaps(newOverlaps(project, changes), input2.allow_overlap ?? false, "The longer clip");
+  }
+  const { results, shifted } = call.commit((tx) => {
+    const rows = [];
+    const moved = [];
+    for (const p of [...plans].sort((a, b) => b.start - a.start)) {
+      if (reset) applyClipPreset(tx, p.clip.id, "time.none");
+      if (p.factor) applyClipPreset(tx, p.clip.id, reverse ? "time.backward" : "time.forward", { speed: Number(pyG(p.factor, 6)) });
+      else if (reverse) applyClipPreset(tx, p.clip.id, "time.reverse");
+      if (ripple) moved.push(...rippleAfter(tx, p.clip, p.start, p.duration, g));
+      rows.push(timingReceipt(tx.project, p.clip, p.duration));
+    }
+    return { results: rows.reverse(), shifted: moved };
+  });
+  const one = results[0];
+  const what = `${reset ? "reset" : ""}${reverse ? " reversed" : ""}`.trim();
+  const speedNote = one.effective_speed !== null ? `${pyFloat(one.effective_speed)}x ${String(one.direction)}` : String(one.direction);
+  const summary = `Retimed ${results.length} clip(s)${what ? ` (${what})` : ""}: ${f2(one.duration_before)} s -> ${f2(one.duration_after)} s, now ${speedNote}` + (shifted.length > 0 ? `; ${shifted.length} later item(s) rippled` : "") + (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") + ".";
+  return ok(call, summary, { clips: results, shifted: uniqueSorted(shifted), overlaps: hits });
+}
+async function repeatClips(call, input2) {
+  const project = call.doc.project;
+  requireTargets(input2, "repeat");
+  const clips = await targetClips(call, input2);
+  requireUnlockedTracks(project, clips.map((c) => c.layer));
+  const g = gridOf(project);
+  const times = input2.times ?? 2;
+  const pattern = input2.pattern ?? "loop";
+  const ripple = input2.ripple ?? false;
+  const delayFrames = pyRound((input2.delay_seconds ?? 0) * g.fps);
+  const ramp = (input2.speed_ramp_percent ?? 0) / 100;
+  const plans = clips.map((clip2) => {
+    if (repeatIsActive(clip2)) {
+      throw new ToolError(`${pyReprString(clipTitle2(clip2))} is already looped; reset it first (set_clip_speed_tool reset=true) or undo the earlier repeat`);
+    }
+    const [s, e] = spanOf(clip2);
+    const duration3 = e - s;
+    const spanFrames = Math.max(1, pyRound(duration3 * g.fps));
+    let total = 0;
+    for (let k = 0; k < times; k += 1) total += Math.max(1, pyRound(spanFrames / Math.abs((1 + ramp) ** k)));
+    total += (times - 1) * delayFrames;
+    const newDuration = total / g.fps;
+    if (newDuration > 3 * 3600) {
+      throw new ToolError(`${pyReprString(clipTitle2(clip2))} would become ${pyFixed(newDuration / 3600, 1)} hours long; use fewer passes or a smaller slow-down`);
+    }
+    return { clip: clip2, start: s, duration: duration3, newDuration };
+  });
+  let hits = [];
+  if (!ripple) {
+    const changes = new Map(plans.map((p) => [p.clip.id, { layer: p.clip.layer, start: p.start, end: p.start + p.newDuration }]));
+    hits = checkOverlaps(newOverlaps(project, changes), input2.allow_overlap ?? false, "The repeated clip");
+  }
+  const { results, shifted } = call.commit((tx) => {
+    const rows = [];
+    const moved = [];
+    for (const p of [...plans].sort((a, b) => b.start - a.start)) {
+      repeatClip(tx, p.clip.id, {
+        pattern: pattern === "ping_pong" ? "pingpong" : "loop",
+        direction: input2.reverse ? -1 : 1,
+        passes: times,
+        delayFrames,
+        ramp
+      });
+      if (ripple) moved.push(...rippleAfter(tx, p.clip, p.start, p.duration, g));
+      rows.push(timingReceipt(tx.project, p.clip, p.duration));
+    }
+    return { results: rows.reverse(), shifted: moved };
+  });
+  const one = results[0];
+  const summary = `Repeated ${results.length} clip(s) ${times}x (${pattern.replaceAll("_", "-")}): ${f2(one.duration_before)} s -> ${f2(one.duration_after)} s` + (shifted.length > 0 ? `; ${shifted.length} later item(s) rippled` : "") + (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") + ".";
+  return ok(call, summary, { times, pattern, clips: results, shifted: uniqueSorted(shifted), overlaps: hits });
+}
+async function freezeFrame(call, input2) {
+  const project = call.doc.project;
+  const clip2 = await targetClip(call, input2);
+  requireUnlockedTracks(project, [clip2.layer]);
+  const g = gridOf(project);
+  const name = pyReprString(clipTitle2(clip2));
+  const [start, end] = spanOf(clip2);
+  if (end - start < g.frame - g.tol) throw new ToolError(`${name} is shorter than a frame`);
+  const which2 = input2.frame ?? "at_time";
+  let t;
+  if (which2 === "first") t = start;
+  else if (which2 === "last") t = end - g.frame;
+  else {
+    const at = input2.at_seconds ?? -1;
+    t = g.snap(at < 0 ? playheadSeconds(call) : at);
+    if (!(start - g.tol <= t && t <= end - g.frame + g.tol)) {
+      throw new ToolError(`${f2(t)} s is outside ${name} (${f2(start)}-${f2(end)} s); give a time inside it or frame='first'/'last'`);
+    }
+  }
+  t = Math.min(Math.max(g.snap(t), start), g.snap(end - g.frame));
+  const hold = wholeFrames(g, input2.hold_seconds ?? 2);
+  const duration3 = end - start;
+  const zoom = input2.zoom ?? false;
+  const ripple = input2.ripple ?? false;
+  const hits = ripple ? [] : checkOverlaps(newOverlaps(project, /* @__PURE__ */ new Map([[clip2.id, { layer: clip2.layer, start, end: end + hold }]])), input2.allow_overlap ?? false, "The freeze");
+  const { receipt: receipt2, shifted } = call.commit((tx) => {
+    applyClipPreset(tx, clip2.id, zoom ? "time.freeze_zoom" : "time.freeze", { seconds: Number(pyG(hold, 6)), playhead: t });
+    const moved = ripple ? rippleAfter(tx, clip2, start, duration3, g) : [];
+    return { receipt: timingReceipt(tx.project, clip2, duration3), shifted: moved };
+  });
+  const summary = `Froze ${name} at ${f2(t)} s for ${f2(hold)} s${zoom ? " with zoom" : ""}; it now ends at ${f2(receipt2.end)} s` + (shifted.length > 0 ? `; ${shifted.length} later item(s) rippled` : "") + (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") + ".";
+  return ok(call, summary, { frozen_at: r3(t), hold_seconds: r3(hold), clip: receipt2, shifted: uniqueSorted(shifted), overlaps: hits });
+}
+async function separateClipAudio(call, input2) {
+  const project = call.doc.project;
+  requireTargets(input2, "separate");
+  const perChannel = input2.per_channel ?? false;
+  const toTrack = (input2.to_track ?? "").trim();
+  if (perChannel && toTrack) throw new ToolError("to_track works with per_channel=false; per-channel clips go on the tracks below");
+  const clips = await targetClips(call, input2);
+  requireUnlockedTracks(project, clips.map((c) => c.layer));
+  for (const clip2 of clips) {
+    const name = pyReprString(clipTitle2(clip2));
+    if (!mediaHasAudio(project, clip2)) throw new ToolError(`${name} has no audio to separate`);
+    if (keyframeValue2(clip2.has_audio) === 0) {
+      throw new ToolError(`${name} already has its audio off (separated before?); turn it back on with set_clip_audio_video_tool(audio='auto') first`);
+    }
+    if (!mediaHasVideo(project, clip2) && !perChannel) throw new ToolError(`${name} is already audio-only; use per_channel=true to split its channels`);
+  }
+  const order = layersBottomUp(project);
+  const dest = toTrack ? resolveLayer(project, toTrack) : void 0;
+  const planned = [];
+  for (const clip2 of clips) {
+    const [s, e] = spanOf(clip2);
+    const channels = Math.trunc(Number(readerOf3(project, clip2).channels)) || 1;
+    let lanes;
+    if (dest !== void 0) lanes = [dest];
+    else {
+      const index = Math.max(0, order.indexOf(clip2.layer));
+      const below = perChannel ? mediaHasVideo(project, clip2) ? channels : channels - 1 : 1;
+      lanes = [];
+      for (let k = 1; k <= below; k += 1) if (index - k >= 0) lanes.push(order[index - k]);
+    }
+    requireUnlockedTracks(project, lanes, "where the audio would go");
+    for (const lane of lanes) planned.push({ label: `audio of ${clipTitle2(clip2)}`, layer: lane, start: s, end: e });
+  }
+  checkOverlaps(newOverlaps(project, /* @__PURE__ */ new Map(), planned), input2.allow_overlap ?? false, "The separated audio", false);
+  const before = new Set(project.clips.map((c) => c.id));
+  call.commit((tx) => {
+    for (const clip2 of clips) separateAudio(tx, clip2.id, { perChannel, ...dest !== void 0 ? { layer: dest } : {} });
+  });
+  const after = call.doc.project;
+  const created = after.clips.filter((c) => !before.has(c.id)).map((c) => c.id).sort().map((id) => {
+    const clip2 = clipById2(after, id);
+    return { ...describeClip(after, clip2), video: keyframeValue2(clip2.has_video) === 0 ? "off" : "auto" };
+  });
+  const originals = clips.map((clip2) => ({
+    timeline_clip_id: clip2.id,
+    title: clipTitle2(clip2),
+    audio: keyframeValue2(clipById2(after, clip2.id)?.has_audio) === 0 ? "off" : "on"
+  }));
+  const tracks = [...new Set(created.map((c) => String(c.track)))].sort();
+  return ok(
+    call,
+    `Separated the audio of ${clips.length} clip(s) into ${created.length} audio clip(s) on track(s) ${tracks.join(", ") || "-"}; the originals are muted.`,
+    { audio_clips: created, originals }
+  );
+}
+function avState(value) {
+  return value === 1 ? "on" : value === 0 ? "off" : "auto";
+}
+async function setClipAudioVideo(call, input2) {
+  const project = call.doc.project;
+  requireTargets(input2, "change");
+  const audio = input2.audio ?? "";
+  const video = input2.video ?? "";
+  const waveform = input2.waveform ?? "";
+  if (!(audio || video || waveform)) throw new ToolError("nothing to change: give audio, video or waveform");
+  const clips = await targetClips(call, input2);
+  requireUnlockedTracks(project, clips.map((c) => c.layer));
+  for (const clip2 of clips) {
+    const name = pyReprString(clipTitle2(clip2));
+    if (audio === "on" && !mediaHasAudio(project, clip2)) throw new ToolError(`${name} has no audio in its media`);
+    if (waveform === "show" && !mediaHasAudio(project, clip2)) throw new ToolError(`${name} has no audio, so it has no waveform`);
+    if (video === "on" && !mediaHasVideo(project, clip2)) throw new ToolError(`${name} has no picture in its media`);
+  }
+  if (waveform === "hide") {
+    return refused(
+      call.tool,
+      `Error: ${call.tool} cannot hide a waveform in this Zenvi surface (the web timeline always draws the waveform of a clip with sound). Call it again without waveform.`
+    );
+  }
+  const changes = clips.map((clip2) => {
+    const fields = [];
+    if (audio && keyframeValue2(clip2.has_audio) !== AV[audio]) fields.push(["has_audio", AV[audio]]);
+    if (video && keyframeValue2(clip2.has_video) !== AV[video]) fields.push(["has_video", AV[video]]);
+    return { clip: clip2, fields };
+  }).filter((c) => c.fields.length > 0);
+  if (changes.length === 0) {
+    const why = waveform === "show" && !audio && !video ? "the web timeline already draws the waveform of every clip with sound" : "the clip(s) were already set that way";
+    return nothingChanged(call, `Nothing changed: ${why}.`, { clips: [] });
+  }
+  call.commit((tx) => {
+    for (const { clip: clip2, fields } of changes) for (const [key, value] of fields) setClipProperty(tx, clip2.id, key, value);
+  });
+  const after = call.doc.project;
+  const states = clips.map((clip2) => {
+    const now = clipById2(after, clip2.id);
+    return {
+      timeline_clip_id: clip2.id,
+      title: clipTitle2(clip2),
+      track: uiTrack(after, clip2.layer),
+      audio: avState(keyframeValue2(now.has_audio)),
+      video: avState(keyframeValue2(now.has_video))
+    };
+  });
+  const parts = [];
+  if (audio) parts.push(`audio ${audio}`);
+  if (video) parts.push(`video ${video}`);
+  if (waveform) parts.push(`waveform ${waveform} (always drawn on the web)`);
+  return ok(call, `Set ${parts.join(", ")} on ${clips.length} clip(s) on ${trackName(after, clips[0].layer)}.`, {
+    clips: states,
+    waveform_requested: [],
+    waveform_hidden: []
+  });
+}
+async function reverseClip(call, input2) {
+  const action = String(input2.mode || "reverse").trim().toLowerCase();
+  let reverse;
+  if (["reverse", "backward", "backwards"].includes(action)) reverse = true;
+  else if (["reset", "none", "forward", "unreverse"].includes(action)) reverse = false;
+  else return "Error: mode must be 'reverse' or 'reset'.";
+  if (!text(input2.timeline_clip_id) && !text(input2.clip_query)) return "Error: reverse_clip_tool requires timeline_clip_id or clip_query.";
+  const resolved = await resolveClip(call, input2);
+  if (!resolved.ok) return resolved.error || "Error: Could not resolve timeline clip.";
+  const clip2 = resolved.clip;
+  if (reverse && timeCurveIsReversed(clip2.time)) return `timeline_clip_id=${clip2.id} is already reversed; nothing changed.`;
+  const points = clip2.time?.Points;
+  if (!reverse && (!Array.isArray(points) || points.length <= 1)) return `timeline_clip_id=${clip2.id} already plays forward at 1x; nothing changed.`;
+  call.commit((tx) => applyClipPreset(tx, clip2.id, reverse ? "time.reverse" : "time.none"));
+  return `${reverse ? "Reversed" : "Reset time on"} timeline_clip_id=${clip2.id}.`;
+}
+var EDIT3, ADD3, MIN_SPEED, MAX_SPEED, AV, timelineTimeTools;
+var init_timeline_time = __esm({
+  "../engine/src/tools/catalog/timeline-time.ts"() {
+    "use strict";
+    init_defaults();
+    init_rounding();
+    init_clips();
+    init_presets();
+    init_retime();
+    init_sequence();
+    init_define();
+    init_receipt();
+    init_pyfmt();
+    init_common();
+    init_timeline_edit_common();
+    EDIT3 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    ADD3 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    MIN_SPEED = 0.0625;
+    MAX_SPEED = 16;
+    AV = { on: 1, off: 0, auto: -1 };
+    timelineTimeTools = [
+      contractTool("reverse_clip_tool", { annotations: EDIT3, run: (call, input2) => reverseClip(call, input2) }),
+      contractTool("set_clip_speed_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => setClipSpeed(call, input2)) }),
+      contractTool("repeat_clip_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => repeatClips(call, input2)) }),
+      contractTool("freeze_frame_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => freezeFrame(call, input2)) }),
+      contractTool("separate_clip_audio_tool", { annotations: ADD3, run: (call, input2) => editorRun(() => separateClipAudio(call, input2)) }),
+      contractTool("set_clip_audio_video_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => setClipAudioVideo(call, input2)) })
+    ];
+  }
+});
+
 // ../engine/src/tools/catalog/titles.ts
 function basename3(path38) {
   return String(path38).split(/[\\/]/).pop() ?? "";
@@ -59867,6 +62558,8 @@ function buildCatalog() {
   const implemented = [
     ...projectTools,
     ...timelineTools,
+    ...timelineEditTools,
+    ...timelineTimeTools,
     ...clipTools,
     ...playbackTools,
     ...audioTools,
@@ -59950,6 +62643,8 @@ var init_registry4 = __esm({
     init_search();
     init_speech_tools();
     init_timeline2();
+    init_timeline_edit();
+    init_timeline_time();
     init_titles2();
     init_transitions3();
     init_define();
@@ -60056,6 +62751,9 @@ var init_availability = __esm({
       reindex_project_file_tool: { webNote: "reports files that are already indexed; uploading for indexing runs in Zenvi desktop" },
       wait_until_project_indexed_tool: { webNote: "reports indexing status once; does not wait" },
       remove_silence_tool: { webNote: "energy VAD on the host's audio analysis" },
+      set_clip_audio_video_tool: {
+        webNote: "waveform=show changes nothing, since the web timeline draws the waveform of every clip with sound; waveform=hide is refused"
+      },
       transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
       remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
       detect_beats_tool: { desktopOnly: "on-device beat tracking" },
@@ -60978,9 +63676,9 @@ var init_types4 = __esm({
         return this._cachedPath;
       }
     };
-    handleResult = (ctx, result) => {
-      if (isValid(result)) {
-        return { success: true, data: result.value };
+    handleResult = (ctx, result2) => {
+      if (isValid(result2)) {
+        return { success: true, data: result2.value };
       } else {
         if (!ctx.common.issues.length) {
           throw new Error("Validation failed but no issues detected.");
@@ -61028,21 +63726,21 @@ var init_types4 = __esm({
         };
       }
       _parseSync(input2) {
-        const result = this._parse(input2);
-        if (isAsync(result)) {
+        const result2 = this._parse(input2);
+        if (isAsync(result2)) {
           throw new Error("Synchronous parse encountered promise.");
         }
-        return result;
+        return result2;
       }
       _parseAsync(input2) {
-        const result = this._parse(input2);
-        return Promise.resolve(result);
+        const result2 = this._parse(input2);
+        return Promise.resolve(result2);
       }
       parse(data, params) {
-        const result = this.safeParse(data, params);
-        if (result.success)
-          return result.data;
-        throw result.error;
+        const result2 = this.safeParse(data, params);
+        if (result2.success)
+          return result2.data;
+        throw result2.error;
       }
       safeParse(data, params) {
         const ctx = {
@@ -61057,8 +63755,8 @@ var init_types4 = __esm({
           data,
           parsedType: getParsedType2(data)
         };
-        const result = this._parseSync({ data, path: ctx.path, parent: ctx });
-        return handleResult(ctx, result);
+        const result2 = this._parseSync({ data, path: ctx.path, parent: ctx });
+        return handleResult(ctx, result2);
       }
       "~validate"(data) {
         const ctx = {
@@ -61074,9 +63772,9 @@ var init_types4 = __esm({
         };
         if (!this["~standard"].async) {
           try {
-            const result = this._parseSync({ data, path: [], parent: ctx });
-            return isValid(result) ? {
-              value: result.value
+            const result2 = this._parseSync({ data, path: [], parent: ctx });
+            return isValid(result2) ? {
+              value: result2.value
             } : {
               issues: ctx.common.issues
             };
@@ -61090,17 +63788,17 @@ var init_types4 = __esm({
             };
           }
         }
-        return this._parseAsync({ data, path: [], parent: ctx }).then((result) => isValid(result) ? {
-          value: result.value
+        return this._parseAsync({ data, path: [], parent: ctx }).then((result2) => isValid(result2) ? {
+          value: result2.value
         } : {
           issues: ctx.common.issues
         });
       }
       async parseAsync(data, params) {
-        const result = await this.safeParseAsync(data, params);
-        if (result.success)
-          return result.data;
-        throw result.error;
+        const result2 = await this.safeParseAsync(data, params);
+        if (result2.success)
+          return result2.data;
+        throw result2.error;
       }
       async safeParseAsync(data, params) {
         const ctx = {
@@ -61116,8 +63814,8 @@ var init_types4 = __esm({
           parsedType: getParsedType2(data)
         };
         const maybeAsyncResult = this._parse({ data, path: ctx.path, parent: ctx });
-        const result = await (isAsync(maybeAsyncResult) ? maybeAsyncResult : Promise.resolve(maybeAsyncResult));
-        return handleResult(ctx, result);
+        const result2 = await (isAsync(maybeAsyncResult) ? maybeAsyncResult : Promise.resolve(maybeAsyncResult));
+        return handleResult(ctx, result2);
       }
       refine(check2, message) {
         const getIssueProperties = (val) => {
@@ -61130,13 +63828,13 @@ var init_types4 = __esm({
           }
         };
         return this._refinement((val, ctx) => {
-          const result = check2(val);
+          const result2 = check2(val);
           const setError = () => ctx.addIssue({
             code: ZodIssueCode2.custom,
             ...getIssueProperties(val)
           });
-          if (typeof Promise !== "undefined" && result instanceof Promise) {
-            return result.then((data) => {
+          if (typeof Promise !== "undefined" && result2 instanceof Promise) {
+            return result2.then((data) => {
               if (!data) {
                 setError();
                 return false;
@@ -61145,7 +63843,7 @@ var init_types4 = __esm({
               }
             });
           }
-          if (!result) {
+          if (!result2) {
             setError();
             return false;
           } else {
@@ -62569,14 +65267,14 @@ var init_types4 = __esm({
         if (ctx.common.async) {
           return Promise.all([...ctx.data].map((item, i) => {
             return def.type._parseAsync(new ParseInputLazyPath(ctx, item, ctx.path, i));
-          })).then((result2) => {
-            return ParseStatus.mergeArray(status, result2);
+          })).then((result3) => {
+            return ParseStatus.mergeArray(status, result3);
           });
         }
-        const result = [...ctx.data].map((item, i) => {
+        const result2 = [...ctx.data].map((item, i) => {
           return def.type._parseSync(new ParseInputLazyPath(ctx, item, ctx.path, i));
         });
-        return ParseStatus.mergeArray(status, result);
+        return ParseStatus.mergeArray(status, result2);
       }
       get element() {
         return this._def.type;
@@ -62956,18 +65654,18 @@ var init_types4 = __esm({
         const { ctx } = this._processInputParams(input2);
         const options = this._def.options;
         function handleResults(results) {
-          for (const result of results) {
-            if (result.result.status === "valid") {
-              return result.result;
+          for (const result2 of results) {
+            if (result2.result.status === "valid") {
+              return result2.result;
             }
           }
-          for (const result of results) {
-            if (result.result.status === "dirty") {
-              ctx.common.issues.push(...result.ctx.common.issues);
-              return result.result;
+          for (const result2 of results) {
+            if (result2.result.status === "dirty") {
+              ctx.common.issues.push(...result2.ctx.common.issues);
+              return result2.result;
             }
           }
-          const unionErrors = results.map((result) => new ZodError2(result.ctx.common.issues));
+          const unionErrors = results.map((result2) => new ZodError2(result2.ctx.common.issues));
           addIssueToContext(ctx, {
             code: ZodIssueCode2.invalid_union,
             unionErrors
@@ -63005,15 +65703,15 @@ var init_types4 = __esm({
               },
               parent: null
             };
-            const result = option._parseSync({
+            const result2 = option._parseSync({
               data: ctx.data,
               path: ctx.path,
               parent: childCtx
             });
-            if (result.status === "valid") {
-              return result;
-            } else if (result.status === "dirty" && !dirty) {
-              dirty = { result, ctx: childCtx };
+            if (result2.status === "valid") {
+              return result2;
+            } else if (result2.status === "dirty" && !dirty) {
+              dirty = { result: result2, ctx: childCtx };
             }
             if (childCtx.common.issues.length) {
               issues.push(childCtx.common.issues);
@@ -63520,9 +66218,9 @@ var init_types4 = __esm({
               error62.addIssue(makeArgsIssue(args, e));
               throw error62;
             });
-            const result = await Reflect.apply(fn, this, parsedArgs);
-            const parsedReturns = await me._def.returns._def.type.parseAsync(result, params).catch((e) => {
-              error62.addIssue(makeReturnsIssue(result, e));
+            const result2 = await Reflect.apply(fn, this, parsedArgs);
+            const parsedReturns = await me._def.returns._def.type.parseAsync(result2, params).catch((e) => {
+              error62.addIssue(makeReturnsIssue(result2, e));
               throw error62;
             });
             return parsedReturns;
@@ -63534,10 +66232,10 @@ var init_types4 = __esm({
             if (!parsedArgs.success) {
               throw new ZodError2([makeArgsIssue(args, parsedArgs.error)]);
             }
-            const result = Reflect.apply(fn, this, parsedArgs.data);
-            const parsedReturns = me._def.returns.safeParse(result, params);
+            const result2 = Reflect.apply(fn, this, parsedArgs.data);
+            const parsedReturns = me._def.returns.safeParse(result2, params);
             if (!parsedReturns.success) {
-              throw new ZodError2([makeReturnsIssue(result, parsedReturns.error)]);
+              throw new ZodError2([makeReturnsIssue(result2, parsedReturns.error)]);
             }
             return parsedReturns.data;
           });
@@ -63782,43 +66480,43 @@ var init_types4 = __esm({
             return Promise.resolve(processed).then(async (processed2) => {
               if (status.value === "aborted")
                 return INVALID2;
-              const result = await this._def.schema._parseAsync({
+              const result2 = await this._def.schema._parseAsync({
                 data: processed2,
                 path: ctx.path,
                 parent: ctx
               });
-              if (result.status === "aborted")
+              if (result2.status === "aborted")
                 return INVALID2;
-              if (result.status === "dirty")
-                return DIRTY(result.value);
+              if (result2.status === "dirty")
+                return DIRTY(result2.value);
               if (status.value === "dirty")
-                return DIRTY(result.value);
-              return result;
+                return DIRTY(result2.value);
+              return result2;
             });
           } else {
             if (status.value === "aborted")
               return INVALID2;
-            const result = this._def.schema._parseSync({
+            const result2 = this._def.schema._parseSync({
               data: processed,
               path: ctx.path,
               parent: ctx
             });
-            if (result.status === "aborted")
+            if (result2.status === "aborted")
               return INVALID2;
-            if (result.status === "dirty")
-              return DIRTY(result.value);
+            if (result2.status === "dirty")
+              return DIRTY(result2.value);
             if (status.value === "dirty")
-              return DIRTY(result.value);
-            return result;
+              return DIRTY(result2.value);
+            return result2;
           }
         }
         if (effect2.type === "refinement") {
           const executeRefinement = (acc) => {
-            const result = effect2.refinement(acc, checkCtx);
+            const result2 = effect2.refinement(acc, checkCtx);
             if (ctx.common.async) {
-              return Promise.resolve(result);
+              return Promise.resolve(result2);
             }
-            if (result instanceof Promise) {
+            if (result2 instanceof Promise) {
               throw new Error("Async refinement encountered during synchronous parse operation. Use .parseAsync instead.");
             }
             return acc;
@@ -63856,18 +66554,18 @@ var init_types4 = __esm({
             });
             if (!isValid(base))
               return INVALID2;
-            const result = effect2.transform(base.value, checkCtx);
-            if (result instanceof Promise) {
+            const result2 = effect2.transform(base.value, checkCtx);
+            if (result2 instanceof Promise) {
               throw new Error(`Asynchronous transform encountered during synchronous parse operation. Use .parseAsync instead.`);
             }
-            return { status: status.value, value: result };
+            return { status: status.value, value: result2 };
           } else {
             return this._def.schema._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx }).then((base) => {
               if (!isValid(base))
                 return INVALID2;
-              return Promise.resolve(effect2.transform(base.value, checkCtx)).then((result) => ({
+              return Promise.resolve(effect2.transform(base.value, checkCtx)).then((result2) => ({
                 status: status.value,
-                value: result
+                value: result2
               }));
             });
           }
@@ -63964,18 +66662,18 @@ var init_types4 = __esm({
             issues: []
           }
         };
-        const result = this._def.innerType._parse({
+        const result2 = this._def.innerType._parse({
           data: newCtx.data,
           path: newCtx.path,
           parent: {
             ...newCtx
           }
         });
-        if (isAsync(result)) {
-          return result.then((result2) => {
+        if (isAsync(result2)) {
+          return result2.then((result3) => {
             return {
               status: "valid",
-              value: result2.status === "valid" ? result2.value : this._def.catchValue({
+              value: result3.status === "valid" ? result3.value : this._def.catchValue({
                 get error() {
                   return new ZodError2(newCtx.common.issues);
                 },
@@ -63986,7 +66684,7 @@ var init_types4 = __esm({
         } else {
           return {
             status: "valid",
-            value: result.status === "valid" ? result.value : this._def.catchValue({
+            value: result2.status === "valid" ? result2.value : this._def.catchValue({
               get error() {
                 return new ZodError2(newCtx.common.issues);
               },
@@ -64099,14 +66797,14 @@ var init_types4 = __esm({
     };
     ZodReadonly2 = class extends ZodType2 {
       _parse(input2) {
-        const result = this._def.innerType._parse(input2);
-        const freeze = (data) => {
+        const result2 = this._def.innerType._parse(input2);
+        const freeze2 = (data) => {
           if (isValid(data)) {
             data.value = Object.freeze(data.value);
           }
           return data;
         };
-        return isAsync(result) ? result.then((data) => freeze(data)) : freeze(result);
+        return isAsync(result2) ? result2.then((data) => freeze2(data)) : freeze2(result2);
       }
       unwrap() {
         return this._def.innerType;
@@ -64355,21 +67053,21 @@ function objectFromShape(shape2) {
 }
 function safeParse3(schema, data) {
   if (isZ4Schema(schema)) {
-    const result2 = safeParse(schema, data);
-    return result2;
+    const result3 = safeParse(schema, data);
+    return result3;
   }
   const v3Schema = schema;
-  const result = v3Schema.safeParse(data);
-  return result;
+  const result2 = v3Schema.safeParse(data);
+  return result2;
 }
 async function safeParseAsync3(schema, data) {
   if (isZ4Schema(schema)) {
-    const result2 = await safeParseAsync(schema, data);
-    return result2;
+    const result3 = await safeParseAsync(schema, data);
+    return result3;
   }
   const v3Schema = schema;
-  const result = await v3Schema.safeParseAsync(data);
-  return result;
+  const result2 = await v3Schema.safeParseAsync(data);
+  return result2;
 }
 function getObjectShape(schema) {
   if (!schema)
@@ -66606,14 +69304,14 @@ function escapeLiteralCheckValue(literal2, refs) {
   return refs.patternStrategy === "escape" ? escapeNonAlphaNumeric(literal2) : literal2;
 }
 function escapeNonAlphaNumeric(source2) {
-  let result = "";
+  let result2 = "";
   for (let i = 0; i < source2.length; i++) {
     if (!ALPHA_NUMERIC.has(source2[i])) {
-      result += "\\";
+      result2 += "\\";
     }
-    result += source2[i];
+    result2 += source2[i];
   }
-  return result;
+  return result2;
 }
 function addFormat(schema, value, message, refs) {
   if (schema.format || schema.anyOf?.some((x) => x.format)) {
@@ -67111,7 +69809,7 @@ var init_number = __esm({
 // ../../node_modules/zod-to-json-schema/dist/esm/parsers/object.js
 function parseObjectDef(def, refs) {
   const forceOptionalIntoNullable = refs.target === "openAi";
-  const result = {
+  const result2 = {
     type: "object",
     properties: {}
   };
@@ -67140,19 +69838,19 @@ function parseObjectDef(def, refs) {
     if (parsedDef === void 0) {
       continue;
     }
-    result.properties[propName] = parsedDef;
+    result2.properties[propName] = parsedDef;
     if (!propOptional) {
       required2.push(propName);
     }
   }
   if (required2.length) {
-    result.required = required2;
+    result2.required = required2;
   }
   const additionalProperties = decideAdditionalProperties(def, refs);
   if (additionalProperties !== void 0) {
-    result.additionalProperties = additionalProperties;
+    result2.additionalProperties = additionalProperties;
   }
-  return result;
+  return result2;
 }
 function decideAdditionalProperties(def, refs) {
   if (def.catchall._def.typeName !== "ZodNever") {
@@ -67670,11 +70368,11 @@ function getMethodLiteral(schema) {
   return value;
 }
 function parseWithCompat(schema, data) {
-  const result = safeParse3(schema, data);
-  if (!result.success) {
-    throw result.error;
+  const result2 = safeParse3(schema, data);
+  if (!result2.success) {
+    throw result2.error;
   }
-  return result.data;
+  return result2.data;
 }
 var init_zod_json_schema_compat = __esm({
   "../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js"() {
@@ -67689,20 +70387,20 @@ function isPlainObject2(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function mergeCapabilities(base, additional) {
-  const result = { ...base };
+  const result2 = { ...base };
   for (const key in additional) {
     const k = key;
     const addValue = additional[k];
     if (addValue === void 0)
       continue;
-    const baseValue = result[k];
+    const baseValue = result2[k];
     if (isPlainObject2(baseValue) && isPlainObject2(addValue)) {
-      result[k] = { ...baseValue, ...addValue };
+      result2[k] = { ...baseValue, ...addValue };
     } else {
-      result[k] = addValue;
+      result2[k] = addValue;
     }
   }
-  return result;
+  return result2;
 }
 var DEFAULT_REQUEST_TIMEOUT_MSEC, Protocol;
 var init_protocol = __esm({
@@ -67785,12 +70483,12 @@ var init_protocol = __esm({
                 return await handleTaskResult();
               }
               if (isTerminal(task.status)) {
-                const result = await this._taskStore.getTaskResult(taskId, extra.sessionId);
+                const result2 = await this._taskStore.getTaskResult(taskId, extra.sessionId);
                 this._clearTaskQueue(taskId);
                 return {
-                  ...result,
+                  ...result2,
                   _meta: {
-                    ...result._meta,
+                    ...result2._meta,
                     [RELATED_TASK_META_KEY]: {
                       taskId
                     }
@@ -68015,12 +70713,12 @@ var init_protocol = __esm({
           if (taskCreationParams) {
             this.assertTaskHandlerCapability(request.method);
           }
-        }).then(() => handler(request, fullExtra)).then(async (result) => {
+        }).then(() => handler(request, fullExtra)).then(async (result2) => {
           if (abortController.signal.aborted) {
             return;
           }
           const response = {
-            result,
+            result: result2,
             jsonrpc: "2.0",
             id: request.id
           };
@@ -68106,9 +70804,9 @@ var init_protocol = __esm({
         this._cleanupTimeout(messageId);
         let isTaskResponse = false;
         if (isJSONRPCResultResponse(response) && response.result && typeof response.result === "object") {
-          const result = response.result;
-          if (result.task && typeof result.task === "object") {
-            const task = result.task;
+          const result2 = response.result;
+          if (result2.task && typeof result2.task === "object") {
+            const task = result2.task;
             if (typeof task.taskId === "string") {
               isTaskResponse = true;
               this._taskProgressTokens.set(task.taskId, messageId);
@@ -68165,8 +70863,8 @@ var init_protocol = __esm({
         const { task } = options ?? {};
         if (!task) {
           try {
-            const result = await this.request(request, resultSchema, options);
-            yield { type: "result", result };
+            const result2 = await this.request(request, resultSchema, options);
+            yield { type: "result", result: result2 };
           } catch (error62) {
             yield {
               type: "error",
@@ -68189,8 +70887,8 @@ var init_protocol = __esm({
             yield { type: "taskStatus", task: task2 };
             if (isTerminal(task2.status)) {
               if (task2.status === "completed") {
-                const result = await this.getTaskResult({ taskId }, resultSchema, options);
-                yield { type: "result", result };
+                const result2 = await this.getTaskResult({ taskId }, resultSchema, options);
+                yield { type: "result", result: result2 };
               } else if (task2.status === "failed") {
                 yield {
                   type: "error",
@@ -68205,8 +70903,8 @@ var init_protocol = __esm({
               return;
             }
             if (task2.status === "input_required") {
-              const result = await this.getTaskResult({ taskId }, resultSchema, options);
-              yield { type: "result", result };
+              const result2 = await this.getTaskResult({ taskId }, resultSchema, options);
+              yield { type: "result", result: result2 };
               return;
             }
             const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
@@ -68600,8 +71298,8 @@ var init_protocol = __esm({
             }
             return task;
           },
-          storeTaskResult: async (taskId, status, result) => {
-            await taskStore.storeTaskResult(taskId, status, result, sessionId);
+          storeTaskResult: async (taskId, status, result2) => {
+            await taskStore.storeTaskResult(taskId, status, result2, sessionId);
             const task = await taskStore.getTask(taskId, sessionId);
             if (task) {
               const notification = TaskStatusNotificationSchema.parse({
@@ -69749,12 +72447,12 @@ var require_util = __commonJS({
       return str3.replace(/~1/g, "/").replace(/~0/g, "~");
     }
     exports.unescapeJsonPointer = unescapeJsonPointer;
-    function eachItem(xs, f2) {
+    function eachItem(xs, f3) {
       if (Array.isArray(xs)) {
         for (const x of xs)
-          f2(x);
+          f3(x);
       } else {
-        f2(xs);
+        f3(xs);
       }
     }
     exports.eachItem = eachItem;
@@ -69801,10 +72499,10 @@ var require_util = __commonJS({
     }
     exports.setEvaluated = setEvaluated;
     var snippets = {};
-    function useFunc(gen, f2) {
+    function useFunc(gen, f3) {
       return gen.scopeValue("func", {
-        ref: f2,
-        code: snippets[f2.code] || (snippets[f2.code] = new code_1._Code(f2.code))
+        ref: f3,
+        code: snippets[f3.code] || (snippets[f3.code] = new code_1._Code(f3.code))
       });
     }
     exports.useFunc = useFunc;
@@ -70539,10 +73237,10 @@ var require_keyword = __commonJS({
       if (def.async && !schemaEnv.$async)
         throw new Error("async keyword in sync schema");
     }
-    function useKeyword(gen, keyword, result) {
-      if (result === void 0)
+    function useKeyword(gen, keyword, result2) {
+      if (result2 === void 0)
         throw new Error(`keyword "${keyword}" failed to compile`);
-      return gen.scopeValue("keyword", typeof result == "function" ? { ref: result } : { ref: result, code: (0, codegen_1.stringify)(result) });
+      return gen.scopeValue("keyword", typeof result2 == "function" ? { ref: result2 } : { ref: result2, code: (0, codegen_1.stringify)(result2) });
     }
     function validSchemaType(schema, schemaType, allowUndefined = false) {
       return !schemaType.length || schemaType.some((st) => st === "array" ? Array.isArray(schema) : st === "object" ? schema && typeof schema == "object" && !Array.isArray(schema) : typeof schema == st || allowUndefined && typeof schema == "undefined");
@@ -76801,12 +79499,12 @@ var require_util2 = __commonJS({
       return str3.replace(/~1/g, "/").replace(/~0/g, "~");
     }
     exports.unescapeJsonPointer = unescapeJsonPointer;
-    function eachItem(xs, f2) {
+    function eachItem(xs, f3) {
       if (Array.isArray(xs)) {
         for (const x of xs)
-          f2(x);
+          f3(x);
       } else {
-        f2(xs);
+        f3(xs);
       }
     }
     exports.eachItem = eachItem;
@@ -76853,10 +79551,10 @@ var require_util2 = __commonJS({
     }
     exports.setEvaluated = setEvaluated;
     var snippets = {};
-    function useFunc(gen, f2) {
+    function useFunc(gen, f3) {
       return gen.scopeValue("func", {
-        ref: f2,
-        code: snippets[f2.code] || (snippets[f2.code] = new code_1._Code(f2.code))
+        ref: f3,
+        code: snippets[f3.code] || (snippets[f3.code] = new code_1._Code(f3.code))
       });
     }
     exports.useFunc = useFunc;
@@ -77591,10 +80289,10 @@ var require_keyword2 = __commonJS({
       if (def.async && !schemaEnv.$async)
         throw new Error("async keyword in sync schema");
     }
-    function useKeyword(gen, keyword, result) {
-      if (result === void 0)
+    function useKeyword(gen, keyword, result2) {
+      if (result2 === void 0)
         throw new Error(`keyword "${keyword}" failed to compile`);
-      return gen.scopeValue("keyword", typeof result == "function" ? { ref: result } : { ref: result, code: (0, codegen_1.stringify)(result) });
+      return gen.scopeValue("keyword", typeof result2 == "function" ? { ref: result2 } : { ref: result2, code: (0, codegen_1.stringify)(result2) });
     }
     function validSchemaType(schema, schemaType, allowUndefined = false) {
       return !schemaType.length || schemaType.some((st) => st === "array" ? Array.isArray(schema) : st === "object" ? schema && typeof schema == "object" && !Array.isArray(schema) : typeof schema == st || allowUndefined && typeof schema == "undefined");
@@ -81490,17 +84188,17 @@ var require_dist = __commonJS({
     };
     formatsPlugin.get = (name, mode = "full") => {
       const formats = mode === "fast" ? formats_1.fastFormats : formats_1.fullFormats;
-      const f2 = formats[name];
-      if (!f2)
+      const f3 = formats[name];
+      if (!f3)
         throw new Error(`Unknown format "${name}"`);
-      return f2;
+      return f3;
     };
     function addFormats(ajv, list2, fs2, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
-      for (const f2 of list2)
-        ajv.addFormat(f2, fs2[f2]);
+      for (const f3 of list2)
+        ajv.addFormat(f3, fs2[f3]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -81638,17 +84336,17 @@ var init_client2 = __esm({
         const validator = clientInternal.getToolOutputValidator(params.name);
         for await (const message of stream) {
           if (message.type === "result" && validator) {
-            const result = message.result;
-            if (!result.structuredContent && !result.isError) {
+            const result2 = message.result;
+            if (!result2.structuredContent && !result2.isError) {
               yield {
                 type: "error",
                 error: new McpError(ErrorCode.InvalidRequest, `Tool ${params.name} has an output schema but did not return structured content`)
               };
               return;
             }
-            if (result.structuredContent) {
+            if (result2.structuredContent) {
               try {
-                const validationResult = validator(result.structuredContent);
+                const validationResult = validator(result2.structuredContent);
                 if (!validationResult.valid) {
                   yield {
                     type: "error",
@@ -81857,20 +84555,20 @@ var init_client3 = __esm({
       _setupListChangedHandlers(config2) {
         if (config2.tools && this._serverCapabilities?.tools?.listChanged) {
           this._setupListChangedHandler("tools", ToolListChangedNotificationSchema, config2.tools, async () => {
-            const result = await this.listTools();
-            return result.tools;
+            const result2 = await this.listTools();
+            return result2.tools;
           });
         }
         if (config2.prompts && this._serverCapabilities?.prompts?.listChanged) {
           this._setupListChangedHandler("prompts", PromptListChangedNotificationSchema, config2.prompts, async () => {
-            const result = await this.listPrompts();
-            return result.prompts;
+            const result2 = await this.listPrompts();
+            return result2.prompts;
           });
         }
         if (config2.resources && this._serverCapabilities?.resources?.listChanged) {
           this._setupListChangedHandler("resources", ResourceListChangedNotificationSchema, config2.resources, async () => {
-            const result = await this.listResources();
-            return result.resources;
+            const result2 = await this.listResources();
+            return result2.resources;
           });
         }
       }
@@ -81930,16 +84628,16 @@ var init_client3 = __esm({
             if (params.mode === "url" && !supportsUrlMode) {
               throw new McpError(ErrorCode.InvalidParams, "Client does not support URL-mode elicitation requests");
             }
-            const result = await Promise.resolve(handler(request, extra));
+            const result2 = await Promise.resolve(handler(request, extra));
             if (params.task) {
-              const taskValidationResult = safeParse3(CreateTaskResultSchema, result);
+              const taskValidationResult = safeParse3(CreateTaskResultSchema, result2);
               if (!taskValidationResult.success) {
                 const errorMessage = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
                 throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage}`);
               }
               return taskValidationResult.data;
             }
-            const validationResult = safeParse3(ElicitResultSchema, result);
+            const validationResult = safeParse3(ElicitResultSchema, result2);
             if (!validationResult.success) {
               const errorMessage = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
               throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation result: ${errorMessage}`);
@@ -81966,9 +84664,9 @@ var init_client3 = __esm({
               throw new McpError(ErrorCode.InvalidParams, `Invalid sampling request: ${errorMessage}`);
             }
             const { params } = validatedRequest.data;
-            const result = await Promise.resolve(handler(request, extra));
+            const result2 = await Promise.resolve(handler(request, extra));
             if (params.task) {
-              const taskValidationResult = safeParse3(CreateTaskResultSchema, result);
+              const taskValidationResult = safeParse3(CreateTaskResultSchema, result2);
               if (!taskValidationResult.success) {
                 const errorMessage = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
                 throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage}`);
@@ -81977,7 +84675,7 @@ var init_client3 = __esm({
             }
             const hasTools = params.tools || params.toolChoice;
             const resultSchema = hasTools ? CreateMessageResultWithToolsSchema : CreateMessageResultSchema;
-            const validationResult = safeParse3(resultSchema, result);
+            const validationResult = safeParse3(resultSchema, result2);
             if (!validationResult.success) {
               const errorMessage = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
               throw new McpError(ErrorCode.InvalidParams, `Invalid sampling result: ${errorMessage}`);
@@ -81999,7 +84697,7 @@ var init_client3 = __esm({
           return;
         }
         try {
-          const result = await this.request({
+          const result2 = await this.request({
             method: "initialize",
             params: {
               protocolVersion: LATEST_PROTOCOL_VERSION,
@@ -82007,18 +84705,18 @@ var init_client3 = __esm({
               clientInfo: this._clientInfo
             }
           }, InitializeResultSchema, options);
-          if (result === void 0) {
-            throw new Error(`Server sent invalid initialize result: ${result}`);
+          if (result2 === void 0) {
+            throw new Error(`Server sent invalid initialize result: ${result2}`);
           }
-          if (!SUPPORTED_PROTOCOL_VERSIONS.includes(result.protocolVersion)) {
-            throw new Error(`Server's protocol version is not supported: ${result.protocolVersion}`);
+          if (!SUPPORTED_PROTOCOL_VERSIONS.includes(result2.protocolVersion)) {
+            throw new Error(`Server's protocol version is not supported: ${result2.protocolVersion}`);
           }
-          this._serverCapabilities = result.capabilities;
-          this._serverVersion = result.serverInfo;
+          this._serverCapabilities = result2.capabilities;
+          this._serverVersion = result2.serverInfo;
           if (transport.setProtocolVersion) {
-            transport.setProtocolVersion(result.protocolVersion);
+            transport.setProtocolVersion(result2.protocolVersion);
           }
-          this._instructions = result.instructions;
+          this._instructions = result2.instructions;
           await this.notification({
             method: "notifications/initialized"
           });
@@ -82186,15 +84884,15 @@ var init_client3 = __esm({
         if (this.isToolTaskRequired(params.name)) {
           throw new McpError(ErrorCode.InvalidRequest, `Tool "${params.name}" requires task-based execution. Use client.experimental.tasks.callToolStream() instead.`);
         }
-        const result = await this.request({ method: "tools/call", params }, resultSchema, options);
+        const result2 = await this.request({ method: "tools/call", params }, resultSchema, options);
         const validator = this.getToolOutputValidator(params.name);
         if (validator) {
-          if (!result.structuredContent && !result.isError) {
+          if (!result2.structuredContent && !result2.isError) {
             throw new McpError(ErrorCode.InvalidRequest, `Tool ${params.name} has an output schema but did not return structured content`);
           }
-          if (result.structuredContent) {
+          if (result2.structuredContent) {
             try {
-              const validationResult = validator(result.structuredContent);
+              const validationResult = validator(result2.structuredContent);
               if (!validationResult.valid) {
                 throw new McpError(ErrorCode.InvalidParams, `Structured content does not match the tool's output schema: ${validationResult.errorMessage}`);
               }
@@ -82206,7 +84904,7 @@ var init_client3 = __esm({
             }
           }
         }
-        return result;
+        return result2;
       }
       isToolTask(toolName) {
         if (!this._serverCapabilities?.tasks?.requests?.tools?.call) {
@@ -82250,9 +84948,9 @@ var init_client3 = __esm({
         return this._cachedToolOutputValidators.get(toolName);
       }
       async listTools(params, options) {
-        const result = await this.request({ method: "tools/list", params }, ListToolsResultSchema, options);
-        this.cacheToolMetadata(result.tools);
-        return result;
+        const result2 = await this.request({ method: "tools/list", params }, ListToolsResultSchema, options);
+        this.cacheToolMetadata(result2.tools);
+        return result2;
       }
       /**
        * Set up a single list changed handler.
@@ -82466,16 +85164,16 @@ async function getRandomValues(size) {
 async function random2(size) {
   const mask2 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
   const evenDistCutoff = Math.pow(2, 8) - Math.pow(2, 8) % mask2.length;
-  let result = "";
-  while (result.length < size) {
-    const randomBytes5 = await getRandomValues(size - result.length);
+  let result2 = "";
+  while (result2.length < size) {
+    const randomBytes5 = await getRandomValues(size - result2.length);
     for (const randomByte of randomBytes5) {
       if (randomByte < evenDistCutoff) {
-        result += mask2[randomByte % mask2.length];
+        result2 += mask2[randomByte % mask2.length];
       }
     }
   }
-  return result;
+  return result2;
 }
 async function generateVerifier(length) {
   return await random2(length);
@@ -82849,8 +85547,8 @@ async function parseErrorResponse(input2) {
   const statusCode = input2 instanceof Response ? input2.status : void 0;
   const body = input2 instanceof Response ? await input2.text() : input2;
   try {
-    const result = OAuthErrorResponseSchema.parse(JSON.parse(body));
-    const { error: error62, error_description, error_uri } = result;
+    const result2 = OAuthErrorResponseSchema.parse(JSON.parse(body));
+    const { error: error62, error_description, error_uri } = result2;
     const errorClass = OAUTH_ERRORS[error62] || ServerError;
     return new errorClass(error_description || "", error_uri);
   } catch (error62) {
@@ -83642,9 +86340,9 @@ var init_streamableHttp = __esm({
         if (!this._authProvider) {
           throw new UnauthorizedError("No auth provider");
         }
-        let result;
+        let result2;
         try {
-          result = await auth(this._authProvider, {
+          result2 = await auth(this._authProvider, {
             serverUrl: this._url,
             resourceMetadataUrl: this._resourceMetadataUrl,
             scope: this._scope,
@@ -83654,7 +86352,7 @@ var init_streamableHttp = __esm({
           this.onerror?.(error62);
           throw error62;
         }
-        if (result !== "AUTHORIZED") {
+        if (result2 !== "AUTHORIZED") {
           throw new UnauthorizedError();
         }
         return await this._startOrAuthSse({ resumptionToken: void 0 });
@@ -83827,14 +86525,14 @@ var init_streamableHttp = __esm({
         if (!this._authProvider) {
           throw new UnauthorizedError("No auth provider");
         }
-        const result = await auth(this._authProvider, {
+        const result2 = await auth(this._authProvider, {
           serverUrl: this._url,
           authorizationCode,
           resourceMetadataUrl: this._resourceMetadataUrl,
           scope: this._scope,
           fetchFn: this._fetchWithInit
         });
-        if (result !== "AUTHORIZED") {
+        if (result2 !== "AUTHORIZED") {
           throw new UnauthorizedError("Failed to authorize");
         }
       }
@@ -83877,13 +86575,13 @@ var init_streamableHttp = __esm({
               const { resourceMetadataUrl, scope } = extractWWWAuthenticateParams(response);
               this._resourceMetadataUrl = resourceMetadataUrl;
               this._scope = scope;
-              const result = await auth(this._authProvider, {
+              const result2 = await auth(this._authProvider, {
                 serverUrl: this._url,
                 resourceMetadataUrl: this._resourceMetadataUrl,
                 scope: this._scope,
                 fetchFn: this._fetchWithInit
               });
-              if (result !== "AUTHORIZED") {
+              if (result2 !== "AUTHORIZED") {
                 throw new UnauthorizedError();
               }
               this._hasCompletedAuthFlow = true;
@@ -83903,13 +86601,13 @@ var init_streamableHttp = __esm({
                   this._resourceMetadataUrl = resourceMetadataUrl;
                 }
                 this._lastUpscopingHeader = wwwAuthHeader ?? void 0;
-                const result = await auth(this._authProvider, {
+                const result2 = await auth(this._authProvider, {
                   serverUrl: this._url,
                   resourceMetadataUrl: this._resourceMetadataUrl,
                   scope: this._scope,
                   fetchFn: this._fetch
                 });
-                if (result !== "AUTHORIZED") {
+                if (result2 !== "AUTHORIZED") {
                   throw new UnauthorizedError();
                 }
                 return this.send(message);
@@ -84052,19 +86750,19 @@ var init_client4 = __esm({
       /** `onprogress` relays the app's progress notifications (long renders); the wait restarts on each one. */
       async callTool(name, args, options = {}) {
         const client = await this.connected();
-        const result = await client.callTool({ name, arguments: args }, void 0, {
+        const result2 = await client.callTool({ name, arguments: args }, void 0, {
           timeout: CALL_TIMEOUT_MS,
           resetTimeoutOnProgress: true,
           ...options.onprogress ? { onprogress: options.onprogress } : {},
           ...options.signal ? { signal: options.signal } : {}
         });
-        const content = Array.isArray(result.content) ? result.content : [];
+        const content = Array.isArray(result2.content) ? result2.content : [];
         const texts = content.filter((c) => c.type === "text").map((c) => String(c.text ?? ""));
         const images = content.filter((c) => c.type === "image" && typeof c.data === "string").map((c) => ({ mimeType: c.mimeType ?? "image/jpeg", data: c.data }));
         const text4 = texts.join("\n");
-        const structured = result.structuredContent;
+        const structured = result2.structuredContent;
         const receipt2 = structured && structured.contract === 3 ? structured : parseReceipt(texts[0] ?? "") ?? void 0;
-        const isError = Boolean(result.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text4.startsWith("Error"));
+        const isError = Boolean(result2.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text4.startsWith("Error"));
         return { receipt: receipt2, text: text4, images, isError };
       }
       async close() {
@@ -84202,17 +86900,17 @@ var init_session2 = __esm({
         const fileBefore = this.fileValue;
         this.openedDuringCall = false;
         const loadsBefore = this.loadEvents;
-        const result = await this.options.registry.run({ doc, host: this.host, signal }, name, args, this.options.surface ?? "cli");
+        const result2 = await this.options.registry.run({ doc, host: this.host, signal }, name, args, this.options.surface ?? "cli");
         const changed = doc.revision !== before;
         if (this.loadEvents !== loadsBefore && !this.openedDuringCall && this.fileValue === fileBefore) {
           this.fileValue = void 0;
           this.diskState = void 0;
-          return { result, changed };
+          return { result: result2, changed };
         }
         if (changed && this.fileValue && !this.openedDuringCall) {
-          return { result, changed, savedTo: await this.save() };
+          return { result: result2, changed, savedTo: await this.save() };
         }
-        return { result, changed };
+        return { result: result2, changed };
       }
     };
   }
@@ -84275,9 +86973,9 @@ var init_executor = __esm({
         return this.session.file;
       }
       async call(name, args, signal) {
-        const { result, savedTo } = await this.session.run(name, args, signal);
-        const receipt2 = result.data ?? parseReceipt(result.text) ?? void 0;
-        return { engine: "portable", project: this.session.file, ok: result.ok, receipt: receipt2, text: result.text, images: result.images ?? [], savedTo };
+        const { result: result2, savedTo } = await this.session.run(name, args, signal);
+        const receipt2 = result2.data ?? parseReceipt(result2.text) ?? void 0;
+        return { engine: "portable", project: this.session.file, ok: result2.ok, receipt: receipt2, text: result2.text, images: result2.images ?? [], savedTo };
       }
       async close() {
       }
@@ -84373,8 +87071,8 @@ function toolArgs(ctx, tool, values) {
   }
   return args;
 }
-function statusMark(ctx, receipt2, ok) {
-  if (!ok) return ctx.out.style("\u2717", "red");
+function statusMark(ctx, receipt2, ok2) {
+  if (!ok2) return ctx.out.style("\u2717", "red");
   if (receipt2?.status === "unchanged") return ctx.out.style("\u2022", "dim");
   return ctx.out.style("\u2713", "green");
 }
@@ -84466,7 +87164,7 @@ If no browser opens, paste that link into one. Waiting for you to sign in\u2026`
   program2.command("push").description("upload the project and its media to Zenvi Cloud and open it in the web editor").option("--name <name>", "cloud project name (default: the file name)").option("--force", "overwrite cloud edits made since your last push").option("--no-open", "do not open the web editor").action(async (opts) => {
     const file3 = await requireProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env });
     const session = await openSession(ctx, file3);
-    const result = await pushProject({
+    const result2 = await pushProject({
       config: ctx.config,
       client: cloudClient(ctx),
       projectFile: file3,
@@ -84477,16 +87175,16 @@ If no browser opens, paste that link into one. Waiting for you to sign in\u2026`
       onProgress: (p) => ctx.out.progress(p.phase === "saving" ? "Saving project\u2026" : `${p.phase === "hashing" ? "Hashing" : "Uploading"} ${p.file ?? ""} (${p.done + 1}/${p.total})`)
     });
     ctx.out.endProgress();
-    await keepCloudRefs(ctx, session, result.cloudRefs);
-    if (opts.open !== false) await openUrl(result.editorUrl, ctx.env);
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pushed ${path21.basename(file3)} to Zenvi Cloud`, engine: "portable", project: file3, ...result });
+    await keepCloudRefs(ctx, session, result2.cloudRefs);
+    if (opts.open !== false) await openUrl(result2.editorUrl, ctx.env);
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pushed ${path21.basename(file3)} to Zenvi Cloud`, engine: "portable", project: file3, ...result2 });
     else {
-      ctx.out.line(`${ctx.out.style("\u2713", "green")} Pushed to Zenvi Cloud: ${result.editorUrl}`);
-      ctx.out.line(ctx.out.style(`  ${result.uploaded} media uploaded, ${result.reused} already there${result.skipped.length ? `, ${result.skipped.length} skipped` : ""}`, "dim"));
+      ctx.out.line(`${ctx.out.style("\u2713", "green")} Pushed to Zenvi Cloud: ${result2.editorUrl}`);
+      ctx.out.line(ctx.out.style(`  ${result2.uploaded} media uploaded, ${result2.reused} already there${result2.skipped.length ? `, ${result2.skipped.length} skipped` : ""}`, "dim"));
     }
   });
   program2.command("pull").description("download a Zenvi Cloud project (and its media) into a folder").argument("<project>", "cloud project id or web editor URL").argument("[dir]", "folder to pull into (default: ./<project name>, or ./<project name> (2)\u2026 when that holds another project)").option("--force", "replace a project file there that belongs to another project or has unpushed edits").action(async (id, dir, opts) => {
-    const result = await pullProject({
+    const result2 = await pullProject({
       config: ctx.config,
       client: cloudClient(ctx),
       id,
@@ -84497,10 +87195,10 @@ If no browser opens, paste that link into one. Waiting for you to sign in\u2026`
       onProgress: (p) => ctx.out.progress(`Downloading ${p.file} (${p.done + 1}/${p.total})`)
     });
     ctx.out.endProgress();
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pulled ${result.projectFile}`, engine: "portable", project: result.projectFile, ...result });
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pulled ${result2.projectFile}`, engine: "portable", project: result2.projectFile, ...result2 });
     else {
-      ctx.out.line(`${ctx.out.style("\u2713", "green")} Pulled into ${result.projectFile}`);
-      ctx.out.line(ctx.out.style(`  ${result.downloaded} media downloaded, ${result.reused} already here${result.missing.length ? `, ${result.missing.length} missing in the cloud` : ""}`, "dim"));
+      ctx.out.line(`${ctx.out.style("\u2713", "green")} Pulled into ${result2.projectFile}`);
+      ctx.out.line(ctx.out.style(`  ${result2.downloaded} media downloaded, ${result2.reused} already here${result2.missing.length ? `, ${result2.missing.length} missing in the cloud` : ""}`, "dim"));
     }
   });
   const cloud = program2.command("cloud").description("Zenvi Cloud");
@@ -84529,7 +87227,7 @@ async function keepCloudRefs(ctx, session, refs) {
   }
   let changed = false;
   for (const [id, ref] of desktopOwns ? [] : Object.entries(refs)) {
-    const entry = session.doc.project.files.find((f2) => f2.id === id);
+    const entry = session.doc.project.files.find((f3) => f3.id === id);
     if (!entry || JSON.stringify(entry.cloud) === JSON.stringify(ref)) continue;
     session.doc.setUntracked(["files", { id }], { ...entry, cloud: ref });
     changed = true;
@@ -84598,8 +87296,8 @@ function placementWindow(flags, fileLength2) {
   return { start_seconds: from };
 }
 function fileLength(file3) {
-  const f2 = file3;
-  const value = typeof f2?.duration === "number" ? f2.duration : f2?.reader?.duration;
+  const f3 = file3;
+  const value = typeof f3?.duration === "number" ? f3.duration : f3?.reader?.duration;
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : void 0;
 }
 function registerEditCommands(program2, ctx) {
@@ -84622,12 +87320,12 @@ function registerEditCommands(program2, ctx) {
         if (executor instanceof PortableExecutor) {
           const files = executor.session.doc.project.files;
           const base = path22.basename(local);
-          fileId = files.find((f2) => f2.path === local)?.id ?? [...files].reverse().find((f2) => path22.basename(String(f2.path)) === base)?.id;
+          fileId = files.find((f3) => f3.path === local)?.id ?? [...files].reverse().find((f3) => path22.basename(String(f3.path)) === base)?.id;
         }
         if (!fileId) query2 = path22.basename(local);
       }
       const flags = { start: parseTime(opts.start), end: parseTime(opts.end), duration: parseTime(opts.duration) };
-      const known = executor instanceof PortableExecutor && fileId ? executor.session.doc.project.files.find((f2) => f2.id === fileId) : void 0;
+      const known = executor instanceof PortableExecutor && fileId ? executor.session.doc.project.files.find((f3) => f3.id === fileId) : void 0;
       const window = placementWindow(flags, fileLength(known));
       const args = toolArgs(ctx, "add_clip_to_timeline_tool", [
         [["file_id"], fileId],
@@ -84714,9 +87412,9 @@ function registerEditCommands(program2, ctx) {
       ctx,
       "set_clip_speed_tool",
       toolArgs(ctx, "set_clip_speed_tool", [
-        [CLIP, clip2],
-        [["factor", "speed", "rate"], Math.abs(factor)],
-        [["direction"], factor < 0 ? "backward" : void 0]
+        [["timeline_clip_ids"], [clip2]],
+        [["speed"], Math.abs(factor)],
+        [["reverse"], factor < 0 ? true : void 0]
       ])
     );
   });
@@ -85687,7 +88385,7 @@ var init_aftereffects = __esm({
 });
 
 // ../adobe-link/src/catalog/premiere.ts
-var UNDO, sequenceRef, clipRef, itemRef, binPath, point, PREMIERE_SEQUENCE_PRESETS, PREMIERE_BLEND_MODES, PREMIERE_EXPORT_PRESETS, PREMIERE_MARKER_COLORS, premiereGetState, premiereListItems, premiereGetSequence, premiereCaptureFrame, premiereImportFiles, premiereCreateSequence, premiereOpenSequence, premierePlaceClip, premiereEditClip, premiereRazor, premiereSetClipProperties, keyframeValue2, premiereAnimate, premiereApplyEffect, premiereAddTransition, premiereApplyLook, premiereAddText, premiereAddMarker, premiereAddCaptions, premiereAutoReframe, premiereSceneDetect, premiereExport, premiereExportXml, premiereImportXml, premiereSaveProject, premiereRunScript, PREMIERE_TOOLS;
+var UNDO, sequenceRef, clipRef, itemRef, binPath, point2, PREMIERE_SEQUENCE_PRESETS, PREMIERE_BLEND_MODES, PREMIERE_EXPORT_PRESETS, PREMIERE_MARKER_COLORS, premiereGetState, premiereListItems, premiereGetSequence, premiereCaptureFrame, premiereImportFiles, premiereCreateSequence, premiereOpenSequence, premierePlaceClip, premiereEditClip, premiereRazor, premiereSetClipProperties, keyframeValue3, premiereAnimate, premiereApplyEffect, premiereAddTransition, premiereApplyLook, premiereAddText, premiereAddMarker, premiereAddCaptions, premiereAutoReframe, premiereSceneDetect, premiereExport, premiereExportXml, premiereImportXml, premiereSaveProject, premiereRunScript, PREMIERE_TOOLS;
 var init_premiere = __esm({
   "../adobe-link/src/catalog/premiere.ts"() {
     "use strict";
@@ -85699,7 +88397,7 @@ var init_premiere = __esm({
     clipRef = external_exports.string().min(1).describe("Clip (track item) nodeId: `node_id` from premiere_get_sequence or a receipt");
     itemRef = external_exports.string().min(1).describe("Project item nodeId: `node_id` from premiere_list_items or premiere_import_files");
     binPath = external_exports.string().min(1).max(500);
-    point = external_exports.array(external_exports.number()).length(2);
+    point2 = external_exports.array(external_exports.number()).length(2);
     PREMIERE_SEQUENCE_PRESETS = ["1080p30", "1080p25", "1080p24", "4k30", "vertical", "square"];
     PREMIERE_BLEND_MODES = [
       "color",
@@ -85863,10 +88561,10 @@ var init_premiere = __esm({
       description: "Static values on a clip's built-in effects: Motion (position in sequence pixels, scale %, rotation, anchor), Opacity (opacity %, blend mode) and audio volume in dB. Only the properties you pass change. An animated property is refused unless `clear_keyframes` (use premiere_animate to change keyframes). Respect the frame: keep faces in the upper third and text inside title-safe (TASTE \xA73). " + UNDO,
       input: external_exports.strictObject({
         clip: clipRef,
-        position: point.optional().describe("Motion > Position [x, y] in sequence pixels from the top-left; [width/2, height/2] is the centre"),
+        position: point2.optional().describe("Motion > Position [x, y] in sequence pixels from the top-left; [width/2, height/2] is the centre"),
         scale: external_exports.number().min(0).max(1e4).optional().describe("Motion > Scale in percent (100 = original size)"),
         rotation: external_exports.number().min(-36e3).max(36e3).optional().describe("Motion > Rotation in degrees, clockwise"),
-        anchor: point.optional().describe("Motion > Anchor Point as fractions of the clip frame [x, y]; [0.5, 0.5] is the centre"),
+        anchor: point2.optional().describe("Motion > Anchor Point as fractions of the clip frame [x, y]; [0.5, 0.5] is the centre"),
         opacity: external_exports.number().min(0).max(100).optional().describe("Opacity in percent"),
         blend_mode: external_exports.enum(PREMIERE_BLEND_MODES).optional().describe("Opacity > Blend Mode"),
         volume_db: external_exports.number().min(-96).max(15).optional().describe("Audio clips: Volume > Level in dB (0 = as recorded, max +15; -96 = silent)"),
@@ -85875,7 +88573,7 @@ var init_premiere = __esm({
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     });
-    keyframeValue2 = external_exports.union([external_exports.number(), external_exports.array(external_exports.number()).min(2).max(4)]);
+    keyframeValue3 = external_exports.union([external_exports.number(), external_exports.array(external_exports.number()).min(2).max(4)]);
     premiereAnimate = defineHostTool({
       name: "premiere_animate",
       title: "Animate a property",
@@ -85892,7 +88590,7 @@ var init_premiere = __esm({
         keyframes: external_exports.array(
           external_exports.strictObject({
             time: seconds.describe("Seconds from the clip's first frame (0 = where it starts on the timeline)"),
-            value: keyframeValue2.describe("position [x, y] px, scale %, rotation degrees, anchor fractions, opacity %, volume dB; effect parameters as Premiere shows them"),
+            value: keyframeValue3.describe("position [x, y] px, scale %, rotation degrees, anchor fractions, opacity %, volume dB; effect parameters as Premiere shows them"),
             easing: easing.optional().describe("Easing of the segment from this keyframe to the next; default: `easing`")
           })
         ).min(2).max(200).describe("At least two keyframes; sorted by time for you"),
@@ -86223,28 +88921,28 @@ async function removeQuietly(file3) {
 async function inspectHost(desktopDir, host, options = {}) {
   const dir = linkDirOf(desktopDir);
   const file3 = path23.join(dir, `${host}.json`);
-  const result = (status, detail2, endpoint2) => ({ host, status, detail: detail2, file: file3, ...endpoint2 ? { endpoint: endpoint2 } : {} });
+  const result2 = (status, detail2, endpoint2) => ({ host, status, detail: detail2, file: file3, ...endpoint2 ? { endpoint: endpoint2 } : {} });
   let raw;
   try {
     raw = await readFile9(file3, "utf8");
   } catch {
-    return result("absent", "no discovery file (the app is not running, or Zenvi Link is not installed)");
+    return result2("absent", "no discovery file (the app is not running, or Zenvi Link is not installed)");
   }
   let parsed;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return result("invalid", "the discovery file is not JSON");
+    return result2("invalid", "the discovery file is not JSON");
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return result("invalid", "the discovery file is not a JSON object");
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return result2("invalid", "the discovery file is not a JSON object");
   const data = parsed;
   const url2 = text2(data.url);
   const pid = Number(data.pid);
-  if (data.app !== host || !url2 || !Number.isInteger(pid)) return result("invalid", "the discovery file is not a Zenvi Link file for this app");
+  if (data.app !== host || !url2 || !Number.isInteger(pid)) return result2("invalid", "the discovery file is not a Zenvi Link file for this app");
   if (typeof data.protocol === "number" && data.protocol > LINK_PROTOCOL) {
-    return result("invalid", `Zenvi Link speaks protocol ${data.protocol}; this client knows ${LINK_PROTOCOL} (update the zenvi CLI)`);
+    return result2("invalid", `Zenvi Link speaks protocol ${data.protocol}; this client knows ${LINK_PROTOCOL} (update the zenvi CLI)`);
   }
-  if (!isLinkUrl(url2)) return result("invalid", `refusing a non-loopback URL (${url2})`);
+  if (!isLinkUrl(url2)) return result2("invalid", `refusing a non-loopback URL (${url2})`);
   const tokenFile = text2(data.token_file);
   const tokenPath = tokenFile ? path23.isAbsolute(tokenFile) ? tokenFile : path23.join(dir, tokenFile) : path23.join(dir, `${host}.token`);
   if (!pidAlive3(pid)) {
@@ -86252,15 +88950,15 @@ async function inspectHost(desktopDir, host, options = {}) {
       await removeQuietly(file3);
       if (path23.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path23.basename(tokenPath))) await removeQuietly(tokenPath);
     }
-    return result("dead", `process ${pid} is gone (left over from a crash)`);
+    return result2("dead", `process ${pid} is gone (left over from a crash)`);
   }
   let token;
   try {
     token = (await readFile9(tokenPath, "utf8")).trim();
   } catch {
-    return result("invalid", `cannot read the token file ${tokenPath}`);
+    return result2("invalid", `cannot read the token file ${tokenPath}`);
   }
-  if (!token) return result("invalid", "the token file is empty");
+  if (!token) return result2("invalid", "the token file is empty");
   const endpoint = {
     host,
     url: url2,
@@ -86276,9 +88974,9 @@ async function inspectHost(desktopDir, host, options = {}) {
     source: file3
   };
   if (options.verify !== false && !await probeHost(url2, token, host, options)) {
-    return result("unreachable", `the server at ${url2} did not answer as Zenvi Link (process ${pid} is alive)`);
+    return result2("unreachable", `the server at ${url2} did not answer as Zenvi Link (process ${pid} is alive)`);
   }
-  return result("connected", "connected", endpoint);
+  return result2("connected", "connected", endpoint);
 }
 function inspectHosts(desktopDir, options = {}) {
   return Promise.all(
@@ -86376,12 +89074,12 @@ var init_client5 = __esm({
         const client = await this.connected();
         const def = catalogFor(this.endpoint.host).find((tool) => tool.name === name);
         const timeout = options.timeoutMs ?? (def?.timeoutMs ?? DEFAULT_TIMEOUT_MS) + RESPONSE_MARGIN_MS;
-        const result = await client.callTool({ name, arguments: args }, void 0, { timeout });
-        const content = Array.isArray(result.content) ? result.content : [];
+        const result2 = await client.callTool({ name, arguments: args }, void 0, { timeout });
+        const content = Array.isArray(result2.content) ? result2.content : [];
         const text4 = content.filter((block) => block.type === "text").map((block) => String(block.text ?? "")).join("\n");
         const images = content.filter((block) => block.type === "image" && typeof block.data === "string").map((block) => ({ mimeType: block.mimeType === "image/jpeg" ? "image/jpeg" : "image/png", data: block.data }));
-        const receipt2 = parseHostReceipt(result.structuredContent) ?? parseHostReceipt(content.find((block) => block.type === "text")?.text);
-        const isError = Boolean(result.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text4.startsWith("Error"));
+        const receipt2 = parseHostReceipt(result2.structuredContent) ?? parseHostReceipt(content.find((block) => block.type === "text")?.text);
+        const isError = Boolean(result2.isError) || (receipt2 ? receipt2.status === "error" || receipt2.status === "refused" : text4.startsWith("Error"));
         return { receipt: receipt2, text: text4, images, isError };
       }
       async close() {
@@ -86481,9 +89179,9 @@ function runInstallAction(action, options = {}) {
       cpSync(action.from, action.to, { recursive: true });
       return;
     default: {
-      const result = spawnSync(systemCommand(action.command), action.args, { stdio: options.stdio ?? "pipe", windowsHide: true });
-      if (result.status !== 0 && !action.args.includes("delete")) {
-        const why = result.error ? result.error.message : `exit ${result.status}`;
+      const result2 = spawnSync(systemCommand(action.command), action.args, { stdio: options.stdio ?? "pipe", windowsHide: true });
+      if (result2.status !== 0 && !action.args.includes("delete")) {
+        const why = result2.error ? result2.error.message : `exit ${result2.status}`;
         throw new Error(`${describeAction(action)} failed (${why})`);
       }
     }
@@ -87128,13 +89826,13 @@ async function callAdobeTool(registry2, name, rawArgs, options = {}) {
   }
   const args = coerceHostArgs(schema, rawArgs);
   try {
-    const result = await connection.client.callTool(name, args, options.timeoutMs ? { timeoutMs: options.timeoutMs } : {});
-    const got = result.receipt ?? {
+    const result2 = await connection.client.callTool(name, args, options.timeoutMs ? { timeoutMs: options.timeoutMs } : {});
+    const got = result2.receipt ?? {
       contract: 3,
-      status: result.isError ? "error" : "ok",
+      status: result2.isError ? "error" : "ok",
       tool: name,
       host,
-      summary: result.isError && !result.text.startsWith("Error") ? `Error: ${result.text}` : result.text || `${name} finished`,
+      summary: result2.isError && !result2.text.startsWith("Error") ? `Error: ${result2.text}` : result2.text || `${name} finished`,
       data: {},
       warnings: [],
       undoSteps: null
@@ -87145,7 +89843,7 @@ async function callAdobeTool(registry2, name, rawArgs, options = {}) {
       ...got.warnings ?? [],
       `${app} answered from another instance than the last call (pid ${connection.switchedFrom} -> ${endpoint.pid}${endpoint.project ? `, ${endpoint.project}` : ""}): the newest Zenvi Link took over. Re-read ${STATE_TOOL[host]} before continuing.`
     ] : got.warnings;
-    return { receipt: { ...got, warnings, host_instance: instance }, images: result.images };
+    return { receipt: { ...got, warnings, host_instance: instance }, images: result2.images };
   } catch (error62) {
     if (error62 instanceof McpError && error62.code === ErrorCode.InvalidParams) {
       const version2 = connection.endpoint.version ? ` ${connection.endpoint.version}` : "";
@@ -87400,8 +90098,8 @@ async function openInDesktop(options) {
     }
     const client = new DesktopClient(gui, options.clientVersion);
     try {
-      const result = await client.callTool("open_project_tool", { file_path: project });
-      if (result.isError) throw new CliError(`Zenvi could not open the project: ${(result.receipt?.summary ?? result.text).replace(/^Error:\s*/, "")}`);
+      const result2 = await client.callTool("open_project_tool", { file_path: project });
+      if (result2.isError) throw new CliError(`Zenvi could not open the project: ${(result2.receipt?.summary ?? result2.text).replace(/^Error:\s*/, "")}`);
     } finally {
       await client.close();
     }
@@ -87733,16 +90431,16 @@ var init_server2 = __esm({
               throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call request: ${errorMessage}`);
             }
             const { params } = validatedRequest.data;
-            const result = await Promise.resolve(handler(request, extra));
+            const result2 = await Promise.resolve(handler(request, extra));
             if (params.task) {
-              const taskValidationResult = safeParse3(CreateTaskResultSchema, result);
+              const taskValidationResult = safeParse3(CreateTaskResultSchema, result2);
               if (!taskValidationResult.success) {
                 const errorMessage = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
                 throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage}`);
               }
               return taskValidationResult.data;
             }
-            const validationResult = safeParse3(CallToolResultSchema, result);
+            const validationResult = safeParse3(CallToolResultSchema, result2);
             if (!validationResult.success) {
               const errorMessage = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
               throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call result: ${errorMessage}`);
@@ -87951,11 +90649,11 @@ var init_server2 = __esm({
               throw new Error("Client does not support form elicitation.");
             }
             const formParams = params.mode === "form" ? params : { ...params, mode: "form" };
-            const result = await this.request({ method: "elicitation/create", params: formParams }, ElicitResultSchema, options);
-            if (result.action === "accept" && result.content && formParams.requestedSchema) {
+            const result2 = await this.request({ method: "elicitation/create", params: formParams }, ElicitResultSchema, options);
+            if (result2.action === "accept" && result2.content && formParams.requestedSchema) {
               try {
                 const validator = this._jsonSchemaValidator.getValidator(formParams.requestedSchema);
-                const validationResult = validator(result.content);
+                const validationResult = validator(result2.content);
                 if (!validationResult.valid) {
                   throw new McpError(ErrorCode.InvalidParams, `Elicitation response content does not match requested schema: ${validationResult.errorMessage}`);
                 }
@@ -87966,7 +90664,7 @@ var init_server2 = __esm({
                 throw new McpError(ErrorCode.InternalError, `Error validating elicitation response: ${error62 instanceof Error ? error62.message : String(error62)}`);
               }
             }
-            return result;
+            return result2;
           }
         }
       }
@@ -88103,9 +90801,9 @@ function issueToolNameWarning(name, warnings) {
   }
 }
 function validateAndWarnToolName(name) {
-  const result = validateToolName(name);
-  issueToolNameWarning(name, result.warnings);
-  return result.isValid;
+  const result2 = validateToolName(name);
+  issueToolNameWarning(name, result2.warnings);
+  return result2.isValid;
 }
 var TOOL_NAME_REGEX;
 var init_toolNameValidation = __esm({
@@ -88315,12 +91013,12 @@ var init_mcp = __esm({
               return await this.handleAutomaticTaskPolling(tool, request, extra);
             }
             const args = await this.validateToolInput(tool, request.params.arguments, request.params.name);
-            const result = await this.executeToolHandler(tool, args, extra);
+            const result2 = await this.executeToolHandler(tool, args, extra);
             if (isTaskRequest) {
-              return result;
+              return result2;
             }
-            await this.validateToolOutput(tool, result, request.params.name);
-            return result;
+            await this.validateToolOutput(tool, result2, request.params.name);
+            return result2;
           } catch (error62) {
             if (error62 instanceof McpError) {
               if (error62.code === ErrorCode.UrlElicitationRequired) {
@@ -88369,21 +91067,21 @@ var init_mcp = __esm({
       /**
        * Validates tool output against the tool's output schema.
        */
-      async validateToolOutput(tool, result, toolName) {
+      async validateToolOutput(tool, result2, toolName) {
         if (!tool.outputSchema) {
           return;
         }
-        if (!("content" in result)) {
+        if (!("content" in result2)) {
           return;
         }
-        if (result.isError) {
+        if (result2.isError) {
           return;
         }
-        if (!result.structuredContent) {
+        if (!result2.structuredContent) {
           throw new McpError(ErrorCode.InvalidParams, `Output validation error: Tool ${toolName} has an output schema but no structured content was provided`);
         }
         const outputObj = normalizeObjectSchema(tool.outputSchema);
-        const parseResult = await safeParseAsync3(outputObj, result.structuredContent);
+        const parseResult = await safeParseAsync3(outputObj, result2.structuredContent);
         if (!parseResult.success) {
           const error62 = "error" in parseResult ? parseResult.error : "Unknown error";
           const errorMessage = getParseErrorMessage(error62);
@@ -88527,8 +91225,8 @@ var init_mcp = __esm({
             if (!template.resourceTemplate.listCallback) {
               continue;
             }
-            const result = await template.resourceTemplate.listCallback(extra);
-            for (const resource of result.resources) {
+            const result2 = await template.resourceTemplate.listCallback(extra);
+            for (const resource of result2.resources) {
               templateResources.push({
                 ...template.metadata,
                 // the defined resource metadata should override the template metadata if present
@@ -89330,10 +92028,10 @@ function parseFps(text4) {
   if (!text4) return void 0;
   const m = /^(\d+)(?:\/(\d+))?$/.exec(text4.trim());
   if (m) return { num: Number(m[1]), den: Number(m[2] ?? 1) };
-  const f2 = Number(text4);
-  if (Number.isFinite(f2) && f2 > 0) {
-    for (const base of [24, 30, 60, 120]) if (Math.abs(f2 - base * 1e3 / 1001) < 0.01) return { num: base * 1e3, den: 1001 };
-    return { num: Math.round(f2 * 1e3), den: 1e3 };
+  const f3 = Number(text4);
+  if (Number.isFinite(f3) && f3 > 0) {
+    for (const base of [24, 30, 60, 120]) if (Math.abs(f3 - base * 1e3 / 1001) < 0.01) return { num: base * 1e3, den: 1001 };
+    return { num: Math.round(f3 * 1e3), den: 1e3 };
   }
   throw new CliError(`Not a frame rate: ${text4}`, 2);
 }
@@ -89412,7 +92110,7 @@ function registerRenderCommands(program2, ctx) {
       const project = session.doc.project;
       const options = exportOptionsFrom(project, output2, flags);
       const started = Date.now();
-      const result = await exporter.export(project, options, (fraction4) => {
+      const result2 = await exporter.export(project, options, (fraction4) => {
         ctx.out.progress(`Rendering ${Math.round(fraction4 * 100)}%`);
       });
       ctx.out.endProgress();
@@ -89420,21 +92118,21 @@ function registerRenderCommands(program2, ctx) {
       if (ctx.out.json) {
         ctx.out.data({
           status: "applied",
-          summary: `Rendered ${result.location}`,
+          summary: `Rendered ${result2.location}`,
           engine: "portable",
           project: session.file ?? null,
-          output: { ...result, format: options.format, width: options.width, height: options.height, fps: options.fps, seconds: seconds2 }
+          output: { ...result2, format: options.format, width: options.width, height: options.height, fps: options.fps, seconds: seconds2 }
         });
       } else {
-        ctx.out.line(`${ctx.out.style("\u2713", "green")} Rendered ${result.location}`);
-        ctx.out.line(ctx.out.style(`  ${options.format}, ${options.width}x${options.height}, ${result.durationSeconds.toFixed(2)} s, ${formatBytes(result.bytes)} in ${seconds2.toFixed(1)} s`, "dim"));
-        for (const w of result.warnings) ctx.out.warn(w);
+        ctx.out.line(`${ctx.out.style("\u2713", "green")} Rendered ${result2.location}`);
+        ctx.out.line(ctx.out.style(`  ${options.format}, ${options.width}x${options.height}, ${result2.durationSeconds.toFixed(2)} s, ${formatBytes(result2.bytes)} in ${seconds2.toFixed(1)} s`, "dim"));
+        for (const w of result2.warnings) ctx.out.warn(w);
       }
-      if (flags.open && options.format !== "png-sequence") await openUrl(result.location);
+      if (flags.open && options.format !== "png-sequence") await openUrl(result2.location);
     });
   });
-  program2.command("frame").description("render one timeline frame to an image (PNG or JPEG)").argument("<time>", "timeline time (seconds or timecode)").argument("[output]", "image file (default: frame-<time>.png)").option("--width <px>", "image width", "1280").option("--jpeg", "write JPEG instead of PNG").option("--grid", "draw the 0-1 coordinate grid and a frame caption (what inspect tools show models)").action(async (timeArg, outputArg, flags) => {
-    const seconds2 = parseTime(timeArg);
+  program2.command("frame").description("render one timeline frame to an image (PNG or JPEG)").argument("<time>", "timeline time (seconds or timecode)").argument("[output]", "image file (default: frame-<time>.png)").option("--width <px>", "image width", "1280").option("--jpeg", "write JPEG instead of PNG").option("--grid", "draw the 0-1 coordinate grid and a frame caption (what inspect tools show models)").action(async (timeArg2, outputArg, flags) => {
+    const seconds2 = parseTime(timeArg2);
     const format = flags.jpeg || /\.jpe?g$/i.test(outputArg ?? "") ? "jpeg" : "png";
     const output2 = path33.resolve(ctx.cwd, outputArg ?? `frame-${seconds2.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
     await withExecutor(ctx, async (executor) => {
@@ -89581,13 +92279,13 @@ function extraTools(ctx) {
         } catch (error62) {
           return { receipt: refused(tool, error62.message) };
         }
-        const result = await session.host.exporter.export(session.doc.project, options, (f2) => call.progress?.(f2, 1, `Rendering ${Math.round(f2 * 100)}%`));
-        const mb = (result.bytes ?? 0) / 1e6;
+        const result2 = await session.host.exporter.export(session.doc.project, options, (f3) => call.progress?.(f3, 1, `Rendering ${Math.round(f3 * 100)}%`));
+        const mb = (result2.bytes ?? 0) / 1e6;
         return {
           receipt: applied(
             tool,
-            `Rendered ${result.location} (${options.format}, ${options.width}x${options.height}, ${result.durationSeconds.toFixed(2)} s, ${mb.toFixed(1)} MB)`,
-            { data: { ...result, format: options.format, width: options.width, height: options.height }, warnings: result.warnings },
+            `Rendered ${result2.location} (${options.format}, ${options.width}x${options.height}, ${result2.durationSeconds.toFixed(2)} s, ${mb.toFixed(1)} MB)`,
+            { data: { ...result2, format: options.format, width: options.width, height: options.height }, warnings: result2.warnings },
             0
           )
         };
@@ -89656,8 +92354,8 @@ function extraTools(ctx) {
         const file3 = text3(args.path) ? path34.resolve(ctx.cwd, text3(args.path)) : state.session.file;
         if (!file3) return { receipt: refused(tool, "This project has no file yet: call open_project_file first.") };
         try {
-          const result = await openInDesktop({ config: ctx.config, project: file3, deps: state.launcher, clientVersion: VERSION });
-          return { receipt: applied(tool, result.summary, { data: { method: result.method, project: file3 } }, 0), engine: null };
+          const result2 = await openInDesktop({ config: ctx.config, project: file3, deps: state.launcher, clientVersion: VERSION });
+          return { receipt: applied(tool, result2.summary, { data: { method: result2.method, project: file3 } }, 0), engine: null };
         } catch (error62) {
           return { receipt: failed(tool, error62 instanceof CliError && error62.hint ? `${error62.message} ${error62.hint}` : error62.message) };
         }
@@ -89683,7 +92381,7 @@ function extraTools(ctx) {
         if (!await ctx.auth.cloudToken()) return { receipt: refused(tool, "Not signed in to Zenvi: run `zenvi login` in a terminal, then try again.") };
         const warnings = [];
         try {
-          const result = await pushProject({
+          const result2 = await pushProject({
             config: ctx.config,
             client: cloudClient(ctx),
             projectFile: file3,
@@ -89692,8 +92390,8 @@ function extraTools(ctx) {
             force: args.force === true || args.force === "true",
             warn: (m) => warnings.push(m)
           });
-          await keepCloudRefs(ctx, state.session, result.cloudRefs);
-          return { receipt: applied(tool, `Pushed to Zenvi Cloud: ${result.editorUrl}`, { data: result, warnings }, 0) };
+          await keepCloudRefs(ctx, state.session, result2.cloudRefs);
+          return { receipt: applied(tool, `Pushed to Zenvi Cloud: ${result2.editorUrl}`, { data: result2, warnings }, 0) };
         } catch (error62) {
           return { receipt: failed(tool, error62 instanceof CliError && error62.hint ? `${error62.message} ${error62.hint}` : error62.message, { warnings }) };
         }
@@ -90688,13 +93386,13 @@ function adobeStepFailed(tool, step, host) {
   return make(tool, `${host.summary.replace(/^Error:\s*/, "")} (${step}; nothing was added to the Zenvi project)`, { data: { [host.host === "aftereffects" ? "after_effects" : "premiere"]: host }, warnings: host.warnings ?? [] });
 }
 function combined(tool, summary, adobeKey, adobe, zenvi, retry, note) {
-  const ok = zenvi.status === "applied" || zenvi.status === "unchanged";
+  const ok2 = zenvi.status === "applied" || zenvi.status === "unchanged";
   const merged = {
     ...zenvi,
     tool,
-    summary: ok ? summary : `Error: ${summary.replace(/[.\s]*$/, ".")} data.retry is the import call (${retry.tool}) to run once that is fixed.`,
+    summary: ok2 ? summary : `Error: ${summary.replace(/[.\s]*$/, ".")} data.retry is the import call (${retry.tool}) to run once that is fixed.`,
     warnings: [...adobe.warnings ?? [], ...zenvi.warnings ?? []],
-    data: ok ? { [adobeKey]: adobe, zenvi } : { [adobeKey]: adobe, zenvi, retry }
+    data: ok2 ? { [adobeKey]: adobe, zenvi } : { [adobeKey]: adobe, zenvi, retry }
   };
   return withNote(merged, note);
 }
@@ -91108,13 +93806,13 @@ __export(server_exports, {
 });
 import { once as once2 } from "node:events";
 function toCallResult(receipt2, images = [], extra = {}) {
-  const ok = isOkHostStatus(receipt2.status);
+  const ok2 = isOkHostStatus(receipt2.status);
   const content = [{ type: "text", text: JSON.stringify(receipt2) }];
-  if (ok) for (const image of images) content.push({ type: "image", data: image.data, mimeType: image.mimeType });
+  if (ok2) for (const image of images) content.push({ type: "image", data: image.data, mimeType: image.mimeType });
   return {
     content,
     structuredContent: { ...receipt2, ...extra },
-    ...ok ? {} : { isError: true }
+    ...ok2 ? {} : { isError: true }
   };
 }
 async function createZenviMcpServer(ctx, projectFile, options = {}) {
@@ -91190,8 +93888,8 @@ async function createZenviMcpServer(ctx, projectFile, options = {}) {
         if (!families[adobe].listed && families[adobe].reason === "ZENVI_MCP_ADOBE=off") {
           return toCallResult(hostRefusal(adobe, name, "UNSUPPORTED", `${APP_LABEL[adobe]} tools are turned off in this server (ZENVI_MCP_ADOBE=off). ${families[adobe].enable ?? ""}`.trim()));
         }
-        const result2 = await callAdobeTool(state.hosts, name, args);
-        return toCallResult(result2.receipt, result2.images);
+        const result3 = await callAdobeTool(state.hosts, name, args);
+        return toCallResult(result3.receipt, result3.images);
       }
       const desktop = await state.desktopExecutor();
       if (desktop) {
@@ -91201,13 +93899,13 @@ async function createZenviMcpServer(ctx, projectFile, options = {}) {
         return { content: [{ type: "text", text: outcome.text }], ...outcome.ok ? {} : { isError: true } };
       }
       state.notePortableCall();
-      const { result } = await state.session.run(name, args, extra.signal);
-      const receipt2 = result.data ?? parseReceipt(result.text);
-      if (!receipt2) return { content: [{ type: "text", text: result.text }], ...result.ok ? {} : { isError: true } };
+      const { result: result2 } = await state.session.run(name, args, extra.signal);
+      const receipt2 = result2.data ?? parseReceipt(result2.text);
+      if (!receipt2) return { content: [{ type: "text", text: result2.text }], ...result2.ok ? {} : { isError: true } };
       if (!state.session.file && receipt2.undoSteps > 0) {
         receipt2.notes = [...receipt2.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];
       }
-      return toCallResult(receipt2, result.images, { engine: "portable" });
+      return toCallResult(receipt2, result2.images, { engine: "portable" });
     } catch (error62) {
       if (ctx.env.ZENVI_DEBUG) process.stderr.write(`[zenvi mcp] ${name} failed: ${error62.stack ?? String(error62)}
 `);
@@ -91785,19 +94483,19 @@ var Help = class {
    * @returns {Map<string, Command[] | Option[]>}
    */
   groupItems(unsortedItems, visibleItems, getGroup) {
-    const result = /* @__PURE__ */ new Map();
+    const result2 = /* @__PURE__ */ new Map();
     unsortedItems.forEach((item) => {
       const group = getGroup(item);
-      if (!result.has(group)) result.set(group, []);
+      if (!result2.has(group)) result2.set(group, []);
     });
     visibleItems.forEach((item) => {
       const group = getGroup(item);
-      if (!result.has(group)) {
-        result.set(group, []);
+      if (!result2.has(group)) {
+        result2.set(group, []);
       }
-      result.get(group).push(item);
+      result2.get(group).push(item);
     });
-    return result;
+    return result2;
   }
   /**
    * Generate the built-in help text.
@@ -92511,11 +95209,11 @@ var Command = class _Command extends EventEmitter {
    * @private
    */
   _getCommandAndAncestors() {
-    const result = [];
+    const result2 = [];
     for (let command = this; command; command = command.parent) {
-      result.push(command);
+      result2.push(command);
     }
-    return result;
+    return result2;
   }
   /**
    * Define a command.
@@ -93668,7 +96366,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @private
    */
   _chainOrCallHooks(promise2, event) {
-    let result = promise2;
+    let result2 = promise2;
     const hooks = [];
     this._getCommandAndAncestors().reverse().filter((cmd) => cmd._lifeCycleHooks[event] !== void 0).forEach((hookedCommand) => {
       hookedCommand._lifeCycleHooks[event].forEach((callback) => {
@@ -93679,11 +96377,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
       hooks.reverse();
     }
     hooks.forEach((hookDetail) => {
-      result = this._chainOrCall(result, () => {
+      result2 = this._chainOrCall(result2, () => {
         return hookDetail.callback(hookDetail.hookedCommand, this);
       });
     });
-    return result;
+    return result2;
   }
   /**
    *
@@ -93694,15 +96392,15 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @private
    */
   _chainOrCallSubCommandHook(promise2, subCommand, event) {
-    let result = promise2;
+    let result2 = promise2;
     if (this._lifeCycleHooks[event] !== void 0) {
       this._lifeCycleHooks[event].forEach((hook) => {
-        result = this._chainOrCall(result, () => {
+        result2 = this._chainOrCall(result2, () => {
           return hook(this, subCommand);
         });
       });
     }
-    return result;
+    return result2;
   }
   /**
    * Process arguments in context of this command.
@@ -93974,13 +96672,13 @@ Expecting one of '${allowedValues.join("', '")}'`);
    */
   opts() {
     if (this._storeOptionsAsProperties) {
-      const result = {};
+      const result2 = {};
       const len = this.options.length;
       for (let i = 0; i < len; i++) {
         const key = this.options[i].attributeName();
-        result[key] = key === this._versionOptionName ? this._version : this[key];
+        result2[key] = key === this._versionOptionName ? this._version : this[key];
       }
-      return result;
+      return result2;
     }
     return this._optionValues;
   }
@@ -94689,8 +97387,8 @@ function tooOldApps(host, folders) {
   });
 }
 var runCommand = (command, args) => {
-  const result = spawnSync2(systemCommand(command), args, { encoding: "utf8", timeout: 5e3, windowsHide: true });
-  return { code: result.status ?? 1, stdout: result.stdout ?? "" };
+  const result2 = spawnSync2(systemCommand(command), args, { encoding: "utf8", timeout: 5e3, windowsHide: true });
+  return { code: result2.status ?? 1, stdout: result2.stdout ?? "" };
 };
 function debugModeVersions(platform, run) {
   return CSXS_VERSIONS.filter((n) => {
@@ -94959,16 +97657,16 @@ async function saveImages(ctx, images, out) {
   return saved;
 }
 function printHostReceipt(ctx, receipt2, images, saved) {
-  const ok = isOkHostStatus(receipt2.status);
-  if (!ok) ctx.exitCode = 1;
+  const ok2 = isOkHostStatus(receipt2.status);
+  if (!ok2) ctx.exitCode = 1;
   if (ctx.out.json) {
     ctx.out.data({ ...receipt2, ...images.length ? { images: images.length } : {}, ...saved.length ? { saved } : {} });
     return;
   }
-  if (!ok) ctx.out.error(receipt2.summary.replace(/^Error:\s*/, ""));
+  if (!ok2) ctx.out.error(receipt2.summary.replace(/^Error:\s*/, ""));
   else ctx.out.line(`${receipt2.status === "unchanged" ? ctx.out.style("\u2022", "dim") : ctx.out.style("\u2713", "green")} ${receipt2.summary}`);
   for (const w of receipt2.warnings ?? []) ctx.out.warn(w);
-  if (ok && receipt2.data && Object.keys(receipt2.data).length) ctx.out.line(ctx.out.style(JSON.stringify(receipt2.data, null, 2), "dim"));
+  if (ok2 && receipt2.data && Object.keys(receipt2.data).length) ctx.out.line(ctx.out.style(JSON.stringify(receipt2.data, null, 2), "dim"));
   for (const file3 of saved) ctx.out.line(`  saved ${file3}`);
   if (images.length && !saved.length) ctx.out.info(ctx.out.style(`  ${images.length} image(s): pass --out <file.png> to save`, "dim"));
 }
@@ -95437,16 +98135,16 @@ function registerIntegrationCommands(program2, ctx) {
     if (opts.web) {
       if (!project) throw new CliError("No project to open.", 2, "Pass a .zvn file.");
       const session = await openSession(ctx, project);
-      const result2 = await pushProject({ config: ctx.config, client: cloudClient(ctx), projectFile: project, project: session.doc.toJSON(), warn: (m) => ctx.out.warn(m) });
-      await keepCloudRefs(ctx, session, result2.cloudRefs);
-      const opened = await openUrl(result2.editorUrl, ctx.env);
-      if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Opened ${result2.editorUrl}`, engine: "portable", project, method: "web", opened, ...result2 });
-      else ctx.out.line(`${ctx.out.style("\u2713", "green")} ${opened ? "Opened" : "Open"} ${result2.editorUrl}`);
+      const result3 = await pushProject({ config: ctx.config, client: cloudClient(ctx), projectFile: project, project: session.doc.toJSON(), warn: (m) => ctx.out.warn(m) });
+      await keepCloudRefs(ctx, session, result3.cloudRefs);
+      const opened = await openUrl(result3.editorUrl, ctx.env);
+      if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Opened ${result3.editorUrl}`, engine: "portable", project, method: "web", opened, ...result3 });
+      else ctx.out.line(`${ctx.out.style("\u2713", "green")} ${opened ? "Opened" : "Open"} ${result3.editorUrl}`);
       return;
     }
-    const result = await openInDesktop({ config: ctx.config, project, clientVersion: VERSION });
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: result.summary, project: project ?? null, method: result.method, app: result.app ?? null });
-    else ctx.out.line(`${ctx.out.style("\u2713", "green")} ${result.summary}`);
+    const result2 = await openInDesktop({ config: ctx.config, project, clientVersion: VERSION });
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: result2.summary, project: project ?? null, method: result2.method, app: result2.app ?? null });
+    else ctx.out.line(`${ctx.out.style("\u2713", "green")} ${result2.summary}`);
   });
   program2.command("mcp").description("run the local MCP server on stdio (for Claude Code, Claude Desktop, Codex, Cursor)").action(async () => {
     const { runStdioServer: runStdioServer2 } = await Promise.resolve().then(() => (init_server3(), server_exports));
@@ -95455,7 +98153,7 @@ function registerIntegrationCommands(program2, ctx) {
   program2.command("mcp-config").description("print (or --install) the MCP config for claude-code, claude-desktop, codex or cursor").argument("<host>", AGENT_TARGETS.join(" | ")).option("--install", "write it into the host's config (other entries are kept)").option("--scope <scope>", "user (default) or project (claude-code, cursor)").option("--name <name>", "server name", "zenvi").option("--force", "replace an existing different entry with the same name").action(async (host, opts) => {
     if (!AGENT_TARGETS.includes(host)) throw new CliError(`Unknown host "${host}". Use one of: ${AGENT_TARGETS.join(", ")}.`, 2);
     if (opts.scope && opts.scope !== "user" && opts.scope !== "project") throw new CliError("--scope must be user or project.", 2);
-    const result = await mcpConfig({
+    const result2 = await mcpConfig({
       target: host,
       command: selfMcpCommand(ctx.env),
       name: opts.name,
@@ -95467,18 +98165,18 @@ function registerIntegrationCommands(program2, ctx) {
       env: ctx.env
     });
     if (ctx.out.json) {
-      ctx.out.data({ status: result.changed ? "applied" : "unchanged", summary: result.message, ...result });
+      ctx.out.data({ status: result2.changed ? "applied" : "unchanged", summary: result2.message, ...result2 });
       return;
     }
     if (!opts.install) {
-      ctx.out.line(result.message);
+      ctx.out.line(result2.message);
       ctx.out.line("");
-      ctx.out.line(result.snippet);
+      ctx.out.line(result2.snippet);
       ctx.out.line("");
       ctx.out.line(ctx.out.style("Run again with --install to write it for you.", "dim"));
     } else {
-      ctx.out.line(`${ctx.out.style(result.changed ? "\u2713" : "\u2022", result.changed ? "green" : "dim")} ${result.message}`);
-      if (result.backup) ctx.out.line(ctx.out.style(`  previous file kept as ${result.backup}`, "dim"));
+      ctx.out.line(`${ctx.out.style(result2.changed ? "\u2713" : "\u2022", result2.changed ? "green" : "dim")} ${result2.message}`);
+      if (result2.backup) ctx.out.line(ctx.out.style(`  previous file kept as ${result2.backup}`, "dim"));
     }
   });
   program2.command("doctor").description("check ffmpeg, fonts, the desktop app, Zenvi Cloud/backend and your sign-in").action(async () => {

@@ -29,6 +29,8 @@ import { projectTools } from "./catalog/project.js";
 import { searchTools } from "./catalog/search.js";
 import { speechTools } from "./catalog/speech-tools.js";
 import { timelineTools } from "./catalog/timeline.js";
+import { timelineEditTools } from "./catalog/timeline-edit.js";
+import { timelineTimeTools } from "./catalog/timeline-time.js";
 import { titleTools } from "./catalog/titles.js";
 import { transitionTools } from "./catalog/transitions.js";
 import { missingCapabilities, resultFor, type CatalogTool } from "./define.js";
@@ -46,6 +48,8 @@ function buildCatalog(): readonly CatalogTool[] {
   const implemented = [
     ...projectTools,
     ...timelineTools,
+    ...timelineEditTools,
+    ...timelineTimeTools,
     ...clipTools,
     ...playbackTools,
     ...audioTools,

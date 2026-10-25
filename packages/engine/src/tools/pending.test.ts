@@ -65,10 +65,10 @@ describe("the desktop contract", () => {
     }
   });
 
-  it("splits into ported tools, pending tools and the names of three older direct tools", () => {
+  it("splits into ported tools, pending tools and the names of two older direct tools", () => {
     const ported = contractNames.filter((name) => getTool(name)?.contract === true);
-    expect(ported).toHaveLength(73);
-    expect(PENDING_DESKTOP_TOOLS.size).toBe(93);
+    expect(ported).toHaveLength(86);
+    expect(PENDING_DESKTOP_TOOLS.size).toBe(81);
     expect(ported.length + PENDING_DESKTOP_TOOLS.size + DESKTOP_NAMES_ON_DIRECT_TOOLS.size).toBe(CONTRACT_TOOL_NAMES.length);
     for (const name of CONTRACT_TOOL_NAMES) {
       const kinds = [ported.includes(name), PENDING_DESKTOP_TOOLS.has(name), DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name)];
@@ -91,12 +91,12 @@ describe("pending desktop tools", () => {
     for (const name of PENDING_DESKTOP_TOOLS) expect(listed.has(name), name).toBe(false);
   });
 
-  it("leave the listings as they were: 73 ported tools and 12 direct tools", () => {
-    expect(allTools).toHaveLength(85);
-    expect(listTools({ includeDeprecated: true })).toHaveLength(85);
+  it("leave the listings as they were: 86 ported tools and 11 direct tools", () => {
+    expect(allTools).toHaveLength(97);
+    expect(listTools({ includeDeprecated: true })).toHaveLength(97);
     // Hidden by default: remove_clip_tool, delete_clips_on_track_tool, suggest_motion_graphics_placements_tool,
     // fetch_remotion_video_from_supabase_tool (deprecated).
-    expect(listTools({ surface: "editor" })).toHaveLength(81);
+    expect(listTools({ surface: "editor" })).toHaveLength(93);
     expect(listTools({ surface: "assistant", includeDeprecated: true }).every((t) => t.contract)).toBe(true);
   });
 

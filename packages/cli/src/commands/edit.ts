@@ -244,13 +244,14 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .action(async (clip: string, factorText: string) => {
       const factor = Number(factorText);
       if (!Number.isFinite(factor) || factor === 0) throw new CliError(`Not a speed factor: ${factorText}`, 2);
+      // The desktop's argument names, which the portable engine and the desktop app both take.
       await runToolCommand(
         ctx,
         "set_clip_speed_tool",
         toolArgs(ctx, "set_clip_speed_tool", [
-          [CLIP, clip],
-          [["factor", "speed", "rate"], Math.abs(factor)],
-          [["direction"], factor < 0 ? "backward" : undefined],
+          [["timeline_clip_ids"], [clip]],
+          [["speed"], Math.abs(factor)],
+          [["reverse"], factor < 0 ? true : undefined],
         ]),
       );
     });

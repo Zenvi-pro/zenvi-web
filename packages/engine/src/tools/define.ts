@@ -7,7 +7,8 @@
  * `call.commit(tx => …)`. The pipeline around it is a port of zenvi-core
  * agent_tools/execute.py `execute_tool_rich` (ref b63c39be7):
  *
- *   coerce (normalize_args) → validate (refused receipt, no history) →
+ *   coerce (normalize_args, or the editor tool registry's coerce_args) →
+ *   validate (refused receipt, no history) →
  *   refuse desktop arguments not ported yet (pending.ts) →
  *   capability check → run → receipt (+ snapshot delta when history grew).
  *
@@ -22,6 +23,7 @@ import { isOpError } from "../ops/errors.js";
 import { contractInputs, contractMeta, type ContractInput, type ContractToolName } from "./schemas.gen.js";
 import type { JsonSchemaObject } from "./json-schema.js";
 import { invalidArgumentsMessage, normalizeArgs } from "./coerce.js";
+import { coerceEditorArgs, isEditorToolHandler } from "./editor-args.js";
 import { pendingArgumentIn, pendingArgumentMessage } from "./pending.js";
 import {
   failed,
@@ -176,7 +178,10 @@ export async function executeTool<I extends z.ZodType>(
       ? rawArgs.chat_session_id.trim()
       : "default";
 
-  const args = normalizeArgs(tool.inputSchema, rawArgs);
+  // Editor tools coerce like the desktop's @editor_tool registry; the older tools like normalize_args.
+  const args = isEditorToolHandler(tool.desktopHandler)
+    ? coerceEditorArgs(tool.inputSchema, rawArgs)
+    : normalizeArgs(tool.inputSchema, rawArgs);
   const parsed = tool.input.safeParse(args);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

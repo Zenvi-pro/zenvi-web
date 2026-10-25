@@ -10,7 +10,7 @@ import { z } from "zod";
 import type { Project } from "../../model/types.js";
 import { Interpolation } from "../../model/types.js";
 import { EFFECTS } from "../../effects/registry.js";
-import { fadeClip, moveClip, setClipProperty, setClipSpeed, splitClip, sliceAllAt, trimClip, trimClipEdge } from "../../ops/clips.js";
+import { fadeClip, moveClip, setClipProperty, splitClip, sliceAllAt, trimClip, trimClipEdge } from "../../ops/clips.js";
 import { removeEffect, setEffectProperty } from "../../ops/effects.js";
 import { addTransition } from "../../ops/transitions.js";
 import { timelineEnd } from "../../timeline/queries.js";
@@ -262,25 +262,6 @@ export const directTools: CatalogTool[] = [
     run: (call, input) => {
       const result = call.commit((tx) => removeEffect(tx, input.effect_id));
       return applied("remove_effect_tool", `Removed effect ${input.effect_id} from clip ${result.clipId}.`, { data: result });
-    },
-  }),
-
-  directTool({
-    name: "set_clip_speed_tool",
-    title: "Set clip speed",
-    description:
-      "Play a clip faster or slower like the Time menu: factor 2 = twice as fast (half as long), 0.5 = half speed. " +
-      "direction=backward plays it in reverse. factor 1 forward resets the speed.",
-    input: z.strictObject({
-      clip_id: clipId,
-      factor: z.number().positive().describe("Speed factor."),
-      direction: z.enum(["forward", "backward"]).optional().describe("Default forward."),
-    }),
-    annotations: EDIT,
-    run: (call, input) => {
-      if (!requireClip(call, input.clip_id)) return `Error: No timeline clip with id='${input.clip_id}'.`;
-      call.commit((tx) => setClipSpeed(tx, input.clip_id, input.factor, { direction: input.direction ?? "forward" }));
-      return `Set clip ${input.clip_id} to ${input.factor}x ${input.direction ?? "forward"}.`;
     },
   }),
 
