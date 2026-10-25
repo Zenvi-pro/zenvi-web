@@ -324,10 +324,11 @@ export const reelTools: CatalogTool[] = [
             const flash = addTitleClip(tx, { file: prepared.flash, position: shot.start, duration: FLASH_SECONDS, layer: track.flash, title: "Flash" }).clip;
             fadeAlpha(tx, flash, 0.75, 0, shot.start, shot.start + FLASH_SECONDS);
           }
-          // A label never shares the frame with the end card.
+          // A label never shares the frame with the end card; one the card cuts down to a flicker is dropped.
           const label = shot.label ? prepared.labels.get(shot.label) : undefined;
-          const labelLength = Math.min(shot.end, endAt) - shot.start;
-          if (label && labelLength >= 0.3) placeTitle(tx, label, shot.start, labelLength, track.labels, null);
+          const labelEnd = Math.min(shot.end, endAt);
+          const labelLength = labelEnd - shot.start;
+          if (label && labelLength > 0 && (labelEnd === shot.end || labelLength >= 0.3)) placeTitle(tx, label, shot.start, labelLength, track.labels, null);
         });
 
         if (prepared.hook) {
