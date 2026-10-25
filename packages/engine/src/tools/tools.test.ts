@@ -337,26 +337,26 @@ const SPECS: Record<string, Spec> = {
   export_video_tool: {
     happy: {
       args: { show_dialog: "false", output_path: "/exports/out.mp4" },
-      summary: /^Exported to \/exports\/out\.mp4\.$/,
+      summary: /^Exported 19\.00s of video with 'MP4 \(h\.264\)' \(High\) to \/exports\/out\.mp4 \(0\.0 MB\), 1280x720 at 30\.0 fps\.$/,
       check: ({ host }) => {
         expect(host.exports).toHaveLength(1);
         expect(host.exports[0]!.format).toBe("mp4");
         expect(host.exports[0]!.width).toBe(1280);
       },
     },
-    failure: { args: { show_dialog: "false", output_path: "/media/interview.mp4" }, summary: /^Error: Export failed: Output path is an input file/ },
+    failure: { args: { show_dialog: "false", output_path: "/media/interview.mp4" }, summary: /^Error: \/media\/interview\.mp4 is one of the project's input files; choose a different name$/ },
   },
-  get_export_settings_tool: { happy: { summary: /^Export type: Video & Audio\nDefault path: export\.mp4\nVideo: 1280x720, 30\/1 fps, codec libx264/ }, failure: null },
+  get_export_settings_tool: { happy: { summary: /^Next export: 'MP4 \(h\.264\)' High video_audio 1280x720 30\.0 fps, 0\.0-19\.0s -> current\.mp4\.$/ }, failure: null },
   set_export_setting_tool: {
     happy: {
       args: { key: "width", value: "640" },
-      summary: /^Set width = 640\.$/,
+      summary: /^Stored export width = 640\.$/,
       check: ({ doc }) => {
         expect(doc.project.export_overrides).toMatchObject({ width: 640 });
         expect(doc.undoLabels).toEqual([]);
       },
     },
-    failure: { args: { key: "width", value: "wide" }, summary: /^Error: width must be an integer \(got wide\)\.$/ },
+    failure: { args: { key: "width", value: "wide" }, summary: /^Error: width must be a whole number, got 'wide'$/ },
   },
 
   // --- media / import --------------------------------------------------------------

@@ -6,7 +6,7 @@
  * - Ops are synchronous and take a `Transaction` (history/document.ts). Call
  *   them inside one transaction per user intent:
  *   `doc.transaction("Split clip", (tx) => splitClip(tx, id, 12.5))`.
- *   (`setExportSetting` is the exception: export overrides are not an undo
+ *   (`storeExportOverrides` is the exception: export overrides are not an undo
  *   step on the desktop, so it takes the document and writes untracked.)
  * - Ops validate every input first and throw `OpError` (`code`, `message`)
  *   before recording anything, so a failed op leaves history untouched.

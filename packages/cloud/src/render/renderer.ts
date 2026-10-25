@@ -46,6 +46,8 @@ export interface Renderer {
   render(input: RenderInput): Promise<void>;
   /** Encoded image bytes of one timeline frame. */
   frame(input: FrameInput): Promise<Uint8Array>;
+  /** The FFmpeg encoders renders can use (`ffmpeg -encoders`); absent = not known. */
+  encoders?(): Promise<ReadonlySet<string>>;
 }
 
 /** ffprobe-backed media inspection (`@zenvi/render-node` `probe`). */

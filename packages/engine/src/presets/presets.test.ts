@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import goldens from "./__fixtures__/desktop-export.json" with { type: "json" };
-import type { Project } from "../model/types.js";
 import {
   ALL_FORMATS,
   DEFAULT_EXPORT_PRESET,
@@ -19,26 +18,11 @@ import {
   presetRates,
   type PresetQuality,
 } from "./catalog.js";
-import {
-  ExportSettingsError,
-  encoderRates,
-  exportContainer,
-  exportOptionsForPreset,
-  exportOptionsFromSettings,
-  getDefaultExportSettings,
-  type DefaultExportSettings,
-} from "./export.js";
+import { ExportSettingsError, encoderRates, exportContainer, exportOptionsForPreset, isSequenceFormat } from "./export.js";
 
-interface SettingsGolden {
-  name: string;
-  project: Record<string, unknown>;
-  video: Record<string, unknown>;
-  audio: Record<string, unknown>;
-  exportType: string;
-  defaultPath: string;
-}
+// The goldens' `settings` cases are the desktop's get_default_export_settings, which no tool ports any more
+// (export_video_tool plans like develop's build_export_plan: plan.test.ts).
 const g = goldens as unknown as {
-  settings: SettingsGolden[];
   parse: [string, number | null][];
   allFormats: [number, number, number, number, PresetQuality, string | null][];
   presetProfiles: Record<string, (string | null)[]>;
@@ -164,95 +148,23 @@ describe("rates (parity with export.py)", () => {
   });
 });
 
-function projectFrom(data: Record<string, unknown>): Project {
-  return data as unknown as Project;
-}
-
-describe("getDefaultExportSettings (parity with get_default_export_settings)", () => {
-  for (const c of g.settings) {
-    it(c.name, () => {
-      const settings = getDefaultExportSettings(projectFrom(c.project), { exportFolder: "/media/exports" });
-      // The desktop copies the Channel Layout combo index; the engine maps it to the layout.
-      const savedLayout = Array.isArray(c.project.export_settings)
-        ? (c.project.export_settings as { name: string; value: number }[]).find((w) => w.name === "cboChannelLayout")
-        : undefined;
-      const audio = savedLayout ? { ...c.audio, channel_layout: [4, 3, 7, 1551, 1599][savedLayout.value] } : c.audio;
-      expect(settings).toEqual({ video: c.video, audio, exportType: c.exportType, defaultPath: c.defaultPath });
-    });
-  }
-
-  it("ignores saved values of the wrong type and prototype keys", () => {
-    const settings = getDefaultExportSettings(
-      projectFrom({
-        width: 1280,
-        export_settings: [
-          { name: "txtWidth", value: "wide" },
-          { name: "constructor", value: 1 },
-          { name: "__proto__", value: 1 },
-          { name: "cboExportTo", value: 9 },
-        ],
-        export_overrides: { width: "640", channels: 6 },
-      }),
-    );
-    expect(settings.video.width).toBe(1280);
-    expect(settings.audio.channels).toBe(6);
-    expect(settings.exportType).toBe("Video & Audio");
-    expect(settings.defaultPath).toBe("export.mp4");
-  });
-});
-
-describe("exportOptionsFromSettings", () => {
-  const settingsOf = (name: string): DefaultExportSettings => {
-    const c = g.settings.find((s) => s.name === name)!;
-    return getDefaultExportSettings(projectFrom(c.project));
-  };
-
-  it("maps the headless defaults (2 Mb/s H.264, 192 kb/s AAC, whole timeline)", () => {
-    expect(exportOptionsFromSettings(settingsOf("defaults"))).toEqual({
-      format: "mp4",
-      width: 1280,
-      height: 720,
-      fps: { num: 30, den: 1 },
-      videoCodec: "libx264",
-      videoBitrate: 2000000,
-      audioCodec: "aac",
-      audioBitrate: 192000,
-      sampleRate: 48000,
-      channels: 2,
-    });
-  });
-
-  it("reads saved dialog rates and ranges", () => {
-    const options = exportOptionsFromSettings(settingsOf("saved-dialog"), { useSavedRange: true });
-    expect(options).toMatchObject({ width: 1440, height: 1080, fps: { num: 24, den: 1 }, videoBitrate: 2050000, audioBitrate: 96000 });
-    expect(options.range).toEqual({ start: 0, end: 1488 / 24 });
-  });
-
-  it("keeps a saved crf and drops audio for Video Only", () => {
-    const options = exportOptionsFromSettings(settingsOf("saved-crf-video-only"));
-    expect(options.crf).toBe(21);
-    expect(options.quality).toBe("high");
-    expect(options.videoBitrate).toBeUndefined();
-    expect(options.channels).toBe(0);
-    expect(options.audioCodec).toBeUndefined();
-  });
-
-  it("applies overrides and rejects containers the engine cannot write", () => {
-    const options = exportOptionsFromSettings(settingsOf("overrides"));
-    expect(options).toMatchObject({ format: "mkv", videoCodec: "libx265", audioCodec: "libopus", sampleRate: 44100, channels: 1, width: 640 });
-    const avi = { ...settingsOf("defaults") };
-    avi.video = { ...avi.video, vformat: "avi" };
-    expect(() => exportOptionsFromSettings(avi)).toThrow(ExportSettingsError);
-  });
-
+describe("exportContainer", () => {
   it("knows which containers the engine writes", () => {
     expect(exportContainer("mp4")).toBe("mp4");
     expect(exportContainer("m4v")).toBe("mp4");
     expect(exportContainer("gif", "Video Only")).toBe("gif");
     expect(exportContainer("mp3", "Audio Only")).toBe("mp3");
-    expect(exportContainer("mp4", "Audio Only")).toBeUndefined();
-    expect(exportContainer("mp4", "Image Sequence")).toBe("png-sequence");
+    // Audio Only MP4 is an MPEG-4 file holding only its sound.
+    expect(exportContainer("mp4", "Audio Only")).toBe("m4a");
+    expect(exportContainer("flac", "Audio Only")).toBe("flac");
+    expect(exportContainer("png", "Image Sequence")).toBe("png-sequence");
+    expect(exportContainer("jpg", "Image Sequence")).toBe("jpg-sequence");
+    expect(exportContainer("tiff", "Image Sequence")).toBe("tiff-sequence");
+    expect(isSequenceFormat("bmp-sequence")).toBe(true);
+    expect(isSequenceFormat("mp4")).toBe(false);
     for (const format of ["avi", "mpeg", "ogg", "dvd"]) expect(exportContainer(format)).toBeUndefined();
+    expect(exportContainer("ppm", "Image Sequence")).toBeUndefined();
+    expect(exportContainer("ogg", "Audio Only")).toBeUndefined();
   });
 });
 

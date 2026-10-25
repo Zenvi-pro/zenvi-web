@@ -249,7 +249,24 @@ export interface PreferenceEntry {
   readOnly?: string;
 }
 
-export type ContainerFormat = "mp4" | "webm" | "mov" | "mkv" | "gif" | "mp3" | "wav" | "png-sequence";
+/**
+ * What an exporter writes: a video container, an audio-only file (`m4a` is
+ * AAC in an MPEG-4 file), or a sequence of numbered images.
+ */
+export type ContainerFormat =
+  | "mp4"
+  | "webm"
+  | "mov"
+  | "mkv"
+  | "gif"
+  | "mp3"
+  | "wav"
+  | "flac"
+  | "m4a"
+  | "png-sequence"
+  | "jpg-sequence"
+  | "bmp-sequence"
+  | "tiff-sequence";
 
 export interface ExportOptions {
   format: ContainerFormat;
@@ -273,22 +290,53 @@ export interface ExportOptions {
 }
 
 export interface ExportResult {
-  /** Local path, OPFS path, blob URL or cloud URL of the finished file. */
+  /** Local path, OPFS path, blob URL or cloud URL of the finished file (an image sequence: its `%05d` pattern). */
   location: string;
   bytes?: number;
   durationSeconds?: number;
   mimeType?: string;
+  /** Video frames written (an image sequence: its files). */
+  frames?: number;
+  /** How the file differs from what was asked (a codec the host swapped, a dropped track). */
+  warnings?: string[];
+  /** A host that renders in the background (Zenvi Cloud): the render, before the file exists. */
+  job?: ExportJob;
 }
+
+/** A background render (`ExportResult.job`). */
+export interface ExportJob {
+  id: string;
+  status: "queued" | "running" | "done" | "error";
+  /** How the person gets the file, e.g. which tool returns the download link. */
+  followUp: string;
+}
+
+/**
+ * Where a finished export goes:
+ * - `files`: written at `ExportOptions.output`, a path (relative to the
+ *   project's folder); a call may choose it with folder / file_name / output_path;
+ * - `download`: the browser downloads it, named after `output`'s file name;
+ * - `job`: rendered in the background (Zenvi Cloud), named after `output`'s
+ *   file name; `ExportResult.job` says how to get the download link.
+ */
+export type ExportDelivery = "files" | "download" | "job";
 
 export interface ExportHost {
   export(project: Project, options: ExportOptions, onProgress?: (fraction: number) => void): Promise<ExportResult>;
   /**
    * Whether this host can encode a container with these FFmpeg encoder names
    * (an export preset's videocodec / audiocodec; "" = none), like the
-   * desktop's FFmpegWriter.IsValidCodec. Without it, every container the
-   * engine's exporters write counts as encodable.
+   * desktop's FFmpegWriter.IsValidCodec, optionally at this frame size and
+   * rate. Without it, every container the engine's exporters write counts
+   * as encodable.
    */
-  supports?(format: ContainerFormat, videoCodec: string, audioCodec: string): Promise<boolean>;
+  supports?(format: ContainerFormat, videoCodec: string, audioCodec: string, frame?: { width: number; height: number; fps: number }): Promise<boolean>;
+  /** Where exports go (default `files`). */
+  delivery?: ExportDelivery;
+  /** The file name an export gets when the call names none (the desktop: the project file's name). */
+  defaultName?(): string | Promise<string>;
+  /** Whether `path`, as a call gave it, is an existing folder (`files` hosts). */
+  isFolder?(path: string): Promise<boolean>;
 }
 
 /** Drawn over an inspect frame (zenvi-core agent_tools/inspect_overlay.py). Hosts may ignore it. */

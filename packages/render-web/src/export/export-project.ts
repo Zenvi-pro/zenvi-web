@@ -22,7 +22,7 @@ import {
   type StreamTargetChunk,
   type Target,
 } from "mediabunny";
-import type { Project } from "@zenvi/engine";
+import { projectAtFrameRate, type Project } from "@zenvi/engine";
 import type { AudioPlan } from "@zenvi/engine/render";
 import type { ContainerFormat, ExportOptions } from "@zenvi/engine/tools";
 import { windowEnd } from "../audio/channels.js";
@@ -82,8 +82,8 @@ const defaultSupport: EncodeSupport = {
 };
 
 /** `canEncodeNamed` with this browser's encoders. */
-export function canExportWith(format: ContainerFormat, videoCodec: string, audioCodec: string): Promise<boolean> {
-  return canEncodeNamed(format, videoCodec, audioCodec, defaultSupport);
+export function canExportWith(format: ContainerFormat, videoCodec: string, audioCodec: string, frame?: { width: number; height: number; fps: number }): Promise<boolean> {
+  return canEncodeNamed(format, videoCodec, audioCodec, defaultSupport, frame);
 }
 
 function outputFormat(container: WebContainer): OutputFormat {
@@ -186,12 +186,14 @@ export function exportAudio(project: Project, engine: RenderEngine, options: Pic
 }
 
 /** The export pipeline, writing to any Mediabunny target. */
-async function encode(project: Project, media: MediaRegistry, options: ExportOptions, run: ExportRunOptions, target: Target): Promise<{ mimeType: string }> {
+async function encode(source: Project, media: MediaRegistry, options: ExportOptions, run: ExportRunOptions, target: Target): Promise<{ mimeType: string }> {
   const engine = run.engine ?? defaultEngine;
   const signal = run.signal;
   if (signal?.aborted) throw abortReason(signal);
 
-  const fps = options.fps && options.fps.num > 0 && options.fps.den > 0 ? options.fps : project.fps;
+  const fps = options.fps && options.fps.num > 0 && options.fps.den > 0 ? options.fps : source.fps;
+  // Frames at the export's rate, keyframes rescaled to it (as the desktop's export and render-node do).
+  const project = projectAtFrameRate(source, fps);
   const rate = fps.num / fps.den;
   const last = engine.lastFrame(project);
   const timelineEnd = last > 0 ? engine.frameTime(project, last + 1) : 0;

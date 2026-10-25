@@ -10,16 +10,16 @@ Every call returns a contract-3 receipt (`{contract: 3, status, tool, summary, c
 
 | Surface | Host | Works | Partial | Not available |
 | --- | --- | --- | --- | --- |
-| Web editor (Zenvi Assistant, command palette) | `apps/editor/src/features/editor/assistant/host.ts` | 114 | 38 | 24 |
-| CLI and local MCP server (zenvi, zenvi mcp) | `packages/render-node/src/host/node-host.ts` | 119 | 28 | 29 |
-| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 102 | 32 | 42 |
+| Web editor (Zenvi Assistant, command palette) | `apps/editor/src/features/editor/assistant/host.ts` | 115 | 37 | 24 |
+| CLI and local MCP server (zenvi, zenvi mcp) | `packages/render-node/src/host/node-host.ts` | 120 | 27 | 29 |
+| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 103 | 33 | 40 |
 | Zenvi desktop | zenvi-core | 163 | 0 | 13 (direct tools are web-only) |
 
 Availability follows each tool's required host capabilities and the host methods it calls at run time; the hosts are described in `SURFACE_PROFILES` (packages/engine/src/tools/availability.ts). Capabilities a session may lack (signed out of Zenvi, no WebCodecs export) are noted per tool.
 
 - **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage, assets, audio; methods media.importUrl, media.pickFiles, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, ui.openExportDialog, audio.decodePcm, audio.transcribe, ui.selection, ui.setSelection, ui.timelineView, ui.showTimelineRange, ui.setTimelineMode, ui.layout, ui.preferences, ui.clearPlaybackCache, exporter.supports; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
 - **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend, assets; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, media.missing, media.fetchWebVideo, storage.open, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, storage.recoveryCopies, storage.customProfiles, media.collect, audio.decodePcm, audio.transcribe, exporter.supports, frames.fontFamilies; only sometimes: backend (signed in with zenvi login), media.fetchWebVideo (yt-dlp is installed; zenvi doctor checks).
-- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.transcribe, frames.fontFamilies; only sometimes: frames (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend); hides 17 local-app tools.
+- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, exporter; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend); hides 16 local-app tools.
 
 ## Matrix
 
@@ -54,9 +54,9 @@ Availability follows each tool's required host capabilities and the host methods
 | [`center_on_playhead_tool`](#center_on_playhead_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
 | [`import_files_tool`](#import_files_tool) | assistant, mcp, cli, editor | — | yes | — | yes |
 | [`wait_until_project_indexed_tool`](#wait_until_project_indexed_tool) | assistant, mcp, cli, editor | partial | partial | partial | yes |
-| [`export_video_tool`](#export_video_tool) | assistant, mcp, cli, editor | partial | partial | — | yes |
+| [`export_video_tool`](#export_video_tool) | assistant, mcp, cli, editor | partial | partial | partial | yes |
 | [`get_export_settings_tool`](#get_export_settings_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
-| [`set_export_setting_tool`](#set_export_setting_tool) | assistant, mcp, cli, editor | partial | partial | partial | yes |
+| [`set_export_setting_tool`](#set_export_setting_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`get_file_info_tool`](#get_file_info_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`split_file_add_clip_tool`](#split_file_add_clip_tool) | mcp, cli, editor | yes | yes | yes | yes |
 | [`add_clip_to_timeline_tool`](#add_clip_to_timeline_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
@@ -144,7 +144,7 @@ Availability follows each tool's required host capabilities and the host methods
 | [`list_comfyui_jobs_tool`](#list_comfyui_jobs_tool) | mcp, cli, editor | — | — | — | yes |
 | [`list_comfyui_templates_tool`](#list_comfyui_templates_tool) | mcp, cli, editor | — | — | — | yes |
 | [`list_effects_tool`](#list_effects_tool) | mcp, cli, editor | yes | yes | yes | yes |
-| [`list_export_presets_tool`](#list_export_presets_tool) | mcp, cli, editor | partial | partial | — | yes |
+| [`list_export_presets_tool`](#list_export_presets_tool) | mcp, cli, editor | partial | partial | partial | yes |
 | [`list_luts_tool`](#list_luts_tool) | mcp, cli, editor | partial | partial | partial | yes |
 | [`list_project_files_tool`](#list_project_files_tool) | mcp, cli, editor | partial | partial | partial | yes |
 | [`list_project_profiles_tool`](#list_project_profiles_tool) | mcp, cli, editor | partial | yes | partial | yes |
@@ -610,38 +610,38 @@ Availability: editor partial (reports indexing status once; does not wait); cli 
 
 ### export_video_tool
 
-**Export video**. Export the project.
+**Export video**. Render the timeline to a file: video, audio only (MP3/WAV/FLAC), animated GIF or an image sequence.
 
 Surfaces: assistant, mcp, cli, editor. edits.
 
-Availability: editor partial (only Zenvi desktop takes audio_bitrate, audio_codec, channels, container, end, export_type, file_name, folder, fps, height, image_format, interlaced, preset, profile, quality, range, sample_rate, start, video_bitrate, video_codec, width so far); cli partial (only Zenvi desktop takes audio_bitrate, audio_codec, channels, container, end, export_type, file_name, folder, fps, height, image_format, interlaced, preset, profile, quality, range, sample_rate, start, video_bitrate, video_codec, width so far); cloud — (hidden: belongs to a local app); desktop yes.
+Availability: editor partial (interlaced is refused (no web encoder interlaces); the CLI renders with ffmpeg and writes files (relative paths and the default folder start at the project's folder), the web editor renders MP4, MOV, MKV, WebM or WAV in the browser and downloads the file (no folders), Zenvi Cloud starts a render job (get_render_status gives the download link; no image sequences)); cli partial (interlaced is refused (no web encoder interlaces); the CLI renders with ffmpeg and writes files (relative paths and the default folder start at the project's folder), the web editor renders MP4, MOV, MKV, WebM or WAV in the browser and downloads the file (no folders), Zenvi Cloud starts a render job (get_render_status gives the download link; no image sequences)); cloud partial (interlaced is refused (no web encoder interlaces); the CLI renders with ffmpeg and writes files (relative paths and the default folder start at the project's folder), the web editor renders MP4, MOV, MKV, WebM or WAV in the browser and downloads the file (no folders), Zenvi Cloud starts a render job (get_render_status gives the download link; no image sequences)); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `audio_bitrate` | string |  | **Zenvi desktop only so far.** Override audio bitrate, e.g. '192 kb/s'. (default "") |
-| `audio_codec` | string |  | **Zenvi desktop only so far.** Override audio codec, e.g. 'aac', 'libmp3lame', 'pcm_s16le', 'flac'. (default "") |
-| `channels` | string |  | **Zenvi desktop only so far.** Override audio channels: mono, stereo, surround, 5.1, 7.1. (default "") |
-| `container` | string |  | **Zenvi desktop only so far.** Override container/extension, e.g. 'mov', 'mkv', 'wav', 'flac'. (default "") |
-| `end` | number |  | **Zenvi desktop only so far.** Range end in timeline seconds (custom range). 0 = end of the last clip. (default 0, min 0) |
-| `export_type` | "auto" \| "video_audio" \| "video_only" \| "audio_only" \| "image_sequence" |  | **Zenvi desktop only so far.** auto = the preset's (GIF = video only, MP3 = audio only). audio_only with container 'wav'/'flac' writes uncompressed/lossless audio. (default "auto") |
-| `file_name` | string |  | **Zenvi desktop only so far.** Output file name without folder (default: the project name). (default "") |
-| `folder` | string |  | **Zenvi desktop only so far.** Output folder (default: the Export folder preference, usually Downloads). (default "") |
-| `fps` | number |  | **Zenvi desktop only so far.** Override export frame rate. 0 = from profile. (default 0, min 0, max 240) |
-| `height` | integer |  | **Zenvi desktop only so far.** Override export height in pixels (even). 0 = from profile. (default 0, min 0, max 16384) |
-| `image_format` | "png" \| "jpg" \| "bmp" \| "tiff" |  | **Zenvi desktop only so far.** Image type for export_type='image_sequence'. (default "png") |
-| `interlaced` | boolean |  | **Zenvi desktop only so far.** Interlaced output (top field first). (default false) |
+| `audio_bitrate` | string |  | Override audio bitrate, e.g. '192 kb/s'. (default "") |
+| `audio_codec` | string |  | Override audio codec, e.g. 'aac', 'libmp3lame', 'pcm_s16le', 'flac'. (default "") |
+| `channels` | string |  | Override audio channels: mono, stereo, surround, 5.1, 7.1. (default "") |
+| `container` | string |  | Override container/extension, e.g. 'mov', 'mkv', 'wav', 'flac'. (default "") |
+| `end` | number |  | Range end in timeline seconds (custom range). 0 = end of the last clip. (default 0, min 0) |
+| `export_type` | "auto" \| "video_audio" \| "video_only" \| "audio_only" \| "image_sequence" |  | auto = the preset's (GIF = video only, MP3 = audio only). audio_only with container 'wav'/'flac' writes uncompressed/lossless audio. (default "auto") |
+| `file_name` | string |  | Output file name without folder (default: the project name). (default "") |
+| `folder` | string |  | Output folder (default: the Export folder preference, usually Downloads). (default "") |
+| `fps` | number |  | Override export frame rate. 0 = from profile. (default 0, min 0, max 240) |
+| `height` | integer |  | Override export height in pixels (even). 0 = from profile. (default 0, min 0, max 16384) |
+| `image_format` | "png" \| "jpg" \| "bmp" \| "tiff" |  | Image type for export_type='image_sequence'. (default "png") |
+| `interlaced` | boolean |  | Interlaced output (top field first). (default false) |
 | `output_path` | string |  | Full output file path. Empty = folder + file_name. The extension follows the container. (default "") |
 | `overwrite` | boolean |  | Replace an existing output file. (default false) |
-| `preset` | string |  | **Zenvi desktop only so far.** Target: an Export dialog preset title or a common name -- 'MP4 (h.264)' (default), 'YouTube', 'YouTube (4K)', 'YouTube Shorts', 'Instagram Reels', 'Instagram', 'TikTok', 'Facebook', 'Twitter / X', 'LinkedIn', 'Vimeo', 'GIF', 'MP3', 'WEBM', 'ProRes', 'MOV', 'MKV', 'HEVC'. See list_export_presets_tool. (default "") |
-| `profile` | string |  | **Zenvi desktop only so far.** Export video profile/size instead of the preset's (Advanced > Profile): a profile name, social preset or 'WIDTHxHEIGHT'. (default "") |
-| `quality` | "" \| "low" \| "med" \| "high" |  | **Zenvi desktop only so far.** Preset quality (bitrate). Empty = stored setting or high. (default "") |
-| `range` | "" \| "whole" \| "selection" \| "custom" |  | **Zenvi desktop only so far.** whole = first clip to last clip; selection = the selected clips' span; custom = start/end. Empty = custom when start/end are given (or stored), else whole. (default "") |
-| `sample_rate` | integer |  | **Zenvi desktop only so far.** Override audio sample rate (Hz), e.g. 44100, 48000. 0 = preset's. (default 0, min 0, max 192000) |
+| `preset` | string |  | Target: an Export dialog preset title or a common name -- 'MP4 (h.264)' (default), 'YouTube', 'YouTube (4K)', 'YouTube Shorts', 'Instagram Reels', 'Instagram', 'TikTok', 'Facebook', 'Twitter / X', 'LinkedIn', 'Vimeo', 'GIF', 'MP3', 'WEBM', 'ProRes', 'MOV', 'MKV', 'HEVC'. See list_export_presets_tool. (default "") |
+| `profile` | string |  | Export video profile/size instead of the preset's (Advanced > Profile): a profile name, social preset or 'WIDTHxHEIGHT'. (default "") |
+| `quality` | "" \| "low" \| "med" \| "high" |  | Preset quality (bitrate). Empty = stored setting or high. (default "") |
+| `range` | "" \| "whole" \| "selection" \| "custom" |  | whole = first clip to last clip; selection = the selected clips' span; custom = start/end. Empty = custom when start/end are given (or stored), else whole. (default "") |
+| `sample_rate` | integer |  | Override audio sample rate (Hz), e.g. 44100, 48000. 0 = preset's. (default 0, min 0, max 192000) |
 | `show_dialog` | boolean \| string |  | Instead of rendering, open the Export Video dialog for the user (returns at once). (default false) |
-| `start` | number |  | **Zenvi desktop only so far.** Range start in timeline seconds (custom range). (default 0, min 0) |
-| `video_bitrate` | string |  | **Zenvi desktop only so far.** Override video rate: '8 Mb/s', '500 kb/s' or a quality like '20 crf'. (default "") |
-| `video_codec` | string |  | **Zenvi desktop only so far.** Override video codec, e.g. 'libx264', 'libx265', 'prores_ks', 'libvpx-vp9'. (default "") |
-| `width` | integer |  | **Zenvi desktop only so far.** Override export width in pixels (even). 0 = from profile. (default 0, min 0, max 16384) |
+| `start` | number |  | Range start in timeline seconds (custom range). (default 0, min 0) |
+| `video_bitrate` | string |  | Override video rate: '8 Mb/s', '500 kb/s' or a quality like '20 crf'. (default "") |
+| `video_codec` | string |  | Override video codec, e.g. 'libx264', 'libx265', 'prores_ks', 'libvpx-vp9'. (default "") |
+| `width` | integer |  | Override export width in pixels (even). 0 = from profile. (default 0, min 0, max 16384) |
 
 ### get_export_settings_tool
 
@@ -659,7 +659,7 @@ No arguments.
 
 Surfaces: assistant, mcp, cli, editor. edits, destructive.
 
-Availability: editor partial (stores a key and value as given (Zenvi desktop checks keys and values first)); cli partial (stores a key and value as given (Zenvi desktop checks keys and values first)); cloud partial (stores a key and value as given (Zenvi desktop checks keys and values first)); desktop yes.
+Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -2028,7 +2028,7 @@ Availability: editor — (needs the local ComfyUI server Zenvi desktop drives (P
 
 Surfaces: mcp, cli, editor. edits.
 
-Availability: editor partial (the CLI copies into the folder (relative to the project's folder; default the project's folder); the web editor downloads each file; Zenvi Cloud answers with download links); cli partial (the CLI copies into the folder (relative to the project's folder; default the project's folder); the web editor downloads each file; Zenvi Cloud answers with download links); cloud partial (the CLI copies into the folder (relative to the project's folder; default the project's folder); the web editor downloads each file; Zenvi Cloud answers with download links; sub-clips and image sequences are rendered to MP4, which needs video rendering); desktop yes.
+Availability: editor partial (the CLI copies into the folder (relative to the project's folder; default the project's folder); the web editor downloads each file; Zenvi Cloud answers with download links); cli partial (the CLI copies into the folder (relative to the project's folder; default the project's folder); the web editor downloads each file; Zenvi Cloud answers with download links); cloud partial (the CLI copies into the folder (relative to the project's folder; default the project's folder); the web editor downloads each file; Zenvi Cloud answers with download links); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -2239,7 +2239,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: mcp, cli, editor. read-only. Needs: exporter.
 
-Availability: editor partial (export_video_tool takes a preset only in Zenvi desktop so far; the web editor's Export dialog offers them; only when browsers with WebCodecs export); cli partial (export_video_tool takes a preset only in Zenvi desktop so far; the web editor's Export dialog offers them); cloud — (needs video rendering); desktop yes.
+Availability: editor partial (the built-in presets (Zenvi desktop also lists the user's own presets folder); only when browsers with WebCodecs export); cli partial (the built-in presets (Zenvi desktop also lists the user's own presets folder)); cloud partial (the built-in presets (Zenvi desktop also lists the user's own presets folder); only when the render worker is configured); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -3248,7 +3248,6 @@ Zenvi desktop lists 169 tools. 6 are not ported yet (`packages/engine/src/tools/
 Arguments of ported tools that only Zenvi desktop takes so far. A call that sets one to anything but its default is refused before anything changes (`Error: <tool> cannot use <argument> in this Zenvi surface yet …`, so the Assistant retries without it):
 
 - `add_effect_tool`: processing
-- `export_video_tool`: audio_bitrate, audio_codec, channels, container, end, export_type, file_name, folder, fps, height, image_format, interlaced, preset, profile, quality, range, sample_rate, start, video_bitrate, video_codec, width
 
 ## Divergences from the desktop
 
@@ -3276,7 +3275,7 @@ Deliberate differences from the zenvi-core handlers:
 - **remove_silence_tool**: Speech windows come from the desktop's energy VAD run on the host's RMS envelope (AudioHost.analyzeAudio), not from on-device VAD models.
 - **web-only arguments**: Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, set_clip_speed_tool clip_id/factor/direction (the web's older speed tool: one clip id, speed, backward = reverse), list_effects_tool category (older name for kind), remove_effect_tool effect_id (the older tool's one id, added to effect_ids), watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).
 - **desktop defaults the web does not follow yet**: save_project_tool and export_video_tool replace an existing file (the CLI's) where the desktop refuses unless overwrite=true; new_project_tool / open_project_tool have no unsaved-changes guard (every web surface autosaves, so discard_unsaved is accepted as is); generate_tts_and_add_to_timeline_tool defaults to the track below the picture, where the desktop picks or creates a free narration track.
-- **tools zenvi-core develop rewrote as editor tools**: get_project_info_tool, list_markers_tool, get_export_settings_tool, set_export_setting_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, export_video_tool, generate_tts_and_add_to_timeline_tool and set_keyframes_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts). set_export_setting_tool stores any key (develop checks keys and aliases); its `clear` is develop's and also clears a key stored here under its own name. set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property) with develop's point times, interpolation, ease presets and modes, and refuses a point without a value (develop keeps the curve's value there).
+- **tools zenvi-core develop rewrote as editor tools**: get_project_info_tool, list_markers_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, generate_tts_and_add_to_timeline_tool and set_keyframes_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts). set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property) with develop's point times, interpolation, ease presets and modes, and refuses a point without a value (develop keeps the curve's value there).
 - **split_file_add_clip_tool**: require_visual_match reads true/false; the desktop's `bool(...)` treats the string "false" as true (tool_handlers.py:2370).
 - **wait_for_editor_job_tool (desktop MCP extra, #237)**: Pending, and likely to stay so: tool calls here run to completion inside the call, so there is never a detached editor job; the name gets the standard not-available refusal.
 - **argument coercion**: As zenvi-core normalize_args, plus numbers/booleans become strings for string-only properties (MCP clients send typed JSON). Tools that are editor tools on the desktop coerce like its @editor_tool registry (`_registry.coerce_args`): case-insensitive enums, "1.5s", comma-separated or JSON lists, "y"/"n"; an empty string or null for an argument that cannot hold it means its default where the desktop refuses it, and a value that cannot be coerced is refused in the web's words (`Invalid arguments for …`) rather than the registry's.
@@ -3314,7 +3313,8 @@ Deliberate differences from the zenvi-core handlers:
 - **get_editor_layout_tool / set_editor_layout_tool**: The web editor's panels: Project Files, Effects, Transitions, Titles, Stock and Generate share the left side (one shows at a time), Properties and Assistant the right; Video Preview and Timeline always stay. The `simple` view is the editor's starting arrangement, and the desktop's dock names and aliases work for the panels both editors have. It has no Color Grade or Recording view, scopes, saved custom views, floating panels (dock_all changes nothing) or toolbar to hide, and a browser enters fullscreen only from a click or a key press: those are refused before anything moves. The CLI and Zenvi Cloud have no editor window and refuse.
 - **get_preferences_tool / set_preference_tool**: The web editor's own settings, in the desktop's entry shape: Snapping (Timeline) can change; Enable Autosave (always on), History Limit (50), Backend URL and the keyboard shortcuts (Zenvi desktop's defaults) are read-only and say why. Values are checked with the desktop's rules (types, ranges, choices, shortcut syntax and conflicts). Zenvi desktop's other preferences (cache, decoders, theme, autosave interval…) do not exist here and are refused as unknown. The CLI and Zenvi Cloud have no editor settings and refuse.
 - **video profiles: list_project_profiles_tool, set_project_profile_tool, set_project_setting_tool, manage_custom_profiles_tool, new_project_tool profile**: Custom profiles live where Zenvi desktop reads them, its profiles folder (`~/.openshot_qt/profiles`): the CLI lists, creates, edits and deletes them there, so a profile made on either shows on the other, and a size or frame rate no built-in profile has gets a `Custom WxH fps` profile like the desktop's. The desktop re-applies a project's named profile when it opens it (HD 720p 30 fps when it does not know the name), so the web editor and Zenvi Cloud, which cannot reach that folder, list the built-in profiles only and refuse to make a custom one, and manage_custom_profiles_tool. set_default is refused everywhere: the default profile is a desktop preference in its settings file. delete checks the open project's profile, not the desktop's default one.
-- **list_export_presets_tool**: `available` means the engine's exporters write the preset's container (mp4, mov, mkv, webm, gif, mp3, wav; not AVI, MPEG, OGG or DVD) and the host can encode its codecs (AAC always counts, as on the desktop): the CLI asks its ffmpeg, the web editor its browser. Zenvi Cloud renders with render_project and does not list the tool. export_video_tool takes a preset only in Zenvi desktop so far; the web editor's Export dialog offers them.
+- **list_export_presets_tool**: `available` means the engine's exporters write the preset's container (mp4, mov, mkv, webm, gif, mp3, wav; not AVI, MPEG, OGG or DVD) and the host can encode its codecs (AAC always counts, as on the desktop): the CLI asks its ffmpeg, the web editor its browser, Zenvi Cloud the ffmpeg its renders use. The user's own presets folder is Zenvi desktop's, so only the built-in presets are listed.
+- **export_video_tool, get_export_settings_tool, set_export_setting_tool**: One plan for every surface, ported from develop's build_export_plan (presets/plan.ts): the preset by title, everyday name (webm, prores, gif, mp3) or social name (tiktok, reels), the quality it offers, the profile it allows closest to the project (with develop's re-framing note), All Formats bitrates from the frame, the call's Advanced overrides, then the defaults set_export_setting_tool stored (checked and stored under develop's keys; keys an earlier web version stored as given, such as start in seconds or fps, are still read), the range (whole = first clip to last clip, selection, custom start/end) in frames of the export's rate, and the output path. Before anything renders the host says whether it writes the container and encodes the codecs; a codec the call or a stored setting named is refused with the ones the host has, a preset's audio codec the host lacks is replaced by one it has in the same container, with a warning (WEBM (vp9) gets Opus where ffmpeg has no libvorbis), as AAC always counts on the desktop. An export at another frame rate renders with every keyframe rescaled to it, as the desktop does. interlaced is refused everywhere: no web encoder interlaces. Per surface: the CLI renders with its ffmpeg and writes the file: relative paths, and the default folder, start at the project's folder (the desktop's default is its Export folder preference), `~` is the home folder, and it writes MP4, MOV, MKV, WebM, GIF, MP3, WAV, FLAC, M4A and PNG, JPG, BMP or TIFF image sequences (not AVI, MPEG, OGG, DVD or PPM). The web editor renders in the browser (MP4, MOV, MKV, WebM with the codecs the browser encodes, and WAV), which downloads the file under file_name (else the project's name): folder is refused and output_path only names the file; range='selection' uses the editor's selection. Zenvi Cloud starts a render job and answers with its render_id (get_render_status returns the download link), one file per render (no image sequences), folder refused. Differences from the desktop: an existing file is replaced (the desktop refuses unless overwrite=true); a size no profile has is rendered without saving a custom profile; a stored image_format applies (the desktop's default image_format='png' hides it); there is no one-export-at-a-time lock (each render writes under a staged name and moves into place).
 - **save_frame_image_tool**: The frame is rendered at the project's size by the host's renderer. The CLI writes the file (a relative or empty file_path starts at the project's folder; the desktop's default is its export folder); the web editor downloads it (a download never replaces a file); Zenvi Cloud keeps it with the project's exports, answers with a download link (24 hours) and renders PNG only (a .jpg request is saved as .png, with a warning). A host that saves no files attaches the frame to the result instead. An existing file is found when writing, after the frame is rendered (the desktop checks first).
 - **export_files_to_folder_tool**: Files keep the desktop's export names. The CLI copies into the folder (relative to the project's folder; empty = the project's folder) and renders sub-clips and image sequences to H.264/AAC MP4 at the file's size and rate (quality 22, written under a staged name, then moved into place); the web editor downloads each file, rendering sub-clips in the browser; Zenvi Cloud answers with a download link per file (24 hours) and refuses sub-clips and image sequences (render_project renders timelines). The receipt's `folder` says where they went.
 - **summary previews**: `…` is written as U+2026; the desktop's file had the mojibake `ΓÇª` (ai_metadata_utils.build_summary_preview).

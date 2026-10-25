@@ -17,14 +17,18 @@
  *           save/open are refused;
  *   backend api.zenvi.pro as the connected person (search, stock, catalog,
  *           TTS; auth/backend-session.ts). AI video is a cloud job, not this host.
+ *   exporter export_video_tool's renders as render jobs (`RenderService.startExport`):
+ *           the answer carries the render_id, get_render_status the download link.
  */
 
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { TRANSCRIPTION_PATH, transcriptionHttpError, type CloudMediaRef, type HostCapability, type Project, type ToolHost } from "@zenvi/engine";
+import { ffmpegCanWrite } from "@zenvi/render-node";
 import { ApiError, tooLarge } from "../http/errors.js";
 import { withSuffix } from "../projects/files.js";
 import { displayName, fileSha256, isBundledAsset } from "../projects/model.js";
+import { isRenderFormat } from "../render/options.js";
 import { filesByPath } from "../render/resolve.js";
 import { attachmentDisposition, cleanFileName, normalizeContentType } from "../services/media.js";
 import { exportPath, mediaPath } from "../services/paths.js";
@@ -54,6 +58,7 @@ export function cloudCapabilities(services: Services): Set<HostCapability> {
   if (services.assets) caps.add("assets");
   if (services.analyzeAudio) caps.add("audio");
   if (services.backendSessions.enabled) caps.add("backend");
+  if (services.renders.rendererAvailable) caps.add("exporter");
   return caps;
 }
 
@@ -211,6 +216,31 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
       contentType: type,
       contentDisposition: attachmentDisposition(name),
     });
+
+  if (caps.has("exporter")) {
+    host.exporter = {
+      delivery: "job",
+      defaultName: async () => (await services.projects.get(userId, projectId)).meta.name,
+      // One file per render (no image sequences), with encoders the render image's ffmpeg has.
+      supports: async (format, videoCodec, audioCodec) => {
+        if (!isRenderFormat(format)) return false;
+        const encoders = await services.renders.encoders();
+        return encoders ? ffmpegCanWrite(format, videoCodec, audioCodec, encoders) : true;
+      },
+      export: async (_project, options) => {
+        const fileName = baseName(options.output ?? "") || "render";
+        const job = await services.renders.startExport(userId, projectId, { options, fileName });
+        return {
+          location: job.fileName,
+          job: {
+            id: job.renderId,
+            status: job.status,
+            followUp: `Call get_render_status with render_id "${job.renderId}" for the download link (a render takes about as long as the video).`,
+          },
+        };
+      },
+    };
+  }
 
   host.storage = {
     save: async () => {

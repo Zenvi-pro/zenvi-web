@@ -14,6 +14,7 @@ import type {
   ContainerFormat,
   EditorLayout,
   EditorSelection,
+  ExportDelivery,
   ExportOptions,
   HostCapability,
   ImportedMedia,
@@ -116,6 +117,18 @@ export interface FakeHostOptions {
   layout?: EditorLayout;
   /** `exporter.supports` (default: every codec but `prores_ks` and `h264_nvenc`). */
   encodable?: (format: ContainerFormat, videoCodec: string, audioCodec: string) => boolean;
+  /**
+   * The exporter's surface (default `files`, like the CLI): `download` names
+   * the file after `output` like the web editor, `job` answers with render
+   * job `r_fakejob00000001` like Zenvi Cloud.
+   */
+  exportDelivery?: ExportDelivery;
+  /** `exporter.defaultName` (default: none, so the project file's name is used). */
+  exportName?: string;
+  /** Paths `exporter.isFolder` reports as folders. */
+  folders?: string[];
+  /** Warnings the exporter reports with each export. */
+  exportWarnings?: string[];
   /** `frames.fontFamilies`: the fonts the renderer draws titles with (default: none listed, like a browser). */
   fonts?: string[];
 }
@@ -219,6 +232,8 @@ export interface FakeHost extends ToolHost {
   readonly backendCalls: BackendCall[];
   readonly written: Map<string, Uint8Array | string>;
   readonly exports: ExportOptions[];
+  /** The project each export was given. */
+  readonly exportedProjects: Project[];
   /** The fake editor's selection and timeline view (what the ui methods read and change). */
   readonly editor: { selection: EditorSelection; view: TimelineView };
 }
@@ -279,6 +294,7 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
   const backendCalls: BackendCall[] = [];
   const written = new Map<string, Uint8Array | string>();
   const exports: ExportOptions[] = [];
+  const exportedProjects: Project[] = [];
   const texts = { ...(options.texts ?? {}) };
   const assets = options.assets ?? { "titles/Bar_1.svg": TITLE_TEMPLATE_SVG };
   const routes = { ...defaultRoutes(), ...(options.routes ?? {}) };
@@ -289,7 +305,7 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
   const disk = options.disk ? fakeDisk(options.disk) : null;
   const contents = { ...(options.contents ?? {}) };
   const profiles = { ...(options.profiles ?? {}) };
-  const host: FakeHost = { calls, backendCalls, written, exports, editor, disk, profiles, log: () => {} };
+  const host: FakeHost = { calls, backendCalls, written, exports, exportedProjects, editor, disk, profiles, log: () => {} };
   const projectPath = options.projectPath === undefined ? "/projects/current.zvn" : options.projectPath;
 
   if (!without.has("media")) {
@@ -486,14 +502,29 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
     if (!omit.has("ui.clearPlaybackCache")) host.ui.clearPlaybackCache = () => calls.push("clearPlaybackCache");
   }
   if (!without.has("exporter")) {
+    const delivery = options.exportDelivery ?? "files";
     host.exporter = {
       export: async (project: Project, exportOptions, onProgress) => {
         calls.push(`export ${exportOptions.format}`);
         exports.push(exportOptions);
+        exportedProjects.push(project);
         onProgress?.(1);
-        return { location: exportOptions.output ?? "/exports/export.mp4", bytes: 1234, mimeType: "video/mp4", durationSeconds: 1 };
+        const location = exportOptions.output ?? "/exports/export.mp4";
+        const warnings = options.exportWarnings ? [...options.exportWarnings] : undefined;
+        if (delivery === "job") {
+          return { location, job: { id: "r_fakejob00000001", status: "queued", followUp: 'Call get_render_status with render_id "r_fakejob00000001" for the download link.' }, ...(warnings ? { warnings } : {}) };
+        }
+        const fps = exportOptions.fps.num / exportOptions.fps.den;
+        const frames = exportOptions.range ? Math.round((exportOptions.range.end - exportOptions.range.start) * fps) : undefined;
+        return { location, bytes: 1234, mimeType: "video/mp4", durationSeconds: 1, ...(frames !== undefined ? { frames } : {}), ...(warnings ? { warnings } : {}) };
       },
+      delivery,
     };
+    if (options.exportName !== undefined) host.exporter.defaultName = () => options.exportName!;
+    if (options.folders) {
+      const folders = new Set(options.folders);
+      host.exporter.isFolder = async (path) => folders.has(path);
+    }
     if (!omit.has("exporter.supports")) {
       const encodable = options.encodable ?? ((_f: ContainerFormat, v: string) => v !== "prores_ks" && v !== "h264_nvenc");
       host.exporter.supports = async (format, videoCodec, audioCodec) => encodable(format, videoCodec, audioCodec);

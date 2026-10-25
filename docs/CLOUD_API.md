@@ -207,7 +207,7 @@ open `editorUrl`.
 
 Presets: `mp4` (project size, default), `mp4-2160p`, `mp4-1080p`, `mp4-720p`,
 `webm`, `gif` (360p), `mp3`, `wav`. `options` (all optional) override the
-preset: `format` (`mp4 webm mov mkv gif mp3 wav`), `width`, `height` (the
+preset: `format` (`mp4 webm mov mkv gif mp3 wav flac m4a`), `width`, `height` (the
 other follows the project aspect), `fps {num,den}`, `quality`
 (`low medium high lossless`), `videoBitrate`, `audioBitrate`, `sampleRate`,
 `channels`, `range {start,end}` (seconds).

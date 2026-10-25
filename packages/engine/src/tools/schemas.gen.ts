@@ -1902,7 +1902,7 @@ export const contractMeta: { readonly [N in ContractToolName]: ContractToolMeta 
   export_video_tool: {
     name: "export_video_tool",
     title: "Export video",
-    description: "Export the project. Default opens the export dialog; set show_dialog=false to render immediately with optional output_path.",
+    description: "Render the timeline to a file: video, audio only (MP3/WAV/FLAC), animated GIF or an image sequence. Picks the target like the Export dialog: preset (YouTube, Instagram Reels, TikTok, YouTube Shorts, MP4 (h.264), GIF, MP3, WEBM...), quality low/med/high, the preset's video profile (closest to the project), and optional Advanced overrides (size, fps, codecs, bitrates, sample rate, channels, container). Range: the whole timeline (first to last clip), the selected clips, or start/end seconds. Arguments left out use the defaults stored with set_export_setting_tool. In the web editor a call that names nothing to render opens its Export dialog (show_dialog=false renders); the editor downloads the file, Zenvi Cloud answers with a render_id (get_render_status gives the download link), the CLI writes the file next to the project. For social vertical formats, switch the project first with set_project_profile_tool (reframe='fill'), otherwise landscape footage renders with bars. Example: {\"preset\": \"Instagram Reels\", \"start\": 0, \"end\": 5}",
     assistant: true,
     desktopReadOnly: false,
     handler: "src/classes/editor_tools/project_export_render.py:export_video",

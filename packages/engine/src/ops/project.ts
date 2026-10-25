@@ -84,6 +84,27 @@ export function rescaleItemKeyframes<T extends Record<string, unknown>>(item: T,
   return out as T;
 }
 
+/**
+ * The project as an export at another frame rate renders it: every keyframe
+ * of its clips, their effects and its transitions rescaled to `fps`
+ * (KeyframeScaler), and `fps` replaced. zenvi-core src/windows/export.py
+ * `run_export` does this on the project before rendering when the export
+ * frame rate differs from the project's, so animations keep their timing.
+ * Pure: returns `project` itself when the rate is the same.
+ */
+export function projectAtFrameRate(project: Project, fps: Fraction): Project {
+  const from = project.fps;
+  const factor = fps.num / fps.den / (from.num / from.den);
+  if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return project;
+  const clips = project.clips.map((clip) => {
+    const next = rescaleItemKeyframes(clip as unknown as Record<string, unknown>, factor);
+    if (Array.isArray(next.effects)) next.effects = (next.effects as Record<string, unknown>[]).map((e) => rescaleItemKeyframes(e, factor));
+    return next as unknown as Project["clips"][number];
+  });
+  const effects = project.effects.map((t) => rescaleItemKeyframes(t as unknown as Record<string, unknown>, factor) as unknown as Project["effects"][number]);
+  return { ...project, fps: { num: fps.num, den: fps.den }, clips, effects };
+}
+
 /** Record the fps side effects of changing from `oldFps` to `profile`'s frame rate (project_data.py fps branch). */
 function applyFrameRateChange(tx: Transaction, project: Project, oldFps: Fraction, newFps: Fraction, profile: Profile | null): void {
   const factor = newFps.num / newFps.den / (oldFps.num / oldFps.den);
@@ -315,34 +336,15 @@ export function setProjectAudio(tx: Transaction, audio: ProjectAudio): string[] 
   return Object.keys(fields);
 }
 
-const INT_EXPORT_KEYS = new Set(["width", "height", "fps_num", "fps_den", "start_frame", "end_frame", "sample_rate", "channels"]);
-
 /**
- * The `export_overrides` object after setting `key` to `value`, coerced like
- * zenvi-core tool_handlers.py `set_export_setting`: integer keys (`width`,
- * `height`, `fps_num`, `fps_den`, `start_frame`, `end_frame`, `sample_rate`,
- * `channels`), aliases (`vcodec` → `video_codec`, `acodec` → `audio_codec`,
- * `path` → `output_path`, `format` → `vformat`), everything else as a string.
- * Pure: does not change the project. Throws `OpError` for invalid values.
+ * The `export_overrides` object with `values` stored (set_export_setting_tool,
+ * keys and values already checked: presets/settings.ts). Pure.
  */
-export function withExportOverride(
+export function withExportOverrides(
   overrides: Readonly<Record<string, unknown>> | null | undefined,
-  key: string,
-  value: string | number,
+  values: Readonly<Record<string, string | number>>,
 ): Record<string, unknown> {
-  if (typeof key !== "string" || key.trim() === "") throw invalid("key is required.");
-  const out: Record<string, unknown> = { ...(overrides ?? {}) };
-  const k = key.toLowerCase().trim();
-  const text = String(value).trim();
-  if (INT_EXPORT_KEYS.has(k)) {
-    if (!/^[+-]?\d+$/.test(text)) throw invalid(`${k} must be an integer (got ${text}).`);
-    out[k] = Number.parseInt(text, 10);
-  } else if (k === "video_codec" || k === "vcodec") out.video_codec = text;
-  else if (k === "audio_codec" || k === "acodec") out.audio_codec = text;
-  else if (k === "output_path" || k === "path") out.output_path = text;
-  else if (k === "vformat" || k === "format") out.vformat = text;
-  else out[k] = text;
-  return out;
+  return { ...(overrides ?? {}), ...values };
 }
 
 /**
@@ -357,7 +359,7 @@ export function withoutExportOverrides(overrides: Readonly<Record<string, unknow
 }
 
 /**
- * Remove stored export overrides. Like `setExportSetting`, not an undo step:
+ * Remove stored export overrides. Like `storeExportOverrides`, not an undo step:
  * `export_overrides` is written untracked. Returns the overrides left.
  */
 export function clearExportSettings(doc: ProjectDocument, names: readonly string[]): Record<string, unknown> {
@@ -370,15 +372,15 @@ export function clearExportSettings(doc: ProjectDocument, names: readonly string
 }
 
 /**
- * Set one export override. Like the desktop (`_ignore_history`), this is not
+ * Store export overrides. Like the desktop (`_ignore_history`), this is not
  * an undo step: it writes `export_overrides` untracked on the document.
  * Returns the new overrides.
  */
-export function setExportSetting(doc: ProjectDocument, key: string, value: string | number): Record<string, unknown> {
-  const next = withExportOverride(doc.project.export_overrides, key, value);
+export function storeExportOverrides(doc: ProjectDocument, values: Readonly<Record<string, string | number>>): Record<string, unknown> {
   if (!("export_overrides" in doc.project)) {
     throw new OpError("conflict", "The project has no export_overrides object (open it with parseProject).");
   }
+  const next = withExportOverrides(doc.project.export_overrides, values);
   doc.setUntracked(["export_overrides"], next);
   return next;
 }

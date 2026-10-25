@@ -12,7 +12,7 @@ import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_ARGS, PENDING_DESKTOP_TO
 import { allTools, getTool, listTools, runTool, unknownToolMessage } from "./registry.js";
 import { CONTRACT_REF, CONTRACT_TOOL_NAMES, contractMeta, type ContractToolName } from "./schemas.gen.js";
 import { fakeHost } from "./test-support/fake-host.js";
-import { fixtureDoc, snapshotOf } from "./test-support/fixture.js";
+import { IDS, fixtureDoc, snapshotOf } from "./test-support/fixture.js";
 import type { ToolSurface } from "./types.js";
 
 /** zenvi-core agent_api_proxy.py MCP_EXTRA_TOOLS: listed by the desktop's MCP server only. */
@@ -154,10 +154,10 @@ describe("pending desktop arguments", () => {
 
   it("let the default value through", async () => {
     const host = fakeHost();
-    const result = await runTool({ doc: fixtureDoc(), host }, "export_video_tool", { interlaced: false });
-    expect(result.data?.summary).toBe("Export video dialog opened.");
-    const refused = await runTool({ doc: fixtureDoc(), host }, "export_video_tool", { interlaced: "true" });
-    expect(refused.data?.summary).toBe(pendingArgumentMessage("export_video_tool", "interlaced"));
+    const result = await runTool({ doc: fixtureDoc(), host }, "add_effect_tool", { timeline_clip_id: IDS.clipA, effect: "Blur", processing: {} });
+    expect(result.ok, result.data?.summary).toBe(true);
+    const refused = await runTool({ doc: fixtureDoc(), host }, "add_effect_tool", { timeline_clip_id: IDS.clipA, effect: "Blur", processing: { smoothing: 10 } });
+    expect(refused.data?.summary).toBe(pendingArgumentMessage("add_effect_tool", "processing"));
   });
 
   it("are not refused with the not-available wording, so the Assistant retries without them", () => {

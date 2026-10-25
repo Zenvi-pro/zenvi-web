@@ -280,14 +280,20 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
   };
   if (exportAvailable) {
     host.exporter = {
+      // The browser downloads the file: export_video_tool's file_name names it, and there are no folders.
+      delivery: "download",
+      defaultName: () => session.meta.getState().name,
       async export(project, options: ExportOptions, onProgress): Promise<ExportResult> {
-        const job = startExport(project, options, (f) => onProgress?.(f), session.media);
+        const warnings: string[] = [];
+        const job = startExport(project, options, (f) => onProgress?.(f), session.media, { onNotes: (notes) => warnings.push(...notes) });
         const blob = await job.promise;
-        const name = safeFileName(session.meta.getState().name, extensionForMime(blob.type));
+        // The planned name with the extension of what the browser wrote (it may fall back to WebM).
+        const planned = (options.output ?? "").split(/[\\/]/).pop()?.replace(/\.[^.]*$/, "") ?? "";
+        const name = safeFileName(planned || session.meta.getState().name, extensionForMime(blob.type));
         downloadBlob(blob, name);
-        return { location: name, bytes: blob.size, mimeType: blob.type };
+        return { location: name, bytes: blob.size, mimeType: blob.type, ...(warnings.length > 0 ? { warnings } : {}) };
       },
-      supports: (format, videoCodec, audioCodec) => canExportWith(format, videoCodec, audioCodec),
+      supports: (format, videoCodec, audioCodec, frame) => canExportWith(format, videoCodec, audioCodec, frame),
     };
   }
   host.assets = { readText: readAsset };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { findClip } from "../model/query.js";
 import { addClip, setClipProperty } from "./clips.js";
-import { clearExportSettings, setExportSetting, setProfile, setProjectAudio, snapToFrameRate, withExportOverride, withoutExportOverrides } from "./project.js";
+import { clearExportSettings, projectAtFrameRate, setProfile, setProjectAudio, snapToFrameRate, storeExportOverrides, withExportOverrides, withoutExportOverrides } from "./project.js";
 import { addTitleClip } from "./titles.js";
 import { expectRefused, expectUndoRedo, makeDoc, reader } from "./testkit.js";
 
@@ -82,19 +82,14 @@ describe("setProjectAudio", () => {
 });
 
 describe("export overrides (set_export_setting)", () => {
-  it("coerces keys and values like the desktop", () => {
-    let o = withExportOverride({}, "Width", " 1920 ");
-    o = withExportOverride(o, "vcodec", "libx264");
-    o = withExportOverride(o, "path", "/tmp/out.mp4");
-    o = withExportOverride(o, "format", "mp4");
-    o = withExportOverride(o, "crf", 18);
-    expect(o).toEqual({ width: 1920, video_codec: "libx264", output_path: "/tmp/out.mp4", vformat: "mp4", crf: "18" });
-    expect(() => withExportOverride({}, "fps_num", "abc")).toThrow(/integer/);
+  it("stores checked values over the ones kept", () => {
+    expect(withExportOverrides({ width: 1920, preset: "YouTube" }, { width: 1280, fps_num: 24, fps_den: 1 })).toEqual({ width: 1280, preset: "YouTube", fps_num: 24, fps_den: 1 });
+    expect(withExportOverrides(null, { quality: "low" })).toEqual({ quality: "low" });
   });
 
   it("is not an undo step", () => {
     const doc = makeDoc();
-    setExportSetting(doc, "height", 720);
+    storeExportOverrides(doc, { height: 720 });
     expect(doc.project.export_overrides).toEqual({ height: 720 });
     expect(doc.canUndo).toBe(false);
   });
@@ -103,11 +98,38 @@ describe("export overrides (set_export_setting)", () => {
     expect(withoutExportOverrides({ height: 720, fps_num: 24, fps_den: 1 }, ["fps_num", "fps_den", "nope"])).toEqual({ height: 720 });
     expect(withoutExportOverrides(null, ["height"])).toEqual({});
     const doc = makeDoc();
-    setExportSetting(doc, "height", 720);
-    setExportSetting(doc, "width", 1280);
+    storeExportOverrides(doc, { height: 720 });
+    storeExportOverrides(doc, { width: 1280 });
     expect(clearExportSettings(doc, ["height"])).toEqual({ width: 1280 });
     expect(doc.project.export_overrides).toEqual({ width: 1280 });
     expect(doc.canUndo).toBe(false);
+  });
+});
+
+describe("projectAtFrameRate (an export at another frame rate)", () => {
+  it("rescales every keyframe like KeyframeScaler and keeps the project as it was", () => {
+    const doc = makeDoc();
+    const project = structuredClone(doc.project);
+    project.clips = [
+      {
+        id: "C1",
+        position: 1,
+        start: 0,
+        end: 4,
+        alpha: { Points: [{ co: { X: 1, Y: 0 }, interpolation: 1 }, { co: { X: 31, Y: 1 }, interpolation: 1 }] },
+        effects: [{ id: "E1", type: "Blur", sigma: { Points: [{ co: { X: 61, Y: 3 }, interpolation: 1 }] } }],
+      } as unknown as (typeof project.clips)[number],
+    ];
+    const at60 = projectAtFrameRate(project, { num: 60, den: 1 });
+    expect(at60.fps).toEqual({ num: 60, den: 1 });
+    const alpha = (at60.clips[0] as unknown as { alpha: { Points: { co: { X: number } }[] } }).alpha.Points.map((p) => p.co.X);
+    expect(alpha).toEqual([1, 62]);
+    const sigma = (at60.clips[0] as unknown as { effects: { sigma: { Points: { co: { X: number } }[] } }[] }).effects[0]!.sigma.Points[0]!.co.X;
+    expect(sigma).toBe(122);
+    expect(at60.clips[0]!.position).toBe(1);
+    expect(project.fps).toEqual(doc.project.fps);
+    expect((project.clips[0] as unknown as { alpha: { Points: { co: { X: number } }[] } }).alpha.Points[1]!.co.X).toBe(31);
+    expect(projectAtFrameRate(project, { num: project.fps.num * 2, den: project.fps.den * 2 })).toBe(project);
   });
 });
 
