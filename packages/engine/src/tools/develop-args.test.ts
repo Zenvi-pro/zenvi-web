@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import { ProjectDocument } from "../history/document.js";
 import { createProject } from "../model/defaults.js";
 import type { Clip, Keyframe } from "../model/types.js";
-import { pendingArgumentMessage } from "./pending.js";
 import { runTool } from "./registry.js";
 import { fakeHost } from "./test-support/fake-host.js";
 import { IDS, L1, fixtureDoc } from "./test-support/fixture.js";
@@ -269,7 +268,7 @@ describe("set_keyframes_tool", () => {
     ]);
   });
 
-  it("refuses points outside the clip, on the same frame, with two times, without a value, or with an ease preset", async () => {
+  it("refuses points outside the clip, on the same frame, with two times, or without a value", async () => {
     const doc = fixtureDoc();
     const host = fakeHost();
     const run = (pts: unknown[]) => summary(doc, host, "set_keyframes_tool", { timeline_clip_id: IDS.clipTail, property: "alpha", points: pts });
@@ -280,8 +279,89 @@ describe("set_keyframes_tool", () => {
     expect(await run([{ seconds: 0, value: 1 }, { frame: 301, value: 0 }])).toBe("Error: points[0] and points[1] land on the same frame 301.");
     expect(await run([{ seconds: 0, frame: 301, value: 1 }])).toBe("Error: points[0] needs exactly one of frame, seconds, timeline_seconds or source_seconds.");
     expect(await run([{ seconds: 0 }])).toBe("Error: points[0] needs a value here (keeping the curve's current value is not ported to this Zenvi surface yet).");
-    expect(await run([{ seconds: 0, value: 1, ease: "ease_in" }])).toBe(pendingArgumentMessage("set_keyframes_tool", "points[0].ease"));
     expect(doc.undoLabels).toEqual([]);
     expect(clip(doc, IDS.clipTail).layer).toBe(L1);
+  });
+
+  // clip_props._build_points / _merge_curve / clip_props_model.apply_ease.
+  const handles = (doc: ProjectDocument) =>
+    (clip(doc, IDS.clipTail).alpha as Keyframe).Points.map((p) => [p.co.X, p.interpolation, p.handle_left && [p.handle_left.X, p.handle_left.Y], p.handle_right && [p.handle_right.X, p.handle_right.Y]]);
+
+  it("shapes each bezier move with an ease preset: the point's handle_left and the previous point's handle_right", async () => {
+    const doc = fixtureDoc();
+    const result = await runTool({ doc, host: fakeHost() }, "set_keyframes_tool", {
+      timeline_clip_id: IDS.clipTail,
+      property: "alpha",
+      ease: "Ease_In_Out",
+      points: [{ seconds: 0, value: 0 }, { seconds: 1, value: 1, ease: "ease_out_back" }, { seconds: 2, value: 0.5, interpolation: "linear" }, { seconds: 3, value: 0 }],
+    });
+    expect(result.ok, result.text).toBe(true);
+    // ease_in_out = (0.42, 0, 0.58, 1); ease_out_back = (0.175, 0.885, 0.32, 1.275); the linear point takes no ease.
+    expect(handles(doc)).toEqual([
+      [301, 0, [0.58, 1], [0.175, 0.885]],
+      [331, 0, [0.32, 1.275], [0.5, 0]],
+      [361, 1, undefined, [0.42, 0]],
+      [391, 0, [0.58, 1], [0.5, 0]],
+    ]);
+    const data = result.data!.data as { points: Record<string, unknown>[] };
+    expect(data.points.map((p) => [p.interpolation, p.ease])).toEqual([
+      ["bezier", "ease_in_out"],
+      ["bezier", "ease_out_back"],
+      ["linear", undefined],
+      ["bezier", "ease_in_out"],
+    ]);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("eases into a merged point from the existing point before it", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    await runTool({ doc, host }, "set_keyframes_tool", { timeline_clip_id: IDS.clipTail, property: "alpha", points: [{ seconds: 0, value: 0 }, { seconds: 3, value: 0 }] });
+    await runTool({ doc, host }, "set_keyframes_tool", { timeline_clip_id: IDS.clipTail, property: "alpha", mode: "merge", points: [{ seconds: 1, value: 1, ease: "ease_in" }] });
+    expect(handles(doc)).toEqual([
+      [301, 0, [0.5, 1], [0.42, 0]],
+      [331, 0, [1, 1], [0.5, 0]],
+      [391, 0, [0.5, 1], [0.5, 0]],
+    ]);
+  });
+
+  it("refuses an ease with a linear or constant move, before anything changes", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    const run = (args: Record<string, unknown>) => summary(doc, host, "set_keyframes_tool", { timeline_clip_id: IDS.clipTail, property: "alpha", ...args });
+    expect(await run({ ease: "ease_in", interpolation: "linear", points: [{ seconds: 0, value: 1 }] })).toBe(
+      "Error: ease presets are bezier curves; drop interpolation or set it to 'bezier'.",
+    );
+    expect(await run({ points: [{ seconds: 0, value: 1, ease: "ease_in", interpolation: "constant" }] })).toBe(
+      "Error: points[0]: ease presets are bezier curves; drop interpolation or use 'bezier'.",
+    );
+    expect(await run({ ease: "wobble", points: [{ seconds: 0, value: 1 }] })).toMatch(/^Error: Invalid arguments for set_keyframes_tool/);
+    expect(doc.undoLabels).toEqual([]);
+  });
+});
+
+describe("set_export_setting_tool clear", () => {
+  it("removes a stored override by key, under the desktop's names or this surface's, never as an undo step", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    // Stored by Zenvi desktop (start / end as frames, format as vformat), and by this surface's set (keys as given).
+    doc.setUntracked(["export_overrides"], { start_frame: 31, end_frame: 91, vformat: "mov", fps: "24", crf: "18" });
+    const start = await runTool({ doc, host }, "set_export_setting_tool", { key: "start", clear: "true" });
+    expect(start.data).toMatchObject({ status: "applied", summary: "Cleared start_frame.", undoSteps: 0 });
+    expect((start.data!.data as { cleared: string[] }).cleared).toEqual(["start_frame"]);
+    expect(await summary(doc, host, "set_export_setting_tool", { key: "Container", clear: "true" })).toBe("Cleared vformat.");
+    expect(await summary(doc, host, "set_export_setting_tool", { key: "frame rate", clear: "true" })).toBe("Cleared fps.");
+    // A key the desktop does not know is cleared when it is stored here, refused when it is not.
+    expect(await summary(doc, host, "set_export_setting_tool", { key: "crf", clear: "true" })).toBe("Cleared crf.");
+    expect(await summary(doc, host, "set_export_setting_tool", { key: "bogus", clear: "true" })).toBe(
+      "Error: unknown export setting 'bogus'; valid keys: preset, quality, export_type, width, height, fps, fps_num, fps_den, start, end, start_frame, end_frame, video_codec, audio_codec, format, video_bitrate, audio_bitrate, sample_rate, channels, output_path, folder, file_name, image_format",
+    );
+    expect(doc.project.export_overrides).toEqual({ end_frame: 91 });
+    const same = await runTool({ doc, host }, "set_export_setting_tool", { key: "start", clear: "true" });
+    expect(same.data).toMatchObject({ status: "unchanged", summary: "No stored override to clear." });
+    // No key: every stored override.
+    expect(await summary(doc, host, "set_export_setting_tool", { clear: "true" })).toBe("Cleared end_frame.");
+    expect(doc.project.export_overrides).toEqual({});
+    expect(doc.undoLabels).toEqual([]);
   });
 });

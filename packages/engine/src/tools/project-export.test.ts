@@ -352,6 +352,102 @@ describe("set_project_profile_tool", () => {
   });
 });
 
+describe("set_project_setting_tool", () => {
+  it("a change is one undo step and renames the profile with the size and rate; the same values change nothing", async () => {
+    const ed = fhd();
+    const same = await ed.call("set_project_setting_tool", { fps_num: "30", fps_den: "1" });
+    expect([same.status, same.undoSteps, same.summary]).toEqual(["unchanged", 0, "Settings already matched."]);
+    const r = await ed.call("set_project_setting_tool", { width: "1280", height: "720", fps_num: "24", fps_den: "1" });
+    expect([r.status, r.undoSteps]).toEqual(["applied", 1]);
+    expect(r.summary).toBe("Updated project settings: 1280x720 at 24.0 fps (HD 720p 24 fps).");
+    const p = ed.doc.project;
+    // Zenvi desktop re-applies a project's profile by name when it opens it, so the name moves with the values.
+    expect([p.width, p.height, p.fps, p.profile]).toEqual([1280, 720, { num: 24, den: 1 }, "HD 720p 24 fps"]);
+    expect(r.data).toMatchObject({ changed: true, width: 1280, height: 720, fps: 24, fps_num: 24, fps_den: 1, profile: "HD 720p 24 fps", saved_as_default: false });
+    expect(ed.stepsSinceMark()).toBe(1);
+    ed.doc.undo();
+    expect([ed.doc.project.fps, ed.doc.project.profile]).toEqual([{ num: 30, den: 1 }, "FHD 1080p 30 fps"]);
+  });
+
+  it("takes #183's arguments: fps, an exact fps_num/fps_den and a size", async () => {
+    const ed = fhd();
+    const r = await ed.receipt("set_project_setting_tool", { fps: "24" });
+    expect(r.changed).toBe(true);
+    expect([ed.doc.project.fps, ed.doc.project.profile]).toEqual([{ num: 24, den: 1 }, "FHD 1080p 24 fps"]);
+    await ed.receipt("set_project_setting_tool", { fps_num: "30000", fps_den: "1001" });
+    expect(ed.doc.project.fps).toEqual({ num: 30000, den: 1001 });
+    await ed.receipt("set_project_setting_tool", { width: "1280", height: "720" });
+    expect([ed.doc.project.width, ed.doc.project.height]).toEqual([1280, 720]);
+    // Only a width keeps the project's height.
+    await ed.receipt("set_project_setting_tool", { width: "960" });
+    expect([ed.doc.project.width, ed.doc.project.height]).toEqual([960, 720]);
+  });
+
+  it("sets the audio format in one undo step and refuses what the desktop refuses", async () => {
+    const ed = fhd();
+    const r = await ed.call("set_project_setting_tool", { sample_rate: "44100", channels: "Mono" });
+    expect(r.summary).toBe("Updated project settings: audio 44100 Hz mono.");
+    expect([ed.doc.project.sample_rate, ed.doc.project.channels, ed.doc.project.channel_layout]).toEqual([44100, 1, 4]);
+    expect((r.data as Row).channel_layout).toBe("mono");
+    expect(ed.stepsSinceMark()).toBe(1);
+    ed.doc.undo();
+    expect([ed.doc.project.sample_rate, ed.doc.project.channels]).toEqual([48000, 2]);
+    ed.mark();
+    const same = await ed.call("set_project_setting_tool", { sample_rate: "48000", channels: "2" });
+    expect([(same.data as Row).changed, same.status]).toEqual([false, "unchanged"]);
+    await ed.refused("set_project_setting_tool", { sample_rate: "12345" }, "sample_rate must be one of 22050, 44100, 48000, 96000, 192000");
+    await ed.refused("set_project_setting_tool", { channels: "quad" }, "channels must be mono, stereo, surround, 5.1 or 7.1");
+    await ed.refused("set_project_setting_tool", {}, "nothing to change");
+    await ed.refused("set_project_setting_tool", { fps_num: "30" }, "give both fps_num and fps_den");
+  });
+
+  it("takes a preset or profile, turns the frame with orientation and reframes like set_project_profile_tool", async () => {
+    const ed = fhd();
+    await ed.receipt("set_project_setting_tool", { preset: "youtube_shorts" });
+    expect([ed.doc.project.width, ed.doc.project.height, ed.doc.project.profile]).toEqual([1080, 1920, "FHD Vertical 1080p 30 fps"]);
+    const back = fhd();
+    const video = back.addClip(back.addFile("video"));
+    const kept = await back.call("set_project_setting_tool", { orientation: "portrait" });
+    expect(kept.summary).toBe("Updated project settings: 1080x1920 at 30.0 fps (FHD Vertical 1080p 30 fps). 1 clip(s) of another shape will show bars; pass reframe='fill' to crop them.");
+    expect((kept.data as Row).letterboxed_clip_ids).toEqual([video]);
+    const filled = await back.call("set_project_setting_tool", { reframe: "fill" });
+    expect(filled.summary).toBe("Updated project settings: 1 clip(s) reframed.");
+    expect([back.clip(video)!.scale, back.clip(video)!.gravity]).toEqual([0, 4]);
+    // Already fitted: orientation=portrait reframe=fit on a vertical project changes nothing.
+    const fit = await back.call("set_project_setting_tool", { orientation: "portrait", reframe: "fit" });
+    expect(fit.summary).toBe("Updated project settings: 1 clip(s) reframed.");
+    expect((await back.call("set_project_setting_tool", { orientation: "portrait", reframe: "fit" })).status).toBe("unchanged");
+  });
+
+  it("keeps a custom profile where the host keeps them, and refuses one where it cannot", async () => {
+    const ed = fhd();
+    await ed.receipt("set_project_setting_tool", { fps: "27" });
+    expect(ed.doc.project.profile).toBe("Custom 1920x1080 27 fps");
+    expect(Object.keys(ed.host.profiles)).toEqual(["01920x1080p0027_16-09"]);
+    await fhd({ omit: ["storage.customProfiles"] }).refused("set_project_setting_tool", { fps: "27" }, "no built-in profile is 1920x1080 at 27 fps", "Zenvi desktop's profiles folder");
+  });
+
+  it("save_as_default keeps the defaults in the editor's settings where it has them, and is refused before anything changes elsewhere", async () => {
+    const audioPrefs: PreferenceEntry[] = [
+      { key: "default-samplerate", title: "Default Audio Sample Rate", tab: "Preview", type: "dropdown", value: 48000, default: 48000, choices: [{ value: 44100, name: "44100" }, { value: 48000, name: "48000" }] },
+      { key: "default-channellayout", title: "Default Audio Channels", tab: "Preview", type: "dropdown", value: "LAYOUT_STEREO", default: "LAYOUT_STEREO", choices: [{ value: "LAYOUT_MONO", name: "Mono" }, { value: "LAYOUT_STEREO", name: "Stereo" }] },
+    ];
+    const editor = fhd({ preferences: audioPrefs });
+    const r = await editor.receipt("set_project_setting_tool", { sample_rate: "44100", channels: "mono", save_as_default: "true" });
+    expect(r.saved_as_default).toBe(true);
+    expect(editor.host.calls).toEqual(expect.arrayContaining(["setPreference default-samplerate=44100", "setPreference default-channellayout=LAYOUT_MONO"]));
+    // The web editor's settings have no default audio for new projects.
+    const web = fhd();
+    await web.refused("set_project_setting_tool", { sample_rate: "44100", save_as_default: "true" }, "no default sample rate for new projects", "without save_as_default");
+    expect(web.doc.project.sample_rate).toBe(48000);
+    // The CLI and Zenvi Cloud have no editor settings at all.
+    const cli = fhd({ omit: ["ui.preferences"] });
+    await cli.refused("set_project_setting_tool", { channels: "mono", save_as_default: "true" }, "there is no editor window here", "Preferences > Default Audio Sample Rate / Channels");
+    // Nothing to keep: the change goes ahead.
+    expect((await cli.receipt("set_project_setting_tool", { fps: "25", save_as_default: "true" })).saved_as_default).toBe(false);
+  });
+});
+
 describe("list_project_profiles_tool", () => {
   it("filters by orientation, size, rate and aspect, with the social presets", async () => {
     const ed = harness();

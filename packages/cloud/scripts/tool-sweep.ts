@@ -323,9 +323,25 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   add_emoji_tool: () => ({ emoji: "🔥", position_seconds: "2", duration_seconds: "2" }),
   add_captions_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
   add_clip_to_timeline_tool: (c) => ({ file_id: c.files.b, position_seconds: "20" }),
-  add_effect_tool: (c) => ({ timeline_clip_id: c.clips.b, effect: "Saturation" }),
+  // Every clip that can take it (the music bed is skipped and listed), with a property set on add.
+  add_effect_tool: () => ({ scope: "all", effect: "Saturation", properties: { saturation: 1.4 } }),
   add_marker_tool: () => ({ position_seconds: "4", label: "Second marker" }),
-  add_title_tool: () => ({ text: "Hello sweep", position_seconds: "6", duration_seconds: "2" }),
+  // A lower third over a dark veil, lifted clear of the platform UI on the vertical baseline. Lato is bundled with
+  // render-node, so every surface that lists its fonts has it.
+  add_title_tool: () => ({
+    text: "Hello sweep",
+    subtitle: "Zenvi Cloud",
+    template: "Standard_1",
+    text_color: "white",
+    background_color: "#00000099",
+    font: "Lato",
+    font_weight: "bold",
+    screen_position: "bottom",
+    fade_in_seconds: "0.5",
+    fade_out_seconds: "0.5",
+    position_seconds: "6",
+    duration_seconds: "2",
+  }),
   add_track_tool: () => ({ label: "Sweep track" }),
   // The title and the still sit on different tracks, so lining up their starts overlaps nothing.
   align_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.title, c.clips.still] }),
@@ -444,7 +460,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   set_keyframes_tool: (c) => ({ timeline_clip_id: c.clips.a, property: "alpha", points: [{ seconds: 0, value: 0 }, { seconds: 1, value: 1 }] }),
   // The baseline is vertical 1080p already: the same profile, and the landscape clips cropped to fill it.
   set_project_profile_tool: () => ({ profile: "instagram_reel", reframe: "fill" }),
-  set_project_setting_tool: () => ({ fps: "24" }),
+  // The baseline is vertical already: the same profile, and full-frame clips of another shape fitted.
+  set_project_setting_tool: () => ({ orientation: "portrait", reframe: "fit" }),
   slice_clip_at_best_match_tool: (c) => ({ query: "middle", timeline_clip_id: c.clips.a, start_seconds: "3" }),
   slice_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.a], at_seconds: 3 }),
   split_clip_tool: (c) => ({ clip_id: c.clips.a, at_seconds: "3" }),

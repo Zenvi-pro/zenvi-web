@@ -757,6 +757,7 @@ export function setClipKeyframes(
   const mode = opts.mode ?? "replace";
   if (mode !== "replace" && mode !== "merge" && mode !== "replace_range") throw invalid(`mode must be replace, merge or replace_range.`);
   const built = points.map((p, i) => pointFromInput(project, clip, p, i));
+  const eases = points.map((p, i) => (p.ease === undefined ? undefined : requireEase(p.ease, i)));
   if (prop === "time") for (const p of built) p.co.Y = Math.trunc(p.co.Y);
   const current = clip[prop] as Keyframe | undefined;
   let base: Keyframe = { ...(current ?? {}), Points: [] };
@@ -767,7 +768,34 @@ export function setClipKeyframes(
     const hi = Math.max(...xs);
     base = { ...current, Points: (current.Points ?? []).filter((p) => p.co.X < lo || p.co.X > hi) };
   }
-  return patchClip(tx, clipId, { [prop]: setKeyframePoints(base, built) });
+  const curve = setKeyframePoints(base, built);
+  built.forEach((point, i) => {
+    const ease = eases[i];
+    if (ease) applyEase(curve.Points, curve.Points.findIndex((p) => p.co.X === point.co.X), ease);
+  });
+  return patchClip(tx, clipId, { [prop]: curve });
+}
+
+function requireEase(ease: unknown, index: number): readonly [number, number, number, number] {
+  if (!Array.isArray(ease) || ease.length !== 4 || ease.some((v) => typeof v !== "number" || !Number.isFinite(v))) {
+    throw invalid(`points[${index}].ease must be four finite numbers [x1, y1, x2, y2].`);
+  }
+  return ease as unknown as readonly [number, number, number, number];
+}
+
+/**
+ * clip_props_model.apply_ease: shape the segment that ends at `points[index]`
+ * with a cubic-bezier preset: that point becomes BEZIER with handle_left
+ * (x2, y2), and the point before it (whatever its interpolation) gets
+ * handle_right (x1, y1). The Properties panel's menu sets the earlier
+ * handle only on a BEZIER point (ops/keyframes.ts setKeyframeInterpolation).
+ */
+function applyEase(points: KeyframePoint[], index: number, ease: readonly [number, number, number, number]): void {
+  const [x1, y1, x2, y2] = ease;
+  const point = points[index]!;
+  point.interpolation = Interpolation.BEZIER;
+  point.handle_left = { X: x2, Y: y2 };
+  if (index > 0) points[index - 1]!.handle_right = { X: x1, Y: y1 };
 }
 
 // ---------------------------------------------------------------------------

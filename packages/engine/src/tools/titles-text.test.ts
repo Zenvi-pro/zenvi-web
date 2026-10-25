@@ -16,7 +16,19 @@ import { addClip } from "../ops/clips.js";
 import { createEffect } from "../effects/registry.js";
 import { addFile } from "../ops/files.js";
 import { setTrackLocked } from "../ops/tracks.js";
-import { parseTitleSvg, lineTexts, setFieldText, textColor, titleFields, titleSvgText } from "../titles/title-svg.js";
+import {
+  BLANK,
+  backgroundColor,
+  editorFontFamily,
+  lineTexts,
+  nodeStyle,
+  parseTitleSvg,
+  setFieldText,
+  textColor,
+  titleFields,
+  titleSvgText,
+  tspanNodes,
+} from "../titles/title-svg.js";
 import { buildCaptionText, parseCaptionText, displayText, type Cue } from "./caption-cues.js";
 import type { ToolReceipt } from "./receipt.js";
 import { runTool } from "./registry.js";
@@ -418,14 +430,14 @@ describe("add_emoji_tool", () => {
 // ---------------------------------------------------------------------------
 
 /** A title from the real Standard_1 template with "Day 1" / "Tokyo", stored at `path`, on two clips (0 s and 10 s). */
-function twoClipTitle(): { doc: ProjectDocument; h: FakeHost; fileId: string; clipA: string; clipB: string; path: string } {
+function twoClipTitle(options: FakeHostOptions = {}): { doc: ProjectDocument; h: FakeHost; fileId: string; clipA: string; clipB: string; path: string } {
   const template = readFileSync(new URL("titles/Standard_1.svg", ASSETS), "utf8");
   const doc0 = parseTitleSvg(template);
   const [title, sub] = titleFields(doc0);
   setFieldText(title!, "Day 1");
   setFieldText(sub!, "Tokyo");
   const path = "/titles/Day 1.svg";
-  const h = host({ texts: { [path]: titleSvgText(doc0) } });
+  const h = host({ ...options, texts: { [path]: titleSvgText(doc0) } });
   const doc = newDoc();
   const ids = doc.transaction("setup", (tx) => {
     const file = addFile(tx, media(path, { ...videoInfo(path, 3600), type: "QtImageReader", has_audio: false, has_single_image: true, width: 1920, height: 1080 }), { mediaType: "image" });
@@ -559,6 +571,238 @@ describe("edit_title_tool", () => {
 // ---------------------------------------------------------------------------
 // Animated titles
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// add_title_tool (tests/test_editor_tools_titles_text.py, add_title part)
+// ---------------------------------------------------------------------------
+
+describe("add_title_tool", () => {
+  /** A title's SVG as written, parsed. */
+  function written(h: FakeHost, r: ToolReceipt) {
+    return parseTitleSvg(svgOf(h, String(data(r).path)));
+  }
+
+  it("adds a title on an empty timeline: track 1, 5 s, the text on both lines of Bar_1, one undo step", async () => {
+    const doc = newDoc();
+    const h = host();
+    const r = await call(doc, h, "add_title_tool", { text: "Tokyo Day 1" });
+    expect(r.summary).toBe("Added title 'Tokyo Day 1' (Bar_1) on track 1 at 0.00-5.00s.");
+    const d = data(r);
+    expect(clip(doc, String(d.timeline_clip_id))).toMatchObject({ layer: L1, position: 0, start: 0, end: 5 });
+    expect(d).toMatchObject({ path: "/generated/Tokyo Day 1.svg", file_name: "Tokyo Day 1.svg", template: "Bar_1", track: 1, new_track: false, screen_position: "center" });
+    expect(lineTexts(written(h, r))).toEqual(["Tokyo Day 1", "Tokyo Day 1"]);
+    expect(doc.project.files.find((f) => f.id === d.file_id)?.path).toBe(d.path);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it.each(["Bar_1", "Oval_4", "Smoke_3", "Standard_2"])("shows the title on the visible line of reflection template %s too", async (template) => {
+    const h = host();
+    const r = await call(newDoc(), h, "add_title_tool", { text: "HELLO", template });
+    expect(lineTexts(written(h, r)).slice(0, 2)).toEqual(["HELLO", "HELLO"]);
+  });
+
+  it("goes on the lowest free track above the video it overlaps", async () => {
+    const doc = newDoc();
+    addVideo(doc, { position: 0, duration: 20 });
+    addVideo(doc, { position: 0, end: 8, layer: L2 });
+    const r = await call(doc, host(), "add_title_tool", { text: "Hello", template: "Standard_1", position_seconds: "2" });
+    expect([clip(doc, String(data(r).timeline_clip_id))!.layer, data(r).track]).toEqual([3_000_000, 3]);
+    // After the upper video ends, the first free track above the remaining video is track 2.
+    const later = await call(doc, host(), "add_title_tool", { text: "Later", position_seconds: "12" });
+    expect(clip(doc, String(data(later).timeline_clip_id))!.layer).toBe(L2);
+  });
+
+  it("opens a 'Titles' track on top when every track is busy; one undo takes clip, file and track", async () => {
+    const doc = newDoc();
+    for (const layer of [1, 2, 3, 4, 5]) addVideo(doc, { position: 0, duration: 30, layer: layer * 1_000_000 });
+    const undo = doc.undoLabels.length;
+    const r = await call(doc, host(), "add_title_tool", { text: "Top", template: "Standard_1" });
+    const d = data(r);
+    expect([d.new_track, d.layer]).toEqual([true, 6_000_000]);
+    expect(r.summary).toBe("Added title 'Top' (Standard_1) on track 6 at 0.00-5.00s on a new track.");
+    expect(doc.project.layers.find((l) => l.number === 6_000_000)?.label).toBe("Titles");
+    expect(doc.undoLabels.length).toBe(undo + 1);
+    doc.undo();
+    expect([clip(doc, String(d.timeline_clip_id)), doc.project.files.find((f) => f.id === d.file_id), doc.project.layers.length]).toEqual([undefined, undefined, 5]);
+    doc.redo();
+    expect(clip(doc, String(d.timeline_clip_id))).toBeDefined();
+  });
+
+  it("refuses a locked or busy explicit track before writing anything", async () => {
+    const doc = newDoc();
+    addVideo(doc, { position: 0, end: 10, layer: L2 });
+    doc.setUntracked(["layers", { number: 3_000_000 }, "lock"], true);
+    const h = host();
+    await expectRefusal(doc, h, "add_title_tool", { text: "X", track: "3" }, "locked");
+    await expectRefusal(doc, h, "add_title_tool", { text: "X", track: "2", position_seconds: "5" }, "already has");
+    expect(h.calls.filter((c) => c.startsWith("writeGenerated"))).toEqual([]);
+    const r = await call(doc, h, "add_title_tool", { text: "Y", track: "2", position_seconds: "10.5" });
+    expect(clip(doc, String(data(r).timeline_clip_id))!.layer).toBe(L2);
+  });
+
+  it("fills a lower third's name and role from subtitle or a newline, anchored at the bottom", async () => {
+    const doc = newDoc();
+    const r = await call(doc, host(), "add_title_tool", { text: "Jane Doe", subtitle: "Founder", template: "Gray_Box_4" });
+    expect((data(r).fields as { text: string }[]).map((f) => f.text)).toEqual(["Jane Doe", "Founder"]);
+    expect(data(r).screen_position).toBe("bottom_center");
+    expect(clip(doc, String(data(r).timeline_clip_id))!.gravity).toBe(7);
+    const ribbon = await call(doc, host(), "add_title_tool", { text: "Jane Doe\nFounder", template: "Ribbon_1" });
+    const byRole = Object.fromEntries((data(ribbon).fields as { role: string; text: string }[]).map((f) => [f.role, f.text]));
+    expect(byRole).toEqual({ title: "Jane Doe", subtitle: "Founder" });
+  });
+
+  it("blanks the template's placeholders that are not filled", async () => {
+    const h = host();
+    const r = await call(newDoc(), h, "add_title_tool", { text: "Only a title", template: "Standard_1" });
+    expect(lineTexts(written(h, r))).toEqual(["Only a title", BLANK]);
+  });
+
+  it("fills multi-line templates from lines and refuses more lines than fields", async () => {
+    const doc = newDoc();
+    const h = host();
+    const r = await call(doc, h, "add_title_tool", { template: "Standard_4", lines: '["Director", "Jane", "Music", "Bob"]' });
+    expect((data(r).fields as { text: string }[]).map((f) => f.text)).toEqual(["Director", "Jane", "Music", "Bob"]);
+    await expectRefusal(doc, h, "add_title_tool", { template: "Standard_1", lines: "a, b, c" }, "Standard_3");
+    await expectRefusal(doc, h, "add_title_tool", { template: "Gold_1", text: "A", subtitle: "B" }, "single text line");
+  });
+
+  it.each([
+    [{ text: "" }, "needs text"],
+    [{ text: "A", template: "Nopey" }, "unknown title template 'Nopey'"],
+    [{ text: "A", text_color: "not-a-colour" }, "text_color"],
+    [{ text: "A", background_color: "#12" }, "background_color"],
+    [{ text: "A", font_weight: "heavy" }, "font_weight"],
+    [{ text: "A", duration_seconds: "0" }, "duration_seconds"],
+    [{ text: "A", position_seconds: "-1" }, "position_seconds"],
+    [{ text: "A", template: "Solid_Color" }, "no text"],
+    [{ text: "A", font: "Comic Papyrus" }, "font 'Comic Papyrus' is not installed; installed fonts like it: "],
+  ])("refuses %j and leaves the project as it was", async (args, needle) => {
+    await expectRefusal(newDoc(), host({ fonts: ["Arial", "DejaVu Sans", "Liberation Sans", "Lato"] }), "add_title_tool", args, needle);
+  });
+
+  it("makes a colour card without text", async () => {
+    const h = host();
+    const r = await call(newDoc(), h, "add_title_tool", { template: "Solid_Color", background_color: "#1e90ff" });
+    expect(backgroundColor(written(h, r))).toEqual(["#1e90ff", 1]);
+    expect(data(r).background_color).toBe("#1e90ff");
+  });
+
+  it("sets colours, font, weight, size and fades (frames 1-16 in, 91-121 out at 30 fps)", async () => {
+    const doc = newDoc();
+    const h = host();
+    const r = await call(doc, h, "add_title_tool", {
+      text: "Styled",
+      template: "Standard_1",
+      text_color: "#FFFFFF80",
+      background_color: "black",
+      font: "Georgia",
+      font_weight: "bold",
+      font_scale: "1.25",
+      fade_in_seconds: "0.5",
+      fade_out_seconds: "1.0",
+      duration_seconds: "4",
+    });
+    const svg = written(h, r);
+    expect(textColor(svg)).toEqual(["#ffffff", 0.502]);
+    expect(nodeStyle(tspanNodes(svg)[0]!).get("font-family")).toBe("'Georgia'");
+    expect(nodeStyle(tspanNodes(svg)[0]!).get("font-weight")).toBe("bold");
+    const alpha = clip(doc, String(data(r).timeline_clip_id))!.alpha as Keyframe;
+    expect(alpha.Points.map((p) => [p.co.X, p.co.Y])).toEqual([
+      [1, 0],
+      [16, 1],
+      [91, 1],
+      [121, 0],
+    ]);
+    expect(data(r)).toMatchObject({ font: "Georgia", text_color: "#ffffff", background_color: "#000000", fade_in: 0.5, fade_out: 1 });
+  });
+
+  it("shrinks a long line to fit unless fit_text is false", async () => {
+    const long = "Our whole summer trip through Japan, Korea and Taiwan";
+    const fitted = await call(newDoc(), host(), "add_title_tool", { template: "Standard_1", text: long });
+    expect(Object.keys(data(fitted).text_shrunk_to_fit as object)).toEqual(["1"]);
+    const kept = await call(newDoc(), host(), "add_title_tool", { template: "Standard_1", text: long, fit_text: "false" });
+    expect(data(kept)).not.toHaveProperty("text_shrunk_to_fit");
+  });
+
+  it("numbers a file name that is taken instead of reusing it", async () => {
+    const doc = newDoc();
+    const h = host();
+    const a = await call(doc, h, "add_title_tool", { text: "Intro", file_name: "Opening" });
+    const b = await call(doc, h, "add_title_tool", { text: "Intro 2", file_name: "Opening", position_seconds: "6" });
+    expect([data(a).file_name, data(b).file_name]).toEqual(["Opening.svg", "Opening (1).svg"]);
+    expect(lineTexts(written(h, a))[0]).toBe("Intro");
+  });
+
+  it("takes #183's arguments as strings", async () => {
+    const r = await call(newDoc(), host(), "add_title_tool", { text: "Lower third", template: "Footer_1", position_seconds: "3", track: "", duration_seconds: "2.5", file_name: "footer" });
+    expect(data(r)).toMatchObject({ template: "Footer_1", position: 3, duration: 2.5, end: 5.5, file_name: "footer.svg" });
+  });
+
+  it("anchors by the template's text zone on vertical video and lifts bottom and top titles clear of the platform UI", async () => {
+    const doc = newDoc();
+    doc.setUntracked(["width"], 1080);
+    doc.setUntracked(["height"], 1920);
+    const header = await call(doc, host(), "add_title_tool", { text: "Top", template: "Header_2" });
+    expect(clip(doc, String(data(header).timeline_clip_id))!.gravity).toBe(1);
+    expect(data(header).lifted_for_vertical_ui).toBe(0.06);
+    const centre = await call(doc, host(), "add_title_tool", { text: "Mid", template: "Standard_1", position_seconds: "6" });
+    expect(clip(doc, String(data(centre).timeline_clip_id))!.gravity).toBe(4);
+    expect(data(centre)).not.toHaveProperty("lifted_for_vertical_ui");
+    const forced = await call(doc, host(), "add_title_tool", { text: "Low", template: "Standard_1", position_seconds: "12", screen_position: "Bottom" });
+    const low = clip(doc, String(data(forced).timeline_clip_id))!;
+    expect([low.gravity, data(forced).screen_position, data(forced).lifted_for_vertical_ui]).toEqual([7, "bottom_center", -0.12]);
+    expect((low.location_y as Keyframe).Points.map((p) => p.co.Y)).toEqual([-0.12]);
+    // A landscape project anchors the same way without a lift.
+    const flat = newDoc();
+    const plain = await call(flat, host(), "add_title_tool", { text: "Low", template: "Standard_1", screen_position: "bottom" });
+    expect(clip(flat, String(data(plain).timeline_clip_id))!.gravity).toBe(7);
+    expect(data(plain)).not.toHaveProperty("lifted_for_vertical_ui");
+  });
+
+  it("starts from an existing title by its path", async () => {
+    const doc = newDoc();
+    const h = host();
+    const first = await call(doc, h, "add_title_tool", { text: "Base", template: "Gray_Box_4", subtitle: "Role" });
+    const r = await call(doc, h, "add_title_tool", { template: String(data(first).path), text: "Second", position_seconds: "6" });
+    expect((data(r).fields as { text: string }[]).map((f) => f.text)).toEqual(["Second", ""]);
+    expect(data(r).template).toBe("Base");
+  });
+
+  it("checks a font against the host's fonts, and replaces a template font the host does not have", async () => {
+    // The desktop's case: on a Mac without DejaVu Sans, Standard_1's font becomes Arial.
+    const mac = host({ fonts: ["Arial", "Arial Black", "Helvetica"] });
+    const replaced = await call(newDoc(), mac, "add_title_tool", { text: "Fonts", template: "Standard_1" });
+    expect(data(replaced)).toMatchObject({ font: "Arial", font_replaced: "DejaVu Sans" });
+    expect(nodeStyle(tspanNodes(written(mac, replaced))[0]!).get("font-family")).toBe("'Arial'");
+    const kept = await call(newDoc(), host({ fonts: ["DejaVu Sans", "Arial"] }), "add_title_tool", { text: "Kept", template: "Standard_1" });
+    expect(data(kept)).not.toHaveProperty("font_replaced");
+    // Liberation Sans comes before Arial in the Title Editor's fallbacks.
+    const h = host({ fonts: ["Arial", "Arial Black", "Liberation Sans", "Liberation Sans Narrow"] });
+    expect(data(await call(newDoc(), h, "add_title_tool", { text: "L", template: "Standard_1" })).font).toBe("Liberation Sans");
+    // The installed spelling, the shortest family starting with the name, then one containing it.
+    const named = await call(newDoc(), h, "add_title_tool", { text: "Named", template: "Standard_1", font: "liberation" });
+    expect(data(named).font).toBe("Liberation Sans");
+    expect(nodeStyle(tspanNodes(written(h, named))[0]!).get("font-family")).toBe("'Liberation Sans'");
+    expect(data(await call(newDoc(), h, "add_title_tool", { text: "B", font: "black" })).font).toBe("Arial Black");
+    // Without a font list (the browser), a font is taken as given.
+    expect(data(await call(newDoc(), host(), "add_title_tool", { text: "G", font: "Comic Papyrus" })).font).toBe("Comic Papyrus");
+  });
+
+  it("picks the Title Editor's fallback font like the desktop (editor_font_family)", () => {
+    expect(editorFontFamily("DejaVu Sans", ["Arial"])).toBe("Arial");
+    // macOS ships many script-specific "Noto Sans X" families: an exact fallback name wins.
+    expect(editorFontFamily("DejaVu Sans", ["Noto Sans Armenian", "Arial Black", "Arial"])).toBe("Arial");
+    expect(editorFontFamily("DejaVu Sans", ["DejaVu Sans Mono", "Arial"])).toBe("DejaVu Sans Mono");
+    expect(editorFontFamily("Nope", [])).toBe("");
+  });
+
+  it("fonts in edit_title_tool follow the same rule", async () => {
+    const { doc, h, clipA } = twoClipTitle({ fonts: ["Arial", "Lato"] });
+    await expectRefusal(doc, h, "edit_title_tool", { timeline_clip_id: clipA, font: "Georgia" }, "font 'Georgia' is not installed; installed fonts like it: Arial");
+    const r = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, font: "lato" });
+    expect(data(r).font).toBe("Lato");
+  });
+});
 
 describe("add_animated_title_tool", () => {
   it("adds a 2D fly-by title above the video with its parameters, one undo step", async () => {

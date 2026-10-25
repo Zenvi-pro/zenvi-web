@@ -15,6 +15,7 @@ import { FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
 import { renderFrame } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
+import { installedFontFamilies } from "../svg/fonts.js";
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createMediaResolver } from "./paths.js";
@@ -147,6 +148,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         });
         return { mimeType: format === "jpeg" ? "image/jpeg" : "image/png", data: bytes.toString("base64") };
       },
+      // The fonts SVG titles render with here (this computer's fonts and the bundled Lato).
+      fontFamilies: () => installedFontFamilies(),
     },
     audio: {
       analyzeAudio: (p, o) => analyzeAudio(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),

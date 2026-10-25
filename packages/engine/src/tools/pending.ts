@@ -30,20 +30,7 @@ export const PENDING_DESKTOP_TOOLS: ReadonlySet<ContractToolName> = new Set<Cont
  * does not follow either are listed in docs/TOOLS.md under Divergences.
  */
 export const PENDING_DESKTOP_ARGS: { readonly [N in ContractToolName]?: readonly string[] } = {
-  add_effect_tool: ["processing", "properties", "scope", "timeline_clip_ids"],
-  add_title_tool: [
-    "background_color",
-    "fade_in_seconds",
-    "fade_out_seconds",
-    "font",
-    "font_scale",
-    "font_style",
-    "font_weight",
-    "lines",
-    "screen_position",
-    "subtitle",
-    "text_color",
-  ],
+  add_effect_tool: ["processing"],
   export_video_tool: [
     "audio_bitrate",
     "audio_codec",
@@ -67,9 +54,6 @@ export const PENDING_DESKTOP_ARGS: { readonly [N in ContractToolName]?: readonly
     "video_codec",
     "width",
   ],
-  set_export_setting_tool: ["clear"],
-  set_keyframes_tool: ["ease"],
-  set_project_setting_tool: ["channels", "orientation", "preset", "profile", "reframe", "save_as_default"],
 };
 
 /** The refusal for a pending argument: not "not available", so the Assistant retries without it. */

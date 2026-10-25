@@ -73,6 +73,13 @@ export type PcmDecoder = (
 ) => Promise<{ sampleRate: number; samples: Float32Array }>;
 
 /**
+ * The font families SVG titles render with in this process
+ * (`@zenvi/render-node` `installedFontFamilies`: the image's fonts and the
+ * bundled Lato), for title tools that must name an installed font.
+ */
+export type FontLister = () => Promise<string[]>;
+
+/**
  * Transcribe a local file's speech through `upload` (`@zenvi/render-node`
  * `transcribeMediaFile`: ffmpeg extracts mono speech audio, long media goes
  * up in pieces).

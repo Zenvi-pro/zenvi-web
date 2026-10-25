@@ -756,13 +756,6 @@ function frameSampleOffset(frame, fps2, sampleRate, channels) {
   total -= total % channels;
   return roundHalfAway(total);
 }
-function fpsFromRate(rate) {
-  if (Math.abs(rate - 23.976) < 0.01) return { num: 24e3, den: 1001 };
-  if (Math.abs(rate - 29.97) < 0.01) return { num: 3e4, den: 1001 };
-  if (Math.abs(rate - 59.94) < 0.01) return { num: 6e4, den: 1001 };
-  if (rate === Math.trunc(rate)) return { num: rate, den: 1 };
-  return limitDenominator(rate, 1001);
-}
 function limitDenominator(x, maxDen) {
   const [num15, den2] = exactRatio(x);
   const max = BigInt(maxDen);
@@ -794,9 +787,6 @@ function exactRatio(x) {
     d /= 2n;
   }
   return [n, d];
-}
-function sameFps(a, b) {
-  return a.num * b.den === b.num * a.den;
 }
 var init_time = __esm({
   "../engine/src/timeline/time.ts"() {
@@ -3475,130 +3465,9 @@ var init_timeline = __esm({
 });
 
 // ../engine/src/titles/svg.ts
-function findTagEnd(xml, from) {
-  let quote = null;
-  for (let i = from; i < xml.length; i += 1) {
-    const ch = xml[i];
-    if (quote) {
-      if (ch === quote) quote = null;
-    } else if (ch === '"' || ch === "'") {
-      quote = ch;
-    } else if (ch === ">") {
-      return i;
-    }
-  }
-  throw new Error("Malformed SVG: unterminated tag.");
-}
-function scan(xml) {
-  const all = [];
-  const stack = [];
-  let i = 0;
-  while ((i = xml.indexOf("<", i)) >= 0) {
-    if (xml.startsWith("<!--", i)) {
-      const close = xml.indexOf("-->", i + 4);
-      if (close < 0) throw new Error("Malformed SVG: unterminated comment.");
-      i = close + 3;
-      continue;
-    }
-    if (xml.startsWith("<![CDATA[", i)) {
-      const close = xml.indexOf("]]>", i + 9);
-      if (close < 0) throw new Error("Malformed SVG: unterminated CDATA.");
-      i = close + 3;
-      continue;
-    }
-    if (xml.startsWith("<?", i) || xml.startsWith("<!", i)) {
-      i = findTagEnd(xml, i + 2) + 1;
-      continue;
-    }
-    const tagEnd2 = findTagEnd(xml, i + 1);
-    if (xml[i + 1] === "/") {
-      const name2 = xml.slice(i + 2, tagEnd2).trim();
-      while (stack.length > 0) {
-        const open7 = stack.pop();
-        open7.closeStart = i;
-        open7.end = tagEnd2 + 1;
-        if (open7.name === name2) break;
-      }
-      i = tagEnd2 + 1;
-      continue;
-    }
-    const nameMatch = /^[^\s/>]+/.exec(xml.slice(i + 1, tagEnd2));
-    const name = nameMatch ? nameMatch[0] : "";
-    const selfClosing = xml[tagEnd2 - 1] === "/";
-    const parent = stack[stack.length - 1] ?? null;
-    const span4 = {
-      name,
-      start: i,
-      openEnd: tagEnd2 + 1,
-      closeStart: tagEnd2 + 1,
-      end: tagEnd2 + 1,
-      selfClosing,
-      parent,
-      children: []
-    };
-    parent?.children.push(span4);
-    all.push(span4);
-    if (!selfClosing) stack.push(span4);
-    i = tagEnd2 + 1;
-  }
-  return all;
-}
-function byName(spans2, name) {
-  return spans2.filter((s) => s.name === name);
-}
-function xmlEscapeText(text5) {
-  return text5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-function xmlUnescape(text5) {
-  return text5.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (whole, ref) => {
-    if (!ref.startsWith("#")) return NAMED_ENTITIES[ref];
-    const code = ref[1] === "x" || ref[1] === "X" ? Number.parseInt(ref.slice(2), 16) : Number.parseInt(ref.slice(1), 10);
-    return code <= 1114111 ? String.fromCodePoint(code) : whole;
-  });
-}
-function apply(xml, edits) {
-  const sorted = [...edits].sort((a, b) => b.from - a.from);
-  let out = xml;
-  let limit = Infinity;
-  for (const edit of sorted) {
-    if (edit.to > limit) throw new Error("Overlapping SVG edits.");
-    out = out.slice(0, edit.from) + edit.text + out.slice(edit.to);
-    limit = edit.from;
-  }
-  return out;
-}
-function setSvgText(template, text5) {
-  const spans2 = scan(template);
-  const tspans = byName(spans2, "tspan");
-  const targets = tspans.length > 0 ? tspans : byName(spans2, "text");
-  if (targets.length === 0) return template;
-  const edits = [];
-  const setContent = (span4, content) => {
-    if (span4.selfClosing) {
-      const tag = template.slice(span4.start, span4.openEnd);
-      edits.push({ from: span4.start, to: span4.end, text: `${tag.slice(0, -2).trimEnd()}>${content}</${span4.name}>` });
-    } else {
-      edits.push({ from: span4.openEnd, to: span4.closeStart, text: content });
-    }
-  };
-  const covered = (span4) => {
-    for (let p = span4.parent; p; p = p.parent) if (targets.includes(p)) return true;
-    return false;
-  };
-  const placeholder = (span4) => span4.selfClosing ? "" : xmlUnescape(template.slice(span4.openEnd, span4.closeStart).replace(/<[^>]*>/g, "")).trim();
-  const first = placeholder(targets[0]);
-  targets.forEach((span4, i) => {
-    if (covered(span4)) return;
-    const same = i === 0 || first !== "" && placeholder(span4) === first;
-    setContent(span4, same ? xmlEscapeText(text5) : "");
-  });
-  return apply(template, edits);
-}
-var NAMED_ENTITIES;
 var init_svg = __esm({
   "../engine/src/titles/svg.ts"() {
     "use strict";
-    NAMED_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
   }
 });
 
@@ -7048,6 +6917,7 @@ function setClipKeyframes(tx, clipId2, prop, points2, opts = {}) {
   const mode = opts.mode ?? "replace";
   if (mode !== "replace" && mode !== "merge" && mode !== "replace_range") throw invalid(`mode must be replace, merge or replace_range.`);
   const built = points2.map((p, i) => pointFromInput(project, clip2, p, i));
+  const eases = points2.map((p, i) => p.ease === void 0 ? void 0 : requireEase(p.ease, i));
   if (prop === "time") for (const p of built) p.co.Y = Math.trunc(p.co.Y);
   const current = clip2[prop];
   let base = { ...current ?? {}, Points: [] };
@@ -7058,7 +6928,25 @@ function setClipKeyframes(tx, clipId2, prop, points2, opts = {}) {
     const hi = Math.max(...xs);
     base = { ...current, Points: (current.Points ?? []).filter((p) => p.co.X < lo || p.co.X > hi) };
   }
-  return patchClip(tx, clipId2, { [prop]: setKeyframePoints(base, built) });
+  const curve2 = setKeyframePoints(base, built);
+  built.forEach((point3, i) => {
+    const ease = eases[i];
+    if (ease) applyEase(curve2.Points, curve2.Points.findIndex((p) => p.co.X === point3.co.X), ease);
+  });
+  return patchClip(tx, clipId2, { [prop]: curve2 });
+}
+function requireEase(ease, index) {
+  if (!Array.isArray(ease) || ease.length !== 4 || ease.some((v) => typeof v !== "number" || !Number.isFinite(v))) {
+    throw invalid(`points[${index}].ease must be four finite numbers [x1, y1, x2, y2].`);
+  }
+  return ease;
+}
+function applyEase(points2, index, ease) {
+  const [x1, y1, x2, y2] = ease;
+  const point3 = points2[index];
+  point3.interpolation = Interpolation.BEZIER;
+  point3.handle_left = { X: x2, Y: y2 };
+  if (index > 0) points2[index - 1].handle_right = { X: x1, Y: y1 };
 }
 function setClipSpeed(tx, clipId2, factor, opts = {}) {
   const project = tx.project;
@@ -7117,7 +7005,7 @@ function fadeClip(tx, clipId2, opts) {
   const doAlpha = opts.video ?? targets.alpha;
   const doVolume = opts.audio ?? targets.volume;
   if (!doAlpha && !doVolume) throw invalid(`Clip ${clipId2} has nothing to fade.`);
-  const apply2 = (kf) => {
+  const apply = (kf) => {
     let next = kf ?? constantKeyframe(1);
     if (fadeIn !== void 0) {
       next = fadeIn === 0 ? clearFadeZone(next, startOfClip, Math.min(startOfClip + FADE_ZONE_SECONDS * rate, endOfClip)) : fadeInKeyframe(next, startOfClip, endOfClip, fadeIn, rate);
@@ -7128,8 +7016,8 @@ function fadeClip(tx, clipId2, opts) {
     return next;
   };
   const patch = {};
-  if (doAlpha) patch.alpha = apply2(clip2.alpha);
-  if (doVolume) patch.volume = apply2(clip2.volume);
+  if (doAlpha) patch.alpha = apply(clip2.alpha);
+  if (doVolume) patch.volume = apply(clip2.volume);
   return patchClip(tx, clipId2, patch);
 }
 function setClipVolume(tx, clipId2, opts) {
@@ -7667,32 +7555,6 @@ function paramError(error62) {
   if (error62 instanceof EffectParamError) throw invalid(error62.message);
   throw error62;
 }
-function addEffect(tx, clipId2, className, params = {}, opts = {}) {
-  const project = tx.project;
-  const clip2 = requireEditableClip(project, clipId2);
-  const def = getEffect(className);
-  if (!def) throw invalid(`Unknown effect: ${className}.`);
-  if (def.needsDialog) {
-    throw new OpError("unsupported", `Effect ${def.className} needs the desktop's processing dialog and cannot be added here.`);
-  }
-  if (opts.id !== void 0 && findClipEffect(project, opts.id)) {
-    throw new OpError("conflict", `An effect with id ${opts.id} already exists.`, { id: opts.id });
-  }
-  const effects = [...clip2.effects ?? []];
-  const index = opts.index ?? effects.length;
-  if (!Number.isInteger(index) || index < 0 || index > effects.length) {
-    throw invalid(`index must be 0..${effects.length} (got ${index}).`);
-  }
-  let effect3;
-  try {
-    effect3 = createEffect(def.className, params, { id: opts.id ?? ids(project)() });
-  } catch (error62) {
-    paramError(error62);
-  }
-  effects.splice(index, 0, effect3);
-  patchClip(tx, clipId2, { effects });
-  return findClipEffect(tx.project, effect3.id).effect;
-}
 function setClipEffects(tx, clipId2, effects) {
   requireEditableClip(tx.project, clipId2);
   patchClip(tx, clipId2, { effects: structuredClone([...effects]) });
@@ -8039,59 +7901,21 @@ function planReframe(project, mode, width, height) {
 function applyReframe(tx, plan) {
   for (const change of plan.changes) tx.update(["clips", { id: change.id }], { scale: change.scale, gravity: change.gravity });
 }
-function requireInt(value, what, min, max) {
-  if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value)) {
-    throw invalid(`${what} must be an integer (got ${String(value)}).`);
+function setProjectAudio(tx, audio) {
+  if (typeof audio !== "object" || audio === null) throw invalid("audio must be an object.");
+  const positiveInt3 = (value, what) => {
+    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) throw invalid(`${what} must be a positive integer (got ${String(value)}).`);
+    return value;
+  };
+  const wanted = {};
+  if (audio.sampleRate !== void 0) wanted.sample_rate = positiveInt3(audio.sampleRate, "sampleRate");
+  if (audio.channels !== void 0) {
+    wanted.channels = positiveInt3(audio.channels.count, "channels.count");
+    wanted.channel_layout = positiveInt3(audio.channels.layout, "channels.layout");
   }
-  if (value < min || value > max) throw invalid(`${what} out of range (${min}..${max}).`);
-  return value;
-}
-function setProjectSettings(tx, patch) {
-  if (typeof patch !== "object" || patch === null) throw invalid("patch must be an object.");
-  const project = tx.project;
-  const updates = {};
-  const notes = [];
-  let fps2;
-  if (patch.fps !== void 0) {
-    if (typeof patch.fps === "number") {
-      if (!Number.isFinite(patch.fps) || patch.fps <= 0) throw invalid("fps must be positive.");
-      fps2 = fpsFromRate(patch.fps);
-    } else if (typeof patch.fps === "object" && patch.fps !== null) {
-      const { num: num15, den: den2 } = patch.fps;
-      if (!Number.isInteger(num15) || !Number.isInteger(den2) || num15 <= 0 || den2 <= 0) {
-        throw invalid("fps num/den must be positive integers.");
-      }
-      fps2 = { num: num15, den: den2 };
-    } else {
-      throw invalid("fps must be a number or {num, den}.");
-    }
-  }
-  const width = patch.width === void 0 ? void 0 : requireInt(patch.width, "width", 16, 8192);
-  const height = patch.height === void 0 ? void 0 : requireInt(patch.height, "height", 16, 8192);
-  const sampleRate = patch.sampleRate === void 0 ? void 0 : requireInt(patch.sampleRate, "sample_rate", 8e3, 192e3);
-  if (fps2 && (project.fps?.num !== fps2.num || project.fps?.den !== fps2.den)) {
-    updates.fps = fps2;
-    notes.push(`fps=${fps2.num}/${fps2.den}`);
-  }
-  if (width !== void 0 && project.width !== width) {
-    updates.width = width;
-    notes.push(`width=${width}`);
-  }
-  if (height !== void 0 && project.height !== height) {
-    updates.height = height;
-    notes.push(`height=${height}`);
-  }
-  if (sampleRate !== void 0 && project.sample_rate !== sampleRate) {
-    updates.sample_rate = sampleRate;
-    notes.push(`sample_rate=${sampleRate}`);
-  }
-  if (Object.keys(updates).length === 0) return { changed: false, updates, notes: ["Settings already matched."] };
-  const oldFps = project.fps;
-  for (const [key2, value] of Object.entries(updates)) tx.replace([key2], value);
-  if (updates.fps && !sameFps(oldFps, updates.fps)) {
-    applyFrameRateChange(tx, project, oldFps, updates.fps, findProfile(project.profile) ?? null);
-  }
-  return { changed: true, updates, notes };
+  const fields = changedFields(tx.project, wanted);
+  for (const [key2, value] of Object.entries(fields)) tx.replace([key2], value);
+  return Object.keys(fields);
 }
 function withExportOverride(overrides, key2, value) {
   if (typeof key2 !== "string" || key2.trim() === "") throw invalid("key is required.");
@@ -8108,6 +7932,19 @@ function withExportOverride(overrides, key2, value) {
   else out[k] = text5;
   return out;
 }
+function withoutExportOverrides(overrides, names2) {
+  const out = { ...overrides ?? {} };
+  for (const name of names2) delete out[name];
+  return out;
+}
+function clearExportSettings(doc, names2) {
+  if (!("export_overrides" in doc.project)) {
+    throw new OpError("conflict", "The project has no export_overrides object (open it with parseProject).");
+  }
+  const next = withoutExportOverrides(doc.project.export_overrides, names2);
+  doc.setUntracked(["export_overrides"], next);
+  return next;
+}
 function setExportSetting(doc, key2, value) {
   const next = withExportOverride(doc.project.export_overrides, key2, value);
   if (!("export_overrides" in doc.project)) {
@@ -8121,11 +7958,9 @@ var init_project = __esm({
   "../engine/src/ops/project.ts"() {
     "use strict";
     init_types();
-    init_profiles();
     init_media();
     init_rounding();
     init_edit();
-    init_time();
     init_errors();
     init_internal();
     INT_EXPORT_KEYS = /* @__PURE__ */ new Set(["width", "height", "fps_num", "fps_den", "start_frame", "end_frame", "sample_rate", "channels"]);
@@ -8161,7 +7996,6 @@ var init_titles = __esm({
     init_errors();
     init_files();
     init_clips();
-    init_svg();
   }
 });
 
@@ -14430,9 +14264,9 @@ function cloneIssues(issues) {
   return issues.map((iss) => iss.path ? { ...iss, path: iss.path.slice() } : { ...iss });
 }
 function isRecursive(inst, stack, resolve) {
-  const cached4 = recursive.get(inst);
-  if (cached4 !== void 0)
-    return cached4 ? PROVEN : NONE;
+  const cached5 = recursive.get(inst);
+  if (cached5 !== void 0)
+    return cached5 ? PROVEN : NONE;
   if (stack.has(inst))
     return PROVEN;
   stack.add(inst);
@@ -29762,15 +29596,15 @@ function visit(schema, fnOrHandlers) {
   };
   const cache5 = /* @__PURE__ */ new Map();
   function run3(s) {
-    const cached4 = cache5.get(s);
-    if (cached4 === RESOLVING) {
+    const cached5 = cache5.get(s);
+    if (cached5 === RESOLVING) {
       return new $ZodLazy({
         type: "lazy",
         getter: () => cache5.get(s)
       });
     }
-    if (cached4 !== void 0)
-      return cached4;
+    if (cached5 !== void 0)
+      return cached5;
     cache5.set(s, RESOLVING);
     const inner = mapInner(s);
     const mapped = fn(inner, inner !== s);
@@ -31292,6 +31126,131 @@ var init_transitions2 = __esm({
   }
 });
 
+// ../engine/src/tools/difflib.ts
+function compareCodePoints(x, y) {
+  const a = Array.from(x);
+  const b = Array.from(y);
+  for (let i = 0; i < Math.min(a.length, b.length); i += 1) {
+    const d = a[i].codePointAt(0) - b[i].codePointAt(0);
+    if (d !== 0) return d;
+  }
+  return a.length - b.length;
+}
+function getCloseMatches(word, possibilities, n = 3, cutoff = 0.6) {
+  if (!(n > 0)) throw new RangeError(`n must be > 0: ${n}`);
+  if (!(cutoff >= 0 && cutoff <= 1)) throw new RangeError(`cutoff must be in [0.0, 1.0]: ${cutoff}`);
+  const result2 = [];
+  for (const x of possibilities) {
+    const s = new SequenceMatcher(x, word);
+    if (s.realQuickRatio() >= cutoff && s.quickRatio() >= cutoff) {
+      const score = s.ratio();
+      if (score >= cutoff) result2.push([score, x]);
+    }
+  }
+  result2.sort((p, q) => q[0] - p[0] || compareCodePoints(q[1], p[1]));
+  return result2.slice(0, n).map(([, x]) => x);
+}
+var SequenceMatcher;
+var init_difflib = __esm({
+  "../engine/src/tools/difflib.ts"() {
+    "use strict";
+    SequenceMatcher = class _SequenceMatcher {
+      a;
+      b;
+      b2j = /* @__PURE__ */ new Map();
+      popular = /* @__PURE__ */ new Set();
+      fullBCount = null;
+      constructor(a, b) {
+        this.a = Array.from(a);
+        this.b = Array.from(b);
+        this.b.forEach((elt, i) => {
+          const list2 = this.b2j.get(elt);
+          if (list2) list2.push(i);
+          else this.b2j.set(elt, [i]);
+        });
+        const n = this.b.length;
+        if (n >= 200) {
+          const ntest = Math.floor(n / 100) + 1;
+          for (const [elt, idxs] of this.b2j) {
+            if (idxs.length > ntest) this.popular.add(elt);
+          }
+          for (const elt of this.popular) this.b2j.delete(elt);
+        }
+      }
+      findLongestMatch(alo, ahi, blo, bhi) {
+        const { a, b } = this;
+        let besti = alo;
+        let bestj = blo;
+        let bestsize = 0;
+        let j2len = /* @__PURE__ */ new Map();
+        for (let i = alo; i < ahi; i += 1) {
+          const newj2len = /* @__PURE__ */ new Map();
+          for (const j of this.b2j.get(a[i]) ?? []) {
+            if (j < blo) continue;
+            if (j >= bhi) break;
+            const k = (j2len.get(j - 1) ?? 0) + 1;
+            newj2len.set(j, k);
+            if (k > bestsize) {
+              besti = i - k + 1;
+              bestj = j - k + 1;
+              bestsize = k;
+            }
+          }
+          j2len = newj2len;
+        }
+        while (besti > alo && bestj > blo && a[besti - 1] === b[bestj - 1]) {
+          besti -= 1;
+          bestj -= 1;
+          bestsize += 1;
+        }
+        while (besti + bestsize < ahi && bestj + bestsize < bhi && a[besti + bestsize] === b[bestj + bestsize]) {
+          bestsize += 1;
+        }
+        return [besti, bestj, bestsize];
+      }
+      matches() {
+        const queue = [[0, this.a.length, 0, this.b.length]];
+        let total = 0;
+        while (queue.length > 0) {
+          const [alo, ahi, blo, bhi] = queue.pop();
+          const [i, j, k] = this.findLongestMatch(alo, ahi, blo, bhi);
+          if (k) {
+            total += k;
+            if (alo < i && blo < j) queue.push([alo, i, blo, j]);
+            if (i + k < ahi && j + k < bhi) queue.push([i + k, ahi, j + k, bhi]);
+          }
+        }
+        return total;
+      }
+      static calculateRatio(matches3, length) {
+        return length ? 2 * matches3 / length : 1;
+      }
+      ratio() {
+        return _SequenceMatcher.calculateRatio(this.matches(), this.a.length + this.b.length);
+      }
+      quickRatio() {
+        if (!this.fullBCount) {
+          this.fullBCount = /* @__PURE__ */ new Map();
+          for (const elt of this.b) this.fullBCount.set(elt, (this.fullBCount.get(elt) ?? 0) + 1);
+        }
+        const avail = /* @__PURE__ */ new Map();
+        let matches3 = 0;
+        for (const elt of this.a) {
+          const numb = avail.has(elt) ? avail.get(elt) : this.fullBCount.get(elt) ?? 0;
+          avail.set(elt, numb - 1);
+          if (numb > 0) matches3 += 1;
+        }
+        return _SequenceMatcher.calculateRatio(matches3, this.a.length + this.b.length);
+      }
+      realQuickRatio() {
+        const la = this.a.length;
+        const lb = this.b.length;
+        return _SequenceMatcher.calculateRatio(Math.min(la, lb), la + lb);
+      }
+    };
+  }
+});
+
 // ../engine/src/titles/templates.data.ts
 var TITLE_TEMPLATE_FILES;
 var init_templates_data = __esm({
@@ -31356,18 +31315,32 @@ var init_templates_data = __esm({
 function isAbsolutePath(ref) {
   return ref.startsWith("/") || ref.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(ref);
 }
+function templateKey(name) {
+  const base = name.trim();
+  const dot = base.lastIndexOf(".");
+  const stem7 = dot > 0 ? base.slice(0, dot) : base;
+  return stem7.trim().toLowerCase().replace(/[\s_-]+/g, "_");
+}
 function getTitleTemplate(template) {
   const ref = (template ?? "").trim();
   if (!ref) return DEFAULT_TITLE_TEMPLATE;
   if (isAbsolutePath(ref)) return void 0;
-  const base = (ref.split(/[\\/]/).pop() ?? "").toLowerCase();
-  const stem7 = base.endsWith(".svg") ? base.slice(0, -4) : base;
-  return TITLE_TEMPLATES.find((t) => t.id.toLowerCase() === stem7 || t.name.toLowerCase() === base);
+  const wanted = templateKey(ref.split(/[\\/]/).pop() ?? "");
+  return TITLE_TEMPLATES.find((t) => templateKey(t.file) === wanted || templateKey(t.name) === wanted);
+}
+function suggestTitleTemplates(name, limit = 6) {
+  const names2 = TITLE_TEMPLATES.map((t) => t.id);
+  const raw = String(name ?? "").trim();
+  const close = getCloseMatches(raw, names2, limit, 0.4);
+  if (close.length > 0) return close;
+  const low = raw.toLowerCase().split("_")[0] ?? "";
+  return names2.filter((n) => low && n.toLowerCase().includes(low)).slice(0, limit);
 }
 var DEFAULT_PREFERENCE, defaultFile, TITLE_TEMPLATES, DEFAULT_TITLE_TEMPLATE;
 var init_templates = __esm({
   "../engine/src/titles/templates.ts"() {
     "use strict";
+    init_difflib();
     init_catalog();
     init_templates_data();
     DEFAULT_PREFERENCE = ["Bar_1.svg", "Standard_1.svg", "Footer_1.svg"];
@@ -32057,8 +32030,8 @@ function transcriptionHttpError(status, body) {
 function speechLanguageCode(value) {
   const raw = String(value ?? "").trim().toLowerCase();
   if (!raw || raw === "auto") return "";
-  const byName2 = CODE_BY_NAME.get(raw);
-  if (byName2) return byName2;
+  const byName = CODE_BY_NAME.get(raw);
+  if (byName) return byName;
   const primary = raw.split(/[-_]/)[0] ?? "";
   return primary in WHISPER_LANGUAGES ? primary : "";
 }
@@ -33367,12 +33340,13 @@ function svgLayer(el, source2, keys, frame) {
   const frames = keys.map((k) => k.frame - el.from + 1);
   const eases = keys.map((k) => k.ease);
   const pose2 = (f3) => keys.map((k) => f3(k.pose));
+  const fit = Math.min(frame.width / pw, frame.height / ph);
   const props = {
-    scale: ScaleMode.NONE,
+    scale: ScaleMode.FIT,
     gravity: Gravity.TOP_LEFT,
     ...keyframeProps(frames, eases, {
-      scale_x: pose2((p) => sOf(p) * sxOf(p) / top),
-      scale_y: pose2((p) => sOf(p) / top),
+      scale_x: pose2((p) => sOf(p) * sxOf(p) / top / fit),
+      scale_y: pose2((p) => sOf(p) / top / fit),
       location_x: pose2((p) => (p.x - source2.cx * sOf(p) * sxOf(p)) / frame.width),
       location_y: pose2((p) => (p.y - source2.cy * sOf(p)) / frame.height),
       alpha: pose2((p) => p.alpha),
@@ -37074,9 +37048,10 @@ function parseNameTable(table) {
     const start = stringOffset + offset;
     if (start + length > table.byteLength) continue;
     const name = decodeName(table.subarray(start, start + length), platform).trim();
-    if (name) names2.add(name.toLowerCase());
+    if (name) names2.add(name);
   }
-  return [...names2];
+  const seen = /* @__PURE__ */ new Set();
+  return [...names2].filter((name) => !seen.has(name.toLowerCase()) && seen.add(name.toLowerCase()));
 }
 async function readAt(handle, position, length) {
   const buffer = new Uint8Array(length);
@@ -37138,6 +37113,9 @@ function sharedFontIndex() {
   shared ??= FontIndex.scan();
   return shared;
 }
+async function installedFontFamilies() {
+  return (await sharedFontIndex()).familyNames();
+}
 function readFontFile(file3) {
   let hit = bufferCache.get(file3);
   if (!hit) {
@@ -37196,23 +37174,35 @@ var init_fonts = __esm({
   "../render-node/src/svg/fonts.ts"() {
     "use strict";
     init_resources();
-    CACHE_VERSION = 2;
+    CACHE_VERSION = 3;
     FONT_EXTS = /* @__PURE__ */ new Set([".ttf", ".otf", ".ttc", ".otc"]);
     MAX_FONT_BYTES = 40 * 1024 * 1024;
     FontIndex = class _FontIndex {
       constructor(faces) {
         this.faces = faces;
         for (const face of faces) {
-          for (const family of face.families) {
+          for (const name of face.families) {
+            const family = name.toLowerCase();
             const list2 = this.byFamily.get(family) ?? [];
             list2.push(face);
             this.byFamily.set(family, list2);
+            if (!this.spelling.has(family)) this.spelling.set(family, name);
           }
         }
         for (const list2 of this.byFamily.values()) list2.sort((a, b) => a.size - b.size);
       }
       faces;
       byFamily = /* @__PURE__ */ new Map();
+      /** Lowercased family → the name as the first font with it spells it. */
+      spelling = /* @__PURE__ */ new Map();
+      /**
+       * The families installed, as the fonts spell them, sorted: what a tool may
+       * name in an SVG title (a Qt font database's `families()`). Hidden system
+       * families (".SF NS") are left out.
+       */
+      familyNames() {
+        return [...this.spelling.values()].filter((name) => !name.startsWith(".")).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+      }
       /**
        * Index the fonts in `dirs`. Family names are cached on disk by
        * path/size/mtime, so later processes only list and stat the folders.
@@ -37224,11 +37214,11 @@ var init_fonts = __esm({
         const files = [];
         const walked = {};
         for (const dir of roots) await walk(dir, 4, files, walked, 8e3);
-        const cached4 = new Map((cache5?.faces ?? []).map((f3) => [f3.path, f3]));
+        const cached5 = new Map((cache5?.faces ?? []).map((f3) => [f3.path, f3]));
         const entries = await mapLimit(files, 16, async (file3) => {
           try {
             const st = await stat(file3);
-            const hit = cached4.get(file3);
+            const hit = cached5.get(file3);
             if (hit && hit.size === st.size && hit.mtimeMs === st.mtimeMs) return hit;
             return { path: file3, size: st.size, mtimeMs: st.mtimeMs, families: await readFontFamilies(file3) };
           } catch {
@@ -38339,6 +38329,48 @@ var init_png = __esm({
   }
 });
 
+// ../render-node/src/limits.ts
+import { readFileSync } from "node:fs";
+function readSmallFile(file3) {
+  try {
+    return readFileSync(file3, "utf8");
+  } catch {
+    return void 0;
+  }
+}
+function containerLimits(read = readSmallFile) {
+  const limits = {};
+  const [quota, period] = (read("/sys/fs/cgroup/cpu.max") ?? "").trim().split(/\s+/);
+  if (quota && quota !== "max" && Number(quota) > 0 && Number(period) > 0) limits.cpus = Number(quota) / Number(period);
+  else {
+    const v1Quota = Number(read("/sys/fs/cgroup/cpu/cpu.cfs_quota_us")?.trim());
+    const v1Period = Number(read("/sys/fs/cgroup/cpu/cpu.cfs_period_us")?.trim());
+    if (v1Quota > 0 && v1Period > 0) limits.cpus = v1Quota / v1Period;
+  }
+  const memory = (read("/sys/fs/cgroup/memory.max") ?? read("/sys/fs/cgroup/memory/memory.limit_in_bytes") ?? "").trim();
+  if (/^\d+$/.test(memory) && Number(memory) > 0 && Number(memory) < 2 ** 60) limits.memoryBytes = Number(memory);
+  return limits;
+}
+function processLimits(env2 = process.env) {
+  if (!cached2) {
+    cached2 = containerLimits();
+    const forced = Number(env2.ZENVI_CPU_LIMIT);
+    if (forced > 0) cached2.cpus = forced;
+  }
+  return cached2;
+}
+function ffmpegThreads(role, limits = processLimits()) {
+  if (limits.cpus === void 0) return [];
+  const cpus = Math.max(1, limits.cpus);
+  return ["-threads", String(role === "decode" ? Math.max(1, Math.floor(cpus)) : Math.max(1, Math.ceil(cpus * 1.5)))];
+}
+var cached2;
+var init_limits = __esm({
+  "../render-node/src/limits.ts"() {
+    "use strict";
+  }
+});
+
 // ../render-node/src/decode/video.ts
 function fpsValue2(fps2) {
   return fps2.num > 0 && fps2.den > 0 ? fps2.num / fps2.den : 30;
@@ -38368,6 +38400,7 @@ function videoDecodeArgs(source2, startFrame, size, quality = "export") {
     "-loglevel",
     "error",
     "-nostdin",
+    ...ffmpegThreads("decode"),
     ...source2.autorotate === false ? ["-noautorotate"] : [],
     ...sequence ? ["-framerate", fpsText2] : [],
     ...seek > 0 ? ["-ss", seek.toFixed(6)] : [],
@@ -38393,6 +38426,7 @@ var init_video = __esm({
     "use strict";
     init_binaries();
     init_process();
+    init_limits();
     init_rgba();
     VideoFrameStream = class {
       constructor(source2, startFrame, size, options = {}) {
@@ -38511,8 +38545,8 @@ var init_video = __esm({
         const count2 = this.source.frameCount;
         if (count2 !== void 0 && count2 > 0 && target >= count2) target = count2 - 1;
         if (this.endFrame !== void 0 && target >= this.endFrame) target = Math.max(0, this.endFrame - 1);
-        const cached4 = this.cache.get(target);
-        if (cached4) return rgbaView(cached4, this.size.width, this.size.height);
+        const cached5 = this.cache.get(target);
+        if (cached5) return rgbaView(cached5, this.size.width, this.size.height);
         if (!this.stream || target < this.stream.position || target - this.stream.position > this.maxSkip) {
           await this.stream?.close();
           const backward = this.stream !== void 0 && target < this.stream.position;
@@ -39394,7 +39428,7 @@ function encoderCommand(job) {
   } else if (graph) {
     args.push("-filter_complex", graph);
   }
-  args.push(...maps, ...videoCodec, ...audioCodec);
+  args.push(...maps, ...videoCodec, ...audioCodec, ...videoCodec.length > 0 ? ffmpegThreads("encode") : []);
   if (info.video && job.video && job.format !== "png-sequence") args.push("-r", `${job.video.fps.num}/${job.video.fps.den}`);
   args.push("-metadata", "comment=Made with Zenvi", ...muxerArgs(job.format), job.output);
   return { args, script };
@@ -39404,6 +39438,7 @@ var init_encoder = __esm({
   "../render-node/src/render/encoder.ts"() {
     "use strict";
     init_src();
+    init_limits();
     FORMATS = {
       mp4: { video: true, audio: true, mimeType: "video/mp4", extension: "mp4" },
       mov: { video: true, audio: true, mimeType: "video/quicktime", extension: "mov" },
@@ -45334,8 +45369,8 @@ function fraction2(g) {
   return Number((g ?? "").padEnd(3, "0")) / 1e3;
 }
 function parseCaptions(text5) {
-  const cached4 = cueCache.get(text5);
-  if (cached4) return cached4;
+  const cached5 = cueCache.get(text5);
+  if (cached5) return cached5;
   const nul = text5.indexOf("\0");
   let prepared = nul >= 0 ? text5.slice(0, nul) : text5;
   if (!prepared.endsWith("\n\n")) prepared += "\n\n";
@@ -45690,7 +45725,7 @@ var init_color_basic = __esm({
         const sG = f327(num8(params, "saturation_G", 1));
         const sB = f327(num8(params, "saturation_B", 1));
         const out = [0, 0, 0];
-        const apply2 = (R, G, B) => {
+        const apply = (R, G, B) => {
           const weighted = 77 * R * R + 150 * G * G + 29 * B * B + 128 >> 8;
           const p = SQRT_LUT[Math.min(65025, weighted)];
           R = clampByte(Math.trunc(f327(f327(R - p) * s + p)));
@@ -45714,14 +45749,14 @@ var init_color_basic = __esm({
           const a = d[i + 3];
           if (a <= 0) continue;
           if (a === 255) {
-            apply2(d[i], d[i + 1], d[i + 2]);
+            apply(d[i], d[i + 1], d[i + 2]);
             d[i] = out[0];
             d[i + 1] = out[1];
             d[i + 2] = out[2];
           } else {
             const ap = f327(a * INV_255);
             const inv = INV_ALPHA2[a];
-            apply2(Math.trunc(f327(d[i] * inv)), Math.trunc(f327(d[i + 1] * inv)), Math.trunc(f327(d[i + 2] * inv)));
+            apply(Math.trunc(f327(d[i] * inv)), Math.trunc(f327(d[i + 1] * inv)), Math.trunc(f327(d[i + 2] * inv)));
             d[i] = Math.trunc(f327(out[0] * ap));
             d[i + 1] = Math.trunc(f327(out[1] * ap));
             d[i + 2] = Math.trunc(f327(out[2] * ap));
@@ -46798,7 +46833,7 @@ var init_denoise = __esm({
 });
 
 // ../engine/src/render/kernels/image-cache.ts
-function cached2(source2, key2, make) {
+function cached3(source2, key2, make) {
   let bySize = cache3.get(source2);
   if (!bySize) {
     bySize = /* @__PURE__ */ new Map();
@@ -46814,13 +46849,13 @@ function cached2(source2, key2, make) {
 }
 function scaledPremul(source2, width, height, delivered) {
   let base = null;
-  const premul = () => base ??= cached2(source2, "premul", () => premultiply(source2));
+  const premul = () => base ??= cached3(source2, "premul", () => premultiply(source2));
   let from = premul;
   if (delivered && (delivered.width !== source2.width || delivered.height !== source2.height) && delivered.width > 0 && delivered.height > 0) {
-    from = () => cached2(source2, `via ${delivered.width}x${delivered.height}`, () => smoothScale(premul(), delivered.width, delivered.height));
+    from = () => cached3(source2, `via ${delivered.width}x${delivered.height}`, () => smoothScale(premul(), delivered.width, delivered.height));
   }
   const via = delivered ? `${delivered.width}x${delivered.height}` : "";
-  return cached2(source2, `${width}x${height}<${via}`, () => {
+  return cached3(source2, `${width}x${height}<${via}`, () => {
     const img = from();
     return img.width === width && img.height === height ? img : smoothScale(img, width, height);
   });
@@ -48797,10 +48832,10 @@ function sphericalKernel(image, params, ctx) {
   const H = image.height;
   if (W <= 0 || H <= 0) return;
   const setup = readSetup(W, H, params);
-  const cached4 = ctx.state?.get(STATE_KEY2);
+  const cached5 = ctx.state?.get(STATE_KEY2);
   let map2;
-  if (cached4 && sameMap(cached4.setup, setup)) {
-    map2 = cached4;
+  if (cached5 && sameMap(cached5.setup, setup)) {
+    map2 = cached5;
   } else {
     map2 = { setup, uv: buildUvMap(setup) };
     ctx.state?.set(STATE_KEY2, map2);
@@ -52472,14 +52507,16 @@ import { availableParallelism } from "node:os";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 import path11 from "node:path";
 import { Worker } from "node:worker_threads";
-function compositeThreads(frames, env2 = process.env) {
+function compositeThreads(frames, env2 = process.env, limits = processLimits()) {
   const forced = env2.ZENVI_RENDER_THREADS?.trim();
   if (forced) {
     const n = Number(forced);
     return Number.isInteger(n) && n >= 0 ? Math.min(n, 16) : 0;
   }
   if (frames < MIN_POOL_FRAMES) return 0;
-  return Math.max(0, Math.min(MAX_THREADS, availableParallelism() - 1, Math.ceil(frames / 30)));
+  const cpus = limits.cpus === void 0 ? availableParallelism() : Math.min(availableParallelism(), Math.max(1, Math.floor(limits.cpus)));
+  const byMemory = limits.memoryBytes === void 0 ? MAX_THREADS : Math.floor(limits.memoryBytes * WORKER_MEMORY_SHARE / (CACHE_BYTES + WORKER_OVERHEAD_BYTES));
+  return Math.max(0, Math.min(MAX_THREADS, cpus - 1, byMemory, Math.ceil(frames / 30)));
 }
 function compositeWorkerScript() {
   const bundle = bundleDir();
@@ -52490,12 +52527,15 @@ function compositeWorkerScript() {
   const dev = fileURLToPath2(new URL("./composite-worker-dev.mjs", import.meta.url));
   return existsSync3(dev) ? dev : void 0;
 }
-var CACHE_BYTES, MIN_POOL_FRAMES, MAX_THREADS, Slot, CompositePool;
+var CACHE_BYTES, WORKER_OVERHEAD_BYTES, WORKER_MEMORY_SHARE, MIN_POOL_FRAMES, MAX_THREADS, Slot, CompositePool;
 var init_composite_pool = __esm({
   "../render-node/src/render/composite-pool.ts"() {
     "use strict";
+    init_limits();
     init_resources();
     CACHE_BYTES = 128 * 1024 * 1024;
+    WORKER_OVERHEAD_BYTES = 96 * 1024 * 1024;
+    WORKER_MEMORY_SHARE = 0.25;
     MIN_POOL_FRAMES = 60;
     MAX_THREADS = 4;
     Slot = class {
@@ -52815,7 +52855,7 @@ var init_opentype = __esm({
 });
 
 // ../render-node/src/svg/text.ts
-import { readFileSync } from "node:fs";
+import { readFileSync as readFileSync2 } from "node:fs";
 function esc2(text5) {
   return text5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -52856,7 +52896,7 @@ var init_text2 = __esm({
         const ordered = [...files].sort((a, b) => Number(STYLE_WORDS.test(a.split(/[\\/]/).pop() ?? "")) - Number(STYLE_WORDS.test(b.split(/[\\/]/).pop() ?? "")));
         for (const file3 of ordered) {
           try {
-            const bytes = new Uint8Array(readFileSync(file3));
+            const bytes = new Uint8Array(readFileSync2(file3));
             const faces = faceOffsets(bytes);
             let pick2;
             for (const offset of faces) {
@@ -52908,8 +52948,8 @@ var init_text2 = __esm({
       }
       inkBounds(text5, font) {
         const key2 = `${font.family}\0${font.pixelSize}\0${text5}`;
-        const cached4 = this.inkCache.get(key2);
-        if (cached4) return cached4;
+        const cached5 = this.inkCache.get(key2);
+        if (cached5) return cached5;
         const { loaded, glyphs, pens, width } = this.layout(text5, font);
         const s = this.scale(loaded, font);
         let rect;
@@ -53037,7 +53077,7 @@ var init_text2 = __esm({
 import { once } from "node:events";
 import { performance } from "node:perf_hooks";
 import { mkdir as mkdir3, mkdtemp, readdir as readdir2, rename as rename3, rm as rm2, stat as stat5, writeFile as writeFile4 } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { availableParallelism as availableParallelism2, tmpdir } from "node:os";
 import path12 from "node:path";
 import { randomBytes as randomBytes2 } from "node:crypto";
 function validFps(fps2, fallback) {
@@ -53135,6 +53175,10 @@ async function renderProject(project, opts) {
       const needsText = projectNeedsText(project);
       const text5 = needsText ? await nodeTextRasterizer() : void 0;
       const threads = opts.engine ? 0 : opts.threads ?? compositeThreads(frames);
+      const limits = processLimits();
+      opts.log?.(
+        `rendering ${frames} frames with ${threads} compositor worker(s); host CPUs ${availableParallelism2()}, container CPUs ${limits.cpus ?? "unlimited"}, memory limit ${limits.memoryBytes ? `${Math.round(limits.memoryBytes / 1048576)} MB` : "unlimited"}`
+      );
       pool = await CompositePool.start(threads, opts.log);
       stats.threads = pool?.size ?? 0;
       const ahead = pool ? pool.size * 2 + 1 : 0;
@@ -53250,6 +53294,7 @@ var init_render_project = __esm({
     init_sources();
     init_starts();
     init_audio_graph();
+    init_limits();
     init_composite_pool();
     init_encoder();
     init_text2();
@@ -54104,8 +54149,8 @@ async function downloadPage(url2, dir, request, cachePurged, options) {
   const cool = await checkRateLimitCooldown(dir, now());
   if (cool) throw new WebVideoError("failed", cool);
   const withSubs = wantsSubtitles(request.intent, request.writeSubs);
-  const cached4 = await loadCachedDownload(dir);
-  if (cached4 && cacheSatisfiesRequest(cached4, request.intent, withSubs)) return downloadOf(cached4, { fromCache: true, cachePurged });
+  const cached5 = await loadCachedDownload(dir);
+  if (cached5 && cacheSatisfiesRequest(cached5, request.intent, withSubs)) return downloadOf(cached5, { fromCache: true, cachePurged });
   const ytDlp = options.ytDlp ?? findYtDlp(env2);
   if (!ytDlp) throw new WebVideoError("unavailable", YT_DLP_MISSING);
   const ffmpeg = options.ffmpeg === void 0 ? findFfmpeg(env2) : options.ffmpeg;
@@ -55019,7 +55064,9 @@ function createNodeHost(options = {}) {
           signal: options.signal
         });
         return { mimeType: format === "jpeg" ? "image/jpeg" : "image/png", data: bytes.toString("base64") };
-      }
+      },
+      // The fonts SVG titles render with here (this computer's fonts and the bundled Lato).
+      fontFamilies: () => installedFontFamilies()
     },
     audio: {
       analyzeAudio: (p, o) => analyzeAudio(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
@@ -55095,6 +55142,7 @@ var init_node_host = __esm({
     init_encoder();
     init_render_frame();
     init_render_project();
+    init_fonts();
     init_backend();
     init_media2();
     init_paths2();
@@ -55183,6 +55231,7 @@ __export(src_exports, {
   guessFrameRate: () => guessFrameRate,
   imageOrientation: () => imageOrientation,
   initResvg: () => initResvg,
+  installedFontFamilies: () => installedFontFamilies,
   isEncoderPreset: () => isEncoderPreset,
   isExecutable: () => isExecutable,
   isInside: () => isInside,
@@ -61076,20 +61125,7 @@ var init_pending = __esm({
       "zenvi_api_request"
     ]);
     PENDING_DESKTOP_ARGS = {
-      add_effect_tool: ["processing", "properties", "scope", "timeline_clip_ids"],
-      add_title_tool: [
-        "background_color",
-        "fade_in_seconds",
-        "fade_out_seconds",
-        "font",
-        "font_scale",
-        "font_style",
-        "font_weight",
-        "lines",
-        "screen_position",
-        "subtitle",
-        "text_color"
-      ],
+      add_effect_tool: ["processing"],
       export_video_tool: [
         "audio_bitrate",
         "audio_codec",
@@ -61112,10 +61148,7 @@ var init_pending = __esm({
         "video_bitrate",
         "video_codec",
         "width"
-      ],
-      set_export_setting_tool: ["clear"],
-      set_keyframes_tool: ["ease"],
-      set_project_setting_tool: ["channels", "orientation", "preset", "profile", "reframe", "save_as_default"]
+      ]
     };
     DESKTOP_NAMES_ON_DIRECT_TOOLS = /* @__PURE__ */ new Set([]);
   }
@@ -62883,6 +62916,26 @@ function fontFamily(doc) {
   }
   return "";
 }
+function editorFontFamily(requested, families) {
+  if (requested) {
+    if (families.includes(requested)) return requested;
+    const containing = families.find((font) => font.includes(requested));
+    if (containing !== void 0) return containing;
+  }
+  for (const fallback of FALLBACK_FONTS) if (families.includes(fallback)) return fallback;
+  for (const fallback of FALLBACK_FONTS) {
+    const containing = families.find((font) => font.includes(fallback));
+    if (containing !== void 0) return containing;
+  }
+  return "";
+}
+function installedFontForTitle(doc, families) {
+  if (families === null) return ["", ""];
+  const current = fontFamily(doc);
+  if (!current || families.some((f3) => current === f3 || f3.includes(current))) return ["", ""];
+  const replacement = editorFontFamily(current, families);
+  return replacement ? [current, replacement] : ["", ""];
+}
 function floatAttr(node2, name) {
   for (let current = node2; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
     const raw = getAttr(current, name);
@@ -63003,6 +63056,15 @@ function freeName(prefix, offset, taken, limit = 1e3) {
   }
   return null;
 }
+function uniqueTitleName(base, taken) {
+  const safe2 = safeBaseName(base);
+  const used = new Set([...taken].map((n) => n.toLowerCase()));
+  if (!used.has(`${safe2}.svg`.toLowerCase())) return `${safe2}.svg`;
+  const [prefix, offset] = duplicatePattern(`${safe2}.svg`);
+  const name = freeName(prefix, offset, used);
+  if (!name) throw new Error(`no free title name for ${safe2}`);
+  return `${name}.svg`;
+}
 function versionName(current, taken) {
   const stem7 = (String(current).split(/[\\/]/).pop() ?? "").replace(/\.[^.]*$/, "");
   const m = /^(.*?) v(\d+)$/.exec(stem7);
@@ -63014,7 +63076,7 @@ function versionName(current, taken) {
   }
   return null;
 }
-var BLANK;
+var BLANK, FALLBACK_FONTS;
 var init_title_svg = __esm({
   "../engine/src/titles/title-svg.ts"() {
     "use strict";
@@ -63022,6 +63084,7 @@ var init_title_svg = __esm({
     init_pyfmt();
     init_xml();
     BLANK = " ";
+    FALLBACK_FONTS = ["DejaVu Sans", "Liberation Sans", "Noto Sans", "FreeSans", "Ubuntu", "Cantarell", "Open Sans", "Sans-serif", "Arial"];
   }
 });
 
@@ -63607,6 +63670,34 @@ function keyframeValueAt(kf, frame, fallback = 0) {
   }
   return y(sorted[sorted.length - 1]);
 }
+async function installedFontFamilies2(call) {
+  const frames = call.host.frames;
+  if (!frames?.fontFamilies) return null;
+  try {
+    const families = await frames.fontFamilies();
+    return families.length > 0 ? families : null;
+  } catch (error62) {
+    call.host.log?.(`font list unavailable: ${error62 instanceof Error ? error62.message : String(error62)}`);
+    return null;
+  }
+}
+function shortest(names2) {
+  return names2.reduce((best, name) => name.length < best.length ? name : best);
+}
+function resolveFont(name, families) {
+  const wanted = String(name ?? "").trim().replace(/^['"]+|['"]+$/g, "");
+  if (!wanted || families === null) return wanted;
+  const low = wanted.toLowerCase();
+  const exact = families.find((f3) => f3.toLowerCase() === low);
+  if (exact !== void 0) return exact;
+  const starts = families.filter((f3) => f3.toLowerCase().startsWith(low));
+  if (starts.length > 0) return shortest(starts);
+  const contains = families.filter((f3) => f3.toLowerCase().includes(low));
+  if (contains.length > 0) return shortest(contains);
+  const close = getCloseMatches(wanted, families, 8, 0.5);
+  const hint = close.length > 0 ? close.join(", ") : [...families].sort(byCodePoint).slice(0, 8).join(", ");
+  return toolError(`font ${pyReprString(wanted)} is not installed; installed fonts like it: ${hint}`);
+}
 function fpsOfProject(project) {
   const fps2 = projectFps(project);
   return fps2.num / fps2.den;
@@ -63693,6 +63784,30 @@ function planOverlayTrack(project, start, end, track2, exclude = /* @__PURE__ */
   const top = numbers2.length > 0 ? numbers2[numbers2.length - 1] : 0;
   return { layer: top + TRACK_STEP, created: true };
 }
+function fadeAlpha(project, start, end, fadeIn, fadeOut, base = 1) {
+  let fin = Math.max(0, Number(fadeIn) || 0);
+  let fout = Math.max(0, Number(fadeOut) || 0);
+  if (fin <= 0 && fout <= 0) return null;
+  const fps2 = fpsOfProject(project);
+  const length = Math.max(frameSecondsOf(project), end - start);
+  if (fin + fout > length) {
+    const scale = length / (fin + fout);
+    fin *= scale;
+    fout *= scale;
+  }
+  const first = pyRound(start * fps2) + 1;
+  const last = pyRound(end * fps2) + 1;
+  const points2 = /* @__PURE__ */ new Map();
+  if (fin > 0) {
+    points2.set(first, 0);
+    points2.set(first + Math.max(1, pyRound(fin * fps2)), base);
+  } else points2.set(first, base);
+  if (fout > 0) {
+    points2.set(last - Math.max(1, pyRound(fout * fps2)), base);
+    points2.set(last, 0);
+  }
+  return keyframeOf([...points2.entries()].sort((a, b) => a[0] - b[0]));
+}
 function overlaySvgText(width, height) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#000000" fill-opacity="0"/></svg>
@@ -63733,7 +63848,7 @@ function carrierFile(tx, carrier) {
   const file3 = addFile(tx, carrier.media, { name: OVERLAY_FILE_NAME, mediaType: "image" });
   return updateFile(tx, file3.id, { name: OVERLAY_FILE_NAME, zenvi_role: OVERLAY_ROLE });
 }
-var TextToolError, COLOR_NAMES, GRAVITY, TRACK_STEP, ONE_FRAME_TOLERANCE, OVERLAY_ROLE, OVERLAY_FILE_NAME;
+var TextToolError, COLOR_NAMES, byCodePoint, GRAVITY, TRACK_STEP, ONE_FRAME_TOLERANCE, OVERLAY_ROLE, OVERLAY_FILE_NAME;
 var init_titles_text = __esm({
   "../engine/src/tools/titles-text.ts"() {
     "use strict";
@@ -63742,6 +63857,7 @@ var init_titles_text = __esm({
     init_rounding();
     init_files();
     init_internal();
+    init_difflib();
     init_frame_time();
     init_pyfmt();
     init_receipt();
@@ -63765,6 +63881,7 @@ var init_titles_text = __esm({
       grey: "#808080",
       transparent: "#00000000"
     };
+    byCodePoint = (a, b) => a < b ? -1 : a > b ? 1 : 0;
     GRAVITY = {
       top_left: 0,
       top_center: 1,
@@ -63834,7 +63951,7 @@ function spinnerNumber(value) {
   return Number(text5);
 }
 function applyParams(t, values, text5, overrides, fileChoices) {
-  const byName2 = new Map(t.params.map((p) => [p.name, p]));
+  const byName = new Map(t.params.map((p) => [p.name, p]));
   const editable = t.params.filter((p) => !HIDDEN_PARAMS2.has(p.name));
   if (text5) {
     const main = editable.find((p) => p.type === "text" || p.type === "multiline");
@@ -63842,7 +63959,7 @@ function applyParams(t, values, text5, overrides, fileChoices) {
     values[main.name] = text5;
   }
   for (const [name, value] of Object.entries(overrides ?? {})) {
-    const p = byName2.get(name);
+    const p = byName.get(name);
     if (!p || HIDDEN_PARAMS2.has(name)) toolError(`unknown parameter ${pyReprString(name)}; this template takes: ${editable.map((q) => q.name).join(", ")}`);
     if (p.type === "spinner") {
       const v = spinnerNumber(value);
@@ -70679,131 +70796,6 @@ var init_color_agent = __esm({
   }
 });
 
-// ../engine/src/tools/difflib.ts
-function compareCodePoints(x, y) {
-  const a = Array.from(x);
-  const b = Array.from(y);
-  for (let i = 0; i < Math.min(a.length, b.length); i += 1) {
-    const d = a[i].codePointAt(0) - b[i].codePointAt(0);
-    if (d !== 0) return d;
-  }
-  return a.length - b.length;
-}
-function getCloseMatches(word, possibilities, n = 3, cutoff = 0.6) {
-  if (!(n > 0)) throw new RangeError(`n must be > 0: ${n}`);
-  if (!(cutoff >= 0 && cutoff <= 1)) throw new RangeError(`cutoff must be in [0.0, 1.0]: ${cutoff}`);
-  const result2 = [];
-  for (const x of possibilities) {
-    const s = new SequenceMatcher(x, word);
-    if (s.realQuickRatio() >= cutoff && s.quickRatio() >= cutoff) {
-      const score = s.ratio();
-      if (score >= cutoff) result2.push([score, x]);
-    }
-  }
-  result2.sort((p, q) => q[0] - p[0] || compareCodePoints(q[1], p[1]));
-  return result2.slice(0, n).map(([, x]) => x);
-}
-var SequenceMatcher;
-var init_difflib = __esm({
-  "../engine/src/tools/difflib.ts"() {
-    "use strict";
-    SequenceMatcher = class _SequenceMatcher {
-      a;
-      b;
-      b2j = /* @__PURE__ */ new Map();
-      popular = /* @__PURE__ */ new Set();
-      fullBCount = null;
-      constructor(a, b) {
-        this.a = Array.from(a);
-        this.b = Array.from(b);
-        this.b.forEach((elt, i) => {
-          const list2 = this.b2j.get(elt);
-          if (list2) list2.push(i);
-          else this.b2j.set(elt, [i]);
-        });
-        const n = this.b.length;
-        if (n >= 200) {
-          const ntest = Math.floor(n / 100) + 1;
-          for (const [elt, idxs] of this.b2j) {
-            if (idxs.length > ntest) this.popular.add(elt);
-          }
-          for (const elt of this.popular) this.b2j.delete(elt);
-        }
-      }
-      findLongestMatch(alo, ahi, blo, bhi) {
-        const { a, b } = this;
-        let besti = alo;
-        let bestj = blo;
-        let bestsize = 0;
-        let j2len = /* @__PURE__ */ new Map();
-        for (let i = alo; i < ahi; i += 1) {
-          const newj2len = /* @__PURE__ */ new Map();
-          for (const j of this.b2j.get(a[i]) ?? []) {
-            if (j < blo) continue;
-            if (j >= bhi) break;
-            const k = (j2len.get(j - 1) ?? 0) + 1;
-            newj2len.set(j, k);
-            if (k > bestsize) {
-              besti = i - k + 1;
-              bestj = j - k + 1;
-              bestsize = k;
-            }
-          }
-          j2len = newj2len;
-        }
-        while (besti > alo && bestj > blo && a[besti - 1] === b[bestj - 1]) {
-          besti -= 1;
-          bestj -= 1;
-          bestsize += 1;
-        }
-        while (besti + bestsize < ahi && bestj + bestsize < bhi && a[besti + bestsize] === b[bestj + bestsize]) {
-          bestsize += 1;
-        }
-        return [besti, bestj, bestsize];
-      }
-      matches() {
-        const queue = [[0, this.a.length, 0, this.b.length]];
-        let total = 0;
-        while (queue.length > 0) {
-          const [alo, ahi, blo, bhi] = queue.pop();
-          const [i, j, k] = this.findLongestMatch(alo, ahi, blo, bhi);
-          if (k) {
-            total += k;
-            if (alo < i && blo < j) queue.push([alo, i, blo, j]);
-            if (i + k < ahi && j + k < bhi) queue.push([i + k, ahi, j + k, bhi]);
-          }
-        }
-        return total;
-      }
-      static calculateRatio(matches3, length) {
-        return length ? 2 * matches3 / length : 1;
-      }
-      ratio() {
-        return _SequenceMatcher.calculateRatio(this.matches(), this.a.length + this.b.length);
-      }
-      quickRatio() {
-        if (!this.fullBCount) {
-          this.fullBCount = /* @__PURE__ */ new Map();
-          for (const elt of this.b) this.fullBCount.set(elt, (this.fullBCount.get(elt) ?? 0) + 1);
-        }
-        const avail = /* @__PURE__ */ new Map();
-        let matches3 = 0;
-        for (const elt of this.a) {
-          const numb = avail.has(elt) ? avail.get(elt) : this.fullBCount.get(elt) ?? 0;
-          avail.set(elt, numb - 1);
-          if (numb > 0) matches3 += 1;
-        }
-        return _SequenceMatcher.calculateRatio(matches3, this.a.length + this.b.length);
-      }
-      realQuickRatio() {
-        const la = this.a.length;
-        const lb = this.b.length;
-        return _SequenceMatcher.calculateRatio(Math.min(la, lb), la + lb);
-      }
-    };
-  }
-});
-
 // ../engine/src/tools/luts.ts
 function norm3(text5) {
   return Array.from(String(text5).toLowerCase().replaceAll("&", "and")).filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("");
@@ -70969,8 +70961,8 @@ function buildCatalog() {
   return out;
 }
 function effectCatalog() {
-  cached3 ??= buildCatalog();
-  return cached3;
+  cached4 ??= buildCatalog();
+  return cached4;
 }
 function normName2(text5) {
   return Array.from(String(text5 ?? "").toLowerCase()).filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("");
@@ -70994,7 +70986,7 @@ function resolveEffectName(name) {
 function effectKind(className) {
   return effectCatalog().get(className)?.kind ?? "video";
 }
-var HIDDEN_PROPERTIES, COMMON_PROPERTIES, PROCESSING_EFFECTS, AUDIO_REACTIVE_EFFECTS, ALIASES5, COLORS_NOT_FLAGGED_KEYFRAME, cached3;
+var HIDDEN_PROPERTIES, COMMON_PROPERTIES, PROCESSING_EFFECTS, AUDIO_REACTIVE_EFFECTS, ALIASES5, COLORS_NOT_FLAGGED_KEYFRAME, cached4;
 var init_effect_catalog = __esm({
   "../engine/src/tools/catalog/effect-catalog.ts"() {
     "use strict";
@@ -72876,6 +72868,24 @@ async function effectsToEdit(call, input4) {
   if (out.length === 0) throw new ToolError(skipped[0]?.reason ?? "no effect to change");
   return { targets: out, skipped };
 }
+function analysisOnDesktop(effect3) {
+  return `${effect3} analysis (Stabilizer, Tracker, Object Detector, Object Mask) runs on OpenCV inside Zenvi desktop only. Open the project in Zenvi desktop to stabilize, track or detect objects; the effects it adds play back there.`;
+}
+function addOrUpdatePlan(ctx, clip2, className, properties, ifExists, interpolation2, newEffect) {
+  const effects = clipEffects(clip2).map((e) => structuredClone(e));
+  const existing = effects.findIndex((e) => e.class_name === className);
+  if (existing >= 0 && ifExists === "update") {
+    const current = effects[existing];
+    const changed = changedValues(current, prepareProperties(ctx, className, properties, current, clip2, interpolation2));
+    Object.assign(current, changed);
+    const any2 = Object.keys(changed).length > 0;
+    return { effects, row: { timeline_clip_id: clip2.id, effect_id: current.id ?? null, action: any2 ? "updated" : "unchanged" }, changed: any2 };
+  }
+  const effect3 = newEffect(className);
+  Object.assign(effect3, prepareProperties(ctx, className, properties, effect3, clip2, interpolation2));
+  effects.push(effect3);
+  return { effects, row: { timeline_clip_id: clip2.id, effect_id: effect3.id, action: "added" }, changed: true };
+}
 var READ4, EDIT4, effectsColorTools;
 var init_effects_color = __esm({
   "../engine/src/tools/catalog/effects-color.ts"() {
@@ -72887,6 +72897,7 @@ var init_effects_color = __esm({
     init_define();
     init_luts2();
     init_pyfmt();
+    init_receipt();
     init_effect_catalog();
     init_effect_values();
     init_effects_color_common();
@@ -72955,6 +72966,44 @@ var init_effects_color = __esm({
             summary = `Clip ${String(rows[0].timeline_clip_id)} has ${total} effect(s): ${names2}`;
           }
           return ok(call, summary, { clips: rows });
+        })
+      }),
+      contractTool("add_effect_tool", {
+        annotations: EDIT4,
+        run: (call, input4) => editorRun(async () => {
+          const name = String(input4.effect || input4.effect_name || "").trim();
+          if (!name) throw new ToolError('add_effect_tool needs effect (e.g. "Blur"; list_effects_tool lists them)');
+          const className = resolveEffectName(name);
+          if (PROCESSING_EFFECTS.includes(className)) return unavailable(call.tool, analysisOnDesktop(className));
+          const project = call.doc.project;
+          const { clips, explicit } = await targetClips2(call, input4);
+          const { ok: compatible, skipped } = splitCompatible(project, clips, explicit, className);
+          const ctx = await valueContext(call, input4.properties);
+          const newEffect = newEffectFactory(call);
+          const changes = [];
+          const rows = [];
+          for (const clip2 of compatible) {
+            const plan = addOrUpdatePlan(ctx, clip2, className, input4.properties, input4.if_exists ?? "update", input4.interpolation ?? "bezier", newEffect);
+            rows.push(plan.row);
+            if (plan.changed) changes.push([clip2.id, plan.effects]);
+          }
+          const display = effectCatalog().get(className).name;
+          if (changes.length === 0) {
+            return nothingChanged(call, `${display} is already on ${rows.length} clip(s) with these settings; nothing changed.`, { effect: className, clips: rows, skipped });
+          }
+          call.commit((tx) => {
+            for (const [cid, effects] of changes) setClipEffects(tx, cid, effects);
+          });
+          const added = rows.filter((r) => r.action === "added").length;
+          const updated = rows.filter((r) => r.action === "updated").length;
+          const parts = [added ? `added ${display} to ${added} clip(s)` : "", updated ? `updated the existing ${display} on ${updated} clip(s)` : ""].filter(Boolean);
+          let summary = parts.join(" and ");
+          summary = `${summary.slice(0, 1).toUpperCase()}${summary.slice(1)}.`;
+          if (skipped.length > 0) summary += ` Skipped ${skipped.length} clip(s).`;
+          const first = rows[0];
+          const data = { effect: className, effect_id: first.effect_id, timeline_clip_id: first.timeline_clip_id, clips: rows, skipped, changed: true };
+          const warnings = rendersHere(className) ? [] : [`${display} is drawn by Zenvi desktop only (OpenCV): the web editor, the zenvi CLI and Zenvi Cloud render these clips without it.`];
+          return applied(call.tool, summary, { data, warnings });
         })
       }),
       contractTool("update_effect_tool", {
@@ -73094,10 +73143,7 @@ var init_effects_color = __esm({
         annotations: EDIT4,
         // effects_color_process.py runs libopenshot's OpenCV ClipProcessingJobs (stabilization, tracking,
         // YOLO detection, EfficientSAM/Cutie masks) on the clip; no web renderer has OpenCV.
-        run: (call, input4) => unavailable(
-          call.tool,
-          `${input4.effect} analysis (Stabilizer, Tracker, Object Detector, Object Mask) runs on OpenCV inside Zenvi desktop only. Open the project in Zenvi desktop to stabilize, track or detect objects; the effects it adds play back there.`
-        )
+        run: (call, input4) => unavailable(call.tool, analysisOnDesktop(String(input4.effect)))
       })
     ];
   }
@@ -73692,7 +73738,28 @@ var init_effects_color_looks = __esm({
 });
 
 // ../engine/src/tools/catalog/export.ts
-var exportTools;
+function normKey(text5) {
+  return String(text5 ?? "").trim().toLowerCase().replace(/[\s\-/]+/g, "_").replace(/^_+|_+$/g, "");
+}
+function clearOverrides(call, key2) {
+  const raw = normKey(key2);
+  const k = KEY_ALIASES[raw] ?? raw;
+  const current = record4(call.doc.project.export_overrides);
+  const stored = (name) => current[name] !== void 0 && current[name] !== null;
+  let targets;
+  if (!k) targets = Object.keys(current).filter(stored);
+  else {
+    const names2 = [.../* @__PURE__ */ new Set([...STORED_AS[k] ?? [k], k, raw])];
+    targets = names2.filter(stored);
+    if (targets.length === 0 && !SETTING_KEYS.includes(k)) {
+      throw new ToolError(`unknown export setting ${pyReprString(String(key2 ?? ""))}; valid keys: ${SETTING_KEYS.join(", ")}`);
+    }
+  }
+  if (targets.length === 0) return nothingChanged(call, "No stored override to clear.", { cleared: [], overrides: current });
+  const left = clearExportSettings(call.doc, targets);
+  return ok(call, `Cleared ${targets.join(", ")}.`, { cleared: targets, overrides: left });
+}
+var SETTING_KEYS, KEY_ALIASES, STORED_AS, exportTools;
 var init_export2 = __esm({
   "../engine/src/tools/catalog/export.ts"() {
     "use strict";
@@ -73704,6 +73771,51 @@ var init_export2 = __esm({
     init_pyfmt();
     init_receipt();
     init_common();
+    init_timeline_edit_common();
+    SETTING_KEYS = [
+      "preset",
+      "quality",
+      "export_type",
+      "width",
+      "height",
+      "fps",
+      "fps_num",
+      "fps_den",
+      "start",
+      "end",
+      "start_frame",
+      "end_frame",
+      "video_codec",
+      "audio_codec",
+      "format",
+      "video_bitrate",
+      "audio_bitrate",
+      "sample_rate",
+      "channels",
+      "output_path",
+      "folder",
+      "file_name",
+      "image_format"
+    ];
+    KEY_ALIASES = {
+      vcodec: "video_codec",
+      acodec: "audio_codec",
+      vformat: "format",
+      container: "format",
+      path: "output_path",
+      type: "export_type",
+      target: "preset",
+      bitrate: "video_bitrate",
+      frame_rate: "fps",
+      framerate: "fps"
+    };
+    STORED_AS = {
+      start: ["start_frame"],
+      end: ["end_frame"],
+      fps: ["fps_num", "fps_den"],
+      format: ["vformat"],
+      channels: ["channels", "channel_layout"]
+    };
     exportTools = [
       contractTool("export_video_tool", {
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -73763,6 +73875,7 @@ var init_export2 = __esm({
       contractTool("set_export_setting_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
         run: (call, input4) => {
+          if (input4.clear) return editorRun(() => clearOverrides(call, input4.key));
           const key2 = String(input4.key ?? "").trim().toLowerCase();
           if (!key2) return "Error: key is required.";
           if (input4.value === void 0 || input4.value === null) return "Error: value is required.";
@@ -76435,8 +76548,8 @@ async function fetchMotionGraphics(call, input4) {
   const single3 = text(input4.supabase_url) || text(input4.url);
   const urls = segs.length > 0 ? [...segs].map((u, i) => ({ u, i })).sort((a, b) => segmentIndex(a.u) - segmentIndex(b.u) || a.i - b.i).map((x) => x.u) : single3 ? [single3] : [];
   if (urls.length === 0) return "Error: segment_urls or supabase_url is required.";
-  const cached4 = alreadyImported(urls);
-  if (cached4) return cached4;
+  const cached5 = alreadyImported(urls);
+  if (cached5) return cached5;
   const downloads = [];
   const failures = [];
   for (const [i, url2] of urls.entries()) {
@@ -77427,14 +77540,10 @@ var init_phase3 = __esm({
     "use strict";
     init_rounding();
     init_types();
-    init_registry();
-    init_effects2();
     init_clips();
-    init_project();
-    init_time();
     init_define();
     init_frame_time();
-    init_pending();
+    init_clip_props_model();
     init_pyfmt();
     init_receipt();
     init_common();
@@ -77446,48 +77555,12 @@ var init_phase3 = __esm({
       constant: Interpolation.CONSTANT
     };
     phase3Tools = [
-      contractTool("add_effect_tool", {
-        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-        run: async (call, input4) => {
-          const tool = "add_effect_tool";
-          const name = text(input4.effect) || text(input4.effect_name);
-          if (!name) return refused(tool, "Error: add_effect_tool needs effect (EffectInfo class_name).");
-          const def = getEffect(name);
-          if (def?.needsDialog) {
-            return refused(
-              tool,
-              `Error: effect ${pyReprString(name)} requires the ProcessEffect dialog and cannot be applied by the agent. Choose a different effect.`
-            );
-          }
-          const resolved = await resolveClip(call, input4);
-          if (!resolved.ok) return failed(tool, resolved.error || "Error: could not resolve a timeline clip.");
-          if (!def) {
-            const sample2 = EFFECTS.map((e) => e.className).sort().slice(0, 12).join(", ");
-            return refused(tool, `Error: unknown effect ${pyReprString(name)}. Examples: ${sample2}.`);
-          }
-          const clipId2 = String(resolved.clip.id);
-          const existing = (resolved.clip.effects ?? []).find((e) => e.class_name === def.className);
-          if (existing && (input4.if_exists ?? "update") === "update") {
-            return unchanged(tool, `${def.name} is already on 1 clip(s) with these settings; nothing changed.`, {
-              data: { effect: def.className, effectId: existing.id, timeline_clip_id: clipId2, changed: false }
-            });
-          }
-          const effect3 = call.commit((tx) => addEffect(tx, clipId2, def.className));
-          return applied(
-            tool,
-            `Added effect ${pyReprString(def.className)} to timeline_clip_id=${clipId2} (effect_id=${effect3.id}).`,
-            {
-              clips: [{ id: clipId2, effect: def.className, effectId: effect3.id }],
-              data: { effect: def.className, effectId: effect3.id, timeline_clip_id: clipId2 }
-            }
-          );
-        }
-      }),
       contractTool("set_keyframes_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
-        // zenvi-core develop editor_tools/clip_props.py set_keyframes / _build_points, for the
-        // seven properties below. Ease presets and points without a value (pinning the curve's
-        // current value) are not ported yet and are refused.
+        // zenvi-core develop editor_tools/clip_props.py set_keyframes / _build_points / _merge_curve,
+        // for the seven properties below, with the 28 bezier ease presets (`ease` for points that
+        // set none, or a point's own). Points without a value (pinning the curve's current value)
+        // are not ported yet and are refused.
         run: async (call, input4) => {
           const tool = "set_keyframes_tool";
           const prop = String(input4.property ?? "").trim();
@@ -77501,9 +77574,15 @@ var init_phase3 = __esm({
           const resolved = await resolveClip(call, input4);
           if (!resolved.ok) return failed(tool, resolved.error || "Error: could not resolve a timeline clip.");
           const clipId2 = String(resolved.clip.id);
+          const defaultEase = input4.ease ?? "";
+          const defaultInterp = input4.interpolation ?? "";
+          if (defaultEase && defaultInterp !== "" && defaultInterp !== "bezier") {
+            return refused(tool, "Error: ease presets are bezier curves; drop interpolation or set it to 'bezier'.");
+          }
           const time3 = clipTime(resolved.clip, projectFps(call.doc.project));
           const built = [];
           const seen = /* @__PURE__ */ new Map();
+          const easeAt = /* @__PURE__ */ new Map();
           for (const [i, raw] of points2.entries()) {
             const units = TIME_UNITS.filter((unit3) => raw[unit3] !== void 0 && raw[unit3] !== null);
             if (units.length !== 1) return refused(tool, `Error: points[${i}] needs exactly one of frame, seconds, timeline_seconds or source_seconds.`);
@@ -77514,47 +77593,39 @@ var init_phase3 = __esm({
             }
             if (seen.has(x)) return refused(tool, `Error: points[${seen.get(x)}] and points[${i}] land on the same frame ${x}.`);
             seen.set(x, i);
-            if (raw.ease) return refused(tool, pendingArgumentMessage(tool, `points[${i}].ease`));
+            const pointEase = raw.ease ?? "";
+            const pointInterp = raw.interpolation ?? "";
+            if (pointEase && pointInterp && pointInterp !== "bezier") {
+              return refused(tool, `Error: points[${i}]: ease presets are bezier curves; drop interpolation or use 'bezier'.`);
+            }
+            const interpName = pointEase ? "bezier" : pointInterp || defaultInterp || "bezier";
+            const easeName = pointEase || (interpName === "bezier" ? defaultEase : "");
+            const ease = easeName ? EASE_PRESETS.get(easeName) : void 0;
+            if (easeName && !ease) return refused(tool, `Error: points[${i}]: unknown ease ${pyReprString(easeName)}; choose one of ${[...EASE_PRESETS.keys()].join(", ")}.`);
             if (raw.value === void 0 || raw.value === null) {
               return refused(tool, `Error: points[${i}] needs a value here (keeping the curve's current value is not ported to this Zenvi surface yet).`);
             }
             const value = typeof raw.value === "boolean" ? Number.NaN : Number(raw.value);
             if (!Number.isFinite(value)) return refused(tool, `Error: points[${i}].value must be a number.`);
-            built.push({ frame: x, value, interpolation: INTERPOLATIONS2[raw.interpolation || input4.interpolation || "bezier"] });
+            built.push({ frame: x, value, interpolation: INTERPOLATIONS2[interpName], ...ease ? { ease } : {} });
+            if (ease) easeAt.set(x, easeName);
           }
           built.sort((a, b) => a.frame - b.frame);
           const mode = input4.mode ?? "replace";
           call.commit((tx) => setClipKeyframes(tx, clipId2, prop, built, { mode }));
           return applied(tool, `Set ${built.length} keyframe(s) on ${prop} for timeline_clip_id=${clipId2}.`, {
             clips: [{ id: clipId2 }],
-            data: { timeline_clip_id: clipId2, property: prop, mode, points: built.map((p) => ({ frame: p.frame, value: p.value })) }
-          });
-        }
-      }),
-      contractTool("set_project_setting_tool", {
-        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
-        run: (call, input4) => {
-          const tool = "set_project_setting_tool";
-          const project = call.doc.project;
-          const patch = {};
-          let fps2 = null;
-          if (input4.fps_num != null || input4.fps_den != null) {
-            fps2 = { num: input4.fps_num ?? 30, den: input4.fps_den ?? 1 };
-          } else if (input4.fps != null) {
-            fps2 = fpsFromRate(input4.fps);
-          }
-          if (fps2) patch.fps = fps2;
-          if (input4.width != null) patch.width = input4.width;
-          if (input4.height != null) patch.height = input4.height;
-          if (input4.sample_rate != null) patch.sampleRate = input4.sample_rate;
-          const current = projectFps(project);
-          const same = (!patch.fps || typeof patch.fps === "object" && patch.fps.num === current.num && patch.fps.den === current.den) && (patch.width === void 0 || patch.width === project.width) && (patch.height === void 0 || patch.height === project.height) && (patch.sampleRate === void 0 || patch.sampleRate === project.sample_rate);
-          if (same) return unchanged(tool, "Settings already matched.", { data: { changed: false } });
-          const result2 = call.commit((tx) => setProjectSettings(tx, patch));
-          if (!result2.changed) return unchanged(tool, "Settings already matched.", { data: { changed: false } });
-          return applied(tool, `Updated project settings: ${result2.notes.join(", ")}.`, {
-            data: { changed: true, updates: result2.updates },
-            notes: result2.notes
+            data: {
+              timeline_clip_id: clipId2,
+              property: prop,
+              mode,
+              points: built.map((p) => ({
+                frame: p.frame,
+                value: p.value,
+                interpolation: INTERPOLATION_NAMES[p.interpolation ?? Interpolation.BEZIER],
+                ...easeAt.has(p.frame) ? { ease: easeAt.get(p.frame) } : {}
+              }))
+            }
           });
         }
       })
@@ -77860,12 +77931,55 @@ function profileReceipt(call, result2, before, profile, reframe, socialKey) {
   const summary = `${parts.join("; ")}.`;
   return result2.changed || result2.reframed.length > 0 ? ok(call, summary, data) : nothingChanged(call, summary, data);
 }
-var READ9, EDIT8, CUSTOM_PROFILE_HOME, PIXEL_RATIO_RE, projectProfileTools;
+function channelLayoutName(value) {
+  const hit = Object.entries(CHANNEL_LAYOUTS2).find(([, [code]]) => value === code);
+  return hit ? hit[0] : value === void 0 || value === null || value === 0 || value === "" ? "" : String(value);
+}
+function defaultAudioSettings(call, sampleRate, layout) {
+  const ui = call.host.ui;
+  const entries = ui?.preferences?.() ?? null;
+  const again = "call again without save_as_default to change only this project";
+  if (entries === null || !ui?.setPreference) {
+    throw new ToolError(
+      `save_as_default keeps the sample rate and channels for new projects in an editor's settings (Zenvi desktop: Preferences > Default Audio Sample Rate / Channels); there is no editor window here, so ${again}`
+    );
+  }
+  const wanted = [];
+  if (sampleRate !== null) wanted.push(["default-samplerate", sampleRate]);
+  if (layout !== null) wanted.push(["default-channellayout", LAYOUT_SETTING[layout]]);
+  for (const [key2] of wanted) {
+    const entry = entries.find((e) => e.key === key2);
+    if (!entry || entry.readOnly) {
+      throw new ToolError(
+        `this editor's settings have no default ${key2 === "default-samplerate" ? "sample rate" : "channels"} for new projects (new projects here start at 48000 Hz stereo; Zenvi desktop keeps them in Preferences), so ${again}`
+      );
+    }
+  }
+  return () => {
+    for (const [key2, value] of wanted) ui.setPreference(key2, value);
+  };
+}
+function settingsSnapshot(project) {
+  const fps2 = projectFps(project);
+  return {
+    width: project.width,
+    height: project.height,
+    fps: Math.round(fps2.num / fps2.den * 1e3) / 1e3,
+    fps_num: fps2.num,
+    fps_den: fps2.den,
+    profile: String(project.profile ?? ""),
+    sample_rate: Math.trunc(Number(project.sample_rate) || 0),
+    channels: Math.trunc(Number(project.channels) || 0),
+    channel_layout: channelLayoutName(project.channel_layout)
+  };
+}
+var READ9, EDIT8, CUSTOM_PROFILE_HOME, PIXEL_RATIO_RE, LAYOUT_BY_NAME, CHANNEL_LAYOUTS2, LAYOUT_SETTING, SAMPLE_RATES, projectProfileTools;
 var init_project_export_profiles = __esm({
   "../engine/src/tools/catalog/project-export-profiles.ts"() {
     "use strict";
     init_profiles();
     init_profile_requests();
+    init_defaults();
     init_project();
     init_define();
     init_frame_time();
@@ -77876,6 +77990,33 @@ var init_project_export_profiles = __esm({
     EDIT8 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     CUSTOM_PROFILE_HOME = "custom profiles live in Zenvi desktop's profiles folder, which Zenvi desktop and the zenvi CLI on the same computer use; a project whose profile Zenvi desktop does not know opens there as HD 720p 30 fps";
     PIXEL_RATIO_RE = /^\s*(\d+)\s*[:/]\s*(\d+)\s*$/;
+    LAYOUT_BY_NAME = {
+      mono: "mono",
+      "1": "mono",
+      stereo: "stereo",
+      "2": "stereo",
+      surround: "surround",
+      "3": "surround",
+      "5.1": "5.1",
+      "6": "5.1",
+      "7.1": "7.1",
+      "8": "7.1"
+    };
+    CHANNEL_LAYOUTS2 = {
+      mono: [ChannelLayout.MONO, 1],
+      stereo: [ChannelLayout.STEREO, 2],
+      surround: [ChannelLayout.SURROUND, 3],
+      "5.1": [ChannelLayout.FIVE_POINT_ONE, 6],
+      "7.1": [ChannelLayout.SEVEN_POINT_ONE, 8]
+    };
+    LAYOUT_SETTING = {
+      mono: "LAYOUT_MONO",
+      stereo: "LAYOUT_STEREO",
+      surround: "LAYOUT_SURROUND",
+      "5.1": "LAYOUT_5POINT1",
+      "7.1": "LAYOUT_7POINT1"
+    };
+    SAMPLE_RATES = [22050, 44100, 48e3, 96e3, 192e3];
     projectProfileTools = [
       contractTool("list_project_profiles_tool", {
         annotations: READ9,
@@ -77951,6 +78092,87 @@ var init_project_export_profiles = __esm({
             reframe,
             socialKey
           );
+        })
+      }),
+      contractTool("set_project_setting_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
+        run: (call, input4) => editorRun(async () => {
+          const project = call.doc.project;
+          const fpsNum = input4.fps_num ?? null;
+          const fpsDen = input4.fps_den ?? null;
+          let fps2 = input4.fps ?? null;
+          let width = input4.width ?? null;
+          let height = input4.height ?? null;
+          const sampleRate = input4.sample_rate ?? null;
+          const profileArg = text(input4.profile) || text(input4.preset);
+          const orientation = input4.orientation ?? "";
+          const reframe = input4.reframe ?? "keep";
+          const videoRequested = [fps2, fpsNum, fpsDen, width, height].some((v) => v !== null && v !== 0) || Boolean(profileArg) || Boolean(orientation);
+          if (fpsNum !== null || fpsDen !== null) {
+            if (fpsNum === null || fpsDen === null) throw new ToolError("give both fps_num and fps_den");
+            fps2 = fpsNum / fpsDen;
+          }
+          let layout = null;
+          const channels = text(input4.channels);
+          if (channels) {
+            layout = LAYOUT_BY_NAME[channels.toLowerCase()] ?? null;
+            if (!layout) throw new ToolError("channels must be mono, stereo, surround, 5.1 or 7.1 (or 1, 2, 3, 6, 8)");
+          }
+          if (sampleRate !== null && !SAMPLE_RATES.includes(sampleRate)) {
+            throw new ToolError(`sample_rate must be one of ${SAMPLE_RATES.join(", ")}`);
+          }
+          if (!videoRequested && sampleRate === null && !layout && reframe === "keep") {
+            throw new ToolError("nothing to change: pass fps, width/height, profile/preset, orientation, sample_rate or channels");
+          }
+          const storeDefaults = input4.save_as_default && (sampleRate !== null || layout !== null) ? defaultAudioSettings(call, sampleRate, layout) : null;
+          let profile = null;
+          if (videoRequested || reframe !== "keep") {
+            if (width === null !== (height === null)) {
+              width = width ?? project.width;
+              height = height ?? project.height;
+            }
+            const ctx = await profileContext(call);
+            let choice = targetProfile(call, ctx, { profile: profileArg, width: width ?? 0, height: height ?? 0, fps: fps2 ?? 0, orientation, fromFileId: "" });
+            if (fpsNum !== null && fpsDen !== null && (choice.profile.fps.num !== fpsNum || choice.profile.fps.den !== fpsDen)) {
+              const base = choice.profile;
+              choice = resolving(() => ensureProfile(ctx, base.width, base.height, { num: fpsNum, den: fpsDen }));
+            }
+            profile = await keepCustomProfile(call, choice);
+          }
+          const audio = {};
+          if (sampleRate !== null && Math.trunc(Number(project.sample_rate) || 0) !== sampleRate) audio.sampleRate = sampleRate;
+          if (layout) {
+            const [code, count2] = CHANNEL_LAYOUTS2[layout];
+            if (project.channel_layout !== code || Math.trunc(Number(project.channels) || 0) !== count2) audio.channels = { count: count2, layout: code };
+          }
+          const plan = profile ? planReframe(project, reframe, profile.width, profile.height) : { changes: [], skipped: [], letterboxed: [], videoClips: 0 };
+          const changedProfile = profile ? profileDiffers(project, profile) : false;
+          const changed = changedProfile || plan.changes.length > 0 || Object.keys(audio).length > 0;
+          if (changed) {
+            call.commit((tx) => {
+              if (profile && (changedProfile || plan.changes.length > 0)) {
+                applyProfile(tx, profile);
+                applyReframe(tx, plan);
+              }
+              setProjectAudio(tx, audio);
+            }, "Set project settings");
+          }
+          storeDefaults?.();
+          const after = settingsSnapshot(call.doc.project);
+          const notes = [];
+          if (changedProfile) notes.push(`${String(after.width)}x${String(after.height)} at ${pyFloat(Number(after.fps))} fps (${String(after.profile)})`);
+          if (plan.changes.length > 0) notes.push(`${plan.changes.length} clip(s) reframed`);
+          if (Object.keys(audio).length > 0) notes.push(`audio ${String(after.sample_rate)} Hz ${String(after.channel_layout)}`);
+          let summary = changed ? `Updated project settings: ${notes.join(", ")}.` : "Settings already matched.";
+          if (plan.letterboxed.length > 0) summary += ` ${plan.letterboxed.length} clip(s) of another shape will show bars; pass reframe='fill' to crop them.`;
+          const data = {
+            changed,
+            ...after,
+            reframed_clip_ids: plan.changes.map((c) => c.id),
+            letterboxed_clip_ids: plan.letterboxed,
+            saved_as_default: storeDefaults !== null
+          };
+          return changed ? ok(call, summary, data) : nothingChanged(call, summary, data);
         })
       }),
       contractTool("manage_custom_profiles_tool", {
@@ -79431,7 +79653,7 @@ function reelTracks(tx) {
   const numbers2 = [...tx.project.layers].map((l) => Number(l.number)).sort((a, b) => a - b);
   return Object.fromEntries(TRACKS.map((role, i) => [role, numbers2[i]]));
 }
-function fadeAlpha(tx, clip2, from, to, start, end) {
+function fadeAlpha2(tx, clip2, from, to, start, end) {
   setClipKeyframes(
     tx,
     clip2.id,
@@ -79447,7 +79669,7 @@ function placeTitle(tx, media, position, duration3, layer2, entrance) {
   const { clip: clip2 } = addTitleClip(tx, { file: media, position, duration: duration3, layer: layer2, title: media.name });
   if (entrance && entrance !== "animate.none") applyClipPreset(tx, clip2.id, entrance);
   const out = Math.min(0.25, duration3 / 4);
-  fadeAlpha(tx, clip2, 1, 0, position + duration3 - out, position + duration3);
+  fadeAlpha2(tx, clip2, 1, 0, position + duration3 - out, position + duration3);
   return clip2;
 }
 var TOOL3, FLASH_SECONDS, FLASH_SPACING_SECONDS, TRACKS, STYLE_LINES, ALL_STYLE_IDS, input3, reelTools;
@@ -79606,11 +79828,11 @@ var init_reels = __esm({
               if (file3.has_audio) setClipProperty(tx, clip2.id, "volume", style.clipVolume);
               for (const look of style.looks) applyLookPreset(tx, clip2.id, look);
               const current = tx.project.clips.find((c) => c.id === clip2.id);
-              if (index === 0 && style.fadeIn) fadeAlpha(tx, current, 0, 1, shot.start, shot.start + Math.min(0.6, length / 2));
-              if (index === plan.shots.length - 1 && style.fadeOut) fadeAlpha(tx, current, 1, 0, shot.end - Math.min(0.8, length / 2), shot.end);
+              if (index === 0 && style.fadeIn) fadeAlpha2(tx, current, 0, 1, shot.start, shot.start + Math.min(0.6, length / 2));
+              if (index === plan.shots.length - 1 && style.fadeOut) fadeAlpha2(tx, current, 1, 0, shot.end - Math.min(0.8, length / 2), shot.end);
               if (prepared.flash && flashes.has(index)) {
                 const flash = addTitleClip(tx, { file: prepared.flash, position: shot.start, duration: FLASH_SECONDS, layer: track2.flash, title: "Flash" }).clip;
-                fadeAlpha(tx, flash, 0.75, 0, shot.start, shot.start + FLASH_SECONDS);
+                fadeAlpha2(tx, flash, 0.75, 0, shot.start, shot.start + FLASH_SECONDS);
               }
               const label2 = shot.label ? prepared.labels.get(shot.label) : void 0;
               const labelEnd = Math.min(shot.end, endAt);
@@ -81355,9 +81577,9 @@ async function addClipsToTimeline(call, input4) {
       g.tol
     );
     if (!lengths) {
-      const shortest = entries.reduce((sum, e, i) => sum + (e.fixed ? e.length : Math.min(e.length, keep2[i])), 0) - (n - 1) * overlap2;
+      const shortest2 = entries.reduce((sum, e, i) => sum + (e.fixed ? e.length : Math.min(e.length, keep2[i])), 0) - (n - 1) * overlap2;
       throw new ToolError(
-        `cannot fit ${n} clips into ${pyFixed(fitTotal, 1)} s: with at least ${pyFixed(minClip, 1)} s each (plus transition overlaps) the shortest possible sequence is ${pyFixed(shortest, 1)} s; lower min_clip_seconds, use fewer clips, or raise fit_total_seconds`
+        `cannot fit ${n} clips into ${pyFixed(fitTotal, 1)} s: with at least ${pyFixed(minClip, 1)} s each (plus transition overlaps) the shortest possible sequence is ${pyFixed(shortest2, 1)} s; lower min_clip_seconds, use fewer clips, or raise fit_total_seconds`
       );
     }
     entries.forEach((entry, i) => {
@@ -83248,6 +83470,7 @@ var init_title_templates = __esm({
       TV_Rating: "small TV rating badge (TV / G), top left"
     };
     TitleStyle = class {
+      /** As given until `resolveFont` matches it to an installed family. */
       font;
       bold;
       italic;
@@ -83260,7 +83483,7 @@ var init_title_templates = __esm({
         const style = args.font_style ?? "";
         if (!["", "bold", "normal"].includes(weight)) toolError("font_weight must be '', 'bold' or 'normal'");
         if (!["", "italic", "normal"].includes(style)) toolError("font_style must be '', 'italic' or 'normal'");
-        this.font = String(args.font ?? "").trim().replace(/^['"]+|['"]+$/g, "");
+        this.font = String(args.font ?? "").trim();
         this.bold = weight === "" ? null : weight === "bold";
         this.italic = style === "" ? null : style === "italic";
         this.fontScale = Number(args.font_scale || 1);
@@ -83271,10 +83494,30 @@ var init_title_templates = __esm({
       get changesAnything() {
         return Boolean(this.font || this.bold !== null || this.italic !== null || Math.abs(this.fontScale - 1) > 1e-9 || this.textColor || this.background);
       }
-      /** `apply`: write the changes; returns the receipt fields they produce. */
-      apply(doc) {
+      /**
+       * `resolve_font`: the requested family matched against the host's fonts
+       * (refused when it is not installed); taken as given when the host cannot
+       * list them (`families` null, the browser).
+       */
+      resolveFont(families) {
+        if (this.font) this.font = resolveFont(this.font, families);
+      }
+      /**
+       * `apply`: write the changes; returns the receipt fields they produce. With
+       * no font requested, a template font the host does not have becomes the
+       * Title Editor's installed fallback (`installed_font_for_title`).
+       */
+      apply(doc, families = null) {
         const info = {};
         const nodes = [...textNodes(doc), ...tspanNodes(doc)];
+        if (!this.font) {
+          const [missing, installed] = installedFontForTitle(doc, families);
+          if (installed) {
+            applyFont(nodes, { family: installed });
+            info.font = installed;
+            info.font_replaced = missing;
+          }
+        }
         if (this.font || this.bold !== null || this.italic !== null || Math.abs(this.fontScale - 1) > 1e-9) {
           applyFont(nodes, { family: this.font || null, italic: this.italic, bold: this.bold, sizeRatio: this.fontScale });
         }
@@ -83368,6 +83611,8 @@ var init_title_templates = __esm({
           const name = String(file3.name || basename5(srcPath));
           if (hasText2 && slots2.length === 0) toolError(`${name} has no text to change`);
           const values = hasText2 ? assignTexts(slots2, text5, subtitle, lines2, name, false) : /* @__PURE__ */ new Map();
+          const families = await installedFontFamilies2(call);
+          style.resolveFont(families);
           const scopeUsed = scope === "this_clip" && clips.length <= 1 ? "all_clips" : scope;
           const affected = scopeUsed === "all_clips" ? clips : clips.filter((c) => c.id === clipId2);
           if (scopeUsed !== "duplicate") {
@@ -83378,7 +83623,7 @@ var init_title_templates = __esm({
           }
           const before = titleSvgText(doc);
           for (const slot of slots2) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index));
-          const styleInfo = style.apply(doc);
+          const styleInfo = style.apply(doc, families);
           const fitted = style.fit(doc, slots2);
           const after = fieldRows(slots2);
           const svg = titleSvgText(doc);
@@ -83433,132 +83678,143 @@ var init_title_templates = __esm({
 
 // ../engine/src/tools/catalog/titles.ts
 function basename6(path42) {
-  return String(path42).split(/[\\/]/).pop() ?? "";
+  return String(path42 ?? "").split(/[\\/]/).pop() ?? "";
 }
 function isAbsolutePath3(path42) {
   return path42.startsWith("/") || path42.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path42);
 }
-async function loadTitleTemplate(call, template) {
-  const tmpl = template.trim();
-  const log = (what, error62) => call.host.log?.(`title template ${what}: ${error62 instanceof Error ? error62.message : String(error62)}`);
-  if (tmpl && isAbsolutePath3(tmpl)) {
+function errorMessage2(error62) {
+  return error62 instanceof Error ? error62.message : String(error62);
+}
+function unknownTemplate(raw) {
+  const hint = suggestTitleTemplates(raw).join(", ") || DEFAULT_TEMPLATES.join(", ");
+  return toolError(`unknown title template ${pyReprString(raw)}; close matches: ${hint} (list_title_templates_tool lists them all)`);
+}
+async function loadTemplate(call, template) {
+  const raw = template.trim();
+  const project = call.doc.project;
+  const inProject = project.files.find((f3) => String(f3.path ?? "") === raw);
+  if (raw && raw.toLowerCase().endsWith(".svg") && (isAbsolutePath3(raw) || inProject)) {
     const storage = call.host.storage;
-    if (!tmpl.toLowerCase().endsWith(".svg") || !storage?.readText) return null;
+    if (!inProject && !storage?.readText) return unknownTemplate(raw);
     try {
-      return { file: basename6(tmpl), svg: await storage.readText(tmpl) };
+      const svg = inProject ? await readProjectSvg(call, inProject) : await storage.readText(raw);
+      return { name: basename6(raw).replace(/\.svg$/i, ""), file: basename6(raw), svg };
     } catch (error62) {
-      log(tmpl, error62);
-      return null;
+      call.host.log?.(`title template ${raw}: ${errorMessage2(error62)}`);
+      return unknownTemplate(raw);
     }
   }
-  const bundled = getTitleTemplate(tmpl);
-  if (!bundled) return null;
+  const bundled = raw ? getTitleTemplate(raw) : DEFAULT_TEMPLATES.map((name) => getTitleTemplate(name)).find(Boolean);
+  if (!bundled) return unknownTemplate(raw);
   try {
-    return { file: bundled.file, svg: await call.host.assets.readText(bundled.assetPath) };
+    return { name: bundled.id, file: bundled.file, svg: await call.host.assets.readText(bundled.assetPath) };
   } catch (error62) {
-    log(bundled.assetPath, error62);
-    return null;
+    return toolError(`cannot read title SVG ${bundled.file}: ${errorMessage2(error62)}`);
   }
 }
-function titleFileName(body, fileName2) {
-  let safe2 = basename6(fileName2.trim());
-  if (!safe2) {
-    const slug2 = pySlice(body.replace(/[^A-Za-z0-9_-]+/g, "_"), 0, 40).replace(/^_+|_+$/g, "") || "title";
-    safe2 = `${slug2}_${generateId().slice(0, 8).toLowerCase()}.svg`;
-  }
-  if (!safe2.toLowerCase().endsWith(".svg")) safe2 += ".svg";
-  return safe2;
-}
-async function prepareTitle(call, template, body, options) {
-  const media = call.host.media;
-  const name = titleFileName(body, options.fileName);
-  let path42;
+async function addTitle(call, input4) {
+  const tool = "add_title_tool";
+  if (!call.host.media.writeGenerated) return unavailable(tool, "it cannot store generated title images.");
+  const lines2 = (input4.lines ?? []).map(String);
+  const body = String(input4.text ?? "");
+  const subtitle = String(input4.subtitle ?? "");
+  const template = await loadTemplate(call, String(input4.template ?? ""));
+  const name = template.name;
+  let doc;
   try {
-    const svg = setSvgText(template.svg, body);
-    path42 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    doc = parseTitleSvg(template.svg);
   } catch (error62) {
-    return `Error: failed to write title SVG: ${error62 instanceof Error ? error62.message : String(error62)}`;
+    return toolError(`cannot read title SVG ${template.file}: ${errorMessage2(error62)}`);
   }
-  let imported;
-  try {
-    const info = await media.probe(path42);
-    imported = { path: path42, info, name };
-  } catch {
-    return `Error: could not import title into media bin: ${path42}`;
-  }
-  const placed = await planPlacement(call, provisionalFile(imported), {
-    position_seconds: options.position,
-    track: options.track,
-    duration_seconds: options.duration,
-    full_file: "true"
+  const slots2 = titleFields(doc);
+  const given = Boolean(body.trim() || subtitle.trim() || lines2.some((v) => v.trim()));
+  if (slots2.length === 0 && given) toolError(`${name} has no text; it is a background card (set background_color), or pick a template with text`);
+  if (slots2.length > 0 && !given) toolError("add_title_tool needs text (or subtitle / lines)");
+  const style = new TitleStyle(input4);
+  const values = assignTexts(slots2, body, subtitle, lines2, name, true);
+  const project = call.doc.project;
+  const fps2 = fpsOfProject(project);
+  const position = snapToFrame(project, Number(input4.position_seconds ?? 0));
+  const duration3 = Math.max(1, pyRound(Number(input4.duration_seconds ?? 5) * fps2)) / fps2;
+  const end = position + duration3;
+  const track2 = String(input4.track ?? "");
+  planOverlayTrack(project, position, end, track2);
+  const taken = project.files.map((f3) => String(f3.path ?? "")).filter((p) => p.toLowerCase().endsWith(".svg")).map(basename6);
+  const families = await installedFontFamilies2(call);
+  style.resolveFont(families);
+  for (const slot of slots2) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index));
+  const styleInfo = style.apply(doc, families);
+  const fitted = style.fit(doc, slots2);
+  const zone = textZone(slots2, artboardSize(doc)[1]);
+  const wanted = input4.screen_position ?? "auto";
+  const posKey = ZONE_POSITION[wanted === "auto" ? zone : wanted] ?? "center";
+  const lift = isVertical(project) ? VERTICAL_SAFE_OFFSET[posKey] ?? 0 : 0;
+  const firstText = slots2.map((s) => values.get(s.index) ?? "").find((v) => v.trim()) || name;
+  const fileName2 = uniqueTitleName(text(input4.file_name) || firstText, taken);
+  const media = await writeTitle(call, fileName2, titleSvgText(doc));
+  const fadeIn = Number(input4.fade_in_seconds ?? 0);
+  const fadeOut = Number(input4.fade_out_seconds ?? 0);
+  const placed = call.commit((tx) => {
+    const { layer: layer2, created } = planOverlayTrack(tx.project, position, end, track2);
+    const file3 = addFile(tx, media, { mediaType: "image" });
+    const props = { gravity: GRAVITY[posKey] };
+    if (lift) props.location_y = constantKeyframe2(lift);
+    const alpha = fadeAlpha(tx.project, 0, duration3, fadeIn, fadeOut);
+    if (alpha) props.alpha = alpha;
+    const clip2 = placeOverlayClip(tx, { fileId: file3.id, position, duration: duration3, layer: layer2, newTrackLabel: "Titles", props });
+    return { fileId: file3.id, clipId: clip2.id, layer: layer2, created };
   });
-  if (typeof placed === "string") return placed;
-  const duration3 = placed.start !== void 0 && placed.end !== void 0 ? placed.end - placed.start : options.duration;
-  const plan = options.track ? placed : { ...placed, layer: planOverlayTrack(call.doc.project, placed.position, placed.position + duration3, "").layer };
-  return { media: imported, plan, duration: duration3 };
+  const shown = slots2.map((s) => (values.get(s.index) ?? "").trim()).filter(Boolean).join(" / ") || name;
+  const t = trackInfo(call.doc.project, placed.layer);
+  const summary = `Added title ${pyReprString(shown)} (${name}) on track ${t.track ?? "None"} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s${placed.created ? " on a new track" : ""}.`;
+  const data = {
+    timeline_clip_id: placed.clipId,
+    file_id: placed.fileId,
+    path: media.path,
+    file_name: basename6(media.path),
+    template: name,
+    fields: fieldRows(slots2),
+    position: pyRoundTo(position, 3),
+    duration: pyRoundTo(duration3, 3),
+    end: pyRoundTo(end, 3),
+    new_track: placed.created,
+    screen_position: posKey,
+    ...t,
+    ...styleInfo
+  };
+  if (fadeIn || fadeOut) Object.assign(data, { fade_in: fadeIn, fade_out: fadeOut });
+  if (Object.keys(fitted).length > 0) data.text_shrunk_to_fit = fitted;
+  if (lift) data.lifted_for_vertical_ui = lift;
+  return applied(tool, summaryLine(summary), { data });
 }
-function placeTitle2(tx, title) {
-  ensureTrack(tx, title.plan.layer, "Titles");
-  const { file: file3, clip: clip2 } = addTitleClip(tx, { file: title.media, position: title.plan.position, duration: title.duration, layer: title.plan.layer });
-  return { fileId: String(file3.id), clip: clip2 };
-}
-var titleTools;
+var DEFAULT_TEMPLATES, ZONE_POSITION, VERTICAL_SAFE_OFFSET, titleTools;
 var init_titles2 = __esm({
   "../engine/src/tools/catalog/titles.ts"() {
     "use strict";
-    init_ids();
+    init_rounding();
+    init_files();
     init_overlays();
-    init_titles();
     init_templates();
+    init_title_svg();
     init_define();
-    init_placement();
     init_pyfmt();
     init_receipt();
     init_titles_text();
-    init_clips2();
     init_common();
+    init_title_templates();
+    DEFAULT_TEMPLATES = ["Bar_1", "Standard_1", "Footer_1"];
+    ZONE_POSITION = {
+      top: "top_center",
+      center: "center",
+      bottom: "bottom_center"
+    };
+    VERTICAL_SAFE_OFFSET = { bottom_center: -0.12, top_center: 0.06 };
     titleTools = [
       contractTool("add_title_tool", {
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
         requires: ["media", "assets"],
-        run: async (call, input4) => {
-          const tool = "add_title_tool";
-          const body = text(input4.text);
-          if (!body) return refused(tool, "Error: add_title_tool needs text.");
-          if (!call.host.media.writeGenerated) return unavailable(tool, "it cannot store generated title images.");
-          const tmplArg = text(input4.template);
-          const template = await loadTitleTemplate(call, tmplArg);
-          if (!template) return failed(tool, `Error: title template not found (${tmplArg || "default"}).`);
-          let pos;
-          let dur;
-          try {
-            pos = parseSecondsArg(input4.position_seconds, 0, "position_seconds") ?? 0;
-            dur = parseSecondsArg(input4.duration_seconds, 5, "duration_seconds") ?? 5;
-          } catch (error62) {
-            if (error62 instanceof TimeArgError) return refused(tool, `Error: ${error62.message}`);
-            throw error62;
-          }
-          if (!(dur > 0)) dur = 5;
-          const prepared = await prepareTitle(call, template, body, { position: pos, duration: dur, track: text(input4.track), fileName: text(input4.file_name) });
-          if (typeof prepared === "string") return failed(tool, prepared);
-          const placed = call.commit((tx) => placeTitle2(tx, prepared));
-          const place = placementText(call.doc.project, prepared.plan, placed.clip);
-          return applied(
-            tool,
-            `Added title ${pyReprString(body)} from template ${template.file} at ${pyFixed(pos, 3)}s for ${pyFixed(dur, 3)}s. ${place}`,
-            {
-              data: {
-                text: body,
-                path: prepared.media.path,
-                file_id: placed.fileId,
-                position_seconds: pos,
-                duration_seconds: dur,
-                template: template.file
-              },
-              notes: [place]
-            }
-          );
-        }
+        run: (call, input4) => guarded("add_title_tool", () => addTitle(call, input4))
       })
     ];
   }
@@ -84022,17 +84278,17 @@ function buildCatalog2() {
     ...projectRenderTools,
     ...projectPrefsTools
   ];
-  const byName2 = /* @__PURE__ */ new Map();
+  const byName = /* @__PURE__ */ new Map();
   for (const tool of [...implemented, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools]) {
-    if (byName2.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
-    byName2.set(tool.name, tool);
+    if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
+    byName.set(tool.name, tool);
   }
   const extra = implemented.filter((tool) => !tool.contract);
   if (extra.length > 0) throw new Error(`tool catalog: non-contract tools outside the direct list: ${extra.map((t) => t.name).join(", ")}`);
   const contract = [];
   const problems = [];
   for (const name of CONTRACT_TOOL_NAMES) {
-    const tool = byName2.get(name);
+    const tool = byName.get(name);
     if (PENDING_DESKTOP_TOOLS.has(name)) {
       if (tool) problems.push(`${name} is implemented: remove it from PENDING_DESKTOP_TOOLS`);
     } else if (DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name)) {
@@ -84159,7 +84415,8 @@ function needName(need) {
     "storage.recoveryCopies": "Zenvi desktop's recovery copies",
     "storage.customProfiles": "Zenvi desktop's custom profiles folder",
     "media.collect": "copying media into the project's folder",
-    "exporter.supports": "checking which codecs it can encode"
+    "exporter.supports": "checking which codecs it can encode",
+    "frames.fontFamilies": "listing the fonts titles render with"
   };
   return names2[need];
 }
@@ -84200,7 +84457,7 @@ function toolAvailability(tool) {
 function availabilityMatrix(tools) {
   return tools.map((tool) => ({ tool, availability: toolAvailability(tool) }));
 }
-var WATCH, SERVER_ASR, WATCH_NOTE, COMFYUI, TOOL_NEEDS, SURFACE_PROFILES;
+var WATCH, SERVER_ASR, WATCH_NOTE, FONTS_UNCHECKED, COMFYUI, TOOL_NEEDS, SURFACE_PROFILES;
 var init_availability = __esm({
   "../engine/src/tools/availability.ts"() {
     "use strict";
@@ -84209,6 +84466,7 @@ var init_availability = __esm({
     WATCH = ["frames", "backend"];
     SERVER_ASR = "speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free";
     WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
+    FONTS_UNCHECKED = "a font is not checked against the installed fonts (the browser does not list them): one it does not have falls back to another, and a template font it lacks is kept";
     COMFYUI = "the local ComfyUI server Zenvi desktop drives (Preferences > AI > ComfyUI URL)";
     TOOL_NEEDS = {
       // Placement and search refine with a vision watch when the host can watch.
@@ -84235,7 +84493,11 @@ var init_availability = __esm({
       // Hosted surfaces do not download third-party pages (terms of service, blocked server addresses): only the person's own computer does.
       ingest_web_video_tool: { methods: ["media.fetchWebVideo"] },
       generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
-      add_title_tool: { methods: ["media.writeGenerated"] },
+      add_title_tool: {
+        methods: ["media.writeGenerated"],
+        optional: ["frames.fontFamilies"],
+        partialNote: FONTS_UNCHECKED
+      },
       add_captions_tool: {
         optional: ["media.writeGenerated", "storage.readText", "audio.transcribe"],
         partialNote: "captions not tied to a clip need stored generated media; srtPath needs file reading; media Zenvi has not indexed needs speech recognition"
@@ -84249,7 +84511,9 @@ var init_availability = __esm({
       list_title_templates_tool: { optional: ["storage.readText"], partialNote: "kind=project needs reading project files" },
       edit_title_tool: {
         methods: ["media.writeGenerated", "storage.readText"],
-        webNote: "the edited version is a new Project Files entry (new file_id) in every clip; fonts are not checked against installed fonts"
+        optional: ["frames.fontFamilies"],
+        partialNote: FONTS_UNCHECKED,
+        webNote: "the edited version is a new Project Files entry (new file_id) in every clip"
       },
       add_animated_title_tool: {
         methods: ["media.writeGenerated"],
@@ -84299,6 +84563,13 @@ var init_availability = __esm({
       match_color_to_reference_tool: { optional: ["media.importPath"], partialNote: "referenceImagePath needs local file access" },
       list_luts_tool: { webNote: "the 50 built-in LUTs; the desktop also lists the user's LUT folder" },
       process_clip_effect_tool: { desktopOnly: "OpenCV clip analysis (Stabilizer, Tracker, Object Detector, Object Mask)" },
+      add_effect_tool: {
+        webNote: "Stabilizer, Tracker, Object Detector and Object Mask need Zenvi desktop's OpenCV analysis and are refused; Outline is kept for Zenvi desktop to draw"
+      },
+      set_keyframes_tool: {
+        webNote: "animates volume, alpha, location_x/y, scale_x/y and rotation (Zenvi desktop: any keyframable clip property) and needs a value for every point (the desktop keeps the curve's value at a point without one)"
+      },
+      set_export_setting_tool: { webNote: "stores a key and value as given (Zenvi desktop checks keys and values first)" },
       transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
       remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
       detect_beats_tool: { methods: ["audio.decodePcm"] },
@@ -84380,6 +84651,11 @@ var init_availability = __esm({
         optional: ["storage.customProfiles"],
         partialNote: "a size or frame rate no built-in profile has needs a custom profile, which only Zenvi desktop and the zenvi CLI keep"
       },
+      set_project_setting_tool: {
+        optional: ["storage.customProfiles"],
+        partialNote: "a size or frame rate no built-in profile has needs a custom profile, which only Zenvi desktop and the zenvi CLI keep",
+        webNote: "save_as_default is refused: the web editor's settings have no default sample rate or channels for new projects, and the CLI and Zenvi Cloud have no editor settings"
+      },
       manage_custom_profiles_tool: {
         methods: ["storage.customProfiles"],
         webNote: "Zenvi desktop's profiles folder on this computer; set_default is refused (the default profile is a Zenvi desktop preference)"
@@ -84455,7 +84731,8 @@ var init_availability = __esm({
           "media.collect",
           "audio.decodePcm",
           "audio.transcribe",
-          "exporter.supports"
+          "exporter.supports",
+          "frames.fontFamilies"
         ],
         conditional: { backend: "signed in with zenvi login", "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks" }
       },
@@ -84474,7 +84751,8 @@ var init_availability = __esm({
           "storage.currentPath",
           "storage.recentProjects",
           "audio.decodePcm",
-          "audio.transcribe"
+          "audio.transcribe",
+          "frames.fontFamilies"
         ],
         conditional: {
           frames: "the render worker is configured",
@@ -85075,15 +85353,15 @@ var init_parseUtil = __esm({
           message: issueData.message
         };
       }
-      let errorMessage2 = "";
+      let errorMessage3 = "";
       const maps = errorMaps.filter((m) => !!m).slice().reverse();
       for (const map2 of maps) {
-        errorMessage2 = map2(fullIssue, { data, defaultError: errorMessage2 }).message;
+        errorMessage3 = map2(fullIssue, { data, defaultError: errorMessage3 }).message;
       }
       return {
         ...issueData,
         path: fullPath,
-        message: errorMessage2
+        message: errorMessage3
       };
     };
     ParseStatus = class _ParseStatus {
@@ -90516,19 +90794,19 @@ var init_Refs = __esm({
 });
 
 // ../../node_modules/zod-to-json-schema/dist/esm/errorMessages.js
-function addErrorMessage(res, key2, errorMessage2, refs) {
+function addErrorMessage(res, key2, errorMessage3, refs) {
   if (!refs?.errorMessages)
     return;
-  if (errorMessage2) {
+  if (errorMessage3) {
     res.errorMessage = {
       ...res.errorMessage,
-      [key2]: errorMessage2
+      [key2]: errorMessage3
     };
   }
 }
-function setResponseValueAndErrors(res, key2, value, errorMessage2, refs) {
+function setResponseValueAndErrors(res, key2, value, errorMessage3, refs) {
   res[key2] = value;
-  addErrorMessage(res, key2, errorMessage2, refs);
+  addErrorMessage(res, key2, errorMessage3, refs);
 }
 var init_errorMessages = __esm({
   "../../node_modules/zod-to-json-schema/dist/esm/errorMessages.js"() {
@@ -92150,8 +92428,8 @@ var init_protocol = __esm({
                       if (queuedMessage.type === "response") {
                         resolver(message);
                       } else {
-                        const errorMessage2 = message;
-                        const error62 = new McpError(errorMessage2.error.code, errorMessage2.error.message, errorMessage2.error.data);
+                        const errorMessage3 = message;
+                        const error62 = new McpError(errorMessage3.error.code, errorMessage3.error.message, errorMessage3.error.data);
                         resolver(error62);
                       }
                     } else {
@@ -106305,8 +106583,8 @@ var init_client3 = __esm({
           const wrappedHandler = async (request, extra) => {
             const validatedRequest = safeParse3(ElicitRequestSchema, request);
             if (!validatedRequest.success) {
-              const errorMessage2 = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation request: ${errorMessage2}`);
+              const errorMessage3 = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation request: ${errorMessage3}`);
             }
             const { params } = validatedRequest.data;
             params.mode = params.mode ?? "form";
@@ -106321,15 +106599,15 @@ var init_client3 = __esm({
             if (params.task) {
               const taskValidationResult = safeParse3(CreateTaskResultSchema, result2);
               if (!taskValidationResult.success) {
-                const errorMessage2 = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
-                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage2}`);
+                const errorMessage3 = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
+                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage3}`);
               }
               return taskValidationResult.data;
             }
             const validationResult = safeParse3(ElicitResultSchema, result2);
             if (!validationResult.success) {
-              const errorMessage2 = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation result: ${errorMessage2}`);
+              const errorMessage3 = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation result: ${errorMessage3}`);
             }
             const validatedResult = validationResult.data;
             const requestedSchema = params.mode === "form" ? params.requestedSchema : void 0;
@@ -106349,16 +106627,16 @@ var init_client3 = __esm({
           const wrappedHandler = async (request, extra) => {
             const validatedRequest = safeParse3(CreateMessageRequestSchema, request);
             if (!validatedRequest.success) {
-              const errorMessage2 = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid sampling request: ${errorMessage2}`);
+              const errorMessage3 = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid sampling request: ${errorMessage3}`);
             }
             const { params } = validatedRequest.data;
             const result2 = await Promise.resolve(handler(request, extra));
             if (params.task) {
               const taskValidationResult = safeParse3(CreateTaskResultSchema, result2);
               if (!taskValidationResult.success) {
-                const errorMessage2 = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
-                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage2}`);
+                const errorMessage3 = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
+                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage3}`);
               }
               return taskValidationResult.data;
             }
@@ -106366,8 +106644,8 @@ var init_client3 = __esm({
             const resultSchema = hasTools ? CreateMessageResultWithToolsSchema : CreateMessageResultSchema;
             const validationResult = safeParse3(resultSchema, result2);
             if (!validationResult.success) {
-              const errorMessage2 = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid sampling result: ${errorMessage2}`);
+              const errorMessage3 = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid sampling result: ${errorMessage3}`);
             }
             return validationResult.data;
           };
@@ -107241,8 +107519,8 @@ async function parseErrorResponse(input4) {
     const errorClass = OAUTH_ERRORS[error62] || ServerError;
     return new errorClass(error_description || "", error_uri);
   } catch (error62) {
-    const errorMessage2 = `${statusCode ? `HTTP ${statusCode}: ` : ""}Invalid OAuth error response: ${error62}. Raw body: ${body}`;
-    return new ServerError(errorMessage2);
+    const errorMessage3 = `${statusCode ? `HTTP ${statusCode}: ` : ""}Invalid OAuth error response: ${error62}. Raw body: ${body}`;
+    return new ServerError(errorMessage3);
   }
 }
 function issuersMatch(a, b) {
@@ -109210,6 +109488,7 @@ function registerEditCommands(program2, ctx) {
     });
   });
   program2.command("keyframe").description("animate a clip property (volume, alpha, location_x/y, scale_x/y, rotation) with time=value points; replaces its curve").argument("<clip>", "clip id").argument("<property>", "property name").argument("<points...>", "time=value (timeline time), or f<frame>=value (the clip's 1-based source frame)").option("--clip-time", "times are seconds into the clip's source instead of timeline times").action(async (clip2, property, points2, opts) => {
+    const unit2 = opts.clipTime ? "source_seconds" : "timeline_seconds";
     const parsed = points2.map((p) => {
       const eq = p.indexOf("=");
       if (eq <= 0) throw new CliError(`Use time=value, e.g. 0=1 2.5=0 (got "${p}").`, 2);
@@ -109217,37 +109496,17 @@ function registerEditCommands(program2, ctx) {
       const value = Number(p.slice(eq + 1));
       if (!Number.isFinite(value)) throw new CliError(`Not a number: ${p.slice(eq + 1)}`, 2);
       const frame = /^f(\d+)$/i.exec(at);
-      return frame ? { frame: Number(frame[1]), value } : { seconds: parseTime(at), value };
+      return frame ? { frame: Number(frame[1]), value } : { [unit2]: parseTime(at), value };
     });
-    await withExecutor(ctx, async (executor) => {
-      let points_ = parsed;
-      if (!opts.clipTime && parsed.some((p) => p.seconds !== void 0)) {
-        const listing = await executor.call("list_clips_tool", {});
-        const clips = listing.receipt?.data?.clips ?? [];
-        const found = clips.find((c) => c.id === clip2);
-        if (!found || typeof found.position !== "number" || typeof found.start !== "number") {
-          throw new CliError(`Cannot find timeline clip '${clip2}' to place its keyframes; give f<frame>=value points or --clip-time.`);
-        }
-        const { position, start } = found;
-        points_ = parsed.map((p) => {
-          if (p.seconds === void 0) return p;
-          const seconds2 = p.seconds - position + start;
-          if (seconds2 < 0) throw new CliError(`${p.seconds}s is before the clip starts on the timeline (${position}s).`, 2);
-          return { seconds: Math.round(seconds2 * 1e6) / 1e6, value: p.value };
-        });
-      }
-      printOutcome(
-        ctx,
-        await executor.call(
-          "set_keyframes_tool",
-          toolArgs(ctx, "set_keyframes_tool", [
-            [CLIP, clip2],
-            [["property"], property],
-            [["points"], points_]
-          ])
-        )
-      );
-    });
+    await runToolCommand(
+      ctx,
+      "set_keyframes_tool",
+      toolArgs(ctx, "set_keyframes_tool", [
+        [CLIP, clip2],
+        [["property"], property],
+        [["points"], parsed]
+      ])
+    );
   });
   const marker2 = program2.command("marker").description("timeline markers");
   marker2.command("add").argument("<time>", "timeline time").argument("[label]", "label").action(async (time3, label2) => {
@@ -111368,8 +111627,8 @@ var init_registry5 = __esm({
        */
       async connect(host) {
         const file3 = path31.join(linkDirOf(this.desktopDir), `${host}.json`);
-        const cached4 = this.clients.get(host);
-        if (cached4) {
+        const cached5 = this.clients.get(host);
+        if (cached5) {
           const raw = await readFile13(file3, "utf8").catch(() => "");
           let key2 = "";
           try {
@@ -111378,7 +111637,7 @@ var init_registry5 = __esm({
           } catch {
             key2 = "";
           }
-          if (key2 === cached4.key && pidAlive3(cached4.endpoint.pid)) return { ok: true, client: cached4.client, endpoint: cached4.endpoint };
+          if (key2 === cached5.key && pidAlive3(cached5.endpoint.pid)) return { ok: true, client: cached5.client, endpoint: cached5.endpoint };
           await this.dropClient(host);
         }
         const discovery = await inspectHost(this.desktopDir, host, { removeStale: true, clientVersion: this.options.clientVersion });
@@ -111406,10 +111665,10 @@ var init_registry5 = __esm({
       }
       /** Forget an app's client (after a transport failure). */
       async dropClient(host) {
-        const cached4 = this.clients.get(host);
+        const cached5 = this.clients.get(host);
         this.clients.delete(host);
         this.invalidate();
-        await cached4?.client.close();
+        await cached5?.client.close();
       }
       async close() {
         await Promise.all([...this.clients.keys()].map((host) => this.dropClient(host)));
@@ -112147,23 +112406,23 @@ var init_server2 = __esm({
           const wrappedHandler = async (request, extra) => {
             const validatedRequest = safeParse3(CallToolRequestSchema, request);
             if (!validatedRequest.success) {
-              const errorMessage2 = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call request: ${errorMessage2}`);
+              const errorMessage3 = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call request: ${errorMessage3}`);
             }
             const { params } = validatedRequest.data;
             const result2 = await Promise.resolve(handler(request, extra));
             if (params.task) {
               const taskValidationResult = safeParse3(CreateTaskResultSchema, result2);
               if (!taskValidationResult.success) {
-                const errorMessage2 = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
-                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage2}`);
+                const errorMessage3 = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
+                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage3}`);
               }
               return taskValidationResult.data;
             }
             const validationResult = safeParse3(CallToolResultSchema, result2);
             if (!validationResult.success) {
-              const errorMessage2 = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call result: ${errorMessage2}`);
+              const errorMessage3 = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call result: ${errorMessage3}`);
             }
             return validationResult.data;
           };
@@ -112756,12 +113015,12 @@ var init_mcp = __esm({
        * @param errorMessage - The error message.
        * @returns The tool error result.
        */
-      createToolError(errorMessage2) {
+      createToolError(errorMessage3) {
         return {
           content: [
             {
               type: "text",
-              text: errorMessage2
+              text: errorMessage3
             }
           ],
           isError: true
@@ -112779,8 +113038,8 @@ var init_mcp = __esm({
         const parseResult = await safeParseAsync3(schemaToParse, args);
         if (!parseResult.success) {
           const error62 = "error" in parseResult ? parseResult.error : "Unknown error";
-          const errorMessage2 = getParseErrorMessage(error62);
-          throw new McpError(ErrorCode.InvalidParams, `Input validation error: Invalid arguments for tool ${toolName}: ${errorMessage2}`);
+          const errorMessage3 = getParseErrorMessage(error62);
+          throw new McpError(ErrorCode.InvalidParams, `Input validation error: Invalid arguments for tool ${toolName}: ${errorMessage3}`);
         }
         return parseResult.data;
       }
@@ -112804,8 +113063,8 @@ var init_mcp = __esm({
         const parseResult = await safeParseAsync3(outputObj, result2.structuredContent);
         if (!parseResult.success) {
           const error62 = "error" in parseResult ? parseResult.error : "Unknown error";
-          const errorMessage2 = getParseErrorMessage(error62);
-          throw new McpError(ErrorCode.InvalidParams, `Output validation error: Invalid structured content for tool ${toolName}: ${errorMessage2}`);
+          const errorMessage3 = getParseErrorMessage(error62);
+          throw new McpError(ErrorCode.InvalidParams, `Output validation error: Invalid structured content for tool ${toolName}: ${errorMessage3}`);
         }
       }
       /**
@@ -113017,8 +113276,8 @@ var init_mcp = __esm({
             const parseResult = await safeParseAsync3(argsObj, request.params.arguments);
             if (!parseResult.success) {
               const error62 = "error" in parseResult ? parseResult.error : "Unknown error";
-              const errorMessage2 = getParseErrorMessage(error62);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid arguments for prompt ${request.params.name}: ${errorMessage2}`);
+              const errorMessage3 = getParseErrorMessage(error62);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid arguments for prompt ${request.params.name}: ${errorMessage3}`);
             }
             const args = parseResult.data;
             const cb = prompt.callback;
@@ -119232,10 +119491,10 @@ function unknownToolResult(name) {
   return { ok: false, text: JSON.stringify(receipt2), data: receipt2 };
 }
 function createRegistry(list2, engine = {}) {
-  const byName2 = new Map(list2.map((t) => [t.name, t]));
+  const byName = new Map(list2.map((t) => [t.name, t]));
   return {
     tools: list2,
-    get: (name) => byName2.get(name),
+    get: (name) => byName.get(name),
     list(surface, host, options = {}) {
       if (engine.listTools) return engine.listTools({ surface, host, includeUnavailable: options.includeUnavailable });
       return list2.filter(
@@ -119244,7 +119503,7 @@ function createRegistry(list2, engine = {}) {
     },
     async run(ctx, name, args, surface) {
       if (engine.runTool) return engine.runTool(ctx, name, args ?? {}, surface ? { surface } : {});
-      const tool = byName2.get(name);
+      const tool = byName.get(name);
       if (!tool || surface && !tool.surfaces.includes(surface)) return unknownToolResult(name);
       return tool.run(ctx, args ?? {});
     }

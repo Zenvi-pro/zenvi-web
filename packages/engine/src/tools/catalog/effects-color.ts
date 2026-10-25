@@ -1,8 +1,9 @@
 /**
  * Effects-color editor tools, part 1: the effect catalog and editing the
  * effects on clips — list_effects_tool, get_clip_effects_tool,
- * update_effect_tool, remove_effect_tool, copy_effects_tool — and
- * process_clip_effect_tool, which the web surfaces refuse.
+ * add_effect_tool, update_effect_tool, remove_effect_tool,
+ * copy_effects_tool — and process_clip_effect_tool, which the web surfaces
+ * refuse (add_effect_tool refuses the same analysis effects).
  *
  * Ports of zenvi-core develop (1f80cb3d0) src/classes/editor_tools/
  * effects_color.py and effects_color_process.py: same arguments, validation,
@@ -21,8 +22,10 @@ import { sameJson } from "../../ops/internal.js";
 import { contractTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { LutError, resolveCheckedLut } from "../luts.js";
 import { pyReprString } from "../pyfmt.js";
+import { applied } from "../receipt.js";
 import {
   COMMON_PROPERTIES,
+  PROCESSING_EFFECTS,
   effectCatalog,
   effectKind,
   normName,
@@ -40,6 +43,7 @@ import {
   lockedMessage,
   resolveClipsList,
   resolveOneClip,
+  splitCompatible,
   targetClips,
   type EffectTargets,
   type SkippedClip,
@@ -159,6 +163,44 @@ async function effectsToEdit(
   return { targets: out, skipped };
 }
 
+/** Why the OpenCV analysis effects (Stabilizer, Tracker, Object Detector, Object Mask) are refused here. */
+function analysisOnDesktop(effect: string): string {
+  return (
+    `${effect} analysis (Stabilizer, Tracker, Object Detector, Object Mask) runs on OpenCV inside Zenvi desktop only. ` +
+    "Open the project in Zenvi desktop to stabilize, track or detect objects; the effects it adds play back there."
+  );
+}
+
+/**
+ * effects_color._add_or_update_plan: one clip's new effect list and its
+ * receipt row (validation only; nothing saved). The clip's first effect of
+ * the class is updated with `properties` when if_exists is "update";
+ * otherwise a new effect is appended with them.
+ */
+function addOrUpdatePlan(
+  ctx: ValueContext,
+  clip: Clip,
+  className: string,
+  properties: unknown,
+  ifExists: string,
+  interpolation: string,
+  newEffect: (className: string) => Effect,
+): { effects: Effect[]; row: Record<string, unknown>; changed: boolean } {
+  const effects = clipEffects(clip).map((e) => structuredClone(e));
+  const existing = effects.findIndex((e) => e.class_name === className);
+  if (existing >= 0 && ifExists === "update") {
+    const current = effects[existing]!;
+    const changed = changedValues(current, prepareProperties(ctx, className, properties, current, clip, interpolation));
+    Object.assign(current, changed);
+    const any = Object.keys(changed).length > 0;
+    return { effects, row: { timeline_clip_id: clip.id, effect_id: current.id ?? null, action: any ? "updated" : "unchanged" }, changed: any };
+  }
+  const effect = newEffect(className);
+  Object.assign(effect, prepareProperties(ctx, className, properties, effect, clip, interpolation));
+  effects.push(effect);
+  return { effects, row: { timeline_clip_id: clip.id, effect_id: effect.id, action: "added" }, changed: true };
+}
+
 export const effectsColorTools: CatalogTool[] = [
   contractTool("list_effects_tool", {
     annotations: READ,
@@ -225,6 +267,48 @@ export const effectsColorTools: CatalogTool[] = [
           summary = `Clip ${String(rows[0]!.timeline_clip_id)} has ${total} effect(s): ${names}`;
         }
         return ok(call, summary, { clips: rows });
+      }),
+  }),
+
+  contractTool("add_effect_tool", {
+    annotations: EDIT,
+    run: (call, input) =>
+      editorRun(async () => {
+        const name = String(input.effect || input.effect_name || "").trim();
+        if (!name) throw new ToolError('add_effect_tool needs effect (e.g. "Blur"; list_effects_tool lists them)');
+        const className = resolveEffectName(name);
+        // The desktop runs these effects' OpenCV analysis (process_clip_effect_tool); no web renderer has OpenCV.
+        if ((PROCESSING_EFFECTS as readonly string[]).includes(className)) return unavailable(call.tool, analysisOnDesktop(className));
+        const project = call.doc.project;
+        const { clips, explicit } = await targetClips(call, input);
+        const { ok: compatible, skipped } = splitCompatible(project, clips, explicit, className);
+        const ctx = await valueContext(call, input.properties);
+        const newEffect = newEffectFactory(call);
+        const changes: [string, Effect[]][] = [];
+        const rows: Record<string, unknown>[] = [];
+        for (const clip of compatible) {
+          const plan = addOrUpdatePlan(ctx, clip, className, input.properties, input.if_exists ?? "update", input.interpolation ?? "bezier", newEffect);
+          rows.push(plan.row);
+          if (plan.changed) changes.push([clip.id, plan.effects]);
+        }
+        const display = effectCatalog().get(className)!.name;
+        if (changes.length === 0) {
+          return nothingChanged(call, `${display} is already on ${rows.length} clip(s) with these settings; nothing changed.`, { effect: className, clips: rows, skipped });
+        }
+        call.commit((tx) => {
+          for (const [cid, effects] of changes) setClipEffects(tx, cid, effects);
+        });
+        const added = rows.filter((r) => r.action === "added").length;
+        const updated = rows.filter((r) => r.action === "updated").length;
+        const parts = [added ? `added ${display} to ${added} clip(s)` : "", updated ? `updated the existing ${display} on ${updated} clip(s)` : ""].filter(Boolean);
+        let summary = parts.join(" and ");
+        summary = `${summary.slice(0, 1).toUpperCase()}${summary.slice(1)}.`;
+        if (skipped.length > 0) summary += ` Skipped ${skipped.length} clip(s).`;
+        const first = rows[0]!;
+        const data = { effect: className, effect_id: first.effect_id, timeline_clip_id: first.timeline_clip_id, clips: rows, skipped, changed: true };
+        // Outline is drawn with OpenCV: kept in the project for Zenvi desktop, not drawn by the web renderers.
+        const warnings = rendersHere(className) ? [] : [`${display} is drawn by Zenvi desktop only (OpenCV): the web editor, the zenvi CLI and Zenvi Cloud render these clips without it.`];
+        return applied(call.tool, summary, { data, warnings });
       }),
   }),
 
@@ -374,11 +458,6 @@ export const effectsColorTools: CatalogTool[] = [
     annotations: EDIT,
     // effects_color_process.py runs libopenshot's OpenCV ClipProcessingJobs (stabilization, tracking,
     // YOLO detection, EfficientSAM/Cutie masks) on the clip; no web renderer has OpenCV.
-    run: (call, input) =>
-      unavailable(
-        call.tool,
-        `${input.effect} analysis (Stabilizer, Tracker, Object Detector, Object Mask) runs on OpenCV inside Zenvi desktop only. ` +
-          "Open the project in Zenvi desktop to stabilize, track or detect objects; the effects it adds play back there.",
-      ),
+    run: (call, input) => unavailable(call.tool, analysisOnDesktop(String(input.effect))),
   }),
 ];

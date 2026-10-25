@@ -50,7 +50,8 @@ export type HostMethod =
   | "storage.recoveryCopies"
   | "storage.customProfiles"
   | "media.collect"
-  | "exporter.supports";
+  | "exporter.supports"
+  | "frames.fontFamilies";
 
 export interface ToolNeeds {
   /** All of these, or the tool refuses. */
@@ -71,6 +72,9 @@ const WATCH = ["frames", "backend"] as (HostCapability | HostMethod)[];
 const SERVER_ASR =
   "speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free";
 const WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
+/** Where a host cannot list its fonts (the browser), a title's font is taken as given, as the desktop does without Qt's list. */
+const FONTS_UNCHECKED =
+  "a font is not checked against the installed fonts (the browser does not list them): one it does not have falls back to another, and a template font it lacks is kept";
 /** The desktop's ComfyUI integration: a server on the person's computer, set in its preferences. */
 const COMFYUI = "the local ComfyUI server Zenvi desktop drives (Preferences > AI > ComfyUI URL)";
 
@@ -100,7 +104,11 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   // Hosted surfaces do not download third-party pages (terms of service, blocked server addresses): only the person's own computer does.
   ingest_web_video_tool: { methods: ["media.fetchWebVideo"] },
   generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
-  add_title_tool: { methods: ["media.writeGenerated"] },
+  add_title_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["frames.fontFamilies"],
+    partialNote: FONTS_UNCHECKED,
+  },
   add_captions_tool: {
     optional: ["media.writeGenerated", "storage.readText", "audio.transcribe"],
     partialNote: "captions not tied to a clip need stored generated media; srtPath needs file reading; media Zenvi has not indexed needs speech recognition",
@@ -114,7 +122,9 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   list_title_templates_tool: { optional: ["storage.readText"], partialNote: "kind=project needs reading project files" },
   edit_title_tool: {
     methods: ["media.writeGenerated", "storage.readText"],
-    webNote: "the edited version is a new Project Files entry (new file_id) in every clip; fonts are not checked against installed fonts",
+    optional: ["frames.fontFamilies"],
+    partialNote: FONTS_UNCHECKED,
+    webNote: "the edited version is a new Project Files entry (new file_id) in every clip",
   },
   add_animated_title_tool: {
     methods: ["media.writeGenerated"],
@@ -164,6 +174,14 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   match_color_to_reference_tool: { optional: ["media.importPath"], partialNote: "referenceImagePath needs local file access" },
   list_luts_tool: { webNote: "the 50 built-in LUTs; the desktop also lists the user's LUT folder" },
   process_clip_effect_tool: { desktopOnly: "OpenCV clip analysis (Stabilizer, Tracker, Object Detector, Object Mask)" },
+  add_effect_tool: {
+    webNote: "Stabilizer, Tracker, Object Detector and Object Mask need Zenvi desktop's OpenCV analysis and are refused; Outline is kept for Zenvi desktop to draw",
+  },
+  set_keyframes_tool: {
+    webNote:
+      "animates volume, alpha, location_x/y, scale_x/y and rotation (Zenvi desktop: any keyframable clip property) and needs a value for every point (the desktop keeps the curve's value at a point without one)",
+  },
+  set_export_setting_tool: { webNote: "stores a key and value as given (Zenvi desktop checks keys and values first)" },
   transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
   remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
@@ -245,6 +263,12 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   set_project_profile_tool: {
     optional: ["storage.customProfiles"],
     partialNote: "a size or frame rate no built-in profile has needs a custom profile, which only Zenvi desktop and the zenvi CLI keep",
+  },
+  set_project_setting_tool: {
+    optional: ["storage.customProfiles"],
+    partialNote: "a size or frame rate no built-in profile has needs a custom profile, which only Zenvi desktop and the zenvi CLI keep",
+    webNote:
+      "save_as_default is refused: the web editor's settings have no default sample rate or channels for new projects, and the CLI and Zenvi Cloud have no editor settings",
   },
   manage_custom_profiles_tool: {
     methods: ["storage.customProfiles"],
@@ -336,6 +360,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "audio.decodePcm",
       "audio.transcribe",
       "exporter.supports",
+      "frames.fontFamilies",
     ],
     conditional: { backend: "signed in with zenvi login", "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks" },
   },
@@ -355,6 +380,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.recentProjects",
       "audio.decodePcm",
       "audio.transcribe",
+      "frames.fontFamilies",
     ],
     conditional: {
       frames: "the render worker is configured",
@@ -431,6 +457,7 @@ function needName(need: HostCapability | HostMethod): string {
     "storage.customProfiles": "Zenvi desktop's custom profiles folder",
     "media.collect": "copying media into the project's folder",
     "exporter.supports": "checking which codecs it can encode",
+    "frames.fontFamilies": "listing the fonts titles render with",
   };
   return names[need as HostMethod];
 }

@@ -10981,7 +10981,7 @@ function cacheDir(env = process.env) {
   if (process.platform === "win32") return path2.join(env.LOCALAPPDATA || path2.join(home, "AppData", "Local"), "zenvi", "Cache");
   return path2.join(env.XDG_CACHE_HOME || path2.join(home, ".cache"), "zenvi");
 }
-var CACHE_VERSION = 2;
+var CACHE_VERSION = 3;
 async function readCache(file) {
   try {
     const parsed = JSON.parse(await readFile(file, "utf8"));
@@ -11073,9 +11073,10 @@ function parseNameTable(table) {
     const start = stringOffset + offset;
     if (start + length > table.byteLength) continue;
     const name = decodeName(table.subarray(start, start + length), platform).trim();
-    if (name) names2.add(name.toLowerCase());
+    if (name) names2.add(name);
   }
-  return [...names2];
+  const seen = /* @__PURE__ */ new Set();
+  return [...names2].filter((name) => !seen.has(name.toLowerCase()) && seen.add(name.toLowerCase()));
 }
 async function readAt(handle2, position, length) {
   const buffer = new Uint8Array(length);
@@ -11137,16 +11138,28 @@ var FontIndex = class _FontIndex {
   constructor(faces) {
     this.faces = faces;
     for (const face of faces) {
-      for (const family of face.families) {
+      for (const name of face.families) {
+        const family = name.toLowerCase();
         const list = this.byFamily.get(family) ?? [];
         list.push(face);
         this.byFamily.set(family, list);
+        if (!this.spelling.has(family)) this.spelling.set(family, name);
       }
     }
     for (const list of this.byFamily.values()) list.sort((a, b) => a.size - b.size);
   }
   faces;
   byFamily = /* @__PURE__ */ new Map();
+  /** Lowercased family → the name as the first font with it spells it. */
+  spelling = /* @__PURE__ */ new Map();
+  /**
+   * The families installed, as the fonts spell them, sorted: what a tool may
+   * name in an SVG title (a Qt font database's `families()`). Hidden system
+   * families (".SF NS") are left out.
+   */
+  familyNames() {
+    return [...this.spelling.values()].filter((name) => !name.startsWith(".")).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  }
   /**
    * Index the fonts in `dirs`. Family names are cached on disk by
    * path/size/mtime, so later processes only list and stat the folders.

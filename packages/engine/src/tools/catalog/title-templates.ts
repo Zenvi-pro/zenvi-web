@@ -13,7 +13,9 @@
  * here the new version is a new entry that takes the old one's place in
  * every clip and in the bin, in the same undo step, because web hosts store
  * media by content and never change the bytes behind a file id. Fonts are
- * not checked against an installed list (the hosts cannot tell).
+ * checked against the fonts the host renders titles with where it can list
+ * them (`FrameHost.fontFamilies`: the CLI, Zenvi Cloud), and taken as given
+ * where it cannot (the browser), like the desktop without Qt's list.
  */
 
 import type { Clip, Project, ProjectFile } from "../../model/types.js";
@@ -29,6 +31,7 @@ import {
   fitField,
   fontFamily,
   freeName,
+  installedFontForTitle,
   parseTitleSvg,
   rectNodes,
   setBackground,
@@ -48,7 +51,18 @@ import { contractTool, unavailable, type ToolCall } from "../define.js";
 import { pyReprString } from "../pyfmt.js";
 import { applied } from "../receipt.js";
 import type { AssetHost, ImportedMedia } from "../types.js";
-import { OVERLAY_ROLE, colorHexAlpha, guarded, isLocked, pyRoundTo, summaryLine, toolError, uiTrackNumber } from "../titles-text.js";
+import {
+  OVERLAY_ROLE,
+  colorHexAlpha,
+  guarded,
+  installedFontFamilies,
+  isLocked,
+  pyRoundTo,
+  resolveFont,
+  summaryLine,
+  toolError,
+  uiTrackNumber,
+} from "../titles-text.js";
 import { animatedCatalog } from "./animated-titles.js";
 
 /** What each bundled template looks like (titles_text.py TEMPLATE_PURPOSE, from rendering all 50). */
@@ -114,7 +128,7 @@ function errorMessage(error: unknown): string {
 }
 
 /** `_field_rows`. */
-function fieldRows(slots: readonly TextField[]): { index: number; role: string; text: string }[] {
+export function fieldRows(slots: readonly TextField[]): { index: number; role: string; text: string }[] {
   return slots.map((s) => ({ index: s.index, role: s.role, text: s.text.trim() }));
 }
 
@@ -134,7 +148,8 @@ export interface TitleStyleArgs {
 
 /** Validated font / colour / size changes for a title document (`_Style`). */
 export class TitleStyle {
-  readonly font: string;
+  /** As given until `resolveFont` matches it to an installed family. */
+  font: string;
   readonly bold: boolean | null;
   readonly italic: boolean | null;
   readonly fontScale: number;
@@ -147,8 +162,7 @@ export class TitleStyle {
     const style = args.font_style ?? "";
     if (!["", "bold", "normal"].includes(weight)) toolError("font_weight must be '', 'bold' or 'normal'");
     if (!["", "italic", "normal"].includes(style)) toolError("font_style must be '', 'italic' or 'normal'");
-    // The hosts cannot list installed fonts, so a font is taken as given (resolve_font without a list).
-    this.font = String(args.font ?? "").trim().replace(/^['"]+|['"]+$/g, "");
+    this.font = String(args.font ?? "").trim();
     this.bold = weight === "" ? null : weight === "bold";
     this.italic = style === "" ? null : style === "italic";
     this.fontScale = Number(args.font_scale || 1);
@@ -161,10 +175,31 @@ export class TitleStyle {
     return Boolean(this.font || this.bold !== null || this.italic !== null || Math.abs(this.fontScale - 1) > 1e-9 || this.textColor || this.background);
   }
 
-  /** `apply`: write the changes; returns the receipt fields they produce. */
-  apply(doc: TitleDoc): Record<string, unknown> {
+  /**
+   * `resolve_font`: the requested family matched against the host's fonts
+   * (refused when it is not installed); taken as given when the host cannot
+   * list them (`families` null, the browser).
+   */
+  resolveFont(families: readonly string[] | null): void {
+    if (this.font) this.font = resolveFont(this.font, families);
+  }
+
+  /**
+   * `apply`: write the changes; returns the receipt fields they produce. With
+   * no font requested, a template font the host does not have becomes the
+   * Title Editor's installed fallback (`installed_font_for_title`).
+   */
+  apply(doc: TitleDoc, families: readonly string[] | null = null): Record<string, unknown> {
     const info: Record<string, unknown> = {};
     const nodes = [...textNodes(doc), ...tspanNodes(doc)];
+    if (!this.font) {
+      const [missing, installed] = installedFontForTitle(doc, families);
+      if (installed) {
+        applyFont(nodes, { family: installed });
+        info.font = installed;
+        info.font_replaced = missing;
+      }
+    }
     if (this.font || this.bold !== null || this.italic !== null || Math.abs(this.fontScale - 1) > 1e-9) {
       applyFont(nodes, { family: this.font || null, italic: this.italic, bold: this.bold, sizeRatio: this.fontScale });
     }
@@ -303,7 +338,7 @@ function titleFiles(project: Project): ProjectFile[] {
 }
 
 /** A bin SVG's text: bundled emoji from the assets, anything else through the host's storage. */
-async function readProjectSvg(call: ToolCall, file: ProjectFile): Promise<string> {
+export async function readProjectSvg(call: ToolCall, file: ProjectFile): Promise<string> {
   const path = String(file.path ?? "");
   if (path.startsWith("@emojis/") && call.host.assets) return call.host.assets.readText(`emojis/${path.slice("@emojis/".length)}`);
   const readText = call.host.storage?.readText;
@@ -408,7 +443,7 @@ async function resolveTitle(call: ToolCall, clipId: string, fileId: string, titl
   return toolError(`which title? pass timeline_clip_id, file_id or title_query (${titles.length} titles in the project; list_title_templates_tool kind=project lists them)`);
 }
 
-async function writeTitle(call: ToolCall, name: string, svg: string): Promise<ImportedMedia> {
+export async function writeTitle(call: ToolCall, name: string, svg: string): Promise<ImportedMedia> {
   const media = call.host.media!;
   let path: string;
   try {
@@ -491,6 +526,8 @@ export const titleTemplateTools = [
         const name = String(file.name || basename(srcPath));
         if (hasText && slots.length === 0) toolError(`${name} has no text to change`);
         const values = hasText ? assignTexts(slots, text, subtitle, lines, name, false) : new Map<number, string>();
+        const families = await installedFontFamilies(call);
+        style.resolveFont(families);
 
         const scopeUsed = scope === "this_clip" && clips.length <= 1 ? "all_clips" : scope;
         const affected = scopeUsed === "all_clips" ? clips : clips.filter((c) => c.id === clipId);
@@ -503,7 +540,7 @@ export const titleTemplateTools = [
 
         const before = titleSvgText(doc);
         for (const slot of slots) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index)!);
-        const styleInfo = style.apply(doc);
+        const styleInfo = style.apply(doc, families);
         const fitted = style.fit(doc, slots);
         const after = fieldRows(slots);
         const svg = titleSvgText(doc);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { findClip } from "../model/query.js";
 import { addClip, setClipProperty } from "./clips.js";
-import { setExportSetting, setProfile, setProjectSettings, snapToFrameRate, withExportOverride } from "./project.js";
+import { clearExportSettings, setExportSetting, setProfile, setProjectAudio, snapToFrameRate, withExportOverride, withoutExportOverrides } from "./project.js";
 import { addTitleClip } from "./titles.js";
 import { expectRefused, expectUndoRedo, makeDoc, reader } from "./testkit.js";
 
@@ -61,25 +61,23 @@ describe("setProfile", () => {
   });
 });
 
-describe("setProjectSettings", () => {
-  it("changes only what differs and reports notes", () => {
+describe("setProjectAudio", () => {
+  it("records only what differs: sample rate, channels and their layout together", () => {
     const doc = makeDoc();
     const before = doc.project;
-    const r = doc.transaction("set", (tx) => setProjectSettings(tx, { fps: 29.97, width: 1280, sampleRate: 44100 }));
-    expect(r).toEqual({ changed: true, updates: { fps: { num: 30000, den: 1001 }, sample_rate: 44100 }, notes: ["fps=30000/1001", "sample_rate=44100"] });
+    const keys = doc.transaction("audio", (tx) => setProjectAudio(tx, { sampleRate: 44100, channels: { count: 1, layout: 4 } }));
+    expect(keys).toEqual(["sample_rate", "channels", "channel_layout"]);
+    expect(doc.project).toMatchObject({ sample_rate: 44100, channels: 1, channel_layout: 4 });
     expectUndoRedo(doc, before);
-    const same = doc.transaction("again", (tx) => setProjectSettings(tx, { width: 1280 }));
-    expect(same.changed).toBe(false);
-    expect(doc.undoLabels.at(-1)).toBe("set");
+    const same = doc.transaction("again", (tx) => setProjectAudio(tx, { sampleRate: 44100 }));
+    expect(same).toEqual([]);
   });
 
-  it("validates ranges", () => {
+  it("refuses values that are not positive whole numbers", () => {
     const doc = makeDoc();
-    expectRefused(doc, "invalid_argument", (tx) => setProjectSettings(tx, { width: 8 }));
-    expectRefused(doc, "invalid_argument", (tx) => setProjectSettings(tx, { height: 100.5 }));
-    expectRefused(doc, "invalid_argument", (tx) => setProjectSettings(tx, { sampleRate: 1 }));
-    expectRefused(doc, "invalid_argument", (tx) => setProjectSettings(tx, { fps: -1 }));
-    expectRefused(doc, "invalid_argument", (tx) => setProjectSettings(tx, { fps: { num: 30, den: 0 } }));
+    expectRefused(doc, "invalid_argument", (tx) => setProjectAudio(tx, { sampleRate: 0 }));
+    expectRefused(doc, "invalid_argument", (tx) => setProjectAudio(tx, { sampleRate: 44100.5 }));
+    expectRefused(doc, "invalid_argument", (tx) => setProjectAudio(tx, { channels: { count: 2, layout: -1 } }));
   });
 });
 
@@ -98,6 +96,17 @@ describe("export overrides (set_export_setting)", () => {
     const doc = makeDoc();
     setExportSetting(doc, "height", 720);
     expect(doc.project.export_overrides).toEqual({ height: 720 });
+    expect(doc.canUndo).toBe(false);
+  });
+
+  it("clears stored overrides without an undo step", () => {
+    expect(withoutExportOverrides({ height: 720, fps_num: 24, fps_den: 1 }, ["fps_num", "fps_den", "nope"])).toEqual({ height: 720 });
+    expect(withoutExportOverrides(null, ["height"])).toEqual({});
+    const doc = makeDoc();
+    setExportSetting(doc, "height", 720);
+    setExportSetting(doc, "width", 1280);
+    expect(clearExportSettings(doc, ["height"])).toEqual({ width: 1280 });
+    expect(doc.project.export_overrides).toEqual({ width: 1280 });
     expect(doc.canUndo).toBe(false);
   });
 });

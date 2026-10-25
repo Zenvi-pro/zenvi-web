@@ -280,6 +280,43 @@ export function fontFamily(doc: TitleDoc): string {
   return "";
 }
 
+/** `FALLBACK_FONTS`: what the Title Editor falls back to when a template's font is not installed. */
+export const FALLBACK_FONTS = ["DejaVu Sans", "Liberation Sans", "Noto Sans", "FreeSans", "Ubuntu", "Cantarell", "Open Sans", "Sans-serif", "Arial"] as const;
+
+/**
+ * `editor_font_family`: the installed family the Title Editor uses for
+ * `requested` (exact, else the first family containing it), else the first
+ * fallback installed under exactly that name, and only then one containing
+ * it (so "Arial" wins over "Noto Sans Armenian" on macOS); "" for none.
+ */
+export function editorFontFamily(requested: string, families: readonly string[]): string {
+  if (requested) {
+    if (families.includes(requested)) return requested;
+    const containing = families.find((font) => font.includes(requested));
+    if (containing !== undefined) return containing;
+  }
+  for (const fallback of FALLBACK_FONTS) if (families.includes(fallback)) return fallback;
+  for (const fallback of FALLBACK_FONTS) {
+    const containing = families.find((font) => font.includes(fallback));
+    if (containing !== undefined) return containing;
+  }
+  return "";
+}
+
+/**
+ * `installed_font_for_title`: [template font, installed replacement] when
+ * the title's font is not installed, else ["", ""] (also when the host cannot
+ * list its fonts: `families` null). Opening such a title in the Title Editor
+ * rewrites the font the same way.
+ */
+export function installedFontForTitle(doc: TitleDoc, families: readonly string[] | null): [string, string] {
+  if (families === null) return ["", ""];
+  const current = fontFamily(doc);
+  if (!current || families.some((f) => current === f || f.includes(current))) return ["", ""];
+  const replacement = editorFontFamily(current, families);
+  return replacement ? [current, replacement] : ["", ""];
+}
+
 // ---------------------------------------------------------------------------
 // Fields: the distinct text slots of a title
 // ---------------------------------------------------------------------------

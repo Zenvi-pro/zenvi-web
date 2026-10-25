@@ -39,7 +39,8 @@ interface FontCache {
   faces: CachedFace[];
 }
 
-const CACHE_VERSION = 2;
+/** 3: family names keep their case (2 stored them lowercased). */
+const CACHE_VERSION = 3;
 
 async function readCache(file: string): Promise<FontCache | undefined> {
   try {
@@ -97,7 +98,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 
 export interface FontFace {
   path: string;
-  /** Lowercased family names (nameID 1 and 16). */
+  /** Family names as the font spells them (nameID 1 and 16); lookups ignore case. */
   families: string[];
   size: number;
 }
@@ -133,7 +134,7 @@ function decodeName(bytes: Uint8Array, platform: number): string {
   return Buffer.from(bytes).toString("latin1");
 }
 
-/** Family names from an sfnt `name` table. */
+/** Family names from an sfnt `name` table, as the font spells them. */
 export function parseNameTable(table: Uint8Array): string[] {
   const view = new DataView(table.buffer, table.byteOffset, table.byteLength);
   if (table.byteLength < 6) return [];
@@ -151,9 +152,11 @@ export function parseNameTable(table: Uint8Array): string[] {
     const start = stringOffset + offset;
     if (start + length > table.byteLength) continue;
     const name = decodeName(table.subarray(start, start + length), platform).trim();
-    if (name) names.add(name.toLowerCase());
+    if (name) names.add(name);
   }
-  return [...names];
+  // One spelling per name (Mac and Windows records usually agree; the first one wins).
+  const seen = new Set<string>();
+  return [...names].filter((name) => !seen.has(name.toLowerCase()) && seen.add(name.toLowerCase()));
 }
 
 async function readAt(handle: Awaited<ReturnType<typeof open>>, position: number, length: number): Promise<Uint8Array> {
@@ -219,15 +222,29 @@ async function walk(dir: string, depth: number, out: string[], dirs: Record<stri
 export class FontIndex {
   private readonly byFamily = new Map<string, FontFace[]>();
 
+  /** Lowercased family → the name as the first font with it spells it. */
+  private readonly spelling = new Map<string, string>();
+
   constructor(readonly faces: FontFace[]) {
     for (const face of faces) {
-      for (const family of face.families) {
+      for (const name of face.families) {
+        const family = name.toLowerCase();
         const list = this.byFamily.get(family) ?? [];
         list.push(face);
         this.byFamily.set(family, list);
+        if (!this.spelling.has(family)) this.spelling.set(family, name);
       }
     }
     for (const list of this.byFamily.values()) list.sort((a, b) => a.size - b.size);
+  }
+
+  /**
+   * The families installed, as the fonts spell them, sorted: what a tool may
+   * name in an SVG title (a Qt font database's `families()`). Hidden system
+   * families (".SF NS") are left out.
+   */
+  familyNames(): string[] {
+    return [...this.spelling.values()].filter((name) => !name.startsWith(".")).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   }
 
   /**
@@ -286,6 +303,11 @@ let shared: Promise<FontIndex> | undefined;
 export function sharedFontIndex(): Promise<FontIndex> {
   shared ??= FontIndex.scan();
   return shared;
+}
+
+/** The font families SVG titles render with in this process (the shared index's `familyNames`). */
+export async function installedFontFamilies(): Promise<string[]> {
+  return (await sharedFontIndex()).familyNames();
 }
 
 const bufferCache = new Map<string, Promise<Uint8Array>>();

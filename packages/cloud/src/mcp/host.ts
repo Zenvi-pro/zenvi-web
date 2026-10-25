@@ -6,7 +6,8 @@
  *   media   probe project media (cached download) and media this call
  *           generated; import URLs (SSRF-guarded); writeGenerated stores bytes
  *           (title SVGs) as content-addressed project media;
- *   frames  preview frames through the cloud renderer;
+ *   frames  preview frames through the cloud renderer, and the fonts it
+ *           draws titles with (the title tools check a font against them);
  *   assets  the engine's bundled assets (title templates);
  *   audio   loudness envelopes and PCM of project media (remove_silence_tool,
  *           beats); speech recognition through the backend as the connected
@@ -151,6 +152,9 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
         return preview.image;
       },
     };
+    // The fonts the renderer draws titles with in this process (the image's fonts and the bundled Lato).
+    const fonts = services.fontFamilies;
+    if (fonts) host.frames.fontFamilies = () => fonts();
   }
 
   const assets = services.assets;
