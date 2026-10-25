@@ -440,13 +440,12 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .action(async (time: string, label?: string) => {
       await runToolCommand(ctx, "add_marker_tool", { position_seconds: parseTime(time), ...(label ? { label } : {}) });
     });
-  // The desktop contract has no marker removal tool; offer it when the catalog does.
   if (ctx.registry.get("remove_marker_tool")) {
     marker
       .command("rm")
-      .argument("<marker>", "marker id")
+      .argument("<marker>", "marker id or name")
       .action(async (id: string) => {
-        await runToolCommand(ctx, "remove_marker_tool", toolArgs(ctx, "remove_marker_tool", [[["marker_id", "id"], id]]));
+        await runToolCommand(ctx, "remove_marker_tool", toolArgs(ctx, "remove_marker_tool", [[["markers", "marker_id", "id"], [id]]]));
       });
   }
 

@@ -4,7 +4,7 @@
  * depending on the full catalog. Test-only.
  */
 
-import { addClip, addFile, addMarker, createProject, type ImportedMedia, type ToolContext, type ToolResult } from "@zenvi/engine";
+import { addClip, addFile, addMarker, createProject, removeMarkers, type ImportedMedia, type ToolContext, type ToolResult } from "@zenvi/engine";
 import { applied, failed, refused, unchanged, type ToolReceipt } from "@zenvi/engine/tools";
 import type { JsonSchema } from "@zenvi/engine/tools";
 import { createRegistry, type Registry, type RegistryTool } from "../engine/registry.js";
@@ -73,6 +73,12 @@ export function testRegistry(): Registry {
     tool("add_marker_tool", { position_seconds: { type: ["string", "number"] }, label: { type: "string" } }, (ctx, args) => {
       const marker = ctx.doc.transaction("Add marker", (tx) => addMarker(tx, Number(args.position_seconds ?? 0), args.label === undefined ? undefined : String(args.label)));
       return applied("add_marker_tool", `Added marker ${marker.id} at ${marker.position}s`, { markers: [{ id: marker.id, position: marker.position }] });
+    }),
+    tool("remove_marker_tool", { markers: { type: "array", items: { type: "string" } } }, (ctx, args) => {
+      const refs = Array.isArray(args.markers) ? args.markers.map(String) : [];
+      const ids = ctx.doc.project.markers.filter((m) => refs.includes(m.id) || refs.includes(String(m.label ?? ""))).map((m) => m.id);
+      ctx.doc.transaction("Remove marker", (tx) => removeMarkers(tx, ids));
+      return applied("remove_marker_tool", `Removed ${ids.length} marker(s)`, { removedMarkerIds: ids });
     }),
     tool("list_markers_tool", {}, (ctx) =>
       applied("list_markers_tool", ctx.doc.project.markers.map((m) => `${m.id} ${m.position}s ${m.label ?? ""}`.trim()).join("\n") || "No markers", { data: ctx.doc.project.markers }, 0),

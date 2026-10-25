@@ -86,6 +86,14 @@ describe("zenvi CLI", () => {
     expect(badArgs.code).toBe(2);
   });
 
+  it("removes a marker by name with `marker rm`", async () => {
+    const r = await run(["marker", "rm", "outro", "--json"]);
+    expect(r.code).toBe(0);
+    expect(r.json()).toMatchObject({ status: "applied", tool: "remove_marker_tool", summary: "Removed 1 marker(s)" });
+    const saved = JSON.parse(await readFile(path.join(work, "trip.zvn"), "utf8")) as { markers: Array<{ label: string }> };
+    expect(saved.markers.map((m) => m.label)).toEqual(["intro"]);
+  });
+
   it("lists the catalog", async () => {
     const r = await run(["tools", "--json"]);
     const names = r.json<{ tools: Array<{ name: string; available: boolean }> }>().tools.map((t) => t.name);

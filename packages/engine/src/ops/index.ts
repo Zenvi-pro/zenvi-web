@@ -33,6 +33,7 @@ export * from "./titles.js";
 export * from "./overlays.js";
 export * from "./clipboard.js";
 export * from "./presets.js";
+export * from "./clip-props.js";
 export * from "./sequence.js";
 export * from "./add-to-timeline.js";
 export { timeCurveIsReversed } from "./retime.js";

@@ -51,6 +51,10 @@ export interface TimelineController {
   centerOnPlayhead(): void;
   /** Scroll so `seconds` is visible (no-op when it already is). */
   reveal(seconds: number): void;
+  /** Timeline seconds at the left and right edges of the visible tracks. */
+  visibleRange(): { start: number; end: number };
+  /** Zoom and scroll so timeline seconds [start, end] fill the visible width. */
+  showRange(start: number, end: number): void;
 }
 
 /** Hooks React views register so commands can reach them. */

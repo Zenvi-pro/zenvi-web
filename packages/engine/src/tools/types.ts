@@ -109,17 +109,55 @@ export interface MediaHost {
 export interface PlayerHost {
   readonly playhead: number;
   readonly playing: boolean;
+  /** Playback speed while playing (1 = normal, negative = backwards); omitted = 1. */
+  readonly rate?: number;
   play(): void;
   pause(): void;
   toggle(): void;
   seek(seconds: number): void;
 }
 
+/** What an editor has selected, by kind, in selection order. */
+export interface EditorSelection {
+  clips: string[];
+  transitions: string[];
+  /** Clip effects shown in the Properties panel. */
+  effects: string[];
+}
+
+/** An editor's timeline view: zoom, scroll and the toolbar's modes. */
+export interface TimelineView {
+  /** The zoom: timeline seconds per 100 screen pixels. */
+  secondsPer100px: number;
+  /** Timeline seconds across the visible width. */
+  visibleSeconds: number;
+  /** First and last visible timeline second. */
+  visibleRange: [number, number];
+  /** Toolbar modes; null when this editor has no such mode. */
+  snapping: boolean | null;
+  razor: boolean | null;
+  timing: boolean | null;
+}
+
+export type TimelineMode = "snapping" | "razor" | "timing";
+
 export interface UiHost {
   zoomIn(): void;
   zoomOut(): void;
   centerOnPlayhead(): void;
   selectedIds?(): string[];
+  /** The selection by kind (what the Properties panel shows and scope='selected' uses). */
+  selection?(): EditorSelection;
+  /** Replace the selection; a selected effect shows in the Properties panel with its clip. */
+  setSelection?(selection: EditorSelection): void;
+  /** Bring the Properties panel to the front. */
+  showProperties?(): void;
+  /** The timeline view, or null while no timeline is on screen. */
+  timelineView?(): TimelineView | null;
+  /** Zoom and scroll so timeline seconds [start, end] fill the timeline's width. */
+  showTimelineRange?(start: number, end: number): void;
+  /** Switch a toolbar mode on or off (only modes `timelineView` reports as non-null). */
+  setTimelineMode?(mode: TimelineMode, on: boolean): void;
   openImportDialog?(): void;
   openExportDialog?(): void;
   notify?(message: string, level?: "info" | "warning" | "error"): void;

@@ -51,7 +51,7 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "add_marker_tool / list_markers_tool",
-    "A marker's name is stored as `label`, the key the web editor shows; zenvi-core develop stores `name` (track_ops.add_marker). list_markers_tool reads either.",
+    "A marker's name is stored as `label`; zenvi-core develop stores `name` (track_ops.add_marker). list_markers_tool, the marker tools and the web editor's ruler read either.",
   ],
   [
     "add_title_tool / add_captions_tool",
@@ -128,6 +128,26 @@ const DIVERGENCES: [string, string][] = [
   [
     "reverse_clip_tool",
     "A clip on a locked track is refused; the desktop's handler reverses it anyway (its Time menu skips the lock check).",
+  ],
+  [
+    "apply_clip_preset_tool",
+    "Runs the engine's port of the clip menu's handlers (ops/presets.ts, also behind the web editor's clip menu) as of develop: fade lengths, the combined in-and-out fade, motion zone lengths and the wipe-out masks. crop / crop_resize add the Crop effect with a new effect id and do not select it (the desktop also selects it and shows its transform handles). An Emphasis preset without at_seconds starts at the host's playhead: the saved playhead on the CLI and in Zenvi Cloud.",
+  ],
+  [
+    "seek_playhead_tool",
+    "In the web editor it moves the editor's playhead and reports where it is. The web editor's playhead stops at the end of the last clip, so a time past it is reported there with a note (the desktop goes there and shows black). Without a preview (CLI, Zenvi Cloud) it moves the playhead saved with the project (`playhead_position`, where the web and desktop editors open), with no undo step, and play=true is refused; previous/next marker then has no selection to follow. Playback is checked before the playhead moves (the desktop moves, then refuses to play from the end).",
+  ],
+  [
+    "get_playhead_and_selection_tool",
+    "Without an editor (CLI, Zenvi Cloud) it reports the saved playhead, playback stopped, and `selection` and `view` as null (`saved: true`). In the web editor the zoom is the editor's pixels per second as `seconds_per_100px`, and `timing` is null: the web timeline has no timing mode.",
+  ],
+  [
+    "set_timeline_view_tool / select_timeline_items_tool",
+    "They need the web editor. Zoom steps are the editor's own (×1.5); a range or visible_seconds zooms and scrolls the editor's timeline within its zoom limits, and the receipt reads the view back. The web timeline has no timing (retime-by-drag) mode: timing=true is refused, timing=false is already so. The Properties panel shows one effect: selecting effects selects the last one named together with its clip, and the receipt says so.",
+  ],
+  [
+    "update_marker_tool / remove_marker_tool",
+    "A marker's name is read from `name` (desktop) or `label` (the web's add_marker_tool); a rename writes it where the marker keeps it, and a marker without a name gets `label`. The web editor's ruler shows either. Times past the end of the timeline are checked against the length the desktop keeps (at least 300 s and 10 s past the last item).",
   ],
   [
     "summary previews",

@@ -642,6 +642,78 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { emoji: "zzqqxxjj" }, host: { assets: ENGINE_ASSETS }, summary: /^Error: no emoji matches 'zzqqxxjj'; try search_emojis_tool with a simpler word$/ },
   },
 
+  // --- clip properties (editor_tools/clip_props*.py) -----------------------------------------------------
+  get_clip_properties_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipA, properties: "alpha, scale" }, summary: /^Clip CLIPINTV01 '.*' \(track 1, 0\.00-10\.00 s\) at 1\.00 s: alpha 1, scale Best Fit\. Animated: nothing\.$/ },
+    failure: { args: { timeline_clip_id: IDS.clipA, properties: "sparkle" }, summary: /^Error: unknown clip property 'sparkle'; settable: / },
+  },
+  set_clip_properties_tool: {
+    happy: {
+      args: { timeline_clip_ids: IDS.clipLogo, properties: '{"alpha": "0.5", "gravity": "top right"}' },
+      summary: /^Set alpha=0\.5, gravity=top right on 1 clip\(s\)\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipLogo)).toMatchObject({ gravity: 2, alpha: { Points: [{ co: { X: 1, Y: 0.5 } }] } }),
+    },
+    failure: { args: { timeline_clip_ids: IDS.clipA, properties: { alpha: 2 } }, summary: /^Error: alpha on clip CLIPINTV01 must be between 0 and 1, got 2$/ },
+  },
+  remove_keyframes_tool: {
+    happy: {
+      setup: (doc) => {
+        doc.transaction("fade", (tx) => tx.update(["clips", { id: IDS.clipA }], { alpha: { Points: [{ co: { X: 1, Y: 0 }, interpolation: 0 }, { co: { X: 31, Y: 1 }, interpolation: 0 }] } }));
+      },
+      args: { timeline_clip_ids: IDS.clipA, properties: "alpha" },
+      summary: /^Removed 2 keyframe\(s\) from 1 clip\(s\)\.$/,
+    },
+    failure: { args: { timeline_clip_ids: IDS.clipA, properties: ["all"] }, summary: /^Error: no keyframes to remove on 1 clip\(s\) for any animated property$/ },
+  },
+  copy_clip_keyframes_tool: {
+    happy: {
+      setup: (doc) => {
+        doc.transaction("fade", (tx) => tx.update(["clips", { id: IDS.clipA }], { alpha: { Points: [{ co: { X: 1, Y: 0 }, interpolation: 0 }, { co: { X: 31, Y: 1 }, interpolation: 0 }] } }));
+      },
+      args: { source_clip_id: IDS.clipA, timeline_clip_ids: IDS.clipB, groups: "alpha" },
+      summary: /^Copied alpha keyframes from clip CLIPINTV01 to 1 clip\(s\) \(timing=stretch\)\.$/,
+    },
+    failure: { args: { source_clip_id: IDS.clipA }, summary: /^Error: name the target clips/ },
+  },
+  apply_clip_preset_tool: {
+    happy: {
+      args: { timeline_clip_ids: IDS.clipA, preset: "fade_in_out", duration_seconds: "2" },
+      summary: /^Applied Fade > Fade In and Out \(duration_seconds, default 1 s\) to 1 clip\(s\); changed alpha, volume\.$/,
+    },
+    failure: { args: { timeline_clip_ids: IDS.clipMusic, preset: "zoom_in" }, summary: /^Error: zoom_in does not apply to the chosen clip\(s\)/ },
+  },
+
+  // --- tracks, markers, playhead, view, selection (editor_tools/tracks_nav.py) ----------------------------
+  update_track_tool: {
+    happy: { args: { track: "2", name: "Music", lock: "true" }, summary: /^Track 2 renamed to 'Music' and locked\.$/ },
+    failure: { args: { track: "1" }, summary: /^Error: nothing to change: pass name and\/or lock$/ },
+  },
+  remove_track_tool: {
+    happy: { args: { track: "4" }, summary: /^Removed track 4\. One undo restores it\.$/, check: ({ doc }) => expect(doc.project.layers).toHaveLength(4) },
+    failure: { args: { track: "1" }, summary: /^Error: track 1 still has 3 clip\(s\) and 0 transition\(s\); pass with_clips=true/ },
+  },
+  update_marker_tool: {
+    happy: { args: { marker: IDS.marker, name: "Chorus", color: "red" }, summary: /^Updated the marker 'Chorus' at 00:00:04,00 \(name, color\)\.$/ },
+    failure: { args: { marker: "Nope", name: "x" }, summary: /^Error: no marker with id or name 'Nope'; markers: Intro ends \(00:00:04,00\)$/ },
+  },
+  remove_marker_tool: {
+    happy: { args: { markers: "Intro ends" }, summary: /^Removed the marker 'Intro ends' at 00:00:04,00\.$/, check: ({ doc }) => expect(doc.project.markers).toEqual([]) },
+    failure: { args: {}, summary: /^Error: say which markers/ },
+  },
+  seek_playhead_tool: {
+    happy: { args: { seconds: "4" }, summary: /^Playhead at 00:00:04,00, frame 121\.$/, check: ({ host }) => expect(host.player!.playhead).toBe(4) },
+    failure: { args: { seconds: "1", to: "end" }, summary: /^Error: give only one of seconds, frame, marker or to \(got seconds, to\)$/ },
+  },
+  select_timeline_items_tool: {
+    happy: { args: { track: "1" }, summary: /^Selection: 3 clips\.$/, check: ({ host }) => expect(host.editor.selection.clips).toEqual([IDS.clipA, IDS.clipB, IDS.clipTail]) },
+    failure: { host: { without: ["ui"] }, summary: /not available/ },
+  },
+  set_timeline_view_tool: {
+    happy: { args: { zoom: "fit" }, summary: /^Timeline view: fit every clip \(0 to 00:00:19,00\)\.$/ },
+    failure: { args: {}, summary: /^Error: nothing to change/ },
+  },
+  get_playhead_and_selection_tool: { happy: { summary: /^Playhead at 00:00:01,00 \(frame 31\), paused; 0 item\(s\) selected\.$/ }, failure: null },
+
   // --- direct tools ----------------------------------------------------------------------------------------
   describe_project_tool: { happy: { summary: /^1280x720 30\/1 fps, 5 track\(s\), 5 clip\(s\), 0 transition\(s\), 4 file\(s\); content ends at 19\.00s\.$/ }, failure: null },
   list_effects_tool: { happy: { args: { category: "audio" }, summary: /^\d+ effect\(s\)\.$/ }, failure: { args: { category: "smell" }, status: "refused", summary: /^Error: Invalid arguments/ } },

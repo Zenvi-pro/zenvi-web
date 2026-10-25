@@ -105,6 +105,9 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       get playing() {
         return session.playback.getState().playing;
       },
+      get rate() {
+        return session.playback.getState().rate;
+      },
       play: () => session.play(),
       pause: () => session.pause(),
       toggle: () => session.togglePlay(),
@@ -115,6 +118,32 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       zoomOut: () => session.views.timeline?.zoomOut(),
       centerOnPlayhead: () => session.views.timeline?.centerOnPlayhead(),
       selectedIds: () => [...session.ui.getState().selection.clips, ...session.ui.getState().selection.transitions],
+      selection: () => {
+        const s = session.ui.getState().selection;
+        return { clips: [...s.clips], transitions: [...s.transitions], effects: s.effect ? [s.effect] : [] };
+      },
+      setSelection: (selection) => {
+        // The Properties panel shows one effect, with its clip selected.
+        const effect = selection.effects.at(-1) ?? null;
+        const clips = [...selection.clips];
+        const owner = effect ? session.project.clips.find((c) => c.effects?.some((e) => e.id === effect)) : undefined;
+        if (owner && !clips.includes(owner.id)) clips.push(owner.id);
+        session.ui.setState({ selection: { clips, transitions: [...selection.transitions], markers: [], effect } });
+      },
+      showProperties: () => session.ui.setState({ rightTab: "properties", panels: { ...session.ui.getState().panels, rightCollapsed: false } }),
+      timelineView: () => {
+        const timeline = session.views.timeline;
+        if (!timeline) return null;
+        const { start, end } = timeline.visibleRange();
+        const ui = session.ui.getState();
+        // The web timeline has no timing (retime-by-drag) mode.
+        return { secondsPer100px: 100 / ui.pxPerSecond, visibleSeconds: end - start, visibleRange: [start, end], snapping: ui.snapping, razor: ui.tool === "razor", timing: null };
+      },
+      showTimelineRange: (start, end) => session.views.timeline?.showRange(start, end),
+      setTimelineMode: (mode, on) => {
+        if (mode === "snapping") session.ui.setState({ snapping: on });
+        else if (mode === "razor") session.ui.setState({ tool: on ? "razor" : "select" });
+      },
       openImportDialog: () => session.views.pickMedia?.(),
       openExportDialog: () => session.ui.setState({ dialog: "export" }),
       notify: (message, level = "info") => {

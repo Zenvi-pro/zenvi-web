@@ -106,6 +106,13 @@ describe("surface-limitation refusals say 'not available'", () => {
     await expectNotAvailable("export_video_tool", { show_dialog: "false" }, { without: ["exporter"] });
   });
 
+  it("for editor state a host does not have", async () => {
+    await expectNotAvailable("seek_playhead_tool", { to: "start", play: "true" }, { without: ["player"] });
+    await expectNotAvailable("select_timeline_items_tool", { mode: "none" }, { omit: ["ui.setSelection"] });
+    await expectNotAvailable("set_timeline_view_tool", { zoom: "fit" }, { omit: ["ui.showTimelineRange"] });
+    await expectNotAvailable("set_timeline_view_tool", { timing: "true" }, {});
+  });
+
   it("for re-indexing, which uploads from the desktop", async () => {
     await expectNotAvailable("reindex_project_file_tool", { file_id: IDS.broll }, {});
   });
