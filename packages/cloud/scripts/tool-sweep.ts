@@ -320,8 +320,14 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   align_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.title, c.clips.still] }),
   add_transition_tool: () => ({ track: "1", position_seconds: "5.5", duration_seconds: "1", transition: "common/fade" }),
   analyze_timeline_audio_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
+  // One clip by id: clip_ids is a comma-separated string on these older colour tools, as on the desktop.
+  apply_color_tool: (c) => ({ timeline_clip_id: c.clips.a, contrast: "0.2", saturation: "1.2" }),
+  apply_look_tool: (c) => ({ timeline_clip_id: c.clips.a, look_id: "gloomy" }),
   apply_transition_tool: (c) => ({ clip1_id: c.clips.a, clip2_id: c.clips.b, transition_name: "fade", duration: "1" }),
   build_reel_tool: (c) => ({ style: "hype", duration_seconds: 8, file_ids: [c.files.a, c.files.b, c.files.still], music_file_id: c.files.beat, hook: "Sweep reel", replace: true }),
+  color_grade_clip_tool: (c) => ({ timeline_clip_id: c.clips.a, lut: "bold red cinema" }),
+  // Clip A has the Blur effect (setup).
+  copy_effects_tool: (c) => ({ source_clip_id: c.clips.a, timeline_clip_ids: [c.clips.b] }),
   // Clip A fades in (setup): keyframes to copy and remove.
   copy_clip_keyframes_tool: (c) => ({ source_clip_id: c.clips.a, timeline_clip_ids: [c.clips.b] }),
   delete_from_timeline_tool: (c) => ({ timeline_clip_id: c.clips.b }),
@@ -347,6 +353,7 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   inspect_media_tool: (c) => ({ fileId: c.files.a, overview: true }),
   inspect_timeline_tool: (c) => ({ clipId: c.clips.a, start: "0", end: "2" }),
   list_captions_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
+  match_color_to_reference_tool: (c) => ({ timeline_clip_id: c.clips.b, referenceClipId: c.clips.a }),
   list_projects: () => ({ limit: 5 }),
   modify_clip_tool: (c) => ({ timeline_clip_id: c.clips.b, description: "a calm ocean at sunset" }),
   move_clip_tool: (c) => ({ clip_id: c.clips.b, position_seconds: "7" }),
@@ -392,6 +399,7 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   transcribe_media_tool: (c) => ({ file_id: c.files.talk }),
   trim_clip_tool: (c) => ({ clip_id: c.clips.a, edge: "right", at_seconds: "5" }),
   trim_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.a], trim_start_seconds: 0.5 }),
+  update_effect_tool: (c) => ({ effect_id: c.effectId, properties: { sigma: 6 } }),
   update_marker_tool: () => ({ marker: "Sweep marker", name: "Renamed marker" }),
   update_track_tool: () => ({ track: "2", name: "Stills" }),
   wait_until_project_indexed_tool: () => ({ timeout_seconds: 5 }),
