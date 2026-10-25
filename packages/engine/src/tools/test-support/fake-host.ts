@@ -116,6 +116,8 @@ export interface FakeHostOptions {
   layout?: EditorLayout;
   /** `exporter.supports` (default: every codec but `prores_ks` and `h264_nvenc`). */
   encodable?: (format: ContainerFormat, videoCodec: string, audioCodec: string) => boolean;
+  /** `frames.fontFamilies`: the fonts the renderer draws titles with (default: none listed, like a browser). */
+  fonts?: string[];
 }
 
 /** A small editor layout like the web editor's: one left and one right panel group, the preview and the timeline. */
@@ -504,6 +506,8 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         return { mimeType: frameOptions?.format === "jpeg" ? "image/jpeg" : "image/png", data: PNG_1PX };
       },
     };
+    const fonts = options.fonts;
+    if (fonts) host.frames.fontFamilies = async () => [...fonts];
   }
   if (!without.has("backend")) {
     host.backend = {

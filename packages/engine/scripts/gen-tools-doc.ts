@@ -26,10 +26,6 @@ const OUT = path.join(ROOT, "docs", "TOOLS.md");
  */
 const DIVERGENCES: [string, string][] = [
   [
-    "add_title_tool",
-    "The text also replaces every line whose placeholder matches the first line's. Reflection templates (Bar_1, the default) draw a mirrored copy first; the desktop's `_set_svg_text` (agent_tools/titles.py:32) fills only that copy and blanks the real line, so its titles render upside down.",
-  ],
-  [
     "add_clip_to_timeline_tool",
     "Appending (no position_seconds) butts the clip against the last clip on the track. The desktop places it at `last_end + _one_frame` (tool_handlers.py:2726), leaving a one-frame black/silent gap.",
   ],
@@ -55,7 +51,7 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "add_title_tool",
-    "Templates are the bundled catalog, read by basename only (the desktop joined a bare template name into its titles folder unchecked, agent_tools/titles.py:81); an absolute .svg path is read through the host's storage.",
+    "Templates are the 50 bundled ones (the desktop also lists the user's template folder). `template` can also be an existing .svg title: an absolute path read through the host's storage, or the path of a title in the project (Zenvi Cloud keeps titles at `@assets/title/…`). The title file is a new Project Files entry stored by the host (the CLI writes it to the project's assets folder, Zenvi Cloud stores it as project media).",
   ],
   [
     "add_animated_title_tool / list_title_templates_tool kind=animated",
@@ -67,7 +63,15 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "titles, captions and timers: fonts",
-    "Fonts are taken as given: the hosts cannot list installed fonts (the browser and resvg each fall back on their own). The desktop checks names against Qt's font database, suggests close matches for an unknown font, replaces a template font that is not installed with the Title Editor's fallback, and drops a caption preset's font (thinning its outline) when that font is missing.",
+    "add_title_tool and edit_title_tool check a font against the fonts the host renders titles with, where it can list them (FrameHost.fontFamilies: render-node's font index on the CLI, which is the computer's fonts plus the bundled Lato, and in Zenvi Cloud, whose image has DejaVu, Liberation Sans / Serif / Mono and Lato), with the desktop's matching, close-match suggestions and Title Editor fallback for a template font that is not installed. The web editor's browser does not list its fonts, so there a font is taken as given (one it lacks falls back to another), as the desktop does when Qt cannot tell. Captions and timers take fonts as given everywhere; the desktop drops a caption preset's font (thinning its outline) when that font is missing.",
+  ],
+  [
+    "add_effect_tool",
+    "Stabilizer, Tracker, Object Detector and Object Mask, whose OpenCV analysis the desktop runs when they are added, are refused as not available here, like process_clip_effect_tool, and `processing` (their analysis options) is not ported. Outline (also OpenCV) is added for Zenvi desktop to draw, with a warning that the web editor, the CLI and Zenvi Cloud render the clip without it.",
+  ],
+  [
+    "set_project_setting_tool",
+    "A size or frame rate no built-in profile has needs a custom profile, which only Zenvi desktop's profiles folder keeps (the CLI writes it there, like set_project_profile_tool); the web editor and Zenvi Cloud refuse it. save_as_default keeps the sample rate and channels as defaults for new projects in an editor's own settings when they have such entries; the web editor's have none (its new projects start at 48000 Hz stereo) and the CLI and Zenvi Cloud have no editor settings, so it is refused there before anything changes, with the reason. saved_as_default says whether defaults were kept (the desktop echoes the argument).",
   ],
   [
     "list_title_templates_tool",
@@ -107,11 +111,11 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "desktop defaults the web does not follow yet",
-    "save_project_tool and export_video_tool replace an existing file (the CLI's) where the desktop refuses unless overwrite=true; add_title_tool never shrinks long lines (desktop fit_text=true); new_project_tool / open_project_tool have no unsaved-changes guard (every web surface autosaves, so discard_unsaved is accepted as is); generate_tts_and_add_to_timeline_tool defaults to the track below the picture, where the desktop picks or creates a free narration track.",
+    "save_project_tool and export_video_tool replace an existing file (the CLI's) where the desktop refuses unless overwrite=true; new_project_tool / open_project_tool have no unsaved-changes guard (every web surface autosaves, so discard_unsaved is accepted as is); generate_tts_and_add_to_timeline_tool defaults to the track below the picture, where the desktop picks or creates a free narration track.",
   ],
   [
     "tools zenvi-core develop rewrote as editor tools",
-    "get_project_info_tool, list_markers_tool, get_export_settings_tool, set_export_setting_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, export_video_tool, generate_tts_and_add_to_timeline_tool, add_effect_tool, add_title_tool, set_keyframes_tool and set_project_setting_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts), set_export_setting_tool stores any key (develop checks keys and aliases), and set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property).",
+    "get_project_info_tool, list_markers_tool, get_export_settings_tool, set_export_setting_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, export_video_tool, generate_tts_and_add_to_timeline_tool and set_keyframes_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts). set_export_setting_tool stores any key (develop checks keys and aliases); its `clear` is develop's and also clears a key stored here under its own name. set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property) with develop's point times, interpolation, ease presets and modes, and refuses a point without a value (develop keeps the curve's value there).",
   ],
   [
     "split_file_add_clip_tool",
@@ -258,7 +262,7 @@ const DIVERGENCES: [string, string][] = [
     "The web editor's own settings, in the desktop's entry shape: Snapping (Timeline) can change; Enable Autosave (always on), History Limit (50), Backend URL and the keyboard shortcuts (Zenvi desktop's defaults) are read-only and say why. Values are checked with the desktop's rules (types, ranges, choices, shortcut syntax and conflicts). Zenvi desktop's other preferences (cache, decoders, theme, autosave interval…) do not exist here and are refused as unknown. The CLI and Zenvi Cloud have no editor settings and refuse.",
   ],
   [
-    "video profiles: list_project_profiles_tool, set_project_profile_tool, manage_custom_profiles_tool, new_project_tool profile",
+    "video profiles: list_project_profiles_tool, set_project_profile_tool, set_project_setting_tool, manage_custom_profiles_tool, new_project_tool profile",
     "Custom profiles live where Zenvi desktop reads them, its profiles folder (`~/.openshot_qt/profiles`): the CLI lists, creates, edits and deletes them there, so a profile made on either shows on the other, and a size or frame rate no built-in profile has gets a `Custom WxH fps` profile like the desktop's. The desktop re-applies a project's named profile when it opens it (HD 720p 30 fps when it does not know the name), so the web editor and Zenvi Cloud, which cannot reach that folder, list the built-in profiles only and refuse to make a custom one, and manage_custom_profiles_tool. set_default is refused everywhere: the default profile is a desktop preference in its settings file. delete checks the open project's profile, not the desktop's default one.",
   ],
   [

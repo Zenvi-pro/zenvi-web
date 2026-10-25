@@ -5,10 +5,12 @@
  * references, refusals). Everything here reads the project; the edits go
  * through ops (`placeOverlayClip`, `replaceClipEffects`, …).
  *
- * Fonts: the desktop checks names against Qt's font database. Web hosts do
- * not report installed fonts (the browser and resvg each fall back on their
- * own), so a font is taken as given, which is what the desktop does when Qt
- * cannot tell (`installed_font_families()` is None).
+ * Fonts: the desktop checks names against Qt's font database. Here the list
+ * is the host renderer's (`FrameHost.fontFamilies`: the fonts render-node
+ * draws SVG titles with on the CLI and in Zenvi Cloud). The web editor's
+ * browser does not disclose its fonts, so there a font is taken as given,
+ * which is what the desktop does when Qt cannot tell
+ * (`installed_font_families()` is None).
  */
 
 import type { ColorKeyframe, Clip, Keyframe, Layer, Project, ProjectFile } from "../model/types.js";
@@ -19,6 +21,7 @@ import { addFile, updateFile } from "../ops/files.js";
 import { snapSeconds } from "../ops/internal.js";
 import type { Transaction } from "../history/document.js";
 import type { ToolCall, ToolOutcome } from "./define.js";
+import { getCloseMatches } from "./difflib.js";
 import { projectFps } from "./frame-time.js";
 import { pyFixed, pyReprString } from "./pyfmt.js";
 import { refused } from "./receipt.js";
@@ -188,6 +191,55 @@ export function keyframeValueAt(kf: unknown, frame: number, fallback = 0): numbe
     }
   }
   return y(sorted[sorted.length - 1]);
+}
+
+// ---------------------------------------------------------------------------
+// Fonts (titles_text_common.installed_font_families / resolve_font)
+// ---------------------------------------------------------------------------
+
+/**
+ * `installed_font_families()`: the families the host draws title text with,
+ * or null when it cannot tell (no list, an empty one, or a failure), in
+ * which case any font is taken as given.
+ */
+export async function installedFontFamilies(call: ToolCall): Promise<string[] | null> {
+  const frames = call.host.frames;
+  if (!frames?.fontFamilies) return null;
+  try {
+    const families = await frames.fontFamilies();
+    return families.length > 0 ? families : null;
+  } catch (error) {
+    call.host.log?.(`font list unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
+const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/** Python `sorted(names, key=len)[0]`: the shortest, the first of equals. */
+function shortest(names: readonly string[]): string {
+  return names.reduce((best, name) => (name.length < best.length ? name : best));
+}
+
+/**
+ * `resolve_font`: the installed family `name` means (same name ignoring
+ * case, else the shortest family starting with it, else the shortest
+ * containing it), or a refusal naming installed fonts like it. Any name is
+ * taken as given when the host cannot list its fonts (`families` null).
+ */
+export function resolveFont(name: unknown, families: readonly string[] | null): string {
+  const wanted = String(name ?? "").trim().replace(/^['"]+|['"]+$/g, "");
+  if (!wanted || families === null) return wanted;
+  const low = wanted.toLowerCase();
+  const exact = families.find((f) => f.toLowerCase() === low);
+  if (exact !== undefined) return exact;
+  const starts = families.filter((f) => f.toLowerCase().startsWith(low));
+  if (starts.length > 0) return shortest(starts);
+  const contains = families.filter((f) => f.toLowerCase().includes(low));
+  if (contains.length > 0) return shortest(contains);
+  const close = getCloseMatches(wanted, families, 8, 0.5);
+  const hint = close.length > 0 ? close.join(", ") : [...families].sort(byCodePoint).slice(0, 8).join(", ");
+  return toolError(`font ${pyReprString(wanted)} is not installed; installed fonts like it: ${hint}`);
 }
 
 // ---------------------------------------------------------------------------

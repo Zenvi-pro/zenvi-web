@@ -306,6 +306,13 @@ export interface FrameHost {
     seconds: number,
     options?: { width?: number; format?: "png" | "jpeg"; overlay?: FrameOverlay },
   ): Promise<ToolImage>;
+  /**
+   * The font families this host's renderer draws title text with (the SVG
+   * rasterizer's fonts), as the fonts spell them: what a title may name, like
+   * Zenvi desktop's Qt font database. Absent where they cannot be listed (a
+   * browser draws titles with fonts it does not disclose).
+   */
+  fontFamilies?(): Promise<string[]>;
 }
 
 /** Per-frame loudness of a file's audio (the input of the desktop's energy VAD). */

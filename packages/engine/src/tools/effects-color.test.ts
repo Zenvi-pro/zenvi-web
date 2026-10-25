@@ -103,6 +103,138 @@ describe("get_clip_effects_tool", () => {
   });
 });
 
+describe("add_effect_tool", () => {
+  it("adds an effect with its properties as one undo step", async () => {
+    const ed = new EditHarness();
+    const c = ed.addClip(ed.addFile("video"));
+    const r = await ed.call("add_effect_tool", { timeline_clip_id: c, effect: "Blur", properties: '{"horizontal_radius": 12, "sigma": "4"}' });
+    expect(r.summary).toBe("Added Blur to 1 clip(s).");
+    const blur = effectsOf(ed, c, "Blur")[0]!;
+    const data = r.data as Row;
+    expect([data.effect, data.effect_id, data.timeline_clip_id, data.changed]).toEqual(["Blur", blur.id, c, true]);
+    expect((data.clips as Row[])[0]).toEqual({ timeline_clip_id: c, effect_id: blur.id, action: "added" });
+    expect([y(blur.horizontal_radius), y(blur.sigma)]).toEqual([[12], [4]]);
+    expect(ed.stepsSinceMark()).toBe(1);
+    ed.doc.undo();
+    expect(effectsOf(ed, c, "Blur")).toEqual([]);
+    ed.doc.redo();
+    expect(effectsOf(ed, c, "Blur")[0]!.id).toBe(blur.id);
+  });
+
+  it("takes #183's arguments: a clip by description, effect_name and occurrence", async () => {
+    const ed = new EditHarness();
+    const f = ed.addFile("video", { name: "sample_video.mp4" });
+    ed.addClip(f, { position: 0 });
+    const c2 = ed.addClip(f, { position: 30 });
+    const r = await ed.receipt("add_effect_tool", { clip_query: "sample_video", effect_name: "crop", occurrence: "2" });
+    expect(r.timeline_clip_id).toBe(c2);
+    expect(effectsOf(ed, c2, "Crop")).toHaveLength(1);
+  });
+
+  it("keyframes properties at clip frames that count the trim", async () => {
+    const ed = new EditHarness();
+    const c = ed.addClip(ed.addFile("video"), { position: 10, start: 2, end: 8 });
+    await ed.receipt("add_effect_tool", {
+      timeline_clip_id: c,
+      effect: "Pixelate",
+      properties: { pixelization: [{ time: 10, value: 0.9 }, { time: 12, value: 0, interpolation: "linear" }] },
+    });
+    const kf = effectsOf(ed, c, "Pixelate")[0]!.pixelization as Keyframe;
+    expect([x(kf), y(kf), kf.Points[1]!.interpolation]).toEqual([[61, 121], [0.9, 0], 1]);
+  });
+
+  it("adds to several clips in one undo step, and with scope=all skips the clips that cannot take it", async () => {
+    const ed = new EditHarness();
+    const v1 = ed.addClip(ed.addFile("video"));
+    const v2 = ed.addClip(ed.addFile("video"), { position: 20 });
+    const ids = await ed.call("add_effect_tool", { timeline_clip_ids: `${v1}, ${v2}`, effect: "Negate" });
+    expect(ids.summary).toBe("Added Negative to 2 clip(s).");
+    expect(ed.stepsSinceMark()).toBe(1);
+    const a = ed.addClip(ed.addFile("audio"), { layer: T2 });
+    const all = await ed.call("add_effect_tool", { scope: "all", effect: "Pixelate" });
+    expect(all.summary).toBe("Added Pixelate to 2 clip(s). Skipped 1 clip(s).");
+    expect(effectsOf(ed, v1, "Pixelate")).toHaveLength(1);
+    expect(effectsOf(ed, a, "Pixelate")).toEqual([]);
+    expect(((all.data as Row).skipped as Row[])[0]).toMatchObject({ timeline_clip_id: a });
+    expect(String(((all.data as Row).skipped as Row[])[0]!.reason)).toContain("is a video effect and clip");
+  });
+
+  it("updates the effect a clip has by default, stacks a copy on request, and changes nothing for the same values", async () => {
+    const ed = new EditHarness();
+    const c = ed.addClip(ed.addFile("video"));
+    await ed.receipt("add_effect_tool", { timeline_clip_id: c, effect: "Blur", properties: { sigma: 2 } });
+    ed.mark();
+    const same = await ed.call("add_effect_tool", { timeline_clip_id: c, effect: "Blur", properties: { sigma: 2 } });
+    expect([same.status, same.summary, (same.data as Row).changed]).toEqual(["unchanged", "Blur is already on 1 clip(s) with these settings; nothing changed.", false]);
+    expect(ed.stepsSinceMark()).toBe(0);
+    const updated = await ed.call("add_effect_tool", { timeline_clip_id: c, effect: "Blur", properties: { sigma: 5 } });
+    expect(updated.summary).toBe("Updated the existing Blur on 1 clip(s).");
+    expect(((updated.data as Row).clips as Row[])[0]!.action).toBe("updated");
+    expect(effectsOf(ed, c, "Blur").map((e) => y(e.sigma))).toEqual([[5]]);
+    await ed.receipt("add_effect_tool", { timeline_clip_id: c, effect: "Blur", if_exists: "add" });
+    expect(effectsOf(ed, c, "Blur")).toHaveLength(2);
+    expect(ed.stepsSinceMark()).toBe(2);
+  });
+
+  it.each([
+    [{ effect: "Blur", properties: { horizontal_radius: 500 } }, "between 0 and 100"],
+    [{ effect: "Blur", properties: { radius: 3 } }, "no property"],
+    [{ effect: "ChromaKey", properties: { keymethod: "magic" } }, "must be one of"],
+    [{ effect: "Blur", properties: { id: "x" } }, "not settable"],
+    [{ effect: "Blur", properties: { sigma: [{ time: 99, value: 1 }] } }, "outside the clip"],
+    [{ effect: "NotAnEffect" }, "unknown effect"],
+    [{ effect: "Compressor" }, "has no sound"],
+    [{ effect: "" }, "needs effect"],
+  ])("refuses %j before anything changes", async (args, needle) => {
+    const ed = new EditHarness();
+    const c = ed.addClip(ed.addFile("video"));
+    await ed.refused("add_effect_tool", { timeline_clip_id: c, ...args }, needle);
+    expect(ed.clip(c)!.effects).toEqual([]);
+  });
+
+  it("refuses a clip on a locked track and a video effect on an audio-only clip", async () => {
+    const ed = new EditHarness();
+    const c = ed.addClip(ed.addFile("video"));
+    ed.lockTrack(1_000_000);
+    await ed.refused("add_effect_tool", { timeline_clip_id: c, effect: "Blur" }, "locked");
+    const a = ed.addClip(ed.addFile("audio"), { layer: T2 });
+    await ed.refused("add_effect_tool", { timeline_clip_id: a, effect: "Sharpen" }, "audio-only");
+  });
+
+  it("puts audio effects on clips with sound and the visualizer on an audio clip", async () => {
+    const ed = new EditHarness();
+    const a = ed.addClip(ed.addFile("audio"));
+    await ed.receipt("add_effect_tool", { timeline_clip_id: a, effect: "Echo", properties: { mix: 0.2, echo_time: "0.3s" } });
+    const echo = effectsOf(ed, a, "Echo")[0]!;
+    expect([y(echo.mix), y(echo.echo_time)]).toEqual([[0.2], [0.3]]);
+    await ed.receipt("add_effect_tool", { timeline_clip_id: a, effect: "AudioVisualization" });
+  });
+
+  it("takes colours, choice names and curves", async () => {
+    const ed = new EditHarness();
+    const c = ed.addClip(ed.addFile("video"));
+    await ed.receipt("add_effect_tool", { timeline_clip_id: c, effect: "ChromaKey", properties: { color: "#00ff00", keymethod: "hsv/hsl hue", fuzz: 30 } });
+    const ck = effectsOf(ed, c, "ChromaKey")[0]! as unknown as { color: Record<string, Keyframe>; keymethod: number; fuzz: Keyframe };
+    expect([y(ck.color.green), y(ck.color.red), ck.keymethod, y(ck.fuzz)]).toEqual([[255], [0], 1, [30]]);
+    await ed.receipt("add_effect_tool", { timeline_clip_id: c, effect: "ColorGrade", properties: { curve_all: [[0, 0], [0.5, 0.6], [1, 1]], saturation: 0 } });
+    const cg = effectsOf(ed, c, "ColorGrade")[0]! as unknown as { curve_all: { nodes: unknown[] }; saturation: Keyframe };
+    expect([cg.curve_all.nodes.length, y(cg.saturation)]).toEqual([3, [0]]);
+  });
+
+  it("refuses the OpenCV analysis effects as desktop-only, and processing as not ported", async () => {
+    const ed = new EditHarness();
+    const c = ed.addClip(ed.addFile("video"));
+    const r = await ed.refused("add_effect_tool", { timeline_clip_id: c, effect: "stabilize" }, "not available in this Zenvi surface", "Stabilizer analysis", "Zenvi desktop");
+    expect(r.status).toBe("refused");
+    await ed.refused("add_effect_tool", { timeline_clip_id: c, effect: "Tracker", processing: { tracker_type: "KCF" } }, "cannot use processing in this Zenvi surface yet");
+    // Outline is drawn by Zenvi desktop only: added, with a warning.
+    const outline = await ed.call("add_effect_tool", { timeline_clip_id: c, effect: "Outline" });
+    expect(outline.status).toBe("applied");
+    expect(outline.warnings).toEqual(["Outline is drawn by Zenvi desktop only (OpenCV): the web editor, the zenvi CLI and Zenvi Cloud render these clips without it."]);
+    expect(ed.clip(c)!.effects.map((e) => e.class_name)).toEqual(["Outline"]);
+  });
+});
+
 describe("update_effect_tool", () => {
   it("changes a property by effect id, then keyframes it by class: one undo step each", async () => {
     const ed = new EditHarness();

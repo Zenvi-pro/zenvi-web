@@ -1,11 +1,15 @@
 /**
  * Video profiles: list_project_profiles_tool, set_project_profile_tool,
- * manage_custom_profiles_tool.
+ * set_project_setting_tool, manage_custom_profiles_tool.
  *
  * Port of zenvi-core develop 1f80cb3d0
  * src/classes/editor_tools/project_export_profiles.py. Profile requests
  * resolve in model/profile-requests.ts; the switch and the reframe are the
  * engine's ops (applyProfile, planReframe), one undo step together.
+ * set_project_setting_tool goes through the same switch, so a new size or
+ * frame rate also renames the project's profile (the desktop re-applies a
+ * project's profile by name when it opens it), and sets the audio format
+ * (setProjectAudio) in the same step.
  *
  * Custom profiles live where Zenvi desktop reads them: its user profiles
  * folder (`~/.openshot_qt/profiles`), which the CLI on the same computer
@@ -41,7 +45,8 @@ import {
   type ProfileChoice,
   type ProfileContext,
 } from "../../model/profile-requests.js";
-import { applyProfile, applyReframe, planReframe, profileDiffers, type ReframeMode } from "../../ops/project.js";
+import { ChannelLayout } from "../../model/defaults.js";
+import { applyProfile, applyReframe, planReframe, profileDiffers, setProjectAudio, type ProjectAudio, type ReframeMode, type ReframePlan } from "../../ops/project.js";
 import { contractTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { projectFps } from "../frame-time.js";
 import { pyFloat, pyG, pyReprString } from "../pyfmt.js";
@@ -232,6 +237,97 @@ function profileReceipt(
 
 const PIXEL_RATIO_RE = /^\s*(\d+)\s*[:/]\s*(\d+)\s*$/;
 
+type ChannelName = "mono" | "stereo" | "surround" | "5.1" | "7.1";
+
+/** project_export_profiles._LAYOUT_BY_NAME. */
+const LAYOUT_BY_NAME: Readonly<Record<string, ChannelName>> = {
+  mono: "mono",
+  "1": "mono",
+  stereo: "stereo",
+  "2": "stereo",
+  surround: "surround",
+  "3": "surround",
+  "5.1": "5.1",
+  "6": "5.1",
+  "7.1": "7.1",
+  "8": "7.1",
+};
+/** project_export.CHANNEL_LAYOUTS: libopenshot ChannelLayout code and channel count. */
+const CHANNEL_LAYOUTS: Readonly<Record<ChannelName, readonly [number, number]>> = {
+  mono: [ChannelLayout.MONO, 1],
+  stereo: [ChannelLayout.STEREO, 2],
+  surround: [ChannelLayout.SURROUND, 3],
+  "5.1": [ChannelLayout.FIVE_POINT_ONE, 6],
+  "7.1": [ChannelLayout.SEVEN_POINT_ONE, 8],
+};
+/** project_export_profiles._LAYOUT_SETTING: the Preferences value of each layout. */
+const LAYOUT_SETTING: Readonly<Record<ChannelName, string>> = {
+  mono: "LAYOUT_MONO",
+  stereo: "LAYOUT_STEREO",
+  surround: "LAYOUT_SURROUND",
+  "5.1": "LAYOUT_5POINT1",
+  "7.1": "LAYOUT_7POINT1",
+};
+const SAMPLE_RATES = [22050, 44100, 48000, 96000, 192000] as const;
+
+/** project_export._channel_layout_name. */
+function channelLayoutName(value: unknown): string {
+  const hit = (Object.entries(CHANNEL_LAYOUTS) as [ChannelName, readonly [number, number]][]).find(([, [code]]) => value === code);
+  return hit ? hit[0] : value === undefined || value === null || value === 0 || value === "" ? "" : String(value);
+}
+
+/**
+ * save_as_default: the sample rate and channels become the defaults for new
+ * projects in the editor's own settings (the desktop's Preferences keys
+ * `default-samplerate` / `default-channellayout`), stored once the project
+ * has changed. Refused, before anything changes, on a surface whose
+ * settings have no such defaults: the web editor's have none (its projects
+ * start at 48000 Hz stereo), and the CLI and Zenvi Cloud have no editor
+ * settings at all.
+ */
+function defaultAudioSettings(call: ToolCall, sampleRate: number | null, layout: ChannelName | null): () => void {
+  const ui = call.host.ui;
+  const entries = ui?.preferences?.() ?? null;
+  const again = "call again without save_as_default to change only this project";
+  if (entries === null || !ui?.setPreference) {
+    throw new ToolError(
+      "save_as_default keeps the sample rate and channels for new projects in an editor's settings " +
+        `(Zenvi desktop: Preferences > Default Audio Sample Rate / Channels); there is no editor window here, so ${again}`,
+    );
+  }
+  const wanted: [string, string | number][] = [];
+  if (sampleRate !== null) wanted.push(["default-samplerate", sampleRate]);
+  if (layout !== null) wanted.push(["default-channellayout", LAYOUT_SETTING[layout]]);
+  for (const [key] of wanted) {
+    const entry = entries.find((e) => e.key === key);
+    if (!entry || entry.readOnly) {
+      throw new ToolError(
+        `this editor's settings have no default ${key === "default-samplerate" ? "sample rate" : "channels"} for new projects ` +
+          `(new projects here start at 48000 Hz stereo; Zenvi desktop keeps them in Preferences), so ${again}`,
+      );
+    }
+  }
+  return () => {
+    for (const [key, value] of wanted) ui.setPreference!(key, value);
+  };
+}
+
+/** `project_snapshot()` fields set_project_setting_tool reports. */
+function settingsSnapshot(project: Project): Record<string, unknown> {
+  const fps = projectFps(project);
+  return {
+    width: project.width,
+    height: project.height,
+    fps: Math.round((fps.num / fps.den) * 1000) / 1000,
+    fps_num: fps.num,
+    fps_den: fps.den,
+    profile: String(project.profile ?? ""),
+    sample_rate: Math.trunc(Number(project.sample_rate) || 0),
+    channels: Math.trunc(Number(project.channels) || 0),
+    channel_layout: channelLayoutName(project.channel_layout),
+  };
+}
+
 export const projectProfileTools: CatalogTool[] = [
   contractTool("list_project_profiles_tool", {
     annotations: READ,
@@ -310,6 +406,93 @@ export const projectProfileTools: CatalogTool[] = [
           reframe,
           socialKey,
         );
+      }),
+  }),
+
+  contractTool("set_project_setting_tool", {
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
+    run: (call, input) =>
+      editorRun(async () => {
+        const project = call.doc.project;
+        const fpsNum = input.fps_num ?? null;
+        const fpsDen = input.fps_den ?? null;
+        let fps = input.fps ?? null;
+        let width = input.width ?? null;
+        let height = input.height ?? null;
+        const sampleRate = input.sample_rate ?? null;
+        const profileArg = text(input.profile) || text(input.preset);
+        const orientation = input.orientation ?? "";
+        const reframe = (input.reframe ?? "keep") as ReframeMode;
+        const videoRequested = [fps, fpsNum, fpsDen, width, height].some((v) => v !== null && v !== 0) || Boolean(profileArg) || Boolean(orientation);
+        if (fpsNum !== null || fpsDen !== null) {
+          if (fpsNum === null || fpsDen === null) throw new ToolError("give both fps_num and fps_den");
+          fps = fpsNum / fpsDen;
+        }
+        let layout: ChannelName | null = null;
+        const channels = text(input.channels);
+        if (channels) {
+          layout = LAYOUT_BY_NAME[channels.toLowerCase()] ?? null;
+          if (!layout) throw new ToolError("channels must be mono, stereo, surround, 5.1 or 7.1 (or 1, 2, 3, 6, 8)");
+        }
+        if (sampleRate !== null && !(SAMPLE_RATES as readonly number[]).includes(sampleRate)) {
+          throw new ToolError(`sample_rate must be one of ${SAMPLE_RATES.join(", ")}`);
+        }
+        if (!videoRequested && sampleRate === null && !layout && reframe === "keep") {
+          throw new ToolError("nothing to change: pass fps, width/height, profile/preset, orientation, sample_rate or channels");
+        }
+        // Checked before anything changes: a surface without such settings refuses the whole call.
+        const storeDefaults = input.save_as_default && (sampleRate !== null || layout !== null) ? defaultAudioSettings(call, sampleRate, layout) : null;
+
+        let profile: CatalogProfile | null = null;
+        if (videoRequested || reframe !== "keep") {
+          if ((width === null) !== (height === null)) {
+            width = width ?? project.width;
+            height = height ?? project.height;
+          }
+          const ctx = await profileContext(call);
+          let choice = targetProfile(call, ctx, { profile: profileArg, width: width ?? 0, height: height ?? 0, fps: fps ?? 0, orientation, fromFileId: "" });
+          if (fpsNum !== null && fpsDen !== null && (choice.profile.fps.num !== fpsNum || choice.profile.fps.den !== fpsDen)) {
+            const base = choice.profile;
+            choice = resolving(() => ensureProfile(ctx, base.width, base.height, { num: fpsNum, den: fpsDen }));
+          }
+          profile = await keepCustomProfile(call, choice);
+        }
+
+        const audio: ProjectAudio = {};
+        if (sampleRate !== null && Math.trunc(Number(project.sample_rate) || 0) !== sampleRate) audio.sampleRate = sampleRate;
+        if (layout) {
+          const [code, count] = CHANNEL_LAYOUTS[layout];
+          if (project.channel_layout !== code || Math.trunc(Number(project.channels) || 0) !== count) audio.channels = { count, layout: code };
+        }
+        const plan: ReframePlan = profile ? planReframe(project, reframe, profile.width, profile.height) : { changes: [], skipped: [], letterboxed: [], videoClips: 0 };
+        const changedProfile = profile ? profileDiffers(project, profile) : false;
+        const changed = changedProfile || plan.changes.length > 0 || Object.keys(audio).length > 0;
+        if (changed) {
+          call.commit((tx) => {
+            if (profile && (changedProfile || plan.changes.length > 0)) {
+              applyProfile(tx, profile);
+              applyReframe(tx, plan);
+            }
+            setProjectAudio(tx, audio);
+          }, "Set project settings");
+        }
+        storeDefaults?.();
+
+        const after = settingsSnapshot(call.doc.project);
+        const notes: string[] = [];
+        if (changedProfile) notes.push(`${String(after.width)}x${String(after.height)} at ${pyFloat(Number(after.fps))} fps (${String(after.profile)})`);
+        if (plan.changes.length > 0) notes.push(`${plan.changes.length} clip(s) reframed`);
+        if (Object.keys(audio).length > 0) notes.push(`audio ${String(after.sample_rate)} Hz ${String(after.channel_layout)}`);
+        let summary = changed ? `Updated project settings: ${notes.join(", ")}.` : "Settings already matched.";
+        if (plan.letterboxed.length > 0) summary += ` ${plan.letterboxed.length} clip(s) of another shape will show bars; pass reframe='fill' to crop them.`;
+        const data = {
+          changed,
+          ...after,
+          reframed_clip_ids: plan.changes.map((c) => c.id),
+          letterboxed_clip_ids: plan.letterboxed,
+          saved_as_default: storeDefaults !== null,
+        };
+        return changed ? ok(call, summary, data) : nothingChanged(call, summary, data);
       }),
   }),
 

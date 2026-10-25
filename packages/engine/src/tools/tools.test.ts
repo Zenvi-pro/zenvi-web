@@ -456,10 +456,14 @@ const SPECS: Record<string, Spec> = {
   add_effect_tool: {
     happy: {
       args: { timeline_clip_id: IDS.clipA, effect: "Blur" },
-      summary: /^Added effect 'Blur' to timeline_clip_id=CLIPINTV01 \(effect_id=\w+\)\.$/,
-      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipA)?.effects).toHaveLength(1),
+      summary: /^Added Blur to 1 clip\(s\)\.$/,
+      check: ({ doc, receipt }) => {
+        const effects = doc.project.clips.find((c) => c.id === IDS.clipA)?.effects;
+        expect(effects).toHaveLength(1);
+        expect(receipt.data).toMatchObject({ effect: "Blur", effect_id: effects![0]!.id, timeline_clip_id: IDS.clipA, changed: true });
+      },
     },
-    failure: { args: { timeline_clip_id: IDS.clipA, effect: "NoSuchEffect" }, summary: /^Error: unknown effect 'NoSuchEffect'\./ },
+    failure: { args: { timeline_clip_id: IDS.clipA, effect: "NoSuchEffect" }, summary: /^Error: unknown effect 'NoSuchEffect'.* list_effects_tool lists all 43 effects$/ },
   },
   set_keyframes_tool: {
     happy: {
@@ -472,7 +476,12 @@ const SPECS: Record<string, Spec> = {
     },
   },
   set_project_setting_tool: {
-    happy: { args: { fps: "25" }, summary: /^Updated project settings: fps=25\/1\.$/, check: ({ doc }) => expect(doc.project.fps).toEqual({ num: 25, den: 1 }) },
+    happy: {
+      args: { fps: "25" },
+      summary: /^Updated project settings: 1280x720 at 25\.0 fps \(HD 720p 25 fps\)\.$/,
+      // The profile follows the new rate: Zenvi desktop re-applies a project's profile by name when it opens it.
+      check: ({ doc }) => expect([doc.project.fps, doc.project.profile]).toEqual([{ num: 25, den: 1 }, "HD 720p 25 fps"]),
+    },
     failure: { args: { fps: "fast" }, summary: /^Error: Invalid arguments for set_project_setting_tool: 'fast' is not valid under any of the given schemas \(at fps\)\.$/ },
   },
 
@@ -681,7 +690,7 @@ const SPECS: Record<string, Spec> = {
   add_title_tool: {
     happy: {
       args: { text: "Chapter One", position_seconds: "3", duration_seconds: "4" },
-      summary: /^Added title 'Chapter One' from template Bar_1\.svg at 3\.000s for 4\.000s\. Added clip to timeline at position 3\.0s/,
+      summary: /^Added title 'Chapter One' \(Bar_1\) on track 4 at 3\.00-7\.00s\.$/,
       check: ({ host, receipt, doc }) => {
         const path = (receipt.data as { path: string }).path;
         expect(String(new TextDecoder().decode(host.written.get(path) as Uint8Array))).toContain(">Chapter One</tspan>");
@@ -691,7 +700,10 @@ const SPECS: Record<string, Spec> = {
         expect(doc.project.layers).toHaveLength(5);
       },
     },
-    failure: { args: { text: "Chapter One", template: "NoSuchTemplate" }, summary: /^Error: title template not found \(NoSuchTemplate\)\.$/ },
+    failure: {
+      args: { text: "Chapter One", template: "NoSuchTemplate" },
+      summary: /^Error: unknown title template 'NoSuchTemplate'; close matches: .+ \(list_title_templates_tool lists them all\)$/,
+    },
   },
   add_captions_tool: {
     happy: {

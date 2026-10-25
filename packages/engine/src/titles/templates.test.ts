@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TITLE_TEMPLATE, TITLE_TEMPLATES, getTitleTemplate } from "./templates.js";
+import { DEFAULT_TITLE_TEMPLATE, TITLE_TEMPLATES, getTitleTemplate, suggestTitleTemplates } from "./templates.js";
 import { setSvgText, titleLines } from "./svg.js";
 
 const asset = (assetPath: string): string => readFileSync(new URL(`../../assets/${assetPath}`, import.meta.url), "utf8");
@@ -35,6 +35,15 @@ describe("title templates", () => {
     expect(getTitleTemplate("/home/me/My_Title.svg")).toBeUndefined();
     expect(getTitleTemplate("C:\\Titles\\Bar_1.svg")).toBeUndefined();
     expect(getTitleTemplate("Nope")).toBeUndefined();
+    // title_svg.find_template: spaces, "_" and "-" are the same, and the display name works too.
+    expect(getTitleTemplate("gray box 4")!.file).toBe("Gray_Box_4.svg");
+    expect(getTitleTemplate("Gray-Box-4")!.file).toBe("Gray_Box_4.svg");
+  });
+
+  it("suggests templates like a misspelt name (title_svg.suggest_templates)", () => {
+    expect(suggestTitleTemplates("standrd_1")).toContain("Standard_1");
+    expect(suggestTitleTemplates("gold")).toEqual(expect.arrayContaining(["Gold_1", "Gold_Bottom"]));
+    expect(suggestTitleTemplates("zzzz")).toEqual([]);
   });
 
   it("works with the desktop text substitution on every bundled template", () => {
