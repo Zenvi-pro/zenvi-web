@@ -75,7 +75,7 @@ export const EDITOR_WIDGET_HTML = `<!doctype html>
   "use strict";
   var root = document.getElementById("root");
   var oa = window.openai;
-  var state = { editor: null, frame: null, origin: null, mode: "inline", theme: null, projectId: null, refreshing: false, ready: false };
+  var state = { editor: null, frame: null, origin: null, mode: "inline", theme: null, projectId: null, refreshing: false, ready: false, backoff: 0, retryAt: 0 };
   var READY_MS = 10000;
   var nextId = 1;
   var pending = {};
@@ -192,16 +192,24 @@ export const EDITOR_WIDGET_HTML = `<!doctype html>
   }
   function refreshToken() {
     if (state.refreshing || !state.projectId) return;
+    // After a refusal (the connection was revoked, say), wait before asking again: the page asks on every 401.
+    if (Date.now() < (state.retryAt || 0)) { toFrame({ type: "zenvi:token-unavailable" }); return; }
     state.refreshing = true;
     callTool("open_in_editor", { project_id: state.projectId, refresh: true }).then(function (result) {
       state.refreshing = false;
       var editor = editorMeta(result && (result._meta || result.meta));
-      if (editor) { state.editor = editor; toFrame({ type: "zenvi:token", token: editor.token }); }
-      else toFrame({ type: "zenvi:token-unavailable" });
+      if (editor) { state.editor = editor; state.backoff = 0; toFrame({ type: "zenvi:token", token: editor.token }); }
+      else { backOff(); toFrame({ type: "zenvi:token-unavailable" }); }
     }, function () {
       state.refreshing = false;
+      backOff();
       toFrame({ type: "zenvi:token-unavailable" });
     });
+  }
+  // 30 s after the first refusal, doubling to 10 min.
+  function backOff() {
+    state.backoff = Math.min((state.backoff || 15000) * 2, 600000);
+    state.retryAt = Date.now() + state.backoff;
   }
   function applyContext(context) {
     if (!context) return;
