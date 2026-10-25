@@ -156,7 +156,7 @@ export async function generateVideo(
     signal: call.signal,
   });
   if (!res.ok) return { error: res.error };
-  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: bareError(res.data.error, "Video generation failed") };
   return { videoUrl: String(res.data.video_url ?? "") };
 }
 
@@ -171,8 +171,13 @@ export async function generateTts(
     signal: call.signal,
   });
   if (!res.ok) return { error: res.error };
-  if (!res.data.success) return { error: String(res.data.error || "TTS generation failed") };
+  if (!res.data.success) return { error: bareError(res.data.error, "TTS generation failed") };
   return { audioBase64: String(res.data.audio_base64 ?? "") };
+}
+
+/** A backend error without the "Error:" some backend paths put in front: the tools add their own. */
+function bareError(value: unknown, fallback: string): string {
+  return String(value || fallback).trim().replace(/^error:\s*/i, "") || fallback;
 }
 
 /** GET /api/v1/pexels/search: Pexels videos for a query (the backend holds the API key). */

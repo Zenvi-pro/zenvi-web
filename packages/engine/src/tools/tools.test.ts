@@ -972,6 +972,14 @@ async function runCase(name: string, c: Case): Promise<Ctx> {
   return { result, receipt: result.data!, doc, host, before };
 }
 
+describe("backend errors", () => {
+  it("say Error: once when the backend's message already starts with it", async () => {
+    const host = fakeHost({ routes: { "/api/v1/generation/tts": () => ({ success: false, error: "Error: Out of credits for tts. Need 3, have 0." }) } });
+    const result = await runTool({ doc: fixtureDoc(), host }, "generate_tts_and_add_to_timeline_tool", { text: "Hi there" });
+    expect(result.data?.summary).toBe("Error: Out of credits for tts. Need 3, have 0.");
+  });
+});
+
 describe("add_title_tool without a track", () => {
   it("opens a 'Titles' track on top when every track above the picture is busy, in the same undo step", async () => {
     const doc = fixtureDoc();
