@@ -2,15 +2,19 @@
  * From designed elements to timeline layers: poses become libopenshot clip
  * keyframes (see render/plan/transform.ts for how a clip is placed).
  *
- * SVG drawings play with scale mode None and gravity top-left: a drawing is
- * shown at its own pixel size, its top-left corner at (location_x × width,
- * location_y × height), scaled from that corner, rotated about `origin`.
- * libopenshot rasterizes a None clip at its size × the largest scale_x/y
- * keyframe *point* and then multiplies by the scale again, so a drawing is
- * drawn at its largest pose (`k` = that scale) and its keyframes run up to
- * exactly 1. Media in cards plays with scale mode Best Fit, centred: its
- * scale and location keyframes size and place the fitted picture, and
- * `corner_radius` rounds it (clip property in libopenshot 1.0).
+ * SVG drawings play with scale mode Best Fit and gravity top-left: a drawing
+ * is drawn at its largest pose (`k` = that scale), and its scale keyframes
+ * divide out the fit, so at the project's frame size it shows at its own
+ * pixel size and at any other render size it keeps its share of the frame.
+ * Its top-left corner is at (location_x × width, location_y × height),
+ * scaled from that corner, rotated about `origin`. (Scale mode None draws a
+ * raster at its pixel size whatever the render size, and libopenshot exports
+ * at the export's size: a 720p export of a 1080p project drew every drawing
+ * 1.5 times too big.)
+ *
+ * Media in cards plays with scale mode Best Fit, centred: its scale and
+ * location keyframes size and place the fitted picture, and `corner_radius`
+ * rounds it (clip property in libopenshot 1.0).
  *
  * Every pose property is an affine function of the pose, so one easing per
  * segment (the same bezier handles on every property) keeps a drawing and the
@@ -123,7 +127,7 @@ const sOf = (p: Pose): number => Math.max(MIN_SCALE, p.s);
 function svgLayer(el: Element, source: SvgSource, keys: Key[], frame: MotionFrame): MotionLayer {
   const top = Math.max(...keys.map((k) => sOf(k.pose)));
   const topX = Math.max(...keys.map((k) => sOf(k.pose) * sxOf(k.pose)));
-  // libopenshot sizes a None clip's raster by the largest scale_x and scale_y points (keeping its aspect).
+  // A drawing is made at its largest pose on both axes: no pose may stretch it wider than that.
   if (Math.abs(topX - top) > 1e-9) throw new Error(`element ${el.name}: its widest pose must also be its largest (sx 1 there)`);
   const drawing = source.draw(top);
   const pw = drawing.pixelWidth;
@@ -131,12 +135,14 @@ function svgLayer(el: Element, source: SvgSource, keys: Key[], frame: MotionFram
   const frames = keys.map((k) => k.frame - el.from + 1);
   const eases = keys.map((k) => k.ease);
   const pose = (f: (p: Pose) => number) => keys.map((k) => f(k.pose));
+  // Best Fit sizes the raster to the frame; dividing the scales by that fit brings it back to its own pixels.
+  const fit = Math.min(frame.width / pw, frame.height / ph);
   const props: Record<string, unknown> = {
-    scale: ScaleMode.NONE,
+    scale: ScaleMode.FIT,
     gravity: Gravity.TOP_LEFT,
     ...keyframeProps(frames, eases, {
-      scale_x: pose((p) => (sOf(p) * sxOf(p)) / top),
-      scale_y: pose((p) => sOf(p) / top),
+      scale_x: pose((p) => (sOf(p) * sxOf(p)) / top / fit),
+      scale_y: pose((p) => sOf(p) / top / fit),
       location_x: pose((p) => (p.x - source.cx * sOf(p) * sxOf(p)) / frame.width),
       location_y: pose((p) => (p.y - source.cy * sOf(p)) / frame.height),
       alpha: pose((p) => p.alpha),

@@ -39,18 +39,21 @@ describe("keyframeThrough", () => {
 });
 
 describe("element layers", () => {
-  it("draws an SVG at its largest pose and keeps scale points at most 1 (libopenshot sizes None clips by them)", () => {
+  it("draws an SVG at its largest pose with Best Fit, its largest scale points bringing it back to its own pixel size", () => {
     const el = drawing("logo", 0, 0, 60, { width: 200, height: 100 }, (d) => d.rect(0, 0, 200, 100, { fill: "#000000" }), [
       key(0, pose(540, 960, { s: 0.5, alpha: 0 })),
       key(10, pose(540, 960, { s: 1.2 }), "out_back"),
       key(20, pose(540, 960, { s: 1 }), "out"),
     ]);
     const layer = elementLayer(el, FRAME);
-    expect(layer.props.scale).toBe(ScaleMode.NONE);
+    expect(layer.props.scale).toBe(ScaleMode.FIT);
     expect(layer.props.gravity).toBe(Gravity.TOP_LEFT);
     expect(layer.source.kind === "svg" && layer.source.width).toBe(240);
+    // Best Fit sizes the 240 × 120 raster to 1080 × 540 in the 1080 × 1920 frame.
     const sx = points(layer.props.scale_x).map((p) => p.co.Y);
-    expect(Math.max(...sx)).toBe(1);
+    const sy = points(layer.props.scale_y).map((p) => p.co.Y);
+    expect(Math.max(...sx) * 1080).toBeCloseTo(240, 3);
+    expect(Math.max(...sy) * 540).toBeCloseTo(120, 3);
     // Centre at (540, 960) at every key: the top left is the centre minus half the scaled drawing.
     const lx = points(layer.props.location_x).map((p) => p.co.Y);
     expect(lx[1]! * 1080 + 120).toBeCloseTo(540, 2);

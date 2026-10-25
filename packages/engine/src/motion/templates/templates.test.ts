@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluate } from "../../keyframe/evaluate.js";
-import type { Keyframe } from "../../model/types.js";
+import { ScaleMode, type Keyframe } from "../../model/types.js";
 import { getAttr, parseXml, type XmlElement } from "../../titles/xml.js";
 import { buildMotionTemplate } from "../build.js";
 import { tempoGrid, TemplateBeats } from "../grid.js";
@@ -47,7 +47,10 @@ function keyframes(layer: MotionLayer): [string, Keyframe][] {
   return Object.entries(layer.props).filter((e): e is [string, Keyframe] => typeof e[1] === "object" && e[1] !== null && Array.isArray((e[1] as Keyframe).Points));
 }
 
-/** A layer's box on the frame at clip frame `at` (rotation left out): drawings at their pixel size, media as Best Fit places them. */
+/**
+ * A layer's box on the frame at clip frame `at` (rotation left out), as Best Fit places it. For a drawing, `sx` and
+ * `sy` are frame pixels per SVG pixel.
+ */
 function boxAt(layer: MotionLayer, frame: MotionFrame, at: number): { left: number; top: number; right: number; bottom: number; sx: number; sy: number } {
   const value = (name: string, fallback: number) => {
     const kf = layer.props[name] as Keyframe | undefined;
@@ -56,9 +59,10 @@ function boxAt(layer: MotionLayer, frame: MotionFrame, at: number): { left: numb
   const sx = value("scale_x", 1);
   const sy = value("scale_y", 1);
   if (layer.source.kind === "svg") {
+    const fit = Math.min(frame.width / layer.source.width, frame.height / layer.source.height);
     const left = value("location_x", 0) * frame.width;
     const top = value("location_y", 0) * frame.height;
-    return { left, top, right: left + layer.source.width * sx, bottom: top + layer.source.height * sy, sx, sy };
+    return { left, top, right: left + layer.source.width * sx * fit, bottom: top + layer.source.height * sy * fit, sx: sx * fit, sy: sy * fit };
   }
   const media = MEDIA_BY_ID.get(layer.source.fileId)!;
   const crop = layer.effects.find((e) => (e as { class_name?: string }).class_name === "Crop") as Record<string, Keyframe> | undefined;
@@ -177,10 +181,12 @@ describe.each(Object.entries(FRAMES))("motion templates, %s", (_name, frame) => 
         expect(ALLOWED.has(el.name), `${layer.name}: <${el.name}>`).toBe(true);
         for (const [attr] of el.attrs) expect(FORBIDDEN_ATTRS, `${layer.name}: ${attr}`).not.toContain(attr);
       }
-      // Scale points never pass 1: libopenshot sizes a scale-None clip's raster by them.
+      // Best Fit sizes the raster to the frame; the largest scale points bring it back to its own pixel size.
+      const fit = Math.min(frame.width / layer.source.width, frame.height / layer.source.height);
+      expect(layer.props.scale, layer.name).toBe(ScaleMode.FIT);
       for (const prop of ["scale_x", "scale_y"]) {
         const kf = layer.props[prop] as Keyframe | undefined;
-        if (kf) expect(Math.max(...kf.Points.map((p) => p.co.Y))).toBeCloseTo(1, 9);
+        if (kf) expect(Math.max(...kf.Points.map((p) => p.co.Y)) * fit, `${layer.name}.${prop}`).toBeCloseTo(1, 4);
       }
       // At its last key a drawing with text sits inside the frame (shadows may spill a little).
       if (/<text/.test(layer.source.svg) && !layer.bleed) {
@@ -190,8 +196,8 @@ describe.each(Object.entries(FRAMES))("motion templates, %s", (_name, frame) => 
         };
         const left = last("location_x", 0) * frame.width;
         const top = last("location_y", 0) * frame.height;
-        const width = layer.source.width * last("scale_x", 1);
-        const height = layer.source.height * last("scale_y", 1);
+        const width = layer.source.width * fit * last("scale_x", 1);
+        const height = layer.source.height * fit * last("scale_y", 1);
         const slack = 0.02 * frame.width;
         expect(left, `${id} ${layer.name} left`).toBeGreaterThanOrEqual(-slack);
         expect(top, `${id} ${layer.name} top`).toBeGreaterThanOrEqual(-slack);

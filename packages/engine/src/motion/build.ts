@@ -12,12 +12,15 @@
  *   beats      TemplateBeats (grid.ts) over the reel planner's grid; entrances
  *              at beats and half beats; staggered parts record their beat in
  *              `cue` (MotionLayer.cue).
- *   drawings   SVG files at their own pixel size: scale mode None (3), gravity
- *              top left (0), drawn at k = the element's largest scale so the
- *              scale_x/scale_y points top out at exactly 1 (libopenshot sizes a
- *              None clip's raster by the largest points, keeping the aspect,
- *              then scales again). location = (centre - element centre × scale)
- *              / frame size; origin = the element centre (rotation pivot).
+ *   drawings   SVG files drawn at k = the element's largest scale: scale mode
+ *              Best Fit (1), gravity top left (0), scale = pose scale / k / fit
+ *              with fit = min(frame width / SVG width, frame height / SVG
+ *              height), so the largest pose shows at the SVG's own pixel size
+ *              at the project's frame size and keeps its share of the frame at
+ *              any other render size (None draws at the pixel size whatever the
+ *              size: too big in a smaller export). location = (centre - element
+ *              centre × scale) / frame size; origin = the element centre
+ *              (rotation pivot).
  *   media      scale mode Best Fit (1), gravity centre (4); scale = rest width
  *              / fitted width × pose scale, location = (centre - frame centre)
  *              / frame size; card shapes from a Crop effect with resize; corners
