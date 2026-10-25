@@ -6,7 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { FILLER_PROMPT, isTranscriptionError, parseTranscription, type AudioEnvelope, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
-import type { AssetSource, MediaProber, SpeechTranscriber } from "../render/renderer.js";
+import type { AssetSource, MediaProber, RenderInput, SpeechTranscriber } from "../render/renderer.js";
 import { fakeRenderer } from "../testing/fakes.js";
 import { type Harness, harness, sampleProject, USER_A } from "../testing/helpers.js";
 import { loadEngineRegistry } from "./engine.js";
@@ -147,6 +147,56 @@ describe("titles in the cloud", () => {
     const names = (await client.listTools()).tools.map((t) => t.name);
     expect(names).not.toContain("add_title_tool");
     expect(names).toContain("export_captions_tool");
+    await client.close();
+  });
+});
+
+describe("export_video_tool in the cloud", () => {
+  it("starts a render job with the desktop's export arguments; get_render_status gives the file", async () => {
+    const rendered: RenderInput[] = [];
+    const renderer = fakeRenderer({ onRender: (input) => rendered.push(input) });
+    const h = await harness({ engine: await loadEngineRegistry(), prober, assets: engineAssets, renderer });
+    const client = await connect(h);
+    const names = (await client.listTools()).tools.map((t) => t.name);
+    expect(names).toEqual(expect.arrayContaining(["export_video_tool", "list_export_presets_tool", "render_project", "get_render_status"]));
+    expect(names).not.toContain("render_video");
+
+    const projectId = (await call(client, "create_project", { name: "Launch teaser" })).structuredContent?.project_id as string;
+    expect((await call(client, "add_title_tool", { text: "Hello cloud", duration_seconds: "4" })).isError).toBeFalsy();
+
+    const started = await call(client, "export_video_tool", { preset: "YouTube", quality: "low", start: 1, end: 3, width: 1280, height: 720, file_name: "teaser" });
+    expect(started.isError, textOf(started)).toBeFalsy();
+    expect(textOf(started)).toMatch(
+      /^Started rendering 2\.00s of video with 'YouTube' \(Low\), 1280x720 at 30\.0 fps as teaser\.mp4: render (r_[a-z0-9]{16}) is queued\. Call get_render_status with render_id "\1" for the download link/,
+    );
+    const receipt = (started.structuredContent?.data as { data: Record<string, unknown> }).data;
+    expect(receipt).toMatchObject({ status: "queued", preset: "YouTube", quality: "Low", width: 1280, height: 720, start_frame: 31, end_frame: 90, path: "teaser.mp4" });
+    await h.services.renders.drain();
+    const status = await call(client, "get_render_status", { render_id: receipt.render_id, wait_seconds: 0 });
+    expect(status.structuredContent).toMatchObject({ status: "done", format: "mp4", width: 1280, height: 720, project_id: projectId });
+    expect(String(status.structuredContent?.url)).toContain("teaser.mp4");
+    expect(rendered).toHaveLength(1);
+    expect(rendered[0]!.options).toMatchObject({ format: "mp4", videoCodec: "libx264", videoBitrate: 8_000_000, audioCodec: "aac", audioBitrate: 128_000, range: { start: 1, end: 3 } });
+    expect(rendered[0]!.options.output).toBeUndefined();
+
+    // The same request again is the same render (connectors retry slow calls).
+    const again = await call(client, "export_video_tool", { preset: "YouTube", quality: "low", start: 1, end: 3, width: 1280, height: 720, file_name: "teaser" });
+    expect((again.structuredContent?.data as { data: Record<string, unknown> }).data.render_id).toBe(receipt.render_id);
+
+    const folder = await call(client, "export_video_tool", { folder: "renders" });
+    expect(textOf(folder)).toBe("Error: this Zenvi surface has no folders (Zenvi Cloud answers with a download link); call it again without folder (file_name names the file)");
+    const frames = await call(client, "export_video_tool", { export_type: "image_sequence" });
+    expect(textOf(frames)).toBe(
+      "Error: this Zenvi surface cannot write PNG image sequences; it can export MP4, MOV, MKV, WebM, GIF, MP3, WAV, FLAC and M4A. Pick one with container= or preset=",
+    );
+    const interlaced = await call(client, "export_video_tool", { interlaced: true });
+    expect(textOf(interlaced)).toMatch(/cannot export interlaced video/);
+    const selection = await call(client, "export_video_tool", { range: "selection" });
+    expect(textOf(selection)).toMatch(/no timeline selection; give start\/end seconds instead/);
+
+    const presets = await call(client, "list_export_presets_tool", { query: "mp3" });
+    expect(presets.content[0]?.text).toBe("1 export preset(s).");
+    expect(textOf(presets)).toContain('"title":"MP3 (audio only)"');
     await client.close();
   });
 });

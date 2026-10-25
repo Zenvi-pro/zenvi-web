@@ -69,6 +69,8 @@ export async function nodeRenderer(): Promise<{ renderer: Renderer; reason?: str
         onProgress: (progress) => input.onProgress(typeof progress === "number" ? progress : progress.fraction),
       });
     },
+    // The same image (and ffmpeg) runs in-process renders and the render workers.
+    encoders: () => renderNode.encoderNames(),
     async frame(input) {
       if (!renderFrame) throw new RendererUnavailableError("frame renderer");
       return renderFrame(input.project, input.seconds, {

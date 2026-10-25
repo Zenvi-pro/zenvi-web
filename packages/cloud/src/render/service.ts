@@ -27,7 +27,7 @@ import type { MediaService } from "../services/media.js";
 import { attachmentDisposition } from "../services/media.js";
 import { renderPath, renderSnapshotPath } from "../services/paths.js";
 import type { LoadedProject, ProjectService } from "../services/projects.js";
-import { CONTENT_TYPES, type PresetName, type RenderFormat, type RenderOverrides, resolveRenderOptions } from "./options.js";
+import { CONTENT_TYPES, isRenderFormat, type PresetName, RENDER_FORMATS, type RenderFormat, type RenderOverrides, resolveRenderOptions } from "./options.js";
 import type { RenderDispatch } from "./dispatch.js";
 import type { PathResolver, Renderer } from "./renderer.js";
 import { projectPathResolver } from "./resolve.js";
@@ -171,8 +171,28 @@ export class RenderService {
    */
   async start(userId: string, projectId: string, input: { preset?: PresetName; options?: RenderOverrides }): Promise<RenderJob> {
     const loaded = await this.options.projects.get(userId, projectId);
-    const options = resolveRenderOptions(loaded.project, input.preset, input.options ?? {});
-    const requestKey = sha256Hex(`${loaded.revision}\n${JSON.stringify(options)}`).slice(0, 32);
+    return this.startResolved(userId, projectId, loaded, resolveRenderOptions(loaded.project, input.preset, input.options ?? {}));
+  }
+
+  /**
+   * Start a render with options already resolved (export_video_tool's plan:
+   * preset, codecs, rates, range), downloaded as `fileName`. Idempotent like
+   * `start` for the same revision, options and name.
+   */
+  async startExport(userId: string, projectId: string, input: { options: ExportOptions; fileName: string }): Promise<RenderJob> {
+    const { output: _output, ...options } = input.options;
+    if (!isRenderFormat(options.format)) throw new ApiError(400, "invalid_request", `Zenvi Cloud renders one file (${RENDER_FORMATS.join(", ")}), not ${options.format}.`);
+    const loaded = await this.options.projects.get(userId, projectId);
+    return this.startResolved(userId, projectId, loaded, options, safeFileBase(input.fileName));
+  }
+
+  /** The FFmpeg encoders renders can use, or null when the renderer does not say. */
+  async encoders(): Promise<ReadonlySet<string> | null> {
+    return (await this.options.renderer.encoders?.()) ?? null;
+  }
+
+  private async startResolved(userId: string, projectId: string, loaded: LoadedProject, options: ExportOptions, fileName?: string): Promise<RenderJob> {
+    const requestKey = sha256Hex(`${loaded.revision}\n${JSON.stringify(options)}${fileName ? `\n${fileName}` : ""}`).slice(0, 32);
     const keyRowKey = `key:${projectId}:${requestKey}`;
 
     for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -186,7 +206,7 @@ export class RenderService {
           if (error instanceof AlreadyExistsError) continue; // another request won the key: use its job
           throw error;
         }
-        return this.createJob(userId, projectId, renderId, loaded, options, requestKey);
+        return this.createJob(userId, projectId, renderId, loaded, options, requestKey, fileName);
       }
       const existing = await this.options.tables.get<RenderRow>(TABLE, userId, key.renderId);
       if (existing && (await this.reusable(userId, existing, now))) return toJob(existing);
@@ -207,7 +227,7 @@ export class RenderService {
         if (error instanceof PreconditionFailedError) continue;
         throw error;
       }
-      return this.createJob(userId, projectId, renderId, loaded, options, requestKey);
+      return this.createJob(userId, projectId, renderId, loaded, options, requestKey, fileName);
     }
     throw new ApiError(503, "busy", "Could not start the render; try again.");
   }
@@ -227,6 +247,7 @@ export class RenderService {
     loaded: LoadedProject,
     options: ExportOptions,
     requestKey: string,
+    fileName?: string,
   ): Promise<RenderJob> {
     await this.options.blobs.write(renderSnapshotPath(userId, projectId, renderId), serializeProject(loaded.project), {
       contentType: "application/json",
@@ -242,7 +263,7 @@ export class RenderService {
       revision: loaded.revision,
       requestKey,
       createdAt: isoAt(this.options.clock.now()),
-      fileName: `${safeFileBase(loaded.meta.name)}.${options.format}`,
+      fileName: fileName ?? `${safeFileBase(loaded.meta.name)}.${options.format}`,
       attempts: 0,
     };
     await this.options.tables.create(TABLE, row);
