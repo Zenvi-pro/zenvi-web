@@ -14,7 +14,7 @@
 import { z } from "zod";
 import type { Transaction } from "../../history/document.js";
 import { isAudioOnlyMedia, isSingleImageMedia } from "../../model/media.js";
-import { Interpolation, type Clip, type Project, type ProjectFile } from "../../model/types.js";
+import { Interpolation, ScaleMode, type Clip, type Project, type ProjectFile } from "../../model/types.js";
 import { addClip, deleteClips, setClipKeyframes, setClipProperty, setClipSpeed } from "../../ops/clips.js";
 import { applyLookPreset } from "../../ops/look.js";
 import { applyClipPreset } from "../../ops/presets.js";
@@ -73,6 +73,16 @@ function visualKind(file: ProjectFile): "video" | "image" | null {
   if (isAudioOnlyMedia(file)) return null;
   if (isSingleImageMedia(file)) return "image";
   return file.has_video ? "video" : null;
+}
+
+/** Display aspect of a file (width / height, with its pixel ratio), or null when unknown. */
+function aspectOf(file: ProjectFile): number | null {
+  const w = Number(file.width);
+  const h = Number(file.height);
+  if (!(w > 0 && h > 0)) return null;
+  const ratio = file.pixel_ratio as { num?: number; den?: number } | undefined;
+  const par = ratio && Number(ratio.num) > 0 && Number(ratio.den) > 0 ? Number(ratio.num) / Number(ratio.den) : 1;
+  return (w * par) / h;
 }
 
 /** The usable part of a video: skip the first fifth of a second (camera settling) on longer clips. */
@@ -266,6 +276,7 @@ export const reelTools: CatalogTool[] = [
         warnings.push("This surface cannot store generated title images: the reel has no titles.");
       }
 
+      const frameAspect = width / height;
       const built = call.commit((tx) => {
         if (tx.project.clips.length > 0) {
           for (const t of [...tx.project.effects]) removeTransition(tx, String(t.id));
@@ -296,6 +307,9 @@ export const reelTools: CatalogTool[] = [
             end: shot.kind === "video" ? shot.sourceEnd : length,
           });
           if (shot.speed < 0.999) setClipSpeed(tx, clip.id, shot.speed);
+          // Fill the frame: landscape footage in a vertical reel is cropped, not letterboxed.
+          const aspect = aspectOf(file);
+          if (aspect !== null && Math.abs(aspect / frameAspect - 1) > 0.03) setClipProperty(tx, clip.id, "scale", ScaleMode.CROP);
           const motion = shot.kind === "image" ? style.motion.image : style.motion.video;
           if (motion && motion !== "animate.none") applyClipPreset(tx, clip.id, motion);
           if (file.has_audio) setClipProperty(tx, clip.id, "volume", style.clipVolume);
