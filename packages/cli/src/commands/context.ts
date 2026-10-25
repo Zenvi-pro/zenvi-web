@@ -47,6 +47,7 @@ export function engineChoice(flags: GlobalFlags): EngineChoice {
 export function hostOptions(ctx: CommandContext) {
   return {
     backend: { baseUrl: ctx.config.backendUrl, token: () => ctx.auth.backendToken(), userAgent: `zenvi-cli/${VERSION}` },
+    env: ctx.env,
     log: ctx.env.ZENVI_DEBUG ? (m: string) => ctx.out.info(`[debug] ${m}`) : undefined,
   };
 }
@@ -134,10 +135,40 @@ export function printOutcome(ctx: CommandContext, outcome: CallOutcome, extra: R
   if (outcome.engine === "desktop") ctx.out.info(ctx.out.style("(ran in the Zenvi desktop app)", "dim"));
 }
 
-/** Run one tool on the selected project and print the outcome. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The job a tool answered `status: "running"` for (ingest_web_video_tool's
+ * long poll), from the receipt's data or, from the desktop app, its JSON
+ * summary.
+ */
+export function runningJobId(outcome: CallOutcome): string | undefined {
+  if (!outcome.ok || !outcome.receipt) return undefined;
+  let payload: unknown = outcome.receipt.data;
+  if (!isRecord(payload)) {
+    try {
+      payload = JSON.parse(outcome.receipt.summary);
+    } catch {
+      return undefined;
+    }
+  }
+  return isRecord(payload) && payload.status === "running" && typeof payload.job_id === "string" && payload.job_id ? payload.job_id : undefined;
+}
+
+/**
+ * Run one tool on the selected project and print the outcome. A command in
+ * a terminal has no client timeout: when the tool answers that its job is
+ * still running, call it again with the job_id until the job is done.
+ */
 export async function runToolCommand(ctx: CommandContext, tool: string, args: Record<string, unknown>, extra?: Record<string, unknown>): Promise<CallOutcome> {
   return withExecutor(ctx, async (executor) => {
-    const outcome = await executor.call(tool, args);
+    let outcome = await executor.call(tool, args);
+    for (let job = runningJobId(outcome); job; job = runningJobId(outcome)) {
+      ctx.out.info(ctx.out.style(`… still running (job ${job}); waiting for it to finish`, "dim"));
+      outcome = await executor.call(tool, { job_id: job });
+    }
     printOutcome(ctx, outcome, extra);
     return outcome;
   });

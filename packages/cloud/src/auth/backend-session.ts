@@ -274,6 +274,8 @@ function httpError(status: number, body: string): string {
     const parsed = JSON.parse(body) as { error?: unknown; detail?: unknown; message?: unknown };
     const raw = parsed.detail ?? parsed.message ?? parsed.error;
     if (typeof raw === "string") detail = raw;
+    // Credit and tier refusals (api/credit_gate.py, HTTP 402/429) carry the words to show in detail.message.
+    else if (raw && typeof raw === "object" && typeof (raw as { message?: unknown }).message === "string") detail = (raw as { message: string }).message;
   } catch {
     detail = body.replace(/\s+/g, " ").trim();
   }

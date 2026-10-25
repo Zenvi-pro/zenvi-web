@@ -4,7 +4,7 @@ import { normalizeUserCode } from "@/features/auth/DevicePage";
 import { normalizeHex } from "@/ui/ColorField";
 import { clampValue, parseNumberInput, roundTo } from "@/ui/NumberField";
 import { safeNext } from "./auth";
-import { backendPath, fetchModelCatalog } from "./backend";
+import { backendPath, errorMessage, fetchModelCatalog } from "./backend";
 import { backendRestBaseFor, chatSocketUrl, config, oauthRedirectUrl, websiteCallbackFor } from "./env";
 import { formatBytes, formatDuration, formatFps, formatRelativeTime, formatResolution } from "./format";
 import { cleanFileName, COMMON_PRESETS, presetProfile, safeFileName } from "./projectFactory";
@@ -32,6 +32,13 @@ describe("backend client", () => {
     expect(backendPath("/api/v1/models")).toBe("/models");
     expect(backendPath("models")).toBe("/models");
     expect(backendPath("/pexels/search?query=x")).toBe("/pexels/search?query=x");
+  });
+
+  it("words a failed request with the backend's detail, or a credit refusal's detail.message", () => {
+    expect(errorMessage(401, { detail: "Sign in required" })).toBe("Sign in required");
+    expect(errorMessage(402, { detail: { code: "insufficient_credits", message: "Out of credits for image generation." } })).toBe("Out of credits for image generation.");
+    expect(errorMessage(500, "Internal Server Error")).toBe("Backend request failed (500)");
+    expect(errorMessage(429, { detail: { code: "tier_limit" } })).toBe("Backend request failed (429)");
   });
 
   it("builds the chat socket URL from the backend origin", () => {

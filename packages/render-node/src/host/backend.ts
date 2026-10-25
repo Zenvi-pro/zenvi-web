@@ -34,6 +34,9 @@ function detail(body: unknown, fallback: string): string {
     const b = body as Record<string, unknown>;
     const d = b.detail ?? b.message ?? b.error;
     if (typeof d === "string") return d;
+    // Credit and tier refusals (zenvi-backend api/credit_gate.py, HTTP 402/429) carry the words to show in detail.message.
+    const message = d && typeof d === "object" ? (d as Record<string, unknown>).message : undefined;
+    if (typeof message === "string" && message) return message;
     if (d !== undefined) return JSON.stringify(d);
   }
   return typeof body === "string" && body ? body.slice(0, 300) : fallback;
@@ -75,7 +78,7 @@ export function createBackendHost(options: BackendHostOptions): BackendHost {
       }
       if (!response.ok) {
         const hint = response.status === 401 || response.status === 403 ? " Sign in with `zenvi login`." : "";
-        throw new BackendError(`Zenvi backend ${response.status}: ${detail(parsed, response.statusText)}.${hint}`, response.status, parsed);
+        throw new BackendError(`Zenvi backend ${response.status}: ${detail(parsed, response.statusText).replace(/\.$/, "")}.${hint}`, response.status, parsed);
       }
       return parsed as T;
     },

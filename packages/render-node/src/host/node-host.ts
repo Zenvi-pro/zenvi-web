@@ -23,6 +23,8 @@ export interface NodeHostOptions {
   /** The open project file, or a getter (MCP sessions switch projects). */
   projectFile?: string | (() => string | undefined);
   importPolicy?: ImportPolicy;
+  /** Environment for finding yt-dlp, ffmpeg and Zenvi's cache folder (default `process.env`). */
+  env?: NodeJS.ProcessEnv;
   /** Bundled engine assets (transition masks, emojis); defaults to the package/bundle copy. */
   engineAssetsDir?: string;
   backend?: BackendHostOptions;
@@ -85,7 +87,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   const host: NodeHost = {
     resolveMedia,
     projectFile: current,
-    media: createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes }),
+    media: createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes, env: options.env }),
     exporter: {
       async export(project, exportOptions, onProgress) {
         const output = exportOptions.output ? inProject(exportOptions.output) : defaultOutput(exportOptions);

@@ -216,6 +216,15 @@ describe("backend host", () => {
     const down = createBackendHost({ baseUrl: "http://127.0.0.1:9" });
     await expect(down.request("/api/v1/ok")).rejects.toThrow(/Cannot reach/);
   });
+
+  it("shows a credit or tier refusal in the backend's own words (detail.message)", async () => {
+    const message = "Out of credits for image generation. Need 3, have 0. Upgrade your plan or enable overage to continue.";
+    const backend = createBackendHost({
+      baseUrl,
+      fetchImpl: async () => new Response(JSON.stringify({ detail: { code: "insufficient_credits", required: 3, balance: 0, message } }), { status: 402 }),
+    });
+    await expect(backend.request("/api/v1/generation/image", { body: { prompt: "a fox" } })).rejects.toMatchObject({ status: 402, message: `Zenvi backend 402: ${message}` });
+  });
 });
 
 describe("analyzeAudio", () => {

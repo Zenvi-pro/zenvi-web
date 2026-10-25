@@ -19,7 +19,7 @@ const ENV_KEYS: Record<BinaryName, string[]> = {
   ffprobe: ["ZENVI_FFPROBE", "FFPROBE_PATH"],
 };
 
-function isExecutable(file: string): boolean {
+export function isExecutable(file: string): boolean {
   try {
     if (!statSync(file).isFile()) return false;
     if (process.platform === "win32") return true;
