@@ -504,7 +504,7 @@ var init_client = __esm({
       token;
       fetchImpl;
       userAgent;
-      async request(method, path38, init = {}) {
+      async request(method, path39, init = {}) {
         const token = await this.token();
         if (!token) throw new CliError("You are not signed in to Zenvi.", 1, "Run `zenvi login` (or `zenvi login --device` on a machine without a browser).");
         const headers = { Accept: "application/json", Authorization: `Bearer ${token}`, "User-Agent": this.userAgent, ...init.headers };
@@ -515,7 +515,7 @@ var init_client = __esm({
         }
         let response;
         try {
-          response = await this.fetchImpl(`${this.baseUrl}${path38}`, { method, headers, body, signal: AbortSignal.timeout(12e4) });
+          response = await this.fetchImpl(`${this.baseUrl}${path39}`, { method, headers, body, signal: AbortSignal.timeout(12e4) });
         } catch (error62) {
           throw new CloudError(`Cannot reach Zenvi Cloud at ${this.baseUrl}: ${error62.message}`, 0, void 0, void 0);
         }
@@ -1359,23 +1359,23 @@ function isRecord(value) {
 function lowerPath(value) {
   return String(value ?? "").toLowerCase();
 }
-function isAudioPath(path38) {
-  const p = lowerPath(path38).split("?")[0];
+function isAudioPath(path39) {
+  const p = lowerPath(path39).split("?")[0];
   return AUDIO_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function isImagePath(path38) {
-  const p = lowerPath(path38);
+function isImagePath(path39) {
+  const p = lowerPath(path39);
   return IMAGE_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function hasExtension(path38) {
-  const base = path38.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
+function hasExtension(path39) {
+  const base = path39.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
   return /\.[a-z0-9]{1,5}$/i.test(base);
 }
 function getMediaType(file3, name) {
-  let path38 = String(file3.path ?? "");
-  if (name && !hasExtension(path38)) path38 = name;
-  if (isAudioPath(path38)) return "audio";
-  const image = isImagePath(path38);
+  let path39 = String(file3.path ?? "");
+  if (name && !hasExtension(path39)) path39 = name;
+  if (isAudioPath(path39)) return "audio";
+  const image = isImagePath(path39);
   if (file3.has_video && !image) return "video";
   if (file3.has_video && image) return "image";
   if (file3.has_audio && !file3.has_video) return "audio";
@@ -1391,8 +1391,8 @@ function isAudioOnlyMedia(file3) {
 function isAudioMedia(source2) {
   const data = isRecord(source2) ? source2 : {};
   if (String(data.media_type ?? "").trim().toLowerCase() === "audio") return true;
-  const path38 = lowerPath(data.path ?? data.file_path ?? "").trim();
-  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path38.endsWith(ext))) return true;
+  const path39 = lowerPath(data.path ?? data.file_path ?? "").trim();
+  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path39.endsWith(ext))) return true;
   return data.has_audio === true && data.has_video === false;
 }
 function isSingleImageMedia(source2) {
@@ -1724,8 +1724,8 @@ function libopenshotClipDefaults() {
   json2.rotation = libopenshotKeyframe(0);
   return json2;
 }
-function basename(path38) {
-  const clean = path38.split(/[?#]/)[0] ?? path38;
+function basename(path39) {
+  const clean = path39.split(/[?#]/)[0] ?? path39;
   const parts = clean.split(/[\\/]/);
   return parts[parts.length - 1] || clean;
 }
@@ -3224,12 +3224,12 @@ function matches(item, match) {
   }
   return true;
 }
-function resolveKey(root, path38) {
-  if (path38.length === 0) return void 0;
+function resolveKey(root, path39) {
+  if (path39.length === 0) return void 0;
   let parent = root;
   let slot = "";
   let value = root;
-  for (const part of path38) {
+  for (const part of path39) {
     if (typeof part === "string") {
       if (!isRecord8(value)) return void 0;
       const key = findKey(value, part);
@@ -3248,8 +3248,8 @@ function resolveKey(root, path38) {
   }
   return { parent, slot, value };
 }
-function formatKey(path38) {
-  return path38.map(
+function formatKey(path39) {
+  return path39.map(
     (part) => typeof part === "string" ? part : `{${Object.entries(part).map(([k, v]) => `${k}:${String(v)}`).join(",")}}`
   ).join("/");
 }
@@ -3272,17 +3272,17 @@ function defaultTransactionId() {
   fallbackCounter += 1;
   return `tx-${Date.now().toString(36)}-${fallbackCounter.toString(36)}`;
 }
-function writeThrough(root, path38, mutate) {
-  const resolved = resolveKey(root, path38);
-  if (!resolved) throw new KeyNotFoundError(path38);
+function writeThrough(root, path39, mutate) {
+  const resolved = resolveKey(root, path39);
+  if (!resolved) throw new KeyNotFoundError(path39);
   const newRoot = { ...root };
   let src = root;
   let dst = newRoot;
-  for (let i = 0; i < path38.length; i += 1) {
-    const partial2 = resolveKey(src, [path38[i]]);
-    if (!partial2) throw new KeyNotFoundError(path38);
+  for (let i = 0; i < path39.length; i += 1) {
+    const partial2 = resolveKey(src, [path39[i]]);
+    if (!partial2) throw new KeyNotFoundError(path39);
     const { slot, value } = partial2;
-    if (i === path38.length - 1) {
+    if (i === path39.length - 1) {
       mutate(dst, slot);
       break;
     }
@@ -4026,9 +4026,9 @@ function pyRepr(value) {
   if (isRecord11(value)) return `{${Object.entries(value).map(([k, v]) => `${pyRepr(k)}: ${pyRepr(v)}`).join(", ")}}`;
   return String(value);
 }
-function valueAt(root, path38) {
+function valueAt(root, path39) {
   let current = root;
-  for (const part of path38) {
+  for (const part of path39) {
     if (Array.isArray(current) && typeof part === "number" && part < current.length) current = current[part];
     else if (isRecord11(current) && typeof part === "string" && part in current) current = current[part];
     else return { found: false, value: void 0 };
@@ -4036,14 +4036,14 @@ function valueAt(root, path38) {
   return { found: true, value: current };
 }
 function formatIssue(issue2, payload) {
-  const path38 = issue2.path.map(String).join(".") || "(root)";
+  const path39 = issue2.path.map(String).join(".") || "(root)";
   const at = valueAt(payload, issue2.path);
   const shown = pyRepr(at.value);
   switch (issue2.code) {
     case "unrecognized_keys": {
       const keys = issue2.keys.map(pyRepr).join(", ");
       const verb = issue2.keys.length === 1 ? "was" : "were";
-      return { message: `Additional properties are not allowed (${keys} ${verb} unexpected)`, path: path38 };
+      return { message: `Additional properties are not allowed (${keys} ${verb} unexpected)`, path: path39 };
     }
     case "invalid_type": {
       if (!at.found && issue2.path.length > 0) {
@@ -4051,27 +4051,27 @@ function formatIssue(issue2, payload) {
         return { message: `${pyRepr(String(issue2.path[issue2.path.length - 1]))} is a required property`, path: parentPath };
       }
       const expected = JSON_TYPE_NAMES[issue2.expected] ?? issue2.expected;
-      return { message: `${shown} is not of type '${expected}'`, path: path38 };
+      return { message: `${shown} is not of type '${expected}'`, path: path39 };
     }
     case "invalid_value":
-      return { message: `${shown} is not one of [${issue2.values.map(pyRepr).join(", ")}]`, path: path38 };
+      return { message: `${shown} is not one of [${issue2.values.map(pyRepr).join(", ")}]`, path: path39 };
     case "invalid_union":
-      return { message: `${shown} is not valid under any of the given schemas`, path: path38 };
+      return { message: `${shown} is not valid under any of the given schemas`, path: path39 };
     case "too_small":
       if (issue2.origin === "array") {
-        return { message: Number(issue2.minimum) <= 1 ? `${shown} should be non-empty` : `${shown} is too short`, path: path38 };
+        return { message: Number(issue2.minimum) <= 1 ? `${shown} should be non-empty` : `${shown} is too short`, path: path39 };
       }
-      return { message: `${shown} is less than ${issue2.inclusive === false ? "or equal to " : ""}the minimum of ${pyRepr(Number(issue2.minimum))}`, path: path38 };
+      return { message: `${shown} is less than ${issue2.inclusive === false ? "or equal to " : ""}the minimum of ${pyRepr(Number(issue2.minimum))}`, path: path39 };
     case "too_big":
-      if (issue2.origin === "array") return { message: `${shown} is too long`, path: path38 };
-      return { message: `${shown} is greater than ${issue2.inclusive === false ? "or equal to " : ""}the maximum of ${pyRepr(Number(issue2.maximum))}`, path: path38 };
+      if (issue2.origin === "array") return { message: `${shown} is too long`, path: path39 };
+      return { message: `${shown} is greater than ${issue2.inclusive === false ? "or equal to " : ""}the maximum of ${pyRepr(Number(issue2.maximum))}`, path: path39 };
     default:
-      return { message: issue2.message, path: path38 };
+      return { message: issue2.message, path: path39 };
   }
 }
 function invalidArgumentsMessage(tool, issue2, payload) {
-  const { message, path: path38 } = formatIssue(issue2, payload);
-  return `Error: Invalid arguments for ${tool}: ${message} (at ${path38}).`;
+  const { message, path: path39 } = formatIssue(issue2, payload);
+  return `Error: Invalid arguments for ${tool}: ${message} (at ${path39}).`;
 }
 var HIDDEN_PARAMS, INTEGER_TEXT, FLOAT_TEXT, JSON_TYPE_NAMES;
 var init_coerce = __esm({
@@ -4339,8 +4339,8 @@ function orZero(value) {
 function fileLooksLikeImage(file3) {
   const data = isRecord12(file3) ? file3 : {};
   if (String(data.media_type ?? "").toLowerCase() === "image") return true;
-  const path38 = String(data.path || data.name || "");
-  const ext = path38.includes(".") ? path38.slice(path38.lastIndexOf(".") + 1).toLowerCase() : "";
+  const path39 = String(data.path || data.name || "");
+  const ext = path39.includes(".") ? path39.slice(path39.lastIndexOf(".") + 1).toLowerCase() : "";
   return IMAGE_EXTS.has(ext);
 }
 function quantizePlacementSeconds(start, end, fps) {
@@ -5633,8 +5633,8 @@ function matchTransition(name) {
     return base.includes(search) || search.includes(base);
   });
 }
-function resolveTransitionAsset(path38) {
-  const match = /(?:^@transitions|(?:^|[\\/])transitions)[\\/](common|extra)[\\/]([^\\/]+)$/.exec(path38 ?? "");
+function resolveTransitionAsset(path39) {
+  const match = /(?:^@transitions|(?:^|[\\/])transitions)[\\/](common|extra)[\\/]([^\\/]+)$/.exec(path39 ?? "");
   return match ? BY_LOCATION.get(`${match[1]}/${match[2]}`) : void 0;
 }
 function gcd(a, b) {
@@ -5702,8 +5702,8 @@ function gcd2(a, b) {
   while (y) [x, y] = [y, x % y];
   return x || 1;
 }
-function maskReader(path38, width = 720, height = 576) {
-  const entry = resolveTransitionAsset(path38);
+function maskReader(path39, width = 720, height = 576) {
+  const entry = resolveTransitionAsset(path39);
   if (entry) return transitionReader(entry);
   const divisor = gcd2(width, height);
   const fields = {
@@ -5711,7 +5711,7 @@ function maskReader(path38, width = 720, height = 576) {
     display_ratio: { den: height / divisor, num: width / divisor },
     file_size: width * height * 4,
     height,
-    path: path38,
+    path: path39,
     width
   };
   return Object.fromEntries(Object.keys(fields).sort().map((key) => [key, fields[key]]));
@@ -5730,13 +5730,13 @@ function requireDuration(duration3) {
   if (!(d > 0)) throw invalid(`duration must be > 0 (got ${d}).`);
   return d;
 }
-function resolveMask(maskId, path38) {
-  if (maskId !== void 0 && path38 !== void 0) throw invalid("Give maskId or path, not both.");
-  if (path38 !== void 0) {
-    if (typeof path38 !== "string" || path38 === "") throw invalid("path must be a non-empty string.");
-    const known = resolveTransitionMask(path38);
-    const stem4 = (path38.split(/[\\/]/).pop() ?? path38).replace(/\.[^.]+$/, "");
-    return known ?? { path: path38, title: stem4, width: 720, height: 576 };
+function resolveMask(maskId, path39) {
+  if (maskId !== void 0 && path39 !== void 0) throw invalid("Give maskId or path, not both.");
+  if (path39 !== void 0) {
+    if (typeof path39 !== "string" || path39 === "") throw invalid("path must be a non-empty string.");
+    const known = resolveTransitionMask(path39);
+    const stem4 = (path39.split(/[\\/]/).pop() ?? path39).replace(/\.[^.]+$/, "");
+    return known ?? { path: path39, title: stem4, width: 720, height: 576 };
   }
   if (maskId === void 0) throw invalid("Give maskId or path.");
   const found = resolveTransitionMask(maskId);
@@ -8865,9 +8865,9 @@ function describeIssues(issues) {
   const more = issues.length > 1 ? ` (and ${issues.length - 1} more)` : "";
   return `Invalid project: ${where}${first.message}${more}`;
 }
-function formatIssuePath(path38) {
+function formatIssuePath(path39) {
   let out = "";
-  for (const part of path38) {
+  for (const part of path39) {
     if (typeof part === "number") out += `[${part}]`;
     else out += out ? `.${String(part)}` : String(part);
   }
@@ -9109,10 +9109,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path38) {
-  if (!path38)
+function getElementAtPath(obj, path39) {
+  if (!path39)
     return obj;
-  return path38.reduce((acc, key) => acc?.[key], obj);
+  return path39.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -9371,11 +9371,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path38, issues) {
+function prefixIssues(path39, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path38);
+    iss.path.unshift(path39);
     return iss;
   });
 }
@@ -9896,16 +9896,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path38 = []) => {
+  const processError = (error63, path39 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path38, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path39, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path38, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path39, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path38, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path39, ...issue2.path]);
       } else {
-        const fullpath = [...path38, ...issue2.path];
+        const fullpath = [...path39, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -9944,17 +9944,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result2 = { errors: [] };
-  const processError = (error63, path38 = []) => {
+  const processError = (error63, path39 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path38, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path39, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path38, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path39, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path38, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path39, ...issue2.path]);
       } else {
-        const fullpath = [...path38, ...issue2.path];
+        const fullpath = [...path39, ...issue2.path];
         if (fullpath.length === 0) {
           result2.errors.push(mapper(issue2));
           continue;
@@ -9993,8 +9993,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path38 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path38) {
+  const path39 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path39) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -12337,8 +12337,8 @@ var init_schemas = __esm({
       const _normalized = cached(() => normalizeDef(def));
       const memo2 = globalConfig.memoizer;
       const generateFastpass = (shape3) => {
-        const normalized = _normalized.value;
-        const syms = normalized.symbolKeys;
+        const normalized2 = _normalized.value;
+        const syms = normalized2.symbolKeys;
         const doc = new Doc(["payload", "ctx"], { shape: shape3, inst, memo: memo2, syms });
         const parseStr = (k) => `shape[${k}]._zod.run({ value: input[${k}], issues: [] }, ctx)`;
         const prefixStr = (id, k) => `
@@ -12356,11 +12356,11 @@ var init_schemas = __esm({
         doc.write(`const input = payload.value;`);
         const ids2 = /* @__PURE__ */ Object.create(null);
         let counter = 0;
-        for (const key of normalized.allKeys) {
+        for (const key of normalized2.allKeys) {
           ids2[key] = `key_${counter++}`;
         }
         doc.write(memo2 ? `const newResult = memo.alloc(inst, payload, {}, ctx);` : `const newResult = {};`);
-        for (const key of normalized.allKeys) {
+        for (const key of normalized2.allKeys) {
           if (key === "__proto__")
             continue;
           const id = ids2[key];
@@ -27990,13 +27990,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path38 = ref.slice(1).split("/").filter(Boolean);
-  if (path38.length === 0) {
+  const path39 = ref.slice(1).split("/").filter(Boolean);
+  if (path39.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path38[0] === defsKey) {
-    const key = path38[1] === void 0 ? void 0 : decodeJSONPointerSegment(path38[1]);
+  if (path39[0] === defsKey) {
+    const key = path39[1] === void 0 ? void 0 : decodeJSONPointerSegment(path39[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28577,23 +28577,23 @@ function fromJSONSchema(schema, params) {
   if (typeof schema === "boolean") {
     return schema ? z.any() : z.never();
   }
-  let normalized;
+  let normalized2;
   try {
-    normalized = JSON.parse(JSON.stringify(schema));
+    normalized2 = JSON.parse(JSON.stringify(schema));
   } catch {
     throw new Error("fromJSONSchema input is not valid JSON (possibly cyclic); use $defs/$ref for recursive schemas");
   }
-  const version2 = detectVersion(normalized, params?.defaultTarget);
-  const defs = normalized.$defs || normalized.definitions || {};
+  const version2 = detectVersion(normalized2, params?.defaultTarget);
+  const defs = normalized2.$defs || normalized2.definitions || {};
   const ctx = {
     version: version2,
     defs,
     refs: /* @__PURE__ */ new Map(),
     processing: /* @__PURE__ */ new Set(),
-    rootSchema: normalized,
+    rootSchema: normalized2,
     registry: params?.registry ?? globalRegistry
   };
-  return convertSchema(normalized, ctx);
+  return convertSchema(normalized2, ctx);
 }
 var z, RECOGNIZED_KEYS, SCHEMA_KEYWORDS, SCHEMA_MAP_KEYWORDS, fullTime;
 var init_from_json_schema = __esm({
@@ -29252,11 +29252,11 @@ function isRecord15(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function checkKeyframes(value, ctx) {
-  const check2 = (candidate, path38) => {
+  const check2 = (candidate, path39) => {
     const result2 = keyframe.safeParse(candidate);
     if (result2.success) return;
     for (const issue2 of result2.error.issues) {
-      ctx.addIssue({ code: "custom", message: issue2.message, path: [...path38, ...issue2.path] });
+      ctx.addIssue({ code: "custom", message: issue2.message, path: [...path39, ...issue2.path] });
     }
   };
   for (const [key, prop] of Object.entries(value)) {
@@ -29803,12 +29803,12 @@ var init_parse3 = __esm({
 });
 
 // ../engine/src/io/paths.ts
-function posixNormalize(path38) {
-  if (path38 === "") return ".";
-  let initialSlashes = path38.startsWith("/") ? 1 : 0;
-  if (initialSlashes && path38.startsWith("//") && !path38.startsWith("///")) initialSlashes = 2;
+function posixNormalize(path39) {
+  if (path39 === "") return ".";
+  let initialSlashes = path39.startsWith("/") ? 1 : 0;
+  if (initialSlashes && path39.startsWith("//") && !path39.startsWith("///")) initialSlashes = 2;
   const comps = [];
-  for (const comp of path38.split("/")) {
+  for (const comp of path39.split("/")) {
     if (comp === "" || comp === ".") continue;
     if (comp !== ".." || !initialSlashes && comps.length === 0 || comps.length > 0 && comps[comps.length - 1] === "..") {
       comps.push(comp);
@@ -29853,15 +29853,15 @@ function components(ops, p) {
   const { drive, rest } = ops.splitRoot(ops.normalize(p));
   return { drive, parts: rest.split(ops.sep).filter((part) => part !== "" && part !== ".") };
 }
-function isUnder(ops, path38, root) {
-  const p = components(ops, path38);
+function isUnder(ops, path39, root) {
+  const p = components(ops, path39);
   const r = components(ops, root);
   if (p.drive !== r.drive || r.parts.length > p.parts.length) return false;
   return r.parts.every((part, i) => part === p.parts[i]);
 }
-function relative(ops, start, path38) {
+function relative(ops, start, path39) {
   const s = components(ops, start).parts;
-  const p = components(ops, path38).parts;
+  const p = components(ops, path39).parts;
   let i = 0;
   while (i < s.length && i < p.length && s[i] === p[i]) i += 1;
   const rel = [...Array(s.length - i).fill(".."), ...p.slice(i)];
@@ -29885,11 +29885,11 @@ function matchAlias(p) {
 function requireAbsoluteDir(ops, projectDir) {
   if (!isAbsolute(ops, projectDir)) throw new TypeError(`projectDir must be an absolute path: ${projectDir}`);
 }
-function toStoredPath(path38, projectDir, roots = {}) {
+function toStoredPath(path39, projectDir, roots = {}) {
   const ops = opsFor(projectDir);
   requireAbsoluteDir(ops, projectDir);
-  if (path38 === "" || hasScheme(path38) || matchAlias(path38)) return path38;
-  const abs = ops.normalize(isAbsolute(ops, path38) ? path38 : ops.join(projectDir, path38));
+  if (path39 === "" || hasScheme(path39) || matchAlias(path39)) return path39;
+  const abs = ops.normalize(isAbsolute(ops, path39) ? path39 : ops.join(projectDir, path39));
   const { head: folder, tail: file3 } = split(ops, abs);
   const under = (root) => Boolean(root) && isUnder(ops, folder, root);
   if (under(roots.thumbnails)) return `thumbnail/${file3}`;
@@ -29902,17 +29902,17 @@ function toStoredPath(path38, projectDir, roots = {}) {
   }
   return relative(ops, projectDir, abs);
 }
-function fromStoredPath(path38, projectDir, roots = {}) {
+function fromStoredPath(path39, projectDir, roots = {}) {
   const ops = opsFor(projectDir);
   requireAbsoluteDir(ops, projectDir);
-  if (path38 === "") return "";
-  const alias = matchAlias(path38);
+  if (path39 === "") return "";
+  const alias = matchAlias(path39);
   if (alias) {
     const root = roots[alias.name];
-    return root ? ops.normalize(alias.rest ? ops.join(root, alias.rest) : root) : path38;
+    return root ? ops.normalize(alias.rest ? ops.join(root, alias.rest) : root) : path39;
   }
-  if (hasScheme(path38)) return path38;
-  return ops.normalize(ops.join(projectDir, path38));
+  if (hasScheme(path39)) return path39;
+  return ops.normalize(ops.join(projectDir, path39));
 }
 function setOwn(container, key, value) {
   if (Array.isArray(container)) container[key] = value;
@@ -29962,11 +29962,11 @@ function rewritePaths(root, rewrite2) {
 }
 function toStoredPaths(project, projectDir, roots = {}) {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
-  return rewritePaths(project, (path38) => toStoredPath(path38, projectDir, roots));
+  return rewritePaths(project, (path39) => toStoredPath(path39, projectDir, roots));
 }
 function fromStoredPaths(project, projectDir, roots = {}) {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
-  return rewritePaths(project, (path38) => fromStoredPath(path38, projectDir, roots));
+  return rewritePaths(project, (path39) => fromStoredPath(path39, projectDir, roots));
 }
 function projectAssetsDir(projectFilePath) {
   const ops = opsFor(projectFilePath);
@@ -30000,8 +30000,8 @@ var init_paths = __esm({
       sep: "\\",
       splitRoot: winSplitRoot,
       /** ntpath.normpath. */
-      normalize(path38) {
-        const { drive, root, rest } = winSplitRoot(path38);
+      normalize(path39) {
+        const { drive, root, rest } = winSplitRoot(path39);
         const comps = rest.split("\\");
         let i = 0;
         while (i < comps.length) {
@@ -30973,6 +30973,298 @@ var init_beats = __esm({
   }
 });
 
+// ../engine/src/analysis/transcription.ts
+function isTranscriptionError(error62) {
+  if (error62 instanceof TranscriptionError) return true;
+  if (!(error62 instanceof Error) || error62.name !== "TranscriptionError") return false;
+  const code = error62.code;
+  return typeof code === "string" && CODES2.has(code);
+}
+function isRecord19(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function detailOf(body) {
+  if (typeof body === "string") return body.replace(/\s+/g, " ").trim().slice(0, 300);
+  if (!isRecord19(body)) return "";
+  const detail2 = body.detail ?? body.message ?? body.error;
+  if (typeof detail2 === "string") return detail2.trim();
+  if (isRecord19(detail2) && typeof detail2.message === "string") return detail2.message.trim();
+  return "";
+}
+function sentence(text4) {
+  const t = text4.trim();
+  if (!t) return t;
+  return /[.!?]$/.test(t) ? t : `${t}.`;
+}
+function transcriptionHttpError(status, body) {
+  const detail2 = detailOf(body);
+  if (status === 404) return new TranscriptionError("unavailable", `${SPEECH_NOT_AVAILABLE} (it needs a newer Zenvi backend)`);
+  if (status === 503) return new TranscriptionError("unavailable", `speech recognition is not set up on this Zenvi server${detail2 ? ` (${detail2.replace(/\.$/, "")})` : ""}`);
+  if (status === 401 || status === 403) return new TranscriptionError("sign_in", "transcribing speech needs a Zenvi sign-in; sign in to Zenvi and try again");
+  if (status === 402) return new TranscriptionError("credits", sentence(`not enough Zenvi credits to transcribe this audio (2 credits per started minute)${detail2 ? `: ${detail2}` : ""}`));
+  if (status === 413) return new TranscriptionError("too_large", sentence(detail2 || "the audio is over the server's 25 MB limit"));
+  if (status === 415 || status === 422) return new TranscriptionError("rejected", sentence(`the Zenvi server refused the audio${detail2 ? `: ${detail2}` : ""}`));
+  return new TranscriptionError("failed", sentence(`transcription failed (HTTP ${status})${detail2 ? `: ${detail2}` : ""}`));
+}
+function speechLanguageCode(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw || raw === "auto") return "";
+  const byName2 = CODE_BY_NAME.get(raw);
+  if (byName2) return byName2;
+  const primary = raw.split(/[-_]/)[0] ?? "";
+  return primary in WHISPER_LANGUAGES ? primary : "";
+}
+function asrLanguage(language) {
+  const code = speechLanguageCode(language);
+  return /^[a-z]{2}$/.test(code) ? code : "";
+}
+function transcriptionPrompt(language) {
+  return language === "" || language === "en" ? FILLER_PROMPT : "";
+}
+function finite(value) {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : Number.NaN;
+  return Number.isFinite(n) ? n : null;
+}
+function timedItems(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  for (const item of value) {
+    if (!isRecord19(item)) continue;
+    const text4 = String(item.text ?? item.word ?? "").trim();
+    const start = finite(item.startSec ?? item.start);
+    const end = finite(item.endSec ?? item.end);
+    if (!text4 || start === null || end === null || start < 0 || end < start) continue;
+    out.push({ text: text4, startSec: start, endSec: end });
+  }
+  return out.map((item, i) => ({ item, i })).sort((a, b) => a.item.startSec - b.item.startSec || a.i - b.i).map(({ item }) => item);
+}
+function normalized(value) {
+  return Array.from(value.toLowerCase()).filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("");
+}
+function punctuateWords(words3, segments2) {
+  const tokens = segments2.flatMap((s) => s.text.split(/\s+/).filter(Boolean));
+  const keys = tokens.map(normalized);
+  let cursor = 0;
+  return words3.map((word) => {
+    const key = normalized(word.text);
+    if (!key) return { ...word };
+    for (let k = cursor; k < Math.min(tokens.length, cursor + ALIGN_LOOKAHEAD); k += 1) {
+      if (keys[k] === key) {
+        cursor = k + 1;
+        return { ...word, text: tokens[k] };
+      }
+    }
+    return { ...word };
+  });
+}
+function repairWordTimes(words3, durationSeconds = Number.POSITIVE_INFINITY) {
+  return words3.map((word, i) => {
+    if (word.endSec - word.startSec >= MIN_WORD_SECONDS) return { ...word };
+    const next = words3.slice(i + 1).find((w) => w.startSec > word.startSec)?.startSec ?? Number.POSITIVE_INFINITY;
+    const audioEnd = durationSeconds > word.startSec ? durationSeconds : Number.POSITIVE_INFINITY;
+    const wanted = word.startSec + Math.min(0.8, Math.max(0.15, 0.07 * Array.from(word.text).length));
+    const end = Math.max(word.endSec, Math.min(wanted, next, audioEnd));
+    return { ...word, endSec: roundMs(end) };
+  });
+}
+function parseTranscription(answer) {
+  if (!isRecord19(answer) || !Array.isArray(answer.words)) {
+    throw new TranscriptionError("failed", "the Zenvi server's transcription answer had no words list");
+  }
+  const segments2 = timedItems(answer.segments);
+  const reported = finite(answer.duration_seconds ?? answer.durationSeconds);
+  const duration3 = reported !== null && reported > 0 ? reported : void 0;
+  const words3 = repairWordTimes(punctuateWords(timedItems(answer.words), segments2), duration3);
+  const lastEnd = Math.max(0, ...words3.map((w) => w.endSec), ...segments2.map((s) => s.endSec));
+  return {
+    language: speechLanguageCode(answer.language),
+    model: typeof answer.model === "string" ? answer.model : "",
+    words: words3,
+    segments: segments2,
+    durationSeconds: duration3 ?? lastEnd
+  };
+}
+function mergeTranscriptions(parts) {
+  const shift2 = (items, offset) => items.map((t) => ({ text: t.text, startSec: roundMs(t.startSec + offset), endSec: roundMs(t.endSec + offset) }));
+  const words3 = parts.flatMap((p) => shift2(p.transcription.words, p.offset));
+  const segments2 = parts.flatMap((p) => shift2(p.transcription.segments, p.offset));
+  const last = parts[parts.length - 1];
+  return {
+    language: parts.map((p) => p.transcription.language).find(Boolean) ?? "",
+    model: parts.map((p) => p.transcription.model).find(Boolean) ?? "",
+    words: words3,
+    segments: segments2,
+    durationSeconds: last ? last.offset + last.transcription.durationSeconds : 0
+  };
+}
+function roundMs(seconds2) {
+  return Math.round(seconds2 * 1e3) / 1e3;
+}
+function quietestPoint(envelope, from, to) {
+  const rate = envelope.sampleRate > 0 ? envelope.sampleRate : SPEECH_SAMPLE_RATE;
+  const frameSec = Math.max(1, envelope.frameSize) / rate;
+  const first = Math.max(0, Math.ceil(from / frameSec));
+  const last = Math.min(envelope.rms.length, Math.floor(to / frameSec));
+  const width = Math.max(1, Math.round(QUIET_WINDOW_SECONDS / frameSec));
+  if (last - first < width) return to;
+  let sum = 0;
+  for (let i = first; i < first + width; i += 1) sum += Number(envelope.rms[i]) || 0;
+  let best = sum;
+  let bestStart = first;
+  for (let i = first + width; i < last; i += 1) {
+    sum += (Number(envelope.rms[i]) || 0) - (Number(envelope.rms[i - width]) || 0);
+    if (sum <= best) {
+      best = sum;
+      bestStart = i - width + 1;
+    }
+  }
+  return (bestStart + width / 2) * frameSec;
+}
+function planSpeechChunks(duration3, maxSeconds = SPEECH_CHUNK_SECONDS, envelope) {
+  const total = Number(duration3);
+  if (!(total > 0)) return [];
+  const step = Math.max(1, Number(maxSeconds) || SPEECH_CHUNK_SECONDS);
+  const chunks = [];
+  let cursor = 0;
+  while (total - cursor > step) {
+    const limit = cursor + step;
+    const from = Math.max(cursor + step / 2, limit - QUIET_SEARCH_SECONDS);
+    const cut2 = envelope ? quietestPoint(envelope, from, limit) : limit;
+    chunks.push([cursor, cut2]);
+    cursor = cut2;
+  }
+  chunks.push([cursor, total]);
+  return chunks;
+}
+var TRANSCRIPTION_PATH, TRANSCRIPTION_MAX_BYTES, SPEECH_CHUNK_SECONDS, SPEECH_SAMPLE_RATE, TranscriptionError, CODES2, SPEECH_NOT_AVAILABLE, WHISPER_LANGUAGES, CODE_BY_NAME, FILLER_PROMPT, ALIGN_LOOKAHEAD, MIN_WORD_SECONDS, QUIET_SEARCH_SECONDS, QUIET_WINDOW_SECONDS;
+var init_transcription = __esm({
+  "../engine/src/analysis/transcription.ts"() {
+    "use strict";
+    TRANSCRIPTION_PATH = "/api/v1/transcription";
+    TRANSCRIPTION_MAX_BYTES = 25 * 1024 * 1024;
+    SPEECH_CHUNK_SECONDS = 20 * 60;
+    SPEECH_SAMPLE_RATE = 16e3;
+    TranscriptionError = class extends Error {
+      constructor(code, message) {
+        super(message);
+        this.code = code;
+      }
+      code;
+      name = "TranscriptionError";
+    };
+    CODES2 = /* @__PURE__ */ new Set(["unavailable", "sign_in", "credits", "too_large", "rejected", "no_audio", "failed"]);
+    SPEECH_NOT_AVAILABLE = "speech recognition is not available yet on this Zenvi server";
+    WHISPER_LANGUAGES = {
+      en: "english",
+      zh: "chinese",
+      de: "german",
+      es: "spanish",
+      ru: "russian",
+      ko: "korean",
+      fr: "french",
+      ja: "japanese",
+      pt: "portuguese",
+      tr: "turkish",
+      pl: "polish",
+      ca: "catalan",
+      nl: "dutch",
+      ar: "arabic",
+      sv: "swedish",
+      it: "italian",
+      id: "indonesian",
+      hi: "hindi",
+      fi: "finnish",
+      vi: "vietnamese",
+      he: "hebrew",
+      uk: "ukrainian",
+      el: "greek",
+      ms: "malay",
+      cs: "czech",
+      ro: "romanian",
+      da: "danish",
+      hu: "hungarian",
+      ta: "tamil",
+      no: "norwegian",
+      th: "thai",
+      ur: "urdu",
+      hr: "croatian",
+      bg: "bulgarian",
+      lt: "lithuanian",
+      la: "latin",
+      mi: "maori",
+      ml: "malayalam",
+      cy: "welsh",
+      sk: "slovak",
+      te: "telugu",
+      fa: "persian",
+      lv: "latvian",
+      bn: "bengali",
+      sr: "serbian",
+      az: "azerbaijani",
+      sl: "slovenian",
+      kn: "kannada",
+      et: "estonian",
+      mk: "macedonian",
+      br: "breton",
+      eu: "basque",
+      is: "icelandic",
+      hy: "armenian",
+      ne: "nepali",
+      mn: "mongolian",
+      bs: "bosnian",
+      kk: "kazakh",
+      sq: "albanian",
+      sw: "swahili",
+      gl: "galician",
+      mr: "marathi",
+      pa: "punjabi",
+      si: "sinhala",
+      km: "khmer",
+      sn: "shona",
+      yo: "yoruba",
+      so: "somali",
+      af: "afrikaans",
+      oc: "occitan",
+      ka: "georgian",
+      be: "belarusian",
+      tg: "tajik",
+      sd: "sindhi",
+      gu: "gujarati",
+      am: "amharic",
+      yi: "yiddish",
+      lo: "lao",
+      uz: "uzbek",
+      fo: "faroese",
+      ht: "haitian creole",
+      ps: "pashto",
+      tk: "turkmen",
+      nn: "nynorsk",
+      mt: "maltese",
+      sa: "sanskrit",
+      lb: "luxembourgish",
+      my: "myanmar",
+      bo: "tibetan",
+      tl: "tagalog",
+      mg: "malagasy",
+      as: "assamese",
+      tt: "tatar",
+      haw: "hawaiian",
+      ln: "lingala",
+      ha: "hausa",
+      ba: "bashkir",
+      jw: "javanese",
+      su: "sundanese",
+      yue: "cantonese"
+    };
+    CODE_BY_NAME = new Map(Object.entries(WHISPER_LANGUAGES).map(([code, name]) => [name, code]));
+    FILLER_PROMPT = "Umm, let me think like, hmm... Okay, here's what I'm, like, thinking.";
+    ALIGN_LOOKAHEAD = 12;
+    MIN_WORD_SECONDS = 0.02;
+    QUIET_SEARCH_SECONDS = 30;
+    QUIET_WINDOW_SECONDS = 0.3;
+  }
+});
+
 // ../engine/src/reels/styles.ts
 var REEL_STYLE_IDS, BOLD, REEL_STYLES;
 var init_styles = __esm({
@@ -31211,7 +31503,7 @@ function planReel(input3) {
   if (slots.length > 0) slots[slots.length - 1].end = onFrame(duration3);
   const cursors = /* @__PURE__ */ new Map();
   const nextFrom = (m, seconds2) => cursors.get(m.fileId) ?? m.start + Math.max(0, (m.end - m.start - seconds2) * 0.3);
-  const fits = (m, seconds2) => m.kind === "image" || m.end - m.start >= seconds2 * MIN_SPEED - EPS2;
+  const fits2 = (m, seconds2) => m.kind === "image" || m.end - m.start >= seconds2 * MIN_SPEED - EPS2;
   const payoff = media.length >= 3 ? media[media.length - 1] : null;
   const body = payoff ? media.slice(0, -1) : media;
   const shots = [];
@@ -31222,10 +31514,10 @@ function planReel(input3) {
     const seconds2 = slot.end - slot.start;
     const isLast = queue.length === 0;
     let chosen;
-    if (isLast && payoff && fits(payoff, seconds2)) chosen = payoff;
+    if (isLast && payoff && fits2(payoff, seconds2)) chosen = payoff;
     for (let j = 0; !chosen && j < body.length; j += 1) {
       const m = body[(rotation + j) % body.length];
-      if (fits(m, seconds2)) {
+      if (fits2(m, seconds2)) {
         chosen = m;
         rotation = (rotation + j + 1) % body.length;
       }
@@ -31355,6 +31647,7 @@ var init_src = __esm({
     init_templates();
     init_presets2();
     init_beats();
+    init_transcription();
     init_styles();
     init_plan();
     init_stock();
@@ -32936,9 +33229,9 @@ function jpegOrientation(bytes) {
   }
   return 1;
 }
-async function imageOrientation(path38) {
-  if (!/\.(jpe?g|jpe)$/i.test(path38)) return 1;
-  const handle = await open3(path38, "r");
+async function imageOrientation(path39) {
+  if (!/\.(jpe?g|jpe)$/i.test(path39)) return 1;
+  const handle = await open3(path39, "r");
   try {
     const buffer = new Uint8Array(128 * 1024);
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
@@ -33591,9 +33884,9 @@ var init_probe = __esm({
     init_ffprobe();
     init_pixfmt_gen();
     ProbeError = class extends Error {
-      constructor(message, path38) {
+      constructor(message, path39) {
         super(message);
-        this.path = path38;
+        this.path = path39;
         this.name = "ProbeError";
       }
       path;
@@ -33647,12 +33940,12 @@ var init_probe = __esm({
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { open as open4, stat as stat4 } from "node:fs/promises";
-async function fingerprint(path38) {
-  if (!path38 || path38.includes("%")) return void 0;
+async function fingerprint(path39) {
+  if (!path39 || path39.includes("%")) return void 0;
   let size;
   let mtime;
   try {
-    const st = await stat4(path38);
+    const st = await stat4(path39);
     if (!st.isFile()) return void 0;
     size = st.size;
     mtime = st.mtimeMs / 1e3;
@@ -33661,7 +33954,7 @@ async function fingerprint(path38) {
   }
   const digest = createHash("sha256");
   digest.update(String(size), "ascii");
-  const handle = await open4(path38, "r");
+  const handle = await open4(path39, "r");
   try {
     const head = Buffer.alloc(Math.min(SAMPLE_BYTES, size));
     const { bytesRead } = await handle.read(head, 0, head.length, 0);
@@ -33677,11 +33970,11 @@ async function fingerprint(path38) {
   }
   return { size, mtime, sha256: digest.digest("hex") };
 }
-async function sha256File(path38, options = {}) {
-  const total = (await stat4(path38)).size;
+async function sha256File(path39, options = {}) {
+  const total = (await stat4(path39)).size;
   const digest = createHash("sha256");
   let bytes = 0;
-  const stream = createReadStream(path38, { highWaterMark: 1024 * 1024, signal: options.signal });
+  const stream = createReadStream(path39, { highWaterMark: 1024 * 1024, signal: options.signal });
   for await (const chunk2 of stream) {
     digest.update(chunk2);
     bytes += chunk2.length;
@@ -35082,7 +35375,7 @@ var init_fma2 = __esm({
 });
 
 // ../engine/src/render/kernels/params.ts
-function isRecord19(v) {
+function isRecord20(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 function num7(params, key, fallback) {
@@ -35114,7 +35407,7 @@ function color(params, key, fallback) {
     };
     return [ch(0), ch(1), ch(2), v.length >= 4 ? ch(3) : fallback[3]];
   }
-  if (isRecord19(v)) {
+  if (isRecord20(v)) {
     const ch = (name, i) => {
       const x = v[name];
       return typeof x === "number" && Number.isFinite(x) ? x : fallback[i];
@@ -35125,7 +35418,7 @@ function color(params, key, fallback) {
 }
 function record3(params, key) {
   const v = params[key];
-  return isRecord19(v) ? v : void 0;
+  return isRecord20(v) ? v : void 0;
 }
 function numbers(params, key) {
   const v = params[key];
@@ -35145,9 +35438,9 @@ function hexColorRgb(c) {
 }
 function readerPath(params, key) {
   const v = params[key];
-  if (!isRecord19(v)) return void 0;
-  const path38 = v.path;
-  return typeof path38 === "string" && path38.length > 0 ? path38 : void 0;
+  if (!isRecord20(v)) return void 0;
+  const path39 = v.path;
+  return typeof path39 === "string" && path39.length > 0 ? path39 : void 0;
 }
 var init_params = __esm({
   "../engine/src/render/kernels/params.ts"() {
@@ -35725,9 +36018,9 @@ function lround(v) {
 }
 function normalizedFrequencyToHz(value, highFrequency) {
   if (value > 1) return value;
-  const normalized = clampf(value, 0, 1);
-  if (highFrequency && normalized <= 0) return 21;
-  return f323(20 * f323(Math.pow(1e3, normalized)));
+  const normalized2 = clampf(value, 0, 1);
+  if (highFrequency && normalized2 <= 0) return 21;
+  return f323(20 * f323(Math.pow(1e3, normalized2)));
 }
 function sampleCount(audio) {
   return audio && audio.channels.length > 0 ? audio.channels[0].length : 0;
@@ -37187,29 +37480,29 @@ function pointsEqual(x1, y1, x2, y2) {
   const ey = y1 === 0 || y2 === 0 ? fuzzyIsNull(y1 - y2) : fuzzyCompare2(y1, y2);
   return ex && ey;
 }
-function moveTo(path38, x, y) {
-  const n = path38.types.length;
-  if (n > 0 && path38.types[n - 1] === MOVE_TO) {
-    path38.pts[(n - 1) * 2] = x;
-    path38.pts[(n - 1) * 2 + 1] = y;
+function moveTo(path39, x, y) {
+  const n = path39.types.length;
+  if (n > 0 && path39.types[n - 1] === MOVE_TO) {
+    path39.pts[(n - 1) * 2] = x;
+    path39.pts[(n - 1) * 2 + 1] = y;
     return;
   }
-  path38.types.push(MOVE_TO);
-  path38.pts.push(x, y);
+  path39.types.push(MOVE_TO);
+  path39.pts.push(x, y);
 }
-function lineTo(path38, x, y) {
-  const n = path38.types.length;
-  if (n > 0 && pointsEqual(x, y, path38.pts[(n - 1) * 2], path38.pts[(n - 1) * 2 + 1])) return;
-  path38.types.push(LINE_TO);
-  path38.pts.push(x, y);
+function lineTo(path39, x, y) {
+  const n = path39.types.length;
+  if (n > 0 && pointsEqual(x, y, path39.pts[(n - 1) * 2], path39.pts[(n - 1) * 2 + 1])) return;
+  path39.types.push(LINE_TO);
+  path39.pts.push(x, y);
 }
-function cubicTo(path38, c1x, c1y, c2x, c2y, ex, ey) {
-  const n = path38.types.length;
-  const lx = path38.pts[(n - 1) * 2];
-  const ly = path38.pts[(n - 1) * 2 + 1];
+function cubicTo(path39, c1x, c1y, c2x, c2y, ex, ey) {
+  const n = path39.types.length;
+  const lx = path39.pts[(n - 1) * 2];
+  const ly = path39.pts[(n - 1) * 2 + 1];
   if (pointsEqual(lx, ly, c1x, c1y) && pointsEqual(c1x, c1y, c2x, c2y) && pointsEqual(c2x, c2y, ex, ey)) return;
-  path38.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
-  path38.pts.push(c1x, c1y, c2x, c2y, ex, ey);
+  path39.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
+  path39.pts.push(c1x, c1y, c2x, c2y, ex, ey);
 }
 function line(x1, y1, x2, y2) {
   return { x1, y1, x2, y2 };
@@ -37224,14 +37517,14 @@ function lineAngle(l) {
   const dx = l.x2 - l.x1;
   const dy = l.y2 - l.y1;
   const theta = Math.atan2(-dy, dx) * 360 / (2 * Math.PI);
-  const normalized = theta < 0 ? theta + 360 : theta;
-  return fuzzyCompare2(normalized, 360) ? 0 : normalized;
+  const normalized2 = theta < 0 ? theta + 360 : theta;
+  return fuzzyCompare2(normalized2, 360) ? 0 : normalized2;
 }
 function angleTo(a, b) {
   if (lineIsNull(a) || lineIsNull(b)) return 0;
   const delta = lineAngle(b) - lineAngle(a);
-  const normalized = delta < 0 ? delta + 360 : delta;
-  return fuzzyCompare2(delta, 360) ? 0 : normalized;
+  const normalized2 = delta < 0 ? delta + 360 : delta;
+  return fuzzyCompare2(delta, 360) ? 0 : normalized2;
 }
 function setLength(l, len) {
   const old = lineLength(l);
@@ -37698,17 +37991,17 @@ function curvesForArc(x, y, w, h, startAngle, sweepIn) {
   curves[curves.length - 1] = epy;
   return { sx: spx, sy: spy, curves };
 }
-function strokePath(path38, style, forceOpen) {
+function strokePath(path39, style, forceOpen) {
   const stroker = new Stroker(style.width, style.cap, style.join, forceOpen);
   let els = [];
   const flush = () => {
     if (els.length > 1) stroker.processSubpath(els);
     els = [];
   };
-  for (let i = 0; i < path38.types.length; i += 1) {
-    const type = path38.types[i];
-    const x = path38.pts[i * 2];
-    const y = path38.pts[i * 2 + 1];
+  for (let i = 0; i < path39.types.length; i += 1) {
+    const type = path39.types[i];
+    const x = path39.pts[i * 2];
+    const y = path39.pts[i * 2 + 1];
     if (type === MOVE_TO) {
       flush();
       els.push({ type: MOVE_TO, x, y });
@@ -37717,7 +38010,7 @@ function strokePath(path38, style, forceOpen) {
   flush();
   return stroker.out;
 }
-function flattenPath(path38, device) {
+function flattenPath(path39, device) {
   const contours = [];
   let current = null;
   const close = () => {
@@ -37729,11 +38022,11 @@ function flattenPath(path38, device) {
     current = null;
   };
   const inside = (x, y) => x >= 0 && x <= device.width && y >= 0 && y <= device.height;
-  const count2 = path38.types.length;
+  const count2 = path39.types.length;
   for (let i = 0; i < count2; i += 1) {
-    const type = path38.types[i];
-    const x = path38.pts[i * 2];
-    const y = path38.pts[i * 2 + 1];
+    const type = path39.types[i];
+    const x = path39.pts[i * 2];
+    const y = path39.pts[i * 2 + 1];
     if (type === MOVE_TO) {
       if (i === count2 - 1) continue;
       close();
@@ -37744,7 +38037,7 @@ function flattenPath(path38, device) {
     } else if (type === CURVE_TO) {
       current ??= [0, 0];
       const n = current.length;
-      const b = [current[n - 2], current[n - 1], x, y, path38.pts[(i + 1) * 2], path38.pts[(i + 1) * 2 + 1], path38.pts[(i + 2) * 2], path38.pts[(i + 2) * 2 + 1]];
+      const b = [current[n - 2], current[n - 1], x, y, path39.pts[(i + 1) * 2], path39.pts[(i + 1) * 2 + 1], path39.pts[(i + 2) * 2], path39.pts[(i + 2) * 2 + 1]];
       i += 2;
       let outside = false;
       if (!inside(b[6], b[7])) {
@@ -38463,9 +38756,9 @@ var init_audio_visualization_cosmetic = __esm({
         if (implicitClose) this.stroke(px2, py, movedX, movedY, 0);
       }
       /** `drawPath` for a path with element types (QPainterPath: lines and cubics). */
-      drawPath(path38) {
-        const types = path38.types;
-        const pts = path38.pts;
+      drawPath(path39) {
+        const types = path39.types;
+        const pts = path39.pts;
         const end = types.length;
         let t = 0;
         while (t < end) {
@@ -39062,8 +39355,8 @@ var init_audio_visualization_paint = __esm({
        * then qgrayraster (antialiased; its spans are the runs of equal coverage,
        * flushed every 256) or QRasterizer's scan converter (aliased).
        */
-      fillPath(path38, brush, evenOdd) {
-        const contours = flattenPath(path38, this);
+      fillPath(path39, brush, evenOdd) {
+        const contours = flattenPath(path39, this);
         if (contours.length === 0) return;
         const p = prepare2(brush);
         if (this.antialias) {
@@ -39092,21 +39385,21 @@ var init_audio_visualization_paint = __esm({
           this.cosmetic(pen2, (c) => c.drawPolygon(points, false));
           return;
         }
-        const path38 = { types: [], pts: [] };
+        const path39 = { types: [], pts: [] };
         for (let i = 0; i < points.length; i += 2) {
-          path38.types.push(i === 0 ? MOVE_TO : LINE_TO);
-          path38.pts.push(points[i], points[i + 1]);
+          path39.types.push(i === 0 ? MOVE_TO : LINE_TO);
+          path39.pts.push(points[i], points[i + 1]);
         }
-        this.fillPath(strokePath(path38, pen2, true), pen2.brush, false);
+        this.fillPath(strokePath(path39, pen2, true), pen2.brush, false);
       }
       /** `QPainter::drawPath` with no brush. */
-      drawPath(path38, pen2) {
-        if (path38.types.length === 0) return;
+      drawPath(path39, pen2) {
+        if (path39.types.length === 0) return;
         if (pen2.width <= 1) {
-          this.cosmetic(pen2, (c) => c.drawPath(path38));
+          this.cosmetic(pen2, (c) => c.drawPath(path39));
           return;
         }
-        this.fillPath(strokePath(path38, pen2, false), pen2.brush, false);
+        this.fillPath(strokePath(path39, pen2, false), pen2.brush, false);
       }
       /** `QPainter::drawLine(QPointF, QPointF)`. */
       drawLine(x1, y1, x2, y2, pen2) {
@@ -39114,8 +39407,8 @@ var init_audio_visualization_paint = __esm({
           this.cosmetic(pen2, (c) => c.drawLine(x1, y1, x2, y2));
           return;
         }
-        const path38 = { types: [MOVE_TO, LINE_TO], pts: [x1, y1, x2, y2] };
-        this.fillPath(strokePath(path38, pen2, false), pen2.brush, false);
+        const path39 = { types: [MOVE_TO, LINE_TO], pts: [x1, y1, x2, y2] };
+        this.fillPath(strokePath(path39, pen2, false), pen2.brush, false);
       }
       /** `QPainter::drawEllipse(center, rx, ry)` with no pen. */
       fillEllipse(cx, cy, rx, ry, brush) {
@@ -39133,12 +39426,12 @@ var init_audio_visualization_paint = __esm({
         }
         const arc = curvesForArc(x, y, w, h, 0, -360);
         if (arc.curves.length === 0) return;
-        const path38 = { types: [MOVE_TO], pts: [arc.sx, arc.sy] };
+        const path39 = { types: [MOVE_TO], pts: [arc.sx, arc.sy] };
         for (let i = 0; i < arc.curves.length; i += 6) {
-          path38.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
-          path38.pts.push(...arc.curves.slice(i, i + 6));
+          path39.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
+          path39.pts.push(...arc.curves.slice(i, i + 6));
         }
-        this.fillPath(path38, brush, true);
+        this.fillPath(path39, brush, true);
       }
       /** `drawImage(0, 0, image)` with SourceOver (the `qBlendFunctions` fast path). */
       drawImageSourceOver(image) {
@@ -39705,23 +39998,23 @@ var init_audio_visualization = __esm({
 });
 
 // ../engine/src/render/plan/effect-params.ts
-function isRecord20(value) {
+function isRecord21(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function isKeyframe(value) {
-  return isRecord20(value) && Array.isArray(value.Points);
+  return isRecord21(value) && Array.isArray(value.Points);
 }
 function isColor(value) {
-  return isRecord20(value) && isKeyframe(value.red) && isKeyframe(value.green) && isKeyframe(value.blue);
+  return isRecord21(value) && isKeyframe(value.red) && isKeyframe(value.green) && isKeyframe(value.blue);
 }
 function isAnimatedCurve(value) {
-  return isRecord20(value) && Array.isArray(value.nodes);
+  return isRecord21(value) && Array.isArray(value.nodes);
 }
 function clamp01(v) {
   return Math.max(0, Math.min(1, v));
 }
 function readNode(raw) {
-  const n = isRecord20(raw) ? raw : {};
+  const n = isRecord21(raw) ? raw : {};
   const int6 = (v, fallback) => typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : fallback;
   return {
     id: int6(n.id, 0),
@@ -39740,7 +40033,7 @@ function valueOf(v, frame) {
   return evaluate(v, frame);
 }
 function evaluateAnimatedCurve(json2, frame, defaultNodes) {
-  const root = isRecord20(json2) ? json2 : {};
+  const root = isRecord21(json2) ? json2 : {};
   const enabled = root.enabled === void 0 ? 1 : valueOf(root.enabled, frame);
   let rawNodes = Array.isArray(root.nodes) && root.nodes.length > 0 ? root.nodes : [];
   if (rawNodes.length === 0) {
@@ -39800,7 +40093,7 @@ function evaluateValue(value, frame) {
     }
     return out;
   }
-  if (isRecord20(value)) {
+  if (isRecord21(value)) {
     const out = {};
     for (const [k, v] of Object.entries(value)) {
       const e = evaluateValue(v, frame);
@@ -41445,9 +41738,9 @@ function applyCubeLut(image, lut, intensity, intensityR, intensityG, intensityB)
     d[i + 2] = constrainByte(f328(f328(alpha * fmaf2(lb, tB, f328(bn * keepB))) * 255));
   }
 }
-function lutForPath(ctx, path38) {
-  if (path38 === "") return null;
-  const text4 = ctx.texts?.get(path38);
+function lutForPath(ctx, path39) {
+  if (path39 === "") return null;
+  const text4 = ctx.texts?.get(path39);
   return text4 === void 0 ? null : cachedCubeLut(text4);
 }
 var f328, INV_2552, colorMap;
@@ -41632,9 +41925,9 @@ function curveLut(curve3) {
   }
   return lut;
 }
-function lutStage(image, ctx, path38, intensity) {
-  if (path38 === "" || !(intensity > 0)) return;
-  const lut = lutForPath(ctx, path38);
+function lutStage(image, ctx, path39, intensity) {
+  if (path39 === "" || !(intensity > 0)) return;
+  const lut = lutForPath(ctx, path39);
   if (lut) applyCubeLut(image, lut, intensity, 1, 1, 1);
 }
 var f329, INV_2553, EPSILON2, LUMA_R, LUMA_G, LUMA_B, TINT_G, TINT_RB, RECOVERY, INV_ALPHA3, EXP2_TABLE, EXP2_C0, EXP2_C1, EXP2_SHIFT, exp2Bits, NAMED_COLORS, namedColors, WHITE, NO_BIAS, identityTable, colorGrade;
@@ -42275,13 +42568,13 @@ function grayTable(brightness2, contrast) {
   return table;
 }
 function displaceKernel(image, params, ctx) {
-  const path38 = displaceMapPath(params);
-  if (!path38) return;
-  const source2 = ctx.images.get(path38);
+  const path39 = displaceMapPath(params);
+  if (!path39) return;
+  const source2 = ctx.images.get(path39);
   const width = image.width;
   const height = image.height;
   if (!source2 || source2.width <= 0 || source2.height <= 0 || width <= 0 || height <= 0) return;
-  const map2 = scaledPremul(source2, width, height, ctx.imageSizes?.[path38]).data;
+  const map2 = scaledPremul(source2, width, height, ctx.imageSizes?.[path39]).data;
   const strength = f3211(num7(params, "strength", 1));
   const xAmount = f3211(f3211(f3211(num7(params, "horizontal", 0.05)) * width) * strength);
   const yAmount = f3211(f3211(f3211(num7(params, "vertical", 0)) * height) * strength);
@@ -43566,9 +43859,9 @@ var init_mask = __esm({
       supported: true,
       handlesMask: true,
       run(image, params, ctx) {
-        const path38 = readerPath(params, "mask_reader") ?? readerPath(params, "reader");
-        if (!path38) return;
-        const source2 = ctx.images.get(path38);
+        const path39 = readerPath(params, "mask_reader") ?? readerPath(params, "reader");
+        if (!path39) return;
+        const source2 = ctx.images.get(path39);
         if (!source2) return;
         applyMaskFromSource(image, source2, {
           brightness: num7(params, "brightness", 0),
@@ -46121,9 +46414,9 @@ function scaleSize(w, h, scale, tw, th) {
       return { width: w, height: h };
   }
 }
-function lowerExt(path38) {
-  const dot = path38.lastIndexOf(".");
-  return dot < 0 ? "" : path38.slice(dot + 1).toLowerCase();
+function lowerExt(path39) {
+  const dot = path39.lastIndexOf(".");
+  return dot < 0 ? "" : path39.slice(dot + 1).toLowerCase();
 }
 function sourceKind(reader) {
   if (!reader || typeof reader.path !== "string") return "unsupported";
@@ -47123,7 +47416,7 @@ function flatten(out, b0, threshold) {
     }
   }
 }
-function outlineContours(path38, transform2) {
+function outlineContours(path39, transform2) {
   const scale = transformScale(transform2);
   const threshold = scale === 0 ? 0.25 : 0.25 / scale;
   const contours = [];
@@ -47133,7 +47426,7 @@ function outlineContours(path38, transform2) {
     const n = current.length;
     if (current[n - 2] !== current[0] || current[n - 1] !== current[1]) current.push(current[0], current[1]);
   };
-  const els = path38.elements;
+  const els = path39.elements;
   for (let i = 0; i < els.length; i += 1) {
     const e = els[i];
     if (e.type === MoveTo) {
@@ -47676,9 +47969,9 @@ function drawImage(dst, src, state) {
       const width = noShear ? h / w : Math.abs(t.m22 * h / (t.m11 * w));
       rasterizeLine(ax, ay, bx, by, width, state.antialias, rasterizerBox(device, clip2), sink);
     } else if (state.antialias) {
-      const path38 = new PainterPath();
-      path38.addRect(0, 0, w, h);
-      const mask2 = grayRasterize(outlineContours(path38, t), true, dst.width, dst.height);
+      const path39 = new PainterPath();
+      path39.addRect(0, 0, w, h);
+      const mask2 = grayRasterize(outlineContours(path39, t), true, dst.width, dst.height);
       spans2 = mask2 ? maskSpans2(mask2) : [];
     } else {
       const poly = [];
@@ -47704,9 +47997,9 @@ function drawImage(dst, src, state) {
   deliverSpans(spans2, clip2, (chunk2) => handleSpans(chunk2, intOpacity, fetch2, process4));
 }
 function roundedRectClip(w, h, radius, transform2, width, height) {
-  const path38 = new PainterPath();
-  path38.addRoundedRect(0, 0, w, h, radius, radius);
-  return ClipData.fromMask(grayRasterize(outlineContours(path38, transform2), true, width, height));
+  const path39 = new PainterPath();
+  path39.addRoundedRect(0, 0, w, h, radius, radius);
+  return ClipData.fromMask(grayRasterize(outlineContours(path39, transform2), true, width, height));
 }
 var FIXED, HALF;
 var init_draw_image = __esm({
@@ -48941,17 +49234,128 @@ var init_analyze = __esm({
   }
 });
 
-// ../render-node/src/host/paths.ts
+// ../render-node/src/audio/speech.ts
 import path13 from "node:path";
+async function speechFormat() {
+  try {
+    return (await encoderNames()).has(MP3_SPEECH.encoder) ? MP3_SPEECH : FLAC_SPEECH;
+  } catch {
+    return FLAC_SPEECH;
+  }
+}
+async function extractSpeechAudio(file3, range, format, signal) {
+  const args = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-nostdin",
+    "-ss",
+    range.start.toFixed(3),
+    "-t",
+    range.duration.toFixed(3),
+    "-i",
+    file3,
+    "-map",
+    "0:a:0",
+    "-vn",
+    "-ac",
+    "1",
+    "-ar",
+    String(SPEECH_SAMPLE_RATE),
+    ...format.args,
+    "pipe:1"
+  ];
+  try {
+    const { stdout } = await runBinary(resolveBinary("ffmpeg"), args, {
+      signal,
+      maxStdout: TRANSCRIPTION_MAX_BYTES,
+      what: `Extracting the speech of ${path13.basename(file3)} failed`
+    });
+    return new Uint8Array(stdout.buffer, stdout.byteOffset, stdout.byteLength);
+  } catch (error62) {
+    if (error62 instanceof FfmpegError && NO_AUDIO.test(error62.stderr)) throw new TranscriptionError("no_audio", `${path13.basename(file3)} has no audio stream.`);
+    if (error62 instanceof FfmpegError && /more output than expected/.test(error62.message)) {
+      throw new TranscriptionError("too_large", "a piece of the speech audio came out over the server's 25 MB limit");
+    }
+    throw error62;
+  }
+}
+async function audioDuration(file3, signal) {
+  const probe2 = await ffprobe(file3, signal);
+  const streams = probe2.streams.filter((s) => s.codec_type === "audio");
+  if (streams.length === 0) throw new TranscriptionError("no_audio", `${path13.basename(file3)} has no audio stream.`);
+  const candidates = [probe2.format.duration, ...streams.map((s) => s.duration)].map((d) => Number(d)).filter((d) => Number.isFinite(d) && d > 0);
+  return candidates.length > 0 ? Math.max(...candidates) : 0;
+}
+async function transcribeMediaFile(file3, options) {
+  const { signal } = options;
+  const format = options.format ?? await speechFormat();
+  const duration3 = await audioDuration(file3, signal);
+  if (!(duration3 > 0)) throw new TranscriptionError("no_audio", `${path13.basename(file3)} has no audio to transcribe.`);
+  let envelope;
+  if (duration3 > format.chunkSeconds) envelope = await analyzeAudio(file3, { signal });
+  const pieces = planSpeechChunks(duration3, format.chunkSeconds, envelope);
+  const stem4 = path13.basename(file3, path13.extname(file3)).replace(/[^\w.-]+/g, "_").slice(0, 60) || "speech";
+  const parts = [];
+  for (const [i, [start, end]] of pieces.entries()) {
+    if (signal?.aborted) throw new AbortedError();
+    const bytes = await extractSpeechAudio(file3, { start, duration: end - start }, format, signal);
+    const piece = {
+      bytes,
+      fileName: `${stem4}${pieces.length > 1 ? `-${i + 1}` : ""}.${format.extension}`,
+      contentType: format.contentType,
+      offset: start
+    };
+    let answer;
+    try {
+      answer = await options.upload(piece, { language: options.language ?? "", prompt: options.prompt ?? "", signal });
+    } catch (error62) {
+      if (isTranscriptionError(error62) || signal?.aborted) throw error62;
+      throw new TranscriptionError("failed", `could not reach the Zenvi server (${error62 instanceof Error ? error62.message : String(error62)})`);
+    }
+    parts.push({ offset: start, transcription: parseTranscription(answer) });
+  }
+  return mergeTranscriptions(parts);
+}
+var MP3_SPEECH, FLAC_SPEECH, NO_AUDIO;
+var init_speech = __esm({
+  "../render-node/src/audio/speech.ts"() {
+    "use strict";
+    init_src();
+    init_binaries();
+    init_capabilities();
+    init_process();
+    init_ffprobe();
+    init_analyze();
+    MP3_SPEECH = {
+      encoder: "libmp3lame",
+      args: ["-c:a", "libmp3lame", "-b:a", "32k", "-f", "mp3"],
+      extension: "mp3",
+      contentType: "audio/mpeg",
+      chunkSeconds: SPEECH_CHUNK_SECONDS
+    };
+    FLAC_SPEECH = {
+      encoder: "flac",
+      args: ["-c:a", "flac", "-f", "flac"],
+      extension: "flac",
+      contentType: "audio/flac",
+      chunkSeconds: 10 * 60
+    };
+    NO_AUDIO = /matches no streams|does not contain any stream|Stream map '0:a:0'/i;
+  }
+});
+
+// ../render-node/src/host/paths.ts
+import path14 from "node:path";
 function isPortableAssetPath(value) {
   return PORTABLE_ALIASES.some((alias) => value === alias || value.startsWith(`${alias}/`) || value.startsWith(`${alias}\\`));
 }
 function engineAssetRoots(engineAssetsDir2) {
   if (!engineAssetsDir2) return {};
   return {
-    transitions: path13.join(engineAssetsDir2, "transitions"),
-    emojis: path13.join(engineAssetsDir2, "emojis"),
-    colors: path13.join(engineAssetsDir2, "colors")
+    transitions: path14.join(engineAssetsDir2, "transitions"),
+    emojis: path14.join(engineAssetsDir2, "emojis"),
+    colors: path14.join(engineAssetsDir2, "colors")
   };
 }
 function storeRoots(projectFile, engineAssetsDir2) {
@@ -48961,8 +49365,8 @@ function loadRoots(projectFile) {
   return { assets: projectAssetsDir(projectFile) };
 }
 function isInside(child, parent) {
-  const rel = path13.relative(path13.resolve(parent), path13.resolve(child));
-  return rel === "" || !rel.startsWith("..") && !path13.isAbsolute(rel);
+  const rel = path14.relative(path14.resolve(parent), path14.resolve(child));
+  return rel === "" || !rel.startsWith("..") && !path14.isAbsolute(rel);
 }
 function mapPathValues(value, convert) {
   const visit2 = (v) => {
@@ -48982,8 +49386,8 @@ function createMediaResolver(options) {
   const roots = engineAssetRoots(options.engineAssetsDir);
   return (value) => {
     if (options.projectFile) {
-      const projectDir = path13.dirname(path13.resolve(options.projectFile));
-      return fromStoredPath(value, projectDir, { ...roots, assets: projectAssetsDir(path13.resolve(options.projectFile)) });
+      const projectDir = path14.dirname(path14.resolve(options.projectFile));
+      return fromStoredPath(value, projectDir, { ...roots, assets: projectAssetsDir(path14.resolve(options.projectFile)) });
     }
     return fromStoredPath(value, process.cwd(), roots);
   };
@@ -49003,7 +49407,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes as randomBytes3 } from "node:crypto";
 import { open as open6, readFile as readFile5, rename as rename4, rm as rm3, stat as stat6, writeFile as writeFile4 } from "node:fs/promises";
 import { hostname as hostname4 } from "node:os";
-import path14 from "node:path";
+import path15 from "node:path";
 function describeParseError(error62) {
   const issues = error62.issues.slice(0, 3).map((i) => i.path ? `${i.path}: ${i.message}` : i.message);
   return `${issues.join("; ")}${error62.issues.length > 3 ? ` (+${error62.issues.length - 3} more)` : ""}`;
@@ -49017,10 +49421,10 @@ function parseProjectFileText(text4, file3) {
     if (error62 instanceof ProjectParseError) throw new ProjectFileError(`${file3} is not a Zenvi project: ${describeParseError(error62)}`, file3);
     throw error62;
   }
-  return fromStoredPaths(project, path14.dirname(file3), loadRoots(file3));
+  return fromStoredPaths(project, path15.dirname(file3), loadRoots(file3));
 }
 async function readProjectFile(file3) {
-  const abs = path14.resolve(file3);
+  const abs = path15.resolve(file3);
   let text4;
   try {
     text4 = await readFile5(abs, "utf8");
@@ -49031,12 +49435,12 @@ async function readProjectFile(file3) {
   return parseProjectFileText(text4, abs);
 }
 function serializeProjectFile(project, file3, options = {}) {
-  const abs = path14.resolve(file3);
-  return serializeProject(toStoredPaths(project, path14.dirname(abs), storeRoots(abs, options.engineAssetsDir)));
+  const abs = path15.resolve(file3);
+  return serializeProject(toStoredPaths(project, path15.dirname(abs), storeRoots(abs, options.engineAssetsDir)));
 }
 async function writeFileAtomic(file3, text4) {
-  const dir = path14.dirname(file3);
-  const tmp = path14.join(dir, `.${path14.basename(file3)}.${process.pid}.${randomBytes3(4).toString("hex")}.tmp`);
+  const dir = path15.dirname(file3);
+  const tmp = path15.join(dir, `.${path15.basename(file3)}.${process.pid}.${randomBytes3(4).toString("hex")}.tmp`);
   const handle = await open6(tmp, "w", 420);
   try {
     await handle.writeFile(text4);
@@ -49052,7 +49456,7 @@ async function writeFileAtomic(file3, text4) {
   }
 }
 async function writeProjectFile(file3, project, options = {}) {
-  const abs = path14.resolve(file3);
+  const abs = path15.resolve(file3);
   await writeFileAtomic(abs, serializeProjectFile(project, abs, options));
   return abs;
 }
@@ -49093,7 +49497,7 @@ async function tryAcquire(lockFile) {
   return false;
 }
 async function withProjectLock(file3, fn, timeoutMs = 3e4) {
-  const lockFile = `${path14.resolve(file3)}.lock`;
+  const lockFile = `${path15.resolve(file3)}.lock`;
   const held = heldHere.getStore();
   if (held?.has(lockFile)) return fn();
   const previous = queues.get(lockFile) ?? Promise.resolve();
@@ -49146,19 +49550,19 @@ var init_storage = __esm({
 import { createWriteStream } from "node:fs";
 import { copyFile, mkdir as mkdir4, readdir as readdir3, rm as rm4, stat as stat7, writeFile as writeFile5 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
-import path15 from "node:path";
+import path16 from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 function expandHome(p) {
   if (p === "~") return process.env.HOME ?? p;
-  if (p.startsWith("~/") || p.startsWith("~\\")) return path15.join(process.env.HOME ?? "", p.slice(2));
+  if (p.startsWith("~/") || p.startsWith("~\\")) return path16.join(process.env.HOME ?? "", p.slice(2));
   return p;
 }
 function localPath(entry) {
   let value = entry.trim().replace(/^["']|["']$/g, "");
   if (/^file:\/\//i.test(value)) value = fileURLToPath3(value);
-  return path15.resolve(expandHome(value));
+  return path16.resolve(expandHome(value));
 }
 function globToRegExp(glob) {
   let re = "";
@@ -49198,8 +49602,8 @@ async function walkFiles(dir, out) {
     return;
   }
   const names2 = entries.filter((e) => !e.name.startsWith(".")).sort((a, b) => a.name.localeCompare(b.name));
-  for (const e of names2) if (e.isFile()) out.push(path15.join(dir, e.name));
-  for (const e of names2) if (e.isDirectory()) await walkFiles(path15.join(dir, e.name), out);
+  for (const e of names2) if (e.isFile()) out.push(path16.join(dir, e.name));
+  for (const e of names2) if (e.isDirectory()) await walkFiles(path16.join(dir, e.name), out);
 }
 async function listPaths(entry) {
   const target = localPath(entry);
@@ -49214,29 +49618,29 @@ async function listPaths(entry) {
   } catch {
   }
   if (/[*?[{]/.test(entry)) {
-    const normalized = target.split(path15.sep).join("/");
-    const firstMagic = normalized.search(/[*?[{]/);
-    const base = normalized.slice(0, normalized.lastIndexOf("/", firstMagic) + 1) || "/";
-    const pattern = globToRegExp(normalized.slice(base.length));
+    const normalized2 = target.split(path16.sep).join("/");
+    const firstMagic = normalized2.search(/[*?[{]/);
+    const base = normalized2.slice(0, normalized2.lastIndexOf("/", firstMagic) + 1) || "/";
+    const pattern = globToRegExp(normalized2.slice(base.length));
     const all = [];
-    await walkFiles(base.split("/").join(path15.sep) || path15.sep, all);
-    const files = all.filter((f3) => pattern.test(f3.split(path15.sep).join("/").slice(base.length)));
+    await walkFiles(base.split("/").join(path16.sep) || path16.sep, all);
+    const files = all.filter((f3) => pattern.test(f3.split(path16.sep).join("/").slice(base.length)));
     return { kind: "glob", files };
   }
   return { kind: "missing", files: [] };
 }
 function safeName(name) {
-  const base = path15.basename(name);
+  const base = path16.basename(name);
   let cleaned = "";
   for (const ch of base) cleaned += ch.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(ch) ? "_" : ch;
   cleaned = cleaned.replace(/^\.+/, "").trim();
   return cleaned.slice(0, 200) || "media";
 }
 async function uniquePath(dir, name) {
-  const ext = path15.extname(name);
+  const ext = path16.extname(name);
   const stem4 = ext ? name.slice(0, -ext.length) : name;
   for (let n = 1; n < 1e4; n += 1) {
-    const candidate = path15.join(dir, n === 1 ? name : `${stem4} (${n})${ext}`);
+    const candidate = path16.join(dir, n === 1 ? name : `${stem4} (${n})${ext}`);
     try {
       await stat7(candidate);
     } catch {
@@ -49262,17 +49666,17 @@ function createNodeMediaHost(options) {
   const policy = options.policy ?? "auto";
   const maxBytes = options.maxDownloadBytes ?? 4 * 1024 ** 3;
   const doFetch = options.fetchImpl ?? fetch;
-  const scratch2 = options.scratchDir ?? path15.join(tmpdir2(), "zenvi-media");
+  const scratch2 = options.scratchDir ?? path16.join(tmpdir2(), "zenvi-media");
   const mediaDir = async (sub) => {
     const project = options.projectFile();
-    const dir = project ? path15.join(projectAssetsDir(project), sub) : path15.join(scratch2, sub);
+    const dir = project ? path16.join(projectAssetsDir(project), sub) : path16.join(scratch2, sub);
     await mkdir4(dir, { recursive: true });
     return dir;
   };
   const imported = async (file3, name, known) => {
     const info = known ? { ...known, path: file3 } : await probe(file3);
     const fp = await fingerprint(file3);
-    const media = { path: file3, info, name: name ?? path15.basename(file3) };
+    const media = { path: file3, info, name: name ?? path16.basename(file3) };
     if (fp) media.fingerprint = fp;
     return media;
   };
@@ -49287,9 +49691,9 @@ function createNodeMediaHost(options) {
     const projectInTemp = project !== void 0 && isInside(project, temp);
     const copy = !inAssets && (policy === "copy" || policy === "auto" && isInside(source2, temp) && !projectInTemp);
     if (!copy) return imported(source2, void 0, info);
-    const dest = await uniquePath(await mediaDir("media"), safeName(path15.basename(source2)));
+    const dest = await uniquePath(await mediaDir("media"), safeName(path16.basename(source2)));
     await copyFile(source2, dest);
-    return imported(dest, path15.basename(source2), info);
+    return imported(dest, path16.basename(source2), info);
   };
   return {
     probe: (p) => probe(localPath(p)),
@@ -49317,7 +49721,7 @@ function createNodeMediaHost(options) {
       });
       try {
         await pipeline(limited, createWriteStream(dest), { signal: opts.signal });
-        return await imported(dest, path15.basename(dest));
+        return await imported(dest, path16.basename(dest));
       } catch (error62) {
         await rm4(dest, { force: true });
         throw error62;
@@ -49394,10 +49798,46 @@ function createBackendHost(options) {
     }
   };
 }
+function backendSpeechUpload(options) {
+  const base = options.baseUrl.replace(/\/+$/, "");
+  const doFetch = options.fetchImpl ?? fetch;
+  return async (piece, fields) => {
+    const form = new FormData();
+    form.append("file", new Blob([piece.bytes], { type: piece.contentType }), piece.fileName);
+    if (fields.language) form.append("language", fields.language);
+    if (fields.prompt) form.append("prompt", fields.prompt);
+    const headers = { Accept: "application/json" };
+    if (options.userAgent) headers["User-Agent"] = options.userAgent;
+    const token = await options.token?.();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const timeout = AbortSignal.timeout(options.transcribeTimeoutMs ?? 6e5);
+    const signal = fields.signal ? AbortSignal.any([fields.signal, timeout]) : timeout;
+    let response;
+    try {
+      response = await doFetch(`${base}${TRANSCRIPTION_PATH}`, { method: "POST", headers, body: form, signal });
+    } catch (error62) {
+      if (fields.signal?.aborted) throw error62;
+      throw new TranscriptionError("failed", `cannot reach the Zenvi backend at ${base}: ${error62.message}`);
+    }
+    const text4 = await response.text();
+    let parsed = text4;
+    try {
+      parsed = text4 ? JSON.parse(text4) : null;
+    } catch {
+    }
+    if (!response.ok) {
+      const error62 = transcriptionHttpError(response.status, parsed);
+      if (error62.code === "sign_in") throw new TranscriptionError("sign_in", "transcribing speech needs a Zenvi sign-in: run `zenvi login`");
+      throw error62;
+    }
+    return parsed;
+  };
+}
 var BackendError;
 var init_backend = __esm({
   "../render-node/src/host/backend.ts"() {
     "use strict";
+    init_src();
     BackendError = class extends Error {
       constructor(message, status, body) {
         super(message);
@@ -49413,14 +49853,14 @@ var init_backend = __esm({
 
 // ../render-node/src/host/node-host.ts
 import { mkdir as mkdir5, readFile as readFile6, stat as stat8 } from "node:fs/promises";
-import path16 from "node:path";
+import path17 from "node:path";
 function createAssetHost(dir) {
-  const root = path16.resolve(dir);
+  const root = path17.resolve(dir);
   return {
     async readText(assetPath) {
-      const file3 = path16.resolve(root, assetPath);
-      const rel = path16.relative(root, file3);
-      if (!rel || rel.startsWith("..") || path16.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
+      const file3 = path17.resolve(root, assetPath);
+      const rel = path17.relative(root, file3);
+      if (!rel || rel.startsWith("..") || path17.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
       if ((await stat8(file3)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
       return readFile6(file3, "utf8");
     }
@@ -49429,20 +49869,20 @@ function createAssetHost(dir) {
 function createNodeHost(options = {}) {
   const current = () => {
     const p = typeof options.projectFile === "function" ? options.projectFile() : options.projectFile;
-    return p ? path16.resolve(p) : void 0;
+    return p ? path17.resolve(p) : void 0;
   };
   const assets = options.engineAssetsDir ?? engineAssetsDir();
   const resolveMedia = (value) => createMediaResolver({ projectFile: current(), engineAssetsDir: assets })(value);
   const baseDir = () => {
     const p = current();
-    return p ? path16.dirname(p) : process.cwd();
+    return p ? path17.dirname(p) : process.cwd();
   };
-  const inProject = (p) => path16.isAbsolute(p) ? p : path16.resolve(baseDir(), p);
+  const inProject = (p) => path17.isAbsolute(p) ? p : path17.resolve(baseDir(), p);
   const defaultOutput = (options_) => {
     const ext = FORMATS[options_.format]?.extension ?? "mp4";
     const project = current();
-    const stem4 = project ? path16.basename(project, path16.extname(project)) : "zenvi-export";
-    return path16.join(baseDir(), `${stem4}.${ext}`);
+    const stem4 = project ? path17.basename(project, path17.extname(project)) : "zenvi-export";
+    return path17.join(baseDir(), `${stem4}.${ext}`);
   };
   const host = {
     resolveMedia,
@@ -49451,7 +49891,7 @@ function createNodeHost(options = {}) {
     exporter: {
       async export(project, exportOptions, onProgress) {
         const output2 = exportOptions.output ? inProject(exportOptions.output) : defaultOutput(exportOptions);
-        await mkdir5(path16.dirname(output2), { recursive: true });
+        await mkdir5(path17.dirname(output2), { recursive: true });
         return renderProject(project, {
           resolveMedia,
           output: output2,
@@ -49487,7 +49927,7 @@ function createNodeHost(options = {}) {
       async save(project, target) {
         const file3 = target ? inProject(target) : current();
         if (!file3) throw new Error("The project has not been saved yet: give a file path (e.g. my-edit.zvn).");
-        await mkdir5(path16.dirname(file3), { recursive: true });
+        await mkdir5(path17.dirname(file3), { recursive: true });
         return writeProjectFile(file3, project, { engineAssetsDir: assets });
       },
       open: (p) => readProjectFile(inProject(p)),
@@ -49498,7 +49938,7 @@ function createNodeHost(options = {}) {
       },
       async writeText(p, text4) {
         const file3 = inProject(p);
-        await mkdir5(path16.dirname(file3), { recursive: true });
+        await mkdir5(path17.dirname(file3), { recursive: true });
         await writeFileAtomic(file3, text4);
         return file3;
       }
@@ -49506,7 +49946,11 @@ function createNodeHost(options = {}) {
     log: options.log
   };
   if (assets) host.assets = createAssetHost(assets);
-  if (options.backend) host.backend = createBackendHost(options.backend);
+  if (options.backend) {
+    host.backend = createBackendHost(options.backend);
+    const upload = backendSpeechUpload(options.backend);
+    host.audio.transcribe = (p, o) => transcribeMediaFile(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal, upload });
+  }
   return host;
 }
 var MAX_TEXT_BYTES;
@@ -49514,6 +49958,7 @@ var init_node_host = __esm({
   "../render-node/src/host/node-host.ts"() {
     "use strict";
     init_analyze();
+    init_speech();
     init_resources();
     init_encoder();
     init_render_frame();
@@ -49536,10 +49981,12 @@ __export(src_exports, {
   CompositePool: () => CompositePool,
   DEFAULT_ENCODER_PRESET: () => DEFAULT_ENCODER_PRESET,
   ENCODER_PRESETS: () => ENCODER_PRESETS,
+  FLAC_SPEECH: () => FLAC_SPEECH,
   FORMATS: () => FORMATS,
   FfmpegError: () => FfmpegError,
   FontIndex: () => FontIndex,
   GENERIC_FAMILIES: () => GENERIC_FAMILIES,
+  MP3_SPEECH: () => MP3_SPEECH,
   NoAudioError: () => NoAudioError,
   NodeTextRasterizer: () => NodeTextRasterizer,
   ProbeError: () => ProbeError,
@@ -49554,6 +50001,7 @@ __export(src_exports, {
   appendFontFallbacks: () => appendFontFallbacks,
   applyOverlay: () => applyOverlay,
   atempoChain: () => atempoChain,
+  backendSpeechUpload: () => backendSpeechUpload,
   binaryVersion: () => binaryVersion,
   blendOver: () => blendOver,
   buildAudioGraph: () => buildAudioGraph,
@@ -49582,6 +50030,7 @@ __export(src_exports, {
   engineAssetsDir: () => engineAssetsDir,
   exportFrameRange: () => exportFrameRange,
   extractFontFamilies: () => extractFontFamilies,
+  extractSpeechAudio: () => extractSpeechAudio,
   faceOffsets: () => faceOffsets,
   fallbackBinaryDirs: () => fallbackBinaryDirs,
   ffmpegMajorVersion: () => ffmpegMajorVersion,
@@ -49639,12 +50088,14 @@ __export(src_exports, {
   sharedFontIndex: () => sharedFontIndex,
   simplifyGain: () => simplifyGain,
   spawnManaged: () => spawnManaged,
+  speechFormat: () => speechFormat,
   splitEffects: () => splitEffects,
   stderrSummary: () => stderrSummary,
   storeRoots: () => storeRoots,
   streamStarts: () => streamStarts,
   svgIntrinsicSize: () => svgIntrinsicSize,
   systemFontDirs: () => systemFontDirs,
+  transcribeMediaFile: () => transcribeMediaFile,
   uniquePath: () => uniquePath,
   videoDecodeArgs: () => videoDecodeArgs,
   videoRateArgs: () => videoRateArgs,
@@ -49678,6 +50129,7 @@ var init_src2 = __esm({
     init_overlay();
     init_render_frame();
     init_analyze();
+    init_speech();
     init_paths2();
     init_storage();
     init_media2();
@@ -49777,14 +50229,14 @@ var init_upload = __esm({
 import { createHash as createHash2 } from "node:crypto";
 import { createWriteStream as createWriteStream2 } from "node:fs";
 import { mkdir as mkdir6, readFile as readFile7, realpath, rename as rename5, rm as rm5, stat as stat10 } from "node:fs/promises";
-import path17 from "node:path";
+import path18 from "node:path";
 import { Readable as Readable2 } from "node:stream";
 import { pipeline as pipeline2 } from "node:stream/promises";
 function linksPath(config2) {
-  return path17.join(config2.configDir, "cloud-links.json");
+  return path18.join(config2.configDir, "cloud-links.json");
 }
 async function linkKey(config2, projectFile) {
-  const real3 = await realpath(projectFile).catch(() => path17.resolve(projectFile));
+  const real3 = await realpath(projectFile).catch(() => path18.resolve(projectFile));
   return `${config2.cloudUrl}|${real3}`;
 }
 async function readLinks(config2) {
@@ -49840,7 +50292,7 @@ async function localProjectState(config2, projectFile, projectId) {
   return { kind: "same", unsynced };
 }
 function contentTypeFor(file3) {
-  return CONTENT_TYPES[path17.extname(file3).slice(1).toLowerCase()] ?? "application/octet-stream";
+  return CONTENT_TYPES[path18.extname(file3).slice(1).toLowerCase()] ?? "application/octet-stream";
 }
 function cloudRef(file3, m) {
   const previous = file3.cloud && typeof file3.cloud === "object" ? file3.cloud : {};
@@ -49853,7 +50305,7 @@ function reusableHash(file3, size, mtime) {
   return c.sha256;
 }
 function uniqueName(name, taken) {
-  const ext = path17.extname(name);
+  const ext = path18.extname(name);
   const stem4 = ext ? name.slice(0, -ext.length) : name;
   let candidate = name;
   for (let n = 2; taken.has(candidate.toLowerCase()); n += 1) candidate = `${stem4} (${n})${ext}`;
@@ -49871,9 +50323,9 @@ function cloudProjectJson(project, media, warn) {
     if (!value || isPortableAssetPath(value) || /^https?:\/\//i.test(value)) return value;
     const hit = byPath.get(value);
     if (hit) return hit.cloudName;
-    if (path17.isAbsolute(value)) {
+    if (path18.isAbsolute(value)) {
       unmapped.add(value);
-      return path17.basename(value);
+      return path18.basename(value);
     }
     return value;
   });
@@ -49882,7 +50334,7 @@ function cloudProjectJson(project, media, warn) {
     if (m) file3.cloud = cloudRef(file3, { ...m, name: m.cloudName });
   }
   for (const value of unmapped) {
-    if (!/[\\/]thumbnail[\\/]/.test(value)) warn?.(`${path17.basename(value)} is referenced by the project but is not a project file; it was not uploaded.`);
+    if (!/[\\/]thumbnail[\\/]/.test(value)) warn?.(`${path18.basename(value)} is referenced by the project but is not a project file; it was not uploaded.`);
   }
   const { [CLOUD_MARKER_KEY]: _marker, ...upload } = mapped;
   return upload;
@@ -49897,7 +50349,7 @@ async function pushProject(options) {
   let done = 0;
   for (const file3 of candidates) {
     const local = String(file3.path);
-    options.onProgress?.({ phase: "hashing", file: path17.basename(local), done, total: candidates.length });
+    options.onProgress?.({ phase: "hashing", file: path18.basename(local), done, total: candidates.length });
     let size;
     let mtime;
     try {
@@ -49913,11 +50365,11 @@ async function pushProject(options) {
     const contentType2 = contentTypeFor(local);
     if (contentType2 === "application/octet-stream") {
       skipped.push(local);
-      warn(`${path17.basename(local)} is not a media type Zenvi Cloud stores; skipped.`);
+      warn(`${path18.basename(local)} is not a media type Zenvi Cloud stores; skipped.`);
       continue;
     }
     const sha256 = reusableHash(file3, size, mtime) ?? await sha256File(local);
-    const displayName2 = typeof file3.name === "string" && file3.name && path17.extname(file3.name) ? file3.name : path17.basename(local);
+    const displayName2 = typeof file3.name === "string" && file3.name && path18.extname(file3.name) ? file3.name : path18.basename(local);
     media.push({ file: file3, local, sha256, size, mtime, contentType: contentType2, cloudName: uniqueName(displayName2, taken) });
     done += 1;
   }
@@ -49938,7 +50390,7 @@ async function pushProject(options) {
   }
   options.onProgress?.({ phase: "saving", done: 0, total: 1 });
   const body = JSON.parse(serializeProject(cloudProjectJson(project, media, warn)));
-  const name = options.name ?? path17.basename(options.projectFile, path17.extname(options.projectFile));
+  const name = options.name ?? path18.basename(options.projectFile, path18.extname(options.projectFile));
   const link = await getLink(config2, options.projectFile);
   let projectId;
   let revision;
@@ -49992,13 +50444,13 @@ async function pullDestination(options, id, name) {
     throw new CliError(`${projectFile} belongs to ${whose}; pulling ${id} would replace it.`, 1, "Pull into another folder, or use --force to replace it.");
   };
   if (options.dir !== void 0) {
-    const projectFile = path17.join(path17.resolve(options.cwd, options.dir), `${name}.zvn`);
+    const projectFile = path18.join(path18.resolve(options.cwd, options.dir), `${name}.zvn`);
     await check2(projectFile, true);
     return projectFile;
   }
   for (let n = 1; n < 1e3; n += 1) {
-    const dir = path17.resolve(options.cwd, n === 1 ? name : `${name} (${n})`);
-    const projectFile = path17.join(dir, `${name}.zvn`);
+    const dir = path18.resolve(options.cwd, n === 1 ? name : `${name} (${n})`);
+    const projectFile = path18.join(dir, `${name}.zvn`);
     if (await check2(projectFile, false) === "use") return projectFile;
   }
   throw new CliError(`Too many folders named ${name} here; pull into a folder of your choice.`, 2);
@@ -50023,14 +50475,14 @@ async function sameContent(file3, sha256, size) {
 }
 async function download(url2, dest, sha256, doFetch) {
   const response = await doFetch(url2, { signal: AbortSignal.timeout(30 * 6e4) });
-  if (!response.ok || !response.body) throw new CliError(`Download failed (HTTP ${response.status}) for ${path17.basename(dest)}.`);
+  if (!response.ok || !response.body) throw new CliError(`Download failed (HTTP ${response.status}) for ${path18.basename(dest)}.`);
   const tmp = `${dest}.${process.pid}.part`;
   const hash2 = createHash2("sha256");
   const source2 = Readable2.fromWeb(response.body);
   source2.on("data", (chunk2) => hash2.update(chunk2));
   try {
     await pipeline2(source2, createWriteStream2(tmp));
-    if (hash2.digest("hex") !== sha256) throw new CliError(`${path17.basename(dest)} did not match its SHA-256 after download.`);
+    if (hash2.digest("hex") !== sha256) throw new CliError(`${path18.basename(dest)} did not match its SHA-256 after download.`);
     await rename5(tmp, dest);
   } catch (error62) {
     await rm5(tmp, { force: true });
@@ -50044,7 +50496,7 @@ async function pullProject(options) {
   const remote = await client.getProject(id);
   const name = safeFileName(remote.name || id);
   const projectFile = await pullDestination(options, id, name);
-  const mediaDir = path17.join(projectAssetsDir(projectFile), "media");
+  const mediaDir = path18.join(projectAssetsDir(projectFile), "media");
   await mkdir6(mediaDir, { recursive: true });
   const project = remote.project;
   const byFile = new Map(remote.media.map((m) => [m.fileId, m]));
@@ -50057,7 +50509,7 @@ async function pullProject(options) {
     const entry = byFile.get(file3.id);
     if (!entry) continue;
     options.onProgress?.({ file: entry.name, done, total: remote.media.length });
-    const dest = path17.join(mediaDir, uniqueName(safeFileName(entry.name || `${file3.id}${path17.extname(String(file3.path ?? ""))}`), taken));
+    const dest = path18.join(mediaDir, uniqueName(safeFileName(entry.name || `${file3.id}${path18.extname(String(file3.path ?? ""))}`), taken));
     if (await sameContent(dest, entry.sha256, entry.size)) reused += 1;
     else {
       await download(entry.url, dest, entry.sha256, options.fetchImpl ?? fetch);
@@ -50145,22 +50597,22 @@ var init_sync = __esm({
 
 // src/project/select.ts
 import { readdir as readdir4 } from "node:fs/promises";
-import path18 from "node:path";
+import path19 from "node:path";
 function isProjectPath(file3) {
-  return PROJECT_EXTENSIONS.includes(path18.extname(file3).toLowerCase());
+  return PROJECT_EXTENSIONS.includes(path19.extname(file3).toLowerCase());
 }
 async function findProject(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const named = options.flag ?? options.env?.ZENVI_PROJECT ?? process.env.ZENVI_PROJECT;
-  if (named?.trim()) return path18.resolve(cwd, named.trim());
+  if (named?.trim()) return path19.resolve(cwd, named.trim());
   let names2;
   try {
     names2 = await readdir4(cwd);
   } catch {
     return void 0;
   }
-  const candidates = names2.filter((n) => path18.extname(n).toLowerCase() === ".zvn" && !n.startsWith(".")).sort();
-  if (candidates.length === 1) return path18.join(cwd, candidates[0]);
+  const candidates = names2.filter((n) => path19.extname(n).toLowerCase() === ".zvn" && !n.startsWith(".")).sort();
+  if (candidates.length === 1) return path19.join(cwd, candidates[0]);
   if (candidates.length > 1) {
     throw new CliError(
       `This folder has ${candidates.length} projects (${candidates.slice(0, 4).join(", ")}${candidates.length > 4 ? ", \u2026" : ""}).`,
@@ -50188,7 +50640,7 @@ var init_select = __esm({
 
 // src/desktop/discovery.ts
 import { readFile as readFile8, realpath as realpath2 } from "node:fs/promises";
-import path19 from "node:path";
+import path20 from "node:path";
 function pidAlive2(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
@@ -50215,7 +50667,7 @@ async function readToken(file3) {
   }
 }
 async function fromFile(config2, name, kind, options) {
-  const file3 = path19.join(config2.desktopDir, name);
+  const file3 = path20.join(config2.desktopDir, name);
   let data;
   try {
     data = JSON.parse(await readFile8(file3, "utf8"));
@@ -50224,7 +50676,7 @@ async function fromFile(config2, name, kind, options) {
   }
   const pid = Number(data.pid);
   if (typeof data.url !== "string" || !isLoopbackUrl(data.url) || !pidAlive2(pid)) return void 0;
-  const tokenFile = typeof data.token_file === "string" && data.token_file ? path19.isAbsolute(data.token_file) ? data.token_file : path19.join(config2.desktopDir, data.token_file) : path19.join(config2.desktopDir, "mcp_token");
+  const tokenFile = typeof data.token_file === "string" && data.token_file ? path20.isAbsolute(data.token_file) ? data.token_file : path20.join(config2.desktopDir, data.token_file) : path20.join(config2.desktopDir, "mcp_token");
   const token = await readToken(tokenFile);
   if (!token) return void 0;
   if (options.verify !== false && !await probeEndpoint(data.url, token, options)) return void 0;
@@ -50278,7 +50730,7 @@ async function probeEndpoint(url2, token, options = {}) {
 }
 async function desktopProcessAlive(config2, kind = "gui") {
   try {
-    const data = JSON.parse(await readFile8(path19.join(config2.desktopDir, `${kind}_mcp.json`), "utf8"));
+    const data = JSON.parse(await readFile8(path20.join(config2.desktopDir, `${kind}_mcp.json`), "utf8"));
     return pidAlive2(Number(data.pid));
   } catch {
     return false;
@@ -50294,7 +50746,7 @@ async function discoverDesktop(config2, options = {}) {
     if (endpoint) found.push(endpoint);
   }
   if (found.length === 0 && options.legacy) {
-    const tokenFile = path19.join(config2.desktopDir, "mcp_token");
+    const tokenFile = path20.join(config2.desktopDir, "mcp_token");
     const token = await readToken(tokenFile);
     if (token && await probeLegacy(token, options)) {
       found.push({ kind: "legacy", url: LEGACY_URL, token, source: tokenFile });
@@ -50303,7 +50755,7 @@ async function discoverDesktop(config2, options = {}) {
   return found;
 }
 async function canonical(file3) {
-  const abs = path19.resolve(file3);
+  const abs = path20.resolve(file3);
   try {
     return await realpath2(abs);
   } catch {
@@ -50417,7 +50869,7 @@ function fromHandlerText(tool, text4, mutated) {
   if (!mutated && UNCHANGED_PHRASES.some((p) => lower.includes(p))) return unchanged(tool, raw);
   return applied(tool, raw, {}, mutated ? 1 : 0);
 }
-function isRecord21(value) {
+function isRecord22(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function parseReceipt(text4) {
@@ -50427,7 +50879,7 @@ function parseReceipt(text4) {
   } catch {
     return null;
   }
-  if (!isRecord21(payload) || payload.contract !== CONTRACT_VERSION) return null;
+  if (!isRecord22(payload) || payload.contract !== CONTRACT_VERSION) return null;
   if (!("status" in payload) || !("summary" in payload)) return null;
   return payload;
 }
@@ -55523,23 +55975,6 @@ var init_pending = __esm({
       "zenvi_api_request"
     ]);
     PENDING_DESKTOP_ARGS = {
-      add_captions_tool: [
-        "background_color",
-        "background_opacity",
-        "clip_query",
-        "cues",
-        "fade_seconds",
-        "font",
-        "overlay_track",
-        "position",
-        "stroke_color",
-        "stroke_width",
-        "style",
-        "text_color",
-        "text_size",
-        "time_base",
-        "uppercase"
-      ],
       add_effect_tool: ["processing", "properties", "scope", "timeline_clip_ids"],
       add_title_tool: [
         "background_color",
@@ -55591,7 +56026,7 @@ var init_pending = __esm({
 });
 
 // ../engine/src/tools/ai-metadata.ts
-function isRecord22(value) {
+function isRecord23(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function pyNum(value, fallback = 0) {
@@ -55608,13 +56043,13 @@ function list(value) {
   return Array.isArray(value) ? value : [];
 }
 function records2(value) {
-  return list(value).filter(isRecord22);
+  return list(value).filter(isRecord23);
 }
 function getSourceWindow(clipData, fileData) {
-  const data = isRecord22(clipData) ? clipData : {};
+  const data = isRecord23(clipData) ? clipData : {};
   let start = pyNum(data.start);
   let end = pyNum(data.end);
-  if (end <= start + SCENE_EPS && isRecord22(fileData)) {
+  if (end <= start + SCENE_EPS && isRecord23(fileData)) {
     const fileDur = pyNum(fileData.duration);
     if (fileDur > start + SCENE_EPS) {
       end = fileDur;
@@ -55633,10 +56068,10 @@ function getSourceWindow(clipData, fileData) {
   return [start, end];
 }
 function sceneSourceTime(scene, metadata) {
-  if (!isRecord22(scene)) return 0;
+  if (!isRecord23(scene)) return 0;
   if (scene.source_time !== void 0 && scene.source_time !== null) return pyNum(scene.source_time);
   const t = pyNum(scene.time);
-  if (isRecord22(metadata) && isRecord22(metadata.source_window)) {
+  if (isRecord23(metadata) && isRecord23(metadata.source_window)) {
     const ws = pyNum(metadata.source_window.start);
     const we = pyNum(metadata.source_window.end);
     const span2 = Math.max(0, we - ws);
@@ -55662,7 +56097,7 @@ function filterScenesInWindow(scenes, startTime, endTime, rebased, metadata, exc
   return out.sort((a, b) => pyNum(a.source_time) - pyNum(b.source_time));
 }
 function filterTagsForWindow(tags, windowScenes) {
-  if (!isRecord22(tags)) return { objects: [], scenes: [], activities: [], mood: [], quality: {} };
+  if (!isRecord23(tags)) return { objects: [], scenes: [], activities: [], mood: [], quality: {} };
   const corpus = windowScenes.map((s) => String(s.description ?? "").toLowerCase()).join(" ");
   const filtered = {};
   for (const key of ["objects", "scenes", "activities", "mood"]) {
@@ -55680,7 +56115,7 @@ function filterTagsForWindow(tags, windowScenes) {
     }
     filtered[key] = kept;
   }
-  filtered.quality = isRecord22(tags.quality) ? tags.quality : {};
+  filtered.quality = isRecord23(tags.quality) ? tags.quality : {};
   return filtered;
 }
 function filterTimedItems(items, sourceStart, sourceEnd, rebased = true) {
@@ -55707,9 +56142,9 @@ function clone3(value) {
 }
 function materializeClipAiMetadata(rootAi, sourceStart, sourceEnd, options = {}) {
   const rebased = options.rebased ?? true;
-  if (!isRecord22(rootAi) || !rootAi.analyzed) return {};
+  if (!isRecord23(rootAi) || !rootAi.analyzed) return {};
   const scenes = filterScenesInWindow(rootAi.scene_descriptions, sourceStart, sourceEnd, rebased, rootAi, options.exclusiveStart ?? false);
-  const tags = filterTagsForWindow(isRecord22(rootAi.tags) ? rootAi.tags : {}, scenes);
+  const tags = filterTagsForWindow(isRecord23(rootAi.tags) ? rootAi.tags : {}, scenes);
   const chapters = [];
   for (const ch of records2(rootAi.chapters)) {
     const c0 = pyNum(ch.start);
@@ -55755,25 +56190,25 @@ function materializeClipAiMetadata(rootAi, sourceStart, sourceEnd, options = {})
   };
 }
 function clipMetadataIsValid(clipAi, sourceStart, sourceEnd) {
-  if (!isRecord22(clipAi) || !clipAi.analyzed) return false;
+  if (!isRecord23(clipAi) || !clipAi.analyzed) return false;
   const sw = clipAi.source_window;
-  if (!isRecord22(sw)) return false;
+  if (!isRecord23(sw)) return false;
   const ws = pyNum(sw.start, -1) || -1;
   const we = pyNum(sw.end, -1) || -1;
   if (Math.abs(ws - sourceStart) > SCENE_EPS || Math.abs(we - sourceEnd) > SCENE_EPS) return false;
   if (!("transcript_cues" in clipAi)) return false;
   const scenes = list(clipAi.scene_descriptions);
   if (scenes.length === 0) return true;
-  return scenes.every((s) => isRecord22(s) && s.source_time !== void 0 && s.source_time !== null);
+  return scenes.every((s) => isRecord23(s) && s.source_time !== void 0 && s.source_time !== null);
 }
 function getEffectiveAiMetadata(fileData, clipData, options = {}) {
   const rebased = options.rebased ?? true;
   const [startTime, endTime] = getSourceWindow(clipData, fileData);
   let rootAi = options.rootAiMetadata;
-  if ((rootAi === void 0 || rootAi === null) && isRecord22(fileData)) rootAi = fileData.ai_metadata;
-  if (!isRecord22(rootAi) || !rootAi.analyzed) return {};
+  if ((rootAi === void 0 || rootAi === null) && isRecord23(fileData)) rootAi = fileData.ai_metadata;
+  if (!isRecord23(rootAi) || !rootAi.analyzed) return {};
   const clipAi = options.clipAiMetadata;
-  if (clipMetadataIsValid(clipAi, startTime, endTime) && isRecord22(clipAi)) {
+  if (clipMetadataIsValid(clipAi, startTime, endTime) && isRecord23(clipAi)) {
     if (!rebased) return clipAi;
     return {
       ...clipAi,
@@ -55788,7 +56223,7 @@ function getEffectiveAiMetadata(fileData, clipData, options = {}) {
   return materializeClipAiMetadata(rootAi, startTime, endTime, { rebased });
 }
 function buildSummaryPreview(effective, maxItems = 5) {
-  if (!isRecord22(effective)) return "";
+  if (!isRecord23(effective)) return "";
   const parts = [];
   const short2 = pyText(effective.short_summary);
   if (short2) parts.push(pySlice(short2, 0, 80));
@@ -55820,7 +56255,7 @@ function buildSummaryPreview(effective, maxItems = 5) {
     }
   }
   if (parts.length === 0) {
-    const tags = isRecord22(effective.tags) ? effective.tags : {};
+    const tags = isRecord23(effective.tags) ? effective.tags : {};
     for (const key of ["objects", "scenes", "activities"]) {
       const values = tags[key];
       if (Array.isArray(values)) {
@@ -55846,28 +56281,28 @@ function filterTagsStringForWindow(tags, effective) {
   return kept.length > 0 ? kept.join(", ") : buildSummaryPreview(effective);
 }
 function fileIsAnalyzed(fileData) {
-  return isRecord22(fileData) && isRecord22(fileData.ai_metadata) && Boolean(fileData.ai_metadata.analyzed);
+  return isRecord23(fileData) && isRecord23(fileData.ai_metadata) && Boolean(fileData.ai_metadata.analyzed);
 }
 function getIndexBlock(aiMetadata) {
-  if (!isRecord22(aiMetadata)) return {};
-  if (isRecord22(aiMetadata.index) && Object.keys(aiMetadata.index).length > 0) return { ...aiMetadata.index };
-  if (isRecord22(aiMetadata.twelvelabs)) return { ...aiMetadata.twelvelabs };
+  if (!isRecord23(aiMetadata)) return {};
+  if (isRecord23(aiMetadata.index) && Object.keys(aiMetadata.index).length > 0) return { ...aiMetadata.index };
+  if (isRecord23(aiMetadata.twelvelabs)) return { ...aiMetadata.twelvelabs };
   return {};
 }
 function isIndexed(meta3) {
-  if (!isRecord22(meta3)) return false;
+  if (!isRecord23(meta3)) return false;
   let block = meta3;
   if ("index" in meta3 || "twelvelabs" in meta3 || "provider" in meta3) {
-    block = isRecord22(meta3.index) && Object.keys(meta3.index).length > 0 ? meta3.index : isRecord22(meta3.twelvelabs) ? meta3.twelvelabs : meta3;
+    block = isRecord23(meta3.index) && Object.keys(meta3.index).length > 0 ? meta3.index : isRecord23(meta3.twelvelabs) ? meta3.twelvelabs : meta3;
   }
-  if (!isRecord22(block)) return false;
+  if (!isRecord23(block)) return false;
   return String(block.status ?? "").toLowerCase() === "ready" && pyText(block.index_id) !== "" && pyText(block.video_id) !== "";
 }
 function tagCorpusSparse(ai) {
   const combined2 = `${pyText(ai.short_summary)} ${pyText(ai.description)} ${pyText(ai.transcript)} ${pyText(ai.sounds)}`.trim();
   const chapters = list(ai.chapters);
   if (Array.from(combined2).length < 40 && chapters.length <= 1) return true;
-  const tags = isRecord22(ai.tags) ? ai.tags : {};
+  const tags = isRecord23(ai.tags) ? ai.tags : {};
   const unique = new Set([...list(tags.objects), ...list(tags.scenes), ...list(tags.activities)].filter(Boolean).map((x) => String(x).toLowerCase()));
   const sceneCount = list(ai.scene_descriptions).length;
   if (unique.size > 0 && unique.size <= 2 && sceneCount <= 2 && Array.from(combined2).length < 40) return true;
@@ -55875,8 +56310,8 @@ function tagCorpusSparse(ai) {
   return false;
 }
 function inferSearchHint(ai, filename = "") {
-  if (!isRecord22(ai)) return "visual_ok";
-  const tl = isRecord22(ai.twelvelabs) ? ai.twelvelabs : {};
+  if (!isRecord23(ai)) return "visual_ok";
+  const tl = isRecord23(ai.twelvelabs) ? ai.twelvelabs : {};
   if (String(tl.status ?? "").toLowerCase() !== "ready") return "visual_ok";
   const desc = `${String(ai.description ?? "")} ${filename.toLowerCase()}`.toLowerCase();
   if (AUDIO_MARKERS.some((m) => desc.includes(m))) return "prefer_audio_and_visual";
@@ -56005,17 +56440,17 @@ var init_tracks2 = __esm({
 });
 
 // ../engine/src/tools/clip-context.ts
-function isRecord23(value) {
+function isRecord24(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function basename2(path38) {
-  const parts = String(path38 ?? "").split(/[\\/]/);
+function basename2(path39) {
+  const parts = String(path39 ?? "").split(/[\\/]/);
   return parts[parts.length - 1] ?? "";
 }
-function normPath(path38) {
+function normPath(path39) {
   const segments2 = [];
-  const absolute = path38.startsWith("/");
-  for (const part of path38.split("/")) {
+  const absolute = path39.startsWith("/");
+  for (const part of path39.split("/")) {
     if (part === "" || part === ".") continue;
     if (part === ".." && segments2.length > 0 && segments2[segments2.length - 1] !== "..") segments2.pop();
     else segments2.push(part);
@@ -56027,24 +56462,24 @@ function findFileData(project, fileId) {
   return (project.files ?? []).find((f3) => String(f3.id) === fileId);
 }
 function resolveParentFileId(project, fileData, fileId = "") {
-  const data = isRecord23(fileData) ? fileData : void 0;
+  const data = isRecord24(fileData) ? fileData : void 0;
   const fid = String(fileId || data?.id || "");
   if (!data) return fid;
   const explicit = String(data.parent_file_id ?? "").trim();
   if (explicit) return explicit;
   if (!data.zenvi_subclip) return fid || String(data.id ?? "");
-  const path38 = String(data.path ?? "");
-  if (path38 && fid) {
+  const path39 = String(data.path ?? "");
+  if (path39 && fid) {
     for (const candidate of project.files ?? []) {
       if (candidate.zenvi_subclip) continue;
       const candPath = String(candidate.path ?? "");
-      if (candPath && normPath(candPath) === normPath(path38)) return String(candidate.id ?? "");
+      if (candPath && normPath(candPath) === normPath(path39)) return String(candidate.id ?? "");
     }
   }
   return fid || String(data.id ?? "");
 }
 function resolveParentFileData(project, fileData, fileId = "") {
-  const data = isRecord23(fileData) ? fileData : void 0;
+  const data = isRecord24(fileData) ? fileData : void 0;
   const fid = String(fileId || data?.id || "");
   const parentId = resolveParentFileId(project, fileData, fid);
   if (!parentId || parentId === fid) return data;
@@ -56052,9 +56487,9 @@ function resolveParentFileData(project, fileData, fileId = "") {
 }
 function resolveRootAiMetadata(project, fileData, fileId = "") {
   const parent = resolveParentFileData(project, fileData, fileId);
-  if (!isRecord23(parent)) return [void 0, void 0];
+  if (!isRecord24(parent)) return [void 0, void 0];
   const rootAi = parent.ai_metadata;
-  if (isRecord23(rootAi) && rootAi.analyzed) return [rootAi, parent];
+  if (isRecord24(rootAi) && rootAi.analyzed) return [rootAi, parent];
   return [void 0, parent];
 }
 function buildTimelineClipContext(project, clip2, fileData, options = {}) {
@@ -56066,27 +56501,27 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
   const [sourceStart, sourceEnd] = getSourceWindow(clipData, fileData);
   const timelinePosition = pyNum(clipData.position);
   const timelineDuration2 = Math.max(0.01, sourceEnd - sourceStart);
-  const clipAi = isRecord23(clipData.ai_metadata) ? clipData.ai_metadata : void 0;
+  const clipAi = isRecord24(clipData.ai_metadata) ? clipData.ai_metadata : void 0;
   const effective = getEffectiveAiMetadata(parentData && Object.keys(parentData).length > 0 ? parentData : fileData, clipData, {
     clipAiMetadata: clipAi,
     rootAiMetadata: rootAi,
     rebased: true
   });
-  const file3 = isRecord23(fileData) ? fileData : void 0;
-  const path38 = file3 ? String(file3.path ?? "") : "";
+  const file3 = isRecord24(fileData) ? fileData : void 0;
+  const path39 = file3 ? String(file3.path ?? "") : "";
   const rawLayer = clipData.layer;
   const layerNum = rawLayer === null || rawLayer === void 0 || rawLayer === "" ? null : Math.trunc(Number(rawLayer));
   const layer2 = layerNum !== null && Number.isFinite(layerNum) ? layerNum : null;
   const uiTrack2 = layer2 !== null ? layerNumberToDisplayIndex(layer2, options.layers ?? []) : null;
-  const fileName2 = String(file3?.name || basename2(path38) || "").trim();
+  const fileName2 = String(file3?.name || basename2(path39) || "").trim();
   const title = String(clipData.title || clipData.label || fileName2 || "Clip").trim();
   let tlMeta = getIndexBlock(parentData ?? {});
   if (Object.keys(tlMeta).length === 0) tlMeta = getIndexBlock(file3 ?? {});
-  if (Object.keys(tlMeta).length === 0 && isRecord23(parentData)) tlMeta = getIndexBlock(parentData.ai_metadata ?? {});
+  if (Object.keys(tlMeta).length === 0 && isRecord24(parentData)) tlMeta = getIndexBlock(parentData.ai_metadata ?? {});
   if (Object.keys(tlMeta).length === 0 && file3) tlMeta = getIndexBlock(file3.ai_metadata ?? {});
   if (Object.keys(tlMeta).length === 0) {
     const raw = (parentData ?? {}).twelvelabs ?? file3?.twelvelabs;
-    if (isRecord23(raw)) tlMeta = raw;
+    if (isRecord24(raw)) tlMeta = raw;
   }
   let indexStatus = String(tlMeta.status ?? "");
   if (isIndexed(tlMeta)) indexStatus = "ready";
@@ -56094,7 +56529,7 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
     timelineClipId: String(clip2.id ?? clipData.id ?? ""),
     fileId: fid,
     parentFileId: parentId,
-    sourcePath: path38,
+    sourcePath: path39,
     sourceStart,
     sourceEnd,
     timelinePosition,
@@ -56128,7 +56563,7 @@ var init_clip_context = __esm({
 });
 
 // ../engine/src/tools/reports.ts
-function isRecord24(value) {
+function isRecord25(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function fnum(value) {
@@ -56148,7 +56583,7 @@ function fileName(file3) {
 }
 function projectInfoText(project) {
   const profile = project.profile || "unknown";
-  const fps = isRecord24(project.fps) ? project.fps : {};
+  const fps = isRecord25(project.fps) ? project.fps : {};
   const num12 = fps.num ?? "";
   const den2 = fps.den ?? 1;
   const duration3 = project.duration || 0;
@@ -56163,7 +56598,7 @@ function visibleFiles(project) {
 }
 function mediaBinFields(file3) {
   const data = file3;
-  const ai = isRecord24(data.ai_metadata) ? data.ai_metadata : {};
+  const ai = isRecord25(data.ai_metadata) ? data.ai_metadata : {};
   return {
     name: fileName(data) || "?",
     dur: pyFixed(fnum(data.duration), 2),
@@ -56465,7 +56900,7 @@ var init_reports = __esm({
 });
 
 // ../engine/src/tools/editor-args.ts
-function isRecord25(value) {
+function isRecord26(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function kindsOf(schema) {
@@ -56492,14 +56927,14 @@ function acceptsEmptyString(schema) {
   const fallback = schema.default;
   return kindsOf(schema).includes("string") && (fallback === void 0 || fallback === null || fallback === "");
 }
-function coerceKind(path38, value, kind, schema) {
+function coerceKind(path39, value, kind, schema) {
   if (kind === "boolean") {
     if (typeof value === "boolean") return value;
     if (typeof value === "number") return value !== 0;
     const s = String(value).trim().toLowerCase();
     if (TRUE.has(s)) return true;
     if (FALSE.has(s)) return false;
-    throw new EditorArgError(`argument '${path38}' must be true or false`);
+    throw new EditorArgError(`argument '${path39}' must be true or false`);
   }
   if (kind === "number" || kind === "integer") {
     let f3;
@@ -56507,14 +56942,14 @@ function coerceKind(path38, value, kind, schema) {
     else if (typeof value === "string") {
       f3 = parsePythonFloat(value.trim().replace(/s+$/, ""));
     } else {
-      throw new EditorArgError(`argument '${path38}' must be a number`);
+      throw new EditorArgError(`argument '${path39}' must be a number`);
     }
-    if (f3 === null) throw new EditorArgError(`argument '${path38}' must be a finite number`);
+    if (f3 === null) throw new EditorArgError(`argument '${path39}' must be a finite number`);
     if (kind === "integer") {
-      if (!Number.isInteger(f3)) throw new EditorArgError(`argument '${path38}' must be a whole number`);
+      if (!Number.isInteger(f3)) throw new EditorArgError(`argument '${path39}' must be a whole number`);
     }
-    if (schema.minimum !== void 0 && f3 < schema.minimum) throw new EditorArgError(`argument '${path38}' is below the minimum`);
-    if (schema.maximum !== void 0 && f3 > schema.maximum) throw new EditorArgError(`argument '${path38}' is above the maximum`);
+    if (schema.minimum !== void 0 && f3 < schema.minimum) throw new EditorArgError(`argument '${path39}' is below the minimum`);
+    if (schema.maximum !== void 0 && f3 > schema.maximum) throw new EditorArgError(`argument '${path39}' is above the maximum`);
     return f3;
   }
   if (kind === "string") {
@@ -56531,7 +56966,7 @@ function coerceKind(path38, value, kind, schema) {
         try {
           parsed = JSON.parse(s);
         } catch {
-          throw new EditorArgError(`argument '${path38}' is not a valid JSON list`);
+          throw new EditorArgError(`argument '${path39}' is not a valid JSON list`);
         }
         list2 = Array.isArray(parsed) ? parsed : [parsed];
       } else {
@@ -56543,7 +56978,7 @@ function coerceKind(path38, value, kind, schema) {
       list2 = [value];
     }
     const items = schema.items;
-    if (items && Object.keys(items).length > 0) return list2.map((v, i) => coerceEditorValue(`${path38}[${i}]`, v, items));
+    if (items && Object.keys(items).length > 0) return list2.map((v, i) => coerceEditorValue(`${path39}[${i}]`, v, items));
     return list2;
   }
   if (kind === "object") {
@@ -56554,30 +56989,30 @@ function coerceKind(path38, value, kind, schema) {
       try {
         obj = JSON.parse(s);
       } catch {
-        throw new EditorArgError(`argument '${path38}' is not a valid JSON object`);
+        throw new EditorArgError(`argument '${path39}' is not a valid JSON object`);
       }
     }
-    if (!isRecord25(obj)) throw new EditorArgError(`argument '${path38}' must be an object`);
+    if (!isRecord26(obj)) throw new EditorArgError(`argument '${path39}' must be an object`);
     const props = schema.properties;
     if (!props || Object.keys(props).length === 0) return obj;
     const out = {};
     for (const [key, v] of Object.entries(obj)) {
       const prop = props[key];
-      if (prop) out[key] = coerceEditorValue(`${path38}.${key}`, v, prop);
-      else if (schema.additionalProperties === false) throw new EditorArgError(`argument '${path38}' has unknown key '${key}'`);
+      if (prop) out[key] = coerceEditorValue(`${path39}.${key}`, v, prop);
+      else if (schema.additionalProperties === false) throw new EditorArgError(`argument '${path39}' has unknown key '${key}'`);
       else out[key] = v;
     }
     for (const key of schema.required ?? []) {
-      if (!(key in out)) throw new EditorArgError(`argument '${path38}' needs key '${key}'`);
+      if (!(key in out)) throw new EditorArgError(`argument '${path39}' needs key '${key}'`);
     }
     return out;
   }
   return value;
 }
-function coerceEditorValue(path38, value, schema) {
+function coerceEditorValue(path39, value, schema) {
   if (value === null || value === void 0) {
     if (acceptsNull(schema)) return null;
-    throw new EditorArgError(`argument '${path38}' must not be null`);
+    throw new EditorArgError(`argument '${path39}' must not be null`);
   }
   if (schema.enum) {
     const choices = schema.enum;
@@ -56591,13 +57026,13 @@ function coerceEditorValue(path38, value, schema) {
       const hit = choices.find((c) => typeof c === "string" && c === String(value));
       if (hit !== void 0) return hit;
     }
-    throw new EditorArgError(`argument '${path38}' is not one of the choices`);
+    throw new EditorArgError(`argument '${path39}' is not one of the choices`);
   }
   const kinds = kindsOf(schema);
   let last;
   for (const kind of kinds) {
     try {
-      return coerceKind(path38, value, kind, schema);
+      return coerceKind(path39, value, kind, schema);
     } catch (error62) {
       if (!(error62 instanceof EditorArgError)) throw error62;
       last = error62;
@@ -56608,7 +57043,7 @@ function coerceEditorValue(path38, value, schema) {
 }
 function coerceEditorArgs(schema, args) {
   if (args === null || args === void 0) return {};
-  if (!isRecord25(args)) return args;
+  if (!isRecord26(args)) return args;
   const out = {};
   for (const [key, value] of Object.entries(args)) {
     if (HIDDEN_PARAMS.has(key)) continue;
@@ -56800,7 +57235,7 @@ function capabilityName(capability) {
 function missingCapabilities(requires, host) {
   return (requires ?? []).filter((cap) => host[cap] === void 0 || host[cap] === null);
 }
-function isRecord26(value) {
+function isRecord27(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function resultFor(receipt2, images) {
@@ -56831,7 +57266,7 @@ function receiptForError(tool, error62, host) {
 }
 async function executeTool(tool, impl, ctx, rawArgs) {
   const name = tool.name;
-  const session = isRecord26(rawArgs) && typeof rawArgs.chat_session_id === "string" && rawArgs.chat_session_id.trim() ? rawArgs.chat_session_id.trim() : "default";
+  const session = isRecord27(rawArgs) && typeof rawArgs.chat_session_id === "string" && rawArgs.chat_session_id.trim() ? rawArgs.chat_session_id.trim() : "default";
   const args = isEditorToolHandler(tool.desktopHandler) ? coerceEditorArgs(tool.inputSchema, rawArgs) : normalizeArgs(tool.inputSchema, rawArgs);
   const parsed = tool.input.safeParse(args);
   if (!parsed.success) {
@@ -58185,14 +58620,14 @@ async function prepareOverlayCarrier(call) {
   const media = call.host.media;
   if (!media?.writeGenerated) toolError("this Zenvi surface cannot store the transparent overlay image a timer or caption overlay needs");
   const name = overlayFileName(w, h);
-  let path38;
+  let path39;
   try {
-    path38 = await media.writeGenerated(name, new TextEncoder().encode(overlaySvgText(w, h)), "image/svg+xml");
+    path39 = await media.writeGenerated(name, new TextEncoder().encode(overlaySvgText(w, h)), "image/svg+xml");
   } catch (error62) {
     return toolError(`could not write the overlay image: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
   try {
-    return { media: { path: path38, info: await media.probe(path38), name } };
+    return { media: { path: path39, info: await media.probe(path39), name } };
   } catch (error62) {
     return toolError(`could not import ${name} into Project Files: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
@@ -58354,14 +58789,14 @@ function projectFileChoices(files) {
 }
 async function writeSvg(call, name, svg) {
   const media = call.host.media;
-  let path38;
+  let path39;
   try {
-    path38 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path39 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return toolError(`could not write the animated title: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
   try {
-    return { path: path38, info: await media.probe(path38), name };
+    return { path: path39, info: await media.probe(path39), name };
   } catch (error62) {
     return toolError(`the animated title could not be imported: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
@@ -58523,6 +58958,9 @@ function silenceRangesFromSpeech(speech, duration3, minPauseSec, padSec = 0.05) 
   if (dur - cursor >= minPauseSec) gaps.push([cursor, dur]);
   return gaps;
 }
+function normalizeWord(value) {
+  return Array.from(String(value ?? "").toLowerCase()).filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("");
+}
 function mergeRanges(ranges, fps) {
   const cleaned = [];
   for (const [a, b] of ranges) {
@@ -58543,6 +58981,31 @@ function mergeRanges(ranges, fps) {
     else out.push([s, e]);
   }
   return out;
+}
+function rangesForWordIndices(words3, indices, fps) {
+  const byIndex = new Map(words3.map((w) => [Math.trunc(Number(w.index)), w]));
+  const ranges = [];
+  for (const raw of indices) {
+    const w = byIndex.get(Math.trunc(Number(raw)));
+    if (!w) continue;
+    const s = Number(w.startSec);
+    const e = Number(w.endSec);
+    if (e > s) ranges.push([s, e]);
+  }
+  return mergeRanges(ranges, fps);
+}
+function indicesForFillerPreset(words3, preset) {
+  const bag = FILLER_PRESETS[preset];
+  if (!bag) return [];
+  return words3.filter((w) => bag.has(normalizeWord(w.text))).map((w) => Math.trunc(Number(w.index)));
+}
+function indicesForMatches(words3, matches3) {
+  const bag = new Set(matches3.map(normalizeWord).filter(Boolean));
+  if (bag.size === 0) return [];
+  return words3.filter((w) => {
+    const token = normalizeWord(w.text);
+    return token !== "" && bag.has(token);
+  }).map((w) => Math.trunc(Number(w.index)));
 }
 function compactFragmentsAfterRemove(position, start, end, removeRanges, fps) {
   const clipStart = snap(start, fps);
@@ -58573,6 +59036,50 @@ function compactFragmentsAfterRemove(position, start, end, removeRanges, fps) {
   }
   return { fragments, removed: Math.max(0, originalDur - keptDur) };
 }
+function clipSpeed(clip2) {
+  const time3 = clip2.time;
+  if (typeof time3 === "number" && time3 > 0) return time3;
+  const speed = Number(clip2.speed);
+  return clip2.speed !== void 0 && clip2.speed !== null && Number.isFinite(speed) && speed > 0 ? speed : 1;
+}
+function timeCurveIsIdentity(curve3, tolerance = 1) {
+  if (curve3 === void 0 || curve3 === null) return true;
+  if (typeof curve3 === "string") return ["TIME_MAP_FORWARD", "none", "", "0"].includes(curve3);
+  if (typeof curve3 === "number") return curve3 === 0 || curve3 === 1;
+  if (typeof curve3 !== "object" || Array.isArray(curve3)) return false;
+  const data = curve3;
+  const points = data.Points ?? data.points ?? [];
+  if (!Array.isArray(points) || points.length === 0) return true;
+  const coords = [];
+  for (const point3 of points) {
+    const co = (typeof point3 === "object" && point3 !== null ? point3.co : void 0) ?? {};
+    const x = Number(co.X ?? co.x ?? 0);
+    const y = Number(co.Y ?? co.y ?? 0);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    coords.push([x, y]);
+  }
+  if (coords.length === 1) {
+    const [x, y] = coords[0];
+    return Math.abs(y - 1) <= 1e-3 || Math.abs(y - x) <= tolerance + 1e-6;
+  }
+  coords.sort((a, b) => a[0] - b[0]);
+  for (let i = 1; i < coords.length; i += 1) if (coords[i][1] + 1e-6 < coords[i - 1][1]) return false;
+  return coords.every(([x, y]) => Math.abs(y - x) <= tolerance + 1e-6);
+}
+function isRetimed(clip2) {
+  return Math.abs(clipSpeed(clip2) - 1) > 1e-9 || !timeCurveIsIdentity(clip2.time, 0);
+}
+function sourceToTimelineSec(sourceSec, position, start, speed = 1) {
+  const rate = speed > 0 ? speed : 1;
+  return position + (sourceSec - start) / rate;
+}
+function timelineSec(word, edge, fps) {
+  const sec = edge === "Start" ? word.timelineStartSec : word.timelineEndSec;
+  if (sec !== void 0 && sec !== null) return Number(sec);
+  const frame = edge === "Start" ? word.startFrame : word.endFrame;
+  if (frame !== void 0 && frame !== null) return toSeconds(Math.trunc(frame), fps);
+  return Number((edge === "Start" ? word.startSec : word.endSec) || 0);
+}
 function phraseWords(words3, fps, options = {}) {
   const maxWords = options.maxWords ?? 8;
   const maxChars = options.maxChars ?? 42;
@@ -58588,8 +59095,8 @@ function phraseWords(words3, fps, options = {}) {
     }
     const first = bucket[0];
     const last = bucket[bucket.length - 1];
-    const startF = first.startFrame !== void 0 && first.startFrame !== null ? Math.trunc(first.startFrame) : toFrame(Number(first.timelineStartSec || first.startSec || 0), fps);
-    let endF = last.endFrame !== void 0 && last.endFrame !== null ? Math.trunc(last.endFrame) : toFrame(Number(last.timelineEndSec || last.endSec || 0), fps);
+    const startF = first.startFrame !== void 0 && first.startFrame !== null ? Math.trunc(first.startFrame) : toFrame(timelineSec(first, "Start", fps), fps);
+    let endF = last.endFrame !== void 0 && last.endFrame !== null ? Math.trunc(last.endFrame) : toFrame(timelineSec(last, "End", fps), fps);
     if (endF <= startF) endF = startF + 1;
     cues.push({
       text: body,
@@ -58609,7 +59116,7 @@ function phraseWords(words3, fps, options = {}) {
       continue;
     }
     const prev = bucket[bucket.length - 1];
-    const gap = (Number(w.startSec) || 0) - (Number(prev.endSec) || 0);
+    const gap = timelineSec(w, "Start", fps) - timelineSec(prev, "End", fps);
     const chars = Array.from(bucket.map((x) => String(x.text ?? "")).join(" ") + " " + t).length;
     if (gap > maxGap || bucket.length >= maxWords || chars > maxChars) {
       flush();
@@ -58649,29 +59156,6 @@ function cuesToVtt(cues, fps) {
   }
   return out.join("\n");
 }
-function parseTs(h, m, s, frac) {
-  const milli = Number.parseInt((frac + "000").slice(0, 3), 10);
-  return Number(h) * 3600 + Number(m) * 60 + Number(s) + milli / 1e3;
-}
-function parseSrtOrVtt(text4, fps) {
-  let body = text4.replace(/^\uFEFF/, "");
-  if (body.trimStart().toUpperCase().startsWith("WEBVTT")) body = body.replace(/^WEBVTT[^\n]*\n/i, "");
-  const cues = [];
-  for (const block of body.trim().split(/\n\s*\n/)) {
-    let lines2 = block.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.trim() !== "");
-    if (lines2.length === 0) continue;
-    if (/^\d+$/.test(lines2[0]) && lines2.length >= 2) lines2 = lines2.slice(1);
-    const m = TIME_RE.exec(lines2[0]);
-    if (!m) continue;
-    const t0 = snap(parseTs(m[1], m[2], m[3], m[4]), fps);
-    let t1 = snap(parseTs(m[5], m[6], m[7], m[8]), fps);
-    if (t1 <= t0) t1 = toSeconds(toFrame(t0, fps) + 1, fps);
-    const caption2 = lines2.slice(1).join(" ").trim();
-    if (!caption2) continue;
-    cues.push({ text: caption2, startSec: t0, endSec: t1, startFrame: toFrame(t0, fps), endFrame: toFrame(t1, fps) });
-  }
-  return cues;
-}
 function wordsToScript(words3) {
   const texts = words3.map((w) => String(w.text ?? "").trim()).filter(Boolean);
   if (texts.length === 0) return "";
@@ -58690,17 +59174,272 @@ function wordsToScript(words3) {
   if (buf.length > 0) parts.push(buf.join(" "));
   return parts.join("\n\n");
 }
-var TIME_RE;
-var init_speech = __esm({
+var FILLER_PRESETS;
+var init_speech2 = __esm({
   "../engine/src/tools/speech.ts"() {
     "use strict";
     init_frame_time();
-    TIME_RE = /(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})/;
+    FILLER_PRESETS = {
+      um_uh: /* @__PURE__ */ new Set(["um", "uh", "umm", "uhh", "uhm"]),
+      english_fillers: /* @__PURE__ */ new Set(["um", "uh", "umm", "uhh", "uhm", "er", "ah", "like", "youknow", "you", "know"])
+    };
+  }
+});
+
+// ../engine/src/tools/transcripts.ts
+function isRecord28(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function timed(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  for (const item of value) {
+    if (!isRecord28(item)) continue;
+    const text4 = String(item.text ?? "").trim();
+    const start = Number(item.startSec ?? item.start);
+    const end = Number(item.endSec ?? item.end);
+    if (text4 && Number.isFinite(start) && Number.isFinite(end) && end >= start) out.push({ text: text4, startSec: start, endSec: end });
+  }
+  return out;
+}
+function mediaSha256(file3) {
+  const candidates = [file3?.cloud?.sha256, file3?.fingerprint?.sha256];
+  return candidates.find((c) => typeof c === "string" && SHA256.test(c));
+}
+function storedTranscript(file3) {
+  const ai = isRecord28(file3?.ai_metadata) ? file3.ai_metadata : void 0;
+  const raw = ai?.[ASR_KEY];
+  if (!isRecord28(raw) || !Array.isArray(raw.words)) return null;
+  const generation = Math.trunc(Number(raw.generation));
+  const record5 = {
+    modelId: String(raw.modelId ?? ""),
+    language: String(raw.language ?? ""),
+    requestLanguage: String(raw.requestLanguage ?? "auto") || "auto",
+    generation: Number.isFinite(generation) && generation > 0 ? generation : 1,
+    transcriptionSource: String(raw.transcriptionSource ?? SERVER_SOURCE) || SERVER_SOURCE,
+    createdAt: Number(raw.createdAt) || 0,
+    words: timed(raw.words),
+    segments: timed(raw.segments)
+  };
+  if (typeof raw.sha256 === "string" && SHA256.test(raw.sha256)) record5.sha256 = raw.sha256;
+  return record5;
+}
+function storeTranscript(doc, fileId, record5) {
+  const file3 = doc.project.files.find((f3) => f3.id === fileId);
+  if (!file3) return;
+  const ai = isRecord28(file3.ai_metadata) ? file3.ai_metadata : {};
+  doc.setUntracked(["files", { id: fileId }], { ...file3, ai_metadata: { ...ai, [ASR_KEY]: record5 } });
+}
+function baseLanguage(value) {
+  return value.split(/[-_]/)[0].toLowerCase();
+}
+function languageMatches(record5, requested) {
+  if (!requested) return true;
+  return [record5.language, record5.requestLanguage].some((l) => l && baseLanguage(l) === requested);
+}
+function wordsFromCues(cues) {
+  const rows = cues.filter(isRecord28).map((c) => ({
+    text: String(c.text ?? "").trim(),
+    start: Number("source_start" in c ? c.source_start : c.start),
+    end: Number("source_end" in c ? c.source_end : c.end)
+  })).filter((c) => c.text && Number.isFinite(c.start) && Number.isFinite(c.end) && c.end > c.start).sort((a, b) => a.start - b.start);
+  const out = [];
+  for (const cue of rows) {
+    const tokens = cue.text.split(/\s+/).filter(Boolean);
+    const weights = tokens.map((t2) => Array.from(t2).length + 1);
+    const total = weights.reduce((a, b) => a + b, 0);
+    let t = cue.start;
+    tokens.forEach((token, i) => {
+      const dur = (cue.end - cue.start) * weights[i] / total;
+      out.push({ text: token, startSec: t, endSec: i === tokens.length - 1 ? cue.end : t + dur });
+      t += dur;
+    });
+  }
+  return out;
+}
+function isWordSource(value) {
+  return "words" in value;
+}
+function fromStored(record5, fresh, warnings = []) {
+  return {
+    words: record5.words,
+    source: record5.transcriptionSource || SERVER_SOURCE,
+    exact: true,
+    generation: record5.generation,
+    modelId: record5.modelId,
+    language: record5.language,
+    fresh,
+    warnings
+  };
+}
+function fromIndex(target, warnings = []) {
+  return {
+    words: wordsFromCues(target.cues),
+    source: INDEX_SOURCE,
+    exact: false,
+    generation: 1,
+    modelId: "",
+    language: "",
+    fresh: false,
+    cues: [...target.cues],
+    warnings
+  };
+}
+function mediaPathOf(file3, clip2) {
+  const reader = isRecord28(clip2?.reader) ? clip2.reader : {};
+  return String(file3?.path || reader.path || "");
+}
+function fileHasAudio(file3) {
+  const type = String(file3.media_type ?? "").toLowerCase();
+  if (type === "image" || type === "image/sequence" || type === "font") return false;
+  return hasAudioStream({}, file3);
+}
+function isTalkingFootage(file3) {
+  return fileHasAudio(file3) && String(file3.media_type ?? "").toLowerCase() !== "audio" && file3.has_video !== false;
+}
+function fileById(project, id) {
+  return project.files.find((f3) => String(f3.id) === id);
+}
+function fileOfClip(project, clip2) {
+  const byId = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
+  if (byId) return byId;
+  const path39 = String((isRecord28(clip2.reader) ? clip2.reader.path : "") ?? "");
+  return path39 ? project.files.find((f3) => f3.path === path39) : void 0;
+}
+function clipTarget(project, clip2) {
+  const file3 = fileOfClip(project, clip2);
+  if (!file3) return void 0;
+  const effective = getEffectiveAiMetadata(file3, clip2, { clipAiMetadata: clip2.ai_metadata });
+  const parent = file3.parent_file_id ? fileById(project, String(file3.parent_file_id)) : void 0;
+  const indexed = Boolean(effective.analyzed) || fileIsAnalyzed(file3) || (parent ? fileIsAnalyzed(parent) : false);
+  return { file: file3, cues: Array.isArray(effective.transcript_cues) ? effective.transcript_cues : [], indexed };
+}
+function fileTarget(file3) {
+  const ai = isRecord28(file3.ai_metadata) ? file3.ai_metadata : {};
+  return { file: file3, cues: Array.isArray(ai.transcript_cues) ? ai.transcript_cues : [], indexed: Boolean(ai.analyzed) };
+}
+function untargetedTranscription(project, clips) {
+  const footage = (clip2) => {
+    const file3 = fileOfClip(project, clip2);
+    return file3 !== void 0 && isTalkingFootage(file3);
+  };
+  const anyFootage = clips.some(footage);
+  return (clip2) => !anyFootage || footage(clip2);
+}
+async function wordsFor(call, target, request) {
+  const { file: file3 } = target;
+  const requested = asrLanguage(request.language);
+  const stored = storedTranscript(file3);
+  const sha = mediaSha256(file3);
+  const sameMedia = stored !== null && (!stored.sha256 || !sha || stored.sha256 === sha);
+  const reusable = stored !== null && sameMedia && languageMatches(stored, requested);
+  const transcribe = request.transcribe ? call.host.audio?.transcribe : void 0;
+  const warnings = [];
+  if (request.force && !transcribe) warnings.push("force ignored: speech recognition is not available on this Zenvi surface");
+  const force = Boolean(request.force && transcribe);
+  if (reusable && !force) return fromStored(stored, false, warnings);
+  if (request.estimatesOk && !force && target.indexed) return fromIndex(target, warnings);
+  if (!fileHasAudio(file3)) return { kind: "no_audio", message: NO_AUDIO_MESSAGE };
+  if (transcribe) {
+    const path39 = mediaPathOf(file3);
+    try {
+      const result2 = await transcribe.call(call.host.audio, path39, { language: requested, prompt: transcriptionPrompt(requested), signal: call.signal });
+      const record5 = {
+        modelId: result2.model,
+        language: result2.language || requested,
+        requestLanguage: requested || "auto",
+        // After the index's words (generation 1), so indices from either never pass for the other.
+        generation: stored ? stored.generation + 1 : target.indexed ? 2 : 1,
+        transcriptionSource: SERVER_SOURCE,
+        createdAt: Math.round(Date.now() / 1e3),
+        ...sha ? { sha256: sha } : {},
+        words: result2.words,
+        segments: result2.segments
+      };
+      storeTranscript(call.doc, file3.id, record5);
+      return fromStored(record5, true, warnings);
+    } catch (error62) {
+      if (call.signal?.aborted) throw error62;
+      const code = isTranscriptionError(error62) ? error62.code : void 0;
+      const message = error62 instanceof Error ? error62.message : String(error62);
+      if (code === "no_audio") return { kind: "no_audio", message: NO_AUDIO_MESSAGE };
+      if (request.estimatesOk && target.indexed) return fromIndex(target, [...warnings, `speech recognition failed (${message}); used the indexed transcript`]);
+      if (code === "unavailable" || code === "sign_in") return { kind: "unavailable", code, message };
+      return { kind: "failed", ...code ? { code } : {}, message: code ? message : `Transcription failed: ${message}` };
+    }
+  }
+  if (reusable) return fromStored(stored, false, warnings);
+  if (request.estimatesOk && target.indexed) return fromIndex(target, warnings);
+  return { kind: "unavailable", message: "speech recognition is not set up on this Zenvi surface" };
+}
+function speechWindowsFromWords(words3, maxGapSec = 0.35) {
+  const windows = [];
+  for (const w of [...words3].sort((a, b) => a.startSec - b.startSec)) {
+    if (!(w.endSec > w.startSec)) continue;
+    const last = windows[windows.length - 1];
+    if (last && w.startSec - last[1] <= maxGapSec) last[1] = Math.max(last[1], w.endSec);
+    else windows.push([w.startSec, w.endSec]);
+  }
+  return windows;
+}
+function wordsForClip(words3, clip2, fps, generation) {
+  const position = Number(clip2.position) || 0;
+  const start = Number(clip2.start) || 0;
+  const end = Number(clip2.end) || start;
+  const speed = clipSpeed(clip2);
+  const out = [];
+  let index = 0;
+  for (const w of words3) {
+    if (w.endSec <= start || w.startSec >= end) continue;
+    const s = Math.max(start, w.startSec);
+    const e = Math.min(end, w.endSec);
+    if (e <= s) continue;
+    const startFrame = toFrame(sourceToTimelineSec(s, position, start, speed), fps);
+    let endFrame = toFrame(sourceToTimelineSec(e, position, start, speed), fps);
+    if (endFrame <= startFrame) endFrame = startFrame + 1;
+    out.push({
+      index,
+      text: w.text,
+      startFrame,
+      endFrame,
+      startSec: s,
+      endSec: e,
+      timelineStartSec: toSeconds(startFrame, fps),
+      timelineEndSec: toSeconds(endFrame, fps),
+      clipId: String(clip2.id),
+      transcriptGeneration: generation
+    });
+    index += 1;
+  }
+  return out;
+}
+function wordsForFile(words3, fps, generation) {
+  return words3.map((w, index) => {
+    const startFrame = toFrame(w.startSec, fps);
+    let endFrame = toFrame(w.endSec, fps);
+    if (endFrame <= startFrame) endFrame = startFrame + 1;
+    return { index, text: w.text, startFrame, endFrame, startSec: w.startSec, endSec: w.endSec, transcriptGeneration: generation };
+  });
+}
+var ASR_KEY, SERVER_SOURCE, INDEX_SOURCE, NO_AUDIO_MESSAGE, SHA256;
+var init_transcripts = __esm({
+  "../engine/src/tools/transcripts.ts"() {
+    "use strict";
+    init_transcription();
+    init_ai_metadata();
+    init_audio_mix();
+    init_frame_time();
+    init_speech2();
+    ASR_KEY = "asr";
+    SERVER_SOURCE = "server";
+    INDEX_SOURCE = "index_cues";
+    NO_AUDIO_MESSAGE = "This video has no audio track, so there's no dialogue to transcribe. Import a clip with spoken audio, or re-record with the microphone / system audio enabled.";
+    SHA256 = /^[0-9a-f]{64}$/;
   }
 });
 
 // ../engine/src/tools/resolve.ts
-function isRecord27(value) {
+function isRecord29(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function optionalFloat(value) {
@@ -58716,21 +59455,21 @@ function tokenize(text4) {
   return (normalizeText(text4).match(/[a-z0-9]+/g) ?? []).filter((t) => t.length > 1);
 }
 function metadataCorpus(ai, maxScenes = 8) {
-  if (!isRecord27(ai)) return "";
+  if (!isRecord29(ai)) return "";
   const parts = [];
   for (const key of ["short_summary", "description", "sounds", "transcript"]) {
     if (ai[key]) parts.push(String(ai[key]));
   }
   for (const ch of (Array.isArray(ai.chapters) ? ai.chapters : []).slice(0, maxScenes)) {
-    if (isRecord27(ch)) {
+    if (isRecord29(ch)) {
       if (ch.title) parts.push(String(ch.title));
       if (ch.summary) parts.push(String(ch.summary));
     }
   }
   for (const sc of (Array.isArray(ai.scene_descriptions) ? ai.scene_descriptions : []).slice(0, maxScenes)) {
-    if (isRecord27(sc) && sc.description) parts.push(String(sc.description));
+    if (isRecord29(sc) && sc.description) parts.push(String(sc.description));
   }
-  const tags = isRecord27(ai.tags) ? ai.tags : {};
+  const tags = isRecord29(ai.tags) ? ai.tags : {};
   for (const key of ["objects", "scenes", "activities", "mood"]) {
     const vals = tags[key];
     if (Array.isArray(vals)) {
@@ -58744,8 +59483,8 @@ function fmtPositionMmss(pos) {
   const s = Math.floor(pos % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-function basenameOf(path38) {
-  const parts = String(path38 ?? "").split(/[\\/]/);
+function basenameOf(path39) {
+  const parts = String(path39 ?? "").split(/[\\/]/);
   return parts[parts.length - 1] ?? "";
 }
 function scoreContextAgainstQuery(ctx, query2, preferPositionNear = 0) {
@@ -58983,13 +59722,13 @@ var init_resolve = __esm({
 });
 
 // ../engine/src/tools/backend.ts
-function isRecord28(value) {
+function isRecord30(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-async function backendRequest(backend, path38, init = {}) {
+async function backendRequest(backend, path39, init = {}) {
   if (!backend) return { ok: false, error: "The Zenvi backend is not available on this surface (sign in to Zenvi)." };
   try {
-    const data = await backend.request(path38, init);
+    const data = await backend.request(path39, init);
     return { ok: true, data };
   } catch (error62) {
     return { ok: false, error: error62 instanceof Error ? error62.message : String(error62) };
@@ -59011,7 +59750,7 @@ async function searchIndex(call, text4, options = {}) {
   if (options.lookFor) body.look_for = options.lookFor;
   const res = await backendRequest(call.host.backend, "/api/v1/search", { method: "POST", body, signal: call.signal });
   if (!res.ok) return { results: [], error: res.error };
-  const results = Array.isArray(res.data.results) ? res.data.results.filter(isRecord28) : [];
+  const results = Array.isArray(res.data.results) ? res.data.results.filter(isRecord30) : [];
   const error62 = typeof res.data.error === "string" && res.data.error ? res.data.error : void 0;
   return error62 ? { results, error: error62 } : { results };
 }
@@ -59025,14 +59764,14 @@ async function projectCatalog(call, projectId) {
     signal: call.signal
   });
   if (!res.ok) return { items: [], error: res.error };
-  const items = Array.isArray(res.data.items) ? res.data.items.filter(isRecord28) : [];
+  const items = Array.isArray(res.data.items) ? res.data.items.filter(isRecord30) : [];
   const error62 = typeof res.data.error === "string" && res.data.error ? res.data.error : void 0;
   return error62 ? { items, error: error62 } : { items };
 }
 async function watchWindowRequest(call, payload) {
   const res = await backendRequest(call.host.backend, "/api/v1/indexing/watch-window", { method: "POST", body: payload, signal: call.signal });
   if (!res.ok) return { error: res.error };
-  return isRecord28(res.data) ? res.data : { error: "bad watch-window response" };
+  return isRecord30(res.data) ? res.data : { error: "bad watch-window response" };
 }
 async function summarizeIndexedVideo(call, input3) {
   const body = {
@@ -59043,7 +59782,7 @@ async function summarizeIndexedVideo(call, input3) {
   };
   const res = await backendRequest(call.host.backend, "/api/v1/indexing/summarize", { method: "POST", body, signal: call.signal });
   if (!res.ok) return { ok: false, error: res.error };
-  const meta3 = isRecord28(res.data.ai_metadata) ? res.data.ai_metadata : void 0;
+  const meta3 = isRecord30(res.data.ai_metadata) ? res.data.ai_metadata : void 0;
   if (meta3 && (meta3.analyzed || res.data.success)) return { ok: true, aiMetadata: meta3 };
   return { ok: false, error: String(res.data.error || meta3?.error || "Summarize did not complete") };
 }
@@ -59071,7 +59810,7 @@ async function searchPexelsVideos(call, search, perPage) {
   const res = await backendRequest(call.host.backend, `/api/v1/pexels/search${query({ query: search, per_page: perPage, page: 1 })}`, { signal: call.signal });
   if (!res.ok) return { error: res.error };
   if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
-  const videos = Array.isArray(res.data.videos) ? res.data.videos.filter(isRecord28) : [];
+  const videos = Array.isArray(res.data.videos) ? res.data.videos.filter(isRecord30) : [];
   return { videos, total: Number(res.data.total_results ?? videos.length) || videos.length };
 }
 async function searchFreesound(call, search, pageSize, minSeconds) {
@@ -59082,11 +59821,11 @@ async function searchFreesound(call, search, pageSize, minSeconds) {
   );
   if (!res.ok) return { error: res.error };
   if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
-  const sounds = Array.isArray(res.data.sounds) ? res.data.sounds.filter(isRecord28) : [];
+  const sounds = Array.isArray(res.data.sounds) ? res.data.sounds.filter(isRecord30) : [];
   return { sounds, total: Number(res.data.count ?? sounds.length) || sounds.length };
 }
 function pickPexelsHdLink(video) {
-  const files = Array.isArray(video.video_files) ? video.video_files.filter(isRecord28) : [];
+  const files = Array.isArray(video.video_files) ? video.video_files.filter(isRecord30) : [];
   const pick2 = files.find((f3) => f3.quality === "hd") ?? files[0];
   return String(pick2?.link || "");
 }
@@ -59113,7 +59852,7 @@ function collectProjectIndex(project) {
   const indexNames = [];
   for (const file3 of project.files ?? []) {
     if (file3.zenvi_subclip) continue;
-    const ai = isRecord28(file3.ai_metadata) ? file3.ai_metadata : {};
+    const ai = isRecord30(file3.ai_metadata) ? file3.ai_metadata : {};
     const block = getIndexBlock(ai);
     if (!isIndexed(block)) continue;
     const videoId = String(block.video_id ?? "").trim();
@@ -59207,7 +59946,7 @@ function indexSearchForResolver(call) {
     if (!indexId) {
       const ids2 = [];
       for (const ctx of contexts) {
-        const tl = isRecord28(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
+        const tl = isRecord30(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
         if (String(tl.status ?? "").toLowerCase() !== "ready") continue;
         const id = String(tl.index_id ?? "").trim();
         if (id) ids2.push(id);
@@ -59219,7 +59958,7 @@ function indexSearchForResolver(call) {
     if (res.error || res.results.length === 0) return [];
     const byVideo = /* @__PURE__ */ new Map();
     for (const ctx of contexts) {
-      const tl = isRecord28(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
+      const tl = isRecord30(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
       if (String(tl.status ?? "").toLowerCase() !== "ready") continue;
       const vid = String(tl.video_id ?? "").trim();
       if (vid) byVideo.set(vid, [...byVideo.get(vid) ?? [], ctx]);
@@ -59258,7 +59997,7 @@ var init_backend2 = __esm({
 });
 
 // ../engine/src/tools/catalog/common.ts
-function isRecord29(value) {
+function isRecord31(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function text(value) {
@@ -59336,7 +60075,7 @@ function fmtMmss(seconds2) {
   const rest = Math.floor((s % 60 + 60) % 60);
   return `${m}:${String(rest).padStart(2, "0")}`;
 }
-function fileById(project, id) {
+function fileById2(project, id) {
   return (project.files ?? []).find((f3) => String(f3.id) === id);
 }
 function playheadSeconds(call) {
@@ -59381,7 +60120,7 @@ function forgetFile(call) {
   lastFiles.get(call.doc)?.delete(call.session);
 }
 function record4(value) {
-  return isRecord29(value) ? value : {};
+  return isRecord31(value) ? value : {};
 }
 var MAX_UNDO_STEPS, STEP_WORDS, ORDINALS, lastFiles;
 var init_common = __esm({
@@ -59431,14 +60170,18 @@ function layerOf2(clip2) {
   const n = Math.trunc(Number(clip2.layer || 0));
   return Number.isFinite(n) ? n : 0;
 }
+function transcriptWindows(words3, clip2) {
+  if (words3.length < MIN_SPEECH_WORDS) return [];
+  return speechWindowsFromSource(speechWindowsFromWords(words3), clip2);
+}
 function collectTimelineAudio(project, layerFilter) {
   const entries = [];
   for (const clip2 of project.clips ?? []) {
     const layer2 = layerOf2(clip2);
     if (layerFilter !== void 0 && layer2 !== layerFilter) continue;
-    const file3 = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
+    const file3 = clip2.file_id ? fileById2(project, String(clip2.file_id)) : void 0;
     const effective = getEffectiveAiMetadata(file3, clip2, { clipAiMetadata: clip2.ai_metadata });
-    const role = classifyClipAudioRole(clip2, file3, effective);
+    let role = classifyClipAudioRole(clip2, file3, effective);
     if (role === "silent") continue;
     let windows = speechWindowsFromCues(clip2, effective);
     let windowSource = windows.length > 0 ? "cues" : "";
@@ -59446,6 +60189,12 @@ function collectTimelineAudio(project, layerFilter) {
       const refined = refineWindowsWithEnergy(windows, clip2);
       if (JSON.stringify(refined) !== JSON.stringify(windows)) windowSource = "cues+energy";
       windows = refined;
+    } else if (role === "unknown") {
+      windows = transcriptWindows(storedTranscript(file3)?.words ?? [], clip2);
+      if (windows.length > 0) {
+        role = "speech";
+        windowSource = "transcript";
+      }
     }
     const [start, end] = clipTimelineExtent(clip2);
     entries.push({
@@ -59501,13 +60250,13 @@ function writeVolumePoints(tx, clipId2, points) {
 }
 async function vadWindows(call, entry) {
   const audio = call.host.audio;
-  const path38 = String(entry.clip.reader?.path ?? entry.file?.path ?? "");
-  if (!audio || !path38) return [];
+  const path39 = String(entry.clip.reader?.path ?? entry.file?.path ?? "");
+  if (!audio || !path39) return [];
   try {
-    const envelope = await audio.analyzeAudio(path38, { signal: call.signal });
+    const envelope = await audio.analyzeAudio(path39, { signal: call.signal });
     return speechWindowsFromSource(energyVadWindows(envelope, { minSpeechSec: 0.12, minSilenceSec: 0.35 }), entry.clip);
   } catch (error62) {
-    call.host.log?.(`analyzeAudio(${path38}) failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
+    call.host.log?.(`analyzeAudio(${path39}) failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
     return [];
   }
 }
@@ -59518,7 +60267,30 @@ async function fallbackSpeechWindows(call, entry) {
   if (energy.length > 0) return [energy, "energy"];
   return [[], "none"];
 }
-var ADJUST, audioTools;
+async function transcribedSpeech(call, entries) {
+  if (!call.host.audio?.transcribe) return [];
+  const project = call.doc.project;
+  const pays = untargetedTranscription(project, entries.map((e) => e.clip));
+  const speech = [];
+  for (const entry of entries) {
+    if (entry.windows.length > 0 || entry.role !== "unknown" || !pays(entry.clip)) continue;
+    const target = clipTarget(call.doc.project, entry.clip);
+    if (!target) continue;
+    const got = await wordsFor(call, target, { estimatesOk: true, transcribe: true });
+    if (!isWordSource(got)) {
+      call.host.log?.(`duck_under_speech: no transcript for ${entry.id}: ${got.message}`);
+      continue;
+    }
+    const windows = transcriptWindows(got.words, entry.clip);
+    if (windows.length === 0) continue;
+    entry.windows = windows;
+    entry.windowSource = "transcript";
+    entry.role = "speech";
+    speech.push(entry);
+  }
+  return speech;
+}
+var MIN_SPEECH_WORDS, ADJUST, audioTools;
 var init_audio3 = __esm({
   "../engine/src/tools/catalog/audio.ts"() {
     "use strict";
@@ -59527,9 +60299,11 @@ var init_audio3 = __esm({
     init_audio_mix();
     init_define();
     init_pyfmt();
-    init_speech();
+    init_speech2();
+    init_transcripts();
     init_tracks2();
     init_common();
+    MIN_SPEECH_WORDS = 3;
     ADJUST = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     audioTools = [
       contractTool("analyze_timeline_audio_tool", {
@@ -59604,7 +60378,7 @@ var init_audio3 = __esm({
           const trackLabel = formatTrackLabelForLlm(layer2, project.layers);
           const locked = lockedTrackError(layer2, project.layers);
           if (locked) return locked;
-          const file3 = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
+          const file3 = clip2.file_id ? fileById2(project, String(clip2.file_id)) : void 0;
           if (!hasAudioStream(clip2, file3)) return `Error: timeline clip ${String(clip2.id)} has no audio stream.`;
           const before = currentStaticLevel(clip2);
           const startS = floatArg(input3.start_seconds, null);
@@ -59667,6 +60441,7 @@ var init_audio3 = __esm({
             }
           } else {
             speech = entries.filter((e) => e.role === "speech" && e.windows.length > 0);
+            if (speech.length === 0) speech = await transcribedSpeech(call, entries);
             if (speech.length === 0) {
               for (const entry of entries) {
                 if (entry.windows.length > 0) continue;
@@ -59840,7 +60615,129 @@ function buildCaptionText(cues) {
 ${cue.text}`);
   return blocks.join("\n\n") + (blocks.length > 0 ? "\n\n" : "");
 }
-var ZERO_WIDTH, RATIO_COLON, CAPTION_RE, TIME_IN_TEXT;
+function unescapeHtml(text4) {
+  return text4.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, name) => {
+    if (name[0] === "#") {
+      const code = name[1] === "x" || name[1] === "X" ? Number.parseInt(name.slice(2), 16) : Number.parseInt(name.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 1114111 ? String.fromCodePoint(code) : whole;
+    }
+    return ENTITIES[name.toLowerCase()] ?? whole;
+  });
+}
+function fileSeconds(h, m, s, frac) {
+  return Number(h ?? 0) * 3600 + Number(m) * 60 + Number(s) + Number(frac.padEnd(3, "0").slice(0, 3)) / 1e3;
+}
+function parseSubtitles(text4) {
+  const body = String(text4 ?? "").replace(/^\uFEFF+/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const cues = [];
+  for (const block of body.trim().split(/\n[ \t]*\n/)) {
+    const lines2 = block.split("\n").filter((l) => l.trim()).map((l) => l.trimEnd());
+    if (lines2.length === 0) continue;
+    const head = lines2[0].trim();
+    if (/^(WEBVTT|NOTE|STYLE|REGION)/i.test(head) && !head.includes("-->")) continue;
+    const timingAt = lines2.findIndex((l) => l.includes("-->"));
+    if (timingAt < 0) continue;
+    const m = FILE_TIME.exec(lines2[timingAt]);
+    if (!m) continue;
+    const start = fileSeconds(m[1], m[2], m[3], m[4]);
+    const end = fileSeconds(m[5], m[6], m[7], m[8]);
+    const textLines = lines2.slice(timingAt + 1).map((l) => unescapeHtml(l.replace(TAGS, "")).trim());
+    const caption2 = textLines.filter(Boolean).join("\n");
+    if (caption2 && end > start) cues.push({ start, end, text: caption2 });
+  }
+  return cues;
+}
+function joinedLength(words3) {
+  return Array.from(words3.join(" ")).length;
+}
+function fits(words3, maxWords, maxChars) {
+  return words3.length <= maxWords && joinedLength(words3) <= maxChars;
+}
+function breakSentence(words3, maxWords, maxChars) {
+  const n = words3.length;
+  const best = new Array(n + 1).fill(Number.POSITIVE_INFINITY);
+  const back = new Array(n + 1).fill(0);
+  best[0] = 0;
+  for (let i = 1; i <= n; i += 1) {
+    for (let j = Math.max(0, i - maxWords); j < i; j += 1) {
+      const group = words3.slice(j, i);
+      const length = joinedLength(group);
+      if (length > maxChars && group.length > 1) continue;
+      let cost = 1 + 6 * ((maxChars - length) / maxChars) ** 2;
+      if (i < n && !PUNCT.some((p) => group[group.length - 1].endsWith(p))) cost += 2;
+      if (group.length === 1 && i < n) cost += 3;
+      if (best[j] + cost < best[i]) {
+        best[i] = best[j] + cost;
+        back[i] = j;
+      }
+    }
+  }
+  const groups = [];
+  for (let i = n; i > 0; i = back[i]) groups.push(words3.slice(back[i], i));
+  return groups.reverse();
+}
+function phrases(text4, maxWords, maxChars) {
+  const out = [];
+  for (const sentence2 of text4.trim().split(SENTENCE_END)) {
+    const words3 = sentence2.split(/\s+/).filter(Boolean);
+    if (words3.length === 0) continue;
+    out.push(...fits(words3, maxWords, maxChars) ? [words3] : breakSentence(words3, maxWords, maxChars));
+  }
+  return out;
+}
+function splitCue(cue, maxWords = 8, maxChars = 42) {
+  const mw = Math.max(1, Math.trunc(maxWords));
+  const mc = Math.max(8, Math.trunc(maxChars));
+  const words3 = String(cue.text ?? "").split(/\s+/).filter(Boolean);
+  if (words3.length === 0) return [];
+  if (fits(words3, mw, mc)) return [{ start: cue.start, end: cue.end, text: words3.join(" ") }];
+  const groups = phrases(words3.join(" "), mw, mc);
+  const total = groups.reduce((sum, g) => sum + joinedLength(g) + 1, 0);
+  const span2 = Math.max(0, cue.end - cue.start);
+  const out = [];
+  let t = cue.start;
+  groups.forEach((group, i) => {
+    const text4 = group.join(" ");
+    const end = i === groups.length - 1 ? cue.end : t + span2 * (Array.from(text4).length + 1) / total;
+    out.push({ start: t, end, text: text4 });
+    t = end;
+  });
+  return out;
+}
+function phraseTimedWords(words3, maxWords = 8, maxChars = 42, maxGapSec = 0.8) {
+  const mw = Math.max(1, Math.trunc(maxWords));
+  const mc = Math.max(8, Math.trunc(maxChars));
+  const runs = [];
+  let run3 = [];
+  for (const word of words3) {
+    const text4 = String(word.text ?? "").trim();
+    if (!text4) continue;
+    const prev = run3[run3.length - 1];
+    if (prev && (word.startSec - prev.endSec > maxGapSec || /[.!?…]$/u.test(prev.text))) {
+      runs.push(run3);
+      run3 = [];
+    }
+    run3.push({ text: text4, startSec: word.startSec, endSec: word.endSec });
+  }
+  if (run3.length > 0) runs.push(run3);
+  const cues = [];
+  for (const r of runs) {
+    const texts = r.map((w) => w.text);
+    const sizes3 = fits(texts, mw, mc) ? [texts.length] : breakSentence(texts, mw, mc).map((g) => g.length);
+    let k = 0;
+    for (const size of sizes3) {
+      const group = r.slice(k, k + size);
+      k += size;
+      cues.push({ start: group[0].startSec, end: Math.max(group[0].startSec, group[group.length - 1].endSec), text: texts.slice(k - size, k).join(" ") });
+    }
+  }
+  for (let i = 0; i + 1 < cues.length; i += 1) {
+    const gap = cues[i + 1].start - cues[i].end;
+    if (gap > 0 && gap <= maxGapSec) cues[i].end = cues[i + 1].start;
+  }
+  return cues;
+}
+var ZERO_WIDTH, RATIO_COLON, CAPTION_RE, TIME_IN_TEXT, FILE_TIME, TAGS, ENTITIES, PUNCT, SENTENCE_END;
 var init_caption_cues = __esm({
   "../engine/src/tools/caption-cues.ts"() {
     "use strict";
@@ -59849,6 +60746,30 @@ var init_caption_cues = __esm({
     RATIO_COLON = "\u2236";
     CAPTION_RE = /(\d{2})?:*(\d{2}):(\d{2})[^\n](\d{2,3})\s*-->\s*(\d{2})?:*(\d{2}):(\d{2})[^\n](\d{2,3})([\s\S]*?)([^\n]*?)(?=\d{2}:\d{2,3}|$(?![\s\S]))/gu;
     TIME_IN_TEXT = /(?<=\d\d):(?=\d\d)/g;
+    FILE_TIME = /(?:(\d{1,2}):)?(\d{1,2}):(\d{2})[,.](\d{1,3})\s*-->\s*(?:(\d{1,2}):)?(\d{1,2}):(\d{2})[,.](\d{1,3})/;
+    TAGS = /<[^>]{1,80}>|\{\\[^}]{0,80}\}/g;
+    ENTITIES = {
+      amp: "&",
+      lt: "<",
+      gt: ">",
+      quot: '"',
+      apos: "'",
+      nbsp: " ",
+      hellip: "\u2026",
+      mdash: "\u2014",
+      ndash: "\u2013",
+      lsquo: "\u2018",
+      rsquo: "\u2019",
+      ldquo: "\u201C",
+      rdquo: "\u201D",
+      copy: "\xA9",
+      reg: "\xAE",
+      trade: "\u2122",
+      eacute: "\xE9",
+      egrave: "\xE8"
+    };
+    PUNCT = [",", ";", ":", ".", "!", "?", "\u2026"];
+    SENTENCE_END = /(?<=[.!?…])\s+/u;
   }
 });
 
@@ -60116,10 +61037,75 @@ function sameJson3(a, b) {
 function countOf(text4, find) {
   return text4.split(find).length - 1;
 }
-var CAPTION_ROLE, LOOK_KEYS, captionTools;
+function hasTimeCurve(clip2) {
+  const time3 = clip2.time;
+  const points = typeof time3 === "object" && time3 !== null ? time3.Points : void 0;
+  return Array.isArray(points) && points.length > 1;
+}
+function basename3(path39) {
+  return path39.split(/[\\/]/).pop() || path39;
+}
+async function readSubtitleFile(call, path39) {
+  let raw;
+  try {
+    raw = await call.host.storage.readText(path39);
+  } catch {
+    return toolError(`subtitle file not found: ${path39}`);
+  }
+  if (raw.length > MAX_SUBTITLE_CHARS) toolError("subtitle file is larger than 5 MB");
+  const cues = parseSubtitles(raw);
+  if (cues.length === 0) {
+    toolError(`no cues found in ${basename3(path39)} (expected SRT or WebVTT timings like 00:00:01,000 --> 00:00:03,000)`);
+  }
+  return cues;
+}
+async function resolveTargets(call, clipId2, query2, trackIndex, needClip) {
+  const project = call.doc.project;
+  if (clipId2) {
+    const clip2 = clipById2(project, clipId2);
+    if (!clip2) return toolError(`no timeline clip with id=${pyReprString(clipId2)}`);
+    return [clip2];
+  }
+  if (query2) return [await clipByQuery(call, query2)];
+  if (trackIndex) {
+    const layer2 = buildTrackStack(project.layers)[trackIndex - 1]?.layer_number;
+    if (!layer2) return toolError(`there is no track ${trackIndex} (UI track 1 = bottom)`);
+    const clips = project.clips.filter((c) => Math.trunc(Number(c.layer) || 0) === layer2);
+    if (clips.length === 0) toolError(`track ${trackIndex} has no clips`);
+    return clips.sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+  }
+  if (needClip) {
+    return [...project.clips].sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0) || (Number(a.layer) || 0) - (Number(b.layer) || 0));
+  }
+  return [];
+}
+function indexCues(clip2, cues) {
+  const start = Number(clip2.start) || 0;
+  const out = [];
+  for (const raw of cues) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const c = raw;
+    const text4 = String(c.text ?? "").trim();
+    if (!text4) continue;
+    let s;
+    let e;
+    if (c.source_start !== void 0 && c.source_start !== null) {
+      s = Number(c.source_start);
+      e = c.source_end !== void 0 && c.source_end !== null ? Number(c.source_end) : s;
+    } else {
+      s = (Number(c.start) || 0) + start;
+      e = (Number(c.end) || 0) + start;
+    }
+    if (Number.isFinite(s) && Number.isFinite(e) && e > s) out.push({ start: s, end: e, text: text4 });
+  }
+  return out;
+}
+var CAPTION_ROLE, LOOK_KEYS, MAX_SUBTITLE_CHARS, captionTools;
 var init_captions = __esm({
   "../engine/src/tools/catalog/captions.ts"() {
     "use strict";
+    init_registry();
+    init_ids();
     init_overlays();
     init_define();
     init_pyfmt();
@@ -60127,10 +61113,220 @@ var init_captions = __esm({
     init_caption_cues();
     init_caption_style();
     init_titles_text();
+    init_tracks2();
+    init_transcripts();
     init_common();
     CAPTION_ROLE = "captions";
     LOOK_KEYS = ["text_size", "font", "text_color", "stroke_color", "stroke_width", "background_color", "background_opacity", "position", "fade"];
+    MAX_SUBTITLE_CHARS = 5 * 1024 * 1024;
     captionTools = [
+      contractTool("add_captions_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        run: (call, input3) => guarded("add_captions_tool", async () => {
+          const tool = "add_captions_tool";
+          const clipIdArg = String(input3.clipId ?? "").trim();
+          const timelineArg = String(input3.timeline_clip_id ?? "").trim();
+          if (clipIdArg && timelineArg && clipIdArg !== timelineArg) toolError("clipId and timeline_clip_id name different clips; pass one");
+          const clipId2 = clipIdArg || timelineArg;
+          const given = givenCues(input3.cues, "cues");
+          const srtPath = String(input3.srtPath ?? "").trim();
+          if (given.length > 0 && srtPath) toolError("pass either cues or srtPath, not both");
+          const source2 = given.length > 0 ? "cues" : srtPath ? "file" : "transcript";
+          const trackIndex = Math.trunc(Number(input3.trackIndex ?? 0)) || 0;
+          if (source2 !== "transcript" && trackIndex) {
+            toolError("trackIndex picks clips to caption from their transcript; with cues or srtPath pass timeline_clip_id (or nothing, for an overlay over the timeline)");
+          }
+          if (source2 === "file" && !call.host.storage?.readText) return unavailable(tool, "it cannot read subtitle files on this host.");
+          const fileCues = source2 === "file" ? await readSubtitleFile(call, srtPath) : [];
+          const styleName = input3.style ?? "classic";
+          const style = new CaptionStyle({
+            style: styleName,
+            font: input3.font ?? "",
+            text_size: input3.text_size ?? 0,
+            text_color: input3.text_color ?? "",
+            stroke_color: input3.stroke_color ?? "",
+            stroke_width: input3.stroke_width ?? -1,
+            background_color: input3.background_color ?? "",
+            background_opacity: input3.background_opacity ?? -1,
+            position: input3.position ?? "",
+            fade_seconds: input3.fade_seconds ?? -1
+          });
+          const query2 = String(input3.clip_query ?? "").trim();
+          const timeBase = input3.time_base ?? "auto";
+          const overlayMode = !(clipId2 || query2 || trackIndex) && source2 !== "transcript";
+          if (overlayMode && timeBase === "source") toolError("time_base='source' needs the clip whose media the times refer to");
+          const overlayTrack = String(input3.overlay_track ?? "");
+          const targets = await resolveTargets(call, clipId2, query2, trackIndex, source2 === "transcript");
+          const raw = source2 === "file" ? fileCues : given;
+          if (overlayMode) {
+            planOverlayTrack(call.doc.project, Math.min(...raw.map((q) => q.start)), Math.max(...raw.map((q) => q.end)), overlayTrack);
+          }
+          style.resolveFont();
+          const warnings = [];
+          const plans = [];
+          const sources = /* @__PURE__ */ new Set();
+          if (source2 === "transcript") {
+            if (timeBase === "timeline") toolError("transcript captions are always in the clip's media time; drop time_base");
+            const project2 = call.doc.project;
+            for (const c of targets) {
+              if (isLocked(project2, c.layer)) toolError(`clip ${c.id} is on locked track ${uiTrackNumber(project2, c.layer)}; unlock it first`);
+            }
+            const pays = clipId2 || query2 || trackIndex ? () => true : untargetedTranscription(project2, targets);
+            const failures = [];
+            let silent = 0;
+            for (const c of targets) {
+              const target = clipTarget(call.doc.project, c);
+              if (!target || !mediaPathOf(target.file, c)) continue;
+              const paid = pays(c);
+              const got = await wordsFor(call, target, { language: input3.language, estimatesOk: true, transcribe: paid });
+              if (!isWordSource(got)) {
+                if (got.kind === "unavailable" && !paid) {
+                  warnings.push(`clip ${c.id} (${clipLabel(c)}) is audio only and was not transcribed; pass timeline_clip_id=${c.id} to caption it`);
+                } else if (got.kind !== "no_audio") failures.push(got);
+                continue;
+              }
+              warnings.push(...got.warnings);
+              const live2 = clipById2(call.doc.project, c.id) ?? c;
+              let cues;
+              if (got.exact) {
+                const [, start, end] = clipWindow(live2);
+                cues = phraseTimedWords(got.words.filter((w) => w.endSec > start && w.startSec < end), input3.maxWords ?? 8, input3.maxChars ?? 42);
+              } else {
+                cues = indexCues(live2, got.cues ?? []).flatMap((cue) => splitCue(cue, input3.maxWords ?? 8, input3.maxChars ?? 42));
+              }
+              if (cues.length === 0) {
+                silent += 1;
+                continue;
+              }
+              sources.add(got.source);
+              plans.push({ clip: live2, cues });
+            }
+            if (plans.length === 0) {
+              const names2 = targets.slice(0, 5).map((c) => `${c.id} (${clipLabel(c)})`).join(", ") || "the timeline has no clips";
+              const blocked = failures.find((f3) => f3.kind === "failed");
+              if (blocked) return failed(tool, `Error: ${blocked.message[0].toUpperCase()}${blocked.message.slice(1).replace(/\.$/, "")}.`);
+              const off = failures.find((f3) => f3.kind === "unavailable");
+              if (off) return unavailable(tool, `${off.message}; ${names2} have no indexed transcript either. Pass cues or srtPath to caption from text you have.`);
+              if (silent > 0) toolError(`no speech was found to caption in ${names2}; pass cues or srtPath instead`);
+              toolError(
+                "no transcript is available to caption from (" + names2 + "). Zenvi fills it when it indexes a file or transcribes the clip; check with get_transcript_tool, or pass cues / srtPath instead"
+              );
+            }
+          } else if (targets.length > 0) {
+            const c = targets[0];
+            const base = timeBase !== "auto" ? timeBase : source2 === "file" ? "source" : "timeline";
+            plans.push({
+              clip: c,
+              cues: raw.map((q) => base === "timeline" ? { start: timelineToCaption(c, q.start), end: timelineToCaption(c, q.end), text: q.text } : { ...q })
+            });
+          } else {
+            plans.push({ clip: null, cues: raw });
+          }
+          const project = call.doc.project;
+          const kept = [];
+          for (const plan of plans) {
+            const c = plan.clip;
+            if (c === null) {
+              kept.push(plan);
+              continue;
+            }
+            if (isLocked(project, c.layer)) toolError(`clip ${c.id} is on locked track ${uiTrackNumber(project, c.layer)}; unlock it first`);
+            const [, start, end] = clipWindow(c);
+            const inside = plan.cues.filter((q) => q.end > start && q.start < end);
+            const dropped = plan.cues.length - inside.length;
+            if (dropped) warnings.push(`${dropped} cue(s) fall outside the visible part of clip ${c.id} and were skipped`);
+            if (inside.length === 0) {
+              toolError(
+                `none of the ${plan.cues.length} cue(s) fall inside clip ${c.id}'s visible range (${pyFixed(captionToTimeline(c, start), 2)}-${pyFixed(captionToTimeline(c, end), 2)}s on the timeline); check time_base`
+              );
+            }
+            if (hasTimeCurve(c)) warnings.push(`clip ${c.id} is retimed; caption times assume normal speed`);
+            kept.push({ clip: c, cues: inside });
+          }
+          const prepared = [];
+          let adjusted = 0;
+          for (const plan of kept) {
+            const [ready2, changed] = prepareCues([...plan.cues].sort((a, b) => a.start - b.start || a.end - b.end), input3.uppercase ?? false);
+            adjusted += changed;
+            if (ready2.length === 0) toolError("the captions have no text left to show");
+            prepared.push({ clip: plan.clip, cues: ready2 });
+          }
+          if (adjusted) warnings.push(`${adjusted} caption(s) were adjusted so libopenshot draws them fully (':' between digits and one-letter lines)`);
+          let carrier;
+          let span2 = [0, 0];
+          if (prepared[0].clip === null) {
+            const ready2 = prepared[0].cues;
+            span2 = [Math.min(...ready2.map((q) => q.start)), Math.max(...ready2.map((q) => q.end))];
+            carrier = await prepareOverlayCarrier(call);
+          }
+          const props = style.properties(call.doc.project, 2);
+          const replaceExisting = input3.replace_existing ?? true;
+          const captioned = call.commit((tx) => {
+            const newId = idFactory(tx.project);
+            const results = [];
+            for (const plan of prepared) {
+              let targetId;
+              let cues;
+              let entry;
+              if (plan.clip === null) {
+                const [spanStart, spanEnd] = span2;
+                const { layer: layer2, created } = planOverlayTrack(tx.project, spanStart, spanEnd, overlayTrack);
+                const file3 = carrierFile(tx, carrier);
+                const overlay = placeOverlayClip(tx, {
+                  fileId: file3.id,
+                  position: spanStart,
+                  duration: spanEnd - spanStart,
+                  layer: layer2,
+                  newTrackLabel: "Captions",
+                  title: "Captions",
+                  props: { zenvi_role: CAPTION_ROLE }
+                });
+                targetId = overlay.id;
+                cues = plan.cues.map((q) => ({ start: q.start - spanStart, end: q.end - spanStart, text: q.text }));
+                entry = { timeline_clip_id: targetId, overlay: true, new_track: created, ...trackInfo(tx.project, layer2) };
+              } else {
+                targetId = plan.clip.id;
+                cues = plan.cues;
+                entry = { timeline_clip_id: targetId, overlay: false, track: uiTrackNumber(tx.project, plan.clip.layer) };
+              }
+              const current = clipById2(tx.project, targetId);
+              const effects = structuredClone(current.effects ?? []);
+              const existing = captionEffects({ effects });
+              let effect3;
+              if (existing.length > 0 && replaceExisting) {
+                effect3 = existing[0];
+                Object.assign(effect3, structuredClone(props), { caption_text: buildCaptionText(cues) });
+                entry.replaced = true;
+              } else {
+                effect3 = { ...defaultEffectJson("Caption", newId()), ...structuredClone(props), caption_text: buildCaptionText(cues) };
+                effects.push(effect3);
+                entry.replaced = false;
+              }
+              const after = replaceClipEffects(tx, targetId, effects);
+              Object.assign(entry, {
+                effect_id: effect3.id,
+                cues: cues.length,
+                first: pyRoundTo(captionToTimeline(after, cues[0].start), 3),
+                last: pyRoundTo(captionToTimeline(after, cues[cues.length - 1].end), 3)
+              });
+              results.push(entry);
+            }
+            return results;
+          });
+          const total = captioned.reduce((n, r) => n + Number(r.cues), 0);
+          const first = captioned[0];
+          const where = first.overlay ? `a Captions overlay on track ${String(first.track)}` : captioned.map((r) => String(r.timeline_clip_id)).join(", ");
+          const from = source2 === "transcript" ? "the transcript" : source2;
+          const data = { source: source2, captioned, style: styleName, look: style.summary() };
+          if (sources.size > 0) data.transcriptionSource = [...sources].join(", ");
+          if (warnings.length > 0) data.warnings = warnings;
+          return applied(tool, summaryLine(`Added ${total} caption(s) from ${from} on ${where}.`), {
+            data,
+            warnings,
+            watchSuggested: { clipId: String(first.timeline_clip_id), start: Number(first.first), end: Math.min(Number(first.last), Number(first.first) + 3) }
+          });
+        })
+      }),
       contractTool("list_captions_tool", {
         annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
         run: (call, input3) => guarded("list_captions_tool", () => {
@@ -60510,7 +61706,7 @@ var init_timeline_edit_common = __esm({
 function norm(text4) {
   return String(text4).trim().toLowerCase().replace(/[\s_\-/()]+/g, "");
 }
-function isRecord30(value) {
+function isRecord32(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function shape2(key) {
@@ -60518,7 +61714,7 @@ function shape2(key) {
 }
 function propertyDefault(key) {
   const value = shape2(key);
-  if (isRecord30(value) && Array.isArray(value.Points)) {
+  if (isRecord32(value) && Array.isArray(value.Points)) {
     const first = curvePoints(value)[0];
     return first ? pointY(first) : 0;
   }
@@ -60571,7 +61767,7 @@ function resolveKey2(name) {
   return key;
 }
 function isCurve2(value) {
-  return isRecord30(value) && (Array.isArray(value.Points) || "red" in value);
+  return isRecord32(value) && (Array.isArray(value.Points) || "red" in value);
 }
 function currentValue(clip2, key) {
   return key in clip2 ? clip2[key] : shape2(key);
@@ -60593,12 +61789,12 @@ function propertyInfo(key, clip2, project) {
   if (override) {
     [lo, hi] = override;
   } else if (SCALE_KEYS.has(key)) {
-    const reader = isRecord30(data.reader) ? data.reader : {};
-    const path38 = String(reader.path ?? "").toLowerCase();
-    const m = maxTransformMultiple(project.width, project.height, path38.endsWith(".svg"));
+    const reader = isRecord32(data.reader) ? data.reader : {};
+    const path39 = String(reader.path ?? "").toLowerCase();
+    const m = maxTransformMultiple(project.width, project.height, path39.endsWith(".svg"));
     [lo, hi] = [-m, m];
   } else if (key === "time") {
-    let frames = videoLengthToProjectFrames(isRecord30(data.reader) ? data.reader : {}, project.fps);
+    let frames = videoLengthToProjectFrames(isRecord32(data.reader) ? data.reader : {}, project.fps);
     if (!frames) frames = pyRound((Number(data.end) || 0) * projectFpsFloat(project)) + 1;
     [lo, hi] = [1, Math.max(1, Math.trunc(frames))];
   }
@@ -60686,7 +61882,7 @@ function coerceParent(value, clipId2, project) {
   const effectId = text4.includes("-") ? text4.slice(0, text4.lastIndexOf("-")) : text4;
   for (const clip2 of project.clips) {
     for (const effect3 of clip2.effects ?? []) {
-      if (isRecord30(effect3) && effect3.id === effectId && effect3.objects) return text4;
+      if (isRecord32(effect3) && effect3.id === effectId && effect3.objects) return text4;
     }
   }
   throw new ToolError(
@@ -60737,8 +61933,8 @@ function valueAt2(info, clip2, frame) {
   const data = clip2;
   const current = currentValue(data, info.key);
   if (info.kind === "color") {
-    const curves = isRecord30(current) ? current : {};
-    const fallbackCurves = isRecord30(shape2(info.key)) ? shape2(info.key) : {};
+    const curves = isRecord32(current) ? current : {};
+    const fallbackCurves = isRecord32(shape2(info.key)) ? shape2(info.key) : {};
     return COLOR_CHANNELS.map((ch) => {
       const fallback = keyframeValue(fallbackCurves[ch], 1, ch === "alpha" ? 255 : 0);
       return pyRound(keyframeValue(curves[ch], frame, fallback));
@@ -60755,7 +61951,7 @@ function valueAt2(info, clip2, frame) {
 }
 function isAnimated(info, clip2) {
   const current = clip2[info.key];
-  if (info.kind === "color" && isRecord30(current)) return COLOR_CHANNELS.some((ch) => curvePoints(current[ch]).length > 1);
+  if (info.kind === "color" && isRecord32(current)) return COLOR_CHANNELS.some((ch) => curvePoints(current[ch]).length > 1);
   return curvePoints(current).length > 1;
 }
 function slug(label2) {
@@ -60764,8 +61960,8 @@ function slug(label2) {
 }
 function easeOf(prev, point3) {
   if (prev === void 0 || Math.trunc(Number(point3.interpolation ?? Interpolation.BEZIER)) !== Interpolation.BEZIER) return void 0;
-  const hr = isRecord30(prev.handle_right) ? prev.handle_right : {};
-  const hl = isRecord30(point3.handle_left) ? point3.handle_left : {};
+  const hr = isRecord32(prev.handle_right) ? prev.handle_right : {};
+  const hl = isRecord32(point3.handle_left) ? point3.handle_left : {};
   const handles = [Number(hr.X ?? 0.5), Number(hr.Y ?? 0), Number(hl.X ?? 0.5), Number(hl.Y ?? 1)];
   if (handles.some((h) => !Number.isFinite(h))) return void 0;
   const same = (preset) => handles.every((h, i) => Math.abs(h - preset[i]) < 1e-6);
@@ -60931,7 +62127,7 @@ async function run(body) {
     throw error62;
   }
 }
-function isRecord31(value) {
+function isRecord33(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function num42(value) {
@@ -60971,7 +62167,7 @@ async function resolveClips(call, ids2, clipQuery, track2, scopeArg) {
   }
   return [await targetClip(call, { clip_query: clipQuery, track: track2 })];
 }
-async function resolveTargets(call, target) {
+async function resolveTargets2(call, target) {
   const project = call.doc.project;
   const ids2 = [];
   for (const raw of target.timeline_clip_ids ?? []) {
@@ -61031,7 +62227,7 @@ async function getClipProperties(call, input3) {
         animatedKeys.push(key);
         if (includeKeyframes) {
           if (info.kind === "color") {
-            const curves = isRecord31(data[key]) ? data[key] : {};
+            const curves = isRecord33(data[key]) ? data[key] : {};
             entry.keyframes = Object.fromEntries(COLOR_CHANNELS.map((ch) => [ch, describePoints(curves[ch], time3)]));
           } else {
             entry.keyframes = describePoints(data[key], time3);
@@ -61041,7 +62237,7 @@ async function getClipProperties(call, input3) {
     }
     out[key] = entry;
   }
-  const effects = (clip2.effects ?? []).filter(isRecord31).map((e) => ({ id: e.id ?? null, class_name: e.class_name ?? null, name: e.name ?? null }));
+  const effects = (clip2.effects ?? []).filter(isRecord33).map((e) => ({ id: e.id ?? null, class_name: e.class_name ?? null, name: e.name ?? null }));
   const head = describeClip(project, clip2);
   const shown = SUMMARY_KEYS.filter((k) => k in out).map((k) => `${k} ${short(out[k].value)}`).join(", ");
   const summary = `Clip ${clip2.id} ${pyReprString(head.title)} (track ${pyStr(head.track)}, ${pyFixed(head.position, 2)}-${pyFixed(head.end, 2)} s) at ${pyFixed(time3.timelineSeconds(frame), 2)} s: ${shown || "see receipt"}. Animated: ${animatedKeys.join(", ") || "nothing"}.` + (effects.length > 0 ? ` Effects: ${effects.map((e) => pyStr(e.class_name)).join(", ")}.` : "");
@@ -61058,7 +62254,7 @@ async function getClipProperties(call, input3) {
 }
 async function setClipProperties(call, input3) {
   const properties = input3.properties;
-  if (!isRecord31(properties) || Object.keys(properties).length === 0) {
+  if (!isRecord33(properties) || Object.keys(properties).length === 0) {
     throw new ToolError('properties must be an object such as {"alpha": 0.5}');
   }
   const keys = /* @__PURE__ */ new Map();
@@ -61072,7 +62268,7 @@ async function setClipProperties(call, input3) {
     }
     keys.set(name, key);
   }
-  const { clips, skipped } = await resolveTargets(call, input3);
+  const { clips, skipped } = await resolveTargets2(call, input3);
   const project = call.doc.project;
   const atSeconds = input3.at_seconds ?? null;
   const plans = [];
@@ -61139,7 +62335,7 @@ async function removeKeyframes(call, input3) {
   const wantAll = names2.some((n) => n.toLowerCase() === "all");
   const keys = wantAll ? [] : [...new Set(names2.map(resolveKey2))];
   if (keys.includes("time")) throw new ToolError("removing time keyframes changes the clip's speed; use the speed tools to reset it");
-  const { clips, skipped } = await resolveTargets(call, input3);
+  const { clips, skipped } = await resolveTargets2(call, input3);
   const project = call.doc.project;
   const start = input3.start_seconds ?? null;
   const end = input3.end_seconds ?? null;
@@ -61160,7 +62356,7 @@ async function removeKeyframes(call, input3) {
       const info = propertyInfo(key, clip2, project);
       if (!info.keyframable) throw new ToolError(`${key} holds a single value and has no keyframes; set it with set_clip_properties_tool`);
       if (info.kind === "color") {
-        const curves = isRecord31(data[key]) ? structuredClone(data[key]) : {};
+        const curves = isRecord33(data[key]) ? structuredClone(data[key]) : {};
         let removed = 0;
         for (const ch of COLOR_CHANNELS) {
           const result3 = curveWithoutPoints(curves[ch], lo, hi, key, ch);
@@ -61214,7 +62410,7 @@ async function copyClipKeyframes(call, input3) {
     throw new ToolError("the only target given is the source clip itself; name other clips to copy onto");
   }
   if (ids2.length === 0 && !input3.clip_query && !input3.scope) throw new ToolError("name the target clips (timeline_clip_ids, clip_query or scope)");
-  const resolved = await resolveTargets(call, { ...input3, timeline_clip_ids: ids2 });
+  const resolved = await resolveTargets2(call, { ...input3, timeline_clip_ids: ids2 });
   const targets = resolved.clips.filter((c) => c.id !== source2.id);
   if (targets.length === 0) throw new ToolError("no target clips other than the source");
   const project = call.doc.project;
@@ -61228,7 +62424,7 @@ async function copyClipKeyframes(call, input3) {
     for (const key of keys) {
       if (!(key in src)) continue;
       let value = src[key];
-      if (isRecord31(value) && Array.isArray(value.Points)) {
+      if (isRecord33(value) && Array.isArray(value.Points)) {
         value = {
           Points: retimeCurvePoints(
             value.Points,
@@ -61295,12 +62491,12 @@ function enginePreset(spec) {
   }
 }
 function hasVisual(clip2) {
-  const reader = isRecord31(clip2.reader) ? clip2.reader : {};
+  const reader = isRecord33(clip2.reader) ? clip2.reader : {};
   const hasVideo = reader.has_video;
   return hasVideo === void 0 || hasVideo === null || Boolean(hasVideo) || Boolean(clip2.waveform);
 }
 function hasAudio(clip2) {
-  const reader = isRecord31(clip2.reader) ? clip2.reader : {};
+  const reader = isRecord33(clip2.reader) ? clip2.reader : {};
   return reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
 }
 function presetSkipReason(spec, clip2) {
@@ -61328,7 +62524,7 @@ function snapshot(clip2) {
 }
 function diff(before, after) {
   const keys = [.../* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])].filter((k) => k !== "effects" && !sameValue(before[k], after[k])).sort();
-  const effectsOf = (clip2) => new Map((Array.isArray(clip2.effects) ? clip2.effects : []).filter(isRecord31).map((e) => [e.id, e]));
+  const effectsOf = (clip2) => new Map((Array.isArray(clip2.effects) ? clip2.effects : []).filter(isRecord33).map((e) => [e.id, e]));
   const old = effectsOf(before);
   const now = effectsOf(after);
   const row = (id, e) => ({ id, class_name: e.class_name ?? null });
@@ -61378,7 +62574,7 @@ async function applyClipPresetTool(call, input3) {
   } else if (level !== null) {
     throw new ToolError("level_percent only goes with preset='volume_level'");
   }
-  const { clips, skipped } = await resolveTargets(call, input3);
+  const { clips, skipped } = await resolveTargets2(call, input3);
   const targets = [];
   for (const clip2 of clips) {
     const reason = presetSkipReason(spec, clip2);
@@ -61885,7 +63081,7 @@ var init_watch = __esm({
 });
 
 // ../engine/src/tools/catalog/clips.ts
-function isRecord32(value) {
+function isRecord34(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function windowIsDialogueDriven(file3, start, end) {
@@ -61899,11 +63095,11 @@ function snapWindowOffBoundaries(file3, start, end) {
 function lookupWatchMeta(project, fileId, file3) {
   let data = file3;
   if (!data && fileId) {
-    const own2 = fileById(project, fileId);
+    const own2 = fileById2(project, fileId);
     const parentId = own2 && own2.parent_file_id ? String(own2.parent_file_id) : "";
-    data = parentId && fileById(project, parentId) || own2;
+    data = parentId && fileById2(project, parentId) || own2;
   }
-  const ai = isRecord32(data?.ai_metadata) ? data.ai_metadata : {};
+  const ai = isRecord34(data?.ai_metadata) ? data.ai_metadata : {};
   const duration3 = Number(data?.duration) || 0;
   return { file: data, duration: duration3, cues: Array.isArray(ai.transcript_cues) ? ai.transcript_cues : [] };
 }
@@ -62193,8 +63389,8 @@ function positiveIntArg(value) {
   const i = Math.trunc(n);
   return i > 0 ? i : null;
 }
-function stem3(path38) {
-  const base = String(path38 ?? "").split(/[\\/]/).pop() ?? "";
+function stem3(path39) {
+  const base = String(path39 ?? "").split(/[\\/]/).pop() ?? "";
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(0, dot) : base;
 }
@@ -62225,7 +63421,7 @@ var init_clips2 = __esm({
           const project = call.doc.project;
           const id = text(input3.file_id);
           if (!id) return "Error: file_id is required.";
-          const file3 = fileById(project, id);
+          const file3 = fileById2(project, id);
           if (!file3) return `Error: File not found for id=${id}.`;
           return describeFileForLlm(project, id, file3);
         }
@@ -62240,7 +63436,7 @@ var init_clips2 = __esm({
               return "Error: No clip was just created. Pass tool_args.file_id with a media_bin file id, or run split_file_add_clip_tool / import_files_tool / import_stock_media_tool immediately before this step (empty file_id only works right after those tools in the same session).";
             }
           }
-          const file3 = fileById(call.doc.project, fileId);
+          const file3 = fileById2(call.doc.project, fileId);
           if (!file3) return `Error: File not found for id=${fileId}.`;
           const placed = await placeExistingFile(call, file3, input3);
           if (placed.clip) forgetFile(call);
@@ -62253,7 +63449,7 @@ var init_clips2 = __esm({
           const project = call.doc.project;
           const fileId = text(input3.file_id);
           if (!fileId) return "Error: file_id is required.";
-          const file3 = fileById(project, fileId);
+          const file3 = fileById2(project, fileId);
           if (!file3) return `Error: File not found for id=${fileId}.`;
           const data = file3;
           const fpsData = record4(data.fps);
@@ -62686,8 +63882,8 @@ var init_export2 = __esm({
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
         run: async (call, input3) => {
           const openUi = !["0", "false", "no"].includes(String(input3.show_dialog ?? "true").toLowerCase().trim());
-          const path38 = text(input3.output_path);
-          if (openUi && !path38 && call.host.ui?.openExportDialog) {
+          const path39 = text(input3.output_path);
+          if (openUi && !path39 && call.host.ui?.openExportDialog) {
             call.host.ui.openExportDialog();
             return "Export video dialog opened.";
           }
@@ -62695,7 +63891,7 @@ var init_export2 = __esm({
           if (!exporter) return unavailable("export_video_tool", "it needs video rendering, which this host does not provide.");
           const project = call.doc.toJSON();
           const settings = getDefaultExportSettings(project);
-          const output2 = path38 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
+          const output2 = path39 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
           if (output2 && (project.files ?? []).some((f3) => f3.path === output2)) {
             return "Error: Export failed: Output path is an input file. Choose a different path.";
           }
@@ -62885,9 +64081,9 @@ var init_generation = __esm({
           if ("error" in res) return `Error: ${res.error}`;
           const bytes = res.audioBase64 ? base64ToBytes(res.audioBase64) : new Uint8Array();
           if (bytes.length === 0) return "Error: TTS returned empty audio.";
-          const path38 = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
-          const info = await call.host.media.probe(path38);
-          const media = { path: path38, info: { ...info, media_type: "audio" }, name: text(input3.name) || narrationName(narration) };
+          const path39 = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
+          const info = await call.host.media.probe(path39);
+          const media = { path: path39, info: { ...info, media_type: "audio" }, name: text(input3.name) || narrationName(narration) };
           const clip2 = call.commit((tx) => {
             const file3 = addFile(tx, media, { dedupe: false, mediaType: "audio" });
             return addClip(tx, { fileId: String(file3.id), position, layer: layer2 });
@@ -63114,10 +64310,10 @@ var init_inspect = __esm({
           const project = call.doc.project;
           const fileId = text(input3.fileId);
           if (!fileId) return refused(tool, "Error: fileId is required.");
-          const file3 = fileById(project, fileId);
+          const file3 = fileById2(project, fileId);
           if (!file3) return refused(tool, `Error: Unknown fileId '${fileId}'.`);
-          const path38 = String(file3.path ?? "");
-          if (!path38) return refused(tool, `Error: Media file not on disk: ${fileId}`);
+          const path39 = String(file3.path ?? "");
+          if (!path39) return refused(tool, `Error: Media file not on disk: ${fileId}`);
           const mediaType = String(file3.media_type ?? "").toLowerCase();
           const isImage = mediaType === "image" || mediaType === "photo" || fileLooksLikeImage(file3);
           const isAudio = file3.has_video === false && Boolean(file3.has_audio) || mediaType === "audio";
@@ -63199,8 +64395,8 @@ function importTruthy(value, fallback = false) {
   if (!t) return fallback;
   return ["1", "true", "yes", "y", "on"].includes(t);
 }
-function importMediaKind(path38) {
-  const ext = extOf(path38);
+function importMediaKind(path39) {
+  const ext = extOf(path39);
   if (IMPORT_VIDEO_EXTS.includes(ext)) return "video";
   if (IMPORT_AUDIO_EXTS.includes(ext)) return "audio";
   if (IMPORT_IMAGE_EXTS.includes(ext)) return "image";
@@ -63234,15 +64430,15 @@ function fromFileUrl(entry) {
   const t = entry.trim();
   if (!t.startsWith("file://")) return t;
   try {
-    let path38 = decodeURIComponent(new URL(t).pathname);
-    if (/^\/[A-Za-z]:/.test(path38)) path38 = path38.slice(1);
-    return path38 || t;
+    let path39 = decodeURIComponent(new URL(t).pathname);
+    if (/^\/[A-Za-z]:/.test(path39)) path39 = path39.slice(1);
+    return path39 || t;
   } catch {
     return t;
   }
 }
-function extOf(path38) {
-  const base = path38.split(/[\\/]/).pop() ?? "";
+function extOf(path39) {
+  const base = path39.split(/[\\/]/).pop() ?? "";
   const dot = base.lastIndexOf(".");
   return dot >= 0 ? base.slice(dot).toLowerCase() : "";
 }
@@ -63365,11 +64561,11 @@ var init_media3 = __esm({
           }
           const imported = [];
           const failures = [];
-          for (const path38 of resolved) {
+          for (const path39 of resolved) {
             try {
-              imported.push(await importPath.call(call.host.media, path38));
+              imported.push(await importPath.call(call.host.media, path39));
             } catch (error62) {
-              failures.push(`${path38}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+              failures.push(`${path39}: ${error62 instanceof Error ? error62.message : String(error62)}`);
             }
           }
           if (imported.length === 0) {
@@ -63515,7 +64711,7 @@ ${placed.text}`;
         run: async (call, input3) => {
           const fileId = text(input3.file_id);
           if (!fileId) return "Error: file_id is required.";
-          const file3 = fileById(call.doc.project, fileId);
+          const file3 = fileById2(call.doc.project, fileId);
           if (!file3) return `Error: File not found (id=${fileId}).`;
           const ai = record4(file3.ai_metadata);
           const block = getIndexBlock(ai);
@@ -63550,7 +64746,7 @@ ${placed.text}`;
         run: (call, input3) => {
           const fileId = text(input3.file_id);
           if (!fileId) return "Error: file_id is required.";
-          const file3 = fileById(call.doc.project, fileId);
+          const file3 = fileById2(call.doc.project, fileId);
           if (!file3) return `Error: File not found (id=${fileId}).`;
           const force = ["1", "true", "yes", "force"].includes(String(input3.force ?? "false").trim().toLowerCase());
           const tl = getIndexBlock(record4(file3.ai_metadata));
@@ -63573,7 +64769,7 @@ ${placed.text}`;
 });
 
 // ../engine/src/tools/catalog/metadata.ts
-function isRecord33(value) {
+function isRecord35(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function pyStr2(value) {
@@ -63636,7 +64832,7 @@ function fullMetadataText(project, level) {
       const n = level === "full" ? chapters.length : Math.min(3, chapters.length);
       lines2.push("    chapter_snippets:");
       for (const raw of chapters.slice(0, n)) {
-        if (!isRecord33(raw) || !(raw.summary || raw.title)) continue;
+        if (!isRecord35(raw) || !(raw.summary || raw.title)) continue;
         const t0 = Number(raw.start) || 0;
         const t1 = Number(raw.end) || t0;
         lines2.push(`      [${fmtMmss(t0)}-${fmtMmss(t1)}] ${String(raw.title ?? "")}: ${pySlice(String(raw.summary ?? ""), 0, 160)}`);
@@ -63646,7 +64842,7 @@ function fullMetadataText(project, level) {
       const n = level === "full" ? scenes.length : Math.min(3, scenes.length);
       lines2.push("    scene_snippets:");
       for (const raw of scenes.slice(0, n)) {
-        if (!isRecord33(raw) || !raw.description) continue;
+        if (!isRecord35(raw) || !raw.description) continue;
         lines2.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
@@ -63685,7 +64881,7 @@ function placementsMetadataText(project, level) {
     if (scenes.length > 0 && limit > 0) {
       lines2.push("    effective_scenes:");
       for (const raw of scenes.slice(0, limit)) {
-        if (!isRecord33(raw) || !raw.description) continue;
+        if (!isRecord35(raw) || !raw.description) continue;
         lines2.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
@@ -63841,12 +65037,12 @@ function segmentIndex(url2) {
   return m ? Number.parseInt(m[1], 10) : 1e6;
 }
 function mgFileName(url2) {
-  const path38 = url2.split("?")[0].replace(/\/+$/, "");
-  let raw = decodeURIComponent(path38.split("/").pop() || "motion_segment.mp4");
+  const path39 = url2.split("?")[0].replace(/\/+$/, "");
+  let raw = decodeURIComponent(path39.split("/").pop() || "motion_segment.mp4");
   const dot = raw.lastIndexOf(".");
   const ext = dot >= 0 ? raw.slice(dot).toLowerCase() : "";
   if (![".mp4", ".webm", ".mov", ".mkv", ".avi"].includes(ext)) {
-    raw = `${(dot >= 0 ? raw.slice(0, dot) : raw) || "motion_segment"}${path38.toLowerCase().endsWith(".webm") || path38.toLowerCase().includes("/output.webm") ? ".webm" : ".mp4"}`;
+    raw = `${(dot >= 0 ? raw.slice(0, dot) : raw) || "motion_segment"}${path39.toLowerCase().endsWith(".webm") || path39.toLowerCase().includes("/output.webm") ? ".webm" : ".mp4"}`;
   }
   return raw;
 }
@@ -63892,7 +65088,7 @@ async function fetchMotionGraphics(call, input3) {
   }
   const alreadyImported = (urls2) => {
     const ids3 = urls2.map((u) => cache5.get(normUrl(u)) ?? "");
-    if (ids3.length === 0 || ids3.some((id) => !id || !fileById(call.doc.project, id))) return null;
+    if (ids3.length === 0 || ids3.some((id) => !id || !fileById2(call.doc.project, id))) return null;
     return `Already imported file_id=${ids3[0]} (file_ids: ${pyRepr2(ids3)}) \u2014 place only if missing. Do NOT re-download these URLs.`;
   };
   const single3 = text(input3.supabase_url) || text(input3.url);
@@ -64126,7 +65322,7 @@ var init_motion = __esm({
           const fid = text(input3.file_id);
           if (!fid) return "Error: file_id is required for place_motion_graphic_tool";
           const project = call.doc.project;
-          const fileData = fileById(project, fid);
+          const fileData = fileById2(project, fid);
           if (!fileData) return `Error: File not found for id=${fid}.`;
           const isTransparent = fileLooksTransparent(fileData);
           const mode = String(input3.mode ?? "overlay").trim().toLowerCase() || "overlay";
@@ -64765,7 +65961,7 @@ var init_playback = __esm({
           }
           const fileId = text(input3.file_id);
           if (fileId) {
-            const file3 = fileById(call.doc.project, fileId);
+            const file3 = fileById2(call.doc.project, fileId);
             if (!file3) return `Error: File not found for id=${fileId}.`;
             const existing2 = (call.doc.project.clips ?? []).find((c) => String(c.file_id) === fileId);
             if (existing2) {
@@ -64778,15 +65974,15 @@ var init_playback = __esm({
             startPlaying(call);
             return `Loaded and playing: ${basename2(String(file3.path ?? "")) || fileId}`;
           }
-          const path38 = text(input3.file_path);
-          if (!path38) return "Error: watch_clip_tool needs timeline_clip_id, query, file_id or file_path.";
+          const path39 = text(input3.file_path);
+          if (!path39) return "Error: watch_clip_tool needs timeline_clip_id, query, file_id or file_path.";
           const importPath = call.host.media?.importPath;
           if (!importPath) return unavailable("watch_clip_tool", "it cannot open local file paths; pass file_id or timeline_clip_id.");
           let media;
           try {
-            media = await importPath.call(call.host.media, path38);
+            media = await importPath.call(call.host.media, path39);
           } catch (error62) {
-            return `Error: Could not import file into media bin: ${path38} (${error62 instanceof Error ? error62.message : String(error62)})`;
+            return `Error: Could not import file into media bin: ${path39} (${error62 instanceof Error ? error62.message : String(error62)})`;
           }
           const existing = (call.doc.project.files ?? []).find((f3) => f3.path === media.path);
           if (existing) {
@@ -64798,7 +65994,7 @@ var init_playback = __esm({
           }
           player.seek(timelineStart(call.doc.project));
           startPlaying(call);
-          return `Loaded and playing: ${basename2(path38)}`;
+          return `Loaded and playing: ${basename2(path39)}`;
         }
       })
     ];
@@ -64994,25 +66190,25 @@ var init_project2 = __esm({
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
         requires: ["storage"],
         run: async (call, input3) => {
-          let path38 = text(input3.path) || text(input3.file_path);
-          if (path38 && !PROJECT_EXTS.some((ext) => path38.endsWith(ext))) path38 += ".zvn";
-          const location = await call.host.storage.save(call.doc.toJSON(), path38 || void 0);
-          return `Project saved to ${location || path38}.`;
+          let path39 = text(input3.path) || text(input3.file_path);
+          if (path39 && !PROJECT_EXTS.some((ext) => path39.endsWith(ext))) path39 += ".zvn";
+          const location = await call.host.storage.save(call.doc.toJSON(), path39 || void 0);
+          return `Project saved to ${location || path39}.`;
         }
       }),
       contractTool("open_project_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
         requires: ["storage"],
         run: async (call, input3) => {
-          const path38 = text(input3.file_path);
-          if (!path38) return "Error: give file_path (a .zvn project) or recent_index.";
-          const project = await call.host.storage.open(path38);
+          const path39 = text(input3.file_path);
+          if (!path39) return "Error: give file_path (a .zvn project) or recent_index.";
+          const project = await call.host.storage.open(path39);
           if (input3.save_first) {
             const refusal = await saveCurrent(call, "open_project_tool");
             if (refusal) return refusal;
           }
           call.doc.load(project);
-          return `Opened project ${path38}.`;
+          return `Opened project ${path39}.`;
         }
       }),
       contractTool("undo_tool", {
@@ -65130,14 +66326,14 @@ function canTrackBeats(call) {
 async function beatsOfFile(call, file3) {
   const decode4 = call.host.audio?.decodePcm;
   if (!decode4) return "Error: this Zenvi surface cannot decode audio for beat tracking.";
-  const path38 = String(file3.path ?? "");
-  if (!path38) return `Error: file ${file3.id} has no media path.`;
+  const path39 = String(file3.path ?? "");
+  if (!path39) return `Error: file ${file3.id} has no media path.`;
   try {
-    const { samples, sampleRate } = await decode4(path38, { sampleRate: BEAT_SAMPLE_RATE, maxSeconds: MAX_SECONDS, signal: call.signal });
+    const { samples, sampleRate } = await decode4(path39, { sampleRate: BEAT_SAMPLE_RATE, maxSeconds: MAX_SECONDS, signal: call.signal });
     return { ...detectBeats(samples, sampleRate), duration: samples.length / sampleRate };
   } catch (error62) {
     const message = error62 instanceof Error ? error62.message : String(error62);
-    call.host.log?.(`decodePcm(${path38}) failed: ${message}`);
+    call.host.log?.(`decodePcm(${path39}) failed: ${message}`);
     return /no audio stream/i.test(message) ? `Error: ${file3.id} has no audio.` : `Error: Beat detection failed: ${message}`;
   }
 }
@@ -65214,8 +66410,8 @@ function flashIndexes(style, shots) {
 }
 async function writeCard(call, name, svg) {
   const media = call.host.media;
-  const path38 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
-  return { path: path38, info: await media.probe(path38), name };
+  const path39 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+  return { path: path39, info: await media.probe(path39), name };
 }
 function reelTracks(tx) {
   while (tx.project.layers.length < TRACKS.length) addTrack(tx, {});
@@ -65444,7 +66640,7 @@ var init_reels = __esm({
 });
 
 // ../engine/src/tools/catalog/search.ts
-function isRecord34(value) {
+function isRecord36(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function hitPeak(hit, s, e) {
@@ -65514,10 +66710,10 @@ function compareNumbers(a, b) {
 }
 function clipInfo2(project, clip2) {
   const fileId = String(clip2.file_id ?? "");
-  const file3 = fileId ? fileById(project, fileId) : void 0;
+  const file3 = fileId ? fileById2(project, fileId) : void 0;
   const [clipStart, clipEnd2] = getSourceWindow(clip2, file3);
   const parent = resolveParentFileData(project, file3, fileId);
-  const sourceAi = isRecord34(parent?.ai_metadata) ? parent.ai_metadata : void 0;
+  const sourceAi = isRecord36(parent?.ai_metadata) ? parent.ai_metadata : void 0;
   const block = getIndexBlock(sourceAi ?? {});
   const watchData = parent ?? file3;
   const wai = record4(watchData?.ai_metadata);
@@ -65541,15 +66737,15 @@ function clipInfo2(project, clip2) {
   };
 }
 function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) {
-  const local = isRecord34(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
+  const local = isRecord36(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
   const candidates = [];
   for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-    if (!isRecord34(ch)) continue;
+    if (!isRecord36(ch)) continue;
     const summary = String(ch.summary || ch.title || "").trim();
     if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
   }
   for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-    if (!isRecord34(sc)) continue;
+    if (!isRecord36(sc)) continue;
     const desc = String(sc.description ?? "").trim();
     if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
   }
@@ -65574,9 +66770,9 @@ function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) 
   return scored[0][0];
 }
 function clipTranscriptCues(project, clip2) {
-  const file3 = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
+  const file3 = clip2.file_id ? fileById2(project, String(clip2.file_id)) : void 0;
   const effective = getEffectiveAiMetadata(file3, clip2, { clipAiMetadata: clip2.ai_metadata });
-  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord34) : [];
+  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord36) : [];
 }
 function fpsParts(project) {
   const fps = record4(project.fps);
@@ -65645,7 +66841,7 @@ function siblingClipsFromSameFile(project, fileId, excludeClipId) {
   const out = [];
   for (const clip2 of project.clips ?? []) {
     if (String(clip2.file_id ?? "") !== fileId || String(clip2.id) === excludeClipId) continue;
-    const file3 = fileById(project, fileId);
+    const file3 = fileById2(project, fileId);
     const [cs, ce] = getSourceWindow(clip2, file3);
     const layer2 = Math.trunc(Number(clip2.layer ?? 1)) || 1;
     out.push({ clip: clip2, id: String(clip2.id), sourceStart: cs, sourceEnd: ce, position: Number(clip2.position) || 0, layer: layer2 });
@@ -65823,17 +67019,17 @@ var init_search = __esm({
             }
           }
           const perClip = record4(target.clip.ai_metadata);
-          const file3 = info.fileId ? fileById(project, info.fileId) : void 0;
+          const file3 = info.fileId ? fileById2(project, info.fileId) : void 0;
           const parent = resolveParentFileData(project, file3, info.fileId);
           const local = Object.keys(perClip).length > 0 ? perClip : getEffectiveAiMetadata(parent ?? file3, target.clip, { rebased: true });
           const candidates = [];
           for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-            if (!isRecord34(ch)) continue;
+            if (!isRecord36(ch)) continue;
             const summary = String(ch.summary || ch.title || "").trim();
             if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
           }
           for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-            if (!isRecord34(sc)) continue;
+            if (!isRecord36(sc)) continue;
             const desc = String(sc.description ?? "").trim();
             if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
           }
@@ -65967,7 +67163,7 @@ var init_search = __esm({
           if (res.error) return `Error: ${res.error}`;
           const items = res.results.filter((it) => String(it.video_id ?? "") === info.videoId);
           const nth = parseOccurrence(input3.occurrence ?? "0", query2);
-          const ownAi = record4(fileById(project, info.fileId)?.ai_metadata);
+          const ownAi = record4(fileById2(project, info.fileId)?.ai_metadata);
           const fallbackToScenes = async (emptyText) => {
             const cut2 = sceneDescriptionCut(info.clipStart, info.clipEnd, Object.keys(ownAi).length ? ownAi : void 0, query2, nth);
             if (cut2 === null) return emptyText;
@@ -66100,92 +67296,30 @@ var init_search = __esm({
 });
 
 // ../engine/src/tools/catalog/speech-tools.ts
-function isRecord35(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function capitalized(message) {
+  return message ? message[0].toUpperCase() + message.slice(1) : message;
 }
-function wordsFromCues(cues) {
-  const rows = cues.filter(isRecord35).map((c) => ({
-    text: String(c.text ?? "").trim(),
-    start: Number("source_start" in c ? c.source_start : c.start),
-    end: Number("source_end" in c ? c.source_end : c.end)
-  })).filter((c) => c.text && Number.isFinite(c.start) && Number.isFinite(c.end) && c.end > c.start).sort((a, b) => a.start - b.start);
-  const out = [];
-  for (const cue of rows) {
-    const tokens = cue.text.split(/\s+/).filter(Boolean);
-    const weights = tokens.map((t2) => Array.from(t2).length + 1);
-    const total = weights.reduce((a, b) => a + b, 0);
-    let t = cue.start;
-    tokens.forEach((token, i) => {
-      const dur = (cue.end - cue.start) * weights[i] / total;
-      out.push({ text: token, startSec: t, endSec: i === tokens.length - 1 ? cue.end : t + dur });
-      t += dur;
-    });
-  }
-  return out;
-}
-function wordsForClip(words3, clip2, fps) {
-  const position = Number(clip2.position) || 0;
-  const start = Number(clip2.start) || 0;
-  const end = Number(clip2.end) || start;
-  const out = [];
-  let index = 0;
-  for (const w of words3) {
-    if (w.endSec <= start || w.startSec >= end) continue;
-    const s = Math.max(start, w.startSec);
-    const e = Math.min(end, w.endSec);
-    if (e <= s) continue;
-    const startFrame = toFrame(position + (s - start), fps);
-    let endFrame = toFrame(position + (e - start), fps);
-    if (endFrame <= startFrame) endFrame = startFrame + 1;
-    out.push({
-      index,
-      text: w.text,
-      startFrame,
-      endFrame,
-      startSec: s,
-      endSec: e,
-      timelineStartSec: toSeconds(startFrame, fps),
-      timelineEndSec: toSeconds(endFrame, fps),
-      clipId: String(clip2.id),
-      transcriptGeneration: 1
-    });
-    index += 1;
-  }
-  return out;
-}
-function fileWords(words3, fps) {
-  return words3.map((w, index) => {
-    const startFrame = toFrame(w.startSec, fps);
-    let endFrame = toFrame(w.endSec, fps);
-    if (endFrame <= startFrame) endFrame = startFrame + 1;
-    return { index, text: w.text, startFrame, endFrame, startSec: w.startSec, endSec: w.endSec, transcriptGeneration: 1 };
-  });
-}
-function cuesForClip(project, clip2) {
-  const file3 = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
-  const effective = getEffectiveAiMetadata(file3, clip2, { clipAiMetadata: clip2.ai_metadata });
-  const parentAnalyzed = file3 ? fileIsAnalyzed(file3) || (file3.parent_file_id ? fileIsAnalyzed(fileById(project, String(file3.parent_file_id))) : false) : false;
-  return { cues: Array.isArray(effective.transcript_cues) ? effective.transcript_cues : [], indexed: Boolean(effective.analyzed) || parentAnalyzed };
-}
-function cuesForFile(file3) {
-  const ai = record4(file3.ai_metadata);
-  return { cues: Array.isArray(ai.transcript_cues) ? ai.transcript_cues : [], indexed: Boolean(ai.analyzed) };
+function failureReceipt(tool, failure2) {
+  if (failure2.kind === "no_audio") return unchanged(tool, NO_AUDIO_MESSAGE, { data: { reason: "no_audio" } });
+  if (failure2.kind === "unavailable") return unavailable(tool, `${failure2.message}; the media has no indexed transcript either.`);
+  return failed(tool, `Error: ${capitalized(failure2.message.replace(/\.$/, ""))}.`);
 }
 function compactRows(words3) {
   return words3.map((w) => [w.index, w.text, w.startFrame]);
 }
-function clipPayload(words3, meta3, includeWords, includeCompact) {
-  const row = { ...meta3, wordCount: words3.length, transcriptGeneration: 1 };
+function clipPayload(words3, meta3, generation, includeWords, includeCompact) {
+  const row = { ...meta3, wordCount: words3.length, transcriptGeneration: generation };
   if (includeCompact || includeWords) row.compactWords = compactRows(words3);
   if (includeWords) row.words = words3;
   return row;
 }
 function transcriptNotes() {
   return [
-    'data.script is the full dialogue for the user. data.clipIds are TIMELINE clip ids (not media-bin fileIds). For cuts: call remove_words_tool ONCE next with data.clipIds[0] + matches (e.g. ["FlowCut","flocut"]) \u2014 do NOT call get_transcript_tool again. Keep language=auto. Never pass fileId to remove_words_tool.'
+    'data.script is the full dialogue for the user. data.clipIds are TIMELINE clip ids (not media-bin fileIds). For cuts: call remove_words_tool ONCE next with data.clipIds[0] + matches (e.g. ["FlowCut","flocut"]) \u2014 do NOT call get_transcript_tool again. Keep language=auto. Never pass fileId to remove_words_tool.',
+    "matches=[...] is enough for brand/filler cuts \u2014 you do not need compactWords or a matching transcriptGeneration. After a successful cut, use remove_words_tool data.script (full remaining dialogue) \u2014 do not truncate or invent a message limit."
   ];
 }
-function shortSummary(wordCount, clipIds, fileIds, suffix = "") {
+function shortSummary(wordCount, source2, language, clipIds, fileIds, suffix = "") {
   let idBit = "";
   let action = "Full dialogue in data.script.";
   if (clipIds.length > 0) {
@@ -66195,10 +67329,11 @@ function shortSummary(wordCount, clipIds, fileIds, suffix = "") {
     idBit = fileIds.length === 1 ? ` fileId=${fileIds[0]}` : ` fileIds=[${fileIds.map((f3) => `'${f3}'`).join(", ")}]`;
     action = "Full dialogue in data.script. This is a media-bin fileId, NOT a timeline clipId \u2014 place the file on the timeline (or re-call get_transcript_tool with empty args once it is placed) before remove_words_tool.";
   }
-  const base = `Transcribed ${wordCount} words (${SOURCE2}).${idBit} ${action}`;
+  const lang = language ? `, ${language}` : "";
+  const base = `Transcribed ${wordCount} words (${source2 || "local"}${lang}).${idBit} ${action}`;
   return suffix ? `${base} ${suffix}`.trim() : base;
 }
-function dataPayload(script, wordCount, clipsOut) {
+function dataPayload(script, wordCount, clipsOut, facts) {
   const clipIds = clipsOut.filter((c) => c.clipId).map((c) => String(c.clipId));
   const fileIds = clipsOut.filter((c) => c.fileId && !c.clipId).map((c) => String(c.fileId));
   const nextAction = clipIds.length ? "remove_words_tool" : fileIds.length ? "place file on timeline then get_transcript_tool again \u2014 remove_words_tool needs data.clipIds (timeline), not fileId" : "pass clipId to remove_words_tool or place the clip first";
@@ -66206,112 +67341,174 @@ function dataPayload(script, wordCount, clipsOut) {
     nextAction,
     clipIds,
     fileIds,
-    transcriptGeneration: 1,
+    transcriptGeneration: facts.generation,
     wordCount,
-    transcriptionSource: SOURCE2,
-    wordTiming: "estimated",
-    modelId: "",
-    language: "",
-    engine: SOURCE2,
+    transcriptionSource: facts.source,
+    wordTiming: facts.exact ? "exact" : "estimated",
+    modelId: facts.modelId,
+    language: facts.language,
+    engine: facts.source,
     clips: clipsOut,
     script
   };
 }
-function transcriptFromCues(call, input3, tool = "get_transcript_tool") {
-  const project = call.doc.project;
-  const fps = projectFps(project);
+function factsOf(sources) {
+  const last = sources[sources.length - 1];
+  return {
+    source: last?.source ?? "local",
+    modelId: last?.modelId ?? "",
+    language: last?.language ?? "",
+    generation: Math.max(1, ...sources.map((s) => s.generation)),
+    exact: sources.length > 0 && sources.every((s) => s.exact)
+  };
+}
+function wantsFull(input3) {
+  const includeWords = input3.includeWords === true || String(input3.includeWords ?? "").toLowerCase() === "true";
+  const detail2 = text(input3.detail_level).toLowerCase();
+  return { includeWords, includeCompact: includeWords || ["full", "all", "verbose", "words", "compact"].includes(detail2) };
+}
+function fileReceipt(tool, file3, got, fps, full, warnings, suffix = "") {
+  const words3 = wordsForFile(got.words, fps, got.generation);
+  const facts = factsOf([got]);
+  const clips = [clipPayload(words3, { fileId: String(file3.id) }, got.generation, full.includeWords, full.includeCompact)];
+  const summary = words3.length ? shortSummary(words3.length, facts.source, facts.language, [], [String(file3.id)], suffix) : `No spoken dialogue found.${suffix ? ` ${suffix}` : ""}`;
+  const allWarnings = [...warnings, ...got.warnings, ...got.exact ? [] : [ESTIMATED_WARNING]];
+  return {
+    words: words3,
+    receipt: applied(tool, summary, { warnings: allWarnings, notes: transcriptNotes(), data: dataPayload(wordsToScript(words3), words3.length, clips, facts) }, 0)
+  };
+}
+async function runTranscript(call, input3, tool = "get_transcript_tool") {
+  const project = () => call.doc.project;
+  const fps = projectFps(project());
   let clipId2 = text(input3.clipId) || text(input3.timeline_clip_id);
   let fileId = text(input3.fileId) || text(input3.file_id);
-  const detail2 = text(input3.detail_level).toLowerCase();
-  const includeWords = input3.includeWords === true;
-  const includeCompact = includeWords || ["full", "all", "verbose", "words", "compact"].includes(detail2);
-  const warnings = [ESTIMATED_WARNING];
+  const full = wantsFull(input3);
+  const trackRaw = input3.trackIndex ?? input3.track_index;
+  const request = (transcribe = true) => ({
+    language: input3.language,
+    force: input3.force === true || String(input3.force ?? "").toLowerCase() === "true",
+    estimatesOk: true,
+    transcribe
+  });
+  const none = (receipt2) => ({ receipt: receipt2, words: [] });
   let targets = [];
   if (clipId2) {
-    const clip2 = (project.clips ?? []).find((c) => String(c.id) === clipId2);
+    const clip2 = project().clips.find((c) => String(c.id) === clipId2);
     if (clip2) targets = [clip2];
     else {
-      const hits = (project.clips ?? []).filter((c) => String(c.file_id ?? "") === clipId2 || String(record4(c.reader).id ?? "") === clipId2);
+      const hits = project().clips.filter((c) => String(c.file_id ?? "") === clipId2 || String(record4(c.reader).id ?? "") === clipId2);
       if (hits.length > 0) targets = hits;
-      else if (fileById(project, clipId2)) {
+      else if (fileById2(project(), clipId2)) {
         fileId = clipId2;
         clipId2 = "";
-      } else return { words: [], receipt: refused(tool, `Error: Unknown clipId '${clipId2}'.`) };
+      } else return none(refused(tool, `Error: Unknown clipId '${clipId2}'.`));
     }
   }
   if (fileId && targets.length === 0) {
-    const file3 = fileById(project, fileId);
-    if (!file3) return { words: [], receipt: refused(tool, `Error: Unknown fileId '${fileId}'.`) };
-    return { words: [], receipt: fileReceipt(tool, file3, fps, includeWords, includeCompact, warnings) };
+    const file3 = fileById2(project(), fileId);
+    if (!file3) return none(refused(tool, `Error: Unknown fileId '${fileId}'.`));
+    if (!mediaPathOf(file3)) return none(refused(tool, "Error: File has no media path."));
+    const got = await wordsFor(call, fileTarget(file3), request());
+    if (!isWordSource(got)) return none(failureReceipt(tool, got));
+    return fileReceipt(tool, fileById2(project(), fileId) ?? file3, got, fps, full, []);
   }
-  if (targets.length === 0 && !fileId && !clipId2) {
-    const trackIndex = input3.trackIndex;
-    for (const clip2 of project.clips ?? []) {
-      if (trackIndex !== void 0 && trackIndex !== null) {
-        const display = layerNumberToDisplayIndex(Math.trunc(Number(clip2.layer ?? -1)), project.layers);
-        if (display !== Number(trackIndex)) continue;
-      }
+  let untargeted = false;
+  if (targets.length === 0 && !clipId2) {
+    let want = null;
+    if (trackRaw !== void 0 && trackRaw !== null && trackRaw !== "") {
+      want = Number(trackRaw);
+      if (!Number.isInteger(want)) return none(refused(tool, "Error: trackIndex must be an integer."));
+    }
+    for (const clip2 of project().clips) {
+      if (want !== null && layerNumberToDisplayIndex(Math.trunc(Number(clip2.layer ?? -1)), project().layers) !== want) continue;
       targets.push(clip2);
     }
-    if (targets.length === 0 && (trackIndex === void 0 || trackIndex === null)) {
-      const usable = (project.files ?? []).filter((f3) => !["image", "image/sequence", "font"].includes(String(f3.media_type ?? "").toLowerCase()) && f3.path);
+    untargeted = want === null;
+    if (targets.length === 0 && want === null) {
+      const usable = project().files.filter((f3) => !["image", "image/sequence", "font"].includes(String(f3.media_type ?? "").toLowerCase()) && mediaPathOf(f3));
       if (usable.length === 1) {
-        const receipt2 = fileReceipt(tool, usable[0], fps, includeWords, includeCompact, [
-          ...warnings,
-          "Timeline had no clips \u2014 transcribed the single media-bin file. Place it on the timeline for clip-scoped word frames."
-        ], "(timeline was empty; transcribed the media-bin file.)");
-        return { words: [], receipt: receipt2 };
+        const only = usable[0];
+        const got = await wordsFor(call, fileTarget(only), request());
+        if (!isWordSource(got)) return none(failureReceipt(tool, got));
+        return fileReceipt(
+          tool,
+          fileById2(project(), only.id) ?? only,
+          got,
+          fps,
+          full,
+          ["Timeline had no clips \u2014 transcribed the single media-bin file. Place it on the timeline for clip-scoped word frames."],
+          "(timeline was empty; transcribed the media-bin file.)"
+        );
       }
       if (usable.length > 1) {
         const ids2 = usable.slice(0, 8).map((f3) => String(f3.id)).join(", ");
-        return { words: [], receipt: refused(tool, `Error: Timeline is empty and multiple media-bin files exist. Pass fileId for one of: ${ids2}`) };
+        return none(refused(tool, `Error: Timeline is empty and multiple media-bin files exist. Pass fileId for one of: ${ids2}`));
       }
     }
   }
   if (targets.length === 0) {
-    return {
-      words: [],
-      receipt: refused(tool, "Error: No clips to transcribe. Pass clipId/timeline_clip_id, fileId/file_id, put a clip on the timeline, or import media first.")
-    };
+    return none(refused(tool, "Error: No clips to transcribe. Pass clipId/timeline_clip_id, fileId/file_id, put a clip on the timeline, or import media first."));
   }
   const clipsOut = [];
   const all = [];
-  let anyIndexed = false;
+  const sources = [];
+  const warnings = [];
+  const failures = [];
+  const pays = untargeted ? untargetedTranscription(project(), targets) : () => true;
   for (const clip2 of targets) {
-    const { cues, indexed } = cuesForClip(project, clip2);
-    anyIndexed = anyIndexed || indexed;
-    if (!indexed) {
-      warnings.push(`clip ${String(clip2.id)}: not indexed (no transcript cues)`);
+    const cid = String(clip2.id);
+    const target = clipTarget(project(), clip2);
+    if (!target || !mediaPathOf(target.file, clip2)) {
+      warnings.push(`clip ${cid}: no media path`);
       continue;
     }
-    const mapped = wordsForClip(wordsFromCues(cues), clip2, fps);
+    const paid = pays(clip2);
+    const got = await wordsFor(call, target, request(paid));
+    if (!isWordSource(got)) {
+      if (got.kind === "no_audio") warnings.push(`clip ${cid}: no audio track`);
+      else if (!paid && got.kind === "unavailable") {
+        warnings.push(`clip ${cid} (${String(clip2.title || target.file.name || target.file.id)}): audio-only, not transcribed without a clipId (pass clipId=${cid} to transcribe it)`);
+        continue;
+      } else warnings.push(`clip ${cid}: ${got.message}`);
+      failures.push(got);
+      continue;
+    }
+    const mapped = wordsForClip(got.words, clip2, fps, got.generation);
     all.push(...mapped);
+    sources.push(got);
+    warnings.push(...got.warnings);
     clipsOut.push(
-      clipPayload(mapped, {
-        clipId: String(clip2.id),
-        fileId: String(clip2.file_id ?? ""),
-        position: Number(clip2.position) || 0,
-        start: Number(clip2.start) || 0,
-        end: Number(clip2.end) || 0
-      }, includeWords, includeCompact)
+      clipPayload(
+        mapped,
+        {
+          clipId: cid,
+          fileId: String(clip2.file_id ?? ""),
+          position: Number(clip2.position) || 0,
+          start: Number(clip2.start) || 0,
+          end: Number(clip2.end) || 0
+        },
+        got.generation,
+        full.includeWords,
+        full.includeCompact
+      )
     );
   }
-  if (!anyIndexed) return { words: [], receipt: unavailable(tool, NO_TRANSCRIPT) };
+  if (clipsOut.length === 0) {
+    if (failures.length > 0 && failures.every((f3) => f3.kind === "no_audio")) return none(unchanged(tool, NO_AUDIO_MESSAGE, { data: { reason: "no_audio" } }));
+    const unavailableOne = failures.find((f3) => f3.kind === "unavailable");
+    if (unavailableOne && failures.every((f3) => f3.kind !== "failed")) return none(unavailable(tool, `${unavailableOne.message}; these clips have no indexed transcript either.`));
+    return none(failed(tool, `Error: Could not transcribe any clip. ${warnings.slice(0, 3).join("; ")}`));
+  }
+  const facts = factsOf(sources);
+  if (!facts.exact) warnings.push(ESTIMATED_WARNING);
   const wordCount = all.length;
   const clipIds = clipsOut.map((c) => String(c.clipId));
-  const summary = wordCount ? shortSummary(wordCount, clipIds, []) : "No spoken dialogue found.";
+  const summary = wordCount ? shortSummary(wordCount, facts.source, facts.language, clipIds, []) : "No spoken dialogue found.";
   return {
     words: all,
-    receipt: applied(tool, summary, { warnings, notes: transcriptNotes(), data: dataPayload(wordsToScript(all), wordCount, clipsOut) }, 0)
+    receipt: applied(tool, summary, { warnings, notes: transcriptNotes(), data: dataPayload(wordsToScript(all), wordCount, clipsOut, facts) }, 0)
   };
-}
-function fileReceipt(tool, file3, fps, includeWords, includeCompact, warnings, suffix = "") {
-  const { cues, indexed } = cuesForFile(file3);
-  if (!indexed) return unavailable(tool, NO_TRANSCRIPT);
-  const words3 = fileWords(wordsFromCues(cues), fps);
-  const clips = [clipPayload(words3, { fileId: String(file3.id) }, includeWords, includeCompact)];
-  const summary = words3.length ? shortSummary(words3.length, [], [String(file3.id)], suffix) : `No spoken dialogue found.${suffix ? ` ${suffix}` : ""}`;
-  return applied(tool, summary, { warnings, notes: transcriptNotes(), data: dataPayload(wordsToScript(words3), words3.length, clips) }, 0);
 }
 function applyCompactedFragments(tx, clipId2, fragments, removed, fps) {
   const original = tx.project.clips.find((c) => c.id === clipId2);
@@ -66345,46 +67542,232 @@ function applyCompactedFragments(tx, clipId2, fragments, removed, fps) {
   }
   return { createdIds, shifted };
 }
-function mediaPath(project, clip2) {
-  const file3 = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
-  return String(file3?.path || record4(clip2.reader).path || "");
+function deleteClipAndRipple(tx, clipId2, removed, fps) {
+  const clip2 = tx.project.clips.find((c) => c.id === clipId2);
+  if (!clip2) throw new Error(`Unknown clipId '${clipId2}'`);
+  const { layer: layer2, position } = clip2;
+  tx.delete(["clips", { id: clipId2 }]);
+  const shifted = [];
+  const gap = snap(removed, fps);
+  if (gap > 1e-9) {
+    for (const other of tx.project.clips.filter((c) => c.layer === layer2)) {
+      if (other.position + 1e-9 >= position) {
+        moveClip(tx, other.id, { position: snap(other.position - gap, fps) });
+        shifted.push({ clipId: other.id, deltaSec: -gap });
+      }
+    }
+  }
+  return shifted;
 }
-var SOURCE2, ESTIMATED_WARNING, NO_TRANSCRIPT, DESKTOP_ONLY, speechTools;
+function parseList(value) {
+  if (value === void 0 || value === null || value === "") return null;
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    const t = value.trim();
+    if (!t) return null;
+    try {
+      const parsed = JSON.parse(t);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      return t.split(",").map((p) => p.trim()).filter(Boolean);
+    }
+  }
+  return [value];
+}
+function intList(value) {
+  const items = parseList(value);
+  if (items === null) return null;
+  return items.map((item) => Number(item)).filter((n) => Number.isFinite(n)).map((n) => Math.trunc(n));
+}
+function strList(value) {
+  const items = parseList(value);
+  if (items === null) return null;
+  const out = items.map((item) => String(item).trim()).filter(Boolean);
+  return out.length > 0 ? out : null;
+}
+var ESTIMATED_WARNING, DESKTOP_ONLY, speechTools;
 var init_speech_tools = __esm({
   "../engine/src/tools/catalog/speech-tools.ts"() {
     "use strict";
     init_clips();
-    init_ai_metadata();
+    init_beats2();
     init_define();
     init_frame_time();
     init_pyfmt();
     init_receipt();
-    init_speech();
-    init_beats2();
+    init_speech2();
     init_tracks2();
+    init_transcripts();
     init_common();
-    SOURCE2 = "index_cues";
-    ESTIMATED_WARNING = "Word timings are estimated from indexed transcript phrases: this Zenvi surface has no on-device speech recognition.";
-    NO_TRANSCRIPT = "on-device transcription runs only in Zenvi desktop, and these clips have no indexed transcript. Index the media with Zenvi (its transcript cues are used here), or transcribe in Zenvi desktop.";
+    ESTIMATED_WARNING = "Word timings are estimated from indexed transcript phrases (no speech recognition result for this media yet).";
     DESKTOP_ONLY = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
     speechTools = [
       contractTool("get_transcript_tool", {
         annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-        run: (call, input3) => transcriptFromCues(call, input3).receipt
+        run: async (call, input3) => (await runTranscript(call, input3)).receipt
       }),
       contractTool("transcribe_media_tool", {
-        annotations: DESKTOP_ONLY,
-        run: () => unavailable(
-          "transcribe_media_tool",
-          "on-device transcription runs only in Zenvi desktop. Indexed transcripts are available through get_transcript_tool."
-        )
+        annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+        run: async (call, input3) => {
+          const tool = "transcribe_media_tool";
+          const fileId = text(input3.fileId) || text(input3.file_id);
+          if (!fileId) return refused(tool, "Error: fileId is required.");
+          const file3 = fileById2(call.doc.project, fileId);
+          if (!file3) return refused(tool, `Error: Unknown fileId '${fileId}'.`);
+          if (!mediaPathOf(file3)) return refused(tool, "Error: File has no media path.");
+          const got = await wordsFor(call, fileTarget(file3), { language: input3.language, force: input3.force === true, estimatesOk: false, transcribe: true });
+          if (!isWordSource(got)) {
+            if (got.kind === "unavailable") {
+              const indexed = fileTarget(file3).indexed ? " Its indexed transcript is available through get_transcript_tool." : "";
+              return unavailable(tool, `${got.message}.${indexed}`);
+            }
+            return failureReceipt(tool, got);
+          }
+          const script = wordsToScript(got.words);
+          const summary = got.words.length ? shortSummary(got.words.length, got.source, got.language, [], [fileId]) : "No spoken dialogue found.";
+          return applied(
+            tool,
+            summary,
+            {
+              warnings: got.warnings,
+              notes: ["Show data.script to the user \u2014 never paste this receipt JSON. Do not re-call this tool; use get_transcript_tool / remove_words_tool next."],
+              data: {
+                fileId,
+                wordCount: got.words.length,
+                language: got.language,
+                modelId: got.modelId,
+                transcriptionSource: got.source,
+                transcriptGeneration: got.generation,
+                engine: got.source,
+                script
+              }
+            },
+            0
+          );
+        }
       }),
       contractTool("remove_words_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
-        run: () => unavailable(
-          "remove_words_tool",
-          "cutting words needs word-level timings from on-device speech recognition, which runs only in Zenvi desktop."
-        )
+        run: async (call, input3) => {
+          const tool = "remove_words_tool";
+          const raw = input3;
+          let clipId2 = text(input3.clipId) || text(input3.timeline_clip_id);
+          const wordIndices = intList(raw.wordIndices ?? raw.word_indices);
+          const matches3 = strList(raw.matches ?? raw.matchTexts ?? raw.match_texts);
+          const fillerPreset = text(input3.fillerPreset) || text(raw.filler_preset);
+          const generationArg = raw.transcriptGeneration ?? raw.transcript_generation;
+          const warnings = [];
+          let project = call.doc.project;
+          if (!clipId2) {
+            if (project.clips.length === 1) clipId2 = String(project.clips[0].id);
+            else {
+              return refused(tool, "Error: clipId is required when the timeline has zero or multiple clips. Pass clipId from get_transcript_tool data.clipIds.");
+            }
+          }
+          let clip2 = project.clips.find((c) => String(c.id) === clipId2);
+          if (!clip2) {
+            const hits = project.clips.filter((c) => String(c.file_id ?? "") === clipId2 || String(record4(c.reader).id ?? "") === clipId2);
+            if (hits.length === 1) {
+              clip2 = hits[0];
+              clipId2 = String(clip2.id);
+            } else if (hits.length > 1) {
+              return refused(tool, `Error: '${clipId2}' is a media-bin fileId with multiple timeline clips. Pass one timeline clipId: ${hits.slice(0, 8).map((c) => c.id).join(", ")}`);
+            } else if (fileById2(project, clipId2)) {
+              return refused(
+                tool,
+                `Error: '${clipId2}' is a media-bin fileId, not a timeline clipId. Place the file on the timeline, call get_transcript_tool (no args), then remove_words_tool with data.clipIds[0].`
+              );
+            } else return refused(tool, `Error: Unknown clipId '${clipId2}'.`);
+          }
+          const target = clipTarget(project, clip2);
+          if (!target || !mediaPathOf(target.file, clip2)) return refused(tool, "Error: Clip has no media path.");
+          if (fillerPreset && !(fillerPreset in FILLER_PRESETS)) {
+            return refused(tool, `Error: Unknown fillerPreset '${fillerPreset}'. Use one of: ${Object.keys(FILLER_PRESETS).sort().join(", ")}.`);
+          }
+          let pinned = null;
+          if (generationArg !== void 0 && generationArg !== null && generationArg !== "") {
+            pinned = Number(generationArg);
+            if (!Number.isInteger(pinned)) return refused(tool, "Error: transcriptGeneration must be an integer.");
+          }
+          if (isRetimed(clip2)) {
+            return refused(tool, "Error: this clip has a speed change or time curve; reset its speed (Time > Normal) before removing words.");
+          }
+          if ((!wordIndices || wordIndices.length === 0) && !matches3 && !fillerPreset) {
+            return unchanged(tool, "No words matched \u2014 nothing removed.", { data: { matches: [] } });
+          }
+          const got = await wordsFor(call, target, { language: input3.language, estimatesOk: false, transcribe: true });
+          if (!isWordSource(got)) {
+            if (got.kind === "no_audio") return unchanged(tool, NO_AUDIO_MESSAGE, { data: { reason: "no_audio" } });
+            if (got.kind === "unavailable") return unavailable(tool, `${got.message}; cutting words needs exact word timings from speech recognition.`);
+            return failed(tool, `Error: ${capitalized(got.message.replace(/\.$/, ""))}.`);
+          }
+          project = call.doc.project;
+          clip2 = project.clips.find((c) => c.id === clipId2);
+          if (pinned !== null && pinned !== got.generation) {
+            if (wordIndices !== null) {
+              return refused(tool, "Error: transcriptGeneration mismatch \u2014 call get_transcript_tool again.", {
+                data: { transcriptGeneration: got.generation, requested: pinned }
+              });
+            }
+            warnings.push(`transcriptGeneration ${pinned} stale; using live generation ${got.generation}`);
+          } else if (pinned === null && wordIndices !== null && got.fresh) {
+            return refused(
+              tool,
+              "Error: wordIndices refer to words you have not seen: this clip was just transcribed with exact word timings. Call get_transcript_tool again for its word indices (or pass matches=[...]).",
+              { data: { transcriptGeneration: got.generation } }
+            );
+          }
+          const fps = projectFps(project);
+          const pos = Number(clip2.position) || 0;
+          const start = Number(clip2.start) || 0;
+          const end = Number(clip2.end) || start;
+          const mapped = wordsForClip(got.words, clip2, fps, got.generation);
+          let indices = [];
+          if (fillerPreset) indices = indicesForFillerPreset(mapped, fillerPreset);
+          if (matches3 !== null) indices = [.../* @__PURE__ */ new Set([...indices, ...indicesForMatches(mapped, matches3)])].sort((a, b) => a - b);
+          if (wordIndices !== null) indices = wordIndices;
+          warnings.push(...got.warnings);
+          const facts = { transcriptGeneration: got.generation };
+          if (indices.length === 0) {
+            const hint = matches3 ? ` (no transcript words matched [${matches3.map((m) => `'${m}'`).join(", ")}])` : "";
+            return unchanged(tool, `No words matched \u2014 nothing removed.${hint}`, { data: { ...facts, matches: matches3 ?? [] }, warnings });
+          }
+          const ranges = rangesForWordIndices(mapped, indices, fps);
+          if (ranges.length === 0) return unchanged(tool, "No removable ranges \u2014 nothing removed.", { data: facts, warnings });
+          const { fragments, removed } = compactFragmentsAfterRemove(pos, start, end, ranges, fps);
+          if (removed <= 0 && fragments.length === 1 && Math.abs(fragments[0][1] - start) < 1e-9 && Math.abs(fragments[0][2] - end) < 1e-9) {
+            return unchanged(tool, "Selection produced no change.", { data: facts, warnings });
+          }
+          if (fragments.length === 0) {
+            const shifted2 = call.commit((tx) => deleteClipAndRipple(tx, clipId2, end - start, fps));
+            return applied(tool, `Removed ${indices.length} word(s) (entire clip).`, {
+              removedClipIds: [clipId2],
+              shifted: shifted2,
+              warnings,
+              data: { clipId: clipId2, removedDurationSec: end - start, transcriptGeneration: got.generation }
+            });
+          }
+          const { createdIds, shifted } = call.commit((tx) => applyCompactedFragments(tx, clipId2, fragments, removed, fps));
+          const removedSet = new Set(indices);
+          const kept = mapped.filter((w) => !removedSet.has(w.index) && String(w.text ?? "").trim()).map((w) => ({ text: String(w.text).trim() }));
+          return applied(tool, `Removed ${indices.length} word(s), closed ${pyFixed(removed, 2)}s.`, {
+            shifted,
+            warnings,
+            data: {
+              clipId: clipId2,
+              createdClipIds: createdIds,
+              removedWordIndices: indices,
+              removedDurationSec: removed,
+              fragmentCount: fragments.length,
+              transcriptGeneration: got.generation,
+              transcriptionSource: got.source,
+              modelId: got.modelId,
+              language: got.language,
+              script: wordsToScript(kept),
+              wordCount: kept.length
+            }
+          });
+        }
       }),
       contractTool("remove_silence_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
@@ -66396,11 +67779,14 @@ var init_speech_tools = __esm({
           const project = call.doc.project;
           const clip2 = (project.clips ?? []).find((c) => String(c.id) === clipId2);
           if (!clip2) return refused(tool, `Error: Unknown clipId '${clipId2}'.`);
-          const path38 = mediaPath(project, clip2);
-          if (!path38) return refused(tool, "Error: Clip has no readable media path.");
+          const path39 = mediaPathOf(fileOfClip(project, clip2), clip2);
+          if (!path39) return refused(tool, "Error: Clip has no readable media path.");
           const minPause = input3.minPauseSec ?? 0.4;
           const pad3 = input3.padSec ?? 0.08;
           const maxFrac = input3.maxRemoveFraction ?? 0.85;
+          if (isRetimed(clip2)) {
+            return refused(tool, "Error: this clip has a speed change or time curve; reset its speed (Time > Normal) before removing silence.");
+          }
           const pos = Number(clip2.position) || 0;
           const start = Number(clip2.start) || 0;
           const end = Number(clip2.end) || start;
@@ -66408,7 +67794,7 @@ var init_speech_tools = __esm({
           if (duration3 <= 0) return unchanged(tool, "Clip has zero duration.");
           let speech;
           try {
-            const envelope = await call.host.audio.analyzeAudio(path38, { signal: call.signal });
+            const envelope = await call.host.audio.analyzeAudio(path39, { signal: call.signal });
             speech = energyVadWindows(envelope, { minSpeechSec: 0.12, minSilenceSec: minPause });
           } catch (error62) {
             return failed(tool, `Error: VAD failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
@@ -66446,30 +67832,38 @@ var init_speech_tools = __esm({
         requires: ["storage"],
         run: async (call, input3) => {
           const tool = "export_captions_tool";
-          const path38 = text(input3.path);
-          if (!path38) return refused(tool, "Error: path is required.");
+          const path39 = text(input3.path);
+          if (!path39) return refused(tool, "Error: path is required.");
           const writeText = call.host.storage.writeText;
           if (!writeText) return unavailable(tool, "this host cannot write files.");
-          const transcript = transcriptFromCues(
+          const transcript = await runTranscript(
             call,
-            { clipId: input3.clipId, timeline_clip_id: input3.timeline_clip_id, trackIndex: input3.trackIndex, includeWords: true },
+            { clipId: input3.clipId, timeline_clip_id: input3.timeline_clip_id, trackIndex: input3.trackIndex, language: input3.language, includeWords: true },
             tool
           );
-          if (transcript.receipt.status === "error" || transcript.receipt.status === "refused") return transcript.receipt;
+          const status = transcript.receipt.status;
+          if (status === "error" || status === "refused") return transcript.receipt;
+          if (status === "unchanged") return transcript.receipt;
           const fps = projectFps(call.doc.project);
           const cues = phraseWords(transcript.words, fps);
           const format = (text(input3.format) || "srt").toLowerCase();
           const body = format === "vtt" ? cuesToVtt(cues, fps) : cuesToSrt(cues, fps);
           let location;
           try {
-            location = await writeText.call(call.host.storage, path38, body, format === "vtt" ? "text/vtt" : "application/x-subrip");
+            location = await writeText.call(call.host.storage, path39, body, format === "vtt" ? "text/vtt" : "application/x-subrip");
           } catch (error62) {
             return failed(tool, `Error: write failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
           }
-          return applied(tool, `Exported ${cues.length} cue(s) to ${location || path38}.`, {
-            warnings: [ESTIMATED_WARNING],
-            data: { path: location || path38, format, count: cues.length }
-          }, 0);
+          const data = record4(transcript.receipt.data);
+          return applied(
+            tool,
+            `Exported ${cues.length} cue(s) to ${location || path39}.`,
+            {
+              warnings: transcript.receipt.warnings,
+              data: { path: location || path39, format, count: cues.length, transcriptionSource: data.transcriptionSource ?? INDEX_SOURCE, wordTiming: data.wordTiming }
+            },
+            0
+          );
         }
       }),
       contractTool("detect_beats_tool", {
@@ -66483,9 +67877,9 @@ var init_speech_tools = __esm({
           if (clipId2) {
             const clip2 = project.clips.find((c) => String(c.id) === clipId2);
             if (!clip2) return refused(tool, `Error: Unknown clipId '${clipId2}'.`);
-            file3 = fileById(project, String(clip2.file_id ?? ""));
+            file3 = fileById2(project, String(clip2.file_id ?? ""));
           } else if (fileId) {
-            file3 = fileById(project, fileId);
+            file3 = fileById2(project, fileId);
             if (!file3) return refused(tool, `Error: Unknown fileId '${fileId}'.`);
           } else {
             return refused(tool, "Error: Provide fileId or clipId.");
@@ -66899,7 +68293,7 @@ async function addClipsToTimeline(call, input3) {
   const fitTotal = input3.fit_total_seconds ?? 0;
   let entries = specs.map((spec) => {
     const fid = String(spec.file_id ?? "").trim();
-    const file3 = fid ? fileById(project, fid) : void 0;
+    const file3 = fid ? fileById2(project, fid) : void 0;
     if (!file3) throw new ToolError(`no project file with id=${pyReprString(fid)} (list_files_tool lists them)`);
     const name = String(file3.name || basename(String(file3.path || fid)));
     const sArg = spec.source_start === void 0 || spec.source_start < 0 ? null : spec.source_start;
@@ -67529,7 +68923,7 @@ function requireTargets(target, verb) {
 function readerOf3(project, clip2) {
   const reader = clip2.reader;
   if (reader && typeof reader === "object" && Object.keys(reader).length > 0) return reader;
-  const file3 = fileById(project, String(clip2.file_id ?? ""));
+  const file3 = fileById2(project, String(clip2.file_id ?? ""));
   return file3 ? file3 : {};
 }
 function mediaHasAudio(project, clip2) {
@@ -68582,8 +69976,8 @@ var init_tracks_nav = __esm({
 });
 
 // ../engine/src/tools/catalog/title-templates.ts
-function basename3(path38) {
-  return String(path38 ?? "").split(/[\\/]/).pop() ?? "";
+function basename4(path39) {
+  return String(path39 ?? "").split(/[\\/]/).pop() ?? "";
 }
 function errorMessage(error62) {
   return error62 instanceof Error ? error62.message : String(error62);
@@ -68674,11 +70068,11 @@ function titleFiles(project) {
   return project.files.filter((f3) => String(f3.path ?? "").toLowerCase().endsWith(".svg") && f3.zenvi_role !== OVERLAY_ROLE);
 }
 async function readProjectSvg(call, file3) {
-  const path38 = String(file3.path ?? "");
-  if (path38.startsWith("@emojis/") && call.host.assets) return call.host.assets.readText(`emojis/${path38.slice("@emojis/".length)}`);
+  const path39 = String(file3.path ?? "");
+  if (path39.startsWith("@emojis/") && call.host.assets) return call.host.assets.readText(`emojis/${path39.slice("@emojis/".length)}`);
   const readText = call.host.storage?.readText;
   if (!readText) throw new Error("this Zenvi surface cannot read project files");
-  return readText.call(call.host.storage, path38);
+  return readText.call(call.host.storage, path39);
 }
 function clipsOf(project, fileId) {
   return project.clips.filter((c) => c.file_id === fileId);
@@ -68687,8 +70081,8 @@ async function projectTitles(call, query2) {
   const project = call.doc.project;
   const out = [];
   for (const f3 of titleFiles(project)) {
-    const path38 = String(f3.path);
-    const entry = { file_id: f3.id, name: f3.name || basename3(path38), path: path38 };
+    const path39 = String(f3.path);
+    const entry = { file_id: f3.id, name: f3.name || basename4(path39), path: path39 };
     try {
       const doc = parseTitleSvg(await readProjectSvg(call, f3));
       entry.fields = fieldRows(titleFields(doc));
@@ -68706,23 +70100,23 @@ async function projectTitles(call, query2) {
   return out;
 }
 function svgTitle(file3) {
-  const path38 = String(file3.path ?? "");
-  if (!path38.toLowerCase().endsWith(".svg")) toolError(`${pyReprString(String(file3.name || basename3(path38)))} is not a title (only .svg titles can be edited)`);
+  const path39 = String(file3.path ?? "");
+  if (!path39.toLowerCase().endsWith(".svg")) toolError(`${pyReprString(String(file3.name || basename4(path39)))} is not a title (only .svg titles can be edited)`);
   if (file3.zenvi_role === OVERLAY_ROLE) toolError("that clip is a caption/timer overlay; use edit_captions_tool or add_timer_tool");
   return file3;
 }
 async function resolveTitle(call, clipId2, fileId, titleQuery) {
   const project = call.doc.project;
-  const fileById2 = (id) => project.files.find((f3) => f3.id === id);
+  const fileById3 = (id) => project.files.find((f3) => f3.id === id);
   if (clipId2) {
     const clip2 = project.clips.find((c) => c.id === clipId2);
     if (!clip2) return toolError(`no timeline clip with id=${pyReprString(clipId2)}`);
-    const file3 = fileById2(String(clip2.file_id ?? ""));
+    const file3 = fileById3(String(clip2.file_id ?? ""));
     if (!file3) return toolError(`clip ${clip2.id} has no project file`);
     return [svgTitle(file3), clip2.id];
   }
   if (fileId) {
-    const file3 = fileById2(fileId);
+    const file3 = fileById3(fileId);
     if (!file3) return toolError(`no project file with id=${pyReprString(fileId)}`);
     return [svgTitle(file3), ""];
   }
@@ -68731,7 +70125,7 @@ async function resolveTitle(call, clipId2, fileId, titleQuery) {
     const q = titleQuery.toLowerCase();
     const scored = [];
     for (const f3 of titles) {
-      const name = String(f3.name || basename3(String(f3.path)));
+      const name = String(f3.name || basename4(String(f3.path)));
       let texts = [];
       try {
         texts = titleFields(parseTitleSvg(await readProjectSvg(call, f3))).map((s) => s.text.trim());
@@ -68747,14 +70141,14 @@ async function resolveTitle(call, clipId2, fileId, titleQuery) {
     const top = scored.filter(([s]) => s === best).map(([, f3]) => f3);
     if (top.length > 1) {
       toolError(
-        `${top.length} titles match ${pyReprString(titleQuery)}: ` + top.slice(0, 6).map((f3) => `${f3.id} (${f3.name || basename3(String(f3.path))})`).join(", ") + "; pass file_id or timeline_clip_id"
+        `${top.length} titles match ${pyReprString(titleQuery)}: ` + top.slice(0, 6).map((f3) => `${f3.id} (${f3.name || basename4(String(f3.path))})`).join(", ") + "; pass file_id or timeline_clip_id"
       );
     }
     return [top[0], ""];
   }
   const selected = (call.host.ui?.selectedIds?.() ?? []).map((id) => project.clips.find((c) => c.id === id)).filter((c) => Boolean(c) && String(c.reader?.path ?? "").toLowerCase().endsWith(".svg"));
   if (selected.length === 1) {
-    const file3 = fileById2(String(selected[0].file_id ?? ""));
+    const file3 = fileById3(String(selected[0].file_id ?? ""));
     if (file3) return [svgTitle(file3), selected[0].id];
   }
   if (titles.length === 1) return [titles[0], ""];
@@ -68762,14 +70156,14 @@ async function resolveTitle(call, clipId2, fileId, titleQuery) {
 }
 async function writeTitle(call, name, svg) {
   const media = call.host.media;
-  let path38;
+  let path39;
   try {
-    path38 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path39 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return toolError(`failed to write title SVG: ${errorMessage(error62)}`);
   }
   try {
-    return { path: path38, info: await media.probe(path38), name };
+    return { path: path39, info: await media.probe(path39), name };
   } catch {
     return toolError(`could not import ${name} into Project Files`);
   }
@@ -68954,10 +70348,10 @@ var init_title_templates = __esm({
           try {
             doc = parseTitleSvg(source2);
           } catch (error62) {
-            return toolError(`cannot read title SVG ${basename3(srcPath)}: ${errorMessage(error62)}`);
+            return toolError(`cannot read title SVG ${basename4(srcPath)}: ${errorMessage(error62)}`);
           }
           const slots = titleFields(doc);
-          const name = String(file3.name || basename3(srcPath));
+          const name = String(file3.name || basename4(srcPath));
           if (hasText2 && slots.length === 0) toolError(`${name} has no text to change`);
           const values = hasText2 ? assignTexts(slots, text4, subtitle, lines2, name, false) : /* @__PURE__ */ new Map();
           const scopeUsed = scope === "this_clip" && clips.length <= 1 ? "all_clips" : scope;
@@ -68975,15 +70369,15 @@ var init_title_templates = __esm({
           const after = fieldRows(slots);
           const svg = titleSvgText(doc);
           if (scopeUsed !== "duplicate" && svg === before) toolError("the title already looks like that; nothing changed");
-          const taken = titleFiles(project).map((f3) => basename3(String(f3.path)));
+          const taken = titleFiles(project).map((f3) => basename4(String(f3.path)));
           let outName;
           if (scopeUsed === "all_clips") outName = versionName(srcPath, taken);
           else {
-            const [prefix, offset] = duplicatePattern(basename3(srcPath));
+            const [prefix, offset] = duplicatePattern(basename4(srcPath));
             const free = freeName(prefix, offset, taken);
             outName = free === null ? null : `${free}.svg`;
           }
-          if (!outName) toolError(scopeUsed === "all_clips" ? `no free version name for ${pyReprString(basename3(srcPath))}` : "no free name for the copy");
+          if (!outName) toolError(scopeUsed === "all_clips" ? `no free version name for ${pyReprString(basename4(srcPath))}` : "no free name for the copy");
           const media = await writeTitle(call, outName, svg);
           const result2 = call.commit((tx) => {
             if (scopeUsed === "all_clips") {
@@ -69003,7 +70397,7 @@ var init_title_templates = __esm({
           let summary;
           if (scopeUsed === "all_clips") summary = `Updated title ${pyReprString(shown)} on ${result2.clipIds.length} clip(s).`;
           else if (scopeUsed === "this_clip") summary = `Gave clip ${clipId2} its own edited title ${pyReprString(shown)}.`;
-          else summary = `Duplicated the title as ${pyReprString(basename3(media.path))} (${pyReprString(shown)}); it is in Project Files.`;
+          else summary = `Duplicated the title as ${pyReprString(basename4(media.path))} (${pyReprString(shown)}); it is in Project Files.`;
           const data = {
             scope: scopeUsed,
             file_id: result2.fileId,
@@ -69024,11 +70418,11 @@ var init_title_templates = __esm({
 });
 
 // ../engine/src/tools/catalog/titles.ts
-function basename4(path38) {
-  return String(path38).split(/[\\/]/).pop() ?? "";
+function basename5(path39) {
+  return String(path39).split(/[\\/]/).pop() ?? "";
 }
-function isAbsolutePath2(path38) {
-  return path38.startsWith("/") || path38.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path38);
+function isAbsolutePath2(path39) {
+  return path39.startsWith("/") || path39.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path39);
 }
 async function loadTitleTemplate(call, template) {
   const tmpl = template.trim();
@@ -69037,7 +70431,7 @@ async function loadTitleTemplate(call, template) {
     const storage = call.host.storage;
     if (!tmpl.toLowerCase().endsWith(".svg") || !storage?.readText) return null;
     try {
-      return { file: basename4(tmpl), svg: await storage.readText(tmpl) };
+      return { file: basename5(tmpl), svg: await storage.readText(tmpl) };
     } catch (error62) {
       log(tmpl, error62);
       return null;
@@ -69053,7 +70447,7 @@ async function loadTitleTemplate(call, template) {
   }
 }
 function titleFileName(body, fileName2) {
-  let safe2 = basename4(fileName2.trim());
+  let safe2 = basename5(fileName2.trim());
   if (!safe2) {
     const slug2 = pySlice(body.replace(/[^A-Za-z0-9_-]+/g, "_"), 0, 40).replace(/^_+|_+$/g, "") || "title";
     safe2 = `${slug2}_${generateId().slice(0, 8).toLowerCase()}.svg`;
@@ -69064,19 +70458,19 @@ function titleFileName(body, fileName2) {
 async function prepareTitle(call, template, body, options) {
   const media = call.host.media;
   const name = titleFileName(body, options.fileName);
-  let path38;
+  let path39;
   try {
     const svg = setSvgText(template.svg, body);
-    path38 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path39 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return `Error: failed to write title SVG: ${error62 instanceof Error ? error62.message : String(error62)}`;
   }
   let imported;
   try {
-    const info = await media.probe(path38);
-    imported = { path: path38, info, name };
+    const info = await media.probe(path39);
+    imported = { path: path39, info, name };
   } catch {
-    return `Error: could not import title into media bin: ${path38}`;
+    return `Error: could not import title into media bin: ${path39}`;
   }
   const placed = await planPlacement(call, provisionalFile(imported), {
     position_seconds: options.position,
@@ -69103,15 +70497,12 @@ var init_titles2 = __esm({
     init_titles();
     init_templates();
     init_define();
-    init_frame_time();
     init_placement();
     init_pyfmt();
     init_receipt();
-    init_speech();
     init_titles_text();
     init_clips2();
     init_common();
-    init_speech_tools();
     titleTools = [
       contractTool("add_title_tool", {
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -69151,91 +70542,6 @@ var init_titles2 = __esm({
                 template: template.file
               },
               notes: [place]
-            }
-          );
-        }
-      }),
-      contractTool("add_captions_tool", {
-        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-        requires: ["media", "assets"],
-        run: async (call, input3) => {
-          const tool = "add_captions_tool";
-          if (!call.host.media.writeGenerated) return unavailable(tool, "it cannot store generated caption images.");
-          const clipId2 = text(input3.clipId) || text(input3.timeline_clip_id);
-          const srtPath = text(input3.srtPath);
-          const fps = projectFps(call.doc.project);
-          const captionGroup = `cap_${generateId().toLowerCase()}`;
-          let cues;
-          let source2 = "local";
-          let generation = null;
-          if (srtPath) {
-            const readText = call.host.storage?.readText;
-            if (!readText) return unavailable(tool, "it cannot read subtitle files on this host.");
-            let raw;
-            try {
-              raw = await readText.call(call.host.storage, srtPath);
-            } catch {
-              return refused(tool, `Error: srtPath not found: ${srtPath}`);
-            }
-            try {
-              cues = parseSrtOrVtt(raw, fps);
-            } catch (error62) {
-              return failed(tool, `Error: Failed to parse subtitles: ${error62 instanceof Error ? error62.message : String(error62)}`);
-            }
-            source2 = "srt";
-          } else {
-            const transcript = transcriptFromCues(call, { clipId: clipId2, trackIndex: input3.trackIndex, includeWords: true }, tool);
-            const receipt2 = transcript.receipt;
-            if (!isOkStatus(receipt2.status)) return receipt2;
-            const data = receipt2.data ?? {};
-            if (receipt2.status === "unchanged") {
-              return unchanged(tool, String(receipt2.summary || "No spoken dialogue to caption."), { data });
-            }
-            source2 = typeof data.transcriptionSource === "string" && data.transcriptionSource ? data.transcriptionSource : "local";
-            generation = data.transcriptGeneration ?? null;
-            const words3 = [];
-            for (const c of Array.isArray(data.clips) ? data.clips : []) {
-              const list2 = c.words;
-              if (Array.isArray(list2)) words3.push(...list2);
-            }
-            if (words3.length === 0) return unchanged(tool, "No words to caption.");
-            cues = phraseWords(words3, fps, { maxWords: input3.maxWords ?? 8, maxChars: input3.maxChars ?? 42 });
-          }
-          if (cues.length === 0) return unchanged(tool, "No caption cues produced.");
-          const template = await loadTitleTemplate(call, "");
-          if (!template) return failed(tool, "Error: Failed to place any captions. Error: title template not found (default).");
-          const prepared = [];
-          const warnings = [];
-          for (const cue of cues) {
-            const body = String(cue.text ?? "").trim();
-            if (!body) continue;
-            const pos = Number(cue.startSec) || 0;
-            const dur = Math.max(0.05, (Number(cue.endSec) || 0) - pos);
-            const title = await prepareTitle(call, template, body, { position: pos, duration: dur, track: "", fileName: `${captionGroup}_${prepared.length}.svg` });
-            if (typeof title === "string") {
-              warnings.push(title);
-              continue;
-            }
-            prepared.push({ cue, body, pos, dur, title });
-          }
-          if (prepared.length === 0) return failed(tool, `Error: Failed to place any captions. ${warnings.slice(0, 2).join("; ")}`);
-          const placed = call.commit((tx) => prepared.map((p) => placeTitle2(tx, p.title)));
-          const captions = prepared.map((p, i) => ({
-            text: p.body,
-            startSec: p.pos,
-            endSec: p.pos + p.dur,
-            startFrame: p.cue.startFrame,
-            endFrame: p.cue.endFrame,
-            file_id: placed[i].fileId
-          }));
-          const first = captions[0];
-          return applied(
-            tool,
-            `Placed ${captions.length} caption(s) (group ${captionGroup}).`,
-            {
-              warnings,
-              watchSuggested: clipId2 ? { clipId: clipId2, start: first.startSec, end: first.endSec } : null,
-              data: { captionGroupId: captionGroup, captions, transcriptionSource: source2, transcriptGeneration: generation, count: captions.length }
             }
           );
         }
@@ -69469,6 +70775,7 @@ function needName(need) {
     "storage.writeText": "writing files",
     "ui.openExportDialog": "an export dialog",
     "audio.decodePcm": "audio decoding",
+    "audio.transcribe": "speech recognition",
     "ui.selection": "reading the editor's selection",
     "ui.setSelection": "selecting in the editor",
     "ui.timelineView": "reading the timeline view",
@@ -69514,13 +70821,14 @@ function toolAvailability(tool) {
 function availabilityMatrix(tools) {
   return tools.map((tool) => ({ tool, availability: toolAvailability(tool) }));
 }
-var WATCH, WATCH_NOTE, TOOL_NEEDS, SURFACE_PROFILES;
+var WATCH, SERVER_ASR, WATCH_NOTE, TOOL_NEEDS, SURFACE_PROFILES;
 var init_availability = __esm({
   "../engine/src/tools/availability.ts"() {
     "use strict";
     init_define();
     init_pending();
     WATCH = ["frames", "backend"];
+    SERVER_ASR = "speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free";
     WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
     TOOL_NEEDS = {
       // Placement and search refine with a vision watch when the host can watch.
@@ -69528,7 +70836,10 @@ var init_availability = __esm({
       split_file_add_clip_tool: { optional: WATCH, partialNote: WATCH_NOTE },
       search_clip_scenes_tool: { optional: ["backend", "frames"], partialNote: "without the Zenvi backend only chapter and scene descriptions are searched" },
       slice_clip_at_best_match_tool: { optional: ["backend", "frames"], partialNote: "without the Zenvi backend only explicit times and scene descriptions work" },
-      duck_under_speech_tool: { optional: ["audio"], partialNote: "without audio analysis only indexed transcript cues find the speech" },
+      duck_under_speech_tool: {
+        optional: ["audio", "audio.transcribe"],
+        partialNote: "without audio analysis and speech recognition only indexed transcript cues find the speech"
+      },
       watch_clip_tool: { optional: ["media.importPath"], partialNote: "file_path needs local file access" },
       export_video_tool: { anyOf: ["exporter", "ui.openExportDialog"] },
       save_project_tool: {},
@@ -69543,12 +70854,15 @@ var init_availability = __esm({
       generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
       add_title_tool: { methods: ["media.writeGenerated"] },
       add_captions_tool: {
-        methods: ["media.writeGenerated"],
-        optional: ["storage.readText"],
-        partialNote: "srtPath needs file reading",
-        webNote: "captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device"
+        optional: ["media.writeGenerated", "storage.readText", "audio.transcribe"],
+        partialNote: "captions not tied to a clip need stored generated media; srtPath needs file reading; media Zenvi has not indexed needs speech recognition"
       },
-      export_captions_tool: { methods: ["storage.writeText"], webNote: "captions come from indexed transcripts (no on-device ASR)" },
+      export_captions_tool: {
+        methods: ["storage.writeText"],
+        optional: ["audio.transcribe"],
+        partialNote: "without speech recognition only media Zenvi indexed has a transcript",
+        webNote: SERVER_ASR
+      },
       list_title_templates_tool: { optional: ["storage.readText"], partialNote: "kind=project needs reading project files" },
       edit_title_tool: {
         methods: ["media.writeGenerated", "storage.readText"],
@@ -69559,7 +70873,11 @@ var init_availability = __esm({
         webNote: "2D keyframed versions of the Blender templates (no 3D depth or particles); earth, magic_wand, snow and picture_frames_4 need Zenvi desktop"
       },
       add_timer_tool: { optional: ["media.writeGenerated"], partialNote: "without storing generated images only timeline_clip_id works" },
-      get_transcript_tool: { webNote: "indexed transcript cues with estimated word timings (no on-device ASR)" },
+      get_transcript_tool: {
+        optional: ["audio.transcribe"],
+        partialNote: "without speech recognition only media Zenvi indexed has a transcript (word timings estimated)",
+        webNote: SERVER_ASR
+      },
       reindex_project_file_tool: { webNote: "reports files that are already indexed; uploading for indexing runs in Zenvi desktop" },
       wait_until_project_indexed_tool: { webNote: "reports indexing status once; does not wait" },
       remove_silence_tool: { webNote: "energy VAD on the host's audio analysis" },
@@ -69579,8 +70897,8 @@ var init_availability = __esm({
         methods: ["ui.timelineView", "ui.showTimelineRange", "ui.setTimelineMode"],
         webNote: "the web editor has no timing (retime-by-drag) mode, so timing=true is refused"
       },
-      transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
-      remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
+      transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
+      remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
       detect_beats_tool: { methods: ["audio.decodePcm"] },
       build_reel_tool: {
         optional: ["audio.decodePcm", "media.writeGenerated"],
@@ -69604,6 +70922,7 @@ var init_availability = __esm({
           "storage.readText",
           "ui.openExportDialog",
           "audio.decodePcm",
+          "audio.transcribe",
           "ui.selection",
           "ui.setSelection",
           "ui.timelineView",
@@ -69624,7 +70943,8 @@ var init_availability = __esm({
           "storage.open",
           "storage.readText",
           "storage.writeText",
-          "audio.decodePcm"
+          "audio.decodePcm",
+          "audio.transcribe"
         ],
         conditional: { backend: "signed in with zenvi login" }
       },
@@ -69632,7 +70952,7 @@ var init_availability = __esm({
         title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
         host: "packages/cloud/src/mcp/engine.ts",
         capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
-        methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText", "audio.decodePcm"],
+        methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText", "audio.decodePcm", "audio.transcribe"],
         conditional: {
           frames: "the render worker is configured",
           media: "ffprobe is available",
@@ -70215,8 +71535,8 @@ var init_parseUtil = __esm({
     init_errors5();
     init_en2();
     makeIssue = (params) => {
-      const { data, path: path38, errorMaps, issueData } = params;
-      const fullPath = [...path38, ...issueData.path || []];
+      const { data, path: path39, errorMaps, issueData } = params;
+      const fullPath = [...path39, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -70500,11 +71820,11 @@ var init_types4 = __esm({
     init_parseUtil();
     init_util2();
     ParseInputLazyPath = class {
-      constructor(parent, value, path38, key) {
+      constructor(parent, value, path39, key) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value;
-        this._path = path38;
+        this._path = path39;
         this._key = key;
       }
       get path() {
@@ -73960,11 +75280,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path38) {
-  if (path38.length === 0) {
+function getDotPath(path39) {
+  if (path39.length === 0) {
     return "object root";
   }
-  return path38.reduce((acc, seg, index) => {
+  return path39.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -81416,8 +82736,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path38) {
-      let input3 = path38;
+    function removeDotSegments(path39) {
+      let input3 = path39;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -81826,8 +83146,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path38 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path38 && path38 !== "/" ? path38 : void 0;
+        const path39 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path39 && path39 !== "/" ? path39 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -82358,8 +83678,8 @@ var require_fast_uri = __commonJS({
       } catch {
         return void 0;
       }
-      const { normalized, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = normalizeStringWithStatus(value, opts);
-      return malformedAuthorityOrPort || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? void 0 : normalized;
+      const { normalized: normalized2, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = normalizeStringWithStatus(value, opts);
+      return malformedAuthorityOrPort || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? void 0 : normalized2;
     }
     var fastUri = {
       SCHEMES,
@@ -93617,7 +94937,7 @@ var init_client4 = __esm({
 });
 
 // src/project/session.ts
-import path20 from "node:path";
+import path21 from "node:path";
 function sameState(a, b) {
   return a?.mtimeMs === b?.mtimeMs && a?.size === b?.size;
 }
@@ -93631,7 +94951,7 @@ var init_session2 = __esm({
     ProjectSession = class _ProjectSession {
       constructor(project, file3, options) {
         this.options = options;
-        this.fileValue = file3 ? path20.resolve(file3) : void 0;
+        this.fileValue = file3 ? path21.resolve(file3) : void 0;
         this.doc = this.makeDoc(project);
         const base = createNodeHost({ ...options.host, projectFile: () => this.fileValue });
         const storage = base.storage;
@@ -93640,7 +94960,7 @@ var init_session2 = __esm({
           storage: {
             ...storage,
             open: async (p) => {
-              const target = path20.resolve(this.fileValue ? path20.dirname(this.fileValue) : process.cwd(), p);
+              const target = path21.resolve(this.fileValue ? path21.dirname(this.fileValue) : process.cwd(), p);
               const loaded = await storage.open(target);
               this.fileValue = target;
               this.openedDuringCall = true;
@@ -93648,7 +94968,7 @@ var init_session2 = __esm({
               return loaded;
             },
             save: async (project2, p) => {
-              const target = p ? path20.resolve(this.fileValue ? path20.dirname(this.fileValue) : process.cwd(), p) : this.fileValue;
+              const target = p ? path21.resolve(this.fileValue ? path21.dirname(this.fileValue) : process.cwd(), p) : this.fileValue;
               if (!target) return storage.save(project2, p);
               const saved = await withProjectLock(target, () => writeProjectFile(target, project2, { engineAssetsDir: this.assetsDir() }));
               this.fileValue = saved;
@@ -93677,7 +94997,7 @@ var init_session2 = __esm({
       }
       /** Open an existing project file. */
       static async open(file3, options) {
-        const abs = path20.resolve(file3);
+        const abs = path21.resolve(file3);
         const project = await readProjectFile(abs);
         const session = new _ProjectSession(project, abs, options);
         session.diskState = await fileState(abs);
@@ -93705,7 +95025,7 @@ var init_session2 = __esm({
       }
       /** Write the document (history included) to the session's file. */
       async save(target) {
-        const file3 = target ? path20.resolve(target) : this.fileValue;
+        const file3 = target ? path21.resolve(target) : this.fileValue;
         if (!file3) throw new Error("This project has no file yet.");
         await withProjectLock(file3, () => writeProjectFile(file3, this.doc.toJSON(), { engineAssetsDir: this.assetsDir() }));
         this.fileValue = file3;
@@ -93714,7 +95034,7 @@ var init_session2 = __esm({
       }
       /** Switch to another project (open it, or create it from `project`). */
       async switchTo(file3, project) {
-        const abs = path20.resolve(file3);
+        const abs = path21.resolve(file3);
         const loaded = project ?? await readProjectFile(abs);
         this.doc = this.makeDoc(loaded);
         this.fileValue = abs;
@@ -93959,7 +95279,7 @@ var init_context = __esm({
 });
 
 // src/commands/account.ts
-import path21 from "node:path";
+import path22 from "node:path";
 function cloudClient(ctx) {
   return new CloudClient(ctx.config.cloudUrl, () => ctx.auth.cloudToken(), fetch, `zenvi-cli/${VERSION}`);
 }
@@ -94019,7 +95339,7 @@ If no browser opens, paste that link into one. Waiting for you to sign in\u2026`
     ctx.out.endProgress();
     await keepCloudRefs(ctx, session, result2.cloudRefs);
     if (opts.open !== false) await openUrl(result2.editorUrl, ctx.env);
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pushed ${path21.basename(file3)} to Zenvi Cloud`, engine: "portable", project: file3, ...result2 });
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pushed ${path22.basename(file3)} to Zenvi Cloud`, engine: "portable", project: file3, ...result2 });
     else {
       ctx.out.line(`${ctx.out.style("\u2713", "green")} Pushed to Zenvi Cloud: ${result2.editorUrl}`);
       ctx.out.line(ctx.out.style(`  ${result2.uploaded} media uploaded, ${result2.reused} already there${result2.skipped.length ? `, ${result2.skipped.length} skipped` : ""}`, "dim"));
@@ -94099,7 +95419,7 @@ var init_account = __esm({
 
 // src/commands/edit.ts
 import { existsSync as existsSync5 } from "node:fs";
-import path22 from "node:path";
+import path23 from "node:path";
 function parseTime(text4) {
   if (text4 === void 0) return void 0;
   const t = text4.trim().toLowerCase();
@@ -94144,14 +95464,14 @@ function fileLength(file3) {
 }
 function registerEditCommands(program2, ctx) {
   program2.command("import").description("add media files (or folders, globs) to the project bin").argument("<paths...>", "files, folders or globs").option("--index", "also send the media to the Zenvi backend for AI indexing (needs `zenvi login`)").action(async (paths, opts) => {
-    const abs = paths.map((p) => /[*?[{]/.test(p) || /^[a-z]+:\/\//i.test(p) ? p : path22.resolve(ctx.cwd, p));
+    const abs = paths.map((p) => /[*?[{]/.test(p) || /^[a-z]+:\/\//i.test(p) ? p : path23.resolve(ctx.cwd, p));
     await runToolCommand(ctx, "import_files_tool", { paths: JSON.stringify(abs), skip_indexing: opts.index ? "false" : "true" });
   });
   program2.command("add").description("put a file on the timeline (imports it first when given a path)").argument("<file>", "file id from `zenvi files`, or a media path").option("--at <time>", "timeline position (default: after the last clip on the track)").option("-t, --track <track>", "track number from the bottom, or layer").option("--start <time>", "source in point").option("--end <time>", "source out point").option("--duration <time>", "how much of the file to use, from --start (default: the whole file)").action(async (file3, opts) => {
     await withExecutor(ctx, async (executor) => {
       let fileId = file3;
       let query2;
-      const local = path22.resolve(ctx.cwd, file3);
+      const local = path23.resolve(ctx.cwd, file3);
       if (existsSync5(local)) {
         const imported = await executor.call("import_files_tool", { paths: JSON.stringify([local]), skip_indexing: "true" });
         if (!imported.ok) {
@@ -94161,10 +95481,10 @@ function registerEditCommands(program2, ctx) {
         fileId = void 0;
         if (executor instanceof PortableExecutor) {
           const files = executor.session.doc.project.files;
-          const base = path22.basename(local);
-          fileId = files.find((f3) => f3.path === local)?.id ?? [...files].reverse().find((f3) => path22.basename(String(f3.path)) === base)?.id;
+          const base = path23.basename(local);
+          fileId = files.find((f3) => f3.path === local)?.id ?? [...files].reverse().find((f3) => path23.basename(String(f3.path)) === base)?.id;
         }
-        if (!fileId) query2 = path22.basename(local);
+        if (!fileId) query2 = path23.basename(local);
       }
       const flags = { start: parseTime(opts.start), end: parseTime(opts.end), duration: parseTime(opts.duration) };
       const known = executor instanceof PortableExecutor && fileId ? executor.session.doc.project.files.find((f3) => f3.id === fileId) : void 0;
@@ -95703,9 +97023,9 @@ var init_receipt2 = __esm({
 
 // ../adobe-link/src/discovery.ts
 import { readFile as readFile9, unlink } from "node:fs/promises";
-import path23 from "node:path";
+import path24 from "node:path";
 function linkDirOf(desktopDir) {
-  return path23.join(desktopDir, "link");
+  return path24.join(desktopDir, "link");
 }
 function pidAlive3(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -95762,7 +97082,7 @@ async function removeQuietly(file3) {
 }
 async function inspectHost(desktopDir, host, options = {}) {
   const dir = linkDirOf(desktopDir);
-  const file3 = path23.join(dir, `${host}.json`);
+  const file3 = path24.join(dir, `${host}.json`);
   const result2 = (status, detail2, endpoint2) => ({ host, status, detail: detail2, file: file3, ...endpoint2 ? { endpoint: endpoint2 } : {} });
   let raw;
   try {
@@ -95786,11 +97106,11 @@ async function inspectHost(desktopDir, host, options = {}) {
   }
   if (!isLinkUrl(url2)) return result2("invalid", `refusing a non-loopback URL (${url2})`);
   const tokenFile = text2(data.token_file);
-  const tokenPath = tokenFile ? path23.isAbsolute(tokenFile) ? tokenFile : path23.join(dir, tokenFile) : path23.join(dir, `${host}.token`);
+  const tokenPath = tokenFile ? path24.isAbsolute(tokenFile) ? tokenFile : path24.join(dir, tokenFile) : path24.join(dir, `${host}.token`);
   if (!pidAlive3(pid)) {
     if (options.removeStale) {
       await removeQuietly(file3);
-      if (path23.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path23.basename(tokenPath))) await removeQuietly(tokenPath);
+      if (path24.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path24.basename(tokenPath))) await removeQuietly(tokenPath);
     }
     return result2("dead", `process ${pid} is gone (left over from a crash)`);
   }
@@ -95828,7 +97148,7 @@ function inspectHosts(desktopDir, options = {}) {
           host,
           status: "invalid",
           detail: `could not read the discovery file: ${error62 instanceof Error ? error62.message : String(error62)}`,
-          file: path23.join(linkDirOf(desktopDir), `${host}.json`)
+          file: path24.join(linkDirOf(desktopDir), `${host}.json`)
         })
       )
     )
@@ -95937,17 +97257,17 @@ var init_client5 = __esm({
 import { randomBytes as randomBytes4 } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { cpSync, lstatSync, mkdirSync, realpathSync, renameSync, rmSync, symlinkSync } from "node:fs";
-import path24 from "node:path";
+import path25 from "node:path";
 function extensionsDir({ platform, home, appData }) {
-  if (platform === "darwin") return path24.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions");
-  if (platform === "win32") return path24.win32.join(appData ?? path24.win32.join(home, "AppData", "Roaming"), "Adobe", "CEP", "extensions");
+  if (platform === "darwin") return path25.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions");
+  if (platform === "win32") return path25.win32.join(appData ?? path25.win32.join(home, "AppData", "Roaming"), "Adobe", "CEP", "extensions");
   throw new Error(`Adobe CEP extensions run on macOS and Windows, not ${platform}`);
 }
 function systemExtensionsDirs(platform, env2 = {}) {
   if (platform === "darwin") return ["/Library/Application Support/Adobe/CEP/extensions"];
   if (platform === "win32") {
     const roots = [env2["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", env2.ProgramFiles ?? "C:\\Program Files"];
-    return [...new Set(roots)].map((root) => path24.win32.join(root, "Common Files", "Adobe", "CEP", "extensions"));
+    return [...new Set(roots)].map((root) => path25.win32.join(root, "Common Files", "Adobe", "CEP", "extensions"));
   }
   return [];
 }
@@ -95957,7 +97277,7 @@ function debugModeCommands(platform, enable) {
   );
 }
 function planExtensionInstall({ platform, home, appData, source: source2, uninstall = false, copy = false }) {
-  const target = (platform === "win32" ? path24.win32 : path24.posix).join(extensionsDir({ platform, home, appData }), BUNDLE_ID);
+  const target = (platform === "win32" ? path25.win32 : path25.posix).join(extensionsDir({ platform, home, appData }), BUNDLE_ID);
   if (uninstall) {
     return {
       target,
@@ -95981,7 +97301,7 @@ function planExtensionInstall({ platform, home, appData, source: source2, uninst
 function describeAction(action) {
   switch (action.kind) {
     case "build":
-      return `build ${path24.join(action.outDir, BUNDLE_ID)}`;
+      return `build ${path25.join(action.outDir, BUNDLE_ID)}`;
     case "remove":
       return `remove ${action.path}`;
     case "link":
@@ -95993,7 +97313,7 @@ function describeAction(action) {
   }
 }
 function systemCommand(command, platform = process.platform, env2 = process.env) {
-  if (platform === "win32" && command.toLowerCase() === "reg") return path24.win32.join(env2.SystemRoot ?? env2.windir ?? "C:\\Windows", "System32", "reg.exe");
+  if (platform === "win32" && command.toLowerCase() === "reg") return path25.win32.join(env2.SystemRoot ?? env2.windir ?? "C:\\Windows", "System32", "reg.exe");
   if (platform === "darwin" && ["defaults", "mdfind", "open"].includes(command)) return `/usr/bin/${command}`;
   return command;
 }
@@ -96013,11 +97333,11 @@ function runInstallAction(action, options = {}) {
       if (exists(action.path)) rmSync(action.path, { recursive: true, force: true });
       return;
     case "link":
-      mkdirSync(path24.dirname(action.to), { recursive: true });
+      mkdirSync(path25.dirname(action.to), { recursive: true });
       symlinkSync(action.from, action.to, action.type);
       return;
     case "copy":
-      mkdirSync(path24.dirname(action.to), { recursive: true });
+      mkdirSync(path25.dirname(action.to), { recursive: true });
       cpSync(action.from, action.to, { recursive: true });
       return;
     default: {
@@ -96033,12 +97353,12 @@ function real(file3) {
   try {
     return realpathSync(file3);
   } catch {
-    return path24.resolve(file3);
+    return path25.resolve(file3);
   }
 }
 function replaceInstall(action) {
   const from = real(action.from);
-  const to = path24.join(real(path24.dirname(action.to)), path24.basename(action.to));
+  const to = path25.join(real(path25.dirname(action.to)), path25.basename(action.to));
   const targetIsLink = (() => {
     try {
       return lstatSync(action.to).isSymbolicLink();
@@ -96046,10 +97366,10 @@ function replaceInstall(action) {
       return false;
     }
   })();
-  if (!targetIsLink && (from === to || from.startsWith(to + path24.sep))) {
+  if (!targetIsLink && (from === to || from.startsWith(to + path25.sep))) {
     throw new Error(`the extension to install (${action.from}) is the installed copy itself (${action.to}); build it somewhere else first`);
   }
-  mkdirSync(path24.dirname(action.to), { recursive: true });
+  mkdirSync(path25.dirname(action.to), { recursive: true });
   const tag = `${process.pid}-${randomBytes4(4).toString("hex")}`;
   const staging = `${action.to}.zenvi-new-${tag}`;
   const old = `${action.to}.zenvi-old-${tag}`;
@@ -96122,7 +97442,7 @@ var init_unknown_args = __esm({
 // src/hosts/extension.ts
 import { lstat, readdir as readdir5, readFile as readFile10, stat as stat11 } from "node:fs/promises";
 import { createRequire as createRequire2 } from "node:module";
-import path25 from "node:path";
+import path26 from "node:path";
 function defaultDetectDeps(home, env2) {
   return {
     platform: process.platform,
@@ -96145,7 +97465,7 @@ function manifestVersion(xml) {
   return xml ? /\bExtensionBundleVersion\s*=\s*"([^"]+)"/.exec(xml)?.[1] : void 0;
 }
 async function readCopy(deps, dir) {
-  const xml = await deps.readText(path25.join(dir, "CSXS", "manifest.xml"));
+  const xml = await deps.readText(path26.join(dir, "CSXS", "manifest.xml"));
   if (xml === void 0) return void 0;
   return { dir, version: manifestVersion(xml) };
 }
@@ -96155,7 +97475,7 @@ async function findInstalledExtensions(deps) {
     [extensionsDir({ platform: deps.platform, home: deps.home, appData: deps.env.APPDATA }), "user"],
     ...systemExtensionsDirs(deps.platform, deps.env).map((dir) => [dir, "system"])
   ];
-  const join = deps.platform === "win32" ? path25.win32.join : path25.posix.join;
+  const join = deps.platform === "win32" ? path26.win32.join : path26.posix.join;
   const found = [];
   for (const [folder, scope] of folders) {
     const dir = join(folder, BUNDLE_ID);
@@ -96170,11 +97490,11 @@ async function bundledExtension(deps) {
   if (override) candidates.push(override);
   else {
     const bundle = bundleDir();
-    if (bundle) candidates.push(path25.join(bundle, "adobe", BUNDLE_ID));
+    if (bundle) candidates.push(path26.join(bundle, "adobe", BUNDLE_ID));
     else {
       try {
         const entry = createRequire2(import.meta.url).resolve("@zenvi/adobe-link");
-        candidates.push(path25.join(path25.dirname(path25.dirname(entry)), "dist", BUNDLE_ID));
+        candidates.push(path26.join(path26.dirname(path26.dirname(entry)), "dist", BUNDLE_ID));
       } catch {
       }
     }
@@ -96186,7 +97506,7 @@ async function bundledExtension(deps) {
   return void 0;
 }
 async function findAdobeApps(deps) {
-  const dirs = deps.platform === "darwin" ? ["/Applications", path25.posix.join(deps.home, "Applications")] : deps.platform === "win32" ? [.../* @__PURE__ */ new Set([deps.env.ProgramFiles ?? "C:\\Program Files", deps.env.ProgramW6432 ?? deps.env.ProgramFiles ?? "C:\\Program Files"])].map((root) => path25.win32.join(root, "Adobe")) : [];
+  const dirs = deps.platform === "darwin" ? ["/Applications", path26.posix.join(deps.home, "Applications")] : deps.platform === "win32" ? [.../* @__PURE__ */ new Set([deps.env.ProgramFiles ?? "C:\\Program Files", deps.env.ProgramW6432 ?? deps.env.ProgramFiles ?? "C:\\Program Files"])].map((root) => path26.win32.join(root, "Adobe")) : [];
   const apps = { aftereffects: [], premiere: [] };
   let looked = false;
   for (const dir of dirs) {
@@ -96213,7 +97533,7 @@ var init_extension = __esm({
 });
 
 // src/hosts/policy.ts
-import path26 from "node:path";
+import path27 from "node:path";
 function adobeMode(env2) {
   const value = env2.ZENVI_MCP_ADOBE?.trim().toLowerCase();
   return value === "on" || value === "off" ? value : "auto";
@@ -96234,7 +97554,7 @@ async function decideFamilies(desktopDir, deps) {
   const { apps } = installed ? await findAdobeApps(deps) : { apps: { aftereffects: [], premiere: [] } };
   const anyApp = HOST_IDS.some((host) => apps[host].length > 0);
   for (const host of HOST_IDS) {
-    if (await deps.exists(path26.join(linkDirOf(desktopDir), `${host}.json`))) {
+    if (await deps.exists(path27.join(linkDirOf(desktopDir), `${host}.json`))) {
       decisions[host] = { listed: true, reason: `Zenvi Link runs in ${APP_LABEL[host]} on this machine` };
     } else if (installed && apps[host].length > 0) {
       decisions[host] = { listed: true, reason: `Zenvi Link and ${apps[host][0]} are installed` };
@@ -96257,7 +97577,7 @@ async function decideHandoff(desktopDir, deps) {
   if (mode === "on") return { listed: true, reason: "ZENVI_MCP_HANDOFF=on" };
   if (mode === "off") return { listed: false, reason: "ZENVI_MCP_HANDOFF=off", enable: "Unset ZENVI_MCP_HANDOFF (or set it to auto or on) in this server's environment." };
   for (const name of ["gui_mcp.json", "headless_mcp.json"]) {
-    if (await deps.exists(path26.join(desktopDir, name))) return { listed: true, reason: "the Zenvi desktop app runs on this machine" };
+    if (await deps.exists(path27.join(desktopDir, name))) return { listed: true, reason: "the Zenvi desktop app runs on this machine" };
   }
   if (await deps.appInstalled()) return { listed: true, reason: "the Zenvi desktop app is installed" };
   return {
@@ -96278,7 +97598,7 @@ var init_policy = __esm({
 
 // src/hosts/registry.ts
 import { readFile as readFile11, stat as stat12 } from "node:fs/promises";
-import path27 from "node:path";
+import path28 from "node:path";
 function toolCount(host) {
   return catalogFor(host).length;
 }
@@ -96302,7 +97622,7 @@ function howToConnect(host, discovery) {
 }
 function describeHosts(report2) {
   const name = (entry) => {
-    const project = typeof entry.project === "string" && entry.project ? ` (${path27.basename(entry.project)})` : "";
+    const project = typeof entry.project === "string" && entry.project ? ` (${path28.basename(entry.project)})` : "";
     const version2 = typeof entry.app_version === "string" && entry.app_version ? ` ${entry.app_version}` : "";
     return `${entry.label}${version2}${project}`;
   };
@@ -96489,7 +97809,7 @@ var init_registry5 = __esm({
        * process lives; otherwise the file is checked again (one initialize).
        */
       async connect(host) {
-        const file3 = path27.join(linkDirOf(this.desktopDir), `${host}.json`);
+        const file3 = path28.join(linkDirOf(this.desktopDir), `${host}.json`);
         const cached3 = this.clients.get(host);
         if (cached3) {
           const raw = await readFile11(file3, "utf8").catch(() => "");
@@ -96729,7 +98049,7 @@ var init_adobe_tools = __esm({
 // src/desktop/launcher.ts
 import { execFile as execFile2, spawn as spawn3 } from "node:child_process";
 import { readdir as readdir6, readFile as readFile13, realpath as realpath3, stat as stat14 } from "node:fs/promises";
-import path31 from "node:path";
+import path32 from "node:path";
 import { promisify as promisify2 } from "node:util";
 function defaultLauncherDeps() {
   const self = [process.argv[1]].filter((p) => typeof p === "string");
@@ -96800,7 +98120,7 @@ async function which(deps, name) {
   const exts = deps.platform === "win32" ? (deps.env.PATHEXT || ".EXE;.CMD;.BAT").split(";") : [""];
   for (const dir of dirs) {
     for (const ext of exts) {
-      const candidate = path31.join(dir, name + ext.toLowerCase());
+      const candidate = path32.join(dir, name + ext.toLowerCase());
       if (await deps.exists(candidate)) return candidate;
     }
   }
@@ -96814,7 +98134,7 @@ async function isSelf(deps, file3) {
   return /^#!.*\bnode\b/.test(head) || /\bzenvi\.mjs\b/.test(real3);
 }
 async function findMac(deps) {
-  const candidates = ["/Applications/Zenvi.app", path31.join(deps.home, "Applications", "Zenvi.app")];
+  const candidates = ["/Applications/Zenvi.app", path32.join(deps.home, "Applications", "Zenvi.app")];
   for (const app2 of candidates) {
     if (await deps.exists(app2)) return { kind: "macos-app", location: app2, command: "open", args: ["-a", app2, "--args"] };
   }
@@ -96839,7 +98159,7 @@ async function findWindows(deps) {
     if (code !== 0) continue;
     const location = regValue(stdout, "InstallLocation");
     if (location) {
-      const file3 = path31.win32.join(location.replace(/^"|"$/g, ""), "zenvi.exe");
+      const file3 = path32.win32.join(location.replace(/^"|"$/g, ""), "zenvi.exe");
       if (await deps.exists(file3)) return exe(file3);
     }
     const icon = regValue(stdout, "DisplayIcon")?.replace(/^"|"$/g, "").replace(/,\d+$/, "");
@@ -96849,40 +98169,40 @@ async function findWindows(deps) {
   const command = /REG_(?:SZ|EXPAND_SZ)\s+(.+?)\s*$/m.exec(assoc.stdout)?.[1];
   const fromAssoc = command ? /^"([^"]+)"/.exec(command)?.[1] ?? command.split(/\s+/)[0] : void 0;
   if (fromAssoc && await deps.exists(fromAssoc)) return exe(fromAssoc);
-  const roots = [deps.env.ProgramFiles, deps.env["ProgramFiles(x86)"], deps.env.LOCALAPPDATA && path31.win32.join(deps.env.LOCALAPPDATA, "Programs")];
+  const roots = [deps.env.ProgramFiles, deps.env["ProgramFiles(x86)"], deps.env.LOCALAPPDATA && path32.win32.join(deps.env.LOCALAPPDATA, "Programs")];
   for (const root of roots) {
     if (!root) continue;
-    const file3 = path31.win32.join(root, "Zenvi", "zenvi.exe");
+    const file3 = path32.win32.join(root, "Zenvi", "zenvi.exe");
     if (await deps.exists(file3)) return exe(file3);
   }
   return void 0;
 }
 function xdgDataDirs(deps) {
-  const home = deps.env.XDG_DATA_HOME || path31.join(deps.home, ".local", "share");
+  const home = deps.env.XDG_DATA_HOME || path32.join(deps.home, ".local", "share");
   const system = (deps.env.XDG_DATA_DIRS || "/usr/local/share:/usr/share").split(":").filter(Boolean);
-  return [home, ...system, "/var/lib/flatpak/exports/share", path31.join(deps.home, ".local", "share", "flatpak", "exports", "share")];
+  return [home, ...system, "/var/lib/flatpak/exports/share", path32.join(deps.home, ".local", "share", "flatpak", "exports", "share")];
 }
 async function findLinux(deps) {
   const bin = await which(deps, "zenvi-desktop");
   if (bin && !await isSelf(deps, bin)) return { kind: "linux-bin", location: bin, command: bin, args: [] };
-  const appImageDirs = [path31.join(deps.home, "Applications"), path31.join(deps.home, ".local", "bin"), path31.join(deps.home, "bin"), "/opt", "/opt/zenvi", "/usr/local/bin"];
+  const appImageDirs = [path32.join(deps.home, "Applications"), path32.join(deps.home, ".local", "bin"), path32.join(deps.home, "bin"), "/opt", "/opt/zenvi", "/usr/local/bin"];
   for (const dir of appImageDirs) {
     const names2 = (await deps.listDir(dir)).filter((n) => /^zenvi.*\.appimage$/i.test(n)).sort().reverse();
     if (names2[0]) {
-      const file3 = path31.join(dir, names2[0]);
+      const file3 = path32.join(dir, names2[0]);
       return { kind: "linux-appimage", location: file3, command: file3, args: [] };
     }
   }
   for (const dataDir of xdgDataDirs(deps)) {
     for (const name of ["org.zenvi.Zenvi.desktop", "zenvi.desktop"]) {
-      const file3 = path31.join(dataDir, "applications", name);
+      const file3 = path32.join(dataDir, "applications", name);
       const text4 = await deps.readText(file3);
       const exec = text4 && /^Exec\s*=\s*(.+)$/m.exec(text4)?.[1];
       if (!exec) continue;
       const argv = parseDesktopExec(exec);
       const head = argv[0];
       if (!head) continue;
-      const resolved = path31.isAbsolute(head) ? head : await which(deps, head);
+      const resolved = path32.isAbsolute(head) ? head : await which(deps, head);
       if (!resolved || await isSelf(deps, resolved)) continue;
       return { kind: "linux-desktop-entry", location: file3, command: resolved, args: argv.slice(1) };
     }
@@ -98788,7 +100108,7 @@ never WebM (Zenvi drops VP9 alpha).
 // src/commands/project.ts
 import { existsSync as existsSync6 } from "node:fs";
 import { mkdir as mkdir8 } from "node:fs/promises";
-import path32 from "node:path";
+import path33 from "node:path";
 function newProject(profile) {
   const create = createProject;
   if (!create) throw new CliError("This build's engine cannot create projects (createProject is not exported).");
@@ -98807,18 +100127,18 @@ function registerProjectCommands(program2, ctx) {
       return;
     }
     const named = ctx.flags().project ?? ctx.env.ZENVI_PROJECT?.trim() ?? void 0;
-    const asFile = (value) => path32.resolve(ctx.cwd, isProjectPath(value) ? value : `${value}.zvn`);
+    const asFile = (value) => path33.resolve(ctx.cwd, isProjectPath(value) ? value : `${value}.zvn`);
     if (positional && named && asFile(positional) !== asFile(named)) {
       throw new CliError(`Two different project files given: ${asFile(positional)} and ${asFile(named)} (-p/ZENVI_PROJECT).`, 2, "Pass only one.");
     }
     const file3 = asFile(positional ?? named ?? "untitled.zvn");
     if (existsSync6(file3) && !opts.force) throw new CliError(`${file3} already exists.`, 1, "Pass --force to replace it.");
     const project = newProject(opts.profile);
-    await mkdir8(path32.dirname(file3), { recursive: true });
+    await mkdir8(path33.dirname(file3), { recursive: true });
     const session = ProjectSession.fromProject(project, file3, { registry: ctx.registry, host: hostOptions(ctx) });
     await session.save();
     const info = { project: file3, id: project.id, profile: project.profile, width: project.width, height: project.height, fps: project.fps };
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Created ${path32.basename(file3)}`, engine: "portable", ...info });
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Created ${path33.basename(file3)}`, engine: "portable", ...info });
     else {
       ctx.out.line(`${ctx.out.style("\u2713", "green")} Created ${file3}`);
       ctx.out.line(ctx.out.style(`  ${project.profile}, ${project.width}x${project.height}`, "dim"));
@@ -98848,7 +100168,7 @@ function registerProjectCommands(program2, ctx) {
     });
   }
   program2.command("save").description("save the project (optionally to a new file)").argument("[file]", "save as this file").action(async (file3) => {
-    await runToolCommand(ctx, "save_project_tool", file3 ? { file_path: path32.resolve(ctx.cwd, file3) } : {});
+    await runToolCommand(ctx, "save_project_tool", file3 ? { file_path: path33.resolve(ctx.cwd, file3) } : {});
   });
 }
 var init_project3 = __esm({
@@ -98865,7 +100185,7 @@ var init_project3 = __esm({
 
 // src/commands/render.ts
 import { writeFile as writeFile8 } from "node:fs/promises";
-import path33 from "node:path";
+import path34 from "node:path";
 function parseFps(text4) {
   if (!text4) return void 0;
   const m = /^(\d+)(?:\/(\d+))?$/.exec(text4.trim());
@@ -98942,7 +100262,7 @@ function formatBytes(n) {
 function registerRenderCommands(program2, ctx) {
   program2.command("render").description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav) or PNG frames").argument("[output]", "output file (default: <project>.mp4 next to the project)").option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav or png (default: from the file name)").option("--quality <quality>", "low, medium, high or lossless", "high").option("--width <px>", "output width (height follows the project aspect)").option("--height <px>", "output height").option("--fps <rate>", "frame rate, e.g. 30 or 30000/1001 (default: the project's)").option("--start <time>", "render from this timeline time").option("--end <time>", "render up to this timeline time").option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)").option("--audio-bitrate <rate>", "e.g. 192k").option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)").option("--encoder-preset <preset>", "encoder speed: ultrafast \u2026 veryslow (default veryfast; the desktop app encodes at medium)").option("--open", "open the result when done").action(async (outputArg, flags) => {
     await withExecutor(ctx, async (executor) => {
-      const output2 = outputArg ? path33.resolve(ctx.cwd, outputArg) : void 0;
+      const output2 = outputArg ? path34.resolve(ctx.cwd, outputArg) : void 0;
       if (!(executor instanceof PortableExecutor)) {
         printOutcome(ctx, await exportOnDesktop(executor, output2));
         return;
@@ -98976,7 +100296,7 @@ function registerRenderCommands(program2, ctx) {
   program2.command("frame").description("render one timeline frame to an image (PNG or JPEG)").argument("<time>", "timeline time (seconds or timecode)").argument("[output]", "image file (default: frame-<time>.png)").option("--width <px>", "image width", "1280").option("--jpeg", "write JPEG instead of PNG").option("--grid", "draw the 0-1 coordinate grid and a frame caption (what inspect tools show models)").action(async (timeArg2, outputArg, flags) => {
     const seconds2 = parseTime(timeArg2);
     const format = flags.jpeg || /\.jpe?g$/i.test(outputArg ?? "") ? "jpeg" : "png";
-    const output2 = path33.resolve(ctx.cwd, outputArg ?? `frame-${seconds2.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
+    const output2 = path34.resolve(ctx.cwd, outputArg ?? `frame-${seconds2.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
     await withExecutor(ctx, async (executor) => {
       let data;
       let mimeType;
@@ -99024,7 +100344,7 @@ var init_render2 = __esm({
 
 // src/mcp/extra-tools.ts
 import { existsSync as existsSync7 } from "node:fs";
-import path34 from "node:path";
+import path35 from "node:path";
 function text3(v) {
   return typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : void 0;
 }
@@ -99062,7 +100382,7 @@ function extraTools(ctx) {
         const tool = "open_project_file";
         const raw = text3(args.path);
         if (!raw) return { receipt: refused(tool, "path is required") };
-        const file3 = path34.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
+        const file3 = path35.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
         if (existsSync7(file3)) {
           await state.switchTo(file3);
           return { receipt: applied(tool, `Opened ${file3}`, { data: projectSummary(state) }, 0) };
@@ -99100,7 +100420,7 @@ function extraTools(ctx) {
         const tool = "render_video";
         const desktop = await state.desktopExecutor();
         const requested = text3(args.output) ?? text3(args.output_path);
-        const output2 = requested ? path34.resolve(ctx.cwd, requested) : void 0;
+        const output2 = requested ? path35.resolve(ctx.cwd, requested) : void 0;
         if (desktop) {
           const outcome = await exportOnDesktop(desktop, output2);
           return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)), engine: "desktop" };
@@ -99193,7 +100513,7 @@ function extraTools(ctx) {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       async run(state, args) {
         const tool = "launch_editor";
-        const file3 = text3(args.path) ? path34.resolve(ctx.cwd, text3(args.path)) : state.session.file;
+        const file3 = text3(args.path) ? path35.resolve(ctx.cwd, text3(args.path)) : state.session.file;
         if (!file3) return { receipt: refused(tool, "This project has no file yet: call open_project_file first.") };
         try {
           const result2 = await openInDesktop({ config: ctx.config, project: file3, deps: state.launcher, clientVersion: VERSION });
@@ -99993,14 +101313,14 @@ media. One undo step restores the link.`,
 
 // src/hosts/handoff.ts
 import { homedir as homedir3 } from "node:os";
-import path35 from "node:path";
+import path36 from "node:path";
 function resolvePathArgs(args, cwd, home = homedir3()) {
   const out = { ...args };
   for (const [key, value] of Object.entries(args)) {
     if (!PATH_ARGS.has(key) || typeof value !== "string" || !value.trim()) continue;
     const text4 = value.trim();
-    const expanded = text4 === "~" ? home : text4.startsWith("~/") || text4.startsWith("~\\") ? path35.join(home, text4.slice(2)) : text4;
-    out[key] = path35.isAbsolute(expanded) || path35.win32.isAbsolute(expanded) ? expanded : path35.resolve(cwd, expanded);
+    const expanded = text4 === "~" ? home : text4.startsWith("~/") || text4.startsWith("~\\") ? path36.join(home, text4.slice(2)) : text4;
+    out[key] = path36.isAbsolute(expanded) || path36.win32.isAbsolute(expanded) ? expanded : path36.resolve(cwd, expanded);
   }
   return out;
 }
@@ -103944,9 +105264,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [path]
    * @return {(string|null|Command)}
    */
-  executableDir(path38) {
-    if (path38 === void 0) return this._executableDir;
-    this._executableDir = path38;
+  executableDir(path39) {
+    if (path39 === void 0) return this._executableDir;
+    this._executableDir = path39;
     return this;
   }
   /**
@@ -104210,7 +105530,7 @@ init_edit2();
 init_src3();
 init_adobe_tools();
 import { lstat as lstat2, writeFile as writeFile6 } from "node:fs/promises";
-import path28 from "node:path";
+import path29 from "node:path";
 
 // src/hosts/doctor.ts
 init_src3();
@@ -104488,8 +105808,8 @@ function hostToolName(host, tool) {
 }
 async function saveImages(ctx, images, out) {
   if (!out || images.length === 0) return [];
-  const target = path28.resolve(ctx.cwd, out);
-  const ext = path28.extname(target);
+  const target = path29.resolve(ctx.cwd, out);
+  const ext = path29.extname(target);
   const saved = [];
   for (const [i, image] of images.entries()) {
     const file3 = images.length === 1 ? target : `${target.slice(0, target.length - ext.length)}-${i + 1}${ext}`;
@@ -104628,14 +105948,14 @@ function registerHostCommands(program2, ctx) {
 init_src3();
 init_src2();
 import { readFile as readFile14 } from "node:fs/promises";
-import path36 from "node:path";
+import path37 from "node:path";
 
 // src/agents/mcp-config.ts
 init_src2();
 init_output();
 import { execFile } from "node:child_process";
 import { copyFile as copyFile2, mkdir as mkdir7, readFile as readFile12, rename as rename6, stat as stat13, writeFile as writeFile7 } from "node:fs/promises";
-import path29 from "node:path";
+import path30 from "node:path";
 import { promisify } from "node:util";
 
 // src/agents/toml.ts
@@ -104754,12 +106074,12 @@ function shellQuote(arg) {
   return /^[A-Za-z0-9_./:@%+=,-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`;
 }
 function claudeDesktopConfigPath(home, platform, env2) {
-  if (platform === "darwin") return path29.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
-  if (platform === "win32") return path29.join(env2.APPDATA || path29.join(home, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
-  return path29.join(env2.XDG_CONFIG_HOME || path29.join(home, ".config"), "Claude", "claude_desktop_config.json");
+  if (platform === "darwin") return path30.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+  if (platform === "win32") return path30.join(env2.APPDATA || path30.join(home, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
+  return path30.join(env2.XDG_CONFIG_HOME || path30.join(home, ".config"), "Claude", "claude_desktop_config.json");
 }
 function codexConfigPath(home, env2) {
-  return path29.join(env2.CODEX_HOME || path29.join(home, ".codex"), "config.toml");
+  return path30.join(env2.CODEX_HOME || path30.join(home, ".codex"), "config.toml");
 }
 function isZenviStdio(entry) {
   if (!entry || typeof entry !== "object") return false;
@@ -104780,7 +106100,7 @@ async function exists2(file3) {
   }
 }
 async function writeWithBackup(file3, text4, hadFile) {
-  await mkdir7(path29.dirname(file3), { recursive: true });
+  await mkdir7(path30.dirname(file3), { recursive: true });
   let backup;
   if (hadFile) {
     backup = `${file3}.zenvi-backup`;
@@ -104833,7 +106153,7 @@ function codexSection(name, command) {
   ].join("\n");
 }
 async function defaultRunClaude(env2, home) {
-  const candidates = [whichSync("claude", env2), path29.join(home, ".local", "bin", "claude"), path29.join(home, ".claude", "local", "claude")];
+  const candidates = [whichSync("claude", env2), path30.join(home, ".local", "bin", "claude"), path30.join(home, ".claude", "local", "claude")];
   let claude;
   for (const c of candidates) if (c && await exists2(c)) {
     claude = c;
@@ -104864,7 +106184,7 @@ async function mcpConfig(options) {
       const scope = options.scope ?? "user";
       const entry = { type: "stdio", ...stdioEntry, env: {} };
       if (scope === "project") {
-        const file3 = path29.join(cwd, ".mcp.json");
+        const file3 = path30.join(cwd, ".mcp.json");
         const snippet2 = JSON.stringify({ mcpServers: { [name]: entry } }, null, 2);
         if (!options.install) return { ...base, scope, file: file3, snippet: snippet2, message: `Add this to ${file3} (Claude Code asks you to approve project servers).` };
         const { changed, backup } = await mergeJsonServer(file3, name, entry, options.force ?? false);
@@ -104896,7 +106216,7 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
     }
     case "cursor": {
       const scope = options.scope ?? "user";
-      const file3 = scope === "project" ? path29.join(cwd, ".cursor", "mcp.json") : path29.join(options.home, ".cursor", "mcp.json");
+      const file3 = scope === "project" ? path30.join(cwd, ".cursor", "mcp.json") : path30.join(options.home, ".cursor", "mcp.json");
       const snippet = JSON.stringify({ mcpServers: { [name]: stdioEntry } }, null, 2);
       if (!options.install) return { ...base, scope, file: file3, snippet, message: `Merge this into ${file3}.` };
       const { changed, backup } = await mergeJsonServer(file3, name, stdioEntry, options.force ?? false);
@@ -104933,7 +106253,7 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
 // src/agents/self-command.ts
 init_src2();
 import { realpathSync as realpathSync2 } from "node:fs";
-import path30 from "node:path";
+import path31 from "node:path";
 function real2(file3) {
   try {
     return realpathSync2(file3);
@@ -104953,7 +106273,7 @@ function selfMcpCommand(env2 = process.env, argv = process.argv) {
     const parts = override.split(/\s+/);
     return { command: parts[0], args: [...parts.slice(1), "mcp"] };
   }
-  const entry = argv[1] ? path30.resolve(argv[1]) : "";
+  const entry = argv[1] ? path31.resolve(argv[1]) : "";
   if (/\.m?js$/.test(entry)) return { command: stableNodePath(env2), args: [real2(entry), "mcp"] };
   return { command: process.execPath, args: [...process.execArgv, real2(entry), "mcp"] };
 }
@@ -104973,7 +106293,7 @@ init_account();
 init_context();
 function registerIntegrationCommands(program2, ctx) {
   program2.command("open").description("show the project in the Zenvi desktop app (or in the web editor with --web)").argument("[project]", "project file (default: the selected project)").option("--web", "push to Zenvi Cloud and open it in the web editor instead").action(async (projectArg, opts) => {
-    const project = projectArg ? path36.resolve(ctx.cwd, projectArg) : await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env });
+    const project = projectArg ? path37.resolve(ctx.cwd, projectArg) : await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env });
     if (opts.web) {
       if (!project) throw new CliError("No project to open.", 2, "Pass a .zvn file.");
       const session = await openSession(ctx, project);
@@ -105110,7 +106430,7 @@ async function runDoctor(ctx) {
   const configured = [];
   const configFiles = [
     ["claude-desktop", claudeDesktopConfigPath(ctx.config.home, process.platform, ctx.env)],
-    ["cursor", path36.join(ctx.config.home, ".cursor", "mcp.json")],
+    ["cursor", path37.join(ctx.config.home, ".cursor", "mcp.json")],
     ["codex", codexConfigPath(ctx.config.home, ctx.env)]
   ];
   for (const [name, file3] of configFiles) {
@@ -105127,7 +106447,7 @@ init_render2();
 
 // src/config.ts
 import { homedir as homedir4 } from "node:os";
-import path37 from "node:path";
+import path38 from "node:path";
 var DEFAULTS = {
   website: "https://zenvi.pro",
   editor: "https://zenvi.pro/editor",
@@ -105146,7 +106466,7 @@ function env(e, ...keys) {
 var trim = (url2) => url2.replace(/\/+$/, "");
 function loadConfig(e = process.env) {
   const home = e.HOME || e.USERPROFILE || homedir4();
-  const configDir = env(e, "ZENVI_CONFIG_DIR") ?? (process.platform === "win32" ? path37.join(e.APPDATA || path37.join(home, "AppData", "Roaming"), "zenvi") : path37.join(e.XDG_CONFIG_HOME || path37.join(home, ".config"), "zenvi"));
+  const configDir = env(e, "ZENVI_CONFIG_DIR") ?? (process.platform === "win32" ? path38.join(e.APPDATA || path38.join(home, "AppData", "Roaming"), "zenvi") : path38.join(e.XDG_CONFIG_HOME || path38.join(home, ".config"), "zenvi"));
   return {
     websiteUrl: trim(env(e, "ZENVI_WEBSITE", "ZENVI_WEBSITE_URL") ?? DEFAULTS.website),
     editorUrl: trim(env(e, "ZENVI_EDITOR_URL") ?? DEFAULTS.editor),
@@ -105155,7 +106475,7 @@ function loadConfig(e = process.env) {
     supabaseUrl: trim(env(e, "ZENVI_SUPABASE_URL", "SUPABASE_URL") ?? DEFAULTS.supabaseUrl),
     supabaseAnonKey: env(e, "ZENVI_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY") ?? DEFAULTS.supabaseAnonKey,
     configDir,
-    desktopDir: env(e, "ZENVI_DESKTOP_DIR") ?? path37.join(home, ".openshot_qt"),
+    desktopDir: env(e, "ZENVI_DESKTOP_DIR") ?? path38.join(home, ".openshot_qt"),
     home
   };
 }

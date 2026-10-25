@@ -1,9 +1,11 @@
 /**
  * `BackendHost`: JSON requests to the Zenvi backend (`/api/v1/…`), with the
- * user's Supabase access token when they are signed in.
+ * user's Supabase access token when they are signed in; and the multipart
+ * upload `AudioHost.transcribe` sends speech audio with.
  */
 
-import type { BackendHost } from "@zenvi/engine";
+import { TRANSCRIPTION_PATH, TranscriptionError, transcriptionHttpError, type BackendHost } from "@zenvi/engine";
+import type { SpeechUpload } from "../audio/speech.js";
 
 export class BackendError extends Error {
   constructor(
@@ -22,6 +24,8 @@ export interface BackendHostOptions {
   token?: () => Promise<string | undefined>;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** Speech uploads wait this long for the transcription (default 10 minutes). */
+  transcribeTimeoutMs?: number;
   userAgent?: string;
 }
 
@@ -75,5 +79,47 @@ export function createBackendHost(options: BackendHostOptions): BackendHost {
       }
       return parsed as T;
     },
+  };
+}
+
+/**
+ * `POST /api/v1/transcription` (multipart: the audio as `file`, `language`,
+ * `prompt`) as the signed-in person: a `SpeechUpload` for
+ * `transcribeMediaFile`. Errors are TranscriptionErrors in words.
+ */
+export function backendSpeechUpload(options: BackendHostOptions): SpeechUpload {
+  const base = options.baseUrl.replace(/\/+$/, "");
+  const doFetch = options.fetchImpl ?? fetch;
+  return async (piece, fields) => {
+    const form = new FormData();
+    form.append("file", new Blob([piece.bytes], { type: piece.contentType }), piece.fileName);
+    if (fields.language) form.append("language", fields.language);
+    if (fields.prompt) form.append("prompt", fields.prompt);
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (options.userAgent) headers["User-Agent"] = options.userAgent;
+    const token = await options.token?.();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const timeout = AbortSignal.timeout(options.transcribeTimeoutMs ?? 600_000);
+    const signal = fields.signal ? AbortSignal.any([fields.signal, timeout]) : timeout;
+    let response: Response;
+    try {
+      response = await doFetch(`${base}${TRANSCRIPTION_PATH}`, { method: "POST", headers, body: form, signal });
+    } catch (error) {
+      if (fields.signal?.aborted) throw error;
+      throw new TranscriptionError("failed", `cannot reach the Zenvi backend at ${base}: ${(error as Error).message}`);
+    }
+    const text = await response.text();
+    let parsed: unknown = text;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      // Plain-text body.
+    }
+    if (!response.ok) {
+      const error = transcriptionHttpError(response.status, parsed);
+      if (error.code === "sign_in") throw new TranscriptionError("sign_in", "transcribing speech needs a Zenvi sign-in: run `zenvi login`");
+      throw error;
+    }
+    return parsed;
   };
 }

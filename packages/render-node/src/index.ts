@@ -21,6 +21,7 @@ export { CompositePool, compositeThreads, compositeWorkerScript } from "./render
 export * from "./render/overlay.js";
 export * from "./render/render-frame.js";
 export * from "./audio/analyze.js";
+export * from "./audio/speech.js";
 export * from "./host/paths.js";
 export * from "./host/storage.js";
 export * from "./host/media.js";

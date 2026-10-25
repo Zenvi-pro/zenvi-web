@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { AudioEnvelope, ReaderInfo } from "@zenvi/engine";
+import { FILLER_PROMPT, isTranscriptionError, parseTranscription, type AudioEnvelope, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
-import type { AssetSource, MediaProber } from "../render/renderer.js";
+import type { AssetSource, MediaProber, SpeechTranscriber } from "../render/renderer.js";
 import { fakeRenderer } from "../testing/fakes.js";
 import { type Harness, harness, sampleProject, USER_A } from "../testing/helpers.js";
 import { loadEngineRegistry } from "./engine.js";
@@ -188,5 +188,107 @@ describe("the cloud ToolHost", () => {
     expect(await h.services.media.get(USER_A, sha("<svg>hi</svg>"))).toMatchObject({ verified: true });
     await expect(host.media!.writeGenerated!("x.html", bytes, "text/html")).rejects.toThrow("does not store");
     await dispose();
+  });
+});
+
+describe("speech recognition in the cloud", () => {
+  const SECRET = "s".repeat(40);
+  const ANSWER = {
+    text: "Hi, um, welcome.",
+    language: "english",
+    model: "whisper-1",
+    duration_seconds: 2,
+    words: [
+      { text: "Hi", startSec: 0.1, endSec: 0.4 },
+      { text: "um", startSec: 0.5, endSec: 0.7 },
+      { text: "welcome", startSec: 0.8, endSec: 1.3 },
+    ],
+    segments: [{ text: "Hi, um, welcome.", startSec: 0, endSec: 1.4 }],
+  };
+
+  /** A transcriber that sends the local copy's bytes as one piece (render-node extracts real speech audio). */
+  const transcribeMedia: SpeechTranscriber = async (file, options) => {
+    const bytes = new Uint8Array(await readFile(file));
+    const answer = await options.upload({ bytes, fileName: "voice.mp3", contentType: "audio/mpeg", offset: 0 }, { language: options.language ?? "", prompt: options.prompt ?? "", signal: options.signal });
+    return parseTranscription(answer);
+  };
+
+  async function speechHarness(status = 200) {
+    const sent: { url: string; auth: string | null; form: FormData }[] = [];
+    const h = await harness({ engine: await loadEngineRegistry(), prober, analyzeAudio: async () => ({ sampleRate: 16000, frameSize: 480, rms: [0.2] }), transcribeMedia, config: { backendAuth: { kind: "assertion", secret: SECRET } } });
+    h.services.backendSessions.fetchImpl = async (url, init) => {
+      sent.push({ url: String(url), auth: new Headers(init?.headers).get("authorization"), form: init?.body as FormData });
+      return new Response(JSON.stringify(status === 200 ? ANSWER : { detail: "Not Found" }), { status, headers: { "content-type": "application/json" } });
+    };
+    const bytes = Buffer.from("speech bytes");
+    const hash = sha(bytes);
+    await h.services.media.storeBytes(USER_A, { sha256: hash, bytes, name: "talk.mp4", contentType: "video/mp4" });
+    const created = await h.services.projects.create(USER_A, {
+      name: "Talk",
+      project: sampleProject({ files: [{ id: "F1", path: "/Users/me/talk.mp4", media_type: "video", has_audio: true, cloud: { sha256: hash, size: bytes.length, name: "talk.mp4" } }] }) as never,
+    });
+    return { h, sent, projectId: created.id };
+  }
+
+  it("sends project media to the backend as the connected person, once per media and language", async () => {
+    const { h, sent, projectId } = await speechHarness();
+    const { project } = await h.services.projects.get(USER_A, projectId);
+    const first = createCloudHost(context(h), projectId, () => project);
+    const t = await first.host.audio!.transcribe!("/Users/me/talk.mp4", { language: "", prompt: FILLER_PROMPT });
+    expect(t.words.map((w) => w.text)).toEqual(["Hi,", "um,", "welcome."]);
+    expect(t.language).toBe("en");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.url).toBe("https://api.zenvi.pro/api/v1/transcription");
+    expect(sent[0]!.auth).toMatch(/^Bearer ey/);
+    const file = sent[0]!.form.get("file") as File;
+    expect(await file.text()).toBe("speech bytes");
+    expect([file.name, file.type]).toEqual(["voice.mp3", "audio/mpeg"]);
+    expect(sent[0]!.form.get("prompt")).toBe(FILLER_PROMPT);
+    expect(sent[0]!.form.get("language")).toBeNull();
+    await first.dispose();
+    // A retried edit (a revision conflict) runs on a new host: the recent transcription is reused, not billed again.
+    const retry = createCloudHost(context(h), projectId, () => project);
+    await retry.host.audio!.transcribe!("/Users/me/talk.mp4", { language: "", prompt: FILLER_PROMPT });
+    expect(sent).toHaveLength(1);
+    await retry.host.audio!.transcribe!("/Users/me/talk.mp4", { language: "de", prompt: "" });
+    expect(sent).toHaveLength(2);
+    await retry.dispose();
+  });
+
+  it("keeps the words in the cloud project, so the next tool call reads them", async () => {
+    const { h, sent, projectId } = await speechHarness();
+    const client = await connect(h);
+    const got = await call(client, "get_transcript_tool", { file_id: "F1", project_id: projectId });
+    expect(got.isError).toBeFalsy();
+    expect(got.content[0]?.text).toMatch(/^Transcribed 3 words \(server, en\)\. fileId=F1 /);
+    const { project } = await h.services.projects.get(USER_A, projectId);
+    expect(project.files[0]?.ai_metadata).toMatchObject({ asr: { generation: 1, modelId: "whisper-1", words: [{ text: "Hi," }, { text: "um," }, { text: "welcome." }] } });
+    expect(project.history?.undo ?? []).toEqual([]);
+    const again = await call(client, "transcribe_media_tool", { file_id: "F1", project_id: projectId });
+    expect(again.content[0]?.text).toMatch(/^Transcribed 3 words/);
+    expect(sent).toHaveLength(1);
+    await client.close();
+  });
+
+  it("says in words that the server has no speech recognition yet", async () => {
+    const { h, projectId } = await speechHarness(404);
+    const { project } = await h.services.projects.get(USER_A, projectId);
+    const { host, dispose } = createCloudHost(context(h), projectId, () => project);
+    const error = await host.audio!.transcribe!("/Users/me/talk.mp4").catch((e: unknown) => e);
+    expect(isTranscriptionError(error) && error.code).toBe("unavailable");
+    await dispose();
+    const client = await connect(h);
+    const refused = await call(client, "get_transcript_tool", { file_id: "F1", project_id: projectId });
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0]?.text).toBe(
+      "Error: get_transcript_tool is not available in this Zenvi surface: speech recognition is not available yet on this Zenvi server (it needs a newer Zenvi backend); the media has no indexed transcript either.",
+    );
+    await client.close();
+  });
+
+  it("has no speech recognition without the backend or ffmpeg", async () => {
+    const h = await harness({ prober, analyzeAudio: async () => ({ sampleRate: 16000, frameSize: 480, rms: [] }), transcribeMedia });
+    const { host } = createCloudHost(context(h), "c_x", () => sampleProject() as never);
+    expect(host.audio?.transcribe).toBeUndefined();
   });
 });

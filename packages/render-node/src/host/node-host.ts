@@ -8,12 +8,13 @@ import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
+import { transcribeMediaFile } from "../audio/speech.js";
 import { engineAssetsDir } from "../resources.js";
 import { FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
 import { renderFrame } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
-import { createBackendHost, type BackendHostOptions } from "./backend.js";
+import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
 import { createNodeMediaHost, type ImportPolicy } from "./media.js";
 import { createMediaResolver } from "./paths.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
@@ -143,6 +144,11 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     log: options.log,
   };
   if (assets) host.assets = createAssetHost(assets);
-  if (options.backend) host.backend = createBackendHost(options.backend);
+  if (options.backend) {
+    host.backend = createBackendHost(options.backend);
+    // Speech recognition through the Zenvi backend, as the person `zenvi login` signed in.
+    const upload = backendSpeechUpload(options.backend);
+    host.audio!.transcribe = (p, o) => transcribeMediaFile(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal, upload });
+  }
   return host;
 }

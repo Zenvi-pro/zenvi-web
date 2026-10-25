@@ -7,7 +7,8 @@
  * a clear message while queues and job records keep working.
  */
 
-import type { AudioEnvelope, ExportOptions, Project, ReaderInfo } from "@zenvi/engine";
+import type { AudioEnvelope, ExportOptions, Project, ReaderInfo, Transcription } from "@zenvi/engine";
+import type { TranscribeFileOptions } from "@zenvi/render-node";
 
 /**
  * Maps a path as stored in the project (a clip's `reader.path`, a file's
@@ -68,6 +69,13 @@ export type PcmDecoder = (
   filePath: string,
   options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
 ) => Promise<{ sampleRate: number; samples: Float32Array }>;
+
+/**
+ * Transcribe a local file's speech through `upload` (`@zenvi/render-node`
+ * `transcribeMediaFile`: ffmpeg extracts mono speech audio, long media goes
+ * up in pieces).
+ */
+export type SpeechTranscriber = (filePath: string, options: TranscribeFileOptions) => Promise<Transcription>;
 
 export class RendererUnavailableError extends Error {
   constructor(what = "renderer") {

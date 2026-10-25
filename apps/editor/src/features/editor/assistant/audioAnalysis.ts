@@ -53,7 +53,7 @@ export function mixToMono(channels: readonly Float32Array[]): Float32Array {
 }
 
 /** Decode `spec`'s audio, resampled to `sampleRate` and mixed to mono. */
-async function decodeMono(spec: MediaSourceSpec, sampleRate: number, signal?: AbortSignal): Promise<Float32Array> {
+export async function decodeMono(spec: MediaSourceSpec, sampleRate: number, signal?: AbortSignal): Promise<Float32Array> {
   if (typeof OfflineAudioContext === "undefined") throw new Error("this browser cannot decode audio");
   const blob = await blobOf(spec, signal);
   if (blob.size > MAX_ANALYZE_BYTES) throw new Error("the file is too large to analyze in the browser; use Zenvi desktop");

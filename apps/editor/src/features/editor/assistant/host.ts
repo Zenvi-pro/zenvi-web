@@ -11,6 +11,7 @@ import { exportAvailable, extensionForMime, probe, renderFrame, resolveBundledMe
 import type { EditorSession } from "../session/EditorSession";
 import { assetUrl } from "../catalog";
 import { analyzeAudio, blobOf, decodePcm } from "./audioAnalysis";
+import { transcribeSpeech } from "./transcribe";
 import { contentTypeFor, fileHash, type MediaSourceSpec } from "../session/media";
 
 const MAX_URL_IMPORT_BYTES = 2 * 1024 * 1024 * 1024;
@@ -209,6 +210,11 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       },
       async decodePcm(path, options) {
         return decodePcm(specFor(path), options);
+      },
+      // Speech recognition through the Zenvi backend, as the signed-in person.
+      async transcribe(path, options) {
+        const file = session.project.files.find((f) => f.path === path || f.id === path);
+        return transcribeSpeech(specFor(path), { ...options, name: String(file?.name ?? path.split(/[\\/]/).pop() ?? "") });
       },
     },
     log: (message) => console.debug(`[zenvi tools] ${message}`),
