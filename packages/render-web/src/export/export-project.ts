@@ -24,7 +24,7 @@ import {
 } from "mediabunny";
 import type { Project } from "@zenvi/engine";
 import type { AudioPlan } from "@zenvi/engine/render";
-import type { ExportOptions } from "@zenvi/engine/tools";
+import type { ContainerFormat, ExportOptions } from "@zenvi/engine/tools";
 import { windowEnd } from "../audio/channels.js";
 import { mixWindow, planHasSound } from "../audio/mixdown.js";
 import { AudioRenderer } from "../audio/renderer.js";
@@ -32,7 +32,7 @@ import type { LayerError } from "../compositor/compositor.js";
 import { defaultEngine, type RenderEngine } from "../engine.js";
 import type { MediaRegistry } from "../media/registry.js";
 import type { SvgRasterizer } from "../media/svg.js";
-import { chooseCodecs, ExportError, type CodecChoice, type EncodeSupport, type WebContainer } from "./codecs.js";
+import { canEncodeNamed, chooseCodecs, ExportError, type CodecChoice, type EncodeSupport, type WebContainer } from "./codecs.js";
 import { FrameRenderer } from "./frame-renderer.js";
 
 export interface ExportProgress {
@@ -80,6 +80,11 @@ const defaultSupport: EncodeSupport = {
   canEncodeVideo: (codec, options) => canEncodeVideo(codec, options),
   canEncodeAudio: (codec, options) => canEncodeAudio(codec, options),
 };
+
+/** `canEncodeNamed` with this browser's encoders. */
+export function canExportWith(format: ContainerFormat, videoCodec: string, audioCodec: string): Promise<boolean> {
+  return canEncodeNamed(format, videoCodec, audioCodec, defaultSupport);
+}
 
 function outputFormat(container: WebContainer): OutputFormat {
   switch (container) {

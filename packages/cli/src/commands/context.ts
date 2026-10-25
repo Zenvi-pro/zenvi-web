@@ -47,6 +47,8 @@ export function engineChoice(flags: GlobalFlags): EngineChoice {
 export function hostOptions(ctx: CommandContext) {
   return {
     backend: { baseUrl: ctx.config.backendUrl, token: () => ctx.auth.backendToken(), userAgent: `zenvi-cli/${VERSION}` },
+    // Zenvi desktop's folder on this computer: its recent projects, recovery copies and custom profiles.
+    desktopDir: ctx.config.desktopDir,
     log: ctx.env.ZENVI_DEBUG ? (m: string) => ctx.out.info(`[debug] ${m}`) : undefined,
   };
 }

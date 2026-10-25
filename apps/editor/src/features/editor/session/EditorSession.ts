@@ -549,6 +549,13 @@ export class EditorSession {
     this.previews.dispose();
   }
 
+  /** Drop cached filmstrips and waveforms and draw the frame again (the desktop's Clear Cache). */
+  clearPreviewCaches(): void {
+    this.previews.clear();
+    this.engine?.setProject(this.displayProject());
+    for (const l of [...this.displayListeners]) l();
+  }
+
   // -------------------------------------------------------------------------
 
   private setDraft(project: Project | null): void {

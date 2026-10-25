@@ -10,6 +10,7 @@ import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
 import { transcribeMediaFile } from "../audio/speech.js";
 import { engineAssetsDir } from "../resources.js";
+import { encoderNames } from "../ffmpeg/capabilities.js";
 import { FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
 import { renderFrame } from "../render/render-frame.js";
@@ -17,6 +18,8 @@ import { renderProject, type RenderProgress } from "../render/render-project.js"
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createMediaResolver } from "./paths.js";
+import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
+import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
 
 export interface NodeHostOptions {
@@ -31,6 +34,12 @@ export interface NodeHostOptions {
   renderEngine?: RenderEngine;
   /** Progress of `exporter.export`, with frame counts. */
   onRenderProgress?: (progress: RenderProgress) => void;
+  /**
+   * Zenvi desktop's user folder (`~/.openshot_qt`): with it the host reads the
+   * desktop's recent projects and recovery copies and keeps custom profiles
+   * where the desktop finds them.
+   */
+  desktopDir?: string;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
@@ -82,12 +91,23 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     return path.join(baseDir(), `${stem}.${ext}`);
   };
 
+  /** The open project file, for what only a saved project has. */
+  const saved = (): string => {
+    const file = current();
+    if (!file) throw new Error("The project has not been saved yet: give a file path (e.g. my-edit.zvn).");
+    return file;
+  };
+  const collectOptions = () => ({ projectFile: saved(), engineAssetsDir: assets, resolveMedia });
+
   const host: NodeHost = {
     resolveMedia,
     projectFile: current,
     media: {
       ...createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes }),
       missing: (files) => missingOnDisk(files, resolveMedia),
+      collect: (files) => collectMedia(files, collectOptions()),
+      reclaimable: (files) => reclaimableMedia(files, collectOptions()),
+      removeCopies: (paths) => removeMediaCopies(paths, collectOptions()),
     },
     exporter: {
       async export(project, exportOptions, onProgress) {
@@ -104,6 +124,12 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
             options.onRenderProgress?.(p);
           },
         });
+      },
+      // The containers this exporter writes, with encoders the local ffmpeg has (FFmpegWriter.IsValidCodec).
+      async supports(format, videoCodec, audioCodec) {
+        if (!FORMATS[format]) return false;
+        const encoders = await encoderNames().catch(() => new Set<string>());
+        return (!videoCodec || encoders.has(videoCodec)) && (!audioCodec || encoders.has(audioCodec));
       },
     },
     frames: {
@@ -143,10 +169,40 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         await writeFileAtomic(file, text);
         return file;
       },
+      writeBytes: (p, bytes, _contentType, opts) => writeBytesFile(inProject(p), bytes, opts?.overwrite),
+      exportMedia: (file, name, folder, render) =>
+        exportMediaFile({
+          source: resolveMedia(String(file.path ?? "")),
+          folder: folder ? inProject(folder) : baseDir(),
+          name,
+          render,
+          resolveMedia,
+          engine: options.renderEngine,
+          signal: options.signal,
+        }),
+      currentPath: () => current() ?? null,
     },
     log: options.log,
   };
   if (assets) host.assets = createAssetHost(assets);
+  const desktopDir = options.desktopDir;
+  if (desktopDir) {
+    Object.assign(host.storage!, {
+      recentProjects: () => desktopRecentProjects(desktopDir),
+      recoveryCopies: async () => {
+        const file = current();
+        return file ? recoveryCopiesFor(desktopDir, file) : [];
+      },
+      restoreRecoveryCopy: async (copy: string) => {
+        const file = saved();
+        const backup = await restoreRecoveryCopy(desktopDir, file, copy);
+        return { project: await readProjectFile(file), path: file, backup };
+      },
+      customProfiles: () => customProfileFiles(desktopDir),
+      writeCustomProfile: (name: string, text: string) => writeCustomProfileFile(desktopDir, name, text),
+      removeCustomProfile: (name: string) => removeCustomProfileFile(desktopDir, name),
+    } satisfies Partial<NonNullable<ToolHost["storage"]>>);
+  }
   if (options.backend) {
     host.backend = createBackendHost(options.backend);
     // Speech recognition through the Zenvi backend, as the person `zenvi login` signed in.

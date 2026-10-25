@@ -189,6 +189,39 @@ describe("the cloud ToolHost", () => {
     await dispose();
   });
 
+  it("saves frames and copies of media as download links, and lists the cloud projects as recent", async () => {
+    const h = await harness({ prober });
+    const { projectId, project } = await projectWithMedia(h, "shot.mp4", Buffer.from("shot bytes"), "video/mp4");
+    const { host, dispose } = createCloudHost(context(h), projectId, () => project);
+    expect(host.storage!.currentPath!()).toBe(projectId);
+
+    const frame = await host.storage!.writeBytes!("/exports/Frame-00061.png", new Uint8Array([1, 2, 3]), "image/png");
+    expect([...(await h.blobs.acceptSignedRead(frame))]).toEqual([1, 2, 3]);
+    expect(new URL(frame).searchParams.get("rscd")).toBe('attachment; filename="Frame-00061.png"');
+    await expect(host.storage!.writeBytes!("Frame-00061.png", new Uint8Array([4]), "image/png")).rejects.toMatchObject({ code: "EEXIST" });
+    const again = await host.storage!.writeBytes!("Frame-00061.png", new Uint8Array([4]), "image/png", { overwrite: true });
+    expect([...(await h.blobs.acceptSignedRead(again))]).toEqual([4]);
+
+    const copy = await host.storage!.exportMedia!(project.files[0]!, "shot [0.00 - 2.00].mp4", "");
+    expect(copy.existed).toBe(false);
+    expect((await h.blobs.acceptSignedRead(copy.location)).toString()).toBe("shot bytes");
+    expect(new URL(copy.location).searchParams.get("rscd")).toBe('attachment; filename="shot _0.00 - 2.00_.mp4"');
+    await expect(host.storage!.exportMedia!({ id: "F3", path: "/Users/me/local-only.mov", media_type: "video" } as never, "x.mov", "")).rejects.toThrow("not uploaded to Zenvi Cloud");
+
+    const other = await h.services.projects.create(USER_A, { name: "Later" });
+    const recent = await host.storage!.recentProjects!();
+    // Most recently edited first (list_projects' order); this harness's clock stands still.
+    expect(recent.map((p) => [p.path, p.name, p.exists])).toEqual(
+      expect.arrayContaining([
+        [other.id, "Later", true],
+        [projectId, "P", true],
+      ]),
+    );
+    expect(recent).toHaveLength(2);
+    expect(typeof recent[0]!.modifiedAt).toBe("number");
+    await dispose();
+  });
+
   it("names generated media after the file, never reusing a path that holds other bytes", async () => {
     const h = await harness({ prober });
     const { projectId } = await projectWithMedia(h, "x.mp4", Buffer.from("x"), "video/mp4");

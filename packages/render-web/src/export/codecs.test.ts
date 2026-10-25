@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { audioCodecFromName, chooseCodecs, ExportError, videoCodecFromName, type ChooseOptions, type EncodeSupport } from "./codecs.js";
+import { audioCodecFromName, canEncodeNamed, chooseCodecs, ExportError, videoCodecFromName, type ChooseOptions, type EncodeSupport } from "./codecs.js";
 
 const support = (video: string[], audio: string[]): EncodeSupport & { videoAsks: string[] } => {
   const videoAsks: string[] = [];
@@ -72,5 +72,20 @@ describe("chooseCodecs", () => {
     expect(videoCodecFromName("libvpx-vp9")).toBe("vp9");
     expect(audioCodecFromName("libopus")).toBe("opus");
     expect(audioCodecFromName("nonsense")).toBeUndefined();
+  });
+});
+
+describe("canEncodeNamed", () => {
+  it("says whether a preset's encoders export as named in this browser", async () => {
+    const browser = support(["avc", "vp9"], ["aac", "opus"]);
+    expect(await canEncodeNamed("mp4", "libx264", "aac", browser)).toBe(true);
+    expect(await canEncodeNamed("webm", "libvpx-vp9", "libopus", browser)).toBe(true);
+    expect(await canEncodeNamed("mp4", "libx265", "aac", browser)).toBe(false);
+    expect(await canEncodeNamed("mov", "prores_ks", "", browser)).toBe(false);
+    expect(await canEncodeNamed("webm", "libx264", "", browser)).toBe(false);
+    expect(await canEncodeNamed("mp4", "mpeg4", "", browser)).toBe(false);
+    expect(await canEncodeNamed("mp4", "libx264", "libmp3lame", browser)).toBe(false);
+    expect(await canEncodeNamed("gif", "gif", "", browser)).toBe(false);
+    expect(await canEncodeNamed("wav", "", "pcm_s16le", support([], ["pcm-s16"]))).toBe(true);
   });
 });

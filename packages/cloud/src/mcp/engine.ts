@@ -33,7 +33,7 @@ export const HIDDEN_ENGINE_TOOLS = new Set([
   "export_video_tool",
   "render_video",
   "render_video_tool",
-  // Playback and timeline-view state belong to an open editor window.
+  // Playback, timeline-view state, panels and editor settings belong to an open editor window.
   "play_tool",
   "go_to_start_tool",
   "go_to_end_tool",
@@ -41,6 +41,10 @@ export const HIDDEN_ENGINE_TOOLS = new Set([
   "zoom_out_tool",
   "center_on_playhead_tool",
   "watch_clip_tool",
+  "get_editor_layout_tool",
+  "set_editor_layout_tool",
+  "get_preferences_tool",
+  "set_preference_tool",
   // Kling is slower than ChatGPT's tool budget. generate_video starts a job instead.
   "generate_video_and_add_to_timeline_tool",
 ]);

@@ -3,11 +3,15 @@
  * Assistant (or the command palette) runs them here.
  */
 import type { CloudMediaRef, ExportOptions, ExportResult, ImportedMedia, ReaderInfo, ToolHost, ToolImage } from "@zenvi/engine";
+import { canExportWith } from "@zenvi/render-web";
 import { backendRequest } from "@/lib/backend";
 import { config } from "@/lib/env";
 import { downloadBlob, safeFileName } from "@/lib/projectFactory";
+import { projectRepository } from "@/lib/storage/projects";
+import { savePanels } from "../session/uiStore";
 import { toast } from "@/ui/Toast";
 import { exportAvailable, extensionForMime, probe, renderFrame, resolveBundledMedia, startExport } from "../render";
+import { editorLayout, editorPreferences, withLayout, withPreference } from "./editorSettings";
 import type { EditorSession } from "../session/EditorSession";
 import { assetUrl } from "../catalog";
 import { analyzeAudio, blobOf, decodePcm } from "./audioAnalysis";
@@ -90,6 +94,16 @@ async function readAsset(path: string): Promise<string> {
   return response.text();
 }
 
+/** A download's file name for a path a tool gave (its base name, made safe), with a fallback name. */
+function downloadName(path: string, fallback: string, extension: string): string {
+  const base = path.split(/[\\/]/).pop() ?? "";
+  return safeFileName(base.replace(/\.[^.]+$/, "") || fallback, base.match(/\.([a-z0-9]+)$/i)?.[1] ?? extension);
+}
+
+function isFullscreen(): boolean {
+  return typeof document !== "undefined" && document.fullscreenElement !== null && document.fullscreenElement !== undefined;
+}
+
 export function createToolHost(session: EditorSession, pickFiles: () => Promise<File[]>): ToolHost {
   // The loaded media of a project file (by path or id), for audio analysis.
   const specFor = (path: string) => {
@@ -147,6 +161,16 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       },
       openImportDialog: () => session.views.pickMedia?.(),
       openExportDialog: () => session.ui.setState({ dialog: "export" }),
+      layout: () => editorLayout(session.ui.getState(), isFullscreen()),
+      setLayout: (change) => {
+        const next = withLayout(session.ui.getState(), change);
+        session.ui.setState(next);
+        savePanels(next.panels);
+        return editorLayout(session.ui.getState(), isFullscreen());
+      },
+      preferences: () => editorPreferences(session.ui.getState(), config.backendUrl),
+      setPreference: (key, value) => session.ui.setState(withPreference(key, value)),
+      clearPlaybackCache: () => session.clearPreviewCaches(),
       notify: (message, level = "info") => {
         if (level === "error") toast.error(message);
         else if (level === "warning") toast.warning(message);
@@ -205,9 +229,38 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       },
       // Exported captions and other text files arrive as downloads.
       async writeText(path, text, contentType) {
-        const name = safeFileName(path.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") || session.meta.getState().name, path.match(/\.([a-z0-9]+)$/i)?.[1] ?? "txt");
+        const name = downloadName(path, session.meta.getState().name, "txt");
         downloadBlob(new Blob([text], { type: contentType ?? "text/plain;charset=utf-8" }), name);
         return name;
+      },
+      // Saved frames too (a download never replaces a file: the browser renames it).
+      async writeBytes(path, bytes, contentType) {
+        const name = downloadName(path, session.meta.getState().name, "png");
+        downloadBlob(new Blob([bytes as BlobPart], { type: contentType }), name);
+        return name;
+      },
+      // Copies of project media download from this browser's storage (or Zenvi Cloud); sub-clips render first.
+      async exportMedia(file, name, _folder, render) {
+        if (render) {
+          if (!exportAvailable) throw new Error("this browser cannot export video");
+          const blob = await startExport(render.project, render.options, () => {}, session.media).promise;
+          downloadBlob(blob, name);
+          return { location: name, folder: "your browser's downloads", existed: false };
+        }
+        const spec = session.media.spec(file.id);
+        if (!spec) throw new Error(`the media of ${String(file.name ?? file.path)} is not loaded (relink it first)`);
+        downloadBlob(await blobOf(spec), name);
+        return { location: name, folder: "your browser's downloads", existed: false };
+      },
+      currentPath: () => session.meta.getState().id,
+      // The projects in this browser, as the projects page lists them (most recently opened or edited first).
+      async recentProjects() {
+        const projects = await projectRepository().list();
+        const at = (p: (typeof projects)[number]) => Math.max(p.openedAt ?? 0, p.updatedAt);
+        return projects
+          .sort((a, b) => at(b) - at(a))
+          .slice(0, 10)
+          .map((p) => ({ path: p.id, name: p.name, exists: true, modifiedAt: p.updatedAt / 1000 }));
       },
     },
     audio: {
@@ -234,6 +287,7 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
         downloadBlob(blob, name);
         return { location: name, bytes: blob.size, mimeType: blob.type };
       },
+      supports: (format, videoCodec, audioCodec) => canExportWith(format, videoCodec, audioCodec),
     };
   }
   host.assets = { readText: readAsset };

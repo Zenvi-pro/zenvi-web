@@ -90,6 +90,16 @@ export class ProjectSession {
         },
       },
     };
+    // Restoring a recovery copy rewrites this file and reopens it, like open.
+    const restore = storage.restoreRecoveryCopy;
+    if (restore) {
+      this.host.storage!.restoreRecoveryCopy = async (copy) => {
+        const restored = await restore(copy);
+        this.openedDuringCall = true;
+        this.diskState = await fileState(restored.path);
+        return restored;
+      };
+    }
   }
 
   private assetsDir(): string | undefined {
