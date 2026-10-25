@@ -295,6 +295,10 @@ export const reelTools: CatalogTool[] = [
           ]);
         }
 
+        // The end card comes in just after the last cut.
+        const last = plan.shots[plan.shots.length - 1]!;
+        const endAt = prepared.end ? last.start + Math.min(0.3, (last.end - last.start) * 0.15) : plan.duration;
+
         plan.shots.forEach((shot, index) => {
           const file = files.get(shot.fileId)!;
           const length = shot.end - shot.start;
@@ -320,8 +324,11 @@ export const reelTools: CatalogTool[] = [
             const flash = addTitleClip(tx, { file: prepared.flash, position: shot.start, duration: FLASH_SECONDS, layer: track.flash, title: "Flash" }).clip;
             fadeAlpha(tx, flash, 0.75, 0, shot.start, shot.start + FLASH_SECONDS);
           }
+          // A label never shares the frame with the end card; one the card cuts down to a flicker is dropped.
           const label = shot.label ? prepared.labels.get(shot.label) : undefined;
-          if (label) placeTitle(tx, label, shot.start, length, track.labels, null);
+          const labelEnd = Math.min(shot.end, endAt);
+          const labelLength = labelEnd - shot.start;
+          if (label && labelLength > 0 && (labelEnd === shot.end || labelLength >= 0.3)) placeTitle(tx, label, shot.start, labelLength, track.labels, null);
         });
 
         if (prepared.hook) {
@@ -329,11 +336,7 @@ export const reelTools: CatalogTool[] = [
           const hold = Math.min(3, Math.max(1.6, first.end - first.start));
           placeTitle(tx, prepared.hook, 0, Math.min(hold, plan.duration), track.titles, style.typography.hookIn);
         }
-        if (prepared.end) {
-          const last = plan.shots[plan.shots.length - 1]!;
-          const at = last.start + Math.min(0.3, (last.end - last.start) * 0.15);
-          placeTitle(tx, prepared.end, at, plan.duration - at, track.titles, style.typography.hookIn);
-        }
+        if (prepared.end) placeTitle(tx, prepared.end, endAt, plan.duration - endAt, track.titles, style.typography.hookIn);
         return { tracks: track };
       }, `Build ${style.name.toLowerCase()} reel`);
 
