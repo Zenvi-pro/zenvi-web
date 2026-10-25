@@ -59,6 +59,7 @@ async function connect(h: Harness): Promise<Client> {
 type Result = { isError?: boolean; content: { type: string; text?: string }[]; structuredContent?: Record<string, unknown> };
 const call = async (client: Client, name: string, args: Record<string, unknown> = {}): Promise<Result> =>
   (await client.callTool({ name, arguments: args })) as Result;
+const textOf = (result: Result): string => result.content.map((c) => c.text ?? "").join("\n");
 
 function context(h: Harness): McpCallContext {
   return {
@@ -123,6 +124,20 @@ describe("titles in the cloud", () => {
     await h.services.renders.drain();
     expect((await h.services.renders.getById(USER_A, job.renderId)).status).toBe("done");
     expect(renderer.renders).toBe(1);
+    await client.close();
+  });
+
+  it("add_title_tool checks a font against the fonts the cloud renders titles with", async () => {
+    const fontFamilies = async () => ["DejaVu Sans", "DejaVu Sans Mono", "Lato", "Liberation Mono", "Liberation Sans", "Liberation Serif"];
+    const h = await harness({ engine: await loadEngineRegistry(), prober, assets: engineAssets, renderer: fakeRenderer(), fontFamilies });
+    const client = await connect(h);
+    const projectId = (await call(client, "create_project", { name: "Fonts" })).structuredContent?.project_id as string;
+    const refused = await call(client, "add_title_tool", { text: "Hi", font: "Helvetica Neue" });
+    expect(textOf(refused)).toMatch(/font 'Helvetica Neue' is not installed; installed fonts like it: /);
+    const titled = await call(client, "add_title_tool", { text: "Hi", font: "liberation sans", text_color: "white", fade_in_seconds: 0.5 });
+    expect(textOf(titled)).toContain('"font":"Liberation Sans"');
+    const { project } = await h.services.projects.get(USER_A, projectId);
+    expect(project.clips).toHaveLength(1);
     await client.close();
   });
 

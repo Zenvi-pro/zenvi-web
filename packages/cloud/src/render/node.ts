@@ -13,7 +13,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { ExportOptions, Project } from "@zenvi/engine";
 import * as renderNode from "@zenvi/render-node";
-import type { AssetSource, AudioAnalyzer, MediaProber, PathResolver, PcmDecoder, Renderer, SpeechTranscriber } from "./renderer.js";
+import type { AssetSource, AudioAnalyzer, FontLister, MediaProber, PathResolver, PcmDecoder, Renderer, SpeechTranscriber } from "./renderer.js";
 import { RendererUnavailableError, unavailableRenderer } from "./renderer.js";
 
 type RenderProjectFn = (
@@ -133,3 +133,4 @@ export function nodeAssetSource(): AssetSource | undefined {
 export const nodeAnalyzeAudio: AudioAnalyzer = (filePath, options) => renderNode.analyzeAudio(filePath, options);
 export const nodeDecodePcm: PcmDecoder = (filePath, options) => renderNode.decodePcm(filePath, options);
 export const nodeTranscribeMedia: SpeechTranscriber = (filePath, options) => renderNode.transcribeMediaFile(filePath, options);
+export const nodeFontFamilies: FontLister = () => renderNode.installedFontFamilies();

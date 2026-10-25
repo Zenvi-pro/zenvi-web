@@ -16,7 +16,7 @@ import { createSupabaseVerifier } from "../src/auth/supabase.js";
 import { loadConfig } from "../src/config.js";
 import { createServices } from "../src/container.js";
 import { loadEngineRegistry } from "../src/mcp/engine.js";
-import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeProber, nodeRenderer, nodeTranscribeMedia } from "../src/render/node.js";
+import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeFontFamilies, nodeProber, nodeRenderer, nodeTranscribeMedia } from "../src/render/node.js";
 import { AzureBlobStore } from "../src/storage/azure.js";
 import { MemoryTableStore } from "../src/storage/memory.js";
 
@@ -75,6 +75,7 @@ async function localCloud(name: string): Promise<LiveCloud> {
     analyzeAudio: nodeAnalyzeAudio,
     decodePcm: nodeDecodePcm,
     transcribeMedia: nodeTranscribeMedia,
+    fontFamilies: nodeFontFamilies,
     supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl }),
   });
   const app = createApp(services);
