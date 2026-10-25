@@ -61,8 +61,9 @@ calls `generate_video`, then `get_generation_status` until the clip is on
 the timeline.
 
 Notes: ChatGPT gives each tool call about a minute, so renders and AI video
-run in the background — `render_project` then `get_render_status`, or
-`generate_video` then `get_generation_status`. Write tools ask for
+run in the background — `render_project` (or `export_video_tool`, which takes
+Zenvi desktop's export arguments: preset, quality, range, size, fps, codecs)
+then `get_render_status`, or `generate_video` then `get_generation_status`. Write tools ask for
 confirmation unless you allow them. Frame previews come back as a link (and
 an image where the host shows images) and in the Zenvi preview panel.
 
