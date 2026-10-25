@@ -338,6 +338,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   apply_transition_tool: (c) => ({ clip1_id: c.clips.a, clip2_id: c.clips.b, transition_name: "fade", duration: "1" }),
   build_reel_tool: (c) => ({ style: "hype", duration_seconds: 8, file_ids: [c.files.a, c.files.b, c.files.still], music_file_id: c.files.beat, hook: "Sweep reel", replace: true }),
   color_grade_clip_tool: (c) => ({ timeline_clip_id: c.clips.a, lut: "bold red cinema" }),
+  // Media in Zenvi Cloud is stored with the project: collecting into a project folder is refused.
+  consolidate_project_media_tool: () => ({ action: "collect" }),
   // Clip A has the Blur effect (setup).
   copy_effects_tool: (c) => ({ source_clip_id: c.clips.a, timeline_clip_ids: [c.clips.b] }),
   // Clip A fades in (setup): keyframes to copy and remove.
@@ -355,7 +357,13 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   export_captions_tool: (c) => ({ path: "sweep.srt", timeline_clip_id: c.clips.talk }),
   edit_captions_tool: (c) => ({ timeline_clip_id: c.clips.talk, uppercase: true }),
   edit_title_tool: (c) => ({ timeline_clip_id: c.clips.title, text: "Edited sweep" }),
+  // Download links for a video and the still.
+  export_files_to_folder_tool: (c) => ({ file_ids: [c.files.a, c.files.still] }),
+  // EDL / Final Cut Pro XML are Zenvi desktop's conversions: refused here.
+  export_project_file_tool: () => ({ format: "fcpxml" }),
   fade_clip_tool: (c) => ({ clip_id: c.clips.a, fade_in_seconds: "0.5", fade_out_seconds: "0.5" }),
+  // The cloud's recent projects are the projects themselves: refused.
+  forget_recent_projects_tool: () => ({ missing_only: true }),
   freeze_frame_tool: (c) => ({ timeline_clip_id: c.clips.a, at_seconds: "2", hold_seconds: "1", ripple: true }),
   fetch_motion_graphics_video_tool: () => ({ segment_urls: process.env.SWEEP_MOTION_URL ? [process.env.SWEEP_MOTION_URL] : [], label: "Motion segment" }),
   generate_tts_and_add_to_timeline_tool: () => ({ text: "This is the sweep narration.", position: "2" }),
@@ -365,11 +373,16 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   // A folder of frames on this machine: Zenvi Cloud has no local folders, so this is refused.
   import_image_sequence_tool: () => ({ path: "renders/intro", fps: 24 }),
   import_attached_file: (c) => ({ file: { download_url: c.urls.still, file_id: "file_sweep", file_name: "attached.png", mime_type: "image/png" } }),
+  // Zenvi desktop's conversion too: refused here.
+  import_project_file_tool: () => ({ file_path: "cut.edl" }),
   import_stock_media_tool: (c) => (c.stock ? { source: "pexels", video_id: String(c.stock.video_id), link: c.stock.link, position_seconds: "16" } : { source: "pexels", video_id: "13736520", position_seconds: "16" }),
   import_video_url_and_add_to_timeline_tool: (c) => ({ video_url: c.urls.b, position_seconds: "20" }),
   inspect_media_tool: (c) => ({ fileId: c.files.a, overview: true }),
   inspect_timeline_tool: (c) => ({ clipId: c.clips.a, start: "0", end: "2" }),
   list_captions_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
+  list_project_profiles_tool: () => ({ query: "vertical", fps: 30 }),
+  // Custom profiles live in Zenvi desktop's profiles folder: refused in the cloud.
+  manage_custom_profiles_tool: () => ({ action: "create", name: "Sweep square", width: 1000, height: 1000, fps: 30 }),
   match_color_to_reference_tool: (c) => ({ timeline_clip_id: c.clips.b, referenceClipId: c.clips.a }),
   list_project_files_tool: () => ({ usage: "used", detail: "full" }),
   list_projects: () => ({ limit: 5 }),
@@ -400,8 +413,13 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   remove_words_tool: (c) => ({ timeline_clip_id: c.clips.talk, fillerPreset: "um_uh" }),
   render_project: () => ({ height: 360, quality: "low" }),
   repeat_clip_tool: (c) => ({ timeline_clip_ids: [c.clips.talk] }),
+  // No stored waveform data in the baseline: nothing to drop.
+  reset_caches_and_history_tool: () => ({ target: "waveforms" }),
+  // Zenvi Cloud keeps no recovery copies: refused.
+  restore_recovery_version_tool: () => ({ version: 1 }),
   resummarize_project_file_tool: (c) => ({ file_id: c.files.a }),
   reverse_transition_tool: (c) => ({ transition_ids: [c.transitions[0]] }),
+  save_frame_image_tool: () => ({ time: 2, file_path: "sweep-still.png" }),
   search_clip_scenes_tool: (c) => ({ query: "colour bars", timeline_clip_id: c.clips.b }),
   search_clips_tool: () => ({ query: "colour bars" }),
   search_emojis_tool: () => ({ query: "fire" }),
@@ -416,6 +434,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   set_effect_property_tool: (c) => ({ effect_id: c.effectId, property: "horizontal_radius", value: "5" }),
   set_export_setting_tool: () => ({ key: "height", value: 720 }),
   set_keyframes_tool: (c) => ({ timeline_clip_id: c.clips.a, property: "alpha", points: [{ seconds: 0, value: 0 }, { seconds: 1, value: 1 }] }),
+  // The baseline is vertical 1080p already: the same profile, and the landscape clips cropped to fill it.
+  set_project_profile_tool: () => ({ profile: "instagram_reel", reframe: "fill" }),
   set_project_setting_tool: () => ({ fps: "24" }),
   slice_clip_at_best_match_tool: (c) => ({ query: "middle", timeline_clip_id: c.clips.a, start_seconds: "3" }),
   slice_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.a], at_seconds: 3 }),
