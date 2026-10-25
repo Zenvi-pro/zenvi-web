@@ -122,7 +122,10 @@ describe("build_reel_tool", () => {
     const titles = doc.project.clips.filter((c) => c.layer === tracks.titles);
     const endCard = titles.reduce((a, b) => (b.position > a.position ? b : a));
     const labels = doc.project.clips.filter((c) => c.layer === tracks.labels);
-    expect(labels.length).toBeGreaterThan(1);
+    const shots = ((result.data as { data: Record<string, unknown> }).data as { shots: { start: number; end: number }[] }).shots;
+    // Every shot keeps its label except the last one when the end card cuts it to a flicker.
+    const cut = shots.filter((s) => s.start < endCard.position && s.end > endCard.position && endCard.position - s.start < 0.3).length;
+    expect(labels).toHaveLength(shots.filter((s) => s.start < endCard.position).length - cut);
     for (const label of labels) expect(span(label)[1]).toBeLessThanOrEqual(endCard.position + 1e-6);
   });
 
