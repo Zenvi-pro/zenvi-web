@@ -4,10 +4,12 @@
  * decodes and feeds the encoder.
  *
  * Pixels are identical to compositing on the main thread: every worker runs
- * the same `compositeFrame`, and frames with clip effects all go to worker 0
- * in timeline order, so effects that keep state across frames (Denoise,
- * BeatSync) see the same sequence as a single-threaded render. Frames
- * without effects are independent and go to the least busy worker.
+ * the same `compositeFrame`, and frames with an effect that keeps state
+ * across frames (DenoiseImage, BeatSync, SphericalProjection:
+ * `KernelSpec.sequential`) all go to worker 0 in timeline order, so those
+ * effects see the same sequence as a single-threaded render. Other frames,
+ * effects included (Color Grade, Film Grain: pure per frame), are
+ * independent and go to the least busy worker.
  *
  * Workers load `composite-worker.mjs` next to a bundle (the CLI and cloud
  * builds emit it) or, from the source tree, the tsx dev entry. When neither
@@ -21,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 import type { FramePlan, RgbaImage } from "@zenvi/engine";
+import { isSequentialEffect } from "@zenvi/engine/render";
 import type { PreparedFrame } from "../decode/sources.js";
 import { processLimits, type ContainerLimits } from "../limits.js";
 import { bundleDir } from "../resources.js";
@@ -170,7 +173,7 @@ export class CompositePool {
   /** Composite `plan` with its decoded sources on a worker. */
   composite(plan: FramePlan, prepared: PreparedFrame, text: boolean): Promise<RgbaImage> {
     if (this.closed) return Promise.reject(new Error("CompositePool is closed"));
-    const ordered = plan.layers.some((layer) => layer.effects.length > 0);
+    const ordered = plan.layers.some((layer) => layer.effects.some((effect) => isSequentialEffect(effect.type)));
     let slot = this.slots[0]!;
     if (!ordered) {
       for (const candidate of this.slots) if (candidate.pending.size < slot.pending.size) slot = candidate;

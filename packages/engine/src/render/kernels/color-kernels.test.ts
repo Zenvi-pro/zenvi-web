@@ -9,7 +9,7 @@ import { colorMap } from "./color-map.js";
 import { cachedCubeLut, parseCubeLut, qtToFloat, qtToInt } from "./cube-lut.js";
 import { denoiseImage } from "./denoise.js";
 import { filmGrain, fnv1a } from "./film-grain.js";
-import { processEffect, registerKernels } from "./registry.js";
+import { isSequentialEffect, processEffect, registerKernels } from "./registry.js";
 
 interface GoldenStep {
   input: string;
@@ -98,6 +98,13 @@ describe("color kernels match libopenshot 1.0 (goldens from scripts/parity/kerne
       }
     });
   }
+});
+
+describe("kernels that keep state across frames", () => {
+  it("are the ones a render must run in order: BeatSync, DenoiseImage, SphericalProjection", () => {
+    for (const type of ["BeatSync", "DenoiseImage", "SphericalProjection"]) expect(isSequentialEffect(type), type).toBe(true);
+    for (const type of ["ColorGrade", "FilmGrain", "Saturation", "Blur", "Caption", "NoSuchEffect"]) expect(isSequentialEffect(type), type).toBe(false);
+  });
 });
 
 describe("ColorGrade's colour cache", () => {

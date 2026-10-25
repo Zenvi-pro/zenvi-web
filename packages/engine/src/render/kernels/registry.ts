@@ -85,6 +85,11 @@ export function getKernelSpec(type: string): KernelSpec | undefined {
   return BY_TYPE.get(type);
 }
 
+/** Whether an effect keeps state across frames (`KernelSpec.sequential`), so its frames must render in order. */
+export function isSequentialEffect(type: string): boolean {
+  return BY_TYPE.get(type)?.sequential === true;
+}
+
 /** Effect types with a working kernel (supported = true). */
 export function supportedVideoEffects(): string[] {
   return [...BY_TYPE.values()].filter((s) => s.supported).map((s) => s.type);

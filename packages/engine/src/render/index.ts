@@ -5,7 +5,7 @@
  */
 export type * from "./types.js";
 
-export { applyVideoEffect, getKernelSpec, getVideoKernel, processEffect, registerKernels, supportedVideoEffects } from "./kernels/registry.js";
+export { applyVideoEffect, getKernelSpec, getVideoKernel, isSequentialEffect, processEffect, registerKernels, supportedVideoEffects } from "./kernels/registry.js";
 export type { KernelSpec, PremulKernel } from "./kernels/types.js";
 export { getAudioKernel, supportedAudioEffects } from "./audio/index.js";
 export { applyMask, applyMaskFromSource, applyMaskPremul, maskGrayTable, type MaskSettings } from "./kernels/mask.js";
