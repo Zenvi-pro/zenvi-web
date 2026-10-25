@@ -698,6 +698,15 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
   },
 
+  add_motion_template_tool: {
+    happy: {
+      args: { template: "end_card", text: "Northwind", subtitle: "Brews in four minutes", position_seconds: "1", bpm: "120" },
+      summary: /^Added end_card at 1\.00-\d+\.\d\ds on 4 track\(s\), entrances on 120 BPM\.$/,
+      check: ({ host }) => expect([...host.written.keys()].filter((p) => p.startsWith("/generated/end_card-"))).toHaveLength(4),
+    },
+    failure: { args: { template: "word_scroll", words: ["Only"] }, status: "refused", summary: /^Error: word_scroll needs words: 2 to 10 of them\.$/ },
+  },
+
   // --- stock search (web) -------------------------------------------------------------
   search_pexels_videos_tool: {
     happy: {

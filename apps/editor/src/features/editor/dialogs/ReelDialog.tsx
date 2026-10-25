@@ -1,4 +1,15 @@
-import { isAudioOnlyMedia, isSingleImageMedia, REEL_STYLE_IDS, REEL_STYLES, type ProjectFile, type ReelStyleId } from "@zenvi/engine";
+import {
+  isAudioOnlyMedia,
+  isMotionStyleId,
+  isSingleImageMedia,
+  MOTION_STYLE_IDS,
+  MOTION_STYLES,
+  REEL_STYLE_IDS,
+  REEL_STYLES,
+  type MotionStyleId,
+  type ProjectFile,
+  type ReelStyleId,
+} from "@zenvi/engine";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/ui/Button";
 import { cn } from "@/ui/cn";
@@ -19,6 +30,20 @@ function isVisual(file: ProjectFile): boolean {
   return !isAudioOnlyMedia(file) && (isSingleImageMedia(file) || Boolean(file.has_video));
 }
 
+type StyleId = ReelStyleId | MotionStyleId;
+
+function styleOf(id: StyleId): { name: string; summary: string; defaultSeconds: number } {
+  return isMotionStyleId(id) ? MOTION_STYLES[id] : REEL_STYLES[id];
+}
+
+/** What the words field holds for each motion style. */
+const WORDS_LABEL: Record<MotionStyleId, { label: string; placeholder: string }> = {
+  ui_promo: { label: "Word list", placeholder: "Explore, Imagine, Create, Share" },
+  editorial_motion: { label: "Kinetic words", placeholder: "Made by hand" },
+  product_callout: { label: "Features", placeholder: "Glass carafe: Borosilicate, Steel filter: Mesh" },
+  tutorial: { label: "A label per step", placeholder: "Eye level, Soft light, Every beat" },
+};
+
 interface Brief {
   format: string;
   story: string;
@@ -33,7 +58,8 @@ interface Brief {
  */
 export function ReelDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const session = useSession();
-  const [style, setStyle] = useState<ReelStyleId>("hype");
+  const [style, setStyle] = useState<StyleId>("hype");
+  const [words, setWords] = useState("");
   const [seconds, setSeconds] = useState<number>(15);
   const [music, setMusic] = useState<string>(AUTO);
   const [hook, setHook] = useState("");
@@ -53,7 +79,7 @@ export function ReelDialog({ open, onClose }: { open: boolean; onClose: () => vo
   }, [session, open]);
 
   useEffect(() => {
-    if (open) setSeconds(REEL_STYLES[style].defaultSeconds);
+    if (open) setSeconds(styleOf(style).defaultSeconds);
     // Only when the dialog opens or the style changes.
   }, [open, style]);
 
@@ -70,6 +96,8 @@ export function ReelDialog({ open, onClose }: { open: boolean; onClose: () => vo
       if (hook.trim()) args.hook = hook.trim();
       if (endCard.trim()) args.end_card = endCard.trim();
       if (endSubtitle.trim()) args.end_card_subtitle = endSubtitle.trim();
+      const list = (isMotionStyleId(style) && style !== "editorial_motion" ? words.split(",") : [words]).map((w) => w.trim()).filter(Boolean);
+      if (isMotionStyleId(style) && list.length > 0) args.words = list;
       if (music !== AUTO && music !== NONE) args.music_file_id = music;
       // "No music": give no music file and build from the visuals only.
       if (music === NONE) args.file_ids = visuals.map((f) => String(f.id));
@@ -117,28 +145,38 @@ export function ReelDialog({ open, onClose }: { open: boolean; onClose: () => vo
       }
     >
       <div className="flex flex-col gap-4">
-        <div role="radiogroup" aria-label="Style" className="grid grid-cols-2 gap-2">
-          {REEL_STYLE_IDS.map((id) => {
-            const s = REEL_STYLES[id];
-            const active = id === style;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => setStyle(id)}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent",
-                  active ? "border-accent bg-accent/[0.1]" : "border-line hover:border-line-strong hover:bg-white/[0.03]",
-                )}
-              >
-                <div className="text-sm font-medium text-fg">{s.name}</div>
-                <div className="mt-0.5 line-clamp-2 text-xs text-fg-subtle">{s.summary}</div>
-              </button>
-            );
-          })}
-        </div>
+        {(
+          [
+            ["Cut to the beat", REEL_STYLE_IDS],
+            ["Motion design", MOTION_STYLE_IDS],
+          ] as const
+        ).map(([group, ids]) => (
+          <div key={group} className="flex flex-col gap-2">
+            <div className="text-xs font-medium text-fg-subtle">{group}</div>
+            <div role="radiogroup" aria-label={`${group} styles`} className="grid grid-cols-2 gap-2">
+              {ids.map((id: StyleId) => {
+                const s = styleOf(id);
+                const active = id === style;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setStyle(id)}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent",
+                      active ? "border-accent bg-accent/[0.1]" : "border-line hover:border-line-strong hover:bg-white/[0.03]",
+                    )}
+                  >
+                    <div className="text-sm font-medium text-fg">{s.name}</div>
+                    <div className="mt-0.5 line-clamp-2 text-xs text-fg-subtle">{s.summary}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 text-xs text-fg-subtle">
             Length
@@ -163,6 +201,12 @@ export function ReelDialog({ open, onClose }: { open: boolean; onClose: () => vo
             <TextInput value={endSubtitle} maxLength={80} placeholder="Optional" onChange={(e) => setEndSubtitle(e.target.value)} />
           </label>
         </div>
+        {isMotionStyleId(style) ? (
+          <label className="flex flex-col gap-1 text-xs text-fg-subtle">
+            {WORDS_LABEL[style].label}
+            <TextInput value={words} maxLength={300} placeholder={WORDS_LABEL[style].placeholder} onChange={(e) => setWords(e.target.value)} />
+          </label>
+        ) : null}
         <p className="text-xs text-fg-subtle">
           {visuals.length === 0
             ? "Import videos or photos first."

@@ -23,6 +23,9 @@ describe("stock picks", () => {
     expect(stockClipsPerQuery("hype", 15, 2)).toBe(3);
     // A calm reel holds four beats a shot: one clip per search is plenty.
     expect(stockClipsPerQuery("minimal", 20, 5)).toBe(1);
+    // A motion style shows a set number of pictures: a UI promo's three cards from three searches.
+    expect(stockClipsPerQuery("ui_promo", 16, 3)).toBe(1);
+    expect(stockClipsPerQuery("tutorial", 20, 1)).toBe(3);
   });
 });
 
@@ -136,6 +139,33 @@ describe("create_reel", () => {
     expect(project.files.some((f) => /reel-label-/.test(String(f.path)))).toBe(true);
     expect(project.clips.length).toBeGreaterThan(data.shots);
     expect(project.history?.undo?.length ?? 0).toBeGreaterThanOrEqual(2);
+    await client.close();
+  }, 60_000);
+
+  it("makes a motion-designed reel from stock: scenes on the beat, the footage inside the graphics", async () => {
+    const { h, client } = await setup();
+    const result = (await client.callTool({
+      name: "create_reel",
+      arguments: {
+        prompt: "A 8 second promo for a morning planner app",
+        style: "ui_promo",
+        duration_seconds: 8,
+        stock_queries: ["team huddle", "player dribble", "goal celebration"],
+        labels: ["Huddle", "Dribble", "Goal"],
+        words: ["Plan", "Focus", "Share"],
+        hook: "Plan a slower morning",
+        end_card: "Zenvi",
+      },
+    })) as CallResult;
+    expect(result.isError, result.content[0]?.text).toBeFalsy();
+    const data = result.structuredContent as { project_id: string; scenes?: number; shots: number; brief: { story: string } };
+    expect(data.scenes).toBeGreaterThanOrEqual(3);
+    expect(data.shots).toBe(data.scenes);
+    expect(data.brief.story).toMatch(/^search, cards/);
+    const { project } = await h.services.projects.get(USER_A, data.project_id);
+    expect(project.files.some((f) => /reel-search-/.test(String(f.path)))).toBe(true);
+    // The footage plays inside the cards (scale Best Fit, corners rounded).
+    expect(project.clips.some((c) => c.title?.toString().includes("card-1") && c.corner_radius !== undefined)).toBe(true);
     await client.close();
   }, 60_000);
 

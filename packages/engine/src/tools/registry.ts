@@ -25,6 +25,7 @@ import { inspectTools } from "./catalog/inspect.js";
 import { mediaTools } from "./catalog/media.js";
 import { metadataTools } from "./catalog/metadata.js";
 import { motionTools } from "./catalog/motion.js";
+import { motionTemplateTools } from "./catalog/motion-templates.js";
 import { overlayTools } from "./catalog/overlays.js";
 import { phase3Tools } from "./catalog/phase3.js";
 import { playbackTools } from "./catalog/playback.js";
@@ -76,7 +77,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...overlayTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...reelTools, ...stockTools]) {
+  for (const tool of [...implemented, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -100,7 +101,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools, ...reelTools, ...stockTools];
+  return [...contract, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */

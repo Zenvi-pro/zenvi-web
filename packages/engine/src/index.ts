@@ -26,6 +26,7 @@ export * from "./presets/index.js";
 export * from "./analysis/beats.js";
 export * from "./reels/styles.js";
 export * from "./reels/plan.js";
+export * from "./motion/index.js";
 export * from "./stock/stock.js";
 export type * from "./tools/types.js";
 export type * from "./render/types.js";
