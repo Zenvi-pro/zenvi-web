@@ -90,7 +90,12 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote: "without audio analysis and speech recognition only indexed transcript cues find the speech",
   },
   watch_clip_tool: { optional: ["media.importPath"], partialNote: "file_path needs local file access" },
-  export_video_tool: { anyOf: ["exporter", "ui.openExportDialog"] },
+  export_video_tool: {
+    anyOf: ["exporter", "ui.openExportDialog"],
+    webNote:
+      "interlaced is refused (no web encoder interlaces); the CLI renders with ffmpeg and writes files (relative paths and the default folder start at the project's folder), " +
+      "the web editor renders MP4, MOV, MKV, WebM or WAV in the browser and downloads the file (no folders), Zenvi Cloud starts a render job (get_render_status gives the download link; no image sequences)",
+  },
   save_project_tool: {},
   open_project_tool: { methods: ["storage.open"] },
   import_files_tool: { methods: ["media.importPath"], optional: ["media.listPaths"], partialNote: "folders and globs need path listing" },
@@ -181,7 +186,6 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     webNote:
       "animates volume, alpha, location_x/y, scale_x/y and rotation (Zenvi desktop: any keyframable clip property) and needs a value for every point (the desktop keeps the curve's value at a point without one)",
   },
-  set_export_setting_tool: { webNote: "stores a key and value as given (Zenvi desktop checks keys and values first)" },
   transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
   remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
@@ -277,7 +281,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   list_export_presets_tool: {
     optional: ["exporter.supports"],
     partialNote: "without a codec check, every preset whose container the engine's exporters write counts as available",
-    webNote: "export_video_tool takes a preset only in Zenvi desktop so far; the web editor's Export dialog offers them",
+    webNote: "the built-in presets (Zenvi desktop also lists the user's own presets folder)",
   },
   save_frame_image_tool: {
     optional: ["storage.writeBytes"],
@@ -367,7 +371,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
-    capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
+    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
     methods: [
       "media.importUrl",
       "media.writeGenerated",
@@ -381,9 +385,11 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "audio.decodePcm",
       "audio.transcribe",
       "frames.fontFamilies",
+      "exporter.supports",
     ],
     conditional: {
       frames: "the render worker is configured",
+      exporter: "the render worker is configured",
       media: "ffprobe is available",
       assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
@@ -394,7 +400,6 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "open_project_tool",
       "save_project_tool",
       "import_files_tool",
-      "export_video_tool",
       "play_tool",
       "go_to_start_tool",
       "go_to_end_tool",

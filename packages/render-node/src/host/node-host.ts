@@ -5,13 +5,14 @@
  */
 
 import { mkdir, readFile, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
 import { transcribeMediaFile } from "../audio/speech.js";
 import { engineAssetsDir } from "../resources.js";
 import { encoderNames } from "../ffmpeg/capabilities.js";
-import { FORMATS } from "../render/encoder.js";
+import { ffmpegCanWrite, FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
 import { renderFrame } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
@@ -86,6 +87,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     return p ? path.dirname(p) : process.cwd();
   };
   const inProject = (p: string): string => (path.isAbsolute(p) ? p : path.resolve(baseDir(), p));
+  /** An export path: `~` is the home folder (the desktop's normalize_path), relative paths start at the project's folder. */
+  const exportPath = (p: string): string => inProject(/^~(?=$|[\\/])/.test(p) ? path.join(homedir(), p.slice(1)) : p);
 
   const defaultOutput = (options_: ExportOptions): string => {
     const ext = FORMATS[options_.format]?.extension ?? "mp4";
@@ -113,8 +116,20 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
       removeCopies: (paths) => removeMediaCopies(paths, collectOptions()),
     },
     exporter: {
+      delivery: "files",
+      // The desktop names an export after the project file (else "Untitled Project").
+      defaultName: () => {
+        const file = current();
+        return file ? path.basename(file, path.extname(file)) : "Untitled Project";
+      },
+      async isFolder(p) {
+        return stat(exportPath(p)).then(
+          (s) => s.isDirectory(),
+          () => false,
+        );
+      },
       async export(project, exportOptions, onProgress) {
-        const output = exportOptions.output ? inProject(exportOptions.output) : defaultOutput(exportOptions);
+        const output = exportOptions.output ? exportPath(exportOptions.output) : defaultOutput(exportOptions);
         await mkdir(path.dirname(output), { recursive: true });
         return renderProject(project, {
           resolveMedia,
@@ -128,11 +143,10 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
           },
         });
       },
-      // The containers this exporter writes, with encoders the local ffmpeg has (FFmpegWriter.IsValidCodec).
+      // The containers this exporter writes, with encoders the local ffmpeg has (FFmpegWriter.IsValidCodec) and the muxer takes.
       async supports(format, videoCodec, audioCodec) {
-        if (!FORMATS[format]) return false;
         const encoders = await encoderNames().catch(() => new Set<string>());
-        return (!videoCodec || encoders.has(videoCodec)) && (!audioCodec || encoders.has(audioCodec));
+        return ffmpegCanWrite(format, videoCodec, audioCodec, encoders);
       },
     },
     frames: {

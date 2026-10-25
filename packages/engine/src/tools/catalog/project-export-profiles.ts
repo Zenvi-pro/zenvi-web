@@ -45,7 +45,7 @@ import {
   type ProfileChoice,
   type ProfileContext,
 } from "../../model/profile-requests.js";
-import { ChannelLayout } from "../../model/defaults.js";
+import { CHANNEL_LAYOUTS, channelLayoutNamed, type ChannelName } from "../../model/channel-layouts.js";
 import { applyProfile, applyReframe, planReframe, profileDiffers, setProjectAudio, type ProjectAudio, type ReframeMode, type ReframePlan } from "../../ops/project.js";
 import { contractTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { projectFps } from "../frame-time.js";
@@ -237,29 +237,6 @@ function profileReceipt(
 
 const PIXEL_RATIO_RE = /^\s*(\d+)\s*[:/]\s*(\d+)\s*$/;
 
-type ChannelName = "mono" | "stereo" | "surround" | "5.1" | "7.1";
-
-/** project_export_profiles._LAYOUT_BY_NAME. */
-const LAYOUT_BY_NAME: Readonly<Record<string, ChannelName>> = {
-  mono: "mono",
-  "1": "mono",
-  stereo: "stereo",
-  "2": "stereo",
-  surround: "surround",
-  "3": "surround",
-  "5.1": "5.1",
-  "6": "5.1",
-  "7.1": "7.1",
-  "8": "7.1",
-};
-/** project_export.CHANNEL_LAYOUTS: libopenshot ChannelLayout code and channel count. */
-const CHANNEL_LAYOUTS: Readonly<Record<ChannelName, readonly [number, number]>> = {
-  mono: [ChannelLayout.MONO, 1],
-  stereo: [ChannelLayout.STEREO, 2],
-  surround: [ChannelLayout.SURROUND, 3],
-  "5.1": [ChannelLayout.FIVE_POINT_ONE, 6],
-  "7.1": [ChannelLayout.SEVEN_POINT_ONE, 8],
-};
 /** project_export_profiles._LAYOUT_SETTING: the Preferences value of each layout. */
 const LAYOUT_SETTING: Readonly<Record<ChannelName, string>> = {
   mono: "LAYOUT_MONO",
@@ -431,7 +408,7 @@ export const projectProfileTools: CatalogTool[] = [
         let layout: ChannelName | null = null;
         const channels = text(input.channels);
         if (channels) {
-          layout = LAYOUT_BY_NAME[channels.toLowerCase()] ?? null;
+          layout = channelLayoutNamed(channels);
           if (!layout) throw new ToolError("channels must be mono, stereo, surround, 5.1 or 7.1 (or 1, 2, 3, 6, 8)");
         }
         if (sampleRate !== null && !(SAMPLE_RATES as readonly number[]).includes(sampleRate)) {

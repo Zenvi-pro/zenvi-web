@@ -31,29 +31,6 @@ export const PENDING_DESKTOP_TOOLS: ReadonlySet<ContractToolName> = new Set<Cont
  */
 export const PENDING_DESKTOP_ARGS: { readonly [N in ContractToolName]?: readonly string[] } = {
   add_effect_tool: ["processing"],
-  export_video_tool: [
-    "audio_bitrate",
-    "audio_codec",
-    "channels",
-    "container",
-    "end",
-    "export_type",
-    "file_name",
-    "folder",
-    "fps",
-    "height",
-    "image_format",
-    "interlaced",
-    "preset",
-    "profile",
-    "quality",
-    "range",
-    "sample_rate",
-    "start",
-    "video_bitrate",
-    "video_codec",
-    "width",
-  ],
 };
 
 /** The refusal for a pending argument: not "not available", so the Assistant retries without it. */

@@ -169,7 +169,7 @@ describe("availability matrix", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
       cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
-      cloud: ["media", "frames", "storage", "assets", "audio", "backend"],
+      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
     };
     for (const tool of allTools) {
       const a = toolAvailability(tool);
@@ -178,5 +178,13 @@ describe("availability matrix", () => {
         if (missing.length > 0) expect(a[surface], `${tool.name} on ${surface}`).toBe("no");
       }
     }
+  });
+
+  it("has export_video_tool on every web surface, partial (no interlacing) and each with its own output", () => {
+    const a = toolAvailability(allTools.find((t) => t.name === "export_video_tool")!);
+    expect([a.editor, a.cli, a.cloud]).toEqual(["partial", "partial", "partial"]);
+    expect(a.notes.cloud).toMatch(/interlaced is refused.*Zenvi Cloud starts a render job/);
+    const presets = toolAvailability(allTools.find((t) => t.name === "list_export_presets_tool")!);
+    expect(presets.cloud).not.toBe("no");
   });
 });

@@ -3,7 +3,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
-import { timelineEnd, type ContainerFormat, type ExportOptions, type Fraction, type Project } from "@zenvi/engine";
+import { isSequenceFormat, timelineEnd, type ContainerFormat, type ExportOptions, type Fraction, type Project } from "@zenvi/engine";
 import { ENCODER_PRESETS, FORMATS, formatFromPath, frameCaption, isEncoderPreset, type NodeExportOptions, type RenderResult } from "@zenvi/render-node";
 import { PortableExecutor, type CallOutcome, type Executor } from "../engine/executor.js";
 import { CliError } from "../output.js";
@@ -44,9 +44,10 @@ export interface RenderFlags {
 /** Export options from flags + project defaults. */
 export function exportOptionsFrom(project: Project, output: string | undefined, flags: RenderFlags): NodeExportOptions {
   const fromPath = output ? formatFromPath(output) : undefined;
-  const format = (flags.format === "png" ? "png-sequence" : flags.format) as ContainerFormat | undefined;
+  const image = flags.format === "jpeg" ? "jpg" : flags.format === "tif" ? "tiff" : flags.format;
+  const format = (image && ["png", "jpg", "bmp", "tiff"].includes(image) ? `${image}-sequence` : flags.format) as ContainerFormat | undefined;
   const chosen = format ?? fromPath ?? "mp4";
-  if (!FORMATS[chosen]) throw new CliError(`Unknown format "${flags.format}" (mp4, webm, mov, mkv, gif, mp3, wav, png).`, 2);
+  if (!FORMATS[chosen]) throw new CliError(`Unknown format "${flags.format}" (mp4, webm, mov, mkv, gif, mp3, wav, flac, m4a, png, jpg, bmp, tiff).`, 2);
   const quality = flags.quality ?? "high";
   if (!(QUALITIES as readonly string[]).includes(quality)) throw new CliError("--quality must be low, medium, high or lossless.", 2);
   let width = flags.width ? Number(flags.width) : project.width;
@@ -118,9 +119,9 @@ function formatBytes(n: number | undefined): string {
 export function registerRenderCommands(program: Command, ctx: CommandContext): void {
   program
     .command("render")
-    .description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav) or PNG frames")
+    .description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav, flac, m4a) or image frames (png, jpg, bmp, tiff)")
     .argument("[output]", "output file (default: <project>.mp4 next to the project)")
-    .option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav or png (default: from the file name)")
+    .option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav, flac, m4a, png, jpg, bmp or tiff (default: from the file name)")
     .option("--quality <quality>", "low, medium, high or lossless", "high")
     .option("--width <px>", "output width (height follows the project aspect)")
     .option("--height <px>", "output height")
@@ -162,7 +163,7 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
           ctx.out.line(ctx.out.style(`  ${options.format}, ${options.width}x${options.height}, ${result.durationSeconds.toFixed(2)} s, ${formatBytes(result.bytes)} in ${seconds.toFixed(1)} s`, "dim"));
           for (const w of result.warnings) ctx.out.warn(w);
         }
-        if (flags.open && options.format !== "png-sequence") await openUrl(result.location);
+        if (flags.open && !isSequenceFormat(options.format)) await openUrl(result.location);
       });
     });
 
