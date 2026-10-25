@@ -24,7 +24,7 @@ import type { McpCallContext, McpTool } from "./types.js";
 import { EDITOR_META_KEY, editorWidgetToolMeta, type EditorSessionMeta } from "./editor-widget.js";
 import { widgetToolMeta } from "./widget.js";
 
-const projectIdArg = z
+export const projectIdArg = z
   .string()
   .max(40)
   .optional()
@@ -314,7 +314,7 @@ const getUploadLink = defineTool({
 const EMBED_TTL_SECONDS = 12 * 3600;
 
 /** The embedded editor for `projectId`: a token for this project only, and where the view frames it. */
-async function editorSession(ctx: McpCallContext, projectId: string): Promise<EditorSessionMeta> {
+export async function editorSession(ctx: McpCallContext, projectId: string): Promise<EditorSessionMeta> {
   const principal = ctx.principal;
   const issued = await ctx.services.tokens.issueEmbed({
     userId: principal.userId,

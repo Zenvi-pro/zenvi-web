@@ -1,0 +1,371 @@
+/**
+ * create_reel: the one-shot path for chats (ChatGPT, Claude). From a short
+ * ask to a finished short video in one tool call:
+ *
+ *   project   a new one in the reel's frame (vertical by default), or the
+ *             open project when it has media and no edit yet
+ *   footage   files attached in the chat, links, and stock clips for the
+ *             searches the model writes (Pexels through the Zenvi backend),
+ *             fetched three at a time, all added to the project in one edit
+ *   music     a link or a stock search (Freesound through the backend)
+ *   edit      the engine's build_reel_tool: cuts on the beat, moves, looks,
+ *             flashes, hook title, end card, music bed
+ *   editor    the Zenvi editor opens in the chat on the result
+ *
+ * Downloads stop at a deadline so the call fits a chat's tool budget: what
+ * arrived in time is used, the rest is reported.
+ */
+
+import { REEL_STYLE_IDS, type Project } from "@zenvi/engine";
+import { z } from "zod";
+import { SCOPE_WRITE } from "../auth/scopes.js";
+import { ApiError } from "../http/errors.js";
+import { addMediaFile } from "../projects/files.js";
+import { PROJECT_FORMATS, profileFor } from "../projects/profiles.js";
+import type { ImportResult } from "../services/importer.js";
+import { editorSession, projectIdArg } from "./cloud-tools.js";
+import { defineTool } from "./define.js";
+import { EDITOR_META_KEY, editorWidgetToolMeta } from "./editor-widget.js";
+import { displayText, type EngineRegistry } from "./engine.js";
+import { createCloudHost } from "./host.js";
+import { editProject, resolveProjectId } from "./projects.js";
+import type { McpTool } from "./types.js";
+
+/** Stop waiting for downloads after this long, ms (a chat gives a tool call about a minute). */
+const FETCH_DEADLINE_MS = 32_000;
+const PARALLEL_FETCHES = 3;
+const MAX_SOURCES = 10;
+
+interface PexelsFile {
+  quality?: string;
+  file_type?: string;
+  width?: number | null;
+  height?: number | null;
+  link?: string;
+}
+interface PexelsVideo {
+  id: number;
+  width: number;
+  height: number;
+  duration: number;
+  url?: string;
+  user_name?: string;
+  video_files?: PexelsFile[];
+}
+interface FreesoundSound {
+  id: number;
+  name: string;
+  duration: number;
+  username?: string;
+  license?: string;
+  previews?: { hq_mp3?: string; lq_mp3?: string };
+}
+
+/** A stock video that suits the frame: the right orientation, long enough, not used yet. */
+export function pickStockVideo(videos: readonly PexelsVideo[], portrait: boolean, used: ReadonlySet<number>, minSeconds = 4): PexelsVideo | undefined {
+  const usable = videos.filter((v) => !used.has(v.id) && v.duration >= minSeconds && (v.video_files ?? []).some((f) => f.link));
+  return usable.find((v) => (portrait ? v.height > v.width : v.width >= v.height)) ?? usable[0];
+}
+
+/** The MP4 rendition closest to the frame's width (at least most of it), so cuts stay sharp without huge downloads. */
+export function pickStockFile(video: PexelsVideo, frameWidth: number, portrait: boolean): string | undefined {
+  const files = (video.video_files ?? []).filter((f) => f.link && (f.file_type ?? "video/mp4") === "video/mp4");
+  if (files.length === 0) return undefined;
+  const side = (f: PexelsFile) => Number((portrait ? Math.min(f.width ?? 0, f.height ?? 0) : f.width) ?? 0) || 0;
+  const big = files.filter((f) => side(f) >= frameWidth * 0.75).sort((a, b) => side(a) - side(b));
+  return (big[0] ?? [...files].sort((a, b) => side(b) - side(a))[0])!.link;
+}
+
+/** Music for a reel: long enough, open licences first (CC0, then CC BY). */
+export function pickMusic(sounds: readonly FreesoundSound[], seconds: number): FreesoundSound | undefined {
+  const usable = sounds.filter((s) => s.duration >= Math.min(seconds + 4, 30) && s.duration <= 360 && (s.previews?.hq_mp3 || s.previews?.lq_mp3));
+  const rank = (s: FreesoundSound) => (/zero|cc0/i.test(s.license ?? "") ? 0 : /noncommercial|nc/i.test(s.license ?? "") ? 2 : 1);
+  return [...usable].sort((a, b) => rank(a) - rank(b))[0];
+}
+
+/** Run `jobs` `limit` at a time; each settles on its own. */
+async function pool<T>(jobs: (() => Promise<T>)[], limit: number): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(jobs.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < jobs.length) {
+      const index = next++;
+      try {
+        results[index] = { status: "fulfilled", value: await jobs[index]!() };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, worker));
+  return results;
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function titleFrom(prompt: string): string {
+  const clean = prompt.replace(/\s+/g, " ").trim();
+  return clean.length <= 60 ? clean : `${clean.slice(0, 57).trimEnd()}…`;
+}
+
+const attachedFile = z.object({
+  download_url: z.string().min(1).max(8192),
+  file_id: z.string().min(1).max(512),
+  mime_type: z.string().max(200).optional(),
+  file_name: z.string().max(255).optional(),
+});
+
+const input = z.object({
+  prompt: z.string().min(1).max(1000).describe("The person's ask, in their words. It names the project."),
+  name: z.string().min(1).max(200).optional().describe("Project name (default: from the prompt)."),
+  style: z
+    .enum(REEL_STYLE_IDS)
+    .optional()
+    .describe(
+      "hype (fast cuts, flashes: launches, sport, travel), cinematic (moody, filmic), highlight (the person's own clips, building to the big moment), " +
+        "match_cut (shapes that line up, one cut per beat), minimal (calm, long holds), editorial (graphic, labels), retro (VHS). Default hype.",
+    ),
+  format: z.enum(PROJECT_FORMATS).optional().describe("Frame (default vertical_1080p for Reels, TikTok and Shorts)."),
+  duration_seconds: z.number().min(5).max(60).optional().describe("Target length, seconds (default per style, 12-20)."),
+  files: z.array(attachedFile).max(MAX_SOURCES).optional().describe("Video, image or audio files the person attached, in story order."),
+  media_urls: z.array(z.string().min(1).max(4096)).max(MAX_SOURCES).optional().describe("Direct https links to media files, in story order."),
+  stock_queries: z
+    .array(z.string().min(2).max(80))
+    .max(8)
+    .optional()
+    .describe("When the person gave no footage: 4-8 concrete visual searches for stock clips, in story order (e.g. 'barista pouring latte art close up')."),
+  music_query: z.string().min(2).max(100).optional().describe("Stock music search: mood, genre, tempo (e.g. 'upbeat electronic 120 bpm'). Default: from the style."),
+  music_url: z.string().min(1).max(4096).optional().describe("Direct https link to the music to use instead of a search."),
+  no_music: z.boolean().optional().describe("Make it without music (cuts follow the style's tempo)."),
+  hook: z.string().max(80).optional().describe("Opening title, 2-6 punchy words."),
+  end_card: z.string().max(80).optional().describe("Closing title: a call to action, a name, a date."),
+  end_card_subtitle: z.string().max(80).optional(),
+  project_id: projectIdArg.describe("Build into this project instead of a new one: its media plus anything above (its timeline must be empty)."),
+});
+
+const output = z.object({
+  project_id: z.string(),
+  name: z.string(),
+  url: z.string(),
+  duration_seconds: z.number(),
+  shots: z.number(),
+  bpm: z.number(),
+  brief: z.object({ format: z.string(), story: z.string(), pace: z.string(), look: z.string() }),
+  music: z.object({ name: z.string(), credit: z.string(), license: z.string(), source: z.string() }).optional(),
+  footage: z.array(z.object({ name: z.string(), credit: z.string(), source: z.string() })),
+  warnings: z.array(z.string()),
+});
+
+const DEFAULT_MUSIC: Record<string, string> = {
+  hype: "energetic electronic beat",
+  cinematic: "cinematic ambient build",
+  highlight: "upbeat sport rock",
+  match_cut: "lofi hip hop beat",
+  minimal: "calm acoustic ambient",
+  editorial: "minimal electronic groove",
+  retro: "retro synthwave",
+};
+
+interface Fetched {
+  imported: ImportResult;
+  role: "visual" | "music";
+  credit?: { name: string; credit: string; license?: string; source: string };
+}
+
+export function reelTools(registry: EngineRegistry, backendEnabled: boolean): McpTool[] {
+  return [
+    defineTool({
+      name: "create_reel",
+      title: "Create a reel",
+      description:
+        "Make a finished short video (Reels, TikTok, Shorts, ads, highlight reels) from a short ask, in one step, and open it in the Zenvi editor here. " +
+        "Uses the files the person attached and links they gave; without footage, give stock_queries (concrete visual searches, story order). " +
+        "Music comes from music_url or a stock search (music_query). The reel is cut on the music's beats in a style, with a hook title and an end card. " +
+        "Answer with the brief it returns (format, story, pace, look). Then keep editing with the other tools; the editor follows live.",
+      input,
+      output,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      scope: SCOPE_WRITE,
+      invoking: "Making the reel…",
+      invoked: "Reel ready",
+      meta: { ...editorWidgetToolMeta(), "openai/fileParams": ["files"] },
+      async run(ctx, args) {
+        const userId = ctx.principal.userId;
+        const retryAfter = ctx.services.limiter.hit(`reel:${userId}`, { limit: 20, windowMs: 3_600_000 });
+        if (retryAfter > 0) throw new ApiError(429, "rate_limited", `Too many reels this hour; try again in ${Math.ceil(retryAfter / 60)} minutes.`);
+        const warnings: string[] = [];
+        const wantsStock = (args.stock_queries?.length ?? 0) > 0;
+        const wantsStockMusic = !args.no_music && !args.music_url;
+        if ((wantsStock || wantsStockMusic) && !backendEnabled) {
+          warnings.push("Stock search needs the Zenvi backend, which this server is not connected to.");
+        }
+
+        // The project: the open one (media, no edit yet) or a new one in the reel's frame.
+        let projectId: string;
+        let project: Project;
+        if (args.project_id) {
+          projectId = await resolveProjectId(ctx, args.project_id);
+          project = (await ctx.services.projects.get(userId, projectId)).project;
+          if (project.clips.length > 0) {
+            throw new ApiError(409, "has_edit", "That project already has an edit on its timeline. Create the reel as a new project (leave project_id out).");
+          }
+        } else {
+          const choice = profileFor(args.format ?? "vertical_1080p", 30);
+          if (!choice.ok) throw new ApiError(400, "unknown_profile", choice.message);
+          const created = await ctx.services.projects.create(userId, { name: args.name ?? titleFrom(args.prompt), profile: choice.profile });
+          await ctx.services.sessions.set(userId, ctx.connection, created.id);
+          projectId = created.id;
+          project = (await ctx.services.projects.get(userId, projectId)).project;
+        }
+        const portrait = Number(project.height) > Number(project.width);
+        const frameWidth = Math.min(Number(project.width) || 1920, Number(project.height) || 1080);
+
+        // Everything to fetch, in story order; stock picks are resolved first (searches are quick).
+        const jobs: { label: string; run: () => Promise<Fetched> }[] = [];
+        const fetch = (url: string, filename: string | undefined, role: Fetched["role"], credit?: Fetched["credit"]) => async (): Promise<Fetched> => ({
+          imported: await ctx.services.importer.importUrl(userId, url, { filename, signal: ctx.signal }),
+          role,
+          credit,
+        });
+        for (const file of args.files ?? []) jobs.push({ label: file.file_name ?? "attached file", run: fetch(file.download_url, file.file_name, "visual") });
+        for (const url of args.media_urls ?? []) jobs.push({ label: url, run: fetch(url, undefined, "visual") });
+        if (wantsStock && backendEnabled) {
+          const used = new Set<number>();
+          const searches = await Promise.allSettled(
+            args.stock_queries!.map((query) =>
+              ctx.services.backendSessions.request<{ videos?: PexelsVideo[]; error?: string }>(userId, `/api/v1/pexels/search?query=${encodeURIComponent(query)}&per_page=15`, { signal: ctx.signal }),
+            ),
+          );
+          searches.forEach((result, i) => {
+            const query = args.stock_queries![i]!;
+            if (result.status === "rejected" || result.value.error) {
+              warnings.push(`Stock search "${query}" failed: ${result.status === "rejected" ? message(result.reason) : result.value.error}`);
+              return;
+            }
+            const video = pickStockVideo(result.value.videos ?? [], portrait, used);
+            const link = video ? pickStockFile(video, frameWidth, portrait) : undefined;
+            if (!video || !link) {
+              warnings.push(`No stock clip found for "${query}".`);
+              return;
+            }
+            used.add(video.id);
+            const name = `${query.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40) || "stock"}_${video.id}.mp4`;
+            jobs.push({ label: query, run: fetch(link, name, "visual", { name: query, credit: video.user_name ? `${video.user_name} on Pexels` : "Pexels", source: video.url ?? `https://www.pexels.com/video/${video.id}/` }) });
+          });
+        }
+        if (!args.no_music) {
+          if (args.music_url) {
+            jobs.push({ label: "music", run: fetch(args.music_url, undefined, "music") });
+          } else if (backendEnabled) {
+            const query = args.music_query ?? DEFAULT_MUSIC[args.style ?? "hype"]!;
+            try {
+              const found = await ctx.services.backendSessions.request<{ sounds?: FreesoundSound[]; error?: string }>(
+                userId,
+                `/api/v1/freesound/search?query=${encodeURIComponent(query)}&page_size=20&min_duration=${Math.max(20, (args.duration_seconds ?? 15) + 4)}`,
+                { signal: ctx.signal },
+              );
+              const sound = found.error ? undefined : pickMusic(found.sounds ?? [], args.duration_seconds ?? 15);
+              const preview = sound?.previews?.hq_mp3 || sound?.previews?.lq_mp3;
+              if (sound && preview) {
+                const name = `${sound.name.replace(/\.[a-z0-9]+$/i, "").replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40) || "music"}.mp3`;
+                jobs.push({
+                  label: "music",
+                  run: fetch(preview, name, "music", { name: sound.name, credit: sound.username ? `${sound.username} on Freesound` : "Freesound", license: sound.license ?? "", source: `https://freesound.org/s/${sound.id}/` }),
+                });
+              } else {
+                warnings.push(`No stock music found for "${query}"${found.error ? ` (${found.error})` : ""}.`);
+              }
+            } catch (error) {
+              warnings.push(`Stock music search failed: ${message(error)}`);
+            }
+          }
+        }
+        if (jobs.length > MAX_SOURCES + 1) jobs.splice(MAX_SOURCES + 1);
+
+        // Fetch three at a time; stop waiting at the deadline and use what arrived.
+        const deadline = new Promise<"late">((resolve) => setTimeout(() => resolve("late"), FETCH_DEADLINE_MS));
+        const settled = await Promise.race([pool(jobs.map((j) => j.run), PARALLEL_FETCHES), deadline]);
+        const results: PromiseSettledResult<Fetched>[] =
+          settled === "late" ? jobs.map(() => ({ status: "rejected", reason: new Error("still downloading at the deadline") })) : settled;
+        if (settled === "late") warnings.push("Downloads took too long; try fewer or shorter files.");
+        const fetched: Fetched[] = [];
+        results.forEach((r, i) => {
+          if (r.status === "fulfilled") fetched.push(r.value);
+          else warnings.push(`Could not fetch ${jobs[i]!.label}: ${message(r.reason)}`);
+        });
+
+        // Add the media in one edit, then cut the reel in another (two undo steps: media, edit).
+        const added = await editProject(ctx, projectId, async (doc) => {
+          const ids: { id: string; role: Fetched["role"]; isAudio: boolean }[] = [];
+          if (fetched.length === 0) return ids;
+          doc.transaction("Import reel media", (tx) => {
+            for (const item of fetched) {
+              const { file } = addMediaFile(tx, item.imported);
+              ids.push({ id: String(file.id), role: item.role, isAudio: !file.has_video && Boolean(file.has_audio) });
+            }
+          });
+          return ids;
+        });
+        const visualIds = [
+          ...(args.project_id ? project.files.filter((f) => f.has_video || /image/i.test(String(f.media_type))).map((f) => String(f.id)) : []),
+          ...added.value.filter((m) => !m.isAudio).map((m) => m.id),
+        ];
+        const musicId = added.value.find((m) => m.role === "music" && m.isAudio)?.id ?? added.value.find((m) => m.isAudio)?.id;
+        if (visualIds.length === 0) {
+          throw new ApiError(422, "no_footage", `No footage to cut. Attach clips, give links, or pass stock_queries. ${warnings.join(" ")}`.trim());
+        }
+
+        const built = await editProject(ctx, projectId, async (doc) => {
+          const { host, dispose } = createCloudHost(ctx, projectId, () => doc.project);
+          try {
+            return await registry.run({ doc, host, signal: ctx.signal }, "build_reel_tool", {
+              style: args.style ?? "hype",
+              file_ids: [...new Set(visualIds)],
+              ...(musicId ? { music_file_id: musicId } : {}),
+              ...(args.duration_seconds ? { duration_seconds: args.duration_seconds } : {}),
+              ...(args.hook ? { hook: args.hook } : {}),
+              ...(args.end_card ? { end_card: args.end_card } : {}),
+              ...(args.end_card_subtitle ? { end_card_subtitle: args.end_card_subtitle } : {}),
+            });
+          } finally {
+            await dispose();
+          }
+        });
+        const result = built.value;
+        if (!result.ok) throw new ApiError(422, "reel_failed", displayText(result));
+        const receipt = result.data as { warnings?: string[]; data?: { duration: number; bpm: number; shots: unknown[]; brief: { format: string; story: string; pace: string; look: string } } };
+        const reel = receipt.data!;
+        warnings.push(...(receipt.warnings ?? []));
+
+        const session = await editorSession(ctx, projectId);
+        const meta = await ctx.services.projects.get(userId, projectId);
+        const music = fetched.find((f) => f.role === "music")?.credit;
+        const footage = fetched.filter((f) => f.role === "visual" && f.credit).map((f) => ({ name: f.credit!.name, credit: f.credit!.credit, source: f.credit!.source }));
+        const brief = reel.brief;
+        const text =
+          `Here's the brief for your reel:\nFormat: ${brief.format}\nStory: ${brief.story}\nPace: ${brief.pace}\nLook: ${brief.look}\n` +
+          `It is open in the Zenvi editor above (full editor: ${session.openUrl}).` +
+          (music ? ` Music: "${music.name}" by ${music.credit}${music.license ? ` (${music.license})` : ""}.` : "") +
+          (warnings.length > 0 ? `\nNotes: ${warnings.join(" ")}` : "");
+        return {
+          text,
+          data: {
+            project_id: projectId,
+            name: meta.meta.name,
+            url: session.openUrl,
+            duration_seconds: reel.duration,
+            shots: reel.shots.length,
+            bpm: Math.round(reel.bpm),
+            brief,
+            ...(music ? { music: { name: music.name, credit: music.credit, license: music.license ?? "", source: music.source } } : {}),
+            footage,
+            warnings,
+          },
+          meta: { [EDITOR_META_KEY]: session },
+        };
+      },
+    }),
+  ];
+}
