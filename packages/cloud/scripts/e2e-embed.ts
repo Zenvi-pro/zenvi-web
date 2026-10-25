@@ -82,7 +82,7 @@ function hostPage(widgetUrl: string): string {
   #widget { display: block; width: 780px; height: 560px; margin: 0 16px; border: 1px solid #3a3a3a; border-radius: 14px; background: #000; }
   body.full #widget { position: fixed; inset: 0; width: 100vw; height: 100vh; margin: 0; border: 0; border-radius: 0; }
   body.mobile #widget { width: calc(100vw - 24px); margin: 0 12px; }
-</style></head><body>
+</style></head><body${mobile ? ' class="mobile"' : ""}>
 <div id="chat">You: Turn these clips into a 12-second highlight reel.<br>Zenvi: Here is your reel.</div>
 <iframe id="widget" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" src="${widgetUrl}"></iframe>
 <script>
@@ -190,7 +190,6 @@ async function main(): Promise<void> {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${hostPort}/host.html`);
-    if (mobile) await page.evaluate(() => document.body.classList.add("mobile"));
     const editor: FrameLocator = page.frameLocator("#widget").frameLocator("#frame");
     const clips = editor.locator("[data-clip-id]");
 

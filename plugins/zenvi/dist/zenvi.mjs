@@ -3502,805 +3502,8 @@ var init_svg = __esm({
   }
 });
 
-// ../engine/src/history/keypath.ts
-function isRecord8(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function findKey(obj, part) {
-  if (part in obj) return part;
-  const lower = part.toLowerCase();
-  if (lower in obj) return lower;
-  return Object.keys(obj).find((k) => k.toLowerCase() === lower);
-}
-function matches(item, match) {
-  if (!isRecord8(item)) return false;
-  for (const [k, v] of Object.entries(match)) {
-    const key2 = findKey(item, k);
-    if (key2 === void 0 || item[key2] !== v) return false;
-  }
-  return true;
-}
-function resolveKey(root, path42) {
-  if (path42.length === 0) return void 0;
-  let parent = root;
-  let slot = "";
-  let value = root;
-  for (const part of path42) {
-    if (typeof part === "string") {
-      if (!isRecord8(value)) return void 0;
-      const key2 = findKey(value, part);
-      if (key2 === void 0) return void 0;
-      parent = value;
-      slot = key2;
-      value = value[key2];
-    } else {
-      if (!Array.isArray(value)) return void 0;
-      const index = value.findIndex((item) => matches(item, part));
-      if (index < 0) return void 0;
-      parent = value;
-      slot = index;
-      value = value[index];
-    }
-  }
-  return { parent, slot, value };
-}
-function formatKey(path42) {
-  return path42.map(
-    (part) => typeof part === "string" ? part : `{${Object.entries(part).map(([k, v]) => `${k}:${String(v)}`).join(",")}}`
-  ).join("/");
-}
-var init_keypath = __esm({
-  "../engine/src/history/keypath.ts"() {
-    "use strict";
-  }
-});
-
-// ../engine/src/history/document.ts
-function isRecord9(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function clone(value) {
-  return value === void 0 ? value : structuredClone(value);
-}
-function defaultTransactionId() {
-  const c = globalThis.crypto;
-  if (c?.randomUUID) return c.randomUUID();
-  fallbackCounter += 1;
-  return `tx-${Date.now().toString(36)}-${fallbackCounter.toString(36)}`;
-}
-function writeThrough(root, path42, mutate) {
-  const resolved = resolveKey(root, path42);
-  if (!resolved) throw new KeyNotFoundError(path42);
-  const newRoot = { ...root };
-  let src = root;
-  let dst = newRoot;
-  for (let i = 0; i < path42.length; i += 1) {
-    const partial2 = resolveKey(src, [path42[i]]);
-    if (!partial2) throw new KeyNotFoundError(path42);
-    const { slot, value } = partial2;
-    if (i === path42.length - 1) {
-      mutate(dst, slot);
-      break;
-    }
-    const copy = Array.isArray(value) ? [...value] : { ...value };
-    dst[slot] = copy;
-    dst = copy;
-    src = value;
-  }
-  return newRoot;
-}
-function stripHistory(action) {
-  const strip = (v) => {
-    if (isRecord9(v) && "history" in v) {
-      const { history: _history, ...rest } = v;
-      return rest;
-    }
-    return v;
-  };
-  return { ...action, value: strip(action.value), old_values: strip(action.old_values) };
-}
-function groupSaved(saved) {
-  if (!Array.isArray(saved)) return [];
-  const entries = [];
-  const byId = /* @__PURE__ */ new Map();
-  for (const raw of saved) {
-    if (!isRecord9(raw)) continue;
-    const type = raw.type;
-    let key2 = raw.key;
-    if (type === "load" || !Array.isArray(key2) || key2[0] === "history") continue;
-    const last = key2[key2.length - 1];
-    if (type === "insert" && typeof last === "object" && last !== null && "id" in last) {
-      key2 = key2.slice(0, -1);
-    }
-    const transaction = typeof raw.transaction === "string" ? raw.transaction : defaultTransactionId();
-    const action = {
-      type,
-      key: key2,
-      value: raw.value ?? raw.values ?? null,
-      old_values: raw.old_values ?? null,
-      transaction
-    };
-    const applied2 = { action, previous: action.old_values };
-    let entry = byId.get(transaction);
-    if (!entry) {
-      entry = { transaction, label: describeSaved(action), actions: [] };
-      byId.set(transaction, entry);
-      entries.push(entry);
-    }
-    entry.actions.push(applied2);
-  }
-  return entries;
-}
-function describeSaved(action) {
-  const collection = typeof action.key[0] === "string" ? action.key[0] : "project";
-  return `${action.type} ${collection}`;
-}
-var KeyNotFoundError, fallbackCounter, ProjectDocument;
-var init_document = __esm({
-  "../engine/src/history/document.ts"() {
-    "use strict";
-    init_keypath();
-    KeyNotFoundError = class extends Error {
-      constructor(key2) {
-        super(`Key not found in project: ${formatKey(key2)}`);
-        this.key = key2;
-        this.name = "KeyNotFoundError";
-      }
-      key;
-    };
-    fallbackCounter = 0;
-    ProjectDocument = class {
-      current;
-      undoStack = [];
-      redoStack = [];
-      listeners = /* @__PURE__ */ new Set();
-      open = null;
-      historyLimit;
-      newTransactionId;
-      /** Incremented on every change (tracked or not). */
-      revision = 0;
-      constructor(project, options = {}) {
-        this.historyLimit = options.historyLimit ?? 50;
-        this.newTransactionId = options.newTransactionId ?? defaultTransactionId;
-        this.current = project;
-        this.loadHistory(project.history);
-      }
-      get project() {
-        return this.current;
-      }
-      get canUndo() {
-        return this.undoStack.length > 0;
-      }
-      get canRedo() {
-        return this.redoStack.length > 0;
-      }
-      /** Labels of undoable steps, most recent last. */
-      get undoLabels() {
-        return this.undoStack.map((e) => e.label);
-      }
-      get redoLabels() {
-        return this.redoStack.map((e) => e.label);
-      }
-      subscribe(listener) {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
-      }
-      /**
-       * Run `body` as one undo step. Returns whatever `body` returns.
-       * Throws (after rolling back) if `body` throws. Nested calls join the outer
-       * transaction, like the desktop's `nested_transaction`.
-       */
-      transaction(label2, body) {
-        if (this.open) {
-          return body(this.recorder(this.open));
-        }
-        const before = this.current;
-        const beforeRevision = this.revision;
-        const open7 = { id: this.newTransactionId(), label: label2, actions: [] };
-        this.open = open7;
-        let result2;
-        try {
-          result2 = body(this.recorder(open7));
-        } catch (error62) {
-          this.current = before;
-          this.revision = beforeRevision;
-          this.open = null;
-          throw error62;
-        }
-        this.open = null;
-        if (open7.actions.length === 0) return result2;
-        this.undoStack.push({ transaction: open7.id, label: label2, actions: open7.actions });
-        this.redoStack = [];
-        this.emit({
-          project: this.current,
-          previous: before,
-          source: "apply",
-          actions: open7.actions.map((a) => a.action),
-          label: label2
-        });
-        return result2;
-      }
-      /** Change UI state saved with the project (playhead, zoom) without an undo step. */
-      setUntracked(key2, value) {
-        const before = this.current;
-        this.current = writeThrough(this.current, key2, (container, slot) => {
-          container[slot] = clone(value);
-        });
-        this.revision += 1;
-        this.emit({ project: this.current, previous: before, source: "untracked", actions: [] });
-      }
-      /** Replace the whole project (open/new). Clears history unless `keepHistory`. */
-      load(project, keepHistory = false) {
-        const before = this.current;
-        this.current = project;
-        if (!keepHistory) {
-          this.undoStack = [];
-          this.redoStack = [];
-          this.loadHistory(project.history);
-        }
-        this.revision += 1;
-        this.emit({
-          project: this.current,
-          previous: before,
-          source: "load",
-          actions: [{ type: "load", key: [], value: null, old_values: null, transaction: "load" }]
-        });
-      }
-      /**
-       * Forget every undo and redo step and keep the project as it is (Edit >
-       * Clear > History, the desktop's `UpdateManager.reset`). Not an undo step;
-       * listeners get an untracked change, so hosts save the project without the
-       * old history. Returns how many steps each stack held.
-       */
-      clearHistory() {
-        const counts = { undo: this.undoStack.length, redo: this.redoStack.length };
-        if (counts.undo === 0 && counts.redo === 0) return counts;
-        this.undoStack = [];
-        this.redoStack = [];
-        const before = this.current;
-        this.current = { ...this.current, history: { ...isRecord9(this.current.history) ? this.current.history : {}, undo: [], redo: [] } };
-        this.revision += 1;
-        this.emit({ project: this.current, previous: before, source: "untracked", actions: [] });
-        return counts;
-      }
-      /** Undo `steps` transactions. Returns the labels undone, most recent first. */
-      undo(steps = 1) {
-        const done = [];
-        for (let i = 0; i < steps && this.undoStack.length > 0; i += 1) {
-          const entry = this.undoStack.pop();
-          const before = this.current;
-          const inverses = [];
-          for (const applied2 of [...entry.actions].reverse()) {
-            inverses.push(this.reverse(applied2));
-          }
-          this.redoStack.push(entry);
-          this.revision += 1;
-          done.push(entry.label);
-          this.emit({ project: this.current, previous: before, source: "undo", actions: inverses, label: entry.label });
-        }
-        return done;
-      }
-      /** Redo `steps` transactions. Returns the labels redone, oldest first. */
-      redo(steps = 1) {
-        const done = [];
-        for (let i = 0; i < steps && this.redoStack.length > 0; i += 1) {
-          const entry = this.redoStack.pop();
-          const before = this.current;
-          const reapplied = [];
-          for (const applied2 of entry.actions) {
-            reapplied.push(this.perform(applied2.action.type, applied2.action.key, applied2.action.value, entry.transaction, applied2.index, applied2.replace));
-          }
-          entry.actions = reapplied;
-          this.undoStack.push(entry);
-          this.revision += 1;
-          done.push(entry.label);
-          this.emit({
-            project: this.current,
-            previous: before,
-            source: "redo",
-            actions: reapplied.map((a) => a.action),
-            label: entry.label
-          });
-        }
-        return done;
-      }
-      /**
-       * The project JSON to save: the current snapshot with the last
-       * `historyLimit` actions of each stack serialized in desktop format.
-       */
-      toJSON() {
-        const limit = this.historyLimit;
-        const flatten2 = (stack) => stack.flatMap((entry) => entry.actions.map((a) => stripHistory(a.action)));
-        const undo = limit > 0 ? flatten2(this.undoStack).slice(-limit) : [];
-        const redo = limit > 0 ? flatten2(this.redoStack).slice(-limit) : [];
-        return { ...this.current, history: { ...this.current.history, undo, redo } };
-      }
-      // -------------------------------------------------------------------------
-      recorder(open7) {
-        const current = () => this.current;
-        return {
-          id: open7.id,
-          get project() {
-            return current();
-          },
-          insert: (key2, value) => {
-            open7.actions.push(this.perform("insert", key2, value, open7.id));
-          },
-          update: (key2, value) => {
-            open7.actions.push(this.perform("update", key2, value, open7.id));
-          },
-          replace: (key2, value) => {
-            open7.actions.push(this.perform("update", key2, value, open7.id, void 0, true));
-          },
-          delete: (key2) => {
-            open7.actions.push(this.perform("delete", key2, null, open7.id));
-          }
-        };
-      }
-      /** Apply one action to `current`; return what is needed to reverse it. */
-      perform(type, key2, value, transaction, index, replace = false) {
-        const root = this.current;
-        const target = resolveKey(root, key2);
-        if (!target) throw new KeyNotFoundError(key2);
-        if (type === "insert") {
-          if (!Array.isArray(target.value)) {
-            throw new TypeError(`insert target is not a list: ${formatKey(key2)}`);
-          }
-          const item = clone(value);
-          let landed = target.value.length;
-          this.current = writeThrough(root, key2, (container, slot) => {
-            const list2 = [...container[slot]];
-            landed = index !== void 0 && index >= 0 && index <= list2.length ? index : list2.length;
-            list2.splice(landed, 0, item);
-            container[slot] = list2;
-          });
-          this.revision += 1;
-          return { action: { type, key: key2, value: clone(value), old_values: null, transaction }, index: landed };
-        }
-        if (type === "delete") {
-          const previous = clone(target.value);
-          const at = target.slot;
-          this.current = writeThrough(root, key2.slice(0, -1), (container, slot) => {
-            const holder = container[slot];
-            if (Array.isArray(holder)) {
-              const list2 = [...holder];
-              list2.splice(at, 1);
-              container[slot] = list2;
-            } else if (isRecord9(holder)) {
-              const obj = { ...holder };
-              delete obj[at];
-              container[slot] = obj;
-            }
-          });
-          this.revision += 1;
-          return {
-            action: { type, key: key2, value: null, old_values: previous, transaction },
-            index: typeof at === "number" ? at : void 0,
-            previous
-          };
-        }
-        if (type === "update") {
-          const previous = clone(target.value);
-          const merge2 = !replace && isRecord9(target.value) && isRecord9(value);
-          const next = merge2 ? { ...target.value, ...clone(value) } : clone(value);
-          this.current = writeThrough(root, key2, (container, slot) => {
-            container[slot] = next;
-          });
-          this.revision += 1;
-          const applied2 = { action: { type, key: key2, value: clone(value), old_values: previous, transaction }, previous };
-          if (replace) applied2.replace = true;
-          return applied2;
-        }
-        throw new TypeError(`unsupported action type in transaction: ${type}`);
-      }
-      /** Exactly undo one applied action. Returns the inverse, in desktop action form. */
-      reverse(applied2) {
-        const { action } = applied2;
-        const root = this.current;
-        if (action.type === "insert") {
-          const id = isRecord9(action.value) ? action.value.id : void 0;
-          const key2 = id !== void 0 ? [...action.key, { id }] : action.key;
-          const target = resolveKey(root, key2);
-          if (target) {
-            this.current = writeThrough(root, action.key, (container, slot) => {
-              const list2 = [...container[slot]];
-              list2.splice(target.slot, 1);
-              container[slot] = list2;
-            });
-          }
-          return { type: "delete", key: key2, value: null, old_values: clone(action.value), transaction: action.transaction };
-        }
-        if (action.type === "delete") {
-          const parentKey = action.key.slice(0, -1);
-          this.current = writeThrough(root, parentKey, (container, slot) => {
-            const holder = container[slot];
-            if (Array.isArray(holder)) {
-              const list2 = [...holder];
-              const at = applied2.index !== void 0 && applied2.index <= list2.length ? applied2.index : list2.length;
-              list2.splice(at, 0, clone(applied2.previous));
-              container[slot] = list2;
-            } else if (isRecord9(holder)) {
-              const last = action.key[action.key.length - 1];
-              if (typeof last === "string") {
-                container[slot] = { ...holder, [last]: clone(applied2.previous) };
-              }
-            }
-          });
-          return { type: "insert", key: parentKey, value: clone(applied2.previous), old_values: null, transaction: action.transaction };
-        }
-        this.current = writeThrough(root, action.key, (container, slot) => {
-          container[slot] = clone(applied2.previous);
-        });
-        return { type: "update", key: action.key, value: clone(applied2.previous), old_values: clone(action.value), transaction: action.transaction };
-      }
-      /** Rebuild undo/redo stacks from a saved project's history (desktop format). */
-      loadHistory(history2) {
-        this.undoStack = groupSaved(history2?.undo);
-        this.redoStack = groupSaved(history2?.redo);
-      }
-      emit(event) {
-        for (const listener of [...this.listeners]) listener(event);
-      }
-    };
-  }
-});
-
-// ../engine/src/ops/errors.ts
-function isOpError(error62) {
-  return error62 instanceof OpError;
-}
-function invalid(message, details) {
-  return new OpError("invalid_argument", message, details);
-}
-function requireObject(value, what) {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw invalid(`${what} must be an object.`);
-  }
-}
-function requireFinite(value, what) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw invalid(`${what} must be a finite number (got ${String(value)}).`);
-  }
-  return value;
-}
-function requireNonNegative(value, what) {
-  const n = requireFinite(value, what);
-  if (n < 0) throw invalid(`${what} must be >= 0 (got ${n}).`);
-  return n;
-}
-function requirePositive(value, what) {
-  const n = requireFinite(value, what);
-  if (n <= 0) throw invalid(`${what} must be > 0 (got ${n}).`);
-  return n;
-}
-function requireClip(project, id) {
-  const clip2 = findClip(project, id);
-  if (!clip2) throw new OpError("not_found", `No clip with id ${id}.`, { id });
-  return clip2;
-}
-function requireFile(project, id) {
-  const file3 = findFile(project, id);
-  if (!file3) throw new OpError("not_found", `No file with id ${id}.`, { id });
-  return file3;
-}
-function requireTransition(project, id) {
-  const transition2 = findTransition(project, id);
-  if (!transition2) throw new OpError("not_found", `No transition with id ${id}.`, { id });
-  return transition2;
-}
-function requireMarker(project, id) {
-  const marker2 = findMarker(project, id);
-  if (!marker2) throw new OpError("not_found", `No marker with id ${id}.`, { id });
-  return marker2;
-}
-function requireLayer(project, layer2) {
-  const found = findLayer(project, layer2);
-  if (!found) throw new OpError("not_found", `No track with number ${layer2}.`, { layer: layer2 });
-  return found;
-}
-function requireClipEffect(project, effectId) {
-  const ref = findClipEffect(project, effectId);
-  if (!ref) throw new OpError("not_found", `No effect with id ${effectId}.`, { id: effectId });
-  return ref;
-}
-function requireUnlocked(project, layer2, what = "Track") {
-  const found = findLayer(project, layer2);
-  if (found?.lock) {
-    const label2 = found.label ? ` "${found.label}"` : "";
-    throw new OpError("locked", `${what}${label2} (${layer2}) is locked.`, { layer: layer2 });
-  }
-}
-var OpError;
-var init_errors = __esm({
-  "../engine/src/ops/errors.ts"() {
-    "use strict";
-    init_query();
-    OpError = class extends Error {
-      constructor(code, message, details) {
-        super(message);
-        this.code = code;
-        this.details = details;
-      }
-      code;
-      details;
-      name = "OpError";
-    };
-  }
-});
-
-// ../engine/src/ops/types.ts
-var init_types3 = __esm({
-  "../engine/src/ops/types.ts"() {
-    "use strict";
-  }
-});
-
-// ../engine/src/ops/internal.ts
-function isRecord10(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function fpsOf(project) {
-  const fps2 = project.fps;
-  return fps2 && fps2.num > 0 && fps2.den > 0 ? fps2 : { num: 30, den: 1 };
-}
-function rateOf(project) {
-  const fps2 = fpsOf(project);
-  return fps2.num / fps2.den;
-}
-function snapSeconds(seconds2, project) {
-  const rate = rateOf(project);
-  return pyRound(seconds2 * rate) / rate;
-}
-function frameSeconds(project) {
-  return 1 / rateOf(project);
-}
-function requireEditableClip(project, clipId2) {
-  const clip2 = requireClip(project, clipId2);
-  requireUnlocked(project, clip2.layer, "Track");
-  return clip2;
-}
-function clipFile(project, clip2) {
-  return clip2.file_id ? findFile(project, clip2.file_id) : void 0;
-}
-function ensureLayer(tx, layer2) {
-  if (!Number.isInteger(layer2) || layer2 <= 0) {
-    throw invalid(`Track number must be a positive integer (got ${layer2}).`);
-  }
-  const existing = findLayer(tx.project, layer2);
-  if (existing) return existing;
-  const id = generateId((candidate) => tx.project.layers.some((l) => l.id === candidate));
-  tx.insert(["layers"], createLayer(layer2, id));
-  return findLayer(tx.project, layer2);
-}
-function withClampedTiming(clip2, project, existing) {
-  const timing = clampTimingToMedia(clip2, fpsOf(project), existing);
-  const next = { ...clip2, start: timing.start, end: timing.end, duration: timing.duration };
-  if (timing.time) next.time = timing.time;
-  return next;
-}
-function changedFields(prev, next) {
-  const out = {};
-  for (const [key2, value] of Object.entries(next)) {
-    if (!sameJson(prev[key2], value)) out[key2] = value;
-  }
-  return out;
-}
-function sameJson(a, b) {
-  if (a === b) return true;
-  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  if (Array.isArray(a)) {
-    const bb = b;
-    return a.length === bb.length && a.every((v, i) => sameJson(v, bb[i]));
-  }
-  const ka = Object.keys(a);
-  const kb = Object.keys(b);
-  if (ka.length !== kb.length) return false;
-  return ka.every((k) => sameJson(a[k], b[k]));
-}
-function patchClip(tx, id, patch) {
-  const clip2 = requireClip(tx.project, id);
-  const changed = changedFields(clip2, patch);
-  if (Object.keys(changed).length > 0) tx.update(["clips", { id }], changed);
-  return requireClip(tx.project, id);
-}
-function patchTransition(tx, id, patch) {
-  const transition2 = tx.project.effects.find((t) => t.id === id);
-  if (!transition2) throw new OpError("not_found", `No transition with id ${id}.`, { id });
-  const changed = changedFields(transition2, patch);
-  if (Object.keys(changed).length > 0) tx.update(["effects", { id }], changed);
-  return tx.project.effects.find((t) => t.id === id);
-}
-function reassignEffectIds(clip2, nextId) {
-  const effects = clip2.effects;
-  if (!Array.isArray(effects)) return;
-  clip2.effects = effects.map((effect3) => isRecord10(effect3) ? { ...effect3, id: nextId() } : effect3);
-}
-function ids(project) {
-  return idFactory(project);
-}
-function resolveClipFrame(project, clip2, at) {
-  if (at.frame !== void 0 && at.time !== void 0) throw invalid("Give at most one of frame / time.");
-  if (at.frame !== void 0) {
-    if (!Number.isFinite(at.frame)) throw invalid(`frame must be a finite number (got ${at.frame}).`);
-    return at.frame;
-  }
-  if (at.time !== void 0) {
-    if (!Number.isFinite(at.time)) throw invalid(`time must be a finite number (got ${at.time}).`);
-    return clipFrameAtTime(clip2, at.time, fpsOf(project));
-  }
-  return void 0;
-}
-function mapKeyframesDeep(value, fn) {
-  if (Array.isArray(value)) return value.map((v) => mapKeyframesDeep(v, fn));
-  if (!isRecord10(value)) return value;
-  if (Array.isArray(value.Points)) return fn(value);
-  const out = {};
-  for (const [k, v] of Object.entries(value)) out[k] = mapKeyframesDeep(v, fn);
-  return out;
-}
-function replaceClip(tx, before, after) {
-  if (sameJson(before, after)) return before;
-  tx.replace(["clips", { id: before.id }], after);
-  return requireClip(tx.project, before.id);
-}
-function fadeTargets(clip2) {
-  const reader = isRecord10(clip2.reader) ? clip2.reader : {};
-  return {
-    alpha: Boolean(reader.has_video ?? true) || Boolean(clip2.waveform),
-    volume: Boolean(reader.has_audio ?? true)
-  };
-}
-var init_internal = __esm({
-  "../engine/src/ops/internal.ts"() {
-    "use strict";
-    init_defaults();
-    init_query();
-    init_rounding();
-    init_timing();
-    init_ids();
-    init_errors();
-    init_windows();
-  }
-});
-
-// ../engine/src/ops/files.ts
-function detectMediaType(media) {
-  return getMediaType({ path: media.path, has_video: media.info.has_video, has_audio: media.info.has_audio }, media.name);
-}
-function addFile(tx, media, opts = {}) {
-  if (!media || typeof media.path !== "string" || media.path === "") {
-    throw invalid("media.path is required.");
-  }
-  if (!media.info || typeof media.info !== "object") throw invalid("media.info is required.");
-  if (opts.mediaType !== void 0 && !["video", "audio", "image"].includes(opts.mediaType)) {
-    throw invalid(`mediaType must be video, audio or image (got ${String(opts.mediaType)}).`);
-  }
-  const project = tx.project;
-  if (opts.dedupe !== false) {
-    const existing = project.files.find((file3) => file3.path === media.path);
-    if (existing) return existing;
-  }
-  if (opts.id !== void 0 && project.files.some((file3) => file3.id === opts.id)) {
-    throw new OpError("conflict", `A file with id ${opts.id} already exists.`, { id: opts.id });
-  }
-  const id = opts.id ?? idFactory(project)();
-  const entry = {
-    ...structuredClone(media.info),
-    path: media.path,
-    id,
-    media_type: opts.mediaType ?? detectMediaType(media)
-  };
-  if (isAudioOnlyMedia(entry)) {
-    entry.has_video = false;
-    entry.width = project.width;
-    entry.height = project.height;
-  }
-  const name = opts.name ?? media.name;
-  if (name !== void 0) entry.name = name;
-  if (opts.tags !== void 0) entry.tags = opts.tags;
-  if (media.fingerprint) entry.fingerprint = structuredClone(media.fingerprint);
-  if (media.cloud) entry.cloud = structuredClone(media.cloud);
-  tx.insert(["files"], entry);
-  return requireFile(tx.project, id);
-}
-function removeFile(tx, fileId, opts = {}) {
-  const project = tx.project;
-  requireFile(project, fileId);
-  const clips = clipsUsingFile(project, fileId);
-  if (clips.length > 0 && opts.removeClips === false) {
-    throw new OpError("conflict", `File ${fileId} is used by ${clips.length} clip(s).`, {
-      clipIds: clips.map((c) => c.id)
-    });
-  }
-  for (const clip2 of clips) tx.delete(["clips", { id: clip2.id }]);
-  tx.delete(["files", { id: fileId }]);
-  return { fileId, removedClipIds: clips.map((c) => c.id) };
-}
-function updateFile(tx, fileId, patch) {
-  const file3 = requireFile(tx.project, fileId);
-  if (!patch || typeof patch !== "object") throw invalid("patch must be an object.");
-  for (const key2 of Object.keys(patch)) {
-    if (IMMUTABLE_FILE_KEYS.has(key2) && patch[key2] !== file3[key2]) {
-      throw invalid(`File ${key2} cannot be changed.`);
-    }
-  }
-  if (patch.media_type !== void 0 && !["video", "audio", "image"].includes(patch.media_type)) {
-    throw invalid(`media_type must be video, audio or image (got ${String(patch.media_type)}).`);
-  }
-  const changed = Object.entries(patch).filter(([key2, value]) => !sameJson(file3[key2], value));
-  if (changed.length === 0) return file3;
-  tx.update(["files", { id: fileId }], Object.fromEntries(changed));
-  return requireFile(tx.project, fileId);
-}
-function writeFile2(tx, fileId, next, opts = {}) {
-  const current = requireFile(tx.project, fileId);
-  if (!isRecord10(next)) throw invalid("writeFile needs the file's record.");
-  if (next.id !== fileId) throw invalid("File id cannot be changed.");
-  if (next.media_type !== void 0 && !["video", "audio", "image"].includes(next.media_type)) {
-    throw invalid(`media_type must be video, audio or image (got ${String(next.media_type)}).`);
-  }
-  if (opts.clipTitle !== void 0 && typeof opts.clipTitle !== "string") throw invalid("clipTitle must be a string.");
-  const changed = changedFields(current, next);
-  if (Object.keys(changed).length > 0) tx.update(["files", { id: fileId }], changed);
-  for (const key2 of Object.keys(current)) {
-    if (!(key2 in next)) tx.delete(["files", { id: fileId }, key2]);
-  }
-  const file3 = requireFile(tx.project, fileId);
-  const duration3 = Number(file3.duration);
-  const updatedClipIds = [];
-  const renamedClipIds = [];
-  for (const clip2 of clipsUsingFile(tx.project, fileId)) {
-    const patch = { reader: structuredClone(file3), duration: file3.duration };
-    if (Number(clip2.end) > duration3) patch.end = file3.duration;
-    if (opts.clipTitle !== void 0 && clip2.title !== opts.clipTitle) {
-      patch.title = opts.clipTitle;
-      renamedClipIds.push(clip2.id);
-    }
-    patchClip(tx, clip2.id, patch);
-    updatedClipIds.push(clip2.id);
-  }
-  return { file: file3, updatedClipIds, renamedClipIds };
-}
-function addSubclipFiles(tx, sourceId, subclips) {
-  const source2 = requireFile(tx.project, sourceId);
-  if (!Array.isArray(subclips) || subclips.length === 0) throw invalid("Give at least one sub-clip.");
-  for (const sub of subclips) {
-    const start = requireNonNegative(sub?.start, "start");
-    const end = requireNonNegative(sub?.end, "end");
-    if (!(end > start)) throw invalid(`A sub-clip must end after it starts (got ${start}..${end}).`);
-    if (typeof sub.name !== "string") throw invalid("A sub-clip needs a name.");
-    if (sub.aiMetadata !== void 0 && !isRecord10(sub.aiMetadata)) throw invalid("aiMetadata must be an object.");
-  }
-  const created = [];
-  for (const sub of subclips) {
-    const { name: _name, id: _id, ...rest } = structuredClone(source2);
-    const entry = rest;
-    entry.start = sub.start;
-    entry.end = sub.end;
-    if (sub.aiMetadata !== void 0) entry.ai_metadata = structuredClone(sub.aiMetadata);
-    entry.name = sub.name;
-    entry.id = ids(tx.project)();
-    tx.insert(["files"], entry);
-    created.push(requireFile(tx.project, entry.id));
-  }
-  return created;
-}
-var IMMUTABLE_FILE_KEYS;
-var init_files = __esm({
-  "../engine/src/ops/files.ts"() {
-    "use strict";
-    init_query();
-    init_ids();
-    init_media();
-    init_errors();
-    init_internal();
-    IMMUTABLE_FILE_KEYS = /* @__PURE__ */ new Set(["id"]);
-  }
-});
-
 // ../engine/src/tools/coerce.ts
-function isRecord11(value) {
+function isRecord8(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function topLevelTypes(prop) {
@@ -4367,7 +3570,7 @@ function coerceValue(value, prop) {
 }
 function normalizeArgs(schema, args) {
   if (args === null || args === void 0) return {};
-  if (!isRecord11(args)) return args;
+  if (!isRecord8(args)) return args;
   const out = {};
   const props = schema?.properties ?? {};
   for (const [key2, value] of Object.entries(args)) {
@@ -4391,14 +3594,14 @@ function pyRepr(value) {
     return quote + (quote === "'" ? body.replaceAll("'", "\\'") : body) + quote;
   }
   if (Array.isArray(value)) return `[${value.map(pyRepr).join(", ")}]`;
-  if (isRecord11(value)) return `{${Object.entries(value).map(([k, v]) => `${pyRepr(k)}: ${pyRepr(v)}`).join(", ")}}`;
+  if (isRecord8(value)) return `{${Object.entries(value).map(([k, v]) => `${pyRepr(k)}: ${pyRepr(v)}`).join(", ")}}`;
   return String(value);
 }
 function valueAt(root, path42) {
   let current = root;
   for (const part of path42) {
     if (Array.isArray(current) && typeof part === "number" && part < current.length) current = current[part];
-    else if (isRecord11(current) && typeof part === "string" && part in current) current = current[part];
+    else if (isRecord8(current) && typeof part === "string" && part in current) current = current[part];
     else return { found: false, value: void 0 };
   }
   return { found: true, value: current };
@@ -4457,75 +3660,6 @@ var init_coerce = __esm({
       object: "object",
       null: "null"
     };
-  }
-});
-
-// ../engine/src/tools/frame-time.ts
-function num3(fps2) {
-  return typeof fps2 === "number" ? fps2 : fps2.num;
-}
-function den(fps2) {
-  return typeof fps2 === "number" ? 1 : fps2.den;
-}
-function requireRate(fps2) {
-  const n = num3(fps2);
-  const d = den(fps2);
-  if (!Number.isFinite(n) || !Number.isFinite(d) || n <= 0 || d <= 0) {
-    throw new RangeError(`fps must be positive, got ${n}/${d}`);
-  }
-}
-function requireFinite2(value, name) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new RangeError(`${name} must be a finite number, got ${String(value)}`);
-  }
-  return value;
-}
-function fpsFloat3(fps2) {
-  requireRate(fps2);
-  return num3(fps2) / den(fps2);
-}
-function roundHalfUp(value) {
-  requireFinite2(value, "value");
-  const r = value >= 0 ? Math.floor(value + 0.5) : Math.ceil(value - 0.5);
-  return r === 0 ? 0 : r;
-}
-function toFrame(seconds2, fps2) {
-  requireFinite2(seconds2, "seconds");
-  return roundHalfUp(seconds2 * fpsFloat3(fps2));
-}
-function toSeconds(frame, fps2) {
-  requireRate(fps2);
-  if (!Number.isInteger(frame)) throw new RangeError(`frame must be an int, got ${String(frame)}`);
-  return frame * den(fps2) / num3(fps2);
-}
-function snap(seconds2, fps2) {
-  return toSeconds(toFrame(seconds2, fps2), fps2);
-}
-function durationFrames(start, end, fps2) {
-  requireFinite2(start, "start");
-  requireFinite2(end, "end");
-  if (end <= start) {
-    if (end === start) return 1;
-    return Math.max(1, toFrame(end, fps2) - toFrame(start, fps2));
-  }
-  return Math.max(1, roundHalfUp((end - start) * fpsFloat3(fps2)));
-}
-function quantizeSpan(position, start, end, fps2) {
-  const posFrame = toFrame(position, fps2);
-  const startFrame = toFrame(start, fps2);
-  const dur = durationFrames(start, end, fps2);
-  return [toSeconds(posFrame, fps2), toSeconds(startFrame, fps2), toSeconds(startFrame + dur, fps2)];
-}
-function projectFps(project) {
-  const fps2 = project?.fps;
-  const n = Math.trunc(Number(fps2?.num));
-  const d = Math.trunc(Number(fps2?.den));
-  if (Number.isFinite(n) && Number.isFinite(d) && n > 0 && d > 0) return { num: n, den: d };
-  return { num: 30, den: 1 };
-}
-var init_frame_time = __esm({
-  "../engine/src/tools/frame-time.ts"() {
-    "use strict";
   }
 });
 
@@ -4692,6 +3826,1396 @@ var init_pyfmt = __esm({
   "../engine/src/tools/pyfmt.ts"() {
     "use strict";
     NON_PRINTABLE = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\p{Zs}]/u;
+  }
+});
+
+// ../engine/src/titles/xml.ts
+function decode(text5) {
+  return text5.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (whole, ref) => {
+    if (!ref.startsWith("#")) return NAMED[ref];
+    const code = ref[1] === "x" || ref[1] === "X" ? Number.parseInt(ref.slice(2), 16) : Number.parseInt(ref.slice(1), 10);
+    return code <= 1114111 ? String.fromCodePoint(code) : whole;
+  });
+}
+function attributeValue(raw) {
+  return decode(raw.replace(/\r\n?/g, "\n").replace(/[\t\n]/g, " "));
+}
+function escapeText(text5) {
+  return text5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function escapeAttr(text5) {
+  return escapeText(text5).replace(/"/g, "&quot;").replace(/\n/g, "&#10;").replace(/\r/g, "&#13;").replace(/\t/g, "&#9;");
+}
+function tagEnd(xml, from) {
+  let quote = null;
+  for (let i = from; i < xml.length; i += 1) {
+    const ch = xml[i];
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === ">") return i;
+  }
+  throw new Error("Malformed SVG: unterminated tag.");
+}
+function parseAttrs(tag) {
+  const out = [];
+  const re = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  for (let m = re.exec(tag); m; m = re.exec(tag)) out.push([m[1], attributeValue(m[2] ?? m[3] ?? "")]);
+  return out;
+}
+function parseXml(xml) {
+  let root = null;
+  let rootStart = -1;
+  let rootEnd = -1;
+  const stack = [];
+  const append = (node2) => {
+    const parent = stack[stack.length - 1];
+    if (!parent) return;
+    node2.parent = parent;
+    parent.children.push(node2);
+  };
+  let i = 0;
+  while (i < xml.length) {
+    const lt = xml.indexOf("<", i);
+    const textEnd = lt < 0 ? xml.length : lt;
+    if (textEnd > i && stack.length > 0) append({ kind: "text", data: decode(xml.slice(i, textEnd)), cdata: false, parent: null });
+    if (lt < 0) break;
+    if (xml.startsWith("<!--", lt)) {
+      const close = xml.indexOf("-->", lt + 4);
+      if (close < 0) throw new Error("Malformed SVG: unterminated comment.");
+      if (stack.length > 0) append({ kind: "other", raw: xml.slice(lt, close + 3), parent: null });
+      i = close + 3;
+      continue;
+    }
+    if (xml.startsWith("<![CDATA[", lt)) {
+      const close = xml.indexOf("]]>", lt + 9);
+      if (close < 0) throw new Error("Malformed SVG: unterminated CDATA.");
+      if (stack.length > 0) append({ kind: "text", data: xml.slice(lt + 9, close), cdata: true, parent: null });
+      i = close + 3;
+      continue;
+    }
+    if (xml.startsWith("<?", lt)) {
+      const close = xml.indexOf("?>", lt + 2);
+      if (close < 0) throw new Error("Malformed SVG: unterminated processing instruction.");
+      if (stack.length > 0) append({ kind: "other", raw: xml.slice(lt, close + 2), parent: null });
+      i = close + 2;
+      continue;
+    }
+    if (xml.startsWith("<!", lt)) {
+      let j = lt + 2;
+      let depth = 0;
+      for (; j < xml.length; j += 1) {
+        if (xml[j] === "[") depth += 1;
+        else if (xml[j] === "]") depth -= 1;
+        else if (xml[j] === ">" && depth <= 0) break;
+      }
+      i = j + 1;
+      continue;
+    }
+    const end = tagEnd(xml, lt + 1);
+    if (xml[lt + 1] === "/") {
+      const name2 = xml.slice(lt + 2, end).trim();
+      const open7 = stack.pop();
+      if (!open7 || open7.name !== name2) throw new Error(`Malformed SVG: </${name2}> does not close <${open7?.name ?? ""}>.`);
+      if (stack.length === 0) rootEnd = end + 1;
+      i = end + 1;
+      continue;
+    }
+    const tag = xml.slice(lt, end + 1);
+    const name = /^<([^\s/>]+)/.exec(tag)?.[1] ?? "";
+    const selfClosing = xml[end - 1] === "/";
+    const element = { kind: "element", name, attrs: parseAttrs(tag.slice(name.length + 1, selfClosing ? -2 : -1)), children: [], parent: null };
+    if (stack.length === 0) {
+      if (root) throw new Error("Malformed SVG: more than one root element.");
+      root = element;
+      rootStart = lt;
+      if (selfClosing) rootEnd = end + 1;
+    } else append(element);
+    if (!selfClosing) stack.push(element);
+    i = end + 1;
+  }
+  if (stack.length > 0) throw new Error(`Malformed SVG: <${stack[stack.length - 1].name}> is not closed.`);
+  if (!root) throw new Error("Malformed SVG: no root element.");
+  return { prolog: xml.slice(0, rootStart), root, epilog: xml.slice(rootEnd) };
+}
+function serializeNode(node2, out) {
+  if (node2.kind === "text") {
+    out.push(node2.cdata ? `<![CDATA[${node2.data}]]>` : escapeText(node2.data));
+    return;
+  }
+  if (node2.kind === "other") {
+    out.push(node2.raw);
+    return;
+  }
+  out.push(`<${node2.name}`);
+  for (const [key2, value] of node2.attrs) out.push(` ${key2}="${escapeAttr(value)}"`);
+  if (node2.children.length === 0) {
+    out.push("/>");
+    return;
+  }
+  out.push(">");
+  for (const child of node2.children) serializeNode(child, out);
+  out.push(`</${node2.name}>`);
+}
+function serializeXml(doc) {
+  const out = [doc.prolog];
+  serializeNode(doc.root, out);
+  out.push(doc.epilog);
+  return out.join("");
+}
+function getAttr(el, name) {
+  return el.attrs.find(([key2]) => key2 === name)?.[1] ?? "";
+}
+function hasAttr(el, name) {
+  return el.attrs.some(([key2]) => key2 === name);
+}
+function setAttr(el, name, value) {
+  const at = el.attrs.findIndex(([key2]) => key2 === name);
+  if (at >= 0) el.attrs[at] = [name, value];
+  else el.attrs.push([name, value]);
+}
+function elementsByTagName(from, name) {
+  const out = [];
+  const visit2 = (el) => {
+    for (const child of el.children) {
+      if (child.kind !== "element") continue;
+      if (child.name === name) out.push(child);
+      visit2(child);
+    }
+  };
+  if ("root" in from) {
+    if (from.root.name === name) out.push(from.root);
+    visit2(from.root);
+  } else visit2(from);
+  return out;
+}
+var NAMED;
+var init_xml = __esm({
+  "../engine/src/titles/xml.ts"() {
+    "use strict";
+    NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+  }
+});
+
+// ../engine/src/titles/title-svg.ts
+function parseTitleSvg(svg) {
+  return parseXml(svg);
+}
+function titleSvgText(doc) {
+  return serializeXml(doc);
+}
+function parseStyle(style) {
+  const out = /* @__PURE__ */ new Map();
+  for (const part of String(style ?? "").split(";")) {
+    const at = part.indexOf(":");
+    if (at < 0) continue;
+    const key2 = part.slice(0, at).trim();
+    if (key2) out.set(key2, part.slice(at + 1).trim());
+  }
+  return out;
+}
+function formatStyle(style) {
+  return [...style.entries()].map(([k, v]) => `${k}:${v}`).join(";") + ";";
+}
+function nodeStyle(node2) {
+  return parseStyle(getAttr(node2, "style"));
+}
+function setNodeStyle(node2, style) {
+  const text5 = formatStyle(style);
+  setAttr(node2, "style", text5);
+  return text5;
+}
+function nodeProperty(node2, name, inherit = true) {
+  for (let current = node2; current; current = current.parent) {
+    let value = nodeStyle(current).get(name);
+    if ((value === void 0 || value === "") && hasAttr(current, name)) value = getAttr(current, name);
+    if (value !== void 0 && value !== "") return value;
+    if (!inherit) break;
+  }
+  return void 0;
+}
+function px(value) {
+  if (value === void 0 || value === "") return null;
+  const m = /^(-?[0-9]*\.?[0-9]+)\s*(px|pt)?$/.exec(value.trim().toLowerCase());
+  if (!m) return null;
+  const n = Number(m[1]);
+  return m[2] === "pt" ? n * 96 / 72 : n;
+}
+function textNodes(doc) {
+  return elementsByTagName(doc, "text");
+}
+function tspanNodes(doc) {
+  return elementsByTagName(doc, "tspan");
+}
+function rectNodes(doc) {
+  return elementsByTagName(doc, "rect");
+}
+function firstTextChild(node2) {
+  const first = node2.children[0];
+  return first && first.kind === "text" && !first.cdata ? first : null;
+}
+function lineNodes(doc) {
+  return tspanNodes(doc).filter((n) => firstTextChild(n) !== null);
+}
+function lineText(node2) {
+  return firstTextChild(node2)?.data ?? "";
+}
+function replaceText(node2, text5) {
+  const fresh = { kind: "text", data: String(text5), cdata: false, parent: node2 };
+  const old = firstTextChild(node2);
+  if (old) node2.children[0] = fresh;
+  else node2.children.unshift(fresh);
+}
+function artboardSize(doc) {
+  const svg = doc.root;
+  let width = px(getAttr(svg, "width"));
+  let height = px(getAttr(svg, "height"));
+  if (!(width && height)) {
+    const box = getAttr(svg, "viewBox").trim().split(/[\s,]+/).filter(Boolean);
+    if (box.length === 4) {
+      const w = parsePythonFloat(box[2]);
+      const h = parsePythonFloat(box[3]);
+      [width, height] = w === null || h === null ? [null, null] : [w, h];
+    }
+  }
+  return [width || 1920, height || 1080];
+}
+function fmt(value) {
+  return pyFixed(value, 4).replace(/0+$/, "").replace(/\.$/, "");
+}
+function opacityText(alpha) {
+  return fmt(Math.max(0, Math.min(1, alpha)));
+}
+function applyFont(nodes, change) {
+  const ratio = change.sizeRatio ?? 1;
+  for (const node2 of nodes) {
+    const style = nodeStyle(node2);
+    if (change.family) style.set("font-family", `'${String(change.family).replace(/^['"]+|['"]+$/g, "")}'`);
+    if (change.italic !== void 0 && change.italic !== null) style.set("font-style", change.italic ? "italic" : "normal");
+    if (change.bold !== void 0 && change.bold !== null) style.set("font-weight", change.bold ? "bold" : "normal");
+    if (ratio && Math.abs(ratio - 1) > 1e-9) {
+      let size = px(style.get("font-size"));
+      if (size === null && hasAttr(node2, "font-size")) size = px(getAttr(node2, "font-size"));
+      if (size !== null) style.set("font-size", `${fmt(size * ratio)}px`);
+    }
+    setNodeStyle(node2, style);
+  }
+}
+function setTextColor(doc, color3, alpha = 1) {
+  const opacity = opacityText(alpha);
+  for (const node2 of [...textNodes(doc), ...tspanNodes(doc)]) {
+    const style = nodeStyle(node2);
+    style.set("fill", color3);
+    const textWithTspans = node2.name === "text" && elementsByTagName(node2, "tspan").length > 0;
+    style.set("opacity", textWithTspans ? "1" : opacity);
+    setNodeStyle(node2, style);
+  }
+}
+function setBackground(doc, color3, alpha = 1) {
+  const rect = rectNodes(doc)[0];
+  if (!rect) return false;
+  const style = nodeStyle(rect);
+  style.set("fill", color3);
+  style.set("opacity", opacityText(alpha));
+  setNodeStyle(rect, style);
+  return true;
+}
+function refColor(doc, refId) {
+  const defs = elementsByTagName(doc, "defs")[0];
+  if (!defs) return "";
+  const seen = /* @__PURE__ */ new Set();
+  let id = refId;
+  while (id && !seen.has(id)) {
+    seen.add(id);
+    const target = defs.children.find((n) => n.kind === "element" && getAttr(n, "id") === id);
+    if (!target) return "";
+    const href = getAttr(target, "xlink:href") || getAttr(target, "href");
+    if (href) {
+      id = href.replace(/^#+/, "");
+      continue;
+    }
+    for (const stop of target.children) {
+      if (stop.kind !== "element" || stop.name !== "stop") continue;
+      const color3 = parseStyle(getAttr(stop, "style")).get("stop-color") || getAttr(stop, "stop-color");
+      if (color3) return color3;
+    }
+    return "";
+  }
+  return "";
+}
+function resolvePaint(doc, value, fallback) {
+  const v = (value ?? "").trim();
+  if (v.startsWith("url(#")) return refColor(doc, v.slice(5).replace(/\)+$/, "")) || fallback;
+  if (!v || v === "none") return fallback;
+  return v;
+}
+function pyFloatOr(value, fallback) {
+  if (value === void 0) return fallback;
+  return parsePythonFloat(value);
+}
+function textColor(doc, node2) {
+  const lines2 = lineNodes(doc);
+  const target = node2 ?? lines2[lines2.length - 1];
+  if (!target) return ["#ffffff", 1];
+  const fill = resolvePaint(doc, nodeProperty(target, "fill"), "#ffffff");
+  let opacity = 1;
+  for (let current = target; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
+    const value = pyFloatOr(nodeProperty(current, "opacity", false), 1);
+    if (value !== null) opacity *= value;
+  }
+  return [fill, opacity];
+}
+function backgroundColor(doc) {
+  const rect = rectNodes(doc)[0];
+  if (!rect) return ["", 0];
+  const raw = nodeProperty(rect, "fill", false);
+  const fill = resolvePaint(doc, raw, "#000000");
+  let opacity = pyFloatOr(nodeProperty(rect, "opacity", false), 1) ?? 1;
+  if ((raw ?? "") === "none") opacity = 0;
+  return [fill, opacity];
+}
+function fontFamily(doc) {
+  for (const node2 of lineNodes(doc)) {
+    const family = nodeProperty(node2, "font-family");
+    if (family) return family.replace(/^['"]+|['"]+$/g, "");
+  }
+  return "";
+}
+function editorFontFamily(requested, families) {
+  if (requested) {
+    if (families.includes(requested)) return requested;
+    const containing = families.find((font) => font.includes(requested));
+    if (containing !== void 0) return containing;
+  }
+  for (const fallback of FALLBACK_FONTS) if (families.includes(fallback)) return fallback;
+  for (const fallback of FALLBACK_FONTS) {
+    const containing = families.find((font) => font.includes(fallback));
+    if (containing !== void 0) return containing;
+  }
+  return "";
+}
+function installedFontForTitle(doc, families) {
+  if (families === null) return ["", ""];
+  const current = fontFamily(doc);
+  if (!current || families.some((f3) => current === f3 || f3.includes(current))) return ["", ""];
+  const replacement = editorFontFamily(current, families);
+  return replacement ? [current, replacement] : ["", ""];
+}
+function floatAttr(node2, name) {
+  for (let current = node2; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
+    const raw = getAttr(current, name);
+    if (raw) return parsePythonFloat(raw.trim().split(/[\s,]+/)[0] ?? "");
+  }
+  return null;
+}
+function isMirrored(node2) {
+  for (let current = node2; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
+    if (getAttr(current, "transform").replace(/ /g, "").includes("scale(1,-1)")) return true;
+  }
+  return false;
+}
+function assignRoles(slots2) {
+  if (slots2.length === 0) return;
+  const ranked = [...slots2].sort((a, b) => (b.fontSize ?? 0) - (a.fontSize ?? 0) || a.index - b.index);
+  const main = ranked.find((s) => !s.text.toLowerCase().includes("sub")) ?? ranked[0];
+  main.role = "title";
+  const rest = ranked.filter((s) => s !== main);
+  const sub = rest.find((s) => s.text.toLowerCase().includes("sub")) ?? rest[0];
+  if (sub) sub.role = "subtitle";
+}
+function titleFields(doc) {
+  const slots2 = [];
+  const byText = /* @__PURE__ */ new Map();
+  for (const node2 of lineNodes(doc)) {
+    const text5 = lineText(node2);
+    const key2 = text5.trim();
+    let slot = key2 ? byText.get(key2) : void 0;
+    if (!slot) {
+      slot = { index: slots2.length + 1, text: text5, nodes: [], fontSize: null, role: "line", x: null, y: null, anchor: "start" };
+      slots2.push(slot);
+      if (key2) byText.set(key2, slot);
+    }
+    slot.nodes.push(node2);
+  }
+  for (const slot of slots2) {
+    const primary = slot.nodes.find((n) => !isMirrored(n)) ?? slot.nodes[0];
+    slot.fontSize = px(nodeProperty(primary, "font-size"));
+    slot.x = floatAttr(primary, "x");
+    slot.y = floatAttr(primary, "y");
+    slot.anchor = nodeProperty(primary, "text-anchor") || "start";
+  }
+  assignRoles(slots2);
+  return slots2;
+}
+function fieldByRole(slots2, role) {
+  return slots2.find((s) => s.role === role);
+}
+function setFieldText(slot, text5) {
+  const value = String(text5 ?? "").split("\n").join(" ").trim() || BLANK;
+  for (const node2 of slot.nodes) replaceText(node2, value);
+  slot.text = value;
+}
+function textZone(slots2, artboardHeight) {
+  const main = fieldByRole(slots2, "title") ?? slots2[0];
+  if (!main || main.y === null || !artboardHeight) return "center";
+  const y = Math.abs(main.y) / artboardHeight;
+  if (y < 0.3) return "top";
+  if (y > 0.7) return "bottom";
+  return "center";
+}
+function estimatedTextWidth(text5, fontPx, bold = true) {
+  let wide = 0;
+  let narrow = 0;
+  let total = 0;
+  for (const ch of text5) {
+    total += 1;
+    if (new RegExp("\\p{Lu}", "u").test(ch) || "MWmw@%".includes(ch)) wide += 1;
+    else if (" .,:;'!|il1".includes(ch)) narrow += 1;
+  }
+  const normal = Math.max(0, total - wide - narrow);
+  const per = bold ? 0.62 : 0.56;
+  return fontPx * (normal * per + wide * (per + 0.14) + narrow * 0.3);
+}
+function availableWidth(slot, artboardWidth) {
+  const x = Math.max(0, Math.min(artboardWidth, slot.x ?? artboardWidth / 2));
+  if (slot.anchor === "middle") return 2 * Math.min(x, artboardWidth - x) * 0.94;
+  if (slot.anchor === "end") return x * 0.96;
+  return (artboardWidth - x) * 0.96;
+}
+function fitField(slot, artboardWidth, minRatio = 0.35) {
+  if (!slot.text.trim() || !slot.fontSize) return 1;
+  const bold = slot.nodes.some((n) => ["bold", "700", "800", "900"].includes(String(nodeProperty(n, "font-weight") ?? "normal").toLowerCase()));
+  const width = estimatedTextWidth(slot.text.trim(), slot.fontSize, bold);
+  const room = availableWidth(slot, artboardWidth);
+  if (width <= room || width <= 0) return 1;
+  const ratio = Math.max(minRatio, room / width);
+  applyFont(slot.nodes, { sizeRatio: ratio });
+  slot.fontSize *= ratio;
+  return ratio;
+}
+function withoutBadChars(text5) {
+  let out = "";
+  for (const ch of text5) out += ch.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(ch) ? " " : ch;
+  return out;
+}
+function safeBaseName(text5, fallback = "Title", limit = 60) {
+  let base = withoutBadChars(String(text5 ?? ""));
+  base = base.split(/\s+/).filter(Boolean).join(" ").replace(/^[ .]+|[ .]+$/g, "");
+  if (base.toLowerCase().endsWith(".svg")) base = base.slice(0, -4).replace(/^[ .]+|[ .]+$/g, "");
+  if ([...base].length > limit) base = [...base].slice(0, limit).join("").replace(/[ .]+$/, "");
+  return base || fallback;
+}
+function duplicatePattern(fileName2) {
+  let name = String(fileName2).split(/[\\/]/).pop() ?? "";
+  if (!name.toLowerCase().endsWith(".svg")) name += ".svg";
+  const m = /^(.+?)(\s*)(\(([0-9]*)\))?\.svg$/i.exec(name);
+  if (!m) return [`${name.replace(/\.[^.]*$/, "")} (`, 0];
+  if (m[4]) return [`${m[1]}${m[2]}(`, Number(m[4])];
+  return [`${m[1]} (`, 0];
+}
+function freeName(prefix, offset, taken, limit = 1e3) {
+  const used = new Set([...taken].map((n) => n.toLowerCase()));
+  for (let i = 1; i < limit; i += 1) {
+    const name = `${prefix}${offset + i})`;
+    if (!used.has(`${name}.svg`.toLowerCase())) return name;
+  }
+  return null;
+}
+function uniqueTitleName(base, taken) {
+  const safe2 = safeBaseName(base);
+  const used = new Set([...taken].map((n) => n.toLowerCase()));
+  if (!used.has(`${safe2}.svg`.toLowerCase())) return `${safe2}.svg`;
+  const [prefix, offset] = duplicatePattern(`${safe2}.svg`);
+  const name = freeName(prefix, offset, used);
+  if (!name) throw new Error(`no free title name for ${safe2}`);
+  return `${name}.svg`;
+}
+function versionName(current, taken) {
+  const stem7 = (String(current).split(/[\\/]/).pop() ?? "").replace(/\.[^.]*$/, "");
+  const m = /^(.*?) v(\d+)$/.exec(stem7);
+  const [base, n] = m ? [m[1], Number(m[2])] : [stem7, 1];
+  const used = new Set([...taken].map((name) => name.toLowerCase()));
+  for (let k = n + 1; k < n + 1e3; k += 1) {
+    const name = `${base} v${k}.svg`;
+    if (!used.has(name.toLowerCase())) return name;
+  }
+  return null;
+}
+var BLANK, FALLBACK_FONTS;
+var init_title_svg = __esm({
+  "../engine/src/titles/title-svg.ts"() {
+    "use strict";
+    init_coerce();
+    init_pyfmt();
+    init_xml();
+    BLANK = " ";
+    FALLBACK_FONTS = ["DejaVu Sans", "Liberation Sans", "Noto Sans", "FreeSans", "Ubuntu", "Cantarell", "Open Sans", "Sans-serif", "Arial"];
+  }
+});
+
+// ../engine/src/history/keypath.ts
+function isRecord9(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function findKey(obj, part) {
+  if (part in obj) return part;
+  const lower = part.toLowerCase();
+  if (lower in obj) return lower;
+  return Object.keys(obj).find((k) => k.toLowerCase() === lower);
+}
+function matches(item, match) {
+  if (!isRecord9(item)) return false;
+  for (const [k, v] of Object.entries(match)) {
+    const key2 = findKey(item, k);
+    if (key2 === void 0 || item[key2] !== v) return false;
+  }
+  return true;
+}
+function resolveKey(root, path42) {
+  if (path42.length === 0) return void 0;
+  let parent = root;
+  let slot = "";
+  let value = root;
+  for (const part of path42) {
+    if (typeof part === "string") {
+      if (!isRecord9(value)) return void 0;
+      const key2 = findKey(value, part);
+      if (key2 === void 0) return void 0;
+      parent = value;
+      slot = key2;
+      value = value[key2];
+    } else {
+      if (!Array.isArray(value)) return void 0;
+      const index = value.findIndex((item) => matches(item, part));
+      if (index < 0) return void 0;
+      parent = value;
+      slot = index;
+      value = value[index];
+    }
+  }
+  return { parent, slot, value };
+}
+function formatKey(path42) {
+  return path42.map(
+    (part) => typeof part === "string" ? part : `{${Object.entries(part).map(([k, v]) => `${k}:${String(v)}`).join(",")}}`
+  ).join("/");
+}
+var init_keypath = __esm({
+  "../engine/src/history/keypath.ts"() {
+    "use strict";
+  }
+});
+
+// ../engine/src/history/document.ts
+function isRecord10(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function clone(value) {
+  return value === void 0 ? value : structuredClone(value);
+}
+function defaultTransactionId() {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  fallbackCounter += 1;
+  return `tx-${Date.now().toString(36)}-${fallbackCounter.toString(36)}`;
+}
+function writeThrough(root, path42, mutate) {
+  const resolved = resolveKey(root, path42);
+  if (!resolved) throw new KeyNotFoundError(path42);
+  const newRoot = { ...root };
+  let src = root;
+  let dst = newRoot;
+  for (let i = 0; i < path42.length; i += 1) {
+    const partial2 = resolveKey(src, [path42[i]]);
+    if (!partial2) throw new KeyNotFoundError(path42);
+    const { slot, value } = partial2;
+    if (i === path42.length - 1) {
+      mutate(dst, slot);
+      break;
+    }
+    const copy = Array.isArray(value) ? [...value] : { ...value };
+    dst[slot] = copy;
+    dst = copy;
+    src = value;
+  }
+  return newRoot;
+}
+function stripHistory(action) {
+  const strip = (v) => {
+    if (isRecord10(v) && "history" in v) {
+      const { history: _history, ...rest } = v;
+      return rest;
+    }
+    return v;
+  };
+  return { ...action, value: strip(action.value), old_values: strip(action.old_values) };
+}
+function groupSaved(saved) {
+  if (!Array.isArray(saved)) return [];
+  const entries = [];
+  const byId = /* @__PURE__ */ new Map();
+  for (const raw of saved) {
+    if (!isRecord10(raw)) continue;
+    const type = raw.type;
+    let key2 = raw.key;
+    if (type === "load" || !Array.isArray(key2) || key2[0] === "history") continue;
+    const last = key2[key2.length - 1];
+    if (type === "insert" && typeof last === "object" && last !== null && "id" in last) {
+      key2 = key2.slice(0, -1);
+    }
+    const transaction = typeof raw.transaction === "string" ? raw.transaction : defaultTransactionId();
+    const action = {
+      type,
+      key: key2,
+      value: raw.value ?? raw.values ?? null,
+      old_values: raw.old_values ?? null,
+      transaction
+    };
+    const applied2 = { action, previous: action.old_values };
+    let entry = byId.get(transaction);
+    if (!entry) {
+      entry = { transaction, label: describeSaved(action), actions: [] };
+      byId.set(transaction, entry);
+      entries.push(entry);
+    }
+    entry.actions.push(applied2);
+  }
+  return entries;
+}
+function describeSaved(action) {
+  const collection = typeof action.key[0] === "string" ? action.key[0] : "project";
+  return `${action.type} ${collection}`;
+}
+var KeyNotFoundError, fallbackCounter, ProjectDocument;
+var init_document = __esm({
+  "../engine/src/history/document.ts"() {
+    "use strict";
+    init_keypath();
+    KeyNotFoundError = class extends Error {
+      constructor(key2) {
+        super(`Key not found in project: ${formatKey(key2)}`);
+        this.key = key2;
+        this.name = "KeyNotFoundError";
+      }
+      key;
+    };
+    fallbackCounter = 0;
+    ProjectDocument = class {
+      current;
+      undoStack = [];
+      redoStack = [];
+      listeners = /* @__PURE__ */ new Set();
+      open = null;
+      historyLimit;
+      newTransactionId;
+      /** Incremented on every change (tracked or not). */
+      revision = 0;
+      constructor(project, options = {}) {
+        this.historyLimit = options.historyLimit ?? 50;
+        this.newTransactionId = options.newTransactionId ?? defaultTransactionId;
+        this.current = project;
+        this.loadHistory(project.history);
+      }
+      get project() {
+        return this.current;
+      }
+      get canUndo() {
+        return this.undoStack.length > 0;
+      }
+      get canRedo() {
+        return this.redoStack.length > 0;
+      }
+      /** Labels of undoable steps, most recent last. */
+      get undoLabels() {
+        return this.undoStack.map((e) => e.label);
+      }
+      get redoLabels() {
+        return this.redoStack.map((e) => e.label);
+      }
+      subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+      }
+      /**
+       * Run `body` as one undo step. Returns whatever `body` returns.
+       * Throws (after rolling back) if `body` throws. Nested calls join the outer
+       * transaction, like the desktop's `nested_transaction`.
+       */
+      transaction(label2, body) {
+        if (this.open) {
+          return body(this.recorder(this.open));
+        }
+        const before = this.current;
+        const beforeRevision = this.revision;
+        const open7 = { id: this.newTransactionId(), label: label2, actions: [] };
+        this.open = open7;
+        let result2;
+        try {
+          result2 = body(this.recorder(open7));
+        } catch (error62) {
+          this.current = before;
+          this.revision = beforeRevision;
+          this.open = null;
+          throw error62;
+        }
+        this.open = null;
+        if (open7.actions.length === 0) return result2;
+        this.undoStack.push({ transaction: open7.id, label: label2, actions: open7.actions });
+        this.redoStack = [];
+        this.emit({
+          project: this.current,
+          previous: before,
+          source: "apply",
+          actions: open7.actions.map((a) => a.action),
+          label: label2
+        });
+        return result2;
+      }
+      /** Change UI state saved with the project (playhead, zoom) without an undo step. */
+      setUntracked(key2, value) {
+        const before = this.current;
+        this.current = writeThrough(this.current, key2, (container, slot) => {
+          container[slot] = clone(value);
+        });
+        this.revision += 1;
+        this.emit({ project: this.current, previous: before, source: "untracked", actions: [] });
+      }
+      /** Replace the whole project (open/new). Clears history unless `keepHistory`. */
+      load(project, keepHistory = false) {
+        const before = this.current;
+        this.current = project;
+        if (!keepHistory) {
+          this.undoStack = [];
+          this.redoStack = [];
+          this.loadHistory(project.history);
+        }
+        this.revision += 1;
+        this.emit({
+          project: this.current,
+          previous: before,
+          source: "load",
+          actions: [{ type: "load", key: [], value: null, old_values: null, transaction: "load" }]
+        });
+      }
+      /**
+       * Forget every undo and redo step and keep the project as it is (Edit >
+       * Clear > History, the desktop's `UpdateManager.reset`). Not an undo step;
+       * listeners get an untracked change, so hosts save the project without the
+       * old history. Returns how many steps each stack held.
+       */
+      clearHistory() {
+        const counts = { undo: this.undoStack.length, redo: this.redoStack.length };
+        if (counts.undo === 0 && counts.redo === 0) return counts;
+        this.undoStack = [];
+        this.redoStack = [];
+        const before = this.current;
+        this.current = { ...this.current, history: { ...isRecord10(this.current.history) ? this.current.history : {}, undo: [], redo: [] } };
+        this.revision += 1;
+        this.emit({ project: this.current, previous: before, source: "untracked", actions: [] });
+        return counts;
+      }
+      /** Undo `steps` transactions. Returns the labels undone, most recent first. */
+      undo(steps = 1) {
+        const done = [];
+        for (let i = 0; i < steps && this.undoStack.length > 0; i += 1) {
+          const entry = this.undoStack.pop();
+          const before = this.current;
+          const inverses = [];
+          for (const applied2 of [...entry.actions].reverse()) {
+            inverses.push(this.reverse(applied2));
+          }
+          this.redoStack.push(entry);
+          this.revision += 1;
+          done.push(entry.label);
+          this.emit({ project: this.current, previous: before, source: "undo", actions: inverses, label: entry.label });
+        }
+        return done;
+      }
+      /** Redo `steps` transactions. Returns the labels redone, oldest first. */
+      redo(steps = 1) {
+        const done = [];
+        for (let i = 0; i < steps && this.redoStack.length > 0; i += 1) {
+          const entry = this.redoStack.pop();
+          const before = this.current;
+          const reapplied = [];
+          for (const applied2 of entry.actions) {
+            reapplied.push(this.perform(applied2.action.type, applied2.action.key, applied2.action.value, entry.transaction, applied2.index, applied2.replace));
+          }
+          entry.actions = reapplied;
+          this.undoStack.push(entry);
+          this.revision += 1;
+          done.push(entry.label);
+          this.emit({
+            project: this.current,
+            previous: before,
+            source: "redo",
+            actions: reapplied.map((a) => a.action),
+            label: entry.label
+          });
+        }
+        return done;
+      }
+      /**
+       * The project JSON to save: the current snapshot with the last
+       * `historyLimit` actions of each stack serialized in desktop format.
+       */
+      toJSON() {
+        const limit = this.historyLimit;
+        const flatten2 = (stack) => stack.flatMap((entry) => entry.actions.map((a) => stripHistory(a.action)));
+        const undo = limit > 0 ? flatten2(this.undoStack).slice(-limit) : [];
+        const redo = limit > 0 ? flatten2(this.redoStack).slice(-limit) : [];
+        return { ...this.current, history: { ...this.current.history, undo, redo } };
+      }
+      // -------------------------------------------------------------------------
+      recorder(open7) {
+        const current = () => this.current;
+        return {
+          id: open7.id,
+          get project() {
+            return current();
+          },
+          insert: (key2, value) => {
+            open7.actions.push(this.perform("insert", key2, value, open7.id));
+          },
+          update: (key2, value) => {
+            open7.actions.push(this.perform("update", key2, value, open7.id));
+          },
+          replace: (key2, value) => {
+            open7.actions.push(this.perform("update", key2, value, open7.id, void 0, true));
+          },
+          delete: (key2) => {
+            open7.actions.push(this.perform("delete", key2, null, open7.id));
+          }
+        };
+      }
+      /** Apply one action to `current`; return what is needed to reverse it. */
+      perform(type, key2, value, transaction, index, replace = false) {
+        const root = this.current;
+        const target = resolveKey(root, key2);
+        if (!target) throw new KeyNotFoundError(key2);
+        if (type === "insert") {
+          if (!Array.isArray(target.value)) {
+            throw new TypeError(`insert target is not a list: ${formatKey(key2)}`);
+          }
+          const item = clone(value);
+          let landed = target.value.length;
+          this.current = writeThrough(root, key2, (container, slot) => {
+            const list2 = [...container[slot]];
+            landed = index !== void 0 && index >= 0 && index <= list2.length ? index : list2.length;
+            list2.splice(landed, 0, item);
+            container[slot] = list2;
+          });
+          this.revision += 1;
+          return { action: { type, key: key2, value: clone(value), old_values: null, transaction }, index: landed };
+        }
+        if (type === "delete") {
+          const previous = clone(target.value);
+          const at = target.slot;
+          this.current = writeThrough(root, key2.slice(0, -1), (container, slot) => {
+            const holder = container[slot];
+            if (Array.isArray(holder)) {
+              const list2 = [...holder];
+              list2.splice(at, 1);
+              container[slot] = list2;
+            } else if (isRecord10(holder)) {
+              const obj = { ...holder };
+              delete obj[at];
+              container[slot] = obj;
+            }
+          });
+          this.revision += 1;
+          return {
+            action: { type, key: key2, value: null, old_values: previous, transaction },
+            index: typeof at === "number" ? at : void 0,
+            previous
+          };
+        }
+        if (type === "update") {
+          const previous = clone(target.value);
+          const merge2 = !replace && isRecord10(target.value) && isRecord10(value);
+          const next = merge2 ? { ...target.value, ...clone(value) } : clone(value);
+          this.current = writeThrough(root, key2, (container, slot) => {
+            container[slot] = next;
+          });
+          this.revision += 1;
+          const applied2 = { action: { type, key: key2, value: clone(value), old_values: previous, transaction }, previous };
+          if (replace) applied2.replace = true;
+          return applied2;
+        }
+        throw new TypeError(`unsupported action type in transaction: ${type}`);
+      }
+      /** Exactly undo one applied action. Returns the inverse, in desktop action form. */
+      reverse(applied2) {
+        const { action } = applied2;
+        const root = this.current;
+        if (action.type === "insert") {
+          const id = isRecord10(action.value) ? action.value.id : void 0;
+          const key2 = id !== void 0 ? [...action.key, { id }] : action.key;
+          const target = resolveKey(root, key2);
+          if (target) {
+            this.current = writeThrough(root, action.key, (container, slot) => {
+              const list2 = [...container[slot]];
+              list2.splice(target.slot, 1);
+              container[slot] = list2;
+            });
+          }
+          return { type: "delete", key: key2, value: null, old_values: clone(action.value), transaction: action.transaction };
+        }
+        if (action.type === "delete") {
+          const parentKey = action.key.slice(0, -1);
+          this.current = writeThrough(root, parentKey, (container, slot) => {
+            const holder = container[slot];
+            if (Array.isArray(holder)) {
+              const list2 = [...holder];
+              const at = applied2.index !== void 0 && applied2.index <= list2.length ? applied2.index : list2.length;
+              list2.splice(at, 0, clone(applied2.previous));
+              container[slot] = list2;
+            } else if (isRecord10(holder)) {
+              const last = action.key[action.key.length - 1];
+              if (typeof last === "string") {
+                container[slot] = { ...holder, [last]: clone(applied2.previous) };
+              }
+            }
+          });
+          return { type: "insert", key: parentKey, value: clone(applied2.previous), old_values: null, transaction: action.transaction };
+        }
+        this.current = writeThrough(root, action.key, (container, slot) => {
+          container[slot] = clone(applied2.previous);
+        });
+        return { type: "update", key: action.key, value: clone(applied2.previous), old_values: clone(action.value), transaction: action.transaction };
+      }
+      /** Rebuild undo/redo stacks from a saved project's history (desktop format). */
+      loadHistory(history2) {
+        this.undoStack = groupSaved(history2?.undo);
+        this.redoStack = groupSaved(history2?.redo);
+      }
+      emit(event) {
+        for (const listener of [...this.listeners]) listener(event);
+      }
+    };
+  }
+});
+
+// ../engine/src/ops/errors.ts
+function isOpError(error62) {
+  return error62 instanceof OpError;
+}
+function invalid(message, details) {
+  return new OpError("invalid_argument", message, details);
+}
+function requireObject(value, what) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw invalid(`${what} must be an object.`);
+  }
+}
+function requireFinite(value, what) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw invalid(`${what} must be a finite number (got ${String(value)}).`);
+  }
+  return value;
+}
+function requireNonNegative(value, what) {
+  const n = requireFinite(value, what);
+  if (n < 0) throw invalid(`${what} must be >= 0 (got ${n}).`);
+  return n;
+}
+function requirePositive(value, what) {
+  const n = requireFinite(value, what);
+  if (n <= 0) throw invalid(`${what} must be > 0 (got ${n}).`);
+  return n;
+}
+function requireClip(project, id) {
+  const clip2 = findClip(project, id);
+  if (!clip2) throw new OpError("not_found", `No clip with id ${id}.`, { id });
+  return clip2;
+}
+function requireFile(project, id) {
+  const file3 = findFile(project, id);
+  if (!file3) throw new OpError("not_found", `No file with id ${id}.`, { id });
+  return file3;
+}
+function requireTransition(project, id) {
+  const transition2 = findTransition(project, id);
+  if (!transition2) throw new OpError("not_found", `No transition with id ${id}.`, { id });
+  return transition2;
+}
+function requireMarker(project, id) {
+  const marker2 = findMarker(project, id);
+  if (!marker2) throw new OpError("not_found", `No marker with id ${id}.`, { id });
+  return marker2;
+}
+function requireLayer(project, layer2) {
+  const found = findLayer(project, layer2);
+  if (!found) throw new OpError("not_found", `No track with number ${layer2}.`, { layer: layer2 });
+  return found;
+}
+function requireClipEffect(project, effectId) {
+  const ref = findClipEffect(project, effectId);
+  if (!ref) throw new OpError("not_found", `No effect with id ${effectId}.`, { id: effectId });
+  return ref;
+}
+function requireUnlocked(project, layer2, what = "Track") {
+  const found = findLayer(project, layer2);
+  if (found?.lock) {
+    const label2 = found.label ? ` "${found.label}"` : "";
+    throw new OpError("locked", `${what}${label2} (${layer2}) is locked.`, { layer: layer2 });
+  }
+}
+var OpError;
+var init_errors = __esm({
+  "../engine/src/ops/errors.ts"() {
+    "use strict";
+    init_query();
+    OpError = class extends Error {
+      constructor(code, message, details) {
+        super(message);
+        this.code = code;
+        this.details = details;
+      }
+      code;
+      details;
+      name = "OpError";
+    };
+  }
+});
+
+// ../engine/src/ops/types.ts
+var init_types3 = __esm({
+  "../engine/src/ops/types.ts"() {
+    "use strict";
+  }
+});
+
+// ../engine/src/ops/internal.ts
+function isRecord11(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function fpsOf(project) {
+  const fps2 = project.fps;
+  return fps2 && fps2.num > 0 && fps2.den > 0 ? fps2 : { num: 30, den: 1 };
+}
+function rateOf(project) {
+  const fps2 = fpsOf(project);
+  return fps2.num / fps2.den;
+}
+function snapSeconds(seconds2, project) {
+  const rate = rateOf(project);
+  return pyRound(seconds2 * rate) / rate;
+}
+function frameSeconds(project) {
+  return 1 / rateOf(project);
+}
+function requireEditableClip(project, clipId2) {
+  const clip2 = requireClip(project, clipId2);
+  requireUnlocked(project, clip2.layer, "Track");
+  return clip2;
+}
+function clipFile(project, clip2) {
+  return clip2.file_id ? findFile(project, clip2.file_id) : void 0;
+}
+function ensureLayer(tx, layer2) {
+  if (!Number.isInteger(layer2) || layer2 <= 0) {
+    throw invalid(`Track number must be a positive integer (got ${layer2}).`);
+  }
+  const existing = findLayer(tx.project, layer2);
+  if (existing) return existing;
+  const id = generateId((candidate) => tx.project.layers.some((l) => l.id === candidate));
+  tx.insert(["layers"], createLayer(layer2, id));
+  return findLayer(tx.project, layer2);
+}
+function withClampedTiming(clip2, project, existing) {
+  const timing = clampTimingToMedia(clip2, fpsOf(project), existing);
+  const next = { ...clip2, start: timing.start, end: timing.end, duration: timing.duration };
+  if (timing.time) next.time = timing.time;
+  return next;
+}
+function changedFields(prev, next) {
+  const out = {};
+  for (const [key2, value] of Object.entries(next)) {
+    if (!sameJson(prev[key2], value)) out[key2] = value;
+  }
+  return out;
+}
+function sameJson(a, b) {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    const bb = b;
+    return a.length === bb.length && a.every((v, i) => sameJson(v, bb[i]));
+  }
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  return ka.every((k) => sameJson(a[k], b[k]));
+}
+function patchClip(tx, id, patch) {
+  const clip2 = requireClip(tx.project, id);
+  const changed = changedFields(clip2, patch);
+  if (Object.keys(changed).length > 0) tx.update(["clips", { id }], changed);
+  return requireClip(tx.project, id);
+}
+function patchTransition(tx, id, patch) {
+  const transition2 = tx.project.effects.find((t) => t.id === id);
+  if (!transition2) throw new OpError("not_found", `No transition with id ${id}.`, { id });
+  const changed = changedFields(transition2, patch);
+  if (Object.keys(changed).length > 0) tx.update(["effects", { id }], changed);
+  return tx.project.effects.find((t) => t.id === id);
+}
+function reassignEffectIds(clip2, nextId) {
+  const effects = clip2.effects;
+  if (!Array.isArray(effects)) return;
+  clip2.effects = effects.map((effect3) => isRecord11(effect3) ? { ...effect3, id: nextId() } : effect3);
+}
+function ids(project) {
+  return idFactory(project);
+}
+function resolveClipFrame(project, clip2, at) {
+  if (at.frame !== void 0 && at.time !== void 0) throw invalid("Give at most one of frame / time.");
+  if (at.frame !== void 0) {
+    if (!Number.isFinite(at.frame)) throw invalid(`frame must be a finite number (got ${at.frame}).`);
+    return at.frame;
+  }
+  if (at.time !== void 0) {
+    if (!Number.isFinite(at.time)) throw invalid(`time must be a finite number (got ${at.time}).`);
+    return clipFrameAtTime(clip2, at.time, fpsOf(project));
+  }
+  return void 0;
+}
+function mapKeyframesDeep(value, fn) {
+  if (Array.isArray(value)) return value.map((v) => mapKeyframesDeep(v, fn));
+  if (!isRecord11(value)) return value;
+  if (Array.isArray(value.Points)) return fn(value);
+  const out = {};
+  for (const [k, v] of Object.entries(value)) out[k] = mapKeyframesDeep(v, fn);
+  return out;
+}
+function replaceClip(tx, before, after) {
+  if (sameJson(before, after)) return before;
+  tx.replace(["clips", { id: before.id }], after);
+  return requireClip(tx.project, before.id);
+}
+function fadeTargets(clip2) {
+  const reader = isRecord11(clip2.reader) ? clip2.reader : {};
+  return {
+    alpha: Boolean(reader.has_video ?? true) || Boolean(clip2.waveform),
+    volume: Boolean(reader.has_audio ?? true)
+  };
+}
+var init_internal = __esm({
+  "../engine/src/ops/internal.ts"() {
+    "use strict";
+    init_defaults();
+    init_query();
+    init_rounding();
+    init_timing();
+    init_ids();
+    init_errors();
+    init_windows();
+  }
+});
+
+// ../engine/src/ops/files.ts
+function detectMediaType(media) {
+  return getMediaType({ path: media.path, has_video: media.info.has_video, has_audio: media.info.has_audio }, media.name);
+}
+function addFile(tx, media, opts = {}) {
+  if (!media || typeof media.path !== "string" || media.path === "") {
+    throw invalid("media.path is required.");
+  }
+  if (!media.info || typeof media.info !== "object") throw invalid("media.info is required.");
+  if (opts.mediaType !== void 0 && !["video", "audio", "image"].includes(opts.mediaType)) {
+    throw invalid(`mediaType must be video, audio or image (got ${String(opts.mediaType)}).`);
+  }
+  const project = tx.project;
+  if (opts.dedupe !== false) {
+    const existing = project.files.find((file3) => file3.path === media.path);
+    if (existing) return existing;
+  }
+  if (opts.id !== void 0 && project.files.some((file3) => file3.id === opts.id)) {
+    throw new OpError("conflict", `A file with id ${opts.id} already exists.`, { id: opts.id });
+  }
+  const id = opts.id ?? idFactory(project)();
+  const entry = {
+    ...structuredClone(media.info),
+    path: media.path,
+    id,
+    media_type: opts.mediaType ?? detectMediaType(media)
+  };
+  if (isAudioOnlyMedia(entry)) {
+    entry.has_video = false;
+    entry.width = project.width;
+    entry.height = project.height;
+  }
+  const name = opts.name ?? media.name;
+  if (name !== void 0) entry.name = name;
+  if (opts.tags !== void 0) entry.tags = opts.tags;
+  if (media.fingerprint) entry.fingerprint = structuredClone(media.fingerprint);
+  if (media.cloud) entry.cloud = structuredClone(media.cloud);
+  tx.insert(["files"], entry);
+  return requireFile(tx.project, id);
+}
+function removeFile(tx, fileId, opts = {}) {
+  const project = tx.project;
+  requireFile(project, fileId);
+  const clips = clipsUsingFile(project, fileId);
+  if (clips.length > 0 && opts.removeClips === false) {
+    throw new OpError("conflict", `File ${fileId} is used by ${clips.length} clip(s).`, {
+      clipIds: clips.map((c) => c.id)
+    });
+  }
+  for (const clip2 of clips) tx.delete(["clips", { id: clip2.id }]);
+  tx.delete(["files", { id: fileId }]);
+  return { fileId, removedClipIds: clips.map((c) => c.id) };
+}
+function updateFile(tx, fileId, patch) {
+  const file3 = requireFile(tx.project, fileId);
+  if (!patch || typeof patch !== "object") throw invalid("patch must be an object.");
+  for (const key2 of Object.keys(patch)) {
+    if (IMMUTABLE_FILE_KEYS.has(key2) && patch[key2] !== file3[key2]) {
+      throw invalid(`File ${key2} cannot be changed.`);
+    }
+  }
+  if (patch.media_type !== void 0 && !["video", "audio", "image"].includes(patch.media_type)) {
+    throw invalid(`media_type must be video, audio or image (got ${String(patch.media_type)}).`);
+  }
+  const changed = Object.entries(patch).filter(([key2, value]) => !sameJson(file3[key2], value));
+  if (changed.length === 0) return file3;
+  tx.update(["files", { id: fileId }], Object.fromEntries(changed));
+  return requireFile(tx.project, fileId);
+}
+function writeFile2(tx, fileId, next, opts = {}) {
+  const current = requireFile(tx.project, fileId);
+  if (!isRecord11(next)) throw invalid("writeFile needs the file's record.");
+  if (next.id !== fileId) throw invalid("File id cannot be changed.");
+  if (next.media_type !== void 0 && !["video", "audio", "image"].includes(next.media_type)) {
+    throw invalid(`media_type must be video, audio or image (got ${String(next.media_type)}).`);
+  }
+  if (opts.clipTitle !== void 0 && typeof opts.clipTitle !== "string") throw invalid("clipTitle must be a string.");
+  const changed = changedFields(current, next);
+  if (Object.keys(changed).length > 0) tx.update(["files", { id: fileId }], changed);
+  for (const key2 of Object.keys(current)) {
+    if (!(key2 in next)) tx.delete(["files", { id: fileId }, key2]);
+  }
+  const file3 = requireFile(tx.project, fileId);
+  const duration3 = Number(file3.duration);
+  const updatedClipIds = [];
+  const renamedClipIds = [];
+  for (const clip2 of clipsUsingFile(tx.project, fileId)) {
+    const patch = { reader: structuredClone(file3), duration: file3.duration };
+    if (Number(clip2.end) > duration3) patch.end = file3.duration;
+    if (opts.clipTitle !== void 0 && clip2.title !== opts.clipTitle) {
+      patch.title = opts.clipTitle;
+      renamedClipIds.push(clip2.id);
+    }
+    patchClip(tx, clip2.id, patch);
+    updatedClipIds.push(clip2.id);
+  }
+  return { file: file3, updatedClipIds, renamedClipIds };
+}
+function addSubclipFiles(tx, sourceId, subclips) {
+  const source2 = requireFile(tx.project, sourceId);
+  if (!Array.isArray(subclips) || subclips.length === 0) throw invalid("Give at least one sub-clip.");
+  for (const sub of subclips) {
+    const start = requireNonNegative(sub?.start, "start");
+    const end = requireNonNegative(sub?.end, "end");
+    if (!(end > start)) throw invalid(`A sub-clip must end after it starts (got ${start}..${end}).`);
+    if (typeof sub.name !== "string") throw invalid("A sub-clip needs a name.");
+    if (sub.aiMetadata !== void 0 && !isRecord11(sub.aiMetadata)) throw invalid("aiMetadata must be an object.");
+  }
+  const created = [];
+  for (const sub of subclips) {
+    const { name: _name, id: _id, ...rest } = structuredClone(source2);
+    const entry = rest;
+    entry.start = sub.start;
+    entry.end = sub.end;
+    if (sub.aiMetadata !== void 0) entry.ai_metadata = structuredClone(sub.aiMetadata);
+    entry.name = sub.name;
+    entry.id = ids(tx.project)();
+    tx.insert(["files"], entry);
+    created.push(requireFile(tx.project, entry.id));
+  }
+  return created;
+}
+var IMMUTABLE_FILE_KEYS;
+var init_files = __esm({
+  "../engine/src/ops/files.ts"() {
+    "use strict";
+    init_query();
+    init_ids();
+    init_media();
+    init_errors();
+    init_internal();
+    IMMUTABLE_FILE_KEYS = /* @__PURE__ */ new Set(["id"]);
+  }
+});
+
+// ../engine/src/tools/frame-time.ts
+function num3(fps2) {
+  return typeof fps2 === "number" ? fps2 : fps2.num;
+}
+function den(fps2) {
+  return typeof fps2 === "number" ? 1 : fps2.den;
+}
+function requireRate(fps2) {
+  const n = num3(fps2);
+  const d = den(fps2);
+  if (!Number.isFinite(n) || !Number.isFinite(d) || n <= 0 || d <= 0) {
+    throw new RangeError(`fps must be positive, got ${n}/${d}`);
+  }
+}
+function requireFinite2(value, name) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new RangeError(`${name} must be a finite number, got ${String(value)}`);
+  }
+  return value;
+}
+function fpsFloat3(fps2) {
+  requireRate(fps2);
+  return num3(fps2) / den(fps2);
+}
+function roundHalfUp(value) {
+  requireFinite2(value, "value");
+  const r = value >= 0 ? Math.floor(value + 0.5) : Math.ceil(value - 0.5);
+  return r === 0 ? 0 : r;
+}
+function toFrame(seconds2, fps2) {
+  requireFinite2(seconds2, "seconds");
+  return roundHalfUp(seconds2 * fpsFloat3(fps2));
+}
+function toSeconds(frame, fps2) {
+  requireRate(fps2);
+  if (!Number.isInteger(frame)) throw new RangeError(`frame must be an int, got ${String(frame)}`);
+  return frame * den(fps2) / num3(fps2);
+}
+function snap(seconds2, fps2) {
+  return toSeconds(toFrame(seconds2, fps2), fps2);
+}
+function durationFrames(start, end, fps2) {
+  requireFinite2(start, "start");
+  requireFinite2(end, "end");
+  if (end <= start) {
+    if (end === start) return 1;
+    return Math.max(1, toFrame(end, fps2) - toFrame(start, fps2));
+  }
+  return Math.max(1, roundHalfUp((end - start) * fpsFloat3(fps2)));
+}
+function quantizeSpan(position, start, end, fps2) {
+  const posFrame = toFrame(position, fps2);
+  const startFrame = toFrame(start, fps2);
+  const dur = durationFrames(start, end, fps2);
+  return [toSeconds(posFrame, fps2), toSeconds(startFrame, fps2), toSeconds(startFrame + dur, fps2)];
+}
+function projectFps(project) {
+  const fps2 = project?.fps;
+  const n = Math.trunc(Number(fps2?.num));
+  const d = Math.trunc(Number(fps2?.den));
+  if (Number.isFinite(n) && Number.isFinite(d) && n > 0 && d > 0) return { num: n, den: d };
+  return { num: 30, den: 1 };
+}
+var init_frame_time = __esm({
+  "../engine/src/tools/frame-time.ts"() {
+    "use strict";
   }
 });
 
@@ -5502,7 +6026,7 @@ function parseColorInput(value) {
     if (!rgba2) throw invalid(`Not a color: ${value} (use #rrggbb or #rrggbbaa).`);
     return rgba2;
   }
-  if (isRecord10(value)) {
+  if (isRecord11(value)) {
     const channel = (key2, fallback) => {
       const v = value[key2] ?? fallback;
       if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 255) {
@@ -6226,7 +6750,7 @@ function addMaskTransition(tx, input4) {
   if (typeof input4 !== "object" || input4 === null) throw invalid("addMaskTransition needs an input object.");
   if (!Number.isInteger(input4.layer) || input4.layer <= 0) throw invalid("layer must be a positive track number.");
   requireUnlocked(project, input4.layer);
-  if (!isRecord10(input4.reader)) throw invalid("reader must be the mask's reader JSON.");
+  if (!isRecord11(input4.reader)) throw invalid("reader must be the mask's reader JSON.");
   const position = snapSeconds(requireNonNegative(input4.position, "position"), project);
   const duration3 = snapSeconds(requireDuration(input4.duration), project);
   if (!(duration3 > 0)) throw invalid("duration is shorter than one frame.");
@@ -6291,7 +6815,7 @@ function moveTransition(tx, transitionId, to) {
 function transitionMaskReader(transition2) {
   for (const key2 of ["mask_reader", "reader"]) {
     const reader = transition2[key2];
-    if (isRecord10(reader)) return reader;
+    if (isRecord11(reader)) return reader;
   }
   return {};
 }
@@ -6318,10 +6842,10 @@ function removeTransition(tx, transitionId) {
 }
 function transitionDirection(transition2) {
   const brightness2 = transition2.brightness;
-  const points2 = isRecord10(brightness2) && Array.isArray(brightness2.Points) ? brightness2.Points : [];
+  const points2 = isRecord11(brightness2) && Array.isArray(brightness2.Points) ? brightness2.Points : [];
   const keyed = [];
   for (const point3 of points2) {
-    const co = isRecord10(point3) && isRecord10(point3.co) ? point3.co : null;
+    const co = isRecord11(point3) && isRecord11(point3.co) ? point3.co : null;
     if (!co) continue;
     const x = Number(co.X);
     const y = Number(co.Y);
@@ -6345,7 +6869,7 @@ function rescaledTransitionCurves(transition2, oldDuration, newDuration, fps2) {
   const out = {};
   for (const prop of ["brightness", "contrast"]) {
     const kf = transition2[prop];
-    if (isRecord10(kf)) out[prop] = rescaleTransitionKeyframes(kf, oldFrames, newFrames);
+    if (isRecord11(kf)) out[prop] = rescaleTransitionKeyframes(kf, oldFrames, newFrames);
   }
   return out;
 }
@@ -6353,7 +6877,7 @@ function reversedTransitionCurves(transition2) {
   const out = {};
   for (const prop of ["brightness", "contrast"]) {
     const kf = transition2[prop];
-    if (isRecord10(kf)) out[prop] = reverseKeyframe(kf);
+    if (isRecord11(kf)) out[prop] = reverseKeyframe(kf);
   }
   return out;
 }
@@ -6370,7 +6894,7 @@ function maskDefaultCurves(transition2, fps2) {
 function writeTransition(tx, transitionId, next) {
   const project = tx.project;
   const current = requireTransition(project, transitionId);
-  if (!isRecord10(next)) throw invalid("writeTransition needs the transition's data.");
+  if (!isRecord11(next)) throw invalid("writeTransition needs the transition's data.");
   if (next.id !== transitionId) throw invalid("A transition's id cannot change.");
   requireUnlocked(project, current.layer);
   const layer2 = Number(next.layer);
@@ -7083,7 +7607,7 @@ function setClipVolume(tx, clipId2, opts) {
 function separateAudio(tx, clipId2, opts = {}) {
   const project = tx.project;
   const clip2 = requireEditableClip(project, clipId2);
-  const reader = isRecord10(clip2.reader) ? clip2.reader : {};
+  const reader = isRecord11(clip2.reader) ? clip2.reader : {};
   const hasAudio2 = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
   const channelCount = reader.channels === void 0 || reader.channels === null ? null : Math.trunc(Number(reader.channels));
   const hasVideo = reader.has_video === void 0 || reader.has_video === null ? true : Boolean(reader.has_video);
@@ -7414,12 +7938,12 @@ function applyFilmGrainPreset(effect3, preset) {
   return payload;
 }
 function clipHasVisual(clip2) {
-  const reader = isRecord10(clip2.reader) ? clip2.reader : {};
+  const reader = isRecord11(clip2.reader) ? clip2.reader : {};
   if (reader.has_video === void 0 || reader.has_video === null || Boolean(reader.has_video)) return true;
   return Boolean(clip2.waveform);
 }
 function isLookManaged(effect3, className) {
-  return isRecord10(effect3) && effect3["ui-menu"] === LOOK_UI_MENU && (className === void 0 || effect3.class_name === className);
+  return isRecord11(effect3) && effect3["ui-menu"] === LOOK_UI_MENU && (className === void 0 || effect3.class_name === className);
 }
 function parseEffectColor(value) {
   if (typeof value !== "string") return null;
@@ -7433,14 +7957,14 @@ function parseEffectColor(value) {
 function setEffectPropertyValue(effect3, key2, value) {
   const current = effect3[key2];
   const channels = parseEffectColor(value);
-  if (channels && isRecord10(current)) {
+  if (channels && isRecord11(current)) {
     const next = { ...current };
     for (const [channel, channelValue] of Object.entries(channels)) {
       const data = current[channel];
-      if (isRecord10(data) && Array.isArray(data.Points)) next[channel] = { ...data, Points: constantProperty(channelValue).Points };
+      if (isRecord11(data) && Array.isArray(data.Points)) next[channel] = { ...data, Points: constantProperty(channelValue).Points };
     }
     effect3[key2] = next;
-  } else if (isRecord10(current) && Array.isArray(current.Points)) {
+  } else if (isRecord11(current) && Array.isArray(current.Points)) {
     effect3[key2] = { ...current, Points: constantProperty(Number(value)).Points };
   } else if (key2 in effect3) {
     effect3[key2] = value;
@@ -7471,21 +7995,21 @@ function lookEffectPresetEffects(effects, className, presetName, create) {
 function colorLookPresetEffects(effects, presetName, create) {
   const list2 = [...effects];
   const matches3 = indexesOf(list2, (e) => e.class_name === "ColorGrade");
-  if (presetName === "reset") return matches3.length === 0 ? null : list2.filter((e) => !(isRecord10(e) && e.class_name === "ColorGrade"));
+  if (presetName === "reset") return matches3.length === 0 ? null : list2.filter((e) => !(isRecord11(e) && e.class_name === "ColorGrade"));
   const preset = applyColorGradePreset(create("ColorGrade"), presetName);
   return replaceMatches(list2, matches3, preset);
 }
 function filmGrainLookPresetEffects(effects, presetName, create) {
   const list2 = [...effects];
   const matches3 = indexesOf(list2, (e) => e.class_name === "FilmGrain");
-  if (presetName === "none") return matches3.length === 0 ? null : list2.filter((e) => !(isRecord10(e) && e.class_name === "FilmGrain"));
+  if (presetName === "none") return matches3.length === 0 ? null : list2.filter((e) => !(isRecord11(e) && e.class_name === "FilmGrain"));
   const source2 = matches3.length > 0 ? list2[matches3[0]] : create("FilmGrain");
   const preset = applyFilmGrainPreset(structuredClone(source2), presetName);
   return replaceMatches(list2, matches3, preset);
 }
 function resetLookEffects(effects) {
   const kept = effects.filter(
-    (e) => !isRecord10(e) || !["ColorGrade", "FilmGrain"].includes(String(e.class_name)) && !isLookManaged(e)
+    (e) => !isRecord11(e) || !["ColorGrade", "FilmGrain"].includes(String(e.class_name)) && !isLookManaged(e)
   );
   return kept.length === effects.length ? null : kept;
 }
@@ -7577,7 +8101,7 @@ var init_look = __esm({
         { x: 1, y: 1 }
       ]
     };
-    indexesOf = (effects, test) => effects.flatMap((e, i) => isRecord10(e) && test(e) ? [i] : []);
+    indexesOf = (effects, test) => effects.flatMap((e, i) => isRecord11(e) && test(e) ? [i] : []);
   }
 });
 
@@ -7781,7 +8305,7 @@ function snapToFrameRate(items, fps2) {
 }
 function rescaleItemKeyframes(item, factor) {
   const scaleProp = (value, scaleY) => {
-    if (!isRecord10(value)) return value;
+    if (!isRecord11(value)) return value;
     if (Array.isArray(value.Points)) {
       const scaled = scaleKeyframe(value, factor, "fps");
       if (!scaleY) return scaled;
@@ -7795,13 +8319,13 @@ function rescaleItemKeyframes(item, factor) {
     }
     const out2 = {};
     for (const [k, v] of Object.entries(value)) {
-      out2[k] = isRecord10(v) ? scaleProp(v, scaleY) : Array.isArray(v) ? v.map((x) => isRecord10(x) ? scaleProp(x, scaleY) : x) : v;
+      out2[k] = isRecord11(v) ? scaleProp(v, scaleY) : Array.isArray(v) ? v.map((x) => isRecord11(x) ? scaleProp(x, scaleY) : x) : v;
     }
     return out2;
   };
   const out = { ...item };
   for (const [key2, value] of Object.entries(item)) {
-    if (isRecord10(value)) out[key2] = scaleProp(value, key2 === "time");
+    if (isRecord11(value)) out[key2] = scaleProp(value, key2 === "time");
   }
   return out;
 }
@@ -7856,7 +8380,7 @@ function applyFrameRateChange(tx, project, oldFps, newFps, profile) {
 }
 function profileDiffers(project, profile) {
   const fps2 = project.fps;
-  const ratio = (value, expected) => !isRecord10(value) || value.num !== expected.num || value.den !== expected.den;
+  const ratio = (value, expected) => !isRecord11(value) || value.num !== expected.num || value.den !== expected.den;
   return project.profile !== profile.description || project.width !== profile.width || project.height !== profile.height || !fps2 || fps2.num !== profile.fps.num || fps2.den !== profile.fps.den || ratio(project.display_ratio, profile.display_ratio) || ratio(project.pixel_ratio, profile.pixel_ratio);
 }
 function applyProfile(tx, profile) {
@@ -7879,17 +8403,17 @@ function applyProfile(tx, profile) {
   return changed;
 }
 function holds(curve2, value) {
-  const points2 = isRecord10(curve2) && Array.isArray(curve2.Points) ? curve2.Points : null;
+  const points2 = isRecord11(curve2) && Array.isArray(curve2.Points) ? curve2.Points : null;
   if (!points2 || points2.length === 0) return true;
   return points2.every((p) => {
-    const co = isRecord10(p) && isRecord10(p.co) ? p.co : {};
+    const co = isRecord11(p) && isRecord11(p.co) ? p.co : {};
     const y = co.Y === void 0 ? value : Number(co.Y);
     return Math.abs(y - value) < 1e-6;
   });
 }
 function sourceAspect(clip2) {
-  const reader = isRecord10(clip2.reader) ? clip2.reader : {};
-  const dar = isRecord10(reader.display_ratio) ? reader.display_ratio : {};
+  const reader = isRecord11(clip2.reader) ? clip2.reader : {};
+  const dar = isRecord11(reader.display_ratio) ? reader.display_ratio : {};
   const num15 = Number(dar.num);
   const den2 = Number(dar.den);
   if (num15 && den2) return num15 / den2;
@@ -7899,7 +8423,7 @@ function sourceAspect(clip2) {
   return null;
 }
 function showsPicture(clip2) {
-  const reader = isRecord10(clip2.reader) ? clip2.reader : {};
+  const reader = isRecord11(clip2.reader) ? clip2.reader : {};
   const hasVideo = "has_video" in reader ? reader.has_video : true;
   return Boolean(hasVideo) && reader.media_type !== "audio";
 }
@@ -7912,7 +8436,7 @@ function planReframe(project, mode, width, height) {
     if (!showsPicture(clip2)) continue;
     plan.videoClips += 1;
     const id = String(clip2.id);
-    const reader = isRecord10(clip2.reader) ? clip2.reader : {};
+    const reader = isRecord11(clip2.reader) ? clip2.reader : {};
     const path42 = String(reader.path || clip2.title || "").toLowerCase();
     const aspect = sourceAspect(clip2);
     if (aspect === null || Math.abs(aspect - target) / target < 0.01) continue;
@@ -8059,7 +8583,7 @@ function jsonCopy(value) {
 }
 function replaceClipEffects(tx, clipId2, effects) {
   requireEditableClip(tx.project, clipId2);
-  if (!Array.isArray(effects) || effects.some((e) => !isRecord10(e) || typeof e.id !== "string")) {
+  if (!Array.isArray(effects) || effects.some((e) => !isRecord11(e) || typeof e.id !== "string")) {
     throw invalid("effects must be a list of effect objects with ids.");
   }
   return patchClip(tx, clipId2, { effects: jsonCopy([...effects]) });
@@ -8369,7 +8893,7 @@ function applyLayout(preset) {
 }
 function applyCrop(clip2, mode, nextId) {
   const effects = Array.isArray(clip2.effects) ? [...clip2.effects] : [];
-  const index = effects.findIndex((fx) => isRecord10(fx) && fx.class_name === "Crop");
+  const index = effects.findIndex((fx) => isRecord11(fx) && fx.class_name === "Crop");
   if (mode === "none") {
     if (index < 0) return clip2;
     effects.splice(index, 1);
@@ -8382,9 +8906,9 @@ function applyCrop(clip2, mode, nextId) {
   return { ...clip2, effects };
 }
 function applyFlip(clip2, key2) {
-  const curve2 = isRecord10(clip2[key2]) ? structuredClone(clip2[key2]) : { Points: [] };
+  const curve2 = isRecord11(clip2[key2]) ? structuredClone(clip2[key2]) : { Points: [] };
   for (const p of Array.isArray(curve2.Points) ? curve2.Points : []) {
-    if (isRecord10(p) && isRecord10(p.co)) p.co.Y = -Number(p.co.Y ?? 0);
+    if (isRecord11(p) && isRecord11(p.co)) p.co.Y = -Number(p.co.Y ?? 0);
   }
   return { ...clip2, [key2]: curve2 };
 }
@@ -8393,11 +8917,11 @@ function resetRepeat(clip2) {
   const cache5 = clip2.repeat_cache;
   const next = { ...clip2 };
   delete next.repeat_cache;
-  if (!isRecord10(cache5) || !repeatIsActive(clip2)) return next;
+  if (!isRecord11(cache5) || !repeatIsActive(clip2)) return next;
   next.start = cache5.start ?? clip2.start;
   next.end = cache5.end ?? clip2.end;
   next.duration = cache5.duration ?? clip2.duration;
-  const props = isRecord10(cache5.properties) ? cache5.properties : {};
+  const props = isRecord11(cache5.properties) ? cache5.properties : {};
   for (const [key2, value] of Object.entries(props)) next[key2] = value;
   if (!("time" in props)) next.time = { Points: [{ co: { X: 1, Y: 1 }, interpolation: Interpolation.LINEAR }] };
   return next;
@@ -8410,7 +8934,7 @@ function applyTime(tx, clip2, requested, opts) {
   if (preset === "freeze" || preset === "freeze_zoom") return freeze(clip2, preset === "freeze_zoom", opts, rate);
   if (preset === "none") {
     const base = resetRepeat(clip2);
-    const reader = isRecord10(base.reader) ? base.reader : {};
+    const reader = isRecord11(base.reader) ? base.reader : {};
     let duration3 = Number(reader.duration ?? 0) || 0;
     if (duration3 <= 0) duration3 = Number(base.duration ?? 0) || 0;
     if (isSingleImageMedia(reader)) duration3 = DEFAULT_IMAGE_LENGTH;
@@ -8496,7 +9020,7 @@ function applyAnimate(tx, original, preset, opts) {
     const kf = original[prop];
     return kf ? evaluate(kf, Math.trunc(pyRound(frame))) : PROP_IDENTITY[prop] ?? 0;
   };
-  const kfOf = (prop) => isRecord10(clip2[prop]) ? clip2[prop] : { Points: [] };
+  const kfOf = (prop) => isRecord11(clip2[prop]) ? clip2[prop] : { Points: [] };
   const clear2 = (prop, from, to) => {
     clip2[prop] = removeKeyframePointsInRange(kfOf(prop), from, to);
   };
@@ -8523,7 +9047,7 @@ function applyAnimate(tx, original, preset, opts) {
       clip2[prop] = { Points: [point(s, value)] };
     }
     clip2.effects = (clip2.effects ?? []).filter(
-      (fx) => !isRecord10(fx) || !["Blur", "Mask"].includes(String(fx.class_name)) || fx["ui-menu"] === "look"
+      (fx) => !isRecord11(fx) || !["Blur", "Mask"].includes(String(fx.class_name)) || fx["ui-menu"] === "look"
     );
     return clip2;
   }
@@ -8749,7 +9273,7 @@ function layoutShowAll(tx, clipIds, opts = {}) {
 }
 function repeatIsActive(clip2) {
   const cache5 = clip2.repeat_cache;
-  if (!isRecord10(cache5) || Object.keys(cache5).length === 0) return false;
+  if (!isRecord11(cache5) || Object.keys(cache5).length === 0) return false;
   const cachedStart = Number(cache5.start ?? 0);
   const cachedEnd = Number(cache5.end ?? 0);
   const start = Number(clip2.start ?? 0);
@@ -8859,7 +9383,7 @@ function repeatClip(tx, clipId2, opts) {
   if (!repeatIsActive(clip2)) {
     const properties = {};
     for (const [key2, value] of Object.entries(clip2)) {
-      if (isRecord10(value) && Array.isArray(value.Points) && value.Points.length > 1) properties[key2] = structuredClone(value);
+      if (isRecord11(value) && Array.isArray(value.Points) && value.Points.length > 1) properties[key2] = structuredClone(value);
     }
     next.repeat_cache = { start: clip2.start ?? 0, end: clip2.end, duration: clip2.duration, properties };
   }
@@ -9621,7 +10145,7 @@ function fpsFraction2(value) {
   return limitDenominator2(rate, 1001);
 }
 function withSequenceFps(file3, fps2) {
-  const current = isRecord10(file3.fps) ? file3.fps : { num: 30, den: 1 };
+  const current = isRecord11(file3.fps) ? file3.fps : { num: 30, den: 1 };
   const original = Number(current.num) / Number(current.den);
   const factor = original / (fps2.num / fps2.den);
   const next = { ...file3 };
@@ -9633,14 +10157,14 @@ function withSequenceFps(file3, fps2) {
   return next;
 }
 function withInOutFrames(file3, startFrame, endFrame) {
-  const fps2 = isRecord10(file3.fps) ? file3.fps : { num: 30, den: 1 };
+  const fps2 = isRecord11(file3.fps) ? file3.fps : { num: 30, den: 1 };
   const rate = Number(fps2.num) / Number(fps2.den);
   return { ...file3, start: (Math.trunc(startFrame) - 1) / rate, end: Math.trunc(endFrame) / rate };
 }
 function relinkedFileData(old, reader, mediaType, fingerprint2) {
   const data = { ...structuredClone(old), ...structuredClone(reader) };
   data.id = "id" in old ? old.id : data.id;
-  const oldSha = isRecord10(old.fingerprint) ? old.fingerprint.sha256 : void 0;
+  const oldSha = isRecord11(old.fingerprint) ? old.fingerprint.sha256 : void 0;
   if (fingerprint2) data.fingerprint = structuredClone(fingerprint2);
   else delete data.fingerprint;
   if (!(oldSha && fingerprint2 && oldSha === fingerprint2.sha256)) delete data.proxy_reader;
@@ -9681,12 +10205,12 @@ function clearWaveformData(tx) {
   let files = 0;
   let clips = 0;
   for (const file3 of tx.project.files) {
-    if (!isRecord10(file3.ui) || !("audio_data" in file3.ui)) continue;
+    if (!isRecord11(file3.ui) || !("audio_data" in file3.ui)) continue;
     tx.update(["files", { id: file3.id }], { ui: withoutWaveform(file3.ui) });
     files += 1;
   }
   for (const clip2 of tx.project.clips) {
-    if (!isRecord10(clip2.ui) || !("audio_data" in clip2.ui)) continue;
+    if (!isRecord11(clip2.ui) || !("audio_data" in clip2.ui)) continue;
     tx.update(["clips", { id: clip2.id }], { ui: withoutWaveform(clip2.ui) });
     clips += 1;
   }
@@ -9715,7 +10239,7 @@ function mediaRepoint(project, moves, keepOriginal) {
     out.files.push(original === void 0 ? { id: file3.id, path: next } : { id: file3.id, path: next, original_path: original });
   }
   for (const clip2 of project.clips) {
-    const reader = isRecord10(clip2.reader) ? clip2.reader : null;
+    const reader = isRecord11(clip2.reader) ? clip2.reader : null;
     if (!reader) continue;
     const readerPath2 = typeof reader.path === "string" ? reader.path : "";
     const next = (clip2.file_id ? byId.get(clip2.file_id)?.to : void 0) ?? (readerPath2 ? byPath.get(readerPath2) : void 0);
@@ -11008,7 +11532,7 @@ function validateFallback(schema, value, _ctx) {
   }
   return result2.issues.length === 0;
 }
-var _parse, parse, _parseAsync, parseAsync, _safeParse, safeParse, _safeParseAsync, safeParseAsync, COMPILE_INVALID, COMPILE_FALLBACK, validate, validateAsync, _encode, encode, _decode, decode, _encodeAsync, encodeAsync, _decodeAsync, decodeAsync, _safeEncode, safeEncode, _safeDecode, safeDecode, _safeEncodeAsync, safeEncodeAsync, _safeDecodeAsync, safeDecodeAsync;
+var _parse, parse, _parseAsync, parseAsync, _safeParse, safeParse, _safeParseAsync, safeParseAsync, COMPILE_INVALID, COMPILE_FALLBACK, validate, validateAsync, _encode, encode, _decode, decode2, _encodeAsync, encodeAsync, _decodeAsync, decodeAsync, _safeEncode, safeEncode, _safeDecode, safeDecode, _safeEncodeAsync, safeEncodeAsync, _safeDecodeAsync, safeDecodeAsync;
 var init_parse = __esm({
   "../../node_modules/zod/v4/core/parse.js"() {
     init_core();
@@ -11099,7 +11623,7 @@ var init_parse = __esm({
       };
       return fn;
     };
-    decode = /* @__PURE__ */ _decode($ZodRealError);
+    decode2 = /* @__PURE__ */ _decode($ZodRealError);
     _encodeAsync = (_Err) => {
       const parseAsync3 = _parseAsync(_Err);
       const fn = async (schema, value, _ctx, _params) => {
@@ -26958,7 +27482,7 @@ __export(core_exports2, {
   config: () => config,
   createStandardJSONSchemaMethod: () => createStandardJSONSchemaMethod,
   createToJSONSchemaMethod: () => createToJSONSchemaMethod,
-  decode: () => decode,
+  decode: () => decode2,
   decodeAsync: () => decodeAsync,
   describe: () => describe,
   encode: () => encode,
@@ -27133,7 +27657,7 @@ var init_errors4 = __esm({
 });
 
 // ../../node_modules/zod/v4/classic/parse.js
-var parse2, parseAsync2, safeParse2, safeParseAsync2, encode2, decode2, encodeAsync2, decodeAsync2, safeEncode2, safeDecode2, safeEncodeAsync2, safeDecodeAsync2;
+var parse2, parseAsync2, safeParse2, safeParseAsync2, encode2, decode3, encodeAsync2, decodeAsync2, safeEncode2, safeDecode2, safeEncodeAsync2, safeDecodeAsync2;
 var init_parse2 = __esm({
   "../../node_modules/zod/v4/classic/parse.js"() {
     init_core2();
@@ -27144,7 +27668,7 @@ var init_parse2 = __esm({
     safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
     safeParseAsync2 = /* @__PURE__ */ _safeParseAsync(ZodRealError);
     encode2 = /* @__PURE__ */ _encode(ZodRealError);
-    decode2 = /* @__PURE__ */ _decode(ZodRealError);
+    decode3 = /* @__PURE__ */ _decode(ZodRealError);
     encodeAsync2 = /* @__PURE__ */ _encodeAsync(ZodRealError);
     decodeAsync2 = /* @__PURE__ */ _decodeAsync(ZodRealError);
     safeEncode2 = /* @__PURE__ */ _safeEncode(ZodRealError);
@@ -27980,7 +28504,7 @@ var init_schemas2 = __esm({
         return encode2(this, data, params, { callee: _encode2 });
       },
       decode: function _decode2(data, params) {
-        return decode2(this, data, params, { callee: _decode2 });
+        return decode3(this, data, params, { callee: _decode2 });
       },
       encodeAsync: async function _encodeAsync2(data, params) {
         return await encodeAsync2(this, data, params, { callee: _encodeAsync2 });
@@ -29981,7 +30505,7 @@ __export(external_exports, {
   currencyCode: () => currencyCode2,
   custom: () => custom,
   date: () => date2,
-  decode: () => decode2,
+  decode: () => decode3,
   decodeAsync: () => decodeAsync2,
   deepPartial: () => deepPartial,
   describe: () => describe2,
@@ -33337,7 +33861,8 @@ var init_styles2 = __esm({
       ui_promo: {
         id: "ui_promo",
         name: "UI promo",
-        summary: "Motion-designed product promo for apps and tools: a search bar types the hook, footage rises in rounded UI cards and a pointer clicks, a word list scrolls in a selection box, a logo end card. Give `words` for the word list.",
+        summary: "Motion-designed product promo for apps and tools: a search bar types the hook, footage rises in rounded UI cards and a pointer clicks, a word list scrolls in a selection box, a logo end card.",
+        hint: "Give `words` for the word list.",
         defaultSeconds: 16,
         defaultBpm: 116,
         media: 3,
@@ -33357,7 +33882,8 @@ var init_styles2 = __esm({
       product_callout: {
         id: "product_callout",
         name: "Product callout",
-        summary: "Technical product reveal: each product shot on a dark field with a soft glow, an 'ANATOMY: NAME' heading, leader lines drawing out to feature labels, one per beat, then a closing card. Give `words` as features ('Foam core: 212 g').",
+        summary: "Technical product reveal: each product shot on a dark field with a soft glow, an 'ANATOMY: NAME' heading, leader lines drawing out to feature labels, one per beat, then a closing card.",
+        hint: "Give `words` as features ('Foam core: 212 g').",
         defaultSeconds: 12,
         defaultBpm: 120,
         media: 2,
@@ -33367,7 +33893,8 @@ var init_styles2 = __esm({
       tutorial: {
         id: "tutorial",
         name: "Tutorial cards",
-        summary: "A how-to in steps (9:16 first): the hook on grid paper, then one step per label (the footage in a bordered card, a numbered caption from `labels`, a label box with an arrow from `words`, one word per step; clips that share a label are one step), ending on 'Save this'.",
+        summary: "A how-to in steps: the hook on grid paper, then each step's footage in a bordered card with a numbered caption and a label box with an arrow, ending on 'Save this'.",
+        hint: "9:16 first. One step per label: the caption from `labels` (clips that share a label are one step), the arrow's box from `words`, one word per step.",
         defaultSeconds: 20,
         defaultBpm: 100,
         media: 4,
@@ -63246,530 +63773,6 @@ var init_animated_templates_data = __esm({
   }
 });
 
-// ../engine/src/titles/xml.ts
-function decode3(text5) {
-  return text5.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (whole, ref) => {
-    if (!ref.startsWith("#")) return NAMED[ref];
-    const code = ref[1] === "x" || ref[1] === "X" ? Number.parseInt(ref.slice(2), 16) : Number.parseInt(ref.slice(1), 10);
-    return code <= 1114111 ? String.fromCodePoint(code) : whole;
-  });
-}
-function attributeValue(raw) {
-  return decode3(raw.replace(/\r\n?/g, "\n").replace(/[\t\n]/g, " "));
-}
-function escapeText(text5) {
-  return text5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-function escapeAttr(text5) {
-  return escapeText(text5).replace(/"/g, "&quot;").replace(/\n/g, "&#10;").replace(/\r/g, "&#13;").replace(/\t/g, "&#9;");
-}
-function tagEnd(xml, from) {
-  let quote = null;
-  for (let i = from; i < xml.length; i += 1) {
-    const ch = xml[i];
-    if (quote) {
-      if (ch === quote) quote = null;
-    } else if (ch === '"' || ch === "'") quote = ch;
-    else if (ch === ">") return i;
-  }
-  throw new Error("Malformed SVG: unterminated tag.");
-}
-function parseAttrs(tag) {
-  const out = [];
-  const re = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
-  for (let m = re.exec(tag); m; m = re.exec(tag)) out.push([m[1], attributeValue(m[2] ?? m[3] ?? "")]);
-  return out;
-}
-function parseXml(xml) {
-  let root = null;
-  let rootStart = -1;
-  let rootEnd = -1;
-  const stack = [];
-  const append = (node2) => {
-    const parent = stack[stack.length - 1];
-    if (!parent) return;
-    node2.parent = parent;
-    parent.children.push(node2);
-  };
-  let i = 0;
-  while (i < xml.length) {
-    const lt = xml.indexOf("<", i);
-    const textEnd = lt < 0 ? xml.length : lt;
-    if (textEnd > i && stack.length > 0) append({ kind: "text", data: decode3(xml.slice(i, textEnd)), cdata: false, parent: null });
-    if (lt < 0) break;
-    if (xml.startsWith("<!--", lt)) {
-      const close = xml.indexOf("-->", lt + 4);
-      if (close < 0) throw new Error("Malformed SVG: unterminated comment.");
-      if (stack.length > 0) append({ kind: "other", raw: xml.slice(lt, close + 3), parent: null });
-      i = close + 3;
-      continue;
-    }
-    if (xml.startsWith("<![CDATA[", lt)) {
-      const close = xml.indexOf("]]>", lt + 9);
-      if (close < 0) throw new Error("Malformed SVG: unterminated CDATA.");
-      if (stack.length > 0) append({ kind: "text", data: xml.slice(lt + 9, close), cdata: true, parent: null });
-      i = close + 3;
-      continue;
-    }
-    if (xml.startsWith("<?", lt)) {
-      const close = xml.indexOf("?>", lt + 2);
-      if (close < 0) throw new Error("Malformed SVG: unterminated processing instruction.");
-      if (stack.length > 0) append({ kind: "other", raw: xml.slice(lt, close + 2), parent: null });
-      i = close + 2;
-      continue;
-    }
-    if (xml.startsWith("<!", lt)) {
-      let j = lt + 2;
-      let depth = 0;
-      for (; j < xml.length; j += 1) {
-        if (xml[j] === "[") depth += 1;
-        else if (xml[j] === "]") depth -= 1;
-        else if (xml[j] === ">" && depth <= 0) break;
-      }
-      i = j + 1;
-      continue;
-    }
-    const end = tagEnd(xml, lt + 1);
-    if (xml[lt + 1] === "/") {
-      const name2 = xml.slice(lt + 2, end).trim();
-      const open7 = stack.pop();
-      if (!open7 || open7.name !== name2) throw new Error(`Malformed SVG: </${name2}> does not close <${open7?.name ?? ""}>.`);
-      if (stack.length === 0) rootEnd = end + 1;
-      i = end + 1;
-      continue;
-    }
-    const tag = xml.slice(lt, end + 1);
-    const name = /^<([^\s/>]+)/.exec(tag)?.[1] ?? "";
-    const selfClosing = xml[end - 1] === "/";
-    const element = { kind: "element", name, attrs: parseAttrs(tag.slice(name.length + 1, selfClosing ? -2 : -1)), children: [], parent: null };
-    if (stack.length === 0) {
-      if (root) throw new Error("Malformed SVG: more than one root element.");
-      root = element;
-      rootStart = lt;
-      if (selfClosing) rootEnd = end + 1;
-    } else append(element);
-    if (!selfClosing) stack.push(element);
-    i = end + 1;
-  }
-  if (stack.length > 0) throw new Error(`Malformed SVG: <${stack[stack.length - 1].name}> is not closed.`);
-  if (!root) throw new Error("Malformed SVG: no root element.");
-  return { prolog: xml.slice(0, rootStart), root, epilog: xml.slice(rootEnd) };
-}
-function serializeNode(node2, out) {
-  if (node2.kind === "text") {
-    out.push(node2.cdata ? `<![CDATA[${node2.data}]]>` : escapeText(node2.data));
-    return;
-  }
-  if (node2.kind === "other") {
-    out.push(node2.raw);
-    return;
-  }
-  out.push(`<${node2.name}`);
-  for (const [key2, value] of node2.attrs) out.push(` ${key2}="${escapeAttr(value)}"`);
-  if (node2.children.length === 0) {
-    out.push("/>");
-    return;
-  }
-  out.push(">");
-  for (const child of node2.children) serializeNode(child, out);
-  out.push(`</${node2.name}>`);
-}
-function serializeXml(doc) {
-  const out = [doc.prolog];
-  serializeNode(doc.root, out);
-  out.push(doc.epilog);
-  return out.join("");
-}
-function getAttr(el, name) {
-  return el.attrs.find(([key2]) => key2 === name)?.[1] ?? "";
-}
-function hasAttr(el, name) {
-  return el.attrs.some(([key2]) => key2 === name);
-}
-function setAttr(el, name, value) {
-  const at = el.attrs.findIndex(([key2]) => key2 === name);
-  if (at >= 0) el.attrs[at] = [name, value];
-  else el.attrs.push([name, value]);
-}
-function elementsByTagName(from, name) {
-  const out = [];
-  const visit2 = (el) => {
-    for (const child of el.children) {
-      if (child.kind !== "element") continue;
-      if (child.name === name) out.push(child);
-      visit2(child);
-    }
-  };
-  if ("root" in from) {
-    if (from.root.name === name) out.push(from.root);
-    visit2(from.root);
-  } else visit2(from);
-  return out;
-}
-var NAMED;
-var init_xml = __esm({
-  "../engine/src/titles/xml.ts"() {
-    "use strict";
-    NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
-  }
-});
-
-// ../engine/src/titles/title-svg.ts
-function parseTitleSvg(svg) {
-  return parseXml(svg);
-}
-function titleSvgText(doc) {
-  return serializeXml(doc);
-}
-function parseStyle(style) {
-  const out = /* @__PURE__ */ new Map();
-  for (const part of String(style ?? "").split(";")) {
-    const at = part.indexOf(":");
-    if (at < 0) continue;
-    const key2 = part.slice(0, at).trim();
-    if (key2) out.set(key2, part.slice(at + 1).trim());
-  }
-  return out;
-}
-function formatStyle(style) {
-  return [...style.entries()].map(([k, v]) => `${k}:${v}`).join(";") + ";";
-}
-function nodeStyle(node2) {
-  return parseStyle(getAttr(node2, "style"));
-}
-function setNodeStyle(node2, style) {
-  const text5 = formatStyle(style);
-  setAttr(node2, "style", text5);
-  return text5;
-}
-function nodeProperty(node2, name, inherit = true) {
-  for (let current = node2; current; current = current.parent) {
-    let value = nodeStyle(current).get(name);
-    if ((value === void 0 || value === "") && hasAttr(current, name)) value = getAttr(current, name);
-    if (value !== void 0 && value !== "") return value;
-    if (!inherit) break;
-  }
-  return void 0;
-}
-function px(value) {
-  if (value === void 0 || value === "") return null;
-  const m = /^(-?[0-9]*\.?[0-9]+)\s*(px|pt)?$/.exec(value.trim().toLowerCase());
-  if (!m) return null;
-  const n = Number(m[1]);
-  return m[2] === "pt" ? n * 96 / 72 : n;
-}
-function textNodes(doc) {
-  return elementsByTagName(doc, "text");
-}
-function tspanNodes(doc) {
-  return elementsByTagName(doc, "tspan");
-}
-function rectNodes(doc) {
-  return elementsByTagName(doc, "rect");
-}
-function firstTextChild(node2) {
-  const first = node2.children[0];
-  return first && first.kind === "text" && !first.cdata ? first : null;
-}
-function lineNodes(doc) {
-  return tspanNodes(doc).filter((n) => firstTextChild(n) !== null);
-}
-function lineText(node2) {
-  return firstTextChild(node2)?.data ?? "";
-}
-function replaceText(node2, text5) {
-  const fresh = { kind: "text", data: String(text5), cdata: false, parent: node2 };
-  const old = firstTextChild(node2);
-  if (old) node2.children[0] = fresh;
-  else node2.children.unshift(fresh);
-}
-function artboardSize(doc) {
-  const svg = doc.root;
-  let width = px(getAttr(svg, "width"));
-  let height = px(getAttr(svg, "height"));
-  if (!(width && height)) {
-    const box = getAttr(svg, "viewBox").trim().split(/[\s,]+/).filter(Boolean);
-    if (box.length === 4) {
-      const w = parsePythonFloat(box[2]);
-      const h = parsePythonFloat(box[3]);
-      [width, height] = w === null || h === null ? [null, null] : [w, h];
-    }
-  }
-  return [width || 1920, height || 1080];
-}
-function fmt(value) {
-  return pyFixed(value, 4).replace(/0+$/, "").replace(/\.$/, "");
-}
-function opacityText(alpha) {
-  return fmt(Math.max(0, Math.min(1, alpha)));
-}
-function applyFont(nodes, change) {
-  const ratio = change.sizeRatio ?? 1;
-  for (const node2 of nodes) {
-    const style = nodeStyle(node2);
-    if (change.family) style.set("font-family", `'${String(change.family).replace(/^['"]+|['"]+$/g, "")}'`);
-    if (change.italic !== void 0 && change.italic !== null) style.set("font-style", change.italic ? "italic" : "normal");
-    if (change.bold !== void 0 && change.bold !== null) style.set("font-weight", change.bold ? "bold" : "normal");
-    if (ratio && Math.abs(ratio - 1) > 1e-9) {
-      let size = px(style.get("font-size"));
-      if (size === null && hasAttr(node2, "font-size")) size = px(getAttr(node2, "font-size"));
-      if (size !== null) style.set("font-size", `${fmt(size * ratio)}px`);
-    }
-    setNodeStyle(node2, style);
-  }
-}
-function setTextColor(doc, color3, alpha = 1) {
-  const opacity = opacityText(alpha);
-  for (const node2 of [...textNodes(doc), ...tspanNodes(doc)]) {
-    const style = nodeStyle(node2);
-    style.set("fill", color3);
-    const textWithTspans = node2.name === "text" && elementsByTagName(node2, "tspan").length > 0;
-    style.set("opacity", textWithTspans ? "1" : opacity);
-    setNodeStyle(node2, style);
-  }
-}
-function setBackground(doc, color3, alpha = 1) {
-  const rect = rectNodes(doc)[0];
-  if (!rect) return false;
-  const style = nodeStyle(rect);
-  style.set("fill", color3);
-  style.set("opacity", opacityText(alpha));
-  setNodeStyle(rect, style);
-  return true;
-}
-function refColor(doc, refId) {
-  const defs = elementsByTagName(doc, "defs")[0];
-  if (!defs) return "";
-  const seen = /* @__PURE__ */ new Set();
-  let id = refId;
-  while (id && !seen.has(id)) {
-    seen.add(id);
-    const target = defs.children.find((n) => n.kind === "element" && getAttr(n, "id") === id);
-    if (!target) return "";
-    const href = getAttr(target, "xlink:href") || getAttr(target, "href");
-    if (href) {
-      id = href.replace(/^#+/, "");
-      continue;
-    }
-    for (const stop of target.children) {
-      if (stop.kind !== "element" || stop.name !== "stop") continue;
-      const color3 = parseStyle(getAttr(stop, "style")).get("stop-color") || getAttr(stop, "stop-color");
-      if (color3) return color3;
-    }
-    return "";
-  }
-  return "";
-}
-function resolvePaint(doc, value, fallback) {
-  const v = (value ?? "").trim();
-  if (v.startsWith("url(#")) return refColor(doc, v.slice(5).replace(/\)+$/, "")) || fallback;
-  if (!v || v === "none") return fallback;
-  return v;
-}
-function pyFloatOr(value, fallback) {
-  if (value === void 0) return fallback;
-  return parsePythonFloat(value);
-}
-function textColor(doc, node2) {
-  const lines2 = lineNodes(doc);
-  const target = node2 ?? lines2[lines2.length - 1];
-  if (!target) return ["#ffffff", 1];
-  const fill = resolvePaint(doc, nodeProperty(target, "fill"), "#ffffff");
-  let opacity = 1;
-  for (let current = target; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
-    const value = pyFloatOr(nodeProperty(current, "opacity", false), 1);
-    if (value !== null) opacity *= value;
-  }
-  return [fill, opacity];
-}
-function backgroundColor(doc) {
-  const rect = rectNodes(doc)[0];
-  if (!rect) return ["", 0];
-  const raw = nodeProperty(rect, "fill", false);
-  const fill = resolvePaint(doc, raw, "#000000");
-  let opacity = pyFloatOr(nodeProperty(rect, "opacity", false), 1) ?? 1;
-  if ((raw ?? "") === "none") opacity = 0;
-  return [fill, opacity];
-}
-function fontFamily(doc) {
-  for (const node2 of lineNodes(doc)) {
-    const family = nodeProperty(node2, "font-family");
-    if (family) return family.replace(/^['"]+|['"]+$/g, "");
-  }
-  return "";
-}
-function editorFontFamily(requested, families) {
-  if (requested) {
-    if (families.includes(requested)) return requested;
-    const containing = families.find((font) => font.includes(requested));
-    if (containing !== void 0) return containing;
-  }
-  for (const fallback of FALLBACK_FONTS) if (families.includes(fallback)) return fallback;
-  for (const fallback of FALLBACK_FONTS) {
-    const containing = families.find((font) => font.includes(fallback));
-    if (containing !== void 0) return containing;
-  }
-  return "";
-}
-function installedFontForTitle(doc, families) {
-  if (families === null) return ["", ""];
-  const current = fontFamily(doc);
-  if (!current || families.some((f3) => current === f3 || f3.includes(current))) return ["", ""];
-  const replacement = editorFontFamily(current, families);
-  return replacement ? [current, replacement] : ["", ""];
-}
-function floatAttr(node2, name) {
-  for (let current = node2; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
-    const raw = getAttr(current, name);
-    if (raw) return parsePythonFloat(raw.trim().split(/[\s,]+/)[0] ?? "");
-  }
-  return null;
-}
-function isMirrored(node2) {
-  for (let current = node2; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
-    if (getAttr(current, "transform").replace(/ /g, "").includes("scale(1,-1)")) return true;
-  }
-  return false;
-}
-function assignRoles(slots2) {
-  if (slots2.length === 0) return;
-  const ranked = [...slots2].sort((a, b) => (b.fontSize ?? 0) - (a.fontSize ?? 0) || a.index - b.index);
-  const main = ranked.find((s) => !s.text.toLowerCase().includes("sub")) ?? ranked[0];
-  main.role = "title";
-  const rest = ranked.filter((s) => s !== main);
-  const sub = rest.find((s) => s.text.toLowerCase().includes("sub")) ?? rest[0];
-  if (sub) sub.role = "subtitle";
-}
-function titleFields(doc) {
-  const slots2 = [];
-  const byText = /* @__PURE__ */ new Map();
-  for (const node2 of lineNodes(doc)) {
-    const text5 = lineText(node2);
-    const key2 = text5.trim();
-    let slot = key2 ? byText.get(key2) : void 0;
-    if (!slot) {
-      slot = { index: slots2.length + 1, text: text5, nodes: [], fontSize: null, role: "line", x: null, y: null, anchor: "start" };
-      slots2.push(slot);
-      if (key2) byText.set(key2, slot);
-    }
-    slot.nodes.push(node2);
-  }
-  for (const slot of slots2) {
-    const primary = slot.nodes.find((n) => !isMirrored(n)) ?? slot.nodes[0];
-    slot.fontSize = px(nodeProperty(primary, "font-size"));
-    slot.x = floatAttr(primary, "x");
-    slot.y = floatAttr(primary, "y");
-    slot.anchor = nodeProperty(primary, "text-anchor") || "start";
-  }
-  assignRoles(slots2);
-  return slots2;
-}
-function fieldByRole(slots2, role) {
-  return slots2.find((s) => s.role === role);
-}
-function setFieldText(slot, text5) {
-  const value = String(text5 ?? "").split("\n").join(" ").trim() || BLANK;
-  for (const node2 of slot.nodes) replaceText(node2, value);
-  slot.text = value;
-}
-function textZone(slots2, artboardHeight) {
-  const main = fieldByRole(slots2, "title") ?? slots2[0];
-  if (!main || main.y === null || !artboardHeight) return "center";
-  const y = Math.abs(main.y) / artboardHeight;
-  if (y < 0.3) return "top";
-  if (y > 0.7) return "bottom";
-  return "center";
-}
-function estimatedTextWidth(text5, fontPx, bold = true) {
-  let wide = 0;
-  let narrow = 0;
-  let total = 0;
-  for (const ch of text5) {
-    total += 1;
-    if (new RegExp("\\p{Lu}", "u").test(ch) || "MWmw@%".includes(ch)) wide += 1;
-    else if (" .,:;'!|il1".includes(ch)) narrow += 1;
-  }
-  const normal = Math.max(0, total - wide - narrow);
-  const per = bold ? 0.62 : 0.56;
-  return fontPx * (normal * per + wide * (per + 0.14) + narrow * 0.3);
-}
-function availableWidth(slot, artboardWidth) {
-  const x = Math.max(0, Math.min(artboardWidth, slot.x ?? artboardWidth / 2));
-  if (slot.anchor === "middle") return 2 * Math.min(x, artboardWidth - x) * 0.94;
-  if (slot.anchor === "end") return x * 0.96;
-  return (artboardWidth - x) * 0.96;
-}
-function fitField(slot, artboardWidth, minRatio = 0.35) {
-  if (!slot.text.trim() || !slot.fontSize) return 1;
-  const bold = slot.nodes.some((n) => ["bold", "700", "800", "900"].includes(String(nodeProperty(n, "font-weight") ?? "normal").toLowerCase()));
-  const width = estimatedTextWidth(slot.text.trim(), slot.fontSize, bold);
-  const room = availableWidth(slot, artboardWidth);
-  if (width <= room || width <= 0) return 1;
-  const ratio = Math.max(minRatio, room / width);
-  applyFont(slot.nodes, { sizeRatio: ratio });
-  slot.fontSize *= ratio;
-  return ratio;
-}
-function withoutBadChars(text5) {
-  let out = "";
-  for (const ch of text5) out += ch.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(ch) ? " " : ch;
-  return out;
-}
-function safeBaseName(text5, fallback = "Title", limit = 60) {
-  let base = withoutBadChars(String(text5 ?? ""));
-  base = base.split(/\s+/).filter(Boolean).join(" ").replace(/^[ .]+|[ .]+$/g, "");
-  if (base.toLowerCase().endsWith(".svg")) base = base.slice(0, -4).replace(/^[ .]+|[ .]+$/g, "");
-  if ([...base].length > limit) base = [...base].slice(0, limit).join("").replace(/[ .]+$/, "");
-  return base || fallback;
-}
-function duplicatePattern(fileName2) {
-  let name = String(fileName2).split(/[\\/]/).pop() ?? "";
-  if (!name.toLowerCase().endsWith(".svg")) name += ".svg";
-  const m = /^(.+?)(\s*)(\(([0-9]*)\))?\.svg$/i.exec(name);
-  if (!m) return [`${name.replace(/\.[^.]*$/, "")} (`, 0];
-  if (m[4]) return [`${m[1]}${m[2]}(`, Number(m[4])];
-  return [`${m[1]} (`, 0];
-}
-function freeName(prefix, offset, taken, limit = 1e3) {
-  const used = new Set([...taken].map((n) => n.toLowerCase()));
-  for (let i = 1; i < limit; i += 1) {
-    const name = `${prefix}${offset + i})`;
-    if (!used.has(`${name}.svg`.toLowerCase())) return name;
-  }
-  return null;
-}
-function uniqueTitleName(base, taken) {
-  const safe2 = safeBaseName(base);
-  const used = new Set([...taken].map((n) => n.toLowerCase()));
-  if (!used.has(`${safe2}.svg`.toLowerCase())) return `${safe2}.svg`;
-  const [prefix, offset] = duplicatePattern(`${safe2}.svg`);
-  const name = freeName(prefix, offset, used);
-  if (!name) throw new Error(`no free title name for ${safe2}`);
-  return `${name}.svg`;
-}
-function versionName(current, taken) {
-  const stem7 = (String(current).split(/[\\/]/).pop() ?? "").replace(/\.[^.]*$/, "");
-  const m = /^(.*?) v(\d+)$/.exec(stem7);
-  const [base, n] = m ? [m[1], Number(m[2])] : [stem7, 1];
-  const used = new Set([...taken].map((name) => name.toLowerCase()));
-  for (let k = n + 1; k < n + 1e3; k += 1) {
-    const name = `${base} v${k}.svg`;
-    if (!used.has(name.toLowerCase())) return name;
-  }
-  return null;
-}
-var BLANK, FALLBACK_FONTS;
-var init_title_svg = __esm({
-  "../engine/src/titles/title-svg.ts"() {
-    "use strict";
-    init_coerce();
-    init_pyfmt();
-    init_xml();
-    BLANK = " ";
-    FALLBACK_FONTS = ["DejaVu Sans", "Liberation Sans", "Noto Sans", "FreeSans", "Ubuntu", "Cantarell", "Open Sans", "Sans-serif", "Arial"];
-  }
-});
-
 // ../engine/src/titles/animated.ts
 function templateFrames2(template) {
   const end = template.params.find((p) => p.name === "end_frame");
@@ -79580,7 +79583,7 @@ var init_project_export = __esm({
             return ok(call, "Cleared the playback cache; preview frames will re-render.", { target });
           }
           if (target === "waveforms") {
-            const has2 = (ui) => isRecord10(ui) && "audio_data" in ui;
+            const has2 = (ui) => isRecord11(ui) && "audio_data" in ui;
             const project = call.doc.project;
             if (!project.files.some((f3) => has2(f3.ui)) && !project.clips.some((c) => has2(c.ui))) {
               return nothingChanged(call, "No file or clip has stored waveform data; nothing cleared.", { target, files: 0, clips: 0 });
@@ -80562,7 +80565,10 @@ var init_reels = __esm({
     FLASH_SECONDS = 0.1;
     FLASH_SPACING_SECONDS = 3;
     TRACKS = ["music", "video", "flash", "labels", "titles"];
-    STYLE_LINES = [...REEL_STYLE_IDS.map((id) => `${id}: ${REEL_STYLES[id].summary}`), ...MOTION_STYLE_IDS.map((id) => `${id}: ${MOTION_STYLES[id].summary}`)].join(" ");
+    STYLE_LINES = [
+      ...REEL_STYLE_IDS.map((id) => `${id}: ${REEL_STYLES[id].summary}`),
+      ...MOTION_STYLE_IDS.map((id) => `${id}: ${MOTION_STYLES[id].summary}${MOTION_STYLES[id].hint ? ` ${MOTION_STYLES[id].hint}` : ""}`)
+    ].join(" ");
     ALL_STYLE_IDS = [...REEL_STYLE_IDS, ...MOTION_STYLE_IDS];
     input3 = external_exports.strictObject({
       style: external_exports.enum(ALL_STYLE_IDS).optional().describe(`How the reel is cut and looks (default hype). ${STYLE_LINES}`),
