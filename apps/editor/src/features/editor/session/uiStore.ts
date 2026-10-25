@@ -36,12 +36,17 @@ export interface EditorUiState {
   /** The engine tool the "tool" dialog runs (from the command palette). */
   toolName: string | null;
   panels: { left: number; right: number; timeline: number; leftCollapsed: boolean; rightCollapsed: boolean };
+  /** When set, the timeline sizes its tracks to share its height, each within [min, max] px (the editor in a chat). */
+  trackFit: readonly [number, number] | null;
   /**
    * Properties the person chose to animate (`<ownerId>:<prop>`) while they
    * still hold one value: the next edit at another frame adds a keyframe.
    */
   armedKeyframes: string[];
 }
+
+/** Track height in the editor's timeline, px. */
+export const TRACK_HEIGHT = 64;
 
 export const MIN_PX_PER_SECOND = 0.5;
 export const MAX_PX_PER_SECOND = 1200;
@@ -95,7 +100,8 @@ export function createUiStore(initial: Partial<EditorUiState> = {}): UiStore {
     tool: "select",
     snapping: true,
     pxPerSecond: 100 / 15,
-    trackHeight: 64,
+    trackHeight: TRACK_HEIGHT,
+    trackFit: null,
     leftTab: "files",
     rightTab: "properties",
     dialog: null,

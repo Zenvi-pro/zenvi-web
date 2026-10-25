@@ -264,7 +264,7 @@ describe("pixels match the desktop's libopenshot Timeline", () => {
 });
 
 describe("compositing on worker threads", () => {
-  it("writes the same pixels as the main thread, stateful effects included (ordered lane)", async () => {
+  it("writes the same pixels as the main thread, stateful effects in order and per-frame ones on any worker", async () => {
     const a = await makeVideo(dir, "pool-a.mp4", { width: 160, height: 90, duration: 1 });
     const b = await makeVideo(dir, "pool-b.mp4", { width: 320, height: 180, duration: 1, source: "smptebars=size=320x180:rate=30:duration=1" });
     const { project: base, clipIds } = await sizedProject(320, 180, [
@@ -276,6 +276,9 @@ describe("compositing on worker threads", () => {
     doc.transaction("edit", (tx) => {
       // DenoiseImage keeps the previous frame (temporal): frames must reach it in order.
       addEffect(tx, clipIds[0]!, "DenoiseImage");
+      // Pure per frame: these frames may composite on any worker.
+      addEffect(tx, clipIds[1]!, "FilmGrain");
+      addEffect(tx, clipIds[1]!, "ColorGrade");
       applyTransitionBetween(tx, clipIds[0]!, clipIds[1]!, "fade", 0.5);
       setClipProperty(tx, clipIds[2]!, "alpha", 0.5);
       setClipProperty(tx, clipIds[2]!, "end", 1.5);

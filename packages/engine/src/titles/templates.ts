@@ -8,6 +8,7 @@
  * (src/classes/agent_tools/titles.py `_default_template`, `add_title`).
  */
 
+import { getCloseMatches } from "../tools/difflib.js";
 import { transitionDisplayName } from "../transitions/catalog.js";
 import { TITLE_TEMPLATE_FILES } from "./templates.data.js";
 
@@ -50,19 +51,37 @@ function isAbsolutePath(ref: string): boolean {
   return ref.startsWith("/") || ref.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(ref);
 }
 
+/** title_svg.find_template's `norm`: no extension, lower case, runs of space, _ and - as one "_". */
+function templateKey(name: string): string {
+  const base = name.trim();
+  const dot = base.lastIndexOf(".");
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  return stem.trim().toLowerCase().replace(/[\s_-]+/g, "_");
+}
+
 /**
- * The built-in template add_title_tool means by `template`: empty → the
- * default; otherwise the file name, its stem or the display name, compared
- * case-insensitively, after dropping any folder (`"titles/Footer_1.svg"`).
- * The desktop matches the file name only (case-insensitively on macOS and
- * Windows). An absolute path names a user's own SVG, not a built-in
- * template, so it returns undefined; hosts read such files themselves.
+ * The built-in template add_title_tool means by `template`
+ * (title_svg.find_template): empty → the default; otherwise the file name,
+ * its stem or the display name, ignoring case, extension and whether words
+ * are joined by spaces, "_" or "-" ("gray box 4", "Gray_Box_4.svg"), after
+ * dropping any folder (`"titles/Footer_1.svg"`). An absolute path names a
+ * user's own SVG, not a built-in template, so it returns undefined; hosts
+ * read such files themselves.
  */
 export function getTitleTemplate(template?: string | null): TitleTemplate | undefined {
   const ref = (template ?? "").trim();
   if (!ref) return DEFAULT_TITLE_TEMPLATE;
   if (isAbsolutePath(ref)) return undefined;
-  const base = (ref.split(/[\\/]/).pop() ?? "").toLowerCase();
-  const stem = base.endsWith(".svg") ? base.slice(0, -4) : base;
-  return TITLE_TEMPLATES.find((t) => t.id.toLowerCase() === stem || t.name.toLowerCase() === base);
+  const wanted = templateKey(ref.split(/[\\/]/).pop() ?? "");
+  return TITLE_TEMPLATES.find((t) => templateKey(t.file) === wanted || templateKey(t.name) === wanted);
+}
+
+/** title_svg.suggest_templates: template names that look like `name`, for "did you mean" refusals. */
+export function suggestTitleTemplates(name: string, limit = 6): string[] {
+  const names = TITLE_TEMPLATES.map((t) => t.id);
+  const raw = String(name ?? "").trim();
+  const close = getCloseMatches(raw, names, limit, 0.4);
+  if (close.length > 0) return close;
+  const low = raw.toLowerCase().split("_")[0] ?? "";
+  return names.filter((n) => low && n.toLowerCase().includes(low)).slice(0, limit);
 }

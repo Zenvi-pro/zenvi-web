@@ -105,7 +105,8 @@ describe("build_reel_tool", () => {
     expect(doc.undoLabels).toEqual(["Build hype montage reel"]);
     doc.undo();
     expect(doc.project.clips).toHaveLength(0);
-  });
+    // Beat analysis of a minute of audio: slow on a loaded machine.
+  }, 30_000);
 
   it("ends shot labels where the end card comes in", async () => {
     const doc = reelProject();

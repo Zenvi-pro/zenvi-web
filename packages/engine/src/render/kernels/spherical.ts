@@ -462,4 +462,4 @@ function sphericalKernel(image: PremulImage, params: Params, ctx: KernelContext)
   return result;
 }
 
-export const sphericalProjection: KernelSpec = { type: "SphericalProjection", supported: true, run: sphericalKernel };
+export const sphericalProjection: KernelSpec = { type: "SphericalProjection", supported: true, sequential: true, run: sphericalKernel };

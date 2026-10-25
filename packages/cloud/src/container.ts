@@ -20,7 +20,8 @@ import { CIMD_FETCH_LIMIT, ClientRegistry, type JsonFetcher } from "./oauth/clie
 import { OAuthService } from "./oauth/service.js";
 import { GenerationService } from "./generation/service.js";
 import { MediaCache } from "./render/cache.js";
-import type { AssetSource, AudioAnalyzer, MediaProber, PcmDecoder, Renderer } from "./render/renderer.js";
+import type { RenderDispatch } from "./render/dispatch.js";
+import type { AssetSource, AudioAnalyzer, FontLister, MediaProber, PcmDecoder, Renderer, SpeechTranscriber } from "./render/renderer.js";
 import { unavailableProber, unavailableRenderer } from "./render/renderer.js";
 import { RenderService } from "./render/service.js";
 import { TokenRepo } from "./repos/tokens.js";
@@ -30,6 +31,7 @@ import { MediaImporter } from "./services/importer.js";
 import { MediaService } from "./services/media.js";
 import { MediaVerifier } from "./services/verifier.js";
 import { ProjectService } from "./services/projects.js";
+import { RecentTranscripts } from "./services/transcripts.js";
 import type { BlobStore, TableStore } from "./storage/types.js";
 import type { Clock } from "./util/clock.js";
 import { systemClock } from "./util/clock.js";
@@ -58,6 +60,12 @@ export interface Dependencies {
   analyzeAudio?: AudioAnalyzer;
   /** Decodes audio to PCM for beat tracking (detect_beats_tool, build_reel_tool); absent = beats from a fixed tempo. */
   decodePcm?: PcmDecoder;
+  /** Extracts speech audio and transcribes it through the backend (the speech tools); absent = index transcripts only. */
+  transcribeMedia?: SpeechTranscriber;
+  /** The fonts titles render with (add_title_tool / edit_title_tool check a font against them); absent = any font is taken as given. */
+  fontFamilies?: FontLister;
+  /** Hands renders to render workers (`render/dispatch.ts`); absent = renders run in this process. */
+  renderDispatch?: RenderDispatch;
 }
 
 export interface Services {
@@ -85,6 +93,9 @@ export interface Services {
   assets: AssetSource | null;
   analyzeAudio: AudioAnalyzer | null;
   decodePcm: PcmDecoder | null;
+  transcribeMedia: SpeechTranscriber | null;
+  fontFamilies: FontLister | null;
+  transcripts: RecentTranscripts;
   limiter: RateLimiter;
   engine: EngineRegistry | null;
   startedAt: number;
@@ -153,6 +164,7 @@ export function createServices(deps: Dependencies): Services {
       tmpDir: config.renderTmpDir,
       maxRenderMediaBytes: config.limits.maxRenderMediaBytes,
       resolveAsset: deps.resolveAsset,
+      dispatch: deps.renderDispatch,
     }),
     devices: new DeviceService(tables, tokens, clock, config.editorUrl, config.tokens.devicePatDays),
     clients,
@@ -176,6 +188,9 @@ export function createServices(deps: Dependencies): Services {
     assets: deps.assets ?? null,
     analyzeAudio: deps.analyzeAudio ?? null,
     decodePcm: deps.decodePcm ?? null,
+    transcribeMedia: deps.transcribeMedia ?? null,
+    fontFamilies: deps.fontFamilies ?? null,
+    transcripts: new RecentTranscripts(clock),
     limiter: new RateLimiter(clock),
     engine: deps.engine ?? null,
     startedAt: clock.now(),

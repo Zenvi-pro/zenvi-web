@@ -6,8 +6,8 @@
  * (one transaction: profile, width, height, ratios, fps, reset
  * export_settings), src/classes/project_data.py `changed` fps branch
  * (convert_framerate.change_profile snapping + remove_gaps, KeyframeScaler,
- * audio-only files resized), src/classes/agent_tools/project_settings.py
- * `set_project_setting`, tool_handlers.py `set_export_setting`.
+ * audio-only files resized), editor_tools/project_export_profiles.py
+ * `set_project_setting` (audio), tool_handlers.py `set_export_setting`.
  *
  * Difference from the desktop: its fps side effects are written outside the
  * undo system, so undoing a profile change only restores the fps value.
@@ -15,12 +15,11 @@
  */
 
 import type { ProjectDocument, Transaction } from "../history/document.js";
-import type { Fraction, Project } from "../model/types.js";
+import { Gravity, ScaleMode, type Fraction, type Project } from "../model/types.js";
 import { findProfile, type Profile } from "../model/profiles.js";
 import { isAudioOnlyMedia } from "../model/media.js";
 import { pyRound } from "../model/rounding.js";
 import { scaleKeyframe } from "../keyframe/edit.js";
-import { fpsFromRate, sameFps } from "../timeline/time.js";
 import { OpError, invalid } from "./errors.js";
 import { changedFields, isRecord, sameJson } from "./internal.js";
 
@@ -85,6 +84,27 @@ export function rescaleItemKeyframes<T extends Record<string, unknown>>(item: T,
   return out as T;
 }
 
+/**
+ * The project as an export at another frame rate renders it: every keyframe
+ * of its clips, their effects and its transitions rescaled to `fps`
+ * (KeyframeScaler), and `fps` replaced. zenvi-core src/windows/export.py
+ * `run_export` does this on the project before rendering when the export
+ * frame rate differs from the project's, so animations keep their timing.
+ * Pure: returns `project` itself when the rate is the same.
+ */
+export function projectAtFrameRate(project: Project, fps: Fraction): Project {
+  const from = project.fps;
+  const factor = fps.num / fps.den / (from.num / from.den);
+  if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return project;
+  const clips = project.clips.map((clip) => {
+    const next = rescaleItemKeyframes(clip as unknown as Record<string, unknown>, factor);
+    if (Array.isArray(next.effects)) next.effects = (next.effects as Record<string, unknown>[]).map((e) => rescaleItemKeyframes(e, factor));
+    return next as unknown as Project["clips"][number];
+  });
+  const effects = project.effects.map((t) => rescaleItemKeyframes(t as unknown as Record<string, unknown>, factor) as unknown as Project["effects"][number]);
+  return { ...project, fps: { num: fps.num, den: fps.den }, clips, effects };
+}
+
 /** Record the fps side effects of changing from `oldFps` to `profile`'s frame rate (project_data.py fps branch). */
 function applyFrameRateChange(tx: Transaction, project: Project, oldFps: Fraction, newFps: Fraction, profile: Profile | null): void {
   const factor = newFps.num / newFps.den / (oldFps.num / oldFps.den);
@@ -138,15 +158,39 @@ export function setProfile(tx: Transaction, profileKey: string): Profile {
   if (typeof profileKey !== "string" || profileKey.trim() === "") throw invalid("profileKey is required.");
   const profile = findProfile(profileKey);
   if (!profile) throw new OpError("not_found", `No profile named ${profileKey}.`, { profile: profileKey });
-  const project = tx.project;
-  const oldFps = project.fps;
-  const changed =
+  applyProfile(tx, profile);
+  return profile;
+}
+
+/**
+ * Whether switching to `profile` changes the project (`project_profile.profile_differs`):
+ * its name, size, frame rate or ratios.
+ */
+export function profileDiffers(project: Project, profile: Profile): boolean {
+  const fps = project.fps;
+  const ratio = (value: unknown, expected: Fraction): boolean =>
+    !isRecord(value) || value.num !== expected.num || value.den !== expected.den;
+  return (
     project.profile !== profile.description ||
     project.width !== profile.width ||
     project.height !== profile.height ||
-    !oldFps ||
-    oldFps.num !== profile.fps.num ||
-    oldFps.den !== profile.fps.den;
+    !fps ||
+    fps.num !== profile.fps.num ||
+    fps.den !== profile.fps.den ||
+    ratio(project.display_ratio, profile.display_ratio) ||
+    ratio(project.pixel_ratio, profile.pixel_ratio)
+  );
+}
+
+/**
+ * Switch the project to a profile record (a built-in one, or a custom one
+ * the host keeps), with the side effects of `setProfile`. Returns whether
+ * anything changed; nothing is recorded when it already uses it.
+ */
+export function applyProfile(tx: Transaction, profile: Profile): boolean {
+  const project = tx.project;
+  const oldFps = project.fps;
+  const changed = profileDiffers(project, profile);
   const fields = changedFields(project as Record<string, unknown>, {
     profile: profile.description,
     width: profile.width,
@@ -160,149 +204,183 @@ export function setProfile(tx: Transaction, profileKey: string): Profile {
     applyFrameRateChange(tx, project, oldFps, profile.fps, profile);
     if (project.export_settings !== null && "export_settings" in project) tx.replace(["export_settings"], null);
   }
-  return profile;
+  return changed;
 }
 
-/** Arguments of `set_project_setting_tool` (all optional; at least one). */
-export interface ProjectSettingsPatch {
-  /**
-   * Frame rate as a number (23.976 / 29.97 / 59.94 snap to the NTSC
-   * fractions, other non-integers are approximated with denominator <= 1001)
-   * or an exact fraction.
-   */
-  fps?: number | Fraction;
-  /** 16..8192. */
-  width?: number;
-  /** 16..8192. */
-  height?: number;
-  /** 8000..192000. */
-  sampleRate?: number;
+// ---------------------------------------------------------------------------
+// Reframe (zenvi-core develop editor_tools/project_export_profiles.py plan_reframe)
+// ---------------------------------------------------------------------------
+
+export type ReframeMode = "keep" | "fit" | "fill";
+
+export interface ReframePlan {
+  /** Clips to set to crop-to-fill (fill) or fit, centred. */
+  changes: { id: string; scale: number; gravity: number }[];
+  skipped: { timeline_clip_id: string; reason: string }[];
+  /** Fitted clips of another shape that will show bars (mode keep). */
+  letterboxed: string[];
+  /** Clips with a picture on the timeline. */
+  videoClips: number;
 }
 
-export interface ProjectSettingsResult {
-  changed: boolean;
-  /** The project keys written and their new values. */
-  updates: { fps?: Fraction; width?: number; height?: number; sample_rate?: number };
-  /** Human-readable notes, e.g. `"fps=30000/1001"`. */
-  notes: string[];
+/** `_constant`: a keyframe curve that holds `value` everywhere (or has no points). */
+function holds(curve: unknown, value: number): boolean {
+  const points = isRecord(curve) && Array.isArray(curve.Points) ? (curve.Points as unknown[]) : null;
+  if (!points || points.length === 0) return true;
+  return points.every((p) => {
+    const co = isRecord(p) && isRecord(p.co) ? p.co : {};
+    const y = co.Y === undefined ? value : Number(co.Y);
+    return Math.abs(y - value) < 1e-6;
+  });
 }
 
-function requireInt(value: unknown, what: string, min: number, max: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value)) {
-    throw invalid(`${what} must be an integer (got ${String(value)}).`);
-  }
-  if (value < min || value > max) throw invalid(`${what} out of range (${min}..${max}).`);
-  return value;
+/** `_source_aspect`: the clip's media shape (display ratio, else pixels), or null. */
+function sourceAspect(clip: Record<string, unknown>): number | null {
+  const reader = isRecord(clip.reader) ? clip.reader : {};
+  const dar = isRecord(reader.display_ratio) ? reader.display_ratio : {};
+  const num = Number(dar.num);
+  const den = Number(dar.den);
+  if (num && den) return num / den;
+  const w = Number(reader.width);
+  const h = Number(reader.height);
+  if (w && h) return w / h;
+  return null;
+}
+
+/** Whether a clip has a picture (`reader.has_video` defaults to true; audio files have none). */
+function showsPicture(clip: Record<string, unknown>): boolean {
+  const reader = isRecord(clip.reader) ? clip.reader : {};
+  const hasVideo = "has_video" in reader ? reader.has_video : true;
+  return Boolean(hasVideo) && reader.media_type !== "audio";
 }
 
 /**
- * Change fps / width / height / sample rate (zenvi-core
- * agent_tools/project_settings.py `set_project_setting`). Values that already
- * match are skipped; when nothing changes nothing is recorded. An fps change
- * has the same side effects as `setProfile` (times snapped to the new grid,
- * keyframes rescaled). The profile description is left as it is, like the
- * desktop.
+ * Which clips to reframe for a `width`×`height` frame: full-frame clips of
+ * another shape are set to crop-to-fill (`fill`) or fit (`fit`), centred;
+ * titles (SVG), picture-in-picture clips (scaled or moved) and clips on
+ * locked tracks are never changed, and `keep` only lists the fitted clips
+ * that will show bars. Changes nothing.
  */
-export function setProjectSettings(tx: Transaction, patch: ProjectSettingsPatch): ProjectSettingsResult {
-  if (typeof patch !== "object" || patch === null) throw invalid("patch must be an object.");
-  const project = tx.project;
-  const updates: ProjectSettingsResult["updates"] = {};
-  const notes: string[] = [];
-
-  let fps: Fraction | undefined;
-  if (patch.fps !== undefined) {
-    if (typeof patch.fps === "number") {
-      if (!Number.isFinite(patch.fps) || patch.fps <= 0) throw invalid("fps must be positive.");
-      fps = fpsFromRate(patch.fps);
-    } else if (typeof patch.fps === "object" && patch.fps !== null) {
-      const { num, den } = patch.fps;
-      if (!Number.isInteger(num) || !Number.isInteger(den) || num <= 0 || den <= 0) {
-        throw invalid("fps num/den must be positive integers.");
-      }
-      fps = { num, den };
-    } else {
-      throw invalid("fps must be a number or {num, den}.");
+export function planReframe(project: Project, mode: ReframeMode, width: number, height: number): ReframePlan {
+  const target = width / height;
+  const plan: ReframePlan = { changes: [], skipped: [], letterboxed: [], videoClips: 0 };
+  const locked = new Set(project.layers.filter((l) => l.lock).map((l) => Number(l.number)));
+  for (const raw of project.clips) {
+    const clip = raw as Record<string, unknown>;
+    if (!showsPicture(clip)) continue;
+    plan.videoClips += 1;
+    const id = String(clip.id);
+    const reader = isRecord(clip.reader) ? clip.reader : {};
+    const path = String(reader.path || clip.title || "").toLowerCase();
+    const aspect = sourceAspect(clip);
+    if (aspect === null || Math.abs(aspect - target) / target < 0.01) continue;
+    const scale = Math.trunc(Number(clip.scale ?? ScaleMode.FIT));
+    const svg = path.endsWith(".svg");
+    if (mode === "keep") {
+      if (scale === ScaleMode.FIT && !svg) plan.letterboxed.push(id);
+      continue;
     }
+    if (svg) {
+      plan.skipped.push({ timeline_clip_id: id, reason: "title (SVG) kept as designed" });
+      continue;
+    }
+    const fullFrame = holds(clip.scale_x, 1) && holds(clip.scale_y, 1) && holds(clip.location_x, 0) && holds(clip.location_y, 0);
+    if (!fullFrame) {
+      plan.skipped.push({ timeline_clip_id: id, reason: "resized or moved (picture-in-picture) clip kept" });
+      continue;
+    }
+    const want = mode === "fill" ? ScaleMode.CROP : ScaleMode.FIT;
+    if (scale === want && Math.trunc(Number(clip.gravity ?? Gravity.CENTER)) === Gravity.CENTER) continue;
+    if (locked.has(Math.trunc(Number(clip.layer) || 0))) {
+      plan.skipped.push({ timeline_clip_id: id, reason: "track is locked" });
+      continue;
+    }
+    plan.changes.push({ id, scale: want, gravity: Gravity.CENTER });
   }
-  const width = patch.width === undefined ? undefined : requireInt(patch.width, "width", 16, 8192);
-  const height = patch.height === undefined ? undefined : requireInt(patch.height, "height", 16, 8192);
-  const sampleRate = patch.sampleRate === undefined ? undefined : requireInt(patch.sampleRate, "sample_rate", 8000, 192000);
-
-  if (fps && (project.fps?.num !== fps.num || project.fps?.den !== fps.den)) {
-    updates.fps = fps;
-    notes.push(`fps=${fps.num}/${fps.den}`);
-  }
-  if (width !== undefined && project.width !== width) {
-    updates.width = width;
-    notes.push(`width=${width}`);
-  }
-  if (height !== undefined && project.height !== height) {
-    updates.height = height;
-    notes.push(`height=${height}`);
-  }
-  if (sampleRate !== undefined && project.sample_rate !== sampleRate) {
-    updates.sample_rate = sampleRate;
-    notes.push(`sample_rate=${sampleRate}`);
-  }
-  if (Object.keys(updates).length === 0) return { changed: false, updates, notes: ["Settings already matched."] };
-
-  const oldFps = project.fps;
-  for (const [key, value] of Object.entries(updates)) tx.replace([key], value);
-  if (updates.fps && !sameFps(oldFps, updates.fps)) {
-    applyFrameRateChange(tx, project, oldFps, updates.fps, findProfile(project.profile) ?? null);
-  }
-  return { changed: true, updates, notes };
+  return plan;
 }
 
-/** Single-key form of `setProjectSettings`. */
-export function setProjectSetting<K extends keyof ProjectSettingsPatch>(
-  tx: Transaction,
-  key: K,
-  value: NonNullable<ProjectSettingsPatch[K]>,
-): ProjectSettingsResult {
-  return setProjectSettings(tx, { [key]: value } as ProjectSettingsPatch);
+/** Record a reframe plan's clip changes (part of the caller's transaction). */
+export function applyReframe(tx: Transaction, plan: ReframePlan): void {
+  for (const change of plan.changes) tx.update(["clips", { id: change.id }], { scale: change.scale, gravity: change.gravity });
 }
 
-const INT_EXPORT_KEYS = new Set(["width", "height", "fps_num", "fps_den", "start_frame", "end_frame", "sample_rate", "channels"]);
+/** A project's audio mix format: what set_project_setting_tool changes besides the profile. */
+export interface ProjectAudio {
+  /** Hz, e.g. 44100 or 48000. */
+  sampleRate?: number;
+  /** Channel count with its FFmpeg layout (`ChannelLayout`), set together. */
+  channels?: { count: number; layout: number };
+}
 
 /**
- * The `export_overrides` object after setting `key` to `value`, coerced like
- * zenvi-core tool_handlers.py `set_export_setting`: integer keys (`width`,
- * `height`, `fps_num`, `fps_den`, `start_frame`, `end_frame`, `sample_rate`,
- * `channels`), aliases (`vcodec` → `video_codec`, `acodec` → `audio_codec`,
- * `path` → `output_path`, `format` → `vformat`), everything else as a string.
- * Pure: does not change the project. Throws `OpError` for invalid values.
+ * Set the project's sample rate and/or channels (count and layout), like
+ * zenvi-core develop editor_tools/project_export_profiles.py
+ * `set_project_setting` (`app.updates.update([key], value)` per key). Only
+ * keys that differ are recorded. Returns the keys written.
  */
-export function withExportOverride(
+export function setProjectAudio(tx: Transaction, audio: ProjectAudio): string[] {
+  if (typeof audio !== "object" || audio === null) throw invalid("audio must be an object.");
+  const positiveInt = (value: unknown, what: string): number => {
+    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) throw invalid(`${what} must be a positive integer (got ${String(value)}).`);
+    return value;
+  };
+  const wanted: Record<string, number> = {};
+  if (audio.sampleRate !== undefined) wanted.sample_rate = positiveInt(audio.sampleRate, "sampleRate");
+  if (audio.channels !== undefined) {
+    wanted.channels = positiveInt(audio.channels.count, "channels.count");
+    wanted.channel_layout = positiveInt(audio.channels.layout, "channels.layout");
+  }
+  const fields = changedFields(tx.project as Record<string, unknown>, wanted);
+  for (const [key, value] of Object.entries(fields)) tx.replace([key], value);
+  return Object.keys(fields);
+}
+
+/**
+ * The `export_overrides` object with `values` stored (set_export_setting_tool,
+ * keys and values already checked: presets/settings.ts). Pure.
+ */
+export function withExportOverrides(
   overrides: Readonly<Record<string, unknown>> | null | undefined,
-  key: string,
-  value: string | number,
+  values: Readonly<Record<string, string | number>>,
 ): Record<string, unknown> {
-  if (typeof key !== "string" || key.trim() === "") throw invalid("key is required.");
+  return { ...(overrides ?? {}), ...values };
+}
+
+/**
+ * The `export_overrides` object without `names` (set_export_setting_tool
+ * `clear`). Pure. The desktop writes None over them; a missing key reads the
+ * same everywhere (None and absent both mean "not stored").
+ */
+export function withoutExportOverrides(overrides: Readonly<Record<string, unknown>> | null | undefined, names: readonly string[]): Record<string, unknown> {
   const out: Record<string, unknown> = { ...(overrides ?? {}) };
-  const k = key.toLowerCase().trim();
-  const text = String(value).trim();
-  if (INT_EXPORT_KEYS.has(k)) {
-    if (!/^[+-]?\d+$/.test(text)) throw invalid(`${k} must be an integer (got ${text}).`);
-    out[k] = Number.parseInt(text, 10);
-  } else if (k === "video_codec" || k === "vcodec") out.video_codec = text;
-  else if (k === "audio_codec" || k === "acodec") out.audio_codec = text;
-  else if (k === "output_path" || k === "path") out.output_path = text;
-  else if (k === "vformat" || k === "format") out.vformat = text;
-  else out[k] = text;
+  for (const name of names) delete out[name];
   return out;
 }
 
 /**
- * Set one export override. Like the desktop (`_ignore_history`), this is not
- * an undo step: it writes `export_overrides` untracked on the document.
- * Returns the new overrides.
+ * Remove stored export overrides. Like `storeExportOverrides`, not an undo step:
+ * `export_overrides` is written untracked. Returns the overrides left.
  */
-export function setExportSetting(doc: ProjectDocument, key: string, value: string | number): Record<string, unknown> {
-  const next = withExportOverride(doc.project.export_overrides, key, value);
+export function clearExportSettings(doc: ProjectDocument, names: readonly string[]): Record<string, unknown> {
   if (!("export_overrides" in doc.project)) {
     throw new OpError("conflict", "The project has no export_overrides object (open it with parseProject).");
   }
+  const next = withoutExportOverrides(doc.project.export_overrides, names);
+  doc.setUntracked(["export_overrides"], next);
+  return next;
+}
+
+/**
+ * Store export overrides. Like the desktop (`_ignore_history`), this is not
+ * an undo step: it writes `export_overrides` untracked on the document.
+ * Returns the new overrides.
+ */
+export function storeExportOverrides(doc: ProjectDocument, values: Readonly<Record<string, string | number>>): Record<string, unknown> {
+  if (!("export_overrides" in doc.project)) {
+    throw new OpError("conflict", "The project has no export_overrides object (open it with parseProject).");
+  }
+  const next = withExportOverrides(doc.project.export_overrides, values);
   doc.setUntracked(["export_overrides"], next);
   return next;
 }

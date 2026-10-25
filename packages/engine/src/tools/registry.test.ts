@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import backendTools from "../../../../docs/specs/backend-frontend-tools.json";
 import { normalizeArgs } from "./coerce.js";
 import type { JsonSchema } from "./json-schema.js";
+import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_TOOLS } from "./pending.js";
 import { allTools, getTool, listTools, runTool } from "./registry.js";
 import { CONTRACT_TOOL_NAMES, contractMeta } from "./schemas.gen.js";
 import { fakeHost } from "./test-support/fake-host.js";
@@ -11,18 +12,16 @@ import type { HostCapability } from "./types.js";
 
 const DIRECT_TOOLS = [
   "describe_project_tool",
-  "list_effects_tool",
   "move_clip_tool",
   "trim_clip_tool",
   "split_clip_tool",
   "set_clip_property_tool",
   "set_effect_property_tool",
-  "remove_effect_tool",
-  "set_clip_speed_tool",
   "fade_clip_tool",
   "add_transition_tool",
   "probe_media_tool",
   "build_reel_tool",
+  "add_motion_template_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
 ];
@@ -43,11 +42,12 @@ function stringForm(schema: JsonSchema): string | undefined {
 }
 
 describe("tool catalog", () => {
-  it("registers every contract-3 tool, in TOOL_SCHEMAS order, then the direct tools", () => {
-    expect(CONTRACT_TOOL_NAMES).toHaveLength(73);
-    expect(allTools.map((t) => t.name)).toEqual([...CONTRACT_TOOL_NAMES, ...DIRECT_TOOLS]);
+  it("registers every ported desktop tool, in the contract's order, then the direct tools", () => {
+    const ported = CONTRACT_TOOL_NAMES.filter((name) => !PENDING_DESKTOP_TOOLS.has(name) && !DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name));
+    expect(ported).toHaveLength(163);
+    expect(allTools.map((t) => t.name)).toEqual([...ported, ...DIRECT_TOOLS]);
     expect(new Set(allTools.map((t) => t.name)).size).toBe(allTools.length);
-    for (const name of CONTRACT_TOOL_NAMES) expect(getTool(name)?.contract).toBe(true);
+    for (const name of ported) expect(getTool(name)?.contract).toBe(true);
     for (const name of DIRECT_TOOLS) expect(getTool(name)?.contract).toBe(false);
   });
 
@@ -81,7 +81,16 @@ describe("tool catalog", () => {
         const value = stringForm(schema);
         if (value !== undefined) args[key] = value;
       }
-      for (const key of tool.inputSchema.required ?? []) if (!(key in args)) args[key] = key === "points" ? [{ frame: 1, value: 1 }] : "x";
+      for (const key of tool.inputSchema.required ?? []) {
+        if (key in args) continue;
+        const type = tool.inputSchema.properties[key]?.type;
+        if (key === "points") args[key] = [{ frame: 1, value: 1 }];
+        else if (key === "subclips") args[key] = [{ source_start_seconds: 1, source_end_seconds: 2 }];
+        else if (type === "array") args[key] = ["x"];
+        // update_effect_tool's properties are an effect's (sigma is Blur's); set_clip_properties_tool takes any object.
+        else if (type === "object") args[key] = key === "properties" ? { sigma: 1 } : { x: 1 };
+        else args[key] = "x";
+      }
       const parsed = tool.input.safeParse(normalizeArgs(tool.inputSchema, args));
       expect(parsed.success ? "ok" : `${tool.name}: ${JSON.stringify(parsed.error.issues[0])}`).toBe("ok");
     }
@@ -158,9 +167,9 @@ describe("availability matrix", () => {
 
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
-      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend"],
-      cloud: ["media", "frames", "storage", "assets", "audio", "backend"],
+      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
+      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
     };
     for (const tool of allTools) {
       const a = toolAvailability(tool);
@@ -169,5 +178,13 @@ describe("availability matrix", () => {
         if (missing.length > 0) expect(a[surface], `${tool.name} on ${surface}`).toBe("no");
       }
     }
+  });
+
+  it("has export_video_tool on every web surface, partial (no interlacing) and each with its own output", () => {
+    const a = toolAvailability(allTools.find((t) => t.name === "export_video_tool")!);
+    expect([a.editor, a.cli, a.cloud]).toEqual(["partial", "partial", "partial"]);
+    expect(a.notes.cloud).toMatch(/interlaced is refused.*Zenvi Cloud starts a render job/);
+    const presets = toolAvailability(allTools.find((t) => t.name === "list_export_presets_tool")!);
+    expect(presets.cloud).not.toBe("no");
   });
 });

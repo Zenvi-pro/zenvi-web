@@ -58,16 +58,16 @@ export function TimelineToolbar() {
         <Trash2 size={14} />
       </IconButton>
       <Divider vertical />
-      <IconButton size="sm" label="Add track" shortcut={shortcutFor("actionAddTrack")} onClick={() => run("actionAddTrack")}>
+      <IconButton size="sm" label="Add track" shortcut={shortcutFor("actionAddTrack")} onClick={() => run("actionAddTrack")} className="max-sm:hidden">
         <Plus size={15} />
       </IconButton>
-      <IconButton size="sm" label="Add marker" shortcut={shortcutFor("actionAddMarker")} onClick={() => run("actionAddMarker")}>
+      <IconButton size="sm" label="Add marker" shortcut={shortcutFor("actionAddMarker")} onClick={() => run("actionAddMarker")} className="max-sm:hidden">
         <BookmarkPlus size={14} />
       </IconButton>
 
       <div className="flex flex-1 items-center justify-center gap-2 text-sm">
         <LiveTimecode className="text-fg" />
-        <span className="font-mono text-xs tnum text-fg-faint">/ {secondsToTimecode(end, fps)}</span>
+        <span className="font-mono text-xs tnum text-fg-faint max-sm:hidden">/ {secondsToTimecode(end, fps)}</span>
       </div>
 
       <IconButton size="sm" label="Zoom out" shortcut={shortcutFor("actionTimelineZoomOut")} onClick={() => run("actionTimelineZoomOut")}>
@@ -75,7 +75,7 @@ export function TimelineToolbar() {
       </IconButton>
       <Slider
         label="Timeline zoom"
-        className="w-28"
+        className="w-28 max-sm:hidden"
         min={0}
         max={1000}
         value={Math.round(zoomToSlider(pps) * 1000)}

@@ -64,7 +64,7 @@ const TrackHeader = memo(function TrackHeader({ layer, name, height, index }: { 
           active={layer.lock}
           tooltipSide="right"
           onClick={() => session.edit(layer.lock ? "Unlock track" : "Lock track", (tx) => setTrackLocked(tx, layer.number, !layer.lock))}
-          className={cn(!layer.lock && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100")}
+          className={cn(!layer.lock && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100", "max-sm:hidden")}
         >
           {layer.lock ? <Lock size={12} /> : <LockOpen size={12} />}
         </IconButton>

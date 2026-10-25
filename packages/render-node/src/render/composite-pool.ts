@@ -4,10 +4,12 @@
  * decodes and feeds the encoder.
  *
  * Pixels are identical to compositing on the main thread: every worker runs
- * the same `compositeFrame`, and frames with clip effects all go to worker 0
- * in timeline order, so effects that keep state across frames (Denoise,
- * BeatSync) see the same sequence as a single-threaded render. Frames
- * without effects are independent and go to the least busy worker.
+ * the same `compositeFrame`, and frames with an effect that keeps state
+ * across frames (DenoiseImage, BeatSync, SphericalProjection:
+ * `KernelSpec.sequential`) all go to worker 0 in timeline order, so those
+ * effects see the same sequence as a single-threaded render. Other frames,
+ * effects included (Color Grade, Film Grain: pure per frame), are
+ * independent and go to the least busy worker.
  *
  * Workers load `composite-worker.mjs` next to a bundle (the CLI and cloud
  * builds emit it) or, from the source tree, the tsx dev entry. When neither
@@ -21,12 +23,18 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 import type { FramePlan, RgbaImage } from "@zenvi/engine";
+import { isSequentialEffect } from "@zenvi/engine/render";
 import type { PreparedFrame } from "../decode/sources.js";
+import { processLimits, type ContainerLimits } from "../limits.js";
 import { bundleDir } from "../resources.js";
 import type { CompositeRequest, CompositeResponse, WireImage } from "./composite-worker.js";
 
 /** Per-worker budget for cached still images (masks, titles, photos). */
 const CACHE_BYTES = 128 * 1024 * 1024;
+/** What one worker costs on top of its still-image cache: its own heap, the compositor and frames in flight. */
+const WORKER_OVERHEAD_BYTES = 96 * 1024 * 1024;
+/** Share of a container's memory limit the workers may take; the rest is the main thread's decode and encode. */
+const WORKER_MEMORY_SHARE = 0.25;
 /** Renders shorter than this composite on the main thread (worker start-up costs more). */
 const MIN_POOL_FRAMES = 60;
 const MAX_THREADS = 4;
@@ -34,16 +42,19 @@ const MAX_THREADS = 4;
 /**
  * Worker threads for a render of `frames` frames: `ZENVI_RENDER_THREADS`
  * when set (0 disables the pool), else up to 4, one core left for the main
- * thread, ffmpeg and the encoder.
+ * thread, ffmpeg and the encoder. In a container the CPU quota and the
+ * memory limit bound it too, so a small one composites on the main thread.
  */
-export function compositeThreads(frames: number, env: NodeJS.ProcessEnv = process.env): number {
+export function compositeThreads(frames: number, env: NodeJS.ProcessEnv = process.env, limits: ContainerLimits = processLimits()): number {
   const forced = env.ZENVI_RENDER_THREADS?.trim();
   if (forced) {
     const n = Number(forced);
     return Number.isInteger(n) && n >= 0 ? Math.min(n, 16) : 0;
   }
   if (frames < MIN_POOL_FRAMES) return 0;
-  return Math.max(0, Math.min(MAX_THREADS, availableParallelism() - 1, Math.ceil(frames / 30)));
+  const cpus = limits.cpus === undefined ? availableParallelism() : Math.min(availableParallelism(), Math.max(1, Math.floor(limits.cpus)));
+  const byMemory = limits.memoryBytes === undefined ? MAX_THREADS : Math.floor((limits.memoryBytes * WORKER_MEMORY_SHARE) / (CACHE_BYTES + WORKER_OVERHEAD_BYTES));
+  return Math.max(0, Math.min(MAX_THREADS, cpus - 1, byMemory, Math.ceil(frames / 30)));
 }
 
 /** The worker script for this build, if one exists. */
@@ -162,7 +173,7 @@ export class CompositePool {
   /** Composite `plan` with its decoded sources on a worker. */
   composite(plan: FramePlan, prepared: PreparedFrame, text: boolean): Promise<RgbaImage> {
     if (this.closed) return Promise.reject(new Error("CompositePool is closed"));
-    const ordered = plan.layers.some((layer) => layer.effects.length > 0);
+    const ordered = plan.layers.some((layer) => layer.effects.some((effect) => isSequentialEffect(effect.type)));
     let slot = this.slots[0]!;
     if (!ordered) {
       for (const candidate of this.slots) if (candidate.pending.size < slot.pending.size) slot = candidate;

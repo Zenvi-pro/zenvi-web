@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { transcriptionHttpError } from "../analysis/transcription.js";
 import { allTools, runTool } from "./registry.js";
 import { fakeHost, type FakeHostOptions } from "./test-support/fake-host.js";
 import { IDS, fixtureDoc, snapshotOf } from "./test-support/fixture.js";
@@ -23,6 +24,8 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   search_transitions_tool: { query: "fade" },
   generate_video_and_add_to_timeline_tool: { prompt: "a sunset over the sea" },
   generate_tts_and_add_to_timeline_tool: { text: "Hello there" },
+  generate_image_and_add_to_timeline_tool: { prompt: "a red fox in snow" },
+  ingest_web_video_tool: { url: "https://youtu.be/abc" },
   resummarize_project_file_tool: { file_id: IDS.interview },
   reindex_project_file_tool: { file_id: IDS.broll },
   set_export_setting_tool: { key: "width", value: "640" },
@@ -37,6 +40,9 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   open_project_tool: { file_path: "/projects/a.zvn" },
   remove_silence_tool: { clipId: IDS.clipA },
   add_captions_tool: { clipId: IDS.clipA },
+  add_emoji_tool: { emoji: "fire" },
+  import_image_sequence_tool: { path: "/frames" },
+  add_motion_template_tool: { template: "end_card", text: "Zenvi" },
 };
 
 async function expectNotAvailable(name: string, args: Record<string, unknown>, host: FakeHostOptions): Promise<void> {
@@ -74,8 +80,6 @@ describe("surface-limitation refusals say 'not available'", () => {
 
   it("for the desktop-only ML and ffmpeg tools", async () => {
     const cases: [string, Record<string, unknown>][] = [
-      ["transcribe_media_tool", { fileId: IDS.interview }],
-      ["remove_words_tool", { clipId: IDS.clipA, matches: ["um"] }],
       ["detect_beats_tool", { fileId: IDS.music }],
       ["diarize_media_tool", { fileId: IDS.interview }],
       ["search_media_local_tool", { query: "dog" }],
@@ -83,6 +87,44 @@ describe("surface-limitation refusals say 'not available'", () => {
       ["generate_transition_clip_tool", { clip_a_id: IDS.clipA, clip_b_id: IDS.clipB }],
     ];
     for (const [name, args] of cases) await expectNotAvailable(name, args, {});
+  });
+
+  it("for Zenvi desktop's ComfyUI and recording tools, and web pages on hosted surfaces", async () => {
+    const cases: [string, Record<string, unknown>][] = [
+      ["list_comfyui_templates_tool", {}],
+      ["list_comfyui_jobs_tool", { job_id: "j1" }],
+      ["create_media_with_comfyui_tool", { prompt: "misty pine forest" }],
+      ["enhance_file_with_comfyui_tool", { file_id: IDS.broll, action: "upscale" }],
+      ["cancel_comfyui_job_tool", { all_jobs: "true" }],
+      ["prepare_recording_tool", { sources: ["mic"] }],
+    ];
+    for (const [name, args] of cases) await expectNotAvailable(name, args, {});
+    await expectNotAvailable("ingest_web_video_tool", { url: "https://youtu.be/abc" }, { omit: ["media.fetchWebVideo"] });
+    await expectNotAvailable("generate_image_and_add_to_timeline_tool", { prompt: "a red fox" }, { omit: ["media.writeGenerated"] });
+  });
+
+  it("for speech recognition a host does not have, or a server without it", async () => {
+    const deaf: FakeHostOptions = { omit: ["audio.transcribe"] };
+    await expectNotAvailable("transcribe_media_tool", { fileId: IDS.broll }, deaf);
+    await expectNotAvailable("transcribe_media_tool", { fileId: IDS.interview }, deaf);
+    await expectNotAvailable("remove_words_tool", { clipId: IDS.clipA, matches: ["um"] }, deaf);
+    await expectNotAvailable("get_transcript_tool", { clipId: IDS.clipB }, deaf);
+    await expectNotAvailable("export_captions_tool", { path: "/out/captions.srt", clipId: IDS.clipB }, deaf);
+    // A server from before zenvi-backend #67 answers 404.
+    const older: FakeHostOptions = { transcripts: { "/media/broll.mp4": transcriptionHttpError(404, { detail: "Not Found" }) } };
+    for (const [name, args] of [
+      ["get_transcript_tool", { clipId: IDS.clipB }],
+      ["transcribe_media_tool", { fileId: IDS.broll }],
+      ["remove_words_tool", { clipId: IDS.clipB, fillerPreset: "um_uh" }],
+      ["export_captions_tool", { path: "/out/b.srt", clipId: IDS.clipB }],
+      ["add_captions_tool", { timeline_clip_id: IDS.clipB }],
+    ] as const) {
+      const doc = fixtureDoc();
+      const result = await runTool({ doc, host: fakeHost(older) }, name, args);
+      expect(result.data?.status, name).toBe("refused");
+      expect(result.data?.summary, name).toMatch(new RegExp(`^Error: ${name} is not available in this Zenvi surface: speech recognition is not available yet on this Zenvi server`));
+      expect(doc.undoLabels, name).toEqual([]);
+    }
   });
 
   it("for local paths on a host without file access (the web editor)", async () => {
@@ -103,6 +145,13 @@ describe("surface-limitation refusals say 'not available'", () => {
     await expectNotAvailable("generate_tts_and_add_to_timeline_tool", { text: "Hello there" }, noWrites);
     await expectNotAvailable("add_title_tool", { text: "Hello" }, noWrites);
     await expectNotAvailable("export_video_tool", { show_dialog: "false" }, { without: ["exporter"] });
+  });
+
+  it("for editor state a host does not have", async () => {
+    await expectNotAvailable("seek_playhead_tool", { to: "start", play: "true" }, { without: ["player"] });
+    await expectNotAvailable("select_timeline_items_tool", { mode: "none" }, { omit: ["ui.setSelection"] });
+    await expectNotAvailable("set_timeline_view_tool", { zoom: "fit" }, { omit: ["ui.showTimelineRange"] });
+    await expectNotAvailable("set_timeline_view_tool", { timing: "true" }, {});
   });
 
   it("for re-indexing, which uploads from the desktop", async () => {

@@ -13,7 +13,8 @@ import type { MediaSourceSpec } from "../session/media";
 /** Web Audio decodes whole files in memory; past this, ask for the desktop app. */
 export const MAX_ANALYZE_BYTES = 768 * 1024 * 1024;
 
-async function blobOf(spec: MediaSourceSpec, signal?: AbortSignal): Promise<Blob> {
+/** The bytes behind a media source (in memory, OPFS or a signed URL). */
+export async function blobOf(spec: MediaSourceSpec, signal?: AbortSignal): Promise<Blob> {
   switch (spec.kind) {
     case "blob":
       return spec.blob;
@@ -52,7 +53,7 @@ export function mixToMono(channels: readonly Float32Array[]): Float32Array {
 }
 
 /** Decode `spec`'s audio, resampled to `sampleRate` and mixed to mono. */
-async function decodeMono(spec: MediaSourceSpec, sampleRate: number, signal?: AbortSignal): Promise<Float32Array> {
+export async function decodeMono(spec: MediaSourceSpec, sampleRate: number, signal?: AbortSignal): Promise<Float32Array> {
   if (typeof OfflineAudioContext === "undefined") throw new Error("this browser cannot decode audio");
   const blob = await blobOf(spec, signal);
   if (blob.size > MAX_ANALYZE_BYTES) throw new Error("the file is too large to analyze in the browser; use Zenvi desktop");

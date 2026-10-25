@@ -5,11 +5,14 @@
  * `_auto_orient_transition_keyframes`, `update_transition_data` (static-mask
  * keyframe rescale on trim), `Reverse_Transition_Triggered`,
  * `_set_transition_mask_defaults`; tool_handlers.py `add_transition_between_clips`
- * and `add_transition_to_clip`; main_window.py `actionRemoveTransition_trigger`.
+ * and `add_transition_to_clip`; main_window.py `actionRemoveTransition_trigger`;
+ * develop 1f80cb3d0 src/classes/transition_ops.py (the rules the timeline and
+ * the transition editor tools share: `direction_of`, `rescale_curves`,
+ * `reverse_transition_data`, `set_mask_defaults`, `new_mask_transition`).
  */
 
 import type { Transaction } from "../history/document.js";
-import type { Clip, Keyframe, ReaderInfo, Transition } from "../model/types.js";
+import type { Clip, Fraction, Keyframe, ReaderInfo, Transition } from "../model/types.js";
 import { createTransition, transitionKeyframes } from "../model/defaults.js";
 import { findLayer, findTransition } from "../model/query.js";
 import { isSingleImageMedia } from "../model/media.js";
@@ -18,7 +21,7 @@ import { TRANSITION_PROPERTIES } from "../model/properties.js";
 import { reverseKeyframe, scaleKeyframe } from "../keyframe/edit.js";
 import { clipFrameAtTime } from "../timeline/windows.js";
 import { OpError, invalid, requireClip, requireFinite, requireNonNegative, requireTransition, requireUnlocked } from "./errors.js";
-import { ensureLayer, fpsOf, frameSeconds, ids, patchClip, patchTransition, rateOf, snapSeconds } from "./internal.js";
+import { changedFields, ensureLayer, fpsOf, frameSeconds, ids, isRecord, patchClip, patchTransition, rateOf, snapSeconds } from "./internal.js";
 import { writeKeyframeValue } from "./values.js";
 import { maskReader, resolveTransitionMask, type TransitionMask } from "./transition-masks.js";
 import type { Edge, KeyframeAt, PropertyValue } from "./types.js";
@@ -155,15 +158,51 @@ function toolTransition(
   duration: number,
   direction: TransitionDirection,
 ): Transition {
+  return addMaskTransition(tx, { layer, position, duration, reader: maskReader(mask.path, mask.width, mask.height), title: mask.title, direction });
+}
+
+export interface AddMaskTransitionInput {
+  /** Track number (unlocked). */
+  layer: number;
+  /** Timeline start, seconds (snapped to the frame grid). */
+  position: number;
+  /** Length, seconds (> 0, snapped). */
+  duration: number;
+  /** The mask's reader JSON (`maskReader(path)` for a catalog mask, a project file's record for a user mask). */
+  reader: ReaderInfo;
+  /** Display title. Default "Transition". */
+  title?: string;
+  /** Default `in` (brightness 1 → -1). */
+  direction?: TransitionDirection;
+  /** Crossfade the audio of the two clips too (`fade_audio_hint`). */
+  fadeAudio?: boolean;
+}
+
+/**
+ * Insert a Mask transition the way the desktop's tools build one
+ * (transition_ops.new_mask_transition): the default brightness and contrast
+ * keyframes over its length, the given mask reader, no `resource`, and
+ * `fade_audio_hint` only when the audio crossfades too.
+ */
+export function addMaskTransition(tx: Transaction, input: AddMaskTransitionInput): Transition {
+  const project = tx.project;
+  if (typeof input !== "object" || input === null) throw invalid("addMaskTransition needs an input object.");
+  if (!Number.isInteger(input.layer) || input.layer <= 0) throw invalid("layer must be a positive track number.");
+  requireUnlocked(project, input.layer);
+  if (!isRecord(input.reader)) throw invalid("reader must be the mask's reader JSON.");
+  const position = snapSeconds(requireNonNegative(input.position, "position"), project);
+  const duration = snapSeconds(requireDuration(input.duration), project);
+  if (!(duration > 0)) throw invalid("duration is shorter than one frame.");
   const transition = createTransition({
-    id: ids(tx.project)(),
-    layer,
+    id: ids(project)(),
+    layer: input.layer,
     position,
     duration,
-    reader: maskReader(mask.path, mask.width, mask.height),
-    fps: fpsOf(tx.project),
-    direction,
-    title: mask.title,
+    reader: input.reader,
+    fps: fpsOf(project),
+    direction: input.direction ?? "in",
+    title: input.title ?? "Transition",
+    fadeAudio: input.fadeAudio ?? false,
   });
   tx.insert(["effects"], transition);
   return requireTransition(tx.project, transition.id);
@@ -245,9 +284,18 @@ export function moveTransition(tx: Transaction, transitionId: string, to: MoveTr
   return patchTransition(tx, transitionId, patch);
 }
 
-function usesStaticMask(transition: Transition): boolean {
-  const reader = (transition.mask_reader as unknown) ?? transition.reader;
-  const data = typeof reader === "object" && reader !== null ? (reader as Record<string, unknown>) : {};
+/** transition_ops.mask_reader: the mask's reader JSON (`mask_reader`, else `reader`), {} when it has none. */
+export function transitionMaskReader(transition: Record<string, unknown>): Record<string, unknown> {
+  for (const key of ["mask_reader", "reader"]) {
+    const reader = transition[key];
+    if (isRecord(reader)) return reader;
+  }
+  return {};
+}
+
+/** transition_ops.uses_static_mask: the mask is one still image (its curves follow the transition's length). */
+export function usesStaticMask(transition: Record<string, unknown>): boolean {
+  const data = transitionMaskReader(transition);
   if ("has_single_image" in data) return Boolean(data.has_single_image);
   return isSingleImageMedia(data);
 }
@@ -311,11 +359,7 @@ export function trimTransition(tx: Transaction, transitionId: string, edge: Edge
 export function reverseTransition(tx: Transaction, transitionId: string): Transition {
   const transition = requireTransition(tx.project, transitionId);
   requireUnlocked(tx.project, transition.layer);
-  const patch: Record<string, unknown> = {};
-  for (const prop of ["brightness", "contrast"] as const) {
-    if (transition[prop]) patch[prop] = reverseKeyframe(transition[prop]);
-  }
-  return patchTransition(tx, transitionId, patch);
+  return patchTransition(tx, transitionId, reversedTransitionCurves(transition));
 }
 
 /** Remove a transition. Returns its id. */
@@ -324,6 +368,113 @@ export function removeTransition(tx: Transaction, transitionId: string): string 
   requireUnlocked(tx.project, transition.layer);
   tx.delete(["effects", { id: transitionId }]);
   return transitionId;
+}
+
+export type CurveDirection = "default" | "reversed";
+
+/**
+ * Which way a transition's progress curve runs (transition_ops.direction_of):
+ * "default" when brightness falls (the lower clip wipes away), "reversed"
+ * when it rises, null when it has fewer than two points or ends where it
+ * starts.
+ */
+export function transitionDirection(transition: Record<string, unknown>): CurveDirection | null {
+  const brightness = transition.brightness;
+  const points = isRecord(brightness) && Array.isArray(brightness.Points) ? brightness.Points : [];
+  const keyed: [number, number][] = [];
+  for (const point of points) {
+    const co = isRecord(point) && isRecord(point.co) ? point.co : null;
+    if (!co) continue;
+    const x = Number(co.X);
+    const y = Number(co.Y);
+    if (co.X === null || co.Y === null || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+    keyed.push([x, y]);
+  }
+  if (keyed.length < 2) return null;
+  keyed.sort((a, b) => a[0] - b[0]);
+  const first = keyed[0]![1];
+  const last = keyed[keyed.length - 1]![1];
+  return first > last ? "default" : first < last ? "reversed" : null;
+}
+
+/** transition_ops.frames_for: whole frames in `seconds`, rounded half up like frame_time (zenvi-core #181). */
+function framesFor(seconds: number, rate: number): number {
+  return Math.max(0, Math.floor(Math.max(0, Number(seconds) || 0) * rate + 0.5));
+}
+
+type Curves = Partial<Pick<Transition, "brightness" | "contrast">>;
+
+/**
+ * A static mask's brightness and contrast fitted to a new length
+ * (transition_ops.rescale_curves, what a drag-trim does): X values scaled by
+ * new/old frames with the desktop rule, then the first point pinned at frame
+ * 1 and the last at the new end. Animated masks keep their curves ({}).
+ */
+export function rescaledTransitionCurves(transition: Record<string, unknown>, oldDuration: number, newDuration: number, fps: Fraction): Curves {
+  if (!usesStaticMask(transition)) return {};
+  const rate = fps.num / fps.den;
+  const oldFrames = framesFor(oldDuration, rate);
+  const newFrames = framesFor(newDuration, rate);
+  const out: Curves = {};
+  for (const prop of ["brightness", "contrast"] as const) {
+    const kf = transition[prop];
+    if (isRecord(kf)) out[prop] = rescaleTransitionKeyframes(kf as unknown as Keyframe, oldFrames, newFrames);
+  }
+  return out;
+}
+
+/** The curves mirrored in time (transition_ops.reverse_transition_data, Transition ▸ Reverse). */
+export function reversedTransitionCurves(transition: Record<string, unknown>): Curves {
+  const out: Curves = {};
+  for (const prop of ["brightness", "contrast"] as const) {
+    const kf = transition[prop];
+    if (isRecord(kf)) out[prop] = reverseKeyframe(kf as unknown as Keyframe);
+  }
+  return out;
+}
+
+/**
+ * Timing and curves for a transition whose mask changed between a still and
+ * an animated one (transition_ops.set_mask_defaults): a still starts at 0
+ * with brightness 1 → -1 and contrast 3; an animated mask keeps its range
+ * with flat 0 curves (the video drives the wipe).
+ */
+export function maskDefaultCurves(
+  transition: Record<string, unknown>,
+  fps: Fraction,
+): { start: number; end: number; duration: number; brightness: Keyframe; contrast: Keyframe } {
+  const start = Number(transition.start) || 0;
+  let end = Number(transition.end) || start;
+  if (end < start) end = start;
+  const duration = Math.max(0, end - start);
+  if (usesStaticMask(transition)) {
+    return { start: 0, end: duration, duration, ...transitionKeyframes(duration, fps, 1.0, -1.0, 3.0) };
+  }
+  return { start, end, duration, ...transitionKeyframes(duration, fps, 0.0, 0.0, 0.0) };
+}
+
+/**
+ * Save a transition's new data as a whole (what the desktop's
+ * `Transition.save` of an edited dict records): changed keys are written,
+ * keys `next` no longer has are deleted. Refused on locked tracks.
+ */
+export function writeTransition(tx: Transaction, transitionId: string, next: Record<string, unknown>): Transition {
+  const project = tx.project;
+  const current = requireTransition(project, transitionId);
+  if (!isRecord(next)) throw invalid("writeTransition needs the transition's data.");
+  if (next.id !== transitionId) throw invalid("A transition's id cannot change.");
+  requireUnlocked(project, current.layer);
+  const layer = Number(next.layer);
+  if (layer !== current.layer) {
+    if (!findLayer(project, layer)) throw new OpError("not_found", `No track with number ${String(next.layer)}.`, { layer: next.layer });
+    requireUnlocked(project, layer);
+  }
+  const changed = changedFields(current as Record<string, unknown>, next);
+  if (Object.keys(changed).length > 0) tx.update(["effects", { id: transitionId }], changed);
+  for (const key of Object.keys(current)) {
+    if (!(key in next)) tx.delete(["effects", { id: transitionId }, key]);
+  }
+  return requireTransition(tx.project, transitionId);
 }
 
 const TRANSITION_KEYFRAMES = new Set(["brightness", "contrast"]);

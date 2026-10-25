@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Interpolation, type Keyframe } from "../model/types.js";
 import { findClip } from "../model/query.js";
 import { addClip } from "./clips.js";
-import { addEffect, moveEffect, removeEffect, setEffectProperty } from "./effects.js";
+import { addEffect, assignNewEffectIds, mergeEffectsByClass, moveEffect, removeEffect, setClipEffects, setEffectProperty, updateEffectValues } from "./effects.js";
 import { setTrackLocked } from "./tracks.js";
 import { expectRefused, expectUndoRedo, makeDoc } from "./testkit.js";
 
@@ -104,5 +104,58 @@ describe("setEffectProperty / removeEffect / moveEffect", () => {
       ["B", 1],
       ["A", 0],
     ]);
+  });
+});
+
+describe("setClipEffects / updateEffectValues", () => {
+  it("replace the effect list in one update, and merge values into one effect", () => {
+    const doc = setup();
+    doc.transaction("blur", (tx) => addEffect(tx, "CLIP", "Blur", {}, { id: "B1" }));
+    const before = doc.project;
+    const negate = { ...effects(doc)[0]!, id: "N1", class_name: "Negate", type: "Negate" };
+    doc.transaction("list", (tx) => setClipEffects(tx, "CLIP", [negate, effects(doc)[0]!]));
+    expect(effects(doc).map((e) => e.id)).toEqual(["N1", "B1"]);
+    expectUndoRedo(doc, before);
+    const sigma = { Points: [{ co: { X: 1, Y: 9 }, interpolation: 1 }] };
+    const merged = doc.project;
+    doc.transaction("sigma", (tx) => updateEffectValues(tx, "B1", { sigma, horizontal_radius: effects(doc)[1]!.horizontal_radius }));
+    expect(effects(doc)[1]!.sigma).toEqual(sigma);
+    expectUndoRedo(doc, merged);
+    const labels = doc.undoLabels.length;
+    doc.transaction("same", (tx) => updateEffectValues(tx, "B1", { sigma }));
+    expect(doc.undoLabels).toHaveLength(labels);
+  });
+
+  it("refuse locked tracks, unknown effects and identity keys", () => {
+    const doc = setup();
+    doc.transaction("blur", (tx) => addEffect(tx, "CLIP", "Blur", {}, { id: "B1" }));
+    expectRefused(doc, "not_found", (tx) => updateEffectValues(tx, "NOPE", { sigma: 1 }));
+    expectRefused(doc, "invalid_argument", (tx) => updateEffectValues(tx, "B1", { id: "X" }));
+    doc.transaction("lock", (tx) => setTrackLocked(tx, 1_000_000, true));
+    expectRefused(doc, "locked", (tx) => updateEffectValues(tx, "B1", { sigma: 1 }));
+    expectRefused(doc, "locked", (tx) => setClipEffects(tx, "CLIP", []));
+  });
+});
+
+describe("mergeEffectsByClass / assignNewEffectIds", () => {
+  it("pastes like the editor: same class overwritten in place, others appended, every copy a new id", () => {
+    const ids = ["N1", "N2"];
+    const existing = [
+      { id: "A", class_name: "Blur", sigma: 1 },
+      { id: "B", class_name: "Negate" },
+    ] as unknown as Parameters<typeof mergeEffectsByClass>[0];
+    const copied = [
+      { id: "S1", class_name: "Blur", sigma: 9 },
+      { id: "S2", class_name: "Hue" },
+    ] as unknown as Parameters<typeof mergeEffectsByClass>[1];
+    expect(mergeEffectsByClass(existing, copied, () => ids.shift()!)).toEqual([
+      { id: "N1", class_name: "Blur", sigma: 9 },
+      { id: "B", class_name: "Negate" },
+      { id: "N2", class_name: "Hue" },
+    ]);
+    expect(existing[0]!.id).toBe("A");
+    const fresh = [...structuredClone(copied)];
+    assignNewEffectIds(fresh, () => "Z");
+    expect(fresh.map((e) => e.id)).toEqual(["Z", "Z"]);
   });
 });

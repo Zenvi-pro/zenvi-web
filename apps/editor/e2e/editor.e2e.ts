@@ -125,6 +125,15 @@ test("new project → import → arrange → split → undo → play → export"
   await shot(page, "05f-title");
   await rail.getByRole("button", { name: "Project files" }).click();
 
+  // The one-shot reel dialog opens on the project's media (looked at, not run: its build has its own tests).
+  await page.getByRole("button", { name: "Make a reel" }).click();
+  const reelDialog = page.getByRole("dialog", { name: "Make a reel" });
+  await expect(reelDialog).toBeVisible();
+  await page.waitForTimeout(400);
+  await shot(page, "05g-reel-dialog");
+  await page.keyboard.press("Escape");
+  await expect(reelDialog).toBeHidden();
+
   // Export in the browser and receive the file.
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "Export video" });

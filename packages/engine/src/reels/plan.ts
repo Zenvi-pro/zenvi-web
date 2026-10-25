@@ -118,16 +118,15 @@ export function chooseMusicStart(music: MusicBeats, seconds: number): number {
 }
 
 /** Beat grid of the reel's timeline: the music's beats from `start`, extended at its tempo past the track's end. */
-function timelineGrid(input: PlanInput, seconds: number): { beats: number[]; downbeats: number[]; bpm: number; musicStart: number | null } {
-  const { music, style } = input;
+function timelineGrid(music: MusicBeats | null, fallbackBpm: number, frameRate: number | undefined, seconds: number): { beats: number[]; downbeats: number[]; bpm: number; musicStart: number | null } {
   if (!music || music.beats.length < 2 || !(music.bpm > 0)) {
-    const period = 60 / style.defaultBpm;
+    const period = 60 / fallbackBpm;
     const beats: number[] = [];
     for (let t = 0; t <= seconds + EPS; t += period) beats.push(round3(t));
-    return { beats, downbeats: beats.filter((_, i) => i % 4 === 0), bpm: style.defaultBpm, musicStart: null };
+    return { beats, downbeats: beats.filter((_, i) => i % 4 === 0), bpm: fallbackBpm, musicStart: null };
   }
   const chosen = chooseMusicStart(music, seconds);
-  const start = input.frameRate && input.frameRate > 0 ? Math.round(chosen * input.frameRate) / input.frameRate : chosen;
+  const start = frameRate && frameRate > 0 ? Math.round(chosen * frameRate) / frameRate : chosen;
   const beats = music.beats.filter((t) => t >= start - 0.05).map((t) => round3(Math.max(0, t - start)));
   const period = 60 / music.bpm;
   while (beats.length < 2 || beats[beats.length - 1]! < seconds) beats.push(round3((beats[beats.length - 1] ?? 0) + period));
@@ -140,7 +139,7 @@ function timelineGrid(input: PlanInput, seconds: number): { beats: number[]; dow
 }
 
 /** Time of fractional beat `k` on the grid (beats are interpolated, extrapolated at the last gap). */
-function timeAtBeat(beats: readonly number[], k: number): number {
+export function timeAtBeat(beats: readonly number[], k: number): number {
   const i = Math.floor(k);
   if (i + 1 < beats.length) return beats[i]! + (k - i) * (beats[i + 1]! - beats[i]!);
   const last = beats.length - 1;
@@ -172,13 +171,39 @@ interface Slot {
   k1: number;
 }
 
-/** Plan a reel: music window, cut points, and the media and source window of every shot. */
-export function planReel(input: PlanInput): ReelPlan {
-  const { style, media } = input;
-  if (media.length === 0) throw new Error("A reel needs at least one video or image.");
-  const target = Math.max(2, input.seconds ?? style.defaultSeconds);
-  const grid = timelineGrid(input, target);
+/** Seconds on the frame grid of `frameRate` (to the millisecond without one). */
+export function onFrameGrid(seconds: number, frameRate?: number): number {
+  return frameRate && frameRate > 0 ? Math.round(seconds * frameRate) / frameRate : round3(seconds);
+}
 
+/** The timeline's beat grid and the reel's length, before any shot is planned. */
+export interface ReelGrid {
+  /** Length, seconds: a downbeat (or beat) of the grid, not yet on the frame grid. */
+  duration: number;
+  /** The length in beats (fractional when it is not on a beat). */
+  beatsInReel: number;
+  bpm: number;
+  /** Where the music starts in its file, seconds, or null without music. */
+  musicStart: number | null;
+  /** Beat and downbeat times on the timeline (they run past `duration`). */
+  beats: number[];
+  downbeats: number[];
+}
+
+export interface ReelGridInput {
+  music: MusicBeats | null;
+  /** Target length, seconds: the reel ends on the last downbeat before it (or the last beat). */
+  seconds: number;
+  /** Tempo of the grid when there is no music. */
+  fallbackBpm: number;
+  /** See `PlanInput.frameRate`. */
+  frameRate?: number;
+}
+
+/** The music window and the beat grid of a reel, and where it ends (never past the music). */
+export function planReelGrid(input: ReelGridInput): ReelGrid {
+  const target = input.seconds;
+  const grid = timelineGrid(input.music, input.fallbackBpm, input.frameRate, target);
   // End on the last downbeat in the target (or the last beat), never past the music.
   const musicLeft = input.music && grid.musicStart !== null ? input.music.duration - grid.musicStart : Infinity;
   const limit = Math.min(target, musicLeft) + EPS;
@@ -187,11 +212,21 @@ export function planReel(input: PlanInput): ReelPlan {
   const duration = round3(downEnd ?? beatEnd ?? Math.min(target, musicLeft));
   const totalBeats = grid.beats.findIndex((t) => Math.abs(t - duration) < 1e-3);
   const beatsInReel = totalBeats >= 0 ? totalBeats : (duration / (60 / grid.bpm));
+  return { duration, beatsInReel, bpm: grid.bpm, musicStart: grid.musicStart, beats: grid.beats, downbeats: grid.downbeats };
+}
+
+/** Plan a reel: music window, cut points, and the media and source window of every shot. */
+export function planReel(input: PlanInput): ReelPlan {
+  const { style, media } = input;
+  if (media.length === 0) throw new Error("A reel needs at least one video or image.");
+  const target = Math.max(2, input.seconds ?? style.defaultSeconds);
+  const grid = planReelGrid({ music: input.music, seconds: target, fallbackBpm: style.defaultBpm, frameRate: input.frameRate });
+  const { duration, beatsInReel } = grid;
 
   // Cuts sit on the frame grid, so one shot ends exactly where the next begins
   // (rounding each clip's position and length on its own left one-frame gaps).
   const fps = input.frameRate && input.frameRate > 0 ? input.frameRate : null;
-  const onFrame = (t: number) => (fps ? Math.round(t * fps) / fps : round3(t));
+  const onFrame = (t: number) => onFrameGrid(t, fps ?? undefined);
   const cuts = cutBeats(style, beatsInReel);
   const slots: Slot[] = [];
   for (let i = 0; i + 1 < cuts.length; i += 1) {

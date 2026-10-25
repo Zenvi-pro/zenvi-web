@@ -1,11 +1,15 @@
 /**
  * Clip presets from the desktop clip context menu: Fade, Rotate, Layout,
- * Volume, Speed (Time), Motion (Animate: in/out, emphasis, camera, credits)
- * and Layout ▸ Show All.
+ * Crop, No Transform, Volume, Speed (Time), Motion (Animate: in/out,
+ * emphasis, camera, credits) and Layout ▸ Show All, plus the agent tools'
+ * mirror (Flip).
  *
  * Ported from zenvi-core src/windows/views/timeline.py (Fade_Triggered,
- * Rotate_Triggered, Layout_Triggered, show_all_clips, Volume_Triggered,
- * Time_Triggered, Animate_Triggered), src/windows/views/retime.py,
+ * Rotate_Triggered, Layout_Triggered, Crop_Triggered, No_Transform_Triggered,
+ * show_all_clips, Volume_Triggered, Time_Triggered, Animate_Triggered; fade
+ * and motion lengths, the combined in-and-out fade and the wipe-out masks as
+ * of develop 1f80cb3d0), editor_tools/clip_props_presets.py `_flip`,
+ * src/windows/views/retime.py,
  * src/windows/views/repeat.py (`reset_repeat`), src/animation_presets.py and
  * src/classes/camera_motion.py. Menu enums:
  * src/windows/views/timeline_backend/enums.py. Points built through
@@ -19,11 +23,12 @@ import { DEFAULT_IMAGE_LENGTH } from "../model/defaults.js";
 import { isSingleImageMedia } from "../model/media.js";
 import { pyRound } from "../model/rounding.js";
 import { evaluate, getLong } from "../keyframe/evaluate.js";
+import { curvePlateau } from "../keyframe/rules.js";
 import { openshotPoint, removeKeyframePointsInRange, setKeyframePoint } from "../keyframe/edit.js";
 import { createEffect } from "../effects/registry.js";
 import { invalid, requireFinite } from "./errors.js";
 import { fadeTargets, fpsOf, ids, isRecord, rateOf, replaceClip, requireEditableClip, withClampedTiming } from "./internal.js";
-import { retimeClip } from "./retime.js";
+import { retimeClip, timeCurveIsReversed } from "./retime.js";
 import { maskReader } from "./transition-masks.js";
 import { ANIMATION_PRESET_DATA, KEYFRAME_EASING } from "./animation-presets.data.js";
 import { cameraPanKeyframes, kenBurnsKeyframes, pushPullKeyframes, sourceDimensions, type CameraKeyframes, type PanDirection } from "./camera-motion.js";
@@ -62,6 +67,18 @@ export type VolumePreset = (typeof VOLUME_PRESETS)[number];
  */
 export const TIME_PRESETS = ["none", "forward", "backward", "reverse", "freeze", "freeze_zoom"] as const;
 export type TimePreset = (typeof TIME_PRESETS)[number];
+
+/** Transform ▸ Crop (Crop_Triggered): remove the Crop effect, or add one that keeps / resizes the picture. */
+export const CROP_PRESETS = ["none", "crop", "resize"] as const;
+export type CropPreset = (typeof CROP_PRESETS)[number];
+
+/** Transform ▸ No Transform (No_Transform_Triggered): no rotation, no crop, layout reset. */
+export const TRANSFORM_PRESETS = ["none"] as const;
+export type TransformPreset = (typeof TRANSFORM_PRESETS)[number];
+
+/** Mirror left-right (scale_x) or top-bottom (scale_y) by negating every point (agent tools; not in the menu). */
+export const FLIP_PRESETS = ["horizontal", "vertical"] as const;
+export type FlipPreset = (typeof FLIP_PRESETS)[number];
 
 /** Desktop MenuAnimate, lower-cased (`SLIDE_IN_LEFT` → `slide_in_left`). */
 export const ANIMATE_PRESETS = [
@@ -105,7 +122,10 @@ export type ClipPresetId =
   | `layout.${LayoutPreset}`
   | `volume.${VolumePreset}`
   | `time.${TimePreset}`
-  | `animate.${AnimatePreset}`;
+  | `animate.${AnimatePreset}`
+  | `crop.${CropPreset}`
+  | `transform.${TransformPreset}`
+  | `flip.${FlipPreset}`;
 
 /** Every preset id, for tool schemas and menus. */
 export const CLIP_PRESET_IDS: readonly ClipPresetId[] = [
@@ -115,6 +135,9 @@ export const CLIP_PRESET_IDS: readonly ClipPresetId[] = [
   ...VOLUME_PRESETS.map((p) => `volume.${p}` as const),
   ...TIME_PRESETS.map((p) => `time.${p}` as const),
   ...ANIMATE_PRESETS.map((p) => `animate.${p}` as const),
+  ...CROP_PRESETS.map((p) => `crop.${p}` as const),
+  ...TRANSFORM_PRESETS.map((p) => `transform.${p}` as const),
+  ...FLIP_PRESETS.map((p) => `flip.${p}` as const),
 ];
 
 export function isClipPresetId(value: string): value is ClipPresetId {
@@ -138,10 +161,17 @@ export interface ClipPresetOptions {
   seconds?: number;
   /**
    * Timeline seconds of the playhead: the frame `time.freeze*` holds and
-   * where emphasis animations start (desktop: the preview's current frame).
-   * Default the clip start.
+   * where emphasis animations start (desktop: the preview's current frame;
+   * the agent tools' `at_seconds`). Default the clip start.
    */
   playhead?: number;
+  /**
+   * Fade and volume-fade length in seconds for Fast and Slow alike (agent
+   * tools' `duration_seconds`). Default: Fast 1 s, Slow 3 s.
+   */
+  fadeSeconds?: number;
+  /** Length in seconds of an In / Out / Emphasis motion (agent tools). Default 1 s. */
+  zoneSeconds?: number;
 }
 
 const point = (frame: number, value: number, interpolation: Interpolation = Interpolation.BEZIER): KeyframePoint =>
@@ -159,35 +189,76 @@ function spans(clip: Clip, rate: number) {
 // Fade / Volume
 // ---------------------------------------------------------------------------
 
-type FadeAction = "none" | "in_fast" | "in_slow" | "out_fast" | "out_slow";
+type FadeAction = "none" | "in_fast" | "in_slow" | "out_fast" | "out_slow" | "in_out_fast" | "in_out_slow";
+
+/** Fade lengths: Fast and Slow in seconds, and the zone (frames) a new fade clears of old fade points. */
+interface FadeLengths {
+  fast: number;
+  slow: number;
+  zone: number;
+}
+
+/**
+ * Fade_Triggered / Volume_Triggered `fade_seconds`: an override replaces
+ * both lengths, and existing fades inside max(3 s, override) are replaced,
+ * so Fast replaces Slow and vice versa.
+ */
+function fadeLengths(opts: ClipPresetOptions, rate: number): FadeLengths {
+  const seconds = opts.fadeSeconds !== undefined && opts.fadeSeconds > 0 ? requireFinite(opts.fadeSeconds, "fadeSeconds") : undefined;
+  return { fast: seconds ?? 1.0, slow: seconds ?? 3.0, zone: Math.max(3.0, seconds ?? 0) * rate };
+}
 
 /** Fade_Triggered / Volume_Triggered for one keyframe and one action. */
-function fadeKeyframe(kf: Keyframe | undefined, action: FadeAction, range: PresetRange, s: number, e: number, rate: number): Keyframe {
+function fadeKeyframe(kf: Keyframe | undefined, action: FadeAction, range: PresetRange, s: number, e: number, rate: number, lengths: FadeLengths): Keyframe {
   if (action === "none") return single(1.0);
-  const length = action.endsWith("_fast") ? 1.0 : 3.0;
+  if (action === "in_out_fast" || action === "in_out_slow") return inOutKeyframe(kf, action, s, e, rate, lengths);
+  const length = action.endsWith("_fast") ? lengths.fast : lengths.slow;
   let startAnimation = s;
   let endAnimation = e;
   if (range === "start") endAnimation = Math.min(s + length * rate, e);
   else if (range === "end") startAnimation = Math.max(1.0, e - length * rate);
   if (action.startsWith("in")) {
-    const zoneEnd = Math.min(s + 3.0 * rate, e);
+    // Read the settled value at the zone boundary before clearing: any previous fade has ended there.
+    const zoneEnd = Math.min(s + lengths.zone, e);
     const target = evaluate(kf, Math.trunc(pyRound(zoneEnd)), 1.0);
     const cleared = removeKeyframePointsInRange(kf, s, zoneEnd);
     return setKeyframePoint(setKeyframePoint(cleared, openshotPoint(startAnimation, 0.0)), openshotPoint(endAnimation, target));
   }
-  const zoneStart = Math.max(1.0, e - 3.0 * rate);
+  const zoneStart = Math.max(1.0, e - lengths.zone);
   const source = evaluate(kf, Math.trunc(pyRound(zoneStart)), 1.0);
   const cleared = removeKeyframePointsInRange(kf, zoneStart, e);
   return setKeyframePoint(setKeyframePoint(cleared, openshotPoint(startAnimation, source)), openshotPoint(endAnimation, 0.0));
 }
 
-/** Expand a fade preset into the desktop's (action, range) steps (in-and-out runs in then out). */
+/**
+ * Fade in and out (Entire Clip): both cleanup zones are cleared before
+ * either fade is added, so on a short clip the fade-out's cleanup cannot
+ * delete the fade-in (OpenShot 0b5db6493). Each fade takes at most a third
+ * of the clip, and both aim for the level the clip otherwise plays at
+ * (`curvePlateau`), so re-applying Fast over Slow does not leave it dim.
+ */
+function inOutKeyframe(kf: Keyframe | undefined, action: "in_out_fast" | "in_out_slow", s: number, e: number, rate: number, lengths: FadeLengths): Keyframe {
+  const seconds = action === "in_out_fast" ? lengths.fast : lengths.slow;
+  const fadeFrames = Math.min(seconds * rate, Math.max(0, e - s) / 3.0);
+  const level = curvePlateau(kf, s, e, 1.0);
+  let next = removeKeyframePointsInRange(kf, s, Math.min(s + lengths.zone, e));
+  next = removeKeyframePointsInRange(next, Math.max(s, e - lengths.zone), e);
+  for (const [x, y] of [
+    [s, 0.0],
+    [s + fadeFrames, level],
+    [e - fadeFrames, level],
+    [e, 0.0],
+  ] as const) {
+    next = setKeyframePoint(next, openshotPoint(x, y));
+  }
+  return next;
+}
+
+/** A fade preset as the desktop's (action, range) step; in-and-out only covers the entire clip. */
 function fadeSteps(preset: string, range: PresetRange | undefined): [FadeAction, PresetRange][] {
   if (preset === "none") return [["none", range ?? "entire"]];
   if (preset === "in_out_fast" || preset === "in_out_slow") {
-    const speed = preset.endsWith("fast") ? "fast" : "slow";
-    if ((range ?? "entire") === "entire") return [[`in_${speed}`, "start"], [`out_${speed}`, "end"]];
-    return [];
+    return (range ?? "entire") === "entire" ? [[preset, "entire"]] : [];
   }
   const action = preset as FadeAction;
   return [[action, range ?? (action.startsWith("in") ? "start" : "end")]];
@@ -196,12 +267,13 @@ function fadeSteps(preset: string, range: PresetRange | undefined): [FadeAction,
 function applyFade(clip: Clip, preset: FadePreset, opts: ClipPresetOptions, rate: number, volumeOnly: boolean): Partial<Clip> {
   const { s, e } = spans(clip, rate);
   const steps = fadeSteps(preset, opts.range);
+  const lengths = fadeLengths(opts, rate);
   const targets = volumeOnly ? { alpha: false, volume: true } : fadeTargets(clip);
   let alpha = clip.alpha;
   let volume = clip.volume;
   for (const [action, range] of steps) {
-    if (targets.alpha) alpha = fadeKeyframe(alpha, action, range, s, e, rate);
-    if (targets.volume) volume = fadeKeyframe(volume, action, range, s, e, rate);
+    if (targets.alpha) alpha = fadeKeyframe(alpha, action, range, s, e, rate, lengths);
+    if (targets.volume) volume = fadeKeyframe(volume, action, range, s, e, rate, lengths);
   }
   const patch: Partial<Clip> = {};
   if (targets.alpha) patch.alpha = alpha;
@@ -244,16 +316,50 @@ function applyLayout(preset: LayoutPreset): Partial<Clip> {
   };
 }
 
+/**
+ * Crop_Triggered: `none` removes the clip's Crop effect; `crop` / `resize`
+ * add one (or reuse it) with `resize` off / on. Its margins are set with the
+ * effect tools.
+ */
+function applyCrop(clip: Clip, mode: CropPreset, nextId: () => string): Clip {
+  const effects = Array.isArray(clip.effects) ? [...clip.effects] : [];
+  const index = effects.findIndex((fx) => isRecord(fx) && fx.class_name === "Crop");
+  if (mode === "none") {
+    if (index < 0) return clip;
+    effects.splice(index, 1);
+    return { ...clip, effects };
+  }
+  const crop = (index >= 0 ? { ...effects[index]! } : createEffect("Crop", {}, { id: nextId() })) as Effect & Record<string, unknown>;
+  crop.resize = mode === "resize";
+  if (index >= 0) effects[index] = crop;
+  else effects.push(crop);
+  return { ...clip, effects };
+}
+
+/** `_flip`: negate every point of scale_x or scale_y (a zoom animation stays, mirrored). */
+function applyFlip(clip: Clip, key: "scale_x" | "scale_y"): Clip {
+  const curve = isRecord(clip[key]) ? (structuredClone(clip[key]) as Keyframe) : { Points: [] };
+  for (const p of Array.isArray(curve.Points) ? curve.Points : []) {
+    if (isRecord(p) && isRecord(p.co)) p.co.Y = -Number(p.co.Y ?? 0);
+  }
+  return { ...clip, [key]: curve };
+}
+
 // ---------------------------------------------------------------------------
 // Time
 // ---------------------------------------------------------------------------
 
-/** repeat.py `reset_repeat`: restore what a Repeat preset cached on the clip. */
+/**
+ * repeat.py `reset_repeat`: restore what a Repeat preset cached on the clip.
+ * A cache whose in/out the clip no longer has (left behind on the desktop by
+ * an undo or a Reset, `repeatIsActive`) is dropped without restoring it.
+ */
 function resetRepeat(clip: Clip): Clip {
+  if (!("repeat_cache" in clip)) return clip;
   const cache = clip.repeat_cache;
-  if (!isRecord(cache)) return clip;
   const next: Record<string, unknown> = { ...clip };
   delete next.repeat_cache;
+  if (!isRecord(cache) || !repeatIsActive(clip)) return next as Clip;
   next.start = cache.start ?? clip.start;
   next.end = cache.end ?? clip.end;
   next.duration = cache.duration ?? clip.duration;
@@ -263,10 +369,12 @@ function resetRepeat(clip: Clip): Clip {
   return next as Clip;
 }
 
-function applyTime(tx: Transaction, clip: Clip, preset: TimePreset, opts: ClipPresetOptions): Clip {
+function applyTime(tx: Transaction, clip: Clip, requested: TimePreset, opts: ClipPresetOptions): Clip {
   const project = tx.project;
   const fps = fpsOf(project);
   const rate = rateOf(project);
+  // Reverse is a toggle (develop Time_Triggered): reversing a reversed clip resets it.
+  const preset: TimePreset = requested === "reverse" && timeCurveIsReversed(clip.time) ? "none" : requested;
   if (preset === "freeze" || preset === "freeze_zoom") return freeze(clip, preset === "freeze_zoom", opts, rate);
   if (preset === "none") {
     const base = resetRepeat(clip);
@@ -354,7 +462,7 @@ const JSON_ANIM: Partial<Record<AnimatePreset, string>> = {
 const EMPHASIS = new Set<AnimatePreset>(["bounce", "flash", "pulse", "rubber_band", "shake_x", "shake_y", "swing", "tada", "wobble", "jello", "heart_beat"]);
 const IN_JSON = new Set<AnimatePreset>(["back_in_down", "back_in_left", "back_in_right", "back_in_up", "bounce_in", "bounce_in_down", "bounce_in_left", "bounce_in_right", "bounce_in_up"]);
 
-/** Wipe presets → common mask file (timeline.py `_WIPE_SVG`). */
+/** Wipe In presets → common mask file (timeline.py `_WIPE_SVG`). */
 const WIPE_SVG: Partial<Record<string, string>> = {
   circle_expand: "circle_in_to_out.svg",
   circle_shrink: "circle_out_to_in.svg",
@@ -363,6 +471,13 @@ const WIPE_SVG: Partial<Record<string, string>> = {
   right: "wipe_right_to_left.svg",
   top: "wipe_top_to_bottom.svg",
   bottom: "wipe_bottom_to_top.svg",
+};
+
+/** Wipe Out reverses the reveal, so an expanding hole needs the out-to-in mask (OpenShot ac9621a02). */
+const WIPE_OUT_SVG: Partial<Record<string, string>> = {
+  ...WIPE_SVG,
+  circle_expand: "circle_out_to_in.svg",
+  circle_shrink: "circle_in_to_out.svg",
 };
 
 const PROP_IDENTITY: Record<string, number> = {
@@ -375,13 +490,17 @@ function applyAnimate(tx: Transaction, original: Clip, preset: AnimatePreset, op
   const project = tx.project;
   const rate = rateOf(project);
   const { s, e } = spans(original, rate);
-  const zone = Math.max(1, pyRound(rate));
+  // One-second In / Out / Emphasis zones unless the caller gives a length (zone_seconds).
+  const zoneSeconds = opts.zoneSeconds !== undefined && opts.zoneSeconds > 0 ? requireFinite(opts.zoneSeconds, "zoneSeconds") : 1.0;
+  const zone = Math.max(1, pyRound(rate * zoneSeconds));
   const inEnd = Math.min(s + zone, e);
   const outStart = Math.max(s, e - zone);
   let emphStart = s;
   if (opts.playhead !== undefined) {
-    const playhead = requireFinite(opts.playhead, "playhead");
-    const clipPlayhead = pyRound((Number(original.start) + Math.max(0, playhead) - Number(original.position)) * rate) + 1;
+    // The playhead is a timeline frame; clip keyframes count the clip's own (source) frames.
+    const timelineFrame = pyRound(requireFinite(opts.playhead, "playhead") * rate) + 1;
+    const seconds = Math.max(0, (timelineFrame - 1) / rate);
+    const clipPlayhead = pyRound((Number(original.start) + seconds - Number(original.position)) * rate) + 1;
     if (s <= clipPlayhead && clipPlayhead <= e) emphStart = clipPlayhead;
   }
   const emphEnd = Math.min(emphStart + zone, e);
@@ -499,7 +618,7 @@ function applyAnimate(tx: Transaction, original: Clip, preset: AnimatePreset, op
     add("alpha", point(outStart, ba), point(e, 0.0));
   } else if (wipe) {
     const [, blur, dir, shape] = wipe;
-    const file = WIPE_SVG[shape!];
+    const file = (dir === "in" ? WIPE_SVG : WIPE_OUT_SVG)[shape!];
     if (file) {
       if (dir === "in") {
         if (blur) blurFx(s, 50.0, inEnd, 0.0);
@@ -601,6 +720,16 @@ export function applyClipPreset(
     case "layout":
       next = { ...clip, ...applyLayout(name as LayoutPreset) };
       break;
+    case "crop":
+      next = applyCrop(clip, name as CropPreset, ids(project));
+      break;
+    case "transform":
+      // No_Transform_Triggered: Rotate ▸ No Rotation, Crop ▸ No Crop, Layout ▸ Reset Layout.
+      next = applyCrop({ ...clip, rotation: single(ROTATIONS.none), ...applyLayout("none") }, "none", ids(project));
+      break;
+    case "flip":
+      next = applyFlip(clip, name === "horizontal" ? "scale_x" : "scale_y");
+      break;
     case "time":
       next = withClampedTiming(applyTime(tx, clip, name as TimePreset, opts) as unknown as Record<string, unknown>, project, clip) as unknown as Clip;
       break;
@@ -667,6 +796,46 @@ export interface RepeatOptions {
   delayFrames?: number;
   /** Speed change per pass, e.g. 0.25 = each pass 25 % faster. Default 0. */
   ramp?: number;
+}
+
+/**
+ * True while Speed ▸ Repeat is applied to a clip (zenvi-core develop
+ * timeline_ops.repeat_is_active). A `repeat_cache` alone is not enough: the
+ * desktop's undo and Reset can leave one behind, but a live repeat always
+ * moved the clip's in/out away from the cached ones.
+ */
+export function repeatIsActive(clip: Partial<Clip>): boolean {
+  const cache = clip.repeat_cache;
+  if (!isRecord(cache) || Object.keys(cache).length === 0) return false;
+  const cachedStart = Number(cache.start ?? 0);
+  const cachedEnd = Number(cache.end ?? 0);
+  const start = Number(clip.start ?? 0);
+  const end = Number(clip.end ?? 0);
+  if (![cachedStart, cachedEnd, start, end].every(Number.isFinite)) return true;
+  return Math.abs(cachedStart - start) > 1e-6 || Math.abs(cachedEnd - end) > 1e-6;
+}
+
+/** How a clip plays relative to its source (`effectiveSpeed`). */
+export interface ClipSpeed {
+  /** Speed factor (2 = twice as fast), or null while the clip is looped. */
+  speed: number | null;
+  direction: "forward" | "backward" | "looped";
+}
+
+/**
+ * A clip's speed and direction from its `time` curve
+ * (timeline_edit_time.effective_speed): the curve maps timeline frames X to
+ * source frames Y, both inclusive, so speed = (|Y1 - Y0| + 1) / (X1 - X0).
+ */
+export function effectiveSpeed(clip: Partial<Clip>): ClipSpeed {
+  if (repeatIsActive(clip)) return { speed: null, direction: "looped" };
+  const points = Array.isArray(clip.time?.Points) ? [...clip.time.Points] : [];
+  if (points.length < 2) return { speed: 1, direction: "forward" };
+  points.sort((a, b) => Number(a?.co?.X) - Number(b?.co?.X));
+  const [x0, y0] = [Number(points[0]!.co?.X), Number(points[0]!.co?.Y)];
+  const [x1, y1] = [Number(points[points.length - 1]!.co?.X), Number(points[points.length - 1]!.co?.Y)];
+  if (![x0, y0, x1, y1].every(Number.isFinite) || x1 <= x0) return { speed: 1, direction: "forward" };
+  return { speed: (Math.abs(y1 - y0) + 1) / (x1 - x0), direction: y1 < y0 ? "backward" : "forward" };
 }
 
 type Pt = { co: { X: number; Y: number }; interpolation: number; [key: string]: unknown };
@@ -775,7 +944,8 @@ export function repeatClip(tx: Transaction, clipId: string, opts: RepeatOptions)
     timeSpan = trimSpan;
   }
 
-  if (!("repeat_cache" in next)) {
+  // A cache left behind by an undo or a Reset (desktop projects) is stale: rebuild it.
+  if (!repeatIsActive(clip)) {
     const properties: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(clip)) {
       if (isRecord(value) && Array.isArray(value.Points) && value.Points.length > 1) properties[key] = structuredClone(value);

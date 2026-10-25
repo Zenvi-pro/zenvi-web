@@ -21,10 +21,13 @@ export { CompositePool, compositeThreads, compositeWorkerScript } from "./render
 export * from "./render/overlay.js";
 export * from "./render/render-frame.js";
 export * from "./audio/analyze.js";
+export * from "./audio/speech.js";
 export * from "./host/paths.js";
 export * from "./host/storage.js";
 export * from "./host/media.js";
 export * from "./host/backend.js";
+export * from "./host/web-video.js";
+export * from "./net/public-address.js";
 export * from "./host/node-host.js";
 export * from "./decode/audio.js";
 export * from "./svg/opentype.js";

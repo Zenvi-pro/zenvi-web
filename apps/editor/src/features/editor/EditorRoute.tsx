@@ -10,7 +10,7 @@ import { Button } from "@/ui/Button";
 import { ZenviMark } from "@/ui/Logo";
 import { importMedia } from "./actions/importMedia";
 import { EditorLayout } from "./layout/EditorLayout";
-import { bindRegistry, probe } from "./render";
+import { bindRegistry, probe, resolveBundledMedia } from "./render";
 import { SessionProvider } from "./session/context";
 import { EditorSession } from "./session/EditorSession";
 import { MediaLibrary } from "./session/media";
@@ -44,6 +44,7 @@ function newMediaLibrary(cloudMedia: CloudMediaEntry[] = []): MediaLibrary {
     probe,
     cloud: () => (useAuth.getState().status === "signed-in" ? cloudClient() : null),
     cloudMedia,
+    bundled: (file) => resolveBundledMedia(String(file.path ?? "")),
   });
   bindRegistry(media);
   return media;

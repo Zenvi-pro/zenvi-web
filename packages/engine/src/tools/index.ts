@@ -6,7 +6,6 @@ export * from "./json-schema.js";
 export { HIDDEN_PARAMS, normalizeArgs } from "./coerce.js";
 export {
   CONTRACT_REF,
-  SNAPSHOT_REF,
   CONTRACT_TOOL_NAMES,
   contractInputs,
   contractMeta,
@@ -14,6 +13,12 @@ export {
   type ContractToolMeta,
   type ContractToolName,
 } from "./schemas.gen.js";
+export {
+  DESKTOP_NAMES_ON_DIRECT_TOOLS,
+  PENDING_DESKTOP_ARGS,
+  PENDING_DESKTOP_TOOLS,
+  pendingArgumentMessage,
+} from "./pending.js";
 export {
   buildEditorSnapshot,
   timelineStateText,

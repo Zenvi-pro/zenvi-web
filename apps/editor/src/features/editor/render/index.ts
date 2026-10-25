@@ -2,7 +2,7 @@
  * The editor's only door to `@zenvi/render-web`: probing, the media registry,
  * the preview engine, thumbnails, waveforms, frames and export.
  */
-import type { ExportOptions, Project, ToolImage } from "@zenvi/engine";
+import { builtinLutForPath, type ExportOptions, type Project, type ToolImage } from "@zenvi/engine";
 import {
   createFrameHost,
   ExportError,
@@ -15,7 +15,7 @@ import {
   type ExportProgress,
 } from "@zenvi/render-web";
 import { browserSupport } from "@/lib/capabilities";
-import { resolveTransitionAsset } from "../catalog";
+import { resolveEmojiAsset, resolveTransitionAsset } from "../catalog";
 import type { MediaLibrary, MediaSourceSpec, ProbeFn } from "../session/media";
 import type { PreviewEngine } from "../session/playback";
 
@@ -25,14 +25,29 @@ export const probe: ProbeFn = (spec, options) => probeMedia(spec, { path: option
 const registries = new WeakMap<MediaLibrary, MediaRegistry>();
 let current: MediaRegistry | null = null;
 
-/** Where bundled assets live when a project refers to them by path. */
-function resolvePath(path: string): MediaSourceSpec | undefined {
+// The built-in colour LUTs (`@colors/<category>/<name>.cube`), bundled from the engine's assets.
+const lutFiles = import.meta.glob("../../../../../../packages/engine/assets/colors/*/*.cube", {
+  eager: true,
+  query: "?url",
+  import: "default",
+}) as Record<string, string>;
+const lutUrls = new Map(Object.entries(lutFiles).map(([file, url]) => [file.slice(file.indexOf("/assets/") + "/assets/".length), url]));
+
+/** Where bundled assets live when a project refers to them by path (transition masks, emoji, colour LUTs). */
+export function resolveBundledMedia(path: string): MediaSourceSpec | undefined {
   if (path.startsWith("@transitions/") || path.includes("/transitions/")) {
     const url = resolveTransitionAsset(path);
     if (url) return { kind: "url", url, name: path.split("/").pop() ?? path };
   }
+  const emoji = resolveEmojiAsset(path);
+  if (emoji) return { kind: "url", url: emoji, name: path.split("/").pop() ?? path };
+  const lut = builtinLutForPath(path);
+  const lutUrl = lut ? lutUrls.get(lut.assetPath) : undefined;
+  if (lut && lutUrl) return { kind: "url", url: lutUrl, name: `${lut.id.split("/").pop()}.cube` };
   return undefined;
 }
+
+const resolvePath = resolveBundledMedia;
 
 /** Create and attach the registry for a media library. */
 export function bindRegistry(media: MediaLibrary): void {

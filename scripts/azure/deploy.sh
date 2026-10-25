@@ -14,6 +14,7 @@ set -euo pipefail
 
 RG="${RG:-zenvi-rg}"
 APP="${APP:-zenvi-cloud}"
+RENDER_JOB="${RENDER_JOB:-zenvi-render}"
 REGISTRY="${REGISTRY:-zenviregistry}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(git -C "$HERE" rev-parse --show-toplevel)"
@@ -38,8 +39,14 @@ step "Building $REGISTRY.azurecr.io/zenvi-cloud:$TAG in ACR"
 az acr build -r "$REGISTRY" -t "zenvi-cloud:$TAG" -f packages/cloud/Dockerfile "$CTX"
 
 if az containerapp show -g "$RG" -n "$APP" -o none 2>/dev/null; then
-  step "Rolling $APP to zenvi-cloud:$TAG"
   ACR_SERVER="$(az acr show -n "$REGISTRY" --query loginServer -o tsv)"
+  # Render workers (render-jobs.sh) run the same image: move them first, so what the new service hands them they know.
+  if az containerapp job show -g "$RG" -n "$RENDER_JOB" -o none 2>/dev/null; then
+    step "Moving render job $RENDER_JOB to zenvi-cloud:$TAG"
+    az containerapp job update -g "$RG" -n "$RENDER_JOB" --image "$ACR_SERVER/zenvi-cloud:$TAG" \
+      --set-env-vars "ZENVI_CLOUD_VERSION=$TAG" -o none
+  fi
+  step "Rolling $APP to zenvi-cloud:$TAG"
   az containerapp update -g "$RG" -n "$APP" --image "$ACR_SERVER/zenvi-cloud:$TAG" \
     --set-env-vars "ZENVI_CLOUD_VERSION=$TAG" -o none
 else

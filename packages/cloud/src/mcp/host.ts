@@ -6,32 +6,43 @@
  *   media   probe project media (cached download) and media this call
  *           generated; import URLs (SSRF-guarded); writeGenerated stores bytes
  *           (title SVGs) as content-addressed project media;
- *   frames  preview frames through the cloud renderer;
+ *   frames  preview frames through the cloud renderer, and the fonts it
+ *           draws titles with (the title tools check a font against them);
  *   assets  the engine's bundled assets (title templates);
- *   audio   loudness envelopes of project media (remove_silence_tool);
+ *   audio   loudness envelopes and PCM of project media (remove_silence_tool,
+ *           beats); speech recognition through the backend as the connected
+ *           person (the speech tools), each media transcribed once per edit;
  *   storage readText of project media, writeText to a downloadable export
  *           (export_captions_tool). Cloud projects save themselves, so
  *           save/open are refused;
  *   backend api.zenvi.pro as the connected person (search, stock, catalog,
  *           TTS; auth/backend-session.ts). AI video is a cloud job, not this host.
+ *   exporter export_video_tool's renders as render jobs (`RenderService.startExport`):
+ *           the answer carries the render_id, get_render_status the download link.
  */
 
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { CloudMediaRef, HostCapability, Project, ToolHost } from "@zenvi/engine";
+import { TRANSCRIPTION_PATH, transcriptionHttpError, type CloudMediaRef, type HostCapability, type Project, type ToolHost } from "@zenvi/engine";
+import { ffmpegCanWrite } from "@zenvi/render-node";
 import { ApiError, tooLarge } from "../http/errors.js";
 import { withSuffix } from "../projects/files.js";
-import { displayName, fileSha256 } from "../projects/model.js";
+import { displayName, fileSha256, isBundledAsset } from "../projects/model.js";
+import { isRenderFormat } from "../render/options.js";
 import { filesByPath } from "../render/resolve.js";
 import { attachmentDisposition, cleanFileName, normalizeContentType } from "../services/media.js";
-import { exportPath } from "../services/paths.js";
+import { exportPath, mediaPath } from "../services/paths.js";
 import { sha256Hex } from "../util/crypto.js";
 import type { Services } from "../container.js";
 import type { McpCallContext } from "./types.js";
 
 const GENERATED_MAX_BYTES = 20 * 1024 * 1024;
 const TEXT_MAX_BYTES = 2 * 1024 * 1024;
+/** Saved frames and other binary exports (save_frame_image_tool). */
+const BYTES_MAX_BYTES = 64 * 1024 * 1024;
 const EXPORT_URL_SECONDS = 24 * 3600;
+/** File > Recent Projects holds the last 10 (project_data.add_to_recent_files). */
+const RECENT_PROJECTS = 10;
 
 export interface CloudHost {
   host: ToolHost;
@@ -47,6 +58,7 @@ export function cloudCapabilities(services: Services): Set<HostCapability> {
   if (services.assets) caps.add("assets");
   if (services.analyzeAudio) caps.add("audio");
   if (services.backendSessions.enabled) caps.add("backend");
+  if (services.renders.rendererAvailable) caps.add("exporter");
   return caps;
 }
 
@@ -114,6 +126,16 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
         generated.set(path, { file, cloud: { sha256, size: bytes.byteLength, name: fileName, content_type: type } });
         return path;
       },
+      // Missing = not uploaded to Zenvi Cloud (what GET /v1/projects/:id lists as missingMedia).
+      missing: async (files) => {
+        const hashes = [...new Set(files.map((f) => fileSha256(f)).filter((h): h is string => h !== undefined))];
+        const stored = new Set(hashes.length > 0 ? (await services.media.check(userId, hashes)).existing : []);
+        return files.map((f) => {
+          if (isBundledAsset(f) || generated.has(String(f.path))) return false;
+          const sha = fileSha256(f);
+          return sha === undefined || !stored.has(sha);
+        });
+      },
     };
     if (services.importer.available) {
       host.media.importUrl = (url, options) => services.importer.importUrl(userId, url, { filename: options?.filename, signal: options?.signal ?? ctx.signal });
@@ -135,6 +157,9 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
         return preview.image;
       },
     };
+    // The fonts the renderer draws titles with in this process (the image's fonts and the bundled Lato).
+    const fonts = services.fontFamilies;
+    if (fonts) host.frames.fontFamilies = () => fonts();
   }
 
   const assets = services.assets;
@@ -149,6 +174,33 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
     };
   }
 
+  const transcribeMedia = services.transcribeMedia;
+  if (host.audio && transcribeMedia && caps.has("backend")) {
+    host.audio.transcribe = async (path, options) => {
+      const file = filesByPath(project()).get(path);
+      const media = (file ? fileSha256(file) : undefined) ?? generated.get(path)?.cloud.sha256;
+      const signal = options?.signal ?? ctx.signal;
+      const run = async () =>
+        transcribeMedia(await localCopy(path), {
+          language: options?.language,
+          prompt: options?.prompt,
+          signal,
+          upload: async (piece, fields) => {
+            const form = new FormData();
+            form.append("file", new Blob([piece.bytes], { type: piece.contentType }), piece.fileName);
+            if (fields.language) form.append("language", fields.language);
+            if (fields.prompt) form.append("prompt", fields.prompt);
+            const answer = await services.backendSessions.send(userId, TRANSCRIPTION_PATH, { form, signal: fields.signal ?? signal });
+            if (answer.status < 200 || answer.status >= 300) throw transcriptionHttpError(answer.status, answer.body);
+            return answer.body;
+          },
+        });
+      // Without a content address the media cannot be told apart from another file at that path.
+      if (!media) return run();
+      return services.transcripts.get(`${userId}|${media}|${options?.language ?? ""}|${options?.prompt ?? ""}`, run);
+    };
+  }
+
   if (caps.has("backend")) {
     host.backend = {
       baseUrl: services.config.backendUrl,
@@ -156,9 +208,79 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
     };
   }
 
+  /** An export blob of this project and its download link (24 h). */
+  const exportLink = async (name: string, type: string): Promise<string> =>
+    services.blobs.signUrl(exportPath(userId, projectId, name), {
+      permission: "read",
+      expiresInSeconds: EXPORT_URL_SECONDS,
+      contentType: type,
+      contentDisposition: attachmentDisposition(name),
+    });
+
+  if (caps.has("exporter")) {
+    host.exporter = {
+      delivery: "job",
+      defaultName: async () => (await services.projects.get(userId, projectId)).meta.name,
+      // One file per render (no image sequences), with encoders the render image's ffmpeg has.
+      supports: async (format, videoCodec, audioCodec) => {
+        if (!isRenderFormat(format)) return false;
+        const encoders = await services.renders.encoders();
+        return encoders ? ffmpegCanWrite(format, videoCodec, audioCodec, encoders) : true;
+      },
+      export: async (_project, options) => {
+        const fileName = baseName(options.output ?? "") || "render";
+        const job = await services.renders.startExport(userId, projectId, { options, fileName });
+        return {
+          location: job.fileName,
+          job: {
+            id: job.renderId,
+            status: job.status,
+            followUp: `Call get_render_status with render_id "${job.renderId}" for the download link (a render takes about as long as the video).`,
+          },
+        };
+      },
+    };
+  }
+
   host.storage = {
     save: async () => {
       throw new ApiError(400, "unsupported", "Zenvi Cloud saves the project after every edit; there is no file to save it to.");
+    },
+    currentPath: () => projectId,
+    // The person's cloud projects, most recently edited first (list_projects).
+    recentProjects: async () =>
+      (await services.projects.list(userId)).slice(0, RECENT_PROJECTS).map((p) => ({
+        path: p.id,
+        name: p.name,
+        exists: true,
+        modifiedAt: Number.isFinite(Date.parse(p.updatedAt)) ? Date.parse(p.updatedAt) / 1000 : null,
+      })),
+    // A saved frame: an export of this project, answered with its download link.
+    writeBytes: async (path, bytes, contentType, options) => {
+      if (bytes.byteLength > BYTES_MAX_BYTES) throw tooLarge("The file is too large to export.");
+      const name = exportName(path, "export.bin");
+      const blobPath = exportPath(userId, projectId, name);
+      if (!options?.overwrite && (await services.blobs.head(blobPath))) {
+        throw Object.assign(new Error(`${name} already exists in this project's exports`), { code: "EEXIST", path: name });
+      }
+      await services.media.assertFits(userId, bytes.byteLength);
+      await services.blobs.write(blobPath, bytes, { contentType, contentDisposition: attachmentDisposition(name) });
+      services.media.invalidateUsage(userId);
+      return exportLink(name, contentType);
+    },
+    // A project file's media: a download link to its bytes in Zenvi Cloud, under the export's name.
+    exportMedia: async (file, name, _folder, render) => {
+      if (render) throw new ApiError(400, "unsupported", "a sub-clip or image sequence is rendered to MP4, which Zenvi Cloud does only with render_project");
+      const sha256 = fileSha256(file);
+      if (!sha256 || isBundledAsset(file)) throw new ApiError(400, "invalid_request", `"${displayName(file)}" is not uploaded to Zenvi Cloud`);
+      const type = normalizeContentType(typeof file.cloud?.content_type === "string" ? file.cloud.content_type : "") ?? "application/octet-stream";
+      const location = await services.blobs.signUrl(mediaPath(userId, sha256), {
+        permission: "read",
+        expiresInSeconds: EXPORT_URL_SECONDS,
+        contentType: type,
+        contentDisposition: attachmentDisposition(name),
+      });
+      return { location, folder: "Zenvi Cloud download links (valid 24 hours)", existed: false };
     },
     open: async () => {
       throw new ApiError(400, "unsupported", "Open cloud projects with open_project.");

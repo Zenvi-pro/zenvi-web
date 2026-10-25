@@ -5100,6 +5100,7 @@ var LAST_FRAME = "BeatSync.lastFrame";
 var beatSync = {
   type: "BeatSync",
   supported: true,
+  sequential: true,
   run(image, params, ctx) {
     const frame = ctx.frame;
     let width = Math.max(1, image.width);
@@ -6621,6 +6622,7 @@ function luma(r, g, b) {
 function sampleCurve2(lut, v) {
   return lut[Math.trunc(f328(v * 255 + 0.5))];
 }
+var MEMO_BITS = 16;
 var INV_ALPHA3 = (() => {
   const t = new Float32Array(256);
   for (let i = 1; i < 256; i += 1) t[i] = f328(255 / i);
@@ -6936,13 +6938,26 @@ var colorGrade = {
     const [hR, hG, hB] = useWheels ? wheelBias(record(wheels, "highlights")) : NO_BIAS;
     const minusTint = -tint2;
     const d = image.data;
+    const memoRgb = new Int32Array(1 << MEMO_BITS).fill(-1);
+    const memoOut = new Int32Array(1 << MEMO_BITS);
     for (let i = 0; i < d.length; i += 4) {
       const A = d[i + 3];
       if (A === 0) continue;
       let R;
       let G;
       let B;
+      let rgb = -1;
+      let slot = 0;
       if (A === 255) {
+        rgb = d[i] << 16 | d[i + 1] << 8 | d[i + 2];
+        slot = Math.imul(rgb, 2654435761) >>> 32 - MEMO_BITS;
+        if (memoRgb[slot] === rgb) {
+          const out = memoOut[slot];
+          d[i] = out >>> 16;
+          d[i + 1] = out >>> 8 & 255;
+          d[i + 2] = out & 255;
+          continue;
+        }
         R = f328(d[i] * INV_2553);
         G = f328(d[i + 1] * INV_2553);
         B = f328(d[i + 2] * INV_2553);
@@ -7017,9 +7032,14 @@ var colorGrade = {
       G = clamp012(fmaf3(origG, inverseMix, f328(G * mix)));
       B = clamp012(fmaf3(origB, inverseMix, f328(B * mix)));
       if (A === 255) {
-        d[i] = clampByte2(f328(R * 255));
-        d[i + 1] = clampByte2(f328(G * 255));
-        d[i + 2] = clampByte2(f328(B * 255));
+        const r8 = clampByte2(f328(R * 255));
+        const g8 = clampByte2(f328(G * 255));
+        const b8 = clampByte2(f328(B * 255));
+        d[i] = r8;
+        d[i + 1] = g8;
+        d[i + 2] = b8;
+        memoRgb[slot] = rgb;
+        memoOut[slot] = r8 << 16 | g8 << 8 | b8;
       } else {
         const ap = f328(A * INV_2553);
         d[i] = clampByte2(f328(f328(R * 255) * ap));
@@ -7192,6 +7212,7 @@ function resetHistory(h) {
 var denoiseImage = {
   type: "DenoiseImage",
   supported: true,
+  sequential: true,
   run(image, params, ctx) {
     const state2 = history(ctx);
     const strength = clamp013(f329(num(params, "strength", 0.78)));
@@ -7574,7 +7595,35 @@ var filmGrain = {
     }
     const scaleX = width > 0 ? f3212(refW / width) : 1;
     const scaleY = height > 0 ? f3212(refH / height) : 1;
-    const fineCache = new Float32Array(8);
+    if (width === 0 || height === 0) return;
+    const fineIxOf = new Int32Array(width);
+    const softIxOf = new Int32Array(width);
+    const softSxOf = new Float32Array(width);
+    const clumpIxOf = new Int32Array(width);
+    const clumpSxOf = new Float32Array(width);
+    for (let x = 0; x < width; x += 1) {
+      const refX = f3212(x * scaleX);
+      fineIxOf[x] = Math.trunc(f3212(refX * fineFrequency));
+      if (useSoft) {
+        const srx = f3212(refX * softFrequency);
+        softIxOf[x] = Math.trunc(srx);
+        softSxOf[x] = smooth(f3212(srx - softIxOf[x]));
+      }
+      if (useClump) {
+        const crx = f3212(refX * clumpFrequency);
+        clumpIxOf[x] = Math.trunc(crx);
+        clumpSxOf[x] = smooth(f3212(crx - clumpIxOf[x]));
+      }
+    }
+    const lastX = width - 1;
+    const fineNoise = new Float32Array((fineIxOf[lastX] + 1) * 8);
+    const fineStamp = new Int32Array(fineIxOf[lastX] + 1).fill(-1);
+    const softTop = new Float32Array((softIxOf[lastX] + 2) * 8);
+    const softBottom = new Float32Array((softIxOf[lastX] + 2) * 8);
+    const softStamp = new Int32Array(softIxOf[lastX] + 2).fill(-1);
+    const clumpTop = new Float32Array((clumpIxOf[lastX] + 2) * 4);
+    const clumpBottom = new Float32Array((clumpIxOf[lastX] + 2) * 4);
+    const clumpStamp = new Int32Array(clumpIxOf[lastX] + 2).fill(-1);
     const softCol0 = new Float32Array(8);
     const softCol1 = new Float32Array(8);
     const clumpCol0 = new Float32Array(4);
@@ -7599,6 +7648,7 @@ var filmGrain = {
         clumpSy = smooth(f3212(cry - clumpIy0));
       }
       let cachedFineIx = -1;
+      let fineAt = 0;
       let cachedSoftIx0 = -1;
       let cachedClumpIx0 = -1;
       for (let x = 0; x < width; x += 1) {
@@ -7624,61 +7674,81 @@ var filmGrain = {
         const midtone = clamp014(f3212(1 - centered * centered));
         const tone = fmaf4(f3212(L * L), highlightStrength, fmaf4(f3212(dark * dark), shadowStrength, f3212(midtoneStrength * midtone)));
         if (tone <= EPSILON2) continue;
-        const refX = f3212(x * scaleX);
-        const fineIx = Math.trunc(f3212(refX * fineFrequency));
+        const fineIx = fineIxOf[x];
         if (fineIx !== cachedFineIx) {
           cachedFineIx = fineIx;
-          for (let t = 0; t < numTimes; t += 1) {
-            for (let s = 0; s < numSalts; s += 1) fineCache[t * 4 + s] = hashSigned(baseSeed, fineIx, fineIy, buckets[t], SALTS[s]);
+          fineAt = fineIx * 8;
+          if (fineStamp[fineIx] !== fineIy) {
+            fineStamp[fineIx] = fineIy;
+            for (let t = 0; t < numTimes; t += 1) {
+              for (let s = 0; s < numSalts; s += 1) fineNoise[fineAt + t * 4 + s] = hashSigned(baseSeed, fineIx, fineIy, buckets[t], SALTS[s]);
+            }
           }
         }
         let softSx = 0;
         if (useSoft) {
-          const srx = f3212(refX * softFrequency);
-          const softIx0 = Math.trunc(srx);
+          const softIx0 = softIxOf[x];
           if (softIx0 !== cachedSoftIx0) {
             cachedSoftIx0 = softIx0;
+            for (let c = softIx0; c <= softIx0 + 1; c += 1) {
+              if (softStamp[c] === softIy0) continue;
+              softStamp[c] = softIy0;
+              for (let t = 0; t < numTimes; t += 1) {
+                for (let s = 0; s < numSalts; s += 1) {
+                  const salt = (SALTS[s] ^ SOFT_XOR) >>> 0;
+                  softTop[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0, buckets[t], salt);
+                  softBottom[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0 + 1, buckets[t], salt);
+                }
+              }
+            }
+            const at0 = softIx0 * 8;
+            const at1 = at0 + 8;
             for (let t = 0; t < numTimes; t += 1) {
               for (let s = 0; s < numSalts; s += 1) {
-                const salt = (SALTS[s] ^ SOFT_XOR) >>> 0;
-                const n00 = hashSigned(baseSeed, softIx0, softIy0, buckets[t], salt);
-                const n10 = hashSigned(baseSeed, softIx0 + 1, softIy0, buckets[t], salt);
-                const n01 = hashSigned(baseSeed, softIx0, softIy0 + 1, buckets[t], salt);
-                const n11 = hashSigned(baseSeed, softIx0 + 1, softIy0 + 1, buckets[t], salt);
-                softCol0[t * 4 + s] = fmaf4(f3212(n01 - n00), softSy, n00);
-                softCol1[t * 4 + s] = fmaf4(f3212(n11 - n10), softSy, n10);
+                const k = t * 4 + s;
+                const n00 = softTop[at0 + k];
+                const n10 = softTop[at1 + k];
+                softCol0[k] = fmaf4(f3212(softBottom[at0 + k] - n00), softSy, n00);
+                softCol1[k] = fmaf4(f3212(softBottom[at1 + k] - n10), softSy, n10);
               }
             }
           }
-          softSx = smooth(f3212(srx - cachedSoftIx0));
+          softSx = softSxOf[x];
         }
         let clumpSx = 0;
         if (useClump) {
-          const crx = f3212(refX * clumpFrequency);
-          const clumpIx0 = Math.trunc(crx);
+          const clumpIx0 = clumpIxOf[x];
           if (clumpIx0 !== cachedClumpIx0) {
             cachedClumpIx0 = clumpIx0;
+            for (let c = clumpIx0; c <= clumpIx0 + 1; c += 1) {
+              if (clumpStamp[c] === clumpIy0) continue;
+              clumpStamp[c] = clumpIy0;
+              for (let s = 0; s < numSalts; s += 1) {
+                const salt = (SALTS[s] ^ CLUMP_XOR) >>> 0;
+                clumpTop[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0, time0, salt);
+                clumpBottom[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0 + 1, time0, salt);
+              }
+            }
+            const at0 = clumpIx0 * 4;
+            const at1 = at0 + 4;
             for (let s = 0; s < numSalts; s += 1) {
-              const salt = (SALTS[s] ^ CLUMP_XOR) >>> 0;
-              const n00 = hashSigned(baseSeed, clumpIx0, clumpIy0, time0, salt);
-              const n10 = hashSigned(baseSeed, clumpIx0 + 1, clumpIy0, time0, salt);
-              const n01 = hashSigned(baseSeed, clumpIx0, clumpIy0 + 1, time0, salt);
-              const n11 = hashSigned(baseSeed, clumpIx0 + 1, clumpIy0 + 1, time0, salt);
-              clumpCol0[s] = fmaf4(f3212(n01 - n00), clumpSy, n00);
-              clumpCol1[s] = fmaf4(f3212(n11 - n10), clumpSy, n10);
+              const n00 = clumpTop[at0 + s];
+              const n10 = clumpTop[at1 + s];
+              clumpCol0[s] = fmaf4(f3212(clumpBottom[at0 + s] - n00), clumpSy, n00);
+              clumpCol1[s] = fmaf4(f3212(clumpBottom[at1 + s] - n10), clumpSy, n10);
             }
           }
-          clumpSx = smooth(f3212(crx - cachedClumpIx0));
+          clumpSx = clumpSxOf[x];
         }
         for (let s = 0; s < numSalts; s += 1) {
-          let g0 = fineCache[s];
+          let g0 = fineNoise[fineAt + s];
           if (useSoft) {
             const soft0 = fmaf4(f3212(softCol1[s] - softCol0[s]), softSx, softCol0[s]);
             g0 = fmaf4(f3212(soft0 - g0), softness, g0);
           }
           let grain = g0;
           if (useTemporal) {
-            let g1 = fineCache[4 + s];
+            let g1 = fineNoise[fineAt + 4 + s];
             if (useSoft) {
               const soft1 = fmaf4(f3212(softCol1[4 + s] - softCol0[4 + s]), softSx, softCol0[4 + s]);
               g1 = fmaf4(f3212(soft1 - g1), softness, g1);
@@ -9311,7 +9381,7 @@ function sphericalKernel(image, params, ctx) {
   }
   return result;
 }
-var sphericalProjection = { type: "SphericalProjection", supported: true, run: sphericalKernel };
+var sphericalProjection = { type: "SphericalProjection", supported: true, sequential: true, run: sphericalKernel };
 
 // ../engine/src/render/kernels/timer.ts
 var TimerMode = { CountUp: 0, CountDown: 1, Clock: 2, Timecode: 3, FrameNumber: 4 };
@@ -10981,7 +11051,7 @@ function cacheDir(env = process.env) {
   if (process.platform === "win32") return path2.join(env.LOCALAPPDATA || path2.join(home, "AppData", "Local"), "zenvi", "Cache");
   return path2.join(env.XDG_CACHE_HOME || path2.join(home, ".cache"), "zenvi");
 }
-var CACHE_VERSION = 2;
+var CACHE_VERSION = 3;
 async function readCache(file) {
   try {
     const parsed = JSON.parse(await readFile(file, "utf8"));
@@ -11073,9 +11143,10 @@ function parseNameTable(table) {
     const start = stringOffset + offset;
     if (start + length > table.byteLength) continue;
     const name = decodeName(table.subarray(start, start + length), platform).trim();
-    if (name) names2.add(name.toLowerCase());
+    if (name) names2.add(name);
   }
-  return [...names2];
+  const seen = /* @__PURE__ */ new Set();
+  return [...names2].filter((name) => !seen.has(name.toLowerCase()) && seen.add(name.toLowerCase()));
 }
 async function readAt(handle2, position, length) {
   const buffer = new Uint8Array(length);
@@ -11137,16 +11208,36 @@ var FontIndex = class _FontIndex {
   constructor(faces) {
     this.faces = faces;
     for (const face of faces) {
-      for (const family of face.families) {
+      for (const name of face.families) {
+        const family = name.toLowerCase();
         const list = this.byFamily.get(family) ?? [];
         list.push(face);
         this.byFamily.set(family, list);
+        if (!this.spelling.has(family)) this.spelling.set(family, name);
       }
     }
     for (const list of this.byFamily.values()) list.sort((a, b) => a.size - b.size);
   }
   faces;
   byFamily = /* @__PURE__ */ new Map();
+  /** Lowercased family → the name as the first font with it spells it. */
+  spelling = /* @__PURE__ */ new Map();
+  /**
+   * The families installed, as the fonts spell them, sorted: what a tool may
+   * name in an SVG title (a Qt font database's `families()`). Hidden system
+   * families (".SF NS") are left out.
+   */
+  familyNames() {
+    return [...this.spelling.values()].filter((name) => !name.startsWith(".")).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  }
+  /** `familyNames`, plus the fonts an installed metric twin draws in their place ("Arial" when Liberation Sans is here). */
+  renderableFamilyNames() {
+    const names2 = new Set(this.familyNames());
+    for (const [name, twins] of Object.entries(METRIC_TWINS)) {
+      if (!this.has(name) && twins.some((twin) => this.has(twin))) names2.add(name);
+    }
+    return [...names2].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  }
   /**
    * Index the fonts in `dirs`. Family names are cached on disk by
    * path/size/mtime, so later processes only list and stat the folders.
@@ -11193,6 +11284,14 @@ function sharedFontIndex() {
   return shared;
 }
 var GENERIC_FAMILIES = /* @__PURE__ */ new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy"]);
+var METRIC_TWINS = {
+  Arial: ["liberation sans", "arimo"],
+  Helvetica: ["liberation sans", "arimo"],
+  "Times New Roman": ["liberation serif", "tinos"],
+  Times: ["liberation serif", "tinos"],
+  "Courier New": ["liberation mono", "cousine"],
+  Courier: ["liberation mono", "cousine"]
+};
 var ALIASES = {
   "dejavu sans": ["verdana", "bitstream vera sans"],
   "bitstream vera sans": ["dejavu sans", "verdana"],

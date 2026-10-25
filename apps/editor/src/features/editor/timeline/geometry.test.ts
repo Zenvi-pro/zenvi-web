@@ -4,6 +4,7 @@ import { parseTimecode, secondsToTimecode } from "@/lib/timecode";
 import {
   anchoredScroll,
   contentWidth,
+  fittedTrackHeight,
   rulerLabel,
   rulerScale,
   rulerTicks,
@@ -121,5 +122,15 @@ describe("timecode (desktop time_parts.py)", () => {
     expect(parseTimecode("12.5", fps30)).toBe(12.5);
     expect(parseTimecode("90s", fps30)).toBe(90);
     expect(parseTimecode("abc", fps30)).toBeNull();
+  });
+});
+
+describe("fittedTrackHeight", () => {
+  it("shares the visible height between the tracks, within the bounds", () => {
+    expect(fittedTrackHeight(90, 1, [28, 64])).toBe(64);
+    expect(fittedTrackHeight(90, 2, [28, 64])).toBe(45);
+    expect(fittedTrackHeight(90, 3, [28, 64])).toBe(30);
+    expect(fittedTrackHeight(90, 5, [28, 64])).toBe(28);
+    expect(fittedTrackHeight(0, 2, [28, 64])).toBe(64);
   });
 });

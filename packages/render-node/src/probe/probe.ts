@@ -40,6 +40,11 @@ export class ProbeError extends Error {
   }
 }
 
+/** A printf-style image sequence pattern in the file name (`frame_%04d.png`, `img%d.jpg`). */
+function isSequencePattern(file: string): boolean {
+  return /%0?\d*d/.test(path.basename(file));
+}
+
 /** Extensions Clip::CreateReader always opens with FFmpegReader. */
 const FFMPEG_EXTS = new Set(["avi", "flac", "mov", "mkv", "mpg", "mpeg", "mp3", "mp4", "mts", "ogg", "wav", "wmv", "webm", "vob", "gif"]);
 /** Codecs Qt's image plugins decode (QtImageReader succeeds for these). */
@@ -467,7 +472,11 @@ export async function probe(filePath: string, options: ProbeOptions = {}): Promi
     size = st.size;
   } catch (error) {
     if (error instanceof ProbeError) throw error;
-    throw new ProbeError(`File not found: ${file}`, file);
+    // An image sequence (`frame_%04d.png`) is no file of its own: FFmpegReader opens the
+    // pattern with the image2 demuxer and reports file_size -1.
+    const folder = isSequencePattern(file) ? await stat(path.dirname(file)).catch(() => undefined) : undefined;
+    if (!folder?.isDirectory()) throw new ProbeError(`File not found: ${file}`, file);
+    size = -1;
   }
   const ext = path.extname(file).slice(1).toLowerCase();
 

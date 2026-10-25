@@ -39,6 +39,8 @@ interface AppliedAction {
   index?: number;
   /** For update: the full previous value at the key (restored verbatim on undo). */
   previous?: unknown;
+  /** For update: recorded with `replace` (no merge), so redo replaces again. */
+  replace?: boolean;
 }
 
 interface HistoryEntry {
@@ -252,6 +254,25 @@ export class ProjectDocument {
     });
   }
 
+  /**
+   * Forget every undo and redo step and keep the project as it is (Edit >
+   * Clear > History, the desktop's `UpdateManager.reset`). Not an undo step;
+   * listeners get an untracked change, so hosts save the project without the
+   * old history. Returns how many steps each stack held.
+   */
+  clearHistory(): { undo: number; redo: number } {
+    const counts = { undo: this.undoStack.length, redo: this.redoStack.length };
+    if (counts.undo === 0 && counts.redo === 0) return counts;
+    this.undoStack = [];
+    this.redoStack = [];
+    const before = this.current;
+    // The loaded history slice would come back if this snapshot were opened again.
+    this.current = { ...this.current, history: { ...(isRecord(this.current.history) ? this.current.history : {}), undo: [], redo: [] } };
+    this.revision += 1;
+    this.emit({ project: this.current, previous: before, source: "untracked", actions: [] });
+    return counts;
+  }
+
   /** Undo `steps` transactions. Returns the labels undone, most recent first. */
   undo(steps = 1): string[] {
     const done: string[] = [];
@@ -278,7 +299,7 @@ export class ProjectDocument {
       const before = this.current;
       const reapplied: AppliedAction[] = [];
       for (const applied of entry.actions) {
-        reapplied.push(this.perform(applied.action.type, applied.action.key, applied.action.value, entry.transaction, applied.index));
+        reapplied.push(this.perform(applied.action.type, applied.action.key, applied.action.value, entry.transaction, applied.index, applied.replace));
       }
       entry.actions = reapplied;
       this.undoStack.push(entry);
@@ -392,7 +413,9 @@ export class ProjectDocument {
         (container as Record<string | number, unknown>)[slot] = next;
       }) as Project;
       this.revision += 1;
-      return { action: { type, key, value: clone(value), old_values: previous, transaction }, previous };
+      const applied: AppliedAction = { action: { type, key, value: clone(value), old_values: previous, transaction }, previous };
+      if (replace) applied.replace = true;
+      return applied;
     }
 
     throw new TypeError(`unsupported action type in transaction: ${type}`);

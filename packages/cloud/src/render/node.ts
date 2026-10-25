@@ -13,7 +13,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { ExportOptions, Project } from "@zenvi/engine";
 import * as renderNode from "@zenvi/render-node";
-import type { AssetSource, AudioAnalyzer, MediaProber, PathResolver, PcmDecoder, Renderer } from "./renderer.js";
+import type { AssetSource, AudioAnalyzer, FontLister, MediaProber, PathResolver, PcmDecoder, Renderer, SpeechTranscriber } from "./renderer.js";
 import { RendererUnavailableError, unavailableRenderer } from "./renderer.js";
 
 type RenderProjectFn = (
@@ -24,6 +24,7 @@ type RenderProjectFn = (
     options: ExportOptions;
     onProgress?: (progress: number | { fraction: number }) => void;
     signal?: AbortSignal;
+    log?: (message: string) => void;
   },
 ) => Promise<unknown>;
 
@@ -64,9 +65,12 @@ export async function nodeRenderer(): Promise<{ renderer: Renderer; reason?: str
         output: input.output,
         options: input.options,
         signal: input.signal,
+        log: input.log,
         onProgress: (progress) => input.onProgress(typeof progress === "number" ? progress : progress.fraction),
       });
     },
+    // The same image (and ffmpeg) runs in-process renders and the render workers.
+    encoders: () => renderNode.encoderNames(),
     async frame(input) {
       if (!renderFrame) throw new RendererUnavailableError("frame renderer");
       return renderFrame(input.project, input.seconds, {
@@ -130,3 +134,5 @@ export function nodeAssetSource(): AssetSource | undefined {
 
 export const nodeAnalyzeAudio: AudioAnalyzer = (filePath, options) => renderNode.analyzeAudio(filePath, options);
 export const nodeDecodePcm: PcmDecoder = (filePath, options) => renderNode.decodePcm(filePath, options);
+export const nodeTranscribeMedia: SpeechTranscriber = (filePath, options) => renderNode.transcribeMediaFile(filePath, options);
+export const nodeFontFamilies: FontLister = () => renderNode.installedFontFamilies();

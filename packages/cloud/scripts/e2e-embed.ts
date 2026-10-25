@@ -14,7 +14,9 @@
  *   5. the token never stays in the frame's address
  *
  *   npm run build -w @zenvi/editor
- *   AZURE_STORAGE_CONNECTION_STRING=… npx tsx packages/cloud/scripts/e2e-embed.ts [--headed] [--shots <dir>]
+ *   AZURE_STORAGE_CONNECTION_STRING=… npx tsx packages/cloud/scripts/e2e-embed.ts [--headed] [--shots <dir>] [--mobile]
+ *
+ * --mobile: a phone (390×844), the view as wide as the chat column, as in the ChatGPT and Claude apps.
  */
 
 import { execFileSync } from "node:child_process";
@@ -44,6 +46,7 @@ const USER = "e2e-embed-0000-4000-8000-000000000001";
 const args = process.argv.slice(2);
 const headed = args.includes("--headed");
 const shotsDir = args.includes("--shots") ? args[args.indexOf("--shots") + 1] : null;
+const mobile = args.includes("--mobile");
 
 type CallResult = { isError?: boolean; content: { type: string; text?: string }[]; structuredContent?: Record<string, unknown>; _meta?: Record<string, unknown> };
 
@@ -72,13 +75,14 @@ async function until<T>(read: () => Promise<T>, done: (value: T) => boolean, tim
 }
 
 function hostPage(widgetUrl: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Stand-in chat host</title>
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Stand-in chat host</title>
 <style>
   body { margin: 0; background: #212121; color: #ececec; font: 14px system-ui; }
   #chat { padding: 12px 16px; }
   #widget { display: block; width: 780px; height: 560px; margin: 0 16px; border: 1px solid #3a3a3a; border-radius: 14px; background: #000; }
   body.full #widget { position: fixed; inset: 0; width: 100vw; height: 100vh; margin: 0; border: 0; border-radius: 0; }
-</style></head><body>
+  body.mobile #widget { width: calc(100vw - 24px); margin: 0 12px; }
+</style></head><body${mobile ? ' class="mobile"' : ""}>
 <div id="chat">You: Turn these clips into a 12-second highlight reel.<br>Zenvi: Here is your reel.</div>
 <iframe id="widget" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" src="${widgetUrl}"></iframe>
 <script>
@@ -182,7 +186,7 @@ async function main(): Promise<void> {
     const token = (openResult._meta?.["zenvi/editor"] as { token?: string } | undefined)?.token ?? "";
     check("open_in_editor carries an embed token only in _meta", token.startsWith("zvn_emb_") && !JSON.stringify(openResult.content).includes(token));
 
-    const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
+    const page = await browser.newPage(mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1360, height: 900 } });
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${hostPort}/host.html`);
@@ -220,18 +224,29 @@ async function main(): Promise<void> {
     );
     check("an edit in the editor is saved to the cloud project", stored === 2, `${stored} clips in the cloud`);
 
-    // Full screen: the host is asked, then the whole editor shows.
+    // Full screen: the host is asked, then the whole editor shows (on a phone, the preview and timeline grow instead).
     await editor.getByRole("button", { name: "Edit full screen" }).click();
     const mode = await until(() => page.evaluate(() => (globalThis as unknown as { __mode: string }).__mode), (m) => m === "fullscreen", 10_000);
-    const library = editor.getByRole("navigation", { name: "Library sections" });
-    await library.waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined);
-    check("Edit full screen asks the host and shows the full editor", mode === "fullscreen" && (await library.isVisible()), mode);
+    if (mobile) {
+      const back = editor.getByRole("button", { name: "Back to the chat" });
+      await back.waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined);
+      check("Edit full screen asks the host and fills the screen", mode === "fullscreen" && (await back.isVisible()), mode);
+    } else {
+      const library = editor.getByRole("navigation", { name: "Library sections" });
+      await library.waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined);
+      check("Edit full screen asks the host and shows the full editor", mode === "fullscreen" && (await library.isVisible()), mode);
+    }
     if (shotsDir) await page.screenshot({ path: join(shotsDir, "embed-fullscreen.png") });
 
-    // "Open in Zenvi" goes through the host to zenvi.pro.
-    await editor.getByRole("button", { name: "Open in Zenvi (full editor)" }).click();
-    const links = await until(() => page.evaluate(() => (globalThis as unknown as { __links: string[] }).__links), (l) => l.length > 0, 5000);
-    check("Open in Zenvi asks the host to open zenvi.pro", links[0] === `https://zenvi.pro/editor/p/${projectId}`, links[0]);
+    // "Open in Zenvi" goes through the host to zenvi.pro; a phone has no use for it (zenvi.pro is view-only there).
+    const openInZenvi = editor.getByRole("button", { name: "Open in Zenvi (full editor)" });
+    if (mobile) {
+      check("a phone leaves out Open in Zenvi", !(await openInZenvi.isVisible()));
+    } else {
+      await openInZenvi.click();
+      const links = await until(() => page.evaluate(() => (globalThis as unknown as { __links: string[] }).__links), (l) => l.length > 0, 5000);
+      check("Open in Zenvi asks the host to open zenvi.pro", links[0] === `https://zenvi.pro/editor/p/${projectId}`, links[0]);
+    }
 
     check("no uncaught errors in the page", errors.length === 0, errors.slice(0, 3).join(" | "));
   } finally {

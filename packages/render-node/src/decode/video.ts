@@ -21,6 +21,7 @@
 import type { Fraction, RgbaImage } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { AbortedError, spawnManaged, type ManagedChild } from "../ffmpeg/process.js";
+import { ffmpegThreads } from "../limits.js";
 import { rgbaView } from "../image/rgba.js";
 
 export type ScaleQuality = "export" | "preview";
@@ -56,13 +57,25 @@ function scaleFlags(quality: ScaleQuality): string {
   return quality === "export" ? "bicubic" : "fast_bilinear";
 }
 
+/**
+ * An image sequence pattern (`frame_%04d.png`). ffmpeg's image2 demuxer
+ * reads it at `-framerate` (the file's fps, which the desktop sets on import)
+ * with whole-frame timestamps and seeks by frame index, so frame k is the
+ * k-th image, as in libopenshot.
+ */
+function isImageSequence(file: string): boolean {
+  const name = file.split(/[\\/]/).pop() ?? file;
+  return /%0?\d*d/.test(name);
+}
+
 export function videoDecodeArgs(source: VideoSourceInfo, startFrame: number, size: DecodeSize, quality: ScaleQuality = "export"): string[] {
   const fps = fpsValue(source.fps);
-  const delta = 0.25 / fps;
+  const sequence = isImageSequence(source.path);
   const nominal = (source.videoStart ?? 0) - (source.formatStart ?? 0) + startFrame / fps;
-  const seek = Math.max(0, nominal - delta);
+  // image2 timestamps are whole frames: seek exactly (to the microsecond below) and do not shift.
+  const seek = sequence ? Math.floor(Math.max(0, nominal) * 1e6) / 1e6 : Math.max(0, nominal - 0.25 / fps);
   // When the seek clamps at 0 the shift must shrink with it.
-  const shift = nominal - seek;
+  const shift = sequence ? 0 : nominal - seek;
   const fpsText = `${source.fps.num > 0 ? source.fps.num : 30}/${source.fps.den > 0 ? source.fps.den : 1}`;
   const filters = [
     shift > 0 ? `setpts=PTS-${shift.toFixed(9)}/TB` : "setpts=PTS",
@@ -74,7 +87,9 @@ export function videoDecodeArgs(source: VideoSourceInfo, startFrame: number, siz
     "-hide_banner",
     "-loglevel", "error",
     "-nostdin",
+    ...ffmpegThreads("decode"),
     ...(source.autorotate === false ? ["-noautorotate"] : []),
+    ...(sequence ? ["-framerate", fpsText] : []),
     ...(seek > 0 ? ["-ss", seek.toFixed(6)] : []),
     "-i", source.path,
     "-map", "0:v:0",

@@ -2,18 +2,22 @@
  * The clip Look menu: Reset Look, Color (Color Grade presets), Film Grain
  * presets, and the Analog Tape / Sharpen / Blur / Glow / Shadow presets.
  *
- * Ported from zenvi-core src/windows/views/timeline.py (Reset_Look_Triggered,
- * _apply_color_preset, Film_Grain_Triggered, _apply_effect_preset,
- * _set_effect_property_value, _clip_has_visual), src/classes/color_presets.py
- * (code port) and src/classes/film_grain_presets.py + LOOK_EFFECT_PRESETS
- * (generated data, look-presets.data.ts).
+ * Ported from zenvi-core develop (1f80cb3d0) src/classes/look_presets.py (the
+ * rules the timeline's Look menu and the agent's look tools share: which
+ * effects a preset replaces, which ids and order it keeps, what Reset Look
+ * removes), src/classes/color_presets.py (code port) and
+ * src/classes/film_grain_presets.py + LOOK_EFFECT_PRESETS (generated data,
+ * look-presets.data.ts), and timeline.py `_clip_has_visual`.
+ *
+ * The `*Effects` functions are pure: they take a clip's effect list and
+ * return the new list, or null when the preset would change nothing (so
+ * callers record no undo step).
  */
 
 import type { Transaction } from "../history/document.js";
 import type { Clip, Effect, Keyframe } from "../model/types.js";
 import { Interpolation } from "../model/types.js";
 import { createEffect } from "../effects/registry.js";
-import { openshotPoint } from "../keyframe/edit.js";
 import { parseHexColor } from "../keyframe/color.js";
 import { invalid } from "./errors.js";
 import { ids, isRecord, patchClip, requireEditableClip } from "./internal.js";
@@ -22,8 +26,13 @@ import { FILM_GRAIN_PRESETS, LOOK_EFFECT_PRESETS } from "./look-presets.data.js"
 /** Effects marked as managed by the Look menu carry `"ui-menu": "look"`. */
 export const LOOK_UI_MENU = "look";
 
+/** Look ▸ Color menu entries. */
 export const COLOR_PRESETS = ["reset", "auto_contrast", "lift_shadows", "warm_up", "boost_color"] as const;
 export type ColorPreset = (typeof COLOR_PRESETS)[number];
+
+/** Every Color Grade preset color_presets.py knows (the Look menu's, plus the Assistant's sunny and gloomy). */
+export const COLOR_GRADE_PRESETS = ["auto_contrast", "lift_shadows", "warm_up", "sunny", "gloomy", "boost_color"] as const;
+export type ColorGradePreset = (typeof COLOR_GRADE_PRESETS)[number];
 
 export const FILM_GRAIN_PRESET_NAMES = ["none", "35mm_fine", "35mm_classic", "35mm_gritty", "16mm_classic", "super_8", "high_iso"] as const;
 export type FilmGrainPreset = (typeof FILM_GRAIN_PRESET_NAMES)[number];
@@ -59,7 +68,7 @@ export const LOOK_PRESET_IDS: readonly LookPresetId[] = [
 // ---------------------------------------------------------------------------
 
 /** `_constant_property`: a one-point keyframe with Python float values (not narrowed). */
-function constantProperty(value: number): Keyframe {
+export function constantProperty(value: number): Keyframe {
   return {
     Points: [
       {
@@ -87,8 +96,17 @@ function curveNode(id: number, x: number, y: number): Record<string, unknown> {
   };
 }
 
-function curve(points: readonly [number, number][], enabled = true): Record<string, unknown> {
-  return { enabled: constantProperty(enabled ? 1.0 : 0.0), nodes: points.map(([x, y], i) => curveNode(i, x, y)) };
+/** `curve_data`: a Color Grade curve through `points` (0-1), linear between nodes. */
+export function curveData(points: readonly { x: number; y: number }[], enabled = true): Record<string, unknown> {
+  return { enabled: constantProperty(enabled ? 1.0 : 0.0), nodes: points.map((p, i) => curveNode(i, p.x, p.y)) };
+}
+
+/** `default_curve_data`: the identity curve. */
+export function defaultCurveData(): Record<string, unknown> {
+  return curveData([
+    { x: 0.0, y: 0.0 },
+    { x: 1.0, y: 1.0 },
+  ]);
 }
 
 function colorKeyframes(hex: string): Record<string, Keyframe> {
@@ -96,7 +114,8 @@ function colorKeyframes(hex: string): Record<string, Keyframe> {
   return { red: constantProperty(r), green: constantProperty(g), blue: constantProperty(b), alpha: constantProperty(255) };
 }
 
-function wheelEntry(color = "#ffffff", amount = 0.0, luma = 0.0): Record<string, unknown> {
+/** `wheel_entry`: one Color Grade wheel (tint color, amount 0-1, luma -1..1). */
+export function wheelEntry(color = "#ffffff", amount = 0.0, luma = 0.0): Record<string, unknown> {
   return {
     color,
     color_keyframes: colorKeyframes(color),
@@ -107,7 +126,8 @@ function wheelEntry(color = "#ffffff", amount = 0.0, luma = 0.0): Record<string,
   };
 }
 
-function defaultWheels(): Record<string, unknown> {
+/** `default_wheels_data`: every wheel neutral. */
+export function defaultWheelsData(): Record<string, unknown> {
   return {
     enabled_keyframes: constantProperty(1.0),
     global: wheelEntry(),
@@ -117,52 +137,101 @@ function defaultWheels(): Record<string, unknown> {
   };
 }
 
-const IDENTITY_CURVE: readonly [number, number][] = [
-  [0.0, 0.0],
-  [1.0, 1.0],
-];
+/** The scalar Color Grade controls and their neutral values (color_presets.py `neutral_color_grade`). */
+export const NEUTRAL_GRADE_SCALARS: Readonly<Record<string, number>> = {
+  temperature: 0.0,
+  tint: 0.0,
+  exposure: 0.0,
+  contrast: 0.0,
+  highlights: 0.0,
+  shadows: 0.0,
+  saturation: 1.0,
+  vibrance: 0.0,
+  mix: 1.0,
+  lut_intensity: 1.0,
+};
 
-/** `apply_color_grade_preset(effect_json, name)`: the keys a Color preset writes. */
-export function colorGradePresetValues(preset: Exclude<ColorPreset, "reset">): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  const scalars: Record<string, number> = {
-    temperature: 0.0,
-    tint: 0.0,
-    exposure: 0.0,
-    contrast: 0.0,
-    highlights: 0.0,
-    shadows: 0.0,
-    saturation: 1.0,
-    vibrance: 0.0,
-    mix: 1.0,
-    lut_intensity: 1.0,
-  };
-  let curveAll: readonly [number, number][] = IDENTITY_CURVE;
-  if (preset === "auto_contrast") {
-    Object.assign(scalars, { contrast: 0.18, highlights: -0.08, shadows: 0.08, vibrance: 0.06 });
-    curveAll = [[0.0, 0.0], [0.25, 0.22], [0.75, 0.8], [1.0, 1.0]];
-  } else if (preset === "lift_shadows") {
-    Object.assign(scalars, { exposure: 0.08, contrast: -0.03, highlights: -0.05, shadows: 0.22 });
-    curveAll = [[0.0, 0.06], [0.35, 0.4], [1.0, 1.0]];
-  } else if (preset === "warm_up") {
-    Object.assign(scalars, { temperature: 0.18, tint: 0.03, saturation: 1.05, vibrance: 0.08 });
-  } else if (preset === "boost_color") {
-    Object.assign(scalars, { contrast: 0.08, saturation: 1.18, vibrance: 0.22 });
-    curveAll = [[0.0, 0.0], [0.2, 0.16], [0.8, 0.86], [1.0, 1.0]];
-  }
-  for (const [key, value] of Object.entries(scalars)) out[key] = constantProperty(value);
-  out.lut_path = "";
-  out.wheels = defaultWheels();
-  out.curve_all = curve(curveAll);
-  out.curve_red = curve(IDENTITY_CURVE);
-  out.curve_green = curve(IDENTITY_CURVE);
-  out.curve_blue = curve(IDENTITY_CURVE);
-  return out;
+const PRESET_SCALARS: Readonly<Record<ColorGradePreset, Readonly<Record<string, number>>>> = {
+  auto_contrast: { contrast: 0.18, highlights: -0.08, shadows: 0.08, vibrance: 0.06 },
+  lift_shadows: { exposure: 0.08, contrast: -0.03, highlights: -0.05, shadows: 0.22 },
+  warm_up: { temperature: 0.18, tint: 0.03, vibrance: 0.1, saturation: 1.08 },
+  sunny: { temperature: 0.12, tint: 0.02, exposure: 0.05, contrast: 0.04, saturation: 1.08, vibrance: 0.08 },
+  gloomy: { temperature: -0.1, exposure: -0.08, contrast: 0.06, highlights: -0.08, saturation: 0.88, vibrance: -0.04 },
+  boost_color: { contrast: 0.08, saturation: 1.18, vibrance: 0.22 },
+};
+
+const PRESET_CURVES: Partial<Record<ColorGradePreset, readonly { x: number; y: number }[]>> = {
+  auto_contrast: [
+    { x: 0.0, y: 0.0 },
+    { x: 0.25, y: 0.22 },
+    { x: 0.75, y: 0.8 },
+    { x: 1.0, y: 1.0 },
+  ],
+  lift_shadows: [
+    { x: 0.0, y: 0.06 },
+    { x: 0.35, y: 0.4 },
+    { x: 1.0, y: 1.0 },
+  ],
+  boost_color: [
+    { x: 0.0, y: 0.0 },
+    { x: 0.2, y: 0.16 },
+    { x: 0.8, y: 0.86 },
+    { x: 1.0, y: 1.0 },
+  ],
+};
+
+/** `neutral_color_grade(effect)`: a copy with every Color Grade control neutral (no LUT, flat curves). */
+export function neutralColorGrade<T extends Record<string, unknown>>(effect: T): T {
+  const payload: Record<string, unknown> = structuredClone(effect ?? {});
+  for (const [key, value] of Object.entries(NEUTRAL_GRADE_SCALARS)) payload[key] = constantProperty(value);
+  payload.lut_path = "";
+  payload.wheels = defaultWheelsData();
+  payload.curve_all = defaultCurveData();
+  payload.curve_red = defaultCurveData();
+  payload.curve_green = defaultCurveData();
+  payload.curve_blue = defaultCurveData();
+  return payload as T;
+}
+
+export function isColorGradePreset(value: string): value is ColorGradePreset {
+  return (COLOR_GRADE_PRESETS as readonly string[]).includes(value);
+}
+
+/** `apply_color_grade_preset(effect, name)`: neutral, then the preset's controls and curve. */
+export function applyColorGradePreset<T extends Record<string, unknown>>(effect: T, preset: ColorGradePreset): T {
+  if (!isColorGradePreset(preset)) throw invalid(`Unknown color preset: ${String(preset)}`);
+  const payload: Record<string, unknown> = neutralColorGrade(effect);
+  for (const [key, value] of Object.entries(PRESET_SCALARS[preset])) payload[key] = constantProperty(value);
+  const curve = PRESET_CURVES[preset];
+  if (curve) payload.curve_all = curveData(curve);
+  return payload as T;
+}
+
+/** The keys a Color preset writes (`apply_color_grade_preset({}, name)`; "neutral" = `neutral_color_grade({})`). */
+export function colorGradePresetValues(preset: ColorGradePreset | "neutral"): Record<string, unknown> {
+  return preset === "neutral" ? neutralColorGrade({}) : applyColorGradePreset({}, preset);
 }
 
 // ---------------------------------------------------------------------------
-// Applying presets
+// film_grain_presets.py
 // ---------------------------------------------------------------------------
+
+/** `apply_film_grain_preset(effect, name)`: a copy with the stock's grain controls (and seed 1 when it has none). */
+export function applyFilmGrainPreset<T extends Record<string, unknown>>(effect: T, preset: Exclude<FilmGrainPreset, "none">): T {
+  const values = FILM_GRAIN_PRESETS[preset];
+  if (!values) throw invalid(`Unknown film grain preset: ${String(preset)}`);
+  const payload: Record<string, unknown> = structuredClone(effect ?? {});
+  for (const [key, value] of Object.entries(values)) payload[key] = constantProperty(value);
+  if (!("seed" in payload)) payload.seed = 1;
+  return payload as T;
+}
+
+// ---------------------------------------------------------------------------
+// look_presets.py
+// ---------------------------------------------------------------------------
+
+/** A fresh effect of `className` with a new id (the desktop's `create_effect_json`). */
+export type CreateEffectJson = (className: string) => Effect;
 
 /** timeline.py `_clip_has_visual`: video, or audio drawn as a waveform. */
 export function clipHasVisual(clip: Clip): boolean {
@@ -171,29 +240,42 @@ export function clipHasVisual(clip: Clip): boolean {
   return Boolean(clip.waveform);
 }
 
-const isLookManaged = (e: Effect, className?: string): boolean =>
-  e["ui-menu"] === LOOK_UI_MENU && (className === undefined || e.class_name === className);
+/** `is_look_managed_effect`: an effect the Look menu created. */
+export function isLookManaged(effect: unknown, className?: string): boolean {
+  return isRecord(effect) && effect["ui-menu"] === LOOK_UI_MENU && (className === undefined || effect.class_name === className);
+}
 
-/** `_set_effect_property_value`: keyframes `Point(1, float(v))`, colors per channel, others raw. */
-function setEffectValue(effect: Record<string, unknown>, key: string, value: number | string): void {
+/** `parse_effect_color`: '#RRGGBB' / '#RRGGBBAA' → channels, else null. */
+function parseEffectColor(value: unknown): Record<"red" | "green" | "blue" | "alpha", number> | null {
+  if (typeof value !== "string") return null;
+  let color = value.trim();
+  if (color.startsWith("#")) color = color.slice(1);
+  if (color.length !== 6 && color.length !== 8) return null;
+  if (!/^[0-9a-fA-F]+$/.test(color)) return null;
+  const at = (i: number): number => Number.parseInt(color.slice(i, i + 2), 16);
+  return { red: at(0), green: at(2), blue: at(4), alpha: color.length === 8 ? at(6) : 255 };
+}
+
+/** `set_effect_property_value`: constant keyframe, colour channels, or a plain key. */
+function setEffectPropertyValue(effect: Record<string, unknown>, key: string, value: number | string): void {
   const current = effect[key];
-  const rgba = typeof value === "string" ? parseHexColor(value) : null;
-  if (rgba && isRecord(current)) {
-    const channels = ["red", "green", "blue", "alpha"] as const;
+  const channels = parseEffectColor(value);
+  if (channels && isRecord(current)) {
     const next: Record<string, unknown> = { ...current };
-    channels.forEach((c, i) => {
-      if (isRecord(current[c]) && Array.isArray((current[c] as Keyframe).Points)) next[c] = { Points: [openshotPoint(1, rgba[i]!)] };
-    });
+    for (const [channel, channelValue] of Object.entries(channels)) {
+      const data = current[channel];
+      if (isRecord(data) && Array.isArray(data.Points)) next[channel] = { ...data, Points: constantProperty(channelValue).Points };
+    }
     effect[key] = next;
   } else if (isRecord(current) && Array.isArray(current.Points)) {
-    effect[key] = { Points: [openshotPoint(1, Number(value))] };
+    effect[key] = { ...current, Points: constantProperty(Number(value)).Points };
   } else if (key in effect) {
     effect[key] = value;
   }
 }
 
-/** Replace the first matching effect (keeping its id and order) and drop the rest, or append. */
-function placePreset(effects: Effect[], matches: number[], preset: Effect): Effect[] {
+/** `_replace_matches`: the preset where the first match was (keeping its id and order); other matches dropped. */
+function replaceMatches(effects: Effect[], matches: readonly number[], preset: Effect): Effect[] {
   const next = [...effects];
   if (matches.length === 0) return [...next, preset];
   const existing = next[matches[0]!]!;
@@ -204,8 +286,75 @@ function placePreset(effects: Effect[], matches: number[], preset: Effect): Effe
   return next;
 }
 
+const indexesOf = (effects: readonly Effect[], test: (e: Effect) => boolean): number[] =>
+  effects.flatMap((e, i) => (isRecord(e) && test(e) ? [i] : []));
+
+/** `apply_look_effect_preset`: Analog Tape / Sharpen / Blur / Shadow / Glow (`none` removes the Look effect). */
+export function lookEffectPresetEffects(
+  effects: readonly Effect[],
+  className: string,
+  presetName: string,
+  create: CreateEffectJson,
+): Effect[] | null {
+  const presets = LOOK_EFFECT_PRESETS[className] ?? {};
+  const values = presets[presetName];
+  if (!values) throw invalid(`Unknown ${className} look preset: ${presetName}`);
+  const list = [...effects];
+  const matches = indexesOf(list, (e) => isLookManaged(e, className));
+  if (presetName === "none") return matches.length === 0 ? null : list.filter((e) => !isLookManaged(e, className));
+  const preset = create(className) as Record<string, unknown>;
+  preset["ui-menu"] = LOOK_UI_MENU;
+  for (const [key, value] of Object.entries(values)) setEffectPropertyValue(preset, key, value);
+  return replaceMatches(list, matches, preset as Effect);
+}
+
+/** `apply_color_look_preset`: a fresh Color Grade with the preset in place of the clip's (`reset` removes it). */
+export function colorLookPresetEffects(
+  effects: readonly Effect[],
+  presetName: "reset" | ColorGradePreset,
+  create: CreateEffectJson,
+): Effect[] | null {
+  const list = [...effects];
+  const matches = indexesOf(list, (e) => e.class_name === "ColorGrade");
+  if (presetName === "reset") return matches.length === 0 ? null : list.filter((e) => !(isRecord(e) && e.class_name === "ColorGrade"));
+  const preset = applyColorGradePreset(create("ColorGrade") as Record<string, unknown>, presetName) as Effect;
+  return replaceMatches(list, matches, preset);
+}
+
+/** `apply_film_grain_look_preset` (`none` removes Film Grain effects). */
+export function filmGrainLookPresetEffects(
+  effects: readonly Effect[],
+  presetName: FilmGrainPreset,
+  create: CreateEffectJson,
+): Effect[] | null {
+  const list = [...effects];
+  const matches = indexesOf(list, (e) => e.class_name === "FilmGrain");
+  if (presetName === "none") return matches.length === 0 ? null : list.filter((e) => !(isRecord(e) && e.class_name === "FilmGrain"));
+  const source = matches.length > 0 ? list[matches[0]!]! : create("FilmGrain");
+  const preset = applyFilmGrainPreset(structuredClone(source) as Record<string, unknown>, presetName) as Effect;
+  return replaceMatches(list, matches, preset);
+}
+
+/** `reset_look`: drop Color Grade, Film Grain and every Look-tagged effect. */
+export function resetLookEffects(effects: readonly Effect[]): Effect[] | null {
+  const kept = effects.filter(
+    (e) => !isRecord(e) || (!["ColorGrade", "FilmGrain"].includes(String(e.class_name)) && !isLookManaged(e)),
+  );
+  return kept.length === effects.length ? null : kept;
+}
+
 export function isLookPresetId(value: string): value is LookPresetId {
   return (LOOK_PRESET_IDS as readonly string[]).includes(value);
+}
+
+/** The clip's effect list after a Look menu preset, or null when it changes nothing. */
+export function lookPresetEffects(effects: readonly Effect[], presetId: LookPresetId, create: CreateEffectJson): Effect[] | null {
+  if (!isLookPresetId(presetId)) throw invalid(`Unknown look preset: ${String(presetId)}.`);
+  if (presetId === "reset") return resetLookEffects(effects);
+  const [family, name] = presetId.split(".") as [string, string];
+  if (family === "color") return colorLookPresetEffects(effects, name as "reset" | ColorGradePreset, create);
+  if (family === "film_grain") return filmGrainLookPresetEffects(effects, name as FilmGrainPreset, create);
+  return lookEffectPresetEffects(effects, LOOK_EFFECT_CLASSES[family as LookEffectKey], name, create);
 }
 
 /**
@@ -218,42 +367,7 @@ export function applyLookPreset(tx: Transaction, clipId: string, presetId: LookP
   const clip = requireEditableClip(project, clipId);
   if (!isLookPresetId(presetId)) throw invalid(`Unknown look preset: ${String(presetId)}.`);
   if (!clipHasVisual(clip)) throw invalid(`Clip ${clipId} has no picture to grade.`);
-  const effects = [...(clip.effects ?? [])];
   const nextId = ids(project);
-
-  if (presetId === "reset") {
-    const kept = effects.filter((e) => !isRecord(e) || (!["ColorGrade", "FilmGrain"].includes(e.class_name) && !isLookManaged(e)));
-    return kept.length === effects.length ? clip : patchClip(tx, clipId, { effects: kept });
-  }
-  const [family, name] = presetId.split(".") as [string, string];
-  if (family === "color") {
-    const matches = effects.flatMap((e, i) => (e.class_name === "ColorGrade" ? [i] : []));
-    if (name === "reset") {
-      return matches.length === 0 ? clip : patchClip(tx, clipId, { effects: effects.filter((e) => e.class_name !== "ColorGrade") });
-    }
-    const preset = { ...createEffect("ColorGrade", {}, { id: nextId() }), ...colorGradePresetValues(name as Exclude<ColorPreset, "reset">) } as Effect;
-    return patchClip(tx, clipId, { effects: placePreset(effects, matches, preset) });
-  }
-  if (family === "film_grain") {
-    const matches = effects.flatMap((e, i) => (e.class_name === "FilmGrain" ? [i] : []));
-    if (name === "none") {
-      return matches.length === 0 ? clip : patchClip(tx, clipId, { effects: effects.filter((e) => e.class_name !== "FilmGrain") });
-    }
-    const source = matches.length > 0 ? structuredClone(effects[matches[0]!]!) : createEffect("FilmGrain", {}, { id: nextId() });
-    const preset = source as Record<string, unknown>;
-    for (const [key, value] of Object.entries(FILM_GRAIN_PRESETS[name] ?? {})) preset[key] = constantProperty(value);
-    if (!("seed" in preset)) preset.seed = 1;
-    return patchClip(tx, clipId, { effects: placePreset(effects, matches, preset as Effect) });
-  }
-  const className = LOOK_EFFECT_CLASSES[family as LookEffectKey];
-  const values = LOOK_EFFECT_PRESETS[className]?.[name];
-  if (!values) throw invalid(`Unknown look preset: ${presetId}.`);
-  const matches = effects.flatMap((e, i) => (isLookManaged(e, className) ? [i] : []));
-  if (name === "none") {
-    return matches.length === 0 ? clip : patchClip(tx, clipId, { effects: effects.filter((e) => !isLookManaged(e, className)) });
-  }
-  const preset = createEffect(className, {}, { id: nextId() }) as Record<string, unknown>;
-  preset["ui-menu"] = LOOK_UI_MENU;
-  for (const [key, value] of Object.entries(values)) setEffectValue(preset, key, value);
-  return patchClip(tx, clipId, { effects: placePreset(effects, matches, preset as Effect) });
+  const next = lookPresetEffects(clip.effects ?? [], presetId, (className) => createEffect(className, {}, { id: nextId() }));
+  return next === null ? clip : patchClip(tx, clipId, { effects: next });
 }

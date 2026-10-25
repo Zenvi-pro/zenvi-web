@@ -3,17 +3,24 @@
  * Assistant (or the command palette) runs them here.
  */
 import type { CloudMediaRef, ExportOptions, ExportResult, ImportedMedia, ReaderInfo, ToolHost, ToolImage } from "@zenvi/engine";
+import { canExportWith } from "@zenvi/render-web";
 import { backendRequest } from "@/lib/backend";
 import { config } from "@/lib/env";
 import { downloadBlob, safeFileName } from "@/lib/projectFactory";
+import { projectRepository } from "@/lib/storage/projects";
+import { savePanels } from "../session/uiStore";
 import { toast } from "@/ui/Toast";
-import { exportAvailable, extensionForMime, probe, renderFrame, startExport } from "../render";
+import { exportAvailable, extensionForMime, probe, renderFrame, resolveBundledMedia, startExport } from "../render";
+import { editorLayout, editorPreferences, withLayout, withPreference } from "./editorSettings";
 import type { EditorSession } from "../session/EditorSession";
 import { assetUrl } from "../catalog";
-import { analyzeAudio, decodePcm } from "./audioAnalysis";
+import { analyzeAudio, blobOf, decodePcm } from "./audioAnalysis";
+import { transcribeSpeech } from "./transcribe";
 import { contentTypeFor, fileHash, type MediaSourceSpec } from "../session/media";
 
 const MAX_URL_IMPORT_BYTES = 2 * 1024 * 1024 * 1024;
+/** Text files tools read (title SVGs, subtitles); the largest bundled title template is under 5 MB. */
+const MAX_TEXT_BYTES = 16 * 1024 * 1024;
 
 async function fileFromUrl(url: string, filename: string | undefined, signal?: AbortSignal): Promise<File> {
   const parsed = new URL(url);
@@ -87,6 +94,16 @@ async function readAsset(path: string): Promise<string> {
   return response.text();
 }
 
+/** A download's file name for a path a tool gave (its base name, made safe), with a fallback name. */
+function downloadName(path: string, fallback: string, extension: string): string {
+  const base = path.split(/[\\/]/).pop() ?? "";
+  return safeFileName(base.replace(/\.[^.]+$/, "") || fallback, base.match(/\.([a-z0-9]+)$/i)?.[1] ?? extension);
+}
+
+function isFullscreen(): boolean {
+  return typeof document !== "undefined" && document.fullscreenElement !== null && document.fullscreenElement !== undefined;
+}
+
 export function createToolHost(session: EditorSession, pickFiles: () => Promise<File[]>): ToolHost {
   // The loaded media of a project file (by path or id), for audio analysis.
   const specFor = (path: string) => {
@@ -103,6 +120,9 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       get playing() {
         return session.playback.getState().playing;
       },
+      get rate() {
+        return session.playback.getState().rate;
+      },
       play: () => session.play(),
       pause: () => session.pause(),
       toggle: () => session.togglePlay(),
@@ -113,8 +133,44 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       zoomOut: () => session.views.timeline?.zoomOut(),
       centerOnPlayhead: () => session.views.timeline?.centerOnPlayhead(),
       selectedIds: () => [...session.ui.getState().selection.clips, ...session.ui.getState().selection.transitions],
+      selection: () => {
+        const s = session.ui.getState().selection;
+        return { clips: [...s.clips], transitions: [...s.transitions], effects: s.effect ? [s.effect] : [] };
+      },
+      setSelection: (selection) => {
+        // The Properties panel shows one effect, with its clip selected.
+        const effect = selection.effects.at(-1) ?? null;
+        const clips = [...selection.clips];
+        const owner = effect ? session.project.clips.find((c) => c.effects?.some((e) => e.id === effect)) : undefined;
+        if (owner && !clips.includes(owner.id)) clips.push(owner.id);
+        session.ui.setState({ selection: { clips, transitions: [...selection.transitions], markers: [], effect } });
+      },
+      showProperties: () => session.ui.setState({ rightTab: "properties", panels: { ...session.ui.getState().panels, rightCollapsed: false } }),
+      timelineView: () => {
+        const timeline = session.views.timeline;
+        if (!timeline) return null;
+        const { start, end } = timeline.visibleRange();
+        const ui = session.ui.getState();
+        // The web timeline has no timing (retime-by-drag) mode.
+        return { secondsPer100px: 100 / ui.pxPerSecond, visibleSeconds: end - start, visibleRange: [start, end], snapping: ui.snapping, razor: ui.tool === "razor", timing: null };
+      },
+      showTimelineRange: (start, end) => session.views.timeline?.showRange(start, end),
+      setTimelineMode: (mode, on) => {
+        if (mode === "snapping") session.ui.setState({ snapping: on });
+        else if (mode === "razor") session.ui.setState({ tool: on ? "razor" : "select" });
+      },
       openImportDialog: () => session.views.pickMedia?.(),
       openExportDialog: () => session.ui.setState({ dialog: "export" }),
+      layout: () => editorLayout(session.ui.getState(), isFullscreen()),
+      setLayout: (change) => {
+        const next = withLayout(session.ui.getState(), change);
+        session.ui.setState(next);
+        savePanels(next.panels);
+        return editorLayout(session.ui.getState(), isFullscreen());
+      },
+      preferences: () => editorPreferences(session.ui.getState(), config.backendUrl),
+      setPreference: (key, value) => session.ui.setState(withPreference(key, value)),
+      clearPlaybackCache: () => session.clearPreviewCaches(),
       notify: (message, level = "info") => {
         if (level === "error") toast.error(message);
         else if (level === "warning") toast.warning(message);
@@ -143,6 +199,12 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
         const media = await prepare(session, new File([bytes as BlobPart], name, { type: contentType }));
         return media.path;
       },
+      // Missing = what Project Files offers to relink: not in this browser and not loadable from Zenvi Cloud.
+      async missing(files) {
+        await session.media.sync(session.project);
+        const gone = new Set(session.media.missing(session.project).map((f) => f.id));
+        return files.map((f) => gone.has(f.id));
+      },
     },
     backend: {
       baseUrl: config.backendUrl,
@@ -156,11 +218,49 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       async open() {
         throw new Error("Open projects from the Zenvi projects page in the web editor.");
       },
+      // A project file's text (title SVGs to edit, subtitles in the bin), by its path or id.
+      async readText(path) {
+        const file = session.project.files.find((f) => f.path === path || f.id === path);
+        const spec = (file ? session.media.spec(file.id) : undefined) ?? intakeOf(session).specs.get(path) ?? resolveBundledMedia(path);
+        if (!spec) throw new Error(`${path} is not loaded in this project`);
+        const blob = await blobOf(spec);
+        if (blob.size > MAX_TEXT_BYTES) throw new Error(`${path} is too large to read as text`);
+        return blob.text();
+      },
       // Exported captions and other text files arrive as downloads.
       async writeText(path, text, contentType) {
-        const name = safeFileName(path.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") || session.meta.getState().name, path.match(/\.([a-z0-9]+)$/i)?.[1] ?? "txt");
+        const name = downloadName(path, session.meta.getState().name, "txt");
         downloadBlob(new Blob([text], { type: contentType ?? "text/plain;charset=utf-8" }), name);
         return name;
+      },
+      // Saved frames too (a download never replaces a file: the browser renames it).
+      async writeBytes(path, bytes, contentType) {
+        const name = downloadName(path, session.meta.getState().name, "png");
+        downloadBlob(new Blob([bytes as BlobPart], { type: contentType }), name);
+        return name;
+      },
+      // Copies of project media download from this browser's storage (or Zenvi Cloud); sub-clips render first.
+      async exportMedia(file, name, _folder, render) {
+        if (render) {
+          if (!exportAvailable) throw new Error("this browser cannot export video");
+          const blob = await startExport(render.project, render.options, () => {}, session.media).promise;
+          downloadBlob(blob, name);
+          return { location: name, folder: "your browser's downloads", existed: false };
+        }
+        const spec = session.media.spec(file.id);
+        if (!spec) throw new Error(`the media of ${String(file.name ?? file.path)} is not loaded (relink it first)`);
+        downloadBlob(await blobOf(spec), name);
+        return { location: name, folder: "your browser's downloads", existed: false };
+      },
+      currentPath: () => session.meta.getState().id,
+      // The projects in this browser, as the projects page lists them (most recently opened or edited first).
+      async recentProjects() {
+        const projects = await projectRepository().list();
+        const at = (p: (typeof projects)[number]) => Math.max(p.openedAt ?? 0, p.updatedAt);
+        return projects
+          .sort((a, b) => at(b) - at(a))
+          .slice(0, 10)
+          .map((p) => ({ path: p.id, name: p.name, exists: true, modifiedAt: p.updatedAt / 1000 }));
       },
     },
     audio: {
@@ -170,18 +270,30 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       async decodePcm(path, options) {
         return decodePcm(specFor(path), options);
       },
+      // Speech recognition through the Zenvi backend, as the signed-in person.
+      async transcribe(path, options) {
+        const file = session.project.files.find((f) => f.path === path || f.id === path);
+        return transcribeSpeech(specFor(path), { ...options, name: String(file?.name ?? path.split(/[\\/]/).pop() ?? "") });
+      },
     },
     log: (message) => console.debug(`[zenvi tools] ${message}`),
   };
   if (exportAvailable) {
     host.exporter = {
+      // The browser downloads the file: export_video_tool's file_name names it, and there are no folders.
+      delivery: "download",
+      defaultName: () => session.meta.getState().name,
       async export(project, options: ExportOptions, onProgress): Promise<ExportResult> {
-        const job = startExport(project, options, (f) => onProgress?.(f), session.media);
+        const warnings: string[] = [];
+        const job = startExport(project, options, (f) => onProgress?.(f), session.media, { onNotes: (notes) => warnings.push(...notes) });
         const blob = await job.promise;
-        const name = safeFileName(session.meta.getState().name, extensionForMime(blob.type));
+        // The planned name with the extension of what the browser wrote (it may fall back to WebM).
+        const planned = (options.output ?? "").split(/[\\/]/).pop()?.replace(/\.[^.]*$/, "") ?? "";
+        const name = safeFileName(planned || session.meta.getState().name, extensionForMime(blob.type));
         downloadBlob(blob, name);
-        return { location: name, bytes: blob.size, mimeType: blob.type };
+        return { location: name, bytes: blob.size, mimeType: blob.type, ...(warnings.length > 0 ? { warnings } : {}) };
       },
+      supports: (format, videoCodec, audioCodec, frame) => canExportWith(format, videoCodec, audioCodec, frame),
     };
   }
   host.assets = { readText: readAsset };

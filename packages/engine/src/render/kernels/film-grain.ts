@@ -155,7 +155,40 @@ export const filmGrain: KernelSpec = {
     const scaleX = width > 0 ? f32(refW / width) : 1;
     const scaleY = height > 0 ? f32(refH / height) : 1;
 
-    const fineCache = new Float32Array(8);
+    if (width === 0 || height === 0) return;
+
+    // What depends on x alone, once per image instead of once per pixel.
+    const fineIxOf = new Int32Array(width);
+    const softIxOf = new Int32Array(width);
+    const softSxOf = new Float32Array(width);
+    const clumpIxOf = new Int32Array(width);
+    const clumpSxOf = new Float32Array(width);
+    for (let x = 0; x < width; x += 1) {
+      const refX = f32(x * scaleX);
+      fineIxOf[x] = Math.trunc(f32(refX * fineFrequency));
+      if (useSoft) {
+        const srx = f32(refX * softFrequency);
+        softIxOf[x] = Math.trunc(srx);
+        softSxOf[x] = smooth(f32(srx - softIxOf[x]!));
+      }
+      if (useClump) {
+        const crx = f32(refX * clumpFrequency);
+        clumpIxOf[x] = Math.trunc(crx);
+        clumpSxOf[x] = smooth(f32(crx - clumpIxOf[x]!));
+      }
+    }
+    // Hashed noise per column of cells, kept while the pixel rows stay in one row of cells (the C++ hashes again on
+    // every pixel row; the values are pure functions of the cell, so the bytes are the same). A stamp is the cell row
+    // a column holds.
+    const lastX = width - 1;
+    const fineNoise = new Float32Array((fineIxOf[lastX]! + 1) * 8);
+    const fineStamp = new Int32Array(fineIxOf[lastX]! + 1).fill(-1);
+    const softTop = new Float32Array((softIxOf[lastX]! + 2) * 8);
+    const softBottom = new Float32Array((softIxOf[lastX]! + 2) * 8);
+    const softStamp = new Int32Array(softIxOf[lastX]! + 2).fill(-1);
+    const clumpTop = new Float32Array((clumpIxOf[lastX]! + 2) * 4);
+    const clumpBottom = new Float32Array((clumpIxOf[lastX]! + 2) * 4);
+    const clumpStamp = new Int32Array(clumpIxOf[lastX]! + 2).fill(-1);
     const softCol0 = new Float32Array(8);
     const softCol1 = new Float32Array(8);
     const clumpCol0 = new Float32Array(4);
@@ -181,6 +214,7 @@ export const filmGrain: KernelSpec = {
         clumpSy = smooth(f32(cry - clumpIy0));
       }
       let cachedFineIx = -1;
+      let fineAt = 0;
       let cachedSoftIx0 = -1;
       let cachedClumpIx0 = -1;
 
@@ -210,65 +244,85 @@ export const filmGrain: KernelSpec = {
         const tone = fmaf(f32(L * L), highlightStrength, fmaf(f32(dark * dark), shadowStrength, f32(midtoneStrength * midtone)));
         if (tone <= EPSILON) continue;
 
-        const refX = f32(x * scaleX);
-        const fineIx = Math.trunc(f32(refX * fineFrequency));
+        const fineIx = fineIxOf[x]!;
         if (fineIx !== cachedFineIx) {
           cachedFineIx = fineIx;
-          for (let t = 0; t < numTimes; t += 1) {
-            for (let s = 0; s < numSalts; s += 1) fineCache[t * 4 + s] = hashSigned(baseSeed, fineIx, fineIy, buckets[t]!, SALTS[s]!);
+          fineAt = fineIx * 8;
+          if (fineStamp[fineIx] !== fineIy) {
+            fineStamp[fineIx] = fineIy;
+            for (let t = 0; t < numTimes; t += 1) {
+              for (let s = 0; s < numSalts; s += 1) fineNoise[fineAt + t * 4 + s] = hashSigned(baseSeed, fineIx, fineIy, buckets[t]!, SALTS[s]!);
+            }
           }
         }
 
         let softSx = 0;
         if (useSoft) {
-          const srx = f32(refX * softFrequency);
-          const softIx0 = Math.trunc(srx);
+          const softIx0 = softIxOf[x]!;
           if (softIx0 !== cachedSoftIx0) {
             cachedSoftIx0 = softIx0;
+            for (let c = softIx0; c <= softIx0 + 1; c += 1) {
+              if (softStamp[c] === softIy0) continue;
+              softStamp[c] = softIy0;
+              for (let t = 0; t < numTimes; t += 1) {
+                for (let s = 0; s < numSalts; s += 1) {
+                  const salt = (SALTS[s]! ^ SOFT_XOR) >>> 0;
+                  softTop[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0, buckets[t]!, salt);
+                  softBottom[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0 + 1, buckets[t]!, salt);
+                }
+              }
+            }
+            const at0 = softIx0 * 8;
+            const at1 = at0 + 8;
             for (let t = 0; t < numTimes; t += 1) {
               for (let s = 0; s < numSalts; s += 1) {
-                const salt = (SALTS[s]! ^ SOFT_XOR) >>> 0;
-                const n00 = hashSigned(baseSeed, softIx0, softIy0, buckets[t]!, salt);
-                const n10 = hashSigned(baseSeed, softIx0 + 1, softIy0, buckets[t]!, salt);
-                const n01 = hashSigned(baseSeed, softIx0, softIy0 + 1, buckets[t]!, salt);
-                const n11 = hashSigned(baseSeed, softIx0 + 1, softIy0 + 1, buckets[t]!, salt);
-                softCol0[t * 4 + s] = fmaf(f32(n01 - n00), softSy, n00);
-                softCol1[t * 4 + s] = fmaf(f32(n11 - n10), softSy, n10);
+                const k = t * 4 + s;
+                const n00 = softTop[at0 + k]!;
+                const n10 = softTop[at1 + k]!;
+                softCol0[k] = fmaf(f32(softBottom[at0 + k]! - n00), softSy, n00);
+                softCol1[k] = fmaf(f32(softBottom[at1 + k]! - n10), softSy, n10);
               }
             }
           }
-          softSx = smooth(f32(srx - cachedSoftIx0));
+          softSx = softSxOf[x]!;
         }
 
         let clumpSx = 0;
         if (useClump) {
-          const crx = f32(refX * clumpFrequency);
-          const clumpIx0 = Math.trunc(crx);
+          const clumpIx0 = clumpIxOf[x]!;
           if (clumpIx0 !== cachedClumpIx0) {
             cachedClumpIx0 = clumpIx0;
+            for (let c = clumpIx0; c <= clumpIx0 + 1; c += 1) {
+              if (clumpStamp[c] === clumpIy0) continue;
+              clumpStamp[c] = clumpIy0;
+              for (let s = 0; s < numSalts; s += 1) {
+                const salt = (SALTS[s]! ^ CLUMP_XOR) >>> 0;
+                clumpTop[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0, time0, salt);
+                clumpBottom[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0 + 1, time0, salt);
+              }
+            }
+            const at0 = clumpIx0 * 4;
+            const at1 = at0 + 4;
             for (let s = 0; s < numSalts; s += 1) {
-              const salt = (SALTS[s]! ^ CLUMP_XOR) >>> 0;
-              const n00 = hashSigned(baseSeed, clumpIx0, clumpIy0, time0, salt);
-              const n10 = hashSigned(baseSeed, clumpIx0 + 1, clumpIy0, time0, salt);
-              const n01 = hashSigned(baseSeed, clumpIx0, clumpIy0 + 1, time0, salt);
-              const n11 = hashSigned(baseSeed, clumpIx0 + 1, clumpIy0 + 1, time0, salt);
-              clumpCol0[s] = fmaf(f32(n01 - n00), clumpSy, n00);
-              clumpCol1[s] = fmaf(f32(n11 - n10), clumpSy, n10);
+              const n00 = clumpTop[at0 + s]!;
+              const n10 = clumpTop[at1 + s]!;
+              clumpCol0[s] = fmaf(f32(clumpBottom[at0 + s]! - n00), clumpSy, n00);
+              clumpCol1[s] = fmaf(f32(clumpBottom[at1 + s]! - n10), clumpSy, n10);
             }
           }
-          clumpSx = smooth(f32(crx - cachedClumpIx0));
+          clumpSx = clumpSxOf[x]!;
         }
 
         // Per-salt grain (FilmGrain.cpp:321-344).
         for (let s = 0; s < numSalts; s += 1) {
-          let g0 = fineCache[s]!;
+          let g0 = fineNoise[fineAt + s]!;
           if (useSoft) {
             const soft0 = fmaf(f32(softCol1[s]! - softCol0[s]!), softSx, softCol0[s]!);
             g0 = fmaf(f32(soft0 - g0), softness, g0);
           }
           let grain = g0;
           if (useTemporal) {
-            let g1 = fineCache[4 + s]!;
+            let g1 = fineNoise[fineAt + 4 + s]!;
             if (useSoft) {
               const soft1 = fmaf(f32(softCol1[4 + s]! - softCol0[4 + s]!), softSx, softCol0[4 + s]!);
               g1 = fmaf(f32(soft1 - g1), softness, g1);

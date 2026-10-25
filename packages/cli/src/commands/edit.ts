@@ -244,13 +244,14 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .action(async (clip: string, factorText: string) => {
       const factor = Number(factorText);
       if (!Number.isFinite(factor) || factor === 0) throw new CliError(`Not a speed factor: ${factorText}`, 2);
+      // The desktop's argument names, which the portable engine and the desktop app both take.
       await runToolCommand(
         ctx,
         "set_clip_speed_tool",
         toolArgs(ctx, "set_clip_speed_tool", [
-          [CLIP, clip],
-          [["factor", "speed", "rate"], Math.abs(factor)],
-          [["direction"], factor < 0 ? "backward" : undefined],
+          [["timeline_clip_ids"], [clip]],
+          [["speed"], Math.abs(factor)],
+          [["reverse"], factor < 0 ? true : undefined],
         ]),
       );
     });
@@ -310,14 +311,15 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .option("--audio", "only audio effects")
     .option("--video", "only video effects")
     .action(async (opts: { audio?: boolean; video?: boolean }) => {
-      await runToolCommand(ctx, "list_effects_tool", opts.audio ? { category: "audio" } : opts.video ? { category: "video" } : {});
+      // The desktop's argument names, which the portable engine and the desktop app both take.
+      await runToolCommand(ctx, "list_effects_tool", opts.audio ? { kind: "audio" } : opts.video ? { kind: "video" } : {});
     });
   effect
     .command("rm")
     .description("remove an effect (ids are in the clip's receipt or `zenvi clips`)")
     .argument("<effect>", "effect id")
     .action(async (id: string) => {
-      await runToolCommand(ctx, "remove_effect_tool", toolArgs(ctx, "remove_effect_tool", [[["effect_id", "effect"], id]]));
+      await runToolCommand(ctx, "remove_effect_tool", { effect_ids: [id] });
     });
   effect
     .command("set")
@@ -390,6 +392,9 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .argument("<points...>", "time=value (timeline time), or f<frame>=value (the clip's 1-based source frame)")
     .option("--clip-time", "times are seconds into the clip's source instead of timeline times")
     .action(async (clip: string, property: string, points: string[], opts: { clipTime?: boolean }) => {
+      // The tool takes each time in the unit it was given (develop's set_keyframes_tool): timeline seconds,
+      // or with --clip-time seconds in the clip's source; f<frame> is the keyframe X itself.
+      const unit = opts.clipTime ? "source_seconds" : "timeline_seconds";
       const parsed = points.map((p) => {
         const eq = p.indexOf("=");
         if (eq <= 0) throw new CliError(`Use time=value, e.g. 0=1 2.5=0 (got "${p}").`, 2);
@@ -397,38 +402,17 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
         const value = Number(p.slice(eq + 1));
         if (!Number.isFinite(value)) throw new CliError(`Not a number: ${p.slice(eq + 1)}`, 2);
         const frame = /^f(\d+)$/i.exec(at);
-        return frame ? { frame: Number(frame[1]), value } : { seconds: parseTime(at)!, value };
+        return frame ? { frame: Number(frame[1]), value } : { [unit]: parseTime(at)!, value };
       });
-      await withExecutor(ctx, async (executor) => {
-        let points_ = parsed;
-        if (!opts.clipTime && parsed.some((p) => p.seconds !== undefined)) {
-          // The tool keys points by the clip's source time; the CLI speaks timeline time.
-          const listing = await executor.call("list_clips_tool", {});
-          const clips = (listing.receipt?.data as { clips?: Array<{ id?: unknown; position?: unknown; start?: unknown }> } | undefined)?.clips ?? [];
-          const found = clips.find((c) => c.id === clip);
-          if (!found || typeof found.position !== "number" || typeof found.start !== "number") {
-            throw new CliError(`Cannot find timeline clip '${clip}' to place its keyframes; give f<frame>=value points or --clip-time.`);
-          }
-          const { position, start } = found as { position: number; start: number };
-          points_ = parsed.map((p) => {
-            if (p.seconds === undefined) return p;
-            const seconds = p.seconds - position + start;
-            if (seconds < 0) throw new CliError(`${p.seconds}s is before the clip starts on the timeline (${position}s).`, 2);
-            return { seconds: Math.round(seconds * 1e6) / 1e6, value: p.value };
-          });
-        }
-        printOutcome(
-          ctx,
-          await executor.call(
-            "set_keyframes_tool",
-            toolArgs(ctx, "set_keyframes_tool", [
-              [CLIP, clip],
-              [["property"], property],
-              [["points"], points_],
-            ]),
-          ),
-        );
-      });
+      await runToolCommand(
+        ctx,
+        "set_keyframes_tool",
+        toolArgs(ctx, "set_keyframes_tool", [
+          [CLIP, clip],
+          [["property"], property],
+          [["points"], parsed],
+        ]),
+      );
     });
 
   const marker = program.command("marker").description("timeline markers");
@@ -439,13 +423,12 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
     .action(async (time: string, label?: string) => {
       await runToolCommand(ctx, "add_marker_tool", { position_seconds: parseTime(time), ...(label ? { label } : {}) });
     });
-  // The desktop contract has no marker removal tool; offer it when the catalog does.
   if (ctx.registry.get("remove_marker_tool")) {
     marker
       .command("rm")
-      .argument("<marker>", "marker id")
+      .argument("<marker>", "marker id or name")
       .action(async (id: string) => {
-        await runToolCommand(ctx, "remove_marker_tool", toolArgs(ctx, "remove_marker_tool", [[["marker_id", "id"], id]]));
+        await runToolCommand(ctx, "remove_marker_tool", toolArgs(ctx, "remove_marker_tool", [[["markers", "marker_id", "id"], [id]]]));
       });
   }
 

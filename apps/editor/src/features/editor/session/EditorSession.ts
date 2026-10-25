@@ -51,6 +51,10 @@ export interface TimelineController {
   centerOnPlayhead(): void;
   /** Scroll so `seconds` is visible (no-op when it already is). */
   reveal(seconds: number): void;
+  /** Timeline seconds at the left and right edges of the visible tracks. */
+  visibleRange(): { start: number; end: number };
+  /** Zoom and scroll so timeline seconds [start, end] fill the visible width. */
+  showRange(start: number, end: number): void;
 }
 
 /** Hooks React views register so commands can reach them. */
@@ -543,6 +547,13 @@ export class EditorSession {
     for (const dispose of this.disposers.splice(0)) dispose();
     this.displayListeners.clear();
     this.previews.dispose();
+  }
+
+  /** Drop cached filmstrips and waveforms and draw the frame again (the desktop's Clear Cache). */
+  clearPreviewCaches(): void {
+    this.previews.clear();
+    this.engine?.setProject(this.displayProject());
+    for (const l of [...this.displayListeners]) l();
   }
 
   // -------------------------------------------------------------------------

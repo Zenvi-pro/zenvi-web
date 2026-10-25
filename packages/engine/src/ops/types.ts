@@ -46,6 +46,14 @@ export interface KeyframePointInput {
   handleLeft?: Coordinate;
   handleRight?: Coordinate;
   handleType?: HandleType;
+  /**
+   * A bezier ease preset for the move INTO this point, as CSS cubic-bezier
+   * handles [x1, y1, x2, y2] (`KEYFRAME_BEZIER_PRESETS`), applied once the
+   * curve is merged: this point becomes BEZIER with handle_left (x2, y2) and
+   * the point before it gets handle_right (x1, y1) (zenvi-core
+   * clip_props_model.apply_ease).
+   */
+  ease?: readonly [number, number, number, number];
 }
 
 /**

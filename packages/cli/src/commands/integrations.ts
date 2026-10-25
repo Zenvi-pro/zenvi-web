@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
 import { inspectHosts } from "@zenvi/adobe-link";
-import { binaryVersion, encoderNames, FontIndex, initResvg, resolveBinary } from "@zenvi/render-node";
+import { binaryVersion, encoderNames, findYtDlp, FontIndex, initResvg, resolveBinary, runBinary } from "@zenvi/render-node";
 import { AGENT_TARGETS, claudeDesktopConfigPath, codexConfigPath, mcpConfig, type AgentTarget } from "../agents/mcp-config.js";
 import { selfMcpCommand } from "../agents/self-command.js";
 import { pushProject } from "../cloud/sync.js";
@@ -155,6 +155,14 @@ export async function runDoctor(ctx: CommandContext): Promise<DoctorCheck[]> {
   } catch (error) {
     checks.push({ name: "titles/fonts", level: "warn", detail: `SVG renderer unavailable: ${(error as Error).message}` });
   }
+  const ytDlp = findYtDlp(ctx.env);
+  const ytDlpVersion = ytDlp ? await runBinary(ytDlp, ["--version"], { timeoutMs: 15_000, env: ctx.env }).then((r) => r.stdout.toString("utf8").trim(), () => undefined) : undefined;
+  checks.push({
+    name: "yt-dlp",
+    level: ytDlpVersion ? "ok" : "warn",
+    detail: ytDlpVersion ? `${ytDlpVersion} (${ytDlp})` : ytDlp ? `${ytDlp} does not run` : "not found",
+    hint: "Optional: ingest_web_video_tool fetches YouTube and other web page videos with it (brew install yt-dlp, winget install yt-dlp, or pip install -U yt-dlp; ZENVI_YT_DLP sets its path).",
+  });
   const toolCount = ctx.registry.tools.length;
   checks.push({ name: "tools", level: toolCount > 0 ? "ok" : "fail", detail: `${toolCount} editing tools in this build` });
   try {

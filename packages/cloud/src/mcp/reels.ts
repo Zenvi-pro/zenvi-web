@@ -16,7 +16,23 @@
  * arrived in time is used, the rest is reported.
  */
 
-import { pickMusic, pickStockFile, pickStockVideo, REEL_STYLE_IDS, REEL_STYLES, type FreesoundSound, type PexelsVideo, type Project } from "@zenvi/engine";
+import {
+  isMotionStyleId,
+  licenceName,
+  licenceRank,
+  MOTION_STYLE_IDS,
+  MOTION_STYLES,
+  pickMusic,
+  pickStockFile,
+  pickStockVideo,
+  REEL_STYLE_IDS,
+  REEL_STYLES,
+  type FreesoundSound,
+  type MotionStyleId,
+  type PexelsVideo,
+  type Project,
+  type ReelStyleId,
+} from "@zenvi/engine";
 import { z } from "zod";
 import { SCOPE_WRITE } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
@@ -39,9 +55,11 @@ const MAX_SOURCES = 10;
 /**
  * How many stock clips to take per search: about one clip for every two
  * cuts the style makes in the reel's length (at its own tempo), so a fast
- * cut does not keep showing the same shot; at most three per search.
+ * cut does not keep showing the same shot; at most three per search. A
+ * motion style shows a fixed number of pictures (its cards, crops, steps).
  */
-export function stockClipsPerQuery(style: keyof typeof REEL_STYLES, seconds: number | undefined, queries: number): number {
+export function stockClipsPerQuery(style: ReelStyleId | MotionStyleId, seconds: number | undefined, queries: number): number {
+  if (isMotionStyleId(style)) return Math.max(1, Math.min(3, Math.ceil(Math.min(MAX_SOURCES, MOTION_STYLES[style].media) / Math.max(1, queries))));
   const s = REEL_STYLES[style];
   const beats = (seconds ?? s.defaultSeconds) * (s.defaultBpm / 60);
   const pattern = [...s.pattern, ...(s.climax ?? s.pattern)];
@@ -94,11 +112,14 @@ const inputSchema = () => z.object({
   prompt: z.string().min(1).max(1000).describe("The person's ask, in their words. It names the project."),
   name: z.string().min(1).max(200).optional().describe("Project name (default: from the prompt)."),
   style: z
-    .enum(REEL_STYLE_IDS)
+    .enum([...REEL_STYLE_IDS, ...MOTION_STYLE_IDS])
     .optional()
     .describe(
-      "hype (fast cuts, flashes: launches, sport, travel), cinematic (moody, filmic), highlight (the person's own clips, building to the big moment), " +
-        "match_cut (shapes that line up, one cut per beat), minimal (calm, long holds), editorial (graphic, labels), retro (VHS). Default hype.",
+      "Footage-led: hype (fast cuts, flashes: launches, sport, travel), cinematic (moody, filmic), highlight (the person's own clips, building to the big moment), " +
+        "match_cut (shapes that line up, one cut per beat), minimal (calm, long holds), editorial (graphic, labels), retro (VHS). " +
+        "Motion-designed (graphics laid out and animated on the beat, the footage inside them): ui_promo (app or tool promo: a search types the hook, footage in UI cards, a pointer clicks, a scrolling word list, a logo card), " +
+        "editorial_motion (specimen-sheet type with image tiles, labelled crop boxes over a shot), product_callout (a product on a dark field with leader lines out to its features), " +
+        "tutorial (how-to steps: footage in cards with numbered captions and arrows, ending on 'Save this'). Default hype.",
     ),
   format: z.enum(PROJECT_FORMATS).optional().describe("Frame (default vertical_1080p for Reels, TikTok and Shorts)."),
   duration_seconds: z.number().min(5).max(60).optional().describe("Target length, seconds (default per style, 12-20)."),
@@ -116,7 +137,14 @@ const inputSchema = () => z.object({
     .array(z.string().max(40))
     .max(MAX_SOURCES)
     .optional()
-    .describe("Small labels on the shots (editorial style): one per attached file / link / stock search, in the same story order (\"\" for none)."),
+    .describe(
+      "Small labels on the shots (editorial style), card captions (ui_promo), crop labels (editorial_motion) or step captions (tutorial): one per attached file / link / stock search, in the same story order (\"\" for none).",
+    ),
+  words: z
+    .array(z.string().min(1).max(48))
+    .max(12)
+    .optional()
+    .describe("Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the product's features as 'Name: value' (product_callout), each step's label box (tutorial)."),
   hook: z.string().max(80).optional().describe("Opening title, 2-6 punchy words."),
   end_card: z.string().max(80).optional().describe("Closing title: a call to action, a name, a date."),
   end_card_subtitle: z.string().max(80).optional(),
@@ -129,6 +157,8 @@ const output = z.object({
   url: z.string(),
   duration_seconds: z.number(),
   shots: z.number(),
+  /** Motion styles: how many scenes. */
+  scenes: z.number().optional(),
   bpm: z.number(),
   brief: z.object({ format: z.string(), story: z.string(), pace: z.string(), look: z.string() }),
   music: z.object({ name: z.string(), credit: z.string(), license: z.string(), source: z.string() }).optional(),
@@ -144,6 +174,10 @@ const DEFAULT_MUSIC: Record<string, string> = {
   minimal: "calm acoustic ambient",
   editorial: "minimal electronic groove",
   retro: "retro synthwave",
+  ui_promo: "upbeat modern tech pop",
+  editorial_motion: "minimal electronic beat",
+  product_callout: "dark electronic pulse",
+  tutorial: "lofi chill beat",
 };
 
 interface Fetched {
@@ -241,7 +275,7 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
             }
             const clips: { video: PexelsVideo; link: string }[] = [];
             for (let n = 0; n < perQuery; n += 1) {
-              const video = pickStockVideo(result.value.videos ?? [], portrait, used);
+              const video = pickStockVideo(result.value.videos ?? [], portrait, used, 4, query);
               const link = video ? pickStockFile(video, frameWidth, portrait)?.link : undefined;
               if (!video || !link) break;
               used.add(video.id);
@@ -288,6 +322,11 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
               const sound = found.error ? undefined : pickMusic(found.sounds ?? [], args.duration_seconds ?? 15);
               const preview = sound?.previews?.hq_mp3 || sound?.previews?.lq_mp3;
               if (sound && preview) {
+                if (licenceRank(sound.license) === 2) {
+                  warnings.push(
+                    `The music is licensed for non-commercial use only (${licenceName(sound.license)}): fine for a personal post, not for an ad or a business's promo. Swap the track before using the reel commercially.`,
+                  );
+                }
                 const name = `${sound.name.replace(/\.[a-z0-9]+$/i, "").replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40) || "music"}.mp3`;
                 musicJobs.push({
                   label: "music",
@@ -363,6 +402,7 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
               ...(args.hook ? { hook: args.hook } : {}),
               ...(args.end_card ? { end_card: args.end_card } : {}),
               ...(args.end_card_subtitle ? { end_card_subtitle: args.end_card_subtitle } : {}),
+              ...(args.words ? { words: args.words } : {}),
             });
           } finally {
             await dispose();
@@ -370,7 +410,7 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
         });
         const result = built.value;
         if (!result.ok) throw new ApiError(422, "reel_failed", displayText(result));
-        const receipt = result.data as { warnings?: string[]; data?: { duration: number; bpm: number; shots: unknown[]; brief: { format: string; story: string; pace: string; look: string } } };
+        const receipt = result.data as { warnings?: string[]; data?: { duration: number; bpm: number; shots?: unknown[]; scenes?: unknown[]; brief: { format: string; story: string; pace: string; look: string } } };
         const reel = receipt.data!;
         warnings.push(...(receipt.warnings ?? []));
 
@@ -391,7 +431,8 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
             name: meta.meta.name,
             url: session.openUrl,
             duration_seconds: reel.duration,
-            shots: reel.shots.length,
+            shots: reel.shots?.length ?? reel.scenes?.length ?? 0,
+            ...(reel.scenes ? { scenes: reel.scenes.length } : {}),
             bpm: Math.round(reel.bpm),
             brief,
             ...(music ? { music: { name: music.name, credit: music.credit, license: music.license ?? "", source: music.source } } : {}),

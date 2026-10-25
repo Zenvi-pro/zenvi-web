@@ -83,6 +83,19 @@ export function media(path: string, info: ReaderInfo = infoForPath(path), name?:
   return name === undefined ? { path, info } : { path, info, name };
 }
 
+/** What the fake host's speech recognition hears in any media: real word timings, punctuated like the desktop's. */
+export const SPOKEN_WORDS = [
+  { text: "Hello", startSec: 0.5, endSec: 0.9 },
+  { text: "and", startSec: 0.9, endSec: 1.1 },
+  { text: "welcome.", startSec: 1.1, endSec: 2.0 },
+  { text: "Um,", startSec: 2.6, endSec: 2.9 },
+  { text: "today", startSec: 3.0, endSec: 3.4 },
+  { text: "we", startSec: 3.4, endSec: 3.5 },
+  { text: "talk", startSec: 3.5, endSec: 3.8 },
+  { text: "about", startSec: 3.8, endSec: 4.1 },
+  { text: "cameras.", startSec: 4.1, endSec: 4.6 },
+];
+
 export const TRANSCRIPT_CUES = [
   { start: 0.5, end: 2.0, text: "Hello and welcome" },
   { start: 2.5, end: 4.5, text: "today we talk about cameras" },

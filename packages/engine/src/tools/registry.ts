@@ -7,31 +7,55 @@
  *   untouched) → capability check → run (at most one `doc.transaction`) →
  *   contract-3 receipt as ToolResult.
  *
- * Contract tools come first, in zenvi-core TOOL_SCHEMAS order, then the
- * direct tools for coding agents. `runTool` never throws: unknown names and
+ * Contract tools come first, in the desktop's order (schemas.gen.ts), then
+ * the direct tools for coding agents. Desktop tools not ported yet
+ * (pending.ts) are in neither: no surface lists them and `runTool` refuses
+ * them like any unknown name. `runTool` never throws: unknown names and
  * unexpected failures come back as receipts too.
  */
 
+import { animatedTitleTools } from "./catalog/animated-titles.js";
 import { audioTools } from "./catalog/audio.js";
+import { captionTools } from "./catalog/captions.js";
+import { clipPropsTools } from "./catalog/clip-props.js";
 import { clipTools } from "./catalog/clips.js";
+import { colorAgentTools } from "./catalog/color-agent.js";
+import { comfyuiRecordingTools } from "./catalog/comfyui-recording.js";
 import { directTools } from "./catalog/direct.js";
+import { effectsColorTools } from "./catalog/effects-color.js";
+import { effectsColorAnalysisTools } from "./catalog/effects-color-analysis.js";
+import { effectsColorLookTools } from "./catalog/effects-color-looks.js";
 import { exportTools } from "./catalog/export.js";
 import { generationTools } from "./catalog/generation.js";
 import { inspectTools } from "./catalog/inspect.js";
 import { mediaTools } from "./catalog/media.js";
+import { mediaFilesTools } from "./catalog/media-files.js";
+import { mediaFilesTransitionTools } from "./catalog/media-files-transitions.js";
 import { metadataTools } from "./catalog/metadata.js";
 import { motionTools } from "./catalog/motion.js";
+import { motionTemplateTools } from "./catalog/motion-templates.js";
+import { overlayTools } from "./catalog/overlays.js";
 import { phase3Tools } from "./catalog/phase3.js";
 import { playbackTools } from "./catalog/playback.js";
 import { projectTools } from "./catalog/project.js";
+import { projectExportTools } from "./catalog/project-export.js";
+import { projectPrefsTools } from "./catalog/project-export-prefs.js";
+import { projectProfileTools } from "./catalog/project-export-profiles.js";
+import { projectRenderTools } from "./catalog/project-export-render.js";
 import { reelTools } from "./catalog/reels.js";
 import { searchTools } from "./catalog/search.js";
 import { speechTools } from "./catalog/speech-tools.js";
 import { stockTools } from "./catalog/stock.js";
 import { timelineTools } from "./catalog/timeline.js";
+import { timelineEditTools } from "./catalog/timeline-edit.js";
+import { timelineTimeTools } from "./catalog/timeline-time.js";
+import { tracksNavTools } from "./catalog/tracks-nav.js";
+import { titleTemplateTools } from "./catalog/title-templates.js";
 import { titleTools } from "./catalog/titles.js";
 import { transitionTools } from "./catalog/transitions.js";
+import { webVideoTools } from "./catalog/web-video.js";
 import { missingCapabilities, resultFor, type CatalogTool } from "./define.js";
+import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_TOOLS } from "./pending.js";
 import { failed, refused, type ToolReceipt } from "./receipt.js";
 import { CONTRACT_TOOL_NAMES } from "./schemas.gen.js";
 import type { ToolContext, ToolHost, ToolResult, ToolSurface } from "./types.js";
@@ -45,6 +69,8 @@ function buildCatalog(): readonly CatalogTool[] {
   const implemented = [
     ...projectTools,
     ...timelineTools,
+    ...timelineEditTools,
+    ...timelineTimeTools,
     ...clipTools,
     ...playbackTools,
     ...audioTools,
@@ -57,22 +83,56 @@ function buildCatalog(): readonly CatalogTool[] {
     ...inspectTools,
     ...speechTools,
     ...generationTools,
+    ...webVideoTools,
+    ...comfyuiRecordingTools,
     ...transitionTools,
+    ...mediaFilesTransitionTools,
+    ...mediaFilesTools,
     ...titleTools,
+    ...titleTemplateTools,
+    ...animatedTitleTools,
+    ...captionTools,
+    ...overlayTools,
+    ...clipPropsTools,
+    ...tracksNavTools,
+    ...effectsColorTools,
+    ...effectsColorLookTools,
+    ...effectsColorAnalysisTools,
+    ...colorAgentTools,
+    ...projectExportTools,
+    ...projectProfileTools,
+    ...projectRenderTools,
+    ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...reelTools, ...stockTools]) {
+  for (const tool of [...implemented, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
-  const missing = CONTRACT_TOOL_NAMES.filter((name) => !byName.has(name));
-  if (missing.length > 0) throw new Error(`tool catalog: contract tools without an implementation: ${missing.join(", ")}`);
   const extra = implemented.filter((tool) => !tool.contract);
   if (extra.length > 0) throw new Error(`tool catalog: non-contract tools outside the direct list: ${extra.map((t) => t.name).join(", ")}`);
-  return [...CONTRACT_TOOL_NAMES.map((name) => byName.get(name)!), ...directTools, ...reelTools, ...stockTools];
+  // Every desktop tool is ported, pending, or (for now) a direct tool's name.
+  const contract: CatalogTool[] = [];
+  const problems: string[] = [];
+  for (const name of CONTRACT_TOOL_NAMES) {
+    const tool = byName.get(name);
+    if (PENDING_DESKTOP_TOOLS.has(name)) {
+      if (tool) problems.push(`${name} is implemented: remove it from PENDING_DESKTOP_TOOLS`);
+    } else if (DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name)) {
+      if (!tool || tool.contract) problems.push(`${name} is not a direct tool: remove it from DESKTOP_NAMES_ON_DIRECT_TOOLS`);
+    } else if (!tool) {
+      problems.push(`${name} has no implementation: port it or add it to PENDING_DESKTOP_TOOLS`);
+    } else if (!tool.contract) {
+      problems.push(`direct tool ${name} has a desktop tool's name: add it to DESKTOP_NAMES_ON_DIRECT_TOOLS`);
+    } else {
+      contract.push(tool);
+    }
+  }
+  if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
+  return [...contract, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools];
 }
 
-/** Every tool: the 73 contract tools (TOOL_SCHEMAS order), then the direct tools. */
+/** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */
 export const allTools: readonly CatalogTool[] = buildCatalog();
 
 const TOOLS_BY_NAME: ReadonlyMap<string, CatalogTool> = new Map(allTools.map((tool) => [tool.name, tool]));

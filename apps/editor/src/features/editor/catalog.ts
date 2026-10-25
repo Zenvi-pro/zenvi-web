@@ -130,7 +130,19 @@ const assetFiles = import.meta.glob(["../../../../../packages/engine/assets/tran
 const assetUrls = new Map(Object.entries(assetFiles).map(([path, url]) => [path.slice(path.indexOf("/assets/") + "/assets/".length), url]));
 
 export function assetUrl(assetPath: string): string | null {
+  if (assetPath.startsWith("emojis/")) return emojiUrl(assetPath.slice("emojis/".length));
   return assetUrls.get(assetPath) ?? null;
+}
+
+/** Bundled emoji are served as files at `<base>emojis/` (vite.config.ts `engineEmojis`), fetched when used. */
+function emojiUrl(file: string): string | null {
+  if (!file || file.includes("/") || file.includes("\\") || file.startsWith(".")) return null;
+  return `${import.meta.env.BASE_URL}emojis/${encodeURIComponent(file)}`;
+}
+
+/** URL of a bundled emoji a project file points at (`@emojis/1F600.svg`, the desktop's stored form). */
+export function resolveEmojiAsset(path: string): string | null {
+  return path.startsWith("@emojis/") ? emojiUrl(path.slice("@emojis/".length)) : null;
 }
 
 /** Every built-in transition, in the desktop dock's order (common, then extra, by file name). */

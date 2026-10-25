@@ -4,14 +4,14 @@
  * decoding); a Worker compositor passes its own `SvgRasterizer`.
  */
 
-import type { SvgRasterizer } from "./svg.js";
+import { type SvgRasterizer, withGenericFontFallbacks } from "./svg.js";
 
 export function createImageElementSvgRasterizer(): SvgRasterizer {
   return async (svg, width, height) => {
     if (typeof Image === "undefined") {
       throw new Error("SVG rasterization needs the DOM; pass an svgRasterizer when running in a Worker");
     }
-    const url = URL.createObjectURL(svg.type === "image/svg+xml" ? svg : new Blob([svg], { type: "image/svg+xml" }));
+    const url = URL.createObjectURL(new Blob([withGenericFontFallbacks(await svg.text())], { type: "image/svg+xml" }));
     try {
       const image = new Image();
       image.decoding = "async";

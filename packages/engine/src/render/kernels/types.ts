@@ -26,6 +26,11 @@ export interface KernelSpec {
   /** `EffectBase::HandlesMaskInternally()` (Mask): skip the generic effect mask. */
   handlesMask?: boolean;
   /**
+   * Keeps state across frames in `ctx.state` (BeatSync's envelope, DenoiseImage's previous frame, SphericalProjection's
+   * reused map): a render must run it on consecutive frames in order, in one place. Other kernels are pure per frame.
+   */
+  sequential?: boolean;
+  /**
    * `UseCustomMaskBlend()`: effects with a `mask_mode` "vary strength" option
    * (Brightness, Saturation, Hue, Blur, Pixelate, Sharpen) blend by the
    * squared mask value instead of the generic linear blend.
