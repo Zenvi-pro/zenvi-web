@@ -5,6 +5,7 @@
  * optional methods, so tests can check each surface limitation.
  */
 
+import { TranscriptionError, type Transcription } from "../../analysis/transcription.js";
 import type { Project } from "../../model/types.js";
 import type {
   AudioEnvelope,
@@ -17,7 +18,7 @@ import type {
   ToolHost,
   ToolImage,
 } from "../types.js";
-import { TRANSCRIPT_CUES, infoForPath } from "./fixture.js";
+import { SPOKEN_WORDS, TRANSCRIPT_CUES, infoForPath } from "./fixture.js";
 
 /** A 1×1 PNG. */
 export const PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -30,6 +31,7 @@ export type OptionalMethod =
   | "media.writeGenerated"
   | "storage.readText"
   | "storage.writeText"
+  | "audio.transcribe"
   | "ui.openExportDialog"
   | "ui.selectedIds"
   | "ui.selection"
@@ -59,6 +61,12 @@ export interface FakeHostOptions {
   playhead?: number;
   /** The editor's timeline view (default `fakeView()`: 0-30 s visible, snapping on, no timing mode). */
   view?: Partial<TimelineView>;
+  /**
+   * What `audio.transcribe` answers per media path (a transcription, or an
+   * error to throw); other paths get `SPOKEN_WORDS`. Each call is recorded
+   * in `calls` as `transcribe <path> <language>`.
+   */
+  transcripts?: Record<string, Transcription | Error>;
 }
 
 export interface FakeHost extends ToolHost {
@@ -305,6 +313,17 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         });
         return { sampleRate: 16000, frameSize: 480, rms };
       },
+    };
+  }
+  if (host.audio && !omit.has("audio.transcribe")) {
+    const transcripts = options.transcripts ?? {};
+    host.audio.transcribe = async (path, opts): Promise<Transcription> => {
+      calls.push(`transcribe ${path} ${opts?.language || "auto"}`);
+      const answer = transcripts[path];
+      if (answer instanceof Error) throw answer;
+      if (answer) return structuredClone(answer);
+      if (path.includes("silent")) throw new TranscriptionError("no_audio", `${path} has no audio stream.`);
+      return { language: opts?.language || "en", model: "whisper-1", words: structuredClone(SPOKEN_WORDS), segments: [], durationSeconds: 8 };
     };
   }
   if (!without.has("assets")) {

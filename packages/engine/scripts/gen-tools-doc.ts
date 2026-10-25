@@ -54,7 +54,7 @@ const DIVERGENCES: [string, string][] = [
     "A marker's name is stored as `label`; zenvi-core develop stores `name` (track_ops.add_marker). list_markers_tool, the marker tools and the web editor's ruler read either.",
   ],
   [
-    "add_title_tool / add_captions_tool",
+    "add_title_tool",
     "Templates are the bundled catalog, read by basename only (the desktop joined a bare template name into its titles folder unchecked, agent_tools/titles.py:81); an absolute .svg path is read through the host's storage.",
   ],
   [
@@ -79,11 +79,23 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "list_captions_tool / edit_captions_tool / remove_captions_tool",
-    "They work on Caption effects, as on desktop develop (captions made by Zenvi desktop or with the Caption effect); the engine's add_captions_tool still places one title per cue (the earlier desktop behaviour), which these tools do not list. With no target the project's only caption track is used: the web has no effect selection to pick from.",
+    "They work on Caption effects, as on desktop develop (made by add_captions_tool, Zenvi desktop or the Caption effect). With no target the project's only caption track is used: the web has no effect selection to pick from.",
   ],
   [
-    "get_transcript_tool, export_captions_tool, add_captions_tool",
-    "Transcripts come from the indexed `ai_metadata.transcript_cues`; word timings inside a cue are estimated by character count (`transcriptionSource: \"index_cues\"`, `wordTiming: \"estimated\"`). The desktop runs on-device ASR.",
+    "speech: get_transcript_tool, transcribe_media_tool, remove_words_tool, export_captions_tool, add_captions_tool, duck_under_speech_tool",
+    "Speech recognition runs on the Zenvi server (`POST /api/v1/transcription`, zenvi-backend #67: OpenAI whisper-1, 2 credits per started minute, a Zenvi sign-in), not on device. The host sends mono 16 kHz speech audio (MP3 from ffmpeg on the CLI and in Zenvi Cloud, WAV from Web Audio in the editor), long media in pieces split at pauses. A file's words come from, in order: a transcription kept on the file, the media index's transcript cues (word timings estimated by character count: `transcriptionSource: \"index_cues\"`, `wordTiming: \"estimated\"`), then a new transcription (`transcriptionSource: \"server\"`, `wordTiming: \"exact\"`). The words are kept in the project on the file (`ai_metadata.asr`: the desktop transcript cache record's fields plus the segments and the media's content hash), outside the undo history, so the next call, another surface or an exported .zvn reuses them and undoing an edit keeps them; the desktop caches on disk and ignores the key. Whisper leaves out \"um\" and \"uh\" unless prompted, so English and auto-detected requests carry OpenAI's filler prompt; words take the punctuation of the server's segments, like faster-whisper's. Without a target only clips with a picture and sound are transcribed (audio-only clips such as music beds only when the timeline has no such footage, or when named). modelId and engine are accepted and unused (one server model). A server without the route answers in words: `speech recognition is not available yet on this Zenvi server`.",
+  ],
+  [
+    "add_captions_tool",
+    "Transcript captions: the desktop reads only the index's transcript cues (shared out by character count); here a clip's words come as for get_transcript_tool, and recognized words keep their own timings: captions break at sentence ends, at pauses over 0.8 s and where the desktop's line-breaking costs put them (maxWords, maxChars), each runs from its first word to its last and stays up across a short pause. Subtitle files are read through the host: from disk on the CLI, from the project's files in Zenvi Cloud and the editor.",
+  ],
+  [
+    "remove_words_tool",
+    "Cuts on real word timings only (a kept or new transcription, never the index's estimates). wordIndices must come from the words they cut: indices for a transcription made by the same call are refused (call get_transcript_tool first), and a transcription made after the index's words gets the next transcriptGeneration, so indices read from the index are refused as stale. Refusals that need no words (an unknown fillerPreset, a retimed clip, an ambiguous clipId) come before any transcription is paid for.",
+  ],
+  [
+    "duck_under_speech_tool / analyze_timeline_audio_tool",
+    "With speech_clip_ids=auto and no indexed speech, talking footage (picture and sound) without a transcript is transcribed and its words become the speech windows (`transcript`); the desktop falls back to its local VAD. A kept transcription also marks a clip the index does not know as speech in analyze_timeline_audio_tool.",
   ],
   [
     "remove_silence_tool",
@@ -95,11 +107,11 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "desktop defaults the web does not follow yet",
-    "save_project_tool and export_video_tool replace an existing file (the CLI's) where the desktop refuses unless overwrite=true; add_title_tool never shrinks long lines (desktop fit_text=true); add_captions_tool adds a new caption group where the desktop replaces the clip's captions (replace_existing=true); new_project_tool / open_project_tool have no unsaved-changes guard (every web surface autosaves, so discard_unsaved is accepted as is); generate_tts_and_add_to_timeline_tool defaults to the track below the picture, where the desktop picks or creates a free narration track.",
+    "save_project_tool and export_video_tool replace an existing file (the CLI's) where the desktop refuses unless overwrite=true; add_title_tool never shrinks long lines (desktop fit_text=true); new_project_tool / open_project_tool have no unsaved-changes guard (every web surface autosaves, so discard_unsaved is accepted as is); generate_tts_and_add_to_timeline_tool defaults to the track below the picture, where the desktop picks or creates a free narration track.",
   ],
   [
     "tools zenvi-core develop rewrote as editor tools",
-    "get_project_info_tool, list_markers_tool, get_export_settings_tool, set_export_setting_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, export_video_tool, generate_tts_and_add_to_timeline_tool, add_effect_tool, add_title_tool, set_keyframes_tool, set_project_setting_tool and add_captions_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts), set_export_setting_tool stores any key (develop checks keys and aliases), and set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property).",
+    "get_project_info_tool, list_markers_tool, get_export_settings_tool, set_export_setting_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, export_video_tool, generate_tts_and_add_to_timeline_tool, add_effect_tool, add_title_tool, set_keyframes_tool and set_project_setting_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts), set_export_setting_tool stores any key (develop checks keys and aliases), and set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property).",
   ],
   [
     "split_file_add_clip_tool",

@@ -32,6 +32,7 @@ export type HostMethod =
   | "storage.writeText"
   | "ui.openExportDialog"
   | "audio.decodePcm"
+  | "audio.transcribe"
   | "ui.selection"
   | "ui.setSelection"
   | "ui.timelineView"
@@ -53,6 +54,9 @@ export interface ToolNeeds {
 }
 
 const WATCH = ["frames", "backend"] as (HostCapability | HostMethod)[];
+/** How the web surfaces transcribe (zenvi-backend POST /api/v1/transcription). */
+const SERVER_ASR =
+  "speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free";
 const WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
 
 /** Run-time needs beyond `requires`, per tool. */
@@ -62,7 +66,10 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   split_file_add_clip_tool: { optional: WATCH, partialNote: WATCH_NOTE },
   search_clip_scenes_tool: { optional: ["backend", "frames"], partialNote: "without the Zenvi backend only chapter and scene descriptions are searched" },
   slice_clip_at_best_match_tool: { optional: ["backend", "frames"], partialNote: "without the Zenvi backend only explicit times and scene descriptions work" },
-  duck_under_speech_tool: { optional: ["audio"], partialNote: "without audio analysis only indexed transcript cues find the speech" },
+  duck_under_speech_tool: {
+    optional: ["audio", "audio.transcribe"],
+    partialNote: "without audio analysis and speech recognition only indexed transcript cues find the speech",
+  },
   watch_clip_tool: { optional: ["media.importPath"], partialNote: "file_path needs local file access" },
   export_video_tool: { anyOf: ["exporter", "ui.openExportDialog"] },
   save_project_tool: {},
@@ -77,12 +84,15 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
   add_title_tool: { methods: ["media.writeGenerated"] },
   add_captions_tool: {
-    methods: ["media.writeGenerated"],
-    optional: ["storage.readText"],
-    partialNote: "srtPath needs file reading",
-    webNote: "captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device",
+    optional: ["media.writeGenerated", "storage.readText", "audio.transcribe"],
+    partialNote: "captions not tied to a clip need stored generated media; srtPath needs file reading; media Zenvi has not indexed needs speech recognition",
   },
-  export_captions_tool: { methods: ["storage.writeText"], webNote: "captions come from indexed transcripts (no on-device ASR)" },
+  export_captions_tool: {
+    methods: ["storage.writeText"],
+    optional: ["audio.transcribe"],
+    partialNote: "without speech recognition only media Zenvi indexed has a transcript",
+    webNote: SERVER_ASR,
+  },
   list_title_templates_tool: { optional: ["storage.readText"], partialNote: "kind=project needs reading project files" },
   edit_title_tool: {
     methods: ["media.writeGenerated", "storage.readText"],
@@ -93,7 +103,11 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     webNote: "2D keyframed versions of the Blender templates (no 3D depth or particles); earth, magic_wand, snow and picture_frames_4 need Zenvi desktop",
   },
   add_timer_tool: { optional: ["media.writeGenerated"], partialNote: "without storing generated images only timeline_clip_id works" },
-  get_transcript_tool: { webNote: "indexed transcript cues with estimated word timings (no on-device ASR)" },
+  get_transcript_tool: {
+    optional: ["audio.transcribe"],
+    partialNote: "without speech recognition only media Zenvi indexed has a transcript (word timings estimated)",
+    webNote: SERVER_ASR,
+  },
   reindex_project_file_tool: { webNote: "reports files that are already indexed; uploading for indexing runs in Zenvi desktop" },
   wait_until_project_indexed_tool: { webNote: "reports indexing status once; does not wait" },
   remove_silence_tool: { webNote: "energy VAD on the host's audio analysis" },
@@ -113,8 +127,8 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     methods: ["ui.timelineView", "ui.showTimelineRange", "ui.setTimelineMode"],
     webNote: "the web editor has no timing (retime-by-drag) mode, so timing=true is refused",
   },
-  transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
-  remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
+  transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
+  remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
   build_reel_tool: {
     optional: ["audio.decodePcm", "media.writeGenerated"],
@@ -152,6 +166,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.readText",
       "ui.openExportDialog",
       "audio.decodePcm",
+      "audio.transcribe",
       "ui.selection",
       "ui.setSelection",
       "ui.timelineView",
@@ -173,6 +188,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.readText",
       "storage.writeText",
       "audio.decodePcm",
+      "audio.transcribe",
     ],
     conditional: { backend: "signed in with zenvi login" },
   },
@@ -180,7 +196,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
     capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
-    methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText", "audio.decodePcm"],
+    methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText", "audio.decodePcm", "audio.transcribe"],
     conditional: {
       frames: "the render worker is configured",
       media: "ffprobe is available",
@@ -233,6 +249,7 @@ function needName(need: HostCapability | HostMethod): string {
     "storage.writeText": "writing files",
     "ui.openExportDialog": "an export dialog",
     "audio.decodePcm": "audio decoding",
+    "audio.transcribe": "speech recognition",
     "ui.selection": "reading the editor's selection",
     "ui.setSelection": "selecting in the editor",
     "ui.timelineView": "reading the timeline view",

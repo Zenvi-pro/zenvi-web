@@ -9,6 +9,7 @@
  * does: `clip.volume = { Points }`, in the call's one transaction.
  */
 
+import type { TimedText } from "../../analysis/transcription.js";
 import type { Transaction } from "../../history/document.js";
 import { setClipKeyframes, setClipVolume } from "../../ops/clips.js";
 import type { Clip, KeyframePoint, Project, ProjectFile } from "../../model/types.js";
@@ -41,6 +42,7 @@ import {
 import { contractTool, type CatalogTool, type ToolCall } from "../define.js";
 import { pyFixed, pyReprString } from "../pyfmt.js";
 import { energyVadWindows } from "../speech.js";
+import { clipTarget, isWordSource, speechWindowsFromWords, storedTranscript, untargetedTranscription, wordsFor } from "../transcripts.js";
 import { formatTrackLabelForLlm, lockedTrackError, normalizeTrackOrLayerArg } from "../tracks.js";
 import { boolArg, fileById, floatArg, idList, resolveClip, text } from "./common.js";
 
@@ -66,6 +68,18 @@ function layerOf(clip: Clip): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * Fewer words than this are not dialogue to duck under: Whisper writes what it
+ * hears in a tone or a jingle as a word or two ("Beeeeeeeep", "Ring...").
+ */
+const MIN_SPEECH_WORDS = 3;
+
+/** Timeline speech windows from a clip's transcribed words, or none when they are too few to be dialogue. */
+function transcriptWindows(words: readonly TimedText[], clip: Clip): Window[] {
+  if (words.length < MIN_SPEECH_WORDS) return [];
+  return speechWindowsFromSource(speechWindowsFromWords(words), clip);
+}
+
 /** Every timeline clip with sound, with its role and speech windows (_collect_timeline_audio). */
 export function collectTimelineAudio(project: Project, layerFilter?: number): AudioEntry[] {
   const entries: AudioEntry[] = [];
@@ -74,7 +88,7 @@ export function collectTimelineAudio(project: Project, layerFilter?: number): Au
     if (layerFilter !== undefined && layer !== layerFilter) continue;
     const file = clip.file_id ? fileById(project, String(clip.file_id)) : undefined;
     const effective = getEffectiveAiMetadata(file, clip, { clipAiMetadata: (clip as { ai_metadata?: unknown }).ai_metadata });
-    const role = classifyClipAudioRole(clip, file, effective);
+    let role = classifyClipAudioRole(clip, file, effective);
     if (role === "silent") continue;
     let windows = speechWindowsFromCues(clip, effective);
     let windowSource = windows.length > 0 ? "cues" : "";
@@ -82,6 +96,13 @@ export function collectTimelineAudio(project: Project, layerFilter?: number): Au
       const refined = refineWindowsWithEnergy(windows, clip);
       if (JSON.stringify(refined) !== JSON.stringify(windows)) windowSource = "cues+energy";
       windows = refined;
+    } else if (role === "unknown") {
+      // Not indexed, but transcribed on the web (transcripts.ts): its words say where the speech is.
+      windows = transcriptWindows(storedTranscript(file)?.words ?? [], clip);
+      if (windows.length > 0) {
+        role = "speech";
+        windowSource = "transcript";
+      }
     }
     const [start, end] = clipTimelineExtent(clip);
     entries.push({
@@ -175,6 +196,36 @@ async function fallbackSpeechWindows(call: ToolCall, entry: AudioEntry): Promise
   const energy = speechWindowsFromEnergy(entry.clip);
   if (energy.length > 0) return [energy, "energy"];
   return [[], "none"];
+}
+
+/**
+ * Speech found by transcribing the talking footage (picture and sound) that
+ * has no transcript yet, when nothing indexed or transcribed says where the
+ * speech is. The words are kept on the file (transcripts.ts), so captions and
+ * cuts reuse them. Music beds are not transcribed.
+ */
+async function transcribedSpeech(call: ToolCall, entries: AudioEntry[]): Promise<AudioEntry[]> {
+  if (!call.host.audio?.transcribe) return [];
+  const project = call.doc.project;
+  const pays = untargetedTranscription(project, entries.map((e) => e.clip));
+  const speech: AudioEntry[] = [];
+  for (const entry of entries) {
+    if (entry.windows.length > 0 || entry.role !== "unknown" || !pays(entry.clip)) continue;
+    const target = clipTarget(call.doc.project, entry.clip);
+    if (!target) continue;
+    const got = await wordsFor(call, target, { estimatesOk: true, transcribe: true });
+    if (!isWordSource(got)) {
+      call.host.log?.(`duck_under_speech: no transcript for ${entry.id}: ${got.message}`);
+      continue;
+    }
+    const windows = transcriptWindows(got.words, entry.clip);
+    if (windows.length === 0) continue;
+    entry.windows = windows;
+    entry.windowSource = "transcript";
+    entry.role = "speech";
+    speech.push(entry);
+  }
+  return speech;
 }
 
 const ADJUST = { readOnlyHint: false, destructiveHint: true, openWorldHint: false } as const;
@@ -331,6 +382,7 @@ export const audioTools: CatalogTool[] = [
         }
       } else {
         speech = entries.filter((e) => e.role === "speech" && e.windows.length > 0);
+        if (speech.length === 0) speech = await transcribedSpeech(call, entries);
         if (speech.length === 0) {
           for (const entry of entries) {
             if (entry.windows.length > 0) continue;

@@ -72,6 +72,17 @@ function captionInterview(doc: ProjectDocument): void {
   doc.transaction("captions", (tx) => tx.update(["clips", { id: IDS.clipA }], { effects: [createEffect("Caption", { caption_text: text }, { id: "CAPTION001" })] }));
 }
 
+/** A snapshot without speech recognition results kept on files (`ai_metadata.asr`): they are not edits and survive undo. */
+function withoutTranscripts(snapshot: unknown): unknown {
+  const project = structuredClone(snapshot) as { files?: { ai_metadata?: Record<string, unknown> }[] };
+  for (const file of project.files ?? []) {
+    if (!file.ai_metadata || !("asr" in file.ai_metadata)) continue;
+    delete file.ai_metadata.asr;
+    if (Object.keys(file.ai_metadata).length === 0) delete file.ai_metadata;
+  }
+  return project;
+}
+
 function clipIds(doc: ProjectDocument): string[] {
   return (doc.project.clips ?? []).map((c) => String(c.id));
 }
@@ -481,8 +492,29 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { clipId: "NOPE" }, summary: /^Error: Unknown clipId 'NOPE'\.$/ },
   },
-  transcribe_media_tool: { happy: { args: { fileId: IDS.interview }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
-  remove_words_tool: { happy: { args: { clipId: IDS.clipA, matches: ["um"] }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
+  transcribe_media_tool: {
+    happy: {
+      args: { fileId: IDS.interview },
+      summary: /^Transcribed 9 words \(server, en\)\. fileId=FILEINTV01 /,
+      check: ({ receipt, doc, host }) => {
+        expect(receipt.data).toMatchObject({ transcriptionSource: "server", transcriptGeneration: 2, modelId: "whisper-1", script: expect.stringContaining("Um, today") });
+        expect(host.calls).toContain("transcribe /media/interview.mp4 auto");
+        expect(doc.project.files.find((f) => f.id === IDS.interview)?.ai_metadata).toMatchObject({ analyzed: true, asr: { generation: 2, words: expect.any(Array) } });
+      },
+    },
+    failure: { args: { fileId: "NOPE" }, summary: /^Error: Unknown fileId 'NOPE'\.$/ },
+  },
+  remove_words_tool: {
+    happy: {
+      args: { clipId: IDS.clipA, fillerPreset: "um_uh" },
+      summary: /^Removed 1 word\(s\), closed 0\.30s\.$/,
+      check: ({ receipt, doc }) => {
+        expect(receipt.data).toMatchObject({ removedWordIndices: [3], transcriptionSource: "server", fragmentCount: 2 });
+        expect(doc.project.clips.find((c) => c.id === IDS.clipB)?.position).toBeCloseTo(9.7, 9);
+      },
+    },
+    failure: { args: { clipId: IDS.clipA, fillerPreset: "ums" }, summary: /^Error: Unknown fillerPreset 'ums'\. Use one of: english_fillers, um_uh\.$/ },
+  },
   remove_silence_tool: {
     happy: {
       args: { clipId: IDS.clipA },
@@ -497,7 +529,7 @@ const SPECS: Record<string, Spec> = {
       summary: /^Exported 3 cue\(s\) to \/out\/captions\.srt\.$/,
       check: ({ host }) => expect(String(host.written.get("/out/captions.srt"))).toMatch(/^1\n00:00:00,500 --> /),
     },
-    failure: { args: { path: "/out/captions.srt", clipId: IDS.clipB }, summary: /not available/ },
+    failure: { args: { path: "/out/captions.srt", clipId: "NOPE" }, summary: /^Error: Unknown clipId 'NOPE'\.$/ },
   },
   detect_beats_tool: { happy: { args: { fileId: IDS.music }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
   diarize_media_tool: { happy: { args: { fileId: IDS.interview }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
@@ -565,13 +597,15 @@ const SPECS: Record<string, Spec> = {
     happy: {
       args: { srtPath: "/subs/a.srt" },
       host: { texts: { "/subs/a.srt": SRT } },
-      summary: /^Placed 2 caption\(s\) \(group cap_\w+\)\.$/,
+      summary: /^Added 2 caption\(s\) from file on a Captions overlay on track 4\.$/,
       check: ({ receipt, doc }) => {
-        expect(receipt.data).toMatchObject({ count: 2, transcriptionSource: "srt" });
-        expect(doc.project.files).toHaveLength(6);
+        expect(receipt.data).toMatchObject({ source: "file", style: "classic", captioned: [{ overlay: true, cues: 2, first: 1, last: 4 }] });
+        const overlay = doc.project.clips.find((c) => c.zenvi_role === "captions");
+        expect(overlay?.effects.map((e) => e.class_name)).toEqual(["Caption"]);
+        expect(doc.project.files).toHaveLength(5);
       },
     },
-    failure: { args: { srtPath: "/subs/missing.srt" }, summary: /^Error: srtPath not found: \/subs\/missing\.srt$/ },
+    failure: { args: { srtPath: "/subs/missing.srt" }, summary: /^Error: subtitle file not found: \/subs\/missing\.srt$/ },
   },
   list_title_templates_tool: {
     happy: { args: { kind: "static", query: "lower third" }, host: { assets: ENGINE_ASSETS }, summary: /^Found 3 title template\(s\) matching 'lower third'\.$/ },
@@ -902,10 +936,10 @@ for (const [name, spec] of Object.entries(SPECS)) {
       if (receipt.undoSteps === 1) {
         const undoneLabels = doc.undo();
         expect(undoneLabels).toHaveLength(1);
-        expect(snapshotOf(doc.project)).toEqual(before);
+        expect(withoutTranscripts(snapshotOf(doc.project))).toEqual(before);
       } else if (!["undo_tool", "redo_tool", "new_project_tool", "open_project_tool"].includes(name)) {
-        // No undo step: nothing tracked changed (untracked export overrides aside).
-        const after = snapshotOf(doc.project) as Record<string, unknown>;
+        // No undo step: nothing tracked changed (untracked export overrides and kept transcripts aside).
+        const after = withoutTranscripts(snapshotOf(doc.project)) as Record<string, unknown>;
         const { export_overrides: _a, ...restAfter } = after;
         const { export_overrides: _b, ...restBefore } = before as unknown as Record<string, unknown>;
         expect(restAfter).toEqual(restBefore);
@@ -922,7 +956,7 @@ for (const [name, spec] of Object.entries(SPECS)) {
         expect(receipt.summary).toMatch(/^Error/);
         if (failure.summary) expect(receipt.summary).toMatch(failure.summary);
         expect(receipt.undoSteps).toBe(0);
-        expect(snapshotOf(doc.project)).toEqual(before);
+        expect(withoutTranscripts(snapshotOf(doc.project))).toEqual(before);
         expect(doc.undoLabels.length).toBe(failure.setup ? doc.undoLabels.length : 0);
       });
     }

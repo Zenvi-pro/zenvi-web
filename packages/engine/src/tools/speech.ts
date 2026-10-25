@@ -210,6 +210,62 @@ export function compactFragmentsAfterRemove(
 }
 
 // ---------------------------------------------------------------------------
+// map_timeline.py
+// ---------------------------------------------------------------------------
+
+/** Playback speed multiplier; 1 when unset or invalid (map_timeline.clip_speed). */
+export function clipSpeed(clip: Readonly<Record<string, unknown>>): number {
+  const time = clip.time;
+  if (typeof time === "number" && time > 0) return time;
+  const speed = Number(clip.speed);
+  return clip.speed !== undefined && clip.speed !== null && Number.isFinite(speed) && speed > 0 ? speed : 1;
+}
+
+/**
+ * True when `clip.time` is a no-op: forward at 1x, `tolerance` frames off the
+ * 1:1 line at most (zenvi-core export_acceleration/smart_render.py
+ * `_time_curve_is_identity`).
+ */
+export function timeCurveIsIdentity(curve: unknown, tolerance = 1): boolean {
+  if (curve === undefined || curve === null) return true;
+  if (typeof curve === "string") return ["TIME_MAP_FORWARD", "none", "", "0"].includes(curve);
+  if (typeof curve === "number") return curve === 0 || curve === 1;
+  if (typeof curve !== "object" || Array.isArray(curve)) return false;
+  const data = curve as Record<string, unknown>;
+  const points = (data.Points ?? data.points ?? []) as unknown;
+  if (!Array.isArray(points) || points.length === 0) return true;
+  const coords: [number, number][] = [];
+  for (const point of points) {
+    const co = (typeof point === "object" && point !== null ? (point as { co?: Record<string, unknown> }).co : undefined) ?? {};
+    const x = Number(co.X ?? co.x ?? 0);
+    const y = Number(co.Y ?? co.y ?? 0);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    coords.push([x, y]);
+  }
+  if (coords.length === 1) {
+    const [x, y] = coords[0]!;
+    return Math.abs(y - 1) <= 1e-3 || Math.abs(y - x) <= tolerance + 1e-6;
+  }
+  coords.sort((a, b) => a[0] - b[0]);
+  for (let i = 1; i < coords.length; i += 1) if (coords[i]![1] + 1e-6 < coords[i - 1]![1]) return false;
+  return coords.every(([x, y]) => Math.abs(y - x) <= tolerance + 1e-6);
+}
+
+/**
+ * True when the clip plays at another speed or through a time curve
+ * (map_timeline.is_retimed). Exact: a one-frame hold shifts every later word.
+ */
+export function isRetimed(clip: Readonly<Record<string, unknown>>): boolean {
+  return Math.abs(clipSpeed(clip) - 1) > 1e-9 || !timeCurveIsIdentity(clip.time, 0);
+}
+
+/** Source seconds to timeline seconds on a placement (map_timeline.source_to_timeline_sec). */
+export function sourceToTimelineSec(sourceSec: number, position: number, start: number, speed = 1): number {
+  const rate = speed > 0 ? speed : 1;
+  return position + (sourceSec - start) / rate;
+}
+
+// ---------------------------------------------------------------------------
 // captions.py
 // ---------------------------------------------------------------------------
 
@@ -222,9 +278,24 @@ export interface CaptionCue {
   wordIndices?: number[];
 }
 
-/** Group word rows into caption cues in timeline frames (phrase_words). */
+type PhraseWord = TimedWord & { timelineStartSec?: number; timelineEndSec?: number };
+
+/** A word's start or end on the timeline (captions.py `_timeline_sec`). */
+function timelineSec(word: PhraseWord, edge: "Start" | "End", fps: Fps): number {
+  const sec = edge === "Start" ? word.timelineStartSec : word.timelineEndSec;
+  if (sec !== undefined && sec !== null) return Number(sec);
+  const frame = edge === "Start" ? word.startFrame : word.endFrame;
+  if (frame !== undefined && frame !== null) return toSeconds(Math.trunc(frame), fps);
+  return Number((edge === "Start" ? word.startSec : word.endSec) || 0);
+}
+
+/**
+ * Group word rows into caption cues in timeline frames (zenvi-core develop
+ * speech/captions.py phrase_words). Pauses are measured on the timeline:
+ * source time restarts in each clip and skips the words a cut removed.
+ */
 export function phraseWords(
-  words: readonly (TimedWord & { timelineStartSec?: number; timelineEndSec?: number })[],
+  words: readonly PhraseWord[],
   fps: Fps,
   options: { maxWords?: number; maxChars?: number; maxGapSec?: number } = {},
 ): CaptionCue[] {
@@ -232,7 +303,7 @@ export function phraseWords(
   const maxChars = options.maxChars ?? 42;
   const maxGap = options.maxGapSec ?? 0.8;
   const cues: CaptionCue[] = [];
-  let bucket: typeof words[number][] = [];
+  let bucket: PhraseWord[] = [];
   const flush = (): void => {
     if (bucket.length === 0) return;
     const body = bucket.map((w) => String(w.text ?? "").trim()).join(" ").trim();
@@ -244,10 +315,10 @@ export function phraseWords(
     const last = bucket[bucket.length - 1]!;
     const startF = first.startFrame !== undefined && first.startFrame !== null
       ? Math.trunc(first.startFrame)
-      : toFrame(Number(first.timelineStartSec || first.startSec || 0), fps);
+      : toFrame(timelineSec(first, "Start", fps), fps);
     let endF = last.endFrame !== undefined && last.endFrame !== null
       ? Math.trunc(last.endFrame)
-      : toFrame(Number(last.timelineEndSec || last.endSec || 0), fps);
+      : toFrame(timelineSec(last, "End", fps), fps);
     if (endF <= startF) endF = startF + 1;
     cues.push({
       text: body,
@@ -267,7 +338,8 @@ export function phraseWords(
       continue;
     }
     const prev = bucket[bucket.length - 1]!;
-    const gap = (Number(w.startSec) || 0) - (Number(prev.endSec) || 0);
+    // Timeline time: source time restarts in each clip and skips cut words.
+    const gap = timelineSec(w, "Start", fps) - timelineSec(prev, "End", fps);
     const chars = Array.from(bucket.map((x) => String(x.text ?? "")).join(" ") + " " + t).length;
     if (gap > maxGap || bucket.length >= maxWords || chars > maxChars) {
       flush();

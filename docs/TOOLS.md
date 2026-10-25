@@ -10,16 +10,16 @@ Every call returns a contract-3 receipt (`{contract: 3, status, tool, summary, c
 
 | Surface | Host | Works | Partial | Not available |
 | --- | --- | --- | --- | --- |
-| Web editor (Zenvi Assistant, command palette) | `apps/editor/src/features/editor/assistant/host.ts` | 94 | 18 | 10 |
-| CLI and local MCP server (zenvi, zenvi mcp) | `packages/render-node/src/host/node-host.ts` | 87 | 19 | 16 |
-| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 83 | 17 | 22 |
+| Web editor (Zenvi Assistant, command palette) | `apps/editor/src/features/editor/assistant/host.ts` | 95 | 19 | 8 |
+| CLI and local MCP server (zenvi, zenvi mcp) | `packages/render-node/src/host/node-host.ts` | 88 | 20 | 14 |
+| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 84 | 18 | 20 |
 | Zenvi desktop | zenvi-core | 108 | 0 | 14 (direct tools are web-only) |
 
 Availability follows each tool's required host capabilities and the host methods it calls at run time; the hosts are described in `SURFACE_PROFILES` (packages/engine/src/tools/availability.ts). Capabilities a session may lack (signed out of Zenvi, no WebCodecs export) are noted per tool.
 
-- **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage, assets, audio; methods media.importUrl, media.pickFiles, media.writeGenerated, storage.readText, ui.openExportDialog, audio.decodePcm, ui.selection, ui.setSelection, ui.timelineView, ui.showTimelineRange, ui.setTimelineMode; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
-- **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend, assets; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, storage.open, storage.readText, storage.writeText, audio.decodePcm; only sometimes: backend (signed in with zenvi login).
-- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend; methods media.importUrl, media.writeGenerated, storage.readText, storage.writeText, audio.decodePcm; only sometimes: frames (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend); hides 13 local-app tools.
+- **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage, assets, audio; methods media.importUrl, media.pickFiles, media.writeGenerated, storage.readText, ui.openExportDialog, audio.decodePcm, audio.transcribe, ui.selection, ui.setSelection, ui.timelineView, ui.showTimelineRange, ui.setTimelineMode; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
+- **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend, assets; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, storage.open, storage.readText, storage.writeText, audio.decodePcm, audio.transcribe; only sometimes: backend (signed in with zenvi login).
+- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend; methods media.importUrl, media.writeGenerated, storage.readText, storage.writeText, audio.decodePcm, audio.transcribe; only sometimes: frames (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend); hides 13 local-app tools.
 
 ## Matrix
 
@@ -91,10 +91,10 @@ Availability follows each tool's required host capabilities and the host methods
 | [`inspect_timeline_tool`](#inspect_timeline_tool) | mcp, cli, editor | yes | yes | yes | yes |
 | [`inspect_media_tool`](#inspect_media_tool) | mcp, cli, editor | yes | yes | yes | yes |
 | [`get_transcript_tool`](#get_transcript_tool) | mcp, cli, editor | partial | partial | partial | yes |
-| [`transcribe_media_tool`](#transcribe_media_tool) | mcp, cli, editor | — | — | — | yes |
-| [`remove_words_tool`](#remove_words_tool) | mcp, cli, editor | — | — | — | yes |
+| [`transcribe_media_tool`](#transcribe_media_tool) | mcp, cli, editor | partial | partial | partial | yes |
+| [`remove_words_tool`](#remove_words_tool) | mcp, cli, editor | partial | partial | partial | yes |
 | [`remove_silence_tool`](#remove_silence_tool) | mcp, cli, editor | partial | partial | partial | yes |
-| [`add_captions_tool`](#add_captions_tool) | mcp, cli, editor | partial | partial | partial | yes |
+| [`add_captions_tool`](#add_captions_tool) | mcp, cli, editor | yes | yes | yes | yes |
 | [`export_captions_tool`](#export_captions_tool) | mcp, cli, editor | — | partial | partial | yes |
 | [`detect_beats_tool`](#detect_beats_tool) | mcp, cli, editor | yes | yes | yes | yes |
 | [`diarize_media_tool`](#diarize_media_tool) | mcp, cli, editor | — | — | — | yes |
@@ -1161,7 +1161,7 @@ Availability: editor yes; cli yes; cloud yes (only when the render worker is con
 
 Surfaces: mcp, cli, editor. read-only.
 
-Availability: editor partial (indexed transcript cues with estimated word timings (no on-device ASR)); cli partial (indexed transcript cues with estimated word timings (no on-device ASR)); cloud partial (indexed transcript cues with estimated word timings (no on-device ASR)); desktop yes.
+Availability: editor partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free); cli partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free); cloud partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1183,7 +1183,7 @@ Availability: editor partial (indexed transcript cues with estimated word timing
 
 Surfaces: mcp, cli, editor. read-only.
 
-Availability: editor — (needs on-device speech recognition (Zenvi desktop)); cli — (needs on-device speech recognition (Zenvi desktop)); cloud — (needs on-device speech recognition (Zenvi desktop)); desktop yes.
+Availability: editor partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free); cli partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free); cloud partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1200,7 +1200,7 @@ Availability: editor — (needs on-device speech recognition (Zenvi desktop)); c
 
 Surfaces: mcp, cli, editor. edits, destructive.
 
-Availability: editor — (needs word timings from on-device speech recognition (Zenvi desktop)); cli — (needs word timings from on-device speech recognition (Zenvi desktop)); cloud — (needs word timings from on-device speech recognition (Zenvi desktop)); desktop yes.
+Availability: editor partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free; cuts use exact word timings only); cli partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free; cuts use exact word timings only); cloud partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free; cuts use exact word timings only); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1234,37 +1234,37 @@ Availability: editor partial (energy VAD on the host's audio analysis); cli part
 
 **Add captions**. Place timed dialogue captions (title clips) for a clip or the whole timeline from its transcript, or import an SRT/VTT file (srtPath).
 
-Surfaces: mcp, cli, editor. edits. Needs: media, assets.
+Surfaces: mcp, cli, editor. edits.
 
-Availability: editor partial (captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device; only Zenvi desktop takes background_color, background_opacity, clip_query, cues, fade_seconds, font, overlay_track, position, stroke_color, stroke_width, style, text_color, text_size, time_base, uppercase so far); cli partial (captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device; only Zenvi desktop takes background_color, background_opacity, clip_query, cues, fade_seconds, font, overlay_track, position, stroke_color, stroke_width, style, text_color, text_size, time_base, uppercase so far); cloud partial (captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device; only Zenvi desktop takes background_color, background_opacity, clip_query, cues, fade_seconds, font, overlay_track, position, stroke_color, stroke_width, style, text_color, text_size, time_base, uppercase so far; only when ffprobe is available and the engine's assets (title templates, emoji) are bundled); desktop yes.
+Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `background_color` | string |  | **Zenvi desktop only so far.** Colour of the box behind the text (alpha in '#RRGGBBAA' sets its opacity). Empty = the style's. (default "") |
-| `background_opacity` | number |  | **Zenvi desktop only so far.** Opacity of the box behind the text, 0 (no box) to 1. -1 = the style's. (default -1, min -1, max 1) |
+| `background_color` | string |  | Colour of the box behind the text (alpha in '#RRGGBBAA' sets its opacity). Empty = the style's. (default "") |
+| `background_opacity` | number |  | Opacity of the box behind the text, 0 (no box) to 1. -1 = the style's. (default -1, min -1, max 1) |
 | `clipId` | string |  | Timeline clip to caption (the speaker's clip). Same as timeline_clip_id. (default "") |
-| `clip_query` | string |  | **Zenvi desktop only so far.** Describe the clip to caption instead of an id, e.g. 'talking head'. (default "") |
-| `cues` | object[] |  | **Zenvi desktop only so far.** Captions to show, each {start, end, text} in timeline seconds (or the clip's source seconds with time_base='source'). Use for text you already have. |
+| `clip_query` | string |  | Describe the clip to caption instead of an id, e.g. 'talking head'. (default "") |
+| `cues` | object[] |  | Captions to show, each {start, end, text} in timeline seconds (or the clip's source seconds with time_base='source'). Use for text you already have. |
 | `engine` | string |  | Accepted for compatibility; not used (the transcript comes from the media index). (default "auto") |
-| `fade_seconds` | number |  | **Zenvi desktop only so far.** Fade each caption in and out over this many seconds (0-3). -1 = the style's. (default -1, min -1, max 3) |
-| `font` | string |  | **Zenvi desktop only so far.** Font family, e.g. 'Arial Black', 'Helvetica Neue'. Empty = the style's font. (default "") |
+| `fade_seconds` | number |  | Fade each caption in and out over this many seconds (0-3). -1 = the style's. (default -1, min -1, max 3) |
+| `font` | string |  | Font family, e.g. 'Arial Black', 'Helvetica Neue'. Empty = the style's font. (default "") |
 | `language` | string |  | Accepted for compatibility with the on-device speech tools; the transcript comes from Zenvi's media index, which already knows the language. (default "auto") |
 | `maxChars` | integer |  | Longest caption, in characters, when phrasing a transcript. (default 42, min 8, max 120) |
 | `maxWords` | integer |  | Longest caption, in words, when phrasing a transcript (subtitle files and cues are kept as written). (default 8, min 1, max 24) |
 | `modelId` | string |  | Accepted for compatibility; not used (the transcript comes from the media index). (default "") |
-| `overlay_track` | string |  | **Zenvi desktop only so far.** Track for the transparent 'Captions' overlay clip used when no clip is captioned. Empty = the lowest free track above the video. (default "") |
-| `position` | "" \| "bottom" \| "center" \| "top" |  | **Zenvi desktop only so far.** Where the captions sit: bottom (above the safe margin, higher on vertical video), center or top. Empty = the style's (bottom). (default "") |
+| `overlay_track` | string |  | Track for the transparent 'Captions' overlay clip used when no clip is captioned. Empty = the lowest free track above the video. (default "") |
+| `position` | "" \| "bottom" \| "center" \| "top" |  | Where the captions sit: bottom (above the safe margin, higher on vertical video), center or top. Empty = the style's (bottom). (default "") |
 | `replace_existing` | boolean |  | Replace the captions a clip already has (true) or add a second caption track to it (false). (default true) |
 | `srtPath` | string |  | Path of an .srt or .vtt subtitle file to burn in. With a clip its times are that clip's media time; without one, timeline time. (default "") |
-| `stroke_color` | string |  | **Zenvi desktop only so far.** Outline colour. Empty = the style's. (default "") |
-| `stroke_width` | number |  | **Zenvi desktop only so far.** Outline thickness relative to the text height: 0 = none, 0.03 thin, 0.09 heavy (heavy outlines only read with heavy fonts such as Arial Black). -1 = the style's. (default -1, min -1, max 0.5) |
-| `style` | "boxed" \| "classic" \| "minimal" \| "reels" \| "yellow" |  | **Zenvi desktop only so far.** Look preset: classic = white text on a dark box at the bottom (subtitles); reels = big bold white text with a black outline (Instagram/TikTok/Shorts); minimal = small white text with a thin outline; yellow = yellow text with a black outline (TV subtitles); boxed = white on a solid black box. The arguments below override parts of it. (default "classic") |
-| `text_color` | string |  | **Zenvi desktop only so far.** Text colour '#RRGGBB' / '#RRGGBBAA' / 'rgba(...)' / name. Empty = the style's. (default "") |
-| `text_size` | number |  | **Zenvi desktop only so far.** Text height as a fraction of the frame's shorter side: 0.04 small, 0.05 normal subtitles, 0.075 big reel captions. 0 = the style's size. (default 0, min 0, max 0.3) |
-| `time_base` | "auto" \| "timeline" \| "source" |  | **Zenvi desktop only so far.** What cue times mean: timeline seconds, or the clip's source (media) seconds. auto = source for subtitle files and transcripts, timeline for cues. (default "auto") |
+| `stroke_color` | string |  | Outline colour. Empty = the style's. (default "") |
+| `stroke_width` | number |  | Outline thickness relative to the text height: 0 = none, 0.03 thin, 0.09 heavy (heavy outlines only read with heavy fonts such as Arial Black). -1 = the style's. (default -1, min -1, max 0.5) |
+| `style` | "boxed" \| "classic" \| "minimal" \| "reels" \| "yellow" |  | Look preset: classic = white text on a dark box at the bottom (subtitles); reels = big bold white text with a black outline (Instagram/TikTok/Shorts); minimal = small white text with a thin outline; yellow = yellow text with a black outline (TV subtitles); boxed = white on a solid black box. The arguments below override parts of it. (default "classic") |
+| `text_color` | string |  | Text colour '#RRGGBB' / '#RRGGBBAA' / 'rgba(...)' / name. Empty = the style's. (default "") |
+| `text_size` | number |  | Text height as a fraction of the frame's shorter side: 0.04 small, 0.05 normal subtitles, 0.075 big reel captions. 0 = the style's size. (default 0, min 0, max 0.3) |
+| `time_base` | "auto" \| "timeline" \| "source" |  | What cue times mean: timeline seconds, or the clip's source (media) seconds. auto = source for subtitle files and transcripts, timeline for cues. (default "auto") |
 | `timeline_clip_id` | string |  | Timeline clip to caption. (default "") |
 | `trackIndex` | integer |  | Caption every clip on this UI track (1 = bottom) from its transcript. 0 = not used. (default 0, min 0) |
-| `uppercase` | boolean |  | **Zenvi desktop only so far.** Show the captions in capital letters. (default false) |
+| `uppercase` | boolean |  | Show the captions in capital letters. (default false) |
 
 ### export_captions_tool
 
@@ -1272,7 +1272,7 @@ Availability: editor partial (captions come from indexed transcripts or an SRT/V
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: storage.
 
-Availability: editor — (needs writing files); cli partial (captions come from indexed transcripts (no on-device ASR)); cloud partial (captions come from indexed transcripts (no on-device ASR)); desktop yes.
+Availability: editor — (needs writing files); cli partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free); cloud partial (speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -2189,7 +2189,6 @@ Desktop tools whose names the web uses for older direct tools with other argumen
 
 Arguments of ported tools that only Zenvi desktop takes so far. A call that sets one to anything but its default is refused before anything changes (`Error: <tool> cannot use <argument> in this Zenvi surface yet …`, so the Assistant retries without it):
 
-- `add_captions_tool`: background_color, background_opacity, clip_query, cues, fade_seconds, font, overlay_track, position, stroke_color, stroke_width, style, text_color, text_size, time_base, uppercase
 - `add_effect_tool`: processing, properties, scope, timeline_clip_ids
 - `add_title_tool`: background_color, fade_in_seconds, fade_out_seconds, font, font_scale, font_style, font_weight, lines, screen_position, subtitle, text_color
 - `export_video_tool`: audio_bitrate, audio_codec, channels, container, end, export_type, file_name, folder, fps, height, image_format, interlaced, preset, profile, quality, range, sample_rate, start, video_bitrate, video_codec, width
@@ -2210,18 +2209,21 @@ Deliberate differences from the zenvi-core handlers:
 - **apply_transition_tool**: clip2 defaults to the next clip on clip1's track instead of `Error: clip2_id is required` (tool_handlers.py:6645); no transition_name means fade (the desktop took the first file in its transitions folder).
 - **reindex_project_file_tool**: "Already indexed" reads the current `ai_metadata.index` block (legacy `twelvelabs` as fallback); the desktop reads only `twelvelabs` (tool_handlers.py:7344). Re-uploading for indexing is not available on the web.
 - **add_marker_tool / list_markers_tool**: A marker's name is stored as `label`; zenvi-core develop stores `name` (track_ops.add_marker). list_markers_tool, the marker tools and the web editor's ruler read either.
-- **add_title_tool / add_captions_tool**: Templates are the bundled catalog, read by basename only (the desktop joined a bare template name into its titles folder unchecked, agent_tools/titles.py:81); an absolute .svg path is read through the host's storage.
+- **add_title_tool**: Templates are the bundled catalog, read by basename only (the desktop joined a bare template name into its titles folder unchecked, agent_tools/titles.py:81); an absolute .svg path is read through the host's storage.
 - **add_animated_title_tool / list_title_templates_tool kind=animated**: The Blender templates are drawn as 2D titles: an SVG title animated with clip keyframes (scale, position, rotation, opacity) and the engine's Glow, Blur and LensFlare effects, so they render the same in the browser, the CLI and the cloud and stay editable. Extrusion, bevel, lighting, particles and 3D camera moves are approximated or dropped. Template names, parameters, defaults, validation and the length (template frames × length_multiplier, remapped for the project frame rate like Blender) are the desktop's; earth, magic_wand, snow and picture_frames_4 are 3D scenes and are refused as desktop-only; spacemovie_intro and colors place three clips in a row; timeout_seconds is accepted and unused. kind=animated lists `renders_here` and `look` per template and a `renderer` block where the desktop reports its Blender setup.
 - **edit_title_tool**: The edited title is a new Project Files entry that takes the old one's place in every clip and in the bin (scope=all_clips), in the same undo step; the desktop points the same entry at the new SVG and keeps its file_id. Web hosts store media by content and never change the bytes behind a file id. The receipt's file_id is the new entry's.
 - **titles, captions and timers: fonts**: Fonts are taken as given: the hosts cannot list installed fonts (the browser and resvg each fall back on their own). The desktop checks names against Qt's font database, suggests close matches for an unknown font, replaces a template font that is not installed with the Title Editor's fallback, and drops a caption preset's font (thinning its outline) when that font is missing.
 - **list_title_templates_tool**: kind=static lists the 50 bundled templates; the web has no user template folder. kind=project reads each title through the host's storage (bundled emoji through the assets).
 - **add_emoji_tool / search_emojis_tool**: The desktop's 1,239 OpenMoji SVGs ship with the engine (assets/emojis, minified without changing what they draw; scripts/gen-emojis.mjs) and are stored as `@emojis/<file>` like the desktop stores them. There is no user emoji folder (group 'user' finds nothing). duration_seconds 0 is 10 s, the desktop's Default Image Length preference default.
-- **list_captions_tool / edit_captions_tool / remove_captions_tool**: They work on Caption effects, as on desktop develop (captions made by Zenvi desktop or with the Caption effect); the engine's add_captions_tool still places one title per cue (the earlier desktop behaviour), which these tools do not list. With no target the project's only caption track is used: the web has no effect selection to pick from.
-- **get_transcript_tool, export_captions_tool, add_captions_tool**: Transcripts come from the indexed `ai_metadata.transcript_cues`; word timings inside a cue are estimated by character count (`transcriptionSource: "index_cues"`, `wordTiming: "estimated"`). The desktop runs on-device ASR.
+- **list_captions_tool / edit_captions_tool / remove_captions_tool**: They work on Caption effects, as on desktop develop (made by add_captions_tool, Zenvi desktop or the Caption effect). With no target the project's only caption track is used: the web has no effect selection to pick from.
+- **speech: get_transcript_tool, transcribe_media_tool, remove_words_tool, export_captions_tool, add_captions_tool, duck_under_speech_tool**: Speech recognition runs on the Zenvi server (`POST /api/v1/transcription`, zenvi-backend #67: OpenAI whisper-1, 2 credits per started minute, a Zenvi sign-in), not on device. The host sends mono 16 kHz speech audio (MP3 from ffmpeg on the CLI and in Zenvi Cloud, WAV from Web Audio in the editor), long media in pieces split at pauses. A file's words come from, in order: a transcription kept on the file, the media index's transcript cues (word timings estimated by character count: `transcriptionSource: "index_cues"`, `wordTiming: "estimated"`), then a new transcription (`transcriptionSource: "server"`, `wordTiming: "exact"`). The words are kept in the project on the file (`ai_metadata.asr`: the desktop transcript cache record's fields plus the segments and the media's content hash), outside the undo history, so the next call, another surface or an exported .zvn reuses them and undoing an edit keeps them; the desktop caches on disk and ignores the key. Whisper leaves out "um" and "uh" unless prompted, so English and auto-detected requests carry OpenAI's filler prompt; words take the punctuation of the server's segments, like faster-whisper's. Without a target only clips with a picture and sound are transcribed (audio-only clips such as music beds only when the timeline has no such footage, or when named). modelId and engine are accepted and unused (one server model). A server without the route answers in words: `speech recognition is not available yet on this Zenvi server`.
+- **add_captions_tool**: Transcript captions: the desktop reads only the index's transcript cues (shared out by character count); here a clip's words come as for get_transcript_tool, and recognized words keep their own timings: captions break at sentence ends, at pauses over 0.8 s and where the desktop's line-breaking costs put them (maxWords, maxChars), each runs from its first word to its last and stays up across a short pause. Subtitle files are read through the host: from disk on the CLI, from the project's files in Zenvi Cloud and the editor.
+- **remove_words_tool**: Cuts on real word timings only (a kept or new transcription, never the index's estimates). wordIndices must come from the words they cut: indices for a transcription made by the same call are refused (call get_transcript_tool first), and a transcription made after the index's words gets the next transcriptGeneration, so indices read from the index are refused as stale. Refusals that need no words (an unknown fillerPreset, a retimed clip, an ambiguous clipId) come before any transcription is paid for.
+- **duck_under_speech_tool / analyze_timeline_audio_tool**: With speech_clip_ids=auto and no indexed speech, talking footage (picture and sound) without a transcript is transcribed and its words become the speech windows (`transcript`); the desktop falls back to its local VAD. A kept transcription also marks a clip the index does not know as speech in analyze_timeline_audio_tool.
 - **remove_silence_tool**: Speech windows come from the desktop's energy VAD run on the host's RMS envelope (AudioHost.analyzeAudio), not from on-device VAD models.
 - **web-only arguments**: Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, set_clip_speed_tool clip_id/factor/direction (the web's older speed tool: one clip id, speed, backward = reverse), watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).
-- **desktop defaults the web does not follow yet**: save_project_tool and export_video_tool replace an existing file (the CLI's) where the desktop refuses unless overwrite=true; add_title_tool never shrinks long lines (desktop fit_text=true); add_captions_tool adds a new caption group where the desktop replaces the clip's captions (replace_existing=true); new_project_tool / open_project_tool have no unsaved-changes guard (every web surface autosaves, so discard_unsaved is accepted as is); generate_tts_and_add_to_timeline_tool defaults to the track below the picture, where the desktop picks or creates a free narration track.
-- **tools zenvi-core develop rewrote as editor tools**: get_project_info_tool, list_markers_tool, get_export_settings_tool, set_export_setting_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, export_video_tool, generate_tts_and_add_to_timeline_tool, add_effect_tool, add_title_tool, set_keyframes_tool, set_project_setting_tool and add_captions_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts), set_export_setting_tool stores any key (develop checks keys and aliases), and set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property).
+- **desktop defaults the web does not follow yet**: save_project_tool and export_video_tool replace an existing file (the CLI's) where the desktop refuses unless overwrite=true; add_title_tool never shrinks long lines (desktop fit_text=true); new_project_tool / open_project_tool have no unsaved-changes guard (every web surface autosaves, so discard_unsaved is accepted as is); generate_tts_and_add_to_timeline_tool defaults to the track below the picture, where the desktop picks or creates a free narration track.
+- **tools zenvi-core develop rewrote as editor tools**: get_project_info_tool, list_markers_tool, get_export_settings_tool, set_export_setting_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, export_video_tool, generate_tts_and_add_to_timeline_tool, add_effect_tool, add_title_tool, set_keyframes_tool and set_project_setting_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts), set_export_setting_tool stores any key (develop checks keys and aliases), and set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property).
 - **split_file_add_clip_tool**: require_visual_match reads true/false; the desktop's `bool(...)` treats the string "false" as true (tool_handlers.py:2370).
 - **wait_for_editor_job_tool (desktop MCP extra, #237)**: Pending, and likely to stay so: tool calls here run to completion inside the call, so there is never a detached editor job; the name gets the standard not-available refusal.
 - **argument coercion**: As zenvi-core normalize_args, plus numbers/booleans become strings for string-only properties (MCP clients send typed JSON). Tools that are editor tools on the desktop coerce like its @editor_tool registry (`_registry.coerce_args`): case-insensitive enums, "1.5s", comma-separated or JSON lists, "y"/"n"; an empty string or null for an argument that cannot hold it means its default where the desktop refuses it, and a value that cannot be coerced is refused in the web's words (`Invalid arguments for …`) rather than the registry's.
