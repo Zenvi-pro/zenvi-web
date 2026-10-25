@@ -100,6 +100,27 @@ describe("color kernels match libopenshot 1.0 (goldens from scripts/parity/kerne
   }
 });
 
+describe("ColorGrade's colour cache", () => {
+  it.each(["colorgrade-basic-ramp", "colorgrade-wheels-scalars-alpha"])("%s: a repeated colour grades exactly as a lone pixel of it", (name) => {
+    const c = doc.cases[name]!;
+    const json = mergePatch(doc.defaults[c.type], c.patch) as Record<string, unknown>;
+    const params = evaluateEffectParams(json, 1);
+    const ctx = (w: number, h: number): KernelContext => ({ frame: 1, canvasWidth: w, canvasHeight: h, images: new Map(), texts, effectId: String(json.id), state: new Map() });
+    // 4096 pixels of 65 colours: most are repeats, and the last colour takes the first one's cache slot
+    // (black and #01b5ac share a slot under the cache's hash), so they keep evicting each other.
+    const colours = [...Array.from({ length: 64 }, (_, k) => [(k * 37) & 255, (k * 91) & 255, (k * 53) & 255]), [0x01, 0xb5, 0xac]];
+    const expected = colours.map((colour) => {
+      const one = new Uint8ClampedArray([...colour, 255]);
+      colorGrade.run(wrapPremul(1, 1, one), params, ctx(1, 1));
+      return [...one];
+    });
+    const data = new Uint8ClampedArray(64 * 64 * 4);
+    for (let i = 0; i < 64 * 64; i += 1) data.set([...colours[i % colours.length]!, 255], i * 4);
+    colorGrade.run(wrapPremul(64, 64, data), params, ctx(64, 64));
+    for (let i = 0; i < 64 * 64; i += 1) expect([...data.subarray(i * 4, i * 4 + 4)], `pixel ${i}`).toEqual(expected[i % colours.length]);
+  });
+});
+
 describe("appleExp2f", () => {
   it("matches macOS libm exp2f bit for bit, including its incorrectly rounded results", () => {
     const vectors = doc.vectors.exp2f;
