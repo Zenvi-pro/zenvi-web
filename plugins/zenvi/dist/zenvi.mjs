@@ -1856,8 +1856,8 @@ function samplesPerFrame(frame, fps, sampleRate, channels) {
   previous -= previous % channels;
   let total = sampleRate * fpsRate * frame;
   total -= total % channels;
-  const count = roundHalfAway(total - previous);
-  return count < 0 ? 0 : count;
+  const count2 = roundHalfAway(total - previous);
+  return count2 < 0 ? 0 : count2;
 }
 function frameSampleOffset(frame, fps, sampleRate, channels) {
   let total = sampleRate * (fps.den / fps.num) * (frame - 1);
@@ -4760,7 +4760,7 @@ function reverseTimePoints(points) {
 function finalizeTimePoints(points, startX, newEndX) {
   if (points.length === 0) return points;
   const sorted = [...points].sort((a, b) => Number(a?.co?.X ?? 0) - Number(b?.co?.X ?? 0));
-  const count = sorted.length;
+  const count2 = sorted.length;
   const lo = Math.trunc(startX);
   const hi = Math.trunc(newEndX);
   const xs = sorted.map((p) => {
@@ -4771,19 +4771,19 @@ function finalizeTimePoints(points, startX, newEndX) {
     return x;
   });
   xs[0] = lo;
-  xs[count - 1] = hi;
-  for (let i = 1; i < count; i += 1) if (xs[i] <= xs[i - 1]) xs[i] = Math.min(hi, xs[i - 1] + 1);
-  for (let i = count - 2; i >= 0; i -= 1) {
-    const maxAllowed = hi - (count - i - 1);
+  xs[count2 - 1] = hi;
+  for (let i = 1; i < count2; i += 1) if (xs[i] <= xs[i - 1]) xs[i] = Math.min(hi, xs[i - 1] + 1);
+  for (let i = count2 - 2; i >= 0; i -= 1) {
+    const maxAllowed = hi - (count2 - i - 1);
     if (xs[i] > maxAllowed) xs[i] = maxAllowed;
     if (xs[i] < lo) xs[i] = lo;
     if (i > 0 && xs[i] <= xs[i - 1]) xs[i] = Math.min(maxAllowed, xs[i - 1] + 1);
   }
   xs[0] = lo;
-  xs[count - 1] = hi;
-  for (let i = 1; i < count; i += 1) if (xs[i] <= xs[i - 1]) xs[i] = Math.min(hi, xs[i - 1] + 1);
+  xs[count2 - 1] = hi;
+  for (let i = 1; i < count2; i += 1) if (xs[i] <= xs[i - 1]) xs[i] = Math.min(hi, xs[i - 1] + 1);
   xs[0] = lo;
-  xs[count - 1] = hi;
+  xs[count2 - 1] = hi;
   return sorted.map((p, i) => ({ ...p, co: { ...p.co, X: xs[i] } }));
 }
 function retimeClip(clip2, newEnd, fps, direction2 = 1, newPosition) {
@@ -8085,14 +8085,14 @@ function codePointLength(str3) {
   const units = str3.length;
   if (!highSurrogate.test(str3))
     return units;
-  let count = units;
+  let count2 = units;
   for (let i = 0; i < units - 1; i++) {
     if ((str3.charCodeAt(i) & 64512) === 55296 && (str3.charCodeAt(i + 1) & 64512) === 56320) {
-      count--;
+      count2--;
       i++;
     }
   }
-  return count;
+  return count2;
 }
 function getLengthableOrigin(input3) {
   if (Array.isArray(input3))
@@ -12555,8 +12555,8 @@ var init_az = __esm({
 });
 
 // ../../node_modules/zod/v4/locales/be.js
-function getBelarusianPlural(count, one, few, many) {
-  const absCount = Math.abs(count);
+function getBelarusianPlural(count2, one, few, many) {
+  const absCount = Math.abs(count2);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
@@ -15329,8 +15329,8 @@ var init_hu = __esm({
 });
 
 // ../../node_modules/zod/v4/locales/hy.js
-function getArmenianPlural(count, one, many) {
-  return Math.abs(count) === 1 ? one : many;
+function getArmenianPlural(count2, one, many) {
+  return Math.abs(count2) === 1 ? one : many;
 }
 function withDefiniteArticle(word) {
   if (!word)
@@ -18205,8 +18205,8 @@ var init_ro = __esm({
 });
 
 // ../../node_modules/zod/v4/locales/ru.js
-function getRussianPlural(count, one, few, many) {
-  const absCount = Math.abs(count);
+function getRussianPlural(count2, one, few, many) {
+  const absCount = Math.abs(count2);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
@@ -29403,12 +29403,12 @@ function detectBeats(pcm, sampleRate, options = {}) {
   let bestAccent = -1;
   for (let p = 0; p < 4; p += 1) {
     let sum = 0;
-    let count = 0;
+    let count2 = 0;
     for (let i = p; i < frames.length; i += 4) {
       sum += bass(frames[i]);
-      count += 1;
+      count2 += 1;
     }
-    const accent = count > 0 ? sum / count : 0;
+    const accent = count2 > 0 ? sum / count2 : 0;
     if (accent > bestAccent) {
       bestAccent = accent;
       phase = p;
@@ -29600,14 +29600,14 @@ function chooseMusicStart(music, seconds2) {
   const loudest = Math.max(...music.beatEnergy ?? [1], EPS2);
   const energyBetween = (from, to) => {
     let sum = 0;
-    let count = 0;
+    let count2 = 0;
     music.beats.forEach((t, i) => {
       if (t >= from - EPS2 && t < to - EPS2) {
         sum += (music.beatEnergy?.[i] ?? loudest) / loudest;
-        count += 1;
+        count2 += 1;
       }
     });
-    return count > 0 ? sum / count : 0;
+    return count2 > 0 ? sum / count2 : 0;
   };
   let best = candidates[0];
   let bestScore = energyBetween(best, best + seconds2);
@@ -29764,6 +29764,41 @@ var init_plan = __esm({
   }
 });
 
+// ../engine/src/stock/stock.ts
+function pickStockFile(video, frameWidth, portrait) {
+  const files = (video.video_files ?? []).filter((f2) => f2.link && (f2.file_type ?? "video/mp4") === "video/mp4");
+  if (files.length === 0) return void 0;
+  const side = (f2) => Number((portrait ? Math.min(f2.width ?? 0, f2.height ?? 0) : f2.width) ?? 0) || 0;
+  const big = files.filter((f2) => side(f2) >= frameWidth * 0.75).sort((a, b) => side(a) - side(b));
+  return big[0] ?? [...files].sort((a, b) => side(b) - side(a))[0];
+}
+function licenceRank(license) {
+  const text4 = license ?? "";
+  if (/zero|cc0/i.test(text4)) return 0;
+  if (/noncommercial|by-nc|\bnc\b/i.test(text4)) return 2;
+  return 1;
+}
+function licenceName(license) {
+  const text4 = license ?? "";
+  if (/zero|cc0/i.test(text4)) return "CC0";
+  const m = /licenses\/([a-z-]+)\/(\d(?:\.\d)?)/i.exec(text4);
+  if (m) return `CC ${m[1].toUpperCase()} ${m[2]}`;
+  if (/sampling\+/i.test(text4)) return "Sampling+";
+  return text4 || "unknown licence";
+}
+function previewOf(sound) {
+  return sound.previews?.hq_mp3 || sound.previews?.lq_mp3 || void 0;
+}
+function clockTime(seconds2) {
+  const whole = Math.max(0, Math.round(seconds2));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+var init_stock = __esm({
+  "../engine/src/stock/stock.ts"() {
+    "use strict";
+  }
+});
+
 // ../engine/src/index.ts
 var init_src = __esm({
   "../engine/src/index.ts"() {
@@ -29794,6 +29829,7 @@ var init_src = __esm({
     init_beats();
     init_styles();
     init_plan();
+    init_stock();
   }
 });
 
@@ -30925,10 +30961,10 @@ function decodeName(bytes, platform) {
 function parseNameTable(table) {
   const view = new DataView(table.buffer, table.byteOffset, table.byteLength);
   if (table.byteLength < 6) return [];
-  const count = view.getUint16(2);
+  const count2 = view.getUint16(2);
   const stringOffset = view.getUint16(4);
   const names2 = /* @__PURE__ */ new Set();
-  for (let i = 0; i < count; i += 1) {
+  for (let i = 0; i < count2; i += 1) {
     const rec = 6 + i * 12;
     if (rec + 12 > table.byteLength) break;
     const platform = view.getUint16(rec);
@@ -31343,8 +31379,8 @@ function readOrientationFromTiff(view, tiffStart) {
   const ifdOffset = view.getUint32(tiffStart + 4, little);
   const ifd = tiffStart + ifdOffset;
   if (ifd + 2 > view.byteLength) return 1;
-  const count = view.getUint16(ifd, little);
-  for (let i = 0; i < count; i += 1) {
+  const count2 = view.getUint16(ifd, little);
+  for (let i = 0; i < count2; i += 1) {
     const entry = ifd + 2 + i * 12;
     if (entry + 12 > view.byteLength) break;
     if (view.getUint16(entry, little) === 274) {
@@ -32363,8 +32399,8 @@ var init_video = __esm({
       async frame(index) {
         if (this.options.signal?.aborted) throw new AbortedError();
         let target = Math.max(0, Math.floor(index));
-        const count = this.source.frameCount;
-        if (count !== void 0 && count > 0 && target >= count) target = count - 1;
+        const count2 = this.source.frameCount;
+        if (count2 !== void 0 && count2 > 0 && target >= count2) target = count2 - 1;
         if (this.endFrame !== void 0 && target >= this.endFrame) target = Math.max(0, this.endFrame - 1);
         const cached3 = this.cache.get(target);
         if (cached3) return rgbaView(cached3, this.size.width, this.size.height);
@@ -34287,8 +34323,8 @@ function spectrumBins(audio, bins, gain, smooth2, lowHz, highHz) {
   }
   return result2;
 }
-function mt19937Floats(seed, count) {
-  const words2 = 397 + count + 1;
+function mt19937Floats(seed, count2) {
+  const words2 = 397 + count2 + 1;
   const mt = new Uint32Array(words2);
   mt[0] = seed >>> 0;
   for (let i = 1; i < words2; i += 1) {
@@ -34296,7 +34332,7 @@ function mt19937Floats(seed, count) {
     mt[i] = Math.imul(1812433253, (prev ^ prev >>> 30) >>> 0) + i >>> 0;
   }
   const out = [];
-  for (let k = 0; k < count; k += 1) {
+  for (let k = 0; k < count2; k += 1) {
     const yp = (mt[k] & 2147483648 | mt[k + 1] & 2147483647) >>> 0;
     const x = (mt[k + 397] ^ yp >>> 1 ^ (yp & 1 ? 2567483615 : 0)) >>> 0;
     let z2 = (x ^ x >>> 11) >>> 0;
@@ -35024,7 +35060,7 @@ function grayRasterize(contours, oddEven, width, height) {
   }
   if (!invalid2) recordCell();
   const data = new Uint8Array(countEx * countEy);
-  const hline = (x, y, a, count) => {
+  const hline = (x, y, a, count2) => {
     let coverage = Math.floor(a / 512);
     if (coverage < 0) coverage = -coverage;
     if (oddEven) {
@@ -35032,7 +35068,7 @@ function grayRasterize(contours, oddEven, width, height) {
       if (coverage > 256) coverage = 512 - coverage;
       else if (coverage === 256) coverage = 255;
     } else if (coverage >= 256) coverage = 255;
-    if (coverage) data.fill(coverage, y * countEx + x, y * countEx + x + count);
+    if (coverage) data.fill(coverage, y * countEx + x, y * countEx + x + count2);
   };
   for (let yi = 0; yi < countEy; yi += 1) {
     const cells = [...rows[yi].entries()].sort((a, b) => a[0] - b[0]);
@@ -36165,13 +36201,13 @@ function flattenPath(path38, device) {
     current = null;
   };
   const inside = (x, y) => x >= 0 && x <= device.width && y >= 0 && y <= device.height;
-  const count = path38.types.length;
-  for (let i = 0; i < count; i += 1) {
+  const count2 = path38.types.length;
+  for (let i = 0; i < count2; i += 1) {
     const type = path38.types[i];
     const x = path38.pts[i * 2];
     const y = path38.pts[i * 2 + 1];
     if (type === MOVE_TO) {
-      if (i === count - 1) continue;
+      if (i === count2 - 1) continue;
       close();
       current = [x, y];
     } else if (type === LINE_TO) {
@@ -37697,20 +37733,20 @@ function drawBars(p, s) {
 }
 function drawSpectrum(p, s) {
   const { width, height, styledGlow, style, spread: spread2, base, palette } = s;
-  const count = clampi(lround(fmaf(s.detail, 220, 56)), 40, Math.max(40, Math.floor(width / 2)));
-  const bins = spectrumBins(s.audio, count, s.gain, s.smoothing, s.lowHz, s.highHz);
+  const count2 = clampi(lround(fmaf(s.detail, 220, 56)), 40, Math.max(40, Math.floor(width / 2)));
+  const bins = spectrumBins(s.audio, count2, s.gain, s.smoothing, s.lowHz, s.highHz);
   const px = [];
   const py = [];
-  for (let i = 0; i < count; i += 1) {
-    px.push(f323(i * width / Math.max(1, count - 1)));
+  for (let i = 0; i < count2; i += 1) {
+    px.push(f323(i * width / Math.max(1, count2 - 1)));
     const hh = f323(f323(bins[i] * height) * f323(0.84));
     py.push(f323(height - (hh > 1 ? hh : 1)));
   }
   const ridge = newPath();
   moveTo(ridge, px[0], py[0]);
-  for (let i = 0; i + 1 < count; i += 1) {
+  for (let i = 0; i + 1 < count2; i += 1) {
     const i0 = i === 0 ? i : i - 1;
-    const i3 = Math.min(i + 2, count - 1);
+    const i3 = Math.min(i + 2, count2 - 1);
     const c1x = (px[i + 1] - px[i0]) / 6 + px[i];
     const c1y = (py[i + 1] - py[i0]) / 6 + py[i];
     const c2x = px[i + 1] - (px[i3] - px[i]) / 6;
@@ -37718,15 +37754,15 @@ function drawSpectrum(p, s) {
     cubicTo(ridge, c1x, c1y, c2x, c2y, px[i + 1], py[i + 1]);
   }
   const terrain = s.colorMode === RAINBOW ? horizontal(width, rainbowStops(base, spread2, styleFillAlpha(style))) : fillBrush(verticalStyleFill(0, 0, 0, height, palette, style));
-  if (count > 1) {
+  if (count2 > 1) {
     const layer2 = createPremul(width, height);
     new Painter(layer2).fillRect(0, 0, width, height, terrain);
     const mask2 = createPremul(width, height);
     const maskPainter = new Painter(mask2);
     const white = pen(solid(rgb8(255, 255, 255)), 1);
     for (let x = 0; x < width; x += 1) {
-      const position = f323(f323(x * (count - 1)) / Math.max(1, width - 1));
-      const index = clampi(Math.floor(position), 0, count - 2);
+      const position = f323(f323(x * (count2 - 1)) / Math.max(1, width - 1));
+      const index = clampi(Math.floor(position), 0, count2 - 2);
       const mix = f323(position - index);
       const y = f323(fma2(py[index], f323(1 - mix), py[index + 1] * mix));
       const lx = f323(x + 0.5);
@@ -37812,7 +37848,7 @@ function drawRadialBars(p, s) {
 function drawPhaseScope(p, s) {
   p.antialias = false;
   const { width, height, styledGlow, spread: spread2, base, palette, gain } = s;
-  const count = clampi(lround(fmaf(s.detail, 224, 96)), 64, 320);
+  const count2 = clampi(lround(fmaf(s.detail, 224, 96)), 64, 320);
   const audio = s.audio;
   const samples = frameSampleCount(audio);
   const left = audio.channels[0];
@@ -37824,8 +37860,8 @@ function drawPhaseScope(p, s) {
   const trace = [];
   const kx = f323(0.38);
   const ky = f323(-0.42);
-  for (let i = 0; i < count; i += 1) {
-    const sample = clampi(Math.trunc(i * samples / count), 0, samples - 1);
+  for (let i = 0; i < count2; i += 1) {
+    const sample = clampi(Math.trunc(i * samples / count2), 0, samples - 1);
     const l = left[sample];
     const r = right[sample];
     const ax = clampf(f323(f323(f323(l - r) * gain) * f323(0.75)), -1, 1);
@@ -37912,7 +37948,7 @@ function intersectRect(x1, y1, w1, h1, x2, y2, w2, h2) {
 }
 function drawParticles(p, s) {
   const { width, height, styledGlow, style, spread: spread2, base, palette, gain } = s;
-  const count = clampi(lround(fmaf(s.detail, 920, 220)), 160, 1280);
+  const count2 = clampi(lround(fmaf(s.detail, 920, 220)), 160, 1280);
   const level = reactiveLevel(s.audio, -1, gain);
   const bands = spectrumBins(s.audio, 36, gain, s.smoothing, s.lowHz, s.highHz);
   const low = bandLevel(bands, 0, f323(0.18));
@@ -37936,7 +37972,7 @@ function drawParticles(p, s) {
   const trailWidthTerm = fmaf(low, f323(0.12), f323(0.28));
   const gradTerm = fmaf(styledGlow, 4, f323(2.2));
   const k035 = f323(0.35);
-  for (let i = 0; i < count; i += 1) {
+  for (let i = 0; i < count2; i += 1) {
     const draws = mt19937Floats(Math.imul(i + 1, PARTICLE_SEED) >>> 0, 4);
     const seed = draws[0];
     const arm = Math.floor(f323(draws[1] * 5));
@@ -39726,8 +39762,8 @@ function parseCubeLut(text4) {
     if (need > MAX_VALUES) return null;
     if (need > (lines.length - i) * 3) return null;
     const data = new Float32Array(need);
-    let count = 0;
-    while (i < lines.length && count < need) {
+    let count2 = 0;
+    while (i < lines.length && count2 < need) {
       const line2 = lines[i++];
       if (line2 === "" || line2.startsWith("#") || line2.startsWith("TITLE")) continue;
       if (line2.startsWith("DOMAIN_MIN") || line2.startsWith("DOMAIN_MAX")) {
@@ -39736,13 +39772,13 @@ function parseCubeLut(text4) {
       }
       const vals = splitTokens(line2);
       if (vals.length >= 3) {
-        data[count] = qtToFloat(vals[0]);
-        data[count + 1] = qtToFloat(vals[1]);
-        data[count + 2] = qtToFloat(vals[2]);
-        count += 3;
+        data[count2] = qtToFloat(vals[0]);
+        data[count2 + 1] = qtToFloat(vals[1]);
+        data[count2 + 2] = qtToFloat(vals[2]);
+        count2 += 3;
       }
     }
-    if (count !== need) return null;
+    if (count2 !== need) return null;
     return { size: detected, data };
   };
   const lut3d = tryParse("LUT_3D_SIZE", true);
@@ -39801,14 +39837,14 @@ function trilinear(t, i000, i100, i010, i110, i001, i101, i011, i111, dr, odr, d
   return fmaf2(c0, odb, f328(c1 * db));
 }
 function sample1d(t, size, value, channel) {
-  const count = t.length;
-  if (size <= 1) return t[Math.min(channel, count - 1)];
+  const count2 = t.length;
+  if (size <= 1) return t[Math.min(channel, count2 - 1)];
   const scaled = f328(value * (size - 1));
   const i0 = floorIndex(scaled);
   const i1 = Math.min(i0 + 1, size - 1);
   const frac = f328(scaled - i0);
-  const v0 = t[Math.max(0, Math.min(i0 * 3 + channel, count - 1))];
-  const v1 = t[Math.max(0, Math.min(i1 * 3 + channel, count - 1))];
+  const v0 = t[Math.max(0, Math.min(i0 * 3 + channel, count2 - 1))];
+  const v1 = t[Math.max(0, Math.min(i1 * 3 + channel, count2 - 1))];
   return fmaf2(v0, f328(1 - frac), f328(v1 * frac));
 }
 function applyCubeLut(image, lut, intensity, intensityR, intensityG, intensityB) {
@@ -40447,15 +40483,15 @@ function buildPixelLut(responses, strength, detail2, temporal, colorNoise) {
   }
   return lut;
 }
-function scratchPlanes(count) {
-  if (count > scratch.capacity) {
-    scratch.capacity = count;
-    scratch.planes = Array.from({ length: 10 }, () => new Float32Array(count));
+function scratchPlanes(count2) {
+  if (count2 > scratch.capacity) {
+    scratch.capacity = count2;
+    scratch.planes = Array.from({ length: 10 }, () => new Float32Array(count2));
   }
-  return scratch.planes.map((plane) => plane.subarray(0, count));
+  return scratch.planes.map((plane) => plane.subarray(0, count2));
 }
-function unpremultiplyInto(data, count, r, g, b) {
-  for (let p = 0; p < count; p += 1) {
+function unpremultiplyInto(data, count2, r, g, b) {
+  for (let p = 0; p < count2; p += 1) {
     const i = p * 4;
     const a = data[i + 3];
     if (a === 255) {
@@ -40560,16 +40596,16 @@ var init_denoise = __esm({
         if (strength >= f3210(0.95) && detail2 <= f3210(0.15)) coarseRadius = 8;
         else if (strength >= f3210(0.8) && detail2 <= f3210(0.35)) coarseRadius = 6;
         else if (strength >= f3210(0.65) && detail2 <= f3210(0.55)) coarseRadius = 5;
-        const count = width * height;
-        const [cr, cg, cb, tmp, fineR, fineG, fineB, baseR, baseG, baseB] = scratchPlanes(count);
-        unpremultiplyInto(data, count, cr, cg, cb);
+        const count2 = width * height;
+        const [cr, cg, cb, tmp, fineR, fineG, fineB, baseR, baseG, baseB] = scratchPlanes(count2);
+        unpremultiplyInto(data, count2, cr, cg, cb);
         boxBlur(cr, fineR, tmp, width, height, fineRadius);
         boxBlur(cg, fineG, tmp, width, height, fineRadius);
         boxBlur(cb, fineB, tmp, width, height, fineRadius);
         boxBlur(fineR, baseR, tmp, width, height, coarseRadius);
         boxBlur(fineG, baseG, tmp, width, height, coarseRadius);
         boxBlur(fineB, baseB, tmp, width, height, coarseRadius);
-        for (let p = 0; p < count; p += 1) {
+        for (let p = 0; p < count2; p += 1) {
           const i = p * 4;
           const centerR = cr[p];
           const centerG = cg[p];
@@ -41255,8 +41291,8 @@ var init_geometry = __esm({
       supported: true,
       run(image, params, ctx) {
         const W = image.width;
-        const count = W * image.height;
-        if (count === 0) return;
+        const count2 = W * image.height;
+        if (count2 === 0) return;
         const original = new Uint8ClampedArray(image.data);
         const d = image.data;
         const time3 = ctx.frame;
@@ -41275,7 +41311,7 @@ var init_geometry = __esm({
             const pixel = rowOffset + x;
             let source2 = roundHalfAway(f3214(pixel + waveVal));
             if (source2 < 0) source2 = 0;
-            if (source2 >= count) source2 = count - 1;
+            if (source2 >= count2) source2 = count2 - 1;
             d[pixel * 4] = original[source2 * 4];
             d[pixel * 4 + 1] = original[source2 * 4 + 1];
             d[pixel * 4 + 2] = original[source2 * 4 + 2];
@@ -42023,10 +42059,10 @@ function clampf3(v, lo, hi) {
   if (v > hi) return hi;
   return v;
 }
-function boxPass(src, dst, len, count, step, lineStep, r) {
+function boxPass(src, dst, len, count2, step, lineStep, r) {
   const inv = f3217(1 / (r * 2 + 1));
   const lastIndex = len - 1;
-  for (let line2 = 0; line2 < count; line2 += 1) {
+  for (let line2 = 0; line2 < count2; line2 += 1) {
     const base = line2 * lineStep;
     const first = src[base];
     const last = src[base + lastIndex * step];
@@ -42050,8 +42086,8 @@ function boxBlur2(mask2, w, h, r, iterations) {
     boxPass(temp, mask2, h, w, w, 1, r);
   }
 }
-function maxPass(src, dst, len, count, step, lineStep, r, queue) {
-  for (let line2 = 0; line2 < count; line2 += 1) {
+function maxPass(src, dst, len, count2, step, lineStep, r, queue) {
+  for (let line2 = 0; line2 < count2; line2 += 1) {
     const base = line2 * lineStep;
     let head = 0;
     let tail = 0;
@@ -43554,15 +43590,15 @@ function attackOrRelease(seconds2, inverseSampleRate) {
   return v === 0 ? 0 : powf(INV_E, f3220(inverseSampleRate / v));
 }
 function mixDown(channels, n, out) {
-  const count = channels.length;
-  if (count === 1) {
+  const count2 = channels.length;
+  if (count2 === 1) {
     out.set(channels[0].subarray(0, n));
     return;
   }
-  const g = f3220(1 / count);
+  const g = f3220(1 / count2);
   const first = channels[0];
   for (let i = 0; i < n; i += 1) out[i] = first[i] * g;
-  for (let c = 1; c < count; c += 1) {
+  for (let c = 1; c < count2; c += 1) {
     const ch = channels[c];
     for (let i = 0; i < n; i += 1) out[i] = fmaf(ch[i], g, out[i]);
   }
@@ -44086,12 +44122,12 @@ var init_stft = __esm({
       /** `STFT::process(block)`: in place, channel by channel. */
       process(channels) {
         const n = this.fftSize;
-        const count = Math.min(this.numChannels, channels.length);
+        const count2 = Math.min(this.numChannels, channels.length);
         let inputWrite = this.inputWrite;
         let outputWrite = this.outputWrite;
         let outputRead = this.outputRead;
         let since = this.sinceLastFft;
-        for (let c = 0; c < count; c += 1) {
+        for (let c = 0; c < count2; c += 1) {
           const data = channels[c];
           const input3 = this.channelBuffer(this.input, c);
           const output2 = this.channelBuffer(this.output, c);
@@ -45274,13 +45310,13 @@ function timeMappedSpans(info, grid, last) {
     const startOffset = increasing ? mappedOffset(info, grid, loc.frame) + loc.sample : mappedOffset(info, grid, loc.frame) + frameSamples(loc.frame) - loc.sample;
     let remaining = source2;
     while (remaining > 0) {
-      const count = frameSamples(loc.frame) - loc.sample;
-      if (count <= 0) {
+      const count2 = frameSamples(loc.frame) - loc.sample;
+      if (count2 <= 0) {
         loc = { frame: loc.frame + (increasing ? 1 : -1), sample: 0 };
         break;
       }
-      if (remaining - count >= 0) {
-        remaining -= count;
+      if (remaining - count2 >= 0) {
+        remaining -= count2;
         loc = { frame: loc.frame + (increasing ? 1 : -1), sample: 0 };
       } else {
         loc = { frame: loc.frame, sample: loc.sample + remaining };
@@ -45803,8 +45839,8 @@ function deliverSpans(spans2, clip2, blend) {
 function handleSpans(spans2, constAlpha, fetch2, process4) {
   let coverage = 0;
   let i = 0;
-  const count = spans2.length;
-  while (i < count) {
+  const count2 = spans2.length;
+  while (i < count2) {
     if (!spans2[i].len) {
       i += 1;
       continue;
@@ -45812,7 +45848,7 @@ function handleSpans(spans2, constAlpha, fetch2, process4) {
     let x = spans2[i].x;
     const y = spans2[i].y;
     let right = x + spans2[i].len;
-    for (let j = i + 1; j < count && spans2[j].y === y && spans2[j].x === right; j += 1) right += spans2[j].len;
+    for (let j = i + 1; j < count2 && spans2[j].y === y && spans2[j].x === right; j += 1) right += spans2[j].len;
     let length = right - x;
     while (length) {
       let l = Math.min(BUFFER_SIZE2, length);
@@ -46518,10 +46554,10 @@ function faceOffsets(bytes) {
 function names(view, t) {
   const name = t.name;
   if (!name) return [];
-  const count = view.getUint16(name.offset + 2);
+  const count2 = view.getUint16(name.offset + 2);
   const strings = name.offset + view.getUint16(name.offset + 4);
   const out = /* @__PURE__ */ new Set();
-  for (let i = 0; i < count; i += 1) {
+  for (let i = 0; i < count2; i += 1) {
     const rec = name.offset + 6 + i * 12;
     const platform = view.getUint16(rec);
     const id = view.getUint16(rec + 6);
@@ -47305,7 +47341,7 @@ async function analyzeAudio(file3, options = {}) {
   );
   const rms = [];
   let sum = 0;
-  let count = 0;
+  let count2 = 0;
   let carry;
   managed.child.stdout.on("data", (chunk2) => {
     let buf = carry ? Buffer.concat([carry, chunk2]) : chunk2;
@@ -47315,11 +47351,11 @@ async function analyzeAudio(file3, options = {}) {
     for (let i = 0; i < buf.length; i += 2) {
       const v = buf.readInt16LE(i) / 32768;
       sum += v * v;
-      count += 1;
-      if (count === frameSize) {
+      count2 += 1;
+      if (count2 === frameSize) {
         rms.push(Math.sqrt(sum / frameSize));
         sum = 0;
-        count = 0;
+        count2 = 0;
       }
     }
   });
@@ -47332,7 +47368,7 @@ async function analyzeAudio(file3, options = {}) {
     if (/matches no streams|does not contain any stream|Stream map '0:a:0'/i.test(stderr)) throw new NoAudioError(file3);
     throw managed.failure(`Audio analysis of ${file3} failed`);
   }
-  if (count > 0) rms.push(Math.sqrt(sum / count));
+  if (count2 > 0) rms.push(Math.sqrt(sum / count2));
   return { sampleRate, frameSize, rms: Float32Array.from(rms) };
 }
 async function decodePcm(file3, options = {}) {
@@ -52535,6 +52571,24 @@ async function generateTts(call, input3) {
   if (!res.data.success) return { error: String(res.data.error || "TTS generation failed") };
   return { audioBase64: String(res.data.audio_base64 ?? "") };
 }
+async function searchPexelsVideos(call, search, perPage) {
+  const res = await backendRequest(call.host.backend, `/api/v1/pexels/search${query({ query: search, per_page: perPage, page: 1 })}`, { signal: call.signal });
+  if (!res.ok) return { error: res.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  const videos = Array.isArray(res.data.videos) ? res.data.videos.filter(isRecord24) : [];
+  return { videos, total: Number(res.data.total_results ?? videos.length) || videos.length };
+}
+async function searchFreesound(call, search, pageSize, minSeconds) {
+  const res = await backendRequest(
+    call.host.backend,
+    `/api/v1/freesound/search${query({ query: search, page_size: pageSize, min_duration: minSeconds > 0 ? Math.round(minSeconds) : void 0 })}`,
+    { signal: call.signal }
+  );
+  if (!res.ok) return { error: res.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  const sounds = Array.isArray(res.data.sounds) ? res.data.sounds.filter(isRecord24) : [];
+  return { sounds, total: Number(res.data.count ?? sounds.length) || sounds.length };
+}
 function pickPexelsHdLink(video) {
   const files = Array.isArray(video.video_files) ? video.video_files.filter(isRecord24) : [];
   const pick2 = files.find((f2) => f2.quality === "hd") ?? files[0];
@@ -54573,16 +54627,16 @@ function clampMaxFrames(raw) {
   }
   return [n, warnings];
 }
-function midBinFrames(start, end, count) {
+function midBinFrames(start, end, count2) {
   const span = Math.trunc(end) - Math.trunc(start);
   if (span <= 0) return [];
-  const n = Math.max(1, Math.min(Math.trunc(count), span));
+  const n = Math.max(1, Math.min(Math.trunc(count2), span));
   return Array.from({ length: n }, (_, i) => Math.trunc(start) + Math.trunc(span * (i + 0.5) / n));
 }
-function midBinSeconds(start, end, count) {
+function midBinSeconds(start, end, count2) {
   const span = end - start;
   if (span <= 0) return [];
-  const n = Math.max(1, Math.trunc(count));
+  const n = Math.max(1, Math.trunc(count2));
   return Array.from({ length: n }, (_, i) => start + span * (i + 0.5) / n);
 }
 function formatTimecode2(seconds2) {
@@ -57801,6 +57855,104 @@ var init_speech_tools = __esm({
   }
 });
 
+// ../engine/src/tools/catalog/stock.ts
+function resultCount(raw) {
+  const n = Math.trunc(Number(raw ?? 8));
+  return Math.max(1, Math.min(16, Number.isFinite(n) ? n : 8));
+}
+var SEARCH2, count, stockTools;
+var init_stock2 = __esm({
+  "../engine/src/tools/catalog/stock.ts"() {
+    "use strict";
+    init_zod();
+    init_stock();
+    init_backend2();
+    init_define();
+    init_receipt();
+    SEARCH2 = { readOnlyHint: true, destructiveHint: false, openWorldHint: true, idempotentHint: true };
+    count = external_exports.union([external_exports.int(), external_exports.string().regex(/^\d+$/)]).optional().describe("How many results (1-16, default 8).");
+    stockTools = [
+      directTool({
+        name: "search_pexels_videos_tool",
+        title: "Search stock videos",
+        description: "Search Pexels stock videos (free to use, credit optional). Returns ids, durations, sizes and an MP4 link sized for this project's frame, the project's orientation first. To add one: import_stock_media_tool with source='pexels', its video_id and link (and position_seconds to place it).",
+        input: external_exports.strictObject({
+          query: external_exports.string().trim().min(1).max(200).describe("What the footage shows, e.g. 'barista pouring latte art close up'."),
+          count,
+          orientation: external_exports.enum(["any", "portrait", "landscape"]).optional().describe("Orientation to put first (default: the project's).")
+        }),
+        annotations: SEARCH2,
+        requires: ["backend"],
+        run: async (call, args) => {
+          const tool = "search_pexels_videos_tool";
+          const n = resultCount(args.count);
+          const found = await searchPexelsVideos(call, args.query, Math.min(16, n * 2));
+          if ("error" in found) return refused(tool, `Error: Pexels search failed: ${found.error}`);
+          const project = call.doc.project;
+          const portrait = project.height > project.width;
+          const want = args.orientation ?? (portrait ? "portrait" : "landscape");
+          const shape2 = (w, h) => h > w ? "portrait" : w > h ? "landscape" : "square";
+          const ranked = [...found.videos].sort((a, b) => Number(want !== "any" && shape2(a.width, a.height) !== want) - Number(want !== "any" && shape2(b.width, b.height) !== want));
+          const results = ranked.map((v) => ({ video: v, file: pickStockFile(v, project.width, portrait) })).filter((r) => r.file?.link).slice(0, n).map(({ video, file: file3 }) => ({
+            video_id: video.id,
+            duration_seconds: video.duration,
+            width: video.width,
+            height: video.height,
+            orientation: shape2(video.width, video.height),
+            link: file3.link,
+            link_width: file3.width ?? null,
+            link_height: file3.height ?? null,
+            user: video.user_name ?? "",
+            page_url: video.url ?? `https://www.pexels.com/video/${video.id}/`,
+            image: video.image ?? null
+          }));
+          if (results.length === 0) return applied(tool, `No Pexels videos found for '${args.query}'.`, { data: { query: args.query, total: 0, results } }, 0);
+          const lines = [
+            `Pexels results for '${args.query}' (${found.total.toLocaleString("en-US")} total):`,
+            ...results.map((r) => `  id=${r.video_id}  duration=${clockTime(r.duration_seconds)}  res=${r.link_width ?? "?"}\xD7${r.link_height ?? "?"}  ${r.orientation}  user=${r.user}  link=${r.link}`)
+          ];
+          return applied(tool, lines.join("\n"), { data: { query: args.query, total: found.total, results } }, 0);
+        }
+      }),
+      directTool({
+        name: "search_freesound_music_tool",
+        title: "Search stock music",
+        description: "Search Freesound music and sound effects. Returns ids, durations, licences and MP3 preview URLs, open licences first (CC0, then CC BY; non-commercial last), then longer tracks. To add one: import_stock_media_tool with source='freesound', its sound_id and preview_url. Credit CC BY sounds (user and link) wherever the video is published.",
+        input: external_exports.strictObject({
+          query: external_exports.string().trim().min(1).max(200).describe("Mood, genre or sound, e.g. 'upbeat lo-fi hip hop' or 'whoosh'."),
+          count,
+          min_seconds: external_exports.union([external_exports.number().min(0).max(3600), external_exports.string().regex(/^\d+(\.\d+)?$/)]).optional().describe("Shortest track wanted, seconds (e.g. the video's length for a music bed).")
+        }),
+        annotations: SEARCH2,
+        requires: ["backend"],
+        run: async (call, args) => {
+          const tool = "search_freesound_music_tool";
+          const n = resultCount(args.count);
+          const found = await searchFreesound(call, args.query, Math.min(30, n * 2), Number(args.min_seconds ?? 0));
+          if ("error" in found) return refused(tool, `Error: Freesound search failed: ${found.error}`);
+          const results = found.sounds.filter((s) => previewOf(s)).sort((a, b) => licenceRank(a.license) - licenceRank(b.license) || b.duration - a.duration).slice(0, n).map((s) => ({
+            sound_id: s.id,
+            name: s.name,
+            duration_seconds: s.duration,
+            licence: licenceName(s.license),
+            licence_url: s.license ?? "",
+            user: s.username ?? "",
+            tags: (s.tags ?? []).slice(0, 4),
+            preview_url: previewOf(s),
+            page_url: `https://freesound.org/s/${s.id}/`
+          }));
+          if (results.length === 0) return applied(tool, `No Freesound results for '${args.query}'.`, { data: { query: args.query, total: 0, results } }, 0);
+          const lines = [
+            `Freesound results for '${args.query}' (${found.total.toLocaleString("en-US")} total):`,
+            ...results.map((r) => `  id=${r.sound_id}  duration=${clockTime(r.duration_seconds)}  licence=${r.licence}  user=${r.user}  tags=[${r.tags.join(", ")}]  preview_url=${r.preview_url}`)
+          ];
+          return applied(tool, lines.join("\n"), { data: { query: args.query, total: found.total, results } }, 0);
+        }
+      })
+    ];
+  }
+});
+
 // ../engine/src/tools/catalog/timeline.ts
 function layerOf3(value) {
   const n = Math.trunc(Number(value ?? 0));
@@ -58292,7 +58444,7 @@ function buildCatalog() {
     ...titleTools
   ];
   const byName2 = /* @__PURE__ */ new Map();
-  for (const tool of [...implemented, ...directTools, ...reelTools]) {
+  for (const tool of [...implemented, ...directTools, ...reelTools, ...stockTools]) {
     if (byName2.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName2.set(tool.name, tool);
   }
@@ -58300,7 +58452,7 @@ function buildCatalog() {
   if (missing.length > 0) throw new Error(`tool catalog: contract tools without an implementation: ${missing.join(", ")}`);
   const extra = implemented.filter((tool) => !tool.contract);
   if (extra.length > 0) throw new Error(`tool catalog: non-contract tools outside the direct list: ${extra.map((t) => t.name).join(", ")}`);
-  return [...CONTRACT_TOOL_NAMES.map((name) => byName2.get(name)), ...directTools, ...reelTools];
+  return [...CONTRACT_TOOL_NAMES.map((name) => byName2.get(name)), ...directTools, ...reelTools, ...stockTools];
 }
 function getTool(name) {
   return TOOLS_BY_NAME.get(name);
@@ -58344,6 +58496,7 @@ var init_registry4 = __esm({
     init_reels();
     init_search();
     init_speech_tools();
+    init_stock2();
     init_timeline2();
     init_titles2();
     init_transitions3();
@@ -69225,20 +69378,20 @@ var require_resolve = __commonJS({
       return false;
     }
     function countKeys(schema) {
-      let count = 0;
+      let count2 = 0;
       for (const key in schema) {
         if (key === "$ref")
           return Infinity;
-        count++;
+        count2++;
         if (SIMPLE_INLINED.has(key))
           continue;
         if (typeof schema[key] == "object") {
-          (0, util_1.eachItem)(schema[key], (sch) => count += countKeys(sch));
+          (0, util_1.eachItem)(schema[key], (sch) => count2 += countKeys(sch));
         }
-        if (count === Infinity)
+        if (count2 === Infinity)
           return Infinity;
       }
-      return count;
+      return count2;
     }
     function getFullPath(resolver, id = "", normalize2) {
       if (normalize2 !== false)
@@ -72720,8 +72873,8 @@ var require_contains = __commonJS({
         cxt.result(valid, () => cxt.reset());
         function validateItemsWithCount() {
           const schValid = gen.name("_valid");
-          const count = gen.let("count", 0);
-          validateItems(schValid, () => gen.if(schValid, () => checkLimits(count)));
+          const count2 = gen.let("count", 0);
+          validateItems(schValid, () => gen.if(schValid, () => checkLimits(count2)));
         }
         function validateItems(_valid, block) {
           gen.forRange("i", 0, len, (i) => {
@@ -72734,16 +72887,16 @@ var require_contains = __commonJS({
             block();
           });
         }
-        function checkLimits(count) {
-          gen.code((0, codegen_1._)`${count}++`);
+        function checkLimits(count2) {
+          gen.code((0, codegen_1._)`${count2}++`);
           if (max === void 0) {
-            gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true).break());
+            gen.if((0, codegen_1._)`${count2} >= ${min}`, () => gen.assign(valid, true).break());
           } else {
-            gen.if((0, codegen_1._)`${count} > ${max}`, () => gen.assign(valid, false).break());
+            gen.if((0, codegen_1._)`${count2} > ${max}`, () => gen.assign(valid, false).break());
             if (min === 1)
               gen.assign(valid, true);
             else
-              gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true));
+              gen.if((0, codegen_1._)`${count2} >= ${min}`, () => gen.assign(valid, true));
           }
         }
       }
@@ -76242,20 +76395,20 @@ var require_resolve2 = __commonJS({
       return false;
     }
     function countKeys(schema) {
-      let count = 0;
+      let count2 = 0;
       for (const key in schema) {
         if (key === "$ref")
           return Infinity;
-        count++;
+        count2++;
         if (SIMPLE_INLINED.has(key))
           continue;
         if (typeof schema[key] == "object") {
-          (0, util_1.eachItem)(schema[key], (sch) => count += countKeys(sch));
+          (0, util_1.eachItem)(schema[key], (sch) => count2 += countKeys(sch));
         }
-        if (count === Infinity)
+        if (count2 === Infinity)
           return Infinity;
       }
-      return count;
+      return count2;
     }
     function getFullPath(resolver, id = "", normalize2) {
       if (normalize2 !== false)
@@ -78618,8 +78771,8 @@ var require_contains2 = __commonJS({
         cxt.result(valid, () => cxt.reset());
         function validateItemsWithCount() {
           const schValid = gen.name("_valid");
-          const count = gen.let("count", 0);
-          validateItems(schValid, () => gen.if(schValid, () => checkLimits(count)));
+          const count2 = gen.let("count", 0);
+          validateItems(schValid, () => gen.if(schValid, () => checkLimits(count2)));
         }
         function validateItems(_valid, block) {
           gen.forRange("i", 0, len, (i) => {
@@ -78632,16 +78785,16 @@ var require_contains2 = __commonJS({
             block();
           });
         }
-        function checkLimits(count) {
-          gen.code((0, codegen_1._)`${count}++`);
+        function checkLimits(count2) {
+          gen.code((0, codegen_1._)`${count2}++`);
           if (max === void 0) {
-            gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true).break());
+            gen.if((0, codegen_1._)`${count2} >= ${min}`, () => gen.assign(valid, true).break());
           } else {
-            gen.if((0, codegen_1._)`${count} > ${max}`, () => gen.assign(valid, false).break());
+            gen.if((0, codegen_1._)`${count2} > ${max}`, () => gen.assign(valid, false).break());
             if (min === 1)
               gen.assign(valid, true);
             else
-              gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true));
+              gen.if((0, codegen_1._)`${count2} >= ${min}`, () => gen.assign(valid, true));
           }
         }
       }
@@ -93319,8 +93472,8 @@ function hostDetails(entry) {
   if (entry.id === "zenvi-desktop") {
     return entry.connected ? [project ?? "untitled project", entry.version ? `Zenvi ${String(entry.version)}` : "", entry.pid ? `pid ${String(entry.pid)}` : ""].filter(Boolean).join(" \xB7 ") : "start it with `zenvi open`";
   }
-  const count = `${String(entry.tools)} tool${entry.tools === 1 ? "" : "s"}`;
-  const listed = entry.tools_listed ? count : `${count}, not listed by zenvi mcp`;
+  const count2 = `${String(entry.tools)} tool${entry.tools === 1 ? "" : "s"}`;
+  const listed = entry.tools_listed ? count2 : `${count2}, not listed by zenvi mcp`;
   if (entry.connected) {
     return [`${String(entry.app_name ?? entry.label)} ${String(entry.app_version ?? "")}`.trim(), project ?? "no saved project", listed].join(" \xB7 ");
   }
