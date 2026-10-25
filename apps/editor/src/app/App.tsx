@@ -14,6 +14,8 @@ import { FullScreenLoader } from "./FullScreenLoader";
 // The editor is the heavy part (timeline, renderer); load it on demand so the
 // projects home opens instantly.
 const EditorRoute = lazy(() => import("@/features/editor/EditorRoute"));
+// The editor inside a chat (served by Zenvi Cloud, framed by its MCP editor view).
+const EmbedRoute = lazy(() => import("@/features/embed/EmbedRoute"));
 
 function Root() {
   return (
@@ -37,6 +39,16 @@ const router = createBrowserRouter(
             <BrowserGate>
               <Suspense fallback={<FullScreenLoader label="Opening editor" />}>
                 <EditorRoute />
+              </Suspense>
+            </BrowserGate>
+          ),
+        },
+        {
+          path: "/embed/:projectId",
+          element: (
+            <BrowserGate>
+              <Suspense fallback={<FullScreenLoader label="Opening the Zenvi editor" />}>
+                <EmbedRoute />
               </Suspense>
             </BrowserGate>
           ),

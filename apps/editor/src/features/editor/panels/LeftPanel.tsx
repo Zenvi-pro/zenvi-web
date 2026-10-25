@@ -20,9 +20,12 @@ const TABS: { id: LeftTab; label: string; icon: ReactNode }[] = [
   { id: "generate", label: "Generate with AI", icon: <WandSparkles size={18} /> },
 ];
 
-export function LeftPanel({ width }: { width: number }) {
+/** `tabs` limits the sections (the chat embed has no Zenvi sign-in, so no stock or AI generation). */
+export function LeftPanel({ width, tabs }: { width: number; tabs?: readonly LeftTab[] }) {
   const session = useSession();
-  const tab = useUi((s) => s.leftTab);
+  const shown = tabs ? TABS.filter((t) => tabs.includes(t.id)) : TABS;
+  const chosen = useUi((s) => s.leftTab);
+  const tab = shown.some((t) => t.id === chosen) ? chosen : (shown[0]?.id ?? chosen);
   const collapsed = useUi((s) => s.panels.leftCollapsed);
   const choose = (id: LeftTab) => {
     const panels = session.ui.getState().panels;
@@ -32,7 +35,7 @@ export function LeftPanel({ width }: { width: number }) {
   return (
     <aside className="flex shrink-0 border-r border-line bg-base" aria-label="Library">
       <nav aria-label="Library sections" className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line py-2">
-        {TABS.map((t) => {
+        {shown.map((t) => {
           const active = t.id === tab && !collapsed;
           return (
             <Tooltip key={t.id} label={t.label} side="right">

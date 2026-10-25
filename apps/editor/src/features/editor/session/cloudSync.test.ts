@@ -111,3 +111,56 @@ describe("cloud sync", () => {
     expect(session.meta.getState().cloud?.revision).toBe("r10");
   });
 });
+
+describe("adoptRemote (edits made elsewhere, e.g. the chat's tools)", () => {
+  function remoteWith(session: EditorSession, mutate: (project: Record<string, unknown>) => void, revision = "r2") {
+    const project = structuredClone(session.project) as unknown as Record<string, unknown>;
+    mutate(project);
+    return { revision, project: project as unknown as typeof session.project };
+  }
+
+  it("takes the cloud's newer revision as one undo step and does not send it back", async () => {
+    const saveProject = vi.fn(async () => ({ revision: "r3" }));
+    const session = linkedSession(fakeCloud({ saveProject }));
+    const remote = remoteWith(session, (p) => {
+      p.markers = [{ id: "M1", position: 2, icon: "blue.png", vector: "blue" }];
+    });
+    expect(session.adoptRemote(remote)).toBe(true);
+    expect(session.project.markers).toHaveLength(1);
+    expect(session.doc.undoLabels.at(-1)).toBe("Changes from the chat");
+    expect(session.meta.getState().cloud?.revision).toBe("r2");
+    await session.autosave.flush();
+    await session.saveCloud();
+    expect(saveProject).not.toHaveBeenCalled();
+    expect(session.cloudSync.getState().state).toBe("synced");
+
+    // Undoing it is a real edit: it goes to the cloud, against the adopted revision.
+    session.undo();
+    await session.saveCloud();
+    expect(saveProject).toHaveBeenCalledTimes(1);
+    expect(saveProject.mock.calls[0]?.[2]).toBe("r2");
+    expect(session.project.markers).toHaveLength(0);
+  });
+
+  it("refuses while this copy has edits the cloud does not have", () => {
+    const session = linkedSession(fakeCloud({ saveProject: async () => ({ revision: "r9" }) }));
+    session.edit("Add", (tx) => addFile(tx, { path: "media/x/clip.webm", info: reader, name: "clip.webm" }));
+    const remote = remoteWith(session, (p) => {
+      p.markers = [{ id: "M1", position: 2, icon: "blue.png", vector: "blue" }];
+    });
+    expect(session.adoptRemote(remote)).toBe(false);
+    expect(session.project.markers).toHaveLength(0);
+    expect(session.meta.getState().cloud?.revision).toBe("r1");
+  });
+
+  it("only moves the revision when nothing but view state changed", () => {
+    const session = linkedSession(fakeCloud({}));
+    const remote = remoteWith(session, (p) => {
+      p.playhead_position = 7;
+    });
+    expect(session.adoptRemote(remote)).toBe(true);
+    expect(session.doc.canUndo).toBe(false);
+    expect(session.meta.getState().cloud?.revision).toBe("r2");
+    expect(session.adoptRemote(remote)).toBe(false);
+  });
+});

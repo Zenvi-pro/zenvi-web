@@ -103,6 +103,17 @@ const CACHE_MS = 30_000;
 const TOUCH_EVERY_MS = 5 * 60_000;
 
 const lookupPk = (hash: string): string => `t:${hash.slice(0, 2)}`;
+
+/** The `resource` an embed token is bound to: one project. */
+export function embedResource(projectId: string): string {
+  return `project:${projectId}`;
+}
+
+/** The project an embed token's `resource` names, or null. */
+export function embedProjectId(resource: string | undefined): string | null {
+  return resource?.startsWith("project:") ? resource.slice("project:".length) || null : null;
+}
+
 const userPk = (userId: string): string => `u:${userId}`;
 
 function toRecord(row: LookupRow): TokenRecord {
@@ -268,6 +279,41 @@ export class TokenRepo {
     await this.tables.create(TABLE, toRow(access.record));
     await this.tables.create(TABLE, toRow(refresh.record));
     return { accessToken: access.token, refreshToken: refresh.token, access: access.record, refresh: refresh.record, familyId };
+  }
+
+  /**
+   * A token for the editor embedded in a chat (the MCP editor widget): it
+   * reads and saves one project and its media, for a few hours. Minted under
+   * the connection's OAuth grant (`familyId`), so disconnecting the app ends
+   * it too; personal-token connections have no grant and rely on the expiry.
+   */
+  async issueEmbed(input: {
+    userId: string;
+    email?: string;
+    projectId: string;
+    clientName: string;
+    scopes: string[];
+    familyId?: string;
+    ttlSeconds: number;
+  }): Promise<{ token: string; record: TokenRecord }> {
+    const now = this.clock.now();
+    const { token, hash } = generateToken("embed");
+    const record: TokenRecord = {
+      id: randomId("emb_", 12),
+      hash,
+      kind: "embed",
+      userId: input.userId,
+      email: input.email,
+      name: input.clientName,
+      scopes: input.scopes,
+      resource: embedResource(input.projectId),
+      familyId: input.familyId,
+      createdAt: isoAt(now),
+      expiresAt: isoAt(now + input.ttlSeconds * 1000),
+      revoked: false,
+    };
+    await this.tables.create(TABLE, toRow(record));
+    return { token, record };
   }
 
   /** Raw lookup by token string, without validity checks. */

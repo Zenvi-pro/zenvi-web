@@ -94,7 +94,7 @@ function ProjectName() {
   );
 }
 
-function SaveStatus() {
+export function SaveStatus() {
   const session = useSession();
   const [status, setStatus] = useState(session.autosave.current);
   useEffect(() => session.autosave.subscribe(setStatus), [session]);
