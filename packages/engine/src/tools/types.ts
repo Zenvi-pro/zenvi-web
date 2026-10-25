@@ -196,6 +196,15 @@ export interface AudioHost {
     path: string,
     options?: { sampleRate?: number; frameSize?: number; signal?: AbortSignal },
   ): Promise<AudioEnvelope>;
+  /**
+   * Decode `path`'s audio to mono float PCM (default 22050 Hz), optionally
+   * from `startSeconds` for at most `maxSeconds`: what beat tracking reads.
+   * Rejects when the file has no audio stream.
+   */
+  decodePcm?(
+    path: string,
+    options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
+  ): Promise<{ sampleRate: number; samples: Float32Array }>;
 }
 
 export interface BackendHost {

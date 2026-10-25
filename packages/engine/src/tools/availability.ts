@@ -27,7 +27,8 @@ export type HostMethod =
   | "storage.open"
   | "storage.readText"
   | "storage.writeText"
-  | "ui.openExportDialog";
+  | "ui.openExportDialog"
+  | "audio.decodePcm";
 
 export interface ToolNeeds {
   /** All of these, or the tool refuses. */
@@ -80,7 +81,11 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   remove_silence_tool: { webNote: "energy VAD on the host's audio analysis" },
   transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
   remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
-  detect_beats_tool: { desktopOnly: "on-device beat tracking" },
+  detect_beats_tool: { methods: ["audio.decodePcm"] },
+  build_reel_tool: {
+    optional: ["audio.decodePcm", "media.writeGenerated"],
+    partialNote: "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes",
+  },
   diarize_media_tool: { desktopOnly: "on-device speaker diarization" },
   search_media_local_tool: { desktopOnly: "the on-device visual index" },
   modify_clip_tool: { desktopOnly: "the desktop's ffmpeg cut, upload and splice pipeline" },
@@ -121,6 +126,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.open",
       "storage.readText",
       "storage.writeText",
+      "audio.decodePcm",
     ],
     conditional: { backend: "signed in with zenvi login" },
   },
@@ -128,7 +134,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
     capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
-    methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText"],
+    methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText", "audio.decodePcm"],
     conditional: {
       frames: "the render worker is configured",
       media: "ffprobe is available",
@@ -180,6 +186,7 @@ function needName(need: HostCapability | HostMethod): string {
     "storage.readText": "reading files",
     "storage.writeText": "writing files",
     "ui.openExportDialog": "an export dialog",
+    "audio.decodePcm": "audio decoding",
   };
   return names[need as HostMethod];
 }

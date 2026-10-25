@@ -7,7 +7,7 @@
 import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
-import { analyzeAudio } from "../audio/analyze.js";
+import { analyzeAudio, decodePcm } from "../audio/analyze.js";
 import { engineAssetsDir } from "../resources.js";
 import { FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
@@ -118,6 +118,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     },
     audio: {
       analyzeAudio: (p, o) => analyzeAudio(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
+      decodePcm: (p, o) => decodePcm(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
     },
     storage: {
       async save(project, target) {
