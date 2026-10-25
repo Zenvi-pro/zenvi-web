@@ -1,0 +1,92 @@
+---
+name: zenvi-reels
+description: Make a finished short-form video (Instagram Reel, TikTok, YouTube Short, ad, teaser, montage, highlight reel) from one short ask with the Zenvi MCP tools - write a brief, gather the footage and the music, then cut it on the beat in a style with build_reel_tool, check the frames and render. Use it whenever the user wants a reel, short, edit "on the beat", hype video, montage, highlight reel or social ad, even from a one-line prompt.
+---
+
+# One-shot reels with Zenvi
+
+A reel is cut to music. Zenvi's `build_reel_tool` does the whole cut in one
+step (and one undo step): shots on the music's beats, the style's camera
+moves and look, flashes on downbeats, an opening hook title, shot labels,
+an end card, and the music bed faded out. Your job is the part a director
+does: the brief, the footage, the music, the words, and the final check.
+
+## 1. Write the brief first (show it to the person)
+
+```
+Format  15 seconds, vertical 9:16
+Story   pour, steam, first sip, morning light (in shot order)
+Pace    fast cuts on the beat, faster in the last third
+Look    punchy colour, fine grain, slow push-ins
+```
+
+Pick from the ask; ask nothing unless the footage or the destination is
+unknowable. Defaults: vertical 9:16 for Reels, TikTok and Shorts; 16:9 for
+YouTube and web; 12-20 seconds.
+
+## 2. Project and frame
+
+`open_project_file` with a new `.zvn` path, then set the frame before
+importing (`set_project_setting_tool`: 1080×1920 for 9:16, 1080×1080 for
+1:1, 1920×1080 for 16:9; 30 fps unless the footage is 24/25/60).
+
+## 3. Footage and music, in story order
+
+- The person's files: `import_files_tool` (paths, folders, globs). Keep
+  their order; the last file closes the reel, so put the payoff (the goal,
+  the reveal, the product) last.
+- Stock: the cloud connector's `create_reel` searches stock for you; locally
+  use footage you can legally use (the person's, or free-licence stock they
+  approve) and say where it came from.
+- One music track: an audio file in the bin. `build_reel_tool` finds its
+  tempo and starts it on a downbeat of its loudest stretch. Prefer music
+  with a clear beat; credit the artist when the licence asks for it.
+- Motion graphics (kinetic type, UI mockups, product callouts, charts) come
+  from HyperFrames or Remotion (the `code-video-handoff` skill): render them
+  and import them like footage, or place them on a top track after the cut.
+
+## 4. Cut it
+
+```json
+build_reel_tool {
+  "style": "hype",
+  "file_ids": ["<in story order>"],
+  "music_file_id": "<the song>",
+  "duration_seconds": 15,
+  "hook": "Morning ritual",
+  "end_card": "Brew better",
+  "end_card_subtitle": "Open daily from 7am"
+}
+```
+
+| style | suits | pace |
+| --- | --- | --- |
+| `hype` | launches, sport, travel, events | cuts on every beat, 1/2-beat bursts in the last third, a flash every few seconds |
+| `cinematic` | stories, brands, places | 2-beat holds tightening to 1, push-ins, grain, fades in and out |
+| `highlight` | the person's own clips of a game, trip or event | builds into the payoff (the last file), a little real sound under the music |
+| `match_cut` | footage that shares a shape or pose (circles, hands, horizons) | one hard cut per beat, no camera moves so the shapes line up |
+| `minimal` | wellness, food, interiors, products | 4-beat holds, gentle moves, soft fades, light type |
+| `editorial` | fashion, design, tech | crisp cuts on 1/2 beats, a label on each shot (`labels`) |
+| `retro` | vlogs, throwbacks, music | tape and super 8 texture, warm colour |
+
+Words: the hook is 2-6 concrete words that make someone stay ("Morning
+ritual", not "Welcome to our video"); the end card is a call to action, a
+name or a date. Labels (editorial) are one or two words per shot.
+
+The receipt has `data.brief`, `data.beats` (the timeline's beat grid: put
+anything else that should land on the beat there) and `data.shots`.
+
+## 5. Look before you call it done
+
+`preview_frame` at: 0.5 s (the hook reads, nothing is cut off), a cut in the
+middle and one in the climax (no black frame, no letterbox bars), the
+payoff, and the last frame (end card centred, music fading). Text stays in
+the centre 80 % of the width; on 9:16 keep it out of the bottom fifth,
+where the apps put their buttons. Fix with the edit tools (or `undo_tool`
+and build again with other arguments), then look again.
+
+## 6. Render and hand off
+
+`render_video` (mp4, the project's size). Then offer `launch_editor` (the
+desktop app) or `push_to_cloud` (a zenvi.pro link) so the person can tweak
+it, and list the music and footage credits.
