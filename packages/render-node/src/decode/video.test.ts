@@ -140,6 +140,16 @@ describe("VideoDecoder", () => {
     expect(videoDecodeArgs({ path: "/x.mp4", fps: { num: 25, den: 1 } }, 0, { width: 10, height: 10 })).not.toContain("-ss");
   });
 
+  it("reads an image sequence at its file's rate and seeks it by whole frames", () => {
+    const args = videoDecodeArgs({ path: "/frames/shot_%04d.png", fps: { num: 24000, den: 1001 } }, 5, { width: 10, height: 10 });
+    expect(args.slice(args.indexOf("-framerate"), args.indexOf("-framerate") + 2)).toEqual(["-framerate", "24000/1001"]);
+    expect(args.indexOf("-framerate")).toBeLessThan(args.indexOf("-i"));
+    // 5 × 1001/24000 = 0.208541666…: rounded down to the microsecond, never past the frame.
+    expect(args[args.indexOf("-ss") + 1]).toBe("0.208541");
+    expect(args[args.indexOf("-vf") + 1]).toMatch(/^setpts=PTS,fps=fps=24000\/1001:start_time=0:round=near/);
+    expect(videoDecodeArgs({ path: "/x.mp4", fps: { num: 25, den: 1 } }, 5, { width: 10, height: 10 })).not.toContain("-framerate");
+  });
+
   it("leaves no ffmpeg children behind", async () => {
     const decoder = new VideoDecoder({ path: numbered, fps: { num: 30, den: 1 } }, { width: 16, height: 12 });
     await decoder.frame(3);

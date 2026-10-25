@@ -174,6 +174,12 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
         const media = await prepare(session, new File([bytes as BlobPart], name, { type: contentType }));
         return media.path;
       },
+      // Missing = what Project Files offers to relink: not in this browser and not loadable from Zenvi Cloud.
+      async missing(files) {
+        await session.media.sync(session.project);
+        const gone = new Set(session.media.missing(session.project).map((f) => f.id));
+        return files.map((f) => gone.has(f.id));
+      },
     },
     backend: {
       baseUrl: config.backendUrl,

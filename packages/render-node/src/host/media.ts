@@ -11,10 +11,10 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
-import type { ImportedMedia, MediaHost, PathListing } from "@zenvi/engine";
+import type { ImportedMedia, MediaHost, PathListing, ProjectFile } from "@zenvi/engine";
 import { fingerprint } from "../probe/fingerprint.js";
 import { probe } from "../probe/probe.js";
-import { projectAssetsDir } from "@zenvi/engine";
+import { projectAssetsDir, sequenceFramesPresent } from "@zenvi/engine";
 import { isInside } from "./paths.js";
 
 /**
@@ -100,11 +100,11 @@ export async function listPaths(entry: string): Promise<PathListing> {
   const target = localPath(entry);
   try {
     const st = await stat(target);
-    if (st.isFile()) return { kind: "file", files: [target] };
+    if (st.isFile()) return { kind: "file", files: [target], path: target };
     if (st.isDirectory()) {
       const files: string[] = [];
       await walkFiles(target, files);
-      return { kind: "directory", files };
+      return { kind: "directory", files, path: target };
     }
   } catch {
     // Not a plain path: maybe a glob.
@@ -117,9 +117,47 @@ export async function listPaths(entry: string): Promise<PathListing> {
     const all: string[] = [];
     await walkFiles(base.split("/").join(path.sep) || path.sep, all);
     const files = all.filter((f) => pattern.test(f.split(path.sep).join("/").slice(base.length)));
-    return { kind: "glob", files };
+    return { kind: "glob", files, path: target };
   }
-  return { kind: "missing", files: [] };
+  return { kind: "missing", files: [], path: target };
+}
+
+/**
+ * Which project files' media is not on this disk (zenvi-core
+ * media_files.media_missing): a file that does not exist, or an image
+ * sequence (`frame_%04d.png`) whose folder holds none of its frames.
+ * `resolve` maps a path as the project holds it to a local file.
+ */
+export async function missingOnDisk(files: readonly ProjectFile[], resolve: (projectPath: string) => string): Promise<boolean[]> {
+  const folders = new Map<string, Promise<string[] | null>>();
+  const namesIn = (folder: string): Promise<string[] | null> => {
+    let hit = folders.get(folder);
+    if (!hit) {
+      hit = readdir(folder).catch(() => null);
+      folders.set(folder, hit);
+    }
+    return hit;
+  };
+  return Promise.all(
+    files.map(async (file) => {
+      const stored = typeof file.path === "string" ? file.path : "";
+      if (!stored) return true;
+      let local: string;
+      try {
+        local = resolve(stored);
+      } catch {
+        return true;
+      }
+      if (local.includes("%")) {
+        const names = await namesIn(path.dirname(local));
+        return names === null || !sequenceFramesPresent(local, names);
+      }
+      return stat(local).then(
+        () => false,
+        () => true,
+      );
+    }),
+  );
 }
 
 function safeName(name: string): string {
