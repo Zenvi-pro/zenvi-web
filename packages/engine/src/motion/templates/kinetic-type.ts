@@ -86,16 +86,20 @@ function lineWidth(words: readonly Piece[][]): number {
   return width;
 }
 
-/** Words into `n` lines of balanced width. */
+/** Words into `n` lines whose widest line is as narrow as it can be (every split tried: headlines are short). */
 function breakLines(words: readonly Piece[][], n: number): Piece[][][] {
-  const target = lineWidth(words) / n;
-  const lines: Piece[][][] = [[]];
-  for (const word of words) {
-    const current = lines[lines.length - 1]!;
-    if (current.length > 0 && lines.length < n && lineWidth([...current, word]) > target * 1.08) lines.push([word]);
-    else current.push(word);
-  }
-  return lines;
+  let best: { lines: Piece[][][]; widest: number } | null = null;
+  const split = (from: number, left: number, acc: Piece[][][]): void => {
+    if (left === 1) {
+      const lines = [...acc, words.slice(from)];
+      const widest = Math.max(...lines.map(lineWidth));
+      if (!best || widest < best.widest - 1e-9) best = { lines, widest };
+      return;
+    }
+    for (let end = from + 1; end <= words.length - (left - 1); end += 1) split(end, left - 1, [...acc, words.slice(from, end)]);
+  };
+  split(0, Math.min(n, words.length), []);
+  return best!.lines;
 }
 
 function layoutWords(words: readonly Piece[][], maxW: number, maxH: number, maxSize: number, maxLines: number): Laid {
@@ -104,8 +108,8 @@ function layoutWords(words: readonly Piece[][], maxW: number, maxH: number, maxS
     const lines = breakLines(words, n);
     const widest = Math.max(...lines.map(lineWidth));
     const size = Math.floor(Math.min(maxSize, maxW / widest, maxH / lines.length));
-    // Another line only for clearly bigger type (a line of one short word reads as an accident).
-    if (size > best.size * 1.25) best = { lines: lines.map((l) => ({ words: l, width: lineWidth(l) })), size };
+    // Each line more only for clearly bigger type (a headline reads best in few lines).
+    if (size > best.size * 1.3 ** (n - best.lines.length)) best = { lines: lines.map((l) => ({ words: l, width: lineWidth(l) })), size };
   }
   return best;
 }

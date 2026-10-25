@@ -4,7 +4,7 @@
  * and side handles, a size readout under it, like a design tool). Words
  * outside the box sit under two bands of the background colour, so only the
  * selected word reads at full strength. An optional lead line (`text`) reads
- * into the word: beside it in landscape ("Made to [Explore]"), above it in
+ * into the word: beside it in landscape ("Made to [Begin]"), above it in
  * portrait.
  */
 

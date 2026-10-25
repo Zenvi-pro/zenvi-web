@@ -25,7 +25,7 @@ const MEDIA_BY_ID = new Map(MEDIA.map((m) => [m.fileId, m]));
 const CONTENT: Record<MotionTemplateId, { content: MotionContent; palette: PaletteId }> = {
   ui_cards: { content: { fileIds: ["VIDEO00001", "VIDEO00002"], labels: ["Slow pour", "Ten pages", "Notes"], button: "Save", subtitle: "Three minutes a day" }, palette: "ui_light" },
   type_search: { content: { text: "Plan a slower morning", button: "Search", tag: "Zenvi", subtitle: "What's on today?", labels: ["Slow pour", "Ten pages"] }, palette: "ui_light" },
-  word_scroll: { content: { words: ["Explore", "Imagine", "Create", "Share"], text: "Made to" }, palette: "ui_dark" },
+  word_scroll: { content: { words: ["Plan", "Brew", "Read", "Begin"], text: "Made to" }, palette: "ui_dark" },
   crop_labels: { content: { fileIds: ["VIDEO00001"], labels: ["Surface_01", "Surface_02", "Surface_03"] }, palette: "editorial" },
   callout: { content: { fileIds: ["PHOTO00001"], text: "Lumen Runner", labels: ["Knit upper", "Foam core", "Grip plate"], values: ["0.6 mm mesh", "212 g", "38 lugs"] }, palette: "callout" },
   kinetic_type: { content: { text: "LIVING GE*METRY IN BL**M", fileIds: ["VIDEO00001", "PHOTO00001"], tag: "Specimen_01", highlight: 1 }, palette: "editorial" },
@@ -106,6 +106,16 @@ describe.each(Object.entries(FRAMES))("motion templates, %s", (_name, frame) => 
 });
 
 describe("motion templates", () => {
+  it("set a headline in few, balanced lines", () => {
+    const grid = tempoGrid(120, 30);
+    const plan = buildMotionTemplate({ template: "kinetic_type", frame: FRAMES.portrait!, start: 0, grid, palette: PALETTES.tutorial, media: MEDIA_BY_ID, content: { text: "Film better reels at home" } });
+    // The last cumulative drawing holds every line but the last word: two baselines ("Film better / reels at home").
+    const last = plan.layers.filter((l) => l.name.startsWith("type-words-")).pop()!;
+    const svg = last.source.kind === "svg" ? last.source.svg : "";
+    const baselines = new Set([...svg.matchAll(/<text x="[^"]*" y="([^"]*)"/g)].map((m) => m[1]));
+    expect(baselines.size).toBe(2);
+  });
+
   it("follow any tempo: entrances move with the beat", () => {
     const slow = build("word_scroll", FRAMES.portrait!, 90).plan;
     const fast = build("word_scroll", FRAMES.portrait!, 140).plan;

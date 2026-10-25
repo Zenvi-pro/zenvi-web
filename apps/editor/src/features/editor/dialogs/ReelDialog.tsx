@@ -38,7 +38,7 @@ function styleOf(id: StyleId): { name: string; summary: string; defaultSeconds: 
 
 /** What the words field holds for each motion style. */
 const WORDS_LABEL: Record<MotionStyleId, { label: string; placeholder: string }> = {
-  ui_promo: { label: "Word list", placeholder: "Explore, Imagine, Create, Share" },
+  ui_promo: { label: "Word list", placeholder: "Plan, Brew, Read, Begin" },
   editorial_motion: { label: "Kinetic words", placeholder: "Made by hand" },
   product_callout: { label: "Features", placeholder: "Glass carafe: Borosilicate, Steel filter: Mesh" },
   tutorial: { label: "A label per step", placeholder: "Eye level, Soft light, Every beat" },

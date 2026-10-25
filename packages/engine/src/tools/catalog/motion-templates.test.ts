@@ -175,7 +175,7 @@ describe("build_reel_tool motion styles", () => {
       hook: "Plan a slower morning",
       end_card: "Zenvi",
       labels: ["Slow pour", "Ten pages", "Morning notes"],
-      words: ["Explore", "Imagine", "Create", "Share"],
+      words: ["Plan", "Brew", "Read", "Begin"],
       duration_seconds: "16",
     });
     expect(result.ok, result.text).toBe(true);

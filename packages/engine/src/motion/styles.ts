@@ -282,9 +282,9 @@ export function storyboard(input: StoryInput): MotionScene[] {
       };
       const first = product(0);
       if (first) drafts.push(first);
-      // Between the products (or after the only one): labelled details of the shot, full frame.
+      // A closer look at the first product, full frame: labelled details.
       if (shots.length > 0) {
-        drafts.push({ name: "details", min: 1, pref: 2, optional: true, templates: [{ template: "crop_labels", palette: "callout", content: { fileIds: [shots[shots.length - 1]!], variant: "boxes", tag: "Detail" } }] });
+        drafts.push({ name: "details", min: 1, pref: 2, optional: true, templates: [{ template: "crop_labels", palette: "callout", content: { fileIds: [shots[0]!], variant: "boxes", tag: "Detail" } }] });
       }
       const second = shots.length > 1 ? product(1) : null;
       if (second) drafts.push(second);

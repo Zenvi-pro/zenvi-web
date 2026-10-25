@@ -32,7 +32,7 @@ describe("tiledHook", () => {
 describe("storyboard", () => {
   it.each(MOTION_STYLE_IDS)("%s fills the bars exactly with scenes of known templates", (style) => {
     for (const bars of [3, 6, 8, 12]) {
-      const scenes = storyboard({ style, bars, media: MEDIA, hook: "Living form", endCard: "Zenvi", labels: ["Slow pour", "Ten pages", "Notes"], words: ["Glass carafe: Borosilicate", "Steel filter: Mesh", "Explore"] });
+      const scenes = storyboard({ style, bars, media: MEDIA, hook: "Living form", endCard: "Zenvi", labels: ["Slow pour", "Ten pages", "Notes"], words: ["Glass carafe: Borosilicate", "Steel filter: Mesh", "Begin"] });
       expect(scenes.reduce((sum, s) => sum + s.bars, 0)).toBe(bars);
       scenes.forEach((s, i) => expect(s.bar).toBe(i === 0 ? 0 : scenes[i - 1]!.bar + scenes[i - 1]!.bars));
       for (const scene of scenes) for (const t of scene.templates) expect(MOTION_TEMPLATE_IDS).toContain(t.template);
@@ -42,7 +42,7 @@ describe("storyboard", () => {
   });
 
   it("tells each style's story: search, cards, words, logo for a UI promo", () => {
-    const scenes = storyboard({ style: "ui_promo", bars: 8, media: MEDIA.slice(0, 3), hook: "Plan a slower morning", endCard: "Zenvi", labels: ["Slow pour"], words: ["Explore", "Create"] });
+    const scenes = storyboard({ style: "ui_promo", bars: 8, media: MEDIA.slice(0, 3), hook: "Plan a slower morning", endCard: "Zenvi", labels: ["Slow pour"], words: ["Plan", "Begin"] });
     expect(scenes.map((s) => s.name)).toEqual(["search", "cards-1", "words", "end"]);
     expect(scenes[0]!.templates[1]!.content).toMatchObject({ text: "Plan a slower morning", tag: "Zenvi", labels: ["Slow pour"] });
     // Without words there is no word list.
