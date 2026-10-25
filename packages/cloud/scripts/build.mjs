@@ -12,6 +12,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { serverBundleOptions } from "./bundle-options.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const packages = dirname(root);
@@ -27,20 +28,7 @@ async function exists(path) {
 }
 
 await rm(outdir, { recursive: true, force: true });
-await build({
-  entryPoints: [join(root, "src/main.ts")],
-  outfile: join(outdir, "server.mjs"),
-  bundle: true,
-  platform: "node",
-  target: "node22",
-  format: "esm",
-  sourcemap: true,
-  legalComments: "none",
-  logLevel: "info",
-  define: { __ZENVI_BUNDLE__: "true" },
-  // CommonJS dependencies bundled into ESM still call require() for Node built-ins.
-  banner: { js: "import { createRequire as __zenviCreateRequire } from 'node:module'; const require = __zenviCreateRequire(import.meta.url);" },
-});
+await build(serverBundleOptions(join(outdir, "server.mjs")));
 
 // The compositor worker (render-node CompositePool) loads composite-worker.mjs
 // next to the bundle; without it cloud renders composite on one thread.

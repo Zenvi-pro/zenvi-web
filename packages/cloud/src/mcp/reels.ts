@@ -124,7 +124,12 @@ const attachedFile = z.object({
   file_name: z.string().max(255).optional(),
 });
 
-const input = z.object({
+/**
+ * The tool's input. Built when the tool list is (after the engine registry
+ * loaded): the bundled server initialises the engine's reel modules with the
+ * tool catalog, so REEL_STYLE_IDS is not ready while this module evaluates.
+ */
+const inputSchema = () => z.object({
   prompt: z.string().min(1).max(1000).describe("The person's ask, in their words. It names the project."),
   name: z.string().min(1).max(200).optional().describe("Project name (default: from the prompt)."),
   style: z
@@ -197,7 +202,7 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
         "Uses the files the person attached and links they gave; without footage, give stock_queries (concrete visual searches, story order). " +
         "Music comes from music_url or a stock search (music_query). The reel is cut on the music's beats in a style, with a hook title and an end card. " +
         "Answer with the brief it returns (format, story, pace, look). Then keep editing with the other tools; the editor follows live.",
-      input,
+      input: inputSchema(),
       output,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       scope: SCOPE_WRITE,
