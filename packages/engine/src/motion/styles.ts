@@ -72,7 +72,7 @@ export const MOTION_STYLES: Readonly<Record<MotionStyleId, MotionStyle>> = {
     id: "product_callout",
     name: "Product callout",
     summary:
-      "Technical product reveal: each product shot on a dark field with a soft glow, an 'EXPERIMENTAL: NAME' heading, leader lines drawing out to feature labels, one per beat, then a closing card. Give `words` as features ('Foam core: 212 g').",
+      "Technical product reveal: each product shot on a dark field with a soft glow, an 'ANATOMY: NAME' heading, leader lines drawing out to feature labels, one per beat, then a closing card. Give `words` as features ('Foam core: 212 g').",
     defaultSeconds: 12,
     defaultBpm: 120,
     media: 2,
@@ -238,17 +238,17 @@ export function storyboard(input: StoryInput): MotionScene[] {
         min: 1,
         pref: 2,
         optional: false,
-        templates: [bg("editorial", "editorial", { labels: corner }), { template: "kinetic_type", palette: "editorial", content: { text: ids.length > 1 ? tiledHook(title) : title, fileIds: ids.slice(1).length > 0 ? ids.slice(1) : ids, tag: "Specimen_01", align: "left" } }],
+        templates: [bg("editorial", "editorial", { labels: corner }), { template: "kinetic_type", palette: "editorial", content: { text: ids.length > 1 ? tiledHook(title) : title, fileIds: ids.slice(1).length > 0 ? ids.slice(1) : ids, tag: "No. 01", align: "left" } }],
       });
       if (ids.length > 0) {
         const boxLabels = labels.length > 0 ? labels.map(clean).filter(Boolean).slice(0, 4) : [];
-        drafts.push({ name: "crops", min: 2, pref: 2, optional: false, templates: [{ template: "crop_labels", palette: "editorial", content: { fileIds: [ids[0]!], ...(boxLabels.length >= 2 ? { labels: boxLabels } : { tag: "Surface" }) } }] });
+        drafts.push({ name: "crops", min: 2, pref: 2, optional: false, templates: [{ template: "crop_labels", palette: "editorial", content: { fileIds: [ids[0]!], ...(boxLabels.length >= 2 ? { labels: boxLabels } : {}) } }] });
       }
       if (words.length > 0) {
         const kinetic = words.join(" ").toUpperCase();
         drafts.push({ name: "words", min: 1, pref: 1, optional: true, templates: [bg("editorial", "editorial", { labels: corner }), { template: "kinetic_type", palette: "editorial", content: { text: ids.length > 1 ? tiledHook(kinetic) : kinetic, fileIds: ids.slice(-2), align: "left", highlight: 0 } }] });
       }
-      drafts.push({ name: "end", min: 1, pref: 2, optional: false, templates: [bg("editorial", "editorial", { labels: corner }), { template: "end_card", palette: "editorial", content: { variant: "plain", text: end || title, ...(sub ? { subtitle: sub } : {}), tag: "Specimen_01", align: "left", backdrop: false } }] });
+      drafts.push({ name: "end", min: 1, pref: 2, optional: false, templates: [bg("editorial", "editorial", { labels: corner }), { template: "end_card", palette: "editorial", content: { variant: "plain", text: end || title, ...(sub ? { subtitle: sub } : {}), tag: "No. 01", align: "left", backdrop: false } }] });
       break;
     }
     case "product_callout": {
@@ -288,7 +288,7 @@ export function storyboard(input: StoryInput): MotionScene[] {
       }
       const second = shots.length > 1 ? product(1) : null;
       if (second) drafts.push(second);
-      drafts.push({ name: "end", min: 1, pref: 2, optional: false, templates: [bg("callout", "dots"), { template: "end_card", palette: "callout", content: { variant: "plain", text: end || hook || "Prototype", ...(sub ? { subtitle: sub } : {}), tag: "Experimental", align: "center", backdrop: false } }] });
+      drafts.push({ name: "end", min: 1, pref: 2, optional: false, templates: [bg("callout", "dots"), { template: "end_card", palette: "callout", content: { variant: "plain", text: end || hook || "Prototype", ...(sub ? { subtitle: sub } : {}), tag: "Anatomy", align: "center", backdrop: false } }] });
       break;
     }
     case "tutorial": {

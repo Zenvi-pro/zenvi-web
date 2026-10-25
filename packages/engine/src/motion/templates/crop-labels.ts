@@ -1,7 +1,7 @@
 /**
  * crop_labels: a shot fills the frame and pushes in slowly; labelled crop
  * boxes snap onto it one per beat (a thin box with corner ticks and a tag:
- * DETAIL_01, DETAIL_02…). Given time, on the next beat a paper scrim covers
+ * DETAIL 01, DETAIL 02…). Given time, on the next beat a paper scrim covers
  * the shot and the crops lift out of it, each the picture under its box (the
  * same moment of the same file, cropped with libopenshot's Crop), gliding
  * into a row of labelled tiles.
@@ -56,7 +56,7 @@ export const cropLabels: TemplateSpec = {
   id: "crop_labels",
   summary:
     "A shot fills the frame and pushes in; labelled crop boxes snap onto it one per beat; then a paper scrim covers it and the crops lift out of the shot into a row of labelled tiles.",
-  reads: "file_ids (the shot: the first file), boxes (frame boxes, 0-1; default a spread), labels (one per box; default DETAIL_01…), tag (the default labels' prefix), variant (boxes: no row)",
+  reads: "file_ids (the shot: the first file), boxes (frame boxes, 0-1; default a spread), labels (one per box; default DETAIL 01…), tag (the default labels' prefix), variant (boxes: no row)",
   media: "required",
   beats: (content) => (content.boxes?.length ?? Math.max(3, content.labels?.length ?? 3)) + (content.variant === "boxes" ? 2 : 5),
   build(input: TemplateInput): TemplateOutput {
@@ -75,8 +75,8 @@ export const cropLabels: TemplateSpec = {
       const y0 = Math.max(m * 1.6, Math.min(H - m - h, b.y * H - h / 2));
       return { x0, y0, w, h };
     });
-    const prefix = (content.tag?.trim() || "DETAIL").toUpperCase().replace(/\s+/g, "_");
-    const labels = boxes.map((_, i) => (content.labels?.[i]?.trim() || `${prefix}_${String(i + 1).padStart(2, "0")}`).toUpperCase());
+    const prefix = (content.tag?.trim() || "DETAIL").toUpperCase().replace(/\s+/g, " ");
+    const labels = boxes.map((_, i) => (content.labels?.[i]?.trim() || `${prefix} ${String(i + 1).padStart(2, "0")}`).toUpperCase());
 
     const elements: Element[] = [];
     const shotKeys = [key(0, pose(W / 2, H / 2)), key(frames - 1, pose(W / 2, H / 2, { s: PUSH }), "linear")];

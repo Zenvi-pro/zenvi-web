@@ -22,7 +22,7 @@ describe("allocateBars", () => {
 
 describe("tiledHook", () => {
   it("swaps an inner O of the longest word that has one for an image tile", () => {
-    expect(tiledHook("LIVING FORM")).toBe("LIVING F*RM");
+    expect(tiledHook("QUIET FORMS")).toBe("QUIET F*RMS");
     expect(tiledHook("Slow morning")).toBe("Slow m*rning");
     expect(tiledHook("NO TILE HERE")).toBe("NO TILE HERE");
     expect(tiledHook("KEEP * MINE")).toBe("KEEP * MINE");
@@ -32,7 +32,7 @@ describe("tiledHook", () => {
 describe("storyboard", () => {
   it.each(MOTION_STYLE_IDS)("%s fills the bars exactly with scenes of known templates", (style) => {
     for (const bars of [3, 6, 8, 12]) {
-      const scenes = storyboard({ style, bars, media: MEDIA, hook: "Living form", endCard: "Zenvi", labels: ["Slow pour", "Ten pages", "Notes"], words: ["Glass carafe: Borosilicate", "Steel filter: Mesh", "Begin"] });
+      const scenes = storyboard({ style, bars, media: MEDIA, hook: "Quiet forms", endCard: "Zenvi", labels: ["Slow pour", "Ten pages", "Notes"], words: ["Glass carafe: Borosilicate", "Steel filter: Mesh", "Begin"] });
       expect(scenes.reduce((sum, s) => sum + s.bars, 0)).toBe(bars);
       scenes.forEach((s, i) => expect(s.bar).toBe(i === 0 ? 0 : scenes[i - 1]!.bar + scenes[i - 1]!.bars));
       for (const scene of scenes) for (const t of scene.templates) expect(MOTION_TEMPLATE_IDS).toContain(t.template);

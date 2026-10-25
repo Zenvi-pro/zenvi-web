@@ -69,7 +69,7 @@ const input = z.strictObject({
   points: z.array(z.strictObject({ x: unit, y: unit })).max(8).optional().describe("callout: anchor points on the product picture (0-1 from its top left); step_card: the point the label's arrow points at."),
   boxes: z.array(z.strictObject({ x: unit, y: unit, w: unit.gt(0), h: unit.gt(0) })).max(6).optional().describe("crop_labels: boxes on the frame (centre x, y and size w, h, 0-1). Default: a spread of boxes."),
   button: z.string().max(24).optional().describe("A button's label: type_search's search button, ui_cards' button the pointer clicks."),
-  tag: z.string().max(32).optional().describe("A small tag: kinetic_type's (e.g. SPECIMEN_01), end_card plain's, step_card's label box, type_search's brand row, crop_labels' label prefix, callout's heading prefix (default EXPERIMENTAL)."),
+  tag: z.string().max(32).optional().describe("A small tag: kinetic_type's (e.g. NO. 01), end_card plain's, step_card's label box, type_search's brand row, crop_labels' label prefix, callout's heading prefix (default ANATOMY)."),
   step: z.number().int().min(1).max(99).optional().describe("step_card: the step number."),
   highlight: z.number().int().min(0).max(30).optional().describe("kinetic_type: index of the word the highlighter marks."),
   variant: z.string().max(20).optional().describe("grid_background: paper | editorial | dots | plain; end_card: logo | save | plain."),

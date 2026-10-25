@@ -26,10 +26,10 @@ const CONTENT: Record<MotionTemplateId, { content: MotionContent; palette: Palet
   ui_cards: { content: { fileIds: ["VIDEO00001", "VIDEO00002"], labels: ["Slow pour", "Ten pages", "Notes"], button: "Save", subtitle: "Three minutes a day" }, palette: "ui_light" },
   type_search: { content: { text: "Plan a slower morning", button: "Search", tag: "Zenvi", subtitle: "What's on today?", labels: ["Slow pour", "Ten pages"] }, palette: "ui_light" },
   word_scroll: { content: { words: ["Plan", "Brew", "Read", "Begin"], text: "Made to" }, palette: "ui_dark" },
-  crop_labels: { content: { fileIds: ["VIDEO00001"], labels: ["Surface_01", "Surface_02", "Surface_03"] }, palette: "editorial" },
+  crop_labels: { content: { fileIds: ["VIDEO00001"], labels: ["Rim", "Glaze", "Foot ring"] }, palette: "editorial" },
   callout: { content: { fileIds: ["PHOTO00001"], text: "Lumen Runner", labels: ["Knit upper", "Foam core", "Grip plate"], values: ["0.6 mm mesh", "212 g", "38 lugs"] }, palette: "callout" },
-  kinetic_type: { content: { text: "LIVING GE*METRY IN BL**M", fileIds: ["VIDEO00001", "PHOTO00001"], tag: "Specimen_01", highlight: 1 }, palette: "editorial" },
-  step_card: { content: { fileIds: ["VIDEO00001"], text: "Record yourself", step: 1, tag: "Eye level", points: [{ x: 0.6, y: 0.4 }], subtitle: "Film better reels" }, palette: "tutorial" },
+  kinetic_type: { content: { text: "QUIET F*RMS IN W**D AND CLAY", fileIds: ["VIDEO00001", "PHOTO00001"], tag: "No. 01", highlight: 1 }, palette: "editorial" },
+  step_card: { content: { fileIds: ["VIDEO00001"], text: "Set up the shot", step: 1, tag: "Eye level", points: [{ x: 0.6, y: 0.4 }], subtitle: "Film better reels" }, palette: "tutorial" },
   grid_background: { content: { variant: "editorial", labels: ["Plate 01", "Study", "1:1", "Zenvi"] }, palette: "editorial" },
   end_card: { content: { variant: "logo", text: "Northwind", subtitle: "Brews in four minutes" }, palette: "ui_light" },
 };
@@ -114,6 +114,22 @@ describe("motion templates", () => {
     const svg = last.source.kind === "svg" ? last.source.svg : "";
     const baselines = new Set([...svg.matchAll(/<text x="[^"]*" y="([^"]*)"/g)].map((m) => m[1]));
     expect(baselines.size).toBe(2);
+  });
+
+  it("fill in their own default copy: a bare ANATOMY heading, boxes numbered DETAIL 01…", () => {
+    const grid = tempoGrid(120, 30);
+    const run = (template: MotionTemplateId, content: MotionContent) =>
+      buildMotionTemplate({ template, frame: FRAMES.portrait!, start: 0, grid, palette: PALETTES.callout, media: MEDIA_BY_ID, content });
+    const svgOf = (plan: MotionPlan, name: string) => {
+      const source = plan.layers.find((l) => l.name === name)?.source;
+      return source?.kind === "svg" ? source.svg : "";
+    };
+    // Without a product name the heading is the prefix alone, no dangling colon.
+    const heading = svgOf(run("callout", { fileIds: ["PHOTO00001"], labels: ["Knit upper"] }), "callout-heading");
+    expect(heading).toContain("ANATOMY");
+    expect(heading).not.toContain("ANATOMY:");
+    const crops = run("crop_labels", { fileIds: ["VIDEO00001"], variant: "boxes" });
+    expect(crops.layers.map((l) => (l.source.kind === "svg" ? l.source.svg : "")).join("")).toContain("DETAIL 01");
   });
 
   it("follow any tempo: entrances move with the beat", () => {

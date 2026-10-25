@@ -95,7 +95,7 @@ beat.
 | --- | --- | --- | --- |
 | `ui_promo` | apps, tools, SaaS, launches | a search bar types the hook and its suggestions drop open, the footage rises in rounded UI cards and a pointer clicks one, a word list scrolls in a selection box, a logo end card | `hook` (the search phrase), `labels` (card captions, also the suggestions), `words` (3-6 words for the list), `end_card` (the brand) |
 | `editorial_motion` | fashion, design, food, objects | the hook as big grotesk type on a gridded sheet with a letter swapped for an image tile, labelled crop boxes over the first shot that lift into a row, kinetic words, a closing card | `hook`, `words` (a short phrase), `labels` (crop names), `end_card` |
-| `product_callout` | one or two products | each product shot on a dark field with a glow, an EXPERIMENTAL: NAME heading, leader lines drawing out to its features, labelled details | `hook` (the product name), `words` as features `"Name: value"` (2-4 per product) |
+| `product_callout` | one or two products | each product shot on a dark field with a glow, an ANATOMY: NAME heading, leader lines drawing out to its features, labelled details | `hook` (the product name), `words` as features `"Name: value"` (2-4 per product) |
 | `tutorial` | how-tos, tips, before/after (9:16) | the hook on grid paper, one step per clip (the footage in a bordered card, a numbered caption, a label box with an arrow), ending on "Save this" | `hook`, `labels` (one caption per step), `words` (one label per step), `end_card_subtitle` |
 
 The footage still matters: three clear clips for `ui_promo`, one striking

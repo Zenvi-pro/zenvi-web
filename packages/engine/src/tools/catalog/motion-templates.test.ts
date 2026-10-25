@@ -196,13 +196,13 @@ describe("build_reel_tool motion styles", () => {
     expect(doc.project.clips).toHaveLength(0);
   });
 
-  it.each(["editorial_motion", "product_callout", "tutorial"] as const)("builds a %s reel from the same media", async (style) => {
+  it.each(["editorial_motion", "product_callout", "tutorial"] as const)("builds the %s style from the same media", async (style) => {
     const doc = verticalProject("bin");
     const result = await runTool({ doc, host: motionHost() }, "build_reel_tool", {
       style,
       file_ids: FILES,
       music_file_id: "SONGXXXXXX",
-      hook: "Living form",
+      hook: "Quiet forms",
       end_card: "Studio Lumen",
       labels: ["One", "Two", "Three"],
       words: ["Glass carafe: Borosilicate", "Steel filter: 4-layer mesh"],

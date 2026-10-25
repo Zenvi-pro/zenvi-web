@@ -30870,17 +30870,17 @@ function storyboard(input4) {
         min: 1,
         pref: 2,
         optional: false,
-        templates: [bg("editorial", "editorial", { labels: corner }), { template: "kinetic_type", palette: "editorial", content: { text: ids2.length > 1 ? tiledHook(title) : title, fileIds: ids2.slice(1).length > 0 ? ids2.slice(1) : ids2, tag: "Specimen_01", align: "left" } }]
+        templates: [bg("editorial", "editorial", { labels: corner }), { template: "kinetic_type", palette: "editorial", content: { text: ids2.length > 1 ? tiledHook(title) : title, fileIds: ids2.slice(1).length > 0 ? ids2.slice(1) : ids2, tag: "No. 01", align: "left" } }]
       });
       if (ids2.length > 0) {
         const boxLabels = labels.length > 0 ? labels.map(clean).filter(Boolean).slice(0, 4) : [];
-        drafts.push({ name: "crops", min: 2, pref: 2, optional: false, templates: [{ template: "crop_labels", palette: "editorial", content: { fileIds: [ids2[0]], ...boxLabels.length >= 2 ? { labels: boxLabels } : { tag: "Surface" } } }] });
+        drafts.push({ name: "crops", min: 2, pref: 2, optional: false, templates: [{ template: "crop_labels", palette: "editorial", content: { fileIds: [ids2[0]], ...boxLabels.length >= 2 ? { labels: boxLabels } : {} } }] });
       }
       if (words3.length > 0) {
         const kinetic = words3.join(" ").toUpperCase();
         drafts.push({ name: "words", min: 1, pref: 1, optional: true, templates: [bg("editorial", "editorial", { labels: corner }), { template: "kinetic_type", palette: "editorial", content: { text: ids2.length > 1 ? tiledHook(kinetic) : kinetic, fileIds: ids2.slice(-2), align: "left", highlight: 0 } }] });
       }
-      drafts.push({ name: "end", min: 1, pref: 2, optional: false, templates: [bg("editorial", "editorial", { labels: corner }), { template: "end_card", palette: "editorial", content: { variant: "plain", text: end || title, ...sub ? { subtitle: sub } : {}, tag: "Specimen_01", align: "left", backdrop: false } }] });
+      drafts.push({ name: "end", min: 1, pref: 2, optional: false, templates: [bg("editorial", "editorial", { labels: corner }), { template: "end_card", palette: "editorial", content: { variant: "plain", text: end || title, ...sub ? { subtitle: sub } : {}, tag: "No. 01", align: "left", backdrop: false } }] });
       break;
     }
     case "product_callout": {
@@ -30919,7 +30919,7 @@ function storyboard(input4) {
       }
       const second = shots.length > 1 ? product(1) : null;
       if (second) drafts.push(second);
-      drafts.push({ name: "end", min: 1, pref: 2, optional: false, templates: [bg("callout", "dots"), { template: "end_card", palette: "callout", content: { variant: "plain", text: end || hook || "Prototype", ...sub ? { subtitle: sub } : {}, tag: "Experimental", align: "center", backdrop: false } }] });
+      drafts.push({ name: "end", min: 1, pref: 2, optional: false, templates: [bg("callout", "dots"), { template: "end_card", palette: "callout", content: { variant: "plain", text: end || hook || "Prototype", ...sub ? { subtitle: sub } : {}, tag: "Anatomy", align: "center", backdrop: false } }] });
       break;
     }
     case "tutorial": {
@@ -30974,7 +30974,7 @@ var init_styles2 = __esm({
       product_callout: {
         id: "product_callout",
         name: "Product callout",
-        summary: "Technical product reveal: each product shot on a dark field with a soft glow, an 'EXPERIMENTAL: NAME' heading, leader lines drawing out to feature labels, one per beat, then a closing card. Give `words` as features ('Foam core: 212 g').",
+        summary: "Technical product reveal: each product shot on a dark field with a soft glow, an 'ANATOMY: NAME' heading, leader lines drawing out to feature labels, one per beat, then a closing card. Give `words` as features ('Foam core: 212 g').",
         defaultSeconds: 12,
         defaultBpm: 120,
         media: 2,
@@ -32134,8 +32134,8 @@ var init_callout = __esm({
     ];
     callout = {
       id: "callout",
-      summary: "A product shot on a dark field with a soft halo and a glowing 'EXPERIMENTAL: NAME' heading over a rule that draws on; then one callout per beat: a dot pops on the product, a leader line draws out and a label (index, name, value) slides in.",
-      reads: "file_ids (the product: the first file), text (the product name), tag (the heading's prefix, default EXPERIMENTAL), labels (callout names, 1-4), values (their second lines), points (anchors on the product picture, 0-1)",
+      summary: "A product shot on a dark field with a soft halo and a glowing 'ANATOMY: NAME' heading over a rule that draws on; then one callout per beat: a dot pops on the product, a leader line draws out and a label (index, name, value) slides in.",
+      reads: "file_ids (the product: the first file), text (the product name), tag (the heading's prefix, default ANATOMY), labels (callout names, 1-4), values (their second lines), points (anchors on the product picture, 0-1)",
       media: "required",
       beats: (content) => Math.max(1, content.labels?.length ?? 3) + 3,
       build(input4) {
@@ -32188,14 +32188,14 @@ var init_callout = __esm({
           }, enter(pose(box.cx, box.cy), e0 + 4, { s: 1.03, frames: 10, ease: "out" }))
         );
         const name = (content.text ?? "").replace(/\s+/g, " ").trim().toUpperCase();
-        const prefix = (content.tag?.trim() || "EXPERIMENTAL").toUpperCase().replace(/:$/, "");
+        const prefix = (content.tag?.trim() || "ANATOMY").toUpperCase().replace(/:$/, "");
         const headSize = Math.round((portrait ? 46 : 42) * u);
         const head = name ? `${prefix}: ${name}` : prefix;
         const headW = textWidth(head, { size: headSize, font: "mono", bold: true, tracking: 0.04 });
         const hx = m * 1.2;
         const hy = m * 1.2 + headSize;
         const headEl = drawing("callout-heading", 3, e0, frames, { width: headW + 40 * u, height: headSize * 1.8, cx: 20 * u, cy: headSize * 0.9 }, (d) => {
-          d.text(20 * u, headSize * 0.9 + headSize * 0.36, [{ text: `${prefix}:`, fill: palette.accent }, ...name ? [{ text: ` ${name}`, fill: palette.ink }] : []], {
+          d.text(20 * u, headSize * 0.9 + headSize * 0.36, [{ text: name ? `${prefix}:` : prefix, fill: palette.accent }, ...name ? [{ text: ` ${name}`, fill: palette.ink }] : []], {
             size: headSize,
             font: "mono",
             bold: true,
@@ -32337,7 +32337,7 @@ var init_crop_labels = __esm({
     cropLabels = {
       id: "crop_labels",
       summary: "A shot fills the frame and pushes in; labelled crop boxes snap onto it one per beat; then a paper scrim covers it and the crops lift out of the shot into a row of labelled tiles.",
-      reads: "file_ids (the shot: the first file), boxes (frame boxes, 0-1; default a spread), labels (one per box; default DETAIL_01\u2026), tag (the default labels' prefix), variant (boxes: no row)",
+      reads: "file_ids (the shot: the first file), boxes (frame boxes, 0-1; default a spread), labels (one per box; default DETAIL 01\u2026), tag (the default labels' prefix), variant (boxes: no row)",
       media: "required",
       beats: (content) => (content.boxes?.length ?? Math.max(3, content.labels?.length ?? 3)) + (content.variant === "boxes" ? 2 : 5),
       build(input4) {
@@ -32356,8 +32356,8 @@ var init_crop_labels = __esm({
           const y0 = Math.max(m * 1.6, Math.min(H - m - h, b.y * H - h / 2));
           return { x0, y0, w, h };
         });
-        const prefix = (content.tag?.trim() || "DETAIL").toUpperCase().replace(/\s+/g, "_");
-        const labels = boxes.map((_, i) => (content.labels?.[i]?.trim() || `${prefix}_${String(i + 1).padStart(2, "0")}`).toUpperCase());
+        const prefix = (content.tag?.trim() || "DETAIL").toUpperCase().replace(/\s+/g, " ");
+        const labels = boxes.map((_, i) => (content.labels?.[i]?.trim() || `${prefix} ${String(i + 1).padStart(2, "0")}`).toUpperCase());
         const elements = [];
         const shotKeys = [key(0, pose(W / 2, H / 2)), key(frames - 1, pose(W / 2, H / 2, { s: PUSH }), "linear")];
         const shotEl = mediaFill("crops-shot", 0, 0, frames, shot, frame.fps, layout, shotKeys);
@@ -65461,7 +65461,7 @@ var init_motion_templates = __esm({
       points: external_exports.array(external_exports.strictObject({ x: unit, y: unit })).max(8).optional().describe("callout: anchor points on the product picture (0-1 from its top left); step_card: the point the label's arrow points at."),
       boxes: external_exports.array(external_exports.strictObject({ x: unit, y: unit, w: unit.gt(0), h: unit.gt(0) })).max(6).optional().describe("crop_labels: boxes on the frame (centre x, y and size w, h, 0-1). Default: a spread of boxes."),
       button: external_exports.string().max(24).optional().describe("A button's label: type_search's search button, ui_cards' button the pointer clicks."),
-      tag: external_exports.string().max(32).optional().describe("A small tag: kinetic_type's (e.g. SPECIMEN_01), end_card plain's, step_card's label box, type_search's brand row, crop_labels' label prefix, callout's heading prefix (default EXPERIMENTAL)."),
+      tag: external_exports.string().max(32).optional().describe("A small tag: kinetic_type's (e.g. NO. 01), end_card plain's, step_card's label box, type_search's brand row, crop_labels' label prefix, callout's heading prefix (default ANATOMY)."),
       step: external_exports.number().int().min(1).max(99).optional().describe("step_card: the step number."),
       highlight: external_exports.number().int().min(0).max(30).optional().describe("kinetic_type: index of the word the highlighter marks."),
       variant: external_exports.string().max(20).optional().describe("grid_background: paper | editorial | dots | plain; end_card: logo | save | plain."),

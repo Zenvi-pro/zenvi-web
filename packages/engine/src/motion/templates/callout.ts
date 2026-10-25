@@ -1,6 +1,6 @@
 /**
  * callout: a product shot on a dark field, a soft halo behind it (stacked
- * translucent discs, no gradient), a heading "EXPERIMENTAL: <NAME>" in mono
+ * translucent discs, no gradient), a heading "ANATOMY: <NAME>" in mono
  * with a rule drawing on under it (and the engine's Glow on the heading).
  * Then one callout per beat: a dot pops on the product, a leader line draws
  * out from it (an elbow: a diagonal, then a level run) and a label slides in
@@ -63,8 +63,8 @@ function productBox(layout: Layout, media: MotionMedia): { cx: number; cy: numbe
 export const callout: TemplateSpec = {
   id: "callout",
   summary:
-    "A product shot on a dark field with a soft halo and a glowing 'EXPERIMENTAL: NAME' heading over a rule that draws on; then one callout per beat: a dot pops on the product, a leader line draws out and a label (index, name, value) slides in.",
-  reads: "file_ids (the product: the first file), text (the product name), tag (the heading's prefix, default EXPERIMENTAL), labels (callout names, 1-4), values (their second lines), points (anchors on the product picture, 0-1)",
+    "A product shot on a dark field with a soft halo and a glowing 'ANATOMY: NAME' heading over a rule that draws on; then one callout per beat: a dot pops on the product, a leader line draws out and a label (index, name, value) slides in.",
+  reads: "file_ids (the product: the first file), text (the product name), tag (the heading's prefix, default ANATOMY), labels (callout names, 1-4), values (their second lines), points (anchors on the product picture, 0-1)",
   media: "required",
   beats: (content) => Math.max(1, content.labels?.length ?? 3) + 3,
   build(input: TemplateInput): TemplateOutput {
@@ -122,14 +122,14 @@ export const callout: TemplateSpec = {
 
     // The heading and its rule.
     const name = (content.text ?? "").replace(/\s+/g, " ").trim().toUpperCase();
-    const prefix = (content.tag?.trim() || "EXPERIMENTAL").toUpperCase().replace(/:$/, "");
+    const prefix = (content.tag?.trim() || "ANATOMY").toUpperCase().replace(/:$/, "");
     const headSize = Math.round((portrait ? 46 : 42) * u);
     const head = name ? `${prefix}: ${name}` : prefix;
     const headW = textWidth(head, { size: headSize, font: "mono", bold: true, tracking: 0.04 });
     const hx = m * 1.2;
     const hy = m * 1.2 + headSize;
     const headEl = drawing("callout-heading", 3, e0, frames, { width: headW + 40 * u, height: headSize * 1.8, cx: 20 * u, cy: headSize * 0.9 }, (d) => {
-      d.text(20 * u, headSize * 0.9 + headSize * 0.36, [{ text: `${prefix}:`, fill: palette.accent }, ...(name ? [{ text: ` ${name}`, fill: palette.ink }] : [])], {
+      d.text(20 * u, headSize * 0.9 + headSize * 0.36, [{ text: name ? `${prefix}:` : prefix, fill: palette.accent }, ...(name ? [{ text: ` ${name}`, fill: palette.ink }] : [])], {
         size: headSize,
         font: "mono",
         bold: true,
