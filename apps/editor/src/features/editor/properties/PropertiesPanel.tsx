@@ -10,6 +10,7 @@ import {
   setEffectProperty,
   setTransitionProperty,
   timeOfClipFrame,
+  trackDisplayName,
   type Clip,
   type Effect,
   type KeyframePoint,
@@ -31,7 +32,7 @@ import type { EditorSession } from "../session/EditorSession";
 import { fileDisplayName } from "../session/media";
 import { EMPTY_SELECTION } from "../session/uiStore";
 import { CLIP_GROUPS, HIDDEN_EFFECT_KEYS, humanize, TRANSITION_GROUPS, type PropertyGroup } from "./groups";
-import { PropertyRow, type KeyframeAt, type PropertyWriter } from "./PropertyRow";
+import { PropertyRow, Row, type KeyframeAt, type PropertyWriter } from "./PropertyRow";
 
 /** The owner-local keyframe frame at the playhead; coarser while playing so the panel stays light. */
 function usePlayheadFrame(item: Timed | undefined, project: Project): number {
@@ -144,6 +145,7 @@ function Groups({
   writer,
   filter,
   readonlyKeys,
+  display,
 }: {
   groups: readonly PropertyGroup[];
   table: PropertyTable | null;
@@ -152,6 +154,8 @@ function Groups({
   writer: PropertyWriter;
   filter: string;
   readonlyKeys?: ReadonlySet<string>;
+  /** Read-only values shown as text instead of their raw form (a track's name rather than its layer number). */
+  display?: Readonly<Record<string, ReactNode>>;
 }) {
   const q = filter.trim().toLowerCase();
   return (
@@ -161,9 +165,15 @@ function Groups({
         if (keys.length === 0) return null;
         return (
           <Section key={group.title} title={group.title} defaultOpen={q ? true : !group.collapsed}>
-            {keys.map((key) => (
-              <PropertyRow key={key} propKey={key} meta={table?.[key]} raw={item[key]} frame={frame} writer={writer} disabled={readonlyKeys?.has(key)} />
-            ))}
+            {keys.map((key) =>
+              display?.[key] !== undefined ? (
+                <Row key={key} label={label(table?.[key], key)}>
+                  <span className="block truncate px-1 text-sm text-fg-muted">{display[key]}</span>
+                </Row>
+              ) : (
+                <PropertyRow key={key} propKey={key} meta={table?.[key]} raw={item[key]} frame={frame} writer={writer} disabled={readonlyKeys?.has(key)} />
+              ),
+            )}
           </Section>
         );
       })}
@@ -299,7 +309,16 @@ function TransitionInspector({ transition, project, filter }: { transition: Tran
           {formatDuration(transition.end - transition.start)} · {formatDuration(transition.position)}–{formatDuration(itemEnd(transition))}
         </p>
       </div>
-      <Groups groups={TRANSITION_GROUPS} table={table} item={item} frame={frame} writer={writer} filter={filter} readonlyKeys={new Set(["duration", "layer"])} />
+      <Groups
+        groups={TRANSITION_GROUPS}
+        table={table}
+        item={item}
+        frame={frame}
+        writer={writer}
+        filter={filter}
+        readonlyKeys={new Set(["duration"])}
+        display={{ layer: trackDisplayName(project, transition.layer) }}
+      />
     </>
   );
 }
