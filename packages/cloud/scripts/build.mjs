@@ -1,5 +1,7 @@
-// Bundle the service into one ESM file, dist/server.mjs (+ source map), plus
-// the non-JS resources @zenvi/render-node loads at runtime, next to it:
+// Bundle the service into one ESM file, dist/server.mjs (+ source map), the
+// render worker into dist/render-job.mjs (Azure Container Apps job executions,
+// src/render-job.ts), plus the non-JS resources @zenvi/render-node loads at
+// runtime, next to them:
 //   dist/composite-worker.mjs  compositor worker threads (render-node CompositePool)
 //   dist/resvg.wasm   SVG rasterizer (titles, transition masks)
 //   dist/fonts/       bundled fallback fonts (OFL)
@@ -29,6 +31,7 @@ async function exists(path) {
 
 await rm(outdir, { recursive: true, force: true });
 await build(serverBundleOptions(join(outdir, "server.mjs")));
+await build(serverBundleOptions(join(outdir, "render-job.mjs"), "src/render-job.ts"));
 
 // The compositor worker (render-node CompositePool) loads composite-worker.mjs
 // next to the bundle; without it cloud renders composite on one thread.

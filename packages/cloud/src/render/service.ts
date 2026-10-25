@@ -2,7 +2,9 @@
  * Render jobs: records in the `renders` table (PK user id, RK render id), an
  * in-process queue with concurrency 1, and a worker that downloads the media a
  * project uses into a temp dir, calls the renderer and uploads the result to
- * `u/{user}/p/{project}/renders/{render}.{ext}`.
+ * `u/{user}/p/{project}/renders/{render}.{ext}`. With a `dispatch`, new jobs go
+ * to render workers in their own containers instead (`dispatch.ts`), and the
+ * in-process worker renders only what no worker claims in time.
  *
  * The project is snapshotted when the job is created, so the render shows
  * exactly the revision that was asked for even if editing continues. Asking
@@ -26,6 +28,7 @@ import { attachmentDisposition } from "../services/media.js";
 import { renderPath, renderSnapshotPath } from "../services/paths.js";
 import type { LoadedProject, ProjectService } from "../services/projects.js";
 import { CONTENT_TYPES, type PresetName, type RenderFormat, type RenderOverrides, resolveRenderOptions } from "./options.js";
+import type { RenderDispatch } from "./dispatch.js";
 import type { PathResolver, Renderer } from "./renderer.js";
 import { projectPathResolver } from "./resolve.js";
 
@@ -70,6 +73,8 @@ interface RenderRow extends TableEntity {
   attempts: number;
   /** Refreshed while a worker renders; a stale one means the worker died. */
   heartbeatAt?: string;
+  /** When the job was last handed to a render worker (`dispatch`). */
+  dispatchedAt?: string;
 }
 
 /**
@@ -87,6 +92,8 @@ const TABLE = "renders" as const;
 const CLAIM_GRACE_MS = 30_000;
 const MAX_ATTEMPTS = 2;
 const HEARTBEAT_MS = 15_000;
+/** A dispatched job no render worker has claimed after this long renders in this process instead. */
+const DISPATCH_GRACE_MS = 5 * 60_000;
 /** A running job whose heartbeat is older than this is re-queued by `recover`. */
 const STALE_MS = 60_000;
 const REUSE_DONE_MS = 24 * 3_600_000;
@@ -138,6 +145,8 @@ export interface RenderServiceOptions {
   maxRenderMediaBytes: number;
   /** Built-in assets (`@transitions/…`) on disk, when this build ships them. */
   resolveAsset?: (projectPath: string) => string | undefined;
+  /** Hands new jobs to render workers (`dispatch.ts`); without it every job renders in this process. */
+  dispatch?: RenderDispatch;
 }
 
 export class RenderService {
@@ -238,8 +247,22 @@ export class RenderService {
     };
     await this.options.tables.create(TABLE, row);
     this.options.media.invalidateUsage(userId);
-    this.enqueue(userId, renderId);
+    await this.hand(userId, renderId);
     return toJob(row);
+  }
+
+  /** Give a queued job to a render worker, or to this process when there are none or the hand-off fails. */
+  private async hand(userId: string, renderId: string): Promise<void> {
+    if (this.options.dispatch) {
+      try {
+        await this.options.tables.update<RenderRow>(TABLE, { partitionKey: userId, rowKey: renderId, dispatchedAt: isoAt(this.options.clock.now()) } as RenderRow);
+        await this.options.dispatch({ userId, renderId });
+        return;
+      } catch (error) {
+        this.options.log.warn("render dispatch failed, rendering here", { renderId, error: errorMessage(error) });
+      }
+    }
+    this.enqueue(userId, renderId);
   }
 
   async get(userId: string, projectId: string, renderId: string): Promise<RenderJobView> {
@@ -279,6 +302,8 @@ export class RenderService {
    * heartbeat stopped (the process died or restarted). Call at startup and
    * periodically; a second instance during a deploy leaves jobs with a fresh
    * heartbeat alone, and claims are ETag-checked, so a job never runs twice.
+   * With render workers, a queued job is theirs for `DISPATCH_GRACE_MS` after
+   * its hand-off, and a re-queued one is handed to them again.
    */
   async recover(): Promise<number> {
     const now = this.options.clock.now();
@@ -290,6 +315,7 @@ export class RenderService {
     let picked = 0;
     for (const row of pending) {
       if (this.local.has(`${row.partitionKey}/${row.rowKey}`)) continue;
+      if (row.status === "queued" && this.options.dispatch && now - Date.parse(row.dispatchedAt ?? row.createdAt) < DISPATCH_GRACE_MS) continue;
       if (row.status === "running") {
         const beat = Date.parse(row.heartbeatAt ?? row.startedAt ?? row.createdAt);
         if (now - beat < STALE_MS) continue;
@@ -303,11 +329,24 @@ export class RenderService {
           if (error instanceof PreconditionFailedError) continue;
           throw error;
         }
+        await this.hand(row.partitionKey, row.rowKey);
+      } else {
+        this.enqueue(row.partitionKey, row.rowKey);
       }
-      this.enqueue(row.partitionKey, row.rowKey);
       picked += 1;
     }
     return picked;
+  }
+
+  /** Render one queued job in this process and wait for it: a render worker's whole job (`render-job.ts`). */
+  async runOne(userId: string, renderId: string): Promise<void> {
+    const controller = new AbortController();
+    this.running = { userId, renderId, controller };
+    try {
+      await this.run(userId, renderId, controller.signal);
+    } finally {
+      this.running = null;
+    }
   }
 
   /** Stop taking jobs and abort the running one (it resumes after restart). */

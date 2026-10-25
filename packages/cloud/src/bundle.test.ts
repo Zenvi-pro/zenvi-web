@@ -5,7 +5,7 @@
  * it the way the image does and check it starts and answers /health.
  */
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -50,5 +50,15 @@ describe("service bundle", () => {
     } finally {
       child.kill();
     }
+  }, 60_000);
+
+  it("bundles the render worker, which loads and refuses to run without Azure storage and a queue", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "zenvi-render-job-bundle-"));
+    dirs.push(dir);
+    const outfile = path.join(dir, "render-job.mjs");
+    await build({ ...serverBundleOptions(outfile, "src/render-job.ts"), logLevel: "silent", sourcemap: false });
+    const result = spawnSync(process.execPath, [outfile], { env: { ...process.env, STORAGE: "memory", LOG_LEVEL: "error" }, encoding: "utf8", timeout: 30_000 });
+    expect(result.status, result.stderr).toBe(1);
+    expect(result.stderr).toContain("a render worker needs Azure storage and ZENVI_RENDER_QUEUE");
   }, 60_000);
 });

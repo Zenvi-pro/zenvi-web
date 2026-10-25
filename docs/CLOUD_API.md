@@ -397,6 +397,7 @@ with `If-Match`, replaying the change if someone else saved in between.
 | `MAX_PROJECT_BYTES`, `MAX_FILE_BYTES`, `MAX_USER_BYTES`, `IMPORT_MAX_BYTES`, `VERIFY_HASH_MAX_BYTES`, `MAX_RENDER_MEDIA_BYTES` | 20 MB, 4 GB, 20 GB, 512 MB, 64 MB, 3 GB | |
 | `RENDER_TMP_DIR` | OS temp | render scratch + frame media cache (2 GB) |
 | `ZENVI_CLOUD_VERSION` | `dev` | set to the image tag by deploy.sh |
+| `ZENVI_RENDER_QUEUE` | | Azure Storage queue of render workers (below); unset = renders run in this process |
 
 Storage (account `zenvicloud`): blob container `zenvi` —
 `u/{userId}/p/{projectId}/{project.json,meta.json,renders/…,frames/…,exports/…}`,
@@ -407,8 +408,18 @@ declarations), `u/{userId}/mcp/{connection}.json` (open project). Tables —
 `oauthcodes` (`req/<id>`, `code/<sha256>`), `devicecodes` (`d/<user code>`),
 `renders` (`<userId>/<renderId>`, plus idempotency keys `<userId>/key:<projectId>:<hash>`); blob prefix `verify/` holds pending upload hash checks. Expired rows are swept every 6 h.
 
-Deploy: `scripts/azure/deploy.sh` (ACR build of the committed tree, roll the
-app, wait for `/health`); configuration: `scripts/azure/provision.sh`; live
+Render workers: `scripts/azure/render-jobs.sh` creates the queue
+`render-jobs` and the Container Apps job `zenvi-render` (4 vCPU, 8 GiB,
+consumption: billed only while it renders). With `ZENVI_RENDER_QUEUE` set,
+the service posts each new render on the queue and the platform starts one
+job execution per message (`dist/render-job.mjs`); the service renders in its
+own process only a job no worker claims within five minutes, and re-queues a
+worker's job when its heartbeat stops. Executions:
+`az containerapp job execution list -g zenvi-rg -n zenvi-render -o table`.
+
+Deploy: `scripts/azure/deploy.sh` (ACR build of the committed tree, move the
+render job to it, roll the app, wait for `/health`); configuration:
+`scripts/azure/provision.sh`; live
 end-to-end check (OAuth, device login, uploads, MCP tools, a real render):
 `npx tsx packages/cloud/scripts/e2e-live.mjs` (test user from
 `~/.config/zenvi-dev/test-user.env`).
@@ -416,9 +427,10 @@ Logs: `az containerapp logs show -g zenvi-rg -n zenvi-cloud --tail 100`
 (JSON lines; tokens, codes, query strings and signed URLs are never logged).
 Local run: `STORAGE=memory PUBLIC_BASE_URL=http://localhost:8080 npm run dev -w @zenvi/cloud`.
 
-Known limits of this release: one replica (in-process render queue and rate
-limits; render jobs are claimed with ETags and heartbeat, so an overlapping
-instance during a deploy never renders a job twice); renders need every
+Known limits of this release: one replica (in-process rate limits, and the
+in-process render queue when there are no render workers; render jobs are
+claimed with ETags and heartbeat, so an overlapping instance or a duplicate
+worker never renders a job twice); renders need every
 clip's media in the cloud; projects are listed by scanning the user's blob
 prefix; orphaned media (no project uses them) and unused dynamically
 registered OAuth clients are not garbage-collected yet.

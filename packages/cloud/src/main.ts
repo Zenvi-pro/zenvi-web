@@ -12,6 +12,7 @@ import { loadConfig } from "./config.js";
 import { createServices } from "./container.js";
 import { createLogger, errorMessage } from "./http/log.js";
 import { loadEngineRegistry } from "./mcp/engine.js";
+import { queueDispatch, type RenderDispatch, renderQueue } from "./render/dispatch.js";
 import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeFontFamilies, nodeProber, nodeRenderer, nodeTranscribeMedia } from "./render/node.js";
 import { unavailableProber } from "./render/renderer.js";
 import { AzureBlobStore, AzureTableStore } from "./storage/azure.js";
@@ -54,6 +55,12 @@ async function main(): Promise<void> {
   if (!assets) log.warn("engine assets not found: title tools are disabled");
   const { renderer, reason } = await nodeRenderer();
   if (reason) log.warn("rendering unavailable", { reason });
+  let renderDispatch: RenderDispatch | undefined;
+  if (config.renderQueue && config.storage.kind === "azure") {
+    const queue = renderQueue(config.storage.connectionString, config.renderQueue);
+    await queue.createIfNotExists();
+    renderDispatch = queueDispatch(queue);
+  }
 
   const services = createServices({
     config,
@@ -70,6 +77,7 @@ async function main(): Promise<void> {
     transcribeMedia: haveFfmpeg && haveFfprobe ? nodeTranscribeMedia : undefined,
     fontFamilies: nodeFontFamilies,
     supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl, log: (message) => log.warn(message) }),
+    renderDispatch,
   });
   const app = createApp(services);
 
@@ -80,6 +88,7 @@ async function main(): Promise<void> {
       storage: blobs.kind,
       renderer: services.renders.rendererAvailable,
       engineTools: engine?.tools.length ?? 0,
+      renderWorkers: config.renderQueue ?? "none",
       version: config.version,
     });
   });

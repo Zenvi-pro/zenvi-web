@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { fakeRenderer } from "../testing/fakes.js";
 import { harness, sampleProject, USER_A } from "../testing/helpers.js";
+import type { RenderTicket } from "./dispatch.js";
 import { resolveRenderOptions } from "./options.js";
 
 const sha = (data: string): string => createHash("sha256").update(data).digest("hex");
@@ -154,6 +155,65 @@ describe("render jobs", () => {
     const other = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, transcribeMedia: undefined, fontFamilies: undefined, supabase: { verify: async () => null }, renderer });
     await other.renders.recover();
     await Promise.all([h.services.renders.drain(), other.renders.drain()]);
+    expect(renderer.renders).toBe(1);
+  });
+
+  it("hand new jobs to render workers, and render here only what none claims in time", async () => {
+    const renderer = fakeRenderer();
+    const tickets: RenderTicket[] = [];
+    const h = await harness({ renderer, renderDispatch: async (ticket) => void tickets.push(ticket) });
+    const token = await h.userToken(USER_A);
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id;
+    const started = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
+    await h.services.renders.drain();
+    expect(tickets).toEqual([{ userId: USER_A, renderId: started.json.renderId }]);
+    expect(renderer.renders).toBe(0);
+    // Fresh: the workers' job.
+    expect(await h.services.renders.recover()).toBe(0);
+    // No worker claimed it in five minutes: this process renders it.
+    h.clock.advance(6 * 60_000);
+    expect(await h.services.renders.recover()).toBe(1);
+    await h.services.renders.drain();
+    expect(renderer.renders).toBe(1);
+    expect((await h.request("GET", `/v1/projects/${id}/renders/${started.json.renderId}`, { token })).json.status).toBe("done");
+  });
+
+  it("render here when the hand-off to a worker fails", async () => {
+    const renderer = fakeRenderer();
+    const h = await harness({ renderer, renderDispatch: async () => Promise.reject(new Error("queue unavailable")) });
+    const token = await h.userToken(USER_A);
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id;
+    const started = await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
+    await h.services.renders.drain();
+    expect(renderer.renders).toBe(1);
+    expect((await h.request("GET", `/v1/projects/${id}/renders/${started.json.renderId}`, { token })).json.status).toBe("done");
+  });
+
+  it("let a worker render the job it was handed once, and hand a dead worker's job to the workers again", async () => {
+    const renderer = fakeRenderer();
+    const tickets: RenderTicket[] = [];
+    const h = await harness({ renderer, renderDispatch: async (ticket) => void tickets.push(ticket) });
+    const token = await h.userToken(USER_A);
+    const id = (await h.request("POST", "/v1/projects", { token, json: { name: "P" } })).json.id;
+    const first = (await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} })).json.renderId as string;
+    // A worker: its own render service over the same stores, as render-job.ts builds it.
+    const { createServices } = await import("../container.js");
+    const worker = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, transcribeMedia: undefined, fontFamilies: undefined, supabase: { verify: async () => null }, renderer });
+    await worker.renders.runOne(USER_A, first);
+    expect(renderer.renders).toBe(1);
+    expect((await h.request("GET", `/v1/projects/${id}/renders/${first}`, { token })).json.status).toBe("done");
+    // The same message twice renders nothing more.
+    await worker.renders.runOne(USER_A, first);
+    expect(renderer.renders).toBe(1);
+
+    // A worker claims the next job and dies: its heartbeat stops, and the job goes back to the workers.
+    await h.request("PUT", `/v1/projects/${id}`, { token, json: sampleProject({ width: 640, height: 360 }), headers: { "if-match": "*" } });
+    const second = (await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} })).json.renderId as string;
+    await h.tables.update("renders", { partitionKey: USER_A, rowKey: second, status: "running", attempts: 1, heartbeatAt: new Date(h.clock.now()).toISOString() });
+    h.clock.advance(120_000);
+    expect(await h.services.renders.recover()).toBe(1);
+    await h.services.renders.drain();
+    expect(tickets.map((t) => t.renderId)).toEqual([first, second, second]);
     expect(renderer.renders).toBe(1);
   });
 
