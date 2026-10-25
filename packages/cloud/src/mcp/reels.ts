@@ -83,9 +83,11 @@ export function pickMusic(sounds: readonly FreesoundSound[], seconds: number): F
   return [...usable].sort((a, b) => rank(a) - rank(b))[0];
 }
 
-/** Run `jobs` `limit` at a time; each settles on its own. */
-async function pool<T>(jobs: (() => Promise<T>)[], limit: number): Promise<PromiseSettledResult<T>[]> {
-  const results: PromiseSettledResult<T>[] = new Array(jobs.length);
+/**
+ * Run `jobs` `limit` at a time, writing each outcome into `results` as it
+ * settles (so whatever finished is usable even if the caller stops waiting).
+ */
+async function pool<T>(jobs: (() => Promise<T>)[], limit: number, results: (PromiseSettledResult<T> | undefined)[]): Promise<void> {
   let next = 0;
   const worker = async () => {
     while (next < jobs.length) {
@@ -98,7 +100,6 @@ async function pool<T>(jobs: (() => Promise<T>)[], limit: number): Promise<Promi
     }
   };
   await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, worker));
-  return results;
 }
 
 function message(error: unknown): string {
@@ -174,7 +175,13 @@ interface Fetched {
   credit?: { name: string; credit: string; license?: string; source: string };
 }
 
-export function reelTools(registry: EngineRegistry, backendEnabled: boolean): McpTool[] {
+export interface ReelToolOptions {
+  /** How long to wait for downloads, ms (default FETCH_DEADLINE_MS). */
+  fetchDeadlineMs?: number;
+}
+
+export function reelTools(registry: EngineRegistry, backendEnabled: boolean, options: ReelToolOptions = {}): McpTool[] {
+  const fetchDeadlineMs = options.fetchDeadlineMs ?? FETCH_DEADLINE_MS;
   return [
     defineTool({
       name: "create_reel",
@@ -223,9 +230,13 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean): Mc
         const frameWidth = Math.min(Number(project.width) || 1920, Number(project.height) || 1080);
 
         // Everything to fetch, in story order; stock picks are resolved first (searches are quick).
+        // Downloads past the deadline are aborted (what arrived is used).
+        const downloads = new AbortController();
+        const stopDownloads = () => downloads.abort();
+        ctx.signal.addEventListener("abort", stopDownloads, { once: true });
         const jobs: { label: string; run: () => Promise<Fetched> }[] = [];
         const fetch = (url: string, filename: string | undefined, role: Fetched["role"], credit?: Fetched["credit"]) => async (): Promise<Fetched> => ({
-          imported: await ctx.services.importer.importUrl(userId, url, { filename, signal: ctx.signal }),
+          imported: await ctx.services.importer.importUrl(userId, url, { filename, signal: downloads.signal }),
           role,
           credit,
         });
@@ -251,13 +262,16 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean): Mc
               return;
             }
             used.add(video.id);
-            const name = `${query.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40) || "stock"}_${video.id}.mp4`;
+            // Named by what it shows (the brief's story reads these names).
+            const name = `${query.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, " ").slice(0, 60) || "stock clip"}.mp4`;
             jobs.push({ label: query, run: fetch(link, name, "visual", { name: query, credit: video.user_name ? `${video.user_name} on Pexels` : "Pexels", source: video.url ?? `https://www.pexels.com/video/${video.id}/` }) });
           });
         }
+        // Music first: the cut follows its beats, so it should never be the file that misses the deadline.
+        const musicJobs: typeof jobs = [];
         if (!args.no_music) {
           if (args.music_url) {
-            jobs.push({ label: "music", run: fetch(args.music_url, undefined, "music") });
+            musicJobs.push({ label: "music", run: fetch(args.music_url, undefined, "music") });
           } else if (backendEnabled) {
             const query = args.music_query ?? DEFAULT_MUSIC[args.style ?? "hype"]!;
             try {
@@ -270,7 +284,7 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean): Mc
               const preview = sound?.previews?.hq_mp3 || sound?.previews?.lq_mp3;
               if (sound && preview) {
                 const name = `${sound.name.replace(/\.[a-z0-9]+$/i, "").replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40) || "music"}.mp3`;
-                jobs.push({
+                musicJobs.push({
                   label: "music",
                   run: fetch(preview, name, "music", { name: sound.name, credit: sound.username ? `${sound.username} on Freesound` : "Freesound", license: sound.license ?? "", source: `https://freesound.org/s/${sound.id}/` }),
                 });
@@ -282,19 +296,29 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean): Mc
             }
           }
         }
-        if (jobs.length > MAX_SOURCES + 1) jobs.splice(MAX_SOURCES + 1);
+        if (jobs.length > MAX_SOURCES) jobs.splice(MAX_SOURCES);
+        jobs.unshift(...musicJobs);
 
         // Fetch three at a time; stop waiting at the deadline and use what arrived.
-        const deadline = new Promise<"late">((resolve) => setTimeout(() => resolve("late"), FETCH_DEADLINE_MS));
-        const settled = await Promise.race([pool(jobs.map((j) => j.run), PARALLEL_FETCHES), deadline]);
-        const results: PromiseSettledResult<Fetched>[] =
-          settled === "late" ? jobs.map(() => ({ status: "rejected", reason: new Error("still downloading at the deadline") })) : settled;
-        if (settled === "late") warnings.push("Downloads took too long; try fewer or shorter files.");
+        const results: (PromiseSettledResult<Fetched> | undefined)[] = new Array(jobs.length);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const finished = await Promise.race([
+          pool(jobs.map((j) => j.run), PARALLEL_FETCHES, results).then(() => true),
+          new Promise<false>((resolve) => (timer = setTimeout(() => resolve(false), fetchDeadlineMs))),
+        ]);
+        clearTimeout(timer);
+        ctx.signal.removeEventListener("abort", stopDownloads);
+        if (!finished) {
+          downloads.abort();
+          warnings.push("Some downloads were still running at the time limit; the reel uses what arrived.");
+        }
         const fetched: Fetched[] = [];
-        results.forEach((r, i) => {
-          if (r.status === "fulfilled") fetched.push(r.value);
-          else warnings.push(`Could not fetch ${jobs[i]!.label}: ${message(r.reason)}`);
-        });
+        // An index loop: a download still running left a hole that forEach would skip.
+        for (let i = 0; i < jobs.length; i += 1) {
+          const r = results[i];
+          if (r?.status === "fulfilled") fetched.push(r.value);
+          else warnings.push(`Could not fetch ${jobs[i]!.label}: ${r ? message(r.reason) : "still downloading at the time limit"}`);
+        }
 
         // Add the media in one edit, then cut the reel in another (two undo steps: media, edit).
         const added = await editProject(ctx, projectId, async (doc) => {

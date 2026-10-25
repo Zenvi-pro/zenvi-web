@@ -33,7 +33,7 @@ const RESOURCE_NOT_FOUND = -32002;
 export function buildToolList(services: Services): McpTool[] {
   const cloud = cloudTools({ backend: services.backendSessions.enabled });
   if (!services.engine) return cloud;
-  const reels = reelTools(services.engine, services.backendSessions.enabled);
+  const reels = reelTools(services.engine, services.backendSessions.enabled, { fetchDeadlineMs: services.config.limits.reelFetchDeadlineMs });
   const reserved = new Set([...cloud, ...reels].map((tool) => tool.name));
   const capabilities = cloudCapabilities(services);
   const engine = engineTools(services.engine, capabilities, reserved, (message) => services.log.warn(message));

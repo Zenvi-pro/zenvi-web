@@ -71,6 +71,12 @@ describe("create_reel", () => {
     ff(["-f", "lavfi", "-i", "sine=frequency=60:duration=0.08", "-af", "apad=whole_dur=0.5", path.join(dir, "kick.wav")]);
     ff(["-stream_loop", "39", "-i", path.join(dir, "kick.wav"), "-c:a", "libmp3lame", path.join(dir, "beat.mp3")]);
     server = createServer((req, res) => {
+      if (req.url === "/slow.mp4") {
+        // Never finishes in time: the reel must go ahead with what arrived.
+        res.writeHead(200, { "content-type": "video/mp4", "content-length": "100000000" });
+        res.write(Buffer.alloc(1024));
+        return;
+      }
       const file = path.join(dir, path.basename(req.url ?? ""));
       try {
         const body = readFileSync(file);
@@ -152,6 +158,20 @@ describe("create_reel", () => {
     expect(project.history?.undo?.length ?? 0).toBeGreaterThanOrEqual(2);
     await client.close();
   }, 60_000);
+
+  it("uses what arrived when a download misses the time limit, and says which one", async () => {
+    const { h } = await setup();
+    const { reelTools } = await import("./reels.js");
+    const [tool] = reelTools(h.services.engine!, true, { fetchDeadlineMs: 1500 });
+    const token = (await h.services.tokens.createPat({ userId: USER_A, name: "t", scopes: [SCOPE_READ, SCOPE_WRITE], ttlDays: 1 })).token;
+    const principal = await h.services.auth.authenticate(token);
+    const ctx = { services: h.services, principal: principal as never, connection: "test", origin: "https://cloud.test", signal: new AbortController().signal };
+    const result = (await tool!.call(ctx, { prompt: "quick", no_music: true, media_urls: [`${base}/a.mp4`, `${base}/slow.mp4`] })) as CallResult;
+    expect(result.isError, result.content[0]?.text).toBeFalsy();
+    const data = result.structuredContent as { shots: number; warnings: string[] };
+    expect(data.shots).toBeGreaterThan(0);
+    expect(data.warnings.join(" ")).toMatch(/slow\.mp4: still downloading at the time limit|slow\.mp4.*abort/);
+  }, 30_000);
 
   it("refuses when there is no footage at all", async () => {
     const { client } = await setup();
