@@ -17,6 +17,18 @@ describe("stock picks", () => {
     expect(pickStockVideo(list, false, new Set())?.id).toBe(1);
   });
 
+  it("prefer clips whose page says what the search asked for, its first words most", () => {
+    const page = (id: number, slug: string, width = 1080, height = 1920) => ({ ...video(id, width, height, 10), url: `https://www.pexels.com/video/${slug}-${id}/` });
+    const ridge = [page(1, "mountains"), page(2, "scenic-views-of-chicago-riverwalk-with-joggers"), page(3, "solo-runner-on-misty-mountain-ridge")];
+    expect(pickStockVideo(ridge, true, new Set(), 4, "trail runner on mountain ridge")?.id).toBe(3);
+    expect(pickStockVideo(ridge, true, new Set([3]), 4, "trail runner on mountain ridge")?.id).toBe(1);
+    // The subject outweighs the place: a runner by a river beats a riverwalk.
+    const river = [page(4, "jogger-passing-chicago-riverwalk-bridge"), page(5, "a-person-running-across-a-shallow-river", 1920, 1080)];
+    expect(pickStockVideo(river, true, new Set(), 4, "runners crossing a river")?.id).toBe(5);
+    // Pages without words, or no search: the frame's orientation, then Pexels' order.
+    expect(pickStockVideo([video(6, 1920, 1080, 10), video(7, 1080, 1920, 10)], true, new Set(), 4, "trail runner")?.id).toBe(7);
+  });
+
   it("take the rendition just big enough for the frame", () => {
     const v = video(9, 2160, 3840, 10, [
       { width: 2160, height: 3840, link: "uhd" },

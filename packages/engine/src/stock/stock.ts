@@ -34,10 +34,47 @@ export interface FreesoundSound {
   previews?: { hq_mp3?: string; lq_mp3?: string };
 }
 
-/** A stock video that suits the frame: the right orientation, long enough, not used yet. */
-export function pickStockVideo(videos: readonly PexelsVideo[], portrait: boolean, used: ReadonlySet<number>, minSeconds = 4): PexelsVideo | undefined {
+const STOP_WORDS = new Set(["a", "an", "the", "of", "on", "in", "at", "to", "and", "with", "by", "for", "from", "up", "close", "shot", "video", "footage"]);
+
+/** Content words cut to a short stem, so "runners" and "running" meet at "runn". */
+function stems(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((w) => w.length > 1 && !STOP_WORDS.has(w))
+    .map((w) => (w.length <= 4 ? w : w.slice(0, Math.max(4, w.length - 3))));
+}
+
+function sameStem(a: string, b: string): boolean {
+  return a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a)));
+}
+
+/**
+ * How well a Pexels video's page slug (".../video/woman-running-on-a-forest-trail-7348382/") matches the search: each
+ * search word it shares counts, earlier words more (the subject usually comes first). 0 when the page has no words.
+ */
+export function stockRelevance(video: PexelsVideo, query: string): number {
+  const words = stems(query);
+  const slug = stems(/\/video\/([^/]*)/.exec(video.url ?? "")?.[1] ?? "");
+  return words.reduce((score, w, i) => (slug.some((s) => sameStem(w, s)) ? score + words.length - i : score), 0);
+}
+
+/**
+ * A stock video that suits the frame: long enough, not used yet, the one whose page best matches the search (Pexels'
+ * deeper results drift: "trail runner" also brings plain mountains), then the frame's orientation, then Pexels' order.
+ */
+export function pickStockVideo(videos: readonly PexelsVideo[], portrait: boolean, used: ReadonlySet<number>, minSeconds = 4, query = ""): PexelsVideo | undefined {
   const usable = videos.filter((v) => !used.has(v.id) && v.duration >= minSeconds && (v.video_files ?? []).some((f) => f.link));
-  return usable.find((v) => (portrait ? v.height > v.width : v.width >= v.height)) ?? usable[0];
+  let best: PexelsVideo | undefined;
+  let bestScore = -1;
+  for (const v of usable) {
+    const score = 2 * stockRelevance(v, query) + ((portrait ? v.height > v.width : v.width >= v.height) ? 1 : 0);
+    if (score > bestScore) {
+      best = v;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 /** The MP4 rendition closest to the frame's width (at least most of it), so cuts stay sharp without huge downloads. */

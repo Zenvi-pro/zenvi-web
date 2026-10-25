@@ -275,7 +275,7 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
             }
             const clips: { video: PexelsVideo; link: string }[] = [];
             for (let n = 0; n < perQuery; n += 1) {
-              const video = pickStockVideo(result.value.videos ?? [], portrait, used);
+              const video = pickStockVideo(result.value.videos ?? [], portrait, used, 4, query);
               const link = video ? pickStockFile(video, frameWidth, portrait)?.link : undefined;
               if (!video || !link) break;
               used.add(video.id);
