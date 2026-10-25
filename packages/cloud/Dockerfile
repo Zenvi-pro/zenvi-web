@@ -48,9 +48,11 @@ RUN npm run build --workspace @zenvi/editor
 
 FROM node:22-bookworm-slim
 # ffmpeg/ffprobe for probing and rendering; DejaVu so SVG titles have a real
-# sans face; tini to forward SIGTERM and reap ffmpeg children.
+# sans face, and Liberation Sans because motion templates measure their text
+# with Helvetica/Arial widths, which it shares (DejaVu Sans runs wider); tini
+# to forward SIGTERM and reap ffmpeg children.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg ca-certificates tini fonts-dejavu-core \
+ && apt-get install -y --no-install-recommends ffmpeg ca-certificates tini fonts-dejavu-core fonts-liberation \
  && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production PORT=8080 RENDER_TMP_DIR=/tmp ZENVI_EDITOR_DIST=/app/editor
 WORKDIR /app
