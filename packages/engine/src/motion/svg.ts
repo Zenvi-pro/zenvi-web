@@ -8,8 +8,7 @@
  * at low opacity.
  *
  * A drawing is authored in frame pixels at its rest size and rendered at `k`
- * times that size (`Drawing.k`): a clip that zooms past its rest size gets a
- * sharper raster instead of an upscaled one (see keyframes.ts).
+ * times that size (`Drawing.k`), its largest pose (see keyframes.ts).
  */
 
 /** Grotesk stack. Helvetica / Arial metrics (text.ts) size every layout; Liberation Sans shares them. */
