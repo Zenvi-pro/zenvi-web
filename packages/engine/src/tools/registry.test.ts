@@ -156,7 +156,7 @@ describe("availability matrix", () => {
 
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
-      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage"],
+      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "audio"],
       cli: ["media", "exporter", "frames", "audio", "storage", "backend"],
       cloud: ["media", "frames", "storage", "assets", "audio", "backend"],
     };
