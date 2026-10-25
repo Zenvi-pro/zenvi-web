@@ -19,7 +19,11 @@ import { audioTools } from "./catalog/audio.js";
 import { captionTools } from "./catalog/captions.js";
 import { clipPropsTools } from "./catalog/clip-props.js";
 import { clipTools } from "./catalog/clips.js";
+import { colorAgentTools } from "./catalog/color-agent.js";
 import { directTools } from "./catalog/direct.js";
+import { effectsColorTools } from "./catalog/effects-color.js";
+import { effectsColorAnalysisTools } from "./catalog/effects-color-analysis.js";
+import { effectsColorLookTools } from "./catalog/effects-color-looks.js";
 import { exportTools } from "./catalog/export.js";
 import { generationTools } from "./catalog/generation.js";
 import { inspectTools } from "./catalog/inspect.js";
@@ -78,6 +82,10 @@ function buildCatalog(): readonly CatalogTool[] {
     ...overlayTools,
     ...clipPropsTools,
     ...tracksNavTools,
+    ...effectsColorTools,
+    ...effectsColorLookTools,
+    ...effectsColorAnalysisTools,
+    ...colorAgentTools,
   ];
   const byName = new Map<string, CatalogTool>();
   for (const tool of [...implemented, ...directTools, ...reelTools, ...stockTools]) {

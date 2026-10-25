@@ -714,9 +714,96 @@ const SPECS: Record<string, Spec> = {
   },
   get_playhead_and_selection_tool: { happy: { summary: /^Playhead at 00:00:01,00 \(frame 31\), paused; 0 item\(s\) selected\.$/ }, failure: null },
 
+  // --- effects and colour (effects_color*.py, the older colour tools) ------------------------------------
+  list_effects_tool: {
+    // category is the web's older name for kind.
+    happy: { args: { category: "audio" }, summary: /^9 effect\(s\)$/ },
+    failure: { args: { category: "smell" }, status: "refused", summary: /^Error: Invalid arguments/ },
+  },
+  get_clip_effects_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipA }, summary: /^Clip CLIPINTV01 has 0 effect\(s\): none$/ },
+    failure: { args: { timeline_clip_id: "NOPE" }, summary: /^Error: / },
+  },
+  update_effect_tool: {
+    happy: {
+      args: { timeline_clip_id: IDS.clipA, effect: "blur", properties: '{"sigma": "5"}' },
+      setup: async (doc, host) => {
+        await runTool({ doc, host }, "add_effect_tool", { timeline_clip_id: IDS.clipA, effect: "Blur" });
+      },
+      summary: /^Updated sigma on 1 effect\(s\)\.$/,
+    },
+    failure: { args: { timeline_clip_id: IDS.clipA, effect: "Sharpen", properties: '{"amount": "2"}' }, summary: /no Sharpen effect/ },
+  },
+  remove_effect_tool: {
+    // effect_id (filled from the setup by runCase) is the web's older single-id argument.
+    happy: {
+      setup: async (doc, host) => {
+        await runTool({ doc, host }, "add_effect_tool", { timeline_clip_id: IDS.clipA, effect: "Blur" });
+      },
+      summary: /^Removed 1 effect\(s\) from 1 clip\(s\)\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipA)?.effects).toHaveLength(0),
+    },
+    failure: { args: { effect_id: "NOPE" }, summary: /^Error: no effect with id='NOPE' on the timeline/ },
+  },
+  copy_effects_tool: {
+    happy: {
+      args: { source_clip_id: IDS.clipA, timeline_clip_ids: IDS.clipB },
+      setup: async (doc, host) => {
+        await runTool({ doc, host }, "add_effect_tool", { timeline_clip_id: IDS.clipA, effect: "Blur" });
+      },
+      summary: /^Copied 1 effect\(s\) from clip CLIPINTV01 onto 1 clip\(s\) \(merge\)\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipB)?.effects.map((e) => e.class_name)).toEqual(["Blur"]),
+    },
+    failure: { args: { source_clip_id: IDS.clipA, timeline_clip_ids: IDS.clipB }, summary: /has no any effects to copy/ },
+  },
+  process_clip_effect_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipA, effect: "Stabilizer" }, status: "refused", summary: /not available in this Zenvi surface: Stabilizer analysis/ },
+    failure: null,
+  },
+  apply_look_preset_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipA, look: "film_grain_35mm_fine" }, summary: /^Applied look film_grain_35mm_fine on 1 clip\(s\)\.$/ },
+    failure: { args: { timeline_clip_id: IDS.clipMusic, look: "glow_neon" }, summary: /is audio-only/ },
+  },
+  color_grade_clip_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipA, look: "warm", exposure: "0.1" }, summary: /^Graded 1 clip\(s\): look warm\.$/ },
+    failure: { args: { timeline_clip_id: IDS.clipA }, summary: /say what to change/ },
+  },
+  list_luts_tool: {
+    happy: { args: { query: "moody" }, summary: /^12 LUT\(s\) matching 'moody'$/ },
+    failure: { args: { query: "glitter" }, summary: /^Error: no LUT matches 'glitter'$/ },
+  },
+  apply_audio_effect_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipA, preset: "echo" }, summary: /^Applied echo \(Echo\) to 1 clip\(s\)\.$/ },
+    failure: { args: { timeline_clip_id: IDS.clipLogo, preset: "echo" }, summary: /has no sound/ },
+  },
+  chroma_key_clip_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipB, key_color: "#00ff00" }, summary: /^Keyed out #00ff00 \(given, basic_soft, fuzz 20, halo 10\) on clip CLIPBROL01\./ },
+    failure: { args: { timeline_clip_id: IDS.clipMusic }, summary: /is audio-only/ },
+  },
+  analyze_frame_colors_tool: {
+    happy: { args: { timeline_clip_id: IDS.clipA }, summary: /^Frame at 5\.00s of clip CLIPINTV01: / },
+    failure: { args: { timeline_clip_id: IDS.clipA, time: "50" }, summary: /time 50s is outside the clip/ },
+  },
+  apply_color_tool: {
+    happy: { args: { clipIds: IDS.clipA, exposure: "0.1" }, summary: /^\{"ok":true,"clips":\[\{"timeline_clip_id":"CLIPINTV01","status":"applied"/ },
+    failure: { args: { clipIds: IDS.clipA, exposure: "x" }, summary: /^Error: exposure must be a finite number$/ },
+  },
+  apply_look_tool: {
+    happy: { args: { clipIds: IDS.clipA, lookId: "sunny" }, summary: /"status":"preset"/ },
+    failure: { args: { clipIds: IDS.clipA, lookId: "nope" }, summary: /^Error: Unknown lookId 'nope'/ },
+  },
+  inspect_color_tool: {
+    happy: { args: { clipId: IDS.clipA }, summary: /^\{"ok":true,"timeline_clip_id":"CLIPINTV01"/ },
+    failure: { args: { clipId: IDS.clipA, atFrame: "x" }, summary: /^Error: atFrame must be an integer frame number\.$/ },
+  },
+  list_looks_tool: { happy: { args: { query: "teal" }, summary: /^\{"ok":true,"count":\d+,"looks":/ }, failure: null },
+  match_color_to_reference_tool: {
+    happy: { args: { clipId: IDS.clipA, reference: IDS.clipB, dry_run: "true" }, summary: /^\{"ok":true/ },
+    failure: { args: { clipId: IDS.clipA }, summary: /requires referenceClipId, referenceFileId, or referenceImagePath/ },
+  },
+
   // --- direct tools ----------------------------------------------------------------------------------------
   describe_project_tool: { happy: { summary: /^1280x720 30\/1 fps, 5 track\(s\), 5 clip\(s\), 0 transition\(s\), 4 file\(s\); content ends at 19\.00s\.$/ }, failure: null },
-  list_effects_tool: { happy: { args: { category: "audio" }, summary: /^\d+ effect\(s\)\.$/ }, failure: { args: { category: "smell" }, status: "refused", summary: /^Error: Invalid arguments/ } },
   move_clip_tool: {
     happy: { args: { clip_id: IDS.clipLogo, position_seconds: "6", track: "4" }, summary: /^Moved clip CLIPLOGO01\.$/, check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipLogo)).toMatchObject({ position: 6, layer: 4_000_000 }) },
     failure: { args: { clip_id: "NOPE", position_seconds: "6" }, summary: /^Error: No timeline clip with id='NOPE'\.$/ },
@@ -742,16 +829,6 @@ const SPECS: Record<string, Spec> = {
       summary: /^Set sigma on effect \w+\.$/,
     },
     failure: { args: { effect_id: "NOPE", property: "sigma", value: "5" }, summary: /^Error: / },
-  },
-  remove_effect_tool: {
-    happy: {
-      setup: async (doc, host) => {
-        await runTool({ doc, host }, "add_effect_tool", { timeline_clip_id: IDS.clipA, effect: "Blur" });
-      },
-      summary: /^Removed effect \w+ from clip CLIPINTV01\.$/,
-      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipA)?.effects).toHaveLength(0),
-    },
-    failure: { args: { effect_id: "NOPE" }, summary: /^Error: No effect with id NOPE\.$/ },
   },
   fade_clip_tool: {
     happy: { args: { clip_id: IDS.clipA, fade_in_seconds: "1", fade_out_seconds: "1" }, summary: /^Faded clip CLIPINTV01\.$/ },
