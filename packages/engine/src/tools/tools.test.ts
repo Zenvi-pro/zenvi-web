@@ -526,6 +526,14 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { path: "/media/interview.mp4" }, summary: /^\/media\/interview\.mp4: 1280x720 30\/1 fps, 2 ch 48000 Hz, 8\.00s\.$/ },
     failure: { args: { path: "/media/missing.mp4" }, summary: /^Error: No media at \/media\/missing\.mp4$/ },
   },
+  build_reel_tool: {
+    happy: {
+      args: { style: "cinematic", replace: "true", duration_seconds: "8", hook: "Camera day" },
+      summary: /^Built a cinematic montage reel: \d+ shots cut to 96 BPM, [\d.]+ seconds, landscape 16:9\.$/,
+      check: ({ doc }) => expect(doc.project.clips.some((c) => c.id === IDS.clipA)).toBe(false),
+    },
+    failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
+  },
 };
 
 /** Fill an arg that needs the setup's ids (set_effect_property_tool / remove_effect_tool). */

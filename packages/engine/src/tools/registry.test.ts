@@ -22,6 +22,7 @@ const DIRECT_TOOLS = [
   "fade_clip_tool",
   "add_transition_tool",
   "probe_media_tool",
+  "build_reel_tool",
 ];
 
 /** A valid string form of a scalar property, the way the Assistant backend sends arguments. */

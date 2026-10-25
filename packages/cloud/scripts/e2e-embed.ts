@@ -34,7 +34,7 @@ import { loadConfig } from "../src/config.js";
 import { createServices } from "../src/container.js";
 import { EDITOR_WIDGET_HTML } from "../src/mcp/editor-widget.js";
 import { loadEngineRegistry } from "../src/mcp/engine.js";
-import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeProber } from "../src/render/node.js";
+import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeProber } from "../src/render/node.js";
 import { AzureBlobStore } from "../src/storage/azure.js";
 import { MemoryTableStore } from "../src/storage/memory.js";
 
@@ -134,6 +134,7 @@ async function main(): Promise<void> {
     resolveAsset: nodeAssetResolver(),
     assets: nodeAssetSource(),
     analyzeAudio: nodeAnalyzeAudio,
+    decodePcm: nodeDecodePcm,
     supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl }),
     // The stand-in host serves the clips from loopback.
     network: { policy: { protocols: ["http:", "https:"], isAllowedAddress: (ip: string) => ip === "127.0.0.1", allowAnyPort: true } },
