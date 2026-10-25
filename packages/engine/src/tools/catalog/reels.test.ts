@@ -99,8 +99,9 @@ describe("build_reel_tool", () => {
     expect(project.clips.filter((c) => c.layer === data.tracks.titles)).toHaveLength(2);
     expect(project.clips.filter((c) => c.layer === data.tracks.flash).length).toBeGreaterThan(1);
     expect([...host.written.keys()]).toEqual(expect.arrayContaining(["/generated/reel-hook.svg", "/generated/reel-end.svg", "/generated/reel-flash.svg"]));
-    // Looks on every shot.
+    // Looks on every shot; landscape footage fills the vertical frame (crop, not letterbox).
     for (const clip of video) expect((clip.effects as unknown[]).length).toBeGreaterThanOrEqual(2);
+    for (const clip of video) expect(clip.scale).toBe(0);
     expect(doc.undoLabels).toEqual(["Build hype montage reel"]);
     doc.undo();
     expect(doc.project.clips).toHaveLength(0);
