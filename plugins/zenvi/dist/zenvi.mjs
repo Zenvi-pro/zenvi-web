@@ -32657,6 +32657,9 @@ function features(words3) {
   }
   return { labels, values };
 }
+function distinctLabels(labels, count2) {
+  return [...new Set(labels.slice(0, count2).map(clean).filter(Boolean))];
+}
 function storyboard(input4) {
   const media = input4.media;
   const ids2 = media.map((m) => m.fileId);
@@ -32669,7 +32672,7 @@ function storyboard(input4) {
   const bg = (palette, variant, extra = {}) => ({ template: "grid_background", palette, content: { variant, ...extra } });
   switch (input4.style) {
     case "ui_promo": {
-      const suggestions = ids2.slice(0, 3).map((_, k) => clean(labels[k])).filter(Boolean);
+      const suggestions = distinctLabels(labels, ids2.length).slice(0, 3);
       drafts.push({
         name: "search",
         min: 1,
@@ -32757,13 +32760,18 @@ function storyboard(input4) {
     case "tutorial": {
       const title = hook || "How to do it";
       drafts.push({ name: "hook", min: 1, pref: 1, optional: false, templates: [bg("tutorial", "paper"), { template: "kinetic_type", palette: "tutorial", content: { text: title, highlight: Math.max(0, title.split(" ").length - 1), align: "center" } }] });
-      ids2.slice(0, 5).forEach((id, i) => {
+      const steps = [];
+      ids2.forEach((id, i) => {
+        const label2 = clean(labels[i]);
+        if (!label2 || label2 !== steps[steps.length - 1]?.label) steps.push({ id, label: label2 });
+      });
+      steps.slice(0, 5).forEach((step, i) => {
         drafts.push({
           name: `step-${i + 1}`,
           min: 1,
           pref: 2,
           optional: i >= 2,
-          templates: [bg("tutorial", "paper"), { template: "step_card", palette: "tutorial", content: { fileIds: [id], step: i + 1, text: clean(labels[i]) || `Step ${i + 1}`, ...words3[i] ? { tag: words3[i] } : {}, subtitle: title } }]
+          templates: [bg("tutorial", "paper"), { template: "step_card", palette: "tutorial", content: { fileIds: [step.id], step: i + 1, text: step.label || `Step ${i + 1}`, ...words3[i] ? { tag: words3[i] } : {}, subtitle: title } }]
         });
       });
       drafts.push({ name: "save", min: 1, pref: 2, optional: false, templates: [bg("tutorial", "paper"), { template: "end_card", palette: "tutorial", content: { variant: "save", text: end || "Save this", ...sub ? { subtitle: sub } : { subtitle: "for later" }, backdrop: false } }] });
@@ -32816,7 +32824,7 @@ var init_styles2 = __esm({
       tutorial: {
         id: "tutorial",
         name: "Tutorial cards",
-        summary: "A how-to in steps (9:16 first): the hook on grid paper, then one step per clip (the footage in a bordered card, a numbered caption from `labels`, a label box with an arrow from `words`), ending on 'Save this'.",
+        summary: "A how-to in steps (9:16 first): the hook on grid paper, then one step per label (the footage in a bordered card, a numbered caption from `labels`, a label box with an arrow from `words`, one word per step; clips that share a label are one step), ending on 'Save this'.",
         defaultSeconds: 20,
         defaultBpm: 100,
         media: 4,
@@ -37114,7 +37122,7 @@ function sharedFontIndex() {
   return shared;
 }
 async function installedFontFamilies() {
-  return (await sharedFontIndex()).familyNames();
+  return (await sharedFontIndex()).renderableFamilyNames();
 }
 function readFontFile(file3) {
   let hit = bufferCache.get(file3);
@@ -37169,7 +37177,7 @@ function resolveFonts(index, familyLists) {
   if (files.size === 0) use("lato");
   return { files: [...files], fallbackFor, sansSerif, serif, monospace };
 }
-var CACHE_VERSION, FONT_EXTS, MAX_FONT_BYTES, FontIndex, shared, bufferCache, GENERIC_FAMILIES, ALIASES4, DEFAULT_SANS, DEFAULT_SERIF, DEFAULT_MONO;
+var CACHE_VERSION, FONT_EXTS, MAX_FONT_BYTES, FontIndex, shared, bufferCache, GENERIC_FAMILIES, METRIC_TWINS, ALIASES4, DEFAULT_SANS, DEFAULT_SERIF, DEFAULT_MONO;
 var init_fonts = __esm({
   "../render-node/src/svg/fonts.ts"() {
     "use strict";
@@ -37202,6 +37210,14 @@ var init_fonts = __esm({
        */
       familyNames() {
         return [...this.spelling.values()].filter((name) => !name.startsWith(".")).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+      }
+      /** `familyNames`, plus the fonts an installed metric twin draws in their place ("Arial" when Liberation Sans is here). */
+      renderableFamilyNames() {
+        const names2 = new Set(this.familyNames());
+        for (const [name, twins] of Object.entries(METRIC_TWINS)) {
+          if (!this.has(name) && twins.some((twin) => this.has(twin))) names2.add(name);
+        }
+        return [...names2].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
       }
       /**
        * Index the fonts in `dirs`. Family names are cached on disk by
@@ -37245,6 +37261,14 @@ var init_fonts = __esm({
     };
     bufferCache = /* @__PURE__ */ new Map();
     GENERIC_FAMILIES = /* @__PURE__ */ new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy"]);
+    METRIC_TWINS = {
+      Arial: ["liberation sans", "arimo"],
+      Helvetica: ["liberation sans", "arimo"],
+      "Times New Roman": ["liberation serif", "tinos"],
+      Times: ["liberation serif", "tinos"],
+      "Courier New": ["liberation mono", "cousine"],
+      Courier: ["liberation mono", "cousine"]
+    };
     ALIASES4 = {
       "dejavu sans": ["verdana", "bitstream vera sans"],
       "bitstream vera sans": ["dejavu sans", "verdana"],
@@ -46253,7 +46277,7 @@ function lutStage(image, ctx, path42, intensity) {
   const lut = lutForPath(ctx, path42);
   if (lut) applyCubeLut(image, lut, intensity, 1, 1, 1);
 }
-var f329, INV_2553, EPSILON2, LUMA_R, LUMA_G, LUMA_B, TINT_G, TINT_RB, RECOVERY, INV_ALPHA3, EXP2_TABLE, EXP2_C0, EXP2_C1, EXP2_SHIFT, exp2Bits, NAMED_COLORS, namedColors, WHITE, NO_BIAS, identityTable, colorGrade;
+var f329, INV_2553, EPSILON2, LUMA_R, LUMA_G, LUMA_B, TINT_G, TINT_RB, RECOVERY, MEMO_BITS, INV_ALPHA3, EXP2_TABLE, EXP2_C0, EXP2_C1, EXP2_SHIFT, exp2Bits, NAMED_COLORS, namedColors, WHITE, NO_BIAS, identityTable, colorGrade;
 var init_color_grade = __esm({
   "../engine/src/render/kernels/color-grade.ts"() {
     "use strict";
@@ -46270,6 +46294,7 @@ var init_color_grade = __esm({
     TINT_G = f329(0.1);
     TINT_RB = f329(0.05);
     RECOVERY = f329(0.35);
+    MEMO_BITS = 16;
     INV_ALPHA3 = (() => {
       const t = new Float32Array(256);
       for (let i = 1; i < 256; i += 1) t[i] = f329(255 / i);
@@ -46444,13 +46469,26 @@ var init_color_grade = __esm({
         const [hR, hG, hB] = useWheels ? wheelBias(record3(wheels, "highlights")) : NO_BIAS;
         const minusTint = -tint2;
         const d = image.data;
+        const memoRgb = new Int32Array(1 << MEMO_BITS).fill(-1);
+        const memoOut = new Int32Array(1 << MEMO_BITS);
         for (let i = 0; i < d.length; i += 4) {
           const A = d[i + 3];
           if (A === 0) continue;
           let R;
           let G;
           let B;
+          let rgb = -1;
+          let slot = 0;
           if (A === 255) {
+            rgb = d[i] << 16 | d[i + 1] << 8 | d[i + 2];
+            slot = Math.imul(rgb, 2654435761) >>> 32 - MEMO_BITS;
+            if (memoRgb[slot] === rgb) {
+              const out = memoOut[slot];
+              d[i] = out >>> 16;
+              d[i + 1] = out >>> 8 & 255;
+              d[i + 2] = out & 255;
+              continue;
+            }
             R = f329(d[i] * INV_2553);
             G = f329(d[i + 1] * INV_2553);
             B = f329(d[i + 2] * INV_2553);
@@ -46525,9 +46563,14 @@ var init_color_grade = __esm({
           G = clamp012(fmaf3(origG, inverseMix, f329(G * mix2)));
           B = clamp012(fmaf3(origB, inverseMix, f329(B * mix2)));
           if (A === 255) {
-            d[i] = clampByte2(f329(R * 255));
-            d[i + 1] = clampByte2(f329(G * 255));
-            d[i + 2] = clampByte2(f329(B * 255));
+            const r8 = clampByte2(f329(R * 255));
+            const g8 = clampByte2(f329(G * 255));
+            const b8 = clampByte2(f329(B * 255));
+            d[i] = r8;
+            d[i + 1] = g8;
+            d[i + 2] = b8;
+            memoRgb[slot] = rgb;
+            memoOut[slot] = r8 << 16 | g8 << 8 | b8;
           } else {
             const ap = f329(A * INV_2553);
             d[i] = clampByte2(f329(f329(R * 255) * ap));
@@ -47123,7 +47166,35 @@ var init_film_grain = __esm({
         }
         const scaleX = width > 0 ? f3213(refW / width) : 1;
         const scaleY = height > 0 ? f3213(refH / height) : 1;
-        const fineCache = new Float32Array(8);
+        if (width === 0 || height === 0) return;
+        const fineIxOf = new Int32Array(width);
+        const softIxOf = new Int32Array(width);
+        const softSxOf = new Float32Array(width);
+        const clumpIxOf = new Int32Array(width);
+        const clumpSxOf = new Float32Array(width);
+        for (let x = 0; x < width; x += 1) {
+          const refX = f3213(x * scaleX);
+          fineIxOf[x] = Math.trunc(f3213(refX * fineFrequency));
+          if (useSoft) {
+            const srx = f3213(refX * softFrequency);
+            softIxOf[x] = Math.trunc(srx);
+            softSxOf[x] = smooth(f3213(srx - softIxOf[x]));
+          }
+          if (useClump) {
+            const crx = f3213(refX * clumpFrequency);
+            clumpIxOf[x] = Math.trunc(crx);
+            clumpSxOf[x] = smooth(f3213(crx - clumpIxOf[x]));
+          }
+        }
+        const lastX = width - 1;
+        const fineNoise = new Float32Array((fineIxOf[lastX] + 1) * 8);
+        const fineStamp = new Int32Array(fineIxOf[lastX] + 1).fill(-1);
+        const softTop = new Float32Array((softIxOf[lastX] + 2) * 8);
+        const softBottom = new Float32Array((softIxOf[lastX] + 2) * 8);
+        const softStamp = new Int32Array(softIxOf[lastX] + 2).fill(-1);
+        const clumpTop = new Float32Array((clumpIxOf[lastX] + 2) * 4);
+        const clumpBottom = new Float32Array((clumpIxOf[lastX] + 2) * 4);
+        const clumpStamp = new Int32Array(clumpIxOf[lastX] + 2).fill(-1);
         const softCol0 = new Float32Array(8);
         const softCol1 = new Float32Array(8);
         const clumpCol0 = new Float32Array(4);
@@ -47148,6 +47219,7 @@ var init_film_grain = __esm({
             clumpSy = smooth(f3213(cry - clumpIy0));
           }
           let cachedFineIx = -1;
+          let fineAt = 0;
           let cachedSoftIx0 = -1;
           let cachedClumpIx0 = -1;
           for (let x = 0; x < width; x += 1) {
@@ -47173,61 +47245,81 @@ var init_film_grain = __esm({
             const midtone = clamp014(f3213(1 - centered * centered));
             const tone = fmaf4(f3213(L * L), highlightStrength, fmaf4(f3213(dark * dark), shadowStrength, f3213(midtoneStrength * midtone)));
             if (tone <= EPSILON3) continue;
-            const refX = f3213(x * scaleX);
-            const fineIx = Math.trunc(f3213(refX * fineFrequency));
+            const fineIx = fineIxOf[x];
             if (fineIx !== cachedFineIx) {
               cachedFineIx = fineIx;
-              for (let t = 0; t < numTimes; t += 1) {
-                for (let s = 0; s < numSalts; s += 1) fineCache[t * 4 + s] = hashSigned(baseSeed, fineIx, fineIy, buckets[t], SALTS[s]);
+              fineAt = fineIx * 8;
+              if (fineStamp[fineIx] !== fineIy) {
+                fineStamp[fineIx] = fineIy;
+                for (let t = 0; t < numTimes; t += 1) {
+                  for (let s = 0; s < numSalts; s += 1) fineNoise[fineAt + t * 4 + s] = hashSigned(baseSeed, fineIx, fineIy, buckets[t], SALTS[s]);
+                }
               }
             }
             let softSx = 0;
             if (useSoft) {
-              const srx = f3213(refX * softFrequency);
-              const softIx0 = Math.trunc(srx);
+              const softIx0 = softIxOf[x];
               if (softIx0 !== cachedSoftIx0) {
                 cachedSoftIx0 = softIx0;
+                for (let c = softIx0; c <= softIx0 + 1; c += 1) {
+                  if (softStamp[c] === softIy0) continue;
+                  softStamp[c] = softIy0;
+                  for (let t = 0; t < numTimes; t += 1) {
+                    for (let s = 0; s < numSalts; s += 1) {
+                      const salt = (SALTS[s] ^ SOFT_XOR) >>> 0;
+                      softTop[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0, buckets[t], salt);
+                      softBottom[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0 + 1, buckets[t], salt);
+                    }
+                  }
+                }
+                const at0 = softIx0 * 8;
+                const at1 = at0 + 8;
                 for (let t = 0; t < numTimes; t += 1) {
                   for (let s = 0; s < numSalts; s += 1) {
-                    const salt = (SALTS[s] ^ SOFT_XOR) >>> 0;
-                    const n00 = hashSigned(baseSeed, softIx0, softIy0, buckets[t], salt);
-                    const n10 = hashSigned(baseSeed, softIx0 + 1, softIy0, buckets[t], salt);
-                    const n01 = hashSigned(baseSeed, softIx0, softIy0 + 1, buckets[t], salt);
-                    const n11 = hashSigned(baseSeed, softIx0 + 1, softIy0 + 1, buckets[t], salt);
-                    softCol0[t * 4 + s] = fmaf4(f3213(n01 - n00), softSy, n00);
-                    softCol1[t * 4 + s] = fmaf4(f3213(n11 - n10), softSy, n10);
+                    const k = t * 4 + s;
+                    const n00 = softTop[at0 + k];
+                    const n10 = softTop[at1 + k];
+                    softCol0[k] = fmaf4(f3213(softBottom[at0 + k] - n00), softSy, n00);
+                    softCol1[k] = fmaf4(f3213(softBottom[at1 + k] - n10), softSy, n10);
                   }
                 }
               }
-              softSx = smooth(f3213(srx - cachedSoftIx0));
+              softSx = softSxOf[x];
             }
             let clumpSx = 0;
             if (useClump) {
-              const crx = f3213(refX * clumpFrequency);
-              const clumpIx0 = Math.trunc(crx);
+              const clumpIx0 = clumpIxOf[x];
               if (clumpIx0 !== cachedClumpIx0) {
                 cachedClumpIx0 = clumpIx0;
+                for (let c = clumpIx0; c <= clumpIx0 + 1; c += 1) {
+                  if (clumpStamp[c] === clumpIy0) continue;
+                  clumpStamp[c] = clumpIy0;
+                  for (let s = 0; s < numSalts; s += 1) {
+                    const salt = (SALTS[s] ^ CLUMP_XOR) >>> 0;
+                    clumpTop[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0, time0, salt);
+                    clumpBottom[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0 + 1, time0, salt);
+                  }
+                }
+                const at0 = clumpIx0 * 4;
+                const at1 = at0 + 4;
                 for (let s = 0; s < numSalts; s += 1) {
-                  const salt = (SALTS[s] ^ CLUMP_XOR) >>> 0;
-                  const n00 = hashSigned(baseSeed, clumpIx0, clumpIy0, time0, salt);
-                  const n10 = hashSigned(baseSeed, clumpIx0 + 1, clumpIy0, time0, salt);
-                  const n01 = hashSigned(baseSeed, clumpIx0, clumpIy0 + 1, time0, salt);
-                  const n11 = hashSigned(baseSeed, clumpIx0 + 1, clumpIy0 + 1, time0, salt);
-                  clumpCol0[s] = fmaf4(f3213(n01 - n00), clumpSy, n00);
-                  clumpCol1[s] = fmaf4(f3213(n11 - n10), clumpSy, n10);
+                  const n00 = clumpTop[at0 + s];
+                  const n10 = clumpTop[at1 + s];
+                  clumpCol0[s] = fmaf4(f3213(clumpBottom[at0 + s] - n00), clumpSy, n00);
+                  clumpCol1[s] = fmaf4(f3213(clumpBottom[at1 + s] - n10), clumpSy, n10);
                 }
               }
-              clumpSx = smooth(f3213(crx - cachedClumpIx0));
+              clumpSx = clumpSxOf[x];
             }
             for (let s = 0; s < numSalts; s += 1) {
-              let g0 = fineCache[s];
+              let g0 = fineNoise[fineAt + s];
               if (useSoft) {
                 const soft0 = fmaf4(f3213(softCol1[s] - softCol0[s]), softSx, softCol0[s]);
                 g0 = fmaf4(f3213(soft0 - g0), softness, g0);
               }
               let grain = g0;
               if (useTemporal) {
-                let g1 = fineCache[4 + s];
+                let g1 = fineNoise[fineAt + 4 + s];
                 if (useSoft) {
                   const soft1 = fmaf4(f3213(softCol1[4 + s] - softCol0[4 + s]), softSx, softCol0[4 + s]);
                   g1 = fmaf4(f3213(soft1 - g1), softness, g1);
