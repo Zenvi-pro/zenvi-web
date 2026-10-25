@@ -20,6 +20,7 @@ import { captionTools } from "./catalog/captions.js";
 import { clipPropsTools } from "./catalog/clip-props.js";
 import { clipTools } from "./catalog/clips.js";
 import { colorAgentTools } from "./catalog/color-agent.js";
+import { comfyuiRecordingTools } from "./catalog/comfyui-recording.js";
 import { directTools } from "./catalog/direct.js";
 import { effectsColorTools } from "./catalog/effects-color.js";
 import { effectsColorAnalysisTools } from "./catalog/effects-color-analysis.js";
@@ -45,6 +46,7 @@ import { tracksNavTools } from "./catalog/tracks-nav.js";
 import { titleTemplateTools } from "./catalog/title-templates.js";
 import { titleTools } from "./catalog/titles.js";
 import { transitionTools } from "./catalog/transitions.js";
+import { webVideoTools } from "./catalog/web-video.js";
 import { missingCapabilities, resultFor, type CatalogTool } from "./define.js";
 import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_TOOLS } from "./pending.js";
 import { failed, refused, type ToolReceipt } from "./receipt.js";
@@ -74,6 +76,8 @@ function buildCatalog(): readonly CatalogTool[] {
     ...inspectTools,
     ...speechTools,
     ...generationTools,
+    ...webVideoTools,
+    ...comfyuiRecordingTools,
     ...transitionTools,
     ...titleTools,
     ...titleTemplateTools,

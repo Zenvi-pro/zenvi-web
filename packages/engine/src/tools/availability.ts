@@ -27,6 +27,7 @@ export type HostMethod =
   | "media.importUrl"
   | "media.pickFiles"
   | "media.writeGenerated"
+  | "media.fetchWebVideo"
   | "storage.open"
   | "storage.readText"
   | "storage.writeText"
@@ -58,6 +59,8 @@ const WATCH = ["frames", "backend"] as (HostCapability | HostMethod)[];
 const SERVER_ASR =
   "speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free";
 const WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
+/** The desktop's ComfyUI integration: a server on the person's computer, set in its preferences. */
+const COMFYUI = "the local ComfyUI server Zenvi desktop drives (Preferences > AI > ComfyUI URL)";
 
 /** Run-time needs beyond `requires`, per tool. */
 export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
@@ -81,6 +84,9 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   fetch_motion_graphics_video_tool: { methods: ["media.importUrl"] },
   fetch_remotion_video_from_supabase_tool: { methods: ["media.importUrl"] },
   generate_video_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
+  generate_image_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
+  // Hosted surfaces do not download third-party pages (terms of service, blocked server addresses): only the person's own computer does.
+  ingest_web_video_tool: { methods: ["media.fetchWebVideo"] },
   generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
   add_title_tool: { methods: ["media.writeGenerated"] },
   add_captions_tool: {
@@ -158,6 +164,12 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   modify_clip_tool: { desktopOnly: "the desktop's ffmpeg cut, upload and splice pipeline" },
   generate_transition_clip_tool: { desktopOnly: "the desktop's ffmpeg pipeline (clip A + AI morph + clip B)" },
   suggest_motion_graphics_placements_tool: { desktopOnly: "deprecated on the desktop too; use propose_overlay_windows_tool" },
+  list_comfyui_templates_tool: { desktopOnly: COMFYUI },
+  list_comfyui_jobs_tool: { desktopOnly: COMFYUI },
+  create_media_with_comfyui_tool: { desktopOnly: COMFYUI },
+  enhance_file_with_comfyui_tool: { desktopOnly: COMFYUI },
+  cancel_comfyui_job_tool: { desktopOnly: COMFYUI },
+  prepare_recording_tool: { desktopOnly: "the Recording dock (microphone, screen and webcam capture)" },
 };
 
 export interface SurfaceProfile {
@@ -166,8 +178,8 @@ export interface SurfaceProfile {
   host: string;
   capabilities: readonly HostCapability[];
   methods: readonly HostMethod[];
-  /** Capabilities present only in some sessions (signed in, browser support). */
-  conditional?: Partial<Record<HostCapability, string>>;
+  /** Capabilities and methods present only in some sessions (signed in, browser support, an installed program). */
+  conditional?: Partial<Record<HostCapability | HostMethod, string>>;
   /** Tools the surface does not expose at all. */
   hidden?: readonly string[];
 }
@@ -203,13 +215,14 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.listPaths",
       "media.importUrl",
       "media.writeGenerated",
+      "media.fetchWebVideo",
       "storage.open",
       "storage.readText",
       "storage.writeText",
       "audio.decodePcm",
       "audio.transcribe",
     ],
-    conditional: { backend: "signed in with zenvi login" },
+    conditional: { backend: "signed in with zenvi login", "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks" },
   },
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
@@ -263,6 +276,7 @@ function needName(need: HostCapability | HostMethod): string {
     "media.importUrl": "URL downloads",
     "media.pickFiles": "a file picker",
     "media.writeGenerated": "storing generated media",
+    "media.fetchWebVideo": "fetching videos from web pages, which only runs on the person's own computer (the zenvi CLI with yt-dlp)",
     "storage.open": "opening project files",
     "storage.readText": "reading files",
     "storage.writeText": "writing files",
@@ -288,7 +302,7 @@ function onSurface(tool: CatalogTool, surface: Exclude<AvailabilitySurface, "des
   const missing = [...(tool.requires ?? []), ...(needs.methods ?? [])].filter((n) => !has(profile, n));
   if (needs.anyOf && !needs.anyOf.some((n) => has(profile, n))) missing.push(...needs.anyOf);
   if (missing.length > 0) return { level: "no", note: `needs ${[...new Set(missing)].map(needName).join(" and ")}` };
-  const conditions = [...(tool.requires ?? [])].map((cap) => profile.conditional?.[cap]).filter((c): c is string => Boolean(c));
+  const conditions = [...(tool.requires ?? []), ...(needs.methods ?? [])].map((need) => profile.conditional?.[need]).filter((c): c is string => Boolean(c));
   const lacking = (needs.optional ?? []).filter((n) => !has(profile, n));
   const pendingArgs = tool.contract ? (PENDING_DESKTOP_ARGS[tool.name as ContractToolName] ?? []) : [];
   const notes = [
