@@ -10,6 +10,11 @@
  *   ZENVI_BACKEND_SERVICE_SECRET=… AZURE_STORAGE_CONNECTION_STRING=… USER_ID=<supabase user id> \
  *   npx tsx packages/cloud/scripts/reel-live.ts <specs.json> <out dir> [height]
  *
+ * Remote mode drives a deployed Zenvi Cloud over HTTPS instead (its network,
+ * its renderer), the way ChatGPT does:
+ *
+ *   ZENVI_CLOUD_URL=https://… ZENVI_TOKEN=zvn_pat_… npx tsx packages/cloud/scripts/reel-live.ts <specs.json> <out dir> [height]
+ *
  * specs.json: [{ "file": "coffee", "prompt": "…", "style": "hype", "stock_queries": [...], "music_query": "…", "hook": "…", "end_card": "…" }]
  */
 
@@ -34,14 +39,27 @@ interface Spec extends Record<string, unknown> {
 
 async function main(): Promise<void> {
   const [specPath, outDir, heightArg] = process.argv.slice(2);
+  if (!specPath || !outDir) throw new Error("usage: reel-live.ts <specs.json> <out dir> [height] (see the header for the environment)");
+  const specs = JSON.parse(readFileSync(specPath, "utf8")) as Spec[];
+  mkdirSync(outDir, { recursive: true });
+  const client = process.env.ZENVI_CLOUD_URL ? await remoteClient(process.env.ZENVI_CLOUD_URL, process.env.ZENVI_TOKEN ?? "") : await localClient();
+  await runSpecs(client, specs, outDir, Number(heightArg) || 1280);
+}
+
+/** A deployed Zenvi Cloud's /mcp with a personal access token. */
+async function remoteClient(base: string, token: string): Promise<Client> {
+  if (!token.startsWith("zvn_")) throw new Error("ZENVI_TOKEN must be a Zenvi personal access token (zvn_pat_…)");
+  const client = new Client({ name: "reel-live", version: "1" });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${base.replace(/\/+$/, "")}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
+  return client;
+}
+
+/** Zenvi Cloud in this process: real backend and blobs, tokens in memory. */
+async function localClient(): Promise<Client> {
   const secret = process.env.ZENVI_BACKEND_SERVICE_SECRET;
   const connection = process.env.AZURE_STORAGE_CONNECTION_STRING;
   const userId = process.env.USER_ID;
-  if (!specPath || !outDir || !secret || !connection || !userId) {
-    throw new Error("usage: ZENVI_BACKEND_SERVICE_SECRET=… AZURE_STORAGE_CONNECTION_STRING=… USER_ID=… reel-live.ts <specs.json> <out dir> [height]");
-  }
-  const specs = JSON.parse(readFileSync(specPath, "utf8")) as Spec[];
-  mkdirSync(outDir, { recursive: true });
+  if (!secret || !connection || !userId) throw new Error("local mode needs ZENVI_BACKEND_SERVICE_SECRET, AZURE_STORAGE_CONNECTION_STRING and USER_ID");
 
   const config = loadConfig({
     STORAGE: "memory",
@@ -75,7 +93,12 @@ async function main(): Promise<void> {
       fetch: async (url, init) => app.request(url.toString(), init),
     }),
   );
-  const call = async (name: string, args: Record<string, unknown>): Promise<CallResult> => (await client.callTool({ name, arguments: args })) as CallResult;
+  return client;
+}
+
+async function runSpecs(client: Client, specs: Spec[], outDir: string, height: number): Promise<void> {
+  const call = async (name: string, args: Record<string, unknown>): Promise<CallResult> =>
+    (await client.callTool({ name, arguments: args }, undefined, { timeout: 120_000 })) as CallResult;
 
   const summary: Record<string, unknown>[] = [];
   for (const spec of specs) {
@@ -91,7 +114,6 @@ async function main(): Promise<void> {
     }
     console.log(made.content[0]?.text);
     const data = made.structuredContent as { project_id: string; duration_seconds: number; shots: number; bpm: number };
-    const height = Number(heightArg) || 1280;
     const render = await call("render_project", { project_id: data.project_id, height, quality: "medium" });
     if (render.isError) {
       console.log(`FAILED render_project: ${render.content[0]?.text}`);
@@ -123,7 +145,6 @@ async function main(): Promise<void> {
   }
   writeFileSync(path.join(outDir, "summary.json"), JSON.stringify(summary, null, 2));
   await client.close();
-  await services.renders.drain?.();
   process.exit(summary.every((s) => s.ok) ? 0 : 1);
 }
 
