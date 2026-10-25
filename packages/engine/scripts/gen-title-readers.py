@@ -14,7 +14,7 @@ Writes
     src/windows/title_editor.py `detect_font`, `update_font_color_button`
     (with `get_ref_color`) and `update_background_color_button` read from
     every desktop title template plus edge-case SVGs. The methods run
-    unmodified (extracted from the source at origin/develop) against real
+    unmodified (extracted from the source at origin/main) against real
     QColor and xml.dom.minidom; QFont is a recorder whose `exactMatch()` is
     true, so the result is the font the template asks for.
 """
@@ -36,11 +36,11 @@ REPO = os.environ.get("ZENVI_DESKTOP_REPO", os.path.expanduser("~/Projects/zenvi
 
 
 def show(path):
-    return subprocess.check_output(["git", "-C", REPO, "show", f"origin/develop:{path}"]).decode("utf-8")
+    return subprocess.check_output(["git", "-C", REPO, "show", f"origin/main:{path}"]).decode("utf-8")
 
 
 def ls(path):
-    out = subprocess.check_output(["git", "-C", REPO, "ls-tree", "--name-only", f"origin/develop:{path}"])
+    out = subprocess.check_output(["git", "-C", REPO, "ls-tree", "--name-only", f"origin/main:{path}"])
     return out.decode("utf-8").split()
 
 

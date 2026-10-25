@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate src/titles/animated-templates.data.ts from zenvi-core's Blender titles.
 
-Dev-time only. Reads src/blender/*.xml at origin/develop (the 19 templates of
+Dev-time only. Reads src/blender/*.xml at origin/main (the 19 templates of
 Title > Animated Title) the way zenvi-core's classes/blender_titles.py does
 (`template_summary`, `animation_details`), so add_animated_title_tool takes the
 same template names, parameters, defaults, ranges and choices as the desktop.
@@ -17,7 +17,7 @@ from xml.dom import minidom
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "src", "titles", "animated-templates.data.ts")
 REPO = os.environ.get("ZENVI_DESKTOP_REPO", os.path.expanduser("~/Projects/zenvi"))
-REF = os.environ.get("ZENVI_DESKTOP_REF", "origin/develop")
+REF = os.environ.get("ZENVI_DESKTOP_REF", "origin/main")
 
 
 def git(*args):

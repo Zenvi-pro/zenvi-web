@@ -2,7 +2,7 @@
 """Run the desktop's own project load code on synthetic inputs.
 
 Dev-time only. Records input/output pairs for src/io/*.test.ts from
-zenvi-core at origin/develop:
+zenvi-core at origin/main:
 
 - `ProjectDataStore.upgrade_project_data_structures` and its helpers
   (src/classes/project_data.py, extracted with `ast`, plus the pure
@@ -34,7 +34,7 @@ import openshot
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "src", "io", "__fixtures__", "desktop-upgrades.json")
 REPO = os.environ.get("ZENVI_DESKTOP_REPO", os.path.expanduser("~/Projects/zenvi"))
-REF = os.environ.get("ZENVI_DESKTOP_REF", "origin/develop")
+REF = os.environ.get("ZENVI_DESKTOP_REF", "origin/main")
 
 METHODS = [
     "upgrade_project_data_structures",

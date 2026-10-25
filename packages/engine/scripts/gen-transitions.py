@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bundle zenvi-core's transition masks and generate the catalog table.
 
-Dev-time only. Reads src/transitions/{common,extra} at origin/develop
+Dev-time only. Reads src/transitions/{common,extra} at origin/main
 (412 files: 7 SVG + 405 JPG) and
 
 - records `openshot.QtImageReader(path).Json()` for every ORIGINAL mask, so
@@ -33,7 +33,7 @@ ENGINE = os.path.join(HERE, "..")
 ASSETS = os.path.join(ENGINE, "assets", "transitions")
 OUT = os.path.join(ENGINE, "src", "transitions", "catalog.data.ts")
 REPO = os.environ.get("ZENVI_DESKTOP_REPO", os.path.expanduser("~/Projects/zenvi"))
-REF = os.environ.get("ZENVI_DESKTOP_REF", "origin/develop")
+REF = os.environ.get("ZENVI_DESKTOP_REF", "origin/main")
 CATEGORIES = ("common", "extra")
 MAX_SIZE = 512
 # Per-file fields of the reader JSON; everything else is the same for every mask.
