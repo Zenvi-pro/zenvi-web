@@ -63,6 +63,12 @@ export type AudioAnalyzer = (
   options?: { sampleRate?: number; frameSize?: number; signal?: AbortSignal },
 ) => Promise<AudioEnvelope>;
 
+/** Mono float PCM of a local file's audio (`@zenvi/render-node` `decodePcm`), for beat tracking. */
+export type PcmDecoder = (
+  filePath: string,
+  options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
+) => Promise<{ sampleRate: number; samples: Float32Array }>;
+
 export class RendererUnavailableError extends Error {
   constructor(what = "renderer") {
     super(`${what} not available: this Zenvi Cloud build has no video ${what} yet`);

@@ -11,6 +11,7 @@
  */
 
 import type { Project } from "../model/types.js";
+import type { FreesoundSound, PexelsVideo } from "../stock/stock.js";
 import type { ToolCall } from "./define.js";
 import { getIndexBlock, isIndexed } from "./ai-metadata.js";
 import type { TimelineClipContext } from "./clip-context.js";
@@ -172,6 +173,28 @@ export async function generateTts(
   if (!res.ok) return { error: res.error };
   if (!res.data.success) return { error: String(res.data.error || "TTS generation failed") };
   return { audioBase64: String(res.data.audio_base64 ?? "") };
+}
+
+/** GET /api/v1/pexels/search: Pexels videos for a query (the backend holds the API key). */
+export async function searchPexelsVideos(call: ToolCall, search: string, perPage: number): Promise<{ videos: PexelsVideo[]; total: number } | { error: string }> {
+  const res = await backendRequest<Record<string, unknown>>(call.host.backend, `/api/v1/pexels/search${query({ query: search, per_page: perPage, page: 1 })}`, { signal: call.signal });
+  if (!res.ok) return { error: res.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  const videos = Array.isArray(res.data.videos) ? (res.data.videos.filter(isRecord) as unknown as PexelsVideo[]) : [];
+  return { videos, total: Number(res.data.total_results ?? videos.length) || videos.length };
+}
+
+/** GET /api/v1/freesound/search: Freesound sounds for a query, at least `minSeconds` long. */
+export async function searchFreesound(call: ToolCall, search: string, pageSize: number, minSeconds: number): Promise<{ sounds: FreesoundSound[]; total: number } | { error: string }> {
+  const res = await backendRequest<Record<string, unknown>>(
+    call.host.backend,
+    `/api/v1/freesound/search${query({ query: search, page_size: pageSize, min_duration: minSeconds > 0 ? Math.round(minSeconds) : undefined })}`,
+    { signal: call.signal },
+  );
+  if (!res.ok) return { error: res.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  const sounds = Array.isArray(res.data.sounds) ? (res.data.sounds.filter(isRecord) as unknown as FreesoundSound[]) : [];
+  return { sounds, total: Number(res.data.count ?? sounds.length) || sounds.length };
 }
 
 /** The HD file of a Pexels video, else its first file (api_client.pick_pexels_hd_link). */

@@ -23,6 +23,8 @@ export interface Limits {
   verifyHashMaxBytes: number;
   /** Total media a single render may download, bytes. */
   maxRenderMediaBytes: number;
+  /** How long create_reel waits for downloads before cutting with what arrived, ms. */
+  reelFetchDeadlineMs: number;
   /** On-disk cache of media for frame previews, bytes. */
   mediaCacheBytes: number;
 }
@@ -167,6 +169,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       verifyHashMaxBytes: bytes(env.VERIFY_HASH_MAX_BYTES, 64 * MiB),
       // The container has 4 GiB of ephemeral disk: renders + cache + imports must fit.
       maxRenderMediaBytes: bytes(env.MAX_RENDER_MEDIA_BYTES, 2 * GiB),
+      // A chat gives a tool call about a minute; the rest of create_reel needs ~10 s.
+      reelFetchDeadlineMs: Math.min(45_000, Math.max(5_000, Number(env.REEL_FETCH_DEADLINE_MS) || 32_000)),
       mediaCacheBytes: bytes(env.MEDIA_CACHE_BYTES, 512 * MiB),
     },
     tokens: {

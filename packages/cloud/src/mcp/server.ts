@@ -18,6 +18,7 @@ import type { Services } from "../container.js";
 import { cloudTools } from "./cloud-tools.js";
 import { engineTools } from "./engine.js";
 import { cloudCapabilities } from "./host.js";
+import { reelTools } from "./reels.js";
 import { errorResult } from "./results.js";
 import type { McpCallContext, McpTool } from "./types.js";
 import { EDITOR_WIDGET_HTML, EDITOR_WIDGET_MIME, EDITOR_WIDGET_URI, editorWidgetResourceMeta } from "./editor-widget.js";
@@ -32,10 +33,11 @@ const RESOURCE_NOT_FOUND = -32002;
 export function buildToolList(services: Services): McpTool[] {
   const cloud = cloudTools({ backend: services.backendSessions.enabled });
   if (!services.engine) return cloud;
-  const reserved = new Set(cloud.map((tool) => tool.name));
+  const reels = reelTools(services.engine, services.backendSessions.enabled, { fetchDeadlineMs: services.config.limits.reelFetchDeadlineMs });
+  const reserved = new Set([...cloud, ...reels].map((tool) => tool.name));
   const capabilities = cloudCapabilities(services);
   const engine = engineTools(services.engine, capabilities, reserved, (message) => services.log.warn(message));
-  return [...cloud, ...engine];
+  return [...cloud, ...reels, ...engine];
 }
 
 function descriptor(tool: McpTool): Record<string, unknown> {

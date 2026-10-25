@@ -68,7 +68,7 @@ export function EmbedLayout({ bridge, cloud, projectId }: { bridge: EmbedBridge;
         {full && wide ? (
           <>
             <div className="flex min-h-0 flex-1">
-              <LeftPanel width={panels.leftCollapsed ? 0 : panels.left} tabs={EMBED_TABS} />
+              <LeftPanel width={panels.leftCollapsed ? 0 : panels.left} tabs={EMBED_TABS} labeled />
               <PreviewPanel />
               {roomy ? <RightPanel width={panels.right} assistant={false} /> : null}
             </div>

@@ -22,6 +22,9 @@ const DIRECT_TOOLS = [
   "fade_clip_tool",
   "add_transition_tool",
   "probe_media_tool",
+  "build_reel_tool",
+  "search_pexels_videos_tool",
+  "search_freesound_music_tool",
 ];
 
 /** A valid string form of a scalar property, the way the Assistant backend sends arguments. */
@@ -155,7 +158,7 @@ describe("availability matrix", () => {
 
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
-      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage"],
+      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "audio"],
       cli: ["media", "exporter", "frames", "audio", "storage", "backend"],
       cloud: ["media", "frames", "storage", "assets", "audio", "backend"],
     };
