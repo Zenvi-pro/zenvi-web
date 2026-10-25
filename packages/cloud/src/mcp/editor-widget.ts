@@ -49,7 +49,7 @@ export function editorWidgetResourceMeta(embedOrigin: string): Record<string, un
     ui: { csp: { frameDomains: [embedOrigin], resourceDomains: [], connectDomains: [] }, prefersBorder: true },
     "openai/widgetDescription": "The Zenvi video editor with the project open: preview, timeline, titles, effects and transitions.",
     "openai/widgetPrefersBorder": true,
-    "openai/widgetCSP": { frame_domains: [embedOrigin], resource_domains: [], connect_domains: [], redirect_domains: ["https://zenvi.pro"] },
+    "openai/widgetCSP": { frame_domains: [embedOrigin], resource_domains: [], connect_domains: [], redirect_domains: ["https://zenvi.pro", embedOrigin] },
   };
 }
 
@@ -75,7 +75,8 @@ export const EDITOR_WIDGET_HTML = `<!doctype html>
   "use strict";
   var root = document.getElementById("root");
   var oa = window.openai;
-  var state = { editor: null, frame: null, origin: null, mode: "inline", theme: null, projectId: null, refreshing: false };
+  var state = { editor: null, frame: null, origin: null, mode: "inline", theme: null, projectId: null, refreshing: false, ready: false };
+  var READY_MS = 10000;
   var nextId = 1;
   var pending = {};
 
@@ -133,7 +134,7 @@ export const EDITOR_WIDGET_HTML = `<!doctype html>
     var editor = meta && meta["${EDITOR_META_KEY}"];
     return editor && typeof editor.url === "string" && typeof editor.token === "string" && /^https?:\\/\\//.test(editor.url) ? editor : null;
   }
-  function message(text, link) {
+  function message(text, link, label) {
     root.textContent = "";
     var card = document.createElement("div");
     card.className = "card";
@@ -143,11 +144,12 @@ export const EDITOR_WIDGET_HTML = `<!doctype html>
     card.appendChild(p);
     if (link) {
       var a = document.createElement("a");
-      a.href = link; a.textContent = "Open in Zenvi"; a.target = "_blank"; a.rel = "noopener";
+      a.href = link; a.textContent = label || "Open in Zenvi"; a.target = "_blank"; a.rel = "noopener";
       a.addEventListener("click", function (event) { event.preventDefault(); openLink(link); });
       card.appendChild(a);
     }
     root.appendChild(card);
+    state.frame = null;
   }
   function show(result) {
     if (!result) return;
@@ -174,7 +176,12 @@ export const EDITOR_WIDGET_HTML = `<!doctype html>
     root.textContent = "";
     root.appendChild(frame);
     state.frame = frame;
+    state.ready = false;
     size();
+    // A host that cannot frame the editor (no frame-domain support) leaves it blank: offer a tab instead.
+    setTimeout(function () {
+      if (state.frame === frame && !state.ready) message("The editor could not open inside this chat.", editor.url + "#" + hash, "Open the Zenvi editor");
+    }, READY_MS);
   }
   function refreshToken() {
     if (state.refreshing || !state.projectId) return;
@@ -200,6 +207,7 @@ export const EDITOR_WIDGET_HTML = `<!doctype html>
     if (state.frame && event.source === state.frame.contentWindow) {
       if (event.origin !== state.origin || !msg || typeof msg.type !== "string") return;
       if (msg.type === "zenvi:ready") {
+        state.ready = true;
         toFrame({ type: "zenvi:display-mode", mode: state.mode });
         if (state.theme) toFrame({ type: "zenvi:theme", theme: state.theme });
       } else if (msg.type === "zenvi:request-display-mode") requestMode(msg.mode === "fullscreen" ? "fullscreen" : "inline");

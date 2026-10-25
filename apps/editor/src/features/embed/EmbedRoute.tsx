@@ -61,11 +61,14 @@ export default function EmbedRoute() {
         cloud: () => cloud,
       });
       // Sizes for a chat panel, not this browser's remembered editor layout.
-      const wide = window.innerWidth >= 1180;
-      session.ui.setState({ panels: { left: 280, right: 300, timeline: 230, leftCollapsed: false, rightCollapsed: !wide } });
+      session.ui.setState({ panels: { left: 280, right: 300, timeline: 230, leftCollapsed: false, rightCollapsed: false } });
       document.title = `${opened.meta.name} · Zenvi`;
+      const live = session;
       stopFollowing = followRemote(session, cloud, projectId, {
-        onAdopted: () => toast.success("Updated from the chat", { duration: 2000 }),
+        onAdopted: () => {
+          toast.success("Updated from the chat", { duration: 2000 });
+          requestAnimationFrame(() => live.views.timeline?.zoomToFit());
+        },
       });
       setState({ kind: "ready", session });
     })().catch((error: unknown) => {

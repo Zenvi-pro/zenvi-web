@@ -48,6 +48,12 @@ export function EmbedLayout({ bridge, cloud, projectId }: { bridge: EmbedBridge;
     return () => window.removeEventListener("keydown", onKey);
   }, [commands, session]);
 
+  // A chat panel shows the whole cut: fit it on open and whenever the layout changes size.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => session.views.timeline?.zoomToFit());
+    return () => cancelAnimationFrame(frame);
+  }, [session, full, wide]);
+
   useEffect(() => {
     session.views.pickMedia = () => mediaInput.current?.click();
     return () => {
@@ -64,7 +70,7 @@ export function EmbedLayout({ bridge, cloud, projectId }: { bridge: EmbedBridge;
             <div className="flex min-h-0 flex-1">
               <LeftPanel width={panels.leftCollapsed ? 0 : panels.left} tabs={EMBED_TABS} />
               <PreviewPanel />
-              {roomy && !panels.rightCollapsed ? <RightPanel width={panels.right} assistant={false} /> : null}
+              {roomy ? <RightPanel width={panels.right} assistant={false} /> : null}
             </div>
             <TimelinePanel height={panels.timeline} />
           </>
