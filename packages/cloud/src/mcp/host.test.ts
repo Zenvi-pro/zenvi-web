@@ -175,6 +175,20 @@ describe("the cloud ToolHost", () => {
     await dispose();
   });
 
+  it("tells which project files are not in Zenvi Cloud (missing media)", async () => {
+    const h = await harness({ prober });
+    const { projectId, project } = await projectWithMedia(h, "here.mp4", Buffer.from("here"), "video/mp4");
+    const files = [
+      ...project.files,
+      { id: "F2", path: "/Users/me/never-uploaded.mp4", media_type: "video", cloud: { sha256: "c".repeat(64), size: 1, name: "never-uploaded.mp4" } },
+      { id: "F3", path: "/Users/me/local-only.mov", media_type: "video" },
+      { id: "F4", path: "@emojis/1F525.svg", media_type: "image" },
+    ] as never[];
+    const { host, dispose } = createCloudHost(context(h), projectId, () => project);
+    expect(await host.media!.missing!(files)).toEqual([false, true, true, false]);
+    await dispose();
+  });
+
   it("names generated media after the file, never reusing a path that holds other bytes", async () => {
     const h = await harness({ prober });
     const { projectId } = await projectWithMedia(h, "x.mp4", Buffer.from("x"), "video/mp4");

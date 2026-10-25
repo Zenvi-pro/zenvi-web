@@ -1949,7 +1949,7 @@ function fpsFraction(value) {
   const den2 = Math.trunc(Number(value.den));
   return Number.isFinite(num14) && Number.isFinite(den2) && num14 !== 0 && den2 !== 0 ? { num: num14, den: den2 } : null;
 }
-function videoLengthToProjectFrames(media, projectFps2) {
+function videoLengthToProjectFrames(media, projectFps3) {
   const data = isRecord3(media) ? media : {};
   let frames = positiveInt(data.video_length);
   const sourceFps = fpsFraction(data.fps);
@@ -1959,16 +1959,16 @@ function videoLengthToProjectFrames(media, projectFps2) {
   }
   if (frames === null || frames <= 0) return null;
   if (!sourceFps) return Math.max(frames, 1);
-  const scaled = frames * projectFps2.num * sourceFps.den / (projectFps2.den * sourceFps.num);
+  const scaled = frames * projectFps3.num * sourceFps.den / (projectFps3.den * sourceFps.num);
   if (!Number.isFinite(scaled)) return Math.max(frames, 1);
   return Math.max(pyRound(scaled), 1);
 }
-function readerBounds(reader, projectFps2) {
+function readerBounds(reader, projectFps3) {
   const data = isRecord3(reader) ? reader : {};
   let duration3 = toFloat(data.duration);
   if (duration3 !== null && duration3 < 0) duration3 = null;
-  const rate = projectFps2.num / projectFps2.den;
-  let frames = videoLengthToProjectFrames(data, projectFps2);
+  const rate = projectFps3.num / projectFps3.den;
+  let frames = videoLengthToProjectFrames(data, projectFps3);
   if (duration3 === null && frames) duration3 = frames / rate;
   if (frames === null && duration3 !== null) frames = positiveInt(duration3 * rate);
   return { duration: duration3, frames };
@@ -2000,10 +2000,10 @@ function clampTimePoints(points2, maxFrames) {
     return { ...point3, co: next };
   });
 }
-function clampTimingToMedia(clip2, projectFps2, existing) {
+function clampTimingToMedia(clip2, projectFps3, existing) {
   const reader = isRecord3(clip2.reader) && Object.keys(clip2.reader).length ? clip2.reader : existing?.reader;
   const pick2 = (key) => clip2[key] === void 0 || clip2[key] === null ? existing?.[key] : clip2[key];
-  const rate = projectFps2.num / projectFps2.den;
+  const rate = projectFps3.num / projectFps3.den;
   const single3 = isSingleImageMedia(reader) || isSingleImageMedia(clip2) || isSingleImageMedia(clip2.reader) || isSingleImageMedia(existing) || isSingleImageMedia(existing?.reader);
   if (single3) {
     let start2 = toFloat(pick2("start"));
@@ -2017,7 +2017,7 @@ function clampTimingToMedia(clip2, projectFps2, existing) {
     return { start: start2, end: end2, duration: Math.max(0, end2 - start2) };
   }
   const points2 = timePoints(clip2);
-  const bounds2 = readerBounds(reader, projectFps2);
+  const bounds2 = readerBounds(reader, projectFps3);
   const timeObject = isRecord3(clip2.time) ? clip2.time : {};
   if (points2 && points2.length > 1) {
     const maxFrames = timeCurveLengthFrames(points2) ?? bounds2.frames;
@@ -2051,16 +2051,16 @@ function clampTimingToMedia(clip2, projectFps2, existing) {
   if (bounds2.frames && points2) result2.time = { ...timeObject, Points: clampTimePoints(points2, bounds2.frames) };
   return result2;
 }
-function clipTimeBounds(clip2, projectFps2) {
+function clipTimeBounds(clip2, projectFps3) {
   const reader = isRecord3(clip2.reader) ? clip2.reader : {};
-  const rate = projectFps2.num / projectFps2.den;
+  const rate = projectFps3.num / projectFps3.den;
   if (isSingleImageMedia(reader) || isSingleImageMedia(clip2)) {
     const duration3 = toFloat(clip2.duration) ?? toFloat(reader.duration) ?? 0;
     const maxFrames2 = duration3 ? Math.max(1, Math.trunc(pyRound(duration3 * rate))) : 1;
     return { maxDuration: duration3, maxFrames: maxFrames2 };
   }
   const points2 = timePoints(clip2);
-  const bounds2 = readerBounds(reader, projectFps2);
+  const bounds2 = readerBounds(reader, projectFps3);
   if (points2 && points2.length > 1) {
     const maxFrames2 = timeCurveLengthFrames(points2) ?? bounds2.frames ?? 1;
     return { maxDuration: maxFrames2 / rate, maxFrames: maxFrames2 };
@@ -2271,6 +2271,25 @@ function scaleKeyframe(kf, factor, rule = "desktop") {
   });
   const out = [];
   for (const p of scaled) insertSorted(out, p);
+  return withPoints(kf, out);
+}
+function reverseKeyframe(kf) {
+  const points2 = normalizeKeyframe(kf).Points;
+  if (points2.length === 0) return withPoints(kf, []);
+  const xs = points2.map(xOf);
+  const pivot = Math.min(...xs) + Math.max(...xs);
+  const out = [];
+  for (const p of points2) {
+    const copy = copyPoint(p);
+    copy.co.X = pivot - xOf(p);
+    const hl = copy.handle_left;
+    const hr = copy.handle_right;
+    delete copy.handle_left;
+    delete copy.handle_right;
+    if (hr !== void 0) copy.handle_left = hr;
+    if (hl !== void 0) copy.handle_right = hl;
+    insertSorted(out, copy);
+  }
   return withPoints(kf, out);
 }
 var init_edit = __esm({
@@ -2813,13 +2832,13 @@ var init_luts = __esm({
     ];
     LUT_ALIAS = "@colors/";
     LUTS = BUILTIN_LUTS.flatMap(
-      ([folder, names2]) => names2.map((stem5) => ({
-        id: `${folder}/${stem5}`,
-        name: pretty(stem5),
+      ([folder, names2]) => names2.map((stem6) => ({
+        id: `${folder}/${stem6}`,
+        name: pretty(stem6),
         category: pretty(folder),
         folder,
-        path: `${LUT_ALIAS}${folder}/${stem5}.cube`,
-        assetPath: `colors/${folder}/${stem5}.cube`,
+        path: `${LUT_ALIAS}${folder}/${stem6}.cube`,
+        assetPath: `colors/${folder}/${stem6}.cube`,
         builtin: true
       }))
     );
@@ -3239,7 +3258,7 @@ function scan(xml) {
     const name = nameMatch ? nameMatch[0] : "";
     const selfClosing = xml[tagEnd2 - 1] === "/";
     const parent = stack[stack.length - 1] ?? null;
-    const span3 = {
+    const span4 = {
       name,
       start: i,
       openEnd: tagEnd2 + 1,
@@ -3249,9 +3268,9 @@ function scan(xml) {
       parent,
       children: []
     };
-    parent?.children.push(span3);
-    all.push(span3);
-    if (!selfClosing) stack.push(span3);
+    parent?.children.push(span4);
+    all.push(span4);
+    if (!selfClosing) stack.push(span4);
     i = tagEnd2 + 1;
   }
   return all;
@@ -3286,24 +3305,24 @@ function setSvgText(template, text5) {
   const targets = tspans.length > 0 ? tspans : byName(spans2, "text");
   if (targets.length === 0) return template;
   const edits = [];
-  const setContent = (span3, content) => {
-    if (span3.selfClosing) {
-      const tag = template.slice(span3.start, span3.openEnd);
-      edits.push({ from: span3.start, to: span3.end, text: `${tag.slice(0, -2).trimEnd()}>${content}</${span3.name}>` });
+  const setContent = (span4, content) => {
+    if (span4.selfClosing) {
+      const tag = template.slice(span4.start, span4.openEnd);
+      edits.push({ from: span4.start, to: span4.end, text: `${tag.slice(0, -2).trimEnd()}>${content}</${span4.name}>` });
     } else {
-      edits.push({ from: span3.openEnd, to: span3.closeStart, text: content });
+      edits.push({ from: span4.openEnd, to: span4.closeStart, text: content });
     }
   };
-  const covered = (span3) => {
-    for (let p = span3.parent; p; p = p.parent) if (targets.includes(p)) return true;
+  const covered = (span4) => {
+    for (let p = span4.parent; p; p = p.parent) if (targets.includes(p)) return true;
     return false;
   };
-  const placeholder = (span3) => span3.selfClosing ? "" : xmlUnescape(template.slice(span3.openEnd, span3.closeStart).replace(/<[^>]*>/g, "")).trim();
+  const placeholder = (span4) => span4.selfClosing ? "" : xmlUnescape(template.slice(span4.openEnd, span4.closeStart).replace(/<[^>]*>/g, "")).trim();
   const first = placeholder(targets[0]);
-  targets.forEach((span3, i) => {
-    if (covered(span3)) return;
-    const same = i === 0 || first !== "" && placeholder(span3) === first;
-    setContent(span3, same ? xmlEscapeText(text5) : "");
+  targets.forEach((span4, i) => {
+    if (covered(span4)) return;
+    const same = i === 0 || first !== "" && placeholder(span4) === first;
+    setContent(span4, same ? xmlEscapeText(text5) : "");
   });
   return apply(template, edits);
 }
@@ -4027,6 +4046,59 @@ function updateFile(tx, fileId, patch) {
   tx.update(["files", { id: fileId }], Object.fromEntries(changed));
   return requireFile(tx.project, fileId);
 }
+function writeFile2(tx, fileId, next, opts = {}) {
+  const current = requireFile(tx.project, fileId);
+  if (!isRecord10(next)) throw invalid("writeFile needs the file's record.");
+  if (next.id !== fileId) throw invalid("File id cannot be changed.");
+  if (next.media_type !== void 0 && !["video", "audio", "image"].includes(next.media_type)) {
+    throw invalid(`media_type must be video, audio or image (got ${String(next.media_type)}).`);
+  }
+  if (opts.clipTitle !== void 0 && typeof opts.clipTitle !== "string") throw invalid("clipTitle must be a string.");
+  const changed = changedFields(current, next);
+  if (Object.keys(changed).length > 0) tx.update(["files", { id: fileId }], changed);
+  for (const key of Object.keys(current)) {
+    if (!(key in next)) tx.delete(["files", { id: fileId }, key]);
+  }
+  const file3 = requireFile(tx.project, fileId);
+  const duration3 = Number(file3.duration);
+  const updatedClipIds = [];
+  const renamedClipIds = [];
+  for (const clip2 of clipsUsingFile(tx.project, fileId)) {
+    const patch = { reader: structuredClone(file3), duration: file3.duration };
+    if (Number(clip2.end) > duration3) patch.end = file3.duration;
+    if (opts.clipTitle !== void 0 && clip2.title !== opts.clipTitle) {
+      patch.title = opts.clipTitle;
+      renamedClipIds.push(clip2.id);
+    }
+    patchClip(tx, clip2.id, patch);
+    updatedClipIds.push(clip2.id);
+  }
+  return { file: file3, updatedClipIds, renamedClipIds };
+}
+function addSubclipFiles(tx, sourceId, subclips) {
+  const source2 = requireFile(tx.project, sourceId);
+  if (!Array.isArray(subclips) || subclips.length === 0) throw invalid("Give at least one sub-clip.");
+  for (const sub of subclips) {
+    const start = requireNonNegative(sub?.start, "start");
+    const end = requireNonNegative(sub?.end, "end");
+    if (!(end > start)) throw invalid(`A sub-clip must end after it starts (got ${start}..${end}).`);
+    if (typeof sub.name !== "string") throw invalid("A sub-clip needs a name.");
+    if (sub.aiMetadata !== void 0 && !isRecord10(sub.aiMetadata)) throw invalid("aiMetadata must be an object.");
+  }
+  const created = [];
+  for (const sub of subclips) {
+    const { name: _name, id: _id, ...rest } = structuredClone(source2);
+    const entry = rest;
+    entry.start = sub.start;
+    entry.end = sub.end;
+    if (sub.aiMetadata !== void 0) entry.ai_metadata = structuredClone(sub.aiMetadata);
+    entry.name = sub.name;
+    entry.id = ids(tx.project)();
+    tx.insert(["files"], entry);
+    created.push(requireFile(tx.project, entry.id));
+  }
+  return created;
+}
 var IMMUTABLE_FILE_KEYS;
 var init_files = __esm({
   "../engine/src/ops/files.ts"() {
@@ -4503,8 +4575,8 @@ function endBoundsKeepWindow(trimStart, trimDur, trimEnd, tolerance = KEEP_WINDO
 function blindTrimRejected(options) {
   if (options.watchedStart !== null || options.hasExplicitEnd || options.hasExplicitStart) return false;
   if (options.isAudio || options.isImage || options.isSubclip) return false;
-  const span3 = options.trimDur ?? 0;
-  return Number.isFinite(span3) && span3 > 0;
+  const span4 = options.trimDur ?? 0;
+  return Number.isFinite(span4) && span4 > 0;
 }
 function parseTimecodeToken(token) {
   if (typeof token === "number") return Number.isFinite(token) ? token : null;
@@ -4570,15 +4642,15 @@ function placementWatchQuery(file3, query2 = "", extra = "") {
   if (typeof tags === "string") tagText = tags.replaceAll(",", " ").trim();
   else if (Array.isArray(tags)) tagText = tags.filter((t) => String(t).trim()).map(String).join(" ").trim();
   if (tagText) return Array.from(tagText).slice(0, 200).join("");
-  const stem5 = basenameStem(String(data.name || data.path || ""));
-  if (stem5) return Array.from(stem5).slice(0, 200).join("");
+  const stem6 = basenameStem(String(data.name || data.path || ""));
+  if (stem6) return Array.from(stem6).slice(0, 200).join("");
   return DEFAULT_WATCH_QUERY;
 }
 function shouldWatchPlacement(options) {
   if (options.isAudio || options.isImage || options.skipExplicitTimes) return false;
   if (options.isAlreadyWatchedSubclip && !options.explicitQuery) return false;
-  const span3 = Number.isFinite(options.windowSec) ? options.windowSec : 0;
-  return span3 > 1e-3 && span3 <= (options.maxWindowSec ?? WATCH_MAX_WINDOW_SEC) + 1e-6;
+  const span4 = Number.isFinite(options.windowSec) ? options.windowSec : 0;
+  return span4 > 1e-3 && span4 <= (options.maxWindowSec ?? WATCH_MAX_WINDOW_SEC) + 1e-6;
 }
 function parseExplicitSourceTimeRange(query2) {
   if (!query2 || typeof query2 !== "string") return null;
@@ -4817,8 +4889,8 @@ function chapterEdges(aiMetadata) {
   return [...edges].sort((a, b) => a - b);
 }
 function cueCoverage(cues, start, end) {
-  const span3 = f(end, 0) - f(start, 0);
-  if (span3 <= 0) return 0;
+  const span4 = f(end, 0) - f(start, 0);
+  if (span4 <= 0) return 0;
   let covered = 0;
   for (const cue of cues ?? []) {
     if (!isRecord13(cue)) continue;
@@ -4826,7 +4898,7 @@ function cueCoverage(cues, start, end) {
     if (!bounds2) continue;
     covered += Math.max(0, Math.min(bounds2[1], end) - Math.max(bounds2[0], start));
   }
-  return Math.min(1, covered / span3);
+  return Math.min(1, covered / span4);
 }
 function snapCutToPhraseEdge(cut2, cues, preferLater, maxShift = MAX_CUE_SHIFT_SEC) {
   const value = f(cut2, 0);
@@ -4923,13 +4995,13 @@ function speechWindowsFromEnergy(clip2, threshold = DEFAULT_ENERGY_THRESHOLD, mi
   const samples = Array.isArray(ui.audio_data) ? ui.audio_data : [];
   if (samples.length < 2) return [];
   const [tlStart, tlEnd] = clipTimelineExtent(data);
-  const span3 = tlEnd - tlStart;
-  if (span3 <= EPS) return [];
+  const span4 = tlEnd - tlStart;
+  if (span4 <= EPS) return [];
   const values = samples.map((s) => Math.abs(f(s, 0)));
   const peak = Math.max(...values);
   if (peak <= EPS) return [];
   const gate = peak * Math.max(0, f(threshold, DEFAULT_ENERGY_THRESHOLD));
-  const step = span3 / values.length;
+  const step = span4 / values.length;
   const windows = [];
   let runStart = null;
   values.forEach((val, i) => {
@@ -5742,6 +5814,33 @@ function matchTransition(name) {
     return base.includes(search) || search.includes(base);
   });
 }
+function normName(text5) {
+  return text5.trim().toLowerCase().replaceAll("_", " ").replaceAll("-", " ").split(/\s+/).filter(Boolean).join(" ");
+}
+function withoutExtension(path39) {
+  const slash = Math.max(path39.lastIndexOf("/"), path39.lastIndexOf("\\"));
+  const base = path39.slice(slash + 1);
+  const dot = base.lastIndexOf(".");
+  return dot > 0 && base.slice(0, dot).replace(/\.+/g, "") !== "" ? path39.slice(0, slash + 1 + dot) : path39;
+}
+function transitionKey(entry) {
+  return stem(entry.file).toLowerCase();
+}
+function lookupTransition(name) {
+  const raw = String(name ?? "").trim();
+  if (!raw) return { entry: void 0, candidates: [] };
+  const direct = BY_ID.get(raw) ?? resolveTransitionAsset(raw);
+  if (direct) return { entry: direct, candidates: [] };
+  const lower = raw.toLowerCase();
+  let wanted = normName(MASK_EXTENSIONS.some((ext) => lower.endsWith(ext)) ? withoutExtension(raw) : raw);
+  const alias = ALIASES[wanted];
+  if (alias) wanted = normName(alias);
+  const exact = TRANSITIONS.find((t) => normName(transitionKey(t)) === wanted || normName(t.name) === wanted);
+  if (exact) return { entry: exact, candidates: [] };
+  const partial2 = TRANSITIONS.filter((t) => normName(transitionKey(t)).includes(wanted));
+  if (partial2.length === 1) return { entry: partial2[0], candidates: [] };
+  return { entry: void 0, candidates: partial2.slice(0, 12).map(transitionKey) };
+}
 function resolveTransitionAsset(path39) {
   const match = /(?:^@transitions|(?:^|[\\/])transitions)[\\/](common|extra)[\\/]([^\\/]+)$/.exec(path39 ?? "");
   return match ? BY_LOCATION.get(`${match[1]}/${match[2]}`) : void 0;
@@ -5765,7 +5864,7 @@ function transitionReader(entry) {
   const sorted = Object.fromEntries(Object.keys(fields).sort().map((key) => [key, fields[key]]));
   return sorted;
 }
-var TRANSITIONS, BY_ID, BY_LOCATION;
+var TRANSITIONS, BY_ID, BY_LOCATION, ALIASES, MASK_EXTENSIONS;
 var init_catalog = __esm({
   "../engine/src/transitions/catalog.ts"() {
     "use strict";
@@ -5785,6 +5884,25 @@ var init_catalog = __esm({
     );
     BY_ID = new Map(TRANSITIONS.map((t) => [t.id, t]));
     BY_LOCATION = new Map(TRANSITIONS.map((t) => [`${t.category}/${t.file}`, t]));
+    ALIASES = {
+      crossfade: "fade",
+      "cross fade": "fade",
+      dissolve: "fade",
+      "cross dissolve": "fade",
+      fade: "fade",
+      mix: "fade",
+      "wipe left": "wipe_right_to_left",
+      "wipe right": "wipe_left_to_right",
+      "wipe up": "wipe_bottom_to_top",
+      "wipe down": "wipe_top_to_bottom",
+      circle: "circle_in_to_out",
+      iris: "circle_in_to_out",
+      "iris open": "circle_in_to_out",
+      "iris close": "circle_out_to_in",
+      "circle in": "circle_out_to_in",
+      "circle out": "circle_in_to_out"
+    };
+    MASK_EXTENSIONS = [".svg", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff", ".mp4", ".mov", ".webm", ".mkv", ".avi"];
   }
 });
 
@@ -5844,8 +5962,8 @@ function resolveMask(maskId, path39) {
   if (path39 !== void 0) {
     if (typeof path39 !== "string" || path39 === "") throw invalid("path must be a non-empty string.");
     const known = resolveTransitionMask(path39);
-    const stem5 = (path39.split(/[\\/]/).pop() ?? path39).replace(/\.[^.]+$/, "");
-    return known ?? { path: path39, title: stem5, width: 720, height: 576 };
+    const stem6 = (path39.split(/[\\/]/).pop() ?? path39).replace(/\.[^.]+$/, "");
+    return known ?? { path: path39, title: stem6, width: 720, height: 576 };
   }
   if (maskId === void 0) throw invalid("Give maskId or path.");
   const found = resolveTransitionMask(maskId);
@@ -5909,15 +6027,27 @@ function addTransition(tx, input3) {
   return requireTransition(tx.project, transition2.id);
 }
 function toolTransition(tx, mask2, layer2, position, duration3, direction2) {
+  return addMaskTransition(tx, { layer: layer2, position, duration: duration3, reader: maskReader(mask2.path, mask2.width, mask2.height), title: mask2.title, direction: direction2 });
+}
+function addMaskTransition(tx, input3) {
+  const project = tx.project;
+  if (typeof input3 !== "object" || input3 === null) throw invalid("addMaskTransition needs an input object.");
+  if (!Number.isInteger(input3.layer) || input3.layer <= 0) throw invalid("layer must be a positive track number.");
+  requireUnlocked(project, input3.layer);
+  if (!isRecord10(input3.reader)) throw invalid("reader must be the mask's reader JSON.");
+  const position = snapSeconds(requireNonNegative(input3.position, "position"), project);
+  const duration3 = snapSeconds(requireDuration(input3.duration), project);
+  if (!(duration3 > 0)) throw invalid("duration is shorter than one frame.");
   const transition2 = createTransition({
-    id: ids(tx.project)(),
-    layer: layer2,
+    id: ids(project)(),
+    layer: input3.layer,
     position,
     duration: duration3,
-    reader: maskReader(mask2.path, mask2.width, mask2.height),
-    fps: fpsOf(tx.project),
-    direction: direction2,
-    title: mask2.title
+    reader: input3.reader,
+    fps: fpsOf(project),
+    direction: input3.direction ?? "in",
+    title: input3.title ?? "Transition",
+    fadeAudio: input3.fadeAudio ?? false
   });
   tx.insert(["effects"], transition2);
   return requireTransition(tx.project, transition2.id);
@@ -5966,11 +6096,102 @@ function moveTransition(tx, transitionId, to) {
   }
   return patchTransition(tx, transitionId, patch);
 }
+function transitionMaskReader(transition2) {
+  for (const key of ["mask_reader", "reader"]) {
+    const reader = transition2[key];
+    if (isRecord10(reader)) return reader;
+  }
+  return {};
+}
+function usesStaticMask(transition2) {
+  const data = transitionMaskReader(transition2);
+  if ("has_single_image" in data) return Boolean(data.has_single_image);
+  return isSingleImageMedia(data);
+}
+function rescaleTransitionKeyframes(kf, oldFrames, newFrames) {
+  let next = oldFrames && newFrames && oldFrames !== newFrames ? scaleKeyframe(kf, newFrames / oldFrames, "desktop") : kf;
+  if (newFrames && next.Points.length >= 2) {
+    const points2 = next.Points.map((p) => ({ ...p, co: { ...p.co } }));
+    points2[0].co.X = 1;
+    points2[points2.length - 1].co.X = Math.trunc(newFrames) + 1;
+    next = { ...next, Points: points2 };
+  }
+  return next;
+}
 function removeTransition(tx, transitionId) {
   const transition2 = requireTransition(tx.project, transitionId);
   requireUnlocked(tx.project, transition2.layer);
   tx.delete(["effects", { id: transitionId }]);
   return transitionId;
+}
+function transitionDirection(transition2) {
+  const brightness2 = transition2.brightness;
+  const points2 = isRecord10(brightness2) && Array.isArray(brightness2.Points) ? brightness2.Points : [];
+  const keyed = [];
+  for (const point3 of points2) {
+    const co = isRecord10(point3) && isRecord10(point3.co) ? point3.co : null;
+    if (!co) continue;
+    const x = Number(co.X);
+    const y = Number(co.Y);
+    if (co.X === null || co.Y === null || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+    keyed.push([x, y]);
+  }
+  if (keyed.length < 2) return null;
+  keyed.sort((a, b) => a[0] - b[0]);
+  const first = keyed[0][1];
+  const last = keyed[keyed.length - 1][1];
+  return first > last ? "default" : first < last ? "reversed" : null;
+}
+function framesFor(seconds2, rate) {
+  return Math.max(0, Math.floor(Math.max(0, Number(seconds2) || 0) * rate + 0.5));
+}
+function rescaledTransitionCurves(transition2, oldDuration, newDuration, fps2) {
+  if (!usesStaticMask(transition2)) return {};
+  const rate = fps2.num / fps2.den;
+  const oldFrames = framesFor(oldDuration, rate);
+  const newFrames = framesFor(newDuration, rate);
+  const out = {};
+  for (const prop of ["brightness", "contrast"]) {
+    const kf = transition2[prop];
+    if (isRecord10(kf)) out[prop] = rescaleTransitionKeyframes(kf, oldFrames, newFrames);
+  }
+  return out;
+}
+function reversedTransitionCurves(transition2) {
+  const out = {};
+  for (const prop of ["brightness", "contrast"]) {
+    const kf = transition2[prop];
+    if (isRecord10(kf)) out[prop] = reverseKeyframe(kf);
+  }
+  return out;
+}
+function maskDefaultCurves(transition2, fps2) {
+  const start = Number(transition2.start) || 0;
+  let end = Number(transition2.end) || start;
+  if (end < start) end = start;
+  const duration3 = Math.max(0, end - start);
+  if (usesStaticMask(transition2)) {
+    return { start: 0, end: duration3, duration: duration3, ...transitionKeyframes(duration3, fps2, 1, -1, 3) };
+  }
+  return { start, end, duration: duration3, ...transitionKeyframes(duration3, fps2, 0, 0, 0) };
+}
+function writeTransition(tx, transitionId, next) {
+  const project = tx.project;
+  const current = requireTransition(project, transitionId);
+  if (!isRecord10(next)) throw invalid("writeTransition needs the transition's data.");
+  if (next.id !== transitionId) throw invalid("A transition's id cannot change.");
+  requireUnlocked(project, current.layer);
+  const layer2 = Number(next.layer);
+  if (layer2 !== current.layer) {
+    if (!findLayer(project, layer2)) throw new OpError("not_found", `No track with number ${String(next.layer)}.`, { layer: next.layer });
+    requireUnlocked(project, layer2);
+  }
+  const changed = changedFields(current, next);
+  if (Object.keys(changed).length > 0) tx.update(["effects", { id: transitionId }], changed);
+  for (const key of Object.keys(current)) {
+    if (!(key in next)) tx.delete(["effects", { id: transitionId }, key]);
+  }
+  return requireTransition(tx.project, transitionId);
 }
 function findMissingTransition(project, clipId2) {
   const clip2 = project.clips.find((c) => c.id === clipId2);
@@ -6027,6 +6248,8 @@ var init_transitions = __esm({
     "use strict";
     init_defaults();
     init_query();
+    init_media();
+    init_edit();
     init_errors();
     init_internal();
     init_transition_masks();
@@ -6252,6 +6475,18 @@ function trimClipEdge(tx, clipId2, edge, timelineSeconds) {
   const out = timingPatch(clip2, next);
   if (patch.position !== void 0) out.position = patch.position;
   return patchClip(tx, clipId2, out);
+}
+function setClipTiming(tx, clipId2, timing) {
+  const clip2 = requireEditableClip(tx.project, clipId2);
+  requireObject(timing, "setClipTiming timing");
+  const patch = {};
+  if (timing.position !== void 0) patch.position = requireNonNegative(timing.position, "position");
+  if (timing.start !== void 0) patch.start = requireNonNegative(timing.start, "start");
+  if (timing.end !== void 0) patch.end = requireNonNegative(timing.end, "end");
+  const start = patch.start ?? clip2.start;
+  const end = patch.end ?? clip2.end;
+  if (!(end > start)) throw invalid(`end (${end}) must be after start (${start}).`);
+  return patchClip(tx, clipId2, patch);
 }
 function slicePoint(project, atSeconds, keep2) {
   const fps2 = fpsOf(project);
@@ -6541,9 +6776,9 @@ function setClipSpeed(tx, clipId2, factor, opts = {}) {
   const direction2 = opts.direction ?? "forward";
   if (direction2 !== "forward" && direction2 !== "backward") throw invalid(`direction must be forward or backward.`);
   const newEnd = Number(clip2.start) + (Number(clip2.end) - Number(clip2.start)) / f3;
-  const retimed = retimeClip(clip2, newEnd, fpsOf(project), direction2 === "backward" ? -1 : 1, clip2.position);
-  if (!retimed) throw invalid(`Speed ${f3} leaves clip ${clipId2} empty.`);
-  const next = withClampedTiming(retimed, project, clip2);
+  const retimed2 = retimeClip(clip2, newEnd, fpsOf(project), direction2 === "backward" ? -1 : 1, clip2.position);
+  if (!retimed2) throw invalid(`Speed ${f3} leaves clip ${clipId2} empty.`);
+  const next = withClampedTiming(retimed2, project, clip2);
   return replaceClip(tx, clip2, next);
 }
 function fadeInKeyframe(kf, startOfClip, endOfClip, length, rate) {
@@ -6799,7 +7034,7 @@ function alignedPositions(items, alignRight, toSeconds2) {
   const out = /* @__PURE__ */ new Map();
   if (spans2.length === 0) return out;
   const target = toSeconds2 !== void 0 ? requireFinite(toSeconds2, "toSeconds") : alignRight ? Math.max(...spans2.map((s) => s.end)) : Math.min(...spans2.map((s) => s.start));
-  for (const span3 of spans2) out.set(span3.id, alignRight ? span3.start + (target - span3.end) : target);
+  for (const span4 of spans2) out.set(span4.id, alignRight ? span4.start + (target - span4.end) : target);
   return out;
 }
 function packTrack(tx, layer2, fromSeconds) {
@@ -7935,22 +8170,22 @@ function applyTime(tx, clip2, requested, opts) {
     if (isSingleImageMedia(reader)) duration3 = DEFAULT_IMAGE_LENGTH;
     if (duration3 <= 0) duration3 = 1 / rate;
     const frames = Math.max(1, Math.trunc(pyRound(duration3 * rate)));
-    const retimed2 = retimeClip(base, Number(base.start) + frames / rate, fps2, 1, base.position) ?? base;
-    return { ...retimed2, time: { Points: [{ co: { X: 1, Y: 1 }, interpolation: Interpolation.LINEAR }] } };
+    const retimed3 = retimeClip(base, Number(base.start) + frames / rate, fps2, 1, base.position) ?? base;
+    return { ...retimed3, time: { Points: [{ co: { X: 1, Y: 1 }, interpolation: Interpolation.LINEAR }] } };
   }
   if (preset === "reverse") {
     let end = Number(clip2.end);
     if (end <= Number(clip2.start)) end = Number(clip2.start) + (Number(clip2.duration) > 0 ? Number(clip2.duration) : 1 / rate);
-    const retimed2 = retimeClip(clip2, end, fps2, -1, clip2.position);
-    if (!retimed2) throw invalid("The clip is too short to reverse.");
-    return retimed2;
+    const retimed3 = retimeClip(clip2, end, fps2, -1, clip2.position);
+    if (!retimed3) throw invalid("The clip is too short to reverse.");
+    return retimed3;
   }
   const speed = requireFinite(opts.speed, "speed");
   if (!(speed >= 1 / 16 && speed <= 16)) throw invalid(`speed must be between 1/16 and 16 (got ${speed}).`);
   const newEnd = Number(clip2.start) + (Number(clip2.end) - Number(clip2.start)) / speed;
-  const retimed = retimeClip(clip2, newEnd, fps2, preset === "backward" ? -1 : 1, clip2.position);
-  if (!retimed) throw invalid("That speed leaves the clip empty.");
-  return retimed;
+  const retimed2 = retimeClip(clip2, newEnd, fps2, preset === "backward" ? -1 : 1, clip2.position);
+  if (!retimed2) throw invalid("That speed leaves the clip empty.");
+  return retimed2;
 }
 function freeze(clip2, zoom, opts, rate) {
   const seconds2 = requireFinite(opts.seconds, "seconds");
@@ -8310,14 +8545,14 @@ function normalizeToTrim(points2, trimStart, trimSpan) {
   });
   return out;
 }
-function repeatCurve(points2, span3, dirSign, passes, delay2, ramp, pattern) {
+function repeatCurve(points2, span4, dirSign, passes, delay2, ramp, pattern) {
   const out = [];
   let base = 0;
   let dir = dirSign;
   for (let k = 0; k < passes; k += 1) {
     const speed = (1 + ramp) ** k;
     const scale = 1 / Math.abs(speed);
-    const dur = Math.max(1, pyRound(span3 * scale));
+    const dur = Math.max(1, pyRound(span4 * scale));
     const iter = dir > 0 ? points2 : [...points2].reverse();
     iter.forEach((p, idx) => {
       const x = pyRound(p.co.X ?? 0) - 1;
@@ -8390,13 +8625,13 @@ function repeatClip(tx, clipId2, opts) {
   for (const [prop, original] of Object.entries(cache5.properties ?? {})) {
     if (prop === "time") continue;
     let norm3 = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
-    let span3 = norm3.length ? pyRound(norm3[norm3.length - 1].co.X) : 0;
-    if (!span3) continue;
-    if (span3 !== timeSpan) {
-      const s = timeSpan / span3;
+    let span4 = norm3.length ? pyRound(norm3[norm3.length - 1].co.X) : 0;
+    if (!span4) continue;
+    if (span4 !== timeSpan) {
+      const s = timeSpan / span4;
       const firstX = Number(norm3[0].co.X ?? 1);
       for (const p of norm3) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
-      span3 = timeSpan;
+      span4 = timeSpan;
     }
     const latest = /* @__PURE__ */ new Map();
     for (const p of norm3) {
@@ -8404,7 +8639,7 @@ function repeatClip(tx, clipId2, opts) {
       latest.set(p.co.X, p);
     }
     norm3 = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
-    const [points2, used] = repeatCurve(norm3, span3, dirSign, opts.passes, delay2, ramp, opts.pattern);
+    const [points2, used] = repeatCurve(norm3, span4, dirSign, opts.passes, delay2, ramp, opts.pattern);
     next[prop] = { Points: points2 };
     total = Math.max(total, used);
   }
@@ -9020,6 +9255,176 @@ var init_add_to_timeline = __esm({
   }
 });
 
+// ../engine/src/ops/project-files.ts
+function folderAndName(path39) {
+  const p = String(path39 ?? "");
+  const cut2 = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return cut2 < 0 ? { folder: "", name: p } : { folder: p.slice(0, cut2), name: p.slice(cut2 + 1) };
+}
+function joinFolder(folder, name) {
+  if (!folder) return name;
+  if (folder.endsWith("/") || folder.endsWith("\\")) return folder + name;
+  const sep = folder.includes("\\") && !folder.includes("/") ? "\\" : "/";
+  return folder + sep + name;
+}
+function escapeRegExp(text5) {
+  return text5.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function detectImageSequence(filePath, folderNames) {
+  const { folder, name } = folderAndName(filePath);
+  const match = SEQUENCE_NAME_RE.exec(name);
+  if (!match) return null;
+  const baseName2 = match[1] ?? "";
+  const zeros = match[2] ?? "";
+  const number4 = Number.parseInt(match[3], 10);
+  const digits = zeros.length + match[3].length;
+  const extension = match[4];
+  const hasDigitCount = (count2) => {
+    const rx = new RegExp(`^${escapeRegExp(baseName2)}[0-9]{${count2}}\\.${escapeRegExp(extension)}$`);
+    for (const n of folderNames) if (rx.test(n)) return true;
+    return false;
+  };
+  const fixlen = zeros !== "" || !(hasDigitCount(digits + 1) || hasDigitCount(digits > 1 ? digits - 1 : 3));
+  let neighbour = false;
+  for (let x = Math.max(0, number4 - 100); x < Math.min(number4 + 101, 5e4); x += 1) {
+    const numbered = fixlen ? String(x).padStart(digits, "0") : String(x);
+    if (x !== number4 && folderNames.has(`${baseName2}${numbered}.${extension}`)) {
+      neighbour = true;
+      break;
+    }
+  }
+  if (!neighbour) return null;
+  const pattern = `${baseName2}${fixlen ? `%0${digits}d` : "%d"}.${extension}`;
+  return { folder_path: folder, base_name: baseName2, fixlen, digits, extension, pattern, path: joinFolder(folder, pattern) };
+}
+function sequenceFrameNumbers(sequence, folderNames) {
+  const digits = sequence.fixlen ? `(\\d{${Math.trunc(sequence.digits) || 1}})` : "(\\d+)";
+  const rx = new RegExp(`^${escapeRegExp(sequence.base_name)}${digits}\\.${escapeRegExp(sequence.extension)}$`);
+  const numbers2 = [];
+  for (const n of folderNames) {
+    const m = rx.exec(n);
+    if (m) numbers2.push(Number.parseInt(m[1], 10));
+  }
+  return numbers2.sort((a, b) => a - b);
+}
+function firstSequenceFrame(folder, folderNames) {
+  const names2 = [...folderNames].filter((n) => !n.startsWith(".")).sort();
+  let best = null;
+  const seen = /* @__PURE__ */ new Set();
+  for (const name of names2) {
+    if (!SEQUENCE_NAME_RE.test(name)) continue;
+    const sequence = detectImageSequence(joinFolder(folder, name), folderNames);
+    if (!sequence || seen.has(sequence.path)) continue;
+    seen.add(sequence.path);
+    const count2 = sequenceFrameNumbers(sequence, folderNames).length;
+    if (count2 > (best?.count ?? 0)) best = { count: count2, first: joinFolder(folder, name), sequence };
+  }
+  return best ? { first: best.first, sequence: best.sequence } : null;
+}
+function isImageSequence(file3) {
+  return String(file3?.path ?? "").includes("%");
+}
+function sequenceFramesPresent(patternPath, folderNames) {
+  const { name } = folderAndName(patternPath);
+  const stem6 = name.split("%", 1)[0] ?? "";
+  const dot = name.lastIndexOf(".");
+  const extension = dot > 0 ? name.slice(dot) : "";
+  for (const n of folderNames) {
+    if (n.startsWith(".") && !stem6.startsWith(".")) continue;
+    if (n.length >= stem6.length + extension.length && n.startsWith(stem6) && n.endsWith(extension)) return true;
+  }
+  return false;
+}
+function bigGcd(a, b) {
+  let x = a < 0n ? -a : a;
+  let y = b < 0n ? -b : b;
+  while (y) [x, y] = [y, x % y];
+  return x;
+}
+function limitDenominator2(x, maxDen) {
+  let mantissa = x;
+  let exponent = 0;
+  while (!Number.isInteger(mantissa)) {
+    mantissa *= 2;
+    exponent += 1;
+  }
+  let num14 = BigInt(mantissa);
+  let den2 = 1n << BigInt(exponent);
+  const g = bigGcd(num14, den2);
+  num14 /= g;
+  den2 /= g;
+  const max = BigInt(maxDen);
+  if (den2 <= max) return { num: Number(num14), den: Number(den2) };
+  let [p0, q0, p1, q1] = [0n, 1n, 1n, 0n];
+  let [n, d] = [num14, den2];
+  for (; ; ) {
+    const a = n / d;
+    const q2 = q0 + a * q1;
+    if (q2 > max) break;
+    [p0, q0, p1, q1] = [p1, q1, p0 + a * p1, q2];
+    [n, d] = [d, n - a * d];
+  }
+  const k = (max - q0) / q1;
+  if (2n * d * (q0 + k * q1) <= den2) return { num: Number(p1), den: Number(q1) };
+  return { num: Number(p0 + k * p1), den: Number(q0 + k * q1) };
+}
+function fpsFraction2(value) {
+  const rate = Number(value);
+  if (!(rate > 0) || !Number.isFinite(rate)) throw new RangeError("frame rate must be positive");
+  for (const [known, fraction5] of NTSC_RATES) if (Math.abs(rate - known) < 5e-3) return { ...fraction5 };
+  return limitDenominator2(rate, 1001);
+}
+function withSequenceFps(file3, fps2) {
+  const current = isRecord10(file3.fps) ? file3.fps : { num: 30, den: 1 };
+  const original = Number(current.num) / Number(current.den);
+  const factor = original / (fps2.num / fps2.den);
+  const next = { ...file3 };
+  next.fps = { num: Math.trunc(fps2.num), den: Math.trunc(fps2.den) };
+  next.video_timebase = { num: Math.trunc(fps2.den), den: Math.trunc(fps2.num) };
+  next.duration = (Number(file3.duration) || 0) * factor;
+  if ("start" in file3) next.start = Number(file3.start) * factor;
+  if ("end" in file3) next.end = Number(file3.end) * factor;
+  return next;
+}
+function withInOutFrames(file3, startFrame, endFrame) {
+  const fps2 = isRecord10(file3.fps) ? file3.fps : { num: 30, den: 1 };
+  const rate = Number(fps2.num) / Number(fps2.den);
+  return { ...file3, start: (Math.trunc(startFrame) - 1) / rate, end: Math.trunc(endFrame) / rate };
+}
+function relinkedFileData(old, reader, mediaType, fingerprint2) {
+  const data = { ...structuredClone(old), ...structuredClone(reader) };
+  data.id = "id" in old ? old.id : data.id;
+  const oldSha = isRecord10(old.fingerprint) ? old.fingerprint.sha256 : void 0;
+  if (fingerprint2) data.fingerprint = structuredClone(fingerprint2);
+  else delete data.fingerprint;
+  if (!(oldSha && fingerprint2 && oldSha === fingerprint2.sha256)) delete data.proxy_reader;
+  if (mediaType) data.media_type = mediaType;
+  const duration3 = Number(data.duration) || 0;
+  if ("end" in data && duration3 > 0 && Number(data.end) > duration3) data.end = duration3;
+  if ("start" in data && "end" in data && Number(data.start) >= Number(data.end)) {
+    delete data.start;
+    delete data.end;
+  }
+  return data;
+}
+var SEQUENCE_EXTENSIONS, SEQUENCE_NAME_RE, NTSC_RATES;
+var init_project_files = __esm({
+  "../engine/src/ops/project-files.ts"() {
+    "use strict";
+    init_internal();
+    SEQUENCE_EXTENSIONS = ["png", "jpg", "jpeg", "tif", "svg"];
+    SEQUENCE_NAME_RE = new RegExp(`(.*[^\\d])?(0*)(\\d+)\\.(${SEQUENCE_EXTENSIONS.join("|")})$`, "i");
+    NTSC_RATES = [
+      [23.976, { num: 24e3, den: 1001 }],
+      [23.98, { num: 24e3, den: 1001 }],
+      [29.97, { num: 3e4, den: 1001 }],
+      [47.952, { num: 48e3, den: 1001 }],
+      [59.94, { num: 6e4, den: 1001 }],
+      [119.88, { num: 12e4, den: 1001 }]
+    ];
+  }
+});
+
 // ../engine/src/ops/index.ts
 var init_ops = __esm({
   "../engine/src/ops/index.ts"() {
@@ -9044,6 +9449,7 @@ var init_ops = __esm({
     init_clip_props();
     init_sequence();
     init_add_to_timeline();
+    init_project_files();
   }
 });
 
@@ -30064,7 +30470,7 @@ function hasScheme(p) {
   return /^[A-Za-z][A-Za-z0-9+.-]+:/.test(p);
 }
 function matchAlias(p) {
-  for (const name of ALIASES) {
+  for (const name of ALIASES2) {
     const token = `@${name}`;
     if (!p.startsWith(token)) continue;
     const after = p.slice(token.length);
@@ -30163,17 +30569,17 @@ function projectAssetsDir(projectFilePath) {
   const { head: dir, tail: name } = split(ops, projectFilePath);
   const leadingDots = /^\.*/.exec(name)[0].length;
   const dot = name.lastIndexOf(".");
-  const stem5 = dot >= leadingDots ? name.slice(0, dot) : name;
-  const folder = `${Array.from(stem5).slice(0, 248).join("")}_assets`;
+  const stem6 = dot >= leadingDots ? name.slice(0, dot) : name;
+  const folder = `${Array.from(stem6).slice(0, 248).join("")}_assets`;
   return dir ? ops.join(dir, folder) : folder;
 }
-var PATH_KEYS, PATH_KEY_SET, ALIASES, posix, win32;
+var PATH_KEYS, PATH_KEY_SET, ALIASES2, posix, win32;
 var init_paths = __esm({
   "../engine/src/io/paths.ts"() {
     "use strict";
     PATH_KEYS = ["image", "path", "resource", "protobuf_data_path", "lut_path"];
     PATH_KEY_SET = new Set(PATH_KEYS);
-    ALIASES = ["transitions", "colors", "emojis", "assets"];
+    ALIASES2 = ["transitions", "colors", "emojis", "assets"];
     posix = {
       sep: "/",
       splitRoot(p) {
@@ -30299,7 +30705,7 @@ function scoreEmoji(entry, query2) {
   const own2 = entry.id.toLowerCase();
   if (own2 === code || own2.replaceAll("-fe0f", "") === code) return 100;
   const name = entry.name.toLowerCase();
-  const alias = Object.hasOwn(ALIASES2, ql) ? ALIASES2[ql] : void 0;
+  const alias = Object.hasOwn(ALIASES3, ql) ? ALIASES3[ql] : void 0;
   const penalty = entry.skintone ? 5 : 0;
   if (alias && name === alias.toLowerCase()) return 95;
   if (name === ql) return 90 - penalty;
@@ -30327,13 +30733,13 @@ function searchEmojis(catalog, query2, group = "", limit = 10) {
   ranked.sort((a, b) => b.score - a.score || (a.entry.name < b.entry.name ? -1 : a.entry.name > b.entry.name ? 1 : 0));
   return ranked.slice(0, Math.max(1, Math.trunc(limit)));
 }
-var EMOJI_CATALOG_ASSET, ALIASES2;
+var EMOJI_CATALOG_ASSET, ALIASES3;
 var init_emojis = __esm({
   "../engine/src/io/emojis.ts"() {
     "use strict";
     init_catalog_data();
     EMOJI_CATALOG_ASSET = "emojis/catalog.json";
-    ALIASES2 = {
+    ALIASES3 = {
       heart: "red heart",
       love: "red heart",
       lol: "face with tears of joy",
@@ -30506,8 +30912,8 @@ function getTitleTemplate(template) {
   if (!ref) return DEFAULT_TITLE_TEMPLATE;
   if (isAbsolutePath(ref)) return void 0;
   const base = (ref.split(/[\\/]/).pop() ?? "").toLowerCase();
-  const stem5 = base.endsWith(".svg") ? base.slice(0, -4) : base;
-  return TITLE_TEMPLATES.find((t) => t.id.toLowerCase() === stem5 || t.name.toLowerCase() === base);
+  const stem6 = base.endsWith(".svg") ? base.slice(0, -4) : base;
+  return TITLE_TEMPLATES.find((t) => t.id.toLowerCase() === stem6 || t.name.toLowerCase() === base);
 }
 var DEFAULT_PREFERENCE, defaultFile, TITLE_TEMPLATES, DEFAULT_TITLE_TEMPLATE;
 var init_templates = __esm({
@@ -32886,7 +33292,7 @@ var init_rgba = __esm({
 
 // ../render-node/src/svg/fonts.ts
 import { existsSync as existsSync2 } from "node:fs";
-import { mkdir as mkdir2, open as open2, readdir, readFile as readFile2, rename as rename2, stat, writeFile as writeFile2 } from "node:fs/promises";
+import { mkdir as mkdir2, open as open2, readdir, readFile as readFile2, rename as rename2, stat, writeFile as writeFile3 } from "node:fs/promises";
 import { homedir as homedir2 } from "node:os";
 import path5 from "node:path";
 function cacheDir(env2 = process.env) {
@@ -32912,7 +33318,7 @@ async function writeCache(file3, cache5) {
   try {
     await mkdir2(path5.dirname(file3), { recursive: true });
     const tmp = `${file3}.${process.pid}.tmp`;
-    await writeFile2(tmp, JSON.stringify(cache5));
+    await writeFile3(tmp, JSON.stringify(cache5));
     await rename2(tmp, file3);
   } catch {
   }
@@ -33074,7 +33480,7 @@ function resolveFonts(index, familyLists) {
     const lowered = requested.map((f3) => f3.toLowerCase());
     if (lowered.some((f3) => index.has(f3) || GENERIC_FAMILIES.has(f3))) return void 0;
     for (const family of lowered) {
-      const alias = firstInstalled(index, ALIASES3[family] ?? []);
+      const alias = firstInstalled(index, ALIASES4[family] ?? []);
       if (alias) return alias;
     }
     return sansSerif;
@@ -33103,7 +33509,7 @@ function resolveFonts(index, familyLists) {
   if (files.size === 0) use("lato");
   return { files: [...files], fallbackFor, sansSerif, serif, monospace };
 }
-var CACHE_VERSION, FONT_EXTS, MAX_FONT_BYTES, FontIndex, shared, bufferCache, GENERIC_FAMILIES, ALIASES3, DEFAULT_SANS, DEFAULT_SERIF, DEFAULT_MONO;
+var CACHE_VERSION, FONT_EXTS, MAX_FONT_BYTES, FontIndex, shared, bufferCache, GENERIC_FAMILIES, ALIASES4, DEFAULT_SANS, DEFAULT_SERIF, DEFAULT_MONO;
 var init_fonts = __esm({
   "../render-node/src/svg/fonts.ts"() {
     "use strict";
@@ -33167,7 +33573,7 @@ var init_fonts = __esm({
     };
     bufferCache = /* @__PURE__ */ new Map();
     GENERIC_FAMILIES = /* @__PURE__ */ new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy"]);
-    ALIASES3 = {
+    ALIASES4 = {
       "dejavu sans": ["verdana", "bitstream vera sans"],
       "bitstream vera sans": ["dejavu sans", "verdana"],
       sans: ["dejavu sans", "verdana"],
@@ -33719,6 +34125,9 @@ var init_pixfmt_gen = __esm({
 // ../render-node/src/probe/probe.ts
 import { stat as stat3 } from "node:fs/promises";
 import path7 from "node:path";
+function isSequencePattern(file3) {
+  return /%0?\d*d/.test(path7.basename(file3));
+}
 function gcd3(a, b) {
   a = Math.abs(a);
   b = Math.abs(b);
@@ -34028,7 +34437,9 @@ async function probe(filePath, options = {}) {
     size = st.size;
   } catch (error62) {
     if (error62 instanceof ProbeError) throw error62;
-    throw new ProbeError(`File not found: ${file3}`, file3);
+    const folder = isSequencePattern(file3) ? await stat3(path7.dirname(file3)).catch(() => void 0) : void 0;
+    if (!folder?.isDirectory()) throw new ProbeError(`File not found: ${file3}`, file3);
+    size = -1;
   }
   const ext = path7.extname(file3).slice(1).toLowerCase();
   if (!FFMPEG_EXTS.has(ext) && !file3.includes("%")) {
@@ -34253,12 +34664,16 @@ function fpsValue(fps2) {
 function scaleFlags(quality) {
   return quality === "export" ? "bicubic" : "fast_bilinear";
 }
+function isImageSequence2(file3) {
+  const name = file3.split(/[\\/]/).pop() ?? file3;
+  return /%0?\d*d/.test(name);
+}
 function videoDecodeArgs(source2, startFrame, size, quality = "export") {
   const fps2 = fpsValue(source2.fps);
-  const delta = 0.25 / fps2;
+  const sequence = isImageSequence2(source2.path);
   const nominal = (source2.videoStart ?? 0) - (source2.formatStart ?? 0) + startFrame / fps2;
-  const seek = Math.max(0, nominal - delta);
-  const shift2 = nominal - seek;
+  const seek = sequence ? Math.floor(Math.max(0, nominal) * 1e6) / 1e6 : Math.max(0, nominal - 0.25 / fps2);
+  const shift2 = sequence ? 0 : nominal - seek;
   const fpsText = `${source2.fps.num > 0 ? source2.fps.num : 30}/${source2.fps.den > 0 ? source2.fps.den : 1}`;
   const filters = [
     shift2 > 0 ? `setpts=PTS-${shift2.toFixed(9)}/TB` : "setpts=PTS",
@@ -34272,6 +34687,7 @@ function videoDecodeArgs(source2, startFrame, size, quality = "export") {
     "error",
     "-nostdin",
     ...source2.autorotate === false ? ["-noautorotate"] : [],
+    ...sequence ? ["-framerate", fpsText] : [],
     ...seek > 0 ? ["-ss", seek.toFixed(6)] : [],
     "-i",
     source2.path,
@@ -34994,8 +35410,8 @@ function simplifyGain(points2, tolerance = 1e-4) {
     const prev = out[out.length - 1];
     const cur = sorted[i];
     const next = sorted[i + 1];
-    const span3 = next.t - prev.t;
-    const expected = span3 > 0 ? prev.gain + (next.gain - prev.gain) * (cur.t - prev.t) / span3 : cur.gain;
+    const span4 = next.t - prev.t;
+    const expected = span4 > 0 ? prev.gain + (next.gain - prev.gain) * (cur.t - prev.t) / span4 : cur.gain;
     if (Math.abs(expected - cur.gain) > tolerance || cur.t === prev.t) out.push(cur);
   }
   out.push(sorted[sorted.length - 1]);
@@ -35080,14 +35496,14 @@ async function buildAudioGraph(options) {
     const sourceSpan = Math.abs(rate) * part.length;
     const a = segment.sourceStart + rate * part.offset;
     let lo = rate > 0 ? a : a - sourceSpan;
-    let span3 = sourceSpan;
+    let span4 = sourceSpan;
     if (lo < 0) {
-      span3 += lo;
+      span4 += lo;
       lo = 0;
     }
-    if (span3 <= 1e-6) continue;
+    if (span4 <= 1e-6) continue;
     const index = options.firstInput + inputs.length;
-    const source2 = { path: file3, seek: Math.max(0, anchor2 + lo), duration: span3 };
+    const source2 = { path: file3, seek: Math.max(0, anchor2 + lo), duration: span4 };
     const toTimeline = ["asetpts=PTS-STARTPTS", ...rate < 0 ? ["areverse"] : [], ...atempoChain(rate), `aformat=sample_fmts=fltp:sample_rates=${sampleRate}:channel_layouts=${layout}`];
     let filters;
     const { runnable, missing } = options.effects ? splitEffects(segment.effects, options.effects.getKernel) : { runnable: [], missing: segment.effects.map((e) => e.type) };
@@ -37538,7 +37954,7 @@ function rasterizePolygonsAliased(subpaths, oddEven, clip2, sink) {
   const leftFP = clip2.left * Q16;
   const rightFP = (clip2.right + 1) * Q16;
   const lines2 = [];
-  const clipEdge = (st, slopeFP, edgeFP, winding) => {
+  const clipEdge2 = (st, slopeFP, edgeFP, winding) => {
     const right = edgeFP === rightFP;
     if (st.xFP === edgeFP) {
       if (slopeFP > 0 !== right) return false;
@@ -37594,8 +38010,8 @@ function rasterizePolygonsAliased(subpaths, oddEven, clip2, sink) {
     const slope = (bx - ax) / (by - ay);
     const slopeFP = Math.trunc(slope * 65536);
     const st = { xFP: aFP + q16Mul(slopeFP, iTop * Q16 + Q16 / 2 - ay * 1024), iTop, iBottom };
-    if (clipEdge(st, slopeFP, leftFP, winding)) return;
-    if (clipEdge(st, slopeFP, rightFP, winding)) return;
+    if (clipEdge2(st, slopeFP, leftFP, winding)) return;
+    if (clipEdge2(st, slopeFP, rightFP, winding)) return;
     lines2.push({ x: st.xFP, delta: slopeFP, top: st.iTop, bottom: st.iBottom, winding });
   };
   for (const pts of subpaths) {
@@ -47450,10 +47866,10 @@ function planAudio(project, range) {
       if (!list2) continue;
       const n = localFrame(c.window, f3);
       if (hasAudioAt(c, n) === 0) continue;
-      let span3;
-      if (c.time) span3 = spans2.get(c)?.get(n);
-      else if (c.mappedLength === 0 || n <= c.mappedLength) span3 = { start: mappedOffset(c, grid, n) / sampleRate, rate: 1, continues: true };
-      if (!span3) continue;
+      let span4;
+      if (c.time) span4 = spans2.get(c)?.get(n);
+      else if (c.mappedLength === 0 || n <= c.mappedLength) span4 = { start: mappedOffset(c, grid, n) / sampleRate, rate: 1, continues: true };
+      if (!span4) continue;
       const layerClips = here.filter((o) => o.layer === c.layer);
       const [gPrev, gCur] = masks.length ? transitionGains(c, f3, top.get(c.layer) === c, layerClips, masks) : [1, 1];
       let pv = f3224(volumeAt(c, n - 1) * gPrev);
@@ -47472,7 +47888,7 @@ function planAudio(project, range) {
         n,
         t0: grid.time(f3),
         t1: grid.time(f3 + 1),
-        span: span3,
+        span: span4,
         pv,
         v,
         filter: intAt(c.channelFilter, n),
@@ -48938,7 +49354,7 @@ var init_text = __esm({
 // ../render-node/src/render/render-project.ts
 import { once } from "node:events";
 import { performance } from "node:perf_hooks";
-import { mkdir as mkdir3, mkdtemp, readdir as readdir2, rename as rename3, rm as rm2, stat as stat5, writeFile as writeFile3 } from "node:fs/promises";
+import { mkdir as mkdir3, mkdtemp, readdir as readdir2, rename as rename3, rm as rm2, stat as stat5, writeFile as writeFile4 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path12 from "node:path";
 import { randomBytes as randomBytes2 } from "node:crypto";
@@ -48955,8 +49371,8 @@ function exportFrameRange(project, fps2, range) {
 function pngPattern(output2) {
   if (/%0?\d*d/.test(output2)) return output2;
   const ext = path12.extname(output2);
-  const stem5 = ext ? output2.slice(0, -ext.length) : output2;
-  return `${stem5}_%05d.png`;
+  const stem6 = ext ? output2.slice(0, -ext.length) : output2;
+  return `${stem6}_%05d.png`;
 }
 function ffmpegMajor() {
   versionPromise ??= binaryVersion("ffmpeg").then((v) => ffmpegMajorVersion(v.version)).catch(() => 99);
@@ -49026,7 +49442,7 @@ async function renderProject(project, opts) {
       scriptPath
     });
     if (command.script) {
-      await writeFile3(command.script.path, command.script.contents);
+      await writeFile4(command.script.path, command.script.contents);
       scriptWritten = true;
     }
     encoder = spawnManaged(resolveBinary("ffmpeg"), command.args, { signal, stdin: info.video ? "pipe" : "ignore", stdout: "ignore" });
@@ -49485,14 +49901,14 @@ async function transcribeMediaFile(file3, options) {
   let envelope;
   if (duration3 > format.chunkSeconds) envelope = await analyzeAudio(file3, { signal });
   const pieces = planSpeechChunks(duration3, format.chunkSeconds, envelope);
-  const stem5 = path13.basename(file3, path13.extname(file3)).replace(/[^\w.-]+/g, "_").slice(0, 60) || "speech";
+  const stem6 = path13.basename(file3, path13.extname(file3)).replace(/[^\w.-]+/g, "_").slice(0, 60) || "speech";
   const parts = [];
   for (const [i, [start, end]] of pieces.entries()) {
     if (signal?.aborted) throw new AbortedError();
     const bytes = await extractSpeechAudio(file3, { start, duration: end - start }, format, signal);
     const piece = {
       bytes,
-      fileName: `${stem5}${pieces.length > 1 ? `-${i + 1}` : ""}.${format.extension}`,
+      fileName: `${stem6}${pieces.length > 1 ? `-${i + 1}` : ""}.${format.extension}`,
       contentType: format.contentType,
       offset: start
     };
@@ -49595,7 +50011,7 @@ var init_paths2 = __esm({
 // ../render-node/src/host/storage.ts
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes as randomBytes3 } from "node:crypto";
-import { open as open6, readFile as readFile5, rename as rename4, rm as rm3, stat as stat6, writeFile as writeFile4 } from "node:fs/promises";
+import { open as open6, readFile as readFile5, rename as rename4, rm as rm3, stat as stat6, writeFile as writeFile5 } from "node:fs/promises";
 import { hostname as hostname4 } from "node:os";
 import path15 from "node:path";
 function describeParseError(error62) {
@@ -49669,7 +50085,7 @@ function pidAlive(pid) {
 }
 async function tryAcquire(lockFile) {
   try {
-    await writeFile4(lockFile, JSON.stringify({ pid: process.pid, host: hostname4(), at: Date.now() }), { flag: "wx" });
+    await writeFile5(lockFile, JSON.stringify({ pid: process.pid, host: hostname4(), at: Date.now() }), { flag: "wx" });
     return true;
   } catch (error62) {
     if (error62.code !== "EEXIST") throw error62;
@@ -49738,7 +50154,7 @@ var init_storage = __esm({
 
 // ../render-node/src/host/media.ts
 import { createWriteStream } from "node:fs";
-import { copyFile, mkdir as mkdir4, readdir as readdir3, rm as rm4, stat as stat7, writeFile as writeFile5 } from "node:fs/promises";
+import { copyFile, mkdir as mkdir4, readdir as readdir3, rm as rm4, stat as stat7, writeFile as writeFile6 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
 import path16 from "node:path";
 import { Readable } from "node:stream";
@@ -49799,11 +50215,11 @@ async function listPaths(entry) {
   const target = localPath(entry);
   try {
     const st = await stat7(target);
-    if (st.isFile()) return { kind: "file", files: [target] };
+    if (st.isFile()) return { kind: "file", files: [target], path: target };
     if (st.isDirectory()) {
       const files = [];
       await walkFiles(target, files);
-      return { kind: "directory", files };
+      return { kind: "directory", files, path: target };
     }
   } catch {
   }
@@ -49815,9 +50231,40 @@ async function listPaths(entry) {
     const all = [];
     await walkFiles(base.split("/").join(path16.sep) || path16.sep, all);
     const files = all.filter((f3) => pattern.test(f3.split(path16.sep).join("/").slice(base.length)));
-    return { kind: "glob", files };
+    return { kind: "glob", files, path: target };
   }
-  return { kind: "missing", files: [] };
+  return { kind: "missing", files: [], path: target };
+}
+async function missingOnDisk(files, resolve) {
+  const folders = /* @__PURE__ */ new Map();
+  const namesIn2 = (folder) => {
+    let hit = folders.get(folder);
+    if (!hit) {
+      hit = readdir3(folder).catch(() => null);
+      folders.set(folder, hit);
+    }
+    return hit;
+  };
+  return Promise.all(
+    files.map(async (file3) => {
+      const stored = typeof file3.path === "string" ? file3.path : "";
+      if (!stored) return true;
+      let local;
+      try {
+        local = resolve(stored);
+      } catch {
+        return true;
+      }
+      if (local.includes("%")) {
+        const names2 = await namesIn2(path16.dirname(local));
+        return names2 === null || !sequenceFramesPresent(local, names2);
+      }
+      return stat7(local).then(
+        () => false,
+        () => true
+      );
+    })
+  );
 }
 function safeName(name) {
   const base = path16.basename(name);
@@ -49828,9 +50275,9 @@ function safeName(name) {
 }
 async function uniquePath(dir, name) {
   const ext = path16.extname(name);
-  const stem5 = ext ? name.slice(0, -ext.length) : name;
+  const stem6 = ext ? name.slice(0, -ext.length) : name;
   for (let n = 1; n < 1e4; n += 1) {
-    const candidate = path16.join(dir, n === 1 ? name : `${stem5} (${n})${ext}`);
+    const candidate = path16.join(dir, n === 1 ? name : `${stem6} (${n})${ext}`);
     try {
       await stat7(candidate);
     } catch {
@@ -49920,7 +50367,7 @@ function createNodeMediaHost(options) {
     async writeGenerated(name, bytes, contentType2) {
       const sub = contentType2 === "image/svg+xml" || name.toLowerCase().endsWith(".svg") ? "title" : "media";
       const dest = await uniquePath(await mediaDir(sub), safeName(name));
-      await writeFile5(dest, bytes);
+      await writeFile6(dest, bytes);
       return dest;
     }
   };
@@ -50071,13 +50518,16 @@ function createNodeHost(options = {}) {
   const defaultOutput = (options_) => {
     const ext = FORMATS[options_.format]?.extension ?? "mp4";
     const project = current();
-    const stem5 = project ? path17.basename(project, path17.extname(project)) : "zenvi-export";
-    return path17.join(baseDir(), `${stem5}.${ext}`);
+    const stem6 = project ? path17.basename(project, path17.extname(project)) : "zenvi-export";
+    return path17.join(baseDir(), `${stem6}.${ext}`);
   };
   const host = {
     resolveMedia,
     projectFile: current,
-    media: createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes }),
+    media: {
+      ...createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes }),
+      missing: (files) => missingOnDisk(files, resolveMedia)
+    },
     exporter: {
       async export(project, exportOptions, onProgress) {
         const output2 = exportOptions.output ? inProject(exportOptions.output) : defaultOutput(exportOptions);
@@ -50244,6 +50694,7 @@ __export(src_exports, {
   loadRoots: () => loadRoots,
   localPath: () => localPath,
   mapPathValues: () => mapPathValues,
+  missingOnDisk: () => missingOnDisk,
   nodeTextRasterizer: () => nodeTextRasterizer,
   num: () => num6,
   orientationFilters: () => orientationFilters,
@@ -50496,9 +50947,9 @@ function reusableHash(file3, size, mtime) {
 }
 function uniqueName(name, taken) {
   const ext = path18.extname(name);
-  const stem5 = ext ? name.slice(0, -ext.length) : name;
+  const stem6 = ext ? name.slice(0, -ext.length) : name;
   let candidate = name;
-  for (let n = 2; taken.has(candidate.toLowerCase()); n += 1) candidate = `${stem5} (${n})${ext}`;
+  for (let n = 2; taken.has(candidate.toLowerCase()); n += 1) candidate = `${stem6} (${n})${ext}`;
   taken.add(candidate.toLowerCase());
   return candidate;
 }
@@ -50559,8 +51010,8 @@ async function pushProject(options) {
       continue;
     }
     const sha256 = reusableHash(file3, size, mtime) ?? await sha256File(local);
-    const displayName2 = typeof file3.name === "string" && file3.name && path18.extname(file3.name) ? file3.name : path18.basename(local);
-    media.push({ file: file3, local, sha256, size, mtime, contentType: contentType2, cloudName: uniqueName(displayName2, taken) });
+    const displayName3 = typeof file3.name === "string" && file3.name && path18.extname(file3.name) ? file3.name : path18.basename(local);
+    media.push({ file: file3, local, sha256, size, mtime, contentType: contentType2, cloudName: uniqueName(displayName3, taken) });
     done += 1;
   }
   const unique = [...new Map(media.map((m) => [m.sha256, m])).values()];
@@ -56108,13 +56559,10 @@ var init_pending = __esm({
   "../engine/src/tools/pending.ts"() {
     "use strict";
     PENDING_DESKTOP_TOOLS = /* @__PURE__ */ new Set([
-      "add_transitions_between_clips_tool",
       "cancel_comfyui_job_tool",
       "capture_editor_screenshot_tool",
       "consolidate_project_media_tool",
-      "copy_transition_tool",
       "create_media_with_comfyui_tool",
-      "create_subclips_tool",
       "enhance_file_with_comfyui_tool",
       "export_files_to_folder_tool",
       "export_project_file_tool",
@@ -56123,33 +56571,24 @@ var init_pending = __esm({
       "get_editor_layout_tool",
       "get_log_paths_tool",
       "get_preferences_tool",
-      "import_image_sequence_tool",
       "import_project_file_tool",
       "ingest_web_video_tool",
       "list_comfyui_jobs_tool",
       "list_comfyui_templates_tool",
       "list_export_presets_tool",
-      "list_project_files_tool",
       "list_project_profiles_tool",
       "list_recent_projects_tool",
       "list_recovery_versions_tool",
-      "list_timeline_transitions_tool",
       "manage_custom_profiles_tool",
-      "manage_optimized_previews_tool",
       "mcp_health_tool",
       "prepare_recording_tool",
-      "remove_files_from_project_tool",
-      "remove_transition_tool",
       "reset_caches_and_history_tool",
       "restore_recovery_version_tool",
-      "reverse_transition_tool",
       "save_frame_image_tool",
       "send_assistant_prompt_tool",
       "set_editor_layout_tool",
       "set_preference_tool",
       "set_project_profile_tool",
-      "update_project_files_tool",
-      "update_transition_tool",
       "wait_for_editor_job_tool",
       "zenvi_api_request"
     ]);
@@ -56250,8 +56689,8 @@ function sceneSourceTime(scene, metadata) {
   if (isRecord23(metadata) && isRecord23(metadata.source_window)) {
     const ws = pyNum(metadata.source_window.start);
     const we = pyNum(metadata.source_window.end);
-    const span3 = Math.max(0, we - ws);
-    if (span3 > 0 && t <= span3 + 1) return ws + t;
+    const span4 = Math.max(0, we - ws);
+    if (span4 > 0 && t <= span4 + 1) return ws + t;
   }
   return t;
 }
@@ -58084,9 +58523,9 @@ function freeName(prefix, offset, taken, limit = 1e3) {
   return null;
 }
 function versionName(current, taken) {
-  const stem5 = (String(current).split(/[\\/]/).pop() ?? "").replace(/\.[^.]*$/, "");
-  const m = /^(.*?) v(\d+)$/.exec(stem5);
-  const [base, n] = m ? [m[1], Number(m[2])] : [stem5, 1];
+  const stem6 = (String(current).split(/[\\/]/).pop() ?? "").replace(/\.[^.]*$/, "");
+  const m = /^(.*?) v(\d+)$/.exec(stem6);
+  const [base, n] = m ? [m[1], Number(m[2])] : [stem6, 1];
   const used = new Set([...taken].map((name) => name.toLowerCase()));
   for (let k = n + 1; k < n + 1e3; k += 1) {
     const name = `${base} v${k}.svg`;
@@ -59969,7 +60408,7 @@ async function generateVideo(call, prompt, durationSeconds, extra) {
     signal: call.signal
   });
   if (!res.ok) return { error: res.error };
-  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: bareError(res.data.error, "Video generation failed") };
   return { videoUrl: String(res.data.video_url ?? "") };
 }
 async function generateTts(call, input3) {
@@ -59979,8 +60418,11 @@ async function generateTts(call, input3) {
     signal: call.signal
   });
   if (!res.ok) return { error: res.error };
-  if (!res.data.success) return { error: String(res.data.error || "TTS generation failed") };
+  if (!res.data.success) return { error: bareError(res.data.error, "TTS generation failed") };
   return { audioBase64: String(res.data.audio_base64 ?? "") };
+}
+function bareError(value, fallback) {
+  return String(value || fallback).trim().replace(/^error:\s*/i, "") || fallback;
 }
 async function searchPexelsVideos(call, search, perPage) {
   const res = await backendRequest(call.host.backend, `/api/v1/pexels/search${query({ query: search, per_page: perPage, page: 1 })}`, { signal: call.signal });
@@ -60869,12 +61311,12 @@ function splitCue(cue, maxWords = 8, maxChars = 42) {
   if (fits(words3, mw, mc)) return [{ start: cue.start, end: cue.end, text: words3.join(" ") }];
   const groups = phrases(words3.join(" "), mw, mc);
   const total = groups.reduce((sum, g) => sum + joinedLength(g) + 1, 0);
-  const span3 = Math.max(0, cue.end - cue.start);
+  const span4 = Math.max(0, cue.end - cue.start);
   const out = [];
   let t = cue.start;
   groups.forEach((group, i) => {
     const text5 = group.join(" ");
-    const end = i === groups.length - 1 ? cue.end : t + span3 * (Array.from(text5).length + 1) / total;
+    const end = i === groups.length - 1 ? cue.end : t + span4 * (Array.from(text5).length + 1) / total;
     out.push({ start: t, end, text: text5 });
     t = end;
   });
@@ -61429,10 +61871,10 @@ var init_captions = __esm({
           }
           if (adjusted) warnings.push(`${adjusted} caption(s) were adjusted so libopenshot draws them fully (':' between digits and one-letter lines)`);
           let carrier;
-          let span3 = [0, 0];
+          let span4 = [0, 0];
           if (prepared[0].clip === null) {
             const ready2 = prepared[0].cues;
-            span3 = [Math.min(...ready2.map((q) => q.start)), Math.max(...ready2.map((q) => q.end))];
+            span4 = [Math.min(...ready2.map((q) => q.start)), Math.max(...ready2.map((q) => q.end))];
             carrier = await prepareOverlayCarrier(call);
           }
           const props = style.properties(call.doc.project, 2);
@@ -61445,7 +61887,7 @@ var init_captions = __esm({
               let cues;
               let entry;
               if (plan.clip === null) {
-                const [spanStart, spanEnd] = span3;
+                const [spanStart, spanEnd] = span4;
                 const { layer: layer2, created } = planOverlayTrack(tx.project, spanStart, spanEnd, overlayTrack);
                 const file3 = carrierFile(tx, carrier);
                 const overlay = placeOverlayClip(tx, {
@@ -63078,14 +63520,14 @@ function cueTimes2(cues, winStart, winEnd) {
   return out;
 }
 function planSampleTimes(winStart, winEnd, cues, maxFrames = WATCH_MAX_FRAMES, extraTimes = []) {
-  const span3 = Math.max(0, winEnd - winStart);
-  const sparse = span3 > DENSE_WINDOW_SEC;
+  const span4 = Math.max(0, winEnd - winStart);
+  const sparse = span4 > DENSE_WINDOW_SEC;
   let warning = "";
   let times = [];
   if (sparse) {
-    warning = `Window is ${pyFixed(span3, 1)}s; sparse-scanned (not a dense watch). Narrow the candidate window if the cut looks off.`;
+    warning = `Window is ${pyFixed(span4, 1)}s; sparse-scanned (not a dense watch). Narrow the candidate window if the cut looks off.`;
     const n = Math.max(2, Math.trunc(maxFrames));
-    const step = span3 / Math.max(n - 1, 1);
+    const step = span4 / Math.max(n - 1, 1);
     times = Array.from({ length: n }, (_, i) => winStart + i * step);
   } else {
     for (let t = winStart; t <= winEnd + 1e-6; t += 0.5) times.push(t);
@@ -63104,8 +63546,8 @@ function planSampleTimes(winStart, winEnd, cues, maxFrames = WATCH_MAX_FRAMES, e
   return { times: rounded, warning, sparse };
 }
 function pickDenseSubwindow(winStart, winEnd, extraTimes) {
-  const span3 = Math.max(0, winEnd - winStart);
-  if (span3 <= DENSE_WINDOW_SEC + 1e-6) return [winStart, winEnd];
+  const span4 = Math.max(0, winEnd - winStart);
+  if (span4 <= DENSE_WINDOW_SEC + 1e-6) return [winStart, winEnd];
   const pts = extraTimes.filter((t) => winStart - 1e-3 <= t && t <= winEnd + 1e-3).sort((a, b) => a - b);
   let center = (winStart + winEnd) / 2;
   if (pts.length > 0) {
@@ -66035,20 +66477,20 @@ function effectCatalog() {
   cached3 ??= buildCatalog();
   return cached3;
 }
-function normName(text5) {
+function normName2(text5) {
   return Array.from(String(text5 ?? "").toLowerCase()).filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("");
 }
 function resolveEffectName(name) {
   const cat = effectCatalog();
-  const key = normName(name);
+  const key = normName2(name);
   if (!key) throw new ToolError("name the effect (see list_effects_tool)");
   for (const [cn, spec] of cat) {
-    if (key === normName(cn) || key === normName(spec.name)) return cn;
+    if (key === normName2(cn) || key === normName2(spec.name)) return cn;
   }
-  const alias = ALIASES4[key];
+  const alias = ALIASES5[key];
   if (alias && cat.has(alias)) return alias;
   for (const [cn, spec] of cat) {
-    if (normName(spec.name).startsWith(key) && key.length >= 4) return cn;
+    if (normName2(spec.name).startsWith(key) && key.length >= 4) return cn;
   }
   const close = getCloseMatches(String(name), [...cat.keys()], 4, 0.5);
   const hint = close.length > 0 ? `; did you mean ${close.join(", ")}?` : "";
@@ -66057,7 +66499,7 @@ function resolveEffectName(name) {
 function effectKind(className) {
   return effectCatalog().get(className)?.kind ?? "video";
 }
-var HIDDEN_PROPERTIES, COMMON_PROPERTIES, PROCESSING_EFFECTS, AUDIO_REACTIVE_EFFECTS, ALIASES4, COLORS_NOT_FLAGGED_KEYFRAME, cached3;
+var HIDDEN_PROPERTIES, COMMON_PROPERTIES, PROCESSING_EFFECTS, AUDIO_REACTIVE_EFFECTS, ALIASES5, COLORS_NOT_FLAGGED_KEYFRAME, cached3;
 var init_effect_catalog = __esm({
   "../engine/src/tools/catalog/effect-catalog.ts"() {
     "use strict";
@@ -66092,7 +66534,7 @@ var init_effect_catalog = __esm({
     COMMON_PROPERTIES = ["apply_before_clip", "mask_invert", "mask_loop_mode", "mask_time_mode", "mask_reader", "mask_source_id"];
     PROCESSING_EFFECTS = ["Stabilizer", "Tracker", "ObjectDetection", "ObjectMask"];
     AUDIO_REACTIVE_EFFECTS = /* @__PURE__ */ new Set(["AudioVisualization", "BeatSync"]);
-    ALIASES4 = {
+    ALIASES5 = {
       greenscreen: "ChromaKey",
       bluescreen: "ChromaKey",
       chroma: "ChromaKey",
@@ -67498,9 +67940,9 @@ function choiceValue(pname, spec, value) {
   const choices = spec.choices ?? [];
   let v = value;
   if (typeof v === "string") {
-    const key = normName(v);
-    for (const c of choices) if (normName(c.name) === key) return c.value;
-    for (const c of choices) if (key && normName(c.name).startsWith(key)) return c.value;
+    const key = normName2(v);
+    for (const c of choices) if (normName2(c.name) === key) return c.value;
+    for (const c of choices) if (key && normName2(c.name).startsWith(key)) return c.value;
     const f3 = parsePythonFloat(v);
     if (f3 === null) {
       const names4 = choices.map((c) => String(c.name)).join(", ");
@@ -67923,14 +68365,14 @@ var init_effects_color = __esm({
             const spec = cat.get(cn);
             return ok(call, `${spec.name} (${cn}): ${spec.description}`, { effect: effectSpec(spec), common_properties: commonProperties() });
           }
-          const q = normName(query2);
+          const q = normName2(query2);
           const words3 = query2.toLowerCase().split(/\s+/).filter(Boolean);
           const rows = [];
           const sorted = [...cat.entries()].sort(([a, sa], [b, sb]) => sa.kind < sb.kind ? -1 : sa.kind > sb.kind ? 1 : a < b ? -1 : a > b ? 1 : 0);
           for (const [cn, spec] of sorted) {
             if (kind !== "all" && spec.kind !== kind) continue;
             const hay = `${cn} ${spec.name} ${spec.description}`.toLowerCase();
-            if (q && !(normName(hay).includes(q) || words3.every((w) => hay.includes(w)))) continue;
+            if (q && !(normName2(hay).includes(q) || words3.every((w) => hay.includes(w)))) continue;
             const row = { effect: spec.effect, name: spec.name, description: spec.description, kind: spec.kind };
             if (spec.needs_processing) row.needs_processing = true;
             const own2 = Object.entries(spec.properties).filter(([k]) => !COMMON_PROPERTIES.includes(k));
@@ -68967,16 +69409,16 @@ function clampMaxFrames(raw) {
   return [n, warnings];
 }
 function midBinFrames(start, end, count2) {
-  const span3 = Math.trunc(end) - Math.trunc(start);
-  if (span3 <= 0) return [];
-  const n = Math.max(1, Math.min(Math.trunc(count2), span3));
-  return Array.from({ length: n }, (_, i) => Math.trunc(start) + Math.trunc(span3 * (i + 0.5) / n));
+  const span4 = Math.trunc(end) - Math.trunc(start);
+  if (span4 <= 0) return [];
+  const n = Math.max(1, Math.min(Math.trunc(count2), span4));
+  return Array.from({ length: n }, (_, i) => Math.trunc(start) + Math.trunc(span4 * (i + 0.5) / n));
 }
 function midBinSeconds(start, end, count2) {
-  const span3 = end - start;
-  if (span3 <= 0) return [];
+  const span4 = end - start;
+  if (span4 <= 0) return [];
   const n = Math.max(1, Math.trunc(count2));
-  return Array.from({ length: n }, (_, i) => start + span3 * (i + 0.5) / n);
+  return Array.from({ length: n }, (_, i) => start + span4 * (i + 0.5) / n);
 }
 function formatTimecode2(seconds2) {
   let whole = Math.trunc(Math.max(0, seconds2));
@@ -69613,6 +70055,1411 @@ ${placed.text}`;
   }
 });
 
+// ../engine/src/tools/catalog/media-files.ts
+function baseName(data) {
+  return folderAndName(String(data.path || "")).name;
+}
+function displayName(data) {
+  return String(data.name || baseName(data) || data.id || "?");
+}
+function tagsOf(data) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const part of String(data.tags || "").split(",")) {
+    const tag = part.trim();
+    if (tag && !seen.has(tag.toLowerCase())) {
+      seen.add(tag.toLowerCase());
+      out.push(tag);
+    }
+  }
+  return out;
+}
+function kindOf(data) {
+  const path39 = String(data.path || "");
+  if (path39.includes("%")) return "image_sequence";
+  if (path39.toLowerCase().endsWith(".svg") && !path39.toLowerCase().includes("emoji")) return "title";
+  const mediaType = String(data.media_type || "").toLowerCase();
+  return ["video", "audio", "image"].includes(mediaType) ? mediaType : "video";
+}
+function stemOf(name) {
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(0, dot) : name;
+}
+function fpsParts(data) {
+  const fps2 = data.fps && typeof data.fps === "object" ? data.fps : {};
+  const num14 = Math.trunc(Number(fps2.num) || 0);
+  const den2 = Math.trunc(Number(fps2.den) || 1);
+  return [Number.isFinite(num14) ? num14 : 0, den2 || 1];
+}
+function clipUsage(project) {
+  const usage = /* @__PURE__ */ new Map();
+  const clips = project.clips.map((c, i) => ({ c, i })).sort((a, b) => (Number(a.c.position) || 0) - (Number(b.c.position) || 0) || (Number(a.c.layer) || 0) - (Number(b.c.layer) || 0) || a.i - b.i);
+  for (const { c } of clips) {
+    const key = String(c.file_id || "");
+    const list2 = usage.get(key) ?? [];
+    list2.push(c.id);
+    usage.set(key, list2);
+  }
+  return usage;
+}
+async function missingFlags(call, files) {
+  const check2 = call.host.media?.missing;
+  const flags = check2 && files.length > 0 ? await check2.call(call.host.media, files) : null;
+  return new Map(files.map((f3, i) => [f3.id, flags ? Boolean(flags[i]) : null]));
+}
+function describeFile(file3, usage, missing, full) {
+  const data = file3;
+  const clipIds = usage.get(String(file3.id)) ?? [];
+  const [start, end] = sourceWindowForFile(data);
+  const kind = kindOf(data);
+  const still = kind === "image" || kind === "title";
+  const out = {
+    file_id: String(file3.id),
+    name: displayName(data),
+    file_name: baseName(data),
+    kind,
+    // A still has no length of its own (libopenshot reports 3600 s); on the timeline it
+    // lasts the Image Length preference unless trimmed.
+    duration: still ? null : r3(Math.max(0, end - start)),
+    tags: tagsOf(data),
+    clip_count: clipIds.length
+  };
+  if (("start" in data || "end" in data) && !still) {
+    out.source_in = r3(start);
+    out.source_out = r3(end);
+  }
+  if (clipIds.length > 0) out.timeline_clip_ids = clipIds.slice(0, 20);
+  if (pyTruthy(data.zenvi_subclip) || pyTruthy(data.parent_file_id)) {
+    out.subclip = true;
+    out.parent_file_id = String(data.parent_file_id || "");
+  }
+  out.missing = missing;
+  if (kind === "video") out.optimized_preview = "none";
+  if (full) {
+    const [num14, den2] = fpsParts(data);
+    const display = data.display_ratio && typeof data.display_ratio === "object" ? data.display_ratio : {};
+    const pixel = data.pixel_ratio && typeof data.pixel_ratio === "object" ? data.pixel_ratio : {};
+    const hasAudio2 = pyTruthy(data.has_audio);
+    const layout = Math.trunc(Number(data.channel_layout) || 0);
+    const ai = data.ai_metadata;
+    Object.assign(out, {
+      path: String(data.path || ""),
+      media_duration: still ? null : r3(Number(data.duration) || 0),
+      width: data.width ?? null,
+      height: data.height ?? null,
+      fps: `${num14}/${den2}`,
+      fps_value: num14 ? r3(num14 / den2) : null,
+      frames: pyTruthy(data.video_length) ? Math.trunc(Number(data.video_length) || 0) : null,
+      has_video: pyTruthy(data.has_video),
+      has_audio: hasAudio2,
+      video_codec: data.vcodec || "",
+      audio_codec: data.acodec || "",
+      sample_rate: data.sample_rate ?? null,
+      channels: data.channels ?? null,
+      channel_layout: hasAudio2 ? LAYOUT_NAMES[layout] ?? String(data.channel_layout) : "none",
+      video_bit_rate: data.video_bit_rate ?? null,
+      audio_bit_rate: data.audio_bit_rate ?? null,
+      interlaced: pyTruthy(data.interlaced_frame),
+      display_ratio: `${display.num ?? ""}:${display.den ?? ""}`,
+      pixel_ratio: `${pixel.num ?? ""}:${pixel.den ?? ""}`,
+      file_size: data.file_size ?? null,
+      analyzed: ai && typeof ai === "object" && !Array.isArray(ai) ? pyTruthy(ai.analyzed) : false
+    });
+    const proxy = data.proxy_reader;
+    if (proxy && typeof proxy === "object" && proxy.path) out.optimized_preview_path = String(proxy.path);
+  } else {
+    out.path = String(data.path || "");
+  }
+  return out;
+}
+function queryScore(file3, q, words3) {
+  const data = file3;
+  const name = displayName(data).toLowerCase();
+  const base = baseName(data).toLowerCase();
+  const stem6 = stemOf(base);
+  const tags = tagsOf(data).map((t) => t.toLowerCase());
+  if ([String(file3.id).toLowerCase(), name, base, stem6].includes(q) || tags.includes(q)) return 3;
+  if (name.includes(q) || base.includes(q)) return 2;
+  const corpus = [name, base, ...tags].join(" ");
+  if (words3.length > 0 && words3.every((w) => corpus.includes(w))) return 1;
+  return 0;
+}
+function resolveFiles(project, fileIds, fileQuery) {
+  if (fileIds && fileIds.length > 0) {
+    const out = [];
+    for (const raw of fileIds) {
+      const fid = String(raw).trim();
+      const file3 = project.files.find((f3) => f3.id === fid);
+      if (!file3) throw new ToolError(`no project file with id=${pyReprString(fid)} (list_project_files_tool lists them)`);
+      if (!out.includes(file3)) out.push(file3);
+    }
+    return out;
+  }
+  const q = String(fileQuery ?? "").trim();
+  if (!q) throw new ToolError("say which file: file_ids or file_query");
+  const lower = q.toLowerCase();
+  const words3 = lower.split(/\s+/).filter(Boolean);
+  const scored = project.files.map((f3) => [queryScore(f3, lower, words3), f3]).filter(([s]) => s > 0);
+  if (scored.length === 0) throw new ToolError(`no project file matches ${pyReprString(q)} (list_project_files_tool lists them)`);
+  const best = Math.max(...scored.map(([s]) => s));
+  const top = scored.filter(([s]) => s === best).map(([, f3]) => f3);
+  if (top.length > 1) {
+    const names2 = top.slice(0, 8).map((f3) => `${pyReprString(displayName(f3))} (file_id=${f3.id})`).join(", ");
+    throw new ToolError(`${pyReprString(q)} matches ${top.length} files: ${names2}; pass file_ids`);
+  }
+  return top;
+}
+async function listProjectFiles(call, input3) {
+  const project = call.doc.project;
+  const usage = clipUsage(project);
+  const mediaType = input3.media_type ?? "";
+  const usageFilter = input3.usage ?? "";
+  const missingOnly = input3.missing_only ?? false;
+  const detail2 = input3.detail ?? "summary";
+  const limit = input3.limit ?? 100;
+  const wantedTags = (input3.tags ?? []).map((t) => String(t).trim().toLowerCase()).filter(Boolean);
+  const q = String(input3.query ?? "").trim().toLowerCase();
+  const words3 = q.split(/\s+/).filter(Boolean);
+  const onlyIds = new Set((input3.file_ids ?? []).map((i) => String(i).trim()).filter(Boolean));
+  const files = project.files;
+  if (onlyIds.size > 0) {
+    const known = new Set(files.map((f3) => String(f3.id)));
+    const unknown2 = [...onlyIds].filter((id) => !known.has(id)).sort();
+    if (unknown2.length > 0) throw new ToolError(`no project file with id(s) ${unknown2.join(", ")}`);
+  }
+  if (missingOnly && !call.host.media?.missing) {
+    return unavailable(call.tool, "it cannot check whether media files are missing here; call it without missing_only.");
+  }
+  const missing = await missingFlags(call, files);
+  const matched = files.filter((f3) => {
+    const data = f3;
+    if (onlyIds.size > 0 && !onlyIds.has(String(f3.id))) return false;
+    if (mediaType && kindOf(data) !== mediaType) return false;
+    if (words3.length > 0 && queryScore(f3, q, words3) === 0) return false;
+    if (wantedTags.length > 0) {
+      const have = new Set(tagsOf(data).map((t) => t.toLowerCase()));
+      if (!wantedTags.every((t) => have.has(t))) return false;
+    }
+    const used = (usage.get(String(f3.id)) ?? []).length > 0;
+    if (usageFilter === "unused" && used || usageFilter === "used" && !used) return false;
+    if (missingOnly && !missing.get(f3.id)) return false;
+    return true;
+  });
+  const shown = matched.slice(0, Math.trunc(limit)).map((f3) => describeFile(f3, usage, missing.get(f3.id) ?? null, detail2 === "full"));
+  const filters = [mediaType, q ? `'${q}'` : "", wantedTags.length > 0 ? `tags ${pyRepr2(wantedTags)}` : "", usageFilter, missingOnly ? "missing" : ""].filter(Boolean);
+  let summary = `${matched.length} of ${files.length} project files match${filters.length > 0 ? ` (${filters.join(", ")})` : ""}.`;
+  if (matched.length > shown.length) summary += ` Showing the first ${shown.length}.`;
+  return ok(call, summary, { files: shown, matched: matched.length, total_files: files.length });
+}
+function namesIn(folder, files) {
+  const out = /* @__PURE__ */ new Set();
+  for (const f3 of files) {
+    const split2 = folderAndName(f3);
+    if (split2.folder === folder) out.add(split2.name);
+  }
+  return out;
+}
+function byFolder(files) {
+  const out = /* @__PURE__ */ new Map();
+  for (const f3 of files) {
+    const { folder, name } = folderAndName(f3);
+    const list2 = out.get(folder) ?? [];
+    list2.push(name);
+    out.set(folder, list2);
+  }
+  return out;
+}
+function listPathsOf(call) {
+  const media = call.host.media;
+  const list2 = media?.listPaths;
+  if (!media || !list2) throw new ToolError("listing folders is not available here");
+  return (entry) => list2.call(media, entry);
+}
+async function relinkTarget(call, data, path39, searchFolder) {
+  const list2 = listPathsOf(call);
+  const wasSequence = isImageSequence(data);
+  const oldName = folderAndName(String(data.path || "")).name;
+  if (searchFolder) {
+    const listing2 = await list2(searchFolder);
+    if (listing2.kind !== "directory") throw new ToolError(`search_folder ${pyReprString(searchFolder)} is not a folder`);
+    if (wasSequence) {
+      const prefix = oldName.split("%", 1)[0] ?? "";
+      for (const [folder, names2] of byFolder(listing2.files)) {
+        const set2 = new Set(names2);
+        for (const n of names2.filter((x) => x.startsWith(prefix)).sort()) {
+          const sequence = detectImageSequence(joinFolder(folder, n), set2);
+          if (sequence && folderAndName(sequence.path).name === oldName) return { mediaPath: joinFolder(folder, n), sequence };
+        }
+      }
+      return null;
+    }
+    const found = listing2.files.find((f3) => folderAndName(f3).name === oldName);
+    return found ? { mediaPath: found, sequence: null } : null;
+  }
+  const listing = await list2(path39);
+  if (wasSequence) {
+    if (listing.kind === "directory") {
+      const folder2 = listing.path ?? folderAndName(listing.files[0] ?? "").folder;
+      const found = firstSequenceFrame(folder2, namesIn(folder2, listing.files));
+      if (!found) throw new ToolError(`no numbered image sequence in ${pyReprString(path39)}`);
+      return { mediaPath: found.first, sequence: found.sequence };
+    }
+    const file3 = listing.kind === "file" ? listing.files[0] : listing.path ?? path39;
+    const folder = folderAndName(file3).folder;
+    const folderListing = folder ? await list2(folder) : null;
+    const sequence = folderListing?.kind === "directory" ? detectImageSequence(file3, namesIn(folder, folderListing.files)) : null;
+    if (!sequence) throw new ToolError(`${pyReprString(path39)} is not a frame of a numbered image sequence (this file is a sequence)`);
+    return { mediaPath: file3, sequence };
+  }
+  if (listing.kind !== "file") throw new ToolError(`no file at ${pyReprString(path39)}`);
+  return { mediaPath: listing.files[0], sequence: null };
+}
+async function relinked(call, data, target) {
+  const media = call.host.media;
+  const oldSha = data.fingerprint && typeof data.fingerprint === "object" ? data.fingerprint.sha256 : void 0;
+  if (target.sequence) {
+    const reader2 = await probeReader(call, target.sequence.path);
+    const [num14, den2] = fpsParts(data);
+    const record6 = relinkedFileData(data, reader2, "video", null);
+    const start = record6.start;
+    const end = record6.end;
+    delete record6.start;
+    delete record6.end;
+    record6.fps = { ...reader2.fps ?? { num: 25, den: 1 } };
+    const rescaled = withSequenceFps(record6, { num: num14 || 25, den: den2 || 1 });
+    if (start !== void 0 && end !== void 0) {
+      rescaled.start = start;
+      rescaled.end = Math.min(Number(end), Number(rescaled.duration));
+    }
+    return { mediaPath: target.mediaPath, record: rescaled, sameContent: null };
+  }
+  let imported;
+  try {
+    imported = await media.importPath(target.mediaPath);
+  } catch (error62) {
+    throw new ToolError(`libopenshot cannot read ${pyReprString(target.mediaPath)} as media (${error62 instanceof Error ? error62.message : String(error62)})`);
+  }
+  if (!(Number(imported.info.duration) > 0)) throw new ToolError(`libopenshot cannot read ${pyReprString(target.mediaPath)} as media`);
+  const { media_type: _mt, ...reader } = imported.info;
+  const fingerprint2 = imported.fingerprint;
+  const mediaType = detectMediaType({ path: imported.path, info: imported.info, name: imported.name });
+  const record5 = relinkedFileData(data, { ...reader, path: imported.path }, mediaType, fingerprint2 ?? null);
+  const sameContent2 = !(oldSha && fingerprint2) ? null : oldSha === fingerprint2.sha256;
+  return { mediaPath: imported.path, record: record5, sameContent: sameContent2 };
+}
+async function probeReader(call, path39) {
+  let info;
+  try {
+    info = await call.host.media.probe(path39);
+  } catch {
+    throw new ToolError(`libopenshot cannot read ${pyReprString(path39)} as media`);
+  }
+  if (!(Number(info.duration) > 0)) throw new ToolError(`libopenshot cannot read ${pyReprString(path39)} as media`);
+  const { media_type: _mt, ...reader } = info;
+  return reader;
+}
+async function updateProjectFiles(call, input3) {
+  const files = resolveFiles(call.doc.project, input3.file_ids, input3.file_query);
+  const name = String(input3.name ?? "").trim();
+  const add = (input3.add_tags ?? []).map((t) => String(t).trim()).filter(Boolean);
+  const drop = new Set((input3.remove_tags ?? []).map((t) => String(t).trim().toLowerCase()).filter(Boolean));
+  const replace = input3.tags === void 0 || input3.tags === null ? null : input3.tags.map((t) => String(t).trim()).filter(Boolean);
+  const startArg = input3.source_start_seconds ?? null;
+  const endArg = input3.source_end_seconds ?? null;
+  const inOut = startArg !== null || endArg !== null;
+  const path39 = String(input3.path ?? "").trim();
+  const searchFolder = String(input3.search_folder ?? "").trim();
+  const relink = Boolean(path39 || searchFolder);
+  const resetInOut = input3.reset_in_out ?? false;
+  const fps2 = input3.fps ?? 0;
+  const renameClips = input3.rename_clips ?? false;
+  if (!(name || add.length > 0 || drop.size > 0 || replace !== null || relink || inOut || resetInOut || fps2)) {
+    throw new ToolError(
+      "nothing to change: pass name, tags/add_tags/remove_tags, path or search_folder, source_start/end_seconds, reset_in_out or fps"
+    );
+  }
+  const single3 = [["name", name], ["path", path39], ["source_start/end_seconds", inOut]].filter(([, used]) => used).map(([label2]) => label2);
+  if (single3.length > 0 && files.length > 1) throw new ToolError(`${single3.join(" and ")} apply to one file; ${files.length} were chosen`);
+  if (input3.path && input3.search_folder) throw new ToolError("pass path or search_folder, not both");
+  if (inOut && resetInOut) throw new ToolError("pass source_start/end_seconds or reset_in_out, not both");
+  if (renameClips && !name) throw new ToolError("rename_clips needs a name");
+  let sequenceFps = { num: 0, den: 1 };
+  if (fps2) {
+    const notSequences = files.filter((f3) => !isImageSequence(f3)).map((f3) => displayName(f3));
+    if (notSequences.length > 0) {
+      throw new ToolError(`only image sequences can change frame rate; ${notSequences.join(", ")} keep the rate their media was recorded at`);
+    }
+    sequenceFps = fpsFraction2(fps2);
+  }
+  const relinkedById = /* @__PURE__ */ new Map();
+  const notFound = [];
+  if (relink) {
+    if (!call.host.media?.importPath || !call.host.media.listPaths) {
+      return unavailable(
+        call.tool,
+        "relinking to a path (path, search_folder) needs local file access: use the zenvi CLI or Zenvi desktop, or Relink\u2026 on the file in the web editor's Project Files."
+      );
+    }
+    for (const f3 of files) {
+      const target = await relinkTarget(call, f3, path39, searchFolder);
+      if (!target) {
+        notFound.push(displayName(f3));
+        continue;
+      }
+      relinkedById.set(f3.id, await relinked(call, f3, target));
+    }
+    if (relinkedById.size === 0) throw new ToolError(`no media named like ${notFound.join(", ")} under ${pyReprString(searchFolder)}`);
+  }
+  const project = call.doc.project;
+  const plans = [];
+  for (const stale of files) {
+    const f3 = project.files.find((x) => x.id === stale.id);
+    if (!f3) throw new ToolError(`no project file with id=${pyReprString(stale.id)} (list_project_files_tool lists them)`);
+    const old = f3;
+    let next = structuredClone(relinkedById.get(f3.id)?.record ?? old);
+    if (name) next.name = name;
+    if (replace !== null || add.length > 0 || drop.size > 0) {
+      const current = replace ?? tagsOf(next);
+      const merged = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const t of [...current, ...add]) {
+        if (!seen.has(t.toLowerCase()) && !drop.has(t.toLowerCase())) {
+          seen.add(t.toLowerCase());
+          merged.push(t);
+        }
+      }
+      if (merged.length > 0 || "tags" in next) next.tags = merged.join(", ");
+    }
+    if (fps2) next = withSequenceFps(next, sequenceFps);
+    if (resetInOut) {
+      delete next.start;
+      delete next.end;
+    }
+    if (inOut) {
+      const [num14, den2] = fpsParts(next);
+      const rate = num14 ? num14 / den2 : gridOf(project).fps;
+      const mediaLength = Number(next.duration) || 0;
+      const [curStart, curEnd] = sourceWindowForFile(next);
+      const start = startArg !== null ? Number(startArg) : curStart;
+      let end = endArg !== null ? Number(endArg) : curEnd;
+      if (mediaLength > 0 && end > mediaLength + 1 / rate) {
+        throw new ToolError(`source_end_seconds ${pyFixed(end, 3)} is past the end of the media (${pyFixed(mediaLength, 3)}s)`);
+      }
+      end = mediaLength > 0 ? Math.min(end, mediaLength) : end;
+      if (end - start < 1 / rate) throw new ToolError(`the in-point (${pyFixed(start, 3)}s) must be before the out-point (${pyFixed(end, 3)}s)`);
+      next = withInOutFrames(next, pyRoundInt(start * rate) + 1, Math.max(1, pyRoundInt(end * rate)));
+    }
+    if (!sameJson(next, old) || renameClips && name) plans.push([f3, next]);
+  }
+  const receiptFiles = files.map((f3) => {
+    const entry = { file_id: f3.id };
+    const r = relinkedById.get(f3.id);
+    if (r) {
+      entry.path = r.mediaPath;
+      entry.same_content = r.sameContent;
+    }
+    return entry;
+  });
+  if (plans.length === 0) {
+    return nothingChanged(call, "No change: the file(s) already have those settings.", { files: receiptFiles, not_found: notFound });
+  }
+  const results = call.commit(
+    (tx) => plans.map(([f3, next]) => writeFile2(tx, f3.id, next, renameClips && name ? { clipTitle: name } : {}))
+  );
+  const updatedClips = [...new Set(results.flatMap((r) => r.updatedClipIds))];
+  const renamedClips = results.flatMap((r) => r.renamedClipIds);
+  for (const entry of receiptFiles) {
+    const result2 = results.find((r) => r.file.id === entry.file_id);
+    if (!result2) continue;
+    const data = result2.file;
+    entry.name = displayName(data);
+    entry.tags = tagsOf(data);
+    const [s, e] = sourceWindowForFile(data);
+    entry.duration = r3(e - s);
+    if ("start" in data) {
+      entry.source_in = r3(s);
+      entry.source_out = r3(e);
+    }
+    if (fps2) entry.fps = `${sequenceFps.num}/${sequenceFps.den}`;
+  }
+  const what = [
+    ["renamed", Boolean(name)],
+    ["tagged", add.length > 0 || drop.size > 0 || replace !== null],
+    ["relinked", relinkedById.size > 0],
+    ["in/out set", inOut || resetInOut],
+    ["frame rate set", Boolean(fps2)]
+  ].filter(([, used]) => used).map(([label2]) => label2);
+  let summary = `Updated ${plans.length} file(s): ${what.join(", ")}.`;
+  if (updatedClips.length > 0) summary += ` Refreshed ${updatedClips.length} timeline clip(s).`;
+  if (notFound.length > 0) summary += ` Not found under the folder: ${notFound.join(", ")}.`;
+  if (receiptFiles.some((e) => e.same_content === false)) summary += " Note: the new media is not the same file as before (content differs).";
+  return ok(call, summary, {
+    changed: true,
+    files: receiptFiles,
+    updated_clip_ids: [...updatedClips].sort(),
+    renamed_clip_ids: renamedClips,
+    not_found: notFound
+  });
+}
+function pyRoundInt(x) {
+  const f3 = Math.floor(x);
+  const diff2 = x - f3;
+  const r = diff2 > 0.5 ? f3 + 1 : diff2 < 0.5 ? f3 : f3 % 2 === 0 ? f3 : f3 + 1;
+  return r === 0 ? 0 : r;
+}
+async function importImageSequence(call, input3) {
+  if (!call.host.media?.listPaths) {
+    return unavailable(call.tool, "it cannot open local folders of frames. Import image sequences with the zenvi CLI or Zenvi desktop.");
+  }
+  const list2 = listPathsOf(call);
+  const given = String(input3.path);
+  const listing = await list2(given.trim());
+  let first;
+  let sequence;
+  let names2;
+  if (listing.kind === "directory") {
+    const folder = listing.path ?? folderAndName(listing.files[0] ?? "").folder;
+    names2 = namesIn(folder, listing.files);
+    const found = firstSequenceFrame(folder, names2);
+    if (!found) throw new ToolError(`no numbered image sequence (name0001.png, name0002.png...) in ${pyReprString(given)}`);
+    first = found.first;
+    sequence = found.sequence;
+  } else if (listing.kind === "file") {
+    first = listing.files[0];
+    const folder = folderAndName(first).folder;
+    names2 = namesIn(folder, (await list2(folder)).files);
+    const found = detectImageSequence(first, names2);
+    if (!found) {
+      throw new ToolError(`${pyReprString(folderAndName(first).name)} has no neighbouring numbered frames; import a single image with import_files_tool`);
+    }
+    sequence = found;
+  } else {
+    throw new ToolError(`no file or folder at ${pyReprString(given)}`);
+  }
+  const frames = sequenceFrameNumbers(sequence, names2);
+  if (frames.length < 2) throw new ToolError(`${sequence.pattern} has only ${frames.length} frame(s); a sequence needs at least 2`);
+  const existing = call.doc.project.files.find((f3) => f3.path === sequence.path);
+  if (existing) {
+    return nothingChanged(call, `That sequence is already in the project as ${pyReprString(displayName(existing))}.`, {
+      file_id: existing.id,
+      path: sequence.path
+    });
+  }
+  const projectFps3 = call.doc.project.fps ?? { num: 30, den: 1 };
+  const fps2 = input3.fps ? fpsFraction2(input3.fps) : { num: Math.trunc(Number(projectFps3.num) || 30), den: Math.trunc(Number(projectFps3.den) || 1) };
+  if (call.doc.project.files.some((f3) => f3.path === first)) {
+    throw new ToolError(`libopenshot could not open ${sequence.pattern} as an image sequence`);
+  }
+  let reader;
+  try {
+    reader = await probeReader(call, sequence.path);
+  } catch {
+    throw new ToolError(`libopenshot could not open ${sequence.pattern} as an image sequence`);
+  }
+  const info = {
+    ...reader,
+    duration: (Number(reader.duration) || 0) * (25 / (fps2.num / fps2.den)),
+    fps: { num: fps2.num, den: fps2.den },
+    video_timebase: { num: fps2.den, den: fps2.num }
+  };
+  const name = String(input3.name ?? "").trim();
+  const file3 = call.commit(
+    (tx) => addFile(tx, { path: sequence.path, info, ...name ? { name } : {} }, { dedupe: false, mediaType: "video" })
+  );
+  const data = file3;
+  const duration3 = Number(data.duration) || 0;
+  const playable = Math.trunc(Number(data.video_length) || 0);
+  const count2 = Math.max(frames.length, playable);
+  const last = playable > frames.length ? frames[0] + playable - 1 : frames[frames.length - 1];
+  return ok(
+    call,
+    `Imported ${count2} frames of ${sequence.pattern} as one ${pyG(fps2.num / fps2.den)} fps sequence (${pyFixed(duration3, 2)}s). Place it with add_clip_to_timeline_tool.`,
+    {
+      file_id: file3.id,
+      name: displayName(data),
+      path: sequence.path,
+      frames: count2,
+      first_frame: frames[0],
+      last_frame: last,
+      fps: `${fps2.num}/${fps2.den}`,
+      duration: r3(duration3),
+      width: data.width ?? null,
+      height: data.height ?? null
+    }
+  );
+}
+async function removeFilesFromProject(call, input3) {
+  const project = call.doc.project;
+  const scope = input3.scope ?? "";
+  if (scope && ((input3.file_ids ?? []).length > 0 || String(input3.file_query ?? "").trim())) {
+    throw new ToolError("pass scope or file_ids/file_query, not both");
+  }
+  const usage = clipUsage(project);
+  let files;
+  if (scope === "unused") {
+    files = project.files.filter((f3) => (usage.get(String(f3.id)) ?? []).length === 0);
+    if (files.length === 0) {
+      return nothingChanged(call, "Every project file is used on the timeline; nothing to remove.", { removed_file_ids: [] });
+    }
+  } else if (scope === "missing") {
+    if (!call.host.media?.missing) {
+      return unavailable(call.tool, "it cannot check whether media files are missing here; name the files with file_ids instead.");
+    }
+    const missing = await missingFlags(call, project.files);
+    files = call.doc.project.files.filter((f3) => missing.get(f3.id));
+    if (files.length === 0) {
+      return nothingChanged(call, "No project file is missing its media; nothing to remove.", { removed_file_ids: [] });
+    }
+  } else {
+    files = resolveFiles(project, input3.file_ids, input3.file_query);
+  }
+  const current = call.doc.project;
+  const used = new Map(files.map((f3) => [f3.id, usage.get(String(f3.id)) ?? []]).filter(([, ids2]) => ids2.length > 0));
+  if (used.size > 0) {
+    const lockedLayers = new Set(current.layers.filter((l) => l.lock).map((l) => l.number));
+    const clips = [...used.values()].flat().map((id) => current.clips.find((c) => c.id === id));
+    const locked = [
+      ...new Set(clips.filter((c) => c && lockedLayers.has(Number(c.layer))).map((c) => uiTrack(current, Number(c.layer)) || Number(c.layer)))
+    ].sort((a, b) => a - b);
+    if (locked.length > 0) throw new ToolError(`clips of these files sit on locked track(s) ${pyRepr2(locked)}; unlock them first`);
+    if (!input3.confirm_remove_clips) {
+      const names3 = files.filter((f3) => used.has(f3.id)).map((f3) => `${pyReprString(displayName(f3))} (${used.get(f3.id).length} clip(s))`).join(", ");
+      const one = used.size === 1;
+      const total = [...used.values()].reduce((n, ids2) => n + ids2.length, 0);
+      throw new ToolError(
+        `${names3} ${one ? "is" : "are"} used on the timeline; removing ${one ? "it" : "them"} also deletes those ${total} timeline clip(s). Ask the user, then call again with confirm_remove_clips=true (or remove only unused files).`
+      );
+    }
+  }
+  const names2 = new Map(files.map((f3) => [f3.id, displayName(f3)]));
+  const removed = call.commit((tx) => files.map((f3) => removeFile(tx, f3.id)));
+  const removedFiles = removed.map((r) => r.fileId);
+  const removedClips = removed.flatMap((r) => r.removedClipIds);
+  const gone = new Set(removedFiles);
+  const keptSubclips = call.doc.project.files.filter((f3) => gone.has(String(f3.parent_file_id || ""))).map((f3) => f3.id);
+  let summary = `Removed ${removedFiles.length} file(s) from the project`;
+  summary += removedClips.length > 0 ? ` and ${removedClips.length} timeline clip(s) that used them.` : ".";
+  summary += " The media files stay on disk.";
+  return ok(call, summary, {
+    changed: true,
+    removed_file_ids: removedFiles,
+    removed_names: removedFiles.map((id) => names2.get(id) ?? id),
+    removed_clip_ids: removedClips,
+    subclips_kept: keptSubclips
+  });
+}
+function compactTime(seconds2, num14, den2, hours, minutes) {
+  const t = secondsToTimeParts(Math.max(0, seconds2), num14, den2);
+  if (hours) return `${t.hour}:${t.min}:${t.sec};${t.frame}`;
+  if (minutes) return `${t.min}:${t.sec};${t.frame}`;
+  return `${t.sec};${t.frame}`;
+}
+function createSubclips(call, input3) {
+  const project = call.doc.project;
+  const source2 = project.files.find((f3) => f3.id === String(input3.file_id).trim());
+  if (!source2) throw new ToolError(`no project file with id=${pyReprString(String(input3.file_id))}`);
+  if (input3.subclips.length === 0) throw new ToolError("give at least one sub-clip with source_start_seconds and source_end_seconds");
+  const data = source2;
+  const [num14, den2] = fpsParts(data);
+  const rate = num14 ? num14 / den2 : gridOf(project).fps;
+  const [mediaStart, mediaEnd] = sourceWindowForFile(data);
+  if (kindOf(data) === "image" || pyTruthy(data.has_single_image)) throw new ToolError("a still image has no time range to split");
+  const plans = [];
+  input3.subclips.forEach((sub, i) => {
+    let s = Number(sub.source_start_seconds);
+    let e = Number(sub.source_end_seconds);
+    if (e <= s) throw new ToolError(`sub-clip ${i + 1}: source_end_seconds must be after source_start_seconds`);
+    if (s < mediaStart - 1e-3 || e > mediaEnd + 1 / rate) {
+      throw new ToolError(
+        `sub-clip ${i + 1}: ${pyFixed(s, 2)}-${pyFixed(e, 2)}s is outside the file's ${pyFixed(mediaStart, 2)}-${pyFixed(mediaEnd, 2)}s`
+      );
+    }
+    s = pyRoundInt(s * rate) / rate;
+    e = Math.min(pyRoundInt(e * rate) / rate, mediaEnd);
+    if (e - s < 1 / rate) throw new ToolError(`sub-clip ${i + 1} is shorter than one frame`);
+    plans.push([s, e, String(sub.name ?? "").trim()]);
+  });
+  const base = stemOf(baseName(data)) || displayName(data);
+  const ai = data.ai_metadata;
+  const subclips = plans.map(([s, e, given]) => {
+    let subName = given;
+    if (!subName) {
+      const hours = s >= 3600 || e >= 3600;
+      const minutes = hours || s >= 60 || e >= 60;
+      subName = `${base} (${compactTime(s, num14 || 30, den2, hours, minutes)} to ${compactTime(e, num14 || 30, den2, hours, minutes)})`;
+    }
+    const aiMetadata = ai && typeof ai === "object" && !Array.isArray(ai) ? materializeClipAiMetadata(ai, s, e, { rebased: true }) : void 0;
+    return { start: s, end: e, name: subName, ...aiMetadata ? { aiMetadata } : {} };
+  });
+  const created = call.commit((tx) => addSubclipFiles(tx, source2.id, subclips));
+  return ok(call, `Created ${created.length} sub-clip(s) of ${pyReprString(displayName(data))}. Place one with add_clip_to_timeline_tool(file_id=...).`, {
+    subclips: created.map((f3, i) => ({
+      file_id: f3.id,
+      name: subclips[i].name,
+      source_in: r3(subclips[i].start),
+      source_out: r3(subclips[i].end),
+      duration: r3(subclips[i].end - subclips[i].start)
+    })),
+    parent_file_id: source2.id
+  });
+}
+var READ6, EDIT6, REMOVE, LAYOUT_NAMES, mediaFilesTools;
+var init_media_files = __esm({
+  "../engine/src/tools/catalog/media-files.ts"() {
+    "use strict";
+    init_files();
+    init_project_files();
+    init_internal();
+    init_ai_metadata();
+    init_define();
+    init_placement();
+    init_pyfmt();
+    init_clips2();
+    init_effect_values();
+    init_timeline_edit_common();
+    READ6 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    EDIT6 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    REMOVE = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    LAYOUT_NAMES = {
+      0: "unknown",
+      3: "stereo",
+      4: "mono",
+      7: "surround_3",
+      11: "2.1",
+      51: "quad",
+      63: "5.1",
+      1551: "5.1",
+      1599: "7.1"
+    };
+    mediaFilesTools = [
+      contractTool("list_project_files_tool", {
+        annotations: READ6,
+        run: (call, input3) => editorRun(() => listProjectFiles(call, input3))
+      }),
+      contractTool("update_project_files_tool", {
+        annotations: EDIT6,
+        run: (call, input3) => editorRun(() => updateProjectFiles(call, input3))
+      }),
+      contractTool("import_image_sequence_tool", {
+        annotations: EDIT6,
+        requires: ["media"],
+        run: (call, input3) => editorRun(() => importImageSequence(call, input3))
+      }),
+      contractTool("remove_files_from_project_tool", {
+        annotations: REMOVE,
+        run: (call, input3) => editorRun(() => removeFilesFromProject(call, input3))
+      }),
+      contractTool("create_subclips_tool", {
+        annotations: EDIT6,
+        run: (call, input3) => editorRun(() => createSubclips(call, input3))
+      }),
+      contractTool("manage_optimized_previews_tool", {
+        annotations: EDIT6,
+        // ProxyService builds small H.264 copies on the desktop and its preview plays them;
+        // no web renderer has optimized copies (each decodes the original media).
+        run: (call) => unavailable(
+          call.tool,
+          "optimized previews exist only in Zenvi desktop, which builds and plays them. The web editor, the CLI and Zenvi Cloud always play and export the original media."
+        )
+      })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/media-files-transitions.ts
+function span3(data) {
+  const position = Number(data.position) || 0;
+  return [position, position + Math.max(0, (Number(data.end) || 0) - (Number(data.start) || 0))];
+}
+function layerOf3(data) {
+  const n = Math.trunc(Number(data.layer) || 0);
+  return Number.isFinite(n) ? n : 0;
+}
+function clipsOn(project, layer2) {
+  return project.clips.filter((c) => layerOf3(c) === layer2).map((c, i) => ({ c, i })).sort((x, y) => (Number(x.c.position) || 0) - (Number(y.c.position) || 0) || x.i - y.i).map(({ c }) => c);
+}
+function maskTransitions(project) {
+  return project.effects.filter((t) => String(t.type || "Mask") === "Mask" || "brightness" in t);
+}
+function byStart(items) {
+  return items.map((t, i) => ({ t, i })).sort((x, y) => span3(x.t)[0] - span3(y.t)[0] || layerOf3(x.t) - layerOf3(y.t) || x.i - y.i).map(({ t }) => t);
+}
+function stem5(path39) {
+  const base = path39.split(/[\\/]/).pop() ?? path39;
+  const dot = base.lastIndexOf(".");
+  return dot > 0 ? base.slice(0, dot) : base;
+}
+function maskName(data) {
+  const path39 = String(transitionMaskReader(data).path || data.resource || "");
+  return path39 ? stem5(path39) : "";
+}
+function firstValue(kf) {
+  const points2 = kf && typeof kf === "object" && Array.isArray(kf.Points) ? kf.Points : [];
+  if (points2.length === 0) return null;
+  const x = (p) => Number(p?.co?.X);
+  const sorted = points2.map((p, i) => ({ p, i })).sort((a, b) => x(a.p) - x(b.p) || a.i - b.i);
+  const y = Number(sorted[0].p?.co?.Y);
+  return Number.isFinite(y) ? y : null;
+}
+function joinedPair(project, data) {
+  const [t0, t1] = span3(data);
+  const over = clipsOn(project, layerOf3(data)).filter((c) => span3(c)[0] < t1 - EPS3 && span3(c)[1] > t0 + EPS3);
+  let best = null;
+  for (let i = 0; i < over.length; i += 1) {
+    let a = over[i];
+    for (let b of over.slice(i + 1)) {
+      let [a0, a1] = span3(a);
+      let [b0, b1] = span3(b);
+      if (b0 < a0) [a, b, a0, a1, b0, b1] = [b, a, b0, b1, a0, a1];
+      const lo = Math.max(a0, b0);
+      const hi = Math.min(a1, b1);
+      if (hi - lo <= EPS3 || b0 <= a0 + EPS3) continue;
+      const cover = Math.min(hi, t1) - Math.max(lo, t0);
+      if (best === null || cover > best[0]) best = [cover, a, b];
+    }
+  }
+  return best ? [best[1], best[2]] : null;
+}
+function clipEdge(project, data) {
+  const [t0, t1] = span3(data);
+  const tol = gridOf(project).frame * 1.5;
+  for (const c of clipsOn(project, layerOf3(data))) {
+    const [c0, c1] = span3(c);
+    if (Math.abs(c0 - t0) <= tol && t1 <= c1 + tol) return ["start", c];
+    if (Math.abs(c1 - t1) <= tol && t0 >= c0 - tol) return ["end", c];
+  }
+  return null;
+}
+function describeTransition(project, data) {
+  const [t0, t1] = span3(data);
+  const layer2 = layerOf3(data);
+  const direction2 = transitionDirection(data) ?? "custom";
+  const out = {
+    transition_id: String(data.id),
+    mask: maskName(data),
+    title: String(data.title || ""),
+    track: uiTrack(project, layer2),
+    layer: layer2,
+    position: r3(t0),
+    end: r3(t1),
+    duration: r3(t1 - t0),
+    direction: direction2,
+    contrast: firstValue(data.contrast),
+    audio_crossfade: pyTruthy(data.fade_audio_hint),
+    invert_mask: pyTruthy(data.mask_invert)
+  };
+  if (pyTruthy(data.replace_image)) out.replace_image = true;
+  const pair = joinedPair(project, data);
+  if (pair) {
+    out.between_clip_ids = [pair[0].id, pair[1].id];
+    const forward2 = direction2 === "default" !== out.invert_mask;
+    out.order = forward2 ? "earlier_to_later" : "later_first";
+    out.clip_overlap = r3(Math.max(0, span3(pair[0])[1] - span3(pair[1])[0]));
+  } else {
+    const edge = clipEdge(project, data);
+    if (edge) out[`on_clip_${edge[0]}`] = edge[1].id;
+  }
+  return out;
+}
+function described(call, transitions) {
+  const project = call.doc.project;
+  return transitions.map((t) => describeTransition(project, project.effects.find((x) => x.id === t.id) ?? t));
+}
+function selectedTransitionIds(call) {
+  const ui = call.host.ui;
+  const fromSelection = ui?.selection?.().transitions;
+  if (fromSelection) return [...fromSelection];
+  const known = new Set(call.doc.project.effects.map((t) => t.id));
+  return (ui?.selectedIds?.() ?? []).filter((id) => known.has(id));
+}
+function resolveTransitions(call, target) {
+  const project = call.doc.project;
+  const scope = (target.scope ?? "").trim().toLowerCase();
+  if (target.transition_ids && target.transition_ids.length > 0) {
+    const out = [];
+    for (const tid of target.transition_ids) {
+      const t = project.effects.find((x) => x.id === String(tid).trim());
+      if (!t) throw new ToolError(`no transition with id=${pyRepr2(tid)} (list_timeline_transitions_tool lists them)`);
+      if (!out.includes(t)) out.push(t);
+    }
+    return out;
+  }
+  if (target.between_clip_ids && target.between_clip_ids.length > 0) {
+    const ids2 = target.between_clip_ids.map((i) => String(i).trim()).filter(Boolean);
+    if (ids2.length !== 2) throw new ToolError("between_clip_ids takes exactly two timeline clip ids");
+    const clips = ids2.map((cid) => {
+      const c = project.clips.find((x) => x.id === cid);
+      if (!c) throw new ToolError(`no timeline clip with id=${pyReprString(cid)}`);
+      return c;
+    });
+    const wanted = new Set(clips.map((c) => c.id));
+    const found = maskTransitions(project).filter((t) => {
+      const pair = joinedPair(project, t);
+      return pair !== null && wanted.size === 2 && wanted.has(pair[0].id) && wanted.has(pair[1].id);
+    });
+    if (found.length === 0) throw new ToolError("no transition joins those two clips (add one with add_transitions_between_clips_tool)");
+    return found;
+  }
+  const track2 = target.track ?? "";
+  const layer2 = track2.trim() ? resolveLayer2(project, track2) : null;
+  if (scope === "selected") {
+    const ids2 = selectedTransitionIds(call);
+    if (ids2.length === 0) throw new ToolError("no transitions are selected in the timeline");
+    return resolveTransitions(call, { transition_ids: ids2 });
+  }
+  const candidates = byStart(maskTransitions(project).filter((t) => layer2 === null || layerOf3(t) === layer2));
+  if (scope === "track" || scope === "all") {
+    if (scope === "track" && layer2 === null) throw new ToolError("scope='track' needs track");
+    if (candidates.length === 0) throw new ToolError(scope === "all" ? "the timeline has no transitions" : `track ${pyStr(track2)} has no transitions`);
+    return candidates;
+  }
+  const where = layer2 !== null ? ` on track ${pyStr(track2)}` : "";
+  if (target.at_seconds !== void 0 && target.at_seconds !== null) {
+    const t = Number(target.at_seconds);
+    const half = gridOf(project).frame / 2;
+    let under = candidates.filter((x) => span3(x)[0] - half <= t && t <= span3(x)[1] + half);
+    if (under.length === 0) {
+      const gap = (x) => Math.min(Math.abs(span3(x)[0] - t), Math.abs(span3(x)[1] - t));
+      const near = candidates.map((x, i) => ({ x, i })).sort((a, b) => gap(a.x) - gap(b.x) || a.i - b.i)[0]?.x;
+      under = near && gap(near) <= 0.5 ? [near] : [];
+    }
+    if (under.length === 0) throw new ToolError(`no transition at ${pyFixed(t, 2)}s${where}`);
+    if (under.length > 1) {
+      throw new ToolError(
+        `${under.length} transitions at ${pyFixed(t, 2)}s on different tracks (${under.map((x) => x.id).join(", ")}); pass track or transition_ids`
+      );
+    }
+    return under;
+  }
+  if (candidates.length === 1) return candidates;
+  if (candidates.length === 0) throw new ToolError(`the timeline has no transitions${where}`);
+  throw new ToolError(`${candidates.length} transitions match; say which with transition_ids, between_clip_ids, at_seconds or scope`);
+}
+function ensureUnlocked2(project, items) {
+  const lockedLayers = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
+  const locked = [...new Set(items.filter((i) => lockedLayers.has(layerOf3(i))).map((i) => uiTrack(project, layerOf3(i)) || layerOf3(i)))].sort((a, b) => a - b);
+  if (locked.length > 0) throw new ToolError(`track(s) ${pyRepr2(locked)} are locked; unlock them first`);
+}
+function isAbsolutePath2(path39) {
+  return path39.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path39) || path39.startsWith("\\\\");
+}
+async function pickMask(call, name) {
+  const raw = name.trim();
+  if (isAbsolutePath2(raw) && call.host.media?.importPath) {
+    const probed = await call.host.media.probe(raw).catch(() => null);
+    if (probed) {
+      const { media_type: _mediaType, ...reader } = probed;
+      return { reader, title: stem5(raw).toLowerCase() };
+    }
+  }
+  const { entry, candidates } = lookupTransition(name);
+  if (!entry) {
+    const hint = candidates.length > 0 ? `; did you mean ${candidates.join(", ")}` : "";
+    throw new ToolError(`unknown transition ${pyReprString(name)}${hint} (list_transitions_tool / search_transitions_tool)`);
+  }
+  return { reader: maskReader(entry.storedPath), title: transitionKey(entry) };
+}
+function keyframeOf2(points2) {
+  const sorted = points2.map((p, i) => ({ p, i })).sort((a, b) => a.p[0] - b.p[0] || a.i - b.i);
+  return { Points: sorted.map(({ p }) => keyframePoint2(p[0], p[1], p[2])) };
+}
+function curveFromPoints(project, points2, duration3) {
+  const fps2 = gridOf(project).fps;
+  const out = [];
+  for (const p of points2) {
+    const sec = Number(p.seconds);
+    if (sec > duration3 + 1e-6) {
+      throw new ToolError(`keyframe at ${pyFixed(sec, 3)}s is past the end of the ${pyFixed(duration3, 3)}s transition`);
+    }
+    out.push([pyRoundInt2(sec * fps2) + 1, Number(p.value), interpolationCode(p.interpolation || "bezier")]);
+  }
+  if (out.length === 0) throw new ToolError("a keyframe list needs at least one point");
+  return keyframeOf2(out);
+}
+function pyRoundInt2(x) {
+  const f3 = Math.floor(x);
+  const diff2 = x - f3;
+  const r = diff2 > 0.5 ? f3 + 1 : diff2 < 0.5 ? f3 : f3 % 2 === 0 ? f3 : f3 + 1;
+  return r === 0 ? 0 : r;
+}
+function signed2(x) {
+  const text5 = pyFixed(x, 2);
+  return text5.startsWith("-") ? text5 : `+${text5}`;
+}
+function projectFps2(project) {
+  const num14 = Math.trunc(Number(project.fps?.num)) || 30;
+  const den2 = Math.trunc(Number(project.fps?.den)) || 1;
+  return { num: num14, den: den2 };
+}
+function isClipId(project, id) {
+  return project.clips.some((c) => c.id === id);
+}
+function listTimelineTransitions(call, input3) {
+  const project = call.doc.project;
+  const track2 = input3.track ?? "";
+  const layer2 = track2.trim() ? resolveLayer2(project, track2) : null;
+  let items = maskTransitions(project).filter((t) => layer2 === null || layerOf3(t) === layer2);
+  if (input3.at_seconds !== void 0 && input3.at_seconds !== null) {
+    const at = Number(input3.at_seconds);
+    const half = gridOf(project).frame / 2;
+    items = items.filter((t) => span3(t)[0] - half <= at && at <= span3(t)[1] + half);
+  }
+  let rows = byStart(items).map((t) => describeTransition(project, t));
+  if (input3.timeline_clip_id) {
+    const cid = input3.timeline_clip_id.trim();
+    rows = rows.filter((r) => (r.between_clip_ids ?? []).includes(cid) || r.on_clip_start === cid || r.on_clip_end === cid);
+  }
+  const where = layer2 !== null ? ` on track ${track2}` : "";
+  return ok(call, `${rows.length} transition(s)${where}.`, { transitions: rows });
+}
+async function updateTransition(call, input3) {
+  let targets = resolveTransitions(call, input3);
+  ensureUnlocked2(call.doc.project, targets);
+  const g = gridOf(call.doc.project);
+  let newDur = Number(input3.duration_seconds ?? 0) || 0;
+  if (newDur) {
+    newDur = g.snap(newDur);
+    if (newDur < g.frame) throw new ToolError("duration_seconds must be at least one frame");
+  }
+  const flip = input3.flip_wipe_side ?? false;
+  const invert = input3.invert_mask ?? null;
+  const position = input3.position_seconds ?? null;
+  const mask2 = input3.mask ?? "";
+  const maskFileId = input3.mask_file_id ?? "";
+  const contrast = input3.contrast ?? null;
+  const brightnessKeyframes = input3.brightness_keyframes ?? [];
+  const contrastKeyframes = input3.contrast_keyframes ?? [];
+  const interpolation2 = input3.interpolation ?? "";
+  const audio = input3.audio_crossfade ?? null;
+  const replaceImage = input3.replace_image ?? null;
+  const keepOverlap = input3.keep_overlap ?? false;
+  const ripple = input3.ripple ?? true;
+  if (flip && invert !== null) throw new ToolError("pass flip_wipe_side or invert_mask, not both");
+  if (!(newDur || position !== null || mask2 || maskFileId || flip || invert !== null || contrast !== null || brightnessKeyframes.length > 0 || contrastKeyframes.length > 0 || interpolation2 || audio !== null || replaceImage !== null)) {
+    throw new ToolError(
+      "nothing to change: pass duration_seconds, position_seconds, mask, flip_wipe_side, contrast, keyframes, interpolation, audio_crossfade or replace_image"
+    );
+  }
+  if (mask2 && maskFileId) throw new ToolError("pass mask or mask_file_id, not both");
+  if (position !== null && targets.length > 1) throw new ToolError("position_seconds moves one transition; several were chosen");
+  let newReader = null;
+  let newTitle = null;
+  if (mask2) {
+    const picked = await pickMask(call, mask2);
+    newReader = picked.reader;
+    newTitle = picked.title;
+    targets = targets.map((t) => call.doc.project.effects.find((x) => x.id === t.id) ?? t);
+  } else if (maskFileId) {
+    const file3 = call.doc.project.files.find((f3) => f3.id === maskFileId.trim());
+    if (!file3) throw new ToolError(`no project file with id=${pyReprString(maskFileId)}`);
+    if (!["image", "video"].includes(String(file3.media_type || ""))) throw new ToolError("the mask must be an image or video file");
+    const { ai_metadata: _ai, ...reader } = structuredClone(file3);
+    newReader = reader;
+    newTitle = stem5(String(file3.path || ""));
+  }
+  const project = call.doc.project;
+  const fps2 = projectFps2(project);
+  const ordered = targets.map((t, i) => ({ t, i })).sort((a, b) => layerOf3(a.t) - layerOf3(b.t) || span3(a.t)[0] - span3(b.t)[0] || a.i - b.i).map(({ t }) => t);
+  const live2 = /* @__PURE__ */ new Map();
+  const lpos = (item) => live2.get(String(item.id)) ?? (Number(item.position) || 0);
+  const lspan = (item) => {
+    const [s0, s1] = span3(item);
+    return [lpos(item), lpos(item) + (s1 - s0)];
+  };
+  const plans = [];
+  const notes = [];
+  for (const t of ordered) {
+    const old = structuredClone(t);
+    const data = structuredClone(t);
+    const [t0, t1] = lspan(t);
+    data.position = t0;
+    const dur = t1 - t0;
+    if (newDur && Math.abs(newDur - dur) > EPS3) {
+      const pair = joinedPair(project, old);
+      const side = pair ? null : clipEdge(project, old)?.[0] ?? null;
+      if (pair && !keepOverlap) {
+        const [a, b] = pair;
+        const [a0, a1] = lspan(a);
+        const [b0, b1] = lspan(b);
+        const shorter = Math.min(a1 - a0, b1 - b0);
+        if (newDur >= shorter - EPS3) {
+          throw new ToolError(`a ${pyFixed(newDur, 2)}s crossfade needs both clips to be longer; the shorter clip is ${pyFixed(shorter, 2)}s`);
+        }
+        const delta = a1 - newDur - b0;
+        if (b0 + delta < a0 + EPS3) throw new ToolError("the later clip cannot start before the earlier one");
+        const layer2 = layerOf3(b);
+        if (ripple) {
+          const items = [...clipsOn(project, layer2), ...maskTransitions(project).filter((x) => layerOf3(x) === layer2)];
+          for (const item of items) {
+            if (item.id !== t.id && item.id !== a.id && lpos(item) >= b0 - EPS3) live2.set(String(item.id), lpos(item) + delta);
+          }
+        } else {
+          if (delta > EPS3) {
+            const blocked = clipsOn(project, layer2).filter((c) => c.id !== a.id && c.id !== b.id && b1 - EPS3 <= lspan(c)[0] && lspan(c)[0] < b1 + delta - EPS3);
+            if (blocked.length > 0) throw new ToolError("moving only the later clip would overlap the next clip; use ripple=true");
+          }
+          live2.set(b.id, b0 + delta);
+        }
+        data.position = g.snap(a1 - newDur);
+        notes.push(`moved clip ${b.id}${ripple ? " and later items" : ""} by ${signed2(delta)}s`);
+      } else if (side === "end") {
+        data.position = Math.max(0, g.snap(t1 - newDur));
+      }
+      data.start = usesStaticMask(data) ? 0 : Number(data.start) || 0;
+      data.end = Number(data.start) + newDur;
+      Object.assign(data, rescaledTransitionCurves(data, dur, newDur, fps2));
+    }
+    if (position !== null) data.position = g.snap(Number(position));
+    if (newReader !== null) {
+      const wasStatic = usesStaticMask(old);
+      data.reader = structuredClone(newReader);
+      delete data.mask_reader;
+      delete data.resource;
+      if (newTitle) data.title = newTitle;
+      if (wasStatic !== usesStaticMask(data)) {
+        const direction2 = transitionDirection(old);
+        Object.assign(data, maskDefaultCurves(data, fps2));
+        if (direction2 === "reversed") Object.assign(data, reversedTransitionCurves(data));
+      }
+    }
+    const length = span3(data)[1] - span3(data)[0];
+    if (brightnessKeyframes.length > 0) data.brightness = curveFromPoints(project, brightnessKeyframes, length);
+    if (contrastKeyframes.length > 0) data.contrast = curveFromPoints(project, contrastKeyframes, length);
+    if (contrast !== null) data.contrast = keyframeOf2([[1, Number(contrast), BEZIER]]);
+    if (interpolation2) {
+      const code = interpolationCode(interpolation2);
+      const points2 = data.brightness?.Points ?? [];
+      for (const p of points2) p.interpolation = code;
+    }
+    if (invert !== null) data.mask_invert = invert;
+    if (flip) {
+      data.mask_invert = !pyTruthy(data.mask_invert);
+      Object.assign(data, reversedTransitionCurves(data));
+    }
+    if (audio !== null) data.fade_audio_hint = audio;
+    if (replaceImage !== null) data.replace_image = replaceImage;
+    live2.set(t.id, Number(data.position));
+    if (!sameJson(data, old)) plans.push([t, data]);
+  }
+  const moved = [];
+  for (const [id, pos] of live2) {
+    const item = project.clips.find((c) => c.id === id) ?? project.effects.find((x) => x.id === id);
+    if (item && Math.abs((Number(item.position) || 0) - pos) > EPS3) moved.push([item, pos]);
+  }
+  ensureUnlocked2(project, moved.map(([item]) => item));
+  if (moved.some(([, pos]) => pos < -EPS3)) throw new ToolError("that would move a clip before the start of the timeline");
+  if (plans.length === 0 && moved.length === 0) {
+    return nothingChanged(call, "No change: the transition(s) already have those settings.", { transitions: described(call, ordered) });
+  }
+  const planned = new Set(plans.map(([t]) => t.id));
+  call.commit((tx) => {
+    for (const [item, pos] of moved) {
+      const id = String(item.id);
+      if (planned.has(id)) continue;
+      if (isClipId(tx.project, id)) moveClip(tx, id, { position: Math.max(0, pos) });
+      else moveTransition(tx, id, { position: Math.max(0, pos) });
+    }
+    for (const [t, data] of plans) writeTransition(tx, t.id, data);
+  });
+  let summary = `Updated ${plans.length} transition(s)`;
+  if (notes.length > 0) summary += "; " + [...new Set(notes)].join("; ");
+  return ok(call, summary + ".", {
+    changed: true,
+    transitions: described(call, ordered),
+    moved_ids: moved.map(([item]) => String(item.id)).filter((id) => !planned.has(id))
+  });
+}
+function reverseTransitions(call, input3) {
+  const targets = resolveTransitions(call, input3);
+  ensureUnlocked2(call.doc.project, targets);
+  const plans = [];
+  for (const t of targets) {
+    const data = { ...structuredClone(t), ...reversedTransitionCurves(t) };
+    if (!sameJson(data, t)) plans.push([t, data]);
+  }
+  if (plans.length === 0) {
+    return nothingChanged(call, "No change: those transitions have constant curves, so reversing does nothing.", { transitions: described(call, targets) });
+  }
+  call.commit((tx) => {
+    for (const [t, data] of plans) writeTransition(tx, t.id, data);
+  });
+  return ok(call, `Reversed ${plans.length} transition(s).`, { changed: true, transitions: described(call, plans.map(([t]) => t)) });
+}
+function removeTransitions(call, input3) {
+  const targets = resolveTransitions(call, input3);
+  ensureUnlocked2(call.doc.project, targets);
+  const removed = described(call, targets);
+  call.commit((tx) => {
+    for (const t of targets) removeTransition(tx, t.id);
+  });
+  return ok(call, `Removed ${removed.length} transition(s); the clips were not changed.`, {
+    removed_transition_ids: removed.map((r) => r.transition_id),
+    removed
+  });
+}
+function copyTransition(call, input3) {
+  const project = call.doc.project;
+  const source2 = project.effects.find((t) => t.id === String(input3.source_transition_id).trim());
+  if (!source2) throw new ToolError(`no transition with id=${pyReprString(String(input3.source_transition_id))}`);
+  const targets = resolveTransitions(call, input3).filter((t) => t.id !== source2.id);
+  if (targets.length === 0) throw new ToolError("choose at least one other transition to paste onto");
+  ensureUnlocked2(project, targets);
+  const what = input3.what ?? "all";
+  const fit = input3.fit_duration ?? true;
+  const fps2 = projectFps2(project);
+  const src = structuredClone(source2);
+  const [s0, s1] = span3(src);
+  const keys = what === "all" ? Object.keys(src).filter((k) => !PASTE_EXCLUDED.has(k)) : COPY_KEYS[what].filter((k) => k in src);
+  const curves = keys.filter((k) => k === "brightness" || k === "contrast");
+  const plans = [];
+  for (const t of targets) {
+    const data = structuredClone(t);
+    for (const k of keys) data[k] = structuredClone(src[k]);
+    if ((what === "all" || what === "mask") && "reader" in src && !("mask_reader" in src)) delete data.mask_reader;
+    const [t0, t1] = span3(data);
+    if (fit && curves.length > 0) {
+      const fitted = rescaledTransitionCurves(data, s1 - s0, t1 - t0, fps2);
+      for (const k of curves) if (fitted[k]) data[k] = fitted[k];
+    }
+    if (!sameJson(data, t)) plans.push([t, data]);
+  }
+  if (plans.length === 0) return nothingChanged(call, "No change: the targets already match.", {});
+  call.commit((tx) => {
+    for (const [t, data] of plans) writeTransition(tx, t.id, data);
+  });
+  return ok(call, `Copied ${what} from transition ${source2.id} onto ${plans.length} transition(s).`, {
+    changed: true,
+    transitions: described(call, plans.map(([t]) => t))
+  });
+}
+function clipMediaLength(clip2) {
+  const reader = clip2.reader && typeof clip2.reader === "object" ? clip2.reader : {};
+  return Number(reader.duration || clip2.duration || 0) || 0;
+}
+function retimed(clip2) {
+  const points2 = clip2.time?.Points;
+  return Array.isArray(points2) && points2.length > 1;
+}
+async function addTransitionsBetweenClips(call, input3) {
+  const track2 = input3.track ?? "";
+  const chosenIds = input3.timeline_clip_ids ?? [];
+  let layer2;
+  let chosen = null;
+  {
+    const project2 = call.doc.project;
+    if (chosenIds.length > 0) {
+      const clips2 = chosenIds.map((cid) => {
+        const c = project2.clips.find((x) => x.id === String(cid).trim());
+        if (!c) throw new ToolError(`no timeline clip with id=${pyRepr2(cid)}`);
+        return c;
+      });
+      const layers = new Set(clips2.map((c) => layerOf3(c)));
+      if (layers.size !== 1) throw new ToolError("timeline_clip_ids must all be on one track");
+      layer2 = [...layers][0];
+      if (track2.trim() && resolveLayer2(project2, track2) !== layer2) throw new ToolError("timeline_clip_ids are not on that track");
+      chosen = new Set(clips2.map((c) => c.id));
+    } else {
+      if (!track2.trim()) throw new ToolError("say which track (track) or which clips (timeline_clip_ids)");
+      layer2 = resolveLayer2(project2, track2);
+    }
+    if (project2.layers.some((l) => l.number === layer2 && l.lock)) {
+      throw new ToolError(`track ${uiTrack(project2, layer2) || layer2} is locked; unlock it first`);
+    }
+  }
+  const g = gridOf(call.doc.project);
+  const length = g.snap((input3.duration_seconds ?? 1) || DEFAULT_TRANSITION_LENGTH);
+  const frame = g.frame;
+  const fps2 = g.fps;
+  if (length < frame) throw new ToolError("duration_seconds must be at least one frame");
+  const name = input3.transition ?? "fade";
+  const randomize = name.trim().toLowerCase() === "random";
+  if (randomize && TRANSITIONS.length === 0) throw new ToolError("no transition images are installed");
+  const mask2 = randomize ? null : await pickMask(call, name || "fade");
+  const project = call.doc.project;
+  const clips = clipsOn(project, layer2);
+  if (chosen) {
+    const onTrack = new Set(clips.map((c) => c.id));
+    const missing = [...chosen].filter((id) => !onTrack.has(id)).sort();
+    if (missing.length > 0) throw new ToolError(`clips ${pyRepr2(missing)} are not on that track`);
+  }
+  if (clips.length < 2) throw new ToolError(`track ${uiTrack(project, layer2) || layer2} has fewer than two clips to join`);
+  const existing = maskTransitions(project).filter((t) => layerOf3(t) === layer2);
+  const method = input3.method ?? "ripple";
+  const maxGap = input3.max_gap_seconds ?? 0.05;
+  const pos = new Map(clips.map((c) => [c.id, Number(c.position) || 0]));
+  const start = new Map(clips.map((c) => [c.id, Number(c.start) || 0]));
+  const end = new Map(clips.map((c) => [c.id, Number(c.end) || 0]));
+  const tpos = new Map(existing.map((t) => [t.id, Number(t.position) || 0]));
+  const joins = [];
+  const skipped = [];
+  for (let i = 0; i + 1 < clips.length; i += 1) {
+    const a = clips[i];
+    const b = clips[i + 1];
+    if (chosen && !(chosen.has(a.id) && chosen.has(b.id))) continue;
+    const aLen = end.get(a.id) - start.get(a.id);
+    const bLen = end.get(b.id) - start.get(b.id);
+    const aEnd = pos.get(a.id) + aLen;
+    const gap = pos.get(b.id) - aEnd;
+    const label2 = `${a.id}->${b.id}`;
+    const overlap2 = Math.max(0, -gap);
+    const lo = Math.min(aEnd, pos.get(b.id));
+    const hi = Math.max(aEnd, pos.get(b.id));
+    const onJoin = existing.filter((t) => {
+      const [x0, x1] = span3(t);
+      const s = tpos.get(t.id);
+      return s < hi + frame && s + (x1 - x0) > lo - frame;
+    });
+    if (onJoin.length > 0 && !input3.replace_existing) {
+      skipped.push({ join: label2, reason: "already has a transition" });
+      continue;
+    }
+    let d = Math.min(length, 0.5 * aLen, 0.5 * bLen);
+    d = Math.max(frame, pyRoundInt2(d * fps2) / fps2);
+    if (aLen < 2 * frame || bLen < 2 * frame) {
+      skipped.push({ join: label2, reason: "clip too short" });
+      continue;
+    }
+    if (overlap2 > frame / 2) {
+      joins.push({ a, b, position: pos.get(b.id), duration: Math.min(overlap2, aLen, bLen), replaces: onJoin });
+      continue;
+    }
+    if (method === "existing_overlaps") {
+      skipped.push({ join: label2, reason: "clips do not overlap" });
+      continue;
+    }
+    if (gap > maxGap + EPS3) {
+      skipped.push({ join: label2, reason: `${pyFixed(gap, 2)}s gap` });
+      continue;
+    }
+    if (method === "handles") {
+      const half = d / 2;
+      if (retimed(a) || retimed(b)) {
+        skipped.push({ join: label2, reason: "speed-changed clip" });
+        continue;
+      }
+      const cut2 = aEnd + Math.max(0, gap) / 2;
+      const extendA = cut2 + half - aEnd;
+      const pullB = pos.get(b.id) - g.snap(cut2 - half);
+      if (clipMediaLength(a) - end.get(a.id) < extendA - EPS3 || start.get(b.id) < pullB - EPS3) {
+        skipped.push({ join: label2, reason: "not enough spare media around the cut" });
+        continue;
+      }
+      end.set(a.id, end.get(a.id) + extendA);
+      pos.set(b.id, pos.get(b.id) - pullB);
+      start.set(b.id, start.get(b.id) - pullB);
+      joins.push({ a, b, position: pos.get(b.id), duration: d, replaces: onJoin });
+      continue;
+    }
+    const shift2 = -(d + gap);
+    const bPos = pos.get(b.id);
+    for (const c of clips) if (pos.get(c.id) >= bPos - EPS3 && c.id !== a.id) pos.set(c.id, pos.get(c.id) + shift2);
+    for (const t of existing) if (tpos.get(t.id) >= bPos - EPS3) tpos.set(t.id, tpos.get(t.id) + shift2);
+    for (const j of joins) if (j.position >= bPos - EPS3) j.position += shift2;
+    joins.push({ a, b, position: pos.get(b.id), duration: d, replaces: onJoin });
+  }
+  if (joins.length === 0) {
+    const why = skipped.slice(0, 8).map((s) => `${s.join}: ${s.reason}`).join("; ");
+    throw new ToolError(why ? `no join to add a transition to (${why})` : "no consecutive clips to join");
+  }
+  if ([...pos.values()].some((p) => p < -EPS3)) throw new ToolError("that would move a clip before the start of the timeline");
+  const moved = [];
+  const clipChanges = [];
+  for (const c of clips) {
+    const newPos = g.snap(Math.max(0, pos.get(c.id)));
+    const changes = {};
+    if (Math.abs(newPos - (Number(c.position) || 0)) > EPS3) changes.position = newPos;
+    if (Math.abs(start.get(c.id) - (Number(c.start) || 0)) > EPS3) changes.start = start.get(c.id);
+    if (Math.abs(end.get(c.id) - (Number(c.end) || 0)) > EPS3) changes.end = end.get(c.id);
+    if (Object.keys(changes).length > 0) {
+      clipChanges.push([c.id, changes]);
+      moved.push({ timeline_clip_id: c.id, ...Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, r3(v)])) });
+    }
+  }
+  const replacedIds = new Set(joins.flatMap((j) => j.replaces.map((t) => t.id)));
+  const replaced = existing.filter((t) => replacedIds.has(t.id)).map((t) => t.id);
+  const picks = joins.map(() => {
+    if (mask2) return mask2;
+    const entry = TRANSITIONS[Math.floor(Math.random() * TRANSITIONS.length)];
+    return { reader: maskReader(entry.storedPath), title: transitionKey(entry) };
+  });
+  const added = call.commit((tx) => {
+    for (const [id, changes] of clipChanges) setClipTiming(tx, id, changes);
+    for (const t of existing) {
+      if (replacedIds.has(t.id)) removeTransition(tx, t.id);
+      else if (Math.abs(tpos.get(t.id) - (Number(t.position) || 0)) > EPS3) moveTransition(tx, t.id, { position: Math.max(0, tpos.get(t.id)) });
+    }
+    return joins.map((j, i) => {
+      const picked = picks[i];
+      const t = addMaskTransition(tx, {
+        layer: layer2,
+        position: Math.max(0, j.position),
+        duration: j.duration,
+        reader: picked.reader,
+        title: picked.title,
+        fadeAudio: input3.audio_crossfade ?? true
+      });
+      return { transition_id: t.id, mask: picked.title, between_clip_ids: [j.a.id, j.b.id], position: t.position, duration: t.end };
+    });
+  });
+  let summary = `Added ${added.length} transition(s) on track ${uiTrack(project, layer2) || layer2}`;
+  if (moved.length > 0 && method === "ripple") summary += `; moved ${moved.length} clip(s) earlier to make the overlaps`;
+  else if (moved.length > 0) summary += `; extended ${moved.length} clip(s) into their spare media`;
+  if (skipped.length > 0) summary += `; skipped ${skipped.length} join(s)`;
+  return ok(call, summary + ".", { changed: true, added, skipped, moved_clips: moved, replaced_transition_ids: replaced });
+}
+var READ7, EDIT7, REMOVE2, EPS3, PASTE_EXCLUDED, COPY_KEYS, mediaFilesTransitionTools;
+var init_media_files_transitions = __esm({
+  "../engine/src/tools/catalog/media-files-transitions.ts"() {
+    "use strict";
+    init_defaults();
+    init_clips();
+    init_transitions();
+    init_internal();
+    init_catalog();
+    init_define();
+    init_pyfmt();
+    init_effect_values();
+    init_timeline_edit_common();
+    READ7 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    EDIT7 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    REMOVE2 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EPS3 = 1e-4;
+    PASTE_EXCLUDED = /* @__PURE__ */ new Set(["id", "position", "layer", "start", "end", "duration"]);
+    COPY_KEYS = {
+      keyframes: ["brightness", "contrast"],
+      brightness: ["brightness"],
+      contrast: ["contrast"],
+      mask: ["reader", "mask_reader", "title", "mask_invert"]
+    };
+    mediaFilesTransitionTools = [
+      contractTool("list_timeline_transitions_tool", {
+        annotations: READ7,
+        run: (call, input3) => editorRun(() => listTimelineTransitions(call, input3))
+      }),
+      contractTool("update_transition_tool", {
+        annotations: EDIT7,
+        run: (call, input3) => editorRun(() => updateTransition(call, input3))
+      }),
+      contractTool("reverse_transition_tool", {
+        annotations: EDIT7,
+        run: (call, input3) => editorRun(() => reverseTransitions(call, input3))
+      }),
+      contractTool("remove_transition_tool", {
+        annotations: REMOVE2,
+        run: (call, input3) => editorRun(() => removeTransitions(call, input3))
+      }),
+      contractTool("copy_transition_tool", {
+        annotations: EDIT7,
+        run: (call, input3) => editorRun(() => copyTransition(call, input3))
+      }),
+      contractTool("add_transitions_between_clips_tool", {
+        annotations: EDIT7,
+        run: (call, input3) => editorRun(() => addTransitionsBetweenClips(call, input3))
+      })
+    ];
+  }
+});
+
 // ../engine/src/tools/catalog/metadata.ts
 function isRecord42(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -69733,7 +71580,7 @@ function placementsMetadataText(project, level) {
   }
   return lines2.join("\n");
 }
-var READ6, metadataTools;
+var READ8, metadataTools;
 var init_metadata = __esm({
   "../engine/src/tools/catalog/metadata.ts"() {
     "use strict";
@@ -69744,22 +71591,22 @@ var init_metadata = __esm({
     init_receipt();
     init_reports();
     init_common();
-    READ6 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ8 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     metadataTools = [
       contractTool("get_clips_with_full_metadata_tool", {
-        annotations: READ6,
+        annotations: READ8,
         run: (call, input3) => {
           return fullMetadataText(call.doc.project, (text(input3.detail_level) || "summary").toLowerCase());
         }
       }),
       contractTool("get_timeline_placements_metadata_tool", {
-        annotations: READ6,
+        annotations: READ8,
         run: (call, input3) => {
           return placementsMetadataText(call.doc.project, (text(input3.detail_level) || "summary").toLowerCase());
         }
       }),
       contractTool("get_timeline_state_tool", {
-        annotations: READ6,
+        annotations: READ8,
         run: (call) => {
           const data = timelineStateData(call.doc.project);
           return applied("get_timeline_state_tool", `Timeline: ${data.clips.length} clip(s), ${data.tracks.length} track(s).`, { data }, 0);
@@ -70915,7 +72762,7 @@ function undoRedo(call, direction2, steps) {
   const beforeProject = doc.project;
   const signatureBefore = timelineSignature(beforeProject);
   let done = 0;
-  let described = null;
+  let described2 = null;
   let touchedClips = false;
   const labels = [];
   let last = null;
@@ -70931,7 +72778,7 @@ function undoRedo(call, direction2, steps) {
       labels.push(...moved);
       const event = last;
       const group = event ? originalActions(event, direction2) : [];
-      if (described === null) described = describeGroup(group);
+      if (described2 === null) described2 = describeGroup(group);
       if (group.some((a) => Array.isArray(a.key) && a.key[0] === "clips")) touchedClips = true;
       done += 1;
     }
@@ -70950,7 +72797,7 @@ function undoRedo(call, direction2, steps) {
   const noun = done === 1 ? "action" : "actions";
   let detail2 = "";
   if (delta) detail2 = `: ${delta}`;
-  else if (described && done === 1) detail2 = ` (${described})`;
+  else if (described2 && done === 1) detail2 = ` (${described2})`;
   let summary;
   if (done < steps) {
     summary = `${verb} ${done} of ${steps} requested${detail2}; nothing left to ${label2}.`;
@@ -70962,7 +72809,7 @@ function undoRedo(call, direction2, steps) {
   const changed = timelineDelta(timelineSnapshot(beforeProject), timelineSnapshot(doc.project));
   return applied(`${direction2}_tool`, summary, { ...changed, data: { steps: done, labels } }, 0);
 }
-var READ7, PROJECT_EXTS, projectTools, SIGNATURE_SKIP_KEYS;
+var READ9, PROJECT_EXTS, projectTools, SIGNATURE_SKIP_KEYS;
 var init_project2 = __esm({
   "../engine/src/tools/catalog/project.ts"() {
     "use strict";
@@ -70973,19 +72820,19 @@ var init_project2 = __esm({
     init_snapshot();
     init_tracks2();
     init_common();
-    READ7 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ9 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     PROJECT_EXTS = [".zvn", ".osp", ".flow"];
     projectTools = [
       contractTool("get_project_info_tool", {
-        annotations: READ7,
+        annotations: READ9,
         run: (call) => projectInfoText(call.doc.project)
       }),
       contractTool("list_files_tool", {
-        annotations: READ7,
+        annotations: READ9,
         run: (call) => listFilesText(call.doc.project)
       }),
       contractTool("list_clips_tool", {
-        annotations: READ7,
+        annotations: READ9,
         run: (call, input3) => {
           const project = call.doc.project;
           let layer2;
@@ -71006,11 +72853,11 @@ var init_project2 = __esm({
         }
       }),
       contractTool("list_layers_tool", {
-        annotations: READ7,
+        annotations: READ9,
         run: (call) => listLayersText(call.doc.project)
       }),
       contractTool("list_markers_tool", {
-        annotations: READ7,
+        annotations: READ9,
         run: (call) => listMarkersText(call.doc.project)
       }),
       contractTool("new_project_tool", {
@@ -71192,7 +73039,7 @@ var init_beats2 = __esm({
 });
 
 // ../engine/src/tools/catalog/reels.ts
-function displayName(file3) {
+function displayName2(file3) {
   const base = String(file3.name ?? file3.path ?? file3.id).split(/[\\/]/).pop() ?? String(file3.id);
   return base.replace(/\.[A-Za-z0-9]+$/, "").replace(/[_-]+/g, " ").trim() || String(file3.id);
 }
@@ -71330,7 +73177,7 @@ var init_reels = __esm({
           const project = call.doc.project;
           const style = REEL_STYLES[args.style ?? "hype"];
           const files = new Map(project.files.map((f3) => [String(f3.id), f3]));
-          const names2 = new Map([...files].map(([id, f3]) => [id, displayName(f3)]));
+          const names2 = new Map([...files].map(([id, f3]) => [id, displayName2(f3)]));
           const ids2 = args.file_ids ?? project.files.filter((f3) => visualKind(f3) !== null).map((f3) => String(f3.id));
           const unknown2 = ids2.filter((id) => !files.has(id));
           if (unknown2.length > 0) return refused(TOOL, `Error: unknown file id(s): ${unknown2.join(", ")}.`);
@@ -71619,13 +73466,13 @@ function clipTranscriptCues(project, clip2) {
   const effective = getEffectiveAiMetadata(file3, clip2, { clipAiMetadata: clip2.ai_metadata });
   return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord43) : [];
 }
-function fpsParts(project) {
+function fpsParts2(project) {
   const fps2 = record4(project.fps);
   return [Number(fps2.num ?? 30) || 30, Number(fps2.den ?? 1) || 1];
 }
 function sliceAtSourceCut(call, info, cutSource, label2) {
   const project = call.doc.project;
-  const [num14, den2] = fpsParts(project);
+  const [num14, den2] = fpsParts2(project);
   let cut2 = cutSource;
   let what = label2;
   const [snappedCut, cue] = snapCutOutOfSpeech(cut2, clipTranscriptCues(project, info.clip));
@@ -71644,7 +73491,7 @@ function sliceAtSourceCut(call, info, cutSource, label2) {
   return `Sliced at ${fmtMmss(cut2 - info.clipStart)} (${what}).`;
 }
 function sliceAtSourceTimes(call, info, t0, t1) {
-  const [num14, den2] = fpsParts(call.doc.project);
+  const [num14, den2] = fpsParts2(call.doc.project);
   const snap2 = (pos) => snapToSliceGrid(pos, num14, den2);
   const eps = 1e-3;
   const { clipStart, clipEnd: clipEnd2, clipPos } = info;
@@ -72865,7 +74712,7 @@ var init_stock2 = __esm({
 });
 
 // ../engine/src/tools/catalog/timeline.ts
-function layerOf3(value) {
+function layerOf4(value) {
   const n = Math.trunc(Number(value ?? 0));
   return Number.isFinite(n) ? n : 0;
 }
@@ -72874,14 +74721,14 @@ async function deleteOneClip(call, args) {
   if (!resolved.ok) return resolved.error || "Error: Could not resolve timeline clip.";
   const project = call.doc.project;
   const clip2 = resolved.clip;
-  const layer2 = layerOf3(clip2.layer);
+  const layer2 = layerOf4(clip2.layer);
   const position = Number(clip2.position) || 0;
   const title = String(clip2.title || clip2.label || "clip");
   const locked = lockedTrackError(layer2, project.layers);
   if (locked) return locked;
   const trackLabel = formatTrackLabelForLlm(layer2, project.layers);
   const ripple = boolArg(args.ripple);
-  const positions = (p) => new Map([...p.clips, ...p.effects].filter((item) => layerOf3(item.layer) === layer2).map((item) => [String(item.id), Number(item.position)]));
+  const positions = (p) => new Map([...p.clips, ...p.effects].filter((item) => layerOf4(item.layer) === layer2).map((item) => [String(item.id), Number(item.position)]));
   const before = positions(project);
   call.commit((tx) => deleteClips(tx, [String(clip2.id)], { ripple }));
   const head = `Deleted timeline clip ${String(clip2.id)} (${pyReprString(title)}) from track ${trackLabel} at ${pyFixed(position, 2)}s`;
@@ -72901,8 +74748,8 @@ function deleteWholeTrack(call, track2, includeTransitions) {
   const locked = lockedTrackError(layer2, project.layers);
   if (locked) return locked;
   const trackLabel = formatTrackLabelForLlm(layer2, project.layers);
-  const clipIds = (project.clips ?? []).filter((c) => layerOf3(c.layer) === layer2).map((c) => String(c.id));
-  const transitionIds = includeTransitions ? (project.effects ?? []).filter((t) => layerOf3(t.layer) === layer2).map((t) => String(t.id)) : [];
+  const clipIds = (project.clips ?? []).filter((c) => layerOf4(c.layer) === layer2).map((c) => String(c.id));
+  const transitionIds = includeTransitions ? (project.effects ?? []).filter((t) => layerOf4(t.layer) === layer2).map((t) => String(t.id)) : [];
   if (clipIds.length > 0 || transitionIds.length > 0) {
     call.commit((tx) => {
       for (const id of transitionIds) removeTransition(tx, id);
@@ -73069,7 +74916,7 @@ var init_timeline2 = __esm({
             if (track2.error) return track2.error;
             if (track2.layer !== void 0) layers = [track2.layer];
           }
-          const onTrack = (layer2) => !layers || layers.includes(layerOf3(layer2));
+          const onTrack = (layer2) => !layers || layers.includes(layerOf4(layer2));
           const clips = (project.clips ?? []).filter((c) => covers(c) && onTrack(c.layer));
           const transitions = (project.effects ?? []).filter((t) => covers(t) && onTrack(t.layer));
           if (clips.length === 0 && transitions.length === 0) return "No clip or transition at the playhead.";
@@ -73085,7 +74932,7 @@ var init_timeline2 = __esm({
 function timeArg(call, seconds2) {
   return seconds2 === void 0 || seconds2 < 0 ? playheadSeconds(call) : seconds2;
 }
-function stemOf(file3) {
+function stemOf2(file3) {
   const dot = file3.lastIndexOf(".");
   return dot > 0 ? file3.slice(0, dot) : file3;
 }
@@ -73097,7 +74944,7 @@ function transitionChoice(name) {
   if (key === "random") return { pool: TRANSITIONS.map((t) => t.id) };
   if (["crossfade", "cross_fade", "dissolve", "cross_dissolve"].includes(key)) key = "fade";
   const stems = /* @__PURE__ */ new Map();
-  for (const t of TRANSITIONS) stems.set(stemOf(t.file).toLowerCase(), t.id);
+  for (const t of TRANSITIONS) stems.set(stemOf2(t.file).toLowerCase(), t.id);
   const exact = stems.get(key);
   if (exact) return { mask: exact, label: key };
   const near = [...stems.keys()].filter((s) => s.includes(key)).sort();
@@ -73727,7 +75574,7 @@ async function alignClips(call, input3) {
     overlaps: hits
   });
 }
-var EDIT6, ADD2, timelineEditTools;
+var EDIT8, ADD2, timelineEditTools;
 var init_timeline_edit = __esm({
   "../engine/src/tools/catalog/timeline-edit.ts"() {
     "use strict";
@@ -73747,16 +75594,16 @@ var init_timeline_edit = __esm({
     init_tracks2();
     init_common();
     init_timeline_edit_common();
-    EDIT6 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT8 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD2 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     timelineEditTools = [
       contractTool("add_clips_to_timeline_tool", { annotations: ADD2, run: (call, input3) => editorRun(() => addClipsToTimeline(call, input3)) }),
-      contractTool("move_clips_tool", { annotations: EDIT6, run: (call, input3) => editorRun(() => moveClips(call, input3)) }),
-      contractTool("trim_clips_tool", { annotations: EDIT6, run: (call, input3) => editorRun(() => trimClips(call, input3)) }),
-      contractTool("slice_clips_tool", { annotations: EDIT6, run: (call, input3) => editorRun(() => sliceClips(call, input3)) }),
-      contractTool("remove_gaps_tool", { annotations: EDIT6, run: (call, input3) => editorRun(() => removeGaps(call, input3)) }),
+      contractTool("move_clips_tool", { annotations: EDIT8, run: (call, input3) => editorRun(() => moveClips(call, input3)) }),
+      contractTool("trim_clips_tool", { annotations: EDIT8, run: (call, input3) => editorRun(() => trimClips(call, input3)) }),
+      contractTool("slice_clips_tool", { annotations: EDIT8, run: (call, input3) => editorRun(() => sliceClips(call, input3)) }),
+      contractTool("remove_gaps_tool", { annotations: EDIT8, run: (call, input3) => editorRun(() => removeGaps(call, input3)) }),
       contractTool("duplicate_clips_tool", { annotations: ADD2, run: (call, input3) => editorRun(() => duplicateClips(call, input3)) }),
-      contractTool("align_clips_tool", { annotations: EDIT6, run: (call, input3) => editorRun(() => alignClips(call, input3)) })
+      contractTool("align_clips_tool", { annotations: EDIT8, run: (call, input3) => editorRun(() => alignClips(call, input3)) })
     ];
   }
 });
@@ -74103,7 +75950,7 @@ async function reverseClip(call, input3) {
   call.commit((tx) => applyClipPreset(tx, clip2.id, reverse ? "time.reverse" : "time.none"));
   return `${reverse ? "Reversed" : "Reset time on"} timeline_clip_id=${clip2.id}.`;
 }
-var EDIT7, ADD3, MIN_SPEED2, MAX_SPEED, AV, timelineTimeTools;
+var EDIT9, ADD3, MIN_SPEED2, MAX_SPEED, AV, timelineTimeTools;
 var init_timeline_time = __esm({
   "../engine/src/tools/catalog/timeline-time.ts"() {
     "use strict";
@@ -74118,18 +75965,18 @@ var init_timeline_time = __esm({
     init_pyfmt();
     init_common();
     init_timeline_edit_common();
-    EDIT7 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT9 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD3 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     MIN_SPEED2 = 0.0625;
     MAX_SPEED = 16;
     AV = { on: 1, off: 0, auto: -1 };
     timelineTimeTools = [
-      contractTool("reverse_clip_tool", { annotations: EDIT7, run: (call, input3) => reverseClip(call, input3) }),
-      contractTool("set_clip_speed_tool", { annotations: EDIT7, run: (call, input3) => editorRun(() => setClipSpeed2(call, input3)) }),
-      contractTool("repeat_clip_tool", { annotations: EDIT7, run: (call, input3) => editorRun(() => repeatClips(call, input3)) }),
-      contractTool("freeze_frame_tool", { annotations: EDIT7, run: (call, input3) => editorRun(() => freezeFrame(call, input3)) }),
+      contractTool("reverse_clip_tool", { annotations: EDIT9, run: (call, input3) => reverseClip(call, input3) }),
+      contractTool("set_clip_speed_tool", { annotations: EDIT9, run: (call, input3) => editorRun(() => setClipSpeed2(call, input3)) }),
+      contractTool("repeat_clip_tool", { annotations: EDIT9, run: (call, input3) => editorRun(() => repeatClips(call, input3)) }),
+      contractTool("freeze_frame_tool", { annotations: EDIT9, run: (call, input3) => editorRun(() => freezeFrame(call, input3)) }),
       contractTool("separate_clip_audio_tool", { annotations: ADD3, run: (call, input3) => editorRun(() => separateClipAudio(call, input3)) }),
-      contractTool("set_clip_audio_video_tool", { annotations: EDIT7, run: (call, input3) => editorRun(() => setClipAudioVideo(call, input3)) })
+      contractTool("set_clip_audio_video_tool", { annotations: EDIT9, run: (call, input3) => editorRun(() => setClipAudioVideo(call, input3)) })
     ];
   }
 });
@@ -74143,13 +75990,13 @@ async function run2(body) {
     throw error62;
   }
 }
-function fpsFraction2(project) {
+function fpsFraction3(project) {
   const num14 = Math.trunc(Number(project.fps?.num)) || 30;
   const den2 = Math.trunc(Number(project.fps?.den)) || 1;
   return { num: num14, den: den2 };
 }
 function fpsOf2(project) {
-  const { num: num14, den: den2 } = fpsFraction2(project);
+  const { num: num14, den: den2 } = fpsFraction3(project);
   return num14 / den2;
 }
 function secondsToFrame2(project, seconds2) {
@@ -74162,7 +76009,7 @@ function pad2(value) {
   return String(Math.trunc(value)).padStart(2, "0");
 }
 function timecode(project, seconds2) {
-  const { num: num14, den: den2 } = fpsFraction2(project);
+  const { num: num14, den: den2 } = fpsFraction3(project);
   const ms = Math.max(0, seconds2) * 1e3;
   let sec = Math.floor(ms / 1e3);
   const milli = ms % 1e3;
@@ -74608,11 +76455,11 @@ async function setTimelineView(call, input3) {
     }
     ui.showTimelineRange(0, last * 1.02);
   } else if (visible !== null) {
-    const span3 = duration3 ? Math.min(visible, duration3) : visible;
-    let from = Math.max(0, playheadSeconds(call) - span3 / 2);
-    if (duration3) from = Math.max(0, Math.min(from, duration3 - span3));
-    ui.showTimelineRange(from, from + span3);
-    done.push(`showing ${pyG(span3)} s around the playhead`);
+    const span4 = duration3 ? Math.min(visible, duration3) : visible;
+    let from = Math.max(0, playheadSeconds(call) - span4 / 2);
+    if (duration3) from = Math.max(0, Math.min(from, duration3 - span4));
+    ui.showTimelineRange(from, from + span4);
+    done.push(`showing ${pyG(span4)} s around the playhead`);
   } else if (ranged) {
     const until = Math.min(end, duration3 || end);
     ui.showTimelineRange(start, until);
@@ -74786,7 +76633,7 @@ async function getPlayheadAndSelection(call) {
   const selected = selection ? `${count2} item(s) selected` : "the selection is not available here";
   return ok(call, `${head}, ${state.playing ? "playing" : "paused"}; ${selected}.`, data);
 }
-var EDIT8, VIEW4, READ8, SAVED_NOTE, tracksNavTools;
+var EDIT10, VIEW4, READ10, SAVED_NOTE, tracksNavTools;
 var init_tracks_nav = __esm({
   "../engine/src/tools/catalog/tracks-nav.ts"() {
     "use strict";
@@ -74803,19 +76650,19 @@ var init_tracks_nav = __esm({
     init_clip_props_model();
     init_common();
     init_timeline_edit_common();
-    EDIT8 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT10 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     VIEW4 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
-    READ8 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ10 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     SAVED_NOTE = "saved with the project; there is no preview player here";
     tracksNavTools = [
-      contractTool("update_track_tool", { annotations: EDIT8, run: (call, input3) => run2(() => updateTrack(call, input3)) }),
-      contractTool("remove_track_tool", { annotations: EDIT8, run: (call, input3) => run2(() => removeTrackTool(call, input3)) }),
-      contractTool("update_marker_tool", { annotations: EDIT8, run: (call, input3) => run2(() => updateMarkerTool(call, input3)) }),
-      contractTool("remove_marker_tool", { annotations: EDIT8, run: (call, input3) => run2(() => removeMarkerTool(call, input3)) }),
+      contractTool("update_track_tool", { annotations: EDIT10, run: (call, input3) => run2(() => updateTrack(call, input3)) }),
+      contractTool("remove_track_tool", { annotations: EDIT10, run: (call, input3) => run2(() => removeTrackTool(call, input3)) }),
+      contractTool("update_marker_tool", { annotations: EDIT10, run: (call, input3) => run2(() => updateMarkerTool(call, input3)) }),
+      contractTool("remove_marker_tool", { annotations: EDIT10, run: (call, input3) => run2(() => removeMarkerTool(call, input3)) }),
       contractTool("seek_playhead_tool", { annotations: VIEW4, run: (call, input3) => run2(() => seekPlayhead(call, input3)) }),
       contractTool("select_timeline_items_tool", { annotations: VIEW4, requires: ["ui"], run: (call, input3) => run2(() => selectTimelineItems(call, input3)) }),
       contractTool("set_timeline_view_tool", { annotations: VIEW4, requires: ["ui"], run: (call, input3) => run2(() => setTimelineView(call, input3)) }),
-      contractTool("get_playhead_and_selection_tool", { annotations: READ8, run: (call) => run2(() => getPlayheadAndSelection(call)) })
+      contractTool("get_playhead_and_selection_tool", { annotations: READ10, run: (call) => run2(() => getPlayheadAndSelection(call)) })
     ];
   }
 });
@@ -75266,13 +77113,13 @@ var init_title_templates = __esm({
 function basename6(path39) {
   return String(path39).split(/[\\/]/).pop() ?? "";
 }
-function isAbsolutePath2(path39) {
+function isAbsolutePath3(path39) {
   return path39.startsWith("/") || path39.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path39);
 }
 async function loadTitleTemplate(call, template) {
   const tmpl = template.trim();
   const log = (what, error62) => call.host.log?.(`title template ${what}: ${error62 instanceof Error ? error62.message : String(error62)}`);
-  if (tmpl && isAbsolutePath2(tmpl)) {
+  if (tmpl && isAbsolutePath3(tmpl)) {
     const storage = call.host.storage;
     if (!tmpl.toLowerCase().endsWith(".svg") || !storage?.readText) return null;
     try {
@@ -75411,7 +77258,7 @@ function durationArg(value) {
   const n = parsePythonFloat(String(value ?? "").trim());
   return n === null ? 1 : n;
 }
-var READ9, transitionTools;
+var READ11, transitionTools;
 var init_transitions3 = __esm({
   "../engine/src/tools/catalog/transitions.ts"() {
     "use strict";
@@ -75421,10 +77268,10 @@ var init_transitions3 = __esm({
     init_define();
     init_pyfmt();
     init_common();
-    READ9 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+    READ11 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
     transitionTools = [
       contractTool("list_transitions_tool", {
-        annotations: READ9,
+        annotations: READ11,
         run: (_call, input3) => {
           const category = (text(input3.category) || "all").toLowerCase();
           const list2 = category === "all" || category === "common" || category === "extra" ? listTransitions(category) : [];
@@ -75435,7 +77282,7 @@ var init_transitions3 = __esm({
         }
       }),
       contractTool("search_transitions_tool", {
-        annotations: READ9,
+        annotations: READ11,
         run: (_call, input3) => {
           const query2 = String(input3.query ?? "");
           const matches3 = searchTransitions(query2);
@@ -75506,6 +77353,8 @@ function buildCatalog2() {
     ...speechTools,
     ...generationTools,
     ...transitionTools,
+    ...mediaFilesTransitionTools,
+    ...mediaFilesTools,
     ...titleTools,
     ...titleTemplateTools,
     ...animatedTitleTools,
@@ -75585,6 +77434,8 @@ var init_registry4 = __esm({
     init_generation();
     init_inspect();
     init_media3();
+    init_media_files();
+    init_media_files_transitions();
     init_metadata();
     init_motion();
     init_overlays2();
@@ -75623,6 +77474,7 @@ function needName(need) {
     "media.importUrl": "URL downloads",
     "media.pickFiles": "a file picker",
     "media.writeGenerated": "storing generated media",
+    "media.missing": "checking for missing media",
     "storage.open": "opening project files",
     "storage.readText": "reading files",
     "storage.writeText": "writing files",
@@ -75780,7 +77632,20 @@ var init_availability = __esm({
       search_media_local_tool: { desktopOnly: "the on-device visual index" },
       modify_clip_tool: { desktopOnly: "the desktop's ffmpeg cut, upload and splice pipeline" },
       generate_transition_clip_tool: { desktopOnly: "the desktop's ffmpeg pipeline (clip A + AI morph + clip B)" },
-      suggest_motion_graphics_placements_tool: { desktopOnly: "deprecated on the desktop too; use propose_overlay_windows_tool" }
+      suggest_motion_graphics_placements_tool: { desktopOnly: "deprecated on the desktop too; use propose_overlay_windows_tool" },
+      // Project Files: missing media is the host's check; relinking and image sequences read local folders.
+      list_project_files_tool: {
+        optional: ["media.missing"],
+        partialNote: "without a media check every file reports missing=null and missing_only is refused",
+        webNote: "optimized_preview is always none: only Zenvi desktop makes and plays optimized previews"
+      },
+      remove_files_from_project_tool: { optional: ["media.missing"], partialNote: "scope='missing' needs a media check" },
+      update_project_files_tool: {
+        optional: ["media.importPath", "media.listPaths"],
+        partialNote: "relinking (path, search_folder) needs local file access"
+      },
+      import_image_sequence_tool: { methods: ["media.listPaths"] },
+      manage_optimized_previews_tool: { desktopOnly: "the optimized previews (proxies) Zenvi desktop builds and plays" }
     };
     SURFACE_PROFILES = {
       editor: {
@@ -75791,6 +77656,7 @@ var init_availability = __esm({
           "media.importUrl",
           "media.pickFiles",
           "media.writeGenerated",
+          "media.missing",
           "storage.readText",
           "ui.openExportDialog",
           "audio.decodePcm",
@@ -75812,6 +77678,7 @@ var init_availability = __esm({
           "media.listPaths",
           "media.importUrl",
           "media.writeGenerated",
+          "media.missing",
           "storage.open",
           "storage.readText",
           "storage.writeText",
@@ -75824,7 +77691,7 @@ var init_availability = __esm({
         title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
         host: "packages/cloud/src/mcp/engine.ts",
         capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
-        methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText", "audio.decodePcm", "audio.transcribe"],
+        methods: ["media.importUrl", "media.writeGenerated", "media.missing", "storage.readText", "storage.writeText", "audio.decodePcm", "audio.transcribe"],
         conditional: {
           frames: "the render worker is configured",
           media: "ffprobe is available",
@@ -105056,7 +106923,7 @@ var init_project3 = __esm({
 });
 
 // src/commands/render.ts
-import { writeFile as writeFile8 } from "node:fs/promises";
+import { writeFile as writeFile9 } from "node:fs/promises";
 import path34 from "node:path";
 function parseFps(text5) {
   if (!text5) return void 0;
@@ -105193,7 +107060,7 @@ function registerRenderCommands(program2, ctx) {
         data = outcome.images[0].data;
         mimeType = outcome.images[0].mimeType;
       }
-      await writeFile8(output2, Buffer.from(data, "base64"));
+      await writeFile9(output2, Buffer.from(data, "base64"));
       if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Wrote ${output2}`, engine: executor.engine, project: executor.project ?? null, file: output2, mimeType, seconds: seconds2 });
       else ctx.out.line(`${ctx.out.style("\u2713", "green")} Wrote ${output2}`);
     });
@@ -106199,7 +108066,7 @@ function resolvePathArgs(args, cwd, home = homedir3()) {
 function declaredName(properties, candidates) {
   return candidates.find((name) => Object.prototype.hasOwnProperty.call(properties, name));
 }
-function fpsFraction3(fps2) {
+function fpsFraction4(fps2) {
   if (fps2 && typeof fps2 === "object") {
     const { num: num14, den: den2 } = fps2;
     if (typeof num14 === "number" && typeof den2 === "number" && num14 > 0 && den2 > 0) return { num: num14, den: den2 };
@@ -106218,7 +108085,7 @@ function aeRenderLink(data, alpha) {
   if (data.link && typeof data.link === "object" && !Array.isArray(data.link)) {
     return { path: file3, link: { ...data.link, kind: "aftereffects" } };
   }
-  const fps2 = fpsFraction3(data.fps);
+  const fps2 = fpsFraction4(data.fps);
   const duration3 = Number(data.duration);
   const codec2 = typeof data.codec === "string" && CODECS.includes(data.codec) ? data.codec : alpha ? "prores4444" : /\.mp4$/i.test(file3) ? "h264" : void 0;
   const render3 = {};
@@ -109163,10 +111030,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
   _executeSubCommand(subcommand, args) {
     args = args.slice();
     const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
-    function findFile2(baseDir, baseName) {
-      const localBin = path.resolve(baseDir, baseName);
+    function findFile2(baseDir, baseName2) {
+      const localBin = path.resolve(baseDir, baseName2);
       if (fs.existsSync(localBin)) return localBin;
-      if (sourceExt.includes(path.extname(baseName))) return void 0;
+      if (sourceExt.includes(path.extname(baseName2))) return void 0;
       const foundExt = sourceExt.find(
         (ext) => fs.existsSync(`${localBin}${ext}`)
       );
@@ -110401,7 +112268,7 @@ init_edit2();
 // src/commands/hosts.ts
 init_src3();
 init_adobe_tools();
-import { lstat as lstat2, writeFile as writeFile6 } from "node:fs/promises";
+import { lstat as lstat2, writeFile as writeFile7 } from "node:fs/promises";
 import path29 from "node:path";
 
 // src/hosts/doctor.ts
@@ -110685,7 +112552,7 @@ async function saveImages(ctx, images, out) {
   const saved = [];
   for (const [i, image] of images.entries()) {
     const file3 = images.length === 1 ? target : `${target.slice(0, target.length - ext.length)}-${i + 1}${ext}`;
-    await writeFile6(file3, Buffer.from(image.data, "base64"));
+    await writeFile7(file3, Buffer.from(image.data, "base64"));
     saved.push(file3);
   }
   return saved;
@@ -110826,7 +112693,7 @@ import path37 from "node:path";
 init_src2();
 init_output();
 import { execFile } from "node:child_process";
-import { copyFile as copyFile2, mkdir as mkdir7, readFile as readFile12, rename as rename6, stat as stat13, writeFile as writeFile7 } from "node:fs/promises";
+import { copyFile as copyFile2, mkdir as mkdir7, readFile as readFile12, rename as rename6, stat as stat13, writeFile as writeFile8 } from "node:fs/promises";
 import path30 from "node:path";
 import { promisify } from "node:util";
 
@@ -110979,7 +112846,7 @@ async function writeWithBackup(file3, text5, hadFile) {
     await copyFile2(file3, backup);
   }
   const tmp = `${file3}.${process.pid}.tmp`;
-  await writeFile7(tmp, text5);
+  await writeFile8(tmp, text5);
   await rename6(tmp, file3);
   return backup;
 }

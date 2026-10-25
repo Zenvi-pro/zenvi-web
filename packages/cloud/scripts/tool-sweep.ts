@@ -154,6 +154,8 @@ interface Context {
   clips: Record<MediaKey | "title", string>;
   /** The Blur effect on clip A. */
   effectId: string;
+  /** The fade-in and fade-out transitions on the still (track 2). */
+  transitions: string[];
   /** A Pexels result from search_pexels_videos_tool, when the surface has it. */
   stock?: { video_id: number; link: string };
 }
@@ -209,15 +211,22 @@ async function setUp(call: (name: string, args: Json) => Promise<CallResult>, re
   // Captions for the caption tools to list, edit and remove: given cues (timeline seconds; the talking clip starts at 11 s).
   const captioned = await call("add_captions_tool", { timeline_clip_id: clips.talk, cues: [{ start: 11.2, end: 13.4, text: "Welcome to the Zenvi tool sweep" }], project_id: projectId }).catch(() => undefined);
   if (captioned) console.log(`setup add_captions_tool: ${oneLine(textOf(captioned)).slice(0, 140)}`);
+  // Transitions for the transition tools to list, change, reverse, copy and remove: a fade in and out on the still.
+  for (const placement of ["start", "end"]) {
+    const faded = await call("apply_transition_tool", { clip1_id: clips.still, placement, transition_name: "fade", duration: "1", project_id: projectId });
+    console.log(`setup apply_transition_tool ${placement}: ${oneLine(textOf(faded)).slice(0, 140)}`);
+  }
   const { project } = await roles();
   const effectId = project.clips.find((c) => c.id === clips.a)?.effects?.[0]?.id ?? "";
+  const transitions = ((project as { effects?: { id: string; position: number }[] }).effects ?? []).sort((x, y) => x.position - y.position).map((t) => t.id);
+  if (transitions.length !== 2) throw new Error(`setup: expected 2 transitions on the still, found ${transitions.length}`);
   for (const key of ["a", "b", "talk", "beat", "still", "title"] as const) if (!clips[key]) throw new Error(`setup: no ${key} clip on the timeline`);
   // Stock the way a chat finds it, when the surface has the search.
   const found = await call("search_pexels_videos_tool", { query: "ocean waves", count: 1, project_id: projectId }).catch(() => undefined);
   // Zenvi Cloud answers an engine tool with { ok, project_id, data: <receipt> }; the results are the receipt's data.
   const receipt = found?.structuredContent?.data as { data?: { results?: { video_id: number; link: string }[] } } | undefined;
   const hit = receipt?.data?.results?.[0];
-  return { projectId, files: files as Context["files"], urls: urls as Context["urls"], clips, effectId, stock: hit };
+  return { projectId, files: files as Context["files"], urls: urls as Context["urls"], clips, effectId, transitions, stock: hit };
 }
 
 function makeMedia(dir: string): Record<"a" | "b" | "talk" | "beat" | "still", string> {
@@ -321,6 +330,7 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   // The title and the still sit on different tracks, so lining up their starts overlaps nothing.
   align_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.title, c.clips.still] }),
   add_transition_tool: () => ({ track: "1", position_seconds: "5.5", duration_seconds: "1", transition: "common/fade" }),
+  add_transitions_between_clips_tool: () => ({ track: "1", duration_seconds: 0.5 }),
   analyze_timeline_audio_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
   // One clip by id: clip_ids is a comma-separated string on these older colour tools, as on the desktop.
   apply_color_tool: (c) => ({ timeline_clip_id: c.clips.a, contrast: "0.2", saturation: "1.2" }),
@@ -332,6 +342,9 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   copy_effects_tool: (c) => ({ source_clip_id: c.clips.a, timeline_clip_ids: [c.clips.b] }),
   // Clip A fades in (setup): keyframes to copy and remove.
   copy_clip_keyframes_tool: (c) => ({ source_clip_id: c.clips.a, timeline_clip_ids: [c.clips.b] }),
+  // The still's fade-in becomes its fade-out's settings.
+  copy_transition_tool: (c) => ({ source_transition_id: c.transitions[0], transition_ids: [c.transitions[1]] }),
+  create_subclips_tool: (c) => ({ file_id: c.files.a, subclips: [{ source_start_seconds: 1, source_end_seconds: 3, name: "Sweep hook" }] }),
   delete_from_timeline_tool: (c) => ({ timeline_clip_id: c.clips.b }),
   detect_beats_tool: (c) => ({ file_id: c.files.beat }),
   diarize_media_tool: (c) => ({ file_id: c.files.talk }),
@@ -349,6 +362,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   get_file_info_tool: (c) => ({ file_id: c.files.talk }),
   get_render_status: () => ({ render_id: "r_sweep_unknown" }),
   get_transcript_tool: (c) => ({ file_id: c.files.talk }),
+  // A folder of frames on this machine: Zenvi Cloud has no local folders, so this is refused.
+  import_image_sequence_tool: () => ({ path: "renders/intro", fps: 24 }),
   import_attached_file: (c) => ({ file: { download_url: c.urls.still, file_id: "file_sweep", file_name: "attached.png", mime_type: "image/png" } }),
   import_stock_media_tool: (c) => (c.stock ? { source: "pexels", video_id: String(c.stock.video_id), link: c.stock.link, position_seconds: "16" } : { source: "pexels", video_id: "13736520", position_seconds: "16" }),
   import_video_url_and_add_to_timeline_tool: (c) => ({ video_url: c.urls.b, position_seconds: "20" }),
@@ -356,7 +371,11 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   inspect_timeline_tool: (c) => ({ clipId: c.clips.a, start: "0", end: "2" }),
   list_captions_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
   match_color_to_reference_tool: (c) => ({ timeline_clip_id: c.clips.b, referenceClipId: c.clips.a }),
+  list_project_files_tool: () => ({ usage: "used", detail: "full" }),
   list_projects: () => ({ limit: 5 }),
+  list_timeline_transitions_tool: () => ({ track: "2" }),
+  // Optimized previews are Zenvi desktop's: refused on every web surface.
+  manage_optimized_previews_tool: () => ({ action: "status" }),
   modify_clip_tool: (c) => ({ timeline_clip_id: c.clips.b, description: "a calm ocean at sunset" }),
   move_clip_tool: (c) => ({ clip_id: c.clips.b, position_seconds: "7" }),
   move_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.still], by_seconds: 1 }),
@@ -368,6 +387,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   reindex_project_file_tool: (c) => ({ file_id: c.files.a }),
   remove_captions_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
   remove_effect_tool: (c) => ({ effect_id: c.effectId }),
+  // The still is used once (track 2): removing its file takes that clip too.
+  remove_files_from_project_tool: (c) => ({ file_ids: [c.files.still], confirm_remove_clips: true }),
   remove_keyframes_tool: (c) => ({ timeline_clip_ids: [c.clips.a], properties: ["all"] }),
   remove_marker_tool: () => ({ markers: ["Sweep marker"] }),
   // Tracks 4 and 5 are empty in the baseline.
@@ -375,10 +396,12 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   // The still starts at 2 s on track 2: one gap to close.
   remove_gaps_tool: () => ({ track: "2" }),
   remove_silence_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
+  remove_transition_tool: (c) => ({ transition_ids: [c.transitions[1]] }),
   remove_words_tool: (c) => ({ timeline_clip_id: c.clips.talk, fillerPreset: "um_uh" }),
   render_project: () => ({ height: 360, quality: "low" }),
   repeat_clip_tool: (c) => ({ timeline_clip_ids: [c.clips.talk] }),
   resummarize_project_file_tool: (c) => ({ file_id: c.files.a }),
+  reverse_transition_tool: (c) => ({ transition_ids: [c.transitions[0]] }),
   search_clip_scenes_tool: (c) => ({ query: "colour bars", timeline_clip_id: c.clips.b }),
   search_clips_tool: () => ({ query: "colour bars" }),
   search_emojis_tool: () => ({ query: "fire" }),
@@ -403,7 +426,10 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   trim_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.a], trim_start_seconds: 0.5 }),
   update_effect_tool: (c) => ({ effect_id: c.effectId, properties: { sigma: 6 } }),
   update_marker_tool: () => ({ marker: "Sweep marker", name: "Renamed marker" }),
+  update_project_files_tool: (c) => ({ file_ids: [c.files.b], name: "Sweep bars", add_tags: ["b-roll"], rename_clips: true }),
   update_track_tool: () => ({ track: "2", name: "Stills" }),
+  // The fade-in at the still's start keeps that edge.
+  update_transition_tool: (c) => ({ transition_ids: [c.transitions[0]], duration_seconds: 1.5, contrast: 6, audio_crossfade: true }),
   wait_until_project_indexed_tool: () => ({ timeout_seconds: 5 }),
   watch_clip_window_tool: (c) => ({ timeline_clip_id: c.clips.a, start: "0", end: "2" }),
 };

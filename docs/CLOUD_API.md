@@ -362,7 +362,9 @@ Host capabilities the catalog gets in the cloud (`GET /health` →
 `hostCapabilities`): `media` (probe project media; URL imports;
 `writeGenerated` stores generated files such as title SVGs as
 content-addressed media at `@assets/title/<name>` with `file.cloud`, so they
-render in cloud renders and travel with the project), `frames`, `assets` (the
+render in cloud renders and travel with the project; `missing` names the
+files whose bytes are not uploaded, as `GET /v1/projects/:id` lists them in
+`missingMedia`), `frames`, `assets` (the
 engine's bundled title templates), `audio` (loudness analysis for
 `remove_silence_tool`) and `storage` (`readText` of project media;
 `writeText` stores an export such as captions under the project and returns a

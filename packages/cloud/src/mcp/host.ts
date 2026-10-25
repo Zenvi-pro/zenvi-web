@@ -23,7 +23,7 @@ import { join } from "node:path";
 import { TRANSCRIPTION_PATH, transcriptionHttpError, type CloudMediaRef, type HostCapability, type Project, type ToolHost } from "@zenvi/engine";
 import { ApiError, tooLarge } from "../http/errors.js";
 import { withSuffix } from "../projects/files.js";
-import { displayName, fileSha256 } from "../projects/model.js";
+import { displayName, fileSha256, isBundledAsset } from "../projects/model.js";
 import { filesByPath } from "../render/resolve.js";
 import { attachmentDisposition, cleanFileName, normalizeContentType } from "../services/media.js";
 import { exportPath } from "../services/paths.js";
@@ -115,6 +115,16 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
         if (project().files.some((f) => f.path === path && f.cloud?.sha256 !== sha256)) path = `@assets/${folder}/${withSuffix(fileName, sha256.slice(0, 8))}`;
         generated.set(path, { file, cloud: { sha256, size: bytes.byteLength, name: fileName, content_type: type } });
         return path;
+      },
+      // Missing = not uploaded to Zenvi Cloud (what GET /v1/projects/:id lists as missingMedia).
+      missing: async (files) => {
+        const hashes = [...new Set(files.map((f) => fileSha256(f)).filter((h): h is string => h !== undefined))];
+        const stored = new Set(hashes.length > 0 ? (await services.media.check(userId, hashes)).existing : []);
+        return files.map((f) => {
+          if (isBundledAsset(f) || generated.has(String(f.path))) return false;
+          const sha = fileSha256(f);
+          return sha === undefined || !stored.has(sha);
+        });
       },
     };
     if (services.importer.available) {

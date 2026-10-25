@@ -121,6 +121,81 @@ export function matchTransition(name: string): TransitionEntry | undefined {
   });
 }
 
+/** What people call the common transitions (zenvi-core develop transition_ops.ALIASES). */
+const ALIASES: Readonly<Record<string, string>> = {
+  crossfade: "fade",
+  "cross fade": "fade",
+  dissolve: "fade",
+  "cross dissolve": "fade",
+  fade: "fade",
+  mix: "fade",
+  "wipe left": "wipe_right_to_left",
+  "wipe right": "wipe_left_to_right",
+  "wipe up": "wipe_bottom_to_top",
+  "wipe down": "wipe_top_to_bottom",
+  circle: "circle_in_to_out",
+  iris: "circle_in_to_out",
+  "iris open": "circle_in_to_out",
+  "iris close": "circle_out_to_in",
+  "circle in": "circle_out_to_in",
+  "circle out": "circle_in_to_out",
+};
+
+/** transition_ops.TRANSITION_EXTENSIONS: what a mask file may be. */
+const MASK_EXTENSIONS = [".svg", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff", ".mp4", ".mov", ".webm", ".mkv", ".avi"];
+
+/** transition_ops._norm: lower case, `_`/`-` as spaces, whitespace collapsed. */
+function normName(text: string): string {
+  return text.trim().toLowerCase().replaceAll("_", " ").replaceAll("-", " ").split(/\s+/).filter(Boolean).join(" ");
+}
+
+/** `os.path.splitext(path)[0]`: the extension of the last path part removed (a leading dot is not one). */
+function withoutExtension(path: string): string {
+  const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  const base = path.slice(slash + 1);
+  const dot = base.lastIndexOf(".");
+  return dot > 0 && base.slice(0, dot).replace(/\.+/g, "") !== "" ? path.slice(0, slash + 1 + dot) : path;
+}
+
+/** A transition's key in the desktop's catalog: its file name without extension, lower case. */
+export function transitionKey(entry: TransitionEntry): string {
+  return stem(entry.file).toLowerCase();
+}
+
+export interface TransitionMatch {
+  /** The mask a name means, or undefined when none or several match. */
+  entry: TransitionEntry | undefined;
+  /** Keys of the masks a name partly matches, when it matched none or several (at most 12). */
+  candidates: string[];
+}
+
+/**
+ * The mask a name means for the transition editor tools (zenvi-core develop
+ * transition_ops.find_transition): exact key or display name, then the
+ * aliases people use ("crossfade", "wipe left", "iris"), then a unique
+ * substring of a key; common masks before extra ones. Several partial
+ * matches answer the candidates instead. A catalog id or a stored path
+ * (`@transitions/common/fade.svg`, or an install path ending in
+ * `transitions/<category>/<file>`, the desktop's existing-file case) is that
+ * mask. apply_transition_tool keeps its older rule, `matchTransition`.
+ */
+export function lookupTransition(name: string): TransitionMatch {
+  const raw = String(name ?? "").trim();
+  if (!raw) return { entry: undefined, candidates: [] };
+  const direct = BY_ID.get(raw) ?? resolveTransitionAsset(raw);
+  if (direct) return { entry: direct, candidates: [] };
+  const lower = raw.toLowerCase();
+  let wanted = normName(MASK_EXTENSIONS.some((ext) => lower.endsWith(ext)) ? withoutExtension(raw) : raw);
+  const alias = ALIASES[wanted];
+  if (alias) wanted = normName(alias);
+  // TRANSITIONS lists common before extra, so the first exact hit is the desktop's pick.
+  const exact = TRANSITIONS.find((t) => normName(transitionKey(t)) === wanted || normName(t.name) === wanted);
+  if (exact) return { entry: exact, candidates: [] };
+  const partial = TRANSITIONS.filter((t) => normName(transitionKey(t)).includes(wanted));
+  if (partial.length === 1) return { entry: partial[0], candidates: [] };
+  return { entry: undefined, candidates: partial.slice(0, 12).map(transitionKey) };
+}
+
 /**
  * The catalog entry a mask path points at: a stored path
  * (`@transitions/common/fade.svg`) or any absolute path ending in

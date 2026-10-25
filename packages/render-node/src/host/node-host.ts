@@ -15,7 +15,7 @@ import type { RenderEngine } from "../render/engine.js";
 import { renderFrame } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
-import { createNodeMediaHost, type ImportPolicy } from "./media.js";
+import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createMediaResolver } from "./paths.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
 
@@ -85,7 +85,10 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   const host: NodeHost = {
     resolveMedia,
     projectFile: current,
-    media: createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes }),
+    media: {
+      ...createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes }),
+      missing: (files) => missingOnDisk(files, resolveMedia),
+    },
     exporter: {
       async export(project, exportOptions, onProgress) {
         const output = exportOptions.output ? inProject(exportOptions.output) : defaultOutput(exportOptions);
