@@ -1,8 +1,8 @@
 /**
- * Title tools: add_title_tool, add_captions_tool.
+ * Title tools: add_title_tool (add_captions_tool is in captions.ts).
  *
- * Ports of zenvi-core (ref b63c39be7) src/classes/agent_tools/titles.py
- * `add_title` and speech_extra.py `add_captions`. A title is a bundled SVG
+ * Port of zenvi-core (ref b63c39be7) src/classes/agent_tools/titles.py
+ * `add_title`. A title is a bundled SVG
  * template with its first text line replaced (W1's `setSvgText`, the port of
  * `_set_svg_text`), written through the host, probed, and placed with
  * add_clip_to_timeline's track/position rules (W1's `addTitleClip` records
@@ -12,9 +12,6 @@
  * `ToolHost.assets` by their `assetPath`); the desktop reads them from its
  * install folder. An absolute `.svg` path is a user's own file, read through
  * `StorageHost.readText`.
- * Captions are one title per caption cue, all in one undo step. Cue text
- * comes from an SRT/VTT file (`srtPath`, through `StorageHost.readText`) or
- * from the indexed transcript (get_transcript_tool on this surface).
  */
 
 import type { Clip } from "../../model/types.js";
@@ -23,16 +20,13 @@ import { ensureTrack } from "../../ops/overlays.js";
 import { addTitleClip, setSvgText } from "../../ops/titles.js";
 import { getTitleTemplate } from "../../titles/templates.js";
 import { contractTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
-import { projectFps } from "../frame-time.js";
 import { parseSecondsArg, TimeArgError } from "../placement.js";
 import { pyFixed, pyReprString, pySlice } from "../pyfmt.js";
-import { applied, failed, isOkStatus, refused, unchanged, type ToolReceipt } from "../receipt.js";
-import { parseSrtOrVtt, phraseWords, type CaptionCue, type TimedWord } from "../speech.js";
+import { applied, failed, refused } from "../receipt.js";
 import { planOverlayTrack } from "../titles-text.js";
 import type { ImportedMedia } from "../types.js";
 import { planPlacement, placementText, provisionalFile, type PlacementPlan } from "./clips.js";
 import { text } from "./common.js";
-import { transcriptFromCues } from "./speech-tools.js";
 
 function basename(path: string): string {
   return String(path).split(/[\\/]/).pop() ?? "";
@@ -179,95 +173,6 @@ export const titleTools: CatalogTool[] = [
             template: template.file,
           },
           notes: [place],
-        },
-      );
-    },
-  }),
-
-  contractTool("add_captions_tool", {
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    requires: ["media", "assets"],
-    run: async (call, input) => {
-      const tool = "add_captions_tool";
-      if (!call.host.media!.writeGenerated) return unavailable(tool, "it cannot store generated caption images.");
-      const clipId = text(input.clipId) || text(input.timeline_clip_id);
-      const srtPath = text(input.srtPath);
-      const fps = projectFps(call.doc.project);
-      const captionGroup = `cap_${generateId().toLowerCase()}`;
-      let cues: CaptionCue[];
-      let source = "local";
-      let generation: unknown = null;
-
-      if (srtPath) {
-        const readText = call.host.storage?.readText;
-        if (!readText) return unavailable(tool, "it cannot read subtitle files on this host.");
-        let raw: string;
-        try {
-          raw = await readText.call(call.host.storage, srtPath);
-        } catch {
-          return refused(tool, `Error: srtPath not found: ${srtPath}`);
-        }
-        try {
-          cues = parseSrtOrVtt(raw, fps);
-        } catch (error) {
-          return failed(tool, `Error: Failed to parse subtitles: ${error instanceof Error ? error.message : String(error)}`);
-        }
-        source = "srt";
-      } else {
-        const transcript = transcriptFromCues(call, { clipId, trackIndex: input.trackIndex, includeWords: true }, tool);
-        const receipt: ToolReceipt = transcript.receipt;
-        if (!isOkStatus(receipt.status)) return receipt;
-        const data = (receipt.data ?? {}) as Record<string, unknown>;
-        if (receipt.status === "unchanged") {
-          return unchanged(tool, String(receipt.summary || "No spoken dialogue to caption."), { data });
-        }
-        source = typeof data.transcriptionSource === "string" && data.transcriptionSource ? data.transcriptionSource : "local";
-        generation = data.transcriptGeneration ?? null;
-        const words: TimedWord[] = [];
-        for (const c of Array.isArray(data.clips) ? data.clips : []) {
-          const list = (c as { words?: unknown }).words;
-          if (Array.isArray(list)) words.push(...(list as TimedWord[]));
-        }
-        if (words.length === 0) return unchanged(tool, "No words to caption.");
-        cues = phraseWords(words, fps, { maxWords: input.maxWords ?? 8, maxChars: input.maxChars ?? 42 });
-      }
-      if (cues.length === 0) return unchanged(tool, "No caption cues produced.");
-
-      const template = await loadTitleTemplate(call, "");
-      if (!template) return failed(tool, "Error: Failed to place any captions. Error: title template not found (default).");
-      const prepared: { cue: CaptionCue; body: string; pos: number; dur: number; title: PreparedTitle }[] = [];
-      const warnings: string[] = [];
-      for (const cue of cues) {
-        const body = String(cue.text ?? "").trim();
-        if (!body) continue;
-        const pos = Number(cue.startSec) || 0;
-        const dur = Math.max(0.05, (Number(cue.endSec) || 0) - pos);
-        const title = await prepareTitle(call, template, body, { position: pos, duration: dur, track: "", fileName: `${captionGroup}_${prepared.length}.svg` });
-        if (typeof title === "string") {
-          warnings.push(title);
-          continue;
-        }
-        prepared.push({ cue, body, pos, dur, title });
-      }
-      if (prepared.length === 0) return failed(tool, `Error: Failed to place any captions. ${warnings.slice(0, 2).join("; ")}`);
-
-      const placed = call.commit((tx) => prepared.map((p) => placeTitle(tx, p.title)));
-      const captions = prepared.map((p, i) => ({
-        text: p.body,
-        startSec: p.pos,
-        endSec: p.pos + p.dur,
-        startFrame: p.cue.startFrame,
-        endFrame: p.cue.endFrame,
-        file_id: placed[i]!.fileId,
-      }));
-      const first = captions[0]!;
-      return applied(
-        tool,
-        `Placed ${captions.length} caption(s) (group ${captionGroup}).`,
-        {
-          warnings,
-          watchSuggested: clipId ? { clipId, start: first.startSec, end: first.endSec } : null,
-          data: { captionGroupId: captionGroup, captions, transcriptionSource: source, transcriptGeneration: generation, count: captions.length },
         },
       );
     },

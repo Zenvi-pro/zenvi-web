@@ -12,7 +12,7 @@ import { loadConfig } from "./config.js";
 import { createServices } from "./container.js";
 import { createLogger, errorMessage } from "./http/log.js";
 import { loadEngineRegistry } from "./mcp/engine.js";
-import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeProber, nodeRenderer } from "./render/node.js";
+import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeProber, nodeRenderer, nodeTranscribeMedia } from "./render/node.js";
 import { unavailableProber } from "./render/renderer.js";
 import { AzureBlobStore, AzureTableStore } from "./storage/azure.js";
 import { MemoryBlobStore, MemoryTableStore } from "./storage/memory.js";
@@ -67,6 +67,7 @@ async function main(): Promise<void> {
     assets,
     analyzeAudio: haveFfmpeg ? nodeAnalyzeAudio : undefined,
     decodePcm: haveFfmpeg ? nodeDecodePcm : undefined,
+    transcribeMedia: haveFfmpeg && haveFfprobe ? nodeTranscribeMedia : undefined,
     supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl, log: (message) => log.warn(message) }),
   });
   const app = createApp(services);

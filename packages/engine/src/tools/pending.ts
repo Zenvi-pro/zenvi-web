@@ -68,23 +68,6 @@ export const PENDING_DESKTOP_TOOLS: ReadonlySet<ContractToolName> = new Set<Cont
  * does not follow either are listed in docs/TOOLS.md under Divergences.
  */
 export const PENDING_DESKTOP_ARGS: { readonly [N in ContractToolName]?: readonly string[] } = {
-  add_captions_tool: [
-    "background_color",
-    "background_opacity",
-    "clip_query",
-    "cues",
-    "fade_seconds",
-    "font",
-    "overlay_track",
-    "position",
-    "stroke_color",
-    "stroke_width",
-    "style",
-    "text_color",
-    "text_size",
-    "time_base",
-    "uppercase",
-  ],
   add_effect_tool: ["processing", "properties", "scope", "timeline_clip_ids"],
   add_title_tool: [
     "background_color",

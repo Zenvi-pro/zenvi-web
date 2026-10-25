@@ -17,7 +17,8 @@
  *   refused   a clean refusal ("Error: …" in words): read it, the arguments may be the problem
  *   crash     an exception, a protocol error, a timeout or an internal error message
  *   broken    the call left a project that no longer parses
- *   dirty     refused or unchanged, but the project changed anyway (history must stay untouched)
+ *   dirty     refused or unchanged, but the project was edited anyway (history must stay untouched;
+ *             a speech recognition result kept on a file, `ai_metadata.asr`, is not an edit)
  *   noop      a tool that adds or imports answered without an error but the project did not change
  * --list only writes tools.json (names and input schemas). Paid generation
  * (video, images) is skipped unless --paid. Needs ffmpeg, and macOS `say`
@@ -114,7 +115,8 @@ async function main(): Promise<void> {
         outcome = "broken";
         thrown = `${answer}\n  parse: ${error instanceof Error ? error.message : String(error)}`;
       }
-      if (outcome !== "broken" && (outcome === "refused" || /"status":\s*"(unchanged|refused)"/.test(answer))) outcome = "dirty";
+      const edited = JSON.stringify(withoutTranscripts(after.project)) !== JSON.stringify(withoutTranscripts(baseline.project));
+      if (edited && outcome !== "broken" && (outcome === "refused" || /"status":\s*"(unchanged|refused)"/.test(answer))) outcome = "dirty";
       const restored = (await rest("PUT", `/v1/projects/${ctx.projectId}`, baseline.project, { "if-match": "*" })) as Json;
       revision = String(restored.revision);
     }
@@ -204,9 +206,9 @@ async function setUp(call: (name: string, args: Json) => Promise<CallResult>, re
   // Alpha keyframes on clip A for the keyframe tools to copy and remove.
   const faded = await call("fade_clip_tool", { clip_id: clips.a, fade_in_seconds: "0.5", project_id: projectId });
   console.log(`setup fade_clip_tool: ${oneLine(textOf(faded)).slice(0, 140)}`);
-  // Captions for the caption tools to list, edit and remove (where the surface has edit_captions_tool).
-  const captioned = await call("edit_captions_tool", { timeline_clip_id: clips.talk, add_cues: [{ start: 0.2, end: 2.4, text: "Welcome to the Zenvi tool sweep" }], project_id: projectId }).catch(() => undefined);
-  if (captioned) console.log(`setup edit_captions_tool: ${oneLine(textOf(captioned)).slice(0, 140)}`);
+  // Captions for the caption tools to list, edit and remove: given cues (timeline seconds; the talking clip starts at 11 s).
+  const captioned = await call("add_captions_tool", { timeline_clip_id: clips.talk, cues: [{ start: 11.2, end: 13.4, text: "Welcome to the Zenvi tool sweep" }], project_id: projectId }).catch(() => undefined);
+  if (captioned) console.log(`setup add_captions_tool: ${oneLine(textOf(captioned)).slice(0, 140)}`);
   const { project } = await roles();
   const effectId = project.clips.find((c) => c.id === clips.a)?.effects?.[0]?.id ?? "";
   for (const key of ["a", "b", "talk", "beat", "still", "title"] as const) if (!clips[key]) throw new Error(`setup: no ${key} clip on the timeline`);
@@ -335,8 +337,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   diarize_media_tool: (c) => ({ file_id: c.files.talk }),
   // The last clip on its track: the copy goes after it without covering anything.
   duplicate_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.talk] }),
-  // Comma-separated ids, as the schema says.
-  duck_under_speech_tool: (c) => ({ bed_clip_ids: c.clips.beat, speech_clip_ids: c.clips.talk }),
+  // Comma-separated ids, as the schema says; the speech is found from the words (auto).
+  duck_under_speech_tool: (c) => ({ bed_clip_ids: c.clips.beat, speech_clip_ids: "auto" }),
   export_captions_tool: (c) => ({ path: "sweep.srt", timeline_clip_id: c.clips.talk }),
   edit_captions_tool: (c) => ({ timeline_clip_id: c.clips.talk, uppercase: true }),
   edit_title_tool: (c) => ({ timeline_clip_id: c.clips.title, text: "Edited sweep" }),
@@ -405,6 +407,17 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   wait_until_project_indexed_tool: () => ({ timeout_seconds: 5 }),
   watch_clip_window_tool: (c) => ({ timeline_clip_id: c.clips.a, start: "0", end: "2" }),
 };
+
+/** A project without speech recognition results kept on its files: keeping one is not an edit. */
+function withoutTranscripts(project: unknown): unknown {
+  const copy = structuredClone(project) as { files?: { ai_metadata?: Record<string, unknown> }[] };
+  for (const file of copy.files ?? []) {
+    if (!file.ai_metadata || !("asr" in file.ai_metadata)) continue;
+    delete file.ai_metadata.asr;
+    if (Object.keys(file.ai_metadata).length === 0) delete file.ai_metadata;
+  }
+  return copy;
+}
 
 function classify(result: CallResult | undefined, thrown: string): Outcome {
   if (thrown) return "crash";

@@ -8,7 +8,9 @@
  *           (title SVGs) as content-addressed project media;
  *   frames  preview frames through the cloud renderer;
  *   assets  the engine's bundled assets (title templates);
- *   audio   loudness envelopes of project media (remove_silence_tool);
+ *   audio   loudness envelopes and PCM of project media (remove_silence_tool,
+ *           beats); speech recognition through the backend as the connected
+ *           person (the speech tools), each media transcribed once per edit;
  *   storage readText of project media, writeText to a downloadable export
  *           (export_captions_tool). Cloud projects save themselves, so
  *           save/open are refused;
@@ -18,7 +20,7 @@
 
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { CloudMediaRef, HostCapability, Project, ToolHost } from "@zenvi/engine";
+import { TRANSCRIPTION_PATH, transcriptionHttpError, type CloudMediaRef, type HostCapability, type Project, type ToolHost } from "@zenvi/engine";
 import { ApiError, tooLarge } from "../http/errors.js";
 import { withSuffix } from "../projects/files.js";
 import { displayName, fileSha256 } from "../projects/model.js";
@@ -146,6 +148,33 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
     host.audio = {
       analyzeAudio: async (path, options) => analyze(await localCopy(path), { ...options, signal: options?.signal ?? ctx.signal }),
       ...(decode ? { decodePcm: async (path: string, options?: Parameters<typeof decode>[1]) => decode(await localCopy(path), { ...options, signal: options?.signal ?? ctx.signal }) } : {}),
+    };
+  }
+
+  const transcribeMedia = services.transcribeMedia;
+  if (host.audio && transcribeMedia && caps.has("backend")) {
+    host.audio.transcribe = async (path, options) => {
+      const file = filesByPath(project()).get(path);
+      const media = (file ? fileSha256(file) : undefined) ?? generated.get(path)?.cloud.sha256;
+      const signal = options?.signal ?? ctx.signal;
+      const run = async () =>
+        transcribeMedia(await localCopy(path), {
+          language: options?.language,
+          prompt: options?.prompt,
+          signal,
+          upload: async (piece, fields) => {
+            const form = new FormData();
+            form.append("file", new Blob([piece.bytes], { type: piece.contentType }), piece.fileName);
+            if (fields.language) form.append("language", fields.language);
+            if (fields.prompt) form.append("prompt", fields.prompt);
+            const answer = await services.backendSessions.send(userId, TRANSCRIPTION_PATH, { form, signal: fields.signal ?? signal });
+            if (answer.status < 200 || answer.status >= 300) throw transcriptionHttpError(answer.status, answer.body);
+            return answer.body;
+          },
+        });
+      // Without a content address the media cannot be told apart from another file at that path.
+      if (!media) return run();
+      return services.transcripts.get(`${userId}|${media}|${options?.language ?? ""}|${options?.prompt ?? ""}`, run);
     };
   }
 

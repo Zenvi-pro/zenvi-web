@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { buildCaptionText, displayText, drawnLines, formatCueTime, parseCaptionText, safeText } from "./caption-cues.js";
+import {
+  buildCaptionText,
+  displayText,
+  drawnLines,
+  formatCueTime,
+  parseCaptionText,
+  parseSubtitles,
+  phraseTimedWords,
+  safeText,
+  splitCue,
+} from "./caption-cues.js";
 import { captionTop, CaptionStyle, isHeavyFont, styleFromEffect, THIN_OUTLINE } from "./caption-style.js";
 import { createProject } from "../model/defaults.js";
 import type { Effect } from "../model/types.js";
@@ -59,6 +69,71 @@ describe("caption cue text (caption_cues.py)", () => {
     expect(lines).toHaveLength(2);
     expect(displayText(safe)).toBe("I\nNOTE: this matters");
     expect(safeText("🔥")[0]).toBe("🔥"); // two UTF-16 units: already drawn
+  });
+});
+
+describe("subtitle files and phrasing (caption_cues.py)", () => {
+  it("reads SRT and WebVTT: index lines, settings, NOTE blocks, tags and entities dropped", () => {
+    const cues = parseSubtitles("\uFEFF" + SRT.replaceAll("\n", "\r\n"));
+    expect(cues.map((c) => [c.start, c.end])).toEqual([
+      [0.5, 3],
+      [3.2, 7.5],
+      [7.7, 11],
+    ]);
+    expect(cues[2]!.text).toBe("First stop: my favorite coffee shop.");
+    const vtt =
+      "WEBVTT - demo\n\nNOTE made by hand\n\nintro\n00:01.000 --> 00:02.500 align:start position:10%\n" +
+      "<b>Hello</b> &amp; welcome\n<i>line two</i>\n\n00:00:03.000 --> 00:00:04.000\n{\\an8}Top\n";
+    expect(parseSubtitles(vtt)).toEqual([
+      { start: 1, end: 2.5, text: "Hello & welcome\nline two" },
+      { start: 3, end: 4, text: "Top" },
+    ]);
+    expect(parseSubtitles("no timings here")).toEqual([]);
+  });
+
+  it("phrases long transcript cues into captions that share the cue's time", () => {
+    const cue = { start: 10, end: 20, text: "so today we are going to walk all the way across the city and find the best coffee" };
+    const parts = splitCue(cue, 8, 42);
+    expect(parts.length).toBeGreaterThanOrEqual(2);
+    for (const p of parts.slice(0, -1)) {
+      expect(p.text.split(" ").length).toBeLessThanOrEqual(8);
+      expect(p.text.length).toBeLessThanOrEqual(42);
+    }
+    expect(parts[0]!.start).toBe(10);
+    expect(parts[parts.length - 1]!.end).toBe(20);
+    parts.slice(1).forEach((p, i) => expect(Math.abs(parts[i]!.end - p.start)).toBeLessThan(1e-9));
+    expect(parts.map((p) => p.text).join(" ")).toBe(cue.text);
+    expect(splitCue({ start: 0, end: 1, text: "short one" }, 8, 42)[0]!.text).toBe("short one");
+  });
+
+  it("breaks at sentences and never leaves a lone word", () => {
+    // Found live on the talking head: word-count splitting gave "downtown. The latte art here is" / "incredible."
+    const texts = splitCue({ start: 0, end: 10, text: "First stop is my favorite coffee shop downtown. The latte art here is incredible." }, 8, 42).map((c) => c.text);
+    expect(texts[texts.length - 1]).toBe("The latte art here is incredible.");
+    expect(texts.every((t) => t.split(" ").length > 1)).toBe(true);
+    expect(texts.join(" | ")).not.toContain("downtown. The");
+  });
+
+  it("times captions from real word timings, breaking at sentences and pauses", () => {
+    const words = [
+      { text: "Welcome", startSec: 0.2, endSec: 0.6 },
+      { text: "to", startSec: 0.6, endSec: 0.7 },
+      { text: "Zenvi.", startSec: 0.7, endSec: 1.2 },
+      { text: "Um,", startSec: 2.6, endSec: 2.9 },
+      { text: "this", startSec: 3.0, endSec: 3.2 },
+      { text: "clip", startSec: 3.2, endSec: 3.5 },
+      { text: "has", startSec: 3.5, endSec: 3.7 },
+      { text: "a", startSec: 3.7, endSec: 3.8 },
+      { text: "pause", startSec: 3.8, endSec: 4.2 },
+    ];
+    expect(phraseTimedWords(words, 8, 42)).toEqual([
+      { start: 0.2, end: 1.2, text: "Welcome to Zenvi." },
+      { start: 2.6, end: 4.2, text: "Um, this clip has a pause" },
+    ]);
+    // Over the limits, a run breaks into evenly full captions held until the next one.
+    const long = phraseTimedWords(words.slice(3), 3, 42);
+    expect(long.map((c) => c.text)).toEqual(["Um, this clip", "has a pause"]);
+    expect(long[0]!.end).toBe(long[1]!.start);
   });
 });
 

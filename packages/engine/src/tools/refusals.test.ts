@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { transcriptionHttpError } from "../analysis/transcription.js";
 import { allTools, runTool } from "./registry.js";
 import { fakeHost, type FakeHostOptions } from "./test-support/fake-host.js";
 import { IDS, fixtureDoc, snapshotOf } from "./test-support/fixture.js";
@@ -75,8 +76,6 @@ describe("surface-limitation refusals say 'not available'", () => {
 
   it("for the desktop-only ML and ffmpeg tools", async () => {
     const cases: [string, Record<string, unknown>][] = [
-      ["transcribe_media_tool", { fileId: IDS.interview }],
-      ["remove_words_tool", { clipId: IDS.clipA, matches: ["um"] }],
       ["detect_beats_tool", { fileId: IDS.music }],
       ["diarize_media_tool", { fileId: IDS.interview }],
       ["search_media_local_tool", { query: "dog" }],
@@ -84,6 +83,30 @@ describe("surface-limitation refusals say 'not available'", () => {
       ["generate_transition_clip_tool", { clip_a_id: IDS.clipA, clip_b_id: IDS.clipB }],
     ];
     for (const [name, args] of cases) await expectNotAvailable(name, args, {});
+  });
+
+  it("for speech recognition a host does not have, or a server without it", async () => {
+    const deaf: FakeHostOptions = { omit: ["audio.transcribe"] };
+    await expectNotAvailable("transcribe_media_tool", { fileId: IDS.broll }, deaf);
+    await expectNotAvailable("transcribe_media_tool", { fileId: IDS.interview }, deaf);
+    await expectNotAvailable("remove_words_tool", { clipId: IDS.clipA, matches: ["um"] }, deaf);
+    await expectNotAvailable("get_transcript_tool", { clipId: IDS.clipB }, deaf);
+    await expectNotAvailable("export_captions_tool", { path: "/out/captions.srt", clipId: IDS.clipB }, deaf);
+    // A server from before zenvi-backend #67 answers 404.
+    const older: FakeHostOptions = { transcripts: { "/media/broll.mp4": transcriptionHttpError(404, { detail: "Not Found" }) } };
+    for (const [name, args] of [
+      ["get_transcript_tool", { clipId: IDS.clipB }],
+      ["transcribe_media_tool", { fileId: IDS.broll }],
+      ["remove_words_tool", { clipId: IDS.clipB, fillerPreset: "um_uh" }],
+      ["export_captions_tool", { path: "/out/b.srt", clipId: IDS.clipB }],
+      ["add_captions_tool", { timeline_clip_id: IDS.clipB }],
+    ] as const) {
+      const doc = fixtureDoc();
+      const result = await runTool({ doc, host: fakeHost(older) }, name, args);
+      expect(result.data?.status, name).toBe("refused");
+      expect(result.data?.summary, name).toMatch(new RegExp(`^Error: ${name} is not available in this Zenvi surface: speech recognition is not available yet on this Zenvi server`));
+      expect(doc.undoLabels, name).toEqual([]);
+    }
   });
 
   it("for local paths on a host without file access (the web editor)", async () => {

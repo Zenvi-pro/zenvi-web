@@ -24,6 +24,7 @@ export * from "./transitions/index.js";
 export * from "./titles/templates.js";
 export * from "./presets/index.js";
 export * from "./analysis/beats.js";
+export * from "./analysis/transcription.js";
 export * from "./reels/styles.js";
 export * from "./reels/plan.js";
 export * from "./stock/stock.js";

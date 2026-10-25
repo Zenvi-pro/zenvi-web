@@ -16,6 +16,7 @@
  */
 
 import type { z } from "zod";
+import type { Transcription } from "../analysis/transcription.js";
 import type { ProjectDocument } from "../history/document.js";
 import type { CloudMediaRef, FileFingerprint, Project, ReaderInfo } from "../model/types.js";
 
@@ -243,6 +244,24 @@ export interface AudioHost {
     path: string,
     options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
   ): Promise<{ sampleRate: number; samples: Float32Array }>;
+  /**
+   * Transcribe the speech in `path`'s audio with word timings, through the
+   * Zenvi backend (`POST /api/v1/transcription`, billed per started minute).
+   * Hosts extract mono speech audio, split long media
+   * (`planSpeechChunks`), read each answer with `parseTranscription` and
+   * merge the pieces. Rejects with a `TranscriptionError` whose code says
+   * what went wrong (no audio stream, not signed in, no credits, a server
+   * without speech recognition…).
+   */
+  transcribe?(path: string, options?: TranscribeOptions): Promise<Transcription>;
+}
+
+export interface TranscribeOptions {
+  /** ISO 639-1 code to transcribe in, or "" to detect the language (`asrLanguage`). */
+  language?: string;
+  /** Text that steers the recognizer, such as `FILLER_PROMPT` (`transcriptionPrompt`). */
+  prompt?: string;
+  signal?: AbortSignal;
 }
 
 export interface BackendHost {
