@@ -109,7 +109,8 @@ export function cardSvg(input: CardInput): string {
     const lineHeight = Math.round(fitted.size * 1.04);
     const centre = h * (end ? 0.5 : portrait ? 0.4 : 0.5);
     const subtitle = input.subtitle ? cased(input.subtitle, { ...typography, case: "as_is" }) : "";
-    const subSize = Math.round(fitted.size * 0.34);
+    // Readable on a phone: never below 3% of the frame's short side.
+    const subSize = Math.max(Math.round(fitted.size * 0.42), Math.round(short * 0.03));
     const blockHeight = fitted.lines.length * lineHeight + (subtitle ? subSize * 1.8 : 0);
     const firstBaseline = centre - blockHeight / 2 + fitted.size * 0.82;
     parts.push(textBlock(fitted.lines, Math.round(w / 2), firstBaseline, fitted.size, lineHeight, typography, "#ffffff", "middle"));

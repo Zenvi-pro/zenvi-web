@@ -331,6 +331,7 @@ export function createCommands(session: EditorSession, env: CommandEnv): Map<str
     },
     { id: "actionProfile", label: "Project format…", group: "File", run: () => openDialog("profile") },
     { id: "actionTitle", label: "New title…", group: "File", run: () => session.ui.setState({ dialog: "title", editingTitleFileId: null }) },
+    { id: "actionMakeReel", label: "Make a reel…", group: "Timeline", run: () => session.ui.setState({ dialog: "reel" }) },
 
     // View
     { id: "actionProperties", label: "Properties", group: "View", run: () => showTab(undefined, "properties") },

@@ -12,7 +12,7 @@ import { nodeAnalyzeAudio, nodeAssetSource, nodeDecodePcm, nodeProber } from "..
 import { type Harness, harness, USER_A } from "../testing/helpers.js";
 import { EDITOR_META_KEY } from "./editor-widget.js";
 import { loadEngineRegistry } from "./engine.js";
-import { pickMusic, pickStockFile, pickStockVideo } from "./reels.js";
+import { pickMusic, pickStockFile, pickStockVideo, stockClipsPerQuery } from "./reels.js";
 
 type CallResult = { isError?: boolean; content: { type: string; text?: string }[]; structuredContent?: Record<string, unknown>; _meta?: Record<string, unknown> };
 
@@ -53,6 +53,14 @@ describe("stock picks", () => {
     ];
     expect(pickMusic(sounds, 15)?.id).toBe(4);
     expect(pickMusic(sounds.slice(0, 3), 15)?.id).toBe(3);
+  });
+
+  it("take more clips per search when the style cuts fast, so shots do not repeat as much", () => {
+    // A 15 s hype reel cuts ~40 times: six searches give two clips each (twelve, capped at ten later).
+    expect(stockClipsPerQuery("hype", 15, 6)).toBe(2);
+    expect(stockClipsPerQuery("hype", 15, 2)).toBe(3);
+    // A calm reel holds four beats a shot: one clip per search is plenty.
+    expect(stockClipsPerQuery("minimal", 20, 5)).toBe(1);
   });
 
   it("prefer the shortest long-enough track within a licence class (the whole track downloads)", () => {
@@ -143,7 +151,15 @@ describe("create_reel", () => {
     const { h, client, searches } = await setup();
     const result = (await client.callTool({
       name: "create_reel",
-      arguments: { prompt: "A 6 second match day reel", style: "highlight", duration_seconds: 6, stock_queries: ["team huddle", "player dribble", "goal celebration"], hook: "Match day", end_card: "See you Sunday" },
+      arguments: {
+        prompt: "A 6 second match day reel",
+        style: "highlight",
+        duration_seconds: 6,
+        stock_queries: ["team huddle", "player dribble", "goal celebration"],
+        labels: ["Huddle", "", "Goal"],
+        hook: "Match day",
+        end_card: "See you Sunday",
+      },
     })) as CallResult;
     expect(result.isError, result.content[0]?.text).toBeFalsy();
     const data = result.structuredContent as { project_id: string; brief: { format: string; story: string }; shots: number; bpm: number; music?: { credit: string; license: string }; footage: unknown[]; warnings: string[] };
@@ -158,8 +174,10 @@ describe("create_reel", () => {
     expect((result._meta?.[EDITOR_META_KEY] as { token?: string } | undefined)?.token).toMatch(/^zvn_emb_/);
 
     const { project } = await h.services.projects.get(USER_A, data.project_id);
-    // Three clips and the song; the rest of the bin is the reel's title images.
-    expect(project.files.filter((f) => !String(f.path).endsWith(".svg"))).toHaveLength(4);
+    // The clips and the song; the rest of the bin is the reel's title images, labels among them.
+    const media = project.files.filter((f) => !String(f.path).endsWith(".svg"));
+    expect(media.length).toBeGreaterThanOrEqual(4);
+    expect(project.files.some((f) => /reel-label-/.test(String(f.path)))).toBe(true);
     expect(project.clips.length).toBeGreaterThan(data.shots);
     expect(project.history?.undo?.length ?? 0).toBeGreaterThanOrEqual(2);
     await client.close();

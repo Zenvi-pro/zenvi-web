@@ -16,7 +16,7 @@
  * arrived in time is used, the rest is reported.
  */
 
-import { REEL_STYLE_IDS, type Project } from "@zenvi/engine";
+import { REEL_STYLE_IDS, REEL_STYLES, type Project } from "@zenvi/engine";
 import { z } from "zod";
 import { SCOPE_WRITE } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
@@ -90,6 +90,20 @@ export function pickMusic(sounds: readonly FreesoundSound[], seconds: number): F
 }
 
 /**
+ * How many stock clips to take per search: about one clip for every two
+ * cuts the style makes in the reel's length (at its own tempo), so a fast
+ * cut does not keep showing the same shot; at most three per search.
+ */
+export function stockClipsPerQuery(style: keyof typeof REEL_STYLES, seconds: number | undefined, queries: number): number {
+  const s = REEL_STYLES[style];
+  const beats = (seconds ?? s.defaultSeconds) * (s.defaultBpm / 60);
+  const pattern = [...s.pattern, ...(s.climax ?? s.pattern)];
+  const shots = beats / (pattern.reduce((a, b) => a + b, 0) / pattern.length);
+  const target = Math.min(MAX_SOURCES, Math.ceil(shots / 2));
+  return Math.max(1, Math.min(3, Math.ceil(target / Math.max(1, queries))));
+}
+
+/**
  * Run `jobs` `limit` at a time, writing each outcome into `results` as it
  * settles (so whatever finished is usable even if the caller stops waiting).
  */
@@ -151,6 +165,11 @@ const inputSchema = () => z.object({
   music_query: z.string().min(2).max(100).optional().describe("Stock music search: mood, genre, tempo (e.g. 'upbeat electronic 120 bpm'). Default: from the style."),
   music_url: z.string().min(1).max(4096).optional().describe("Direct https link to the music to use instead of a search."),
   no_music: z.boolean().optional().describe("Make it without music (cuts follow the style's tempo)."),
+  labels: z
+    .array(z.string().max(40))
+    .max(MAX_SOURCES)
+    .optional()
+    .describe("Small labels on the shots (editorial style): one per attached file / link / stock search, in the same story order (\"\" for none)."),
   hook: z.string().max(80).optional().describe("Opening title, 2-6 punchy words."),
   end_card: z.string().max(80).optional().describe("Closing title: a call to action, a name, a date."),
   end_card_subtitle: z.string().max(80).optional(),
@@ -184,6 +203,8 @@ interface Fetched {
   imported: ImportResult;
   role: "visual" | "music";
   credit?: { name: string; credit: string; license?: string; source: string };
+  /** Which attached file / link / stock search this came from (story order), for its label. */
+  source?: number;
 }
 
 export interface ReelToolOptions {
@@ -246,41 +267,63 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
         const stopDownloads = () => downloads.abort();
         ctx.signal.addEventListener("abort", stopDownloads, { once: true });
         const jobs: { label: string; run: () => Promise<Fetched> }[] = [];
-        const fetch = (url: string, filename: string | undefined, role: Fetched["role"], credit?: Fetched["credit"]) => async (): Promise<Fetched> => ({
+        const fetch = (url: string, filename: string | undefined, role: Fetched["role"], credit?: Fetched["credit"], source?: number) => async (): Promise<Fetched> => ({
           imported: await ctx.services.importer.importUrl(userId, url, { filename, signal: downloads.signal }),
           role,
           credit,
+          source,
         });
-        for (const file of args.files ?? []) jobs.push({ label: file.file_name ?? "attached file", run: fetch(file.download_url, file.file_name, "visual") });
-        for (const url of args.media_urls ?? []) jobs.push({ label: url, run: fetch(url, undefined, "visual") });
+        let sourceIndex = 0;
+        for (const file of args.files ?? []) jobs.push({ label: file.file_name ?? "attached file", run: fetch(file.download_url, file.file_name, "visual", undefined, sourceIndex++) });
+        for (const url of args.media_urls ?? []) jobs.push({ label: url, run: fetch(url, undefined, "visual", undefined, sourceIndex++) });
         if (wantsStock && backendEnabled) {
           const used = new Set<number>();
-          // Few searches: take two clips from each, so a fast cut does not show the same shot over and over.
-          const perQuery = args.stock_queries!.length <= 4 ? 2 : 1;
+          const queries = args.stock_queries!;
+          const perQuery = stockClipsPerQuery(args.style ?? "hype", args.duration_seconds, queries.length);
+          const picked: { query: string; clips: { video: PexelsVideo; link: string }[] }[] = [];
           const searches = await Promise.allSettled(
             args.stock_queries!.map((query) =>
               ctx.services.backendSessions.request<{ videos?: PexelsVideo[]; error?: string }>(userId, `/api/v1/pexels/search?query=${encodeURIComponent(query)}&per_page=15`, { signal: ctx.signal }),
             ),
           );
           searches.forEach((result, i) => {
-            const query = args.stock_queries![i]!;
+            const query = queries[i]!;
             if (result.status === "rejected" || result.value.error) {
               warnings.push(`Stock search "${query}" failed: ${result.status === "rejected" ? message(result.reason) : result.value.error}`);
               return;
             }
+            const clips: { video: PexelsVideo; link: string }[] = [];
             for (let n = 0; n < perQuery; n += 1) {
               const video = pickStockVideo(result.value.videos ?? [], portrait, used);
               const link = video ? pickStockFile(video, frameWidth, portrait) : undefined;
-              if (!video || !link) {
-                if (n === 0) warnings.push(`No stock clip found for "${query}".`);
-                return;
-              }
+              if (!video || !link) break;
               used.add(video.id);
+              clips.push({ video, link });
+            }
+            if (clips.length === 0) warnings.push(`No stock clip found for "${query}".`);
+            else picked.push({ query, clips });
+          });
+          // Within the cap, drop second clips from the middle of the story first (never the opening or the payoff).
+          let total = picked.reduce((n, p) => n + p.clips.length, 0) + jobs.length;
+          for (let step = 0, i = Math.floor(picked.length / 2); total > MAX_SOURCES && step < picked.length * 3; step += 1) {
+            const entry = picked[(i + step) % picked.length]!;
+            if (entry.clips.length > 1) {
+              entry.clips.pop();
+              total -= 1;
+            }
+          }
+          const firstStock = sourceIndex;
+          for (const { query, clips } of picked) {
+            const source = firstStock + queries.indexOf(query);
+            clips.forEach(({ video, link }, n) => {
               // Named by what it shows (the brief's story reads these names).
               const name = `${query.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, " ").slice(0, 60) || "stock clip"}${n > 0 ? ` ${n + 1}` : ""}.mp4`;
-              jobs.push({ label: n > 0 ? `${query} (2)` : query, run: fetch(link, name, "visual", { name: query, credit: video.user_name ? `${video.user_name} on Pexels` : "Pexels", source: video.url ?? `https://www.pexels.com/video/${video.id}/` }) });
-            }
-          });
+              jobs.push({
+                label: n > 0 ? `${query} (${n + 1})` : query,
+                run: fetch(link, name, "visual", { name: query, credit: video.user_name ? `${video.user_name} on Pexels` : "Pexels", source: video.url ?? `https://www.pexels.com/video/${video.id}/` }, source),
+              });
+            });
+          }
         }
         // Music first: the cut follows its beats, so it should never be the file that misses the deadline.
         const musicJobs: typeof jobs = [];
@@ -337,20 +380,25 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
 
         // Add the media in one edit, then cut the reel in another (two undo steps: media, edit).
         const added = await editProject(ctx, projectId, async (doc) => {
-          const ids: { id: string; role: Fetched["role"]; isAudio: boolean }[] = [];
+          const ids: { id: string; role: Fetched["role"]; isAudio: boolean; source?: number }[] = [];
           if (fetched.length === 0) return ids;
           doc.transaction("Import reel media", (tx) => {
             for (const item of fetched) {
               const { file } = addMediaFile(tx, item.imported);
-              ids.push({ id: String(file.id), role: item.role, isAudio: !file.has_video && Boolean(file.has_audio) });
+              ids.push({ id: String(file.id), role: item.role, isAudio: !file.has_video && Boolean(file.has_audio), source: item.source });
             }
           });
           return ids;
         });
-        const visualIds = [
-          ...(args.project_id ? project.files.filter((f) => f.has_video || /image/i.test(String(f.media_type))).map((f) => String(f.id)) : []),
-          ...added.value.filter((m) => !m.isAudio).map((m) => m.id),
-        ];
+        const existing = args.project_id ? project.files.filter((f) => f.has_video || /image/i.test(String(f.media_type))).map((f) => String(f.id)) : [];
+        const fresh = added.value.filter((m) => !m.isAudio);
+        const visualIds = [...existing, ...fresh.map((m) => m.id)];
+        // Labels follow the sources (files, links, searches) in story order; a search's extra clips share its label.
+        const labelFor = new Map<string, string>();
+        fresh.forEach((m) => {
+          const label = m.source !== undefined ? args.labels?.[m.source] : undefined;
+          if (label?.trim()) labelFor.set(m.id, label.trim());
+        });
         const musicId = added.value.find((m) => m.role === "music" && m.isAudio)?.id ?? added.value.find((m) => m.isAudio)?.id;
         if (visualIds.length === 0) {
           throw new ApiError(422, "no_footage", `No footage to cut. Attach clips, give links, or pass stock_queries. ${warnings.join(" ")}`.trim());
@@ -364,6 +412,7 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
               file_ids: [...new Set(visualIds)],
               ...(musicId ? { music_file_id: musicId } : {}),
               ...(args.duration_seconds ? { duration_seconds: args.duration_seconds } : {}),
+              ...(labelFor.size > 0 ? { labels: [...new Set(visualIds)].map((id) => labelFor.get(id) ?? "") } : {}),
               ...(args.hook ? { hook: args.hook } : {}),
               ...(args.end_card ? { end_card: args.end_card } : {}),
               ...(args.end_card_subtitle ? { end_card_subtitle: args.end_card_subtitle } : {}),
