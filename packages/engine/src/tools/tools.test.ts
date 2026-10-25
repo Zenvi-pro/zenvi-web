@@ -550,9 +550,13 @@ const SPECS: Record<string, Spec> = {
     happy: {
       args: { text: "Chapter One", position_seconds: "3", duration_seconds: "4" },
       summary: /^Added title 'Chapter One' from template Bar_1\.svg at 3\.000s for 4\.000s\. Added clip to timeline at position 3\.0s/,
-      check: ({ host, receipt }) => {
+      check: ({ host, receipt, doc }) => {
         const path = (receipt.data as { path: string }).path;
         expect(String(new TextDecoder().decode(host.written.get(path) as Uint8Array))).toContain(">Chapter One</tspan>");
+        // Over the picture, not on the video's track: the first free track above the logo on track 3.
+        const title = doc.project.clips.find((c) => c.position === 3 && c.file_id === (receipt.data as { file_id: string }).file_id);
+        expect(title?.layer).toBe(4_000_000);
+        expect(doc.project.layers).toHaveLength(5);
       },
     },
     failure: { args: { text: "Chapter One", template: "NoSuchTemplate" }, summary: /^Error: title template not found \(NoSuchTemplate\)\.$/ },
@@ -784,6 +788,25 @@ async function runCase(name: string, c: Case): Promise<Ctx> {
   const result = await runTool({ doc, host }, name, args);
   return { result, receipt: result.data!, doc, host, before };
 }
+
+describe("add_title_tool without a track", () => {
+  it("opens a 'Titles' track on top when every track above the picture is busy, in the same undo step", async () => {
+    const doc = fixtureDoc();
+    doc.transaction("fill the top tracks", (tx) => {
+      addClip(tx, { fileId: IDS.logo, position: 2, layer: 4_000_000, start: 0, end: 6 });
+      addClip(tx, { fileId: IDS.logo, position: 2, layer: 5_000_000, start: 0, end: 6 });
+    });
+    const steps = doc.undoLabels.length;
+    const result = await runTool({ doc, host: fakeHost() }, "add_title_tool", { text: "On top", position_seconds: "3", duration_seconds: "2" });
+    expect(result.ok, result.text).toBe(true);
+    const fileId = (result.data!.data as { file_id: string }).file_id;
+    expect(doc.project.clips.find((c) => c.file_id === fileId)?.layer).toBe(6_000_000);
+    expect(doc.project.layers.find((l) => l.number === 6_000_000)?.label).toBe("Titles");
+    expect(doc.undoLabels).toHaveLength(steps + 1);
+    doc.undo();
+    expect(doc.project.layers.some((l) => l.number === 6_000_000)).toBe(false);
+  });
+});
 
 describe("every tool has a spec", () => {
   it("covers the whole catalog", () => {

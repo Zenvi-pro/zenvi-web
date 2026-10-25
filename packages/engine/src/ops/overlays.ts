@@ -39,6 +39,13 @@ export interface PlaceOverlayClipInput {
   props?: Readonly<Record<string, unknown>>;
 }
 
+/** Create track `layer` labelled `label` when no track has that number. */
+export function ensureTrack(tx: Transaction, layer: number, label = ""): void {
+  if (findLayer(tx.project, layer)) return;
+  const id = generateId((candidate) => tx.project.layers.some((l) => l.id === candidate));
+  tx.insert(["layers"], createLayer(layer, id, label));
+}
+
 /** Place a file on the timeline with its look already set, as one edit (`place_clip`). Returns the clip. */
 export function placeOverlayClip(tx: Transaction, input: PlaceOverlayClipInput): Clip {
   requireObject(input, "placeOverlayClip input");
@@ -53,10 +60,7 @@ export function placeOverlayClip(tx: Transaction, input: PlaceOverlayClipInput):
     const bad = Object.keys(input.props).filter((key) => PLACEMENT_KEYS.has(key));
     if (bad.length > 0) throw invalid(`props cannot set ${bad.join(", ")}.`);
   }
-  if (!findLayer(project, input.layer)) {
-    const id = generateId((candidate) => tx.project.layers.some((l) => l.id === candidate));
-    tx.insert(["layers"], createLayer(input.layer, id, input.newTrackLabel ?? ""));
-  }
+  ensureTrack(tx, input.layer, input.newTrackLabel ?? "");
   const clipInput: Parameters<typeof addClip>[1] = { fileId: input.fileId, position: input.position, layer: input.layer, start: 0, end: input.duration };
   if (input.title !== undefined) clipInput.title = input.title;
   const clip = addClip(tx, clipInput);

@@ -19,6 +19,7 @@
 
 import type { Clip } from "../../model/types.js";
 import { generateId } from "../../model/ids.js";
+import { ensureTrack } from "../../ops/overlays.js";
 import { addTitleClip, setSvgText } from "../../ops/titles.js";
 import { getTitleTemplate } from "../../titles/templates.js";
 import { contractTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
@@ -27,6 +28,7 @@ import { parseSecondsArg, TimeArgError } from "../placement.js";
 import { pyFixed, pyReprString, pySlice } from "../pyfmt.js";
 import { applied, failed, isOkStatus, refused, unchanged, type ToolReceipt } from "../receipt.js";
 import { parseSrtOrVtt, phraseWords, type CaptionCue, type TimedWord } from "../speech.js";
+import { planOverlayTrack } from "../titles-text.js";
 import type { ImportedMedia } from "../types.js";
 import { planPlacement, placementText, provisionalFile, type PlacementPlan } from "./clips.js";
 import { text } from "./common.js";
@@ -118,18 +120,22 @@ async function prepareTitle(
   } catch {
     return `Error: could not import title into media bin: ${path}`;
   }
-  const plan = await planPlacement(call, provisionalFile(imported), {
+  const placed = await planPlacement(call, provisionalFile(imported), {
     position_seconds: options.position,
     track: options.track,
     duration_seconds: options.duration,
     full_file: "true",
   });
-  if (typeof plan === "string") return plan;
-  const duration = plan.start !== undefined && plan.end !== undefined ? plan.end - plan.start : options.duration;
+  if (typeof placed === "string") return placed;
+  const duration = placed.start !== undefined && placed.end !== undefined ? placed.end - placed.start : options.duration;
+  // Without a track, a title goes over the picture: the lowest free track above every clip with video at
+  // that time, or a new top track (develop's add_title_tool), not the bottom track under the video.
+  const plan = options.track ? placed : { ...placed, layer: planOverlayTrack(call.doc.project, placed.position, placed.position + duration, "").layer };
   return { media: imported, plan, duration };
 }
 
 function placeTitle(tx: Parameters<typeof addTitleClip>[0], title: PreparedTitle): { fileId: string; clip: Clip } {
+  ensureTrack(tx, title.plan.layer, "Titles");
   const { file, clip } = addTitleClip(tx, { file: title.media, position: title.plan.position, duration: title.duration, layer: title.plan.layer });
   return { fileId: String(file.id), clip };
 }
