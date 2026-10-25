@@ -219,12 +219,19 @@ export async function chooseCodecs(options: ChooseOptions, support: EncodeSuppor
 
 /**
  * Whether this browser can export `format` with these encoders, named the
- * way the desktop's export presets name them ("" = none): what
- * list_export_presets_tool reports as `available` (the desktop asks
- * FFmpegWriter.IsValidCodec). `chooseCodecs` may still export such a preset
- * with another codec; this says whether it exports as the preset says.
+ * way the desktop's export presets name them ("" = none), at this frame
+ * size and rate (default 720p30): what list_export_presets_tool reports as
+ * `available` and export_video_tool checks before rendering (the desktop
+ * asks FFmpegWriter.IsValidCodec). `chooseCodecs` may still export such a
+ * preset with another codec; this says whether it exports as the preset says.
  */
-export async function canEncodeNamed(format: ContainerFormat, videoCodec: string, audioCodec: string, support: EncodeSupport): Promise<boolean> {
+export async function canEncodeNamed(
+  format: ContainerFormat,
+  videoCodec: string,
+  audioCodec: string,
+  support: EncodeSupport,
+  frame: { width: number; height: number; fps: number } = { width: 1280, height: 720, fps: 30 },
+): Promise<boolean> {
   let container: WebContainer;
   try {
     container = webContainer(format);
@@ -234,7 +241,9 @@ export async function canEncodeNamed(format: ContainerFormat, videoCodec: string
   if (videoCodec) {
     const codec = videoCodecFromName(videoCodec);
     if (!codec || !CONTAINER_VIDEO_ALLOWED[container].includes(codec)) return false;
-    if (!(await support.canEncodeVideo(codec, { width: 1280, height: 720, frameRate: 30 }))) return false;
+    const width = evenFor(codec, frame.width);
+    const height = evenFor(codec, frame.height);
+    if (!(await support.canEncodeVideo(codec, { width, height, frameRate: frame.fps }))) return false;
   }
   if (audioCodec) {
     const codec = audioCodecFromName(audioCodec);

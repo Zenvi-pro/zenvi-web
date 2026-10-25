@@ -88,4 +88,13 @@ describe("canEncodeNamed", () => {
     expect(await canEncodeNamed("gif", "gif", "", browser)).toBe(false);
     expect(await canEncodeNamed("wav", "", "pcm_s16le", support([], ["pcm-s16"]))).toBe(true);
   });
+
+  it("asks at the export's own frame size, and refuses what the browser cannot write (export_video_tool)", async () => {
+    const browser = support(["avc"], ["aac"]);
+    expect(await canEncodeNamed("mp4", "libx264", "", browser, { width: 3840, height: 2160, fps: 60 })).toBe(true);
+    expect(browser.videoAsks).toEqual(["avc@3840x2160"]);
+    for (const format of ["mp3", "flac", "m4a", "gif", "png-sequence", "jpg-sequence"] as const) {
+      expect(await canEncodeNamed(format, "", "", browser), format).toBe(false);
+    }
+  });
 });
