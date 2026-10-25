@@ -107,6 +107,25 @@ describe("build_reel_tool", () => {
     expect(doc.project.clips).toHaveLength(0);
   });
 
+  it("ends shot labels where the end card comes in", async () => {
+    const doc = reelProject();
+    const result = await runTool({ doc, host: withAudio(fakeHost()) }, "build_reel_tool", {
+      style: "editorial",
+      file_ids: FILES,
+      labels: ["Huddle", "Dribble", "Break", "Strike"],
+      end_card: "Full game Sunday",
+      duration_seconds: "12",
+    });
+    expect(result.ok, result.text).toBe(true);
+    const tracks = ((result.data as { data: Record<string, unknown> }).data as { tracks: Record<string, number> }).tracks;
+    const span = (c: { position: number; start: number; end: number }) => [c.position, c.position + (c.end - c.start)] as const;
+    const titles = doc.project.clips.filter((c) => c.layer === tracks.titles);
+    const endCard = titles.reduce((a, b) => (b.position > a.position ? b : a));
+    const labels = doc.project.clips.filter((c) => c.layer === tracks.labels);
+    expect(labels.length).toBeGreaterThan(1);
+    for (const label of labels) expect(span(label)[1]).toBeLessThanOrEqual(endCard.position + 1e-6);
+  });
+
   it("refuses to build over an edit unless asked to replace it, then replaces it in the same undo step", async () => {
     const doc = reelProject();
     const host = withAudio(fakeHost());
