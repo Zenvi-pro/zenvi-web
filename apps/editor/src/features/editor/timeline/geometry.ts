@@ -136,6 +136,12 @@ export function contentWidth(duration: number, pxPerSecond: number, viewportWidt
   return Math.max(viewportWidth, Math.ceil((duration + TRAILING_SECONDS) * pxPerSecond));
 }
 
+/** The track height that shows `count` tracks in `visible` px, within [min, max]. */
+export function fittedTrackHeight(visible: number, count: number, [min, max]: readonly [number, number]): number {
+  if (count <= 0 || !(visible > 0)) return max;
+  return Math.max(min, Math.min(max, Math.floor(visible / count)));
+}
+
 /** Which track row (index from the top) a y coordinate falls in, or -1. */
 export function trackIndexAt(y: number, trackHeight: number, trackCount: number): number {
   if (y < 0) return -1;

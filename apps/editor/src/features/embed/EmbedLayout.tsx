@@ -10,8 +10,9 @@ import { useMediaQuery } from "../editor/layout/useMediaQuery";
 import { LeftPanel } from "../editor/panels/LeftPanel";
 import { RightPanel } from "../editor/panels/RightPanel";
 import { PreviewPanel } from "../editor/preview/PreviewPanel";
+import { TimelineResizeHandle } from "../editor/layout/TimelineResizeHandle";
 import { useSession, useUi } from "../editor/session/context";
-import type { LeftTab } from "../editor/session/uiStore";
+import { type LeftTab, TRACK_HEIGHT } from "../editor/session/uiStore";
 import { TimelinePanel } from "../editor/timeline/TimelinePanel";
 import type { EmbedBridge } from "./bridge";
 import { EmbedTopBar } from "./EmbedTopBar";
@@ -21,6 +22,14 @@ const EMBED_TABS: readonly LeftTab[] = ["files", "titles", "effects", "transitio
 
 /** Inline in the conversation: the cut at a glance. */
 const INLINE_TIMELINE = 150;
+/** Track heights the timeline fits its tracks within: inline, small enough that a reel's few tracks all show. */
+const INLINE_TRACK_HEIGHTS: readonly [number, number] = [28, TRACK_HEIGHT];
+const FULL_TRACK_HEIGHTS: readonly [number, number] = [44, TRACK_HEIGHT];
+
+/** Full screen in a chat panel: a timeline that grows with the window. */
+function fullTimelineHeight(windowHeight: number): number {
+  return Math.round(Math.min(380, Math.max(230, windowHeight * 0.32)));
+}
 
 /**
  * The editor inside a chat. Full screen it is the whole editor (library,
@@ -54,6 +63,20 @@ export function EmbedLayout({ bridge, cloud, projectId }: { bridge: EmbedBridge;
     return () => cancelAnimationFrame(frame);
   }, [session, full, wide]);
 
+  // The tracks share the timeline's height (inline: every track of a reel shows); full screen, the timeline follows the
+  // window until the person drags its edge.
+  const sized = useRef(false);
+  useEffect(() => {
+    session.ui.setState({ trackFit: full ? FULL_TRACK_HEIGHTS : INLINE_TRACK_HEIGHTS });
+    if (!full) return;
+    const fit = () => {
+      if (!sized.current) session.ui.setState({ panels: { ...session.ui.getState().panels, timeline: fullTimelineHeight(window.innerHeight) } });
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [session, full]);
+
   useEffect(() => {
     session.views.pickMedia = () => mediaInput.current?.click();
     return () => {
@@ -72,6 +95,7 @@ export function EmbedLayout({ bridge, cloud, projectId }: { bridge: EmbedBridge;
               <PreviewPanel />
               {roomy ? <RightPanel width={panels.right} assistant={false} /> : null}
             </div>
+            <TimelineResizeHandle remember={false} onResized={() => (sized.current = true)} />
             <TimelinePanel height={panels.timeline} />
           </>
         ) : (

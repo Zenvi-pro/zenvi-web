@@ -39,7 +39,7 @@ import { fileDisplayName } from "../session/media";
 import { clickSelect, EMPTY_SELECTION, type Selection } from "../session/uiStore";
 import { ClipView, TransitionView, type ClipGeometry } from "./ClipView";
 import { computeMove, computeTrim, edgeAt, marqueeHits, normalizeRect, type Box, type DragItem, type MoveResult, type Rect, type SnapSettings, type TrimResult, type TrimSubject } from "./dragMath";
-import { anchoredScroll, clampZoom, contentWidth, HEADER_WIDTH, RULER_HEIGHT, trackIndexAt, zoomStep, zoomToFit } from "./geometry";
+import { anchoredScroll, clampZoom, contentWidth, fittedTrackHeight, HEADER_WIDTH, RULER_HEIGHT, trackIndexAt, zoomStep, zoomToFit } from "./geometry";
 import { clipMenu, emptyAreaMenu, markerMenu, transitionMenu } from "./menus";
 import { Ruler, type RulerHandle } from "./Ruler";
 import { TrackHeaders } from "./TrackHeaders";
@@ -182,6 +182,23 @@ export function TimelineBody() {
   useLayoutEffect(() => {
     revealContent();
   }, [revealContent]);
+
+  // With a track fit (the editor in a chat), the tracks share the visible height, as the timeline and the tracks change.
+  const trackFit = useUi((s) => s.trackFit);
+  useLayoutEffect(() => {
+    const el = viewport.current;
+    if (!el || !trackFit) return;
+    const fit = () => {
+      const next = fittedTrackHeight(el.clientHeight, sortedLayers(session.project).length, trackFit);
+      if (next === session.ui.getState().trackHeight) return;
+      session.ui.setState({ trackHeight: next });
+      revealContent();
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [session, trackFit, tracks.length, revealContent]);
 
   // Timeline controller for commands (=, -, \, Shift+C).
   useEffect(() => {

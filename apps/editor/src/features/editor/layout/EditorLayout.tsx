@@ -15,10 +15,11 @@ import { savePanels } from "../session/uiStore";
 import { TimelinePanel } from "../timeline/TimelinePanel";
 import { CommandsContext } from "./commandsContext";
 import { MobileEditor } from "./MobileEditor";
+import { TimelineResizeHandle } from "./TimelineResizeHandle";
 import { TopBar } from "./TopBar";
 import { useMediaQuery } from "./useMediaQuery";
 
-const LIMITS = { left: [220, 560], right: [260, 600], timeline: [150, 900] } as const;
+const LIMITS = { left: [220, 560], right: [260, 600] } as const;
 
 function clamp(v: number, [min, max]: readonly [number, number]): number {
   return Math.min(max, Math.max(min, v));
@@ -109,21 +110,7 @@ export function EditorLayout() {
           )}
           <RightPanel width={panels.rightCollapsed ? 0 : panels.right} />
         </div>
-        <ResizeHandle
-          axis="y"
-          label="Resize timeline"
-          onResizeStart={() => (start.current = session.ui.getState().panels)}
-          onResize={(d) => setPanels({ timeline: clamp(start.current.timeline - d, [LIMITS.timeline[0], Math.max(200, window.innerHeight - 260)]) })}
-          onResizeEnd={persist}
-          onNudge={(d) => {
-            setPanels({ timeline: clamp(session.ui.getState().panels.timeline - d, LIMITS.timeline) });
-            persist();
-          }}
-          onReset={() => {
-            setPanels({ timeline: 300 });
-            persist();
-          }}
-        />
+        <TimelineResizeHandle />
         <TimelinePanel height={panels.timeline} />
         <EditorDialogs />
       </div>
