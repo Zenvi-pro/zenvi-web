@@ -32,6 +32,17 @@ export function backendPath(path: string): string {
   return p.replace(/^\/api\/v1(?=\/|$)/, "") || "/";
 }
 
+/**
+ * The words of a failed request: the backend's `detail`, or for its credit
+ * and tier refusals (api/credit_gate.py, HTTP 402/429) `detail.message`.
+ */
+export function errorMessage(status: number, body: unknown): string {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string") return detail;
+  const message = detail && typeof detail === "object" ? (detail as { message?: unknown }).message : undefined;
+  return typeof message === "string" && message ? message : `Backend request failed (${status})`;
+}
+
 export async function backendRequest<T = unknown>(path: string, init: BackendRequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   let body: BodyInit | undefined;
@@ -56,11 +67,7 @@ export async function backendRequest<T = unknown>(path: string, init: BackendReq
   } catch {
     // not JSON
   }
-  if (!response.ok) {
-    const detail = (parsed as { detail?: unknown } | null)?.detail;
-    const message = typeof detail === "string" ? detail : `Backend request failed (${response.status})`;
-    throw new BackendError(message, response.status, parsed);
-  }
+  if (!response.ok) throw new BackendError(errorMessage(response.status, parsed), response.status, parsed);
   return parsed as T;
 }
 

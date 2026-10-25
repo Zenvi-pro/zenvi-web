@@ -561,6 +561,28 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { text: "Hi", track: "Nope" }, summary: /^Error: Unknown track or layer 'Nope'/ },
   },
+  generate_image_and_add_to_timeline_tool: {
+    happy: {
+      args: { prompt: "a red fox in snow", position_seconds: "20", duration_seconds: "3" },
+      summary: /^Added clip to timeline at position 20\.0s on track 1000000 .* duration=3\.00s timeline_clip_id=\w+\.$/,
+      check: ({ host }) => expect(host.backendCalls.find((c) => c.path === "/api/v1/generation/image")?.body).toEqual({ prompt: "a red fox in snow", width: 1920, height: 1080 }),
+    },
+    failure: { args: { prompt: "a red fox", track: "Nope" }, summary: /^Error: Unknown track or layer 'Nope'/ },
+  },
+  ingest_web_video_tool: {
+    happy: {
+      args: { url: "https://youtu.be/abc", intent: "reference" },
+      summary: /^Ingested “Web clip” as media_bin file_id=\w+\.\nColour match: match_color_to_reference_tool/,
+      check: ({ host }) => expect(host.calls).toContain("fetchWebVideo https://youtu.be/abc reference subs=true"),
+    },
+    failure: { args: { url: "https://youtu.be/abc", intent: "edit" }, status: "refused", summary: /^Error: Unknown intent 'edit'\. Use reference, timeline, or recreate\.$/ },
+  },
+  list_comfyui_templates_tool: { happy: { args: {}, status: "refused", summary: /not available in this Zenvi surface: ComfyUI/ }, failure: null },
+  list_comfyui_jobs_tool: { happy: { args: {}, status: "refused", summary: /not available in this Zenvi surface: ComfyUI/ }, failure: null },
+  create_media_with_comfyui_tool: { happy: { args: { prompt: "misty pine forest" }, status: "refused", summary: /not available in this Zenvi surface: ComfyUI/ }, failure: null },
+  enhance_file_with_comfyui_tool: { happy: { args: { file_id: IDS.broll }, status: "refused", summary: /not available in this Zenvi surface: ComfyUI/ }, failure: null },
+  cancel_comfyui_job_tool: { happy: { args: { job_id: "j1" }, status: "refused", summary: /not available in this Zenvi surface: ComfyUI/ }, failure: null },
+  prepare_recording_tool: { happy: { args: { sources: ["mic"] }, status: "refused", summary: /not available in this Zenvi surface: recording/ }, failure: null },
   modify_clip_tool: { happy: { args: { timeline_clip_id: IDS.clipA, description: "make it night" }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
   generate_transition_clip_tool: { happy: { args: { clip_a_id: IDS.clipA, clip_b_id: IDS.clipB }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
 

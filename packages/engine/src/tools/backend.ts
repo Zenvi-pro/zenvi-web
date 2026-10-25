@@ -4,7 +4,7 @@
  * Ports of zenvi-core src/classes/api_client.py (ref b63c39be7):
  * `search`, `watch_window`, `is_indexing_configured`, `get_project_catalog`,
  * `generate_video`, `generate_tts`, `summarize_indexed_video`,
- * `pick_pexels_hd_link`; and of classes/project_tl_index.py
+ * `pick_pexels_hd_link` (and develop 1f80cb3d0's `generate_image`); and of classes/project_tl_index.py
  * (the project's shared video index) and classes/twelvelabs_match.py (hit
  * selection). Like the desktop client, failures come back as `{ error }`
  * instead of throwing.
@@ -158,6 +158,27 @@ export async function generateVideo(
   if (!res.ok) return { error: res.error };
   if (typeof res.data.error === "string" && res.data.error) return { error: bareError(res.data.error, "Video generation failed") };
   return { videoUrl: String(res.data.video_url ?? "") };
+}
+
+/**
+ * POST /api/v1/generation/image (api_client.generate_image, zenvi-core
+ * develop): a still from a text prompt, charged by the backend. Only the
+ * aspect of width/height is used. The image comes back inline (base64).
+ */
+export async function generateImage(
+  call: ToolCall,
+  prompt: string,
+  size: { width: number; height: number },
+): Promise<{ imageBase64: string; mimeType: string } | { error: string }> {
+  const res = await backendRequest<Record<string, unknown>>(call.host.backend, "/api/v1/generation/image", {
+    method: "POST",
+    body: { prompt, width: size.width, height: size.height },
+    signal: call.signal,
+  });
+  if (!res.ok) return { error: res.error };
+  if (!isRecord(res.data)) return { error: "Unexpected response from the Zenvi backend" };
+  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  return { imageBase64: String(res.data.image_base64 ?? ""), mimeType: String(res.data.mime_type ?? "") };
 }
 
 /** POST /api/v1/generation/tts (api_client.generate_tts): MP3 bytes as base64. */

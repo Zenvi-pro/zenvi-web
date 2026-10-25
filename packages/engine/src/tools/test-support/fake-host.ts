@@ -8,6 +8,7 @@
 import { TranscriptionError, type Transcription } from "../../analysis/transcription.js";
 import type { Project } from "../../model/types.js";
 import { folderAndName, sequenceFramesPresent } from "../../ops/project-files.js";
+import { isDirectMediaUrl, isYoutubeUrl, type WebVideoDownload, type WebVideoRequest } from "../../web-video/web-video.js";
 import type {
   AudioEnvelope,
   EditorSelection,
@@ -31,6 +32,7 @@ export type OptionalMethod =
   | "media.pickFiles"
   | "media.writeGenerated"
   | "media.missing"
+  | "media.fetchWebVideo"
   | "storage.readText"
   | "storage.writeText"
   | "audio.transcribe"
@@ -77,6 +79,12 @@ export interface FakeHostOptions {
   disk?: string[];
   /** Content of disk files, for their fingerprints (`fingerprint.sha256` = the content); others have none. */
   contents?: Record<string, string>;
+  /**
+   * What `media.fetchWebVideo` does (default: a finished download of
+   * `/cache/web/<last path part>.mp4` titled "Web clip"). Each call is
+   * recorded in `calls` as `fetchWebVideo <url> <intent> subs=<bool>`.
+   */
+  webVideo?: (request: WebVideoRequest) => Promise<WebVideoDownload>;
 }
 
 /** The disk a fake host reads: listings in the CLI host's walk order, and what exists. */
@@ -118,6 +126,27 @@ function fakeDisk(paths: readonly string[]) {
       }
       return count;
     },
+  };
+}
+
+/** The download the fake host's fetchWebVideo answers by default. */
+export function fakeWebVideoDownload(request: WebVideoRequest, overrides: Partial<WebVideoDownload> = {}): WebVideoDownload {
+  const last = request.url.split("?")[0]!.split("/").filter(Boolean).pop() || "video";
+  return {
+    path: `/cache/web/${last.replace(/\.[a-z0-9]+$/i, "")}.mp4`,
+    title: "Web clip",
+    extractor: isYoutubeUrl(request.url) ? "youtube" : "generic",
+    durationSeconds: 8,
+    width: 1280,
+    height: 720,
+    webpageUrl: request.url,
+    id: "web1",
+    isYoutube: isYoutubeUrl(request.url),
+    subtitlePaths: [],
+    direct: isDirectMediaUrl(request.url),
+    fromCache: false,
+    cachePurged: 0,
+    ...overrides,
   };
 }
 
@@ -169,6 +198,7 @@ function defaultRoutes(): Record<string, (body: unknown, path: string) => unknow
     "/api/v1/indexing/summarize": () => ({ success: true, ai_metadata: { analyzed: true, short_summary: "Re-summarized." } }),
     "/api/v1/generation/video": () => ({ video_url: "https://cdn.example.com/generated.mp4" }),
     "/api/v1/generation/tts": () => ({ success: true, audio_base64: "SUQzAwAAAAAAAA==" }),
+    "/api/v1/generation/image": () => ({ image_base64: PNG_1PX, mime_type: "image/png" }),
     "/api/v1/pexels/search": () => ({
       videos: [{ id: 101, url: "https://www.pexels.com/video/101/", video_files: [{ quality: "hd", link: "https://videos.pexels.com/101-hd.mp4" }] }],
     }),
@@ -247,6 +277,13 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         calls.push(`writeGenerated ${name}`);
         written.set(path, bytes);
         return path;
+      };
+    }
+    if (!omit.has("media.fetchWebVideo")) {
+      const fetchWebVideo = options.webVideo ?? (async (request: WebVideoRequest) => fakeWebVideoDownload(request));
+      host.media.fetchWebVideo = async (request) => {
+        calls.push(`fetchWebVideo ${request.url} ${request.intent} subs=${request.writeSubs}`);
+        return fetchWebVideo(request);
       };
     }
   }

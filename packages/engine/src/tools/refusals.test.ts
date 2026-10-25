@@ -24,6 +24,8 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   search_transitions_tool: { query: "fade" },
   generate_video_and_add_to_timeline_tool: { prompt: "a sunset over the sea" },
   generate_tts_and_add_to_timeline_tool: { text: "Hello there" },
+  generate_image_and_add_to_timeline_tool: { prompt: "a red fox in snow" },
+  ingest_web_video_tool: { url: "https://youtu.be/abc" },
   resummarize_project_file_tool: { file_id: IDS.interview },
   reindex_project_file_tool: { file_id: IDS.broll },
   set_export_setting_tool: { key: "width", value: "640" },
@@ -85,6 +87,20 @@ describe("surface-limitation refusals say 'not available'", () => {
       ["generate_transition_clip_tool", { clip_a_id: IDS.clipA, clip_b_id: IDS.clipB }],
     ];
     for (const [name, args] of cases) await expectNotAvailable(name, args, {});
+  });
+
+  it("for Zenvi desktop's ComfyUI and recording tools, and web pages on hosted surfaces", async () => {
+    const cases: [string, Record<string, unknown>][] = [
+      ["list_comfyui_templates_tool", {}],
+      ["list_comfyui_jobs_tool", { job_id: "j1" }],
+      ["create_media_with_comfyui_tool", { prompt: "misty pine forest" }],
+      ["enhance_file_with_comfyui_tool", { file_id: IDS.broll, action: "upscale" }],
+      ["cancel_comfyui_job_tool", { all_jobs: "true" }],
+      ["prepare_recording_tool", { sources: ["mic"] }],
+    ];
+    for (const [name, args] of cases) await expectNotAvailable(name, args, {});
+    await expectNotAvailable("ingest_web_video_tool", { url: "https://youtu.be/abc" }, { omit: ["media.fetchWebVideo"] });
+    await expectNotAvailable("generate_image_and_add_to_timeline_tool", { prompt: "a red fox" }, { omit: ["media.writeGenerated"] });
   });
 
   it("for speech recognition a host does not have, or a server without it", async () => {

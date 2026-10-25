@@ -29,5 +29,6 @@ export * from "./reels/styles.js";
 export * from "./reels/plan.js";
 export * from "./motion/index.js";
 export * from "./stock/stock.js";
+export * from "./web-video/web-video.js";
 export type * from "./tools/types.js";
 export type * from "./render/types.js";

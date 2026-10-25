@@ -19,6 +19,7 @@ import type { z } from "zod";
 import type { Transcription } from "../analysis/transcription.js";
 import type { ProjectDocument } from "../history/document.js";
 import type { CloudMediaRef, FileFingerprint, Project, ProjectFile, ReaderInfo } from "../model/types.js";
+import type { WebVideoDownload, WebVideoRequest } from "../web-video/web-video.js";
 
 export type ToolSurface = "assistant" | "mcp" | "cli" | "editor";
 
@@ -113,6 +114,15 @@ export interface MediaHost {
    * (media_files.media_missing). One flag per file, in order.
    */
   missing?(files: readonly ProjectFile[]): Promise<boolean[]>;
+  /**
+   * Fetch the video of a web page (YouTube and other sites, with yt-dlp) or
+   * a direct media link into this computer's cache, for
+   * ingest_web_video_tool; the tool imports the file with `importPath`.
+   * Only hosts on the person's own computer have it (the CLI): hosted
+   * surfaces do not download third-party pages. Rejects with a
+   * `WebVideoError` in words (no yt-dlp, a private address, a failed pull).
+   */
+  fetchWebVideo?(request: WebVideoRequest): Promise<WebVideoDownload>;
 }
 
 export interface PlayerHost {

@@ -358,6 +358,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   fade_clip_tool: (c) => ({ clip_id: c.clips.a, fade_in_seconds: "0.5", fade_out_seconds: "0.5" }),
   freeze_frame_tool: (c) => ({ timeline_clip_id: c.clips.a, at_seconds: "2", hold_seconds: "1", ripple: true }),
   fetch_motion_graphics_video_tool: () => ({ segment_urls: process.env.SWEEP_MOTION_URL ? [process.env.SWEEP_MOTION_URL] : [], label: "Motion segment" }),
+  // Paid (--paid): one still, placed after the baseline.
+  generate_image_and_add_to_timeline_tool: () => ({ prompt: "a red fox in fresh snow at golden hour", position_seconds: "16", duration_seconds: "3" }),
   generate_tts_and_add_to_timeline_tool: () => ({ text: "This is the sweep narration.", position: "2" }),
   get_file_info_tool: (c) => ({ file_id: c.files.talk }),
   get_render_status: () => ({ render_id: "r_sweep_unknown" }),
@@ -367,9 +369,15 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   import_attached_file: (c) => ({ file: { download_url: c.urls.still, file_id: "file_sweep", file_name: "attached.png", mime_type: "image/png" } }),
   import_stock_media_tool: (c) => (c.stock ? { source: "pexels", video_id: String(c.stock.video_id), link: c.stock.link, position_seconds: "16" } : { source: "pexels", video_id: "13736520", position_seconds: "16" }),
   import_video_url_and_add_to_timeline_tool: (c) => ({ video_url: c.urls.b, position_seconds: "20" }),
+  // Hosted surfaces refuse web pages (nothing is fetched); the refusal names import_media_from_url.
+  ingest_web_video_tool: () => ({ url: "https://www.youtube.com/watch?v=sweep000000", intent: "reference" }),
   inspect_media_tool: (c) => ({ fileId: c.files.a, overview: true }),
   inspect_timeline_tool: (c) => ({ clipId: c.clips.a, start: "0", end: "2" }),
   list_captions_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
+  // ComfyUI and recording are Zenvi desktop's: refused in words.
+  create_media_with_comfyui_tool: () => ({ kind: "image", prompt: "misty pine forest at dawn" }),
+  enhance_file_with_comfyui_tool: (c) => ({ file_id: c.files.a, action: "upscale" }),
+  prepare_recording_tool: (c) => ({ sources: ["mic"], timeline_clip_id: c.clips.a }),
   match_color_to_reference_tool: (c) => ({ timeline_clip_id: c.clips.b, referenceClipId: c.clips.a }),
   list_project_files_tool: () => ({ usage: "used", detail: "full" }),
   list_projects: () => ({ limit: 5 }),

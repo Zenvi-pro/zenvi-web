@@ -504,7 +504,7 @@ var init_client = __esm({
       token;
       fetchImpl;
       userAgent;
-      async request(method, path39, init = {}) {
+      async request(method, path40, init = {}) {
         const token = await this.token();
         if (!token) throw new CliError("You are not signed in to Zenvi.", 1, "Run `zenvi login` (or `zenvi login --device` on a machine without a browser).");
         const headers = { Accept: "application/json", Authorization: `Bearer ${token}`, "User-Agent": this.userAgent, ...init.headers };
@@ -515,7 +515,7 @@ var init_client = __esm({
         }
         let response;
         try {
-          response = await this.fetchImpl(`${this.baseUrl}${path39}`, { method, headers, body, signal: AbortSignal.timeout(12e4) });
+          response = await this.fetchImpl(`${this.baseUrl}${path40}`, { method, headers, body, signal: AbortSignal.timeout(12e4) });
         } catch (error62) {
           throw new CloudError(`Cannot reach Zenvi Cloud at ${this.baseUrl}: ${error62.message}`, 0, void 0, void 0);
         }
@@ -1359,23 +1359,23 @@ function isRecord(value) {
 function lowerPath(value) {
   return String(value ?? "").toLowerCase();
 }
-function isAudioPath(path39) {
-  const p = lowerPath(path39).split("?")[0];
+function isAudioPath(path40) {
+  const p = lowerPath(path40).split("?")[0];
   return AUDIO_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function isImagePath(path39) {
-  const p = lowerPath(path39);
+function isImagePath(path40) {
+  const p = lowerPath(path40);
   return IMAGE_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function hasExtension(path39) {
-  const base = path39.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
+function hasExtension(path40) {
+  const base = path40.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
   return /\.[a-z0-9]{1,5}$/i.test(base);
 }
 function getMediaType(file3, name) {
-  let path39 = String(file3.path ?? "");
-  if (name && !hasExtension(path39)) path39 = name;
-  if (isAudioPath(path39)) return "audio";
-  const image = isImagePath(path39);
+  let path40 = String(file3.path ?? "");
+  if (name && !hasExtension(path40)) path40 = name;
+  if (isAudioPath(path40)) return "audio";
+  const image = isImagePath(path40);
   if (file3.has_video && !image) return "video";
   if (file3.has_video && image) return "image";
   if (file3.has_audio && !file3.has_video) return "audio";
@@ -1391,8 +1391,8 @@ function isAudioOnlyMedia(file3) {
 function isAudioMedia(source2) {
   const data = isRecord(source2) ? source2 : {};
   if (String(data.media_type ?? "").trim().toLowerCase() === "audio") return true;
-  const path39 = lowerPath(data.path ?? data.file_path ?? "").trim();
-  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path39.endsWith(ext))) return true;
+  const path40 = lowerPath(data.path ?? data.file_path ?? "").trim();
+  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path40.endsWith(ext))) return true;
   return data.has_audio === true && data.has_video === false;
 }
 function isSingleImageMedia(source2) {
@@ -1724,8 +1724,8 @@ function libopenshotClipDefaults() {
   json2.rotation = libopenshotKeyframe(0);
   return json2;
 }
-function basename(path39) {
-  const clean2 = path39.split(/[?#]/)[0] ?? path39;
+function basename(path40) {
+  const clean2 = path40.split(/[?#]/)[0] ?? path40;
   const parts = clean2.split(/[\\/]/);
   return parts[parts.length - 1] || clean2;
 }
@@ -2761,14 +2761,14 @@ function listLuts() {
 function builtinLutByRelativePath(relative2) {
   return BY_RELATIVE.get(relative2.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase());
 }
-function builtinLutForPath(path39) {
-  const normalized2 = String(path39 ?? "").trim().replaceAll("\\", "/");
+function builtinLutForPath(path40) {
+  const normalized2 = String(path40 ?? "").trim().replaceAll("\\", "/");
   if (normalized2.startsWith(LUT_ALIAS)) return builtinLutByRelativePath(normalized2.slice(LUT_ALIAS.length));
   const at = normalized2.toLowerCase().lastIndexOf("/colors/");
   return at >= 0 ? builtinLutByRelativePath(normalized2.slice(at + "/colors/".length)) : void 0;
 }
-function isAbsoluteFilePath(path39) {
-  return path39.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path39) || path39.startsWith("\\\\");
+function isAbsoluteFilePath(path40) {
+  return path40.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path40) || path40.startsWith("\\\\");
 }
 var BUILTIN_LUTS, LUT_ALIAS, LUTS, BY_RELATIVE;
 var init_luts = __esm({
@@ -3352,12 +3352,12 @@ function matches(item, match) {
   }
   return true;
 }
-function resolveKey(root, path39) {
-  if (path39.length === 0) return void 0;
+function resolveKey(root, path40) {
+  if (path40.length === 0) return void 0;
   let parent = root;
   let slot = "";
   let value = root;
-  for (const part of path39) {
+  for (const part of path40) {
     if (typeof part === "string") {
       if (!isRecord8(value)) return void 0;
       const key2 = findKey(value, part);
@@ -3376,8 +3376,8 @@ function resolveKey(root, path39) {
   }
   return { parent, slot, value };
 }
-function formatKey(path39) {
-  return path39.map(
+function formatKey(path40) {
+  return path40.map(
     (part) => typeof part === "string" ? part : `{${Object.entries(part).map(([k, v]) => `${k}:${String(v)}`).join(",")}}`
   ).join("/");
 }
@@ -3400,17 +3400,17 @@ function defaultTransactionId() {
   fallbackCounter += 1;
   return `tx-${Date.now().toString(36)}-${fallbackCounter.toString(36)}`;
 }
-function writeThrough(root, path39, mutate) {
-  const resolved = resolveKey(root, path39);
-  if (!resolved) throw new KeyNotFoundError(path39);
+function writeThrough(root, path40, mutate) {
+  const resolved = resolveKey(root, path40);
+  if (!resolved) throw new KeyNotFoundError(path40);
   const newRoot = { ...root };
   let src = root;
   let dst = newRoot;
-  for (let i = 0; i < path39.length; i += 1) {
-    const partial2 = resolveKey(src, [path39[i]]);
-    if (!partial2) throw new KeyNotFoundError(path39);
+  for (let i = 0; i < path40.length; i += 1) {
+    const partial2 = resolveKey(src, [path40[i]]);
+    if (!partial2) throw new KeyNotFoundError(path40);
     const { slot, value } = partial2;
-    if (i === path39.length - 1) {
+    if (i === path40.length - 1) {
       mutate(dst, slot);
       break;
     }
@@ -4207,9 +4207,9 @@ function pyRepr(value) {
   if (isRecord11(value)) return `{${Object.entries(value).map(([k, v]) => `${pyRepr(k)}: ${pyRepr(v)}`).join(", ")}}`;
   return String(value);
 }
-function valueAt(root, path39) {
+function valueAt(root, path40) {
   let current = root;
-  for (const part of path39) {
+  for (const part of path40) {
     if (Array.isArray(current) && typeof part === "number" && part < current.length) current = current[part];
     else if (isRecord11(current) && typeof part === "string" && part in current) current = current[part];
     else return { found: false, value: void 0 };
@@ -4217,14 +4217,14 @@ function valueAt(root, path39) {
   return { found: true, value: current };
 }
 function formatIssue(issue2, payload) {
-  const path39 = issue2.path.map(String).join(".") || "(root)";
+  const path40 = issue2.path.map(String).join(".") || "(root)";
   const at = valueAt(payload, issue2.path);
   const shown = pyRepr(at.value);
   switch (issue2.code) {
     case "unrecognized_keys": {
       const keys = issue2.keys.map(pyRepr).join(", ");
       const verb = issue2.keys.length === 1 ? "was" : "were";
-      return { message: `Additional properties are not allowed (${keys} ${verb} unexpected)`, path: path39 };
+      return { message: `Additional properties are not allowed (${keys} ${verb} unexpected)`, path: path40 };
     }
     case "invalid_type": {
       if (!at.found && issue2.path.length > 0) {
@@ -4232,27 +4232,27 @@ function formatIssue(issue2, payload) {
         return { message: `${pyRepr(String(issue2.path[issue2.path.length - 1]))} is a required property`, path: parentPath };
       }
       const expected = JSON_TYPE_NAMES[issue2.expected] ?? issue2.expected;
-      return { message: `${shown} is not of type '${expected}'`, path: path39 };
+      return { message: `${shown} is not of type '${expected}'`, path: path40 };
     }
     case "invalid_value":
-      return { message: `${shown} is not one of [${issue2.values.map(pyRepr).join(", ")}]`, path: path39 };
+      return { message: `${shown} is not one of [${issue2.values.map(pyRepr).join(", ")}]`, path: path40 };
     case "invalid_union":
-      return { message: `${shown} is not valid under any of the given schemas`, path: path39 };
+      return { message: `${shown} is not valid under any of the given schemas`, path: path40 };
     case "too_small":
       if (issue2.origin === "array") {
-        return { message: Number(issue2.minimum) <= 1 ? `${shown} should be non-empty` : `${shown} is too short`, path: path39 };
+        return { message: Number(issue2.minimum) <= 1 ? `${shown} should be non-empty` : `${shown} is too short`, path: path40 };
       }
-      return { message: `${shown} is less than ${issue2.inclusive === false ? "or equal to " : ""}the minimum of ${pyRepr(Number(issue2.minimum))}`, path: path39 };
+      return { message: `${shown} is less than ${issue2.inclusive === false ? "or equal to " : ""}the minimum of ${pyRepr(Number(issue2.minimum))}`, path: path40 };
     case "too_big":
-      if (issue2.origin === "array") return { message: `${shown} is too long`, path: path39 };
-      return { message: `${shown} is greater than ${issue2.inclusive === false ? "or equal to " : ""}the maximum of ${pyRepr(Number(issue2.maximum))}`, path: path39 };
+      if (issue2.origin === "array") return { message: `${shown} is too long`, path: path40 };
+      return { message: `${shown} is greater than ${issue2.inclusive === false ? "or equal to " : ""}the maximum of ${pyRepr(Number(issue2.maximum))}`, path: path40 };
     default:
-      return { message: issue2.message, path: path39 };
+      return { message: issue2.message, path: path40 };
   }
 }
 function invalidArgumentsMessage(tool, issue2, payload) {
-  const { message, path: path39 } = formatIssue(issue2, payload);
-  return `Error: Invalid arguments for ${tool}: ${message} (at ${path39}).`;
+  const { message, path: path40 } = formatIssue(issue2, payload);
+  return `Error: Invalid arguments for ${tool}: ${message} (at ${path40}).`;
 }
 var HIDDEN_PARAMS, INTEGER_TEXT, FLOAT_TEXT, JSON_TYPE_NAMES;
 var init_coerce = __esm({
@@ -4495,6 +4495,11 @@ function pyBool(value) {
 function pySlice(value, start, end) {
   return Array.from(value).slice(start, end).join("");
 }
+function pyLen(value) {
+  let n = 0;
+  for (const _ of value) n += 1;
+  return n;
+}
 var NON_PRINTABLE;
 var init_pyfmt = __esm({
   "../engine/src/tools/pyfmt.ts"() {
@@ -4520,8 +4525,8 @@ function orZero(value) {
 function fileLooksLikeImage(file3) {
   const data = isRecord12(file3) ? file3 : {};
   if (String(data.media_type ?? "").toLowerCase() === "image") return true;
-  const path39 = String(data.path || data.name || "");
-  const ext = path39.includes(".") ? path39.slice(path39.lastIndexOf(".") + 1).toLowerCase() : "";
+  const path40 = String(data.path || data.name || "");
+  const ext = path40.includes(".") ? path40.slice(path40.lastIndexOf(".") + 1).toLowerCase() : "";
   return IMAGE_EXTS.has(ext);
 }
 function quantizePlacementSeconds(start, end, fps2) {
@@ -5817,11 +5822,11 @@ function matchTransition(name) {
 function normName(text5) {
   return text5.trim().toLowerCase().replaceAll("_", " ").replaceAll("-", " ").split(/\s+/).filter(Boolean).join(" ");
 }
-function withoutExtension(path39) {
-  const slash = Math.max(path39.lastIndexOf("/"), path39.lastIndexOf("\\"));
-  const base = path39.slice(slash + 1);
+function withoutExtension(path40) {
+  const slash = Math.max(path40.lastIndexOf("/"), path40.lastIndexOf("\\"));
+  const base = path40.slice(slash + 1);
   const dot = base.lastIndexOf(".");
-  return dot > 0 && base.slice(0, dot).replace(/\.+/g, "") !== "" ? path39.slice(0, slash + 1 + dot) : path39;
+  return dot > 0 && base.slice(0, dot).replace(/\.+/g, "") !== "" ? path40.slice(0, slash + 1 + dot) : path40;
 }
 function transitionKey(entry) {
   return stem(entry.file).toLowerCase();
@@ -5841,8 +5846,8 @@ function lookupTransition(name) {
   if (partial2.length === 1) return { entry: partial2[0], candidates: [] };
   return { entry: void 0, candidates: partial2.slice(0, 12).map(transitionKey) };
 }
-function resolveTransitionAsset(path39) {
-  const match = /(?:^@transitions|(?:^|[\\/])transitions)[\\/](common|extra)[\\/]([^\\/]+)$/.exec(path39 ?? "");
+function resolveTransitionAsset(path40) {
+  const match = /(?:^@transitions|(?:^|[\\/])transitions)[\\/](common|extra)[\\/]([^\\/]+)$/.exec(path40 ?? "");
   return match ? BY_LOCATION.get(`${match[1]}/${match[2]}`) : void 0;
 }
 function gcd(a, b) {
@@ -5929,8 +5934,8 @@ function gcd2(a, b) {
   while (y) [x, y] = [y, x % y];
   return x || 1;
 }
-function maskReader(path39, width = 720, height = 576) {
-  const entry = resolveTransitionAsset(path39);
+function maskReader(path40, width = 720, height = 576) {
+  const entry = resolveTransitionAsset(path40);
   if (entry) return transitionReader(entry);
   const divisor = gcd2(width, height);
   const fields = {
@@ -5938,7 +5943,7 @@ function maskReader(path39, width = 720, height = 576) {
     display_ratio: { den: height / divisor, num: width / divisor },
     file_size: width * height * 4,
     height,
-    path: path39,
+    path: path40,
     width
   };
   return Object.fromEntries(Object.keys(fields).sort().map((key2) => [key2, fields[key2]]));
@@ -5957,13 +5962,13 @@ function requireDuration(duration3) {
   if (!(d > 0)) throw invalid(`duration must be > 0 (got ${d}).`);
   return d;
 }
-function resolveMask(maskId, path39) {
-  if (maskId !== void 0 && path39 !== void 0) throw invalid("Give maskId or path, not both.");
-  if (path39 !== void 0) {
-    if (typeof path39 !== "string" || path39 === "") throw invalid("path must be a non-empty string.");
-    const known = resolveTransitionMask(path39);
-    const stem6 = (path39.split(/[\\/]/).pop() ?? path39).replace(/\.[^.]+$/, "");
-    return known ?? { path: path39, title: stem6, width: 720, height: 576 };
+function resolveMask(maskId, path40) {
+  if (maskId !== void 0 && path40 !== void 0) throw invalid("Give maskId or path, not both.");
+  if (path40 !== void 0) {
+    if (typeof path40 !== "string" || path40 === "") throw invalid("path must be a non-empty string.");
+    const known = resolveTransitionMask(path40);
+    const stem6 = (path40.split(/[\\/]/).pop() ?? path40).replace(/\.[^.]+$/, "");
+    return known ?? { path: path40, title: stem6, width: 720, height: 576 };
   }
   if (maskId === void 0) throw invalid("Give maskId or path.");
   const found = resolveTransitionMask(maskId);
@@ -9256,8 +9261,8 @@ var init_add_to_timeline = __esm({
 });
 
 // ../engine/src/ops/project-files.ts
-function folderAndName(path39) {
-  const p = String(path39 ?? "");
+function folderAndName(path40) {
+  const p = String(path40 ?? "");
   const cut2 = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
   return cut2 < 0 ? { folder: "", name: p } : { folder: p.slice(0, cut2), name: p.slice(cut2 + 1) };
 }
@@ -9461,9 +9466,9 @@ function describeIssues(issues) {
   const more = issues.length > 1 ? ` (and ${issues.length - 1} more)` : "";
   return `Invalid project: ${where}${first.message}${more}`;
 }
-function formatIssuePath(path39) {
+function formatIssuePath(path40) {
   let out = "";
-  for (const part of path39) {
+  for (const part of path40) {
     if (typeof part === "number") out += `[${part}]`;
     else out += out ? `.${String(part)}` : String(part);
   }
@@ -9705,10 +9710,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path39) {
-  if (!path39)
+function getElementAtPath(obj, path40) {
+  if (!path40)
     return obj;
-  return path39.reduce((acc, key2) => acc?.[key2], obj);
+  return path40.reduce((acc, key2) => acc?.[key2], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -9967,11 +9972,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path39, issues) {
+function prefixIssues(path40, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path39);
+    iss.path.unshift(path40);
     return iss;
   });
 }
@@ -10492,16 +10497,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path39 = []) => {
+  const processError = (error63, path40 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path39, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path40, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path39, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path40, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path39, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path40, ...issue2.path]);
       } else {
-        const fullpath = [...path39, ...issue2.path];
+        const fullpath = [...path40, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -10540,17 +10545,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result2 = { errors: [] };
-  const processError = (error63, path39 = []) => {
+  const processError = (error63, path40 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path39, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path40, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path39, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path40, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path39, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path40, ...issue2.path]);
       } else {
-        const fullpath = [...path39, ...issue2.path];
+        const fullpath = [...path40, ...issue2.path];
         if (fullpath.length === 0) {
           result2.errors.push(mapper(issue2));
           continue;
@@ -10589,8 +10594,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path39 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path39) {
+  const path40 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path40) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -28586,13 +28591,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path39 = ref.slice(1).split("/").filter(Boolean);
-  if (path39.length === 0) {
+  const path40 = ref.slice(1).split("/").filter(Boolean);
+  if (path40.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path39[0] === defsKey) {
-    const key2 = path39[1] === void 0 ? void 0 : decodeJSONPointerSegment(path39[1]);
+  if (path40[0] === defsKey) {
+    const key2 = path40[1] === void 0 ? void 0 : decodeJSONPointerSegment(path40[1]);
     if (!key2 || !ctx.defs[key2]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -29848,11 +29853,11 @@ function isRecord15(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function checkKeyframes(value, ctx) {
-  const check2 = (candidate, path39) => {
+  const check2 = (candidate, path40) => {
     const result2 = keyframe.safeParse(candidate);
     if (result2.success) return;
     for (const issue2 of result2.error.issues) {
-      ctx.addIssue({ code: "custom", message: issue2.message, path: [...path39, ...issue2.path] });
+      ctx.addIssue({ code: "custom", message: issue2.message, path: [...path40, ...issue2.path] });
     }
   };
   for (const [key2, prop] of Object.entries(value)) {
@@ -30399,12 +30404,12 @@ var init_parse3 = __esm({
 });
 
 // ../engine/src/io/paths.ts
-function posixNormalize(path39) {
-  if (path39 === "") return ".";
-  let initialSlashes = path39.startsWith("/") ? 1 : 0;
-  if (initialSlashes && path39.startsWith("//") && !path39.startsWith("///")) initialSlashes = 2;
+function posixNormalize(path40) {
+  if (path40 === "") return ".";
+  let initialSlashes = path40.startsWith("/") ? 1 : 0;
+  if (initialSlashes && path40.startsWith("//") && !path40.startsWith("///")) initialSlashes = 2;
   const comps = [];
-  for (const comp of path39.split("/")) {
+  for (const comp of path40.split("/")) {
     if (comp === "" || comp === ".") continue;
     if (comp !== ".." || !initialSlashes && comps.length === 0 || comps.length > 0 && comps[comps.length - 1] === "..") {
       comps.push(comp);
@@ -30449,15 +30454,15 @@ function components(ops, p) {
   const { drive, rest } = ops.splitRoot(ops.normalize(p));
   return { drive, parts: rest.split(ops.sep).filter((part) => part !== "" && part !== ".") };
 }
-function isUnder(ops, path39, root) {
-  const p = components(ops, path39);
+function isUnder(ops, path40, root) {
+  const p = components(ops, path40);
   const r = components(ops, root);
   if (p.drive !== r.drive || r.parts.length > p.parts.length) return false;
   return r.parts.every((part, i) => part === p.parts[i]);
 }
-function relative(ops, start, path39) {
+function relative(ops, start, path40) {
   const s = components(ops, start).parts;
-  const p = components(ops, path39).parts;
+  const p = components(ops, path40).parts;
   let i = 0;
   while (i < s.length && i < p.length && s[i] === p[i]) i += 1;
   const rel = [...Array(s.length - i).fill(".."), ...p.slice(i)];
@@ -30481,11 +30486,11 @@ function matchAlias(p) {
 function requireAbsoluteDir(ops, projectDir) {
   if (!isAbsolute(ops, projectDir)) throw new TypeError(`projectDir must be an absolute path: ${projectDir}`);
 }
-function toStoredPath(path39, projectDir, roots = {}) {
+function toStoredPath(path40, projectDir, roots = {}) {
   const ops = opsFor(projectDir);
   requireAbsoluteDir(ops, projectDir);
-  if (path39 === "" || hasScheme(path39) || matchAlias(path39)) return path39;
-  const abs = ops.normalize(isAbsolute(ops, path39) ? path39 : ops.join(projectDir, path39));
+  if (path40 === "" || hasScheme(path40) || matchAlias(path40)) return path40;
+  const abs = ops.normalize(isAbsolute(ops, path40) ? path40 : ops.join(projectDir, path40));
   const { head: folder, tail: file3 } = split(ops, abs);
   const under = (root) => Boolean(root) && isUnder(ops, folder, root);
   if (under(roots.thumbnails)) return `thumbnail/${file3}`;
@@ -30498,17 +30503,17 @@ function toStoredPath(path39, projectDir, roots = {}) {
   }
   return relative(ops, projectDir, abs);
 }
-function fromStoredPath(path39, projectDir, roots = {}) {
+function fromStoredPath(path40, projectDir, roots = {}) {
   const ops = opsFor(projectDir);
   requireAbsoluteDir(ops, projectDir);
-  if (path39 === "") return "";
-  const alias = matchAlias(path39);
+  if (path40 === "") return "";
+  const alias = matchAlias(path40);
   if (alias) {
     const root = roots[alias.name];
-    return root ? ops.normalize(alias.rest ? ops.join(root, alias.rest) : root) : path39;
+    return root ? ops.normalize(alias.rest ? ops.join(root, alias.rest) : root) : path40;
   }
-  if (hasScheme(path39)) return path39;
-  return ops.normalize(ops.join(projectDir, path39));
+  if (hasScheme(path40)) return path40;
+  return ops.normalize(ops.join(projectDir, path40));
 }
 function setOwn(container, key2, value) {
   if (Array.isArray(container)) container[key2] = value;
@@ -30558,11 +30563,11 @@ function rewritePaths(root, rewrite2) {
 }
 function toStoredPaths(project, projectDir, roots = {}) {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
-  return rewritePaths(project, (path39) => toStoredPath(path39, projectDir, roots));
+  return rewritePaths(project, (path40) => toStoredPath(path40, projectDir, roots));
 }
 function fromStoredPaths(project, projectDir, roots = {}) {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
-  return rewritePaths(project, (path39) => fromStoredPath(path39, projectDir, roots));
+  return rewritePaths(project, (path40) => fromStoredPath(path40, projectDir, roots));
 }
 function projectAssetsDir(projectFilePath) {
   const ops = opsFor(projectFilePath);
@@ -30596,8 +30601,8 @@ var init_paths = __esm({
       sep: "\\",
       splitRoot: winSplitRoot,
       /** ntpath.normpath. */
-      normalize(path39) {
-        const { drive, root, rest } = winSplitRoot(path39);
+      normalize(path40) {
+        const { drive, root, rest } = winSplitRoot(path40);
         const comps = rest.split("\\");
         let i = 0;
         while (i < comps.length) {
@@ -30693,7 +30698,7 @@ function stripVariationSelectors(text5) {
 function words2(text5) {
   return text5.toLowerCase().match(/[a-z0-9]+/g) ?? [];
 }
-function pyLen(text5) {
+function pyLen2(text5) {
   return [...text5].length;
 }
 function scoreEmoji(entry, query2) {
@@ -30711,8 +30716,8 @@ function scoreEmoji(entry, query2) {
   if (name === ql) return 90 - penalty;
   const qw = words2(ql);
   const nw = words2(name);
-  if (qw.length > 0 && qw.every((w) => nw.includes(w))) return 70 - penalty - nw.length * 0.5 - pyLen(name) / 100;
-  if (name.startsWith(ql)) return 60 - penalty - pyLen(name) / 100;
+  if (qw.length > 0 && qw.every((w) => nw.includes(w))) return 70 - penalty - nw.length * 0.5 - pyLen2(name) / 100;
+  if (name.startsWith(ql)) return 60 - penalty - pyLen2(name) / 100;
   const tw = words2(entry.tags);
   if (qw.length > 0 && qw.every((w) => tw.includes(w) || nw.includes(w))) return 40 - penalty - nw.length * 0.5;
   if (name.includes(ql) || entry.tags.toLowerCase().includes(ql)) return 20 - penalty;
@@ -34392,8 +34397,8 @@ var init_type_search = __esm({
         const shadow2 = { offset: 12 * u };
         const pad3 = Math.ceil(shadow2.offset * 3.4);
         const e0 = beats.frame(0);
-        const settle2 = 12;
-        const fieldIn = { s: 0.94, dy: 26 * u, frames: settle2, ease: "out_strong" };
+        const settle3 = 12;
+        const fieldIn = { s: 0.94, dy: 26 * u, frames: settle3, ease: "out_strong" };
         elements.push(
           drawing("search-field", 1, e0, frames, { width: fw + 2 * pad3, height: fh + 2 * pad3 }, (d) => {
             for (const [spread2, alpha] of [
@@ -34428,7 +34433,7 @@ var init_type_search = __esm({
         const pressing = pressAt + 10 <= frames;
         if (button) {
           const rel = (s, dy) => pose(cx + (bx - cx) * s, cy + dy + (by - cy) * s, { s });
-          const keys = [key(e0, { ...rel(fieldIn.s, fieldIn.dy), alpha: 0 }), key(e0 + settle2, rel(1, 0), "out_strong")];
+          const keys = [key(e0, { ...rel(fieldIn.s, fieldIn.dy), alpha: 0 }), key(e0 + settle3, rel(1, 0), "out_strong")];
           if (pressing) keys.push(key(pressAt, rel(1, 0), "smooth"), key(pressAt + 4, pose(bx, by, { s: 0.9 }), "out"), key(pressAt + 12, pose(bx, by), "out_back"));
           elements.push(
             drawing("search-button", 2, e0, frames, { width: bw, height: bh }, (d) => {
@@ -34450,7 +34455,7 @@ var init_type_search = __esm({
         const span4 = Math.max(1, typeEnd - typeFrom);
         const group = Math.max(1, Math.ceil(MIN_PREFIX_FRAMES * n / span4));
         const clips = Math.ceil(n / group);
-        if (typeFrom > e0 + settle2) elements.push(cued(typed("search-caret-0", e0 + settle2, typeFrom, "", "on"), e0));
+        if (typeFrom > e0 + settle3) elements.push(cued(typed("search-caret-0", e0 + settle3, typeFrom, "", "on"), e0));
         for (let j = 0; j < clips; j += 1) {
           const from = typeFrom + Math.round(j * span4 / clips);
           const to = typeFrom + Math.round((j + 1) * span4 / clips);
@@ -34982,6 +34987,134 @@ var init_stock = __esm({
   }
 });
 
+// ../engine/src/web-video/web-video.ts
+function isWebVideoError(error62) {
+  return error62 instanceof WebVideoError || error62 instanceof Error && error62.name === "WebVideoError" && typeof error62.code === "string";
+}
+function normalizeWebVideoIntent(intent) {
+  const raw = String(intent || "reference").trim().toLowerCase();
+  const mapped = INTENT_ALIASES[raw] ?? raw;
+  if (WEB_VIDEO_INTENTS.includes(mapped)) return mapped;
+  throw new WebVideoError("refused", `Unknown intent '${String(intent)}'. Use reference, timeline, or recreate.`);
+}
+function parseUrl(url2) {
+  try {
+    return new URL(String(url2 ?? "").trim());
+  } catch {
+    return null;
+  }
+}
+function isProbableWebVideoUrl(url2) {
+  const parsed = parseUrl(url2);
+  return parsed !== null && (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.host !== "";
+}
+function isYoutubeUrl(url2) {
+  const host = parseUrl(url2)?.hostname.toLowerCase() ?? "";
+  return YOUTUBE_HOSTS.has(host) || host.endsWith(".youtube.com");
+}
+function isDirectMediaUrl(url2) {
+  const lower = String(url2 ?? "").trim().split("?")[0].toLowerCase();
+  return DIRECT_MEDIA_EXTS.some((ext) => lower.endsWith(ext));
+}
+function requestedHeightForIntent(intent) {
+  return intent === "timeline" ? 1080 : 720;
+}
+function wantsSubtitles(intent, writeSubs) {
+  return writeSubs || intent === "reference" || intent === "recreate";
+}
+function formatSelectorForIntent(intent, hasFfmpeg = true) {
+  const height = requestedHeightForIntent(intent);
+  if (!hasFfmpeg) return `best[height<=${height}][ext=mp4]/best[height<=${height}]/best[ext=mp4]/best`;
+  return `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${height}]+bestaudio/best[height<=${height}]/best`;
+}
+function cachedInt(value) {
+  const n = typeof value === "number" ? value : Number(String(value ?? "").trim() || 0);
+  return Number.isFinite(n) ? Math.trunc(n) : 0;
+}
+function cacheSatisfiesRequest(meta3, intent, writeSubs) {
+  const want = requestedHeightForIntent(intent);
+  const have = cachedInt(meta3.height);
+  if (have && have < want) return false;
+  if (!have) {
+    const stored = cachedInt(meta3.requested_height);
+    if (stored && stored < want) return false;
+  }
+  if (wantsSubtitles(intent, writeSubs)) {
+    const subs = meta3.subtitle_paths;
+    if ((!Array.isArray(subs) || subs.length === 0) && !meta3.write_subs_requested) return false;
+  }
+  return true;
+}
+function isRateLimitError(message) {
+  const low = message.toLowerCase();
+  return low.includes("http error 429") || low.includes("too many requests") || low.includes("rate-limited");
+}
+function cooldownMessage(remainingSeconds) {
+  const minutes = Math.max(1, Math.trunc((remainingSeconds + 59) / 60));
+  return `YouTube is still rate-limiting this link. Wait about ${minutes} minute(s), or upload an MP4 yourself.`;
+}
+function humanizeIngestFailure(error62) {
+  if (isWebVideoError(error62)) return error62.message;
+  const message = (error62 instanceof Error ? error62.message : String(error62 ?? "")).trim();
+  const name = error62 instanceof Error ? error62.name || "Error" : "Error";
+  const low = message.toLowerCase();
+  if (low.includes("ffmpeg") || low.includes("ffprobe")) {
+    return "Pull needs ffmpeg to combine YouTube video+audio. Install ffmpeg (e.g. brew install ffmpeg) and try again, or upload an MP4 yourself.";
+  }
+  const restricted = ["sign in", "login required", "private video", "members only", "members-only", "join this channel", "confirm your age", "age-restricted", "restricted", "premium"];
+  if (restricted.some((word) => low.includes(word))) return `This video is private, restricted, or requires sign-in.${UPLOAD_HINT}`;
+  if (low.includes("unavailable") || low.includes("not available") || low.includes("removed")) {
+    return `That video is unavailable (removed, region-blocked, or bad link).${UPLOAD_HINT}`;
+  }
+  if (low.includes("unsupported url") || low.includes("no suitable")) {
+    return "That URL is not a supported video page. Paste a public YouTube watch link, or upload an MP4 yourself.";
+  }
+  if (low.includes("http error 429") || low.includes("too many requests")) {
+    return "YouTube rate-limited the download. Wait about 10 minutes, or upload an MP4 yourself.";
+  }
+  if (low.includes("timed out") || low.includes("timeout")) return "Pull timed out. Check the network and try again, or upload an MP4 yourself.";
+  if (low.includes("js runtime") || low.includes("javascript runtime")) {
+    return "YouTube blocked some formats (JS runtime). Try again once; if it still fails, update yt-dlp or upload an MP4 yourself.";
+  }
+  let one = message.replace(/\s+/g, " ").trim();
+  if (Array.from(one).length > 180) one = `${Array.from(one).slice(0, 177).join("")}...`;
+  return `Pull failed (${one || name}).${UPLOAD_HINT}`;
+}
+var WEB_VIDEO_INTENTS, INTENT_ALIASES, WEB_VIDEO_CACHE_TTL_SECONDS, WEB_VIDEO_COOLDOWN_SECONDS, DIRECT_MEDIA_EXTS, YOUTUBE_HOSTS, WebVideoError, NOT_HTTP_URL_MESSAGE, UPLOAD_HINT;
+var init_web_video = __esm({
+  "../engine/src/web-video/web-video.ts"() {
+    "use strict";
+    WEB_VIDEO_INTENTS = ["reference", "timeline", "recreate"];
+    INTENT_ALIASES = {
+      ref: "reference",
+      look: "reference",
+      colour: "reference",
+      color: "reference",
+      grade: "reference",
+      match: "reference",
+      place: "timeline",
+      add: "timeline",
+      timeline: "timeline",
+      remake: "recreate",
+      recreate_like: "recreate"
+    };
+    WEB_VIDEO_CACHE_TTL_SECONDS = 7 * 24 * 3600;
+    WEB_VIDEO_COOLDOWN_SECONDS = 10 * 60;
+    DIRECT_MEDIA_EXTS = [".mp4", ".mov", ".webm", ".mkv", ".avi"];
+    YOUTUBE_HOSTS = /* @__PURE__ */ new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be", "music.youtube.com"]);
+    WebVideoError = class extends Error {
+      constructor(code, message) {
+        super(message);
+        this.code = code;
+        this.name = "WebVideoError";
+      }
+      code;
+    };
+    NOT_HTTP_URL_MESSAGE = "URL must be http(s). Local paths use import_files_tool; direct MP4s may use import_video_url_and_add_to_timeline_tool.";
+    UPLOAD_HINT = " Download the MP4 yourself and import it (Imports / import_files_tool).";
+  }
+});
+
 // ../engine/src/index.ts
 var init_src = __esm({
   "../engine/src/index.ts"() {
@@ -35015,6 +35148,7 @@ var init_src = __esm({
     init_plan();
     init_motion();
     init_stock();
+    init_web_video();
   }
 });
 
@@ -36593,9 +36727,9 @@ function jpegOrientation(bytes) {
   }
   return 1;
 }
-async function imageOrientation(path39) {
-  if (!/\.(jpe?g|jpe)$/i.test(path39)) return 1;
-  const handle = await open3(path39, "r");
+async function imageOrientation(path40) {
+  if (!/\.(jpe?g|jpe)$/i.test(path40)) return 1;
+  const handle = await open3(path40, "r");
   try {
     const buffer = new Uint8Array(128 * 1024);
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
@@ -37253,9 +37387,9 @@ var init_probe = __esm({
     init_ffprobe();
     init_pixfmt_gen();
     ProbeError = class extends Error {
-      constructor(message, path39) {
+      constructor(message, path40) {
         super(message);
-        this.path = path39;
+        this.path = path40;
         this.name = "ProbeError";
       }
       path;
@@ -37309,12 +37443,12 @@ var init_probe = __esm({
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { open as open4, stat as stat4 } from "node:fs/promises";
-async function fingerprint(path39) {
-  if (!path39 || path39.includes("%")) return void 0;
+async function fingerprint(path40) {
+  if (!path40 || path40.includes("%")) return void 0;
   let size;
   let mtime;
   try {
-    const st = await stat4(path39);
+    const st = await stat4(path40);
     if (!st.isFile()) return void 0;
     size = st.size;
     mtime = st.mtimeMs / 1e3;
@@ -37323,7 +37457,7 @@ async function fingerprint(path39) {
   }
   const digest = createHash("sha256");
   digest.update(String(size), "ascii");
-  const handle = await open4(path39, "r");
+  const handle = await open4(path40, "r");
   try {
     const head = Buffer.alloc(Math.min(SAMPLE_BYTES, size));
     const { bytesRead } = await handle.read(head, 0, head.length, 0);
@@ -37339,11 +37473,11 @@ async function fingerprint(path39) {
   }
   return { size, mtime, sha256: digest.digest("hex") };
 }
-async function sha256File(path39, options = {}) {
-  const total = (await stat4(path39)).size;
+async function sha256File(path40, options = {}) {
+  const total = (await stat4(path40)).size;
   const digest = createHash("sha256");
   let bytes = 0;
-  const stream = createReadStream(path39, { highWaterMark: 1024 * 1024, signal: options.signal });
+  const stream = createReadStream(path40, { highWaterMark: 1024 * 1024, signal: options.signal });
   for await (const chunk2 of stream) {
     digest.update(chunk2);
     bytes += chunk2.length;
@@ -38813,8 +38947,8 @@ function hexColorRgb(c) {
 function readerPath(params, key2) {
   const v = params[key2];
   if (!isRecord20(v)) return void 0;
-  const path39 = v.path;
-  return typeof path39 === "string" && path39.length > 0 ? path39 : void 0;
+  const path40 = v.path;
+  return typeof path40 === "string" && path40.length > 0 ? path40 : void 0;
 }
 var init_params = __esm({
   "../engine/src/render/kernels/params.ts"() {
@@ -40854,29 +40988,29 @@ function pointsEqual(x1, y1, x2, y2) {
   const ey = y1 === 0 || y2 === 0 ? fuzzyIsNull(y1 - y2) : fuzzyCompare2(y1, y2);
   return ex && ey;
 }
-function moveTo(path39, x, y) {
-  const n = path39.types.length;
-  if (n > 0 && path39.types[n - 1] === MOVE_TO) {
-    path39.pts[(n - 1) * 2] = x;
-    path39.pts[(n - 1) * 2 + 1] = y;
+function moveTo(path40, x, y) {
+  const n = path40.types.length;
+  if (n > 0 && path40.types[n - 1] === MOVE_TO) {
+    path40.pts[(n - 1) * 2] = x;
+    path40.pts[(n - 1) * 2 + 1] = y;
     return;
   }
-  path39.types.push(MOVE_TO);
-  path39.pts.push(x, y);
+  path40.types.push(MOVE_TO);
+  path40.pts.push(x, y);
 }
-function lineTo(path39, x, y) {
-  const n = path39.types.length;
-  if (n > 0 && pointsEqual(x, y, path39.pts[(n - 1) * 2], path39.pts[(n - 1) * 2 + 1])) return;
-  path39.types.push(LINE_TO);
-  path39.pts.push(x, y);
+function lineTo(path40, x, y) {
+  const n = path40.types.length;
+  if (n > 0 && pointsEqual(x, y, path40.pts[(n - 1) * 2], path40.pts[(n - 1) * 2 + 1])) return;
+  path40.types.push(LINE_TO);
+  path40.pts.push(x, y);
 }
-function cubicTo(path39, c1x, c1y, c2x, c2y, ex, ey) {
-  const n = path39.types.length;
-  const lx = path39.pts[(n - 1) * 2];
-  const ly = path39.pts[(n - 1) * 2 + 1];
+function cubicTo(path40, c1x, c1y, c2x, c2y, ex, ey) {
+  const n = path40.types.length;
+  const lx = path40.pts[(n - 1) * 2];
+  const ly = path40.pts[(n - 1) * 2 + 1];
   if (pointsEqual(lx, ly, c1x, c1y) && pointsEqual(c1x, c1y, c2x, c2y) && pointsEqual(c2x, c2y, ex, ey)) return;
-  path39.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
-  path39.pts.push(c1x, c1y, c2x, c2y, ex, ey);
+  path40.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
+  path40.pts.push(c1x, c1y, c2x, c2y, ex, ey);
 }
 function line(x1, y1, x2, y2) {
   return { x1, y1, x2, y2 };
@@ -41365,17 +41499,17 @@ function curvesForArc(x, y, w, h, startAngle, sweepIn) {
   curves[curves.length - 1] = epy;
   return { sx: spx, sy: spy, curves };
 }
-function strokePath(path39, style, forceOpen) {
+function strokePath(path40, style, forceOpen) {
   const stroker = new Stroker(style.width, style.cap, style.join, forceOpen);
   let els = [];
   const flush = () => {
     if (els.length > 1) stroker.processSubpath(els);
     els = [];
   };
-  for (let i = 0; i < path39.types.length; i += 1) {
-    const type = path39.types[i];
-    const x = path39.pts[i * 2];
-    const y = path39.pts[i * 2 + 1];
+  for (let i = 0; i < path40.types.length; i += 1) {
+    const type = path40.types[i];
+    const x = path40.pts[i * 2];
+    const y = path40.pts[i * 2 + 1];
     if (type === MOVE_TO) {
       flush();
       els.push({ type: MOVE_TO, x, y });
@@ -41384,7 +41518,7 @@ function strokePath(path39, style, forceOpen) {
   flush();
   return stroker.out;
 }
-function flattenPath(path39, device) {
+function flattenPath(path40, device) {
   const contours = [];
   let current = null;
   const close = () => {
@@ -41396,11 +41530,11 @@ function flattenPath(path39, device) {
     current = null;
   };
   const inside = (x, y) => x >= 0 && x <= device.width && y >= 0 && y <= device.height;
-  const count2 = path39.types.length;
+  const count2 = path40.types.length;
   for (let i = 0; i < count2; i += 1) {
-    const type = path39.types[i];
-    const x = path39.pts[i * 2];
-    const y = path39.pts[i * 2 + 1];
+    const type = path40.types[i];
+    const x = path40.pts[i * 2];
+    const y = path40.pts[i * 2 + 1];
     if (type === MOVE_TO) {
       if (i === count2 - 1) continue;
       close();
@@ -41411,7 +41545,7 @@ function flattenPath(path39, device) {
     } else if (type === CURVE_TO) {
       current ??= [0, 0];
       const n = current.length;
-      const b = [current[n - 2], current[n - 1], x, y, path39.pts[(i + 1) * 2], path39.pts[(i + 1) * 2 + 1], path39.pts[(i + 2) * 2], path39.pts[(i + 2) * 2 + 1]];
+      const b = [current[n - 2], current[n - 1], x, y, path40.pts[(i + 1) * 2], path40.pts[(i + 1) * 2 + 1], path40.pts[(i + 2) * 2], path40.pts[(i + 2) * 2 + 1]];
       i += 2;
       let outside = false;
       if (!inside(b[6], b[7])) {
@@ -42130,9 +42264,9 @@ var init_audio_visualization_cosmetic = __esm({
         if (implicitClose) this.stroke(px2, py, movedX, movedY, 0);
       }
       /** `drawPath` for a path with element types (QPainterPath: lines and cubics). */
-      drawPath(path39) {
-        const types = path39.types;
-        const pts = path39.pts;
+      drawPath(path40) {
+        const types = path40.types;
+        const pts = path40.pts;
         const end = types.length;
         let t = 0;
         while (t < end) {
@@ -42729,8 +42863,8 @@ var init_audio_visualization_paint = __esm({
        * then qgrayraster (antialiased; its spans are the runs of equal coverage,
        * flushed every 256) or QRasterizer's scan converter (aliased).
        */
-      fillPath(path39, brush, evenOdd) {
-        const contours = flattenPath(path39, this);
+      fillPath(path40, brush, evenOdd) {
+        const contours = flattenPath(path40, this);
         if (contours.length === 0) return;
         const p = prepare2(brush);
         if (this.antialias) {
@@ -42759,21 +42893,21 @@ var init_audio_visualization_paint = __esm({
           this.cosmetic(pen2, (c) => c.drawPolygon(points2, false));
           return;
         }
-        const path39 = { types: [], pts: [] };
+        const path40 = { types: [], pts: [] };
         for (let i = 0; i < points2.length; i += 2) {
-          path39.types.push(i === 0 ? MOVE_TO : LINE_TO);
-          path39.pts.push(points2[i], points2[i + 1]);
+          path40.types.push(i === 0 ? MOVE_TO : LINE_TO);
+          path40.pts.push(points2[i], points2[i + 1]);
         }
-        this.fillPath(strokePath(path39, pen2, true), pen2.brush, false);
+        this.fillPath(strokePath(path40, pen2, true), pen2.brush, false);
       }
       /** `QPainter::drawPath` with no brush. */
-      drawPath(path39, pen2) {
-        if (path39.types.length === 0) return;
+      drawPath(path40, pen2) {
+        if (path40.types.length === 0) return;
         if (pen2.width <= 1) {
-          this.cosmetic(pen2, (c) => c.drawPath(path39));
+          this.cosmetic(pen2, (c) => c.drawPath(path40));
           return;
         }
-        this.fillPath(strokePath(path39, pen2, false), pen2.brush, false);
+        this.fillPath(strokePath(path40, pen2, false), pen2.brush, false);
       }
       /** `QPainter::drawLine(QPointF, QPointF)`. */
       drawLine(x1, y1, x2, y2, pen2) {
@@ -42781,8 +42915,8 @@ var init_audio_visualization_paint = __esm({
           this.cosmetic(pen2, (c) => c.drawLine(x1, y1, x2, y2));
           return;
         }
-        const path39 = { types: [MOVE_TO, LINE_TO], pts: [x1, y1, x2, y2] };
-        this.fillPath(strokePath(path39, pen2, false), pen2.brush, false);
+        const path40 = { types: [MOVE_TO, LINE_TO], pts: [x1, y1, x2, y2] };
+        this.fillPath(strokePath(path40, pen2, false), pen2.brush, false);
       }
       /** `QPainter::drawEllipse(center, rx, ry)` with no pen. */
       fillEllipse(cx, cy, rx, ry, brush) {
@@ -42800,12 +42934,12 @@ var init_audio_visualization_paint = __esm({
         }
         const arc = curvesForArc(x, y, w, h, 0, -360);
         if (arc.curves.length === 0) return;
-        const path39 = { types: [MOVE_TO], pts: [arc.sx, arc.sy] };
+        const path40 = { types: [MOVE_TO], pts: [arc.sx, arc.sy] };
         for (let i = 0; i < arc.curves.length; i += 6) {
-          path39.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
-          path39.pts.push(...arc.curves.slice(i, i + 6));
+          path40.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
+          path40.pts.push(...arc.curves.slice(i, i + 6));
         }
-        this.fillPath(path39, brush, true);
+        this.fillPath(path40, brush, true);
       }
       /** `drawImage(0, 0, image)` with SourceOver (the `qBlendFunctions` fast path). */
       drawImageSourceOver(image) {
@@ -45112,9 +45246,9 @@ function applyCubeLut(image, lut, intensity, intensityR, intensityG, intensityB)
     d[i + 2] = constrainByte(f328(f328(alpha * fmaf2(lb, tB, f328(bn * keepB))) * 255));
   }
 }
-function lutForPath(ctx, path39) {
-  if (path39 === "") return null;
-  const text5 = ctx.texts?.get(path39);
+function lutForPath(ctx, path40) {
+  if (path40 === "") return null;
+  const text5 = ctx.texts?.get(path40);
   return text5 === void 0 ? null : cachedCubeLut(text5);
 }
 var f328, INV_2552, colorMap;
@@ -45299,9 +45433,9 @@ function curveLut(curve2) {
   }
   return lut;
 }
-function lutStage(image, ctx, path39, intensity) {
-  if (path39 === "" || !(intensity > 0)) return;
-  const lut = lutForPath(ctx, path39);
+function lutStage(image, ctx, path40, intensity) {
+  if (path40 === "" || !(intensity > 0)) return;
+  const lut = lutForPath(ctx, path40);
   if (lut) applyCubeLut(image, lut, intensity, 1, 1, 1);
 }
 var f329, INV_2553, EPSILON2, LUMA_R, LUMA_G, LUMA_B, TINT_G, TINT_RB, RECOVERY, INV_ALPHA3, EXP2_TABLE, EXP2_C0, EXP2_C1, EXP2_SHIFT, exp2Bits, NAMED_COLORS, namedColors, WHITE, NO_BIAS, identityTable, colorGrade;
@@ -45942,13 +46076,13 @@ function grayTable(brightness2, contrast) {
   return table;
 }
 function displaceKernel(image, params, ctx) {
-  const path39 = displaceMapPath(params);
-  if (!path39) return;
-  const source2 = ctx.images.get(path39);
+  const path40 = displaceMapPath(params);
+  if (!path40) return;
+  const source2 = ctx.images.get(path40);
   const width = image.width;
   const height = image.height;
   if (!source2 || source2.width <= 0 || source2.height <= 0 || width <= 0 || height <= 0) return;
-  const map2 = scaledPremul(source2, width, height, ctx.imageSizes?.[path39]).data;
+  const map2 = scaledPremul(source2, width, height, ctx.imageSizes?.[path40]).data;
   const strength = f3211(num8(params, "strength", 1));
   const xAmount = f3211(f3211(f3211(num8(params, "horizontal", 0.05)) * width) * strength);
   const yAmount = f3211(f3211(f3211(num8(params, "vertical", 0)) * height) * strength);
@@ -47233,9 +47367,9 @@ var init_mask = __esm({
       supported: true,
       handlesMask: true,
       run(image, params, ctx) {
-        const path39 = readerPath(params, "mask_reader") ?? readerPath(params, "reader");
-        if (!path39) return;
-        const source2 = ctx.images.get(path39);
+        const path40 = readerPath(params, "mask_reader") ?? readerPath(params, "reader");
+        if (!path40) return;
+        const source2 = ctx.images.get(path40);
         if (!source2) return;
         applyMaskFromSource(image, source2, {
           brightness: num8(params, "brightness", 0),
@@ -49788,9 +49922,9 @@ function scaleSize(w, h, scale, tw, th) {
       return { width: w, height: h };
   }
 }
-function lowerExt(path39) {
-  const dot = path39.lastIndexOf(".");
-  return dot < 0 ? "" : path39.slice(dot + 1).toLowerCase();
+function lowerExt(path40) {
+  const dot = path40.lastIndexOf(".");
+  return dot < 0 ? "" : path40.slice(dot + 1).toLowerCase();
 }
 function sourceKind(reader) {
   if (!reader || typeof reader.path !== "string") return "unsupported";
@@ -50790,7 +50924,7 @@ function flatten(out, b0, threshold) {
     }
   }
 }
-function outlineContours(path39, transform2) {
+function outlineContours(path40, transform2) {
   const scale = transformScale(transform2);
   const threshold = scale === 0 ? 0.25 : 0.25 / scale;
   const contours = [];
@@ -50800,7 +50934,7 @@ function outlineContours(path39, transform2) {
     const n = current.length;
     if (current[n - 2] !== current[0] || current[n - 1] !== current[1]) current.push(current[0], current[1]);
   };
-  const els = path39.elements;
+  const els = path40.elements;
   for (let i = 0; i < els.length; i += 1) {
     const e = els[i];
     if (e.type === MoveTo) {
@@ -51343,9 +51477,9 @@ function drawImage(dst, src, state) {
       const width = noShear ? h / w : Math.abs(t.m22 * h / (t.m11 * w));
       rasterizeLine(ax, ay, bx, by, width, state.antialias, rasterizerBox(device, clip2), sink);
     } else if (state.antialias) {
-      const path39 = new PainterPath();
-      path39.addRect(0, 0, w, h);
-      const mask2 = grayRasterize(outlineContours(path39, t), true, dst.width, dst.height);
+      const path40 = new PainterPath();
+      path40.addRect(0, 0, w, h);
+      const mask2 = grayRasterize(outlineContours(path40, t), true, dst.width, dst.height);
       spans2 = mask2 ? maskSpans2(mask2) : [];
     } else {
       const poly = [];
@@ -51371,9 +51505,9 @@ function drawImage(dst, src, state) {
   deliverSpans(spans2, clip2, (chunk2) => handleSpans(chunk2, intOpacity, fetch2, process4));
 }
 function roundedRectClip(w, h, radius, transform2, width, height) {
-  const path39 = new PainterPath();
-  path39.addRoundedRect(0, 0, w, h, radius, radius);
-  return ClipData.fromMask(grayRasterize(outlineContours(path39, transform2), true, width, height));
+  const path40 = new PainterPath();
+  path40.addRoundedRect(0, 0, w, h, radius, radius);
+  return ClipData.fromMask(grayRasterize(outlineContours(path40, transform2), true, width, height));
 }
 var FIXED, HALF;
 var init_draw_image = __esm({
@@ -51864,7 +51998,7 @@ function parseOpenType(bytes, faceOffset = 0) {
     descender = view.getInt16(os2 + 70);
     lineGap = view.getInt16(os2 + 72);
   }
-  const lookup = cmapLookup(view, t);
+  const lookup2 = cmapLookup(view, t);
   const kern = kernTable(view, t);
   const hmtx = t.hmtx.offset;
   const lastAdvance = numberOfHMetrics > 0 ? view.getUint16(hmtx + (numberOfHMetrics - 1) * 4) : 0;
@@ -51882,7 +52016,7 @@ function parseOpenType(bytes, faceOffset = 0) {
     ascender,
     descender,
     lineGap,
-    glyphIndex: lookup,
+    glyphIndex: lookup2,
     advanceWidth: (g) => g < numberOfHMetrics ? view.getUint16(hmtx + g * 4) : lastAdvance,
     kerning: (l, r) => kern.get(l * 65536 + r) ?? 0,
     glyphBox: (g) => {
@@ -52920,23 +53054,444 @@ var init_storage = __esm({
   }
 });
 
-// ../render-node/src/host/media.ts
+// ../render-node/src/net/public-address.ts
+import { BlockList, isIP } from "node:net";
+function hextets(ip) {
+  let text5 = ip.toLowerCase();
+  const quad = /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(text5);
+  if (quad) {
+    const bytes = quad.slice(1).map(Number);
+    if (bytes.some((b2) => b2 > 255)) return null;
+    const [a = 0, b = 0, c = 0, d = 0] = bytes;
+    text5 = `${text5.slice(0, quad.index)}${(a << 8 | b).toString(16)}:${(c << 8 | d).toString(16)}`;
+  }
+  const halves = text5.split("::");
+  if (halves.length > 2) return null;
+  const parse4 = (part) => part ? part.split(":").map((h) => Number.parseInt(h, 16)) : [];
+  const head = parse4(halves[0]);
+  const tail = parse4(halves[1]);
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+  const all = [...head, ...Array(halves.length === 1 ? 0 : missing).fill(0), ...tail];
+  return all.length === 8 && all.every((h) => Number.isInteger(h) && h >= 0 && h <= 65535) ? all : null;
+}
+function mappedV4(ip) {
+  const parts = hextets(ip);
+  if (!parts) return null;
+  if (parts.slice(0, 5).some((h) => h !== 0) || parts[5] !== 65535) return null;
+  const hi = parts[6] ?? 0;
+  const lo = parts[7] ?? 0;
+  return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+}
+function isPublicAddress(ip) {
+  if (ip.includes("%")) return false;
+  const family = isIP(ip);
+  if (family === 4) return !v4Blocked.check(ip, "ipv4");
+  if (family === 6) {
+    const v4 = mappedV4(ip);
+    if (v4 !== null) return isPublicAddress(v4);
+    return v6Global.check(ip, "ipv6") && !v6Blocked.check(ip, "ipv6");
+  }
+  return false;
+}
+var V4_BLOCKED, V6_BLOCKED, v4Blocked, v6Blocked, v6Global;
+var init_public_address = __esm({
+  "../render-node/src/net/public-address.ts"() {
+    "use strict";
+    V4_BLOCKED = [
+      ["0.0.0.0", 8],
+      ["10.0.0.0", 8],
+      ["100.64.0.0", 10],
+      ["127.0.0.0", 8],
+      ["169.254.0.0", 16],
+      ["172.16.0.0", 12],
+      ["192.0.0.0", 24],
+      ["192.0.2.0", 24],
+      ["192.88.99.0", 24],
+      ["192.168.0.0", 16],
+      ["198.18.0.0", 15],
+      ["198.51.100.0", 24],
+      ["203.0.113.0", 24],
+      ["224.0.0.0", 4],
+      ["240.0.0.0", 4],
+      ["168.63.129.16", 32]
+    ];
+    V6_BLOCKED = [
+      ["64:ff9b::", 96],
+      ["64:ff9b:1::", 48],
+      ["100::", 64],
+      ["2001::", 23],
+      ["2001:db8::", 32],
+      ["2002::", 16],
+      ["3fff::", 20]
+    ];
+    v4Blocked = new BlockList();
+    for (const [net, prefix] of V4_BLOCKED) v4Blocked.addSubnet(net, prefix, "ipv4");
+    v6Blocked = new BlockList();
+    for (const [net, prefix] of V6_BLOCKED) v6Blocked.addSubnet(net, prefix, "ipv6");
+    v6Global = new BlockList();
+    v6Global.addSubnet("2000::", 3, "ipv6");
+  }
+});
+
+// ../render-node/src/host/web-video.ts
+import { createHash as createHash2 } from "node:crypto";
+import { lookup } from "node:dns/promises";
 import { createWriteStream } from "node:fs";
-import { copyFile, mkdir as mkdir4, readdir as readdir3, rm as rm4, stat as stat7, writeFile as writeFile6 } from "node:fs/promises";
-import { tmpdir as tmpdir2 } from "node:os";
+import { mkdir as mkdir4, readdir as readdir3, readFile as readFile6, rm as rm4, stat as stat7, writeFile as writeFile6 } from "node:fs/promises";
+import { isIP as isIP2 } from "node:net";
 import path16 from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+function webVideoCacheRoot(env2 = process.env) {
+  return path16.join(cacheDir(env2), "web-video-cache");
+}
+function urlCacheKey(url2) {
+  return createHash2("sha256").update(url2.trim(), "utf8").digest("hex").slice(0, 24);
+}
+function findYtDlp(env2 = process.env) {
+  const override = env2.ZENVI_YT_DLP?.trim();
+  if (override) return override;
+  const found = whichSync("yt-dlp", env2);
+  if (found) return found;
+  const exe = process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
+  return fallbackBinaryDirs(env2).map((dir) => path16.join(dir, exe)).find(isExecutable);
+}
+function findFfmpeg(env2) {
+  const ffmpeg = resolveBinary("ffmpeg", env2);
+  return path16.isAbsolute(ffmpeg) ? isExecutable(ffmpeg) ? ffmpeg : null : whichSync(ffmpeg, env2) ?? null;
+}
+async function systemResolve(host) {
+  return (await lookup(host, { all: true, verbatim: true })).map((a) => a.address);
+}
+async function assertPublicHttpUrl(url2, options = {}) {
+  if (!isProbableWebVideoUrl(url2)) throw new WebVideoError("refused", NOT_HTTP_URL_MESSAGE);
+  const host = new URL(url2.trim()).hostname.replace(/^\[|\]$/g, "");
+  if (!host) throw new WebVideoError("refused", "URL host is missing.");
+  let addresses;
+  try {
+    addresses = isIP2(host) ? [host] : await (options.resolve ?? systemResolve)(host);
+  } catch {
+    throw new WebVideoError("failed", `Could not resolve host '${host}'.`);
+  }
+  if (addresses.length === 0) throw new WebVideoError("failed", `Could not resolve host '${host}'.`);
+  const allowed = options.isAllowedAddress ?? isPublicAddress;
+  if (!addresses.every(allowed)) {
+    throw new WebVideoError("refused", "That URL points at a private or local network address, which cannot be fetched.");
+  }
+}
+async function purgeExpiredCache(root, options = {}) {
+  const ttl = Math.max(3600, Math.trunc(options.ttlSeconds ?? WEB_VIDEO_CACHE_TTL_SECONDS));
+  const cutoff = (options.now ?? Date.now()) - ttl * 1e3;
+  let entries;
+  try {
+    entries = await readdir3(root, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dir = path16.join(root, entry.name);
+    const mtime = await stat7(dir).then((s) => s.mtimeMs, () => void 0);
+    if (mtime === void 0 || mtime >= cutoff) continue;
+    await rm4(dir, { recursive: true, force: true });
+    removed += 1;
+  }
+  return removed;
+}
+async function checkRateLimitCooldown(dir, now = Date.now()) {
+  const file3 = path16.join(dir, COOLDOWN);
+  let until;
+  try {
+    until = Number(JSON.parse(await readFile6(file3, "utf8")).until) * 1e3;
+  } catch {
+    return null;
+  }
+  if (!Number.isFinite(until) || now >= until) {
+    await rm4(file3, { force: true });
+    return null;
+  }
+  return cooldownMessage((until - now) / 1e3);
+}
+async function writeRateLimitCooldown(dir, now = Date.now()) {
+  try {
+    await mkdir4(dir, { recursive: true });
+    await writeFile6(path16.join(dir, COOLDOWN), JSON.stringify({ until: now / 1e3 + WEB_VIDEO_COOLDOWN_SECONDS, reason: "rate_limit" }));
+  } catch {
+  }
+}
+async function isFile(file3) {
+  return stat7(file3).then((s) => s.isFile(), () => false);
+}
+async function largestMediaFile(dir) {
+  let best;
+  let bestSize = -1;
+  for (const name of await readdir3(dir).catch(() => [])) {
+    if (!MEDIA_EXTS.has(path16.extname(name).toLowerCase())) continue;
+    const file3 = path16.join(dir, name);
+    const size = await stat7(file3).then((s) => s.isFile() ? s.size : -1, () => -1);
+    if (size > bestSize) {
+      bestSize = size;
+      best = file3;
+    }
+  }
+  return best;
+}
+async function subtitleFiles(dir) {
+  const names2 = await readdir3(dir).catch(() => []);
+  return names2.filter((n) => /\.(vtt|srt)$/i.test(n)).map((n) => path16.join(dir, n)).sort();
+}
+async function loadCachedDownload(dir) {
+  let meta3;
+  try {
+    meta3 = JSON.parse(await readFile6(path16.join(dir, SIDECAR), "utf8"));
+  } catch {
+    return null;
+  }
+  if (!meta3 || typeof meta3 !== "object" || Array.isArray(meta3)) return null;
+  const out = { ...meta3 };
+  let video = String(out.video_path ?? "").trim();
+  if (!video || !await isFile(video)) video = await largestMediaFile(dir) ?? "";
+  if (!video) return null;
+  out.video_path = path16.resolve(video);
+  return out;
+}
+function numberOrNull(value) {
+  const n = typeof value === "number" ? value : value === null || value === void 0 || value === "" ? NaN : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+function downloadOf(meta3, extra) {
+  return {
+    path: String(meta3.video_path),
+    title: String(meta3.title ?? ""),
+    extractor: String(meta3.extractor ?? ""),
+    durationSeconds: numberOrNull(meta3.duration_seconds),
+    width: numberOrNull(meta3.width),
+    height: numberOrNull(meta3.height),
+    webpageUrl: String(meta3.webpage_url ?? meta3.url ?? ""),
+    id: String(meta3.id ?? ""),
+    isYoutube: Boolean(meta3.is_youtube),
+    subtitlePaths: Array.isArray(meta3.subtitle_paths) ? meta3.subtitle_paths.map(String) : [],
+    direct: false,
+    ...extra
+  };
+}
+function ytDlpArgs(url2, dir, intent, withSubs, ffmpeg) {
+  const args = [
+    "--format",
+    formatSelectorForIntent(intent, ffmpeg !== null),
+    "--output",
+    // Named after the page (the desktop's media.%(ext)s): the project keeps a copy under this name.
+    path16.join(dir, "%(title).80B [%(id)s].%(ext)s"),
+    "--no-playlist",
+    "--retries",
+    "3",
+    "--fragment-retries",
+    "3",
+    "--force-overwrites",
+    "--no-warnings",
+    "--no-progress",
+    "--print",
+    PRINT_FIELDS
+  ];
+  if (ffmpeg !== null) args.push("--merge-output-format", "mp4", "--ffmpeg-location", ffmpeg);
+  if (withSubs) args.push("--write-subs", "--write-auto-subs", "--sub-langs", "en,en-US,en-GB", "--sub-format", "vtt/srt/best");
+  if (isYoutubeUrl(url2)) args.push("--extractor-args", "youtube:player_client=android,web");
+  args.push("--", url2);
+  return args;
+}
+function ytDlpError(stderr) {
+  const lines2 = stderr.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const errors = lines2.filter((l) => l.startsWith("ERROR:")).map((l) => l.replace(/^ERROR:\s*/, ""));
+  return (errors.length > 0 ? errors : lines2.slice(-3)).join(" ");
+}
+function printedInfo(stdout) {
+  for (const line2 of stdout.split(/\r?\n/).reverse()) {
+    const t = line2.trim();
+    if (!t.startsWith("{")) continue;
+    try {
+      const value = JSON.parse(t);
+      if (value && typeof value === "object" && !Array.isArray(value)) return value;
+    } catch {
+    }
+  }
+  return {};
+}
+async function downloadPage(url2, dir, request, cachePurged, options) {
+  const env2 = options.env ?? process.env;
+  const now = options.now ?? Date.now;
+  const cool = await checkRateLimitCooldown(dir, now());
+  if (cool) throw new WebVideoError("failed", cool);
+  const withSubs = wantsSubtitles(request.intent, request.writeSubs);
+  const cached4 = await loadCachedDownload(dir);
+  if (cached4 && cacheSatisfiesRequest(cached4, request.intent, withSubs)) return downloadOf(cached4, { fromCache: true, cachePurged });
+  const ytDlp = options.ytDlp ?? findYtDlp(env2);
+  if (!ytDlp) throw new WebVideoError("unavailable", YT_DLP_MISSING);
+  const ffmpeg = options.ffmpeg === void 0 ? findFfmpeg(env2) : options.ffmpeg;
+  let stdout;
+  try {
+    const result2 = await runBinary(ytDlp, ytDlpArgs(url2, dir, request.intent, withSubs, ffmpeg), {
+      env: env2,
+      signal: request.signal,
+      maxStdout: 1024 * 1024,
+      what: "yt-dlp"
+    });
+    stdout = result2.stdout.toString("utf8");
+  } catch (error62) {
+    if (error62 instanceof BinaryNotFoundError) throw new WebVideoError("unavailable", YT_DLP_MISSING);
+    const detail2 = error62 instanceof FfmpegError ? ytDlpError(error62.stderr) || error62.message : error62 instanceof Error ? error62.message : String(error62);
+    if (isRateLimitError(detail2)) await writeRateLimitCooldown(dir, now());
+    throw new WebVideoError("failed", humanizeIngestFailure(new Error(detail2)));
+  }
+  const info = printedInfo(stdout);
+  let video = typeof info.filepath === "string" ? info.filepath : "";
+  if (!video || !await isFile(video)) video = await largestMediaFile(dir) ?? "";
+  if (!video) throw new WebVideoError("failed", "Download finished but no video file landed on disk. Try again or update yt-dlp.");
+  const title = Array.from(String(info.title || info.id || "web_video").trim().replace(/\s+/g, " ")).slice(0, 180).join("");
+  const meta3 = {
+    ok: true,
+    url: url2,
+    intent: request.intent,
+    title,
+    extractor: String(info.extractor || info.extractor_key || ""),
+    duration_seconds: numberOrNull(info.duration),
+    width: numberOrNull(info.width),
+    height: numberOrNull(info.height),
+    requested_height: requestedHeightForIntent(request.intent),
+    write_subs_requested: withSubs,
+    video_path: path16.resolve(video),
+    subtitle_paths: await subtitleFiles(dir),
+    webpage_url: String(info.webpage_url || url2).trim(),
+    id: String(info.id ?? ""),
+    is_youtube: isYoutubeUrl(url2)
+  };
+  await writeFile6(path16.join(dir, SIDECAR), JSON.stringify(meta3, null, 2)).catch(() => void 0);
+  return downloadOf(meta3, { fromCache: false, cachePurged });
+}
+async function fetchChecked(url2, options, signal) {
+  const doFetch = options.fetchImpl ?? fetch;
+  let current = url2;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    await assertPublicHttpUrl(current, options);
+    const response = await doFetch(current, { redirect: "manual", headers: { "User-Agent": "ZenviApp/1.0" }, signal });
+    if (!REDIRECTS.has(response.status)) return response;
+    const location = response.headers.get("location");
+    await response.body?.cancel().catch(() => void 0);
+    if (!location) throw new WebVideoError("failed", `Pull failed (HTTP Error ${response.status} without a Location).`);
+    current = new URL(location, current).toString();
+  }
+  throw new WebVideoError("failed", "Pull failed (too many redirects).");
+}
+function directName(url2) {
+  const raw = new URL(url2).pathname.split("/").filter(Boolean).pop() ?? "";
+  let last = raw;
+  try {
+    last = decodeURIComponent(raw);
+  } catch {
+  }
+  const cleaned = last.replace(/[\u0000-\u001f<>:"/\\|?*]/g, "_").replace(/^\.+/, "").trim().slice(0, 200);
+  return cleaned || "video.mp4";
+}
+async function downloadDirect(url2, dir, cachePurged, options, signal) {
+  const maxBytes = options.maxDownloadBytes ?? 4 * 1024 ** 3;
+  let response;
+  try {
+    response = await fetchChecked(url2, options, signal);
+  } catch (error62) {
+    throw error62 instanceof WebVideoError ? error62 : new WebVideoError("failed", humanizeIngestFailure(error62));
+  }
+  if (!response.ok || !response.body) {
+    await response.body?.cancel().catch(() => void 0);
+    const status = `HTTP Error ${response.status}${response.statusText ? `: ${response.statusText}` : ""}`;
+    throw new WebVideoError("failed", humanizeIngestFailure(new Error(status)));
+  }
+  if (/^(text\/html|application\/xhtml)/i.test(response.headers.get("content-type") ?? "")) {
+    await response.body.cancel().catch(() => void 0);
+    return null;
+  }
+  const declared = Number(response.headers.get("content-length") ?? "0");
+  if (declared > maxBytes) {
+    await response.body.cancel().catch(() => void 0);
+    throw new WebVideoError("failed", `The file is ${declared} bytes, over the ${maxBytes}-byte limit. Download it yourself and import it.`);
+  }
+  const dest = path16.join(dir, directName(url2));
+  let received = 0;
+  const body = Readable.fromWeb(response.body);
+  body.on("data", (chunk2) => {
+    received += chunk2.length;
+    if (received > maxBytes) body.destroy(new WebVideoError("failed", `The file is over the ${maxBytes}-byte limit. Download it yourself and import it.`));
+  });
+  try {
+    await pipeline(body, createWriteStream(dest), { signal });
+  } catch (error62) {
+    await rm4(dest, { force: true });
+    throw error62 instanceof WebVideoError ? error62 : new WebVideoError("failed", humanizeIngestFailure(error62));
+  }
+  return {
+    path: dest,
+    title: path16.basename(dest),
+    extractor: "",
+    durationSeconds: null,
+    width: null,
+    height: null,
+    webpageUrl: url2,
+    id: "",
+    isYoutube: false,
+    subtitlePaths: [],
+    direct: true,
+    fromCache: false,
+    cachePurged
+  };
+}
+function createWebVideoFetcher(options = {}) {
+  return async (request) => {
+    const url2 = request.url.trim();
+    await assertPublicHttpUrl(url2, options);
+    const root = options.cacheRoot ?? webVideoCacheRoot(options.env ?? process.env);
+    const cachePurged = await purgeExpiredCache(root, { now: (options.now ?? Date.now)() });
+    const dir = path16.join(root, urlCacheKey(url2));
+    await mkdir4(dir, { recursive: true });
+    const direct = isDirectMediaUrl(url2) ? await downloadDirect(url2, dir, cachePurged, options, request.signal) : null;
+    return direct ?? downloadPage(url2, dir, request, cachePurged, options);
+  };
+}
+var PRINT_FIELDS, MEDIA_EXTS, SIDECAR, COOLDOWN, REDIRECTS, MAX_REDIRECTS, YT_DLP_MISSING;
+var init_web_video2 = __esm({
+  "../render-node/src/host/web-video.ts"() {
+    "use strict";
+    init_src();
+    init_binaries();
+    init_process();
+    init_public_address();
+    init_fonts();
+    PRINT_FIELDS = "after_move:%(.{id,title,duration,extractor,extractor_key,webpage_url,width,height,ext,filepath})j";
+    MEDIA_EXTS = /* @__PURE__ */ new Set([".mp4", ".mkv", ".webm", ".mov", ".m4a", ".mp3"]);
+    SIDECAR = "ingest.json";
+    COOLDOWN = "cooldown.json";
+    REDIRECTS = /* @__PURE__ */ new Set([301, 302, 303, 307, 308]);
+    MAX_REDIRECTS = 5;
+    YT_DLP_MISSING = "fetching videos from web pages needs yt-dlp on this computer, and it was not found. Install it (macOS: brew install yt-dlp; Windows: winget install yt-dlp; anywhere with Python: pip install -U yt-dlp) or set ZENVI_YT_DLP to its path, then call again. Direct links to video files (.mp4, .mov, .webm, .mkv, .avi) work without it.";
+  }
+});
+
+// ../render-node/src/host/media.ts
+import { createWriteStream as createWriteStream2 } from "node:fs";
+import { copyFile, mkdir as mkdir5, readdir as readdir4, rm as rm5, stat as stat8, writeFile as writeFile7 } from "node:fs/promises";
+import { tmpdir as tmpdir2 } from "node:os";
+import path17 from "node:path";
+import { Readable as Readable2 } from "node:stream";
+import { pipeline as pipeline2 } from "node:stream/promises";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 function expandHome(p) {
   if (p === "~") return process.env.HOME ?? p;
-  if (p.startsWith("~/") || p.startsWith("~\\")) return path16.join(process.env.HOME ?? "", p.slice(2));
+  if (p.startsWith("~/") || p.startsWith("~\\")) return path17.join(process.env.HOME ?? "", p.slice(2));
   return p;
 }
 function localPath(entry) {
   let value = entry.trim().replace(/^["']|["']$/g, "");
   if (/^file:\/\//i.test(value)) value = fileURLToPath3(value);
-  return path16.resolve(expandHome(value));
+  return path17.resolve(expandHome(value));
 }
 function globToRegExp(glob) {
   let re = "";
@@ -52971,18 +53526,18 @@ async function walkFiles(dir, out) {
   if (out.length >= MAX_LISTED) return;
   let entries;
   try {
-    entries = await readdir3(dir, { withFileTypes: true });
+    entries = await readdir4(dir, { withFileTypes: true });
   } catch {
     return;
   }
   const names2 = entries.filter((e) => !e.name.startsWith(".")).sort((a, b) => a.name.localeCompare(b.name));
-  for (const e of names2) if (e.isFile()) out.push(path16.join(dir, e.name));
-  for (const e of names2) if (e.isDirectory()) await walkFiles(path16.join(dir, e.name), out);
+  for (const e of names2) if (e.isFile()) out.push(path17.join(dir, e.name));
+  for (const e of names2) if (e.isDirectory()) await walkFiles(path17.join(dir, e.name), out);
 }
 async function listPaths(entry) {
   const target = localPath(entry);
   try {
-    const st = await stat7(target);
+    const st = await stat8(target);
     if (st.isFile()) return { kind: "file", files: [target], path: target };
     if (st.isDirectory()) {
       const files = [];
@@ -52992,13 +53547,13 @@ async function listPaths(entry) {
   } catch {
   }
   if (/[*?[{]/.test(entry)) {
-    const normalized2 = target.split(path16.sep).join("/");
+    const normalized2 = target.split(path17.sep).join("/");
     const firstMagic = normalized2.search(/[*?[{]/);
     const base = normalized2.slice(0, normalized2.lastIndexOf("/", firstMagic) + 1) || "/";
     const pattern = globToRegExp(normalized2.slice(base.length));
     const all = [];
-    await walkFiles(base.split("/").join(path16.sep) || path16.sep, all);
-    const files = all.filter((f3) => pattern.test(f3.split(path16.sep).join("/").slice(base.length)));
+    await walkFiles(base.split("/").join(path17.sep) || path17.sep, all);
+    const files = all.filter((f3) => pattern.test(f3.split(path17.sep).join("/").slice(base.length)));
     return { kind: "glob", files, path: target };
   }
   return { kind: "missing", files: [], path: target };
@@ -53008,7 +53563,7 @@ async function missingOnDisk(files, resolve) {
   const namesIn2 = (folder) => {
     let hit = folders.get(folder);
     if (!hit) {
-      hit = readdir3(folder).catch(() => null);
+      hit = readdir4(folder).catch(() => null);
       folders.set(folder, hit);
     }
     return hit;
@@ -53024,10 +53579,10 @@ async function missingOnDisk(files, resolve) {
         return true;
       }
       if (local.includes("%")) {
-        const names2 = await namesIn2(path16.dirname(local));
+        const names2 = await namesIn2(path17.dirname(local));
         return names2 === null || !sequenceFramesPresent(local, names2);
       }
-      return stat7(local).then(
+      return stat8(local).then(
         () => false,
         () => true
       );
@@ -53035,19 +53590,19 @@ async function missingOnDisk(files, resolve) {
   );
 }
 function safeName(name) {
-  const base = path16.basename(name);
+  const base = path17.basename(name);
   let cleaned = "";
   for (const ch of base) cleaned += ch.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(ch) ? "_" : ch;
   cleaned = cleaned.replace(/^\.+/, "").trim();
   return cleaned.slice(0, 200) || "media";
 }
 async function uniquePath(dir, name) {
-  const ext = path16.extname(name);
+  const ext = path17.extname(name);
   const stem6 = ext ? name.slice(0, -ext.length) : name;
   for (let n = 1; n < 1e4; n += 1) {
-    const candidate = path16.join(dir, n === 1 ? name : `${stem6} (${n})${ext}`);
+    const candidate = path17.join(dir, n === 1 ? name : `${stem6} (${n})${ext}`);
     try {
-      await stat7(candidate);
+      await stat8(candidate);
     } catch {
       return candidate;
     }
@@ -53071,34 +53626,35 @@ function createNodeMediaHost(options) {
   const policy = options.policy ?? "auto";
   const maxBytes = options.maxDownloadBytes ?? 4 * 1024 ** 3;
   const doFetch = options.fetchImpl ?? fetch;
-  const scratch2 = options.scratchDir ?? path16.join(tmpdir2(), "zenvi-media");
+  const scratch2 = options.scratchDir ?? path17.join(tmpdir2(), "zenvi-media");
   const mediaDir = async (sub) => {
     const project = options.projectFile();
-    const dir = project ? path16.join(projectAssetsDir(project), sub) : path16.join(scratch2, sub);
-    await mkdir4(dir, { recursive: true });
+    const dir = project ? path17.join(projectAssetsDir(project), sub) : path17.join(scratch2, sub);
+    await mkdir5(dir, { recursive: true });
     return dir;
   };
   const imported = async (file3, name, known) => {
     const info = known ? { ...known, path: file3 } : await probe(file3);
     const fp = await fingerprint(file3);
-    const media = { path: file3, info, name: name ?? path16.basename(file3) };
+    const media = { path: file3, info, name: name ?? path17.basename(file3) };
     if (fp) media.fingerprint = fp;
     return media;
   };
   const importPath = async (entry) => {
     const source2 = localPath(entry);
-    const st = await stat7(source2).catch(() => void 0);
+    const st = await stat8(source2).catch(() => void 0);
     if (!st?.isFile()) throw new Error(`File not found: ${source2}`);
     const info = await probe(source2);
     const project = options.projectFile();
     const inAssets = project !== void 0 && isInside(source2, projectAssetsDir(project));
-    const temp = options.tempRoot ?? tmpdir2();
-    const projectInTemp = project !== void 0 && isInside(project, temp);
-    const copy = !inAssets && (policy === "copy" || policy === "auto" && isInside(source2, temp) && !projectInTemp);
+    const cleanedUp = [options.tempRoot ?? tmpdir2(), options.cacheRoot ?? cacheDir(options.env)].some(
+      (folder) => isInside(source2, folder) && !(project !== void 0 && isInside(project, folder))
+    );
+    const copy = !inAssets && (policy === "copy" || policy === "auto" && cleanedUp);
     if (!copy) return imported(source2, void 0, info);
-    const dest = await uniquePath(await mediaDir("media"), safeName(path16.basename(source2)));
+    const dest = await uniquePath(await mediaDir("media"), safeName(path17.basename(source2)));
     await copyFile(source2, dest);
-    return imported(dest, path16.basename(source2), info);
+    return imported(dest, path17.basename(source2), info);
   };
   return {
     probe: (p) => probe(localPath(p)),
@@ -53119,23 +53675,28 @@ function createNodeMediaHost(options) {
       if (declared > maxBytes) throw new Error(`Download is ${declared} bytes, over the ${maxBytes}-byte limit.`);
       const dest = await uniquePath(await mediaDir("media"), filenameFromResponse(parsed, response, opts.filename));
       let received = 0;
-      const limited = Readable.fromWeb(response.body);
+      const limited = Readable2.fromWeb(response.body);
       limited.on("data", (chunk2) => {
         received += chunk2.length;
         if (received > maxBytes) limited.destroy(new Error(`Download exceeded the ${maxBytes}-byte limit.`));
       });
       try {
-        await pipeline(limited, createWriteStream(dest), { signal: opts.signal });
-        return await imported(dest, path16.basename(dest));
+        await pipeline2(limited, createWriteStream2(dest), { signal: opts.signal });
+        return await imported(dest, path17.basename(dest));
       } catch (error62) {
-        await rm4(dest, { force: true });
+        await rm5(dest, { force: true });
         throw error62;
       }
     },
+    fetchWebVideo: options.fetchWebVideo ?? createWebVideoFetcher({
+      ...options.cacheRoot ? { cacheRoot: path17.join(options.cacheRoot, "web-video-cache") } : {},
+      env: options.env,
+      fetchImpl: options.fetchImpl
+    }),
     async writeGenerated(name, bytes, contentType2) {
       const sub = contentType2 === "image/svg+xml" || name.toLowerCase().endsWith(".svg") ? "title" : "media";
       const dest = await uniquePath(await mediaDir(sub), safeName(name));
-      await writeFile6(dest, bytes);
+      await writeFile7(dest, bytes);
       return dest;
     }
   };
@@ -53147,7 +53708,9 @@ var init_media2 = __esm({
     init_fingerprint();
     init_probe();
     init_src();
+    init_fonts();
     init_paths2();
+    init_web_video2();
     MAX_LISTED = 5e3;
   }
 });
@@ -53158,6 +53721,8 @@ function detail(body, fallback) {
     const b = body;
     const d = b.detail ?? b.message ?? b.error;
     if (typeof d === "string") return d;
+    const message = d && typeof d === "object" ? d.message : void 0;
+    if (typeof message === "string" && message) return message;
     if (d !== void 0) return JSON.stringify(d);
   }
   return typeof body === "string" && body ? body.slice(0, 300) : fallback;
@@ -53197,7 +53762,7 @@ function createBackendHost(options) {
       }
       if (!response.ok) {
         const hint = response.status === 401 || response.status === 403 ? " Sign in with `zenvi login`." : "";
-        throw new BackendError(`Zenvi backend ${response.status}: ${detail(parsed, response.statusText)}.${hint}`, response.status, parsed);
+        throw new BackendError(`Zenvi backend ${response.status}: ${detail(parsed, response.statusText).replace(/\.$/, "")}.${hint}`, response.status, parsed);
       }
       return parsed;
     }
@@ -53257,49 +53822,49 @@ var init_backend = __esm({
 });
 
 // ../render-node/src/host/node-host.ts
-import { mkdir as mkdir5, readFile as readFile6, stat as stat8 } from "node:fs/promises";
-import path17 from "node:path";
+import { mkdir as mkdir6, readFile as readFile7, stat as stat9 } from "node:fs/promises";
+import path18 from "node:path";
 function createAssetHost(dir) {
-  const root = path17.resolve(dir);
+  const root = path18.resolve(dir);
   return {
     async readText(assetPath) {
-      const file3 = path17.resolve(root, assetPath);
-      const rel = path17.relative(root, file3);
-      if (!rel || rel.startsWith("..") || path17.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
-      if ((await stat8(file3)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
-      return readFile6(file3, "utf8");
+      const file3 = path18.resolve(root, assetPath);
+      const rel = path18.relative(root, file3);
+      if (!rel || rel.startsWith("..") || path18.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
+      if ((await stat9(file3)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
+      return readFile7(file3, "utf8");
     }
   };
 }
 function createNodeHost(options = {}) {
   const current = () => {
     const p = typeof options.projectFile === "function" ? options.projectFile() : options.projectFile;
-    return p ? path17.resolve(p) : void 0;
+    return p ? path18.resolve(p) : void 0;
   };
   const assets = options.engineAssetsDir ?? engineAssetsDir();
   const resolveMedia = (value) => createMediaResolver({ projectFile: current(), engineAssetsDir: assets })(value);
   const baseDir = () => {
     const p = current();
-    return p ? path17.dirname(p) : process.cwd();
+    return p ? path18.dirname(p) : process.cwd();
   };
-  const inProject = (p) => path17.isAbsolute(p) ? p : path17.resolve(baseDir(), p);
+  const inProject = (p) => path18.isAbsolute(p) ? p : path18.resolve(baseDir(), p);
   const defaultOutput = (options_) => {
     const ext = FORMATS[options_.format]?.extension ?? "mp4";
     const project = current();
-    const stem6 = project ? path17.basename(project, path17.extname(project)) : "zenvi-export";
-    return path17.join(baseDir(), `${stem6}.${ext}`);
+    const stem6 = project ? path18.basename(project, path18.extname(project)) : "zenvi-export";
+    return path18.join(baseDir(), `${stem6}.${ext}`);
   };
   const host = {
     resolveMedia,
     projectFile: current,
     media: {
-      ...createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes }),
+      ...createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes, env: options.env }),
       missing: (files) => missingOnDisk(files, resolveMedia)
     },
     exporter: {
       async export(project, exportOptions, onProgress) {
         const output2 = exportOptions.output ? inProject(exportOptions.output) : defaultOutput(exportOptions);
-        await mkdir5(path17.dirname(output2), { recursive: true });
+        await mkdir6(path18.dirname(output2), { recursive: true });
         return renderProject(project, {
           resolveMedia,
           output: output2,
@@ -53335,18 +53900,18 @@ function createNodeHost(options = {}) {
       async save(project, target) {
         const file3 = target ? inProject(target) : current();
         if (!file3) throw new Error("The project has not been saved yet: give a file path (e.g. my-edit.zvn).");
-        await mkdir5(path17.dirname(file3), { recursive: true });
+        await mkdir6(path18.dirname(file3), { recursive: true });
         return writeProjectFile(file3, project, { engineAssetsDir: assets });
       },
       open: (p) => readProjectFile(inProject(p)),
       async readText(p) {
         const file3 = inProject(p);
-        if ((await stat8(file3)).size > MAX_TEXT_BYTES) throw new Error(`${file3} is larger than ${MAX_TEXT_BYTES} bytes.`);
-        return readFile6(file3, "utf8");
+        if ((await stat9(file3)).size > MAX_TEXT_BYTES) throw new Error(`${file3} is larger than ${MAX_TEXT_BYTES} bytes.`);
+        return readFile7(file3, "utf8");
       },
       async writeText(p, text5) {
         const file3 = inProject(p);
-        await mkdir5(path17.dirname(file3), { recursive: true });
+        await mkdir6(path18.dirname(file3), { recursive: true });
         await writeFileAtomic(file3, text5);
         return file3;
       }
@@ -53405,9 +53970,11 @@ __export(src_exports, {
   TailBuffer: () => TailBuffer,
   VideoDecoder: () => VideoDecoder,
   VideoFrameStream: () => VideoFrameStream,
+  YT_DLP_MISSING: () => YT_DLP_MISSING,
   analyzeAudio: () => analyzeAudio,
   appendFontFallbacks: () => appendFontFallbacks,
   applyOverlay: () => applyOverlay,
+  assertPublicHttpUrl: () => assertPublicHttpUrl,
   atempoChain: () => atempoChain,
   backendSpeechUpload: () => backendSpeechUpload,
   binaryVersion: () => binaryVersion,
@@ -53417,6 +53984,7 @@ __export(src_exports, {
   bundledFontsDir: () => bundledFontsDir,
   cacheDir: () => cacheDir,
   channelPan: () => channelPan,
+  checkRateLimitCooldown: () => checkRateLimitCooldown,
   compositeThreads: () => compositeThreads,
   compositeWorkerScript: () => compositeWorkerScript,
   createAssetHost: () => createAssetHost,
@@ -53425,6 +53993,7 @@ __export(src_exports, {
   createNodeHost: () => createNodeHost,
   createNodeMediaHost: () => createNodeMediaHost,
   createRgba: () => createRgba,
+  createWebVideoFetcher: () => createWebVideoFetcher,
   decodePcm: () => decodePcm,
   decodeStill: () => decodeStill,
   decoderNameFor: () => decoderNameFor,
@@ -53443,6 +54012,7 @@ __export(src_exports, {
   fallbackBinaryDirs: () => fallbackBinaryDirs,
   ffmpegMajorVersion: () => ffmpegMajorVersion,
   fileState: () => fileState,
+  findYtDlp: () => findYtDlp,
   fingerprint: () => fingerprint,
   flattenOver: () => flattenOver,
   formatFromPath: () => formatFromPath,
@@ -53453,12 +54023,15 @@ __export(src_exports, {
   imageOrientation: () => imageOrientation,
   initResvg: () => initResvg,
   isEncoderPreset: () => isEncoderPreset,
+  isExecutable: () => isExecutable,
   isInside: () => isInside,
   isPortableAssetPath: () => isPortableAssetPath,
+  isPublicAddress: () => isPublicAddress,
   isSvgPath: () => isSvgPath,
   jpegOrientation: () => jpegOrientation,
   listPaths: () => listPaths,
   liveChildCount: () => liveChildCount,
+  loadCachedDownload: () => loadCachedDownload,
   loadRoots: () => loadRoots,
   localPath: () => localPath,
   mapPathValues: () => mapPathValues,
@@ -53474,6 +54047,7 @@ __export(src_exports, {
   previewSize: () => previewSize,
   probe: () => probe,
   projectNeedsText: () => projectNeedsText,
+  purgeExpiredCache: () => purgeExpiredCache,
   rasterizeSvg: () => rasterizeSvg,
   rasterizeSvgFile: () => rasterizeSvgFile,
   readFontFamilies: () => readFontFamilies,
@@ -53506,12 +54080,16 @@ __export(src_exports, {
   systemFontDirs: () => systemFontDirs,
   transcribeMediaFile: () => transcribeMediaFile,
   uniquePath: () => uniquePath,
+  urlCacheKey: () => urlCacheKey,
   videoDecodeArgs: () => videoDecodeArgs,
   videoRateArgs: () => videoRateArgs,
+  webVideoCacheRoot: () => webVideoCacheRoot,
   whichSync: () => whichSync,
   withProjectLock: () => withProjectLock,
   writeFileAtomic: () => writeFileAtomic,
-  writeProjectFile: () => writeProjectFile
+  writeProjectFile: () => writeProjectFile,
+  writeRateLimitCooldown: () => writeRateLimitCooldown,
+  ytDlpArgs: () => ytDlpArgs
 });
 var init_src2 = __esm({
   "../render-node/src/index.ts"() {
@@ -53543,6 +54121,8 @@ var init_src2 = __esm({
     init_storage();
     init_media2();
     init_backend();
+    init_web_video2();
+    init_public_address();
     init_node_host();
     init_audio();
     init_opentype();
@@ -53554,7 +54134,7 @@ var init_src2 = __esm({
 
 // src/cloud/upload.ts
 import { createReadStream as createReadStream2 } from "node:fs";
-import { stat as stat9 } from "node:fs/promises";
+import { stat as stat10 } from "node:fs/promises";
 import http from "node:http";
 import https from "node:https";
 function put(url2, headers, body, length) {
@@ -53582,7 +54162,7 @@ function withQuery(url2, extra) {
   return u.toString();
 }
 async function uploadFile(file3, url2, options = {}) {
-  const size = (await stat9(file3)).size;
+  const size = (await stat10(file3)).size;
   const headers = options.headers ?? { "x-ms-blob-type": "BlockBlob" };
   if (size <= SINGLE_SHOT_MAX) {
     let sent = 0;
@@ -53635,22 +54215,22 @@ var init_upload = __esm({
 });
 
 // src/cloud/sync.ts
-import { createHash as createHash2 } from "node:crypto";
-import { createWriteStream as createWriteStream2 } from "node:fs";
-import { mkdir as mkdir6, readFile as readFile7, realpath, rename as rename5, rm as rm5, stat as stat10 } from "node:fs/promises";
-import path18 from "node:path";
-import { Readable as Readable2 } from "node:stream";
-import { pipeline as pipeline2 } from "node:stream/promises";
+import { createHash as createHash3 } from "node:crypto";
+import { createWriteStream as createWriteStream3 } from "node:fs";
+import { mkdir as mkdir7, readFile as readFile8, realpath, rename as rename5, rm as rm6, stat as stat11 } from "node:fs/promises";
+import path19 from "node:path";
+import { Readable as Readable3 } from "node:stream";
+import { pipeline as pipeline3 } from "node:stream/promises";
 function linksPath(config2) {
-  return path18.join(config2.configDir, "cloud-links.json");
+  return path19.join(config2.configDir, "cloud-links.json");
 }
 async function linkKey(config2, projectFile) {
-  const real3 = await realpath(projectFile).catch(() => path18.resolve(projectFile));
+  const real3 = await realpath(projectFile).catch(() => path19.resolve(projectFile));
   return `${config2.cloudUrl}|${real3}`;
 }
 async function readLinks(config2) {
   try {
-    const parsed = JSON.parse(await readFile7(linksPath(config2), "utf8"));
+    const parsed = JSON.parse(await readFile8(linksPath(config2), "utf8"));
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -53662,19 +54242,19 @@ async function getLink(config2, projectFile) {
 async function setLink(config2, projectFile, link) {
   const links = await readLinks(config2);
   links[await linkKey(config2, projectFile)] = link;
-  await mkdir6(config2.configDir, { recursive: true, mode: 448 });
+  await mkdir7(config2.configDir, { recursive: true, mode: 448 });
   await writeFileAtomic(linksPath(config2), `${JSON.stringify(links, null, 2)}
 `);
 }
 function textSha256(text5) {
-  return createHash2("sha256").update(text5).digest("hex");
+  return createHash3("sha256").update(text5).digest("hex");
 }
 async function markSynced(config2, projectFile) {
   const link = await getLink(config2, projectFile);
   if (!link) return;
   let bytes;
   try {
-    bytes = await readFile7(projectFile);
+    bytes = await readFile8(projectFile);
   } catch {
     return;
   }
@@ -53683,7 +54263,7 @@ async function markSynced(config2, projectFile) {
 async function localProjectState(config2, projectFile, projectId) {
   let bytes;
   try {
-    bytes = await readFile7(projectFile);
+    bytes = await readFile8(projectFile);
   } catch (error62) {
     if (error62.code === "ENOENT") return { kind: "missing" };
     throw error62;
@@ -53701,7 +54281,7 @@ async function localProjectState(config2, projectFile, projectId) {
   return { kind: "same", unsynced };
 }
 function contentTypeFor(file3) {
-  return CONTENT_TYPES[path18.extname(file3).slice(1).toLowerCase()] ?? "application/octet-stream";
+  return CONTENT_TYPES[path19.extname(file3).slice(1).toLowerCase()] ?? "application/octet-stream";
 }
 function cloudRef(file3, m) {
   const previous = file3.cloud && typeof file3.cloud === "object" ? file3.cloud : {};
@@ -53714,7 +54294,7 @@ function reusableHash(file3, size, mtime) {
   return c.sha256;
 }
 function uniqueName(name, taken) {
-  const ext = path18.extname(name);
+  const ext = path19.extname(name);
   const stem6 = ext ? name.slice(0, -ext.length) : name;
   let candidate = name;
   for (let n = 2; taken.has(candidate.toLowerCase()); n += 1) candidate = `${stem6} (${n})${ext}`;
@@ -53732,9 +54312,9 @@ function cloudProjectJson(project, media, warn) {
     if (!value || isPortableAssetPath(value) || /^https?:\/\//i.test(value)) return value;
     const hit = byPath.get(value);
     if (hit) return hit.cloudName;
-    if (path18.isAbsolute(value)) {
+    if (path19.isAbsolute(value)) {
       unmapped.add(value);
-      return path18.basename(value);
+      return path19.basename(value);
     }
     return value;
   });
@@ -53743,7 +54323,7 @@ function cloudProjectJson(project, media, warn) {
     if (m) file3.cloud = cloudRef(file3, { ...m, name: m.cloudName });
   }
   for (const value of unmapped) {
-    if (!/[\\/]thumbnail[\\/]/.test(value)) warn?.(`${path18.basename(value)} is referenced by the project but is not a project file; it was not uploaded.`);
+    if (!/[\\/]thumbnail[\\/]/.test(value)) warn?.(`${path19.basename(value)} is referenced by the project but is not a project file; it was not uploaded.`);
   }
   const { [CLOUD_MARKER_KEY]: _marker, ...upload } = mapped;
   return upload;
@@ -53758,11 +54338,11 @@ async function pushProject(options) {
   let done = 0;
   for (const file3 of candidates) {
     const local = String(file3.path);
-    options.onProgress?.({ phase: "hashing", file: path18.basename(local), done, total: candidates.length });
+    options.onProgress?.({ phase: "hashing", file: path19.basename(local), done, total: candidates.length });
     let size;
     let mtime;
     try {
-      const st = await stat10(local);
+      const st = await stat11(local);
       if (!st.isFile()) throw new Error("not a file");
       size = st.size;
       mtime = st.mtimeMs / 1e3;
@@ -53774,11 +54354,11 @@ async function pushProject(options) {
     const contentType2 = contentTypeFor(local);
     if (contentType2 === "application/octet-stream") {
       skipped.push(local);
-      warn(`${path18.basename(local)} is not a media type Zenvi Cloud stores; skipped.`);
+      warn(`${path19.basename(local)} is not a media type Zenvi Cloud stores; skipped.`);
       continue;
     }
     const sha256 = reusableHash(file3, size, mtime) ?? await sha256File(local);
-    const displayName3 = typeof file3.name === "string" && file3.name && path18.extname(file3.name) ? file3.name : path18.basename(local);
+    const displayName3 = typeof file3.name === "string" && file3.name && path19.extname(file3.name) ? file3.name : path19.basename(local);
     media.push({ file: file3, local, sha256, size, mtime, contentType: contentType2, cloudName: uniqueName(displayName3, taken) });
     done += 1;
   }
@@ -53799,7 +54379,7 @@ async function pushProject(options) {
   }
   options.onProgress?.({ phase: "saving", done: 0, total: 1 });
   const body = JSON.parse(serializeProject(cloudProjectJson(project, media, warn)));
-  const name = options.name ?? path18.basename(options.projectFile, path18.extname(options.projectFile));
+  const name = options.name ?? path19.basename(options.projectFile, path19.extname(options.projectFile));
   const link = await getLink(config2, options.projectFile);
   let projectId;
   let revision;
@@ -53853,13 +54433,13 @@ async function pullDestination(options, id, name) {
     throw new CliError(`${projectFile} belongs to ${whose}; pulling ${id} would replace it.`, 1, "Pull into another folder, or use --force to replace it.");
   };
   if (options.dir !== void 0) {
-    const projectFile = path18.join(path18.resolve(options.cwd, options.dir), `${name}.zvn`);
+    const projectFile = path19.join(path19.resolve(options.cwd, options.dir), `${name}.zvn`);
     await check2(projectFile, true);
     return projectFile;
   }
   for (let n = 1; n < 1e3; n += 1) {
-    const dir = path18.resolve(options.cwd, n === 1 ? name : `${name} (${n})`);
-    const projectFile = path18.join(dir, `${name}.zvn`);
+    const dir = path19.resolve(options.cwd, n === 1 ? name : `${name} (${n})`);
+    const projectFile = path19.join(dir, `${name}.zvn`);
     if (await check2(projectFile, false) === "use") return projectFile;
   }
   throw new CliError(`Too many folders named ${name} here; pull into a folder of your choice.`, 2);
@@ -53875,7 +54455,7 @@ function safeFileName(name) {
 }
 async function sameContent(file3, sha256, size) {
   try {
-    const st = await stat10(file3);
+    const st = await stat11(file3);
     if (size !== void 0 && st.size !== size) return false;
     return await sha256File(file3) === sha256;
   } catch {
@@ -53884,17 +54464,17 @@ async function sameContent(file3, sha256, size) {
 }
 async function download(url2, dest, sha256, doFetch) {
   const response = await doFetch(url2, { signal: AbortSignal.timeout(30 * 6e4) });
-  if (!response.ok || !response.body) throw new CliError(`Download failed (HTTP ${response.status}) for ${path18.basename(dest)}.`);
+  if (!response.ok || !response.body) throw new CliError(`Download failed (HTTP ${response.status}) for ${path19.basename(dest)}.`);
   const tmp = `${dest}.${process.pid}.part`;
-  const hash2 = createHash2("sha256");
-  const source2 = Readable2.fromWeb(response.body);
+  const hash2 = createHash3("sha256");
+  const source2 = Readable3.fromWeb(response.body);
   source2.on("data", (chunk2) => hash2.update(chunk2));
   try {
-    await pipeline2(source2, createWriteStream2(tmp));
-    if (hash2.digest("hex") !== sha256) throw new CliError(`${path18.basename(dest)} did not match its SHA-256 after download.`);
+    await pipeline3(source2, createWriteStream3(tmp));
+    if (hash2.digest("hex") !== sha256) throw new CliError(`${path19.basename(dest)} did not match its SHA-256 after download.`);
     await rename5(tmp, dest);
   } catch (error62) {
-    await rm5(tmp, { force: true });
+    await rm6(tmp, { force: true });
     throw error62;
   }
 }
@@ -53905,8 +54485,8 @@ async function pullProject(options) {
   const remote = await client.getProject(id);
   const name = safeFileName(remote.name || id);
   const projectFile = await pullDestination(options, id, name);
-  const mediaDir = path18.join(projectAssetsDir(projectFile), "media");
-  await mkdir6(mediaDir, { recursive: true });
+  const mediaDir = path19.join(projectAssetsDir(projectFile), "media");
+  await mkdir7(mediaDir, { recursive: true });
   const project = remote.project;
   const byFile = new Map(remote.media.map((m) => [m.fileId, m]));
   const localFor = /* @__PURE__ */ new Map();
@@ -53918,7 +54498,7 @@ async function pullProject(options) {
     const entry = byFile.get(file3.id);
     if (!entry) continue;
     options.onProgress?.({ file: entry.name, done, total: remote.media.length });
-    const dest = path18.join(mediaDir, uniqueName(safeFileName(entry.name || `${file3.id}${path18.extname(String(file3.path ?? ""))}`), taken));
+    const dest = path19.join(mediaDir, uniqueName(safeFileName(entry.name || `${file3.id}${path19.extname(String(file3.path ?? ""))}`), taken));
     if (await sameContent(dest, entry.sha256, entry.size)) reused += 1;
     else {
       await download(entry.url, dest, entry.sha256, options.fetchImpl ?? fetch);
@@ -53940,7 +54520,7 @@ async function pullProject(options) {
     if (!dest) continue;
     file3.path = dest;
     const entry = byFile.get(file3.id);
-    const st = await stat10(dest);
+    const st = await stat11(dest);
     if (entry) file3.cloud = cloudRef(file3, { sha256: entry.sha256, size: st.size, contentType: entry.contentType ?? file3.cloud?.content_type ?? contentTypeFor(dest), name: entry.name, mtime: st.mtimeMs / 1e3 });
   }
   const marker2 = { project_id: id, revision: remote.revision ?? "" };
@@ -53951,7 +54531,7 @@ async function pullProject(options) {
     revision: remote.revision ?? "",
     editorUrl: remote.editorUrl,
     syncedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    fileSha256: textSha256(await readFile7(projectFile))
+    fileSha256: textSha256(await readFile8(projectFile))
   });
   return { projectFile, projectId: id, revision: remote.revision ?? "", downloaded, reused, missing };
 }
@@ -54005,23 +54585,23 @@ var init_sync = __esm({
 });
 
 // src/project/select.ts
-import { readdir as readdir4 } from "node:fs/promises";
-import path19 from "node:path";
+import { readdir as readdir5 } from "node:fs/promises";
+import path20 from "node:path";
 function isProjectPath(file3) {
-  return PROJECT_EXTENSIONS.includes(path19.extname(file3).toLowerCase());
+  return PROJECT_EXTENSIONS.includes(path20.extname(file3).toLowerCase());
 }
 async function findProject(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const named = options.flag ?? options.env?.ZENVI_PROJECT ?? process.env.ZENVI_PROJECT;
-  if (named?.trim()) return path19.resolve(cwd, named.trim());
+  if (named?.trim()) return path20.resolve(cwd, named.trim());
   let names2;
   try {
-    names2 = await readdir4(cwd);
+    names2 = await readdir5(cwd);
   } catch {
     return void 0;
   }
-  const candidates = names2.filter((n) => path19.extname(n).toLowerCase() === ".zvn" && !n.startsWith(".")).sort();
-  if (candidates.length === 1) return path19.join(cwd, candidates[0]);
+  const candidates = names2.filter((n) => path20.extname(n).toLowerCase() === ".zvn" && !n.startsWith(".")).sort();
+  if (candidates.length === 1) return path20.join(cwd, candidates[0]);
   if (candidates.length > 1) {
     throw new CliError(
       `This folder has ${candidates.length} projects (${candidates.slice(0, 4).join(", ")}${candidates.length > 4 ? ", \u2026" : ""}).`,
@@ -54048,8 +54628,8 @@ var init_select = __esm({
 });
 
 // src/desktop/discovery.ts
-import { readFile as readFile8, realpath as realpath2 } from "node:fs/promises";
-import path20 from "node:path";
+import { readFile as readFile9, realpath as realpath2 } from "node:fs/promises";
+import path21 from "node:path";
 function pidAlive2(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
@@ -54069,23 +54649,23 @@ function isLoopbackUrl(value) {
 }
 async function readToken(file3) {
   try {
-    const token = (await readFile8(file3, "utf8")).trim();
+    const token = (await readFile9(file3, "utf8")).trim();
     return token || void 0;
   } catch {
     return void 0;
   }
 }
 async function fromFile(config2, name, kind, options) {
-  const file3 = path20.join(config2.desktopDir, name);
+  const file3 = path21.join(config2.desktopDir, name);
   let data;
   try {
-    data = JSON.parse(await readFile8(file3, "utf8"));
+    data = JSON.parse(await readFile9(file3, "utf8"));
   } catch {
     return void 0;
   }
   const pid = Number(data.pid);
   if (typeof data.url !== "string" || !isLoopbackUrl(data.url) || !pidAlive2(pid)) return void 0;
-  const tokenFile = typeof data.token_file === "string" && data.token_file ? path20.isAbsolute(data.token_file) ? data.token_file : path20.join(config2.desktopDir, data.token_file) : path20.join(config2.desktopDir, "mcp_token");
+  const tokenFile = typeof data.token_file === "string" && data.token_file ? path21.isAbsolute(data.token_file) ? data.token_file : path21.join(config2.desktopDir, data.token_file) : path21.join(config2.desktopDir, "mcp_token");
   const token = await readToken(tokenFile);
   if (!token) return void 0;
   if (options.verify !== false && !await probeEndpoint(data.url, token, options)) return void 0;
@@ -54139,7 +54719,7 @@ async function probeEndpoint(url2, token, options = {}) {
 }
 async function desktopProcessAlive(config2, kind = "gui") {
   try {
-    const data = JSON.parse(await readFile8(path20.join(config2.desktopDir, `${kind}_mcp.json`), "utf8"));
+    const data = JSON.parse(await readFile9(path21.join(config2.desktopDir, `${kind}_mcp.json`), "utf8"));
     return pidAlive2(Number(data.pid));
   } catch {
     return false;
@@ -54155,7 +54735,7 @@ async function discoverDesktop(config2, options = {}) {
     if (endpoint) found.push(endpoint);
   }
   if (found.length === 0 && options.legacy) {
-    const tokenFile = path20.join(config2.desktopDir, "mcp_token");
+    const tokenFile = path21.join(config2.desktopDir, "mcp_token");
     const token = await readToken(tokenFile);
     if (token && await probeLegacy(token, options)) {
       found.push({ kind: "legacy", url: LEGACY_URL, token, source: tokenFile });
@@ -54164,7 +54744,7 @@ async function discoverDesktop(config2, options = {}) {
   return found;
 }
 async function canonical(file3) {
-  const abs = path20.resolve(file3);
+  const abs = path21.resolve(file3);
   try {
     return await realpath2(abs);
   } catch {
@@ -59327,29 +59907,21 @@ var init_pending = __esm({
   "../engine/src/tools/pending.ts"() {
     "use strict";
     PENDING_DESKTOP_TOOLS = /* @__PURE__ */ new Set([
-      "cancel_comfyui_job_tool",
       "capture_editor_screenshot_tool",
       "consolidate_project_media_tool",
-      "create_media_with_comfyui_tool",
-      "enhance_file_with_comfyui_tool",
       "export_files_to_folder_tool",
       "export_project_file_tool",
       "forget_recent_projects_tool",
-      "generate_image_and_add_to_timeline_tool",
       "get_editor_layout_tool",
       "get_log_paths_tool",
       "get_preferences_tool",
       "import_project_file_tool",
-      "ingest_web_video_tool",
-      "list_comfyui_jobs_tool",
-      "list_comfyui_templates_tool",
       "list_export_presets_tool",
       "list_project_profiles_tool",
       "list_recent_projects_tool",
       "list_recovery_versions_tool",
       "manage_custom_profiles_tool",
       "mcp_health_tool",
-      "prepare_recording_tool",
       "reset_caches_and_history_tool",
       "restore_recovery_version_tool",
       "save_frame_image_tool",
@@ -59826,14 +60398,14 @@ var init_tracks2 = __esm({
 function isRecord24(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function basename2(path39) {
-  const parts = String(path39 ?? "").split(/[\\/]/);
+function basename2(path40) {
+  const parts = String(path40 ?? "").split(/[\\/]/);
   return parts[parts.length - 1] ?? "";
 }
-function normPath(path39) {
+function normPath(path40) {
   const segments2 = [];
-  const absolute = path39.startsWith("/");
-  for (const part of path39.split("/")) {
+  const absolute = path40.startsWith("/");
+  for (const part of path40.split("/")) {
     if (part === "" || part === ".") continue;
     if (part === ".." && segments2.length > 0 && segments2[segments2.length - 1] !== "..") segments2.pop();
     else segments2.push(part);
@@ -59851,12 +60423,12 @@ function resolveParentFileId(project, fileData, fileId = "") {
   const explicit = String(data.parent_file_id ?? "").trim();
   if (explicit) return explicit;
   if (!data.zenvi_subclip) return fid || String(data.id ?? "");
-  const path39 = String(data.path ?? "");
-  if (path39 && fid) {
+  const path40 = String(data.path ?? "");
+  if (path40 && fid) {
     for (const candidate of project.files ?? []) {
       if (candidate.zenvi_subclip) continue;
       const candPath = String(candidate.path ?? "");
-      if (candPath && normPath(candPath) === normPath(path39)) return String(candidate.id ?? "");
+      if (candPath && normPath(candPath) === normPath(path40)) return String(candidate.id ?? "");
     }
   }
   return fid || String(data.id ?? "");
@@ -59891,12 +60463,12 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
     rebased: true
   });
   const file3 = isRecord24(fileData) ? fileData : void 0;
-  const path39 = file3 ? String(file3.path ?? "") : "";
+  const path40 = file3 ? String(file3.path ?? "") : "";
   const rawLayer = clipData.layer;
   const layerNum = rawLayer === null || rawLayer === void 0 || rawLayer === "" ? null : Math.trunc(Number(rawLayer));
   const layer2 = layerNum !== null && Number.isFinite(layerNum) ? layerNum : null;
   const uiTrack2 = layer2 !== null ? layerNumberToDisplayIndex(layer2, options.layers ?? []) : null;
-  const fileName2 = String(file3?.name || basename2(path39) || "").trim();
+  const fileName2 = String(file3?.name || basename2(path40) || "").trim();
   const title = String(clipData.title || clipData.label || fileName2 || "Clip").trim();
   let tlMeta = getIndexBlock(parentData ?? {});
   if (Object.keys(tlMeta).length === 0) tlMeta = getIndexBlock(file3 ?? {});
@@ -59912,7 +60484,7 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
     timelineClipId: String(clip2.id ?? clipData.id ?? ""),
     fileId: fid,
     parentFileId: parentId,
-    sourcePath: path39,
+    sourcePath: path40,
     sourceStart,
     sourceEnd,
     timelinePosition,
@@ -60310,14 +60882,14 @@ function acceptsEmptyString(schema) {
   const fallback = schema.default;
   return kindsOf(schema).includes("string") && (fallback === void 0 || fallback === null || fallback === "");
 }
-function coerceKind(path39, value, kind, schema) {
+function coerceKind(path40, value, kind, schema) {
   if (kind === "boolean") {
     if (typeof value === "boolean") return value;
     if (typeof value === "number") return value !== 0;
     const s = String(value).trim().toLowerCase();
     if (TRUE.has(s)) return true;
     if (FALSE.has(s)) return false;
-    throw new EditorArgError(`argument '${path39}' must be true or false`);
+    throw new EditorArgError(`argument '${path40}' must be true or false`);
   }
   if (kind === "number" || kind === "integer") {
     let f3;
@@ -60325,14 +60897,14 @@ function coerceKind(path39, value, kind, schema) {
     else if (typeof value === "string") {
       f3 = parsePythonFloat(value.trim().replace(/s+$/, ""));
     } else {
-      throw new EditorArgError(`argument '${path39}' must be a number`);
+      throw new EditorArgError(`argument '${path40}' must be a number`);
     }
-    if (f3 === null) throw new EditorArgError(`argument '${path39}' must be a finite number`);
+    if (f3 === null) throw new EditorArgError(`argument '${path40}' must be a finite number`);
     if (kind === "integer") {
-      if (!Number.isInteger(f3)) throw new EditorArgError(`argument '${path39}' must be a whole number`);
+      if (!Number.isInteger(f3)) throw new EditorArgError(`argument '${path40}' must be a whole number`);
     }
-    if (schema.minimum !== void 0 && f3 < schema.minimum) throw new EditorArgError(`argument '${path39}' is below the minimum`);
-    if (schema.maximum !== void 0 && f3 > schema.maximum) throw new EditorArgError(`argument '${path39}' is above the maximum`);
+    if (schema.minimum !== void 0 && f3 < schema.minimum) throw new EditorArgError(`argument '${path40}' is below the minimum`);
+    if (schema.maximum !== void 0 && f3 > schema.maximum) throw new EditorArgError(`argument '${path40}' is above the maximum`);
     return f3;
   }
   if (kind === "string") {
@@ -60349,7 +60921,7 @@ function coerceKind(path39, value, kind, schema) {
         try {
           parsed = JSON.parse(s);
         } catch {
-          throw new EditorArgError(`argument '${path39}' is not a valid JSON list`);
+          throw new EditorArgError(`argument '${path40}' is not a valid JSON list`);
         }
         list2 = Array.isArray(parsed) ? parsed : [parsed];
       } else {
@@ -60361,7 +60933,7 @@ function coerceKind(path39, value, kind, schema) {
       list2 = [value];
     }
     const items = schema.items;
-    if (items && Object.keys(items).length > 0) return list2.map((v, i) => coerceEditorValue(`${path39}[${i}]`, v, items));
+    if (items && Object.keys(items).length > 0) return list2.map((v, i) => coerceEditorValue(`${path40}[${i}]`, v, items));
     return list2;
   }
   if (kind === "object") {
@@ -60372,30 +60944,30 @@ function coerceKind(path39, value, kind, schema) {
       try {
         obj = JSON.parse(s);
       } catch {
-        throw new EditorArgError(`argument '${path39}' is not a valid JSON object`);
+        throw new EditorArgError(`argument '${path40}' is not a valid JSON object`);
       }
     }
-    if (!isRecord26(obj)) throw new EditorArgError(`argument '${path39}' must be an object`);
+    if (!isRecord26(obj)) throw new EditorArgError(`argument '${path40}' must be an object`);
     const props = schema.properties;
     if (!props || Object.keys(props).length === 0) return obj;
     const out = {};
     for (const [key2, v] of Object.entries(obj)) {
       const prop = props[key2];
-      if (prop) out[key2] = coerceEditorValue(`${path39}.${key2}`, v, prop);
-      else if (schema.additionalProperties === false) throw new EditorArgError(`argument '${path39}' has unknown key '${key2}'`);
+      if (prop) out[key2] = coerceEditorValue(`${path40}.${key2}`, v, prop);
+      else if (schema.additionalProperties === false) throw new EditorArgError(`argument '${path40}' has unknown key '${key2}'`);
       else out[key2] = v;
     }
     for (const key2 of schema.required ?? []) {
-      if (!(key2 in out)) throw new EditorArgError(`argument '${path39}' needs key '${key2}'`);
+      if (!(key2 in out)) throw new EditorArgError(`argument '${path40}' needs key '${key2}'`);
     }
     return out;
   }
   return value;
 }
-function coerceEditorValue(path39, value, schema) {
+function coerceEditorValue(path40, value, schema) {
   if (value === null || value === void 0) {
     if (acceptsNull(schema)) return null;
-    throw new EditorArgError(`argument '${path39}' must not be null`);
+    throw new EditorArgError(`argument '${path40}' must not be null`);
   }
   if (schema.enum) {
     const choices = schema.enum;
@@ -60409,13 +60981,13 @@ function coerceEditorValue(path39, value, schema) {
       const hit = choices.find((c) => typeof c === "string" && c === String(value));
       if (hit !== void 0) return hit;
     }
-    throw new EditorArgError(`argument '${path39}' is not one of the choices`);
+    throw new EditorArgError(`argument '${path40}' is not one of the choices`);
   }
   const kinds = kindsOf(schema);
   let last;
   for (const kind of kinds) {
     try {
-      return coerceKind(path39, value, kind, schema);
+      return coerceKind(path40, value, kind, schema);
     } catch (error62) {
       if (!(error62 instanceof EditorArgError)) throw error62;
       last = error62;
@@ -62003,14 +62575,14 @@ async function prepareOverlayCarrier(call) {
   const media = call.host.media;
   if (!media?.writeGenerated) toolError("this Zenvi surface cannot store the transparent overlay image a timer or caption overlay needs");
   const name = overlayFileName(w, h);
-  let path39;
+  let path40;
   try {
-    path39 = await media.writeGenerated(name, new TextEncoder().encode(overlaySvgText(w, h)), "image/svg+xml");
+    path40 = await media.writeGenerated(name, new TextEncoder().encode(overlaySvgText(w, h)), "image/svg+xml");
   } catch (error62) {
     return toolError(`could not write the overlay image: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
   try {
-    return { media: { path: path39, info: await media.probe(path39), name } };
+    return { media: { path: path40, info: await media.probe(path40), name } };
   } catch (error62) {
     return toolError(`could not import ${name} into Project Files: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
@@ -62172,14 +62744,14 @@ function projectFileChoices(files) {
 }
 async function writeSvg(call, name, svg) {
   const media = call.host.media;
-  let path39;
+  let path40;
   try {
-    path39 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path40 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return toolError(`could not write the animated title: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
   try {
-    return { path: path39, info: await media.probe(path39), name };
+    return { path: path40, info: await media.probe(path40), name };
   } catch (error62) {
     return toolError(`the animated title could not be imported: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
@@ -62686,8 +63258,8 @@ function fileById(project, id) {
 function fileOfClip(project, clip2) {
   const byId = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
   if (byId) return byId;
-  const path39 = String((isRecord28(clip2.reader) ? clip2.reader.path : "") ?? "");
-  return path39 ? project.files.find((f3) => f3.path === path39) : void 0;
+  const path40 = String((isRecord28(clip2.reader) ? clip2.reader.path : "") ?? "");
+  return path40 ? project.files.find((f3) => f3.path === path40) : void 0;
 }
 function clipTarget(project, clip2) {
   const file3 = fileOfClip(project, clip2);
@@ -62724,9 +63296,9 @@ async function wordsFor(call, target, request) {
   if (request.estimatesOk && !force && target.indexed) return fromIndex(target, warnings);
   if (!fileHasAudio(file3)) return { kind: "no_audio", message: NO_AUDIO_MESSAGE };
   if (transcribe) {
-    const path39 = mediaPathOf(file3);
+    const path40 = mediaPathOf(file3);
     try {
-      const result2 = await transcribe.call(call.host.audio, path39, { language: requested, prompt: transcriptionPrompt(requested), signal: call.signal });
+      const result2 = await transcribe.call(call.host.audio, path40, { language: requested, prompt: transcriptionPrompt(requested), signal: call.signal });
       const record5 = {
         modelId: result2.model,
         language: result2.language || requested,
@@ -62866,8 +63438,8 @@ function fmtPositionMmss(pos) {
   const s = Math.floor(pos % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-function basenameOf(path39) {
-  const parts = String(path39 ?? "").split(/[\\/]/);
+function basenameOf(path40) {
+  const parts = String(path40 ?? "").split(/[\\/]/);
   return parts[parts.length - 1] ?? "";
 }
 function scoreContextAgainstQuery(ctx, query2, preferPositionNear = 0) {
@@ -63108,10 +63680,10 @@ var init_resolve = __esm({
 function isRecord30(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-async function backendRequest(backend, path39, init = {}) {
+async function backendRequest(backend, path40, init = {}) {
   if (!backend) return { ok: false, error: "The Zenvi backend is not available on this surface (sign in to Zenvi)." };
   try {
-    const data = await backend.request(path39, init);
+    const data = await backend.request(path40, init);
     return { ok: true, data };
   } catch (error62) {
     return { ok: false, error: error62 instanceof Error ? error62.message : String(error62) };
@@ -63178,6 +63750,17 @@ async function generateVideo(call, prompt, durationSeconds, extra) {
   if (!res.ok) return { error: res.error };
   if (typeof res.data.error === "string" && res.data.error) return { error: bareError(res.data.error, "Video generation failed") };
   return { videoUrl: String(res.data.video_url ?? "") };
+}
+async function generateImage(call, prompt, size) {
+  const res = await backendRequest(call.host.backend, "/api/v1/generation/image", {
+    method: "POST",
+    body: { prompt, width: size.width, height: size.height },
+    signal: call.signal
+  });
+  if (!res.ok) return { error: res.error };
+  if (!isRecord30(res.data)) return { error: "Unexpected response from the Zenvi backend" };
+  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  return { imageBase64: String(res.data.image_base64 ?? ""), mimeType: String(res.data.mime_type ?? "") };
 }
 async function generateTts(call, input4) {
   const res = await backendRequest(call.host.backend, "/api/v1/generation/tts", {
@@ -63636,13 +64219,13 @@ function writeVolumePoints(tx, clipId2, points2) {
 }
 async function vadWindows(call, entry) {
   const audio = call.host.audio;
-  const path39 = String(entry.clip.reader?.path ?? entry.file?.path ?? "");
-  if (!audio || !path39) return [];
+  const path40 = String(entry.clip.reader?.path ?? entry.file?.path ?? "");
+  if (!audio || !path40) return [];
   try {
-    const envelope = await audio.analyzeAudio(path39, { signal: call.signal });
+    const envelope = await audio.analyzeAudio(path40, { signal: call.signal });
     return speechWindowsFromSource(energyVadWindows(envelope, { minSpeechSec: 0.12, minSilenceSec: 0.35 }), entry.clip);
   } catch (error62) {
-    call.host.log?.(`analyzeAudio(${path39}) failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
+    call.host.log?.(`analyzeAudio(${path40}) failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
     return [];
   }
 }
@@ -64428,20 +65011,20 @@ function hasTimeCurve(clip2) {
   const points2 = typeof time3 === "object" && time3 !== null ? time3.Points : void 0;
   return Array.isArray(points2) && points2.length > 1;
 }
-function basename3(path39) {
-  return path39.split(/[\\/]/).pop() || path39;
+function basename3(path40) {
+  return path40.split(/[\\/]/).pop() || path40;
 }
-async function readSubtitleFile(call, path39) {
+async function readSubtitleFile(call, path40) {
   let raw;
   try {
-    raw = await call.host.storage.readText(path39);
+    raw = await call.host.storage.readText(path40);
   } catch {
-    return toolError(`subtitle file not found: ${path39}`);
+    return toolError(`subtitle file not found: ${path40}`);
   }
   if (raw.length > MAX_SUBTITLE_CHARS) toolError("subtitle file is larger than 5 MB");
   const cues = parseSubtitles(raw);
   if (cues.length === 0) {
-    toolError(`no cues found in ${basename3(path39)} (expected SRT or WebVTT timings like 00:00:01,000 --> 00:00:03,000)`);
+    toolError(`no cues found in ${basename3(path40)} (expected SRT or WebVTT timings like 00:00:01,000 --> 00:00:03,000)`);
   }
   return cues;
 }
@@ -65176,8 +65759,8 @@ function propertyInfo(key2, clip2, project) {
     [lo, hi] = override;
   } else if (SCALE_KEYS.has(key2)) {
     const reader = isRecord32(data.reader) ? data.reader : {};
-    const path39 = String(reader.path ?? "").toLowerCase();
-    const m = maxTransformMultiple(project.width, project.height, path39.endsWith(".svg"));
+    const path40 = String(reader.path ?? "").toLowerCase();
+    const m = maxTransformMultiple(project.width, project.height, path40.endsWith(".svg"));
     [lo, hi] = [-m, m];
   } else if (key2 === "time") {
     let frames = videoLengthToProjectFrames(isRecord32(data.reader) ? data.reader : {}, project.fps);
@@ -66775,8 +67358,8 @@ function positiveIntArg(value) {
   const i = Math.trunc(n);
   return i > 0 ? i : null;
 }
-function stem3(path39) {
-  const base = String(path39 ?? "").split(/[\\/]/).pop() ?? "";
+function stem3(path40) {
+  const base = String(path40 ?? "").split(/[\\/]/).pop() ?? "";
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(0, dot) : base;
 }
@@ -69121,16 +69704,16 @@ function lutFileUnsupported(call) {
   if (call.host.media?.importPath && call.host.storage?.readText) return null;
   return "a .cube file outside the built-in LUTs needs local file access (Zenvi desktop or the zenvi CLI); use a built-in LUT (list_luts_tool)";
 }
-async function checkLutFile(call, path39) {
+async function checkLutFile(call, path40) {
   const unsupported2 = lutFileUnsupported(call);
   if (unsupported2) throw new LutError(unsupported2);
   let text5;
   try {
-    text5 = await call.host.storage.readText(path39);
+    text5 = await call.host.storage.readText(path40);
   } catch {
-    throw new LutError(`LUT file not found or not a .cube file: ${path39}`);
+    throw new LutError(`LUT file not found or not a .cube file: ${path40}`);
   }
-  if (!parseCubeLut(text5)) throw new LutError(`${path39} is not a LUT libopenshot can load (no LUT_3D_SIZE / LUT_1D_SIZE table)`);
+  if (!parseCubeLut(text5)) throw new LutError(`${path40} is not a LUT libopenshot can load (no LUT_3D_SIZE / LUT_1D_SIZE table)`);
 }
 async function resolveCheckedLut(call, value) {
   const resolved = resolveLut(value);
@@ -69704,14 +70287,14 @@ async function profileMediaFile(call, file3) {
   }
   return { profile: buildLookProfile(scopes), scopes_samples: scopes.length, sample_frames: frames, preview, duration_s: duration3 };
 }
-async function profileLocalPath(call, path39) {
+async function profileLocalPath(call, path40) {
   try {
-    const info = await call.host.media.probe(path39);
-    const file3 = { ...info, id: "ZENVIREFIMG", path: path39 };
+    const info = await call.host.media.probe(path40);
+    const file3 = { ...info, id: "ZENVIREFIMG", path: path40 };
     return await profileMediaFile(call, file3);
   } catch (error62) {
     const reason = error62 instanceof Error ? error62.message : String(error62);
-    return { profile: { present: false, error: `file not found: ${path39} (${reason})` }, scopes_samples: 0, sample_frames: [], preview: null, duration_s: 0 };
+    return { profile: { present: false, error: `file not found: ${path40} (${reason})` }, scopes_samples: 0, sample_frames: [], preview: null, duration_s: 0 };
   }
 }
 function pyIntOr(value, fallback) {
@@ -70319,6 +70902,51 @@ var init_color_agent2 = __esm({
   }
 });
 
+// ../engine/src/tools/catalog/comfyui-recording.ts
+var COMFYUI_REASON, GENERATE_INSTEAD, LIST, QUEUE, comfyuiRecordingTools;
+var init_comfyui_recording = __esm({
+  "../engine/src/tools/catalog/comfyui-recording.ts"() {
+    "use strict";
+    init_define();
+    COMFYUI_REASON = "ComfyUI is an optional AI server on the person's own computer that only Zenvi desktop drives (Preferences > AI > ComfyUI URL); this surface has no ComfyUI connection and no ComfyUI jobs.";
+    GENERATE_INSTEAD = " Here, generate_image_and_add_to_timeline_tool and generate_video_and_add_to_timeline_tool make images and clips with Zenvi's cloud models (they use credits).";
+    LIST = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+    QUEUE = { readOnlyHint: false, destructiveHint: false, openWorldHint: true };
+    comfyuiRecordingTools = [
+      contractTool("list_comfyui_templates_tool", {
+        annotations: LIST,
+        run: (call) => unavailable(call.tool, `${COMFYUI_REASON} Use Zenvi desktop for AI Tools > Create / Enhance with AI.${GENERATE_INSTEAD}`)
+      }),
+      contractTool("list_comfyui_jobs_tool", {
+        annotations: LIST,
+        run: (call) => unavailable(call.tool, `${COMFYUI_REASON} Generation jobs started in Zenvi desktop are listed there.`)
+      }),
+      contractTool("create_media_with_comfyui_tool", {
+        annotations: QUEUE,
+        run: (call) => unavailable(call.tool, `${COMFYUI_REASON}${GENERATE_INSTEAD}`)
+      }),
+      contractTool("enhance_file_with_comfyui_tool", {
+        annotations: QUEUE,
+        run: (call) => unavailable(
+          call.tool,
+          `${COMFYUI_REASON} Upscaling, object tracking, restyling and audio clean-up with ComfyUI templates need Zenvi desktop (Project Files > Enhance with AI).`
+        )
+      }),
+      contractTool("cancel_comfyui_job_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        run: (call) => unavailable(call.tool, `${COMFYUI_REASON} Cancel generation jobs in Zenvi desktop (Project Files > Cancel Job).`)
+      }),
+      contractTool("prepare_recording_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        run: (call) => unavailable(
+          call.tool,
+          "recording a voiceover, the screen or a webcam happens in Zenvi desktop's Recording dock, which this surface does not have. Record in Zenvi desktop, or import a recording you already have; generate_tts_and_add_to_timeline_tool makes a narration from text."
+        )
+      })
+    ];
+  }
+});
+
 // ../engine/src/tools/catalog/direct.ts
 function resolveTrack(project, raw) {
   if (raw === void 0 || String(raw).trim() === "") return {};
@@ -70786,8 +71414,8 @@ function points(ctx, clip2, kfs, defaultInterp, convert) {
   }
   return [...byFrame.keys()].sort((a, b) => a - b).map((k) => keyframePoint2(...byFrame.get(k)));
 }
-function basename4(path39) {
-  return path39.split(/[\\/]/).pop() ?? path39;
+function basename4(path40) {
+  return path40.split(/[\\/]/).pop() ?? path40;
 }
 function fileReader(ctx, value) {
   const key2 = value === null || value === void 0 || value === false || value === 0 ? "" : String(value).trim();
@@ -70796,8 +71424,8 @@ function fileReader(ctx, value) {
   let file3 = files.find((f3) => String(f3.id) === key2);
   if (!file3) {
     file3 = files.find((f3) => {
-      const path39 = String(f3.path ?? "");
-      return basename4(path39).toLowerCase() === key2.toLowerCase() || path39 === key2;
+      const path40 = String(f3.path ?? "");
+      return basename4(path40).toLowerCase() === key2.toLowerCase() || path40 === key2;
     });
   }
   if (!file3) throw new ToolError(`no project file ${pyRepr2(value)} for the image/video input (use a file id from list_files_tool)`);
@@ -71937,8 +72565,8 @@ var init_export2 = __esm({
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
         run: async (call, input4) => {
           const openUi = !["0", "false", "no"].includes(String(input4.show_dialog ?? "true").toLowerCase().trim());
-          const path39 = text(input4.output_path);
-          if (openUi && !path39 && call.host.ui?.openExportDialog) {
+          const path40 = text(input4.output_path);
+          if (openUi && !path40 && call.host.ui?.openExportDialog) {
             call.host.ui.openExportDialog();
             return "Export video dialog opened.";
           }
@@ -71946,7 +72574,7 @@ var init_export2 = __esm({
           if (!exporter) return unavailable("export_video_tool", "it needs video rendering, which this host does not provide.");
           const project = call.doc.toJSON();
           const settings = getDefaultExportSettings(project);
-          const output2 = path39 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
+          const output2 = path40 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
           if (output2 && (project.files ?? []).some((f3) => f3.path === output2)) {
             return "Error: Export failed: Output path is an input file. Choose a different path.";
           }
@@ -72025,14 +72653,55 @@ function base64ToBytes(b64) {
   for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
   return out;
 }
+function strictBase64(b64) {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64) || b64.length % 4 !== 0) return new Uint8Array();
+  try {
+    return base64ToBytes(b64);
+  } catch {
+    return new Uint8Array();
+  }
+}
+function generatedImageType(mimeType) {
+  const mime = mimeType.trim().toLowerCase();
+  if (mime === "image/png") return { ext: ".png", contentType: mime };
+  if (mime === "image/webp") return { ext: ".webp", contentType: mime };
+  return { ext: ".jpg", contentType: "image/jpeg" };
+}
+function tagList(tags) {
+  const items = typeof tags === "string" ? tags.split(",") : Array.isArray(tags) ? tags.map(String) : [];
+  return items.map((t) => t.trim()).filter(Boolean);
+}
+function generatedMediaStamp(prompt, source2, existing = {}) {
+  const summary = prompt.trim();
+  if (!summary) return {};
+  const tags = tagList(existing.tags);
+  if (!tags.includes("ai_generated")) tags.push("ai_generated");
+  const stamp = {
+    tags: tags.join(", "),
+    ai_metadata: {
+      ...record4(existing.ai_metadata),
+      short_summary: pySlice(summary, 0, 400),
+      description: pySlice(summary, 0, 400),
+      analyzed: true,
+      source: source2
+    }
+  };
+  if (!existing.name) stamp.name = pySlice(summary, 0, 120);
+  return stamp;
+}
+function plannedStill(width, height) {
+  return { id: "", path: "generated.jpg", media_type: "image", has_video: true, has_audio: false, duration: 3600, width, height };
+}
 var generationTools;
 var init_generation = __esm({
   "../engine/src/tools/catalog/generation.ts"() {
     "use strict";
+    init_ids();
     init_clips();
     init_files();
     init_backend2();
     init_define();
+    init_placement();
     init_pyfmt();
     init_receipt();
     init_tracks2();
@@ -72106,6 +72775,74 @@ var init_generation = __esm({
           return placementText(call.doc.project, plan, placed.clip);
         }
       }),
+      contractTool("generate_image_and_add_to_timeline_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+        requires: ["backend", "media"],
+        run: async (call, input4) => {
+          const tool = "generate_image_and_add_to_timeline_tool";
+          const prompt = text(input4.prompt);
+          if (Array.from(prompt).length < 2) return "Error: Prompt must be at least 2 characters.";
+          let seconds2;
+          try {
+            seconds2 = parseSecondsArg(input4.duration_seconds, 5, "duration_seconds") ?? 5;
+          } catch (error62) {
+            if (error62 instanceof TimeArgError) return `Error: ${error62.message}`;
+            throw error62;
+          }
+          if (!(seconds2 > 0)) return "Error: duration_seconds must be greater than 0.";
+          const media = call.host.media;
+          const writeGenerated = media.writeGenerated;
+          if (!writeGenerated) return unavailable(tool, "it cannot store generated images.");
+          const project = call.doc.project;
+          const args = {
+            position_seconds: input4.position_seconds ?? "",
+            track: input4.track ?? "",
+            query: prompt,
+            duration_seconds: pyG(seconds2)
+          };
+          const planned = await planPlacement(call, plannedStill(project.width, project.height), args);
+          if (typeof planned === "string") return planned;
+          const locked = lockedTrackError(planned.layer, project.layers);
+          if (locked) return locked;
+          const [width, height] = t2vDims(project.width, project.height);
+          const result2 = await generateImage(call, prompt, { width, height });
+          if ("error" in result2) return `Error: ${result2.error}`;
+          const bytes = strictBase64(result2.imageBase64);
+          if (bytes.length === 0) return "Error: The backend returned no image data.";
+          const { ext, contentType: contentType2 } = generatedImageType(result2.mimeType);
+          const name = `generated_${generateId(void 0, 12).toLowerCase()}${ext}`;
+          let path40;
+          try {
+            path40 = await writeGenerated.call(media, name, bytes, contentType2);
+          } catch (error62) {
+            return `Error: Could not save the generated image: ${error62 instanceof Error ? error62.message : String(error62)}`;
+          }
+          let imported;
+          try {
+            imported = { path: path40, info: await media.probe(path40) };
+          } catch {
+            return "Error: Image generated but failed to import into project files.";
+          }
+          const stamp = generatedMediaStamp(prompt, "ai_image_generation");
+          const plan = await planPlacement(call, provisionalFile(imported, { ...stamp, media_type: "image" }), args);
+          const placementError = typeof plan === "string" ? plan : lockedTrackError(plan.layer, call.doc.project.layers);
+          const placed = call.commit((tx) => {
+            const file3 = addFile(tx, imported, { dedupe: true, mediaType: "image" });
+            tx.update(["files", { id: file3.id }], stamp);
+            if (placementError || typeof plan === "string") return { file: file3, clip: void 0 };
+            return { file: file3, clip: applyPlacement(tx, String(file3.id), plan) };
+          });
+          if (!placed.clip || typeof plan === "string") {
+            const fileId = String(placed.file.id);
+            return applied(
+              tool,
+              `Image imported (file_id=${fileId}) but timeline placement failed: ${placementError || "unknown"}. Do NOT regenerate \u2014 call add_clip_to_timeline_tool(file_id='${fileId}', track=<layer_number from list_layers_tool>, position_seconds=..., duration_seconds=${pyG(seconds2)}).`,
+              { data: { file_id: fileId } }
+            );
+          }
+          return placementText(call.doc.project, plan, placed.clip);
+        }
+      }),
       contractTool("generate_tts_and_add_to_timeline_tool", {
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
         requires: ["backend", "media"],
@@ -72136,9 +72873,9 @@ var init_generation = __esm({
           if ("error" in res) return `Error: ${res.error}`;
           const bytes = res.audioBase64 ? base64ToBytes(res.audioBase64) : new Uint8Array();
           if (bytes.length === 0) return "Error: TTS returned empty audio.";
-          const path39 = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
-          const info = await call.host.media.probe(path39);
-          const media = { path: path39, info: { ...info, media_type: "audio" }, name: text(input4.name) || narrationName(narration) };
+          const path40 = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
+          const info = await call.host.media.probe(path40);
+          const media = { path: path40, info: { ...info, media_type: "audio" }, name: text(input4.name) || narrationName(narration) };
           const clip2 = call.commit((tx) => {
             const file3 = addFile(tx, media, { dedupe: false, mediaType: "audio" });
             return addClip(tx, { fileId: String(file3.id), position, layer: layer2 });
@@ -72367,8 +73104,8 @@ var init_inspect = __esm({
           if (!fileId) return refused(tool, "Error: fileId is required.");
           const file3 = fileById2(project, fileId);
           if (!file3) return refused(tool, `Error: Unknown fileId '${fileId}'.`);
-          const path39 = String(file3.path ?? "");
-          if (!path39) return refused(tool, `Error: Media file not on disk: ${fileId}`);
+          const path40 = String(file3.path ?? "");
+          if (!path40) return refused(tool, `Error: Media file not on disk: ${fileId}`);
           const mediaType = String(file3.media_type ?? "").toLowerCase();
           const isImage = mediaType === "image" || mediaType === "photo" || fileLooksLikeImage(file3);
           const isAudio = file3.has_video === false && Boolean(file3.has_audio) || mediaType === "audio";
@@ -72450,8 +73187,8 @@ function importTruthy(value, fallback = false) {
   if (!t) return fallback;
   return ["1", "true", "yes", "y", "on"].includes(t);
 }
-function importMediaKind(path39) {
-  const ext = extOf(path39);
+function importMediaKind(path40) {
+  const ext = extOf(path40);
   if (IMPORT_VIDEO_EXTS.includes(ext)) return "video";
   if (IMPORT_AUDIO_EXTS.includes(ext)) return "audio";
   if (IMPORT_IMAGE_EXTS.includes(ext)) return "image";
@@ -72485,15 +73222,15 @@ function fromFileUrl(entry) {
   const t = entry.trim();
   if (!t.startsWith("file://")) return t;
   try {
-    let path39 = decodeURIComponent(new URL(t).pathname);
-    if (/^\/[A-Za-z]:/.test(path39)) path39 = path39.slice(1);
-    return path39 || t;
+    let path40 = decodeURIComponent(new URL(t).pathname);
+    if (/^\/[A-Za-z]:/.test(path40)) path40 = path40.slice(1);
+    return path40 || t;
   } catch {
     return t;
   }
 }
-function extOf(path39) {
-  const base = path39.split(/[\\/]/).pop() ?? "";
+function extOf(path40) {
+  const base = path40.split(/[\\/]/).pop() ?? "";
   const dot = base.lastIndexOf(".");
   return dot >= 0 ? base.slice(dot).toLowerCase() : "";
 }
@@ -72616,11 +73353,11 @@ var init_media3 = __esm({
           }
           const imported = [];
           const failures = [];
-          for (const path39 of resolved) {
+          for (const path40 of resolved) {
             try {
-              imported.push(await importPath.call(call.host.media, path39));
+              imported.push(await importPath.call(call.host.media, path40));
             } catch (error62) {
-              failures.push(`${path39}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+              failures.push(`${path40}: ${error62 instanceof Error ? error62.message : String(error62)}`);
             }
           }
           if (imported.length === 0) {
@@ -72843,9 +73580,9 @@ function tagsOf(data) {
   return out;
 }
 function kindOf(data) {
-  const path39 = String(data.path || "");
-  if (path39.includes("%")) return "image_sequence";
-  if (path39.toLowerCase().endsWith(".svg") && !path39.toLowerCase().includes("emoji")) return "title";
+  const path40 = String(data.path || "");
+  if (path40.includes("%")) return "image_sequence";
+  if (path40.toLowerCase().endsWith(".svg") && !path40.toLowerCase().includes("emoji")) return "title";
   const mediaType = String(data.media_type || "").toLowerCase();
   return ["video", "audio", "image"].includes(mediaType) ? mediaType : "video";
 }
@@ -73043,7 +73780,7 @@ function listPathsOf(call) {
   if (!media || !list2) throw new ToolError("listing folders is not available here");
   return (entry) => list2.call(media, entry);
 }
-async function relinkTarget(call, data, path39, searchFolder) {
+async function relinkTarget(call, data, path40, searchFolder) {
   const list2 = listPathsOf(call);
   const wasSequence = isImageSequence(data);
   const oldName = folderAndName(String(data.path || "")).name;
@@ -73064,22 +73801,22 @@ async function relinkTarget(call, data, path39, searchFolder) {
     const found = listing2.files.find((f3) => folderAndName(f3).name === oldName);
     return found ? { mediaPath: found, sequence: null } : null;
   }
-  const listing = await list2(path39);
+  const listing = await list2(path40);
   if (wasSequence) {
     if (listing.kind === "directory") {
       const folder2 = listing.path ?? folderAndName(listing.files[0] ?? "").folder;
       const found = firstSequenceFrame(folder2, namesIn(folder2, listing.files));
-      if (!found) throw new ToolError(`no numbered image sequence in ${pyReprString(path39)}`);
+      if (!found) throw new ToolError(`no numbered image sequence in ${pyReprString(path40)}`);
       return { mediaPath: found.first, sequence: found.sequence };
     }
-    const file3 = listing.kind === "file" ? listing.files[0] : listing.path ?? path39;
+    const file3 = listing.kind === "file" ? listing.files[0] : listing.path ?? path40;
     const folder = folderAndName(file3).folder;
     const folderListing = folder ? await list2(folder) : null;
     const sequence = folderListing?.kind === "directory" ? detectImageSequence(file3, namesIn(folder, folderListing.files)) : null;
-    if (!sequence) throw new ToolError(`${pyReprString(path39)} is not a frame of a numbered image sequence (this file is a sequence)`);
+    if (!sequence) throw new ToolError(`${pyReprString(path40)} is not a frame of a numbered image sequence (this file is a sequence)`);
     return { mediaPath: file3, sequence };
   }
-  if (listing.kind !== "file") throw new ToolError(`no file at ${pyReprString(path39)}`);
+  if (listing.kind !== "file") throw new ToolError(`no file at ${pyReprString(path40)}`);
   return { mediaPath: listing.files[0], sequence: null };
 }
 async function relinked(call, data, target) {
@@ -73115,14 +73852,14 @@ async function relinked(call, data, target) {
   const sameContent2 = !(oldSha && fingerprint2) ? null : oldSha === fingerprint2.sha256;
   return { mediaPath: imported.path, record: record5, sameContent: sameContent2 };
 }
-async function probeReader(call, path39) {
+async function probeReader(call, path40) {
   let info;
   try {
-    info = await call.host.media.probe(path39);
+    info = await call.host.media.probe(path40);
   } catch {
-    throw new ToolError(`libopenshot cannot read ${pyReprString(path39)} as media`);
+    throw new ToolError(`libopenshot cannot read ${pyReprString(path40)} as media`);
   }
-  if (!(Number(info.duration) > 0)) throw new ToolError(`libopenshot cannot read ${pyReprString(path39)} as media`);
+  if (!(Number(info.duration) > 0)) throw new ToolError(`libopenshot cannot read ${pyReprString(path40)} as media`);
   const { media_type: _mt, ...reader } = info;
   return reader;
 }
@@ -73135,9 +73872,9 @@ async function updateProjectFiles(call, input4) {
   const startArg = input4.source_start_seconds ?? null;
   const endArg = input4.source_end_seconds ?? null;
   const inOut = startArg !== null || endArg !== null;
-  const path39 = String(input4.path ?? "").trim();
+  const path40 = String(input4.path ?? "").trim();
   const searchFolder = String(input4.search_folder ?? "").trim();
-  const relink = Boolean(path39 || searchFolder);
+  const relink = Boolean(path40 || searchFolder);
   const resetInOut = input4.reset_in_out ?? false;
   const fps2 = input4.fps ?? 0;
   const renameClips = input4.rename_clips ?? false;
@@ -73146,7 +73883,7 @@ async function updateProjectFiles(call, input4) {
       "nothing to change: pass name, tags/add_tags/remove_tags, path or search_folder, source_start/end_seconds, reset_in_out or fps"
     );
   }
-  const single3 = [["name", name], ["path", path39], ["source_start/end_seconds", inOut]].filter(([, used]) => used).map(([label2]) => label2);
+  const single3 = [["name", name], ["path", path40], ["source_start/end_seconds", inOut]].filter(([, used]) => used).map(([label2]) => label2);
   if (single3.length > 0 && files.length > 1) throw new ToolError(`${single3.join(" and ")} apply to one file; ${files.length} were chosen`);
   if (input4.path && input4.search_folder) throw new ToolError("pass path or search_folder, not both");
   if (inOut && resetInOut) throw new ToolError("pass source_start/end_seconds or reset_in_out, not both");
@@ -73169,7 +73906,7 @@ async function updateProjectFiles(call, input4) {
       );
     }
     for (const f3 of files) {
-      const target = await relinkTarget(call, f3, path39, searchFolder);
+      const target = await relinkTarget(call, f3, path40, searchFolder);
       if (!target) {
         notFound.push(displayName(f3));
         continue;
@@ -73552,14 +74289,14 @@ function maskTransitions(project) {
 function byStart(items) {
   return items.map((t, i) => ({ t, i })).sort((x, y) => span3(x.t)[0] - span3(y.t)[0] || layerOf3(x.t) - layerOf3(y.t) || x.i - y.i).map(({ t }) => t);
 }
-function stem5(path39) {
-  const base = path39.split(/[\\/]/).pop() ?? path39;
+function stem5(path40) {
+  const base = path40.split(/[\\/]/).pop() ?? path40;
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(0, dot) : base;
 }
 function maskName(data) {
-  const path39 = String(transitionMaskReader(data).path || data.resource || "");
-  return path39 ? stem5(path39) : "";
+  const path40 = String(transitionMaskReader(data).path || data.resource || "");
+  return path40 ? stem5(path40) : "";
 }
 function firstValue(kf) {
   const points2 = kf && typeof kf === "object" && Array.isArray(kf.Points) ? kf.Points : [];
@@ -73708,8 +74445,8 @@ function ensureUnlocked2(project, items) {
   const locked = [...new Set(items.filter((i) => lockedLayers.has(layerOf3(i))).map((i) => uiTrack(project, layerOf3(i)) || layerOf3(i)))].sort((a, b) => a - b);
   if (locked.length > 0) throw new ToolError(`track(s) ${pyRepr2(locked)} are locked; unlock them first`);
 }
-function isAbsolutePath2(path39) {
-  return path39.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path39) || path39.startsWith("\\\\");
+function isAbsolutePath2(path40) {
+  return path40.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path40) || path40.startsWith("\\\\");
 }
 async function pickMask(call, name) {
   const raw = name.trim();
@@ -74497,12 +75234,12 @@ function segmentIndex(url2) {
   return m ? Number.parseInt(m[1], 10) : 1e6;
 }
 function mgFileName(url2) {
-  const path39 = url2.split("?")[0].replace(/\/+$/, "");
-  let raw = decodeURIComponent(path39.split("/").pop() || "motion_segment.mp4");
+  const path40 = url2.split("?")[0].replace(/\/+$/, "");
+  let raw = decodeURIComponent(path40.split("/").pop() || "motion_segment.mp4");
   const dot = raw.lastIndexOf(".");
   const ext = dot >= 0 ? raw.slice(dot).toLowerCase() : "";
   if (![".mp4", ".webm", ".mov", ".mkv", ".avi"].includes(ext)) {
-    raw = `${(dot >= 0 ? raw.slice(0, dot) : raw) || "motion_segment"}${path39.toLowerCase().endsWith(".webm") || path39.toLowerCase().includes("/output.webm") ? ".webm" : ".mp4"}`;
+    raw = `${(dot >= 0 ? raw.slice(0, dot) : raw) || "motion_segment"}${path40.toLowerCase().endsWith(".webm") || path40.toLowerCase().includes("/output.webm") ? ".webm" : ".mp4"}`;
   }
   return raw;
 }
@@ -74957,14 +75694,14 @@ function canTrackBeats(call) {
 async function beatsOfFile(call, file3) {
   const decode4 = call.host.audio?.decodePcm;
   if (!decode4) return "Error: this Zenvi surface cannot decode audio for beat tracking.";
-  const path39 = String(file3.path ?? "");
-  if (!path39) return `Error: file ${file3.id} has no media path.`;
+  const path40 = String(file3.path ?? "");
+  if (!path40) return `Error: file ${file3.id} has no media path.`;
   try {
-    const { samples, sampleRate } = await decode4(path39, { sampleRate: BEAT_SAMPLE_RATE, maxSeconds: MAX_SECONDS, signal: call.signal });
+    const { samples, sampleRate } = await decode4(path40, { sampleRate: BEAT_SAMPLE_RATE, maxSeconds: MAX_SECONDS, signal: call.signal });
     return { ...detectBeats(samples, sampleRate), duration: samples.length / sampleRate };
   } catch (error62) {
     const message = error62 instanceof Error ? error62.message : String(error62);
-    call.host.log?.(`decodePcm(${path39}) failed: ${message}`);
+    call.host.log?.(`decodePcm(${path40}) failed: ${message}`);
     return /no audio stream/i.test(message) ? `Error: ${file3.id} has no audio.` : `Error: Beat detection failed: ${message}`;
   }
 }
@@ -75043,8 +75780,8 @@ async function writeDrawings(call, plan, prefix) {
     if (layer2.source.kind !== "svg") continue;
     const name = `${prefix}-${layer2.source.name}.svg`;
     try {
-      const path39 = await media.writeGenerated(name, new TextEncoder().encode(layer2.source.svg), "image/svg+xml");
-      out.set(layer2.name, { path: path39, info: await media.probe(path39), name });
+      const path40 = await media.writeGenerated(name, new TextEncoder().encode(layer2.source.svg), "image/svg+xml");
+      out.set(layer2.name, { path: path40, info: await media.probe(path40), name });
     } catch (error62) {
       return `Error: could not write the template's drawing ${name}: ${error62 instanceof Error ? error62.message : String(error62)}`;
     }
@@ -75822,15 +76559,15 @@ var init_playback = __esm({
             startPlaying(call);
             return `Loaded and playing: ${basename2(String(file3.path ?? "")) || fileId}`;
           }
-          const path39 = text(input4.file_path);
-          if (!path39) return "Error: watch_clip_tool needs timeline_clip_id, query, file_id or file_path.";
+          const path40 = text(input4.file_path);
+          if (!path40) return "Error: watch_clip_tool needs timeline_clip_id, query, file_id or file_path.";
           const importPath = call.host.media?.importPath;
           if (!importPath) return unavailable("watch_clip_tool", "it cannot open local file paths; pass file_id or timeline_clip_id.");
           let media;
           try {
-            media = await importPath.call(call.host.media, path39);
+            media = await importPath.call(call.host.media, path40);
           } catch (error62) {
-            return `Error: Could not import file into media bin: ${path39} (${error62 instanceof Error ? error62.message : String(error62)})`;
+            return `Error: Could not import file into media bin: ${path40} (${error62 instanceof Error ? error62.message : String(error62)})`;
           }
           const existing = (call.doc.project.files ?? []).find((f3) => f3.path === media.path);
           if (existing) {
@@ -75842,7 +76579,7 @@ var init_playback = __esm({
           }
           player.seek(timelineStart(call.doc.project));
           startPlaying(call);
-          return `Loaded and playing: ${basename2(path39)}`;
+          return `Loaded and playing: ${basename2(path40)}`;
         }
       })
     ];
@@ -76038,25 +76775,25 @@ var init_project2 = __esm({
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
         requires: ["storage"],
         run: async (call, input4) => {
-          let path39 = text(input4.path) || text(input4.file_path);
-          if (path39 && !PROJECT_EXTS.some((ext) => path39.endsWith(ext))) path39 += ".zvn";
-          const location = await call.host.storage.save(call.doc.toJSON(), path39 || void 0);
-          return `Project saved to ${location || path39}.`;
+          let path40 = text(input4.path) || text(input4.file_path);
+          if (path40 && !PROJECT_EXTS.some((ext) => path40.endsWith(ext))) path40 += ".zvn";
+          const location = await call.host.storage.save(call.doc.toJSON(), path40 || void 0);
+          return `Project saved to ${location || path40}.`;
         }
       }),
       contractTool("open_project_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
         requires: ["storage"],
         run: async (call, input4) => {
-          const path39 = text(input4.file_path);
-          if (!path39) return "Error: give file_path (a .zvn project) or recent_index.";
-          const project = await call.host.storage.open(path39);
+          const path40 = text(input4.file_path);
+          if (!path40) return "Error: give file_path (a .zvn project) or recent_index.";
+          const project = await call.host.storage.open(path40);
           if (input4.save_first) {
             const refusal = await saveCurrent(call, "open_project_tool");
             if (refusal) return refusal;
           }
           call.doc.load(project);
-          return `Opened project ${path39}.`;
+          return `Opened project ${path40}.`;
         }
       }),
       contractTool("undo_tool", {
@@ -76161,8 +76898,8 @@ async function buildMotionReel(call, input4) {
         if (layer2.source.kind !== "svg") continue;
         const name = `reel-${scene.name}-${i + 1}-${layer2.source.name}.svg`;
         try {
-          const path39 = await call.host.media.writeGenerated(name, new TextEncoder().encode(layer2.source.svg), "image/svg+xml");
-          written.set(layer2.name, { path: path39, info: await call.host.media.probe(path39), name });
+          const path40 = await call.host.media.writeGenerated(name, new TextEncoder().encode(layer2.source.svg), "image/svg+xml");
+          written.set(layer2.name, { path: path40, info: await call.host.media.probe(path40), name });
         } catch (error62) {
           return failed(TOOL2, `Error: failed to write the reel's drawings: ${error62 instanceof Error ? error62.message : String(error62)}`);
         }
@@ -76390,8 +77127,8 @@ function flashIndexes(style, shots) {
 }
 async function writeCard(call, name, svg) {
   const media = call.host.media;
-  const path39 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
-  return { path: path39, info: await media.probe(path39), name };
+  const path40 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+  return { path: path40, info: await media.probe(path40), name };
 }
 function reelTracks(tx) {
   while (tx.project.layers.length < TRACKS.length) addTrack(tx, {});
@@ -77280,10 +78017,10 @@ var init_search = __esm({
 function capitalized(message) {
   return message ? message[0].toUpperCase() + message.slice(1) : message;
 }
-function failureReceipt(tool, failure2) {
-  if (failure2.kind === "no_audio") return unchanged(tool, NO_AUDIO_MESSAGE, { data: { reason: "no_audio" } });
-  if (failure2.kind === "unavailable") return unavailable(tool, `${failure2.message}; the media has no indexed transcript either.`);
-  return failed(tool, `Error: ${capitalized(failure2.message.replace(/\.$/, ""))}.`);
+function failureReceipt(tool, failure3) {
+  if (failure3.kind === "no_audio") return unchanged(tool, NO_AUDIO_MESSAGE, { data: { reason: "no_audio" } });
+  if (failure3.kind === "unavailable") return unavailable(tool, `${failure3.message}; the media has no indexed transcript either.`);
+  return failed(tool, `Error: ${capitalized(failure3.message.replace(/\.$/, ""))}.`);
 }
 function compactRows(words3) {
   return words3.map((w) => [w.index, w.text, w.startFrame]);
@@ -77760,8 +78497,8 @@ var init_speech_tools = __esm({
           const project = call.doc.project;
           const clip2 = (project.clips ?? []).find((c) => String(c.id) === clipId2);
           if (!clip2) return refused(tool, `Error: Unknown clipId '${clipId2}'.`);
-          const path39 = mediaPathOf(fileOfClip(project, clip2), clip2);
-          if (!path39) return refused(tool, "Error: Clip has no readable media path.");
+          const path40 = mediaPathOf(fileOfClip(project, clip2), clip2);
+          if (!path40) return refused(tool, "Error: Clip has no readable media path.");
           const minPause = input4.minPauseSec ?? 0.4;
           const pad3 = input4.padSec ?? 0.08;
           const maxFrac = input4.maxRemoveFraction ?? 0.85;
@@ -77775,7 +78512,7 @@ var init_speech_tools = __esm({
           if (duration3 <= 0) return unchanged(tool, "Clip has zero duration.");
           let speech;
           try {
-            const envelope = await call.host.audio.analyzeAudio(path39, { signal: call.signal });
+            const envelope = await call.host.audio.analyzeAudio(path40, { signal: call.signal });
             speech = energyVadWindows(envelope, { minSpeechSec: 0.12, minSilenceSec: minPause });
           } catch (error62) {
             return failed(tool, `Error: VAD failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
@@ -77813,8 +78550,8 @@ var init_speech_tools = __esm({
         requires: ["storage"],
         run: async (call, input4) => {
           const tool = "export_captions_tool";
-          const path39 = text(input4.path);
-          if (!path39) return refused(tool, "Error: path is required.");
+          const path40 = text(input4.path);
+          if (!path40) return refused(tool, "Error: path is required.");
           const writeText = call.host.storage.writeText;
           if (!writeText) return unavailable(tool, "this host cannot write files.");
           const transcript = await runTranscript(
@@ -77831,17 +78568,17 @@ var init_speech_tools = __esm({
           const body = format === "vtt" ? cuesToVtt(cues, fps2) : cuesToSrt(cues, fps2);
           let location;
           try {
-            location = await writeText.call(call.host.storage, path39, body, format === "vtt" ? "text/vtt" : "application/x-subrip");
+            location = await writeText.call(call.host.storage, path40, body, format === "vtt" ? "text/vtt" : "application/x-subrip");
           } catch (error62) {
             return failed(tool, `Error: write failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
           }
           const data = record4(transcript.receipt.data);
           return applied(
             tool,
-            `Exported ${cues.length} cue(s) to ${location || path39}.`,
+            `Exported ${cues.length} cue(s) to ${location || path40}.`,
             {
               warnings: transcript.receipt.warnings,
-              data: { path: location || path39, format, count: cues.length, transcriptionSource: data.transcriptionSource ?? INDEX_SOURCE, wordTiming: data.wordTiming }
+              data: { path: location || path40, format, count: cues.length, transcriptionSource: data.transcriptionSource ?? INDEX_SOURCE, wordTiming: data.wordTiming }
             },
             0
           );
@@ -79957,8 +80694,8 @@ var init_tracks_nav = __esm({
 });
 
 // ../engine/src/tools/catalog/title-templates.ts
-function basename5(path39) {
-  return String(path39 ?? "").split(/[\\/]/).pop() ?? "";
+function basename5(path40) {
+  return String(path40 ?? "").split(/[\\/]/).pop() ?? "";
 }
 function errorMessage(error62) {
   return error62 instanceof Error ? error62.message : String(error62);
@@ -80049,11 +80786,11 @@ function titleFiles(project) {
   return project.files.filter((f3) => String(f3.path ?? "").toLowerCase().endsWith(".svg") && f3.zenvi_role !== OVERLAY_ROLE);
 }
 async function readProjectSvg(call, file3) {
-  const path39 = String(file3.path ?? "");
-  if (path39.startsWith("@emojis/") && call.host.assets) return call.host.assets.readText(`emojis/${path39.slice("@emojis/".length)}`);
+  const path40 = String(file3.path ?? "");
+  if (path40.startsWith("@emojis/") && call.host.assets) return call.host.assets.readText(`emojis/${path40.slice("@emojis/".length)}`);
   const readText = call.host.storage?.readText;
   if (!readText) throw new Error("this Zenvi surface cannot read project files");
-  return readText.call(call.host.storage, path39);
+  return readText.call(call.host.storage, path40);
 }
 function clipsOf(project, fileId) {
   return project.clips.filter((c) => c.file_id === fileId);
@@ -80062,8 +80799,8 @@ async function projectTitles(call, query2) {
   const project = call.doc.project;
   const out = [];
   for (const f3 of titleFiles(project)) {
-    const path39 = String(f3.path);
-    const entry = { file_id: f3.id, name: f3.name || basename5(path39), path: path39 };
+    const path40 = String(f3.path);
+    const entry = { file_id: f3.id, name: f3.name || basename5(path40), path: path40 };
     try {
       const doc = parseTitleSvg(await readProjectSvg(call, f3));
       entry.fields = fieldRows(titleFields(doc));
@@ -80081,8 +80818,8 @@ async function projectTitles(call, query2) {
   return out;
 }
 function svgTitle(file3) {
-  const path39 = String(file3.path ?? "");
-  if (!path39.toLowerCase().endsWith(".svg")) toolError(`${pyReprString(String(file3.name || basename5(path39)))} is not a title (only .svg titles can be edited)`);
+  const path40 = String(file3.path ?? "");
+  if (!path40.toLowerCase().endsWith(".svg")) toolError(`${pyReprString(String(file3.name || basename5(path40)))} is not a title (only .svg titles can be edited)`);
   if (file3.zenvi_role === OVERLAY_ROLE) toolError("that clip is a caption/timer overlay; use edit_captions_tool or add_timer_tool");
   return file3;
 }
@@ -80137,14 +80874,14 @@ async function resolveTitle(call, clipId2, fileId, titleQuery) {
 }
 async function writeTitle(call, name, svg) {
   const media = call.host.media;
-  let path39;
+  let path40;
   try {
-    path39 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path40 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return toolError(`failed to write title SVG: ${errorMessage(error62)}`);
   }
   try {
-    return { path: path39, info: await media.probe(path39), name };
+    return { path: path40, info: await media.probe(path40), name };
   } catch {
     return toolError(`could not import ${name} into Project Files`);
   }
@@ -80399,11 +81136,11 @@ var init_title_templates = __esm({
 });
 
 // ../engine/src/tools/catalog/titles.ts
-function basename6(path39) {
-  return String(path39).split(/[\\/]/).pop() ?? "";
+function basename6(path40) {
+  return String(path40).split(/[\\/]/).pop() ?? "";
 }
-function isAbsolutePath3(path39) {
-  return path39.startsWith("/") || path39.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path39);
+function isAbsolutePath3(path40) {
+  return path40.startsWith("/") || path40.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path40);
 }
 async function loadTitleTemplate(call, template) {
   const tmpl = template.trim();
@@ -80439,19 +81176,19 @@ function titleFileName(body, fileName2) {
 async function prepareTitle(call, template, body, options) {
   const media = call.host.media;
   const name = titleFileName(body, options.fileName);
-  let path39;
+  let path40;
   try {
     const svg = setSvgText(template.svg, body);
-    path39 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path40 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return `Error: failed to write title SVG: ${error62 instanceof Error ? error62.message : String(error62)}`;
   }
   let imported;
   try {
-    const info = await media.probe(path39);
-    imported = { path: path39, info, name };
+    const info = await media.probe(path40);
+    imported = { path: path40, info, name };
   } catch {
-    return `Error: could not import title into media bin: ${path39}`;
+    return `Error: could not import title into media bin: ${path40}`;
   }
   const placed = await planPlacement(call, provisionalFile(imported), {
     position_seconds: options.position,
@@ -80619,6 +81356,333 @@ ID: ${t.id}, Duration: ${pyFixed(t.end - t.start, 2)}s, Position: ${pyFixed(t.po
   }
 });
 
+// ../engine/src/tools/catalog/web-video.ts
+function jobsOf(media) {
+  let jobs = JOBS.get(media);
+  if (!jobs) {
+    jobs = new IngestJobs();
+    JOBS.set(media, jobs);
+  }
+  return jobs;
+}
+function newJobId() {
+  const c = globalThis.crypto;
+  return c?.randomUUID ? c.randomUUID() : generateId(void 0, 32).toLowerCase();
+}
+async function waitFor(job, ms, signal) {
+  if (job.settled || ms <= 0 || signal?.aborted) return;
+  let timer2;
+  let onAbort;
+  await Promise.race([
+    job.fetched,
+    new Promise((resolve) => {
+      timer2 = setTimeout(resolve, ms);
+    }),
+    new Promise((resolve) => {
+      if (!signal) return;
+      onAbort = () => resolve();
+      signal.addEventListener("abort", onAbort, { once: true });
+    })
+  ]);
+  clearTimeout(timer2);
+  if (onAbort) signal?.removeEventListener("abort", onAbort);
+}
+function failPayload(reason, url2 = "", intent = "") {
+  let msg = (reason || "Ingest failed.").trim().split(/\s+/).filter(Boolean).join(" ");
+  if (pyLen(msg) > 280) msg = `${pySlice(msg, 0, 277)}...`;
+  return { ok: false, status: "failed", error: msg, url: url2, intent, file_id: "", placed: false, message: msg, next: FAIL_NEXT };
+}
+function refuse2(reason, url2 = "", intent = "") {
+  const data = failPayload(reason.replace(/^Error:\s*/, ""), url2, intent);
+  return refused(TOOL4, `Error: ${String(data.error)}`, { data });
+}
+function runningPayload(job) {
+  return {
+    ok: true,
+    status: "running",
+    job_id: job.id,
+    url: job.url,
+    intent: job.intent,
+    file_id: "",
+    placed: false,
+    message: RUNNING_MESSAGE,
+    next: `Call ingest_web_video_tool(job_id="${job.id}") again \u2014 the tool waits until the download finishes or ~45s, then returns. Do not start another download of the same URL. A client 'operation timed out' is not failure \u2014 keep calling this job_id.`
+  };
+}
+function summaryOf(data) {
+  const lines2 = [String(data.message ?? "")];
+  if (data.placed === true && typeof data.placement === "string" && data.placement) lines2.push(data.placement);
+  if (typeof data.error === "string" && data.error) lines2.push(data.error);
+  if (typeof data.next === "string" && data.next) lines2.push(data.next);
+  return lines2.filter(Boolean).join("\n");
+}
+function jobPayload(job, payload) {
+  return { ...payload, status: payload.ok === true ? "completed" : "failed", job_id: job.id };
+}
+function failure2(job, reason) {
+  const data = jobPayload(job, failPayload(reason, job.url, job.intent));
+  const answer = () => failed(TOOL4, `Error: ${String(data.error)}`, { data });
+  return { fresh: answer(), replay: answer };
+}
+function sizeMb2(media) {
+  const bytes = Number(media.fingerprint?.size ?? media.info.file_size ?? 0);
+  return Number.isFinite(bytes) ? bytes / (1024 * 1024) : 0;
+}
+function webVideoTags(intent, isYoutube) {
+  const tags = [];
+  for (const tag of ["web_video", intent, isYoutube ? "youtube" : "web"]) if (!tags.includes(tag)) tags.push(tag);
+  if (intent === "recreate") tags.push("reference_only");
+  return tags.join(", ");
+}
+async function importDownload(call, job) {
+  if (job.error !== void 0) {
+    if (isWebVideoError(job.error) && job.error.code === "unavailable") {
+      const reason = job.error.message;
+      const answer = () => unavailable(TOOL4, reason);
+      return { fresh: answer(), replay: answer };
+    }
+    return failure2(job, humanizeIngestFailure(job.error));
+  }
+  const download2 = job.download;
+  const direct = download2.direct;
+  let media;
+  try {
+    media = await call.host.media.importPath.call(call.host.media, download2.path);
+  } catch (error62) {
+    const why = error62 instanceof Error ? error62.message : String(error62);
+    return failure2(job, direct ? `Could not import the file into the media bin: ${why}` : `Downloaded OK but import into the project failed: ${why}`);
+  }
+  const patch = direct ? {} : { tags: webVideoTags(job.intent, download2.isYoutube), ...download2.title ? { name: pySlice(download2.title, 0, 120) } : {} };
+  let placementError = "";
+  let plan;
+  if (job.place) {
+    plan = await planPlacement(call, provisionalFile(media, patch), { position_seconds: job.positionSeconds ?? "", track: job.track ?? "" });
+    placementError = typeof plan === "string" ? plan : lockedTrackError(plan.layer, call.doc.project.layers);
+  }
+  const { file: file3, clip: clip2 } = call.commit((tx) => {
+    const added = addFile(tx, media, { ...patch.name ? { name: patch.name } : {}, ...patch.tags ? { tags: patch.tags } : {} });
+    if (!plan || typeof plan === "string" || placementError) return { file: added, clip: void 0 };
+    return { file: added, clip: applyPlacement(tx, String(added.id), plan) };
+  });
+  const fileId = String(file3.id);
+  const placement4 = clip2 && plan && typeof plan !== "string" ? placementText(call.doc.project, plan, clip2) : placementError;
+  const placed = Boolean(clip2);
+  let payload;
+  if (direct) {
+    payload = placed ? {
+      ok: true,
+      intent: job.intent,
+      file_id: fileId,
+      placed: true,
+      url: job.url,
+      message: `\u2705 Video imported (file_id: ${fileId}, ${pyFixed(sizeMb2(media), 1)} MB) and added to the timeline.
+${placement4}`,
+      next: "Direct media URL imported and placed on the timeline.",
+      product_note: DIRECT_NOTE
+    } : {
+      ok: true,
+      intent: job.intent,
+      file_id: fileId,
+      placed: false,
+      url: job.url,
+      message: "Direct media URL imported to media bin.",
+      next: "Colour: match_color_to_reference_tool(referenceFileId=file_id). Timeline: add_clip_to_timeline_tool(file_id=...).",
+      product_note: DIRECT_NOTE
+    };
+  } else {
+    const next = [];
+    if (job.intent === "reference" || job.intent === "recreate") next.push(`Colour match: match_color_to_reference_tool(referenceFileId="${fileId}").`);
+    if (job.intent === "recreate") {
+      next.push("Recreate with the user's clips / stock_video / video_gen \u2014 do not leave the YouTube original on the story cut unless asked.");
+    }
+    if (job.intent === "timeline" && !placed) next.push(`Place with add_clip_to_timeline_tool(file_id="${fileId}").`);
+    if (download2.subtitlePaths.length > 0) next.push("Subtitles cached (paths in subtitle_paths); caption tool can consume later.");
+    payload = {
+      ok: !job.place || placed,
+      intent: job.intent,
+      file_id: fileId,
+      placed,
+      url: download2.webpageUrl || job.url,
+      title: download2.title,
+      duration_seconds: download2.durationSeconds,
+      extractor: download2.extractor,
+      is_youtube: download2.isYoutube,
+      subtitle_paths: download2.subtitlePaths,
+      cache_purged: download2.cachePurged,
+      placement: job.place ? placement4 : "",
+      message: `Ingested \u201C${download2.title || "video"}\u201D as media_bin file_id=${fileId}.`,
+      next: next.join(" "),
+      product_note: PAGE_NOTE,
+      undo: "one step"
+    };
+  }
+  if (job.place && !placed) {
+    payload.ok = false;
+    payload.error = placementError || "Timeline placement failed after import.";
+    payload.message = `Imported to media bin as file_id=${fileId}, but timeline placement failed.`;
+    payload.next = `Place with add_clip_to_timeline_tool(file_id="${fileId}").`;
+  }
+  const data = jobPayload(job, payload);
+  const summary = summaryOf(data);
+  const warnings = placed || !job.place ? [] : [String(data.error)];
+  return {
+    fresh: applied(TOOL4, summary, { data, warnings }),
+    replay: () => unchanged(TOOL4, summary, { data, warnings })
+  };
+}
+async function settle2(call, jobs, job, waitSeconds) {
+  await waitFor(job, waitSeconds * 1e3, call.signal);
+  if (job.final) return job.final.replay();
+  if (!job.settled) {
+    const data = runningPayload(job);
+    return unchanged(TOOL4, `${String(data.message)} ${String(data.next)}`, { data });
+  }
+  if (job.importing) return (await job.importing).replay();
+  job.importing = importDownload(call, job).catch((error62) => failure2(job, `Downloaded OK but import into the project failed: ${error62 instanceof Error ? error62.message : String(error62)}`)).then((final) => {
+    jobs.finish(job, final);
+    return final;
+  });
+  return (await job.importing).fresh;
+}
+function truthy3(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+var TOOL4, INGEST_WAIT, HOSTED_WEB_VIDEO_REASON, PAGE_NOTE, DIRECT_NOTE, FAIL_NEXT, RUNNING_MESSAGE, IngestJobs, JOBS, webVideoTools;
+var init_web_video3 = __esm({
+  "../engine/src/tools/catalog/web-video.ts"() {
+    "use strict";
+    init_files();
+    init_web_video();
+    init_ids();
+    init_define();
+    init_placement();
+    init_pyfmt();
+    init_receipt();
+    init_tracks2();
+    init_clips2();
+    init_common();
+    TOOL4 = "ingest_web_video_tool";
+    INGEST_WAIT = { firstSeconds: 25, pollSeconds: 45, jobTtlSeconds: 30 * 60 };
+    HOSTED_WEB_VIDEO_REASON = "hosted Zenvi (Zenvi Cloud, the web editor) does not download videos from web pages such as YouTube: that runs only on your own computer, in Zenvi desktop or the zenvi CLI (with yt-dlp). Use a direct link to the media file instead (import_media_from_url in Zenvi Cloud; import_video_url_and_add_to_timeline_tool also places it), or upload the file.";
+    PAGE_NOTE = "User-initiated local cache for personal reference/edit in Zenvi. Do not re-upload the original as your own content.";
+    DIRECT_NOTE = "User-initiated local import. Do not re-upload the original as your own.";
+    FAIL_NEXT = "Tell the user what failed in one short sentence. Do not retry the same URL in a loop.";
+    RUNNING_MESSAGE = "YouTube/web download still in progress \u2014 long videos can take a few minutes. This is not a failure.";
+    IngestJobs = class {
+      byId = /* @__PURE__ */ new Map();
+      inflight = /* @__PURE__ */ new Map();
+      get(id) {
+        return this.byId.get(id);
+      }
+      /** The unfinished job for this link, intent and placement, if any: a second call joins it. */
+      open(key2) {
+        const id = this.inflight.get(key2);
+        const job = id ? this.byId.get(id) : void 0;
+        return job && !job.final ? job : void 0;
+      }
+      add(job) {
+        this.byId.set(job.id, job);
+        this.inflight.set(job.key, job.id);
+      }
+      finish(job, final) {
+        job.final = final;
+        job.updatedAt = Date.now();
+        if (this.inflight.get(job.key) === job.id) this.inflight.delete(job.key);
+      }
+      /** Forget downloads that ended more than the TTL ago (_purge_stale_ingest_jobs). */
+      purge(now = Date.now()) {
+        const cutoff = now - INGEST_WAIT.jobTtlSeconds * 1e3;
+        for (const [id, job] of this.byId) {
+          if (!job.settled || job.importing && !job.final || job.updatedAt >= cutoff) continue;
+          this.byId.delete(id);
+          if (this.inflight.get(job.key) === id) this.inflight.delete(job.key);
+        }
+      }
+    };
+    JOBS = /* @__PURE__ */ new WeakMap();
+    webVideoTools = [
+      contractTool("ingest_web_video_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+        requires: ["media"],
+        run: async (call, input4) => {
+          const media = call.host.media;
+          if (!media.fetchWebVideo) return unavailable(TOOL4, HOSTED_WEB_VIDEO_REASON);
+          if (!media.importPath) return unavailable(TOOL4, "it cannot import downloaded files into the project.");
+          const jobs = jobsOf(media);
+          jobs.purge();
+          const jobId = text(input4.job_id);
+          const rawUrl = text(input4.url) || text(input4.video_url);
+          if (jobId) {
+            const job2 = jobs.get(jobId);
+            if (!job2) {
+              return refuse2(
+                `Unknown ingest job_id '${jobId}'. Pass the job_id from the status=running reply, or call again with url= to start fresh.`,
+                rawUrl,
+                text(input4.intent)
+              );
+            }
+            return settle2(call, jobs, job2, INGEST_WAIT.pollSeconds);
+          }
+          if (!rawUrl) return refuse2("Paste a YouTube (or other site) video link \u2014 url is required.");
+          let intent;
+          try {
+            intent = normalizeWebVideoIntent(input4.intent || "reference");
+          } catch (error62) {
+            return refuse2(error62 instanceof Error ? error62.message : String(error62), rawUrl);
+          }
+          if (!isProbableWebVideoUrl(rawUrl)) return refuse2(NOT_HTTP_URL_MESSAGE, rawUrl, intent);
+          const place = intent === "timeline" || intent !== "recreate" && truthy3(input4.place);
+          const subsArg = String(input4.write_subs || "").trim();
+          const writeSubs = subsArg === "" ? intent === "reference" || intent === "recreate" : truthy3(subsArg);
+          if (place) {
+            try {
+              parseSecondsArg(input4.position_seconds, null, "position_seconds");
+            } catch (error62) {
+              if (error62 instanceof TimeArgError) return refuse2(error62.message, rawUrl, intent);
+              throw error62;
+            }
+            const track2 = normalizeTrackOrLayerArg(input4.track === void 0 ? "" : String(input4.track), call.doc.project.layers);
+            if (track2.error) return refuse2(track2.error, rawUrl, intent);
+            if (track2.layer !== void 0) {
+              const locked = lockedTrackError(track2.layer, call.doc.project.layers);
+              if (locked) return refuse2(locked, rawUrl, intent);
+            }
+          }
+          const key2 = `${rawUrl}\0${intent}\0${place}`;
+          const running = jobs.open(key2);
+          if (running) return settle2(call, jobs, running, INGEST_WAIT.pollSeconds);
+          const fetchVideo = media.fetchWebVideo.bind(media);
+          const job = {
+            id: newJobId(),
+            url: rawUrl,
+            intent,
+            place,
+            track: input4.track,
+            positionSeconds: input4.position_seconds,
+            key: key2,
+            settled: false,
+            updatedAt: Date.now(),
+            // The download outlives this call (no signal): later calls with the job_id collect it.
+            fetched: fetchVideo({ url: rawUrl, intent, writeSubs }).then(
+              (download2) => {
+                job.download = download2;
+              },
+              (error62) => {
+                job.error = error62;
+              }
+            ).finally(() => {
+              job.settled = true;
+              job.updatedAt = Date.now();
+            })
+          };
+          jobs.add(job);
+          return settle2(call, jobs, job, INGEST_WAIT.firstSeconds);
+        }
+      })
+    ];
+  }
+});
+
 // ../engine/src/tools/registry.ts
 function unknownToolMessage(name) {
   return `Error: ${name} is not available in this Zenvi surface`;
@@ -80641,6 +81705,8 @@ function buildCatalog2() {
     ...inspectTools,
     ...speechTools,
     ...generationTools,
+    ...webVideoTools,
+    ...comfyuiRecordingTools,
     ...transitionTools,
     ...mediaFilesTransitionTools,
     ...mediaFilesTools,
@@ -80715,6 +81781,7 @@ var init_registry4 = __esm({
     init_clip_props2();
     init_clips2();
     init_color_agent2();
+    init_comfyui_recording();
     init_direct();
     init_effects_color();
     init_effects_color_analysis();
@@ -80743,6 +81810,7 @@ var init_registry4 = __esm({
     init_title_templates();
     init_titles2();
     init_transitions3();
+    init_web_video3();
     init_define();
     init_pending();
     init_receipt();
@@ -80765,6 +81833,7 @@ function needName(need) {
     "media.pickFiles": "a file picker",
     "media.writeGenerated": "storing generated media",
     "media.missing": "checking for missing media",
+    "media.fetchWebVideo": "fetching videos from web pages, which only runs on the person's own computer (the zenvi CLI with yt-dlp)",
     "storage.open": "opening project files",
     "storage.readText": "reading files",
     "storage.writeText": "writing files",
@@ -80789,7 +81858,7 @@ function onSurface(tool, surface) {
   const missing = [...tool.requires ?? [], ...needs.methods ?? []].filter((n) => !has(profile, n));
   if (needs.anyOf && !needs.anyOf.some((n) => has(profile, n))) missing.push(...needs.anyOf);
   if (missing.length > 0) return { level: "no", note: `needs ${[...new Set(missing)].map(needName).join(" and ")}` };
-  const conditions = [...tool.requires ?? []].map((cap) => profile.conditional?.[cap]).filter((c) => Boolean(c));
+  const conditions = [...tool.requires ?? [], ...needs.methods ?? []].map((need) => profile.conditional?.[need]).filter((c) => Boolean(c));
   const lacking = (needs.optional ?? []).filter((n) => !has(profile, n));
   const pendingArgs = tool.contract ? PENDING_DESKTOP_ARGS[tool.name] ?? [] : [];
   const notes = [
@@ -80816,7 +81885,7 @@ function toolAvailability(tool) {
 function availabilityMatrix(tools) {
   return tools.map((tool) => ({ tool, availability: toolAvailability(tool) }));
 }
-var WATCH, SERVER_ASR, WATCH_NOTE, TOOL_NEEDS, SURFACE_PROFILES;
+var WATCH, SERVER_ASR, WATCH_NOTE, COMFYUI, TOOL_NEEDS, SURFACE_PROFILES;
 var init_availability = __esm({
   "../engine/src/tools/availability.ts"() {
     "use strict";
@@ -80825,6 +81894,7 @@ var init_availability = __esm({
     WATCH = ["frames", "backend"];
     SERVER_ASR = "speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free";
     WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
+    COMFYUI = "the local ComfyUI server Zenvi desktop drives (Preferences > AI > ComfyUI URL)";
     TOOL_NEEDS = {
       // Placement and search refine with a vision watch when the host can watch.
       add_clip_to_timeline_tool: { optional: WATCH, partialNote: WATCH_NOTE },
@@ -80846,6 +81916,9 @@ var init_availability = __esm({
       fetch_motion_graphics_video_tool: { methods: ["media.importUrl"] },
       fetch_remotion_video_from_supabase_tool: { methods: ["media.importUrl"] },
       generate_video_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
+      generate_image_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
+      // Hosted surfaces do not download third-party pages (terms of service, blocked server addresses): only the person's own computer does.
+      ingest_web_video_tool: { methods: ["media.fetchWebVideo"] },
       generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
       add_title_tool: { methods: ["media.writeGenerated"] },
       add_captions_tool: {
@@ -80940,7 +82013,13 @@ var init_availability = __esm({
         partialNote: "relinking (path, search_folder) needs local file access"
       },
       import_image_sequence_tool: { methods: ["media.listPaths"] },
-      manage_optimized_previews_tool: { desktopOnly: "the optimized previews (proxies) Zenvi desktop builds and plays" }
+      manage_optimized_previews_tool: { desktopOnly: "the optimized previews (proxies) Zenvi desktop builds and plays" },
+      list_comfyui_templates_tool: { desktopOnly: COMFYUI },
+      list_comfyui_jobs_tool: { desktopOnly: COMFYUI },
+      create_media_with_comfyui_tool: { desktopOnly: COMFYUI },
+      enhance_file_with_comfyui_tool: { desktopOnly: COMFYUI },
+      cancel_comfyui_job_tool: { desktopOnly: COMFYUI },
+      prepare_recording_tool: { desktopOnly: "the Recording dock (microphone, screen and webcam capture)" }
     };
     SURFACE_PROFILES = {
       editor: {
@@ -80974,13 +82053,14 @@ var init_availability = __esm({
           "media.importUrl",
           "media.writeGenerated",
           "media.missing",
+          "media.fetchWebVideo",
           "storage.open",
           "storage.readText",
           "storage.writeText",
           "audio.decodePcm",
           "audio.transcribe"
         ],
-        conditional: { backend: "signed in with zenvi login" }
+        conditional: { backend: "signed in with zenvi login", "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks" }
       },
       cloud: {
         title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
@@ -81569,8 +82649,8 @@ var init_parseUtil = __esm({
     init_errors5();
     init_en2();
     makeIssue = (params) => {
-      const { data, path: path39, errorMaps, issueData } = params;
-      const fullPath = [...path39, ...issueData.path || []];
+      const { data, path: path40, errorMaps, issueData } = params;
+      const fullPath = [...path40, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -81854,11 +82934,11 @@ var init_types5 = __esm({
     init_parseUtil();
     init_util2();
     ParseInputLazyPath = class {
-      constructor(parent, value, path39, key2) {
+      constructor(parent, value, path40, key2) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value;
-        this._path = path39;
+        this._path = path40;
         this._key = key2;
       }
       get path() {
@@ -85314,11 +86394,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path39) {
-  if (path39.length === 0) {
+function getDotPath(path40) {
+  if (path40.length === 0) {
     return "object root";
   }
-  return path39.reduce((acc, seg, index) => {
+  return path40.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -92679,13 +93759,13 @@ var require_utils = __commonJS({
       }
       return true;
     }
-    function compressIPv6ZeroRun(hextets) {
+    function compressIPv6ZeroRun(hextets2) {
       let bestStart = -1;
       let bestLength = 0;
       let runStart = -1;
       let runLength = 0;
-      for (let i = 0; i < hextets.length; i++) {
-        if (hextets[i] === "0") {
+      for (let i = 0; i < hextets2.length; i++) {
+        if (hextets2[i] === "0") {
           if (runStart === -1) runStart = i;
           runLength++;
           if (runLength > bestLength) {
@@ -92697,9 +93777,9 @@ var require_utils = __commonJS({
           runLength = 0;
         }
       }
-      if (bestLength < 2) return hextets.join(":");
-      const head = hextets.slice(0, bestStart).join(":");
-      const tail = hextets.slice(bestStart + bestLength).join(":");
+      if (bestLength < 2) return hextets2.join(":");
+      const head = hextets2.slice(0, bestStart).join(":");
+      const tail = hextets2.slice(bestStart + bestLength).join(":");
       return head + "::" + tail;
     }
     function normalizeIPv6Address(input4) {
@@ -92770,8 +93850,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path39) {
-      let input4 = path39;
+    function removeDotSegments(path40) {
+      let input4 = path40;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -92848,8 +93928,8 @@ var require_utils = __commonJS({
     var HOST_DELIMS = { "@": "%40", "/": "%2F", "?": "%3F", "#": "%23", ":": "%3A" };
     var HOST_DELIM_RE = /[@/?#:]/g;
     var HOST_DELIM_NO_COLON_RE = /[@/?#]/g;
-    function reescapeHostDelimiters(host, isIP) {
-      const re = isIP ? HOST_DELIM_NO_COLON_RE : HOST_DELIM_RE;
+    function reescapeHostDelimiters(host, isIP3) {
+      const re = isIP3 ? HOST_DELIM_NO_COLON_RE : HOST_DELIM_RE;
       re.lastIndex = 0;
       return host.replace(re, (ch) => HOST_DELIMS[ch]);
     }
@@ -93180,8 +94260,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path39 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path39 && path39 !== "/" ? path39 : void 0;
+        const path40 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path40 && path40 !== "/" ? path40 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -93538,8 +94618,8 @@ var require_fast_uri = __commonJS({
       const host = matches3[4];
       return hasMalformedPercentEncoding(matches3[3]) || host !== void 0 && !isIPLiteral(host) && hasMalformedPercentEncoding(host) || hasMalformedPercentEncoding(matches3[6]) || hasMalformedPercentEncoding(matches3[7]) || hasMalformedPercentEncoding(matches3[8]);
     }
-    function canonicalizeHost(parsed, options, schemeHandler, isIP) {
-      if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed.host && !isIPLiteral(parsed.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
+    function canonicalizeHost(parsed, options, schemeHandler, isIP3) {
+      if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed.host && !isIPLiteral(parsed.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP3 === false && nonSimpleDomain(parsed.host)) {
         try {
           parsed.host = new URL("http://" + parsed.host).hostname;
         } catch (e) {
@@ -93566,7 +94646,7 @@ var require_fast_uri = __commonJS({
       let malformedHost = false;
       let malformedIPLiteral = false;
       let malformedScheme = false;
-      let isIP = false;
+      let isIP3 = false;
       if (options.reference === "suffix") {
         if (options.scheme) {
           uri = options.scheme + ":" + uri;
@@ -93629,15 +94709,15 @@ var require_fast_uri = __commonJS({
             const bracketedIPLiteral = isIPLiteral(parsed.host);
             const hasIPLiteralBracket = parsed.host.indexOf("[") !== -1 || parsed.host.indexOf("]") !== -1;
             const ipv6result = normalizeIPv6(parsed.host);
-            isIP = ipv6result.isIPV6 || ipv6result.isIPVFuture === true;
+            isIP3 = ipv6result.isIPV6 || ipv6result.isIPVFuture === true;
             malformedIPLiteral = hasIPLiteralBracket && (!bracketedIPLiteral || ipv6result.error === true);
-            parsed.host = isIP ? ipv6result.host : ipv6result.host.toLowerCase();
+            parsed.host = isIP3 ? ipv6result.host : ipv6result.host.toLowerCase();
             if (malformedIPLiteral) {
               parsed.error = parsed.error || "URI host is malformed.";
               malformedAuthorityOrPort = true;
             }
           } else {
-            isIP = true;
+            isIP3 = true;
           }
         }
         if (parsed.scheme === void 0 && parsed.userinfo === void 0 && parsed.host === void 0 && parsed.port === void 0 && parsed.query === void 0 && !parsed.path) {
@@ -93654,14 +94734,14 @@ var require_fast_uri = __commonJS({
         }
         const schemeHandler = getSchemeHandler(options.scheme || parsed.scheme);
         if (!malformedIPLiteral) {
-          malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP);
+          malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP3);
         }
         if (uri.indexOf("%") !== -1 && parsed.host !== void 0 && !malformedIPLiteral) {
-          let host = isIP ? parsed.host : normalizePercentEncoding(parsed.host, true);
-          if (!isIP) {
+          let host = isIP3 ? parsed.host : normalizePercentEncoding(parsed.host, true);
+          if (!isIP3) {
             host = normalizePercentEncoding(host.toLowerCase());
           }
-          parsed.host = reescapeHostDelimiters(host, isIP);
+          parsed.host = reescapeHostDelimiters(host, isIP3);
         }
         if (!schemeHandler || schemeHandler && !schemeHandler.skipNormalize) {
           if (parsed.path) {
@@ -104971,7 +106051,7 @@ var init_client4 = __esm({
 });
 
 // src/project/session.ts
-import path21 from "node:path";
+import path22 from "node:path";
 function sameState(a, b) {
   return a?.mtimeMs === b?.mtimeMs && a?.size === b?.size;
 }
@@ -104985,7 +106065,7 @@ var init_session2 = __esm({
     ProjectSession = class _ProjectSession {
       constructor(project, file3, options) {
         this.options = options;
-        this.fileValue = file3 ? path21.resolve(file3) : void 0;
+        this.fileValue = file3 ? path22.resolve(file3) : void 0;
         this.doc = this.makeDoc(project);
         const base = createNodeHost({ ...options.host, projectFile: () => this.fileValue });
         const storage = base.storage;
@@ -104994,7 +106074,7 @@ var init_session2 = __esm({
           storage: {
             ...storage,
             open: async (p) => {
-              const target = path21.resolve(this.fileValue ? path21.dirname(this.fileValue) : process.cwd(), p);
+              const target = path22.resolve(this.fileValue ? path22.dirname(this.fileValue) : process.cwd(), p);
               const loaded = await storage.open(target);
               this.fileValue = target;
               this.openedDuringCall = true;
@@ -105002,7 +106082,7 @@ var init_session2 = __esm({
               return loaded;
             },
             save: async (project2, p) => {
-              const target = p ? path21.resolve(this.fileValue ? path21.dirname(this.fileValue) : process.cwd(), p) : this.fileValue;
+              const target = p ? path22.resolve(this.fileValue ? path22.dirname(this.fileValue) : process.cwd(), p) : this.fileValue;
               if (!target) return storage.save(project2, p);
               const saved = await withProjectLock(target, () => writeProjectFile(target, project2, { engineAssetsDir: this.assetsDir() }));
               this.fileValue = saved;
@@ -105031,7 +106111,7 @@ var init_session2 = __esm({
       }
       /** Open an existing project file. */
       static async open(file3, options) {
-        const abs = path21.resolve(file3);
+        const abs = path22.resolve(file3);
         const project = await readProjectFile(abs);
         const session = new _ProjectSession(project, abs, options);
         session.diskState = await fileState(abs);
@@ -105059,7 +106139,7 @@ var init_session2 = __esm({
       }
       /** Write the document (history included) to the session's file. */
       async save(target) {
-        const file3 = target ? path21.resolve(target) : this.fileValue;
+        const file3 = target ? path22.resolve(target) : this.fileValue;
         if (!file3) throw new Error("This project has no file yet.");
         await withProjectLock(file3, () => writeProjectFile(file3, this.doc.toJSON(), { engineAssetsDir: this.assetsDir() }));
         this.fileValue = file3;
@@ -105068,7 +106148,7 @@ var init_session2 = __esm({
       }
       /** Switch to another project (open it, or create it from `project`). */
       async switchTo(file3, project) {
-        const abs = path21.resolve(file3);
+        const abs = path22.resolve(file3);
         const loaded = project ?? await readProjectFile(abs);
         this.doc = this.makeDoc(loaded);
         this.fileValue = abs;
@@ -105223,6 +106303,7 @@ function engineChoice(flags) {
 function hostOptions(ctx) {
   return {
     backend: { baseUrl: ctx.config.backendUrl, token: () => ctx.auth.backendToken(), userAgent: `zenvi-cli/${VERSION}` },
+    env: ctx.env,
     log: ctx.env.ZENVI_DEBUG ? (m) => ctx.out.info(`[debug] ${m}`) : void 0
   };
 }
@@ -105293,9 +106374,28 @@ function printOutcome(ctx, outcome, extra = {}) {
   for (const n of receipt2?.notes ?? []) ctx.out.line(ctx.out.style(`  note: ${n}`, "dim"));
   if (outcome.engine === "desktop") ctx.out.info(ctx.out.style("(ran in the Zenvi desktop app)", "dim"));
 }
+function isRecord44(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function runningJobId(outcome) {
+  if (!outcome.ok || !outcome.receipt) return void 0;
+  let payload = outcome.receipt.data;
+  if (!isRecord44(payload)) {
+    try {
+      payload = JSON.parse(outcome.receipt.summary);
+    } catch {
+      return void 0;
+    }
+  }
+  return isRecord44(payload) && payload.status === "running" && typeof payload.job_id === "string" && payload.job_id ? payload.job_id : void 0;
+}
 async function runToolCommand(ctx, tool, args, extra) {
   return withExecutor(ctx, async (executor) => {
-    const outcome = await executor.call(tool, args);
+    let outcome = await executor.call(tool, args);
+    for (let job = runningJobId(outcome); job; job = runningJobId(outcome)) {
+      ctx.out.info(ctx.out.style(`\u2026 still running (job ${job}); waiting for it to finish`, "dim"));
+      outcome = await executor.call(tool, { job_id: job });
+    }
     printOutcome(ctx, outcome, extra);
     return outcome;
   });
@@ -105313,7 +106413,7 @@ var init_context = __esm({
 });
 
 // src/commands/account.ts
-import path22 from "node:path";
+import path23 from "node:path";
 function cloudClient(ctx) {
   return new CloudClient(ctx.config.cloudUrl, () => ctx.auth.cloudToken(), fetch, `zenvi-cli/${VERSION}`);
 }
@@ -105373,7 +106473,7 @@ If no browser opens, paste that link into one. Waiting for you to sign in\u2026`
     ctx.out.endProgress();
     await keepCloudRefs(ctx, session, result2.cloudRefs);
     if (opts.open !== false) await openUrl(result2.editorUrl, ctx.env);
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pushed ${path22.basename(file3)} to Zenvi Cloud`, engine: "portable", project: file3, ...result2 });
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pushed ${path23.basename(file3)} to Zenvi Cloud`, engine: "portable", project: file3, ...result2 });
     else {
       ctx.out.line(`${ctx.out.style("\u2713", "green")} Pushed to Zenvi Cloud: ${result2.editorUrl}`);
       ctx.out.line(ctx.out.style(`  ${result2.uploaded} media uploaded, ${result2.reused} already there${result2.skipped.length ? `, ${result2.skipped.length} skipped` : ""}`, "dim"));
@@ -105453,7 +106553,7 @@ var init_account = __esm({
 
 // src/commands/edit.ts
 import { existsSync as existsSync5 } from "node:fs";
-import path23 from "node:path";
+import path24 from "node:path";
 function parseTime(text5) {
   if (text5 === void 0) return void 0;
   const t = text5.trim().toLowerCase();
@@ -105498,14 +106598,14 @@ function fileLength(file3) {
 }
 function registerEditCommands(program2, ctx) {
   program2.command("import").description("add media files (or folders, globs) to the project bin").argument("<paths...>", "files, folders or globs").option("--index", "also send the media to the Zenvi backend for AI indexing (needs `zenvi login`)").action(async (paths, opts) => {
-    const abs = paths.map((p) => /[*?[{]/.test(p) || /^[a-z]+:\/\//i.test(p) ? p : path23.resolve(ctx.cwd, p));
+    const abs = paths.map((p) => /[*?[{]/.test(p) || /^[a-z]+:\/\//i.test(p) ? p : path24.resolve(ctx.cwd, p));
     await runToolCommand(ctx, "import_files_tool", { paths: JSON.stringify(abs), skip_indexing: opts.index ? "false" : "true" });
   });
   program2.command("add").description("put a file on the timeline (imports it first when given a path)").argument("<file>", "file id from `zenvi files`, or a media path").option("--at <time>", "timeline position (default: after the last clip on the track)").option("-t, --track <track>", "track number from the bottom, or layer").option("--start <time>", "source in point").option("--end <time>", "source out point").option("--duration <time>", "how much of the file to use, from --start (default: the whole file)").action(async (file3, opts) => {
     await withExecutor(ctx, async (executor) => {
       let fileId = file3;
       let query2;
-      const local = path23.resolve(ctx.cwd, file3);
+      const local = path24.resolve(ctx.cwd, file3);
       if (existsSync5(local)) {
         const imported = await executor.call("import_files_tool", { paths: JSON.stringify([local]), skip_indexing: "true" });
         if (!imported.ok) {
@@ -105515,10 +106615,10 @@ function registerEditCommands(program2, ctx) {
         fileId = void 0;
         if (executor instanceof PortableExecutor) {
           const files = executor.session.doc.project.files;
-          const base = path23.basename(local);
-          fileId = files.find((f3) => f3.path === local)?.id ?? [...files].reverse().find((f3) => path23.basename(String(f3.path)) === base)?.id;
+          const base = path24.basename(local);
+          fileId = files.find((f3) => f3.path === local)?.id ?? [...files].reverse().find((f3) => path24.basename(String(f3.path)) === base)?.id;
         }
-        if (!fileId) query2 = path23.basename(local);
+        if (!fileId) query2 = path24.basename(local);
       }
       const flags = { start: parseTime(opts.start), end: parseTime(opts.end), duration: parseTime(opts.duration) };
       const known = executor instanceof PortableExecutor && fileId ? executor.session.doc.project.files.find((f3) => f3.id === fileId) : void 0;
@@ -107056,10 +108156,10 @@ var init_receipt2 = __esm({
 });
 
 // ../adobe-link/src/discovery.ts
-import { readFile as readFile9, unlink } from "node:fs/promises";
-import path24 from "node:path";
+import { readFile as readFile10, unlink } from "node:fs/promises";
+import path25 from "node:path";
 function linkDirOf(desktopDir) {
-  return path24.join(desktopDir, "link");
+  return path25.join(desktopDir, "link");
 }
 function pidAlive3(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -107116,11 +108216,11 @@ async function removeQuietly(file3) {
 }
 async function inspectHost(desktopDir, host, options = {}) {
   const dir = linkDirOf(desktopDir);
-  const file3 = path24.join(dir, `${host}.json`);
+  const file3 = path25.join(dir, `${host}.json`);
   const result2 = (status, detail2, endpoint2) => ({ host, status, detail: detail2, file: file3, ...endpoint2 ? { endpoint: endpoint2 } : {} });
   let raw;
   try {
-    raw = await readFile9(file3, "utf8");
+    raw = await readFile10(file3, "utf8");
   } catch {
     return result2("absent", "no discovery file (the app is not running, or Zenvi Link is not installed)");
   }
@@ -107140,17 +108240,17 @@ async function inspectHost(desktopDir, host, options = {}) {
   }
   if (!isLinkUrl(url2)) return result2("invalid", `refusing a non-loopback URL (${url2})`);
   const tokenFile = text3(data.token_file);
-  const tokenPath = tokenFile ? path24.isAbsolute(tokenFile) ? tokenFile : path24.join(dir, tokenFile) : path24.join(dir, `${host}.token`);
+  const tokenPath = tokenFile ? path25.isAbsolute(tokenFile) ? tokenFile : path25.join(dir, tokenFile) : path25.join(dir, `${host}.token`);
   if (!pidAlive3(pid)) {
     if (options.removeStale) {
       await removeQuietly(file3);
-      if (path24.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path24.basename(tokenPath))) await removeQuietly(tokenPath);
+      if (path25.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path25.basename(tokenPath))) await removeQuietly(tokenPath);
     }
     return result2("dead", `process ${pid} is gone (left over from a crash)`);
   }
   let token;
   try {
-    token = (await readFile9(tokenPath, "utf8")).trim();
+    token = (await readFile10(tokenPath, "utf8")).trim();
   } catch {
     return result2("invalid", `cannot read the token file ${tokenPath}`);
   }
@@ -107182,7 +108282,7 @@ function inspectHosts(desktopDir, options = {}) {
           host,
           status: "invalid",
           detail: `could not read the discovery file: ${error62 instanceof Error ? error62.message : String(error62)}`,
-          file: path24.join(linkDirOf(desktopDir), `${host}.json`)
+          file: path25.join(linkDirOf(desktopDir), `${host}.json`)
         })
       )
     )
@@ -107198,7 +108298,7 @@ var init_discovery2 = __esm({
 
 // ../adobe-link/src/client.ts
 import http2 from "node:http";
-import { Readable as Readable3 } from "node:stream";
+import { Readable as Readable4 } from "node:stream";
 function loopbackFetch(input4, init = {}) {
   return new Promise((resolve, reject) => {
     const url2 = new URL(String(input4));
@@ -107223,7 +108323,7 @@ function loopbackFetch(input4, init = {}) {
         const status = response.statusCode ?? 502;
         const empty = method === "HEAD" || status === 204 || status === 205 || status === 304;
         if (empty) response.resume();
-        resolve(new Response(empty ? null : Readable3.toWeb(response), { status, statusText: response.statusMessage, headers }));
+        resolve(new Response(empty ? null : Readable4.toWeb(response), { status, statusText: response.statusMessage, headers }));
       }
     );
     request.on("error", reject);
@@ -107291,17 +108391,17 @@ var init_client5 = __esm({
 import { randomBytes as randomBytes4 } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { cpSync, lstatSync, mkdirSync, realpathSync, renameSync, rmSync, symlinkSync } from "node:fs";
-import path25 from "node:path";
+import path26 from "node:path";
 function extensionsDir({ platform, home, appData }) {
-  if (platform === "darwin") return path25.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions");
-  if (platform === "win32") return path25.win32.join(appData ?? path25.win32.join(home, "AppData", "Roaming"), "Adobe", "CEP", "extensions");
+  if (platform === "darwin") return path26.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions");
+  if (platform === "win32") return path26.win32.join(appData ?? path26.win32.join(home, "AppData", "Roaming"), "Adobe", "CEP", "extensions");
   throw new Error(`Adobe CEP extensions run on macOS and Windows, not ${platform}`);
 }
 function systemExtensionsDirs(platform, env2 = {}) {
   if (platform === "darwin") return ["/Library/Application Support/Adobe/CEP/extensions"];
   if (platform === "win32") {
     const roots = [env2["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", env2.ProgramFiles ?? "C:\\Program Files"];
-    return [...new Set(roots)].map((root) => path25.win32.join(root, "Common Files", "Adobe", "CEP", "extensions"));
+    return [...new Set(roots)].map((root) => path26.win32.join(root, "Common Files", "Adobe", "CEP", "extensions"));
   }
   return [];
 }
@@ -107311,7 +108411,7 @@ function debugModeCommands(platform, enable) {
   );
 }
 function planExtensionInstall({ platform, home, appData, source: source2, uninstall = false, copy = false }) {
-  const target = (platform === "win32" ? path25.win32 : path25.posix).join(extensionsDir({ platform, home, appData }), BUNDLE_ID);
+  const target = (platform === "win32" ? path26.win32 : path26.posix).join(extensionsDir({ platform, home, appData }), BUNDLE_ID);
   if (uninstall) {
     return {
       target,
@@ -107335,7 +108435,7 @@ function planExtensionInstall({ platform, home, appData, source: source2, uninst
 function describeAction(action) {
   switch (action.kind) {
     case "build":
-      return `build ${path25.join(action.outDir, BUNDLE_ID)}`;
+      return `build ${path26.join(action.outDir, BUNDLE_ID)}`;
     case "remove":
       return `remove ${action.path}`;
     case "link":
@@ -107347,7 +108447,7 @@ function describeAction(action) {
   }
 }
 function systemCommand(command, platform = process.platform, env2 = process.env) {
-  if (platform === "win32" && command.toLowerCase() === "reg") return path25.win32.join(env2.SystemRoot ?? env2.windir ?? "C:\\Windows", "System32", "reg.exe");
+  if (platform === "win32" && command.toLowerCase() === "reg") return path26.win32.join(env2.SystemRoot ?? env2.windir ?? "C:\\Windows", "System32", "reg.exe");
   if (platform === "darwin" && ["defaults", "mdfind", "open"].includes(command)) return `/usr/bin/${command}`;
   return command;
 }
@@ -107367,11 +108467,11 @@ function runInstallAction(action, options = {}) {
       if (exists(action.path)) rmSync(action.path, { recursive: true, force: true });
       return;
     case "link":
-      mkdirSync(path25.dirname(action.to), { recursive: true });
+      mkdirSync(path26.dirname(action.to), { recursive: true });
       symlinkSync(action.from, action.to, action.type);
       return;
     case "copy":
-      mkdirSync(path25.dirname(action.to), { recursive: true });
+      mkdirSync(path26.dirname(action.to), { recursive: true });
       cpSync(action.from, action.to, { recursive: true });
       return;
     default: {
@@ -107387,12 +108487,12 @@ function real(file3) {
   try {
     return realpathSync(file3);
   } catch {
-    return path25.resolve(file3);
+    return path26.resolve(file3);
   }
 }
 function replaceInstall(action) {
   const from = real(action.from);
-  const to = path25.join(real(path25.dirname(action.to)), path25.basename(action.to));
+  const to = path26.join(real(path26.dirname(action.to)), path26.basename(action.to));
   const targetIsLink = (() => {
     try {
       return lstatSync(action.to).isSymbolicLink();
@@ -107400,10 +108500,10 @@ function replaceInstall(action) {
       return false;
     }
   })();
-  if (!targetIsLink && (from === to || from.startsWith(to + path25.sep))) {
+  if (!targetIsLink && (from === to || from.startsWith(to + path26.sep))) {
     throw new Error(`the extension to install (${action.from}) is the installed copy itself (${action.to}); build it somewhere else first`);
   }
-  mkdirSync(path25.dirname(action.to), { recursive: true });
+  mkdirSync(path26.dirname(action.to), { recursive: true });
   const tag = `${process.pid}-${randomBytes4(4).toString("hex")}`;
   const staging = `${action.to}.zenvi-new-${tag}`;
   const old = `${action.to}.zenvi-old-${tag}`;
@@ -107474,9 +108574,9 @@ var init_unknown_args = __esm({
 });
 
 // src/hosts/extension.ts
-import { lstat, readdir as readdir5, readFile as readFile10, stat as stat11 } from "node:fs/promises";
+import { lstat, readdir as readdir6, readFile as readFile11, stat as stat12 } from "node:fs/promises";
 import { createRequire as createRequire2 } from "node:module";
-import path26 from "node:path";
+import path27 from "node:path";
 function defaultDetectDeps(home, env2) {
   return {
     platform: process.platform,
@@ -107484,14 +108584,14 @@ function defaultDetectDeps(home, env2) {
     env: env2,
     exists: async (file3) => {
       try {
-        await stat11(file3);
+        await stat12(file3);
         return true;
       } catch {
         return false;
       }
     },
-    listDir: async (dir) => readdir5(dir).catch(() => void 0),
-    readText: async (file3) => readFile10(file3, "utf8").catch(() => void 0),
+    listDir: async (dir) => readdir6(dir).catch(() => void 0),
+    readText: async (file3) => readFile11(file3, "utf8").catch(() => void 0),
     isLink: async (file3) => (await lstat(file3).catch(() => void 0))?.isSymbolicLink() ?? false
   };
 }
@@ -107499,7 +108599,7 @@ function manifestVersion(xml) {
   return xml ? /\bExtensionBundleVersion\s*=\s*"([^"]+)"/.exec(xml)?.[1] : void 0;
 }
 async function readCopy(deps, dir) {
-  const xml = await deps.readText(path26.join(dir, "CSXS", "manifest.xml"));
+  const xml = await deps.readText(path27.join(dir, "CSXS", "manifest.xml"));
   if (xml === void 0) return void 0;
   return { dir, version: manifestVersion(xml) };
 }
@@ -107509,7 +108609,7 @@ async function findInstalledExtensions(deps) {
     [extensionsDir({ platform: deps.platform, home: deps.home, appData: deps.env.APPDATA }), "user"],
     ...systemExtensionsDirs(deps.platform, deps.env).map((dir) => [dir, "system"])
   ];
-  const join = deps.platform === "win32" ? path26.win32.join : path26.posix.join;
+  const join = deps.platform === "win32" ? path27.win32.join : path27.posix.join;
   const found = [];
   for (const [folder, scope] of folders) {
     const dir = join(folder, BUNDLE_ID);
@@ -107524,11 +108624,11 @@ async function bundledExtension(deps) {
   if (override) candidates.push(override);
   else {
     const bundle = bundleDir();
-    if (bundle) candidates.push(path26.join(bundle, "adobe", BUNDLE_ID));
+    if (bundle) candidates.push(path27.join(bundle, "adobe", BUNDLE_ID));
     else {
       try {
         const entry = createRequire2(import.meta.url).resolve("@zenvi/adobe-link");
-        candidates.push(path26.join(path26.dirname(path26.dirname(entry)), "dist", BUNDLE_ID));
+        candidates.push(path27.join(path27.dirname(path27.dirname(entry)), "dist", BUNDLE_ID));
       } catch {
       }
     }
@@ -107540,7 +108640,7 @@ async function bundledExtension(deps) {
   return void 0;
 }
 async function findAdobeApps(deps) {
-  const dirs = deps.platform === "darwin" ? ["/Applications", path26.posix.join(deps.home, "Applications")] : deps.platform === "win32" ? [.../* @__PURE__ */ new Set([deps.env.ProgramFiles ?? "C:\\Program Files", deps.env.ProgramW6432 ?? deps.env.ProgramFiles ?? "C:\\Program Files"])].map((root) => path26.win32.join(root, "Adobe")) : [];
+  const dirs = deps.platform === "darwin" ? ["/Applications", path27.posix.join(deps.home, "Applications")] : deps.platform === "win32" ? [.../* @__PURE__ */ new Set([deps.env.ProgramFiles ?? "C:\\Program Files", deps.env.ProgramW6432 ?? deps.env.ProgramFiles ?? "C:\\Program Files"])].map((root) => path27.win32.join(root, "Adobe")) : [];
   const apps = { aftereffects: [], premiere: [] };
   let looked = false;
   for (const dir of dirs) {
@@ -107567,7 +108667,7 @@ var init_extension = __esm({
 });
 
 // src/hosts/policy.ts
-import path27 from "node:path";
+import path28 from "node:path";
 function adobeMode(env2) {
   const value = env2.ZENVI_MCP_ADOBE?.trim().toLowerCase();
   return value === "on" || value === "off" ? value : "auto";
@@ -107588,7 +108688,7 @@ async function decideFamilies(desktopDir, deps) {
   const { apps } = installed ? await findAdobeApps(deps) : { apps: { aftereffects: [], premiere: [] } };
   const anyApp = HOST_IDS.some((host) => apps[host].length > 0);
   for (const host of HOST_IDS) {
-    if (await deps.exists(path27.join(linkDirOf(desktopDir), `${host}.json`))) {
+    if (await deps.exists(path28.join(linkDirOf(desktopDir), `${host}.json`))) {
       decisions[host] = { listed: true, reason: `Zenvi Link runs in ${APP_LABEL[host]} on this machine` };
     } else if (installed && apps[host].length > 0) {
       decisions[host] = { listed: true, reason: `Zenvi Link and ${apps[host][0]} are installed` };
@@ -107611,7 +108711,7 @@ async function decideHandoff(desktopDir, deps) {
   if (mode === "on") return { listed: true, reason: "ZENVI_MCP_HANDOFF=on" };
   if (mode === "off") return { listed: false, reason: "ZENVI_MCP_HANDOFF=off", enable: "Unset ZENVI_MCP_HANDOFF (or set it to auto or on) in this server's environment." };
   for (const name of ["gui_mcp.json", "headless_mcp.json"]) {
-    if (await deps.exists(path27.join(desktopDir, name))) return { listed: true, reason: "the Zenvi desktop app runs on this machine" };
+    if (await deps.exists(path28.join(desktopDir, name))) return { listed: true, reason: "the Zenvi desktop app runs on this machine" };
   }
   if (await deps.appInstalled()) return { listed: true, reason: "the Zenvi desktop app is installed" };
   return {
@@ -107631,8 +108731,8 @@ var init_policy = __esm({
 });
 
 // src/hosts/registry.ts
-import { readFile as readFile11, stat as stat12 } from "node:fs/promises";
-import path28 from "node:path";
+import { readFile as readFile12, stat as stat13 } from "node:fs/promises";
+import path29 from "node:path";
 function toolCount(host) {
   return catalogFor(host).length;
 }
@@ -107656,7 +108756,7 @@ function howToConnect(host, discovery) {
 }
 function describeHosts(report2) {
   const name = (entry) => {
-    const project = typeof entry.project === "string" && entry.project ? ` (${path28.basename(entry.project)})` : "";
+    const project = typeof entry.project === "string" && entry.project ? ` (${path29.basename(entry.project)})` : "";
     const version2 = typeof entry.app_version === "string" && entry.app_version ? ` ${entry.app_version}` : "";
     return `${entry.label}${version2}${project}`;
   };
@@ -107726,7 +108826,7 @@ var init_registry5 = __esm({
           ]);
           const desktopTouched = /* @__PURE__ */ new Map();
           for (const endpoint of desktop) {
-            const info = await stat12(endpoint.source).catch(() => void 0);
+            const info = await stat13(endpoint.source).catch(() => void 0);
             if (info) desktopTouched.set(endpoint.source, info.mtimeMs);
           }
           return { desktop, desktopTouched, adobe };
@@ -107843,10 +108943,10 @@ var init_registry5 = __esm({
        * process lives; otherwise the file is checked again (one initialize).
        */
       async connect(host) {
-        const file3 = path28.join(linkDirOf(this.desktopDir), `${host}.json`);
+        const file3 = path29.join(linkDirOf(this.desktopDir), `${host}.json`);
         const cached4 = this.clients.get(host);
         if (cached4) {
-          const raw = await readFile11(file3, "utf8").catch(() => "");
+          const raw = await readFile12(file3, "utf8").catch(() => "");
           let key2 = "";
           try {
             const data = JSON.parse(raw);
@@ -108082,8 +109182,8 @@ var init_adobe_tools = __esm({
 
 // src/desktop/launcher.ts
 import { execFile as execFile2, spawn as spawn3 } from "node:child_process";
-import { readdir as readdir6, readFile as readFile13, realpath as realpath3, stat as stat14 } from "node:fs/promises";
-import path32 from "node:path";
+import { readdir as readdir7, readFile as readFile14, realpath as realpath3, stat as stat15 } from "node:fs/promises";
+import path33 from "node:path";
 import { promisify as promisify2 } from "node:util";
 function defaultLauncherDeps() {
   const self = [process.argv[1]].filter((p) => typeof p === "string");
@@ -108093,14 +109193,14 @@ function defaultLauncherDeps() {
     home: process.env.HOME || process.env.USERPROFILE || "",
     exists: async (file3) => {
       try {
-        await stat14(file3);
+        await stat15(file3);
         return true;
       } catch {
         return false;
       }
     },
-    readText: async (file3) => readFile13(file3, "utf8").catch(() => void 0),
-    listDir: async (dir) => readdir6(dir).catch(() => []),
+    readText: async (file3) => readFile14(file3, "utf8").catch(() => void 0),
+    listDir: async (dir) => readdir7(dir).catch(() => []),
     run: async (command, args) => {
       try {
         const { stdout } = await execFileAsync2(systemCommand(command), args, { timeout: 5e3, windowsHide: true, maxBuffer: 1024 * 1024 });
@@ -108154,7 +109254,7 @@ async function which(deps, name) {
   const exts = deps.platform === "win32" ? (deps.env.PATHEXT || ".EXE;.CMD;.BAT").split(";") : [""];
   for (const dir of dirs) {
     for (const ext of exts) {
-      const candidate = path32.join(dir, name + ext.toLowerCase());
+      const candidate = path33.join(dir, name + ext.toLowerCase());
       if (await deps.exists(candidate)) return candidate;
     }
   }
@@ -108168,7 +109268,7 @@ async function isSelf(deps, file3) {
   return /^#!.*\bnode\b/.test(head) || /\bzenvi\.mjs\b/.test(real3);
 }
 async function findMac(deps) {
-  const candidates = ["/Applications/Zenvi.app", path32.join(deps.home, "Applications", "Zenvi.app")];
+  const candidates = ["/Applications/Zenvi.app", path33.join(deps.home, "Applications", "Zenvi.app")];
   for (const app2 of candidates) {
     if (await deps.exists(app2)) return { kind: "macos-app", location: app2, command: "open", args: ["-a", app2, "--args"] };
   }
@@ -108193,7 +109293,7 @@ async function findWindows(deps) {
     if (code !== 0) continue;
     const location = regValue(stdout, "InstallLocation");
     if (location) {
-      const file3 = path32.win32.join(location.replace(/^"|"$/g, ""), "zenvi.exe");
+      const file3 = path33.win32.join(location.replace(/^"|"$/g, ""), "zenvi.exe");
       if (await deps.exists(file3)) return exe(file3);
     }
     const icon = regValue(stdout, "DisplayIcon")?.replace(/^"|"$/g, "").replace(/,\d+$/, "");
@@ -108203,40 +109303,40 @@ async function findWindows(deps) {
   const command = /REG_(?:SZ|EXPAND_SZ)\s+(.+?)\s*$/m.exec(assoc.stdout)?.[1];
   const fromAssoc = command ? /^"([^"]+)"/.exec(command)?.[1] ?? command.split(/\s+/)[0] : void 0;
   if (fromAssoc && await deps.exists(fromAssoc)) return exe(fromAssoc);
-  const roots = [deps.env.ProgramFiles, deps.env["ProgramFiles(x86)"], deps.env.LOCALAPPDATA && path32.win32.join(deps.env.LOCALAPPDATA, "Programs")];
+  const roots = [deps.env.ProgramFiles, deps.env["ProgramFiles(x86)"], deps.env.LOCALAPPDATA && path33.win32.join(deps.env.LOCALAPPDATA, "Programs")];
   for (const root of roots) {
     if (!root) continue;
-    const file3 = path32.win32.join(root, "Zenvi", "zenvi.exe");
+    const file3 = path33.win32.join(root, "Zenvi", "zenvi.exe");
     if (await deps.exists(file3)) return exe(file3);
   }
   return void 0;
 }
 function xdgDataDirs(deps) {
-  const home = deps.env.XDG_DATA_HOME || path32.join(deps.home, ".local", "share");
+  const home = deps.env.XDG_DATA_HOME || path33.join(deps.home, ".local", "share");
   const system = (deps.env.XDG_DATA_DIRS || "/usr/local/share:/usr/share").split(":").filter(Boolean);
-  return [home, ...system, "/var/lib/flatpak/exports/share", path32.join(deps.home, ".local", "share", "flatpak", "exports", "share")];
+  return [home, ...system, "/var/lib/flatpak/exports/share", path33.join(deps.home, ".local", "share", "flatpak", "exports", "share")];
 }
 async function findLinux(deps) {
   const bin = await which(deps, "zenvi-desktop");
   if (bin && !await isSelf(deps, bin)) return { kind: "linux-bin", location: bin, command: bin, args: [] };
-  const appImageDirs = [path32.join(deps.home, "Applications"), path32.join(deps.home, ".local", "bin"), path32.join(deps.home, "bin"), "/opt", "/opt/zenvi", "/usr/local/bin"];
+  const appImageDirs = [path33.join(deps.home, "Applications"), path33.join(deps.home, ".local", "bin"), path33.join(deps.home, "bin"), "/opt", "/opt/zenvi", "/usr/local/bin"];
   for (const dir of appImageDirs) {
     const names2 = (await deps.listDir(dir)).filter((n) => /^zenvi.*\.appimage$/i.test(n)).sort().reverse();
     if (names2[0]) {
-      const file3 = path32.join(dir, names2[0]);
+      const file3 = path33.join(dir, names2[0]);
       return { kind: "linux-appimage", location: file3, command: file3, args: [] };
     }
   }
   for (const dataDir of xdgDataDirs(deps)) {
     for (const name of ["org.zenvi.Zenvi.desktop", "zenvi.desktop"]) {
-      const file3 = path32.join(dataDir, "applications", name);
+      const file3 = path33.join(dataDir, "applications", name);
       const text5 = await deps.readText(file3);
       const exec = text5 && /^Exec\s*=\s*(.+)$/m.exec(text5)?.[1];
       if (!exec) continue;
       const argv = parseDesktopExec(exec);
       const head = argv[0];
       if (!head) continue;
-      const resolved = path32.isAbsolute(head) ? head : await which(deps, head);
+      const resolved = path33.isAbsolute(head) ? head : await which(deps, head);
       if (!resolved || await isSelf(deps, resolved)) continue;
       return { kind: "linux-desktop-entry", location: file3, command: resolved, args: argv.slice(1) };
     }
@@ -110141,8 +111241,8 @@ never WebM (Zenvi drops VP9 alpha).
 
 // src/commands/project.ts
 import { existsSync as existsSync6 } from "node:fs";
-import { mkdir as mkdir8 } from "node:fs/promises";
-import path33 from "node:path";
+import { mkdir as mkdir9 } from "node:fs/promises";
+import path34 from "node:path";
 function newProject(profile) {
   const create = createProject;
   if (!create) throw new CliError("This build's engine cannot create projects (createProject is not exported).");
@@ -110161,18 +111261,18 @@ function registerProjectCommands(program2, ctx) {
       return;
     }
     const named = ctx.flags().project ?? ctx.env.ZENVI_PROJECT?.trim() ?? void 0;
-    const asFile = (value) => path33.resolve(ctx.cwd, isProjectPath(value) ? value : `${value}.zvn`);
+    const asFile = (value) => path34.resolve(ctx.cwd, isProjectPath(value) ? value : `${value}.zvn`);
     if (positional && named && asFile(positional) !== asFile(named)) {
       throw new CliError(`Two different project files given: ${asFile(positional)} and ${asFile(named)} (-p/ZENVI_PROJECT).`, 2, "Pass only one.");
     }
     const file3 = asFile(positional ?? named ?? "untitled.zvn");
     if (existsSync6(file3) && !opts.force) throw new CliError(`${file3} already exists.`, 1, "Pass --force to replace it.");
     const project = newProject(opts.profile);
-    await mkdir8(path33.dirname(file3), { recursive: true });
+    await mkdir9(path34.dirname(file3), { recursive: true });
     const session = ProjectSession.fromProject(project, file3, { registry: ctx.registry, host: hostOptions(ctx) });
     await session.save();
     const info = { project: file3, id: project.id, profile: project.profile, width: project.width, height: project.height, fps: project.fps };
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Created ${path33.basename(file3)}`, engine: "portable", ...info });
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Created ${path34.basename(file3)}`, engine: "portable", ...info });
     else {
       ctx.out.line(`${ctx.out.style("\u2713", "green")} Created ${file3}`);
       ctx.out.line(ctx.out.style(`  ${project.profile}, ${project.width}x${project.height}`, "dim"));
@@ -110202,7 +111302,7 @@ function registerProjectCommands(program2, ctx) {
     });
   }
   program2.command("save").description("save the project (optionally to a new file)").argument("[file]", "save as this file").action(async (file3) => {
-    await runToolCommand(ctx, "save_project_tool", file3 ? { file_path: path33.resolve(ctx.cwd, file3) } : {});
+    await runToolCommand(ctx, "save_project_tool", file3 ? { file_path: path34.resolve(ctx.cwd, file3) } : {});
   });
 }
 var init_project3 = __esm({
@@ -110218,8 +111318,8 @@ var init_project3 = __esm({
 });
 
 // src/commands/render.ts
-import { writeFile as writeFile9 } from "node:fs/promises";
-import path34 from "node:path";
+import { writeFile as writeFile10 } from "node:fs/promises";
+import path35 from "node:path";
 function parseFps(text5) {
   if (!text5) return void 0;
   const m = /^(\d+)(?:\/(\d+))?$/.exec(text5.trim());
@@ -110296,7 +111396,7 @@ function formatBytes(n) {
 function registerRenderCommands(program2, ctx) {
   program2.command("render").description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav) or PNG frames").argument("[output]", "output file (default: <project>.mp4 next to the project)").option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav or png (default: from the file name)").option("--quality <quality>", "low, medium, high or lossless", "high").option("--width <px>", "output width (height follows the project aspect)").option("--height <px>", "output height").option("--fps <rate>", "frame rate, e.g. 30 or 30000/1001 (default: the project's)").option("--start <time>", "render from this timeline time").option("--end <time>", "render up to this timeline time").option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)").option("--audio-bitrate <rate>", "e.g. 192k").option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)").option("--encoder-preset <preset>", "encoder speed: ultrafast \u2026 veryslow (default veryfast; the desktop app encodes at medium)").option("--open", "open the result when done").action(async (outputArg, flags) => {
     await withExecutor(ctx, async (executor) => {
-      const output2 = outputArg ? path34.resolve(ctx.cwd, outputArg) : void 0;
+      const output2 = outputArg ? path35.resolve(ctx.cwd, outputArg) : void 0;
       if (!(executor instanceof PortableExecutor)) {
         printOutcome(ctx, await exportOnDesktop(executor, output2));
         return;
@@ -110330,7 +111430,7 @@ function registerRenderCommands(program2, ctx) {
   program2.command("frame").description("render one timeline frame to an image (PNG or JPEG)").argument("<time>", "timeline time (seconds or timecode)").argument("[output]", "image file (default: frame-<time>.png)").option("--width <px>", "image width", "1280").option("--jpeg", "write JPEG instead of PNG").option("--grid", "draw the 0-1 coordinate grid and a frame caption (what inspect tools show models)").action(async (timeArg2, outputArg, flags) => {
     const seconds2 = parseTime(timeArg2);
     const format = flags.jpeg || /\.jpe?g$/i.test(outputArg ?? "") ? "jpeg" : "png";
-    const output2 = path34.resolve(ctx.cwd, outputArg ?? `frame-${seconds2.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
+    const output2 = path35.resolve(ctx.cwd, outputArg ?? `frame-${seconds2.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
     await withExecutor(ctx, async (executor) => {
       let data;
       let mimeType;
@@ -110355,7 +111455,7 @@ function registerRenderCommands(program2, ctx) {
         data = outcome.images[0].data;
         mimeType = outcome.images[0].mimeType;
       }
-      await writeFile9(output2, Buffer.from(data, "base64"));
+      await writeFile10(output2, Buffer.from(data, "base64"));
       if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Wrote ${output2}`, engine: executor.engine, project: executor.project ?? null, file: output2, mimeType, seconds: seconds2 });
       else ctx.out.line(`${ctx.out.style("\u2713", "green")} Wrote ${output2}`);
     });
@@ -110378,7 +111478,7 @@ var init_render2 = __esm({
 
 // src/mcp/extra-tools.ts
 import { existsSync as existsSync7 } from "node:fs";
-import path35 from "node:path";
+import path36 from "node:path";
 function text4(v) {
   return typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : void 0;
 }
@@ -110416,7 +111516,7 @@ function extraTools(ctx) {
         const tool = "open_project_file";
         const raw = text4(args.path);
         if (!raw) return { receipt: refused(tool, "path is required") };
-        const file3 = path35.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
+        const file3 = path36.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
         if (existsSync7(file3)) {
           await state.switchTo(file3);
           return { receipt: applied(tool, `Opened ${file3}`, { data: projectSummary(state) }, 0) };
@@ -110454,7 +111554,7 @@ function extraTools(ctx) {
         const tool = "render_video";
         const desktop = await state.desktopExecutor();
         const requested = text4(args.output) ?? text4(args.output_path);
-        const output2 = requested ? path35.resolve(ctx.cwd, requested) : void 0;
+        const output2 = requested ? path36.resolve(ctx.cwd, requested) : void 0;
         if (desktop) {
           const outcome = await exportOnDesktop(desktop, output2);
           return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)), engine: "desktop" };
@@ -110547,7 +111647,7 @@ function extraTools(ctx) {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       async run(state, args) {
         const tool = "launch_editor";
-        const file3 = text4(args.path) ? path35.resolve(ctx.cwd, text4(args.path)) : state.session.file;
+        const file3 = text4(args.path) ? path36.resolve(ctx.cwd, text4(args.path)) : state.session.file;
         if (!file3) return { receipt: refused(tool, "This project has no file yet: call open_project_file first.") };
         try {
           const result2 = await openInDesktop({ config: ctx.config, project: file3, deps: state.launcher, clientVersion: VERSION });
@@ -111347,14 +112447,14 @@ media. One undo step restores the link.`,
 
 // src/hosts/handoff.ts
 import { homedir as homedir3 } from "node:os";
-import path36 from "node:path";
+import path37 from "node:path";
 function resolvePathArgs(args, cwd, home = homedir3()) {
   const out = { ...args };
   for (const [key2, value] of Object.entries(args)) {
     if (!PATH_ARGS.has(key2) || typeof value !== "string" || !value.trim()) continue;
     const text5 = value.trim();
-    const expanded = text5 === "~" ? home : text5.startsWith("~/") || text5.startsWith("~\\") ? path36.join(home, text5.slice(2)) : text5;
-    out[key2] = path36.isAbsolute(expanded) || path36.win32.isAbsolute(expanded) ? expanded : path36.resolve(cwd, expanded);
+    const expanded = text5 === "~" ? home : text5.startsWith("~/") || text5.startsWith("~\\") ? path37.join(home, text5.slice(2)) : text5;
+    out[key2] = path37.isAbsolute(expanded) || path37.win32.isAbsolute(expanded) ? expanded : path37.resolve(cwd, expanded);
   }
   return out;
 }
@@ -111843,7 +112943,7 @@ var init_host_tools = __esm({
 });
 
 // src/mcp/state.ts
-import { stat as stat15 } from "node:fs/promises";
+import { stat as stat16 } from "node:fs/promises";
 function launcherDeps(ctx) {
   return { ...defaultLauncherDeps(), env: ctx.env, home: ctx.config.home };
 }
@@ -111928,7 +113028,7 @@ var init_state = __esm({
         if (this.handoffCache && now - this.handoffCache.at <= 2e3) return this.handoffCache.value;
         const value = decideHandoff(this.ctx.config.desktopDir, {
           env: this.ctx.env,
-          exists: (file3) => stat15(file3).then(
+          exists: (file3) => stat16(file3).then(
             () => true,
             () => false
           ),
@@ -112181,6 +113281,7 @@ var init_server3 = __esm({
       "Zenvi workflow: (1) open_project_file with a .zvn path (created if missing; the project in the working folder is opened automatically). (2) import_files_tool with media paths, then add_clip_to_timeline_tool, apply_transition_tool, add_title_tool, set_clip_volume_tool, set_keyframes_tool, delete_from_timeline_tool and the other tools. (3) render_video exports (mp4 by default). (4) launch_editor shows the project in the Zenvi desktop app; push_to_cloud returns a zenvi.pro web editor link to share.",
       "Handoffs run in the Zenvi desktop app on the saved project, which is opened for you: send_to_after_effects_tool / export_to_after_effects_tool, send_to_premiere_tool / export_to_premiere_tool, import_timeline_xml_tool, the Remotion and HyperFrames import and export tools, and linked clips (get_linked_clip_tool, update_linked_clip_tool, rerender_linked_clip_tool, open_linked_source_tool, unlink_clip_tool). bring_from_after_effects renders a comp into the project as a linked clip; bring_from_premiere brings a sequence back as native clips. zenvi://handoff says what survives each direction.",
       "Taste: omitted arguments take the defaults in zenvi://taste (entrances 0.6 s, exits 0.4 s, smooth easing, nothing that moves is linear, text inside title-safe). Look before you say done: after any visual change capture frames (preview_frame, with grid=true for a 0-1 coordinate grid; ae_capture_frame; premiere_capture_frame) at the first frame, entrance ends, holds and the last frame, check them against the review checklist (prompt edit_review), fix, and look again.",
+      "Web videos: for a YouTube or other web page link call ingest_web_video_tool once (intent=timeline only when the person asked to put it on the timeline, reference for a colour or look reference; it needs yt-dlp on this machine). If it answers status=running, call it again with the job_id until completed or failed: each call waits up to about 45 s, and a client timeout is not a failure. On ok=false report the reason once and stop. A direct link to a media file can use import_video_url_and_add_to_timeline_tool.",
       'Every tool returns a JSON receipt (contract 3): status applied|unchanged|refused|error (read-only Adobe tools: ok), summary, and what changed (clips, shifted, removedClipIds, createdTracks, undoSteps; Adobe tools: ids in data). Patch your view from receipts instead of re-listing everything. Failures start with "Error:"; refused means nothing changed, so read the summary and adjust. Each Zenvi call is one undo step (undo_tool); edits autosave to the project file with their undo history. Use these tools instead of running ffmpeg yourself: they keep the project editable in Zenvi. Times are seconds.'
     ].join("\n\n");
     listingKey = (families, handoff2) => `${HOST_IDS.filter((host) => families[host].listed).join(",")}|handoff:${handoff2.listed}`;
@@ -115298,9 +116399,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [path]
    * @return {(string|null|Command)}
    */
-  executableDir(path39) {
-    if (path39 === void 0) return this._executableDir;
-    this._executableDir = path39;
+  executableDir(path40) {
+    if (path40 === void 0) return this._executableDir;
+    this._executableDir = path40;
     return this;
   }
   /**
@@ -115563,8 +116664,8 @@ init_edit2();
 // src/commands/hosts.ts
 init_src3();
 init_adobe_tools();
-import { lstat as lstat2, writeFile as writeFile7 } from "node:fs/promises";
-import path29 from "node:path";
+import { lstat as lstat2, writeFile as writeFile8 } from "node:fs/promises";
+import path30 from "node:path";
 
 // src/hosts/doctor.ts
 init_src3();
@@ -115842,12 +116943,12 @@ function hostToolName(host, tool) {
 }
 async function saveImages(ctx, images, out) {
   if (!out || images.length === 0) return [];
-  const target = path29.resolve(ctx.cwd, out);
-  const ext = path29.extname(target);
+  const target = path30.resolve(ctx.cwd, out);
+  const ext = path30.extname(target);
   const saved = [];
   for (const [i, image] of images.entries()) {
     const file3 = images.length === 1 ? target : `${target.slice(0, target.length - ext.length)}-${i + 1}${ext}`;
-    await writeFile7(file3, Buffer.from(image.data, "base64"));
+    await writeFile8(file3, Buffer.from(image.data, "base64"));
     saved.push(file3);
   }
   return saved;
@@ -115981,15 +117082,15 @@ function registerHostCommands(program2, ctx) {
 // src/commands/integrations.ts
 init_src3();
 init_src2();
-import { readFile as readFile14 } from "node:fs/promises";
-import path37 from "node:path";
+import { readFile as readFile15 } from "node:fs/promises";
+import path38 from "node:path";
 
 // src/agents/mcp-config.ts
 init_src2();
 init_output();
 import { execFile } from "node:child_process";
-import { copyFile as copyFile2, mkdir as mkdir7, readFile as readFile12, rename as rename6, stat as stat13, writeFile as writeFile8 } from "node:fs/promises";
-import path30 from "node:path";
+import { copyFile as copyFile2, mkdir as mkdir8, readFile as readFile13, rename as rename6, stat as stat14, writeFile as writeFile9 } from "node:fs/promises";
+import path31 from "node:path";
 import { promisify } from "node:util";
 
 // src/agents/toml.ts
@@ -116108,12 +117209,12 @@ function shellQuote(arg) {
   return /^[A-Za-z0-9_./:@%+=,-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`;
 }
 function claudeDesktopConfigPath(home, platform, env2) {
-  if (platform === "darwin") return path30.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
-  if (platform === "win32") return path30.join(env2.APPDATA || path30.join(home, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
-  return path30.join(env2.XDG_CONFIG_HOME || path30.join(home, ".config"), "Claude", "claude_desktop_config.json");
+  if (platform === "darwin") return path31.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+  if (platform === "win32") return path31.join(env2.APPDATA || path31.join(home, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
+  return path31.join(env2.XDG_CONFIG_HOME || path31.join(home, ".config"), "Claude", "claude_desktop_config.json");
 }
 function codexConfigPath(home, env2) {
-  return path30.join(env2.CODEX_HOME || path30.join(home, ".codex"), "config.toml");
+  return path31.join(env2.CODEX_HOME || path31.join(home, ".codex"), "config.toml");
 }
 function isZenviStdio(entry) {
   if (!entry || typeof entry !== "object") return false;
@@ -116127,21 +117228,21 @@ function sameJson4(a, b) {
 }
 async function exists2(file3) {
   try {
-    await stat13(file3);
+    await stat14(file3);
     return true;
   } catch {
     return false;
   }
 }
 async function writeWithBackup(file3, text5, hadFile) {
-  await mkdir7(path30.dirname(file3), { recursive: true });
+  await mkdir8(path31.dirname(file3), { recursive: true });
   let backup;
   if (hadFile) {
     backup = `${file3}.zenvi-backup`;
     await copyFile2(file3, backup);
   }
   const tmp = `${file3}.${process.pid}.tmp`;
-  await writeFile8(tmp, text5);
+  await writeFile9(tmp, text5);
   await rename6(tmp, file3);
   return backup;
 }
@@ -116149,7 +117250,7 @@ async function mergeJsonServer(file3, name, entry, force) {
   const hadFile = await exists2(file3);
   let root = {};
   if (hadFile) {
-    const text5 = await readFile12(file3, "utf8");
+    const text5 = await readFile13(file3, "utf8");
     if (text5.trim()) {
       try {
         const parsed = JSON.parse(text5);
@@ -116187,7 +117288,7 @@ function codexSection(name, command) {
   ].join("\n");
 }
 async function defaultRunClaude(env2, home) {
-  const candidates = [whichSync("claude", env2), path30.join(home, ".local", "bin", "claude"), path30.join(home, ".claude", "local", "claude")];
+  const candidates = [whichSync("claude", env2), path31.join(home, ".local", "bin", "claude"), path31.join(home, ".claude", "local", "claude")];
   let claude;
   for (const c of candidates) if (c && await exists2(c)) {
     claude = c;
@@ -116218,7 +117319,7 @@ async function mcpConfig(options) {
       const scope = options.scope ?? "user";
       const entry = { type: "stdio", ...stdioEntry, env: {} };
       if (scope === "project") {
-        const file3 = path30.join(cwd, ".mcp.json");
+        const file3 = path31.join(cwd, ".mcp.json");
         const snippet2 = JSON.stringify({ mcpServers: { [name]: entry } }, null, 2);
         if (!options.install) return { ...base, scope, file: file3, snippet: snippet2, message: `Add this to ${file3} (Claude Code asks you to approve project servers).` };
         const { changed, backup } = await mergeJsonServer(file3, name, entry, options.force ?? false);
@@ -116250,7 +117351,7 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
     }
     case "cursor": {
       const scope = options.scope ?? "user";
-      const file3 = scope === "project" ? path30.join(cwd, ".cursor", "mcp.json") : path30.join(options.home, ".cursor", "mcp.json");
+      const file3 = scope === "project" ? path31.join(cwd, ".cursor", "mcp.json") : path31.join(options.home, ".cursor", "mcp.json");
       const snippet = JSON.stringify({ mcpServers: { [name]: stdioEntry } }, null, 2);
       if (!options.install) return { ...base, scope, file: file3, snippet, message: `Merge this into ${file3}.` };
       const { changed, backup } = await mergeJsonServer(file3, name, stdioEntry, options.force ?? false);
@@ -116265,7 +117366,7 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
 # or: codex mcp add ${shellQuote(name)} -- ${[command.command, ...command.args].map(shellQuote).join(" ")}`;
       if (!options.install) return { ...base, file: file3, snippet, message: `Add this to ${file3}.` };
       const hadFile = await exists2(file3);
-      const original = hadFile ? await readFile12(file3, "utf8") : "";
+      const original = hadFile ? await readFile13(file3, "utf8") : "";
       let current;
       try {
         current = readTable(original, table);
@@ -116287,7 +117388,7 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
 // src/agents/self-command.ts
 init_src2();
 import { realpathSync as realpathSync2 } from "node:fs";
-import path31 from "node:path";
+import path32 from "node:path";
 function real2(file3) {
   try {
     return realpathSync2(file3);
@@ -116307,7 +117408,7 @@ function selfMcpCommand(env2 = process.env, argv = process.argv) {
     const parts = override.split(/\s+/);
     return { command: parts[0], args: [...parts.slice(1), "mcp"] };
   }
-  const entry = argv[1] ? path31.resolve(argv[1]) : "";
+  const entry = argv[1] ? path32.resolve(argv[1]) : "";
   if (/\.m?js$/.test(entry)) return { command: stableNodePath(env2), args: [real2(entry), "mcp"] };
   return { command: process.execPath, args: [...process.execArgv, real2(entry), "mcp"] };
 }
@@ -116327,7 +117428,7 @@ init_account();
 init_context();
 function registerIntegrationCommands(program2, ctx) {
   program2.command("open").description("show the project in the Zenvi desktop app (or in the web editor with --web)").argument("[project]", "project file (default: the selected project)").option("--web", "push to Zenvi Cloud and open it in the web editor instead").action(async (projectArg, opts) => {
-    const project = projectArg ? path37.resolve(ctx.cwd, projectArg) : await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env });
+    const project = projectArg ? path38.resolve(ctx.cwd, projectArg) : await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env });
     if (opts.web) {
       if (!project) throw new CliError("No project to open.", 2, "Pass a .zvn file.");
       const session = await openSession(ctx, project);
@@ -116427,6 +117528,14 @@ async function runDoctor(ctx) {
   } catch (error62) {
     checks.push({ name: "titles/fonts", level: "warn", detail: `SVG renderer unavailable: ${error62.message}` });
   }
+  const ytDlp = findYtDlp(ctx.env);
+  const ytDlpVersion = ytDlp ? await runBinary(ytDlp, ["--version"], { timeoutMs: 15e3, env: ctx.env }).then((r) => r.stdout.toString("utf8").trim(), () => void 0) : void 0;
+  checks.push({
+    name: "yt-dlp",
+    level: ytDlpVersion ? "ok" : "warn",
+    detail: ytDlpVersion ? `${ytDlpVersion} (${ytDlp})` : ytDlp ? `${ytDlp} does not run` : "not found",
+    hint: "Optional: ingest_web_video_tool fetches YouTube and other web page videos with it (brew install yt-dlp, winget install yt-dlp, or pip install -U yt-dlp; ZENVI_YT_DLP sets its path)."
+  });
   const toolCount2 = ctx.registry.tools.length;
   checks.push({ name: "tools", level: toolCount2 > 0 ? "ok" : "fail", detail: `${toolCount2} editing tools in this build` });
   try {
@@ -116464,11 +117573,11 @@ async function runDoctor(ctx) {
   const configured = [];
   const configFiles = [
     ["claude-desktop", claudeDesktopConfigPath(ctx.config.home, process.platform, ctx.env)],
-    ["cursor", path37.join(ctx.config.home, ".cursor", "mcp.json")],
+    ["cursor", path38.join(ctx.config.home, ".cursor", "mcp.json")],
     ["codex", codexConfigPath(ctx.config.home, ctx.env)]
   ];
   for (const [name, file3] of configFiles) {
-    const text5 = await readFile14(file3, "utf8").catch(() => "");
+    const text5 = await readFile15(file3, "utf8").catch(() => "");
     if (/zenvi[^\n]*\bmcp\b|mcp_servers\.zenvi\b|"zenvi"\s*:/.test(text5)) configured.push(name);
   }
   checks.push({ name: "agent configs", level: "ok", detail: configured.length ? `zenvi configured for ${configured.join(", ")}` : "none yet (see `zenvi mcp-config`)" });
@@ -116481,7 +117590,7 @@ init_render2();
 
 // src/config.ts
 import { homedir as homedir4 } from "node:os";
-import path38 from "node:path";
+import path39 from "node:path";
 var DEFAULTS2 = {
   website: "https://zenvi.pro",
   editor: "https://zenvi.pro/editor",
@@ -116500,7 +117609,7 @@ function env(e, ...keys) {
 var trim = (url2) => url2.replace(/\/+$/, "");
 function loadConfig(e = process.env) {
   const home = e.HOME || e.USERPROFILE || homedir4();
-  const configDir = env(e, "ZENVI_CONFIG_DIR") ?? (process.platform === "win32" ? path38.join(e.APPDATA || path38.join(home, "AppData", "Roaming"), "zenvi") : path38.join(e.XDG_CONFIG_HOME || path38.join(home, ".config"), "zenvi"));
+  const configDir = env(e, "ZENVI_CONFIG_DIR") ?? (process.platform === "win32" ? path39.join(e.APPDATA || path39.join(home, "AppData", "Roaming"), "zenvi") : path39.join(e.XDG_CONFIG_HOME || path39.join(home, ".config"), "zenvi"));
   return {
     websiteUrl: trim(env(e, "ZENVI_WEBSITE", "ZENVI_WEBSITE_URL") ?? DEFAULTS2.website),
     editorUrl: trim(env(e, "ZENVI_EDITOR_URL") ?? DEFAULTS2.editor),
@@ -116509,7 +117618,7 @@ function loadConfig(e = process.env) {
     supabaseUrl: trim(env(e, "ZENVI_SUPABASE_URL", "SUPABASE_URL") ?? DEFAULTS2.supabaseUrl),
     supabaseAnonKey: env(e, "ZENVI_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY") ?? DEFAULTS2.supabaseAnonKey,
     configDir,
-    desktopDir: env(e, "ZENVI_DESKTOP_DIR") ?? path38.join(home, ".openshot_qt"),
+    desktopDir: env(e, "ZENVI_DESKTOP_DIR") ?? path39.join(home, ".openshot_qt"),
     home
   };
 }
