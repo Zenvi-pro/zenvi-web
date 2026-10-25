@@ -122,7 +122,7 @@ const SPECS: Record<string, Spec> = {
   add_track_tool: {
     happy: {
       args: { label: "Captions" },
-      summary: /^Track added\.$/,
+      summary: /^Added track 6 \('Captions'\) at the top\. Track numbers count from the bottom\.$/,
       check: ({ doc, receipt }) => {
         expect(doc.project.layers).toHaveLength(6);
         expect(doc.project.layers.some((l) => l.label === "Captions")).toBe(true);
@@ -137,7 +137,8 @@ const SPECS: Record<string, Spec> = {
       summary: /^Marker added\.$/,
       check: ({ doc }) => expect(doc.project.markers.map((m) => m.position)).toContain(7.5),
     },
-    failure: { args: { position_seconds: "abc" }, summary: /^Error: position_seconds='abc' is not a time in seconds/ },
+    // develop's schema: position_seconds is a number (the desktop refuses timecodes too).
+    failure: { args: { position_seconds: "abc" }, summary: /^Error: Invalid arguments for add_marker_tool: 'abc' is not valid under any of the given schemas \(at position_seconds\)\.$/ },
   },
   delete_from_timeline_tool: {
     happy: {
@@ -191,7 +192,7 @@ const SPECS: Record<string, Spec> = {
   },
 
   // --- playback / view ---------------------------------------------------------
-  play_tool: { happy: { summary: /^Playback toggled\.$/, check: ({ host }) => expect(host.calls).toEqual(["toggle"]) }, failure: { host: { without: ["player"] }, summary: /not available/ } },
+  play_tool: { happy: { summary: /^Playing at 1x, now at 1\.00 s\.$/, check: ({ host }) => expect(host.calls).toEqual(["toggle"]) }, failure: { host: { without: ["player"] }, summary: /not available/ } },
   go_to_start_tool: { happy: { summary: /^Seeked to start\.$/, check: ({ host }) => expect(host.player!.playhead).toBe(0) }, failure: { host: { without: ["player"] }, summary: /not available/ } },
   go_to_end_tool: { happy: { summary: /^Seeked to end\.$/, check: ({ host }) => expect(host.player!.playhead).toBeCloseTo(18.9667, 3) }, failure: { host: { without: ["player"] }, summary: /not available/ } },
   zoom_in_tool: { happy: { summary: /zoomed in/, check: ({ host }) => expect(host.calls).toEqual(["zoomIn"]) }, failure: { host: { without: ["ui"] }, summary: /not available/ } },
@@ -349,11 +350,14 @@ const SPECS: Record<string, Spec> = {
       args: { timeline_clip_id: IDS.clipLogo, property: "alpha", points: [{ seconds: 0, value: 0 }, { seconds: 1, value: 1 }] },
       summary: /^Set 2 keyframe\(s\) on alpha for timeline_clip_id=CLIPLOGO01\.$/,
     },
-    failure: { args: { timeline_clip_id: IDS.clipLogo, property: "alpha", points: [{ value: 1 }] }, summary: /^Error: points\[0\] needs frame or seconds\.$/ },
+    failure: {
+      args: { timeline_clip_id: IDS.clipLogo, property: "alpha", points: [{ value: 1 }] },
+      summary: /^Error: points\[0\] needs exactly one of frame, seconds, timeline_seconds or source_seconds\.$/,
+    },
   },
   set_project_setting_tool: {
     happy: { args: { fps: "25" }, summary: /^Updated project settings: fps=25\/1\.$/, check: ({ doc }) => expect(doc.project.fps).toEqual({ num: 25, den: 1 }) },
-    failure: { args: { fps: "fast" }, summary: /^Error: fps must be a number/ },
+    failure: { args: { fps: "fast" }, summary: /^Error: Invalid arguments for set_project_setting_tool: 'fast' is not valid under any of the given schemas \(at fps\)\.$/ },
   },
 
   // --- inspect -------------------------------------------------------------------------------------

@@ -40,6 +40,10 @@ Read `docs/ARCHITECTURE.md` before your first change.
   receipt (`data`) listing created/changed ids.
 - Tools never throw for user errors; they return an error result. They throw
   only for programmer errors.
+- `packages/engine/src/tools/schemas.gen.ts` is generated from zenvi-core
+  (`scripts/gen-tool-schemas.py`); never edit it by hand. Desktop tools and
+  arguments not ported yet live in `packages/engine/src/tools/pending.ts`:
+  port one, then delete its line.
 
 ## Tests
 

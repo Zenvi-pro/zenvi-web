@@ -1,11 +1,12 @@
 {
   "_comment": [
-    "Hand-written additions merged by gen-tool-schemas.py on top of zenvi-core TOOL_SCHEMAS",
-    "(agent_tools/schema.py) and the backend's frontend-tool schemas (docs/specs/backend-frontend-tools.json).",
+    "Hand-written additions merged by gen-tool-schemas.py on top of zenvi-core's schemas (agent_tools/schema.py",
+    "TOOL_SCHEMAS, the editor tool manifest docs/specs/desktop-editor-tools-manifest.json, the MCP extras) and the",
+    "backend's frontend-tool schemas (docs/specs/backend-frontend-tools.json). A description here wins over both.",
     "Only descriptions, the real backend signature of tools the snapshot lacks, and default overrides live here;",
     "names, types and enums come from the two sources.",
     "web_extra_props: arguments only the web surfaces accept (hosts without a playhead or local paths, CLI aliases);",
-    "listed in docs/TOOLS.md under Divergences. Everything else matches the desktop's TOOL_SCHEMAS."
+    "listed in docs/TOOLS.md under Divergences. Everything else matches the desktop's schemas."
   ],
   "common_props": {
     "timeline_clip_id": "Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).",
@@ -24,6 +25,9 @@
     "engine": "auto | apple | whisper (on-device ASR hosts only)."
   },
   "tools": {
+    "new_project_tool": {
+      "description": "Create a new empty project. save_first=true saves the current project where it is first."
+    },
     "save_project_tool": {
       "web_extra_props": {
         "path": {"type": "string"}
@@ -34,6 +38,7 @@
       }
     },
     "open_project_tool": {
+      "description": "Open a project from file_path. save_first=true saves the current project where it is before opening the other one.",
       "props": {
         "file_path": {"description": "Alias for path (Assistant naming)."}
       }
@@ -58,6 +63,9 @@
         "end": {"description": "Window end, source seconds."}
       }
     },
+    "play_tool": {
+      "description": "Control preview playback: action play, pause, toggle (default, like the Space bar), stop (pause and return to the start), or step_forward / step_back by frames. Plays at normal speed only: fast_forward, rewind and other speeds are refused."
+    },
     "undo_tool": {
       "props": {
         "steps": {"description": "Number of undo steps (1-20; words like 'two' work)."}
@@ -72,28 +80,27 @@
       "web_extra_props": {
         "label": {"type": "string"}
       },
-      "description": "Add a new track below the selected track (on top when nothing is selected). Returns the new track in createdTracks.",
+      "description": "Add empty tracks: on top (default, like the Add Track button), at the bottom, or above / below the track in relative_to. name names the track ('Music'); count adds several in one undo step ('<name> 1'..'<name> N' bottom to top). Track numbers count from the bottom; the new tracks are in createdTracks.",
       "props": {
-        "label": {"description": "Optional label for the new track."}
+        "label": {"description": "Alias for name."}
       }
     },
     "add_marker_tool": {
       "web_extra_props": {
-        "position_seconds": {"oneOf": [{"type": "string"}, {"type": "number"}]},
         "label": {"type": "string"},
         "text": {"type": "string"}
       },
-      "description": "Add a timeline marker at the playhead, or at position_seconds.",
+      "description": "Add a timeline marker at position_seconds (default: the playhead), with a name and a colour tag.",
       "props": {
-        "position_seconds": {"description": "Marker time in timeline seconds (default: the playhead)."},
-        "label": {"description": "Optional marker label."},
-        "text": {"description": "Alias for label."}
+        "label": {"description": "Alias for name."},
+        "text": {"description": "Alias for name."}
       }
     },
     "delete_from_timeline_tool": {
       "props": {
         "scope": {"description": "auto (default): a clip id/query deletes one placement, a bare track clears the track. clip / track force the branch."},
-        "include_transitions": {"description": "Track scope only: also delete transitions on the track (default true)."}
+        "include_transitions": {"description": "Track scope only: also delete transitions on the track (default true)."},
+        "ripple": {"description": "One clip only: true closes the gap it leaves (later items on that track move left); default false leaves the gap."}
       }
     },
     "remove_clip_tool": {
@@ -270,6 +277,7 @@
       }
     },
     "generate_tts_and_add_to_timeline_tool": {
+      "description": "Generate narration with AI text-to-speech and place it on the timeline at position_seconds (default: the playhead). Single tool for all voice-over requests: do not call separate generate/add TTS tools.",
       "props": {
         "text": {"description": "Narration text."},
         "voice": {"description": "Voice (default alloy)."},
@@ -315,7 +323,7 @@
 
     },
     "add_effect_tool": {
-      "description": "Add a libopenshot effect (EffectInfo class_name such as Blur, Brightness, Saturation, ChromaKey) to one timeline clip, with its default parameters. Returns the new effectId.",
+      "description": "Add a libopenshot effect (EffectInfo class_name such as Blur, Brightness, Saturation, ChromaKey) to one timeline clip, with its default parameters. When the clip already has that effect nothing changes, unless if_exists='add' stacks another copy. Returns the new effectId.",
       "props": {
         "effect_name": {"description": "Alias for effect."}
       }
@@ -328,7 +336,7 @@
       }
     },
     "set_keyframes_tool": {
-      "description": "Replace one clip property's keyframe curve (volume, alpha, location_x/y, scale_x/y, rotation) with the given points. Each point is {frame, value} (1-based project frame of the clip's source) or {seconds, value}.",
+      "description": "Animate one clip property (volume, alpha, location_x/y, scale_x/y, rotation) with keyframes. Each point gives one time inside the clip (frame = keyframe X; seconds from the clip's first visible frame; timeline_seconds; or source_seconds) and a value. interpolation: bezier (default), linear or constant, per point or for all; mode: replace (default), merge or replace_range. One undo step.",
       "props": {
         "property": {"description": "The clip property to animate."},
         "points": {"description": "Keyframe points, e.g. [{\"seconds\": 0, \"value\": 0}, {\"seconds\": 1, \"value\": 1}]."}

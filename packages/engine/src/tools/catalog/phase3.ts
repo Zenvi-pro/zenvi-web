@@ -3,24 +3,66 @@
  * set_project_setting_tool (add_title_tool lives in titles.ts).
  *
  * Ports of zenvi-core (ref b63c39be7) src/classes/agent_tools/effects.py,
- * keyframes.py and project_settings.py. They return structured contract-3
- * receipts like the desktop.
+ * keyframes.py and project_settings.py, with develop 1f80cb3d0's
+ * add_effect if_exists and set_keyframes point times, interpolation and
+ * modes (editor_tools/effects_color.py, clip_props.py). They return
+ * structured contract-3 receipts like the desktop.
  */
 
-import { Interpolation, type Fraction } from "../../model/types.js";
+import { pyRound } from "../../model/rounding.js";
+import { Interpolation, type Clip, type Fraction } from "../../model/types.js";
 import { EFFECTS, getEffect } from "../../effects/registry.js";
 import { addEffect } from "../../ops/effects.js";
 import { setClipKeyframes } from "../../ops/clips.js";
+import type { KeyframePointInput } from "../../ops/types.js";
 import { setProjectSettings, type ProjectSettingsPatch } from "../../ops/project.js";
 import { fpsFromRate } from "../../timeline/time.js";
 import { contractTool, type CatalogTool } from "../define.js";
-import { keyframeX, projectFps } from "../frame-time.js";
+import { projectFps } from "../frame-time.js";
+import { pendingArgumentMessage } from "../pending.js";
 import { pyRepr, pyReprString } from "../pyfmt.js";
 import { applied, failed, refused, unchanged } from "../receipt.js";
 import { resolveClip, text } from "./common.js";
 
 /** agent_tools/keyframes.py ALLOWED_PROPERTIES. */
 export const KEYFRAME_PROPERTIES = ["volume", "alpha", "location_x", "location_y", "scale_x", "scale_y", "rotation"] as const;
+
+const TIME_UNITS = ["frame", "seconds", "timeline_seconds", "source_seconds"] as const;
+
+const INTERPOLATIONS: Record<"bezier" | "linear" | "constant", Interpolation> = {
+  bezier: Interpolation.BEZIER,
+  linear: Interpolation.LINEAR,
+  constant: Interpolation.CONSTANT,
+};
+
+/**
+ * Keyframe X arithmetic for one clip (zenvi-core develop
+ * editor_tools/clip_props_model.py ClipTime): X is a 1-based frame that
+ * counts the trimmed-off source frames, so the first visible frame is
+ * round(start * fps) + 1; `seconds` count from that frame.
+ */
+function clipTime(clip: Clip, fps: Fraction) {
+  const rate = fps.num / fps.den;
+  const start = Number(clip.start) || 0;
+  const end = Number(clip.end) || 0;
+  const position = Number(clip.position) || 0;
+  const first = pyRound(start * rate) + 1;
+  const last = Math.max(first, pyRound(end * rate) + 1);
+  const duration = Math.max(0, end - start);
+  return {
+    first,
+    last,
+    frameOf(unit: (typeof TIME_UNITS)[number], amount: number): number {
+      if (unit === "frame") return amount;
+      if (unit === "seconds") return pyRound((start + amount) * rate) + 1;
+      if (unit === "timeline_seconds") return pyRound((start + amount - position) * rate) + 1;
+      return pyRound(amount * rate) + 1;
+    },
+    ranges:
+      `frames ${first}-${last}, seconds 0-${duration.toFixed(3)} from the clip's start, ` +
+      `timeline_seconds ${position.toFixed(3)}-${(position + duration).toFixed(3)}, source_seconds ${start.toFixed(3)}-${end.toFixed(3)}`,
+  };
+}
 
 export const phase3Tools: CatalogTool[] = [
   contractTool("add_effect_tool", {
@@ -43,6 +85,15 @@ export const phase3Tools: CatalogTool[] = [
         return refused(tool, `Error: unknown effect ${pyReprString(name)}. Examples: ${sample}.`);
       }
       const clipId = String(resolved.clip.id);
+      // zenvi-core develop editor_tools/effects_color.py add_effect: if_exists='update' (the default)
+      // changes the effect the clip already has instead of stacking a copy. Without properties
+      // (not ported yet) there is nothing to change.
+      const existing = (resolved.clip.effects ?? []).find((e) => e.class_name === def.className);
+      if (existing && (input.if_exists ?? "update") === "update") {
+        return unchanged(tool, `${def.name} is already on 1 clip(s) with these settings; nothing changed.`, {
+          data: { effect: def.className, effectId: existing.id, timeline_clip_id: clipId, changed: false },
+        });
+      }
       const effect = call.commit((tx) => addEffect(tx, clipId, def.className));
       return applied(
         tool,
@@ -57,6 +108,9 @@ export const phase3Tools: CatalogTool[] = [
 
   contractTool("set_keyframes_tool", {
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
+    // zenvi-core develop editor_tools/clip_props.py set_keyframes / _build_points, for the
+    // seven properties below. Ease presets and points without a value (pinning the curve's
+    // current value) are not ported yet and are refused.
     run: async (call, input) => {
       const tool = "set_keyframes_tool";
       const prop = String(input.property ?? "").trim();
@@ -65,40 +119,38 @@ export const phase3Tools: CatalogTool[] = [
       }
       const points = input.points;
       if (!Array.isArray(points) || points.length === 0) {
-        return refused(tool, "Error: points must be a non-empty array of {frame|seconds, value} objects.");
+        return refused(tool, 'Error: points must list at least one keyframe, e.g. [{"seconds": 0, "value": 1}].');
       }
       const resolved = await resolveClip(call, input);
       if (!resolved.ok) return failed(tool, resolved.error || "Error: could not resolve a timeline clip.");
-      const fps = projectFps(call.doc.project);
-      const built: { frame: number; value: number }[] = [];
-      for (const [i, raw] of points.entries()) {
-        const value = Number(raw.value);
-        if (!Number.isFinite(value)) return refused(tool, `Error: points[${i}].value must be a number.`);
-        let x: number;
-        if (raw.frame !== undefined && raw.frame !== null) {
-          x = Math.trunc(Number(raw.frame));
-          if (x < 1) return refused(tool, `Error: points[${i}].frame must be >= 1.`);
-        } else if (raw.seconds !== undefined && raw.seconds !== null) {
-          x = keyframeX(Number(raw.seconds), fps);
-        } else {
-          return refused(tool, `Error: points[${i}] needs frame or seconds.`);
-        }
-        built.push({ frame: x, value });
-      }
-      built.sort((a, b) => a.frame - b.frame);
       const clipId = String(resolved.clip.id);
-      call.commit((tx) =>
-        setClipKeyframes(
-          tx,
-          clipId,
-          prop,
-          built.map((p) => ({ frame: p.frame, value: p.value, interpolation: Interpolation.CONSTANT })),
-          { mode: "replace" },
-        ),
-      );
+      const time = clipTime(resolved.clip, projectFps(call.doc.project));
+      const built: KeyframePointInput[] = [];
+      const seen = new Map<number, number>();
+      for (const [i, raw] of points.entries()) {
+        const units = TIME_UNITS.filter((unit) => raw[unit] !== undefined && raw[unit] !== null);
+        if (units.length !== 1) return refused(tool, `Error: points[${i}] needs exactly one of frame, seconds, timeline_seconds or source_seconds.`);
+        const unit = units[0]!;
+        const x = time.frameOf(unit, Number(raw[unit]));
+        if (x < time.first || x > time.last) {
+          return refused(tool, `Error: points[${i}] (${unit}=${pyRepr(raw[unit])}) lands on frame ${x}, outside clip ${clipId}; valid: ${time.ranges}.`);
+        }
+        if (seen.has(x)) return refused(tool, `Error: points[${seen.get(x)}] and points[${i}] land on the same frame ${x}.`);
+        seen.set(x, i);
+        if (raw.ease) return refused(tool, pendingArgumentMessage(tool, `points[${i}].ease`));
+        if (raw.value === undefined || raw.value === null) {
+          return refused(tool, `Error: points[${i}] needs a value here (keeping the curve's current value is not ported to this Zenvi surface yet).`);
+        }
+        const value = typeof raw.value === "boolean" ? Number.NaN : Number(raw.value);
+        if (!Number.isFinite(value)) return refused(tool, `Error: points[${i}].value must be a number.`);
+        built.push({ frame: x, value, interpolation: INTERPOLATIONS[raw.interpolation || input.interpolation || "bezier"] });
+      }
+      built.sort((a, b) => a.frame! - b.frame!);
+      const mode = input.mode ?? "replace";
+      call.commit((tx) => setClipKeyframes(tx, clipId, prop, built, { mode }));
       return applied(tool, `Set ${built.length} keyframe(s) on ${prop} for timeline_clip_id=${clipId}.`, {
         clips: [{ id: clipId }],
-        data: { timeline_clip_id: clipId, property: prop, points: built },
+        data: { timeline_clip_id: clipId, property: prop, mode, points: built.map((p) => ({ frame: p.frame, value: p.value })) },
       });
     },
   }),
@@ -109,25 +161,17 @@ export const phase3Tools: CatalogTool[] = [
       const tool = "set_project_setting_tool";
       const project = call.doc.project;
       const patch: ProjectSettingsPatch = {};
+      // develop's schema: numbers (fps 1-240, fps_num/fps_den >= 1) or null for "unchanged".
       let fps: Fraction | null = null;
-      if (input.fps_num !== undefined || input.fps_den !== undefined) {
-        const num = Math.trunc(Number(input.fps_num ?? 30));
-        const den = Math.trunc(Number(input.fps_den ?? 1));
-        if (!Number.isFinite(num) || !Number.isFinite(den)) return refused(tool, "Error: fps_num/fps_den must be integers.");
-        fps = { num, den };
-      } else if (input.fps !== undefined && String(input.fps).trim() !== "") {
-        const rate = Number(String(input.fps).trim());
-        if (!Number.isFinite(rate)) return refused(tool, `Error: fps must be a number (got ${pyRepr(input.fps)}).`);
-        if (rate <= 0) return refused(tool, "Error: fps must be positive.");
-        fps = fpsFromRate(rate);
+      if (input.fps_num != null || input.fps_den != null) {
+        fps = { num: input.fps_num ?? 30, den: input.fps_den ?? 1 };
+      } else if (input.fps != null) {
+        fps = fpsFromRate(input.fps);
       }
-      if (fps) {
-        if (fps.num <= 0 || fps.den <= 0) return refused(tool, "Error: fps_num and fps_den must be positive.");
-        patch.fps = fps;
-      }
-      if (input.width !== undefined) patch.width = input.width;
-      if (input.height !== undefined) patch.height = input.height;
-      if (input.sample_rate !== undefined) patch.sampleRate = input.sample_rate;
+      if (fps) patch.fps = fps;
+      if (input.width != null) patch.width = input.width;
+      if (input.height != null) patch.height = input.height;
+      if (input.sample_rate != null) patch.sampleRate = input.sample_rate;
       const current = projectFps(project);
       const same =
         (!patch.fps || (typeof patch.fps === "object" && patch.fps.num === current.num && patch.fps.den === current.den)) &&

@@ -8,6 +8,7 @@
  * agent_tools/execute.py `execute_tool_rich` (ref b63c39be7):
  *
  *   coerce (normalize_args) → validate (refused receipt, no history) →
+ *   refuse desktop arguments not ported yet (pending.ts) →
  *   capability check → run → receipt (+ snapshot delta when history grew).
  *
  * Implementations may return a structured receipt, or the desktop's legacy
@@ -21,6 +22,7 @@ import { isOpError } from "../ops/errors.js";
 import { contractInputs, contractMeta, type ContractInput, type ContractToolName } from "./schemas.gen.js";
 import type { JsonSchemaObject } from "./json-schema.js";
 import { invalidArgumentsMessage, normalizeArgs } from "./coerce.js";
+import { pendingArgumentIn, pendingArgumentMessage } from "./pending.js";
 import {
   failed,
   fromHandlerText,
@@ -181,6 +183,9 @@ export async function executeTool<I extends z.ZodType>(
     const message = issue ? invalidArgumentsMessage(name, issue, args) : `Error: Invalid arguments for ${name}.`;
     return resultFor(refused(name, message));
   }
+  // A desktop argument this surface does not honour yet is refused, never ignored.
+  const pendingArg = tool.contract ? pendingArgumentIn(name, parsed.data, tool.inputSchema) : undefined;
+  if (pendingArg) return resultFor(refused(name, pendingArgumentMessage(name, pendingArg)));
 
   const missing = missingCapabilities(tool.requires, ctx.host);
   if (missing.length > 0) {

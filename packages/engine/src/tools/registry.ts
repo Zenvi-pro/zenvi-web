@@ -7,8 +7,10 @@
  *   untouched) → capability check → run (at most one `doc.transaction`) →
  *   contract-3 receipt as ToolResult.
  *
- * Contract tools come first, in zenvi-core TOOL_SCHEMAS order, then the
- * direct tools for coding agents. `runTool` never throws: unknown names and
+ * Contract tools come first, in the desktop's order (schemas.gen.ts), then
+ * the direct tools for coding agents. Desktop tools not ported yet
+ * (pending.ts) are in neither: no surface lists them and `runTool` refuses
+ * them like any unknown name. `runTool` never throws: unknown names and
  * unexpected failures come back as receipts too.
  */
 
@@ -30,6 +32,7 @@ import { timelineTools } from "./catalog/timeline.js";
 import { titleTools } from "./catalog/titles.js";
 import { transitionTools } from "./catalog/transitions.js";
 import { missingCapabilities, resultFor, type CatalogTool } from "./define.js";
+import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_TOOLS } from "./pending.js";
 import { failed, refused, type ToolReceipt } from "./receipt.js";
 import { CONTRACT_TOOL_NAMES } from "./schemas.gen.js";
 import type { ToolContext, ToolHost, ToolResult, ToolSurface } from "./types.js";
@@ -63,14 +66,30 @@ function buildCatalog(): readonly CatalogTool[] {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
-  const missing = CONTRACT_TOOL_NAMES.filter((name) => !byName.has(name));
-  if (missing.length > 0) throw new Error(`tool catalog: contract tools without an implementation: ${missing.join(", ")}`);
   const extra = implemented.filter((tool) => !tool.contract);
   if (extra.length > 0) throw new Error(`tool catalog: non-contract tools outside the direct list: ${extra.map((t) => t.name).join(", ")}`);
-  return [...CONTRACT_TOOL_NAMES.map((name) => byName.get(name)!), ...directTools];
+  // Every desktop tool is ported, pending, or (for now) a direct tool's name.
+  const contract: CatalogTool[] = [];
+  const problems: string[] = [];
+  for (const name of CONTRACT_TOOL_NAMES) {
+    const tool = byName.get(name);
+    if (PENDING_DESKTOP_TOOLS.has(name)) {
+      if (tool) problems.push(`${name} is implemented: remove it from PENDING_DESKTOP_TOOLS`);
+    } else if (DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name)) {
+      if (!tool || tool.contract) problems.push(`${name} is not a direct tool: remove it from DESKTOP_NAMES_ON_DIRECT_TOOLS`);
+    } else if (!tool) {
+      problems.push(`${name} has no implementation: port it or add it to PENDING_DESKTOP_TOOLS`);
+    } else if (!tool.contract) {
+      problems.push(`direct tool ${name} has a desktop tool's name: add it to DESKTOP_NAMES_ON_DIRECT_TOOLS`);
+    } else {
+      contract.push(tool);
+    }
+  }
+  if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
+  return [...contract, ...directTools];
 }
 
-/** Every tool: the 73 contract tools (TOOL_SCHEMAS order), then the direct tools. */
+/** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */
 export const allTools: readonly CatalogTool[] = buildCatalog();
 
 const TOOLS_BY_NAME: ReadonlyMap<string, CatalogTool> = new Map(allTools.map((tool) => [tool.name, tool]));

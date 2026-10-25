@@ -6,7 +6,8 @@
  * Ports of zenvi-core src/classes/tool_handlers.py (ref b63c39be7):
  * generate_video_and_add_to_timeline (+ _snap_kling_o1_duration,
  * _project_kling_o1_t2v_dims), generate_tts_and_add_to_timeline /
- * add_tts_audio_to_timeline, modify_clip, generate_transition_clip.
+ * add_tts_audio_to_timeline (with develop 1f80cb3d0's position_seconds,
+ * playhead default and narration name), modify_clip, generate_transition_clip.
  *
  * Credits are enforced by the backend on /generation/* (api/credit_gate.py),
  * so the desktop's client-side credit pre-check is not repeated here.
@@ -20,13 +21,12 @@ import { addClip, moveClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
 import { generateTts, generateVideo } from "../backend.js";
 import { contractTool, unavailable, type CatalogTool } from "../define.js";
-import { parseSecondsArg, TimeArgError } from "../placement.js";
 import { pyFloat } from "../pyfmt.js";
 import { applied } from "../receipt.js";
 import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, normalizeTrackOrLayerArg } from "../tracks.js";
 import type { ImportedMedia } from "../types.js";
 import { applyPlacement, planPlacement, provisionalFile, placementText } from "./clips.js";
-import { record, text } from "./common.js";
+import { playheadSeconds, record, text } from "./common.js";
 
 /** Kling O1 Pro durations: 5 s unless 10 s is clearly asked for (>= 8). */
 export function snapKlingDuration(duration: unknown): number {
@@ -41,6 +41,12 @@ export function t2vDims(width: number, height: number): [number, number] {
   if (aspect > 1.2) return [1920, 1080];
   if (aspect < 0.8) return [1080, 1920];
   return [1440, 1440];
+}
+
+/** Project Files name of a narration (zenvi-core develop ai_generation_tts.default_name). */
+export function narrationName(text: string): string {
+  const words = text.split(/\s+/).filter(Boolean);
+  return `Narration - ${words.slice(0, 6).join(" ")}${words.length > 6 ? "..." : ""}`;
 }
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -137,13 +143,14 @@ export const generationTools: CatalogTool[] = [
       if (!narration) return "Error: No text provided for narration.";
       const writeGenerated = call.host.media!.writeGenerated;
       if (!writeGenerated) return unavailable("generate_tts_and_add_to_timeline_tool", "it cannot store generated audio.");
-      let position: number;
-      try {
-        position = parseSecondsArg(input.position, 0, "position") ?? 0;
-      } catch (error) {
-        if (error instanceof TimeArgError) return `Error: ${error.message}`;
-        throw error;
+      // zenvi-core develop editor_tools/ai_generation_tts.py _start_seconds: position is the
+      // older name of position_seconds; neither means the playhead.
+      const asked = input.position_seconds ?? null;
+      const older = input.position ?? null;
+      if (asked !== null && older !== null && Math.abs(asked - older) > 1e-6) {
+        return `Error: position (${pyFloat(older)}) and position_seconds (${pyFloat(asked)}) disagree; pass position_seconds only.`;
       }
+      const position = Math.max(0, asked ?? older ?? playheadSeconds(call));
       const project = call.doc.project;
       let layer = defaultUnderlayLayerNumber(project.layers);
       if (input.track !== undefined && String(input.track).trim() !== "") {
@@ -162,7 +169,7 @@ export const generationTools: CatalogTool[] = [
       if (bytes.length === 0) return "Error: TTS returned empty audio.";
       const path = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
       const info = await call.host.media!.probe(path);
-      const media: ImportedMedia = { path, info: { ...info, media_type: "audio" }, name: "Narration" };
+      const media: ImportedMedia = { path, info: { ...info, media_type: "audio" }, name: text(input.name) || narrationName(narration) };
       const clip = call.commit((tx) => {
         const file = addFile(tx, media, { dedupe: false, mediaType: "audio" });
         return addClip(tx, { fileId: String(file.id), position, layer });

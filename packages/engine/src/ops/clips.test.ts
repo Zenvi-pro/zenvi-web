@@ -229,6 +229,20 @@ describe("deleteClips / duplicateClip / removeGap", () => {
     expectRefused(doc, "locked", (tx) => deleteClips(tx, ["B"]));
   });
 
+  it("ripple moves an overlapping clip to where the deleted one began, not before it (close_gap_at)", () => {
+    // A 0-20, B 15-20 (a crossfade partner), C 25-30: the freed room is 15 s, not A's 20 s.
+    const doc = docWithClip(0, "A");
+    doc.transaction("b", (tx) => {
+      addClip(tx, { fileId: "VIDEO00001", position: 15, layer: V1, id: "B", end: 5 });
+      addClip(tx, { fileId: "VIDEO00001", position: 25, layer: V1, id: "C", end: 5 });
+    });
+    doc.transaction("ripple", (tx) => deleteClips(tx, ["A"], { ripple: true }));
+    expect(doc.project.clips.map((c) => [c.id, c.position])).toEqual([
+      ["B", 0],
+      ["C", 10],
+    ]);
+  });
+
   it("duplicates with fresh clip and effect ids", () => {
     const doc = docWithClip(0);
     doc.transaction("fx", (tx) => tx.update(["clips", { id: "CLIP000001" }], { effects: [{ id: "E1", class_name: "Blur", type: "Blur" }] }));
@@ -306,6 +320,12 @@ describe("setClipProperty / setClipKeyframes", () => {
       setClipKeyframes(tx, "CLIP000001", "location_x", [{ time: 3, value: 0 }], { mode: "merge" }),
     );
     expect(xs(merged.location_x)).toEqual([1, 31, 61]);
+    // replace_range: points between the first and last new X go, the rest stay.
+    const ranged = doc.transaction("kf3", (tx) =>
+      setClipKeyframes(tx, "CLIP000001", "location_x", [{ frame: 20, value: 5 }, { frame: 40, value: 6 }], { mode: "replace_range" }),
+    );
+    expect(xs(ranged.location_x)).toEqual([1, 20, 40, 61]);
+    expect(ys(ranged.location_x)).toEqual([-1, 5, 6, 0]);
     expectRefused(doc, "invalid_argument", (tx) => setClipKeyframes(tx, "CLIP000001", "location_x", []));
     expectRefused(doc, "invalid_argument", (tx) => setClipKeyframes(tx, "CLIP000001", "gravity", [{ frame: 1, value: 1 }]));
     expectRefused(doc, "invalid_argument", (tx) =>

@@ -444,14 +444,24 @@ export function deleteClips(tx: Transaction, clipIds: readonly string[], opts: D
   return unique;
 }
 
-/** main_window.py `ripple_delete_gap`: items on `layer` strictly after `from` move left by `gap`. */
+const RIPPLE_EPSILON = 1e-6;
+
+/**
+ * zenvi-core timeline_ops.close_gap_at (develop 1f80cb3d0, also behind
+ * main_window.py `ripple_delete_gap`): items on `layer` starting after `from`
+ * move left by the room actually freed, `gap` but never further than the
+ * first of them starts past `from`, so a clip that overlapped the removed one
+ * (a crossfade partner) lands where the removed clip began.
+ */
 function rippleShift(tx: Transaction, layer: number, from: number, gap: number): void {
-  for (const c of tx.project.clips.filter((c) => c.layer === layer && c.position > from)) {
-    tx.update(["clips", { id: c.id }], { position: c.position - gap });
-  }
-  for (const t of tx.project.effects.filter((t) => t.layer === layer && t.position > from)) {
-    tx.update(["effects", { id: t.id }], { position: t.position - gap });
-  }
+  const later = [
+    ...tx.project.clips.filter((c) => c.layer === layer && c.position > from + RIPPLE_EPSILON).map((c) => ["clips", c] as const),
+    ...tx.project.effects.filter((t) => t.layer === layer && t.position > from + RIPPLE_EPSILON).map((t) => ["effects", t] as const),
+  ];
+  if (later.length === 0 || gap <= RIPPLE_EPSILON) return;
+  const shift = Math.min(gap, Math.min(...later.map(([, item]) => item.position)) - from);
+  if (shift <= RIPPLE_EPSILON) return;
+  for (const [kind, item] of later) tx.update([kind, { id: item.id }], { position: item.position - shift });
 }
 
 export interface DuplicateClipOptions {
@@ -627,8 +637,10 @@ export interface SetKeyframesOptions {
    * `replace` (default): the property's points become exactly `points`.
    * `merge`: each point replaces an existing point at the same frame or is
    * inserted; other points stay.
+   * `replace_range`: existing points between the first and last new point
+   * are dropped, the rest stay (zenvi-core develop clip_props._merge_curve).
    */
-  mode?: "replace" | "merge";
+  mode?: "replace" | "merge" | "replace_range";
 }
 
 /** Build a JSON point from a `KeyframePointInput` (frame or time resolved against the clip). */
@@ -660,11 +672,18 @@ export function setClipKeyframes(
   if (!CLIP_KEYFRAME_KEYS.includes(prop)) throw invalid(`${prop} is not a keyframed clip property.`);
   if (!Array.isArray(points) || points.length === 0) throw invalid("points must be a non-empty array.");
   const mode = opts.mode ?? "replace";
-  if (mode !== "replace" && mode !== "merge") throw invalid(`mode must be replace or merge.`);
+  if (mode !== "replace" && mode !== "merge" && mode !== "replace_range") throw invalid(`mode must be replace, merge or replace_range.`);
   const built = points.map((p, i) => pointFromInput(project, clip, p, i));
   if (prop === "time") for (const p of built) p.co.Y = Math.trunc(p.co.Y);
   const current = clip[prop] as Keyframe | undefined;
-  const base: Keyframe = mode === "merge" && current ? current : { ...(current ?? {}), Points: [] };
+  let base: Keyframe = { ...(current ?? {}), Points: [] };
+  if (mode === "merge" && current) base = current;
+  if (mode === "replace_range" && current) {
+    const xs = built.map((p) => p.co.X);
+    const lo = Math.min(...xs);
+    const hi = Math.max(...xs);
+    base = { ...current, Points: (current.Points ?? []).filter((p) => p.co.X < lo || p.co.X > hi) };
+  }
   return patchClip(tx, clipId, { [prop]: setKeyframePoints(base, built) });
 }
 

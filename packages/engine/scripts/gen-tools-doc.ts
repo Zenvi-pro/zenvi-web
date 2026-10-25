@@ -13,15 +13,16 @@ import { fileURLToPath } from "node:url";
 import { SURFACE_PROFILES, availabilityMatrix, type Availability } from "../src/tools/availability.js";
 import type { CatalogTool } from "../src/tools/define.js";
 import type { JsonSchema } from "../src/tools/json-schema.js";
+import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_ARGS, PENDING_DESKTOP_TOOLS } from "../src/tools/pending.js";
 import { allTools } from "../src/tools/registry.js";
-import { CONTRACT_REF, SNAPSHOT_REF } from "../src/tools/schemas.gen.js";
+import { CONTRACT_REF, CONTRACT_TOOL_NAMES, contractMeta, type ContractToolName } from "../src/tools/schemas.gen.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const OUT = path.join(ROOT, "docs", "TOOLS.md");
 
 /**
  * Deliberate differences from the desktop handlers (zenvi-core develop
- * 2c99ed2c0 src/classes/tool_handlers.py unless noted).
+ * 1f80cb3d0; src/classes/tool_handlers.py unless noted).
  */
 const DIVERGENCES: [string, string][] = [
   [
@@ -49,8 +50,8 @@ const DIVERGENCES: [string, string][] = [
     "\"Already indexed\" reads the current `ai_metadata.index` block (legacy `twelvelabs` as fallback); the desktop reads only `twelvelabs` (tool_handlers.py:7344). Re-uploading for indexing is not available on the web.",
   ],
   [
-    "list_markers_tool",
-    "A marker's `label` (set by the web editor and add_marker_tool) is shown as its name; desktop markers have none (tool_handlers.py:1252).",
+    "add_marker_tool / list_markers_tool",
+    "A marker's name is stored as `label`, the key the web editor shows; zenvi-core develop stores `name` (track_ops.add_marker). list_markers_tool reads either.",
   ],
   [
     "add_title_tool / add_captions_tool",
@@ -66,7 +67,15 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "web-only arguments",
-    "Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's TOOL_SCHEMAS do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool position_seconds/label/text (the desktop adds at the playhead), add_track_tool label, save_project_tool path, set_clip_volume_tool volume/gain/db, watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted unchanged.",
+    "Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).",
+  ],
+  [
+    "desktop defaults the web does not follow yet",
+    "save_project_tool and export_video_tool replace an existing file (the CLI's) where the desktop refuses unless overwrite=true; add_title_tool never shrinks long lines (desktop fit_text=true); add_captions_tool adds a new caption group where the desktop replaces the clip's captions (replace_existing=true); new_project_tool / open_project_tool have no unsaved-changes guard (every web surface autosaves, so discard_unsaved is accepted as is); generate_tts_and_add_to_timeline_tool defaults to the track below the picture, where the desktop picks or creates a free narration track.",
+  ],
+  [
+    "tools zenvi-core develop rewrote as editor tools",
+    "get_project_info_tool, list_markers_tool, get_export_settings_tool, set_export_setting_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, export_video_tool, generate_tts_and_add_to_timeline_tool, add_effect_tool, add_title_tool, set_keyframes_tool, set_project_setting_tool and add_captions_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts), set_export_setting_tool stores any key (develop checks keys and aliases), and set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property).",
   ],
   [
     "split_file_add_clip_tool",
@@ -74,7 +83,7 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "wait_for_editor_job_tool (desktop MCP extra, #237)",
-    "Not in the catalog: tool calls here run to completion inside the call, so there is never a detached editor job; the name gets the standard not-available refusal.",
+    "Pending, and likely to stay so: tool calls here run to completion inside the call, so there is never a detached editor job; the name gets the standard not-available refusal.",
   ],
   [
     "argument coercion",
@@ -111,16 +120,63 @@ function argsTable(tool: CatalogTool): string[] {
   const props = Object.entries(tool.inputSchema.properties);
   if (props.length === 0) return ["No arguments."];
   const required = new Set(tool.inputSchema.required ?? []);
+  const desktopOnly = new Set<string>(tool.contract ? (PENDING_DESKTOP_ARGS[tool.name as ContractToolName] ?? []) : []);
   const rows = ["| Argument | Type | Required | Description |", "| --- | --- | --- | --- |"];
   for (const [name, schema] of props) {
     const extras: string[] = [];
     if (schema.default !== undefined) extras.push(`default ${JSON.stringify(schema.default)}`);
     if (schema.minimum !== undefined) extras.push(`min ${schema.minimum}`);
     if (schema.maximum !== undefined) extras.push(`max ${schema.maximum}`);
-    const desc = [schema.description ?? "", extras.length ? `(${extras.join(", ")})` : ""].filter(Boolean).join(" ");
+    const desc = [desktopOnly.has(name) ? "**Zenvi desktop only so far.**" : "", schema.description ?? "", extras.length ? `(${extras.join(", ")})` : ""]
+      .filter(Boolean)
+      .join(" ");
     rows.push(`| \`${name}\` | ${typeOf(schema)} | ${required.has(name) ? "yes" : ""} | ${cell(desc)} |`);
   }
   return rows;
+}
+
+/** zenvi-core editor_tools workstreams (editor_tools/__init__.py WORKSTREAM_OF_MODULE). */
+const WORKSTREAMS = ["project_export", "timeline_edit", "clip_props", "effects_color", "titles_text", "tracks_nav", "media_files", "ai_generation"];
+
+/** The desktop area a tool's handler lives in: its editor_tools workstream, or its module. */
+function desktopArea(name: ContractToolName): string {
+  const file = contractMeta[name].handler.split(":")[0]!;
+  const module = /editor_tools\/(\w+)\.py$/.exec(file)?.[1];
+  if (module) {
+    const workstream = WORKSTREAMS.find((w) => module === w || module.startsWith(`${w}_`)) ?? module;
+    return `${workstream.replace("_", "-")} (editor_tools)`;
+  }
+  if (file.endsWith("agent_api_proxy.py")) return "MCP extras (desktop app plumbing)";
+  return file.split("/").pop()!;
+}
+
+function notPorted(): string[] {
+  const byArea = new Map<string, string[]>();
+  for (const name of PENDING_DESKTOP_TOOLS) {
+    const area = desktopArea(name);
+    byArea.set(area, [...(byArea.get(area) ?? []), name]);
+  }
+  const out = [
+    "## Not ported yet",
+    "",
+    `Zenvi desktop lists ${CONTRACT_TOOL_NAMES.length} tools. ${PENDING_DESKTOP_TOOLS.size} are not ported yet (\`packages/engine/src/tools/pending.ts\`): ` +
+      "no web surface lists them, and a call answers `Error: <tool> is not available in this Zenvi surface`. Their desktop schemas are in `schemas.gen.ts`. By desktop area:",
+    "",
+  ];
+  for (const [area, names] of [...byArea].sort(([a], [b]) => a.localeCompare(b))) {
+    out.push(`- **${area}** (${names.length}): ${names.map((n) => `\`${n}\``).join(", ")}`);
+  }
+  out.push(
+    "",
+    `Desktop tools whose names the web uses for older direct tools with other arguments (the desktop versions are not ported): ${[...DESKTOP_NAMES_ON_DIRECT_TOOLS].map((n) => `\`${n}\``).join(", ")}.`,
+    "",
+    "Arguments of ported tools that only Zenvi desktop takes so far. A call that sets one to anything but its default is refused before anything changes " +
+      "(`Error: <tool> cannot use <argument> in this Zenvi surface yet …`, so the Assistant retries without it):",
+    "",
+  );
+  for (const [name, args] of Object.entries(PENDING_DESKTOP_ARGS)) out.push(`- \`${name}\`: ${args.join(", ")}`);
+  out.push("");
+  return out;
 }
 
 function render(): string {
@@ -134,7 +190,8 @@ function render(): string {
     "<!-- Generated by packages/engine/scripts/gen-tools-doc.ts from @zenvi/engine/tools. Do not edit by hand. -->",
     "",
     `One tool catalog for every Zenvi surface: the Zenvi Assistant in the web editor, the local MCP server (\`zenvi mcp\`), the Zenvi Cloud remote MCP server, and the CLI. ` +
-      `${allTools.length} tools: the ${contract} contract-3 tools of Zenvi desktop (zenvi-core develop \`${CONTRACT_REF}\`; the inspect and speech tools develop does not have yet from \`${SNAPSHOT_REF}\`; same names, arguments and receipts) and ${direct} direct tools for coding agents.`,
+      `${allTools.length} tools: ${contract} of the ${CONTRACT_TOOL_NAMES.length} tools Zenvi desktop lists (zenvi-core develop \`${CONTRACT_REF}\`; same names, arguments and receipts) and ${direct} direct tools for coding agents. ` +
+      `The other desktop tools are not ported yet (see [Not ported yet](#not-ported-yet)).`,
     "",
     "Every call returns a contract-3 receipt (`{contract: 3, status, tool, summary, clips, …, undoSteps}`); a failure's summary starts with `Error:`, " +
       "and a surface limitation says `Error: <tool> is not available in this Zenvi surface: …` (do not retry). One call is at most one undo step.",
@@ -181,6 +238,7 @@ function render(): string {
     out.push(`Availability: ${notes.join("; ")}.`, "");
     out.push(...argsTable(tool), "");
   }
+  out.push(...notPorted());
   out.push("## Divergences from the desktop", "", "Deliberate differences from the zenvi-core handlers:", "");
   for (const [what, why] of DIVERGENCES) out.push(`- **${what}**: ${why}`);
   out.push("");

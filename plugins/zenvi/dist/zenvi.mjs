@@ -3831,9 +3831,6 @@ function toSeconds(frame, fps) {
 function snap(seconds2, fps) {
   return toSeconds(toFrame(seconds2, fps), fps);
 }
-function keyframeX(seconds2, fps) {
-  return toFrame(seconds2, fps) + 1;
-}
 function durationFrames(start, end, fps) {
   requireFinite2(start, "start");
   requireFinite2(end, "end");
@@ -5902,12 +5899,14 @@ function deleteClips(tx, clipIds, opts = {}) {
   return unique;
 }
 function rippleShift(tx, layer2, from, gap) {
-  for (const c of tx.project.clips.filter((c2) => c2.layer === layer2 && c2.position > from)) {
-    tx.update(["clips", { id: c.id }], { position: c.position - gap });
-  }
-  for (const t of tx.project.effects.filter((t2) => t2.layer === layer2 && t2.position > from)) {
-    tx.update(["effects", { id: t.id }], { position: t.position - gap });
-  }
+  const later = [
+    ...tx.project.clips.filter((c) => c.layer === layer2 && c.position > from + RIPPLE_EPSILON).map((c) => ["clips", c]),
+    ...tx.project.effects.filter((t) => t.layer === layer2 && t.position > from + RIPPLE_EPSILON).map((t) => ["effects", t])
+  ];
+  if (later.length === 0 || gap <= RIPPLE_EPSILON) return;
+  const shift2 = Math.min(gap, Math.min(...later.map(([, item]) => item.position)) - from);
+  if (shift2 <= RIPPLE_EPSILON) return;
+  for (const [kind, item] of later) tx.update([kind, { id: item.id }], { position: item.position - shift2 });
 }
 function duplicateClip(tx, clipId2, opts = {}) {
   const project = tx.project;
@@ -6009,11 +6008,18 @@ function setClipKeyframes(tx, clipId2, prop, points, opts = {}) {
   if (!CLIP_KEYFRAME_KEYS.includes(prop)) throw invalid(`${prop} is not a keyframed clip property.`);
   if (!Array.isArray(points) || points.length === 0) throw invalid("points must be a non-empty array.");
   const mode = opts.mode ?? "replace";
-  if (mode !== "replace" && mode !== "merge") throw invalid(`mode must be replace or merge.`);
+  if (mode !== "replace" && mode !== "merge" && mode !== "replace_range") throw invalid(`mode must be replace, merge or replace_range.`);
   const built = points.map((p, i) => pointFromInput(project, clip2, p, i));
   if (prop === "time") for (const p of built) p.co.Y = Math.trunc(p.co.Y);
   const current = clip2[prop];
-  const base = mode === "merge" && current ? current : { ...current ?? {}, Points: [] };
+  let base = { ...current ?? {}, Points: [] };
+  if (mode === "merge" && current) base = current;
+  if (mode === "replace_range" && current) {
+    const xs = built.map((p) => p.co.X);
+    const lo = Math.min(...xs);
+    const hi = Math.max(...xs);
+    base = { ...current, Points: (current.Points ?? []).filter((p) => p.co.X < lo || p.co.X > hi) };
+  }
   return patchClip(tx, clipId2, { [prop]: setKeyframePoints(base, built) });
 }
 function setClipSpeed(tx, clipId2, factor, opts = {}) {
@@ -6117,7 +6123,7 @@ function setClipVolume(tx, clipId2, opts) {
   const next = patchClip(tx, clipId2, { volume: { ...clip2.volume ?? {}, Points: points } });
   return { clip: next, before, target: Math.max(0, Math.min(1.3, target)), points: points.length };
 }
-var PLAIN_CLIP_KEYS, TIMING_KEYS, SCALE_CLAMP_KEYS, FADE_ZONE_SECONDS;
+var RIPPLE_EPSILON, PLAIN_CLIP_KEYS, TIMING_KEYS, SCALE_CLAMP_KEYS, FADE_ZONE_SECONDS;
 var init_clips = __esm({
   "../engine/src/ops/clips.ts"() {
     "use strict";
@@ -6136,6 +6142,7 @@ var init_clips = __esm({
     init_retime();
     init_values();
     init_transitions();
+    RIPPLE_EPSILON = 1e-6;
     PLAIN_CLIP_KEYS = {
       gravity: "int",
       scale: "int",
@@ -47507,29 +47514,36 @@ var init_json_schema2 = __esm({
 });
 
 // ../engine/src/tools/schemas.gen.ts
-var CONTRACT_REF, SNAPSHOT_REF, contractInputs, contractMeta, CONTRACT_TOOL_NAMES;
+var CONTRACT_REF, contractInputs, contractMeta, CONTRACT_TOOL_NAMES;
 var init_schemas_gen = __esm({
   "../engine/src/tools/schemas.gen.ts"() {
     "use strict";
     init_zod();
-    CONTRACT_REF = "2c99ed2c0fd5";
-    SNAPSHOT_REF = "b63c39be7c3c";
+    CONTRACT_REF = "1f80cb3d061b";
     contractInputs = {
       get_project_info_tool: external_exports.strictObject({}),
       list_files_tool: external_exports.strictObject({}),
       list_clips_tool: external_exports.strictObject({
         "layer": external_exports.string().describe("Optional layer_number or UI track filter.").optional(),
-        "detail_level": external_exports.string().describe("Sent by the assistant backend; ignored here.").optional()
+        "detail_level": external_exports.string().describe("summary (default) or full \u2014 accepted for Assistant/LLM compat; listing is always complete.").optional()
       }),
       list_layers_tool: external_exports.strictObject({}),
       list_markers_tool: external_exports.strictObject({}),
-      new_project_tool: external_exports.strictObject({}),
+      new_project_tool: external_exports.strictObject({
+        "discard_unsaved": external_exports.boolean().describe("Throw away unsaved changes in the current project. Only after the user agreed.").optional(),
+        "profile": external_exports.string().describe("Optional video profile or social preset for the new project, e.g. 'instagram_reel', 'youtube_4k', 'FHD 1080p 30 fps' (see list_project_profiles_tool). Empty = default profile.").optional(),
+        "save_first": external_exports.boolean().describe("Save the current project to its existing file first (it must have been saved before).").optional()
+      }),
       save_project_tool: external_exports.strictObject({
-        "file_path": external_exports.string().describe("Optional destination path; empty saves in place.").optional(),
+        "file_path": external_exports.string().describe("Where to save. Empty = the project's current file (Save). A new path = Save As (.zvn is added when there is no project extension; missing folders are created).").optional(),
+        "overwrite": external_exports.boolean().describe("Allow replacing an existing file that is not this project's current file.").optional(),
         "path": external_exports.string().describe("Where to save the project (.zvn is appended when missing). Omit to save to the current location.").optional()
       }),
       open_project_tool: external_exports.strictObject({
-        "file_path": external_exports.string().describe("Project file path.")
+        "discard_unsaved": external_exports.boolean().describe("Throw away unsaved changes in the current project. Only after the user agreed.").optional(),
+        "file_path": external_exports.string().describe("Path of a .zvn project (legacy .osp/.flow also open). Leave empty when using recent_index.").optional(),
+        "recent_index": external_exports.int().min(0).max(10).describe("Open a recent project instead: 1 = most recent (see list_recent_projects_tool). 0 = use file_path.").optional(),
+        "save_first": external_exports.boolean().describe("Save the current project to its existing file before opening the other one.").optional()
       }),
       watch_clip_tool: external_exports.strictObject({
         "file_path": external_exports.string().describe("Media path to import, place and play.").optional(),
@@ -47547,7 +47561,11 @@ var init_schemas_gen = __esm({
         "occurrence": external_exports.union([external_exports.string(), external_exports.number()]).describe("1-based pick when the query matches the same source several times (0 = best match).").optional(),
         "position_near": external_exports.union([external_exports.string(), external_exports.number(), external_exports.null()]).describe("Timeline seconds; only clips that span this time match.").optional()
       }),
-      play_tool: external_exports.strictObject({}),
+      play_tool: external_exports.strictObject({
+        "action": external_exports.enum(["toggle", "play", "pause", "stop", "fast_forward", "rewind", "step_forward", "step_back"]).describe("What to do. play / pause (always pass one of these for a plain 'play' or 'pause'); toggle = the Space bar; stop = pause and return to the start; fast_forward / rewind = the L / J keys (one speed step faster forward / backward); step_forward / step_back = pause and move by `frames`.").optional(),
+        "frames": external_exports.int().min(1).max(1e4).describe("For step_forward / step_back: how many frames to move.").optional(),
+        "speed": external_exports.union([external_exports.int().min(-16).max(16), external_exports.null()]).describe("For action='play': playback speed, 1 = normal, 2 or 4 = fast, -1 = backwards. Omit for normal speed.").optional()
+      }),
       go_to_start_tool: external_exports.strictObject({}),
       go_to_end_tool: external_exports.strictObject({}),
       undo_tool: external_exports.strictObject({
@@ -47557,12 +47575,18 @@ var init_schemas_gen = __esm({
         "steps": external_exports.union([external_exports.string(), external_exports.number()]).describe("Number of redo steps (1-20).").optional()
       }),
       add_track_tool: external_exports.strictObject({
-        "label": external_exports.string().describe("Optional label for the new track.").optional()
+        "count": external_exports.int().min(1).max(10).describe("How many tracks to add in this one step. With a name they are called '<name> 1' .. '<name> N' from bottom to top.").optional(),
+        "name": external_exports.string().describe("Name shown in the new track's header, e.g. 'Music'. Empty = the default 'Track N'.").optional(),
+        "position": external_exports.enum(["top", "bottom", "above", "below"]).describe("Where the new track goes: 'top' (above every track, like the Add Track button), 'bottom' (below every track), or 'above' / 'below' the track in relative_to (Track menu > Add Track Above / Below).").optional(),
+        "relative_to": external_exports.string().describe("For position 'above' / 'below': the existing track, as a UI track number (1 = bottom), track name, track id (L3) or layer number.").optional(),
+        "label": external_exports.string().describe("Alias for name.").optional()
       }),
       add_marker_tool: external_exports.strictObject({
-        "position_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("Marker time in timeline seconds (default: the playhead).").optional(),
-        "label": external_exports.string().describe("Optional marker label.").optional(),
-        "text": external_exports.string().describe("Alias for label.").optional()
+        "color": external_exports.enum(["blue", "red", "green", "yellow", "orange", "purple", "pink", "white"]).describe("Marker color tag; the timeline tints the marker's icon with it (blue = the default icon) and shows the marker's name next to it.").optional(),
+        "name": external_exports.string().describe("Marker name, e.g. 'Drop', 'Chorus', 'Cut here'. Used to find it again.").optional(),
+        "position_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Timeline seconds for the marker (0:32 = 32, 1:05 = 65). Omit to mark the playhead position.").optional(),
+        "label": external_exports.string().describe("Alias for name.").optional(),
+        "text": external_exports.string().describe("Alias for name.").optional()
       }),
       delete_from_timeline_tool: external_exports.strictObject({
         "timeline_clip_id": external_exports.string().describe("Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).").optional(),
@@ -47571,7 +47595,8 @@ var init_schemas_gen = __esm({
         "scope": external_exports.enum(["auto", "clip", "track"]).describe("auto (default): a clip id/query deletes one placement, a bare track clears the track. clip / track force the branch.").optional(),
         "occurrence": external_exports.string().describe("1-based pick when the query matches the same source several times (0 = best match).").optional(),
         "position_near": external_exports.union([external_exports.string(), external_exports.number(), external_exports.null()]).describe("Timeline seconds; only clips that span this time match.").optional(),
-        "include_transitions": external_exports.boolean().describe("Track scope only: also delete transitions on the track (default true).").optional()
+        "include_transitions": external_exports.boolean().describe("Track scope only: also delete transitions on the track (default true).").optional(),
+        "ripple": external_exports.union([external_exports.string(), external_exports.boolean()]).describe("One clip only: true closes the gap it leaves (later items on that track move left); default false leaves the gap.").optional()
       }),
       remove_clip_tool: external_exports.strictObject({
         "timeline_clip_id": external_exports.string().describe("Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).").optional(),
@@ -47604,6 +47629,13 @@ var init_schemas_gen = __esm({
         "gain": external_exports.union([external_exports.string(), external_exports.number()]).describe("Alias for level.").optional(),
         "db": external_exports.union([external_exports.string(), external_exports.number()]).describe("Alias for level_db.").optional()
       }),
+      reverse_clip_tool: external_exports.strictObject({
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).").optional(),
+        "clip_query": external_exports.string().describe("Describe the clip instead of passing an id: file name, subject, or words from its summary. Narrow it with track, occurrence or position_near.").optional(),
+        "track": external_exports.string().describe("Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom).").optional(),
+        "occurrence": external_exports.union([external_exports.string(), external_exports.number()]).describe("1-based pick when the query matches the same source several times (0 = best match).").optional(),
+        "mode": external_exports.string().describe("'reverse' (default) or 'reset'.").optional()
+      }),
       duck_under_speech_tool: external_exports.strictObject({
         "bed_clip_ids": external_exports.string().describe("Comma-separated music/SFX clip ids to duck (default: every bed overlapping speech).").optional(),
         "bed_query": external_exports.string().describe("Describe the bed clip instead of passing ids.").optional(),
@@ -47615,16 +47647,17 @@ var init_schemas_gen = __esm({
         "pad_before_ms": external_exports.union([external_exports.string(), external_exports.number()]).describe("Start ducking this long before speech, ms (default 200).").optional(),
         "pad_after_ms": external_exports.union([external_exports.string(), external_exports.number()]).describe("Keep ducking this long after speech, ms (default 300).").optional(),
         "boost_speech_db": external_exports.union([external_exports.string(), external_exports.number()]).describe("Also set speech clips to this level in dB (default 0 = unchanged).").optional(),
-        "dry_run": external_exports.string().describe("true/false \u2014 preview without writing.").optional()
+        "dry_run": external_exports.union([external_exports.string(), external_exports.boolean()]).describe("true/false \u2014 preview without writing.").optional()
       }),
       zoom_in_tool: external_exports.strictObject({}),
       zoom_out_tool: external_exports.strictObject({}),
       center_on_playhead_tool: external_exports.strictObject({}),
       import_files_tool: external_exports.strictObject({
-        "paths": external_exports.string().describe("Comma-separated paths or JSON list.").optional(),
+        "paths": external_exports.union([external_exports.array(external_exports.string()), external_exports.string()]).describe("List of paths, or one comma-separated string.").optional(),
+        "files": external_exports.union([external_exports.array(external_exports.string()), external_exports.string()]).describe("Alias of paths.").optional(),
         "path": external_exports.string().describe("One file, folder or glob to import.").optional(),
         "folder": external_exports.string().describe("A folder to import recursively (media files only).").optional(),
-        "skip_indexing": external_exports.string().describe("true to skip AI indexing after import (hosts with an indexer).").optional(),
+        "skip_indexing": external_exports.union([external_exports.string(), external_exports.boolean()]).describe("true to skip AI indexing after import (hosts with an indexer).").optional(),
         "dry_run": external_exports.union([external_exports.string(), external_exports.boolean()]).describe("true previews what would be imported; nothing changes.").optional(),
         "media_types": external_exports.string().describe("all (default), video, audio, image, or a comma list.").optional()
       }),
@@ -47632,13 +47665,36 @@ var init_schemas_gen = __esm({
         "timeout_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("How long to wait, seconds (min 30, default 1800).").optional()
       }),
       export_video_tool: external_exports.strictObject({
-        "show_dialog": external_exports.string().describe("true (default) opens the export dialog when the host has one; false renders directly to output_path.").optional(),
-        "output_path": external_exports.string().describe("Where to write the video (hosts pick a location when omitted).").optional()
+        "audio_bitrate": external_exports.string().describe("Override audio bitrate, e.g. '192 kb/s'.").optional(),
+        "audio_codec": external_exports.string().describe("Override audio codec, e.g. 'aac', 'libmp3lame', 'pcm_s16le', 'flac'.").optional(),
+        "channels": external_exports.string().describe("Override audio channels: mono, stereo, surround, 5.1, 7.1.").optional(),
+        "container": external_exports.string().describe("Override container/extension, e.g. 'mov', 'mkv', 'wav', 'flac'.").optional(),
+        "end": external_exports.number().min(0).describe("Range end in timeline seconds (custom range). 0 = end of the last clip.").optional(),
+        "export_type": external_exports.enum(["auto", "video_audio", "video_only", "audio_only", "image_sequence"]).describe("auto = the preset's (GIF = video only, MP3 = audio only). audio_only with container 'wav'/'flac' writes uncompressed/lossless audio.").optional(),
+        "file_name": external_exports.string().describe("Output file name without folder (default: the project name).").optional(),
+        "folder": external_exports.string().describe("Output folder (default: the Export folder preference, usually Downloads).").optional(),
+        "fps": external_exports.number().min(0).max(240).describe("Override export frame rate. 0 = from profile.").optional(),
+        "height": external_exports.int().min(0).max(16384).describe("Override export height in pixels (even). 0 = from profile.").optional(),
+        "image_format": external_exports.enum(["png", "jpg", "bmp", "tiff"]).describe("Image type for export_type='image_sequence'.").optional(),
+        "interlaced": external_exports.boolean().describe("Interlaced output (top field first).").optional(),
+        "output_path": external_exports.string().describe("Full output file path. Empty = folder + file_name. The extension follows the container.").optional(),
+        "overwrite": external_exports.boolean().describe("Replace an existing output file.").optional(),
+        "preset": external_exports.string().describe("Target: an Export dialog preset title or a common name -- 'MP4 (h.264)' (default), 'YouTube', 'YouTube (4K)', 'YouTube Shorts', 'Instagram Reels', 'Instagram', 'TikTok', 'Facebook', 'Twitter / X', 'LinkedIn', 'Vimeo', 'GIF', 'MP3', 'WEBM', 'ProRes', 'MOV', 'MKV', 'HEVC'. See list_export_presets_tool.").optional(),
+        "profile": external_exports.string().describe("Export video profile/size instead of the preset's (Advanced > Profile): a profile name, social preset or 'WIDTHxHEIGHT'.").optional(),
+        "quality": external_exports.enum(["", "low", "med", "high"]).describe("Preset quality (bitrate). Empty = stored setting or high.").optional(),
+        "range": external_exports.enum(["", "whole", "selection", "custom"]).describe("whole = first clip to last clip; selection = the selected clips' span; custom = start/end. Empty = custom when start/end are given (or stored), else whole.").optional(),
+        "sample_rate": external_exports.int().min(0).max(192e3).describe("Override audio sample rate (Hz), e.g. 44100, 48000. 0 = preset's.").optional(),
+        "show_dialog": external_exports.union([external_exports.boolean(), external_exports.string()]).describe("Instead of rendering, open the Export Video dialog for the user (returns at once).").optional(),
+        "start": external_exports.number().min(0).describe("Range start in timeline seconds (custom range).").optional(),
+        "video_bitrate": external_exports.string().describe("Override video rate: '8 Mb/s', '500 kb/s' or a quality like '20 crf'.").optional(),
+        "video_codec": external_exports.string().describe("Override video codec, e.g. 'libx264', 'libx265', 'prores_ks', 'libvpx-vp9'.").optional(),
+        "width": external_exports.int().min(0).max(16384).describe("Override export width in pixels (even). 0 = from profile.").optional()
       }),
       get_export_settings_tool: external_exports.strictObject({}),
       set_export_setting_tool: external_exports.strictObject({
-        "key": external_exports.string().describe("width, height, fps_num, fps_den, start_frame, end_frame, sample_rate, channels, video_codec (vcodec), audio_codec (acodec), output_path (path), vformat (format), or any other export key."),
-        "value": external_exports.union([external_exports.string(), external_exports.number(), external_exports.boolean(), external_exports.null()]).describe("New value (integers for the numeric keys).").optional()
+        "clear": external_exports.boolean().describe("Remove the stored override for key (or every override when key is empty).").optional(),
+        "key": external_exports.string().describe("Setting to store: preset, quality, export_type, width, height, fps, start, end, video_codec, audio_codec, format, video_bitrate, audio_bitrate, sample_rate, channels, output_path, folder, file_name, image_format (also start_frame, end_frame, fps_num, fps_den).").optional(),
+        "value": external_exports.string().describe("New value (see get_export_settings_tool valid_keys for each key's format).").optional()
       }),
       get_file_info_tool: external_exports.strictObject({
         "file_id": external_exports.string().describe("Media-bin file id (from list_files_tool or an import receipt).")
@@ -47661,7 +47717,7 @@ var init_schemas_gen = __esm({
         "start_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("Source in-point relative to the file start, seconds. Alone it keeps the rest of the file.").optional(),
         "end_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("Source out-point (keep window end). A duration_seconds that disagrees with it wins.").optional(),
         "query": external_exports.string().describe("What the kept moment shows (used to confirm the window when the host can watch frames).").optional(),
-        "full_file": external_exports.string().describe("true to place the whole file (one continuous audio bed, or a whole video) without a watch.").optional()
+        "full_file": external_exports.union([external_exports.string(), external_exports.boolean()]).describe("true to place the whole file (one continuous audio bed, or a whole video) without a watch.").optional()
       }),
       import_video_url_and_add_to_timeline_tool: external_exports.strictObject({
         "video_url": external_exports.string().describe("Alias for url (Assistant naming).").optional(),
@@ -47672,6 +47728,100 @@ var init_schemas_gen = __esm({
         "end_seconds": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
         "duration_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("Length in seconds.").optional(),
         "full_file": external_exports.union([external_exports.string(), external_exports.boolean()]).optional()
+      }),
+      ingest_web_video_tool: external_exports.strictObject({
+        "url": external_exports.string().describe("YouTube / web page URL (preferred).").optional(),
+        "video_url": external_exports.string().describe("Alias for url.").optional(),
+        "intent": external_exports.string().describe("'reference' (default, media bin), 'timeline' (place), or 'recreate'.").optional(),
+        "place": external_exports.union([external_exports.string(), external_exports.boolean()]).describe("Place on timeline; ignored for recreate.").optional(),
+        "track": external_exports.union([external_exports.string(), external_exports.number()]).describe("Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom).").optional(),
+        "position_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("Timeline position in seconds (a timecode like 1:05 also works).").optional(),
+        "write_subs": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "job_id": external_exports.string().describe("Long-poll id from a prior status=running reply.").optional()
+      }),
+      apply_color_tool: external_exports.strictObject({
+        "clipIds": external_exports.string().describe("JSON list, comma-separated ids, or 'all'.").optional(),
+        "clip_ids": external_exports.string().optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).").optional(),
+        "clipId": external_exports.string().describe("Timeline clip id.").optional(),
+        "all_clips": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "allClips": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "reset": external_exports.union([external_exports.string(), external_exports.boolean()]).describe("true removes ColorGrade.").optional(),
+        "color": external_exports.string().describe("Full grade object JSON to paste.").optional(),
+        "exposure": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "contrast": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "saturation": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "vibrance": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "temperature": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "tint": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "temperature_delta": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "tint_delta": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "exposure_delta": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "vibrance_delta": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "highlights": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "shadows": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "mix": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "lut_path": external_exports.string().optional(),
+        "lut_intensity": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "lut": external_exports.string().optional(),
+        "wheels": external_exports.string().describe("Wheels JSON.").optional(),
+        "curve_all": external_exports.string().optional(),
+        "curve_red": external_exports.string().optional(),
+        "curve_green": external_exports.string().optional(),
+        "curve_blue": external_exports.string().optional(),
+        "masterCurve": external_exports.string().optional(),
+        "redCurve": external_exports.string().optional(),
+        "greenCurve": external_exports.string().optional(),
+        "blueCurve": external_exports.string().optional()
+      }),
+      inspect_color_tool: external_exports.strictObject({
+        "clipId": external_exports.string().describe("Timeline clip id.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).").optional(),
+        "clip_id": external_exports.string().optional(),
+        "atFrame": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "at_frame": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "reference": external_exports.string().optional(),
+        "referenceClipId": external_exports.string().optional(),
+        "include_preview": external_exports.union([external_exports.string(), external_exports.boolean()]).optional()
+      }),
+      list_looks_tool: external_exports.strictObject({
+        "query": external_exports.string().optional(),
+        "vibe": external_exports.string().optional()
+      }),
+      apply_look_tool: external_exports.strictObject({
+        "clipIds": external_exports.string().describe("JSON list, comma-separated ids, or 'all'.").optional(),
+        "clip_ids": external_exports.string().optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).").optional(),
+        "clipId": external_exports.string().describe("Timeline clip id.").optional(),
+        "lookId": external_exports.string().describe("Id from list_looks_tool.").optional(),
+        "look_id": external_exports.string().optional(),
+        "lutPath": external_exports.string().optional(),
+        "lut_path": external_exports.string().optional(),
+        "lutIntensity": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "lut_intensity": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "mix": external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+        "stackGrain": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "stack_grain": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "grainPreset": external_exports.string().optional(),
+        "grain_preset": external_exports.string().optional(),
+        "all_clips": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "allClips": external_exports.union([external_exports.string(), external_exports.boolean()]).optional()
+      }),
+      match_color_to_reference_tool: external_exports.strictObject({
+        "clipId": external_exports.string().describe("Timeline clip id.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).").optional(),
+        "clip_id": external_exports.string().optional(),
+        "clipIds": external_exports.string().optional(),
+        "clip_ids": external_exports.string().optional(),
+        "reference": external_exports.string().optional(),
+        "referenceClipId": external_exports.string().optional(),
+        "referenceFileId": external_exports.string().optional(),
+        "referenceImagePath": external_exports.string().optional(),
+        "all_clips": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "allClips": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "dry_run": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "dryRun": external_exports.union([external_exports.string(), external_exports.boolean()]).optional(),
+        "max_iterations": external_exports.union([external_exports.string(), external_exports.number()]).optional()
       }),
       slice_clip_at_playhead_tool: external_exports.strictObject({}),
       search_clips_tool: external_exports.strictObject({
@@ -47735,6 +47885,12 @@ var init_schemas_gen = __esm({
         "track": external_exports.string().describe("Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom).").optional(),
         "duration_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("5 (default) or 10.").optional()
       }),
+      generate_image_and_add_to_timeline_tool: external_exports.strictObject({
+        "prompt": external_exports.string(),
+        "position_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("Timeline position in seconds (a timecode like 1:05 also works).").optional(),
+        "track": external_exports.string().describe("Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom).").optional(),
+        "duration_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("Length in seconds.").optional()
+      }),
       modify_clip_tool: external_exports.strictObject({
         "mode": external_exports.string().describe("'replace' (default) or another handler mode.").optional(),
         "description": external_exports.string().describe("What to generate.").optional(),
@@ -47752,7 +47908,8 @@ var init_schemas_gen = __esm({
         "clip_b_id": external_exports.string().describe("Incoming clip id.").optional(),
         "clip_a_query": external_exports.string().optional(),
         "clip_b_query": external_exports.string().optional(),
-        "prompt_hint": external_exports.string().describe("Optional style hint for the morph.").optional()
+        "prompt_hint": external_exports.string().describe("Optional style hint for the morph.").optional(),
+        "duration_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("Length in seconds.").optional()
       }),
       list_transitions_tool: external_exports.strictObject({
         "category": external_exports.string().describe("'all' (default), 'common' or 'extra'.").optional()
@@ -47768,12 +47925,14 @@ var init_schemas_gen = __esm({
         "placement": external_exports.string().describe("'between' (default), 'start' or 'end'.").optional()
       }),
       generate_tts_and_add_to_timeline_tool: external_exports.strictObject({
-        "text": external_exports.string().describe("Narration text."),
-        "voice": external_exports.string().describe("Voice (default alloy).").optional(),
-        "model": external_exports.string().describe("TTS model (default tts-1).").optional(),
-        "speed": external_exports.union([external_exports.string(), external_exports.number()]).describe("Speaking speed (default 1.0).").optional(),
-        "track": external_exports.union([external_exports.string(), external_exports.number()]).describe("Track (default: the bottom track).").optional(),
-        "position": external_exports.union([external_exports.string(), external_exports.number()]).describe("Timeline position in seconds.").optional()
+        "model": external_exports.string().describe("Speech model: tts-1 (default, fast), tts-1-hd (higher quality), gpt-4o-mini-tts.").optional(),
+        "name": external_exports.string().describe("Project Files name for the narration (default 'Narration - <first words>').").optional(),
+        "position": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Older name for position_seconds (same meaning); prefer position_seconds.").optional(),
+        "position_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Timeline seconds where the narration starts (0:05 = 5). Omit to start at the playhead.").optional(),
+        "speed": external_exports.number().min(0.25).max(4).describe("Speaking rate: 1 = normal, 0.8 = slower, 1.25 = faster.").optional(),
+        "text": external_exports.string().describe("The words to speak, exactly as they should be read (up to 4096 characters). Punctuation shapes the pauses."),
+        "track": external_exports.union([external_exports.string(), external_exports.int()]).describe("Track for the narration: UI track number (1 = bottom), track name or layer number. Leave empty to use a free narration track (never the bottom picture track; a 'Narration' track is created above it when every track is busy).").optional(),
+        "voice": external_exports.string().describe("Speaker voice, e.g. alloy (neutral, default), echo, fable, onyx (deep), nova, shimmer, ash, coral, sage.").optional()
       }),
       import_stock_media_tool: external_exports.strictObject({
         "source": external_exports.string().describe("'pexels' or 'freesound'; empty with local_path.").optional(),
@@ -47802,41 +47961,68 @@ var init_schemas_gen = __esm({
         "detail_level": external_exports.string().describe("summary (default) or full.").optional()
       }),
       get_timeline_state_tool: external_exports.strictObject({
-        "detail_level": external_exports.string().describe("Sent by the assistant backend; ignored here.").optional()
+        "detail_level": external_exports.string().describe("summary (default) or full \u2014 accepted for Assistant/LLM compat.").optional()
       }),
       add_effect_tool: external_exports.strictObject({
-        "timeline_clip_id": external_exports.string().describe("Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).").optional(),
-        "clip_query": external_exports.string().describe("Describe the clip instead of passing an id: file name, subject, or words from its summary. Narrow it with track, occurrence or position_near.").optional(),
-        "track": external_exports.string().describe("Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom).").optional(),
-        "occurrence": external_exports.union([external_exports.string(), external_exports.number()]).describe("1-based pick when the query matches the same source several times (0 = best match).").optional(),
-        "position_near": external_exports.union([external_exports.string(), external_exports.number(), external_exports.null()]).describe("Timeline seconds; only clips that span this time match.").optional(),
-        "effect": external_exports.string().describe("libopenshot EffectInfo class_name.").optional(),
-        "effect_name": external_exports.string().describe("Alias for effect.").optional()
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "effect": external_exports.string().describe("Effect to add: class or display name from list_effects_tool (Blur, Sharpen, ChromaKey, ColorGrade, Pixelate, Compressor, Echo, ParametricEQ...).").optional(),
+        "effect_name": external_exports.string().describe("Same as effect (either works).").optional(),
+        "if_exists": external_exports.enum(["update", "add"]).describe("When the clip already has this effect: 'update' changes that one (default, avoids stacking duplicates); 'add' stacks another copy.").optional(),
+        "interpolation": external_exports.enum(["bezier", "linear", "constant"]).describe("Default interpolation for keyframes that do not name one.").optional(),
+        "occurrence": external_exports.int().min(0).describe("With clip_query: take the Nth match (1 = first). 0 = the best match.").optional(),
+        "position_near": external_exports.union([external_exports.number(), external_exports.null()]).describe("With clip_query: prefer the clip nearest this timeline time (seconds).").optional(),
+        "processing": external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+        "properties": external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Several timeline clip ids to change in one step.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
       }),
       add_title_tool: external_exports.strictObject({
-        "text": external_exports.string().describe("Title / lower-third text."),
-        "template": external_exports.string().describe("Bundled SVG template basename without .svg.").optional(),
-        "position_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("Timeline position in seconds (a timecode like 1:05 also works).").optional(),
-        "track": external_exports.string().describe("Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom).").optional(),
-        "duration_seconds": external_exports.union([external_exports.string(), external_exports.number()]).describe("How long the title shows (default 5).").optional(),
-        "file_name": external_exports.string().describe("File name for the generated SVG.").optional()
+        "background_color": external_exports.string().describe("Colour of the title's full-frame background (transparent in most templates) with optional alpha, e.g. '#000000' for a solid black end card or '#00000080' for a 50% dark veil over the video. Empty keeps it.").optional(),
+        "duration_seconds": external_exports.number().min(0.01).max(86400).describe("How long the title stays on screen, in seconds.").optional(),
+        "fade_in_seconds": external_exports.number().min(0).max(10).describe("Fade the title in over this many seconds (0 = appear at once).").optional(),
+        "fade_out_seconds": external_exports.number().min(0).max(10).describe("Fade the title out over this many seconds (0 = disappear at once).").optional(),
+        "file_name": external_exports.string().describe("Name for the new title file in Project Files (without .svg). Empty = from the text. An existing name gets ' (1)', ' (2)'... instead of being overwritten.").optional(),
+        "fit_text": external_exports.boolean().describe("Shrink a line whose text would run off the frame (templates do not wrap text).").optional(),
+        "font": external_exports.string().describe("Font family for every line, e.g. 'Arial Black', 'Helvetica Neue', 'Georgia'. Must be installed; empty keeps the template's font.").optional(),
+        "font_scale": external_exports.number().min(0.2).max(5).describe("Text size relative to the template: 1 = as designed, 1.5 = half again as big, 0.7 = smaller.").optional(),
+        "font_style": external_exports.enum(["", "italic", "normal"]).describe("Italic or upright text; empty keeps the template's.").optional(),
+        "font_weight": external_exports.enum(["", "bold", "normal"]).describe("Make the text bold or normal weight; empty keeps the template's.").optional(),
+        "lines": external_exports.array(external_exports.string()).describe("Every field in order (as listed by list_title_templates_tool), for templates with several lines such as Standard_4 or credits. Overrides text/subtitle; fields left out are blanked.").optional(),
+        "position_seconds": external_exports.number().min(0).describe("Timeline second where the title starts.").optional(),
+        "screen_position": external_exports.enum(["auto", "top", "center", "bottom"]).describe("Where the 16:9 title artboard sits when the project is not 16:9 (vertical reels, square): auto = by where the template's text is (lower thirds at the bottom, headers at the top). On 9:16 video bottom/top titles are lifted clear of the platform UI bands.").optional(),
+        "subtitle": external_exports.string().describe("Text for the template's subtitle field (second line), e.g. a role under a name.").optional(),
+        "template": external_exports.string().describe("Template name from list_title_templates_tool (e.g. 'Standard_1', 'Gray_Box_4', 'Bar_3', 'OpenShot'), or the path of an existing .svg title to start from. Empty = Bar_1 (centre title on a blue bar).").optional(),
+        "text": external_exports.string().describe("Main title text, e.g. 'Tokyo Day 1'. A '\\n' puts the rest on the template's next field(s): 'Jane Doe\\nFounder' fills a lower third's name and role.").optional(),
+        "text_color": external_exports.string().describe("Colour of every line: '#RRGGBB', '#RRGGBBAA' (alpha = opacity), 'rgba(r,g,b,a)' or a basic name ('white', 'yellow'). Empty keeps the template's colours.").optional(),
+        "track": external_exports.string().describe("UI track number (1 = bottom), name or layer for the title. Empty = the lowest free track above every clip with video at that time (a new top track when none is free).").optional()
       }),
       set_keyframes_tool: external_exports.strictObject({
-        "timeline_clip_id": external_exports.string().describe("Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt).").optional(),
-        "clip_query": external_exports.string().describe("Describe the clip instead of passing an id: file name, subject, or words from its summary. Narrow it with track, occurrence or position_near.").optional(),
-        "track": external_exports.string().describe("Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom).").optional(),
-        "occurrence": external_exports.union([external_exports.string(), external_exports.number()]).describe("1-based pick when the query matches the same source several times (0 = best match).").optional(),
-        "position_near": external_exports.union([external_exports.string(), external_exports.number(), external_exports.null()]).describe("Timeline seconds; only clips that span this time match.").optional(),
-        "property": external_exports.enum(["volume", "alpha", "location_x", "location_y", "scale_x", "scale_y", "rotation"]).describe("The clip property to animate."),
-        "points": external_exports.array(external_exports.strictObject({ "frame": external_exports.int().min(1).optional(), "seconds": external_exports.number().min(0).optional(), "value": external_exports.number() })).min(1).describe('Keyframe points, e.g. [{"seconds": 0, "value": 0}, {"seconds": 1, "value": 1}].')
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "ease": external_exports.enum(["", "ease", "ease_in", "ease_out", "ease_in_out", "ease_in_quad", "ease_in_cubic", "ease_in_quart", "ease_in_quint", "ease_in_sine", "ease_in_expo", "ease_in_circ", "ease_in_back", "ease_out_quad", "ease_out_cubic", "ease_out_quart", "ease_out_quint", "ease_out_sine", "ease_out_expo", "ease_out_circ", "ease_out_back", "ease_in_out_quad", "ease_in_out_cubic", "ease_in_out_quart", "ease_in_out_quint", "ease_in_out_sine", "ease_in_out_expo", "ease_in_out_circ", "ease_in_out_back"]).describe("Default bezier ease for points that set none (e.g. 'ease_in_out').").optional(),
+        "interpolation": external_exports.enum(["", "bezier", "linear", "constant"]).describe("Default interpolation for points that set none ('' = bezier, constant for choice properties).").optional(),
+        "mode": external_exports.enum(["replace", "merge", "replace_range"]).describe("replace = these points become the whole curve; merge = add/update these points and keep the others; replace_range = drop existing points between the first and last new point, keep the rest.").optional(),
+        "occurrence": external_exports.int().min(0).describe("With clip_query: take the Nth matching clip in timeline order (0 = best match).").optional(),
+        "points": external_exports.array(external_exports.strictObject({ "ease": external_exports.enum(["ease", "ease_in", "ease_out", "ease_in_out", "ease_in_quad", "ease_in_cubic", "ease_in_quart", "ease_in_quint", "ease_in_sine", "ease_in_expo", "ease_in_circ", "ease_in_back", "ease_out_quad", "ease_out_cubic", "ease_out_quart", "ease_out_quint", "ease_out_sine", "ease_out_expo", "ease_out_circ", "ease_out_back", "ease_in_out_quad", "ease_in_out_cubic", "ease_in_out_quart", "ease_in_out_quint", "ease_in_out_sine", "ease_in_out_expo", "ease_in_out_circ", "ease_in_out_back"]).describe("Bezier ease preset (the Properties dock's list) for the move INTO this point; implies bezier.").optional(), "frame": external_exports.int().min(1).describe("Clip frame X exactly as stored: 1-based and counting trimmed-off source frames (the first visible frame is round(start*fps)+1).").optional(), "interpolation": external_exports.enum(["bezier", "linear", "constant"]).describe("How the value moves INTO this point from the previous one: bezier (smooth), linear, or constant (holds the previous value, then jumps).").optional(), "seconds": external_exports.number().describe("Seconds from the clip's first visible frame: 0 = where the clip starts on the timeline, the clip's duration = its end. Works the same on trimmed clips.").optional(), "source_seconds": external_exports.number().describe("Time in the source media in seconds (inside the clip's trimmed range).").optional(), "timeline_seconds": external_exports.number().describe("Timeline time in seconds (must fall inside the clip).").optional(), "value": external_exports.union([external_exports.number(), external_exports.string(), external_exports.boolean()]).describe("Value at that time: a number (alpha 0-1, scale 1 = 100%, location -1..1 = one frame, rotation in degrees, volume 0-1.3, time = source frame), a choice name for choice properties (has_audio: Auto/Off/On), or a color for wave_color. Omit to keep the value the curve already has there (pins it).").optional() })).describe('Keyframes: each gives one time (frame, seconds, timeline_seconds or source_seconds) and a value. Example: [{"seconds": 0, "value": 1}, {"seconds": 3, "value": 1.3, "ease": "ease_in_out"}].'),
+        "position_near": external_exports.union([external_exports.number(), external_exports.null()]).describe("With clip_query: prefer the clip under this timeline time (seconds).").optional(),
+        "property": external_exports.string().describe("The clip property to animate: 'scale_x', 'scale_y', 'location_x', 'location_y', 'rotation', 'alpha', 'volume', 'shear_x', 'shear_y', 'origin_x', 'origin_y', 'corner_radius', 'margin', 'wave_color', 'has_audio', 'has_video', 'channel_filter', 'channel_mapping' or 'time' (or its label, e.g. 'Scale X')."),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
       }),
       set_project_setting_tool: external_exports.strictObject({
-        "fps": external_exports.union([external_exports.string(), external_exports.number()]).describe("Frame rate as a number (23.976, 29.97 and 59.94 map to the NTSC fractions).").optional(),
-        "fps_num": external_exports.int().min(1).describe("Exact frame rate numerator.").optional(),
-        "fps_den": external_exports.int().min(1).describe("Exact frame rate denominator.").optional(),
-        "width": external_exports.int().min(16).max(8192).describe("Frame width in pixels.").optional(),
-        "height": external_exports.int().min(16).max(8192).describe("Frame height in pixels.").optional(),
-        "sample_rate": external_exports.int().min(8e3).max(192e3).describe("Audio sample rate in Hz.").optional()
+        "channels": external_exports.string().describe("Audio channels: 'mono', 'stereo', 'surround', '5.1', '7.1' (or 1, 2, 3, 6, 8).").optional(),
+        "fps": external_exports.union([external_exports.number().min(1).max(240), external_exports.null()]).describe("Frame rate, e.g. 24, 29.97, 30, 60.").optional(),
+        "fps_den": external_exports.union([external_exports.int().min(1), external_exports.null()]).describe("Exact frame-rate denominator, e.g. 1001.").optional(),
+        "fps_num": external_exports.union([external_exports.int().min(1), external_exports.null()]).describe("Exact frame-rate numerator (with fps_den), e.g. 30000.").optional(),
+        "height": external_exports.union([external_exports.int().min(16).max(16384), external_exports.null()]).describe("Frame height in pixels (even).").optional(),
+        "orientation": external_exports.enum(["", "landscape", "portrait", "square"]).describe("Turn the frame to this shape.").optional(),
+        "preset": external_exports.string().describe("Alias of profile for social presets: 'instagram_reel', 'tiktok', 'youtube', ...").optional(),
+        "profile": external_exports.string().describe("Profile name or social preset instead of size/fps (see set_project_profile_tool).").optional(),
+        "reframe": external_exports.enum(["keep", "fit", "fill"]).describe("What happens to existing full-frame clips of another shape (see set_project_profile_tool).").optional(),
+        "sample_rate": external_exports.union([external_exports.int().min(8e3).max(192e3), external_exports.null()]).describe("Project audio sample rate: 22050, 44100, 48000, 96000 or 192000.").optional(),
+        "save_as_default": external_exports.boolean().describe("Also store sample_rate/channels as the Preferences default for new projects (takes effect after restart).").optional(),
+        "width": external_exports.union([external_exports.int().min(16).max(16384), external_exports.null()]).describe("Frame width in pixels (even).").optional()
       }),
       inspect_timeline_tool: external_exports.strictObject({
         "startFrame": external_exports.int().min(0).describe("0-index project frame.").optional(),
@@ -47862,7 +48048,7 @@ var init_schemas_gen = __esm({
         "file_id": external_exports.string().describe("Alias for fileId.").optional(),
         "trackIndex": external_exports.int().min(0).describe("UI track index; omit for all clips.").optional(),
         "language": external_exports.string().describe("BCP-47 / whisper code, or 'auto'.").optional(),
-        "modelId": external_exports.string().describe("e.g. faster-whisper-base (whisper path only).").optional(),
+        "modelId": external_exports.string().describe("faster-whisper model, e.g. faster-whisper-base; ignored by the bundled whisper.cpp engine (one model).").optional(),
         "force": external_exports.boolean().describe("Ignore cache and re-run ASR.").optional(),
         "engine": external_exports.string().describe("auto|apple|whisper. auto=Apple SpeechAnalyzer on macOS 26+ when helper is present, else Whisper. Windows always Whisper.").optional(),
         "detail_level": external_exports.string().describe("Omit for a compact receipt (script + compactWords). Pass 'full' to also include the verbose words array.").optional(),
@@ -47872,7 +48058,7 @@ var init_schemas_gen = __esm({
         "fileId": external_exports.string().describe("Media-bin file id.").optional(),
         "file_id": external_exports.string().describe("Alias for fileId.").optional(),
         "language": external_exports.string().describe("BCP-47 / whisper code, or 'auto'.").optional(),
-        "modelId": external_exports.string().describe("e.g. faster-whisper-base").optional(),
+        "modelId": external_exports.string().describe("faster-whisper model, e.g. faster-whisper-base; ignored by the bundled whisper.cpp engine.").optional(),
         "force": external_exports.boolean().describe("Ignore cache and re-run ASR.").optional(),
         "engine": external_exports.string().describe("auto|apple|whisper").optional()
       }),
@@ -47895,15 +48081,31 @@ var init_schemas_gen = __esm({
         "maxRemoveFraction": external_exports.number().min(0.1).max(0.99).describe("Refuse if more than this fraction would be deleted.").optional()
       }),
       add_captions_tool: external_exports.strictObject({
-        "clipId": external_exports.string().describe("Timeline clip id.").optional(),
-        "timeline_clip_id": external_exports.string().describe("Alias for clipId.").optional(),
-        "trackIndex": external_exports.int().min(0).describe("UI track index (1 = bottom) whose clips to caption.").optional(),
-        "maxWords": external_exports.int().min(1).max(24).describe("Maximum words per caption (default 8).").optional(),
-        "maxChars": external_exports.int().min(8).max(120).describe("Maximum characters per caption (default 42).").optional(),
-        "language": external_exports.string().describe("BCP-47 language code, or 'auto'.").optional(),
-        "modelId": external_exports.string().describe("Speech model id (on-device ASR hosts only).").optional(),
-        "engine": external_exports.string().describe("auto|apple|whisper \u2014 same on-device ASR as get_transcript_tool (never cloud).").optional(),
-        "srtPath": external_exports.string().describe("Import SRT/VTT instead of transcribing.").optional()
+        "background_color": external_exports.string().describe("Colour of the box behind the text (alpha in '#RRGGBBAA' sets its opacity). Empty = the style's.").optional(),
+        "background_opacity": external_exports.number().min(-1).max(1).describe("Opacity of the box behind the text, 0 (no box) to 1. -1 = the style's.").optional(),
+        "clipId": external_exports.string().describe("Timeline clip to caption (the speaker's clip). Same as timeline_clip_id.").optional(),
+        "clip_query": external_exports.string().describe("Describe the clip to caption instead of an id, e.g. 'talking head'.").optional(),
+        "cues": external_exports.array(external_exports.strictObject({ "end": external_exports.number().describe("End second (after start)."), "start": external_exports.number().describe("Start second."), "text": external_exports.string().describe("Caption text; '\\n' for a second line.") })).describe("Captions to show, each {start, end, text} in timeline seconds (or the clip's source seconds with time_base='source'). Use for text you already have.").optional(),
+        "engine": external_exports.string().describe("Accepted for compatibility; not used (the transcript comes from the media index).").optional(),
+        "fade_seconds": external_exports.number().min(-1).max(3).describe("Fade each caption in and out over this many seconds (0-3). -1 = the style's.").optional(),
+        "font": external_exports.string().describe("Font family, e.g. 'Arial Black', 'Helvetica Neue'. Empty = the style's font.").optional(),
+        "language": external_exports.string().describe("Accepted for compatibility with the on-device speech tools; the transcript comes from Zenvi's media index, which already knows the language.").optional(),
+        "maxChars": external_exports.int().min(8).max(120).describe("Longest caption, in characters, when phrasing a transcript.").optional(),
+        "maxWords": external_exports.int().min(1).max(24).describe("Longest caption, in words, when phrasing a transcript (subtitle files and cues are kept as written).").optional(),
+        "modelId": external_exports.string().describe("Accepted for compatibility; not used (the transcript comes from the media index).").optional(),
+        "overlay_track": external_exports.string().describe("Track for the transparent 'Captions' overlay clip used when no clip is captioned. Empty = the lowest free track above the video.").optional(),
+        "position": external_exports.enum(["", "bottom", "center", "top"]).describe("Where the captions sit: bottom (above the safe margin, higher on vertical video), center or top. Empty = the style's (bottom).").optional(),
+        "replace_existing": external_exports.boolean().describe("Replace the captions a clip already has (true) or add a second caption track to it (false).").optional(),
+        "srtPath": external_exports.string().describe("Path of an .srt or .vtt subtitle file to burn in. With a clip its times are that clip's media time; without one, timeline time.").optional(),
+        "stroke_color": external_exports.string().describe("Outline colour. Empty = the style's.").optional(),
+        "stroke_width": external_exports.number().min(-1).max(0.5).describe("Outline thickness relative to the text height: 0 = none, 0.03 thin, 0.09 heavy (heavy outlines only read with heavy fonts such as Arial Black). -1 = the style's.").optional(),
+        "style": external_exports.enum(["boxed", "classic", "minimal", "reels", "yellow"]).describe("Look preset: classic = white text on a dark box at the bottom (subtitles); reels = big bold white text with a black outline (Instagram/TikTok/Shorts); minimal = small white text with a thin outline; yellow = yellow text with a black outline (TV subtitles); boxed = white on a solid black box. The arguments below override parts of it.").optional(),
+        "text_color": external_exports.string().describe("Text colour '#RRGGBB' / '#RRGGBBAA' / 'rgba(...)' / name. Empty = the style's.").optional(),
+        "text_size": external_exports.number().min(0).max(0.3).describe("Text height as a fraction of the frame's shorter side: 0.04 small, 0.05 normal subtitles, 0.075 big reel captions. 0 = the style's size.").optional(),
+        "time_base": external_exports.enum(["auto", "timeline", "source"]).describe("What cue times mean: timeline seconds, or the clip's source (media) seconds. auto = source for subtitle files and transcripts, timeline for cues.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip to caption.").optional(),
+        "trackIndex": external_exports.int().min(0).describe("Caption every clip on this UI track (1 = bottom) from its transcript. 0 = not used.").optional(),
+        "uppercase": external_exports.boolean().describe("Show the captions in capital letters.").optional()
       }),
       export_captions_tool: external_exports.strictObject({
         "path": external_exports.string().describe("Destination .srt or .vtt path."),
@@ -47932,6 +48134,762 @@ var init_schemas_gen = __esm({
         "query": external_exports.string().describe("Visual / semantic query."),
         "top_k": external_exports.int().min(1).max(50).describe("Maximum hits (default 5).").optional(),
         "provider": external_exports.string().describe("local or auto.").optional()
+      }),
+      add_animated_title_tool: external_exports.strictObject({
+        "file_name": external_exports.string().describe("Base name of the rendered frames. Empty = from the text.").optional(),
+        "length_multiplier": external_exports.int().min(1).max(5).describe("Animation length: 1 = as designed (about 3-5 s), 2 = twice as long, up to 5.").optional(),
+        "params": external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+        "position_seconds": external_exports.number().min(0).describe("Timeline second where the animation starts.").optional(),
+        "template": external_exports.string().describe("Animated title from list_title_templates_tool kind=animated, by name or title, e.g. 'fly_by_1' (Fly Towards Camera), 'rotate_360', 'glare', 'neon_curves', 'dissolve', 'explode', 'spacemovie_intro'.").optional(),
+        "text": external_exports.string().describe("The title text (the template's first text field; '\\n' for a second line).").optional(),
+        "timeout_seconds": external_exports.int().min(30).max(7200).describe("Give up (and stop Blender) after this many seconds.").optional(),
+        "track": external_exports.string().describe("UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video.").optional()
+      }),
+      add_clips_to_timeline_tool: external_exports.strictObject({
+        "allow_overlap": external_exports.boolean().describe("Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.").optional(),
+        "fade": external_exports.enum(["none", "in", "out", "in_out"]).describe("Opacity fades on every clip, used instead of a transition; clips overlap by fade_seconds so the fades cross.").optional(),
+        "fade_seconds": external_exports.number().min(0.04).describe("Fade length in seconds.").optional(),
+        "file_ids": external_exports.array(external_exports.string()).describe("Project file ids to place, in timeline order (list_files_tool). Use this OR items.").optional(),
+        "fit_total_seconds": external_exports.number().min(0).describe("Make the whole sequence last exactly this long (e.g. 60 for a 60-second vlog) by trimming the longest clips evenly, keeping the middle of each (heads and tails are usually shaky); 0 = full lengths.").optional(),
+        "image_seconds": external_exports.number().min(0).describe("How long each still image stays on screen; 0 = the Default Image Length preference.").optional(),
+        "items": external_exports.array(external_exports.strictObject({ "file_id": external_exports.string().describe("Project file id (list_files_tool). Sub-clip file ids work too."), "source_end": external_exports.number().describe("Source out point in seconds; -1 or omitted = the file's own out point. For a still image this sets how long it stays on screen.").optional(), "source_start": external_exports.number().describe("Source in point in seconds; -1 or omitted = the file's own in point.").optional() })).describe("Files with their own in/out points, in timeline order. Use this OR file_ids.").optional(),
+        "min_clip_seconds": external_exports.number().min(0.1).describe("Shortest a clip may be trimmed to by fit_total_seconds.").optional(),
+        "order": external_exports.enum(["as_given", "shuffle", "name"]).describe("Order on the timeline: as given, shuffled, or by file name.").optional(),
+        "start_seconds": external_exports.number().describe("Timeline time of the first clip; -1 = right after the last clip already on the track (0 on an empty track).").optional(),
+        "track": external_exports.string().describe("Track to fill: UI track number (1 = bottom), name, or layer number. Empty = the selected track, else the bottom track.").optional(),
+        "transition": external_exports.string().describe("Transition between consecutive clips: '' = hard cuts, 'fade' = crossfade, 'random', or a transition name such as 'wipe_left_to_right' or 'circle_in_to_out' (list_transitions_tool).").optional(),
+        "transition_seconds": external_exports.number().min(0).describe("Length of each transition; clips overlap by this much. 0 = the Default Transition Length preference.").optional(),
+        "zoom": external_exports.enum(["none", "in", "out", "random"]).describe("Slow zoom on every clip (Ken Burns): in = 100% to 125%, out = 125% to 100%, random = random zoom and pan.").optional()
+      }),
+      add_emoji_tool: external_exports.strictObject({
+        "duration_seconds": external_exports.number().min(0).max(86400).describe("How long it stays, in seconds. 0 = the editor's default image length (Preferences, 10 s unless changed).").optional(),
+        "emoji": external_exports.string().describe("Which emoji: a name ('fire', 'red heart', 'party popper'), the character ('\u{1F525}') or an OpenMoji code from search_emojis_tool ('1F525')."),
+        "group": external_exports.enum(["", "smileys-emotion", "animals-nature", "food-drink", "travel-places", "activities", "objects", "symbols", "extras-openmoji", "user"]).describe("Narrow a name to one emoji group.").optional(),
+        "margin": external_exports.number().min(0).max(0.4).describe("Distance from the edges it hugs, as a fraction of the shorter side.").optional(),
+        "position_seconds": external_exports.number().min(0).describe("Timeline second where the emoji appears.").optional(),
+        "screen_position": external_exports.enum(["top_left", "top_center", "top_right", "center_left", "center", "center_right", "bottom_left", "bottom_center", "bottom_right"]).describe("Where on the frame the emoji sits.").optional(),
+        "size": external_exports.number().min(0.02).max(1).describe("Emoji size as a fraction of the frame's shorter side (0.2 = a fifth).").optional(),
+        "track": external_exports.string().describe("UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video.").optional()
+      }),
+      add_timer_tool: external_exports.strictObject({
+        "background": external_exports.boolean().describe("Draw a rounded box behind the digits.").optional(),
+        "background_color": external_exports.string().describe("Box colour.").optional(),
+        "background_opacity": external_exports.number().min(0).max(1).describe("Box opacity 0-1.").optional(),
+        "countdown_from_seconds": external_exports.number().min(0).max(86400).describe("count_down: the number it starts from (0 = the timer's duration).").optional(),
+        "duration_seconds": external_exports.number().min(0).max(86400).describe("How long the timer shows. 0 = automatic: a countdown's length, otherwise until the end of the timeline.").optional(),
+        "font": external_exports.string().describe("Font family, e.g. 'Menlo', 'Arial Black'. Empty = the default sans font.").optional(),
+        "format": external_exports.enum(["mm:ss", "hh:mm:ss", "hh:mm:ss.mmm", "timecode", "frames"]).describe("How the time is written.").optional(),
+        "margin_percent": external_exports.number().min(0).max(40).describe("Distance from the frame edges it hugs, in % of the frame.").optional(),
+        "mode": external_exports.enum(["count_up", "count_down", "clock", "timecode", "frame_number"]).describe("count_down = remaining time to zero; count_up = elapsed time (stopwatch); clock = a time of day starting at start_at_seconds; timecode = HH:MM:SS:FF; frame_number = frame count.").optional(),
+        "position_seconds": external_exports.number().min(0).describe("Timeline second where the timer appears (overlay mode).").optional(),
+        "prefix": external_exports.string().describe("Text before the time, e.g. 'T-' or 'Starts in '.").optional(),
+        "screen_position": external_exports.enum(["top_left", "top_center", "top_right", "center_left", "center", "center_right", "bottom_left", "bottom_center", "bottom_right"]).describe("Where on the frame the timer sits.").optional(),
+        "start_at_seconds": external_exports.number().min(-86400).max(86400).describe("count_up: starting offset; clock: the time of day to start at, in seconds after midnight (9:30 = 34200).").optional(),
+        "stroke_color": external_exports.string().describe("Outline colour.").optional(),
+        "stroke_width": external_exports.number().min(0).max(0.5).describe("Outline thickness relative to the digit height (0 = none).").optional(),
+        "suffix": external_exports.string().describe("Text after the time, e.g. ' left'.").optional(),
+        "text_color": external_exports.string().describe("Digit colour ('#RRGGBB[AA]', 'rgba(...)', name).").optional(),
+        "text_size": external_exports.number().min(0.01).max(0.5).describe("Digit height as a fraction of the frame's shorter side (0.07 = normal, 0.15 = a big centre countdown).").optional(),
+        "timeline_clip_id": external_exports.string().describe("Draw the timer on this clip instead of a new overlay (it then follows the clip; count_up shows the time since the clip's first visible frame).").optional(),
+        "track": external_exports.string().describe("Overlay track: UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video.").optional()
+      }),
+      add_transitions_between_clips_tool: external_exports.strictObject({
+        "audio_crossfade": external_exports.boolean().describe("Also crossfade the clips' audio (equal-power) under each transition.").optional(),
+        "duration_seconds": external_exports.number().min(0).describe("Length of each transition in seconds. 0 = the Default Transition Length preference.").optional(),
+        "max_gap_seconds": external_exports.number().min(0).max(10).describe("Clips further apart than this are not joined (a gap stays a gap).").optional(),
+        "method": external_exports.enum(["ripple", "handles", "existing_overlaps"]).describe("How clips come to overlap. ripple (default, like Project Files > Add to Timeline): each later clip and everything after it on the track moves earlier, so the track gets shorter by one transition per join; other tracks do not move. handles: keep every cut in place and use extra media before/after the cut (keeps sync with music/other tracks; joins without enough spare media are skipped). existing_overlaps: only where clips already overlap; nothing moves.").optional(),
+        "replace_existing": external_exports.boolean().describe("Replace a transition already on a join (otherwise that join is skipped).").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Only join these clips (all on one track, joined in timeline order). Leave out for every clip on the track.").optional(),
+        "track": external_exports.string().describe("The track whose consecutive clips get transitions (UI track number, 1 = bottom; name; or layer number). Required unless timeline_clip_ids are given.").optional(),
+        "transition": external_exports.string().describe("'fade' (crossfade, default), 'random', or any transition name ('wipe_left_to_right', 'circle_in_to_out', list_transitions_tool).").optional()
+      }),
+      align_clips_tool: external_exports.strictObject({
+        "allow_overlap": external_exports.boolean().describe("Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "edge": external_exports.enum(["start", "end"]).describe("Line up the clips' starts or their ends.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on.").optional(),
+        "to_seconds": external_exports.number().describe("Timeline time to line the edges up at; -1 = the earliest start / latest end among them (Clip menu > Align Left / Right).").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      analyze_frame_colors_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "compare_without_effects": external_exports.boolean().describe("Also analyze the same frame with the effects removed (before/after).").optional(),
+        "region": external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+        "save_frame_path": external_exports.string().describe("Also save the analyzed frame as a PNG at this absolute path (to look at it).").optional(),
+        "time": external_exports.union([external_exports.number(), external_exports.null()]).describe("Timeline seconds to analyze (default: the clip's middle, or the playhead for the whole timeline).").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional(),
+        "whole_timeline": external_exports.boolean().describe("Analyze the composite of every track at `time` instead of one clip alone.").optional()
+      }),
+      apply_audio_effect_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "preset": external_exports.enum(["add_noise", "bass_boost", "canyon_echo", "distortion", "echo", "high_cut", "low_cut", "noise_gate", "robot", "slapback", "strong_compressor", "sync_delay", "telephone", "treble_boost", "voice_compressor", "voice_presence", "whisper"]).describe("Audio effect preset: voice_compressor = even out a voice (gentle 3:1); strong_compressor = podcast/broadcast squash; noise_gate = quiet the room noise between phrases; echo = clear echo; slapback = short room slap; canyon_echo = long repeating echo; low_cut = remove rumble / wind below 90 Hz; high_cut = tame hiss above 8 kHz; bass_boost = +6 dB low shelf at 120 Hz; treble_boost = +5 dB high shelf at 6 kHz; voice_presence = +4 dB at 3 kHz for clarity; telephone = band-pass phone/radio voice; robot = robotic voice; whisper = whispering voice; distortion = soft-clipped grit; add_noise = white noise bed (15%); sync_delay = delay the sound (fix A/V sync; set delay_time seconds)."),
+        "properties": external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Several timeline clip ids to change in one step.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
+      }),
+      apply_clip_preset_tool: external_exports.strictObject({
+        "at_seconds": external_exports.union([external_exports.number(), external_exports.null()]).describe("Emphasis presets only: timeline time (seconds) where the emphasis starts. Default: the playhead if it is over the clip, else the clip's start.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "duration_seconds": external_exports.union([external_exports.number().min(0.04).max(600), external_exports.null()]).describe("Length in seconds of a fade (fade_in/fade_out/fade_in_out and volume_fade_*; default 1 s, *_fast = 1 s, *_slow = 3 s) or of an In / Out / Emphasis motion (default 1 s). Camera moves and credits always span the whole clip.").optional(),
+        "level_percent": external_exports.union([external_exports.int().min(0).max(130), external_exports.null()]).describe("volume_level only: the level in percent, 0-130 (100 = unchanged).").optional(),
+        "preset": external_exports.enum(["fade_none", "fade_in", "fade_in_fast", "fade_in_slow", "fade_out", "fade_out_fast", "fade_out_slow", "fade_in_out", "fade_in_out_fast", "fade_in_out_slow", "motion_none", "back_in_from_bottom", "back_in_from_left", "back_in_from_right", "back_in_from_top", "blur_in", "bounce_in", "bounce_in_from_bottom", "bounce_in_from_left", "bounce_in_from_right", "bounce_in_from_top", "pop_in", "slide_in_from_bottom", "slide_in_from_left", "slide_in_from_right", "slide_in_from_top", "spiral_in", "wipe_in_circle_expand", "wipe_in_circle_shrink", "wipe_in_from_bottom", "wipe_in_from_left", "wipe_in_from_right", "wipe_in_from_top", "blur_wipe_in_circle_expand", "blur_wipe_in_circle_shrink", "blur_wipe_in_from_bottom", "blur_wipe_in_from_left", "blur_wipe_in_from_right", "blur_wipe_in_from_top", "back_out_to_bottom", "back_out_to_left", "back_out_to_right", "back_out_to_top", "blur_out", "bounce_out", "bounce_out_to_bottom", "bounce_out_to_left", "bounce_out_to_right", "bounce_out_to_top", "pop_out", "slide_out_to_bottom", "slide_out_to_left", "slide_out_to_right", "slide_out_to_top", "spiral_out", "wipe_out_circle_expand", "wipe_out_circle_shrink", "wipe_out_to_bottom", "wipe_out_to_left", "wipe_out_to_right", "wipe_out_to_top", "blur_wipe_out_circle_expand", "blur_wipe_out_circle_shrink", "blur_wipe_out_to_bottom", "blur_wipe_out_to_left", "blur_wipe_out_to_right", "blur_wipe_out_to_top", "bounce", "flash", "heartbeat", "jello", "pulse", "rubber_band", "shake_x", "shake_y", "swing", "tada", "wobble", "zoom_in", "zoom_out", "pan_auto", "pan_left_to_right", "pan_right_to_left", "pan_top_to_bottom", "pan_bottom_to_top", "ken_burns_in", "ken_burns_in_left_to_right", "ken_burns_in_right_to_left", "ken_burns_in_top_to_bottom", "ken_burns_in_bottom_to_top", "ken_burns_out", "ken_burns_out_left_to_right", "ken_burns_out_right_to_left", "ken_burns_out_top_to_bottom", "ken_burns_out_bottom_to_top", "credits_scroll_up", "credits_scroll_down", "transform_none", "rotate_none", "rotate_90_right", "rotate_90_left", "rotate_180", "flip_horizontal", "flip_vertical", "crop_none", "crop", "crop_resize", "layout_reset", "layout_quarter_center", "layout_quarter_top_left", "layout_quarter_top_right", "layout_quarter_bottom_left", "layout_quarter_bottom_right", "layout_grid", "layout_grid_stretch", "volume_reset", "volume_level", "volume_fade_in", "volume_fade_in_fast", "volume_fade_in_slow", "volume_fade_out", "volume_fade_out_fast", "volume_fade_out_slow", "volume_fade_in_out", "volume_fade_in_out_fast", "volume_fade_in_out_slow"]).describe("The Clip-menu preset to apply (see the tool description for the list)."),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on (from get_timeline_state_tool).").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      apply_look_preset_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "look": external_exports.enum(["analog_tape_heavy", "analog_tape_subtle", "analog_tape_vhs", "blur_heavy", "blur_medium", "blur_soft_focus", "color_auto_contrast", "color_boost_color", "color_lift_shadows", "color_warm_up", "film_grain_16mm_classic", "film_grain_35mm_classic", "film_grain_35mm_fine", "film_grain_35mm_gritty", "film_grain_high_iso", "film_grain_super_8", "glow_inner", "glow_neon", "glow_soft_white", "glow_warm", "remove_analog_tape", "remove_blur", "remove_color", "remove_film_grain", "remove_glow", "remove_shadow", "remove_sharpen", "reset_look", "shadow_long", "shadow_soft", "shadow_strong", "shadow_subtle", "sharpen_medium", "sharpen_strong", "sharpen_subtle"]).describe("Clip > Look preset. color_* = Color Grade presets; film_grain_* = film stocks; analog_tape_* = VHS/home-video; sharpen_*, blur_* (soft focus), glow_*, shadow_* (drop shadow for cut-outs/titles); remove_<family> removes that look; reset_look removes every look effect (Color Grade, Film Grain and Look presets)."),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Several timeline clip ids to change in one step.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
+      }),
+      cancel_comfyui_job_tool: external_exports.strictObject({
+        "all_jobs": external_exports.boolean().describe("Instead: cancel every queued or running job.").optional(),
+        "file_id": external_exports.string().describe("Instead: cancel the active job processing this Project Files item (Project Files > Cancel Job).").optional(),
+        "job_id": external_exports.string().describe("The job to cancel (list_comfyui_jobs_tool).").optional()
+      }),
+      chroma_key_clip_tool: external_exports.strictObject({
+        "align": external_exports.enum(["auto", "start", "keep"]).describe("With a background: auto = move the keyed clip to the background's start only if they do not overlap in time; start = always start together; keep = keep the keyed clip's time.").optional(),
+        "background_clip_id": external_exports.string().describe("Background clip to show through (timeline clip id). The keyed clip is put on a track above it.").optional(),
+        "background_query": external_exports.string().describe("Or describe the background clip ('the beach clip').").optional(),
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "fuzz": external_exports.union([external_exports.number().min(0).max(125), external_exports.null()]).describe("Tolerance around the key color (0-125): raise it if screen remains, lower it if the subject gets holes. Default: estimated from how uneven the screen is with key_color='auto', else 20.").optional(),
+        "halo": external_exports.number().min(0).max(125).describe("Edge softening/spill cleanup (0-125).").optional(),
+        "key_color": external_exports.string().describe("Screen color to remove: 'auto' (sampled from the frame), 'green' / 'blue' (that screen's actual shade, sampled from the footage), or #RRGGBB.").optional(),
+        "method": external_exports.enum(["basic", "basic_soft", "cbcr_vector", "cie_distance", "hsl_luminance", "hsl_saturation", "hsv_hue", "hsv_saturation", "hsv_value", "lch_chroma", "lch_hue", "lch_luminosity"]).describe("Keying method; basic_soft (default) suits most green/blue screens, hsv_hue helps uneven lighting, cbcr_vector for spill-heavy footage.").optional(),
+        "sample_time": external_exports.union([external_exports.number(), external_exports.null()]).describe("Timeline time to sample the key color from (default: middle of the clip).").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
+      }),
+      color_grade_clip_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "contrast": external_exports.union([external_exports.number().min(-1).max(1), external_exports.null()]).describe("Contrast. Range -1..1; leave out to keep the current/look value.").optional(),
+        "curves": external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+        "exposure": external_exports.union([external_exports.number().min(-2).max(2), external_exports.null()]).describe("Brightness in stops (+0.3 = brighter). Range -2..2; leave out to keep the current/look value.").optional(),
+        "highlights": external_exports.union([external_exports.number().min(-1).max(1), external_exports.null()]).describe("Bright areas (negative recovers blown skies). Range -1..1; leave out to keep the current/look value.").optional(),
+        "look": external_exports.enum(["", "auto_contrast", "black_and_white", "boost_color", "bright_airy", "cinematic", "cool", "film_noir", "golden_hour", "lift_shadows", "moody", "natural", "neutral", "teal_orange", "vibrant", "vintage", "warm", "warm_up"]).describe("Named grade: neutral = every control neutral, no LUT (undo a grade); natural = gentle contrast S-curve, a little vibrance; auto_contrast = Look > Color > Auto Contrast; lift_shadows = Look > Color > Lift Shadows (open up dark footage); warm_up = Look > Color > Warm Up; boost_color = Look > Color > Boost Color; cinematic = blockbuster teal/orange LUT at 50%, contrast curve, slightly muted; teal_orange = strong teal shadows / orange skin tones; warm = warmer white balance; golden_hour = sunset orange glow; cool = cooler, bluer; vintage = faded film, lifted blacks; black_and_white = monochrome with a little contrast; film_noir = hard-contrast black and white; moody = darker, desaturated, cold shadows; vibrant = punchy saturated color; bright_airy = light, soft, lifted. Starts from neutral; the other arguments then adjust it.").optional(),
+        "lut": external_exports.string().describe("LUT to apply: a name from list_luts_tool ('teal & orange cinema', 'film_stock_&_vintage/classic_film'), a .cube path, or 'none' to remove it.").optional(),
+        "lut_intensity": external_exports.union([external_exports.number().min(0).max(1), external_exports.null()]).describe("How strongly the LUT applies. Range 0..1; leave out to keep the current/look value.").optional(),
+        "mix": external_exports.union([external_exports.number().min(0).max(1), external_exports.null()]).describe("Grade strength: 1 = full, 0.5 = half-way to the original. Range 0..1; leave out to keep the current/look value.").optional(),
+        "reset": external_exports.boolean().describe("Start from a neutral grade instead of the clip's current one.").optional(),
+        "saturation": external_exports.union([external_exports.number().min(0).max(4), external_exports.null()]).describe("Color intensity: 1 = unchanged, 0 = black and white. Range 0..4; leave out to keep the current/look value.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.").optional(),
+        "shadows": external_exports.union([external_exports.number().min(-1).max(1), external_exports.null()]).describe("Dark areas (positive lifts them). Range -1..1; leave out to keep the current/look value.").optional(),
+        "temperature": external_exports.union([external_exports.number().min(-1).max(1), external_exports.null()]).describe("White balance: + warmer (orange), - cooler (blue). Range -1..1; leave out to keep the current/look value.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Several timeline clip ids to change in one step.").optional(),
+        "tint": external_exports.union([external_exports.number().min(-1).max(1), external_exports.null()]).describe("White balance: + magenta, - green. Range -1..1; leave out to keep the current/look value.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional(),
+        "vibrance": external_exports.union([external_exports.number().min(-1).max(1), external_exports.null()]).describe("Boosts muted colors more than saturated ones. Range -1..1; leave out to keep the current/look value.").optional(),
+        "wheels": external_exports.record(external_exports.string(), external_exports.unknown()).optional()
+      }),
+      consolidate_project_media_tool: external_exports.strictObject({
+        "action": external_exports.enum(["collect", "reclaim"]).describe("collect = copy media stored outside the project into its assets folder (for handoff/archive); reclaim = delete asset copies whose original still exists unchanged, pointing back at the original.")
+      }),
+      copy_clip_keyframes_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "groups": external_exports.array(external_exports.enum(["all", "alpha", "scale", "shear", "rotation", "location", "time", "volume"]).describe("A Copy > Keyframes group.")).describe("What to copy, as in the Clip menu's Copy > Keyframes: all, alpha, scale (+gravity), shear, rotation (+gravity), location (+gravity), time, volume.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "source_clip_id": external_exports.string().describe("Timeline clip id to copy FROM (preferred).").optional(),
+        "source_query": external_exports.string().describe("Describe the source clip instead of an id.").optional(),
+        "source_track": external_exports.string().describe("Narrow source_query to a track (UI track number, name or layer).").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on (from get_timeline_state_tool).").optional(),
+        "timing": external_exports.enum(["stretch", "offset", "exact"]).describe("How keyframe times map onto each target: stretch = scaled to the target's length (a whole-clip zoom stays whole-clip, a fade-out stays at the end); offset = same seconds from each clip's start; exact = the same clip frames, like the editor's Copy/Paste.").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      copy_effects_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Or describe one target clip.").optional(),
+        "effects": external_exports.array(external_exports.string()).describe('Only these effects (names), e.g. ["ColorGrade"]. Empty = all.').optional(),
+        "mode": external_exports.enum(["merge", "replace", "append"]).describe("merge = Paste in the editor: an effect of the same kind is overwritten, others added; replace = targets end up with exactly the copied effects; append = always add copies.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Targets instead of ids: selection, a whole track, or every clip (the source is skipped).").optional(),
+        "source_clip_id": external_exports.string().describe("Clip to copy effects from (timeline clip id).").optional(),
+        "source_clip_query": external_exports.string().describe("Or describe the source clip.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Clips to paste onto.").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track'.").optional()
+      }),
+      copy_transition_tool: external_exports.strictObject({
+        "at_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Instead of ids: the transition under this timeline time (on `track` when given).").optional(),
+        "between_clip_ids": external_exports.array(external_exports.string()).describe("Instead of ids: the two timeline clip ids the transition joins, e.g. [clip_a, clip_b].").optional(),
+        "fit_duration": external_exports.boolean().describe("Rescale copied curves to each target's length, so a curve copied from a 1 s transition still finishes at the end of a 2 s one.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("'selected' = selected transitions, 'track' = every transition on `track`, 'all' = every transition on the timeline.").optional(),
+        "source_transition_id": external_exports.string().describe("The transition to copy from."),
+        "track": external_exports.string().describe("Track to look on (UI track number, 1 = bottom; name; or layer number). With scope='track' every transition on it.").optional(),
+        "transition_ids": external_exports.array(external_exports.string()).describe("Transition ids (list_timeline_transitions_tool or get_timeline_state_tool 'Effects/Transitions'). Preferred.").optional(),
+        "what": external_exports.enum(["all", "keyframes", "brightness", "contrast", "mask"]).describe("all = every setting (Copy > Transition, then Paste); keyframes = progress + edge curves (Copy > Keyframes > All); brightness / contrast = one curve; mask = the wipe image only.").optional()
+      }),
+      create_media_with_comfyui_tool: external_exports.strictObject({
+        "kind": external_exports.enum(["", "image", "video", "sound", "music"]).describe("What to make with the built-in templates: image, short video, sound effect or music. Ignored when template is given.").optional(),
+        "name": external_exports.string().describe("Name for the new Project Files item (default: generation, generation_gen2, ...).").optional(),
+        "prompt": external_exports.string().describe("What to generate, in plain words (subject, style, mood). For music: style tags, then optionally a line 'Lyrics:' followed by the lyrics."),
+        "reference_image_file_id": external_exports.string().describe("An image in Project Files, for templates that need a reference image.").optional(),
+        "template": external_exports.string().describe("A template id or menu name from list_comfyui_templates_tool (for user templates); overrides kind.").optional()
+      }),
+      create_subclips_tool: external_exports.strictObject({
+        "file_id": external_exports.string().describe("The project file to cut sub-clips from (list_project_files_tool)."),
+        "subclips": external_exports.array(external_exports.strictObject({ "name": external_exports.string().describe("Name in Project Files. '' = '<file> (start to end)' like Split Clip.").optional(), "source_end_seconds": external_exports.number().min(0).describe("Out-point in seconds of the source media."), "source_start_seconds": external_exports.number().min(0).describe("In-point in seconds of the source media.") })).describe("Sub-clips to create, each with its own in/out and optional name.")
+      }),
+      duplicate_clips_tool: external_exports.strictObject({
+        "allow_overlap": external_exports.boolean().describe("Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "copies": external_exports.int().min(1).max(50).describe("How many copies, placed back to back.").optional(),
+        "include_transitions": external_exports.boolean().describe("Also copy the transitions between the copied clips (crossfades inside the selection).").optional(),
+        "position_seconds": external_exports.number().describe("Timeline time for the first copy; -1 = right after the copied clips.").optional(),
+        "ripple": external_exports.boolean().describe("Insert the copies: push the clips at the destination later to make room.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on.").optional(),
+        "to_track": external_exports.string().describe("Track for the copies: UI track number (1 = bottom), name, or layer number. Empty = the same track(s).").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      edit_captions_tool: external_exports.strictObject({
+        "add_cues": external_exports.array(external_exports.strictObject({ "end": external_exports.number().describe("End second (after start)."), "start": external_exports.number().describe("Start second."), "text": external_exports.string().describe("Caption text; '\\n' for a second line.") })).describe("New cues {start, end, text} in timeline seconds (like the Captions dock's Insert Caption).").optional(),
+        "background_color": external_exports.string().describe("Colour of the box behind the text (alpha in '#RRGGBBAA' sets its opacity). Empty = the style's.").optional(),
+        "background_opacity": external_exports.number().min(-1).max(1).describe("Opacity of the box behind the text, 0 (no box) to 1. -1 = the style's.").optional(),
+        "clip_query": external_exports.string().describe("Describe the captioned clip instead of an id.").optional(),
+        "cue_edits": external_exports.array(external_exports.strictObject({ "delete": external_exports.boolean().describe("Remove this cue.").optional(), "end": external_exports.number().describe("New end, timeline seconds.").optional(), "index": external_exports.int().min(1).describe("Cue number from list_captions_tool (1 = first)."), "start": external_exports.number().describe("New start, timeline seconds.").optional(), "text": external_exports.string().describe("New text for the cue.").optional() })).describe("Changes to numbered cues: new text, new start/end (timeline seconds) or delete=true. Numbers are the order before this call.").optional(),
+        "effect_id": external_exports.string().describe("Caption effect id from list_captions_tool.").optional(),
+        "fade_seconds": external_exports.number().min(-1).max(3).describe("Fade each caption in and out over this many seconds (0-3). -1 = the style's.").optional(),
+        "find": external_exports.string().describe("Replace this text in every cue (e.g. a misspelled name)...").optional(),
+        "font": external_exports.string().describe("Font family, e.g. 'Arial Black', 'Helvetica Neue'. Empty = the style's font.").optional(),
+        "position": external_exports.enum(["", "bottom", "center", "top"]).describe("Where the captions sit: bottom (above the safe margin, higher on vertical video), center or top. Empty = the style's (bottom).").optional(),
+        "replace": external_exports.string().describe("...with this text.").optional(),
+        "shift_seconds": external_exports.number().min(-3600).max(3600).describe("Move every cue later (positive) or earlier (negative) to fix sync.").optional(),
+        "stroke_color": external_exports.string().describe("Outline colour. Empty = the style's.").optional(),
+        "stroke_width": external_exports.number().min(-1).max(0.5).describe("Outline thickness relative to the text height: 0 = none, 0.03 thin, 0.09 heavy (heavy outlines only read with heavy fonts such as Arial Black). -1 = the style's.").optional(),
+        "style": external_exports.enum(["", "boxed", "classic", "minimal", "reels", "yellow"]).describe("Switch to a look preset (then apply the overrides below). Empty keeps the current look.").optional(),
+        "text_color": external_exports.string().describe("Text colour '#RRGGBB' / '#RRGGBBAA' / 'rgba(...)' / name. Empty = the style's.").optional(),
+        "text_size": external_exports.number().min(0).max(0.3).describe("Text height as a fraction of the frame's shorter side: 0.04 small, 0.05 normal subtitles, 0.075 big reel captions. 0 = the style's size.").optional(),
+        "timeline_clip_id": external_exports.string().describe("The captioned clip (when it has one caption track).").optional(),
+        "uppercase": external_exports.boolean().describe("Turn every cue's text into capital letters.").optional()
+      }),
+      edit_title_tool: external_exports.strictObject({
+        "background_color": external_exports.string().describe("Colour of the title's full-frame background (transparent in most templates) with optional alpha, e.g. '#000000' for a solid black end card or '#00000080' for a 50% dark veil over the video. Empty keeps it.").optional(),
+        "file_id": external_exports.string().describe("The title's Project Files id instead of a clip.").optional(),
+        "fit_text": external_exports.boolean().describe("Shrink a line whose text would run off the frame (templates do not wrap text).").optional(),
+        "font": external_exports.string().describe("Font family for every line, e.g. 'Arial Black', 'Helvetica Neue', 'Georgia'. Must be installed; empty keeps the template's font.").optional(),
+        "font_scale": external_exports.number().min(0.2).max(5).describe("Text size relative to the template: 1 = as designed, 1.5 = half again as big, 0.7 = smaller.").optional(),
+        "font_style": external_exports.enum(["", "italic", "normal"]).describe("Italic or upright text; empty keeps the template's.").optional(),
+        "font_weight": external_exports.enum(["", "bold", "normal"]).describe("Make the text bold or normal weight; empty keeps the template's.").optional(),
+        "lines": external_exports.array(external_exports.string()).describe("New text for fields 1..N in order (list_title_templates_tool kind=project shows them); '' blanks a field; fields after N are kept.").optional(),
+        "scope": external_exports.enum(["all_clips", "this_clip", "duplicate"]).describe("all_clips = change the title everywhere it is used (Edit Title); this_clip = change only timeline_clip_id, as its own copy; duplicate = save the changed copy as a new title in Project Files without touching any clip (Duplicate).").optional(),
+        "subtitle": external_exports.string().describe("New subtitle text. Empty keeps it.").optional(),
+        "text": external_exports.string().describe("New main title text ('\\n' continues into the next fields). Empty keeps it.").optional(),
+        "text_color": external_exports.string().describe("Colour of every line: '#RRGGBB', '#RRGGBBAA' (alpha = opacity), 'rgba(r,g,b,a)' or a basic name ('white', 'yellow'). Empty keeps the template's colours.").optional(),
+        "timeline_clip_id": external_exports.string().describe("A title clip on the timeline (from add_title_tool or get_timeline_state_tool).").optional(),
+        "title_query": external_exports.string().describe("Find the title by its current text or file name, e.g. 'Tokyo'.").optional()
+      }),
+      enhance_file_with_comfyui_tool: external_exports.strictObject({
+        "action": external_exports.enum(["", "upscale", "restyle", "image_to_video", "blur_object", "highlight_object", "mask_object", "depth", "lines", "smooth_motion", "split_scenes", "captions", "speech_clarity", "reduce_noise", "remove_noise"]).describe("What to do. Images: upscale, restyle, image_to_video, blur_object, highlight_object, mask_object, depth, lines. Videos: upscale, smooth_motion (2x frame rate), split_scenes, captions (from speech), restyle, blur_object, highlight_object, mask_object, depth, lines. Audio: speech_clarity, reduce_noise, remove_noise.").optional(),
+        "auto_detect": external_exports.boolean().describe("Object tracking: let SAM2 pick the main objects itself (no points needed).").optional(),
+        "background_brightness": external_exports.number().min(0).max(3).describe("highlight_object: brightness of everything else (0-3).").optional(),
+        "border_color": external_exports.string().describe("highlight_object: outline color.").optional(),
+        "border_width": external_exports.int().min(0).max(64).describe("highlight_object: outline width in pixels (0-64).").optional(),
+        "boxes": external_exports.array(external_exports.strictObject({ "x1": external_exports.number().describe("Left edge, source pixels."), "x2": external_exports.number().describe("Right edge."), "y1": external_exports.number().describe("Top edge."), "y2": external_exports.number().describe("Bottom edge.") })).describe("Object tracking: rectangles around the object (source pixels).").optional(),
+        "file_id": external_exports.string().describe("The Project Files item to process (list_files_tool). The result is a NEW file; the original is untouched."),
+        "highlight_color": external_exports.string().describe("highlight_object: fill color, #RRGGBB or a color name (#AARRGGBB keeps its alpha).").optional(),
+        "highlight_opacity": external_exports.number().min(0).max(1).describe("highlight_object: fill opacity 0-1.").optional(),
+        "mask_brightness": external_exports.number().min(0).max(3).describe("highlight_object: brightness of the object (1 = unchanged, 0-3).").optional(),
+        "name": external_exports.string().describe("Name for the new Project Files item (default: '<file>_genN').").optional(),
+        "negative_boxes": external_exports.array(external_exports.strictObject({ "x1": external_exports.number().describe("Left edge, source pixels."), "x2": external_exports.number().describe("Right edge."), "y1": external_exports.number().describe("Top edge."), "y2": external_exports.number().describe("Bottom edge.") })).describe("Object tracking: rectangles to exclude.").optional(),
+        "negative_points": external_exports.array(external_exports.strictObject({ "x": external_exports.number().describe("Source pixel column."), "y": external_exports.number().describe("Source pixel row.") })).describe("Object tracking: clicks on things that are NOT the object.").optional(),
+        "points": external_exports.array(external_exports.strictObject({ "x": external_exports.number().describe("Source pixel column."), "y": external_exports.number().describe("Source pixel row.") })).describe("Object tracking: clicks ON the object, in source pixels of the file (x from the left, y from the top) on seed_frame.").optional(),
+        "prompt": external_exports.string().describe("For restyle / image_to_video: the look or motion to create. For blur/highlight/mask: the object to find, in words ('the red car'), instead of or with points/boxes.").optional(),
+        "reference_image_file_id": external_exports.string().describe("An image in Project Files whose look to copy (video restyle needs one).").optional(),
+        "seed_frame": external_exports.int().min(1).describe("Object tracking in video: the 1-based source frame the points/boxes were chosen on.").optional(),
+        "template": external_exports.string().describe("A template id or menu name from list_comfyui_templates_tool(file_id) instead of action (user templates).").optional()
+      }),
+      export_files_to_folder_tool: external_exports.strictObject({
+        "file_ids": external_exports.array(external_exports.string()).describe("Project file ids (media_bin_file_id from list_files_tool)."),
+        "folder": external_exports.string().describe("Destination folder (created if missing). Empty = the export folder preference.").optional()
+      }),
+      export_project_file_tool: external_exports.strictObject({
+        "file_path": external_exports.string().describe("Output file. Empty = next to the project (or in Downloads) named after the project.").optional(),
+        "format": external_exports.enum(["fcpxml", "edl"]).describe("fcpxml = Final Cut Pro XML (Premiere, Resolve, FCP 7); edl = CMX EDL, one file per track.").optional(),
+        "overwrite": external_exports.boolean().describe("Allow replacing existing output file(s).").optional()
+      }),
+      forget_recent_projects_tool: external_exports.strictObject({
+        "file_path": external_exports.string().describe("Forget only this project path. Empty = every entry (or only missing ones with missing_only).").optional(),
+        "missing_only": external_exports.boolean().describe("Only forget entries whose file no longer exists.").optional()
+      }),
+      freeze_frame_tool: external_exports.strictObject({
+        "allow_overlap": external_exports.boolean().describe("Let the longer clip overlap the next clip on its track (the receipt lists it). Off by default: the tool refuses and says what is in the way.").optional(),
+        "at_seconds": external_exports.number().describe("Timeline time of the frame to hold (with frame='at_time'); -1 = the playhead.").optional(),
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "frame": external_exports.enum(["at_time", "first", "last"]).describe("Which frame to hold: the one at at_seconds, the clip's first frame, or its last frame.").optional(),
+        "hold_seconds": external_exports.number().min(0.1).max(60).describe("How long the frame stays frozen.").optional(),
+        "ripple": external_exports.boolean().describe("Shift the later clips on the track by the change in length, so nothing overlaps and no gap opens.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional(),
+        "zoom": external_exports.boolean().describe("Freeze & Zoom: push in slightly (to 105%) and back during the hold.").optional()
+      }),
+      get_clip_effects_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "detail": external_exports.enum(["full", "summary"]).describe("full = current property values too; summary = ids only.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Several timeline clip ids to change in one step.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
+      }),
+      get_clip_properties_tool: external_exports.strictObject({
+        "at_seconds": external_exports.union([external_exports.number(), external_exports.null()]).describe("Timeline time (seconds) to read the values at. Default: the playhead if it is over the clip, otherwise the clip's first frame.").optional(),
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "include_keyframes": external_exports.boolean().describe("List every keyframe of animated properties (frame, clip and timeline seconds, value, interpolation, ease).").optional(),
+        "properties": external_exports.array(external_exports.string()).describe("Only these properties (keys such as 'alpha', 'scale_x' or labels such as 'Scale X'). Empty = every property.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
+      }),
+      get_editor_layout_tool: external_exports.strictObject({}),
+      get_playhead_and_selection_tool: external_exports.strictObject({}),
+      get_preferences_tool: external_exports.strictObject({
+        "key": external_exports.string().describe("One preference by key (e.g. 'autosave-interval') or its title.").optional(),
+        "query": external_exports.string().describe("Words in the key or title, e.g. 'cache', 'audio'.").optional(),
+        "tab": external_exports.enum(["", "General", "Preview", "Timeline", "Autosave", "Cache", "Debug", "Keyboard", "Performance", "Location", "AI"]).describe("Only this Preferences tab.").optional()
+      }),
+      import_image_sequence_tool: external_exports.strictObject({
+        "fps": external_exports.number().min(0).max(240).describe("Frames per second to play the sequence at (24, 30, 12, 23.976...). 0 = the project frame rate (what the Import Files prompt uses).").optional(),
+        "name": external_exports.string().describe("Display name in Project Files. '' = the pattern file name.").optional(),
+        "path": external_exports.string().describe("A folder of numbered frames (frame_0001.png, frame_0002.png...) or any one frame of the sequence. png, jpg, jpeg, tif and svg frames."),
+        "skip_indexing": external_exports.boolean().describe("Skip the background AI analysis of the new file.").optional()
+      }),
+      import_project_file_tool: external_exports.strictObject({
+        "file_path": external_exports.string().describe("Path of an .edl (Edit Decision List) or Final Cut Pro .xml file."),
+        "format": external_exports.enum(["auto", "edl", "fcpxml"]).describe("File format; auto = from the extension.").optional()
+      }),
+      list_captions_tool: external_exports.strictObject({
+        "timeline_clip_id": external_exports.string().describe("Only this clip's captions. Empty = every caption track in the project.").optional()
+      }),
+      list_comfyui_jobs_tool: external_exports.strictObject({
+        "active_only": external_exports.boolean().describe("Only queued, running or canceling jobs.").optional(),
+        "job_id": external_exports.string().describe("One job (from create_media_with_comfyui_tool / enhance_file_with_comfyui_tool). Empty = every job this session.").optional(),
+        "wait_seconds": external_exports.number().min(0).max(900).describe("With job_id: wait up to this many seconds for the job to finish (0-900) before answering.").optional()
+      }),
+      list_comfyui_templates_tool: external_exports.strictObject({
+        "file_id": external_exports.string().describe("A Project Files id: list what Enhance with AI offers for that file (its media type decides). Empty = the whole catalogue.").optional(),
+        "media_type": external_exports.enum(["", "image", "video", "audio"]).describe("Without file_id: only the Enhance templates for this kind of media.").optional()
+      }),
+      list_effects_tool: external_exports.strictObject({
+        "effect": external_exports.string().describe("One effect (class or display name) to describe in full, with every property.").optional(),
+        "include_properties": external_exports.boolean().describe("Include each listed effect's properties (ranges, defaults, choices).").optional(),
+        "kind": external_exports.enum(["all", "video", "audio"]).describe("Only video (picture) or audio (sound) effects.").optional(),
+        "query": external_exports.string().describe("Filter by words in the name or description ('blur', 'color', 'voice').").optional()
+      }),
+      list_export_presets_tool: external_exports.strictObject({
+        "category": external_exports.enum(["", "All Formats", "Web", "Device", "DVD", "Blu-Ray/AVCHD"]).describe("Only this Export dialog 'Profile' group.").optional(),
+        "include_unavailable": external_exports.boolean().describe("Also list presets whose codec this build cannot encode.").optional(),
+        "query": external_exports.string().describe("Words in the preset title, e.g. 'youtube', 'h.264', 'audio'.").optional()
+      }),
+      list_luts_tool: external_exports.strictObject({
+        "query": external_exports.string().describe("Filter by words in the LUT name or category ('teal', 'film', 'moody').").optional()
+      }),
+      list_project_files_tool: external_exports.strictObject({
+        "detail": external_exports.enum(["summary", "full"]).describe("'full' adds media info: size, fps, frames, codecs, sample rate, channels, bit rates, interlacing, aspect ratios, file size, optimized-preview path.").optional(),
+        "file_ids": external_exports.array(external_exports.string()).describe("Only these file ids (e.g. to read full media info).").optional(),
+        "limit": external_exports.int().min(1).max(1e3).describe("Most files to return.").optional(),
+        "media_type": external_exports.enum(["", "video", "audio", "image", "image_sequence", "title"]).describe("Only this kind: video, audio, image, image_sequence or title (SVG titles). '' = every kind.").optional(),
+        "missing_only": external_exports.boolean().describe("Only files whose media is missing on disk (moved or deleted; relink them with update_project_files_tool).").optional(),
+        "query": external_exports.string().describe("Search text matched against the file name, display name and tags, like the Project Files search box (every word must match). '' = no text filter.").optional(),
+        "tags": external_exports.array(external_exports.string()).describe("Only files that have ALL of these tags (case-insensitive).").optional(),
+        "usage": external_exports.enum(["", "unused", "used"]).describe("'unused' = files no timeline clip uses (what 'remove unused files' removes), 'used' = files on the timeline, '' = both.").optional()
+      }),
+      list_project_profiles_tool: external_exports.strictObject({
+        "aspect": external_exports.string().describe("Only this aspect, e.g. '16:9', '9:16', '1:1', '4:5'.").optional(),
+        "fps": external_exports.number().min(0).describe("Only this frame rate, e.g. 24, 29.97, 60. 0 = any.").optional(),
+        "height": external_exports.int().min(0).describe("Only profiles this tall (pixels). 0 = any.").optional(),
+        "include_social_presets": external_exports.boolean().describe("Also list the social preset names (instagram_reel, tiktok, ...).").optional(),
+        "limit": external_exports.int().min(1).max(500).describe("Maximum profiles returned.").optional(),
+        "orientation": external_exports.enum(["", "landscape", "portrait", "square"]).describe("Only this orientation.").optional(),
+        "query": external_exports.string().describe("Words in the profile name, e.g. 'vertical 1080p', 'PAL', '4K'.").optional(),
+        "width": external_exports.int().min(0).describe("Only profiles this wide (pixels). 0 = any.").optional()
+      }),
+      list_recent_projects_tool: external_exports.strictObject({}),
+      list_recovery_versions_tool: external_exports.strictObject({}),
+      list_timeline_transitions_tool: external_exports.strictObject({
+        "at_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Only the transition(s) under this timeline time.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Only transitions touching this timeline clip.").optional(),
+        "track": external_exports.string().describe("Only this track (UI track number, 1 = bottom; name; or layer number). '' = all.").optional()
+      }),
+      list_title_templates_tool: external_exports.strictObject({
+        "kind": external_exports.enum(["static", "animated", "project", "all"]).describe("static = the 50 SVG title templates + the user's templates (for add_title_tool); animated = the Blender animated titles and their parameters (for add_animated_title_tool); project = titles already in this project with their current text and the clips using them (for edit_title_tool); all = everything.").optional(),
+        "query": external_exports.string().describe("Optional filter words matched against name, look and text, e.g. 'lower third', 'gold', 'end card', 'credits', 'Tokyo'.").optional()
+      }),
+      manage_custom_profiles_tool: external_exports.strictObject({
+        "action": external_exports.enum(["create", "duplicate", "edit", "delete", "set_default"]).describe("create = new profile from the values below; duplicate = copy 'profile' with changes; edit = change a custom profile; delete = remove a custom profile file (never deletes clips); set_default = profile used for new projects (Preferences > Default Profile)."),
+        "fps": external_exports.number().min(0).max(240).describe("Frame rate. 0 = from 'profile' (or 30).").optional(),
+        "height": external_exports.int().min(0).max(4e4).describe("Height in pixels (even). 0 = from 'profile'.").optional(),
+        "interlaced": external_exports.boolean().describe("Interlaced (true) or progressive (false, default).").optional(),
+        "name": external_exports.string().describe("Description for a created/duplicated/edited profile; must be unique.").optional(),
+        "pixel_ratio": external_exports.string().describe("Pixel aspect 'num:den' (1:1 for square pixels).").optional(),
+        "profile": external_exports.string().describe("Existing profile name/key (for duplicate, edit, delete, set_default).").optional(),
+        "spherical": external_exports.boolean().describe("360\xB0 spherical video.").optional(),
+        "width": external_exports.int().min(0).max(4e4).describe("Width in pixels (even). 0 = from 'profile'.").optional()
+      }),
+      manage_optimized_previews_tool: external_exports.strictObject({
+        "action": external_exports.enum(["optimize", "status", "link", "unlink", "delete", "cancel", "clear_all"]).describe("optimize = build a small preview copy for smooth playback (runs in the background); status = report progress/state; link = use existing optimized copies from a folder (or proxy_path for one file); unlink = stop using the copy (kept on disk); delete = unlink and delete the copy from disk; cancel = stop a running optimize job; clear_all = unlink and delete every optimized copy in this project's assets folder (Edit > Clear > Optimized Videos; needs confirm).").optional(),
+        "all_videos": external_exports.boolean().describe("Act on every video file in the project instead of file_ids/file_query.").optional(),
+        "confirm": external_exports.boolean().describe("Required for clear_all (deletes files from the assets folder).").optional(),
+        "file_ids": external_exports.array(external_exports.string()).describe("Project file ids (file_id / media_bin_file_id from list_project_files_tool).").optional(),
+        "file_query": external_exports.string().describe("Name one file instead of ids: its name, file name or a tag ('intro.mp4', 'the drone shot').").optional(),
+        "folder": external_exports.string().describe("For action=link: the folder that holds the optimized copies (matched by file name).").optional(),
+        "proxy_path": external_exports.string().describe("For action=link with one file: the exact optimized video to use.").optional(),
+        "wait_seconds": external_exports.number().min(0).max(1800).describe("For optimize: wait up to this long for the jobs to finish before answering (0 = return at once; poll with action=status).").optional()
+      }),
+      move_clips_tool: external_exports.strictObject({
+        "after_clip_id": external_exports.string().describe("Place the clip(s) right after this timeline clip, on its track.").optional(),
+        "allow_overlap": external_exports.boolean().describe("Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.").optional(),
+        "before_clip_id": external_exports.string().describe("Place the clip(s) right before this timeline clip, on its track.").optional(),
+        "by_frames": external_exports.int().describe("Nudge by this many frames (negative = earlier), like Ctrl+Left/Right.").optional(),
+        "by_seconds": external_exports.number().describe("Move by this many seconds (negative = earlier).").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "position_seconds": external_exports.number().describe("New timeline start of the (first) clip; -1 = keep the time.").optional(),
+        "ripple": external_exports.boolean().describe("Reorder instead of overwrite: close the hole the clips leave and push the clips at the destination later to make room (use this to reorder a sequence).").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on.").optional(),
+        "to_track": external_exports.string().describe("Destination track: UI track number (1 = bottom), name, or layer number. Empty = stay on the same track(s).").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      prepare_recording_tool: external_exports.strictObject({
+        "audio_format": external_exports.enum(["", "wav", "flac", "mp3"]).describe("Microphone file format (the dock defaults to flac).").optional(),
+        "channels": external_exports.enum(["", "mono", "stereo"]).describe("Microphone channels.").optional(),
+        "hide_zenvi": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("Screen: hide the Zenvi window while recording a window or region.").optional(),
+        "mic_device": external_exports.string().describe("Microphone by name (the dock's Input list); empty = keep.").optional(),
+        "preview": external_exports.enum(["", "off", "full", "half", "quarter"]).describe("Play the timeline while recording: off, full, half or quarter resolution (always off when recording the screen).").optional(),
+        "recording_view": external_exports.boolean().describe("Also switch the editor to the Recording View layout (View > Recording View).").optional(),
+        "sample_rate": external_exports.int().min(0).describe("Microphone sample rate: 44100, 48000 or 96000 (0 = keep).").optional(),
+        "screen": external_exports.string().describe("Which screen to capture, by its name in the dock's Screen list; empty = keep.").optional(),
+        "screen_fps": external_exports.int().min(0).describe("Screen capture frame rate: 15, 24, 30 or 60 (0 = keep).").optional(),
+        "screen_region": external_exports.union([external_exports.strictObject({ "height": external_exports.number().describe("Height in screen pixels (>= 16)."), "width": external_exports.number().describe("Width in screen pixels (>= 16)."), "x": external_exports.number().describe("Left edge in screen pixels."), "y": external_exports.number().describe("Top edge in screen pixels.") }), external_exports.null()]).describe("Capture only this area of the screen (Region mode): {x, y, width, height} in screen pixels. Omit for the full screen.").optional(),
+        "show_cursor": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("Screen: include the mouse cursor.").optional(),
+        "sources": external_exports.array(external_exports.enum(["mic", "screen", "webcam"])).describe("What to record: mic (voice), screen, webcam; any combination. Empty = keep the dock's current choice.").optional(),
+        "start_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Timeline seconds where the recording will be placed (also moves the playhead there). Omit = wherever the playhead is when Record is pressed.").optional(),
+        "system_audio": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("Screen: also record the computer's sound output.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Record over this clip, like its menu's Audio > Record: starts at the clip, on the nearest free unlocked track below it (track/start_seconds override).").optional(),
+        "track": external_exports.string().describe("Track for the recording: UI track number (1 = bottom), name or layer number; extra sources go on the tracks below it. 'none' = add to Project Files only. Empty = keep.").optional(),
+        "webcam_corners": external_exports.enum(["", "rectangle", "rounded", "oval"]).describe("Webcam frame shape.").optional(),
+        "webcam_device": external_exports.string().describe("Webcam by name; empty = keep.").optional(),
+        "webcam_fps": external_exports.int().min(0).describe("Webcam recording frame rate (0 = keep).").optional(),
+        "webcam_layout": external_exports.enum(["", "bottom-right", "top-right", "bottom-left", "top-left", "left", "right", "center", "full"]).describe("Where the webcam sits over a screen recording.").optional(),
+        "webcam_resolution": external_exports.string().describe("Webcam resolution such as '1280x720' (from the dock's list); empty = keep.").optional(),
+        "webcam_size": external_exports.number().min(0).max(0.4).describe("Webcam corner size over a screen recording: 0.2, 0.3 or 0.4 of the frame (0 = keep).").optional()
+      }),
+      process_clip_effect_tool: external_exports.strictObject({
+        "boxes": external_exports.array(external_exports.record(external_exports.string(), external_exports.unknown())).describe('ObjectMask: box(es) around the object, [{"x", "y", "width", "height"}] (fractions).').optional(),
+        "class_filter": external_exports.string().describe("ObjectDetection: only show these labels, comma separated ('person,car').").optional(),
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "confidence": external_exports.union([external_exports.number().min(0).max(1), external_exports.null()]).describe("ObjectDetection: minimum confidence 0-1 (default 0.25).").optional(),
+        "device": external_exports.enum(["CPU", "GPU_AUTO", "GPU_CUDA", "GPU_OPENCL"]).describe("ObjectDetection/ObjectMask processing device.").optional(),
+        "download_model": external_exports.boolean().describe("Download the model files if missing (Object Detector ~10-90 MB, Object Mask ~175 MB, from the OpenShot model releases, sha256-verified).").optional(),
+        "effect": external_exports.enum(["Stabilizer", "Tracker", "ObjectDetection", "ObjectMask"]).describe("Stabilizer = remove camera shake; Tracker = follow a boxed object; ObjectDetection = find people/cars/animals... (YOLO); ObjectMask = cut out an object you point at."),
+        "if_exists": external_exports.enum(["auto", "update", "add"]).describe("If the clip already has this effect: auto = replace a Stabilizer/Object Detector, add another Tracker/Object Mask; update = replace; add = keep both.").optional(),
+        "interpolation": external_exports.enum(["bezier", "linear", "constant"]).describe("Default interpolation for keyframes that do not name one.").optional(),
+        "mask_quality": external_exports.enum(["", "cutie-low", "cutie-medium", "cutie-high"]).describe("ObjectMask Cutie tracking quality ('' = recommended medium).").optional(),
+        "model": external_exports.enum(["", "yolo26n-seg", "yolo26s-seg", "yolo26m-seg", "yoloe-26n-seg", "yoloe-26s-seg", "yoloe-26m-seg", "yolo11n-seg", "yolo11s-seg", "yolo11m-seg"]).describe("ObjectDetection model ('' = recommended YOLO26 Nano; yoloe-* know more labels).").optional(),
+        "negative_points": external_exports.array(external_exports.record(external_exports.string(), external_exports.unknown())).describe("ObjectMask: points NOT on the object (background).").optional(),
+        "points": external_exports.array(external_exports.record(external_exports.string(), external_exports.unknown())).describe('ObjectMask: points ON the object, [{"x": 0.5, "y": 0.4}] (fractions).').optional(),
+        "properties": external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+        "region": external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+        "region_time": external_exports.union([external_exports.number(), external_exports.null()]).describe("Tracker/ObjectMask: timeline seconds of the frame the region/points refer to (default: the clip's first frame).").optional(),
+        "smoothing": external_exports.int().min(1).max(100).describe("Stabilizer: frames averaged, 1-100 (30 default; higher = steadier, more crop).").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "timeout_seconds": external_exports.number().min(5).max(3600).describe("Give up (changing nothing) after this long.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional(),
+        "tracker_type": external_exports.enum(["KCF", "CSRT", "MIL", "BOOSTING", "TLD", "MEDIANFLOW", "MOSSE"]).describe("Tracker algorithm: KCF fast (default), CSRT most accurate, MOSSE fastest.").optional()
+      }),
+      remove_captions_tool: external_exports.strictObject({
+        "all_captions": external_exports.boolean().describe("Remove every caption track in the project.").optional(),
+        "clip_query": external_exports.string().describe("Describe the captioned clip instead of an id.").optional(),
+        "effect_id": external_exports.string().describe("Caption effect id from list_captions_tool.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Remove the captions of this clip.").optional()
+      }),
+      remove_effect_tool: external_exports.strictObject({
+        "all_effects": external_exports.boolean().describe("Remove every effect from the target clip(s).").optional(),
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "effect": external_exports.string().describe("Instead of ids: remove this effect (Blur, ChromaKey...) from the target clip(s).").optional(),
+        "effect_ids": external_exports.array(external_exports.string()).describe("Effect ids to remove (get_clip_effects_tool lists them).").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Several timeline clip ids to change in one step.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
+      }),
+      remove_files_from_project_tool: external_exports.strictObject({
+        "confirm_remove_clips": external_exports.boolean().describe("Required when a chosen file is used on the timeline: its timeline clips are removed with it. Ask the user first.").optional(),
+        "file_ids": external_exports.array(external_exports.string()).describe("Project file ids (file_id / media_bin_file_id from list_project_files_tool).").optional(),
+        "file_query": external_exports.string().describe("Name one file instead of ids: its name, file name or a tag ('intro.mp4', 'the drone shot').").optional(),
+        "scope": external_exports.enum(["", "unused", "missing"]).describe("Instead of ids/query: 'unused' = every file no timeline clip uses, 'missing' = every file whose media is gone from disk.").optional()
+      }),
+      remove_gaps_tool: external_exports.strictObject({
+        "from_seconds": external_exports.number().min(0).describe("Only close gaps that end after this timeline time (0 = the whole track, including empty space before the first clip).").optional(),
+        "only_first": external_exports.boolean().describe("Close just the first gap at/after from_seconds (Remove Gap) instead of all of them (Remove All Gaps).").optional(),
+        "track": external_exports.string().describe("Track to close gaps on: UI track number (1 = bottom), name, or layer number. Empty = the one track that has gaps (refused when several do).").optional()
+      }),
+      remove_keyframes_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "end_seconds": external_exports.union([external_exports.number(), external_exports.null()]).describe("Only remove keyframes at or before this timeline time (seconds).").optional(),
+        "properties": external_exports.array(external_exports.string()).describe('Properties whose keyframes to remove (keys or labels), or ["all"] for every animated property.'),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "start_seconds": external_exports.union([external_exports.number(), external_exports.null()]).describe("Only remove keyframes at or after this timeline time (seconds).").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on (from get_timeline_state_tool).").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      remove_marker_tool: external_exports.strictObject({
+        "all": external_exports.boolean().describe("Remove every marker on the timeline.").optional(),
+        "at_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Remove the marker at this timeline time (the nearest marker within half a second).").optional(),
+        "markers": external_exports.array(external_exports.string()).describe("Markers to remove, each a marker_id (from list_markers_tool) or an exact marker name.").optional()
+      }),
+      remove_track_tool: external_exports.strictObject({
+        "track": external_exports.string().describe("Track lane to remove: UI track number (1 = bottom), track name, track id (L3) or layer number."),
+        "with_clips": external_exports.boolean().describe("The track still has clips or transitions: true deletes them together with the lane (Track menu > Remove Track); false refuses, so tidying up empty lanes never deletes clips by accident.").optional()
+      }),
+      remove_transition_tool: external_exports.strictObject({
+        "at_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Instead of ids: the transition under this timeline time (on `track` when given).").optional(),
+        "between_clip_ids": external_exports.array(external_exports.string()).describe("Instead of ids: the two timeline clip ids the transition joins, e.g. [clip_a, clip_b].").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("'selected' = selected transitions, 'track' = every transition on `track`, 'all' = every transition on the timeline.").optional(),
+        "track": external_exports.string().describe("Track to look on (UI track number, 1 = bottom; name; or layer number). With scope='track' every transition on it.").optional(),
+        "transition_ids": external_exports.array(external_exports.string()).describe("Transition ids (list_timeline_transitions_tool or get_timeline_state_tool 'Effects/Transitions'). Preferred.").optional()
+      }),
+      repeat_clip_tool: external_exports.strictObject({
+        "allow_overlap": external_exports.boolean().describe("Let the longer clip overlap the next clip on its track (the receipt lists it). Off by default: the tool refuses and says what is in the way.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "delay_seconds": external_exports.number().min(0).max(60).describe("Pause (hold the last frame) between passes.").optional(),
+        "pattern": external_exports.enum(["loop", "ping_pong"]).describe("loop = start over each time; ping_pong = forward, backward, forward...").optional(),
+        "reverse": external_exports.boolean().describe("Start the first pass backwards.").optional(),
+        "ripple": external_exports.boolean().describe("Shift the later clips on the track by the change in length, so nothing overlaps and no gap opens.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "speed_ramp_percent": external_exports.number().min(-90).max(1e3).describe("Each pass plays this much faster (+) or slower (-) than the one before, in percent.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on.").optional(),
+        "times": external_exports.int().min(2).max(500).describe("How many times the clip plays in total (2 = the clip then one repeat).").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      reset_caches_and_history_tool: external_exports.strictObject({
+        "confirm": external_exports.boolean().describe("Must be true for undo_history: it cannot be undone. Ask the user first.").optional(),
+        "target": external_exports.enum(["playback_cache", "waveforms", "undo_history"]).describe("playback_cache = drop cached preview frames (Ctrl+Shift+Esc; fixes stale previews); waveforms = drop stored waveform data from files and clips (Edit > Clear > Waveform); undo_history = forget every undo/redo step (Edit > Clear > History).")
+      }),
+      restore_recovery_version_tool: external_exports.strictObject({
+        "discard_unsaved": external_exports.boolean().describe("Throw away unsaved changes in the open project. Only after the user agreed.").optional(),
+        "version": external_exports.int().min(1).describe("Which copy from list_recovery_versions_tool: 1 = newest.").optional()
+      }),
+      reverse_transition_tool: external_exports.strictObject({
+        "at_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Instead of ids: the transition under this timeline time (on `track` when given).").optional(),
+        "between_clip_ids": external_exports.array(external_exports.string()).describe("Instead of ids: the two timeline clip ids the transition joins, e.g. [clip_a, clip_b].").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("'selected' = selected transitions, 'track' = every transition on `track`, 'all' = every transition on the timeline.").optional(),
+        "track": external_exports.string().describe("Track to look on (UI track number, 1 = bottom; name; or layer number). With scope='track' every transition on it.").optional(),
+        "transition_ids": external_exports.array(external_exports.string()).describe("Transition ids (list_timeline_transitions_tool or get_timeline_state_tool 'Effects/Transitions'). Preferred.").optional()
+      }),
+      save_frame_image_tool: external_exports.strictObject({
+        "file_path": external_exports.string().describe("Output image path (.png or .jpg). Empty = the export folder, 'Frame-<n>.png'.").optional(),
+        "overwrite": external_exports.boolean().describe("Replace an existing file.").optional(),
+        "time": external_exports.number().min(-1).describe("Timeline seconds of the frame. -1 = the playhead.").optional()
+      }),
+      search_emojis_tool: external_exports.strictObject({
+        "group": external_exports.enum(["", "smileys-emotion", "animals-nature", "food-drink", "travel-places", "activities", "objects", "symbols", "extras-openmoji", "user"]).describe("Only this emoji group (the Emojis dock's dropdown). Empty = all.").optional(),
+        "limit": external_exports.int().min(1).max(50).describe("How many matches to return.").optional(),
+        "query": external_exports.string().describe("A name or word ('fire', 'heart', 'thumbs up', 'coffee'), an emoji character ('\u{1F525}') or an OpenMoji code ('1F525'). Empty lists a group.").optional()
+      }),
+      seek_playhead_tool: external_exports.strictObject({
+        "frame": external_exports.union([external_exports.int().min(1), external_exports.null()]).describe("Go to this 1-based timeline frame.").optional(),
+        "marker": external_exports.string().describe("Go to the marker with this name or marker_id (see list_markers_tool).").optional(),
+        "play": external_exports.boolean().describe("Start playback from the new position (e.g. 'play from the start' = to='start', play=true).").optional(),
+        "seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Go to this timeline time in seconds (0:32 = 32, 1:05 = 65).").optional(),
+        "to": external_exports.enum(["", "start", "end", "next_marker", "previous_marker", "next_edit", "previous_edit"]).describe("Go to: 'start' / 'end' of the timeline (Home / End); 'next_marker' / 'previous_marker' (the editor's Next / Previous Marker: markers, the timeline start and end, and the edges and keyframes of selected clips); 'next_edit' / 'previous_edit' (the nearest clip start or end: a cut point).").optional(),
+        "track": external_exports.string().describe("For to='next_edit' / 'previous_edit': only clip edges on this track (UI track number (1 = bottom), track name, track id (L3) or layer number).").optional()
+      }),
+      select_timeline_items_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids (file name or content, e.g. 'the interview clip'); track narrows it.").optional(),
+        "effect_ids": external_exports.array(external_exports.string()).describe("Effect ids from a clip's effects; the Properties panel then shows that effect.").optional(),
+        "end_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("End of the time range.").optional(),
+        "include_transitions": external_exports.boolean().describe("With track or a time range: also select the transitions there.").optional(),
+        "mode": external_exports.enum(["replace", "add", "remove", "all", "none", "ripple"]).describe("'replace' (default) = select exactly these; 'add' / 'remove' = add them to / take them out of the current selection; 'all' = every clip and transition (Ctrl+A); 'none' = clear the selection (Ctrl+Shift+A); 'ripple' = these (or the current selection) plus everything after them on the same track (Alt+A).").optional(),
+        "show_properties": external_exports.boolean().describe("Also bring the Properties panel to the front, like double-clicking a clip.").optional(),
+        "start_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Clips overlapping the range start_seconds..end_seconds (timeline seconds). Without end_seconds: clips under that moment.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids (list_clips_tool / get_timeline_state_tool).").optional(),
+        "track": external_exports.string().describe("Every clip on this track (UI track number (1 = bottom), track name, track id (L3) or layer number); with start/end only the clips in that range.").optional(),
+        "transition_ids": external_exports.array(external_exports.string()).describe("Transition ids.").optional()
+      }),
+      separate_clip_audio_tool: external_exports.strictObject({
+        "allow_overlap": external_exports.boolean().describe("Put the audio clip there even if it overlaps clips already on that track.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "per_channel": external_exports.boolean().describe("One audio clip per channel (left/right...) on successive tracks below, instead of one clip with all channels.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on.").optional(),
+        "to_track": external_exports.string().describe("Track for the new audio clip: UI track number (1 = bottom), name, or layer number. Empty = the track directly below (created when there is none), like the menu.").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      set_clip_audio_video_tool: external_exports.strictObject({
+        "audio": external_exports.enum(["", "on", "off", "auto"]).describe("Clip sound: off = mute the clip entirely, on = force on, auto = as the media has it (Properties > Enable Audio). '' = leave it.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on.").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional(),
+        "video": external_exports.enum(["", "on", "off", "auto"]).describe("Clip picture: off = sound only (audio-only clip), on/auto = show the picture (Properties > Enable Video). '' = leave it.").optional(),
+        "waveform": external_exports.enum(["", "show", "hide"]).describe("Draw the clip's audio waveform on the timeline, or hide it.").optional()
+      }),
+      set_clip_properties_tool: external_exports.strictObject({
+        "at_seconds": external_exports.union([external_exports.number(), external_exports.null()]).describe("Leave empty for static values (an animated property is flattened to the new value). Give a timeline time (seconds) to set the value only at that moment, as a keyframe, like editing in the Properties dock with the playhead there; other keyframes stay.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "properties": external_exports.record(external_exports.string(), external_exports.unknown()),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on (from get_timeline_state_tool).").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      set_clip_speed_tool: external_exports.strictObject({
+        "absolute": external_exports.boolean().describe("Read speed relative to the original media instead (1 = normal speed, 2 = double normal), keeping the same part of the source.").optional(),
+        "allow_overlap": external_exports.boolean().describe("Let the longer clip overlap the next clip on its track (the receipt lists it). Off by default: the tool refuses and says what is in the way.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "reset": external_exports.boolean().describe("Clip > Speed > Reset first: normal speed, forward, loops removed. Like the menu, the clip then runs from its in point to the end of its source.").optional(),
+        "reverse": external_exports.boolean().describe("Flip the playback direction (a reversed clip plays forward again).").optional(),
+        "ripple": external_exports.boolean().describe("Shift the later clips on the track by the change in length, so nothing overlaps and no gap opens.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "speed": external_exports.number().min(0).max(16).describe("Speed factor relative to how the clip plays now: 2 = twice as fast (half as long), 0.5 = half speed, 1.5, 4... 0 = leave the speed alone.").optional(),
+        "target_duration_seconds": external_exports.number().min(0).describe("Retime so the clip lasts exactly this long on the timeline (speeds up or slows down as needed); 0 = unused.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on.").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      set_editor_layout_tool: external_exports.strictObject({
+        "delete_view": external_exports.string().describe("Delete this saved custom view (by name). Never touches the project.").optional(),
+        "dock_all": external_exports.boolean().describe("Dock every floating panel back into the window.").optional(),
+        "fullscreen": external_exports.enum(["", "on", "off"]).describe("Enter or leave fullscreen.").optional(),
+        "hide_panels": external_exports.array(external_exports.string()).describe("Panels to close (default none).").optional(),
+        "save_view_as": external_exports.string().describe("After the changes, save the layout as a new custom view with this name.").optional(),
+        "scopes": external_exports.enum(["", "show_all", "hide_all"]).describe("Open or close every scope (Histogram, Luma Waveform, Vectorscope, Audio Levels).").optional(),
+        "show_panels": external_exports.array(external_exports.string()).describe("Panels to open, e.g. ['Properties', 'Effects', 'Histogram', 'Color Wheels', 'Captions'] (default none).").optional(),
+        "toolbar": external_exports.enum(["", "show", "hide"]).describe("Show or hide the main toolbar.").optional(),
+        "update_active_view": external_exports.boolean().describe("After the changes, overwrite the active custom view with the layout.").optional(),
+        "view": external_exports.string().describe("Switch view: 'simple' (default editing), 'color' (Properties, Color Wheels and scopes), 'recording' (Recording dock), or the name of a saved custom view.").optional()
+      }),
+      set_preference_tool: external_exports.strictObject({
+        "key": external_exports.string().describe("Preference key (or its title) from get_preferences_tool, e.g. 'autosave-interval'.").optional(),
+        "restore_tab": external_exports.enum(["", "General", "Preview", "Timeline", "Autosave", "Cache", "Debug", "Keyboard", "Performance", "Location", "AI"]).describe("Instead of key/value: restore every preference on this tab to its default (Preferences > Restore Defaults).").optional(),
+        "value": external_exports.string().describe("New value: true/false, a number within min/max, a dropdown value or name, text, or a shortcut like 'Ctrl+Shift+K' (several: 'Ctrl+K | F5').").optional()
+      }),
+      set_project_profile_tool: external_exports.strictObject({
+        "fps": external_exports.number().min(0).max(240).describe("Frame rate, e.g. 24, 25, 29.97, 30, 60. 0 = keep (or the preset's).").optional(),
+        "from_file_id": external_exports.string().describe("Match a project file's size and frame rate (media_bin_file_id from list_files_tool).").optional(),
+        "height": external_exports.int().min(0).max(16384).describe("Frame height in pixels (with width). 0 = unchanged.").optional(),
+        "orientation": external_exports.enum(["", "landscape", "portrait", "square"]).describe("Turn the (current or named) profile to this shape: 'portrait' makes 1920x1080 -> 1080x1920.").optional(),
+        "profile": external_exports.string().describe("Profile name ('FHD Vertical 1080p 30 fps'), key ('01080x1920p0030_09-16'), social preset ('instagram_reel', 'tiktok', 'youtube_shorts', 'instagram_post', 'instagram_portrait', 'youtube', 'youtube_4k', 'cinema', '4k') or 'WIDTHxHEIGHT'. Empty = keep the current one.").optional(),
+        "reframe": external_exports.enum(["keep", "fit", "fill"]).describe("Existing full-frame clips whose shape differs from the new frame: keep = unchanged (letterboxed/pillarboxed), fit = whole picture with bars, fill = crop to fill, centred. Titles and picture-in-picture clips are never changed.").optional(),
+        "width": external_exports.int().min(0).max(16384).describe("Frame width in pixels (with height) instead of a profile name. 0 = unchanged.").optional()
+      }),
+      set_timeline_view_tool: external_exports.strictObject({
+        "center_on_playhead": external_exports.boolean().describe("Scroll so the playhead is in the middle (Center on Playhead).").optional(),
+        "end_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("End of the range to show (timeline seconds).").optional(),
+        "razor": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("true: clicking a clip slices it (Razor tool); false: normal clicks.").optional(),
+        "snapping": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("true: dragged clips snap to clip edges, the playhead and markers; false: free dragging.").optional(),
+        "start_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Show exactly this range: its start (timeline seconds). Give end_seconds too.").optional(),
+        "steps": external_exports.int().min(1).max(10).describe("How many zoom steps for zoom 'in' / 'out'.").optional(),
+        "timing": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("true: dragging a clip edge retimes (speeds up / slows down) the clip instead of trimming it; false: normal trimming.").optional(),
+        "visible_seconds": external_exports.union([external_exports.number().min(0.1), external_exports.null()]).describe("Zoom so this many seconds fill the timeline width, centered on the playhead.").optional(),
+        "zoom": external_exports.enum(["", "in", "out", "fit"]).describe("'in' / 'out' = zoom one step like the = / - keys (repeat with steps); 'fit' = show every clip, from 0 to the end of the last clip.").optional()
+      }),
+      slice_clips_tool: external_exports.strictObject({
+        "at_seconds": external_exports.number().describe("Timeline time to cut at; -1 = the playhead.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip to cut instead of ids.").optional(),
+        "include_transitions": external_exports.boolean().describe("With scope 'track'/'all'/'selected': cut transitions under the time too.").optional(),
+        "keep": external_exports.enum(["both", "left", "right"]).describe("both = cut into two clips; left = keep the part before the cut (drop the rest); right = keep the part after it.").optional(),
+        "ripple": external_exports.boolean().describe("With keep='left' or 'right': close the gap the dropped part leaves.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the selected clips, 'track' = everything on track under the time, 'all' = everything under the time on every unlocked track (a razor cut through the whole timeline).").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Clips to cut (each must be under at_seconds).").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional()
+      }),
+      trim_clips_tool: external_exports.strictObject({
+        "allow_overlap": external_exports.boolean().describe("Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.").optional(),
+        "clip_query": external_exports.string().describe("Describe one clip instead of ids.").optional(),
+        "duration_seconds": external_exports.number().min(0).describe("Set the clip's length on the timeline by moving its out point; 0 = unchanged.").optional(),
+        "ripple": external_exports.boolean().describe("Shift the later clips on the track to follow (close/open the room), like a ripple edit. With ripple the clip keeps its start on the timeline.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.").optional(),
+        "source_end": external_exports.number().describe("Set the out point: seconds into the source media; -1 = unchanged.").optional(),
+        "source_start": external_exports.number().describe("Set the in point: seconds into the source media; -1 = unchanged.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Timeline clip ids to act on.").optional(),
+        "track": external_exports.string().describe("Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.").optional(),
+        "trim_end_seconds": external_exports.number().describe("Cut this much off the end (negative = extend further into the source).").optional(),
+        "trim_start_seconds": external_exports.number().describe("Cut this much off the start (negative = extend back into the source).").optional()
+      }),
+      update_effect_tool: external_exports.strictObject({
+        "clip_query": external_exports.string().describe("Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.").optional(),
+        "effect": external_exports.string().describe("Instead of effect_id: the effect name on the clip(s) (Blur, ColorGrade...).").optional(),
+        "effect_id": external_exports.string().describe("Effect id from get_clip_effects_tool / add_effect_tool. Preferred.").optional(),
+        "interpolation": external_exports.enum(["bezier", "linear", "constant"]).describe("Default interpolation for keyframes that do not name one.").optional(),
+        "occurrence": external_exports.int().min(0).describe("With effect: which one if a clip has several of that effect (1 = first).").optional(),
+        "properties": external_exports.record(external_exports.string(), external_exports.unknown()),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.").optional(),
+        "timeline_clip_id": external_exports.string().describe("Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.").optional(),
+        "timeline_clip_ids": external_exports.array(external_exports.string()).describe("Several timeline clip ids to change in one step.").optional(),
+        "track": external_exports.string().describe("Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.").optional()
+      }),
+      update_marker_tool: external_exports.strictObject({
+        "color": external_exports.enum(["", "blue", "red", "green", "yellow", "orange", "purple", "pink", "white"]).describe("New color tag; empty = keep. the timeline tints the marker's icon with it (blue = the default icon) and shows the marker's name next to it.").optional(),
+        "marker": external_exports.string().describe("Marker to change: its marker_id (from list_markers_tool) or its exact name."),
+        "name": external_exports.union([external_exports.string(), external_exports.null()]).describe("New name. Empty string clears it. Omit to keep the name.").optional(),
+        "position_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Move the marker to this timeline time (seconds). Omit to keep it where it is.").optional()
+      }),
+      update_project_files_tool: external_exports.strictObject({
+        "add_tags": external_exports.array(external_exports.string()).describe("Tags to add to every chosen file ('b-roll', 'intro').").optional(),
+        "file_ids": external_exports.array(external_exports.string()).describe("Project file ids (file_id / media_bin_file_id from list_project_files_tool).").optional(),
+        "file_query": external_exports.string().describe("Name one file instead of ids: its name, file name or a tag ('intro.mp4', 'the drone shot').").optional(),
+        "fps": external_exports.number().min(0).max(240).describe("New frame rate for IMAGE SEQUENCES only (e.g. 24, 12, 29.97); rescales its duration. 0 = keep.").optional(),
+        "name": external_exports.string().describe("New display name (one file). '' = keep.").optional(),
+        "path": external_exports.string().describe("Relink one file to this media path (the file moved or was replaced). For an image sequence: a frame of the new sequence or its folder. '' = keep.").optional(),
+        "remove_tags": external_exports.array(external_exports.string()).describe("Tags to remove from every chosen file.").optional(),
+        "rename_clips": external_exports.boolean().describe("With name: also relabel the timeline clips that use the file.").optional(),
+        "reset_in_out": external_exports.boolean().describe("Clear the file's in/out so it spans the whole media again.").optional(),
+        "search_folder": external_exports.string().describe("Relink every chosen file to the file with the same name found in this folder (searched recursively). '' = no search.").optional(),
+        "source_end_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("New out-point, in seconds of the source media (File Properties > End Frame). One file.").optional(),
+        "source_start_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("New in-point, in seconds of the source media (File Properties > Start Frame). One file.").optional(),
+        "tags": external_exports.union([external_exports.array(external_exports.string()), external_exports.null()]).describe("Replace the file(s) tags with exactly these. [] clears them; leave out to keep.").optional()
+      }),
+      update_track_tool: external_exports.strictObject({
+        "lock": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("true locks the track, false unlocks it. Omit to leave it as is.").optional(),
+        "name": external_exports.union([external_exports.string(), external_exports.null()]).describe("New name for the track header. Empty string = back to the default 'Track N'. Omit to keep the current name.").optional(),
+        "track": external_exports.string().describe("Track to change: UI track number (1 = bottom), track name, track id (L3) or layer number.")
+      }),
+      update_transition_tool: external_exports.strictObject({
+        "at_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Instead of ids: the transition under this timeline time (on `track` when given).").optional(),
+        "audio_crossfade": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("Also crossfade the two clips' audio under the transition (equal-power).").optional(),
+        "between_clip_ids": external_exports.array(external_exports.string()).describe("Instead of ids: the two timeline clip ids the transition joins, e.g. [clip_a, clip_b].").optional(),
+        "brightness_keyframes": external_exports.array(external_exports.strictObject({ "interpolation": external_exports.enum(["bezier", "linear", "constant"]).describe("Easing into the next point.").optional(), "seconds": external_exports.number().min(0).describe("Time from the START of the transition, 0 = its first frame."), "value": external_exports.number().describe("Curve value (brightness -1..1: 1 = wipe not started, -1 = finished; contrast 0..20).") })).describe("Replace the progress curve (brightness): 1 = not started, -1 = finished; times from the transition start.").optional(),
+        "contrast": external_exports.union([external_exports.number().min(0).max(20), external_exports.null()]).describe("Edge hardness of the wipe: 0 = very soft/blurry edge, 3 = the default soft edge, 20 = a hard line.").optional(),
+        "contrast_keyframes": external_exports.array(external_exports.strictObject({ "interpolation": external_exports.enum(["bezier", "linear", "constant"]).describe("Easing into the next point.").optional(), "seconds": external_exports.number().min(0).describe("Time from the START of the transition, 0 = its first frame."), "value": external_exports.number().describe("Curve value (brightness -1..1: 1 = wipe not started, -1 = finished; contrast 0..20).") })).describe("Replace the edge-hardness curve over time.").optional(),
+        "duration_seconds": external_exports.number().min(0).describe("New length in seconds (0 = keep). On a crossfade between two clips the later clip moves so the clips overlap by exactly this much (see keep_overlap).").optional(),
+        "flip_wipe_side": external_exports.boolean().describe("Wipe from the other side (left-to-right becomes right-to-left, circle-out becomes circle-in) and still go from the earlier clip to the later one. Works for any mask (inverts it and reverses its curve).").optional(),
+        "interpolation": external_exports.enum(["", "bezier", "linear", "constant"]).describe("Easing of the progress curve: bezier = ease in/out (default), linear = constant speed, constant = jump. '' = keep.").optional(),
+        "invert_mask": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("Raw 'mask invert' property. Alone it makes the later clip show first (it flashes back before the cut); use flip_wipe_side instead.").optional(),
+        "keep_overlap": external_exports.boolean().describe("With duration_seconds on a crossfade: do not move any clip (the transition may then run past the overlap and dip to the track below).").optional(),
+        "mask": external_exports.string().describe("Change the wipe shape: a transition name ('fade', 'wipe_left_to_right', 'circle_in_to_out', any list_transitions_tool name) or an image file path. '' = keep.").optional(),
+        "mask_file_id": external_exports.string().describe("Use this project image file (e.g. a gradient or logo) as the wipe shape. '' = keep.").optional(),
+        "position_seconds": external_exports.union([external_exports.number().min(0), external_exports.null()]).describe("Move the transition to start at this timeline time (clips stay).").optional(),
+        "replace_image": external_exports.union([external_exports.boolean(), external_exports.null()]).describe("Show the mask image itself instead of transitioning (a preview aid).").optional(),
+        "ripple": external_exports.boolean().describe("With duration_seconds on a crossfade: move everything after the later clip on that track too, so no gap or overlap opens further down. false = move only the later clip.").optional(),
+        "scope": external_exports.enum(["", "selected", "track", "all"]).describe("'selected' = selected transitions, 'track' = every transition on `track`, 'all' = every transition on the timeline.").optional(),
+        "track": external_exports.string().describe("Track to look on (UI track number, 1 = bottom; name; or layer number). With scope='track' every transition on it.").optional(),
+        "transition_ids": external_exports.array(external_exports.string()).describe("Transition ids (list_timeline_transitions_tool or get_timeline_state_tool 'Effects/Transitions'). Preferred.").optional()
+      }),
+      zenvi_api_request: external_exports.strictObject({
+        "method": external_exports.string().optional(),
+        "path": external_exports.string().optional(),
+        "body": external_exports.string().optional(),
+        "query": external_exports.string().optional()
+      }),
+      send_assistant_prompt_tool: external_exports.strictObject({
+        "message": external_exports.string().optional(),
+        "session_id": external_exports.string().optional(),
+        "timeout_seconds": external_exports.int().optional()
+      }),
+      mcp_health_tool: external_exports.strictObject({
+        "main_thread_timeout_seconds": external_exports.int().optional()
+      }),
+      wait_for_editor_job_tool: external_exports.strictObject({
+        "job_id": external_exports.string().optional(),
+        "timeout_seconds": external_exports.int().optional()
+      }),
+      get_log_paths_tool: external_exports.strictObject({}),
+      capture_editor_screenshot_tool: external_exports.strictObject({
+        "path": external_exports.string().optional(),
+        "target": external_exports.string().optional(),
+        "max_width": external_exports.int().optional()
       })
     };
     contractMeta = {
@@ -47941,8 +48899,7 @@ var init_schemas_gen = __esm({
         description: "Return project profile, fps, duration, and scale.",
         assistant: true,
         desktopReadOnly: true,
-        handler: "src/classes/tool_handlers.py:get_project_info",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/project_export.py:get_project_info",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -47956,7 +48913,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:list_files",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -47970,13 +48926,12 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:list_clips",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
             "layer": { "type": "string", "description": "Optional layer_number or UI track filter." },
-            "detail_level": { "type": "string", "description": "Sent by the assistant backend; ignored here." }
+            "detail_level": { "type": "string", "description": "summary (default) or full \u2014 accepted for Assistant/LLM compat; listing is always complete." }
           }
         }
       },
@@ -47987,7 +48942,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:list_layers",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48000,8 +48954,7 @@ var init_schemas_gen = __esm({
         description: "List every marker in the project.",
         assistant: true,
         desktopReadOnly: true,
-        handler: "src/classes/tool_handlers.py:list_markers",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/tracks_nav.py:list_markers",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48011,15 +48964,18 @@ var init_schemas_gen = __esm({
       new_project_tool: {
         name: "new_project_tool",
         title: "New project",
-        description: "Create a new empty project.",
+        description: "Create a new empty project. save_first=true saves the current project where it is first.",
         assistant: true,
         desktopReadOnly: false,
-        handler: "src/classes/tool_handlers.py:new_project",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/project_export.py:new_project",
         inputSchema: {
           type: "object",
           additionalProperties: false,
-          properties: {}
+          properties: {
+            "discard_unsaved": { "default": false, "description": "Throw away unsaved changes in the current project. Only after the user agreed.", "type": "boolean" },
+            "profile": { "default": "", "description": "Optional video profile or social preset for the new project, e.g. 'instagram_reel', 'youtube_4k', 'FHD 1080p 30 fps' (see list_project_profiles_tool). Empty = default profile.", "type": "string" },
+            "save_first": { "default": false, "description": "Save the current project to its existing file first (it must have been saved before).", "type": "boolean" }
+          }
         }
       },
       save_project_tool: {
@@ -48028,13 +48984,13 @@ var init_schemas_gen = __esm({
         description: "Save the project to file_path (e.g. /home/user/my.zvn).",
         assistant: true,
         desktopReadOnly: false,
-        handler: "src/classes/tool_handlers.py:save_project",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/project_export.py:save_project",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
-            "file_path": { "type": "string", "description": "Optional destination path; empty saves in place." },
+            "file_path": { "default": "", "description": "Where to save. Empty = the project's current file (Save). A new path = Save As (.zvn is added when there is no project extension; missing folders are created).", "type": "string" },
+            "overwrite": { "default": false, "description": "Allow replacing an existing file that is not this project's current file.", "type": "boolean" },
             "path": { "type": "string", "description": "Where to save the project (.zvn is appended when missing). Omit to save to the current location." }
           }
         }
@@ -48042,17 +48998,18 @@ var init_schemas_gen = __esm({
       open_project_tool: {
         name: "open_project_tool",
         title: "Open project",
-        description: "Open a project from file_path.",
+        description: "Open a project from file_path. save_first=true saves the current project where it is before opening the other one.",
         assistant: true,
         desktopReadOnly: false,
-        handler: "src/classes/tool_handlers.py:open_project",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/project_export.py:open_project",
         inputSchema: {
           type: "object",
           additionalProperties: false,
-          required: ["file_path"],
           properties: {
-            "file_path": { "type": "string", "description": "Project file path." }
+            "discard_unsaved": { "default": false, "description": "Throw away unsaved changes in the current project. Only after the user agreed.", "type": "boolean" },
+            "file_path": { "default": "", "description": "Path of a .zvn project (legacy .osp/.flow also open). Leave empty when using recent_index.", "type": "string" },
+            "recent_index": { "default": 0, "description": "Open a recent project instead: 1 = most recent (see list_recent_projects_tool). 0 = use file_path.", "maximum": 10, "minimum": 0, "type": "integer" },
+            "save_first": { "default": false, "description": "Save the current project to its existing file before opening the other one.", "type": "boolean" }
           }
         }
       },
@@ -48063,7 +49020,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:watch_clip_and_play",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48082,7 +49038,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:watch_clip_window",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48100,16 +49055,19 @@ var init_schemas_gen = __esm({
       },
       play_tool: {
         name: "play_tool",
-        title: "Toggle playback",
-        description: "Start or toggle playback.",
+        title: "Play / pause",
+        description: "Control preview playback: action play, pause, toggle (default, like the Space bar), stop (pause and return to the start), or step_forward / step_back by frames. Plays at normal speed only: fast_forward, rewind and other speeds are refused.",
         assistant: true,
         desktopReadOnly: false,
-        handler: "src/classes/tool_handlers.py:play",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/tracks_nav.py:play",
         inputSchema: {
           type: "object",
           additionalProperties: false,
-          properties: {}
+          properties: {
+            "action": { "default": "toggle", "description": "What to do. play / pause (always pass one of these for a plain 'play' or 'pause'); toggle = the Space bar; stop = pause and return to the start; fast_forward / rewind = the L / J keys (one speed step faster forward / backward); step_forward / step_back = pause and move by `frames`.", "enum": ["toggle", "play", "pause", "stop", "fast_forward", "rewind", "step_forward", "step_back"], "type": "string" },
+            "frames": { "default": 1, "description": "For step_forward / step_back: how many frames to move.", "maximum": 1e4, "minimum": 1, "type": "integer" },
+            "speed": { "description": "For action='play': playback speed, 1 = normal, 2 or 4 = fast, -1 = backwards. Omit for normal speed.", "maximum": 16, "minimum": -16, "nullable": true, "type": ["integer", "null"] }
+          }
         }
       },
       go_to_start_tool: {
@@ -48119,7 +49077,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:go_to_start",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48133,7 +49090,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:go_to_end",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48147,7 +49103,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:undo",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48163,7 +49118,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:redo",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48175,34 +49129,38 @@ var init_schemas_gen = __esm({
       add_track_tool: {
         name: "add_track_tool",
         title: "Add track",
-        description: "Add a new track below the selected track (on top when nothing is selected). Returns the new track in createdTracks.",
+        description: "Add empty tracks: on top (default, like the Add Track button), at the bottom, or above / below the track in relative_to. name names the track ('Music'); count adds several in one undo step ('<name> 1'..'<name> N' bottom to top). Track numbers count from the bottom; the new tracks are in createdTracks.",
         assistant: true,
         desktopReadOnly: false,
-        handler: "src/classes/tool_handlers.py:add_track",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/tracks_nav.py:add_track",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
-            "label": { "type": "string", "description": "Optional label for the new track." }
+            "count": { "default": 1, "description": "How many tracks to add in this one step. With a name they are called '<name> 1' .. '<name> N' from bottom to top.", "maximum": 10, "minimum": 1, "type": "integer" },
+            "name": { "default": "", "description": "Name shown in the new track's header, e.g. 'Music'. Empty = the default 'Track N'.", "type": "string" },
+            "position": { "default": "top", "description": "Where the new track goes: 'top' (above every track, like the Add Track button), 'bottom' (below every track), or 'above' / 'below' the track in relative_to (Track menu > Add Track Above / Below).", "enum": ["top", "bottom", "above", "below"], "type": "string" },
+            "relative_to": { "default": "", "description": "For position 'above' / 'below': the existing track, as a UI track number (1 = bottom), track name, track id (L3) or layer number.", "type": "string" },
+            "label": { "type": "string", "description": "Alias for name." }
           }
         }
       },
       add_marker_tool: {
         name: "add_marker_tool",
         title: "Add marker",
-        description: "Add a timeline marker at the playhead, or at position_seconds.",
+        description: "Add a timeline marker at position_seconds (default: the playhead), with a name and a colour tag.",
         assistant: true,
         desktopReadOnly: false,
-        handler: "src/classes/tool_handlers.py:add_marker",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/tracks_nav.py:add_marker",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
-            "position_seconds": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Marker time in timeline seconds (default: the playhead)." },
-            "label": { "type": "string", "description": "Optional marker label." },
-            "text": { "type": "string", "description": "Alias for label." }
+            "color": { "default": "blue", "description": "Marker color tag; the timeline tints the marker's icon with it (blue = the default icon) and shows the marker's name next to it.", "enum": ["blue", "red", "green", "yellow", "orange", "purple", "pink", "white"], "type": "string" },
+            "name": { "default": "", "description": "Marker name, e.g. 'Drop', 'Chorus', 'Cut here'. Used to find it again.", "type": "string" },
+            "position_seconds": { "description": "Timeline seconds for the marker (0:32 = 32, 1:05 = 65). Omit to mark the playhead position.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "label": { "type": "string", "description": "Alias for name." },
+            "text": { "type": "string", "description": "Alias for name." }
           }
         }
       },
@@ -48213,7 +49171,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:delete_from_timeline",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48224,7 +49181,8 @@ var init_schemas_gen = __esm({
             "scope": { "type": "string", "enum": ["auto", "clip", "track"], "description": "auto (default): a clip id/query deletes one placement, a bare track clears the track. clip / track force the branch.", "default": "auto" },
             "occurrence": { "type": "string", "description": "1-based pick when the query matches the same source several times (0 = best match).", "default": "0" },
             "position_near": { "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "null" }], "description": "Timeline seconds; only clips that span this time match." },
-            "include_transitions": { "type": "boolean", "description": "Track scope only: also delete transitions on the track (default true).", "default": true }
+            "include_transitions": { "type": "boolean", "description": "Track scope only: also delete transitions on the track (default true).", "default": true },
+            "ripple": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "description": "One clip only: true closes the gap it leaves (later items on that track move left); default false leaves the gap.", "default": false }
           }
         }
       },
@@ -48235,7 +49193,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:remove_clip",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48255,7 +49212,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:delete_clips_on_track",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48272,7 +49228,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:analyze_timeline_audio",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48290,7 +49245,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:set_clip_volume",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48311,6 +49265,25 @@ var init_schemas_gen = __esm({
           }
         }
       },
+      reverse_clip_tool: {
+        name: "reverse_clip_tool",
+        title: "Reverse clip",
+        description: "Reverse a timeline clip (or reset time remapping).",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/tool_handlers.py:reverse_clip",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "timeline_clip_id": { "type": "string", "description": "Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt)." },
+            "clip_query": { "type": "string", "description": "Describe the clip instead of passing an id: file name, subject, or words from its summary. Narrow it with track, occurrence or position_near." },
+            "track": { "type": "string", "description": "Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom)." },
+            "occurrence": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "1-based pick when the query matches the same source several times (0 = best match).", "default": "0" },
+            "mode": { "type": "string", "description": "'reverse' (default) or 'reset'.", "default": "reverse" }
+          }
+        }
+      },
       duck_under_speech_tool: {
         name: "duck_under_speech_tool",
         title: "Duck music under speech",
@@ -48318,7 +49291,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:duck_under_speech",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48333,7 +49305,7 @@ var init_schemas_gen = __esm({
             "pad_before_ms": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Start ducking this long before speech, ms (default 200).", "default": "200" },
             "pad_after_ms": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Keep ducking this long after speech, ms (default 300).", "default": "300" },
             "boost_speech_db": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Also set speech clips to this level in dB (default 0 = unchanged).", "default": "0" },
-            "dry_run": { "type": "string", "description": "true/false \u2014 preview without writing.", "default": "false" }
+            "dry_run": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "description": "true/false \u2014 preview without writing.", "default": "false" }
           }
         }
       },
@@ -48344,7 +49316,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:zoom_in",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48358,7 +49329,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:zoom_out",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48372,7 +49342,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:center_on_playhead",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48386,15 +49355,15 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:import_files",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
-            "paths": { "type": "string", "description": "Comma-separated paths or JSON list." },
+            "paths": { "oneOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "string" }], "description": "List of paths, or one comma-separated string." },
+            "files": { "oneOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "string" }], "description": "Alias of paths." },
             "path": { "type": "string", "description": "One file, folder or glob to import." },
             "folder": { "type": "string", "description": "A folder to import recursively (media files only)." },
-            "skip_indexing": { "type": "string", "description": "true to skip AI indexing after import (hosts with an indexer).", "default": "false" },
+            "skip_indexing": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "description": "true to skip AI indexing after import (hosts with an indexer).", "default": "false" },
             "dry_run": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "description": "true previews what would be imported; nothing changes.", "default": "false" },
             "media_types": { "type": "string", "description": "all (default), video, audio, image, or a comma list.", "default": "all" }
           }
@@ -48407,7 +49376,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:wait_until_project_indexed",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48422,14 +49390,35 @@ var init_schemas_gen = __esm({
         description: "Export the project. Default opens the export dialog; set show_dialog=false to render immediately with optional output_path.",
         assistant: true,
         desktopReadOnly: false,
-        handler: "src/classes/tool_handlers.py:export_video",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/project_export_render.py:export_video",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
-            "show_dialog": { "type": "string", "description": "true (default) opens the export dialog when the host has one; false renders directly to output_path.", "default": "true" },
-            "output_path": { "type": "string", "description": "Where to write the video (hosts pick a location when omitted)." }
+            "audio_bitrate": { "default": "", "description": "Override audio bitrate, e.g. '192 kb/s'.", "type": "string" },
+            "audio_codec": { "default": "", "description": "Override audio codec, e.g. 'aac', 'libmp3lame', 'pcm_s16le', 'flac'.", "type": "string" },
+            "channels": { "default": "", "description": "Override audio channels: mono, stereo, surround, 5.1, 7.1.", "type": "string" },
+            "container": { "default": "", "description": "Override container/extension, e.g. 'mov', 'mkv', 'wav', 'flac'.", "type": "string" },
+            "end": { "default": 0, "description": "Range end in timeline seconds (custom range). 0 = end of the last clip.", "minimum": 0, "type": "number" },
+            "export_type": { "default": "auto", "description": "auto = the preset's (GIF = video only, MP3 = audio only). audio_only with container 'wav'/'flac' writes uncompressed/lossless audio.", "enum": ["auto", "video_audio", "video_only", "audio_only", "image_sequence"], "type": "string" },
+            "file_name": { "default": "", "description": "Output file name without folder (default: the project name).", "type": "string" },
+            "folder": { "default": "", "description": "Output folder (default: the Export folder preference, usually Downloads).", "type": "string" },
+            "fps": { "default": 0, "description": "Override export frame rate. 0 = from profile.", "maximum": 240, "minimum": 0, "type": "number" },
+            "height": { "default": 0, "description": "Override export height in pixels (even). 0 = from profile.", "maximum": 16384, "minimum": 0, "type": "integer" },
+            "image_format": { "default": "png", "description": "Image type for export_type='image_sequence'.", "enum": ["png", "jpg", "bmp", "tiff"], "type": "string" },
+            "interlaced": { "default": false, "description": "Interlaced output (top field first).", "type": "boolean" },
+            "output_path": { "default": "", "description": "Full output file path. Empty = folder + file_name. The extension follows the container.", "type": "string" },
+            "overwrite": { "default": false, "description": "Replace an existing output file.", "type": "boolean" },
+            "preset": { "default": "", "description": "Target: an Export dialog preset title or a common name -- 'MP4 (h.264)' (default), 'YouTube', 'YouTube (4K)', 'YouTube Shorts', 'Instagram Reels', 'Instagram', 'TikTok', 'Facebook', 'Twitter / X', 'LinkedIn', 'Vimeo', 'GIF', 'MP3', 'WEBM', 'ProRes', 'MOV', 'MKV', 'HEVC'. See list_export_presets_tool.", "type": "string" },
+            "profile": { "default": "", "description": "Export video profile/size instead of the preset's (Advanced > Profile): a profile name, social preset or 'WIDTHxHEIGHT'.", "type": "string" },
+            "quality": { "default": "", "description": "Preset quality (bitrate). Empty = stored setting or high.", "enum": ["", "low", "med", "high"], "type": "string" },
+            "range": { "default": "", "description": "whole = first clip to last clip; selection = the selected clips' span; custom = start/end. Empty = custom when start/end are given (or stored), else whole.", "enum": ["", "whole", "selection", "custom"], "type": "string" },
+            "sample_rate": { "default": 0, "description": "Override audio sample rate (Hz), e.g. 44100, 48000. 0 = preset's.", "maximum": 192e3, "minimum": 0, "type": "integer" },
+            "show_dialog": { "anyOf": [{ "type": "boolean" }, { "type": "string" }], "default": false, "description": "Instead of rendering, open the Export Video dialog for the user (returns at once)." },
+            "start": { "default": 0, "description": "Range start in timeline seconds (custom range).", "minimum": 0, "type": "number" },
+            "video_bitrate": { "default": "", "description": "Override video rate: '8 Mb/s', '500 kb/s' or a quality like '20 crf'.", "type": "string" },
+            "video_codec": { "default": "", "description": "Override video codec, e.g. 'libx264', 'libx265', 'prores_ks', 'libvpx-vp9'.", "type": "string" },
+            "width": { "default": 0, "description": "Override export width in pixels (even). 0 = from profile.", "maximum": 16384, "minimum": 0, "type": "integer" }
           }
         }
       },
@@ -48439,8 +49428,7 @@ var init_schemas_gen = __esm({
         description: "Return current export settings (resolution, fps, codecs, format, path, frame range).",
         assistant: true,
         desktopReadOnly: true,
-        handler: "src/classes/tool_handlers.py:get_export_settings",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/project_export_render.py:get_export_settings",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48453,15 +49441,14 @@ var init_schemas_gen = __esm({
         description: "Set one export setting (key: width, height, fps_num, fps_den, video_codec, audio_codec, output_path, start_frame, end_frame, vformat).",
         assistant: true,
         desktopReadOnly: false,
-        handler: "src/classes/tool_handlers.py:set_export_setting",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/project_export_render.py:set_export_setting",
         inputSchema: {
           type: "object",
           additionalProperties: false,
-          required: ["key"],
           properties: {
-            "key": { "type": "string", "description": "width, height, fps_num, fps_den, start_frame, end_frame, sample_rate, channels, video_codec (vcodec), audio_codec (acodec), output_path (path), vformat (format), or any other export key." },
-            "value": { "type": ["string", "number", "boolean", "null"], "description": "New value (integers for the numeric keys)." }
+            "clear": { "default": false, "description": "Remove the stored override for key (or every override when key is empty).", "type": "boolean" },
+            "key": { "default": "", "description": "Setting to store: preset, quality, export_type, width, height, fps, start, end, video_codec, audio_codec, format, video_bitrate, audio_bitrate, sample_rate, channels, output_path, folder, file_name, image_format (also start_frame, end_frame, fps_num, fps_den).", "type": "string" },
+            "value": { "default": "", "description": "New value (see get_export_settings_tool valid_keys for each key's format).", "type": "string" }
           }
         }
       },
@@ -48472,7 +49459,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:get_file_info",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48489,7 +49475,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:split_file_add_clip",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48512,7 +49497,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:add_clip_to_timeline",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48524,7 +49508,7 @@ var init_schemas_gen = __esm({
             "start_seconds": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Source in-point relative to the file start, seconds. Alone it keeps the rest of the file." },
             "end_seconds": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Source out-point (keep window end). A duration_seconds that disagrees with it wins." },
             "query": { "type": "string", "description": "What the kept moment shows (used to confirm the window when the host can watch frames)." },
-            "full_file": { "type": "string", "description": "true to place the whole file (one continuous audio bed, or a whole video) without a watch." }
+            "full_file": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "description": "true to place the whole file (one continuous audio bed, or a whole video) without a watch." }
           }
         }
       },
@@ -48535,7 +49519,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:import_video_url_and_add_to_timeline",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48551,6 +49534,172 @@ var init_schemas_gen = __esm({
           }
         }
       },
+      ingest_web_video_tool: {
+        name: "ingest_web_video_tool",
+        title: "Ingest web / YouTube video",
+        description: "Fetch a YouTube/web video URL via yt-dlp into Imports/media bin (one undo).",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/tool_handlers.py:ingest_web_video",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "url": { "type": "string", "description": "YouTube / web page URL (preferred)." },
+            "video_url": { "type": "string", "description": "Alias for url." },
+            "intent": { "type": "string", "description": "'reference' (default, media bin), 'timeline' (place), or 'recreate'.", "default": "reference" },
+            "place": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "description": "Place on timeline; ignored for recreate.", "default": "false" },
+            "track": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom)." },
+            "position_seconds": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Timeline position in seconds (a timecode like 1:05 also works)." },
+            "write_subs": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "job_id": { "type": "string", "description": "Long-poll id from a prior status=running reply." }
+          }
+        }
+      },
+      apply_color_tool: {
+        name: "apply_color_tool",
+        title: "Apply color grade",
+        description: "Merge ColorGrade knobs/curves/wheels/LUT onto timeline clip(s); one undo.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/tool_handlers.py:apply_color",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clipIds": { "type": "string", "description": "JSON list, comma-separated ids, or 'all'." },
+            "clip_ids": { "type": "string" },
+            "timeline_clip_id": { "type": "string", "description": "Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt)." },
+            "clipId": { "type": "string", "description": "Timeline clip id." },
+            "all_clips": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "allClips": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "reset": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "description": "true removes ColorGrade.", "default": "false" },
+            "color": { "type": "string", "description": "Full grade object JSON to paste." },
+            "exposure": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "contrast": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "saturation": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "vibrance": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "temperature": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "tint": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "temperature_delta": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "tint_delta": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "exposure_delta": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "vibrance_delta": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "highlights": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "shadows": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "mix": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "lut_path": { "type": "string" },
+            "lut_intensity": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "lut": { "type": "string" },
+            "wheels": { "type": "string", "description": "Wheels JSON." },
+            "curve_all": { "type": "string" },
+            "curve_red": { "type": "string" },
+            "curve_green": { "type": "string" },
+            "curve_blue": { "type": "string" },
+            "masterCurve": { "type": "string" },
+            "redCurve": { "type": "string" },
+            "greenCurve": { "type": "string" },
+            "blueCurve": { "type": "string" }
+          }
+        }
+      },
+      inspect_color_tool: {
+        name: "inspect_color_tool",
+        title: "Inspect color",
+        description: "Measure graded look at a frame: isolated scopes + ColorGrade + preview JPEG.",
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/tool_handlers.py:inspect_color",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clipId": { "type": "string", "description": "Timeline clip id." },
+            "timeline_clip_id": { "type": "string", "description": "Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt)." },
+            "clip_id": { "type": "string" },
+            "atFrame": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "at_frame": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "reference": { "type": "string" },
+            "referenceClipId": { "type": "string" },
+            "include_preview": { "oneOf": [{ "type": "string" }, { "type": "boolean" }], "default": "true" }
+          }
+        }
+      },
+      list_looks_tool: {
+        name: "list_looks_tool",
+        title: "List looks",
+        description: "List ColorGrade presets, LUT packs, and Film Grain looks with vibe tags.",
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/tool_handlers.py:list_looks",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "query": { "type": "string" },
+            "vibe": { "type": "string" }
+          }
+        }
+      },
+      apply_look_tool: {
+        name: "apply_look_tool",
+        title: "Apply look",
+        description: "Apply a Look preset, LUT, or Film Grain to clip(s); one undo.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/tool_handlers.py:apply_look",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clipIds": { "type": "string", "description": "JSON list, comma-separated ids, or 'all'." },
+            "clip_ids": { "type": "string" },
+            "timeline_clip_id": { "type": "string", "description": "Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt)." },
+            "clipId": { "type": "string", "description": "Timeline clip id." },
+            "lookId": { "type": "string", "description": "Id from list_looks_tool." },
+            "look_id": { "type": "string" },
+            "lutPath": { "type": "string" },
+            "lut_path": { "type": "string" },
+            "lutIntensity": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "lut_intensity": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "mix": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "stackGrain": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "stack_grain": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "grainPreset": { "type": "string" },
+            "grain_preset": { "type": "string" },
+            "all_clips": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "allClips": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] }
+          }
+        }
+      },
+      match_color_to_reference_tool: {
+        name: "match_color_to_reference_tool",
+        title: "Match color to reference",
+        description: "Match SUBJECT look to REFERENCE via LookProfile + closed verify loop.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/tool_handlers.py:match_color_to_reference",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clipId": { "type": "string", "description": "Timeline clip id." },
+            "timeline_clip_id": { "type": "string", "description": "Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt)." },
+            "clip_id": { "type": "string" },
+            "clipIds": { "type": "string" },
+            "clip_ids": { "type": "string" },
+            "reference": { "type": "string" },
+            "referenceClipId": { "type": "string" },
+            "referenceFileId": { "type": "string" },
+            "referenceImagePath": { "type": "string" },
+            "all_clips": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "allClips": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "dry_run": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "dryRun": { "oneOf": [{ "type": "string" }, { "type": "boolean" }] },
+            "max_iterations": { "oneOf": [{ "type": "string" }, { "type": "number" }] }
+          }
+        }
+      },
       slice_clip_at_playhead_tool: {
         name: "slice_clip_at_playhead_tool",
         title: "Slice clip at playhead",
@@ -48558,7 +49707,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:slice_clip_at_playhead",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48572,7 +49720,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:search_clips",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48591,7 +49738,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:search_clip_scenes",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48614,7 +49760,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:get_project_catalog",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48628,7 +49773,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:slice_clip_at_best_match",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48651,7 +49795,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:suggest_motion_graphics_placements",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48668,7 +49811,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:propose_overlay_windows",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48685,7 +49827,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:place_motion_graphic",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48707,7 +49848,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:fetch_motion_graphics_video",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48727,7 +49867,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:fetch_motion_graphics_video",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48747,7 +49886,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:generate_video_and_add_to_timeline",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48760,6 +49898,25 @@ var init_schemas_gen = __esm({
           }
         }
       },
+      generate_image_and_add_to_timeline_tool: {
+        name: "generate_image_and_add_to_timeline_tool",
+        title: "Generate image",
+        description: "Generate an AI still image from a text prompt (cloud text-to-image, uses credits) and place it on the timeline.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/tool_handlers.py:generate_image_and_add_to_timeline",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["prompt"],
+          properties: {
+            "prompt": { "type": "string" },
+            "position_seconds": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Timeline position in seconds (a timecode like 1:05 also works)." },
+            "track": { "type": "string", "description": "Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom)." },
+            "duration_seconds": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Length in seconds." }
+          }
+        }
+      },
       modify_clip_tool: {
         name: "modify_clip_tool",
         title: "AI edit clip",
@@ -48767,7 +49924,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:modify_clip",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48792,7 +49948,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:generate_transition_clip",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48801,7 +49956,8 @@ var init_schemas_gen = __esm({
             "clip_b_id": { "type": "string", "description": "Incoming clip id." },
             "clip_a_query": { "type": "string" },
             "clip_b_query": { "type": "string" },
-            "prompt_hint": { "type": "string", "description": "Optional style hint for the morph." }
+            "prompt_hint": { "type": "string", "description": "Optional style hint for the morph." },
+            "duration_seconds": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Length in seconds." }
           }
         }
       },
@@ -48812,7 +49968,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:list_transitions",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48828,7 +49983,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:search_transitions",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48845,7 +49999,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:apply_transition",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48862,22 +50015,23 @@ var init_schemas_gen = __esm({
       generate_tts_and_add_to_timeline_tool: {
         name: "generate_tts_and_add_to_timeline_tool",
         title: "Add narration (TTS)",
-        description: "Generate narration with OpenAI TTS and place it on the timeline (desktop only). Single tool for all voice-over requests. Do not call separate generate/add TTS tools.",
+        description: "Generate narration with AI text-to-speech and place it on the timeline at position_seconds (default: the playhead). Single tool for all voice-over requests: do not call separate generate/add TTS tools.",
         assistant: true,
         desktopReadOnly: false,
-        handler: "src/classes/tool_handlers.py:generate_tts_and_add_to_timeline",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/ai_generation_tts.py:generate_tts_and_add_to_timeline",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           required: ["text"],
           properties: {
-            "text": { "type": "string", "description": "Narration text." },
-            "voice": { "type": "string", "description": "Voice (default alloy).", "default": "alloy" },
-            "model": { "type": "string", "description": "TTS model (default tts-1).", "default": "tts-1" },
-            "speed": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Speaking speed (default 1.0).", "default": 1 },
-            "track": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Track (default: the bottom track)." },
-            "position": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Timeline position in seconds.", "default": 0 }
+            "model": { "default": "tts-1", "description": "Speech model: tts-1 (default, fast), tts-1-hd (higher quality), gpt-4o-mini-tts.", "type": "string" },
+            "name": { "default": "", "description": "Project Files name for the narration (default 'Narration - <first words>').", "type": "string" },
+            "position": { "description": "Older name for position_seconds (same meaning); prefer position_seconds.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "position_seconds": { "description": "Timeline seconds where the narration starts (0:05 = 5). Omit to start at the playhead.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "speed": { "default": 1, "description": "Speaking rate: 1 = normal, 0.8 = slower, 1.25 = faster.", "maximum": 4, "minimum": 0.25, "type": "number" },
+            "text": { "description": "The words to speak, exactly as they should be read (up to 4096 characters). Punctuation shapes the pauses.", "type": "string" },
+            "track": { "anyOf": [{ "type": "string" }, { "type": "integer" }], "default": "", "description": "Track for the narration: UI track number (1 = bottom), track name or layer number. Leave empty to use a free narration track (never the bottom picture track; a 'Narration' track is created above it when every track is busy)." },
+            "voice": { "default": "alloy", "description": "Speaker voice, e.g. alloy (neutral, default), echo, fable, onyx (deep), nova, shimmer, ash, coral, sage.", "type": "string" }
           }
         }
       },
@@ -48888,7 +50042,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:import_stock_media",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48914,7 +50067,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:resummarize_project_file",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48931,7 +50083,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/tool_handlers.py:reindex_project_file",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48949,7 +50100,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:get_clips_with_full_metadata",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48965,7 +50115,6 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:get_timeline_placements_metadata",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -48981,34 +50130,38 @@ var init_schemas_gen = __esm({
         assistant: true,
         desktopReadOnly: true,
         handler: "src/classes/tool_handlers.py:get_timeline_state",
-        ref: "2c99ed2c0fd5",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
-            "detail_level": { "type": "string", "description": "Sent by the assistant backend; ignored here." }
+            "detail_level": { "type": "string", "description": "summary (default) or full \u2014 accepted for Assistant/LLM compat." }
           }
         }
       },
       add_effect_tool: {
         name: "add_effect_tool",
         title: "Add effect",
-        description: "Add a libopenshot effect (EffectInfo class_name such as Blur, Brightness, Saturation, ChromaKey) to one timeline clip, with its default parameters. Returns the new effectId.",
+        description: "Add a libopenshot effect (EffectInfo class_name such as Blur, Brightness, Saturation, ChromaKey) to one timeline clip, with its default parameters. When the clip already has that effect nothing changes, unless if_exists='add' stacks another copy. Returns the new effectId.",
         assistant: false,
         desktopReadOnly: false,
-        handler: "src/classes/agent_tools/effects.py:add_effect",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/effects_color.py:add_effect",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
-            "timeline_clip_id": { "type": "string", "description": "Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt)." },
-            "clip_query": { "type": "string", "description": "Describe the clip instead of passing an id: file name, subject, or words from its summary. Narrow it with track, occurrence or position_near." },
-            "track": { "type": "string", "description": "Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom)." },
-            "occurrence": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "1-based pick when the query matches the same source several times (0 = best match).", "default": "0" },
-            "position_near": { "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "null" }], "description": "Timeline seconds; only clips that span this time match." },
-            "effect": { "type": "string", "description": "libopenshot EffectInfo class_name." },
-            "effect_name": { "type": "string", "description": "Alias for effect." }
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "effect": { "default": "", "description": "Effect to add: class or display name from list_effects_tool (Blur, Sharpen, ChromaKey, ColorGrade, Pixelate, Compressor, Echo, ParametricEQ...).", "type": "string" },
+            "effect_name": { "default": "", "description": "Same as effect (either works).", "type": "string" },
+            "if_exists": { "default": "update", "description": "When the clip already has this effect: 'update' changes that one (default, avoids stacking duplicates); 'add' stacks another copy.", "enum": ["update", "add"], "type": "string" },
+            "interpolation": { "default": "bezier", "description": "Default interpolation for keyframes that do not name one.", "enum": ["bezier", "linear", "constant"], "type": "string" },
+            "occurrence": { "default": 0, "description": "With clip_query: take the Nth match (1 = first). 0 = the best match.", "minimum": 0, "type": "integer" },
+            "position_near": { "description": "With clip_query: prefer the clip nearest this timeline time (seconds).", "nullable": true, "type": ["number", "null"] },
+            "processing": { "description": "Only for Stabilizer, Tracker, ObjectDetection, ObjectMask: the analysis options, same names as process_clip_effect_tool (smoothing, region, region_time, tracker_type, model, device, download_model, class_filter, confidence, points, negative_points, boxes, mask_quality).", "type": "object" },
+            "properties": { "description": 'Effect properties to set, as {name: value}. A value is a number, true/false, a choice name ("HSV/HSL hue"), a color ("#00ff00") or text; or keyframes [{"time": 2.0, "value": 10, "interpolation": "linear"}] in timeline seconds to animate it. list_effects_tool(effect=...) lists every property with its range, default and choices.', "type": "object" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "timeline_clip_ids": { "description": "Several timeline clip ids to change in one step.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
           }
         }
       },
@@ -49018,63 +50171,80 @@ var init_schemas_gen = __esm({
         description: "Create a title / lower-third from a bundled SVG template with your text and place it on the timeline (default 5 s at 0 s).",
         assistant: false,
         desktopReadOnly: false,
-        handler: "src/classes/agent_tools/titles.py:add_title",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/titles_text.py:add_title",
         inputSchema: {
           type: "object",
           additionalProperties: false,
-          required: ["text"],
           properties: {
-            "text": { "type": "string", "description": "Title / lower-third text." },
-            "template": { "type": "string", "description": "Bundled SVG template basename without .svg." },
-            "position_seconds": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Timeline position in seconds (a timecode like 1:05 also works)." },
-            "track": { "type": "string", "description": "Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom)." },
-            "duration_seconds": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "How long the title shows (default 5)." },
-            "file_name": { "type": "string", "description": "File name for the generated SVG." }
+            "background_color": { "default": "", "description": "Colour of the title's full-frame background (transparent in most templates) with optional alpha, e.g. '#000000' for a solid black end card or '#00000080' for a 50% dark veil over the video. Empty keeps it.", "type": "string" },
+            "duration_seconds": { "default": 5, "description": "How long the title stays on screen, in seconds.", "maximum": 86400, "minimum": 0.01, "type": "number" },
+            "fade_in_seconds": { "default": 0, "description": "Fade the title in over this many seconds (0 = appear at once).", "maximum": 10, "minimum": 0, "type": "number" },
+            "fade_out_seconds": { "default": 0, "description": "Fade the title out over this many seconds (0 = disappear at once).", "maximum": 10, "minimum": 0, "type": "number" },
+            "file_name": { "default": "", "description": "Name for the new title file in Project Files (without .svg). Empty = from the text. An existing name gets ' (1)', ' (2)'... instead of being overwritten.", "type": "string" },
+            "fit_text": { "default": true, "description": "Shrink a line whose text would run off the frame (templates do not wrap text).", "type": "boolean" },
+            "font": { "default": "", "description": "Font family for every line, e.g. 'Arial Black', 'Helvetica Neue', 'Georgia'. Must be installed; empty keeps the template's font.", "type": "string" },
+            "font_scale": { "default": 1, "description": "Text size relative to the template: 1 = as designed, 1.5 = half again as big, 0.7 = smaller.", "maximum": 5, "minimum": 0.2, "type": "number" },
+            "font_style": { "default": "", "description": "Italic or upright text; empty keeps the template's.", "enum": ["", "italic", "normal"], "type": "string" },
+            "font_weight": { "default": "", "description": "Make the text bold or normal weight; empty keeps the template's.", "enum": ["", "bold", "normal"], "type": "string" },
+            "lines": { "description": "Every field in order (as listed by list_title_templates_tool), for templates with several lines such as Standard_4 or credits. Overrides text/subtitle; fields left out are blanked.", "items": { "type": "string" }, "type": "array" },
+            "position_seconds": { "default": 0, "description": "Timeline second where the title starts.", "minimum": 0, "type": "number" },
+            "screen_position": { "default": "auto", "description": "Where the 16:9 title artboard sits when the project is not 16:9 (vertical reels, square): auto = by where the template's text is (lower thirds at the bottom, headers at the top). On 9:16 video bottom/top titles are lifted clear of the platform UI bands.", "enum": ["auto", "top", "center", "bottom"], "type": "string" },
+            "subtitle": { "default": "", "description": "Text for the template's subtitle field (second line), e.g. a role under a name.", "type": "string" },
+            "template": { "default": "", "description": "Template name from list_title_templates_tool (e.g. 'Standard_1', 'Gray_Box_4', 'Bar_3', 'OpenShot'), or the path of an existing .svg title to start from. Empty = Bar_1 (centre title on a blue bar).", "type": "string" },
+            "text": { "default": "", "description": "Main title text, e.g. 'Tokyo Day 1'. A '\\n' puts the rest on the template's next field(s): 'Jane Doe\\nFounder' fills a lower third's name and role.", "type": "string" },
+            "text_color": { "default": "", "description": "Colour of every line: '#RRGGBB', '#RRGGBBAA' (alpha = opacity), 'rgba(r,g,b,a)' or a basic name ('white', 'yellow'). Empty keeps the template's colours.", "type": "string" },
+            "track": { "default": "", "description": "UI track number (1 = bottom), name or layer for the title. Empty = the lowest free track above every clip with video at that time (a new top track when none is free).", "type": "string" }
           }
         }
       },
       set_keyframes_tool: {
         name: "set_keyframes_tool",
-        title: "Set keyframes",
-        description: "Replace one clip property's keyframe curve (volume, alpha, location_x/y, scale_x/y, rotation) with the given points. Each point is {frame, value} (1-based project frame of the clip's source) or {seconds, value}.",
+        title: "Animate clip property",
+        description: "Animate one clip property (volume, alpha, location_x/y, scale_x/y, rotation) with keyframes. Each point gives one time inside the clip (frame = keyframe X; seconds from the clip's first visible frame; timeline_seconds; or source_seconds) and a value. interpolation: bezier (default), linear or constant, per point or for all; mode: replace (default), merge or replace_range. One undo step.",
         assistant: false,
         desktopReadOnly: false,
-        handler: "src/classes/agent_tools/keyframes.py:set_keyframes",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/clip_props.py:set_keyframes",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           required: ["property", "points"],
           properties: {
-            "timeline_clip_id": { "type": "string", "description": "Timeline clip id (from list_clips_tool, get_timeline_state_tool or an earlier receipt)." },
-            "clip_query": { "type": "string", "description": "Describe the clip instead of passing an id: file name, subject, or words from its summary. Narrow it with track, occurrence or position_near." },
-            "track": { "type": "string", "description": "Track: layer_number (preferred), track_id, the exact label, or ui_track counted from the bottom (1 = bottom)." },
-            "occurrence": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "1-based pick when the query matches the same source several times (0 = best match).", "default": "0" },
-            "position_near": { "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "null" }], "description": "Timeline seconds; only clips that span this time match." },
-            "property": { "type": "string", "enum": ["volume", "alpha", "location_x", "location_y", "scale_x", "scale_y", "rotation"], "description": "The clip property to animate." },
-            "points": { "type": "array", "minItems": 1, "items": { "type": "object", "properties": { "frame": { "type": "integer", "minimum": 1 }, "seconds": { "type": "number", "minimum": 0 }, "value": { "type": "number" } }, "additionalProperties": false, "required": ["value"] }, "description": 'Keyframe points, e.g. [{"seconds": 0, "value": 0}, {"seconds": 1, "value": 1}].' }
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "ease": { "default": "", "description": "Default bezier ease for points that set none (e.g. 'ease_in_out').", "enum": ["", "ease", "ease_in", "ease_out", "ease_in_out", "ease_in_quad", "ease_in_cubic", "ease_in_quart", "ease_in_quint", "ease_in_sine", "ease_in_expo", "ease_in_circ", "ease_in_back", "ease_out_quad", "ease_out_cubic", "ease_out_quart", "ease_out_quint", "ease_out_sine", "ease_out_expo", "ease_out_circ", "ease_out_back", "ease_in_out_quad", "ease_in_out_cubic", "ease_in_out_quart", "ease_in_out_quint", "ease_in_out_sine", "ease_in_out_expo", "ease_in_out_circ", "ease_in_out_back"], "type": "string" },
+            "interpolation": { "default": "", "description": "Default interpolation for points that set none ('' = bezier, constant for choice properties).", "enum": ["", "bezier", "linear", "constant"], "type": "string" },
+            "mode": { "default": "replace", "description": "replace = these points become the whole curve; merge = add/update these points and keep the others; replace_range = drop existing points between the first and last new point, keep the rest.", "enum": ["replace", "merge", "replace_range"], "type": "string" },
+            "occurrence": { "default": 0, "description": "With clip_query: take the Nth matching clip in timeline order (0 = best match).", "minimum": 0, "type": "integer" },
+            "points": { "description": 'Keyframes: each gives one time (frame, seconds, timeline_seconds or source_seconds) and a value. Example: [{"seconds": 0, "value": 1}, {"seconds": 3, "value": 1.3, "ease": "ease_in_out"}].', "items": { "additionalProperties": false, "properties": { "ease": { "description": "Bezier ease preset (the Properties dock's list) for the move INTO this point; implies bezier.", "enum": ["ease", "ease_in", "ease_out", "ease_in_out", "ease_in_quad", "ease_in_cubic", "ease_in_quart", "ease_in_quint", "ease_in_sine", "ease_in_expo", "ease_in_circ", "ease_in_back", "ease_out_quad", "ease_out_cubic", "ease_out_quart", "ease_out_quint", "ease_out_sine", "ease_out_expo", "ease_out_circ", "ease_out_back", "ease_in_out_quad", "ease_in_out_cubic", "ease_in_out_quart", "ease_in_out_quint", "ease_in_out_sine", "ease_in_out_expo", "ease_in_out_circ", "ease_in_out_back"], "type": "string" }, "frame": { "description": "Clip frame X exactly as stored: 1-based and counting trimmed-off source frames (the first visible frame is round(start*fps)+1).", "minimum": 1, "type": "integer" }, "interpolation": { "description": "How the value moves INTO this point from the previous one: bezier (smooth), linear, or constant (holds the previous value, then jumps).", "enum": ["bezier", "linear", "constant"], "type": "string" }, "seconds": { "description": "Seconds from the clip's first visible frame: 0 = where the clip starts on the timeline, the clip's duration = its end. Works the same on trimmed clips.", "type": "number" }, "source_seconds": { "description": "Time in the source media in seconds (inside the clip's trimmed range).", "type": "number" }, "timeline_seconds": { "description": "Timeline time in seconds (must fall inside the clip).", "type": "number" }, "value": { "description": "Value at that time: a number (alpha 0-1, scale 1 = 100%, location -1..1 = one frame, rotation in degrees, volume 0-1.3, time = source frame), a choice name for choice properties (has_audio: Auto/Off/On), or a color for wave_color. Omit to keep the value the curve already has there (pins it).", "nullable": true, "type": ["number", "string", "boolean"] } }, "type": "object" }, "type": "array" },
+            "position_near": { "description": "With clip_query: prefer the clip under this timeline time (seconds).", "nullable": true, "type": ["number", "null"] },
+            "property": { "description": "The clip property to animate: 'scale_x', 'scale_y', 'location_x', 'location_y', 'rotation', 'alpha', 'volume', 'shear_x', 'shear_y', 'origin_x', 'origin_y', 'corner_radius', 'margin', 'wave_color', 'has_audio', 'has_video', 'channel_filter', 'channel_mapping' or 'time' (or its label, e.g. 'Scale X').", "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
           }
         }
       },
       set_project_setting_tool: {
         name: "set_project_setting_tool",
-        title: "Set project setting",
+        title: "Set project settings",
         description: "Change the project's frame rate, resolution and/or audio sample rate. Keyframes are rescaled on an fps change so animations keep their timing. No-op when the values already match.",
         assistant: false,
         desktopReadOnly: false,
-        handler: "src/classes/agent_tools/project_settings.py:set_project_setting",
-        ref: "2c99ed2c0fd5",
+        handler: "src/classes/editor_tools/project_export_profiles.py:set_project_setting",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
-            "fps": { "oneOf": [{ "type": "string" }, { "type": "number" }], "description": "Frame rate as a number (23.976, 29.97 and 59.94 map to the NTSC fractions)." },
-            "fps_num": { "type": "integer", "minimum": 1, "description": "Exact frame rate numerator." },
-            "fps_den": { "type": "integer", "minimum": 1, "description": "Exact frame rate denominator." },
-            "width": { "type": "integer", "minimum": 16, "maximum": 8192, "description": "Frame width in pixels." },
-            "height": { "type": "integer", "minimum": 16, "maximum": 8192, "description": "Frame height in pixels." },
-            "sample_rate": { "type": "integer", "minimum": 8e3, "maximum": 192e3, "description": "Audio sample rate in Hz." }
+            "channels": { "default": "", "description": "Audio channels: 'mono', 'stereo', 'surround', '5.1', '7.1' (or 1, 2, 3, 6, 8).", "type": "string" },
+            "fps": { "description": "Frame rate, e.g. 24, 29.97, 30, 60.", "maximum": 240, "minimum": 1, "nullable": true, "type": ["number", "null"] },
+            "fps_den": { "description": "Exact frame-rate denominator, e.g. 1001.", "minimum": 1, "nullable": true, "type": ["integer", "null"] },
+            "fps_num": { "description": "Exact frame-rate numerator (with fps_den), e.g. 30000.", "minimum": 1, "nullable": true, "type": ["integer", "null"] },
+            "height": { "description": "Frame height in pixels (even).", "maximum": 16384, "minimum": 16, "nullable": true, "type": ["integer", "null"] },
+            "orientation": { "default": "", "description": "Turn the frame to this shape.", "enum": ["", "landscape", "portrait", "square"], "type": "string" },
+            "preset": { "default": "", "description": "Alias of profile for social presets: 'instagram_reel', 'tiktok', 'youtube', ...", "type": "string" },
+            "profile": { "default": "", "description": "Profile name or social preset instead of size/fps (see set_project_profile_tool).", "type": "string" },
+            "reframe": { "default": "keep", "description": "What happens to existing full-frame clips of another shape (see set_project_profile_tool).", "enum": ["keep", "fit", "fill"], "type": "string" },
+            "sample_rate": { "description": "Project audio sample rate: 22050, 44100, 48000, 96000 or 192000.", "maximum": 192e3, "minimum": 8e3, "nullable": true, "type": ["integer", "null"] },
+            "save_as_default": { "default": false, "description": "Also store sample_rate/channels as the Preferences default for new projects (takes effect after restart).", "type": "boolean" },
+            "width": { "description": "Frame width in pixels (even).", "maximum": 16384, "minimum": 16, "nullable": true, "type": ["integer", "null"] }
           }
         }
       },
@@ -49085,7 +50255,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: true,
         handler: "src/classes/agent_tools/inspect.py:inspect_timeline",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49107,7 +50276,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: true,
         handler: "src/classes/agent_tools/inspect.py:inspect_media",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49129,7 +50297,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: true,
         handler: "src/classes/agent_tools/transcript.py:get_transcript",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49140,7 +50307,7 @@ var init_schemas_gen = __esm({
             "file_id": { "type": "string", "description": "Alias for fileId." },
             "trackIndex": { "type": "integer", "description": "UI track index; omit for all clips.", "minimum": 0 },
             "language": { "type": "string", "description": "BCP-47 / whisper code, or 'auto'.", "default": "auto" },
-            "modelId": { "type": "string", "description": "e.g. faster-whisper-base (whisper path only)." },
+            "modelId": { "type": "string", "description": "faster-whisper model, e.g. faster-whisper-base; ignored by the bundled whisper.cpp engine (one model)." },
             "force": { "type": "boolean", "description": "Ignore cache and re-run ASR.", "default": false },
             "engine": { "type": "string", "description": "auto|apple|whisper. auto=Apple SpeechAnalyzer on macOS 26+ when helper is present, else Whisper. Windows always Whisper.", "default": "auto" },
             "detail_level": { "type": "string", "description": "Omit for a compact receipt (script + compactWords). Pass 'full' to also include the verbose words array." },
@@ -49155,7 +50322,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: true,
         handler: "src/classes/agent_tools/transcript.py:transcribe_media",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49163,7 +50329,7 @@ var init_schemas_gen = __esm({
             "fileId": { "type": "string", "description": "Media-bin file id." },
             "file_id": { "type": "string", "description": "Alias for fileId." },
             "language": { "type": "string", "description": "BCP-47 / whisper code, or 'auto'.", "default": "auto" },
-            "modelId": { "type": "string", "description": "e.g. faster-whisper-base" },
+            "modelId": { "type": "string", "description": "faster-whisper model, e.g. faster-whisper-base; ignored by the bundled whisper.cpp engine." },
             "force": { "type": "boolean", "description": "Ignore cache and re-run ASR.", "default": false },
             "engine": { "type": "string", "description": "auto|apple|whisper", "default": "auto" }
           }
@@ -49176,7 +50342,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: false,
         handler: "src/classes/agent_tools/transcript.py:remove_words",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49200,7 +50365,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: false,
         handler: "src/classes/agent_tools/speech_extra.py:remove_silence",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49219,21 +50383,36 @@ var init_schemas_gen = __esm({
         description: "Place timed dialogue captions (title clips) for a clip or the whole timeline from its transcript, or import an SRT/VTT file (srtPath). One undo step for all captions.",
         assistant: false,
         desktopReadOnly: false,
-        handler: "src/classes/agent_tools/speech_extra.py:add_captions",
-        ref: "b63c39be7c3c",
+        handler: "src/classes/editor_tools/titles_text_captions.py:add_captions",
         inputSchema: {
           type: "object",
           additionalProperties: false,
           properties: {
-            "clipId": { "type": "string", "description": "Timeline clip id." },
-            "timeline_clip_id": { "type": "string", "description": "Alias for clipId." },
-            "trackIndex": { "type": "integer", "minimum": 0, "description": "UI track index (1 = bottom) whose clips to caption." },
-            "maxWords": { "type": "integer", "minimum": 1, "maximum": 24, "description": "Maximum words per caption (default 8).", "default": 8 },
-            "maxChars": { "type": "integer", "minimum": 8, "maximum": 120, "description": "Maximum characters per caption (default 42).", "default": 42 },
-            "language": { "type": "string", "description": "BCP-47 language code, or 'auto'.", "default": "auto" },
-            "modelId": { "type": "string", "description": "Speech model id (on-device ASR hosts only)." },
-            "engine": { "type": "string", "description": "auto|apple|whisper \u2014 same on-device ASR as get_transcript_tool (never cloud).", "default": "auto" },
-            "srtPath": { "type": "string", "description": "Import SRT/VTT instead of transcribing." }
+            "background_color": { "default": "", "description": "Colour of the box behind the text (alpha in '#RRGGBBAA' sets its opacity). Empty = the style's.", "type": "string" },
+            "background_opacity": { "default": -1, "description": "Opacity of the box behind the text, 0 (no box) to 1. -1 = the style's.", "maximum": 1, "minimum": -1, "type": "number" },
+            "clipId": { "default": "", "description": "Timeline clip to caption (the speaker's clip). Same as timeline_clip_id.", "type": "string" },
+            "clip_query": { "default": "", "description": "Describe the clip to caption instead of an id, e.g. 'talking head'.", "type": "string" },
+            "cues": { "description": "Captions to show, each {start, end, text} in timeline seconds (or the clip's source seconds with time_base='source'). Use for text you already have.", "items": { "additionalProperties": false, "properties": { "end": { "description": "End second (after start).", "type": "number" }, "start": { "description": "Start second.", "type": "number" }, "text": { "description": "Caption text; '\\n' for a second line.", "type": "string" } }, "required": ["start", "end", "text"], "type": "object" }, "type": "array" },
+            "engine": { "default": "auto", "description": "Accepted for compatibility; not used (the transcript comes from the media index).", "type": "string" },
+            "fade_seconds": { "default": -1, "description": "Fade each caption in and out over this many seconds (0-3). -1 = the style's.", "maximum": 3, "minimum": -1, "type": "number" },
+            "font": { "default": "", "description": "Font family, e.g. 'Arial Black', 'Helvetica Neue'. Empty = the style's font.", "type": "string" },
+            "language": { "default": "auto", "description": "Accepted for compatibility with the on-device speech tools; the transcript comes from Zenvi's media index, which already knows the language.", "type": "string" },
+            "maxChars": { "default": 42, "description": "Longest caption, in characters, when phrasing a transcript.", "maximum": 120, "minimum": 8, "type": "integer" },
+            "maxWords": { "default": 8, "description": "Longest caption, in words, when phrasing a transcript (subtitle files and cues are kept as written).", "maximum": 24, "minimum": 1, "type": "integer" },
+            "modelId": { "default": "", "description": "Accepted for compatibility; not used (the transcript comes from the media index).", "type": "string" },
+            "overlay_track": { "default": "", "description": "Track for the transparent 'Captions' overlay clip used when no clip is captioned. Empty = the lowest free track above the video.", "type": "string" },
+            "position": { "default": "", "description": "Where the captions sit: bottom (above the safe margin, higher on vertical video), center or top. Empty = the style's (bottom).", "enum": ["", "bottom", "center", "top"], "type": "string" },
+            "replace_existing": { "default": true, "description": "Replace the captions a clip already has (true) or add a second caption track to it (false).", "type": "boolean" },
+            "srtPath": { "default": "", "description": "Path of an .srt or .vtt subtitle file to burn in. With a clip its times are that clip's media time; without one, timeline time.", "type": "string" },
+            "stroke_color": { "default": "", "description": "Outline colour. Empty = the style's.", "type": "string" },
+            "stroke_width": { "default": -1, "description": "Outline thickness relative to the text height: 0 = none, 0.03 thin, 0.09 heavy (heavy outlines only read with heavy fonts such as Arial Black). -1 = the style's.", "maximum": 0.5, "minimum": -1, "type": "number" },
+            "style": { "default": "classic", "description": "Look preset: classic = white text on a dark box at the bottom (subtitles); reels = big bold white text with a black outline (Instagram/TikTok/Shorts); minimal = small white text with a thin outline; yellow = yellow text with a black outline (TV subtitles); boxed = white on a solid black box. The arguments below override parts of it.", "enum": ["boxed", "classic", "minimal", "reels", "yellow"], "type": "string" },
+            "text_color": { "default": "", "description": "Text colour '#RRGGBB' / '#RRGGBBAA' / 'rgba(...)' / name. Empty = the style's.", "type": "string" },
+            "text_size": { "default": 0, "description": "Text height as a fraction of the frame's shorter side: 0.04 small, 0.05 normal subtitles, 0.075 big reel captions. 0 = the style's size.", "maximum": 0.3, "minimum": 0, "type": "number" },
+            "time_base": { "default": "auto", "description": "What cue times mean: timeline seconds, or the clip's source (media) seconds. auto = source for subtitle files and transcripts, timeline for cues.", "enum": ["auto", "timeline", "source"], "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip to caption.", "type": "string" },
+            "trackIndex": { "default": 0, "description": "Caption every clip on this UI track (1 = bottom) from its transcript. 0 = not used.", "minimum": 0, "type": "integer" },
+            "uppercase": { "default": false, "description": "Show the captions in capital letters.", "type": "boolean" }
           }
         }
       },
@@ -49244,7 +50423,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: true,
         handler: "src/classes/agent_tools/speech_extra.py:export_captions",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49266,7 +50444,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: true,
         handler: "src/classes/agent_tools/speech_extra.py:detect_beats_tool_handler",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49285,7 +50462,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: true,
         handler: "src/classes/agent_tools/speech_extra.py:diarize_media",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49307,7 +50483,6 @@ var init_schemas_gen = __esm({
         assistant: false,
         desktopReadOnly: true,
         handler: "src/classes/agent_tools/speech_extra.py:search_media_local",
-        ref: "b63c39be7c3c",
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -49318,9 +50493,2150 @@ var init_schemas_gen = __esm({
             "provider": { "type": "string", "description": "local or auto.", "default": "local" }
           }
         }
+      },
+      add_animated_title_tool: {
+        name: "add_animated_title_tool",
+        title: "Add animated title",
+        description: 'Render a 3D animated title with Blender and place it on the timeline (Title > Animated Title).\n\nUse for "animated title", "3D flying title", "neon title", "space movie intro". Needs Blender (Preferences > General > Blender Command); without it the call is refused with setup steps -- offer add_title_tool (static SVG titles with fades) instead. Rendering runs in the background and takes from tens of seconds to several minutes; the result is a transparent image-sequence clip on the lowest free track above the video. list_title_templates_tool kind=animated lists the templates and their parameters. One undo step removes the clip and file.\n\nExample: {"template": "fly_by_1", "text": "Tokyo Day 1", "params": {"diffuse_color": "#ffcc00"}, "position_seconds": 0}.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/titles_text_animated.py:add_animated_title",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "file_name": { "default": "", "description": "Base name of the rendered frames. Empty = from the text.", "type": "string" },
+            "length_multiplier": { "default": 1, "description": "Animation length: 1 = as designed (about 3-5 s), 2 = twice as long, up to 5.", "maximum": 5, "minimum": 1, "type": "integer" },
+            "params": { "description": "Other template parameters by name, e.g. {'diffuse_color': '#ff3b30', 'text_size': 1.5, 'spacemode': 'LEFT', 'sub_title': 'Day 1'}. Colours as '#RRGGBB'; project_files* take a Project Files id.", "type": "object" },
+            "position_seconds": { "default": 0, "description": "Timeline second where the animation starts.", "minimum": 0, "type": "number" },
+            "template": { "default": "", "description": "Animated title from list_title_templates_tool kind=animated, by name or title, e.g. 'fly_by_1' (Fly Towards Camera), 'rotate_360', 'glare', 'neon_curves', 'dissolve', 'explode', 'spacemovie_intro'.", "type": "string" },
+            "text": { "default": "", "description": "The title text (the template's first text field; '\\n' for a second line).", "type": "string" },
+            "timeout_seconds": { "default": 900, "description": "Give up (and stop Blender) after this many seconds.", "maximum": 7200, "minimum": 30, "type": "integer" },
+            "track": { "default": "", "description": "UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video.", "type": "string" }
+          }
+        }
+      },
+      add_clips_to_timeline_tool: {
+        name: "add_clips_to_timeline_tool",
+        title: "Add clips to timeline",
+        description: 'Place several project files back to back on one track in one step: the backbone of "make a 60-second vlog from these clips", "put all the beach shots on the timeline with crossfades", "make a slideshow of these photos, 3 seconds each".\n\nWorks like Project Files > Add to Timeline: files go on one track in the given order (or shuffled / by name), starting at start_seconds (default: after the last clip on that track), with optional crossfades or other transitions between consecutive clips, opacity fades, and a slow zoom. Still images last image_seconds. Give per-file in/out points with items, e.g. items=[{"file_id": "F1", "source_start": 4, "source_end": 9}, {"file_id": "F2"}].\n\nfit_total_seconds trims the sequence to an exact length: the longest clips are cut to one common length (never below min_clip_seconds), keeping the middle of each; clips given with explicit in/out points are never trimmed; transition overlaps are accounted for. Example: 8 files, fit_total_seconds=60, transition="fade", transition_seconds=0.5.\n\nFor one file at a precise time use add_clip_to_timeline_tool. The call is one undo step. Returns the new timeline clip ids in order with their positions and source in/out.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit.py:add_clips_to_timeline",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "allow_overlap": { "default": false, "description": "Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.", "type": "boolean" },
+            "fade": { "default": "none", "description": "Opacity fades on every clip, used instead of a transition; clips overlap by fade_seconds so the fades cross.", "enum": ["none", "in", "out", "in_out"], "type": "string" },
+            "fade_seconds": { "default": 2, "description": "Fade length in seconds.", "minimum": 0.04, "type": "number" },
+            "file_ids": { "default": [], "description": "Project file ids to place, in timeline order (list_files_tool). Use this OR items.", "items": { "type": "string" }, "type": "array" },
+            "fit_total_seconds": { "default": 0, "description": "Make the whole sequence last exactly this long (e.g. 60 for a 60-second vlog) by trimming the longest clips evenly, keeping the middle of each (heads and tails are usually shaky); 0 = full lengths.", "minimum": 0, "type": "number" },
+            "image_seconds": { "default": 0, "description": "How long each still image stays on screen; 0 = the Default Image Length preference.", "minimum": 0, "type": "number" },
+            "items": { "default": [], "description": "Files with their own in/out points, in timeline order. Use this OR file_ids.", "items": { "additionalProperties": false, "description": "One file to place, with optional source in/out points in seconds of that file.", "properties": { "file_id": { "description": "Project file id (list_files_tool). Sub-clip file ids work too.", "type": "string" }, "source_end": { "description": "Source out point in seconds; -1 or omitted = the file's own out point. For a still image this sets how long it stays on screen.", "type": "number" }, "source_start": { "description": "Source in point in seconds; -1 or omitted = the file's own in point.", "type": "number" } }, "required": ["file_id"], "type": "object" }, "type": "array" },
+            "min_clip_seconds": { "default": 1, "description": "Shortest a clip may be trimmed to by fit_total_seconds.", "minimum": 0.1, "type": "number" },
+            "order": { "default": "as_given", "description": "Order on the timeline: as given, shuffled, or by file name.", "enum": ["as_given", "shuffle", "name"], "type": "string" },
+            "start_seconds": { "default": -1, "description": "Timeline time of the first clip; -1 = right after the last clip already on the track (0 on an empty track).", "type": "number" },
+            "track": { "default": "", "description": "Track to fill: UI track number (1 = bottom), name, or layer number. Empty = the selected track, else the bottom track.", "type": "string" },
+            "transition": { "default": "", "description": "Transition between consecutive clips: '' = hard cuts, 'fade' = crossfade, 'random', or a transition name such as 'wipe_left_to_right' or 'circle_in_to_out' (list_transitions_tool).", "type": "string" },
+            "transition_seconds": { "default": 0, "description": "Length of each transition; clips overlap by this much. 0 = the Default Transition Length preference.", "minimum": 0, "type": "number" },
+            "zoom": { "default": "none", "description": "Slow zoom on every clip (Ken Burns): in = 100% to 125%, out = 125% to 100%, random = random zoom and pan.", "enum": ["none", "in", "out", "random"], "type": "string" }
+          }
+        }
+      },
+      add_emoji_tool: {
+        name: "add_emoji_tool",
+        title: "Add emoji",
+        description: `Put an emoji sticker on the video, e.g. "put a \u{1F525} emoji top right", "add a heart at 5 seconds".
+
+Finds the emoji by name, character or code among the Emojis dock's OpenMoji stickers (search_emojis_tool shows alternatives), adds it to Project Files the way the dock does, and places it on the lowest free track above the video at position_seconds, sized and pinned to screen_position. The receipt lists close alternatives in case the match was not the intended one. One undo step.
+
+Example: {"emoji": "fire", "screen_position": "top_right", "size": 0.15, "position_seconds": 2, "duration_seconds": 3}.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/titles_text_overlays.py:add_emoji",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["emoji"],
+          properties: {
+            "duration_seconds": { "default": 0, "description": "How long it stays, in seconds. 0 = the editor's default image length (Preferences, 10 s unless changed).", "maximum": 86400, "minimum": 0, "type": "number" },
+            "emoji": { "default": "", "description": "Which emoji: a name ('fire', 'red heart', 'party popper'), the character ('\u{1F525}') or an OpenMoji code from search_emojis_tool ('1F525').", "type": "string" },
+            "group": { "default": "", "description": "Narrow a name to one emoji group.", "enum": ["", "smileys-emotion", "animals-nature", "food-drink", "travel-places", "activities", "objects", "symbols", "extras-openmoji", "user"], "type": "string" },
+            "margin": { "default": 0.04, "description": "Distance from the edges it hugs, as a fraction of the shorter side.", "maximum": 0.4, "minimum": 0, "type": "number" },
+            "position_seconds": { "default": 0, "description": "Timeline second where the emoji appears.", "minimum": 0, "type": "number" },
+            "screen_position": { "default": "center", "description": "Where on the frame the emoji sits.", "enum": ["top_left", "top_center", "top_right", "center_left", "center", "center_right", "bottom_left", "bottom_center", "bottom_right"], "type": "string" },
+            "size": { "default": 0.2, "description": "Emoji size as a fraction of the frame's shorter side (0.2 = a fifth).", "maximum": 1, "minimum": 0.02, "type": "number" },
+            "track": { "default": "", "description": "UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video.", "type": "string" }
+          }
+        }
+      },
+      add_timer_tool: {
+        name: "add_timer_tool",
+        title: "Add timer",
+        description: `Put a live timer on screen: countdown, stopwatch, clock, timecode or frame counter.
+
+Use for "add a 10-second countdown", "show a stopwatch in the top right", "burn in timecode", "a clock starting at 9:30". By default it adds a transparent 'Timer' overlay clip from position_seconds for duration_seconds on the lowest free track above the video; with timeline_clip_id the Timer effect goes on that clip instead. Rendered by libopenshot's Timer effect (live digits, not an image). The time is written as mm:ss unless format says otherwise ('00:10' counts to '00:00'). One undo step. For static text use add_title_tool.
+
+Examples: {"mode": "count_down", "countdown_from_seconds": 10, "position_seconds": 5, "screen_position": "center", "text_size": 0.15}; {"mode": "timecode", "format": "timecode", "screen_position": "bottom_right"}.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/titles_text_overlays.py:add_timer",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "background": { "default": true, "description": "Draw a rounded box behind the digits.", "type": "boolean" },
+            "background_color": { "default": "#000000", "description": "Box colour.", "type": "string" },
+            "background_opacity": { "default": 0.45, "description": "Box opacity 0-1.", "maximum": 1, "minimum": 0, "type": "number" },
+            "countdown_from_seconds": { "default": 0, "description": "count_down: the number it starts from (0 = the timer's duration).", "maximum": 86400, "minimum": 0, "type": "number" },
+            "duration_seconds": { "default": 0, "description": "How long the timer shows. 0 = automatic: a countdown's length, otherwise until the end of the timeline.", "maximum": 86400, "minimum": 0, "type": "number" },
+            "font": { "default": "", "description": "Font family, e.g. 'Menlo', 'Arial Black'. Empty = the default sans font.", "type": "string" },
+            "format": { "default": "mm:ss", "description": "How the time is written.", "enum": ["mm:ss", "hh:mm:ss", "hh:mm:ss.mmm", "timecode", "frames"], "type": "string" },
+            "margin_percent": { "default": 3, "description": "Distance from the frame edges it hugs, in % of the frame.", "maximum": 40, "minimum": 0, "type": "number" },
+            "mode": { "default": "count_down", "description": "count_down = remaining time to zero; count_up = elapsed time (stopwatch); clock = a time of day starting at start_at_seconds; timecode = HH:MM:SS:FF; frame_number = frame count.", "enum": ["count_up", "count_down", "clock", "timecode", "frame_number"], "type": "string" },
+            "position_seconds": { "default": 0, "description": "Timeline second where the timer appears (overlay mode).", "minimum": 0, "type": "number" },
+            "prefix": { "default": "", "description": "Text before the time, e.g. 'T-' or 'Starts in '.", "type": "string" },
+            "screen_position": { "default": "bottom_center", "description": "Where on the frame the timer sits.", "enum": ["top_left", "top_center", "top_right", "center_left", "center", "center_right", "bottom_left", "bottom_center", "bottom_right"], "type": "string" },
+            "start_at_seconds": { "default": 0, "description": "count_up: starting offset; clock: the time of day to start at, in seconds after midnight (9:30 = 34200).", "maximum": 86400, "minimum": -86400, "type": "number" },
+            "stroke_color": { "default": "#000000", "description": "Outline colour.", "type": "string" },
+            "stroke_width": { "default": 0.03, "description": "Outline thickness relative to the digit height (0 = none).", "maximum": 0.5, "minimum": 0, "type": "number" },
+            "suffix": { "default": "", "description": "Text after the time, e.g. ' left'.", "type": "string" },
+            "text_color": { "default": "#ffffff", "description": "Digit colour ('#RRGGBB[AA]', 'rgba(...)', name).", "type": "string" },
+            "text_size": { "default": 0.07, "description": "Digit height as a fraction of the frame's shorter side (0.07 = normal, 0.15 = a big centre countdown).", "maximum": 0.5, "minimum": 0.01, "type": "number" },
+            "timeline_clip_id": { "default": "", "description": "Draw the timer on this clip instead of a new overlay (it then follows the clip; count_up shows the time since the clip's first visible frame).", "type": "string" },
+            "track": { "default": "", "description": "Overlay track: UI track number (1 = bottom), name or layer. Empty = the lowest free track above the video.", "type": "string" }
+          }
+        }
+      },
+      add_transitions_between_clips_tool: {
+        name: "add_transitions_between_clips_tool",
+        title: "Add transitions between clips",
+        description: 'Add a transition at every join between consecutive clips on a track ("crossfades between all clips").\n\nUse for "add crossfades between all my clips", "put a 0.5 s dissolve between every shot on track 1", "random transitions between the photos". Each join gets one transition of `duration_seconds` over the overlap of the two clips (clamped to half of the shorter clip). Read `method` for how the overlap is made; the receipt lists every join added, skipped (gap, too short, already has one, no spare media) and every clip moved. One undo step. Refused on a locked track; never deletes clips. For one specific pair you can also use apply_transition_tool. Example: track="1", transition="fade", duration_seconds=0.5.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files_transitions.py:add_transitions_between_clips",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "audio_crossfade": { "default": true, "description": "Also crossfade the clips' audio (equal-power) under each transition.", "type": "boolean" },
+            "duration_seconds": { "default": 1, "description": "Length of each transition in seconds. 0 = the Default Transition Length preference.", "minimum": 0, "type": "number" },
+            "max_gap_seconds": { "default": 0.05, "description": "Clips further apart than this are not joined (a gap stays a gap).", "maximum": 10, "minimum": 0, "type": "number" },
+            "method": { "default": "ripple", "description": "How clips come to overlap. ripple (default, like Project Files > Add to Timeline): each later clip and everything after it on the track moves earlier, so the track gets shorter by one transition per join; other tracks do not move. handles: keep every cut in place and use extra media before/after the cut (keeps sync with music/other tracks; joins without enough spare media are skipped). existing_overlaps: only where clips already overlap; nothing moves.", "enum": ["ripple", "handles", "existing_overlaps"], "type": "string" },
+            "replace_existing": { "default": false, "description": "Replace a transition already on a join (otherwise that join is skipped).", "type": "boolean" },
+            "timeline_clip_ids": { "description": "Only join these clips (all on one track, joined in timeline order). Leave out for every clip on the track.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "The track whose consecutive clips get transitions (UI track number, 1 = bottom; name; or layer number). Required unless timeline_clip_ids are given.", "type": "string" },
+            "transition": { "default": "fade", "description": "'fade' (crossfade, default), 'random', or any transition name ('wipe_left_to_right', 'circle_in_to_out', list_transitions_tool).", "type": "string" }
+          }
+        }
+      },
+      align_clips_tool: {
+        name: "align_clips_tool",
+        title: "Align clips",
+        description: 'Line up the starts (or ends) of clips on different tracks: Clip menu > Align Left / Right.\n\nUse for "start the title and the music together with the video", "make all these clips end at the same time", "line these up at 10 seconds". Each clip keeps its track and length; only its timeline position changes. By default the starts go to the earliest start (the ends to the latest end); to_seconds picks the time. Clips on the same track would pile up, so that is refused unless allow_overlap=true. One undo step.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit.py:align_clips",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "allow_overlap": { "default": false, "description": "Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.", "type": "boolean" },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "edge": { "default": "start", "description": "Line up the clips' starts or their ends.", "enum": ["start", "end"], "type": "string" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_ids": { "default": [], "description": "Timeline clip ids to act on.", "items": { "type": "string" }, "type": "array" },
+            "to_seconds": { "default": -1, "description": "Timeline time to line the edges up at; -1 = the earliest start / latest end among them (Clip menu > Align Left / Right).", "type": "number" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      analyze_frame_colors_tool: {
+        name: "analyze_frame_colors_tool",
+        title: "Analyze colors",
+        description: 'Measure a frame the way the scopes do, as numbers, to grade objectively and to check that an effect or grade did what was asked: luma percentiles p1-p99 and mean (0 = black, 1 = white), clipped shadows/highlights %, mean RGB, warmth (R-B), green/magenta balance, the white-balance cast of near-neutral pixels (neutral_tint_uv, cast label), saturation_mean (HSV 0-1: <0.12 muted, 0.2-0.4 natural, >0.55 very saturated), chroma (UV), gray_pct (100 = black and white), transparent_pct (share keyed out / transparent), a plain-words verdict and suggested_grade values for color_grade_clip_tool. Renders off the GUI thread; changes nothing.\n\nUse it before grading ("it\'s too dark", "fix the colors", "match the look") and after, to verify ("is it black and white now?", "did the green screen key cleanly?"). With a clip it renders that clip alone with its effects; whole_timeline=true measures what the viewer sees at `time`. compare_without_effects gives before/after numbers. save_frame_path writes a PNG you can view.',
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/effects_color_analysis.py:analyze_frame_colors",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "compare_without_effects": { "default": false, "description": "Also analyze the same frame with the effects removed (before/after).", "type": "boolean" },
+            "region": { "description": 'Only this part of the frame: {"x", "y", "width", "height"} as fractions 0-1 (e.g. a face or the sky).', "type": "object" },
+            "save_frame_path": { "default": "", "description": "Also save the analyzed frame as a PNG at this absolute path (to look at it).", "type": "string" },
+            "time": { "description": "Timeline seconds to analyze (default: the clip's middle, or the playhead for the whole timeline).", "nullable": true, "type": ["number", "null"] },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" },
+            "whole_timeline": { "default": false, "description": "Analyze the composite of every track at `time` instead of one clip alone.", "type": "boolean" }
+          }
+        }
+      },
+      apply_audio_effect_tool: {
+        name: "apply_audio_effect_tool",
+        title: "Apply audio effect",
+        description: `Put an audio effect on clips' sound with sensible settings: "add a compressor to the voice", "add echo", "remove the low rumble", "boost the bass", "make it sound like a phone call", "robot voice", "whisper effect", "noise gate", "delay the audio 100 ms to fix sync". A clip that already has the same effect type is updated (not stacked). Tune further with update_effect_tool; remove with remove_effect_tool. For volume and ducking use the volume tools, not this. Refused: clips without sound (images, titles, muted-in-source), locked tracks. One undo step.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/effects_color_looks.py:apply_audio_effect",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["preset"],
+          properties: {
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "preset": { "description": "Audio effect preset: voice_compressor = even out a voice (gentle 3:1); strong_compressor = podcast/broadcast squash; noise_gate = quiet the room noise between phrases; echo = clear echo; slapback = short room slap; canyon_echo = long repeating echo; low_cut = remove rumble / wind below 90 Hz; high_cut = tame hiss above 8 kHz; bass_boost = +6 dB low shelf at 120 Hz; treble_boost = +5 dB high shelf at 6 kHz; voice_presence = +4 dB at 3 kHz for clarity; telephone = band-pass phone/radio voice; robot = robotic voice; whisper = whispering voice; distortion = soft-clipped grit; add_noise = white noise bed (15%); sync_delay = delay the sound (fix A/V sync; set delay_time seconds).", "enum": ["add_noise", "bass_boost", "canyon_echo", "distortion", "echo", "high_cut", "low_cut", "noise_gate", "robot", "slapback", "strong_compressor", "sync_delay", "telephone", "treble_boost", "voice_compressor", "voice_presence", "whisper"], "type": "string" },
+            "properties": { "description": 'Override preset values, e.g. {"ratio": 4} or {"delay_time": 0.25}; names from list_effects_tool(effect=...).', "type": "object" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "timeline_clip_ids": { "description": "Several timeline clip ids to change in one step.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      apply_clip_preset_tool: {
+        name: "apply_clip_preset_tool",
+        title: "Apply clip preset",
+        description: `Apply a one-click Fade, Motion, Transform or Volume preset from the timeline's clip menu.
+
+Exactly what the clip menu does, on one or many clips, as one undo step. Use it for "fade in the first clip", "fade everything in and out over 2 seconds", "slow zoom on the speaker" (zoom_in), "Ken Burns the photos" (ken_burns_in), "slide the title in from the left", "make it bounce", "picture-in-picture top right" (layout_quarter_top_right), "rotate it 90 degrees", "mirror it" (flip_horizontal), "crop it" (crop / crop_resize adds the Crop effect; set its left/top/right/bottom with the effect tools), "tile these clips in a grid" (layout_grid), "reset the transform", "set the music to 60%" (volume_level + level_percent=60), "fade the music out".
+
+Presets: fade (picture and sound): fade_none, fade_in, fade_in_fast, fade_in_slow, fade_out, fade_out_fast, fade_out_slow, fade_in_out, fade_in_out_fast, fade_in_out_slow. motion In (first second): back_in_from_{bottom,left,right,top}, blur_in, bounce_in, bounce_in_from_{bottom,left,right,top}, pop_in, slide_in_from_{bottom,left,right,top}, spiral_in, wipe_in_{circle_expand,circle_shrink}, wipe_in_from_{bottom,left,right,top}, blur_wipe_in_{circle_expand,circle_shrink}, blur_wipe_in_from_{...}. motion Out (last second): back_out_to_{...}, blur_out, bounce_out, bounce_out_to_{...}, pop_out, slide_out_to_{bottom,left,right,top}, spiral_out, wipe_out_{circle_expand,circle_shrink}, wipe_out_to_{...}, blur_wipe_out_{circle_expand,circle_shrink}, blur_wipe_out_to_{...}. motion Emphasis (1 s at the playhead or at_seconds): bounce, flash, heartbeat, jello, pulse, rubber_band, shake_x, shake_y, swing, tada, wobble. motion Camera (whole clip): zoom_in, zoom_out, pan_auto, pan_left_to_right, pan_right_to_left, pan_top_to_bottom, pan_bottom_to_top, ken_burns_in, ken_burns_in_{left_to_right,right_to_left,top_to_bottom,bottom_to_top}, ken_burns_out, ken_burns_out_{...}; credits_scroll_up, credits_scroll_down; motion_none resets all motion (scale, position, rotation, shear, opacity, motion blur/wipe effects). transform: transform_none, rotate_none, rotate_90_right, rotate_90_left, rotate_180, flip_horizontal, flip_vertical, crop_none, crop, crop_resize, layout_reset, layout_quarter_{center,top_left,top_right,bottom_left, bottom_right} (half width and height = picture-in-picture), layout_grid, layout_grid_stretch. volume (clips with sound): volume_reset, volume_level, volume_fade_in, volume_fade_in_fast, volume_fade_in_slow, volume_fade_out, _fast, _slow, volume_fade_in_out, _fast, _slow.
+
+flip_horizontal/flip_vertical mirror in place only when the clip's gravity is centred on that axis (Center, Top Center, Bottom Center for left-right); a corner PiP is refused with how to fix it. Motion presets are relative to the clip's current look and only replace keyframes inside their zone, so they combine (e.g. zoom_in plus fade_in). In/Out/Emphasis motions keep the clip's gravity, so a corner PiP slides or pops in its corner (the menu would recentre it); camera moves and credits fill the frame and centre it, like the menu. Re-applying a blur or wipe motion adds another Blur/Mask effect; use motion_none first to start over. On clips shorter than 6 s prefer fade_in_out over separate fade_in and fade_out. Motion and transform presets skip audio-only clips, volume presets skip silent clips, and clips on locked tracks are refused (skipped with scope); the receipt lists what changed and which effects were added (e.g. the Crop effect id).
+
+Example: apply_clip_preset_tool(scope="all", preset="fade_in_out", duration_seconds=2)`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/clip_props_presets.py:apply_clip_preset",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["preset"],
+          properties: {
+            "at_seconds": { "description": "Emphasis presets only: timeline time (seconds) where the emphasis starts. Default: the playhead if it is over the clip, else the clip's start.", "nullable": true, "type": ["number", "null"] },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "duration_seconds": { "description": "Length in seconds of a fade (fade_in/fade_out/fade_in_out and volume_fade_*; default 1 s, *_fast = 1 s, *_slow = 3 s) or of an In / Out / Emphasis motion (default 1 s). Camera moves and credits always span the whole clip.", "maximum": 600, "minimum": 0.04, "nullable": true, "type": ["number", "null"] },
+            "level_percent": { "description": "volume_level only: the level in percent, 0-130 (100 = unchanged).", "maximum": 130, "minimum": 0, "nullable": true, "type": ["integer", "null"] },
+            "preset": { "description": "The Clip-menu preset to apply (see the tool description for the list).", "enum": ["fade_none", "fade_in", "fade_in_fast", "fade_in_slow", "fade_out", "fade_out_fast", "fade_out_slow", "fade_in_out", "fade_in_out_fast", "fade_in_out_slow", "motion_none", "back_in_from_bottom", "back_in_from_left", "back_in_from_right", "back_in_from_top", "blur_in", "bounce_in", "bounce_in_from_bottom", "bounce_in_from_left", "bounce_in_from_right", "bounce_in_from_top", "pop_in", "slide_in_from_bottom", "slide_in_from_left", "slide_in_from_right", "slide_in_from_top", "spiral_in", "wipe_in_circle_expand", "wipe_in_circle_shrink", "wipe_in_from_bottom", "wipe_in_from_left", "wipe_in_from_right", "wipe_in_from_top", "blur_wipe_in_circle_expand", "blur_wipe_in_circle_shrink", "blur_wipe_in_from_bottom", "blur_wipe_in_from_left", "blur_wipe_in_from_right", "blur_wipe_in_from_top", "back_out_to_bottom", "back_out_to_left", "back_out_to_right", "back_out_to_top", "blur_out", "bounce_out", "bounce_out_to_bottom", "bounce_out_to_left", "bounce_out_to_right", "bounce_out_to_top", "pop_out", "slide_out_to_bottom", "slide_out_to_left", "slide_out_to_right", "slide_out_to_top", "spiral_out", "wipe_out_circle_expand", "wipe_out_circle_shrink", "wipe_out_to_bottom", "wipe_out_to_left", "wipe_out_to_right", "wipe_out_to_top", "blur_wipe_out_circle_expand", "blur_wipe_out_circle_shrink", "blur_wipe_out_to_bottom", "blur_wipe_out_to_left", "blur_wipe_out_to_right", "blur_wipe_out_to_top", "bounce", "flash", "heartbeat", "jello", "pulse", "rubber_band", "shake_x", "shake_y", "swing", "tada", "wobble", "zoom_in", "zoom_out", "pan_auto", "pan_left_to_right", "pan_right_to_left", "pan_top_to_bottom", "pan_bottom_to_top", "ken_burns_in", "ken_burns_in_left_to_right", "ken_burns_in_right_to_left", "ken_burns_in_top_to_bottom", "ken_burns_in_bottom_to_top", "ken_burns_out", "ken_burns_out_left_to_right", "ken_burns_out_right_to_left", "ken_burns_out_top_to_bottom", "ken_burns_out_bottom_to_top", "credits_scroll_up", "credits_scroll_down", "transform_none", "rotate_none", "rotate_90_right", "rotate_90_left", "rotate_180", "flip_horizontal", "flip_vertical", "crop_none", "crop", "crop_resize", "layout_reset", "layout_quarter_center", "layout_quarter_top_left", "layout_quarter_top_right", "layout_quarter_bottom_left", "layout_quarter_bottom_right", "layout_grid", "layout_grid_stretch", "volume_reset", "volume_level", "volume_fade_in", "volume_fade_in_fast", "volume_fade_in_slow", "volume_fade_out", "volume_fade_out_fast", "volume_fade_out_slow", "volume_fade_in_out", "volume_fade_in_out_fast", "volume_fade_in_out_slow"], "type": "string" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_ids": { "description": "Timeline clip ids to act on (from get_timeline_state_tool).", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      apply_look_preset_tool: {
+        name: "apply_look_preset_tool",
+        title: "Apply look preset",
+        description: `Apply one of the editor's Clip > Look presets to clips, exactly as the menu does: "add film grain", "make it look like VHS", "soft focus", "add a glow", "drop shadow under the logo", "sharpen it", "remove the look". Re-applying a preset of the same family replaces it (no stacking).
+
+For a real color grade ("cinematic", "teal & orange", "black and white", "fix the exposure", a LUT) use color_grade_clip_tool; for other effects add_effect_tool. Audio-only clips and locked tracks are refused. One undo step for all clips.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/effects_color_looks.py:apply_look_preset",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["look"],
+          properties: {
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "look": { "description": "Clip > Look preset. color_* = Color Grade presets; film_grain_* = film stocks; analog_tape_* = VHS/home-video; sharpen_*, blur_* (soft focus), glow_*, shadow_* (drop shadow for cut-outs/titles); remove_<family> removes that look; reset_look removes every look effect (Color Grade, Film Grain and Look presets).", "enum": ["analog_tape_heavy", "analog_tape_subtle", "analog_tape_vhs", "blur_heavy", "blur_medium", "blur_soft_focus", "color_auto_contrast", "color_boost_color", "color_lift_shadows", "color_warm_up", "film_grain_16mm_classic", "film_grain_35mm_classic", "film_grain_35mm_fine", "film_grain_35mm_gritty", "film_grain_high_iso", "film_grain_super_8", "glow_inner", "glow_neon", "glow_soft_white", "glow_warm", "remove_analog_tape", "remove_blur", "remove_color", "remove_film_grain", "remove_glow", "remove_shadow", "remove_sharpen", "reset_look", "shadow_long", "shadow_soft", "shadow_strong", "shadow_subtle", "sharpen_medium", "sharpen_strong", "sharpen_subtle"], "type": "string" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "timeline_clip_ids": { "description": "Several timeline clip ids to change in one step.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      cancel_comfyui_job_tool: {
+        name: "cancel_comfyui_job_tool",
+        title: "Cancel ComfyUI job",
+        description: "Cancel a queued or running ComfyUI generation job (Project Files > Cancel Job).\n\nPass exactly one of job_id, file_id (the job working on that file) or all_jobs=true. A running job first reports 'canceling' while ComfyUI stops it. Never deletes files or clips and adds no undo step; a finished job cannot be canceled.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/ai_generation_comfyui.py:cancel_comfyui_job",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "all_jobs": { "default": false, "description": "Instead: cancel every queued or running job.", "type": "boolean" },
+            "file_id": { "default": "", "description": "Instead: cancel the active job processing this Project Files item (Project Files > Cancel Job).", "type": "string" },
+            "job_id": { "default": "", "description": "The job to cancel (list_comfyui_jobs_tool).", "type": "string" }
+          }
+        }
+      },
+      chroma_key_clip_tool: {
+        name: "chroma_key_clip_tool",
+        title: "Chroma key",
+        description: `Remove a green or blue screen from a clip with the Chroma Key effect, and optionally composite it over a background clip ("remove the green screen and put me on the beach"). key_color='auto' samples the screen color from the frame edges, or from the frame's screen areas when the screen does not reach the edges; 'green' / 'blue' sample that screen's real shade (the stock shade if none is found). One ChromaKey per clip (updated if present). With background_clip_id/background_query the keyed clip moves to a free track above the background (a new top track if needed) so the background shows through, and to the background's start if they did not overlap. One undo step for key + placement.
+
+The receipt's keyed_pct is the share of the frame the key made transparent: roughly the screen's share means it worked, a few percent means it missed the screen (try key_color='auto', a sampled #RRGGBB or a higher fuzz). analyze_frame_colors_tool on the composite checks the rest. Refused: audio-only clips, locked tracks, a background that is the same clip, 'auto' when the frame edges are not a green/blue screen.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/effects_color_looks.py:chroma_key_clip",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "align": { "default": "auto", "description": "With a background: auto = move the keyed clip to the background's start only if they do not overlap in time; start = always start together; keep = keep the keyed clip's time.", "enum": ["auto", "start", "keep"], "type": "string" },
+            "background_clip_id": { "default": "", "description": "Background clip to show through (timeline clip id). The keyed clip is put on a track above it.", "type": "string" },
+            "background_query": { "default": "", "description": "Or describe the background clip ('the beach clip').", "type": "string" },
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "fuzz": { "description": "Tolerance around the key color (0-125): raise it if screen remains, lower it if the subject gets holes. Default: estimated from how uneven the screen is with key_color='auto', else 20.", "maximum": 125, "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "halo": { "default": 10, "description": "Edge softening/spill cleanup (0-125).", "maximum": 125, "minimum": 0, "type": "number" },
+            "key_color": { "default": "auto", "description": "Screen color to remove: 'auto' (sampled from the frame), 'green' / 'blue' (that screen's actual shade, sampled from the footage), or #RRGGBB.", "type": "string" },
+            "method": { "default": "basic_soft", "description": "Keying method; basic_soft (default) suits most green/blue screens, hsv_hue helps uneven lighting, cbcr_vector for spill-heavy footage.", "enum": ["basic", "basic_soft", "cbcr_vector", "cie_distance", "hsl_luminance", "hsl_saturation", "hsv_hue", "hsv_saturation", "hsv_value", "lch_chroma", "lch_hue", "lch_luminosity"], "type": "string" },
+            "sample_time": { "description": "Timeline time to sample the key color from (default: middle of the clip).", "nullable": true, "type": ["number", "null"] },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      color_grade_clip_tool: {
+        name: "color_grade_clip_tool",
+        title: "Color grade",
+        description: 'Color grade clips with the Color Grade effect: a named look ("make it cinematic", "teal and orange", "warm it up", "cooler", "vintage", "black and white", "film noir", "moody", "vibrant", "bright and airy"), a LUT, and/or exact controls (exposure, contrast, highlights, shadows, saturation, vibrance, temperature, tint, wheels, curves). Each clip keeps ONE Color Grade effect: it is updated in place, never stacked. One undo step for all clips.\n\nWithout look/reset only the given controls change and the rest of the current grade stays ("a bit brighter" -> exposure=0.3). With a look the grade starts from neutral, then the look, then your controls ("cinematic but less saturated" -> look="cinematic", saturation=0.8). To fix exposure or color casts objectively, call analyze_frame_colors_tool first and use its suggested values, then analyze again to verify. Refused: audio-only clips, locked tracks, unknown LUT names (closest matches listed), out-of-range values.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/effects_color_looks.py:color_grade_clip",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "contrast": { "description": "Contrast. Range -1..1; leave out to keep the current/look value.", "maximum": 1, "minimum": -1, "nullable": true, "type": ["number", "null"] },
+            "curves": { "description": `Tone curves {"all"|"red"|"green"|"blue": [[x, y], ...]} with input->output points in 0-1, e.g. an S-curve {"all": [[0,0],[0.25,0.2],[0.75,0.82],[1,1]]}; 'reset' flattens.`, "type": "object" },
+            "exposure": { "description": "Brightness in stops (+0.3 = brighter). Range -2..2; leave out to keep the current/look value.", "maximum": 2, "minimum": -2, "nullable": true, "type": ["number", "null"] },
+            "highlights": { "description": "Bright areas (negative recovers blown skies). Range -1..1; leave out to keep the current/look value.", "maximum": 1, "minimum": -1, "nullable": true, "type": ["number", "null"] },
+            "look": { "default": "", "description": "Named grade: neutral = every control neutral, no LUT (undo a grade); natural = gentle contrast S-curve, a little vibrance; auto_contrast = Look > Color > Auto Contrast; lift_shadows = Look > Color > Lift Shadows (open up dark footage); warm_up = Look > Color > Warm Up; boost_color = Look > Color > Boost Color; cinematic = blockbuster teal/orange LUT at 50%, contrast curve, slightly muted; teal_orange = strong teal shadows / orange skin tones; warm = warmer white balance; golden_hour = sunset orange glow; cool = cooler, bluer; vintage = faded film, lifted blacks; black_and_white = monochrome with a little contrast; film_noir = hard-contrast black and white; moody = darker, desaturated, cold shadows; vibrant = punchy saturated color; bright_airy = light, soft, lifted. Starts from neutral; the other arguments then adjust it.", "enum": ["", "auto_contrast", "black_and_white", "boost_color", "bright_airy", "cinematic", "cool", "film_noir", "golden_hour", "lift_shadows", "moody", "natural", "neutral", "teal_orange", "vibrant", "vintage", "warm", "warm_up"], "type": "string" },
+            "lut": { "default": "", "description": "LUT to apply: a name from list_luts_tool ('teal & orange cinema', 'film_stock_&_vintage/classic_film'), a .cube path, or 'none' to remove it.", "type": "string" },
+            "lut_intensity": { "description": "How strongly the LUT applies. Range 0..1; leave out to keep the current/look value.", "maximum": 1, "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "mix": { "description": "Grade strength: 1 = full, 0.5 = half-way to the original. Range 0..1; leave out to keep the current/look value.", "maximum": 1, "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "reset": { "default": false, "description": "Start from a neutral grade instead of the clip's current one.", "type": "boolean" },
+            "saturation": { "description": "Color intensity: 1 = unchanged, 0 = black and white. Range 0..4; leave out to keep the current/look value.", "maximum": 4, "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "shadows": { "description": "Dark areas (positive lifts them). Range -1..1; leave out to keep the current/look value.", "maximum": 1, "minimum": -1, "nullable": true, "type": ["number", "null"] },
+            "temperature": { "description": "White balance: + warmer (orange), - cooler (blue). Range -1..1; leave out to keep the current/look value.", "maximum": 1, "minimum": -1, "nullable": true, "type": ["number", "null"] },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "timeline_clip_ids": { "description": "Several timeline clip ids to change in one step.", "items": { "type": "string" }, "type": "array" },
+            "tint": { "description": "White balance: + magenta, - green. Range -1..1; leave out to keep the current/look value.", "maximum": 1, "minimum": -1, "nullable": true, "type": ["number", "null"] },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" },
+            "vibrance": { "description": "Boosts muted colors more than saturated ones. Range -1..1; leave out to keep the current/look value.", "maximum": 1, "minimum": -1, "nullable": true, "type": ["number", "null"] },
+            "wheels": { "description": 'Color wheels, e.g. {"shadows": {"color": "#2a6cff", "amount": 0.15}, "highlights": {"color": "#ffb36b", "amount": 0.12, "luma": 0.02}}: tint color, amount 0-1, luma -1..1 per wheel (global, shadows, midtones, highlights).', "type": "object" }
+          }
+        }
+      },
+      consolidate_project_media_tool: {
+        name: "consolidate_project_media_tool",
+        title: "Collect / reclaim media",
+        description: "Collect external media into the project's assets folder, or reclaim duplicate copies (File > Collect / Reclaim).\n\nThe project must be saved. collect copies files (the originals stay) and repoints the project at the copies -- one undo step points back at the originals. reclaim deletes copies that are byte-identical to their recorded original and repoints at the original; it cannot be undone (the copies are gone), so it adds no undo step. Nothing is deleted if its original is missing.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export.py:consolidate_project_media",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["action"],
+          properties: {
+            "action": { "description": "collect = copy media stored outside the project into its assets folder (for handoff/archive); reclaim = delete asset copies whose original still exists unchanged, pointing back at the original.", "enum": ["collect", "reclaim"], "type": "string" }
+          }
+        }
+      },
+      copy_clip_keyframes_tool: {
+        name: "copy_clip_keyframes_tool",
+        title: "Copy keyframes between clips",
+        description: `Copy the animation (keyframes) of one clip onto other clips.
+
+Use it for "give clip B the same zoom as clip A", "copy the fade to all clips", "same position and size as that one". The groups match the Clip menu's Copy > Keyframes items: all, alpha (opacity), scale, shear, rotation, location, time (speed curve) and volume; scale, rotation and location also copy gravity. With timing='stretch' (default) the keyframes are scaled to each target's length, so a whole-clip Ken Burns or a fade-out lands the same way on a shorter or longer clip; 'offset' keeps the seconds from each clip's start; 'exact' copies the raw frames like the editor's paste. The 'time' curve is only copied with timing='exact' (and skipped from 'all' otherwise), since stretching a speed curve changes what the target shows. Targets exclude the source and must not be on locked tracks. One undo step.
+
+Example: copy_clip_keyframes_tool(source_clip_id="A1", timeline_clip_ids=["B2", "C3"], groups=["scale", "location"])`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/clip_props.py:copy_clip_keyframes",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "groups": { "default": ["all"], "description": "What to copy, as in the Clip menu's Copy > Keyframes: all, alpha, scale (+gravity), shear, rotation (+gravity), location (+gravity), time, volume.", "items": { "description": "A Copy > Keyframes group.", "enum": ["all", "alpha", "scale", "shear", "rotation", "location", "time", "volume"], "type": "string" }, "type": "array" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "source_clip_id": { "default": "", "description": "Timeline clip id to copy FROM (preferred).", "type": "string" },
+            "source_query": { "default": "", "description": "Describe the source clip instead of an id.", "type": "string" },
+            "source_track": { "default": "", "description": "Narrow source_query to a track (UI track number, name or layer).", "type": "string" },
+            "timeline_clip_ids": { "description": "Timeline clip ids to act on (from get_timeline_state_tool).", "items": { "type": "string" }, "type": "array" },
+            "timing": { "default": "stretch", "description": "How keyframe times map onto each target: stretch = scaled to the target's length (a whole-clip zoom stays whole-clip, a fade-out stays at the end); offset = same seconds from each clip's start; exact = the same clip frames, like the editor's Copy/Paste.", "enum": ["stretch", "offset", "exact"], "type": "string" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      copy_effects_tool: {
+        name: "copy_effects_tool",
+        title: "Copy effects",
+        description: `Copy the effects of one clip onto other clips (Copy > Effects, then Paste): "give all clips the same grade as this one", "copy the blur and sharpen to clip 3". One undo step for every target. mode='merge' matches the editor's Paste (same-kind effect overwritten, new ones appended); pasted effects get new ids.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/effects_color.py:copy_effects",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clip_query": { "default": "", "description": "Or describe one target clip.", "type": "string" },
+            "effects": { "description": 'Only these effects (names), e.g. ["ColorGrade"]. Empty = all.', "items": { "type": "string" }, "type": "array" },
+            "mode": { "default": "merge", "description": "merge = Paste in the editor: an effect of the same kind is overwritten, others added; replace = targets end up with exactly the copied effects; append = always add copies.", "enum": ["merge", "replace", "append"], "type": "string" },
+            "scope": { "default": "", "description": "Targets instead of ids: selection, a whole track, or every clip (the source is skipped).", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "source_clip_id": { "default": "", "description": "Clip to copy effects from (timeline clip id).", "type": "string" },
+            "source_clip_query": { "default": "", "description": "Or describe the source clip.", "type": "string" },
+            "timeline_clip_ids": { "description": "Clips to paste onto.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track'.", "type": "string" }
+          }
+        }
+      },
+      copy_transition_tool: {
+        name: "copy_transition_tool",
+        title: "Copy transition settings",
+        description: `Copy one transition's settings onto other transitions (Copy > Transition / Keyframes, then Paste).
+
+"Make all the transitions on track 1 like this one" -> source_transition_id=X, scope='track', track='1'. Targets keep their own position, track and length (the Paste rule); with fit_duration the curves are fitted to each target's length. One undo step. To add new transitions use add_transitions_between_clips_tool. Refused on locked tracks; never deletes clips.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files_transitions.py:copy_transition",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["source_transition_id"],
+          properties: {
+            "at_seconds": { "description": "Instead of ids: the transition under this timeline time (on `track` when given).", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "between_clip_ids": { "description": "Instead of ids: the two timeline clip ids the transition joins, e.g. [clip_a, clip_b].", "items": { "type": "string" }, "type": "array" },
+            "fit_duration": { "default": true, "description": "Rescale copied curves to each target's length, so a curve copied from a 1 s transition still finishes at the end of a 2 s one.", "type": "boolean" },
+            "scope": { "default": "", "description": "'selected' = selected transitions, 'track' = every transition on `track`, 'all' = every transition on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "source_transition_id": { "description": "The transition to copy from.", "type": "string" },
+            "track": { "default": "", "description": "Track to look on (UI track number, 1 = bottom; name; or layer number). With scope='track' every transition on it.", "type": "string" },
+            "transition_ids": { "description": "Transition ids (list_timeline_transitions_tool or get_timeline_state_tool 'Effects/Transitions'). Preferred.", "items": { "type": "string" }, "type": "array" },
+            "what": { "default": "all", "description": "all = every setting (Copy > Transition, then Paste); keyframes = progress + edge curves (Copy > Keyframes > All); brightness / contrast = one curve; mask = the wipe image only.", "enum": ["all", "keyframes", "brightness", "contrast", "mask"], "type": "string" }
+          }
+        }
+      },
+      create_media_with_comfyui_tool: {
+        name: "create_media_with_comfyui_tool",
+        title: "Create with ComfyUI",
+        description: 'Generate a new image, video clip, sound effect or music track with the local ComfyUI server (AI Tools > Create with AI).\n\nUse only when the user wants local/ComfyUI generation and list_comfyui_templates_tool reports comfyui.status=ready; when ComfyUI is not configured this refuses with how to set it up (cloud video generation is generate_video_and_add_to_timeline_tool). Queues a job and returns its job_id at once; the result lands in Project Files when it finishes -- wait with list_comfyui_jobs_tool(job_id, wait_seconds), then place it with add_clip_to_timeline_tool. Nothing changes on the timeline and there is no undo step. Example: {"kind": "image", "prompt": "misty pine forest at dawn, cinematic"}.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/ai_generation_comfyui.py:create_media_with_comfyui",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["prompt"],
+          properties: {
+            "kind": { "default": "", "description": "What to make with the built-in templates: image, short video, sound effect or music. Ignored when template is given.", "enum": ["", "image", "video", "sound", "music"], "type": "string" },
+            "name": { "default": "", "description": "Name for the new Project Files item (default: generation, generation_gen2, ...).", "type": "string" },
+            "prompt": { "description": "What to generate, in plain words (subject, style, mood). For music: style tags, then optionally a line 'Lyrics:' followed by the lyrics.", "type": "string" },
+            "reference_image_file_id": { "default": "", "description": "An image in Project Files, for templates that need a reference image.", "type": "string" },
+            "template": { "default": "", "description": "A template id or menu name from list_comfyui_templates_tool (for user templates); overrides kind.", "type": "string" }
+          }
+        }
+      },
+      create_subclips_tool: {
+        name: "create_subclips_tool",
+        title: "Create sub-clips",
+        description: `Cut several named sub-clips out of one project file in one call (Project Files > Split Clip).
+
+Use when the user gives explicit source times: "make sub-clips 0:05-0:12 'Hook' and 1:10-1:30 'Demo' from interview.mp4". Each sub-clip is a new Project Files entry that plays only its range (times in seconds of the source media); AI scene descriptions are trimmed to the range. Nothing is placed on the timeline: put them there with add_clip_to_timeline_tool(file_id=<new id>). To find a moment by description instead of times use split_file_add_clip_tool(query=...). One undo step for all sub-clips.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files.py:create_subclips",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["file_id", "subclips"],
+          properties: {
+            "file_id": { "description": "The project file to cut sub-clips from (list_project_files_tool).", "type": "string" },
+            "subclips": { "description": "Sub-clips to create, each with its own in/out and optional name.", "items": { "additionalProperties": false, "description": "One sub-clip.", "properties": { "name": { "description": "Name in Project Files. '' = '<file> (start to end)' like Split Clip.", "type": "string" }, "source_end_seconds": { "description": "Out-point in seconds of the source media.", "minimum": 0, "type": "number" }, "source_start_seconds": { "description": "In-point in seconds of the source media.", "minimum": 0, "type": "number" } }, "required": ["source_start_seconds", "source_end_seconds"], "type": "object" }, "type": "array" }
+          }
+        }
+      },
+      duplicate_clips_tool: {
+        name: "duplicate_clips_tool",
+        title: "Duplicate clips",
+        description: `Copy clips (with their effects, keyframes and the transitions between them) and paste the copies at a time and track: Copy + Paste / Duplicate in the editor.
+
+Use for "duplicate this clip", "copy the intro to the end", "repeat this section three times" (copies=3), "put a copy of the logo on track 3 at 20 s". Copies keep the originals' spacing and relative tracks, get new ids (and new effect ids), and land right after the originals by default. The tool refuses to cover existing clips unless ripple=true (insert, pushing later clips) or allow_overlap=true. The system clipboard is not touched. To move instead of copy use move_clips_tool; to loop one clip's playback use repeat_clip_tool. One undo step.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit.py:duplicate_clips",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "allow_overlap": { "default": false, "description": "Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.", "type": "boolean" },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "copies": { "default": 1, "description": "How many copies, placed back to back.", "maximum": 50, "minimum": 1, "type": "integer" },
+            "include_transitions": { "default": true, "description": "Also copy the transitions between the copied clips (crossfades inside the selection).", "type": "boolean" },
+            "position_seconds": { "default": -1, "description": "Timeline time for the first copy; -1 = right after the copied clips.", "type": "number" },
+            "ripple": { "default": false, "description": "Insert the copies: push the clips at the destination later to make room.", "type": "boolean" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_ids": { "default": [], "description": "Timeline clip ids to act on.", "items": { "type": "string" }, "type": "array" },
+            "to_track": { "default": "", "description": "Track for the copies: UI track number (1 = bottom), name, or layer number. Empty = the same track(s).", "type": "string" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      edit_captions_tool: {
+        name: "edit_captions_tool",
+        title: "Edit captions",
+        description: `Change existing captions: fix a cue's words or timing, add or delete cues, shift sync, restyle.
+
+Use after add_captions_tool or for captions made in the Captions dock ("fix the typo in caption 3", "the captions are half a second late", "make the captions yellow and bigger", "add a caption 'Thanks!' at 12 s for 2 s", "delete the last caption"). Get cue numbers from list_captions_tool. Times are timeline seconds. With no target the selected Caption effect, or the project's only caption track, is used. One undo step. To remove captions entirely use remove_captions_tool.
+
+Example: {"timeline_clip_id": "C1", "cue_edits": [{"index": 2, "text": "Today we explore Tokyo."}], "shift_seconds": -0.4, "style": "reels"}.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/titles_text_captions.py:edit_captions",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "add_cues": { "description": "New cues {start, end, text} in timeline seconds (like the Captions dock's Insert Caption).", "items": { "additionalProperties": false, "properties": { "end": { "description": "End second (after start).", "type": "number" }, "start": { "description": "Start second.", "type": "number" }, "text": { "description": "Caption text; '\\n' for a second line.", "type": "string" } }, "required": ["start", "end", "text"], "type": "object" }, "type": "array" },
+            "background_color": { "default": "", "description": "Colour of the box behind the text (alpha in '#RRGGBBAA' sets its opacity). Empty = the style's.", "type": "string" },
+            "background_opacity": { "default": -1, "description": "Opacity of the box behind the text, 0 (no box) to 1. -1 = the style's.", "maximum": 1, "minimum": -1, "type": "number" },
+            "clip_query": { "default": "", "description": "Describe the captioned clip instead of an id.", "type": "string" },
+            "cue_edits": { "description": "Changes to numbered cues: new text, new start/end (timeline seconds) or delete=true. Numbers are the order before this call.", "items": { "additionalProperties": false, "properties": { "delete": { "description": "Remove this cue.", "type": "boolean" }, "end": { "description": "New end, timeline seconds.", "type": "number" }, "index": { "description": "Cue number from list_captions_tool (1 = first).", "minimum": 1, "type": "integer" }, "start": { "description": "New start, timeline seconds.", "type": "number" }, "text": { "description": "New text for the cue.", "type": "string" } }, "required": ["index"], "type": "object" }, "type": "array" },
+            "effect_id": { "default": "", "description": "Caption effect id from list_captions_tool.", "type": "string" },
+            "fade_seconds": { "default": -1, "description": "Fade each caption in and out over this many seconds (0-3). -1 = the style's.", "maximum": 3, "minimum": -1, "type": "number" },
+            "find": { "default": "", "description": "Replace this text in every cue (e.g. a misspelled name)...", "type": "string" },
+            "font": { "default": "", "description": "Font family, e.g. 'Arial Black', 'Helvetica Neue'. Empty = the style's font.", "type": "string" },
+            "position": { "default": "", "description": "Where the captions sit: bottom (above the safe margin, higher on vertical video), center or top. Empty = the style's (bottom).", "enum": ["", "bottom", "center", "top"], "type": "string" },
+            "replace": { "default": "", "description": "...with this text.", "type": "string" },
+            "shift_seconds": { "default": 0, "description": "Move every cue later (positive) or earlier (negative) to fix sync.", "maximum": 3600, "minimum": -3600, "type": "number" },
+            "stroke_color": { "default": "", "description": "Outline colour. Empty = the style's.", "type": "string" },
+            "stroke_width": { "default": -1, "description": "Outline thickness relative to the text height: 0 = none, 0.03 thin, 0.09 heavy (heavy outlines only read with heavy fonts such as Arial Black). -1 = the style's.", "maximum": 0.5, "minimum": -1, "type": "number" },
+            "style": { "default": "", "description": "Switch to a look preset (then apply the overrides below). Empty keeps the current look.", "enum": ["", "boxed", "classic", "minimal", "reels", "yellow"], "type": "string" },
+            "text_color": { "default": "", "description": "Text colour '#RRGGBB' / '#RRGGBBAA' / 'rgba(...)' / name. Empty = the style's.", "type": "string" },
+            "text_size": { "default": 0, "description": "Text height as a fraction of the frame's shorter side: 0.04 small, 0.05 normal subtitles, 0.075 big reel captions. 0 = the style's size.", "maximum": 0.3, "minimum": 0, "type": "number" },
+            "timeline_clip_id": { "default": "", "description": "The captioned clip (when it has one caption track).", "type": "string" },
+            "uppercase": { "default": false, "description": "Turn every cue's text into capital letters.", "type": "boolean" }
+          }
+        }
+      },
+      edit_title_tool: {
+        name: "edit_title_tool",
+        title: "Edit title",
+        description: `Change an existing title's text, font or colours, or duplicate it.
+
+Use when the user wants to fix or restyle a title that is already there ("change the title to 'Day 2'", "make the lower third yellow", "use Georgia for the end card", "make a copy of this title"). Target it by timeline_clip_id (best), file_id or title_query (its text); with no target the selected title clip, or the project's only title, is used. Only what you pass changes; other fields keep their text. scope=all_clips (default) updates every clip showing that title, like the editor's Edit Title; this_clip gives just that clip its own edited copy; duplicate saves an edited copy as a new title (place it with add_clip_to_timeline_tool). One undo step restores the previous look. To move, trim or re-time a title clip use the timeline tools instead.
+
+Example: {"timeline_clip_id": "C1A2", "text": "Tokyo Day 2", "text_color": "#FFD700"}.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/titles_text.py:edit_title",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "background_color": { "default": "", "description": "Colour of the title's full-frame background (transparent in most templates) with optional alpha, e.g. '#000000' for a solid black end card or '#00000080' for a 50% dark veil over the video. Empty keeps it.", "type": "string" },
+            "file_id": { "default": "", "description": "The title's Project Files id instead of a clip.", "type": "string" },
+            "fit_text": { "default": true, "description": "Shrink a line whose text would run off the frame (templates do not wrap text).", "type": "boolean" },
+            "font": { "default": "", "description": "Font family for every line, e.g. 'Arial Black', 'Helvetica Neue', 'Georgia'. Must be installed; empty keeps the template's font.", "type": "string" },
+            "font_scale": { "default": 1, "description": "Text size relative to the template: 1 = as designed, 1.5 = half again as big, 0.7 = smaller.", "maximum": 5, "minimum": 0.2, "type": "number" },
+            "font_style": { "default": "", "description": "Italic or upright text; empty keeps the template's.", "enum": ["", "italic", "normal"], "type": "string" },
+            "font_weight": { "default": "", "description": "Make the text bold or normal weight; empty keeps the template's.", "enum": ["", "bold", "normal"], "type": "string" },
+            "lines": { "description": "New text for fields 1..N in order (list_title_templates_tool kind=project shows them); '' blanks a field; fields after N are kept.", "items": { "type": "string" }, "type": "array" },
+            "scope": { "default": "all_clips", "description": "all_clips = change the title everywhere it is used (Edit Title); this_clip = change only timeline_clip_id, as its own copy; duplicate = save the changed copy as a new title in Project Files without touching any clip (Duplicate).", "enum": ["all_clips", "this_clip", "duplicate"], "type": "string" },
+            "subtitle": { "default": "", "description": "New subtitle text. Empty keeps it.", "type": "string" },
+            "text": { "default": "", "description": "New main title text ('\\n' continues into the next fields). Empty keeps it.", "type": "string" },
+            "text_color": { "default": "", "description": "Colour of every line: '#RRGGBB', '#RRGGBBAA' (alpha = opacity), 'rgba(r,g,b,a)' or a basic name ('white', 'yellow'). Empty keeps the template's colours.", "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "A title clip on the timeline (from add_title_tool or get_timeline_state_tool).", "type": "string" },
+            "title_query": { "default": "", "description": "Find the title by its current text or file name, e.g. 'Tokyo'.", "type": "string" }
+          }
+        }
+      },
+      enhance_file_with_comfyui_tool: {
+        name: "enhance_file_with_comfyui_tool",
+        title: "Enhance with ComfyUI",
+        description: 'Process a Project Files image, video or audio file with a local ComfyUI template (Project Files > Enhance with AI).\n\nFor "upscale this video 4x", "make the motion smoother", "split this into scenes", "caption it from the speech", "blur the license plate", "highlight the player", "cut out the dog (mask)", "clean up the noise / make the speech clearer", "turn this photo into a video", "restyle it like a watercolor". Needs comfyui.status=ready (list_comfyui_templates_tool); otherwise refuses with setup steps. Queues a job and returns its job_id at once; the output becomes a NEW Project Files item (captions are stored on the file, split_scenes creates one file per scene). Wait with list_comfyui_jobs_tool(job_id, wait_seconds). No undo step. Object tracking (blur/highlight/mask) needs points, boxes, a prompt naming the object, or auto_detect. Example: {"file_id": "F12", "action": "blur_object", "prompt": "license plate"}.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/ai_generation_comfyui.py:enhance_file_with_comfyui",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["file_id"],
+          properties: {
+            "action": { "default": "", "description": "What to do. Images: upscale, restyle, image_to_video, blur_object, highlight_object, mask_object, depth, lines. Videos: upscale, smooth_motion (2x frame rate), split_scenes, captions (from speech), restyle, blur_object, highlight_object, mask_object, depth, lines. Audio: speech_clarity, reduce_noise, remove_noise.", "enum": ["", "upscale", "restyle", "image_to_video", "blur_object", "highlight_object", "mask_object", "depth", "lines", "smooth_motion", "split_scenes", "captions", "speech_clarity", "reduce_noise", "remove_noise"], "type": "string" },
+            "auto_detect": { "default": false, "description": "Object tracking: let SAM2 pick the main objects itself (no points needed).", "type": "boolean" },
+            "background_brightness": { "default": 0.75, "description": "highlight_object: brightness of everything else (0-3).", "maximum": 3, "minimum": 0, "type": "number" },
+            "border_color": { "default": "#ffffffff", "description": "highlight_object: outline color.", "type": "string" },
+            "border_width": { "default": 2, "description": "highlight_object: outline width in pixels (0-64).", "maximum": 64, "minimum": 0, "type": "integer" },
+            "boxes": { "description": "Object tracking: rectangles around the object (source pixels).", "items": { "additionalProperties": false, "properties": { "x1": { "description": "Left edge, source pixels.", "type": "number" }, "x2": { "description": "Right edge.", "type": "number" }, "y1": { "description": "Top edge.", "type": "number" }, "y2": { "description": "Bottom edge.", "type": "number" } }, "required": ["x1", "y1", "x2", "y2"], "type": "object" }, "type": "array" },
+            "file_id": { "description": "The Project Files item to process (list_files_tool). The result is a NEW file; the original is untouched.", "type": "string" },
+            "highlight_color": { "default": "#b32ea6ff", "description": "highlight_object: fill color, #RRGGBB or a color name (#AARRGGBB keeps its alpha).", "type": "string" },
+            "highlight_opacity": { "default": 0.28, "description": "highlight_object: fill opacity 0-1.", "maximum": 1, "minimum": 0, "type": "number" },
+            "mask_brightness": { "default": 1.15, "description": "highlight_object: brightness of the object (1 = unchanged, 0-3).", "maximum": 3, "minimum": 0, "type": "number" },
+            "name": { "default": "", "description": "Name for the new Project Files item (default: '<file>_genN').", "type": "string" },
+            "negative_boxes": { "description": "Object tracking: rectangles to exclude.", "items": { "additionalProperties": false, "properties": { "x1": { "description": "Left edge, source pixels.", "type": "number" }, "x2": { "description": "Right edge.", "type": "number" }, "y1": { "description": "Top edge.", "type": "number" }, "y2": { "description": "Bottom edge.", "type": "number" } }, "required": ["x1", "y1", "x2", "y2"], "type": "object" }, "type": "array" },
+            "negative_points": { "description": "Object tracking: clicks on things that are NOT the object.", "items": { "additionalProperties": false, "properties": { "x": { "description": "Source pixel column.", "type": "number" }, "y": { "description": "Source pixel row.", "type": "number" } }, "required": ["x", "y"], "type": "object" }, "type": "array" },
+            "points": { "description": "Object tracking: clicks ON the object, in source pixels of the file (x from the left, y from the top) on seed_frame.", "items": { "additionalProperties": false, "properties": { "x": { "description": "Source pixel column.", "type": "number" }, "y": { "description": "Source pixel row.", "type": "number" } }, "required": ["x", "y"], "type": "object" }, "type": "array" },
+            "prompt": { "default": "", "description": "For restyle / image_to_video: the look or motion to create. For blur/highlight/mask: the object to find, in words ('the red car'), instead of or with points/boxes.", "type": "string" },
+            "reference_image_file_id": { "default": "", "description": "An image in Project Files whose look to copy (video restyle needs one).", "type": "string" },
+            "seed_frame": { "default": 1, "description": "Object tracking in video: the 1-based source frame the points/boxes were chosen on.", "minimum": 1, "type": "integer" },
+            "template": { "default": "", "description": "A template id or menu name from list_comfyui_templates_tool(file_id) instead of action (user templates).", "type": "string" }
+          }
+        }
+      },
+      export_files_to_folder_tool: {
+        name: "export_files_to_folder_tool",
+        title: "Export project files",
+        description: "Export chosen project files to a folder (Project Files > Export Selected Clips).\n\nPlain files are copied; sub-clips (files with in/out points, e.g. from split_file_add_clip_tool) and image sequences are rendered as H.264/AAC MP4 of just that part, at the file's own size and frame rate (on a QThread, never the GUI or a plain worker thread). Existing destination files are skipped, like the dialog. Changes nothing in the project.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export_render.py:export_files_to_folder",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["file_ids"],
+          properties: {
+            "file_ids": { "description": "Project file ids (media_bin_file_id from list_files_tool).", "items": { "type": "string" }, "type": "array" },
+            "folder": { "default": "", "description": "Destination folder (created if missing). Empty = the export folder preference.", "type": "string" }
+          }
+        }
+      },
+      export_project_file_tool: {
+        name: "export_project_file_tool",
+        title: "Export EDL / XML",
+        description: `Export the timeline as a Final Cut Pro XML or EDL file for another editor (File > Export Project).
+
+Use for "send this edit to Premiere/Resolve" or "give me an EDL". Not a video render (that is export_video_tool). EDL holds one track per file, so each non-empty track is written as '<name>-<track>.edl'. Changes nothing in the project.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export.py:export_project_file",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "file_path": { "default": "", "description": "Output file. Empty = next to the project (or in Downloads) named after the project.", "type": "string" },
+            "format": { "default": "fcpxml", "description": "fcpxml = Final Cut Pro XML (Premiere, Resolve, FCP 7); edl = CMX EDL, one file per track.", "enum": ["fcpxml", "edl"], "type": "string" },
+            "overwrite": { "default": false, "description": "Allow replacing existing output file(s).", "type": "boolean" }
+          }
+        }
+      },
+      forget_recent_projects_tool: {
+        name: "forget_recent_projects_tool",
+        title: "Forget recent projects",
+        description: "Remove entries from File > Recent Projects (Clear Recent Projects). Never deletes any file.\n\nEmpty file_path clears the whole list; missing_only=true drops only entries whose file is gone. Not an undo step (it is an editor preference).",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export.py:forget_recent_projects",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "file_path": { "default": "", "description": "Forget only this project path. Empty = every entry (or only missing ones with missing_only).", "type": "string" },
+            "missing_only": { "default": false, "description": "Only forget entries whose file no longer exists.", "type": "boolean" }
+          }
+        }
+      },
+      freeze_frame_tool: {
+        name: "freeze_frame_tool",
+        title: "Freeze frame",
+        description: `Hold one frame of a clip still for a few seconds, then carry on (Clip menu > Speed > Freeze).
+
+Use for "freeze on the last frame for 2 seconds" (frame='last'), "freeze here" (the playhead), "hold the frame at 12.5 s for 3 seconds with a slight zoom" (zoom=true). The clip gets hold_seconds longer and its sound is muted during the hold. The tool refuses to run into the next clip unless ripple=true or allow_overlap=true. For slow motion use set_clip_speed_tool. One undo step.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit_time.py:freeze_frame",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "allow_overlap": { "default": false, "description": "Let the longer clip overlap the next clip on its track (the receipt lists it). Off by default: the tool refuses and says what is in the way.", "type": "boolean" },
+            "at_seconds": { "default": -1, "description": "Timeline time of the frame to hold (with frame='at_time'); -1 = the playhead.", "type": "number" },
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "frame": { "default": "at_time", "description": "Which frame to hold: the one at at_seconds, the clip's first frame, or its last frame.", "enum": ["at_time", "first", "last"], "type": "string" },
+            "hold_seconds": { "default": 2, "description": "How long the frame stays frozen.", "maximum": 60, "minimum": 0.1, "type": "number" },
+            "ripple": { "default": false, "description": "Shift the later clips on the track by the change in length, so nothing overlaps and no gap opens.", "type": "boolean" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" },
+            "zoom": { "default": false, "description": "Freeze & Zoom: push in slightly (to 105%) and back during the hold.", "type": "boolean" }
+          }
+        }
+      },
+      get_clip_effects_tool: {
+        name: "get_clip_effects_tool",
+        title: "Clip effects",
+        description: 'List the effects already applied to clip(s): effect ids, class, name, and their current property values (keyframed properties as timed points). Use it before update_effect_tool / remove_effect_tool to get effect ids, or to answer "what effects are on this clip?". Timeline listings do not show effects; this does.',
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/effects_color.py:get_clip_effects",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "detail": { "default": "full", "description": "full = current property values too; summary = ids only.", "enum": ["full", "summary"], "type": "string" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "timeline_clip_ids": { "description": "Several timeline clip ids to change in one step.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      get_clip_properties_tool: {
+        name: "get_clip_properties_tool",
+        title: "Read clip properties",
+        description: `Read every property of one timeline clip, the way the Properties dock shows it.
+
+Use this before changing how a clip looks or moves: it tells you each property's value at a time (opacity 'alpha', 'scale' mode, 'gravity', 'scale_x'/'scale_y', 'location_x'/'location_y', 'rotation', 'shear_x'/'shear_y', 'origin_x'/'origin_y', blend mode 'composite', 'volume', 'wave_color', 'corner_radius', 'margin', ...), its allowed range or choices, whether it can be animated and, for animated ones, every keyframe with its frame, clip seconds (0 = the clip's first visible frame), timeline seconds, value, interpolation and ease. Also lists the clip's effects (id, class). Changes nothing.
+
+Example: get_clip_properties_tool(timeline_clip_id="ABC123", properties=["scale_x", "alpha"])`,
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/clip_props.py:get_clip_properties",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "at_seconds": { "description": "Timeline time (seconds) to read the values at. Default: the playhead if it is over the clip, otherwise the clip's first frame.", "nullable": true, "type": ["number", "null"] },
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "include_keyframes": { "default": true, "description": "List every keyframe of animated properties (frame, clip and timeline seconds, value, interpolation, ease).", "type": "boolean" },
+            "properties": { "default": [], "description": "Only these properties (keys such as 'alpha', 'scale_x' or labels such as 'Scale X'). Empty = every property.", "items": { "type": "string" }, "type": "array" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      get_editor_layout_tool: {
+        name: "get_editor_layout_tool",
+        title: "Read editor layout",
+        description: "Report the editor layout: active view, open and closed panels, saved custom views, toolbar and fullscreen.\n\nPanel names in the report are what set_editor_layout_tool's show_panels / hide_panels accept.",
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/project_export_views.py:get_editor_layout",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {}
+        }
+      },
+      get_playhead_and_selection_tool: {
+        name: "get_playhead_and_selection_tool",
+        title: "Read playhead and selection",
+        description: `Read what the editor is showing right now: the playhead, playback, the selection and the timeline view.
+
+Returns the playhead (frame, seconds, timecode as on the ruler), whether the preview is playing and at what speed, the selected clips / transitions / effects (ids, track, times, locked), the zoom (seconds visible, visible range) and whether snapping, razor and timing modes are on, plus where the content ends and the markers just before and after the playhead. Use it for "what's selected?", "where is the playhead?" or before acting on the selection. Read-only.`,
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/tracks_nav.py:get_playhead_and_selection",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {}
+        }
+      },
+      get_preferences_tool: {
+        name: "get_preferences_tool",
+        title: "Read preferences",
+        description: "Read editor preferences (Edit > Preferences) with their allowed values.\n\nEach entry has key (pass it to set_preference_tool), title, tab, type (bool / spinner / spinner-int / dropdown / text / browse), value, default, min/max, choices for dropdowns, and restart_required. Keyboard shortcuts are listed only for tab='Keyboard' or a query. Internal settings are not shown.",
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/project_export_prefs.py:get_preferences",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "key": { "default": "", "description": "One preference by key (e.g. 'autosave-interval') or its title.", "type": "string" },
+            "query": { "default": "", "description": "Words in the key or title, e.g. 'cache', 'audio'.", "type": "string" },
+            "tab": { "default": "", "description": "Only this Preferences tab.", "enum": ["", "General", "Preview", "Timeline", "Autosave", "Cache", "Debug", "Keyboard", "Performance", "Location", "AI"], "type": "string" }
+          }
+        }
+      },
+      import_image_sequence_tool: {
+        name: "import_image_sequence_tool",
+        title: "Import image sequence",
+        description: 'Import a folder of numbered images as ONE image-sequence file (an animation/video clip).\n\nUse for "import these frames as a sequence at 24 fps", renders from Blender/After Effects, stop-motion or time-lapse photo folders. The frames play at `fps` (the project rate when 0). It only adds the file to Project Files: place it with add_clip_to_timeline_tool(file_id=...). To import photos as separate stills (a slideshow), use import_files_tool instead. Returns the file id, pattern, frame count, fps and duration. One undo step. Example: path="~/renders/intro/", fps=24.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files.py:import_image_sequence",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["path"],
+          properties: {
+            "fps": { "default": 0, "description": "Frames per second to play the sequence at (24, 30, 12, 23.976...). 0 = the project frame rate (what the Import Files prompt uses).", "maximum": 240, "minimum": 0, "type": "number" },
+            "name": { "default": "", "description": "Display name in Project Files. '' = the pattern file name.", "type": "string" },
+            "path": { "description": "A folder of numbered frames (frame_0001.png, frame_0002.png...) or any one frame of the sequence. png, jpg, jpeg, tif and svg frames.", "type": "string" },
+            "skip_indexing": { "default": false, "description": "Skip the background AI analysis of the new file.", "type": "boolean" }
+          }
+        }
+      },
+      import_project_file_tool: {
+        name: "import_project_file_tool",
+        title: "Import EDL / XML",
+        description: 'Import an EDL or Final Cut Pro XML timeline into new tracks of this project (File > Import Project).\n\nClips keep their positions, trims and opacity/volume (and, from XML, position/scale/rotation) keyframes; media not already in the project is added. Media that cannot be found is skipped and listed (no dialog). An EDL becomes one new track "EDL Import"; XML creates one track per source track. One undo step removes everything it added.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export.py:import_project_file",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["file_path"],
+          properties: {
+            "file_path": { "description": "Path of an .edl (Edit Decision List) or Final Cut Pro .xml file.", "type": "string" },
+            "format": { "default": "auto", "description": "File format; auto = from the extension.", "enum": ["auto", "edl", "fcpxml"], "type": "string" }
+          }
+        }
+      },
+      list_captions_tool: {
+        name: "list_captions_tool",
+        title: "List captions",
+        description: `List every caption track (Caption effect) with its numbered cues and look.
+
+Use before edit_captions_tool (cue numbers, current text, timeline times) or to answer "what do the captions say". Cue start/end are timeline seconds (source_start / source_end are the clip's media time the effect stores); visible=false marks cues outside the clip's trimmed range. Read-only.`,
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/titles_text_captions.py:list_captions",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "timeline_clip_id": { "default": "", "description": "Only this clip's captions. Empty = every caption track in the project.", "type": "string" }
+          }
+        }
+      },
+      list_comfyui_jobs_tool: {
+        name: "list_comfyui_jobs_tool",
+        title: "List ComfyUI jobs",
+        description: `List ComfyUI generation jobs: status (queued, running, canceling, completed, failed, canceled), progress, errors and the Project Files ids they produced.
+
+Use after create_media_with_comfyui_tool / enhance_file_with_comfyui_tool to wait for a result (job_id + wait_seconds) and get imported_file_ids to place with add_clip_to_timeline_tool, or to answer "is my generation done?". Jobs live for this editor session only. A failed job's error says why (e.g. a missing ComfyUI node/model).`,
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/ai_generation_comfyui.py:list_comfyui_jobs",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "active_only": { "default": false, "description": "Only queued, running or canceling jobs.", "type": "boolean" },
+            "job_id": { "default": "", "description": "One job (from create_media_with_comfyui_tool / enhance_file_with_comfyui_tool). Empty = every job this session.", "type": "string" },
+            "wait_seconds": { "default": 0, "description": "With job_id: wait up to this many seconds for the job to finish (0-900) before answering.", "maximum": 900, "minimum": 0, "type": "number" }
+          }
+        }
+      },
+      list_comfyui_templates_tool: {
+        name: "list_comfyui_templates_tool",
+        title: "List ComfyUI templates",
+        description: 'List the local ComfyUI generation templates (AI Tools menu) and whether ComfyUI is set up.\n\nUse before create_media_with_comfyui_tool / enhance_file_with_comfyui_tool, or to answer "what AI tools can I use on this clip?". Each row gives the template id, its menu name and path, the kind (create) or action (enhance) to pass, input/output media and what it needs (prompt, reference image, object selection). comfyui.status is not_configured, unreachable or ready: ComfyUI is optional; when it is not ready say how to enable it (how_to_enable) instead of trying to generate. With file_id: exactly what the Enhance with AI menu offers for that file.',
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/ai_generation_comfyui.py:list_comfyui_templates",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "file_id": { "default": "", "description": "A Project Files id: list what Enhance with AI offers for that file (its media type decides). Empty = the whole catalogue.", "type": "string" },
+            "media_type": { "default": "", "description": "Without file_id: only the Enhance templates for this kind of media.", "enum": ["", "image", "video", "audio"], "type": "string" }
+          }
+        }
+      },
+      list_effects_tool: {
+        name: "list_effects_tool",
+        title: "List effects",
+        description: `List the effects Zenvi can put on clips (libopenshot 1.0's full set: 34 video, 9 audio) with what they do, and, for one effect or with include_properties, every property with its range, default and choices.
+
+Use this to find the right effect and the exact property names before add_effect_tool / update_effect_tool. For common requests prefer the intent tools: color_grade_clip_tool (grades, LUTs, black & white), apply_look_preset_tool (film grain, VHS, glow...), chroma_key_clip_tool (green screen), process_clip_effect_tool (stabilize, track, detect objects), apply_audio_effect_tool (compressor, echo, EQ, robot voice). Effects marked needs_processing analyse the clip first. Example: list_effects_tool(effect="Blur") -> horizontal_radius 0-100, sigma, iterations, mask_mode...`,
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/effects_color.py:list_effects",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "effect": { "default": "", "description": "One effect (class or display name) to describe in full, with every property.", "type": "string" },
+            "include_properties": { "default": false, "description": "Include each listed effect's properties (ranges, defaults, choices).", "type": "boolean" },
+            "kind": { "default": "all", "description": "Only video (picture) or audio (sound) effects.", "enum": ["all", "video", "audio"], "type": "string" },
+            "query": { "default": "", "description": "Filter by words in the name or description ('blur', 'color', 'voice').", "type": "string" }
+          }
+        }
+      },
+      list_export_presets_tool: {
+        name: "list_export_presets_tool",
+        title: "List export presets",
+        description: `List export targets (the Export dialog's Profile / Target / Quality choices) with what they produce.
+
+Each preset has its title (pass it as export_video_tool's preset), category, export_to (Video & Audio / Video Only / Audio Only), container format, video/audio codecs and whether this build can encode them, the Low/Med/High video and audio bitrates, and the video profiles it allows ("any" when it follows the project). Social names like 'tiktok' or 'instagram_reel' also work as export_video_tool presets.`,
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/project_export_render.py:list_export_presets",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "category": { "default": "", "description": "Only this Export dialog 'Profile' group.", "enum": ["", "All Formats", "Web", "Device", "DVD", "Blu-Ray/AVCHD"], "type": "string" },
+            "include_unavailable": { "default": false, "description": "Also list presets whose codec this build cannot encode.", "type": "boolean" },
+            "query": { "default": "", "description": "Words in the preset title, e.g. 'youtube', 'h.264', 'audio'.", "type": "string" }
+          }
+        }
+      },
+      list_luts_tool: {
+        name: "list_luts_tool",
+        title: "List LUTs",
+        description: "List the LUTs (3D color lookup tables, .cube) available for color grading: the 50 built-in ones in 6 categories (Cinematic & Blockbuster, Dark & Moody, Film Stock & Vintage, Teal & Orange Vibes, Utility & Correction, Vibrant & Colorful) plus any in the user's LUT folder. Pass an `id` to color_grade_clip_tool(lut=...) to apply one with an intensity.",
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/effects_color_looks.py:list_luts",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "query": { "default": "", "description": "Filter by words in the LUT name or category ('teal', 'film', 'moody').", "type": "string" }
+          }
+        }
+      },
+      list_project_files_tool: {
+        name: "list_project_files_tool",
+        title: "List project files",
+        description: 'List or filter the Project Files (the media bin): by kind, name/tag search, usage and missing media.\n\nUse it to answer "what footage do I have", "show my b-roll", "which files are unused", "which files are missing", or to get file ids and full media info (resolution, fps, duration, codecs, audio channels) before editing. Each file reports its kind, duration, tags, how many timeline clips use it (with their ids), whether its media is missing on disk, and for videos the optimized-preview state (none/queued/running/ready/missing). Sub-clips made with Split Clip / create_subclips_tool are listed too (with source_in/out). Read-only. Example: usage="unused" before remove_files_from_project_tool(scope="unused").',
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/media_files.py:list_project_files",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "detail": { "default": "summary", "description": "'full' adds media info: size, fps, frames, codecs, sample rate, channels, bit rates, interlacing, aspect ratios, file size, optimized-preview path.", "enum": ["summary", "full"], "type": "string" },
+            "file_ids": { "description": "Only these file ids (e.g. to read full media info).", "items": { "type": "string" }, "type": "array" },
+            "limit": { "default": 100, "description": "Most files to return.", "maximum": 1e3, "minimum": 1, "type": "integer" },
+            "media_type": { "default": "", "description": "Only this kind: video, audio, image, image_sequence or title (SVG titles). '' = every kind.", "enum": ["", "video", "audio", "image", "image_sequence", "title"], "type": "string" },
+            "missing_only": { "default": false, "description": "Only files whose media is missing on disk (moved or deleted; relink them with update_project_files_tool).", "type": "boolean" },
+            "query": { "default": "", "description": "Search text matched against the file name, display name and tags, like the Project Files search box (every word must match). '' = no text filter.", "type": "string" },
+            "tags": { "description": "Only files that have ALL of these tags (case-insensitive).", "items": { "type": "string" }, "type": "array" },
+            "usage": { "default": "", "description": "'unused' = files no timeline clip uses (what 'remove unused files' removes), 'used' = files on the timeline, '' = both.", "enum": ["", "unused", "used"], "type": "string" }
+          }
+        }
+      },
+      list_project_profiles_tool: {
+        name: "list_project_profiles_tool",
+        title: "List video profiles",
+        description: "Search the 425 built-in video profiles plus the user's custom ones (the Choose Profile dialog).\n\nAlso lists the social presets that set_project_profile_tool understands (instagram_reel 1080x1920, instagram_post 1080x1080, instagram_portrait 1080x1350, tiktok, youtube_shorts, youtube, youtube_4k, cinema 24 fps...). Each profile has name (pass it to set_project_profile_tool), key, size, fps, aspect, orientation, interlaced, spherical and user (custom).",
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/project_export_profiles.py:list_project_profiles",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "aspect": { "default": "", "description": "Only this aspect, e.g. '16:9', '9:16', '1:1', '4:5'.", "type": "string" },
+            "fps": { "default": 0, "description": "Only this frame rate, e.g. 24, 29.97, 60. 0 = any.", "minimum": 0, "type": "number" },
+            "height": { "default": 0, "description": "Only profiles this tall (pixels). 0 = any.", "minimum": 0, "type": "integer" },
+            "include_social_presets": { "default": true, "description": "Also list the social preset names (instagram_reel, tiktok, ...).", "type": "boolean" },
+            "limit": { "default": 30, "description": "Maximum profiles returned.", "maximum": 500, "minimum": 1, "type": "integer" },
+            "orientation": { "default": "", "description": "Only this orientation.", "enum": ["", "landscape", "portrait", "square"], "type": "string" },
+            "query": { "default": "", "description": "Words in the profile name, e.g. 'vertical 1080p', 'PAL', '4K'.", "type": "string" },
+            "width": { "default": 0, "description": "Only profiles this wide (pixels). 0 = any.", "minimum": 0, "type": "integer" }
+          }
+        }
+      },
+      list_recent_projects_tool: {
+        name: "list_recent_projects_tool",
+        title: "List recent projects",
+        description: 'List File > Recent Projects, most recent first, with whether each file still exists.\n\nUse the index with open_project_tool(recent_index=N) ("open my last project"), or forget_recent_projects_tool to tidy the list.',
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/project_export.py:list_recent_projects",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {}
+        }
+      },
+      list_recovery_versions_tool: {
+        name: "list_recovery_versions_tool",
+        title: "List recovery versions",
+        description: 'List File > Recovery: the automatic copies saved each time this project was saved, newest first.\n\nUse before restore_recovery_version_tool ("go back to the version from an hour ago"). A project that was never saved has none.',
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/project_export.py:list_recovery_versions",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {}
+        }
+      },
+      list_timeline_transitions_tool: {
+        name: "list_timeline_transitions_tool",
+        title: "List timeline transitions",
+        description: "List the transitions placed on the timeline, with what each one does.\n\nFor each: id, mask shape (fade, wipe_left_to_right, circle_in_to_out...), track, start, end and duration (timeline seconds), direction of the curve ('default' / 'reversed'), edge softness (contrast), audio crossfade, and either the two clips it joins (between_clip_ids, their overlap, and order: 'earlier_to_later' as expected, or 'later_first' = the later clip shows first and flashes back) or the clip edge it fades (on_clip_start = fade in, on_clip_end = fade out). Use before changing, reversing, copying or removing a transition. The catalog of transitions you can add is list_transitions_tool / search_transitions_tool. Read-only.",
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/media_files_transitions.py:list_timeline_transitions",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "at_seconds": { "description": "Only the transition(s) under this timeline time.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "timeline_clip_id": { "default": "", "description": "Only transitions touching this timeline clip.", "type": "string" },
+            "track": { "default": "", "description": "Only this track (UI track number, 1 = bottom; name; or layer number). '' = all.", "type": "string" }
+          }
+        }
+      },
+      list_title_templates_tool: {
+        name: "list_title_templates_tool",
+        title: "List title templates",
+        description: `List title templates (and the titles already in the project) with their editable text fields.
+
+Use before add_title_tool when the user wants a particular look ("lower third", "end card", "gold title"), before edit_title_tool to see a title's current text, and with kind="animated" before add_animated_title_tool. Each static template lists its fields in order (index, role title/subtitle/line, placeholder text), its text colour, background and where its text sits (zone top/center/bottom). Good defaults: Standard_1 (plain centred title + subtitle), Gray_Box_4 (lower third: name + role), Bar_3 / Gold_Bottom (bottom text), OpenShot / Box / Flare (full-screen end card), Standard_4 (credits), Solid_Color (colour card). Example: {"kind": "static", "query": "lower third"}.`,
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/titles_text.py:list_title_templates",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "kind": { "default": "static", "description": "static = the 50 SVG title templates + the user's templates (for add_title_tool); animated = the Blender animated titles and their parameters (for add_animated_title_tool); project = titles already in this project with their current text and the clips using them (for edit_title_tool); all = everything.", "enum": ["static", "animated", "project", "all"], "type": "string" },
+            "query": { "default": "", "description": "Optional filter words matched against name, look and text, e.g. 'lower third', 'gold', 'end card', 'credits', 'Tokyo'.", "type": "string" }
+          }
+        }
+      },
+      manage_custom_profiles_tool: {
+        name: "manage_custom_profiles_tool",
+        title: "Custom video profiles",
+        description: "Create, duplicate, edit or delete custom video profiles, or set the default profile for new projects.\n\nCustom profiles live in the user's profiles folder and appear in the Choose Profile dialog and list_project_profiles_tool. Built-in profiles cannot be edited or deleted (duplicate them instead). The current project's profile and the default profile cannot be deleted. Does not change the open project -- use set_project_profile_tool for that. Not an undo step.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export_profiles.py:manage_custom_profiles",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["action"],
+          properties: {
+            "action": { "description": "create = new profile from the values below; duplicate = copy 'profile' with changes; edit = change a custom profile; delete = remove a custom profile file (never deletes clips); set_default = profile used for new projects (Preferences > Default Profile).", "enum": ["create", "duplicate", "edit", "delete", "set_default"], "type": "string" },
+            "fps": { "default": 0, "description": "Frame rate. 0 = from 'profile' (or 30).", "maximum": 240, "minimum": 0, "type": "number" },
+            "height": { "default": 0, "description": "Height in pixels (even). 0 = from 'profile'.", "maximum": 4e4, "minimum": 0, "type": "integer" },
+            "interlaced": { "default": false, "description": "Interlaced (true) or progressive (false, default).", "type": "boolean" },
+            "name": { "default": "", "description": "Description for a created/duplicated/edited profile; must be unique.", "type": "string" },
+            "pixel_ratio": { "default": "", "description": "Pixel aspect 'num:den' (1:1 for square pixels).", "type": "string" },
+            "profile": { "default": "", "description": "Existing profile name/key (for duplicate, edit, delete, set_default).", "type": "string" },
+            "spherical": { "default": false, "description": "360\xB0 spherical video.", "type": "boolean" },
+            "width": { "default": 0, "description": "Width in pixels (even). 0 = from 'profile'.", "maximum": 4e4, "minimum": 0, "type": "integer" }
+          }
+        }
+      },
+      manage_optimized_previews_tool: {
+        name: "manage_optimized_previews_tool",
+        title: "Optimized previews",
+        description: 'Optimized previews (proxies): smooth playback of heavy media (4K, high bit rate) while editing.\n\n"Optimize the 4K clip for smooth playback" -> action=optimize (a background job builds a small H.264 copy, at most the Optimized Preview Resolution preference, 720p by default; the preview plays the copy, exports always use the original). Poll with action=status or pass wait_seconds. link/unlink/delete/cancel mirror Preview > Optimize; clear_all is Edit > Clear > Optimized Videos. Videos only. Linking/unlinking is one undo step; a finished optimize job links its copy in its own undo step (as the menu does). Never deletes timeline clips or original media.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files.py:manage_optimized_previews",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "action": { "default": "optimize", "description": "optimize = build a small preview copy for smooth playback (runs in the background); status = report progress/state; link = use existing optimized copies from a folder (or proxy_path for one file); unlink = stop using the copy (kept on disk); delete = unlink and delete the copy from disk; cancel = stop a running optimize job; clear_all = unlink and delete every optimized copy in this project's assets folder (Edit > Clear > Optimized Videos; needs confirm).", "enum": ["optimize", "status", "link", "unlink", "delete", "cancel", "clear_all"], "type": "string" },
+            "all_videos": { "default": false, "description": "Act on every video file in the project instead of file_ids/file_query.", "type": "boolean" },
+            "confirm": { "default": false, "description": "Required for clear_all (deletes files from the assets folder).", "type": "boolean" },
+            "file_ids": { "description": "Project file ids (file_id / media_bin_file_id from list_project_files_tool).", "items": { "type": "string" }, "type": "array" },
+            "file_query": { "default": "", "description": "Name one file instead of ids: its name, file name or a tag ('intro.mp4', 'the drone shot').", "type": "string" },
+            "folder": { "default": "", "description": "For action=link: the folder that holds the optimized copies (matched by file name).", "type": "string" },
+            "proxy_path": { "default": "", "description": "For action=link with one file: the exact optimized video to use.", "type": "string" },
+            "wait_seconds": { "default": 0, "description": "For optimize: wait up to this long for the jobs to finish before answering (0 = return at once; poll with action=status).", "maximum": 1800, "minimum": 0, "type": "number" }
+          }
+        }
+      },
+      move_clips_tool: {
+        name: "move_clips_tool",
+        title: "Move clips",
+        description: `Move clips to another time and/or track, nudge them by frames, or reorder a sequence.
+
+Use for "move the intro to the end", "put the drone shot before the beach clip", "move this to track 2", "shift everything on track 1 two seconds later", "nudge it 3 frames left". Several clips keep their spacing and their relative tracks. Give exactly one of position_seconds, by_seconds, by_frames, after_clip_id or before_clip_id (or only to_track).
+
+Without ripple the clips are placed over whatever is there; the tool refuses if that would cover another clip unless allow_overlap=true. With ripple=true the move is a reorder: the hole left behind closes and the clips at the destination slide later to make room, e.g. move the first clip to the end of track 1: timeline_clip_ids=[intro], after_clip_id=<last clip>, ripple=true. position_seconds counts in the timeline as it is before the move. Transitions stay where they are (only clips move). On a crossfaded sequence an insertion point falls inside the previous clip's tail and is refused: reorder first, then add the transitions. One undo step. Locked tracks are refused.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit.py:move_clips",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "after_clip_id": { "default": "", "description": "Place the clip(s) right after this timeline clip, on its track.", "type": "string" },
+            "allow_overlap": { "default": false, "description": "Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.", "type": "boolean" },
+            "before_clip_id": { "default": "", "description": "Place the clip(s) right before this timeline clip, on its track.", "type": "string" },
+            "by_frames": { "default": 0, "description": "Nudge by this many frames (negative = earlier), like Ctrl+Left/Right.", "type": "integer" },
+            "by_seconds": { "default": 0, "description": "Move by this many seconds (negative = earlier).", "type": "number" },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "position_seconds": { "default": -1, "description": "New timeline start of the (first) clip; -1 = keep the time.", "type": "number" },
+            "ripple": { "default": false, "description": "Reorder instead of overwrite: close the hole the clips leave and push the clips at the destination later to make room (use this to reorder a sequence).", "type": "boolean" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_ids": { "default": [], "description": "Timeline clip ids to act on.", "items": { "type": "string" }, "type": "array" },
+            "to_track": { "default": "", "description": "Destination track: UI track number (1 = bottom), name, or layer number. Empty = stay on the same track(s).", "type": "string" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      prepare_recording_tool: {
+        name: "prepare_recording_tool",
+        title: "Prepare recording",
+        description: `Open the Recording panel set up for a voiceover, screen recording or webcam recording, ready for the person to press Record.
+
+Use for "set up a voiceover for this clip", "get ready to record my screen with my webcam in the corner", "record narration onto track 3 at 0:30". It selects the sources, devices, formats, screen area, webcam layout, target track and start time in the Recording dock and returns the resulting setup (ready_to_record, what is selected, the available devices and screens). It never starts recording: the person presses Start Recording, and the clip lands on the timeline when they stop. Choosing mic or webcam turns on the dock's level meter / camera preview as clicking them does. No undo step. Example: {"sources": ["mic"], "timeline_clip_id": "C7"} -> voiceover over clip C7 on the free track below it.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/ai_generation_recording.py:prepare_recording",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "audio_format": { "default": "", "description": "Microphone file format (the dock defaults to flac).", "enum": ["", "wav", "flac", "mp3"], "type": "string" },
+            "channels": { "default": "", "description": "Microphone channels.", "enum": ["", "mono", "stereo"], "type": "string" },
+            "hide_zenvi": { "description": "Screen: hide the Zenvi window while recording a window or region.", "nullable": true, "type": ["boolean", "null"] },
+            "mic_device": { "default": "", "description": "Microphone by name (the dock's Input list); empty = keep.", "type": "string" },
+            "preview": { "default": "", "description": "Play the timeline while recording: off, full, half or quarter resolution (always off when recording the screen).", "enum": ["", "off", "full", "half", "quarter"], "type": "string" },
+            "recording_view": { "default": false, "description": "Also switch the editor to the Recording View layout (View > Recording View).", "type": "boolean" },
+            "sample_rate": { "default": 0, "description": "Microphone sample rate: 44100, 48000 or 96000 (0 = keep).", "minimum": 0, "type": "integer" },
+            "screen": { "default": "", "description": "Which screen to capture, by its name in the dock's Screen list; empty = keep.", "type": "string" },
+            "screen_fps": { "default": 0, "description": "Screen capture frame rate: 15, 24, 30 or 60 (0 = keep).", "minimum": 0, "type": "integer" },
+            "screen_region": { "additionalProperties": false, "description": "Capture only this area of the screen (Region mode): {x, y, width, height} in screen pixels. Omit for the full screen.", "nullable": true, "properties": { "height": { "description": "Height in screen pixels (>= 16).", "type": "number" }, "width": { "description": "Width in screen pixels (>= 16).", "type": "number" }, "x": { "description": "Left edge in screen pixels.", "type": "number" }, "y": { "description": "Top edge in screen pixels.", "type": "number" } }, "required": ["x", "y", "width", "height"], "type": ["object", "null"] },
+            "show_cursor": { "description": "Screen: include the mouse cursor.", "nullable": true, "type": ["boolean", "null"] },
+            "sources": { "description": "What to record: mic (voice), screen, webcam; any combination. Empty = keep the dock's current choice.", "items": { "enum": ["mic", "screen", "webcam"], "type": "string" }, "type": "array" },
+            "start_seconds": { "description": "Timeline seconds where the recording will be placed (also moves the playhead there). Omit = wherever the playhead is when Record is pressed.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "system_audio": { "description": "Screen: also record the computer's sound output.", "nullable": true, "type": ["boolean", "null"] },
+            "timeline_clip_id": { "default": "", "description": "Record over this clip, like its menu's Audio > Record: starts at the clip, on the nearest free unlocked track below it (track/start_seconds override).", "type": "string" },
+            "track": { "default": "", "description": "Track for the recording: UI track number (1 = bottom), name or layer number; extra sources go on the tracks below it. 'none' = add to Project Files only. Empty = keep.", "type": "string" },
+            "webcam_corners": { "default": "", "description": "Webcam frame shape.", "enum": ["", "rectangle", "rounded", "oval"], "type": "string" },
+            "webcam_device": { "default": "", "description": "Webcam by name; empty = keep.", "type": "string" },
+            "webcam_fps": { "default": 0, "description": "Webcam recording frame rate (0 = keep).", "minimum": 0, "type": "integer" },
+            "webcam_layout": { "default": "", "description": "Where the webcam sits over a screen recording.", "enum": ["", "bottom-right", "top-right", "bottom-left", "top-left", "left", "right", "center", "full"], "type": "string" },
+            "webcam_resolution": { "default": "", "description": "Webcam resolution such as '1280x720' (from the dock's list); empty = keep.", "type": "string" },
+            "webcam_size": { "default": 0, "description": "Webcam corner size over a screen recording: 0.2, 0.3 or 0.4 of the frame (0 = keep).", "maximum": 0.4, "minimum": 0, "type": "number" }
+          }
+        }
+      },
+      process_clip_effect_tool: {
+        name: "process_clip_effect_tool",
+        title: "Stabilize / track / detect",
+        description: `Run an analysis effect on a video clip, off the GUI thread, and add the result as an effect: "stabilize the shaky shot" (Stabilizer), "track the ball / the car" (Tracker with a region box), "detect people" (ObjectDetection, YOLO), "cut out the person / mask the dog" (ObjectMask with points or a box). Takes seconds to minutes (about real time for Stabilizer); changes nothing on failure or timeout; one undo step.
+
+The result's tracked objects (Tracker/ObjectDetection/ObjectMask) can drive other effects: add Blur or Pixelate with properties {"mask_source_id": "<effect_id>"} to blur only the tracked object ("blur the face / licence plate"), plus "mask_invert": 1 to blur everything else ("blur the background"). Use analyze_frame_colors_tool(save_frame_path=...) to look at a frame before picking a region. Model files are downloaded only with download_model=true. Refused: still images, audio-only clips, locked tracks, a missing region/points, builds without OpenCV. Example: effect="Tracker", region={"x":0.42,"y":0.30,"width":0.12,"height":0.20}, region_time=3.0.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/effects_color_process.py:process_clip_effect",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["effect"],
+          properties: {
+            "boxes": { "description": 'ObjectMask: box(es) around the object, [{"x", "y", "width", "height"}] (fractions).', "items": { "type": "object" }, "type": "array" },
+            "class_filter": { "default": "", "description": "ObjectDetection: only show these labels, comma separated ('person,car').", "type": "string" },
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "confidence": { "description": "ObjectDetection: minimum confidence 0-1 (default 0.25).", "maximum": 1, "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "device": { "default": "CPU", "description": "ObjectDetection/ObjectMask processing device.", "enum": ["CPU", "GPU_AUTO", "GPU_CUDA", "GPU_OPENCL"], "type": "string" },
+            "download_model": { "default": false, "description": "Download the model files if missing (Object Detector ~10-90 MB, Object Mask ~175 MB, from the OpenShot model releases, sha256-verified).", "type": "boolean" },
+            "effect": { "description": "Stabilizer = remove camera shake; Tracker = follow a boxed object; ObjectDetection = find people/cars/animals... (YOLO); ObjectMask = cut out an object you point at.", "enum": ["Stabilizer", "Tracker", "ObjectDetection", "ObjectMask"], "type": "string" },
+            "if_exists": { "default": "auto", "description": "If the clip already has this effect: auto = replace a Stabilizer/Object Detector, add another Tracker/Object Mask; update = replace; add = keep both.", "enum": ["auto", "update", "add"], "type": "string" },
+            "interpolation": { "default": "bezier", "description": "Default interpolation for keyframes that do not name one.", "enum": ["bezier", "linear", "constant"], "type": "string" },
+            "mask_quality": { "default": "", "description": "ObjectMask Cutie tracking quality ('' = recommended medium).", "enum": ["", "cutie-low", "cutie-medium", "cutie-high"], "type": "string" },
+            "model": { "default": "", "description": "ObjectDetection model ('' = recommended YOLO26 Nano; yoloe-* know more labels).", "enum": ["", "yolo26n-seg", "yolo26s-seg", "yolo26m-seg", "yoloe-26n-seg", "yoloe-26s-seg", "yoloe-26m-seg", "yolo11n-seg", "yolo11s-seg", "yolo11m-seg"], "type": "string" },
+            "negative_points": { "description": "ObjectMask: points NOT on the object (background).", "items": { "type": "object" }, "type": "array" },
+            "points": { "description": 'ObjectMask: points ON the object, [{"x": 0.5, "y": 0.4}] (fractions).', "items": { "type": "object" }, "type": "array" },
+            "properties": { "description": 'Effect properties to set, as {name: value}. A value is a number, true/false, a choice name ("HSV/HSL hue"), a color ("#00ff00") or text; or keyframes [{"time": 2.0, "value": 10, "interpolation": "linear"}] in timeline seconds to animate it. list_effects_tool(effect=...) lists every property with its range, default and choices.', "type": "object" },
+            "region": { "description": 'Tracker: box around the object at region_time, {"x", "y", "width", "height"} as fractions of the frame (0,0 = top-left).', "type": "object" },
+            "region_time": { "description": "Tracker/ObjectMask: timeline seconds of the frame the region/points refer to (default: the clip's first frame).", "nullable": true, "type": ["number", "null"] },
+            "smoothing": { "default": 30, "description": "Stabilizer: frames averaged, 1-100 (30 default; higher = steadier, more crop).", "maximum": 100, "minimum": 1, "type": "integer" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "timeout_seconds": { "default": 900, "description": "Give up (changing nothing) after this long.", "maximum": 3600, "minimum": 5, "type": "number" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" },
+            "tracker_type": { "default": "KCF", "description": "Tracker algorithm: KCF fast (default), CSRT most accurate, MOSSE fastest.", "enum": ["KCF", "CSRT", "MIL", "BOOSTING", "TLD", "MEDIANFLOW", "MOSSE"], "type": "string" }
+          }
+        }
+      },
+      remove_captions_tool: {
+        name: "remove_captions_tool",
+        title: "Remove captions",
+        description: `Remove captions (Caption effects) from clips. It never deletes clips.
+
+Use for "remove the captions / subtitles". Target one caption track by effect_id, the captions of one clip by timeline_clip_id / clip_query, or all_captions=true. The clips themselves stay; a transparent 'Captions' overlay clip that carried them stays too (delete it with delete_from_timeline_tool if the user wants it gone). One undo step brings the captions back.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/titles_text_captions.py:remove_captions",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "all_captions": { "default": false, "description": "Remove every caption track in the project.", "type": "boolean" },
+            "clip_query": { "default": "", "description": "Describe the captioned clip instead of an id.", "type": "string" },
+            "effect_id": { "default": "", "description": "Caption effect id from list_captions_tool.", "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "Remove the captions of this clip.", "type": "string" }
+          }
+        }
+      },
+      remove_effect_tool: {
+        name: "remove_effect_tool",
+        title: "Remove effect",
+        description: 'Remove effects from clips (effect badge > Remove Effect). It never deletes timeline clips; to delete clips use delete_from_timeline_tool. Target effect ids, or an effect name on clip(s) ("remove the blur", "take the green screen key off"), or all_effects=true to strip every effect. For Look presets you can also use apply_look_preset_tool(look="reset_look"). One undo step.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/effects_color.py:remove_effect",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "all_effects": { "default": false, "description": "Remove every effect from the target clip(s).", "type": "boolean" },
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "effect": { "default": "", "description": "Instead of ids: remove this effect (Blur, ChromaKey...) from the target clip(s).", "type": "string" },
+            "effect_ids": { "description": "Effect ids to remove (get_clip_effects_tool lists them).", "items": { "type": "string" }, "type": "array" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "timeline_clip_ids": { "description": "Several timeline clip ids to change in one step.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      remove_files_from_project_tool: {
+        name: "remove_files_from_project_tool",
+        title: "Remove files from project",
+        description: `Remove files from Project Files (Remove from Project). The media on disk is never deleted.
+
+Use for "remove unused files" (scope="unused": safe, no clip is touched), "clean up the missing files" (scope="missing"), or "remove intro.mp4 from the project". A file that is used on the timeline takes its timeline clips with it, so the call is refused until confirm_remove_clips=true; confirm with the user first. Refused when such a clip sits on a locked track. Cancels the file's AI generation and optimize jobs. One undo step restores the files and their clips. To delete clips but keep the file use delete_from_timeline_tool; this tool never deletes clips of other files.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files.py:remove_files_from_project",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "confirm_remove_clips": { "default": false, "description": "Required when a chosen file is used on the timeline: its timeline clips are removed with it. Ask the user first.", "type": "boolean" },
+            "file_ids": { "description": "Project file ids (file_id / media_bin_file_id from list_project_files_tool).", "items": { "type": "string" }, "type": "array" },
+            "file_query": { "default": "", "description": "Name one file instead of ids: its name, file name or a tag ('intro.mp4', 'the drone shot').", "type": "string" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'unused' = every file no timeline clip uses, 'missing' = every file whose media is gone from disk.", "enum": ["", "unused", "missing"], "type": "string" }
+          }
+        }
+      },
+      remove_gaps_tool: {
+        name: "remove_gaps_tool",
+        title: "Remove gaps",
+        description: 'Close empty space on a track by sliding the later clips and transitions left. Never deletes timeline clips.\n\nUse for "remove the gaps", "close the gap between the clips", "pack track 1 together", and to finish a ripple delete: delete_from_timeline_tool removes a clip and leaves a hole, then remove_gaps_tool(track=<its track>, from_seconds=<where it started>, only_first=true) closes exactly that hole. Clips that overlap (crossfades) move together, like Track menu > Remove All Gaps. Other tracks are not touched, so music or voice-over on another track stays where it is. Returns the gaps closed. One undo step; nothing to close is not an error.',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit.py:remove_gaps",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "from_seconds": { "default": 0, "description": "Only close gaps that end after this timeline time (0 = the whole track, including empty space before the first clip).", "minimum": 0, "type": "number" },
+            "only_first": { "default": false, "description": "Close just the first gap at/after from_seconds (Remove Gap) instead of all of them (Remove All Gaps).", "type": "boolean" },
+            "track": { "default": "", "description": "Track to close gaps on: UI track number (1 = bottom), name, or layer number. Empty = the one track that has gaps (refused when several do).", "type": "string" }
+          }
+        }
+      },
+      remove_keyframes_tool: {
+        name: "remove_keyframes_tool",
+        title: "Remove keyframes",
+        description: `Remove keyframes (animation points) from clip properties; never deletes clips.
+
+Use it for "remove the zoom", "stop it moving", "delete the keyframe at 3 s", "clear all animation on these clips". Give the properties (or ["all"] = every animated property) and optionally a timeline time range; without a range every keyframe of those properties goes. When a property loses its last keyframe it falls back to the Properties dock default (alpha 1, scale 1, location 0, rotation 0, shear 0, origin 0.5, volume 1), exactly like Remove Keyframe in the Properties dock; to keep some other fixed value use set_clip_properties_tool instead. To remove fades use apply_clip_preset_tool(preset='fade_none'). One undo step.
+
+Example: remove_keyframes_tool(timeline_clip_ids=["ABC123"], properties=["scale_x", "scale_y"])`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/clip_props.py:remove_keyframes",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["properties"],
+          properties: {
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "end_seconds": { "description": "Only remove keyframes at or before this timeline time (seconds).", "nullable": true, "type": ["number", "null"] },
+            "properties": { "description": 'Properties whose keyframes to remove (keys or labels), or ["all"] for every animated property.', "items": { "type": "string" }, "type": "array" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "start_seconds": { "description": "Only remove keyframes at or after this timeline time (seconds).", "nullable": true, "type": ["number", "null"] },
+            "timeline_clip_ids": { "description": "Timeline clip ids to act on (from get_timeline_state_tool).", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      remove_marker_tool: {
+        name: "remove_marker_tool",
+        title: "Remove marker",
+        description: `Remove timeline markers (Marker menu > Remove Marker). It never deletes clips, tracks or anything else.
+
+Target one way: markers = ids or exact names (a name several markers share is refused with their ids), at_seconds = the marker at that time (nearest within 0.5 s), or all=true. One undo step brings them back. Example: "remove the Drop marker" -> markers=['Drop']; "clear all markers" -> all=true.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/tracks_nav.py:remove_marker",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "all": { "default": false, "description": "Remove every marker on the timeline.", "type": "boolean" },
+            "at_seconds": { "description": "Remove the marker at this timeline time (the nearest marker within half a second).", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "markers": { "description": "Markers to remove, each a marker_id (from list_markers_tool) or an exact marker name.", "items": { "type": "string" }, "type": "array" }
+          }
+        }
+      },
+      remove_track_tool: {
+        name: "remove_track_tool",
+        title: "Remove track",
+        description: "Remove a track lane from the timeline (Track menu > Remove Track).\n\nIt never deletes clips unless with_clips=true: a track that still holds clips or transitions is refused with how many it has. with_clips=true deletes the lane together with its clips and transitions, in one undo step (undo brings everything back). To delete the clips but keep the lane use delete_from_timeline_tool with scope='track'. Locked tracks and the last remaining track cannot be removed. The tracks above move down one number; the result's `tracks` list is the new numbering. Example: \"remove the empty track\" -> track='3'.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/tracks_nav.py:remove_track",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["track"],
+          properties: {
+            "track": { "description": "Track lane to remove: UI track number (1 = bottom), track name, track id (L3) or layer number.", "type": "string" },
+            "with_clips": { "default": false, "description": "The track still has clips or transitions: true deletes them together with the lane (Track menu > Remove Track); false refuses, so tidying up empty lanes never deletes clips by accident.", "type": "boolean" }
+          }
+        }
+      },
+      remove_transition_tool: {
+        name: "remove_transition_tool",
+        title: "Remove transition",
+        description: `Remove transitions from the timeline (Transition menu > Remove Transition). Never deletes clips.
+
+The clips stay exactly where they are: two clips that overlapped keep overlapping and now cut at the start of the later clip. "Remove all transitions on track 2" -> scope='track', track='2'. One undo step brings them back. Refused on locked tracks. To delete timeline clips use delete_from_timeline_tool.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files_transitions.py:remove_transition",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "at_seconds": { "description": "Instead of ids: the transition under this timeline time (on `track` when given).", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "between_clip_ids": { "description": "Instead of ids: the two timeline clip ids the transition joins, e.g. [clip_a, clip_b].", "items": { "type": "string" }, "type": "array" },
+            "scope": { "default": "", "description": "'selected' = selected transitions, 'track' = every transition on `track`, 'all' = every transition on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "track": { "default": "", "description": "Track to look on (UI track number, 1 = bottom; name; or layer number). With scope='track' every transition on it.", "type": "string" },
+            "transition_ids": { "description": "Transition ids (list_timeline_transitions_tool or get_timeline_state_tool 'Effects/Transitions'). Preferred.", "items": { "type": "string" }, "type": "array" }
+          }
+        }
+      },
+      repeat_clip_tool: {
+        name: "repeat_clip_tool",
+        title: "Repeat clip",
+        description: `Loop a clip's playback N times within one timeline clip (Clip menu > Speed > Repeat).
+
+Use for "loop the beat 4 times" (times=4), "boomerang this" (pattern='ping_pong', times=3), "repeat it with a half-second pause" (delay_seconds=0.5), "loop it, speeding up each time" (speed_ramp_percent=25). The clip becomes N times as long (plus delays); the tool refuses to run into the next clip unless ripple=true or allow_overlap=true. A clip that is already looped must be reset first (set_clip_speed_tool reset=true) or undone. To place separate copies instead, use duplicate_clips_tool. One undo step.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit_time.py:repeat_clip",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "allow_overlap": { "default": false, "description": "Let the longer clip overlap the next clip on its track (the receipt lists it). Off by default: the tool refuses and says what is in the way.", "type": "boolean" },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "delay_seconds": { "default": 0, "description": "Pause (hold the last frame) between passes.", "maximum": 60, "minimum": 0, "type": "number" },
+            "pattern": { "default": "loop", "description": "loop = start over each time; ping_pong = forward, backward, forward...", "enum": ["loop", "ping_pong"], "type": "string" },
+            "reverse": { "default": false, "description": "Start the first pass backwards.", "type": "boolean" },
+            "ripple": { "default": false, "description": "Shift the later clips on the track by the change in length, so nothing overlaps and no gap opens.", "type": "boolean" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "speed_ramp_percent": { "default": 0, "description": "Each pass plays this much faster (+) or slower (-) than the one before, in percent.", "maximum": 1e3, "minimum": -90, "type": "number" },
+            "timeline_clip_ids": { "default": [], "description": "Timeline clip ids to act on.", "items": { "type": "string" }, "type": "array" },
+            "times": { "default": 2, "description": "How many times the clip plays in total (2 = the clip then one repeat).", "maximum": 500, "minimum": 2, "type": "integer" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      reset_caches_and_history_tool: {
+        name: "reset_caches_and_history_tool",
+        title: "Reset caches / history",
+        description: "Clear the playback frame cache, the stored waveform data, or the undo history.\n\nplayback_cache is harmless (frames re-render). waveforms is one undo step (waveforms are regenerated when shown again). undo_history empties undo and redo for this session and marks the project unsaved; it needs confirm=true. Never deletes clips or media.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export.py:reset_caches_and_history",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["target"],
+          properties: {
+            "confirm": { "default": false, "description": "Must be true for undo_history: it cannot be undone. Ask the user first.", "type": "boolean" },
+            "target": { "description": "playback_cache = drop cached preview frames (Ctrl+Shift+Esc; fixes stale previews); waveforms = drop stored waveform data from files and clips (Edit > Clear > Waveform); undo_history = forget every undo/redo step (Edit > Clear > History).", "enum": ["playback_cache", "waveforms", "undo_history"], "type": "string" }
+          }
+        }
+      },
+      restore_recovery_version_tool: {
+        name: "restore_recovery_version_tool",
+        title: "Restore recovery version",
+        description: "Replace the project file with one of its recovery copies and reopen it (File > Recovery).\n\nThe current project file is kept first as '<name>-<time>-backup.zvn' next to it, so nothing is lost. Refuses while there are unsaved changes unless discard_unsaved=true. Undo history becomes the restored file's history.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export.py:restore_recovery_version",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "discard_unsaved": { "default": false, "description": "Throw away unsaved changes in the open project. Only after the user agreed.", "type": "boolean" },
+            "version": { "default": 1, "description": "Which copy from list_recovery_versions_tool: 1 = newest.", "minimum": 1, "type": "integer" }
+          }
+        }
+      },
+      reverse_transition_tool: {
+        name: "reverse_transition_tool",
+        title: "Reverse transition",
+        description: `Reverse transitions (Transition menu > Reverse Transition): play the transition backwards.
+
+Mirrors the progress and edge curves in time. Right for a fade on ONE clip edge: a fade-in becomes a fade-out and back. On a crossfade/wipe BETWEEN two clips it makes the later clip show first and the earlier one flash back before the cut (the receipt's order becomes 'later_first'), which is rarely wanted: for "make the wipe go the other way" use update_transition_tool(flip_wipe_side=true). Several transitions in one undo step (scope='track' reverses a whole track). Refused on locked tracks; never deletes clips.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files_transitions.py:reverse_transition",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "at_seconds": { "description": "Instead of ids: the transition under this timeline time (on `track` when given).", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "between_clip_ids": { "description": "Instead of ids: the two timeline clip ids the transition joins, e.g. [clip_a, clip_b].", "items": { "type": "string" }, "type": "array" },
+            "scope": { "default": "", "description": "'selected' = selected transitions, 'track' = every transition on `track`, 'all' = every transition on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "track": { "default": "", "description": "Track to look on (UI track number, 1 = bottom; name; or layer number). With scope='track' every transition on it.", "type": "string" },
+            "transition_ids": { "description": "Transition ids (list_timeline_transitions_tool or get_timeline_state_tool 'Effects/Transitions'). Preferred.", "items": { "type": "string" }, "type": "array" }
+          }
+        }
+      },
+      save_frame_image_tool: {
+        name: "save_frame_image_tool",
+        title: "Save frame as image",
+        description: `Save one frame of the timeline as a full-resolution image (File > Save Current Frame).
+
+For a thumbnail or still ("save this frame", "grab a still at 12 s"). Renders at the project's full size, not the preview size. Changes nothing in the project.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export_render.py:save_frame_image",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "file_path": { "default": "", "description": "Output image path (.png or .jpg). Empty = the export folder, 'Frame-<n>.png'.", "type": "string" },
+            "overwrite": { "default": false, "description": "Replace an existing file.", "type": "boolean" },
+            "time": { "default": -1, "description": "Timeline seconds of the frame. -1 = the playhead.", "minimum": -1, "type": "number" }
+          }
+        }
+      },
+      search_emojis_tool: {
+        name: "search_emojis_tool",
+        title: "Search emoji",
+        description: `Find emoji in the Emojis dock's 1,239 OpenMoji stickers by name, character, code or group.
+
+The set has faces, animals, food, travel, activities, objects and symbols (no people, hands or flags).
+
+Use when the user wants to see options ("what fire emojis are there", "show me food emoji") or when add_emoji_tool picked the wrong one. Each match has the emoji character, its name, group and code (pass the code to add_emoji_tool). Read-only.`,
+        assistant: false,
+        desktopReadOnly: true,
+        handler: "src/classes/editor_tools/titles_text_overlays.py:search_emojis",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "group": { "default": "", "description": "Only this emoji group (the Emojis dock's dropdown). Empty = all.", "enum": ["", "smileys-emotion", "animals-nature", "food-drink", "travel-places", "activities", "objects", "symbols", "extras-openmoji", "user"], "type": "string" },
+            "limit": { "default": 10, "description": "How many matches to return.", "maximum": 50, "minimum": 1, "type": "integer" },
+            "query": { "default": "", "description": "A name or word ('fire', 'heart', 'thumbs up', 'coffee'), an emoji character ('\u{1F525}') or an OpenMoji code ('1F525'). Empty lists a group.", "type": "string" }
+          }
+        }
+      },
+      seek_playhead_tool: {
+        name: "seek_playhead_tool",
+        title: "Move playhead",
+        description: `Move the playhead (go to a time, frame, marker, the start/end, or the next/previous marker or cut).
+
+Give exactly one of: seconds (timeline seconds: "go to 1:05" -> 65), frame, marker (a name like 'Drop' or a marker_id), or to = 'start' | 'end' | 'next_marker' | 'previous_marker' | 'next_edit' | 'previous_edit'. The preview shows the frame there and the Properties panel follows it. play=true starts playback from the new position. The result has the playhead frame, seconds and timecode (HH:MM:SS,FF as on the ruler), and whether it is playing. Examples: "jump to the drop" -> marker='Drop'; "play from the start" -> to='start', play=true; "next cut on track 1" -> to='next_edit', track='1'.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/tracks_nav.py:seek_playhead",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "frame": { "description": "Go to this 1-based timeline frame.", "minimum": 1, "nullable": true, "type": ["integer", "null"] },
+            "marker": { "default": "", "description": "Go to the marker with this name or marker_id (see list_markers_tool).", "type": "string" },
+            "play": { "default": false, "description": "Start playback from the new position (e.g. 'play from the start' = to='start', play=true).", "type": "boolean" },
+            "seconds": { "description": "Go to this timeline time in seconds (0:32 = 32, 1:05 = 65).", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "to": { "default": "", "description": "Go to: 'start' / 'end' of the timeline (Home / End); 'next_marker' / 'previous_marker' (the editor's Next / Previous Marker: markers, the timeline start and end, and the edges and keyframes of selected clips); 'next_edit' / 'previous_edit' (the nearest clip start or end: a cut point).", "enum": ["", "start", "end", "next_marker", "previous_marker", "next_edit", "previous_edit"], "type": "string" },
+            "track": { "default": "", "description": "For to='next_edit' / 'previous_edit': only clip edges on this track (UI track number (1 = bottom), track name, track id (L3) or layer number).", "type": "string" }
+          }
+        }
+      },
+      select_timeline_items_tool: {
+        name: "select_timeline_items_tool",
+        title: "Select on timeline",
+        description: `Select clips, transitions or effects on the timeline, as clicking, Ctrl+click, Ctrl+A or Alt+A would.
+
+The selection is what the Properties panel shows and what other tools use for scope='selected'. Say what to select with ids, clip_query, track (every clip on it) and/or a time range (start_seconds..end_seconds, on every track or on \`track\`). mode: 'replace' (default), 'add', 'remove', 'all', 'none', 'ripple'. Returns the resulting selection. Selecting is not an undo step and does not change the project. Examples: "select every clip on track 1" -> track='1'; "select the clips between 0:10 and 0:20" -> start_seconds=10, end_seconds=20; "deselect everything" -> mode='none'.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/tracks_nav.py:select_timeline_items",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids (file name or content, e.g. 'the interview clip'); track narrows it.", "type": "string" },
+            "effect_ids": { "description": "Effect ids from a clip's effects; the Properties panel then shows that effect.", "items": { "type": "string" }, "type": "array" },
+            "end_seconds": { "description": "End of the time range.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "include_transitions": { "default": false, "description": "With track or a time range: also select the transitions there.", "type": "boolean" },
+            "mode": { "default": "replace", "description": "'replace' (default) = select exactly these; 'add' / 'remove' = add them to / take them out of the current selection; 'all' = every clip and transition (Ctrl+A); 'none' = clear the selection (Ctrl+Shift+A); 'ripple' = these (or the current selection) plus everything after them on the same track (Alt+A).", "enum": ["replace", "add", "remove", "all", "none", "ripple"], "type": "string" },
+            "show_properties": { "default": false, "description": "Also bring the Properties panel to the front, like double-clicking a clip.", "type": "boolean" },
+            "start_seconds": { "description": "Clips overlapping the range start_seconds..end_seconds (timeline seconds). Without end_seconds: clips under that moment.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "timeline_clip_ids": { "description": "Timeline clip ids (list_clips_tool / get_timeline_state_tool).", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Every clip on this track (UI track number (1 = bottom), track name, track id (L3) or layer number); with start/end only the clips in that range.", "type": "string" },
+            "transition_ids": { "description": "Transition ids.", "items": { "type": "string" }, "type": "array" }
+          }
+        }
+      },
+      separate_clip_audio_tool: {
+        name: "separate_clip_audio_tool",
+        title: "Separate audio",
+        description: `Split a clip's sound onto its own audio-only clip and mute the original (Clip menu > Audio > Separate Audio).
+
+Use for "separate the audio from the talking-head clip", "detach the sound so I can move it", "put the left and right channels on their own tracks" (per_channel=true). The new clip covers the same time, plays only sound (video off) and goes on the track below (or to_track); the original keeps its picture with its audio turned off. Refused for clips without audio, clips whose audio is already off, and when the destination is locked or already has clips there (unless allow_overlap=true). One undo step. Returns the new audio clip ids.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit_time.py:separate_clip_audio",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "allow_overlap": { "default": false, "description": "Put the audio clip there even if it overlaps clips already on that track.", "type": "boolean" },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "per_channel": { "default": false, "description": "One audio clip per channel (left/right...) on successive tracks below, instead of one clip with all channels.", "type": "boolean" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_ids": { "default": [], "description": "Timeline clip ids to act on.", "items": { "type": "string" }, "type": "array" },
+            "to_track": { "default": "", "description": "Track for the new audio clip: UI track number (1 = bottom), name, or layer number. Empty = the track directly below (created when there is none), like the menu.", "type": "string" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      set_clip_audio_video_tool: {
+        name: "set_clip_audio_video_tool",
+        title: "Clip audio/video on-off",
+        description: `Turn a clip's sound or picture on or off, or show/hide its waveform on the timeline.
+
+Use for "mute this clip" (audio='off'), "unmute it" (audio='auto'), "make it audio only" / "hide the video but keep the sound" (video='off'), "show the waveform" (waveform='show'). This switches the track of sound or picture entirely; to change how loud a clip is use set_clip_volume_tool, and to get the sound onto its own clip use separate_clip_audio_tool. Refused on locked tracks and for 'on'/'show' when the media has no audio/video. Already in that state is not an error (no undo step). One undo step. Waveforms are drawn a moment later.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit_time.py:set_clip_audio_video",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "audio": { "default": "", "description": "Clip sound: off = mute the clip entirely, on = force on, auto = as the media has it (Properties > Enable Audio). '' = leave it.", "enum": ["", "on", "off", "auto"], "type": "string" },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_ids": { "default": [], "description": "Timeline clip ids to act on.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" },
+            "video": { "default": "", "description": "Clip picture: off = sound only (audio-only clip), on/auto = show the picture (Properties > Enable Video). '' = leave it.", "enum": ["", "on", "off", "auto"], "type": "string" },
+            "waveform": { "default": "", "description": "Draw the clip's audio waveform on the timeline, or hide it.", "enum": ["", "show", "hide"], "type": "string" }
+          }
+        }
+      },
+      set_clip_properties_tool: {
+        name: "set_clip_properties_tool",
+        title: "Set clip properties",
+        description: 'Set one or more properties of one or more timeline clips to fixed values.\n\nUse it for "make it 50% transparent" (alpha 0.5), "use the multiply blend mode" (composite), "fit/fill the frame" (scale Best Fit / Crop), "pin it to the top right" (gravity), "make it half size" (scale_x/scale_y 0.5), "move it left" (location_x), "tilt it 10 degrees" (rotation), "mirror it" (scale_x -1; mirrors in place only with a centred gravity, otherwise the receipt warns), "rounded corners" (corner_radius), "turn it down" (volume), "show frame numbers" (display). Several properties and several clips in one call, one undo step. A static value replaces any animation of that property (the receipt says so); to animate or change only part of a curve use set_keyframes_tool, and for fades, zooms, slides or layouts use apply_clip_preset_tool. Timeline position, trim and track are not properties here (use the timeline editing tools). Clips on locked tracks are refused (or skipped with scope).\n\nExample: set_clip_properties_tool(timeline_clip_ids=["ABC123"], properties={"alpha": 0.5, "composite": "multiply"})',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/clip_props.py:set_clip_properties",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["properties"],
+          properties: {
+            "at_seconds": { "description": "Leave empty for static values (an animated property is flattened to the new value). Give a timeline time (seconds) to set the value only at that moment, as a keyframe, like editing in the Properties dock with the playhead there; other keyframes stay.", "nullable": true, "type": ["number", "null"] },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "properties": { "description": 'Property -> value, several at once. Keys are property keys or their Properties-dock labels; values are numbers, choice names or colors. Examples: {"alpha": 0.5} (50% opacity), {"scale": "Best Fit"} (Crop | Best Fit | Stretch | None), {"gravity": "top right"}, {"composite": "multiply"} (blend mode: Normal, Darken, Multiply, Color Burn, Lighten, Screen, Color Dodge, Add, Overlay, Soft Light, Hard Light, Difference, Exclusion), {"scale_x": 0.4, "scale_y": 0.4}, {"location_x": 0.25} (-1..1 = one frame width), {"rotation": 15} (degrees), {"scale_x": -1} (mirror; in place only with a centred gravity such as Center), {"corner_radius": 0.1, "margin": 0.04}, {"volume": 0.8} (0-1.3), {"wave_color": "#ff8800"}, {"display": "Timeline"} (frame-number overlay), {"mixing": "Average"}, {"waveform": true}.', "type": "object" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_ids": { "description": "Timeline clip ids to act on (from get_timeline_state_tool).", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      set_clip_speed_tool: {
+        name: "set_clip_speed_tool",
+        title: "Change clip speed",
+        description: `Speed clips up or slow them down, play them backwards, or retime them to an exact length (Clip menu > Speed). Keyframes and the audio follow the new timing.
+
+Use for "speed up the drone shot 2x" (speed=2), "slow motion" (speed=0.5), "play it in reverse" (reverse=true), "make this clip exactly 3 seconds" (target_duration_seconds=3), "back to normal speed" (speed=1, absolute=true keeps the same part of the source; reset=true is the menu's Reset). speed combines with reverse. Speeds from 1/16x to 16x.
+
+A slower clip gets longer and may run into the next clip on its track: the tool refuses unless ripple=true (push later clips along) or allow_overlap=true. Looped clips (repeat_clip_tool) need reset=true before a new speed. For a still frame use freeze_frame_tool; to loop use repeat_clip_tool. One undo step for all clips. Returns each clip's length before/after and its effective speed.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit_time.py:set_clip_speed",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "absolute": { "default": false, "description": "Read speed relative to the original media instead (1 = normal speed, 2 = double normal), keeping the same part of the source.", "type": "boolean" },
+            "allow_overlap": { "default": false, "description": "Let the longer clip overlap the next clip on its track (the receipt lists it). Off by default: the tool refuses and says what is in the way.", "type": "boolean" },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "reset": { "default": false, "description": "Clip > Speed > Reset first: normal speed, forward, loops removed. Like the menu, the clip then runs from its in point to the end of its source.", "type": "boolean" },
+            "reverse": { "default": false, "description": "Flip the playback direction (a reversed clip plays forward again).", "type": "boolean" },
+            "ripple": { "default": false, "description": "Shift the later clips on the track by the change in length, so nothing overlaps and no gap opens.", "type": "boolean" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "speed": { "default": 0, "description": "Speed factor relative to how the clip plays now: 2 = twice as fast (half as long), 0.5 = half speed, 1.5, 4... 0 = leave the speed alone.", "maximum": 16, "minimum": 0, "type": "number" },
+            "target_duration_seconds": { "default": 0, "description": "Retime so the clip lasts exactly this long on the timeline (speeds up or slows down as needed); 0 = unused.", "minimum": 0, "type": "number" },
+            "timeline_clip_ids": { "default": [], "description": "Timeline clip ids to act on.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      set_editor_layout_tool: {
+        name: "set_editor_layout_tool",
+        title: "Change editor layout",
+        description: `Rearrange the editor window: switch view, open/close panels and scopes, toolbar, fullscreen, custom views.
+
+Use for "switch to the color view", "show the scopes", "open the properties panel", "go fullscreen", "save this layout as Review". Uses the View menu's own actions. Not an undo step (layout is an editor preference). Example: {"view": "color"}; {"show_panels": ["Histogram"], "save_view_as": "Grade"}`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export_views.py:set_editor_layout",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "delete_view": { "default": "", "description": "Delete this saved custom view (by name). Never touches the project.", "type": "string" },
+            "dock_all": { "default": false, "description": "Dock every floating panel back into the window.", "type": "boolean" },
+            "fullscreen": { "default": "", "description": "Enter or leave fullscreen.", "enum": ["", "on", "off"], "type": "string" },
+            "hide_panels": { "description": "Panels to close (default none).", "items": { "type": "string" }, "type": "array" },
+            "save_view_as": { "default": "", "description": "After the changes, save the layout as a new custom view with this name.", "type": "string" },
+            "scopes": { "default": "", "description": "Open or close every scope (Histogram, Luma Waveform, Vectorscope, Audio Levels).", "enum": ["", "show_all", "hide_all"], "type": "string" },
+            "show_panels": { "description": "Panels to open, e.g. ['Properties', 'Effects', 'Histogram', 'Color Wheels', 'Captions'] (default none).", "items": { "type": "string" }, "type": "array" },
+            "toolbar": { "default": "", "description": "Show or hide the main toolbar.", "enum": ["", "show", "hide"], "type": "string" },
+            "update_active_view": { "default": false, "description": "After the changes, overwrite the active custom view with the layout.", "type": "boolean" },
+            "view": { "default": "", "description": "Switch view: 'simple' (default editing), 'color' (Properties, Color Wheels and scopes), 'recording' (Recording dock), or the name of a saved custom view.", "type": "string" }
+          }
+        }
+      },
+      set_preference_tool: {
+        name: "set_preference_tool",
+        title: "Change preference",
+        description: "Change one editor preference, validated against its type and allowed values, or restore a tab's defaults.\n\nTakes effect like the Preferences dialog (autosave timer, cache, theme, decoder, shortcuts...); restart_required in the receipt says when a restart is needed. Refuses unknown keys (with suggestions), out-of-range numbers, invalid choices, conflicting shortcuts and internal or protected settings. Not an undo step: call again with the previous value to revert.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export_prefs.py:set_preference",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "key": { "default": "", "description": "Preference key (or its title) from get_preferences_tool, e.g. 'autosave-interval'.", "type": "string" },
+            "restore_tab": { "default": "", "description": "Instead of key/value: restore every preference on this tab to its default (Preferences > Restore Defaults).", "enum": ["", "General", "Preview", "Timeline", "Autosave", "Cache", "Debug", "Keyboard", "Performance", "Location", "AI"], "type": "string" },
+            "value": { "default": "", "description": "New value: true/false, a number within min/max, a dropdown value or name, text, or a shortcut like 'Ctrl+Shift+K' (several: 'Ctrl+K | F5').", "type": "string" }
+          }
+        }
+      },
+      set_project_profile_tool: {
+        name: "set_project_profile_tool",
+        title: "Set project format",
+        description: `Change the project's video format: size, aspect and frame rate (File > Choose Profile).
+
+Use for "make this an Instagram reel / TikTok / YouTube Short" (profile= 'instagram_reel' etc. -> 1080x1920 9:16), "square for Instagram", "switch to 4K 24 fps" (profile='cinema_4k' or profile='4k', fps=24), "make it vertical" (orientation='portrait'), or "match this clip" (from_file_id). Landscape footage in a vertical project is letterboxed unless you pass reframe='fill' (crop to fill, centred) -- do that when the user wants the picture to fill the frame. Keyframes and trims follow a frame-rate change. One undo step reverts the profile and the reframe. Export settings saved in the Export dialog are reset when the profile changes. Example: {"profile": "instagram_reel", "reframe": "fill"}`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/project_export_profiles.py:set_project_profile",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "fps": { "default": 0, "description": "Frame rate, e.g. 24, 25, 29.97, 30, 60. 0 = keep (or the preset's).", "maximum": 240, "minimum": 0, "type": "number" },
+            "from_file_id": { "default": "", "description": "Match a project file's size and frame rate (media_bin_file_id from list_files_tool).", "type": "string" },
+            "height": { "default": 0, "description": "Frame height in pixels (with width). 0 = unchanged.", "maximum": 16384, "minimum": 0, "type": "integer" },
+            "orientation": { "default": "", "description": "Turn the (current or named) profile to this shape: 'portrait' makes 1920x1080 -> 1080x1920.", "enum": ["", "landscape", "portrait", "square"], "type": "string" },
+            "profile": { "default": "", "description": "Profile name ('FHD Vertical 1080p 30 fps'), key ('01080x1920p0030_09-16'), social preset ('instagram_reel', 'tiktok', 'youtube_shorts', 'instagram_post', 'instagram_portrait', 'youtube', 'youtube_4k', 'cinema', '4k') or 'WIDTHxHEIGHT'. Empty = keep the current one.", "type": "string" },
+            "reframe": { "default": "keep", "description": "Existing full-frame clips whose shape differs from the new frame: keep = unchanged (letterboxed/pillarboxed), fit = whole picture with bars, fill = crop to fill, centred. Titles and picture-in-picture clips are never changed.", "enum": ["keep", "fit", "fill"], "type": "string" },
+            "width": { "default": 0, "description": "Frame width in pixels (with height) instead of a profile name. 0 = unchanged.", "maximum": 16384, "minimum": 0, "type": "integer" }
+          }
+        }
+      },
+      set_timeline_view_tool: {
+        name: "set_timeline_view_tool",
+        title: "Timeline view",
+        description: `Change how the timeline is shown: zoom in/out/fit, show N seconds or a time range, center on the playhead, and turn snapping, razor or timing mode on or off.
+
+Pick at most one zoom: zoom='in' / 'out' (steps = how many), zoom='fit' (every clip in view), visible_seconds (e.g. 10 = ten seconds across), or start_seconds + end_seconds (show that range). center_on_playhead scrolls to the playhead. snapping / razor / timing switch the timeline toolbar's modes: they only change what mouse drags and clicks do for the person editing, not the project. Nothing here is an undo step. Examples: "zoom to fit" -> zoom='fit'; "show me 0:30 to 1:00" -> start_seconds=30, end_seconds=60; "turn off snapping" -> snapping=false.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/tracks_nav.py:set_timeline_view",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "center_on_playhead": { "default": false, "description": "Scroll so the playhead is in the middle (Center on Playhead).", "type": "boolean" },
+            "end_seconds": { "description": "End of the range to show (timeline seconds).", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "razor": { "description": "true: clicking a clip slices it (Razor tool); false: normal clicks.", "nullable": true, "type": ["boolean", "null"] },
+            "snapping": { "description": "true: dragged clips snap to clip edges, the playhead and markers; false: free dragging.", "nullable": true, "type": ["boolean", "null"] },
+            "start_seconds": { "description": "Show exactly this range: its start (timeline seconds). Give end_seconds too.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "steps": { "default": 1, "description": "How many zoom steps for zoom 'in' / 'out'.", "maximum": 10, "minimum": 1, "type": "integer" },
+            "timing": { "description": "true: dragging a clip edge retimes (speeds up / slows down) the clip instead of trimming it; false: normal trimming.", "nullable": true, "type": ["boolean", "null"] },
+            "visible_seconds": { "description": "Zoom so this many seconds fill the timeline width, centered on the playhead.", "minimum": 0.1, "nullable": true, "type": ["number", "null"] },
+            "zoom": { "default": "", "description": "'in' / 'out' = zoom one step like the = / - keys (repeat with steps); 'fit' = show every clip, from 0 to the end of the last clip.", "enum": ["", "in", "out", "fit"], "type": "string" }
+          }
+        }
+      },
+      slice_clips_tool: {
+        name: "slice_clips_tool",
+        title: "Slice clips",
+        description: `Cut clips at a timeline time (the Slice menu / razor tool).
+
+Use for "split the clip at 12 seconds", "cut everything at the playhead", "cut off everything after 30 s on track 1" (keep='left'), "drop the first part of this clip and close the gap" (keep='right', ripple=true). Target one clip (timeline_clip_ids / clip_query), the selection, one track, or everything under the time (scope='all'). Explicit clips must lie under at_seconds; locked tracks are refused for explicit targets and skipped (and reported) for scope='all'. keep='both' returns the new right-hand clip ids. One undo step. To shorten a clip without cutting it in two, trim_clips_tool is simpler.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit.py:slice_clips",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "at_seconds": { "default": -1, "description": "Timeline time to cut at; -1 = the playhead.", "type": "number" },
+            "clip_query": { "default": "", "description": "Describe one clip to cut instead of ids.", "type": "string" },
+            "include_transitions": { "default": true, "description": "With scope 'track'/'all'/'selected': cut transitions under the time too.", "type": "boolean" },
+            "keep": { "default": "both", "description": "both = cut into two clips; left = keep the part before the cut (drop the rest); right = keep the part after it.", "enum": ["both", "left", "right"], "type": "string" },
+            "ripple": { "default": false, "description": "With keep='left' or 'right': close the gap the dropped part leaves.", "type": "boolean" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the selected clips, 'track' = everything on track under the time, 'all' = everything under the time on every unlocked track (a razor cut through the whole timeline).", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_ids": { "default": [], "description": "Clips to cut (each must be under at_seconds).", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      trim_clips_tool: {
+        name: "trim_clips_tool",
+        title: "Trim clips",
+        description: `Change where clips start and end in their source media (drag a clip edge).
+
+Use for "trim the first two seconds", "cut the last second off every clip on track 1", "make this clip 5 seconds long", "start the clip at 0:12 of the video". Times are seconds of the source (source_start/source_end) or amounts to cut (trim_start_seconds / trim_end_seconds; negative amounts extend the clip into unused source).
+
+Trimming the start keeps the picture in place: the clip's left edge moves later and a gap opens. With ripple=true the clip keeps its start and every later clip on the track moves to close (or open) the room. Extending past the media, before 0 s, or over another clip is refused with the exact limit (allow_overlap=true overlaps anyway). Still images can be any length. To cut a clip in two use slice_clips_tool; to change speed use set_clip_speed_tool. One undo step for the whole batch.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/timeline_edit.py:trim_clips",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "allow_overlap": { "default": false, "description": "Let the result overlap other clips on the track (the receipt lists what it covers). Off by default: the tool refuses and says what is in the way.", "type": "boolean" },
+            "clip_query": { "default": "", "description": "Describe one clip instead of ids.", "type": "string" },
+            "duration_seconds": { "default": 0, "description": "Set the clip's length on the timeline by moving its out point; 0 = unchanged.", "minimum": 0, "type": "number" },
+            "ripple": { "default": false, "description": "Shift the later clips on the track to follow (close/open the room), like a ripple edit. With ripple the clip keeps its start on the timeline.", "type": "boolean" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "source_end": { "default": -1, "description": "Set the out point: seconds into the source media; -1 = unchanged.", "type": "number" },
+            "source_start": { "default": -1, "description": "Set the in point: seconds into the source media; -1 = unchanged.", "type": "number" },
+            "timeline_clip_ids": { "default": [], "description": "Timeline clip ids to act on.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Track for clip_query or scope='track': UI track number (1 = bottom), name, or layer number.", "type": "string" },
+            "trim_end_seconds": { "default": 0, "description": "Cut this much off the end (negative = extend further into the source).", "type": "number" },
+            "trim_start_seconds": { "default": 0, "description": "Cut this much off the start (negative = extend back into the source).", "type": "number" }
+          }
+        }
+      },
+      update_effect_tool: {
+        name: "update_effect_tool",
+        title: "Change effect",
+        description: `Change properties of an effect that is already on a clip: static values, or keyframes to animate them ("make the blur stronger", "fade the pixelation out over 2 seconds", "set the echo mix to 0.2"). Target one effect by effect_id, or name the effect class on one or several clips (scope='all' for "every clip's blur"). Only the given properties change; one undo step.
+
+Keyframes: {"sigma": [{"time": 0, "value": 8}, {"time": 2, "value": 0, "interpolation": "linear"}]} with timeline seconds inside the clip. Colors: "#RRGGBB". Choices by name ("Basic keying"). For ColorGrade prefer color_grade_clip_tool. Refused: unknown or read-only property, out-of-range value, locked track, a clip without that effect.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/effects_color.py:update_effect",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["properties"],
+          properties: {
+            "clip_query": { "default": "", "description": "Describe the clip instead of an id: its file name or what it shows (e.g. 'beach sunset'). Add track when several clips match. Prefer timeline_clip_id.", "type": "string" },
+            "effect": { "default": "", "description": "Instead of effect_id: the effect name on the clip(s) (Blur, ColorGrade...).", "type": "string" },
+            "effect_id": { "default": "", "description": "Effect id from get_clip_effects_tool / add_effect_tool. Preferred.", "type": "string" },
+            "interpolation": { "default": "bezier", "description": "Default interpolation for keyframes that do not name one.", "enum": ["bezier", "linear", "constant"], "type": "string" },
+            "occurrence": { "default": 0, "description": "With effect: which one if a clip has several of that effect (1 = first).", "minimum": 0, "type": "integer" },
+            "properties": { "description": 'Effect properties to set, as {name: value}. A value is a number, true/false, a choice name ("HSV/HSL hue"), a color ("#00ff00") or text; or keyframes [{"time": 2.0, "value": 10, "interpolation": "linear"}] in timeline seconds to animate it. list_effects_tool(effect=...) lists every property with its range, default and choices.', "type": "object" },
+            "scope": { "default": "", "description": "Instead of ids/query: 'selected' = timeline selection, 'track' = every clip on `track`, 'all' = every clip. Clips that cannot take the effect (locked track, no picture/sound) are skipped and listed.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "timeline_clip_id": { "default": "", "description": "Timeline clip id from list_clips_tool / get_timeline_state_tool. Preferred.", "type": "string" },
+            "timeline_clip_ids": { "description": "Several timeline clip ids to change in one step.", "items": { "type": "string" }, "type": "array" },
+            "track": { "default": "", "description": "Narrow clip_query to a track: UI track number (1 = bottom), track name, or layer number.", "type": "string" }
+          }
+        }
+      },
+      update_marker_tool: {
+        name: "update_marker_tool",
+        title: "Edit marker",
+        description: `Rename, recolor or move an existing timeline marker.
+
+marker is the marker_id from list_markers_tool or the marker's exact name (a name several markers share is refused with their ids). Pass only what should change. Example: "rename the marker at 0:32 to Chorus" -> first list_markers_tool, then marker='<id>', name='Chorus'; "move the Drop marker to 0:40" -> marker='Drop', position_seconds=40. One undo step.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/tracks_nav.py:update_marker",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["marker"],
+          properties: {
+            "color": { "default": "", "description": "New color tag; empty = keep. the timeline tints the marker's icon with it (blue = the default icon) and shows the marker's name next to it.", "enum": ["", "blue", "red", "green", "yellow", "orange", "purple", "pink", "white"], "type": "string" },
+            "marker": { "description": "Marker to change: its marker_id (from list_markers_tool) or its exact name.", "type": "string" },
+            "name": { "description": "New name. Empty string clears it. Omit to keep the name.", "nullable": true, "type": ["string", "null"] },
+            "position_seconds": { "description": "Move the marker to this timeline time (seconds). Omit to keep it where it is.", "minimum": 0, "nullable": true, "type": ["number", "null"] }
+          }
+        }
+      },
+      update_project_files_tool: {
+        name: "update_project_files_tool",
+        title: "Update project files",
+        description: 'Change project files (File Properties): rename, tag, relink moved media, set in/out, set sequence fps.\n\nUse for "rename the clip to Intro" (with rename_clips=true the timeline clips get the label too), "tag these as b-roll" (add_tags on many file_ids at once), "I moved my footage to ~/Movies/shoot, fix the missing files" (search_folder, or path for one file), "only use 0:05-0:20 of this file" (source_start/end_seconds, source seconds), "play this image sequence at 12 fps" (fps; image sequences only). Timeline clips that use a changed file are refreshed (their end is clamped to the new length, as the dialog does). Relinking keeps the name, tags, AI metadata, in/out and optimized preview, and reports same_content=false when the new media is a different file. One undo step. Does not trim timeline clips (that is a timeline edit) and never deletes anything. Example: file_ids=["A1","B2"], add_tags=["b-roll"].',
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files.py:update_project_files",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "add_tags": { "description": "Tags to add to every chosen file ('b-roll', 'intro').", "items": { "type": "string" }, "type": "array" },
+            "file_ids": { "description": "Project file ids (file_id / media_bin_file_id from list_project_files_tool).", "items": { "type": "string" }, "type": "array" },
+            "file_query": { "default": "", "description": "Name one file instead of ids: its name, file name or a tag ('intro.mp4', 'the drone shot').", "type": "string" },
+            "fps": { "default": 0, "description": "New frame rate for IMAGE SEQUENCES only (e.g. 24, 12, 29.97); rescales its duration. 0 = keep.", "maximum": 240, "minimum": 0, "type": "number" },
+            "name": { "default": "", "description": "New display name (one file). '' = keep.", "type": "string" },
+            "path": { "default": "", "description": "Relink one file to this media path (the file moved or was replaced). For an image sequence: a frame of the new sequence or its folder. '' = keep.", "type": "string" },
+            "remove_tags": { "description": "Tags to remove from every chosen file.", "items": { "type": "string" }, "type": "array" },
+            "rename_clips": { "default": false, "description": "With name: also relabel the timeline clips that use the file.", "type": "boolean" },
+            "reset_in_out": { "default": false, "description": "Clear the file's in/out so it spans the whole media again.", "type": "boolean" },
+            "search_folder": { "default": "", "description": "Relink every chosen file to the file with the same name found in this folder (searched recursively). '' = no search.", "type": "string" },
+            "source_end_seconds": { "description": "New out-point, in seconds of the source media (File Properties > End Frame). One file.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "source_start_seconds": { "description": "New in-point, in seconds of the source media (File Properties > Start Frame). One file.", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "tags": { "description": "Replace the file(s) tags with exactly these. [] clears them; leave out to keep.", "items": { "type": "string" }, "nullable": true, "type": ["array", "null"] }
+          }
+        }
+      },
+      update_track_tool: {
+        name: "update_track_tool",
+        title: "Rename or lock track",
+        description: `Rename a track and/or lock or unlock it (Track menu > Rename Track / Lock Track / Unlock Track).
+
+A locked track's clips cannot be moved, trimmed, sliced, deleted or edited until it is unlocked; renaming a locked track is fine. Pass only what should change. Examples: "rename track 2 to B-roll" -> track='2', name='B-roll'; "lock the voiceover track" -> track='Voiceover', lock=true; "unlock everything on track 1" -> track='1', lock=false. One undo step; asking for the state a track already has changes nothing.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/tracks_nav.py:update_track",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["track"],
+          properties: {
+            "lock": { "description": "true locks the track, false unlocks it. Omit to leave it as is.", "nullable": true, "type": ["boolean", "null"] },
+            "name": { "description": "New name for the track header. Empty string = back to the default 'Track N'. Omit to keep the current name.", "nullable": true, "type": ["string", "null"] },
+            "track": { "description": "Track to change: UI track number (1 = bottom), track name, track id (L3) or layer number.", "type": "string" }
+          }
+        }
+      },
+      update_transition_tool: {
+        name: "update_transition_tool",
+        title: "Change transition",
+        description: `Change a transition on the timeline: length, position, wipe shape, softness, curves, audio crossfade.
+
+"Make the crossfade 2 seconds" -> duration_seconds=2: on a transition between two clips the later clip (and, with ripple=true, everything after it on that track) moves so the clips overlap by 2 s and the transition covers the overlap; other tracks never move. On a fade at a clip's start/end the transition keeps that edge. The progress curve is rescaled to the new length (with the default soft edge the visible dissolve is shorter than the transition; a lower contrast makes it more gradual). "Use a circle wipe instead" -> mask="circle_in_to_out"; "make the wipe go the other way" -> flip_wipe_side=true (or the mirrored mask, e.g. wipe_right_to_left); "harder edge" -> contrast=20. Changes every chosen transition in one undo step. Refused on locked tracks. Never deletes clips. Example: between_clip_ids=["A","B"], duration_seconds=2.`,
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/editor_tools/media_files_transitions.py:update_transition",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "at_seconds": { "description": "Instead of ids: the transition under this timeline time (on `track` when given).", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "audio_crossfade": { "description": "Also crossfade the two clips' audio under the transition (equal-power).", "nullable": true, "type": ["boolean", "null"] },
+            "between_clip_ids": { "description": "Instead of ids: the two timeline clip ids the transition joins, e.g. [clip_a, clip_b].", "items": { "type": "string" }, "type": "array" },
+            "brightness_keyframes": { "description": "Replace the progress curve (brightness): 1 = not started, -1 = finished; times from the transition start.", "items": { "additionalProperties": false, "description": "One keyframe of a transition curve.", "properties": { "interpolation": { "default": "bezier", "description": "Easing into the next point.", "enum": ["bezier", "linear", "constant"], "type": "string" }, "seconds": { "description": "Time from the START of the transition, 0 = its first frame.", "minimum": 0, "type": "number" }, "value": { "description": "Curve value (brightness -1..1: 1 = wipe not started, -1 = finished; contrast 0..20).", "type": "number" } }, "required": ["seconds", "value"], "type": "object" }, "type": "array" },
+            "contrast": { "description": "Edge hardness of the wipe: 0 = very soft/blurry edge, 3 = the default soft edge, 20 = a hard line.", "maximum": 20, "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "contrast_keyframes": { "description": "Replace the edge-hardness curve over time.", "items": { "additionalProperties": false, "description": "One keyframe of a transition curve.", "properties": { "interpolation": { "default": "bezier", "description": "Easing into the next point.", "enum": ["bezier", "linear", "constant"], "type": "string" }, "seconds": { "description": "Time from the START of the transition, 0 = its first frame.", "minimum": 0, "type": "number" }, "value": { "description": "Curve value (brightness -1..1: 1 = wipe not started, -1 = finished; contrast 0..20).", "type": "number" } }, "required": ["seconds", "value"], "type": "object" }, "type": "array" },
+            "duration_seconds": { "default": 0, "description": "New length in seconds (0 = keep). On a crossfade between two clips the later clip moves so the clips overlap by exactly this much (see keep_overlap).", "minimum": 0, "type": "number" },
+            "flip_wipe_side": { "default": false, "description": "Wipe from the other side (left-to-right becomes right-to-left, circle-out becomes circle-in) and still go from the earlier clip to the later one. Works for any mask (inverts it and reverses its curve).", "type": "boolean" },
+            "interpolation": { "default": "", "description": "Easing of the progress curve: bezier = ease in/out (default), linear = constant speed, constant = jump. '' = keep.", "enum": ["", "bezier", "linear", "constant"], "type": "string" },
+            "invert_mask": { "description": "Raw 'mask invert' property. Alone it makes the later clip show first (it flashes back before the cut); use flip_wipe_side instead.", "nullable": true, "type": ["boolean", "null"] },
+            "keep_overlap": { "default": false, "description": "With duration_seconds on a crossfade: do not move any clip (the transition may then run past the overlap and dip to the track below).", "type": "boolean" },
+            "mask": { "default": "", "description": "Change the wipe shape: a transition name ('fade', 'wipe_left_to_right', 'circle_in_to_out', any list_transitions_tool name) or an image file path. '' = keep.", "type": "string" },
+            "mask_file_id": { "default": "", "description": "Use this project image file (e.g. a gradient or logo) as the wipe shape. '' = keep.", "type": "string" },
+            "position_seconds": { "description": "Move the transition to start at this timeline time (clips stay).", "minimum": 0, "nullable": true, "type": ["number", "null"] },
+            "replace_image": { "description": "Show the mask image itself instead of transitioning (a preview aid).", "nullable": true, "type": ["boolean", "null"] },
+            "ripple": { "default": true, "description": "With duration_seconds on a crossfade: move everything after the later clip on that track too, so no gap or overlap opens further down. false = move only the later clip.", "type": "boolean" },
+            "scope": { "default": "", "description": "'selected' = selected transitions, 'track' = every transition on `track`, 'all' = every transition on the timeline.", "enum": ["", "selected", "track", "all"], "type": "string" },
+            "track": { "default": "", "description": "Track to look on (UI track number, 1 = bottom; name; or layer number). With scope='track' every transition on it.", "type": "string" },
+            "transition_ids": { "description": "Transition ids (list_timeline_transitions_tool or get_timeline_state_tool 'Effects/Transitions'). Preferred.", "items": { "type": "string" }, "type": "array" }
+          }
+        }
+      },
+      zenvi_api_request: {
+        name: "zenvi_api_request",
+        title: "Zenvi api request",
+        description: "Call the Zenvi backend API (api.zenvi.pro) as the signed-in Zenvi user.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/agent_api_proxy.py:zenvi_api_request",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "method": { "type": "string", "default": "GET" },
+            "path": { "type": "string" },
+            "body": { "type": "string" },
+            "query": { "type": "string" }
+          }
+        }
+      },
+      send_assistant_prompt_tool: {
+        name: "send_assistant_prompt_tool",
+        title: "Send assistant prompt",
+        description: "Send a prompt to Zenvi's own assistant and wait for the whole turn to finish.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/agent_api_proxy.py:send_assistant_prompt_tool",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "message": { "type": "string" },
+            "session_id": { "type": "string" },
+            "timeout_seconds": { "type": "integer", "default": 900 }
+          }
+        }
+      },
+      mcp_health_tool: {
+        name: "mcp_health_tool",
+        title: "Mcp health",
+        description: "Check that the editor is up AND its Qt main thread is still alive.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/agent_api_proxy.py:mcp_health_tool",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "main_thread_timeout_seconds": { "type": "integer", "default": 5 }
+          }
+        }
+      },
+      wait_for_editor_job_tool: {
+        name: "wait_for_editor_job_tool",
+        title: "Wait for editor job",
+        description: "Wait for an edit that was still running when its tool call stopped waiting.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/agent_api_proxy.py:wait_for_editor_job_tool",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "job_id": { "type": "string" },
+            "timeout_seconds": { "type": "integer", "default": 60 }
+          }
+        }
+      },
+      get_log_paths_tool: {
+        name: "get_log_paths_tool",
+        title: "Get log paths",
+        description: "Report where Zenvi's logs live, for diagnosing a hung or failed harness run.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/agent_api_proxy.py:get_log_paths_tool",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {}
+        }
+      },
+      capture_editor_screenshot_tool: {
+        name: "capture_editor_screenshot_tool",
+        title: "Capture editor screenshot",
+        description: "Save a PNG of the editor as it looks right now: the whole window or one panel.",
+        assistant: false,
+        desktopReadOnly: false,
+        handler: "src/classes/agent_api_proxy.py:capture_editor_screenshot_tool",
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            "path": { "type": "string" },
+            "target": { "type": "string", "default": "window" },
+            "max_width": { "type": "integer", "default": 1600 }
+          }
+        }
       }
     };
     CONTRACT_TOOL_NAMES = Object.keys(contractInputs);
+  }
+});
+
+// ../engine/src/tools/pending.ts
+function pendingArgumentMessage(tool, arg) {
+  return `Error: ${tool} cannot use ${arg} in this Zenvi surface yet (only Zenvi desktop can). Call it again without ${arg}.`;
+}
+function isUnset(value) {
+  if (value === void 0 || value === null) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  return typeof value === "object" && Object.keys(value).length === 0;
+}
+function pendingArgumentIn(tool, input2, schema) {
+  const pending = PENDING_DESKTOP_ARGS[tool];
+  if (!pending || typeof input2 !== "object" || input2 === null) return void 0;
+  const values = input2;
+  return pending.find((arg) => {
+    const value = values[arg];
+    if (isUnset(value)) return false;
+    const fallback = schema.properties[arg]?.default;
+    return fallback === void 0 || JSON.stringify(value) !== JSON.stringify(fallback);
+  });
+}
+var PENDING_DESKTOP_TOOLS, PENDING_DESKTOP_ARGS, DESKTOP_NAMES_ON_DIRECT_TOOLS;
+var init_pending = __esm({
+  "../engine/src/tools/pending.ts"() {
+    "use strict";
+    PENDING_DESKTOP_TOOLS = /* @__PURE__ */ new Set([
+      "add_animated_title_tool",
+      "add_clips_to_timeline_tool",
+      "add_emoji_tool",
+      "add_timer_tool",
+      "add_transitions_between_clips_tool",
+      "align_clips_tool",
+      "analyze_frame_colors_tool",
+      "apply_audio_effect_tool",
+      "apply_clip_preset_tool",
+      "apply_color_tool",
+      "apply_look_preset_tool",
+      "apply_look_tool",
+      "cancel_comfyui_job_tool",
+      "capture_editor_screenshot_tool",
+      "chroma_key_clip_tool",
+      "color_grade_clip_tool",
+      "consolidate_project_media_tool",
+      "copy_clip_keyframes_tool",
+      "copy_effects_tool",
+      "copy_transition_tool",
+      "create_media_with_comfyui_tool",
+      "create_subclips_tool",
+      "duplicate_clips_tool",
+      "edit_captions_tool",
+      "edit_title_tool",
+      "enhance_file_with_comfyui_tool",
+      "export_files_to_folder_tool",
+      "export_project_file_tool",
+      "forget_recent_projects_tool",
+      "freeze_frame_tool",
+      "generate_image_and_add_to_timeline_tool",
+      "get_clip_effects_tool",
+      "get_clip_properties_tool",
+      "get_editor_layout_tool",
+      "get_log_paths_tool",
+      "get_playhead_and_selection_tool",
+      "get_preferences_tool",
+      "import_image_sequence_tool",
+      "import_project_file_tool",
+      "ingest_web_video_tool",
+      "inspect_color_tool",
+      "list_captions_tool",
+      "list_comfyui_jobs_tool",
+      "list_comfyui_templates_tool",
+      "list_export_presets_tool",
+      "list_looks_tool",
+      "list_luts_tool",
+      "list_project_files_tool",
+      "list_project_profiles_tool",
+      "list_recent_projects_tool",
+      "list_recovery_versions_tool",
+      "list_timeline_transitions_tool",
+      "list_title_templates_tool",
+      "manage_custom_profiles_tool",
+      "manage_optimized_previews_tool",
+      "match_color_to_reference_tool",
+      "mcp_health_tool",
+      "move_clips_tool",
+      "prepare_recording_tool",
+      "process_clip_effect_tool",
+      "remove_captions_tool",
+      "remove_files_from_project_tool",
+      "remove_gaps_tool",
+      "remove_keyframes_tool",
+      "remove_marker_tool",
+      "remove_track_tool",
+      "remove_transition_tool",
+      "repeat_clip_tool",
+      "reset_caches_and_history_tool",
+      "restore_recovery_version_tool",
+      "reverse_clip_tool",
+      "reverse_transition_tool",
+      "save_frame_image_tool",
+      "search_emojis_tool",
+      "seek_playhead_tool",
+      "select_timeline_items_tool",
+      "send_assistant_prompt_tool",
+      "separate_clip_audio_tool",
+      "set_clip_audio_video_tool",
+      "set_clip_properties_tool",
+      "set_editor_layout_tool",
+      "set_preference_tool",
+      "set_project_profile_tool",
+      "set_timeline_view_tool",
+      "slice_clips_tool",
+      "trim_clips_tool",
+      "update_effect_tool",
+      "update_marker_tool",
+      "update_project_files_tool",
+      "update_track_tool",
+      "update_transition_tool",
+      "wait_for_editor_job_tool",
+      "zenvi_api_request"
+    ]);
+    PENDING_DESKTOP_ARGS = {
+      add_captions_tool: [
+        "background_color",
+        "background_opacity",
+        "clip_query",
+        "cues",
+        "fade_seconds",
+        "font",
+        "overlay_track",
+        "position",
+        "stroke_color",
+        "stroke_width",
+        "style",
+        "text_color",
+        "text_size",
+        "time_base",
+        "uppercase"
+      ],
+      add_effect_tool: ["processing", "properties", "scope", "timeline_clip_ids"],
+      add_title_tool: [
+        "background_color",
+        "fade_in_seconds",
+        "fade_out_seconds",
+        "font",
+        "font_scale",
+        "font_style",
+        "font_weight",
+        "lines",
+        "screen_position",
+        "subtitle",
+        "text_color"
+      ],
+      export_video_tool: [
+        "audio_bitrate",
+        "audio_codec",
+        "channels",
+        "container",
+        "end",
+        "export_type",
+        "file_name",
+        "folder",
+        "fps",
+        "height",
+        "image_format",
+        "interlaced",
+        "preset",
+        "profile",
+        "quality",
+        "range",
+        "sample_rate",
+        "start",
+        "video_bitrate",
+        "video_codec",
+        "width"
+      ],
+      new_project_tool: ["profile"],
+      open_project_tool: ["recent_index"],
+      set_export_setting_tool: ["clear"],
+      set_keyframes_tool: ["ease"],
+      set_project_setting_tool: ["channels", "orientation", "preset", "profile", "reframe", "save_as_default"]
+    };
+    DESKTOP_NAMES_ON_DIRECT_TOOLS = /* @__PURE__ */ new Set([
+      "list_effects_tool",
+      "remove_effect_tool",
+      "set_clip_speed_tool"
+    ]);
   }
 });
 
@@ -49687,6 +53003,11 @@ function normalizeTrackOrLayerArg(raw, layers) {
   const low = text4.toLowerCase();
   const m = /^(?:ui\s*)?track\s*[#:]?\s*(.+)$/i.exec(low);
   const labelQuery = (m ? m[1].trim() : low).trim();
+  let uiNumber = n;
+  if (uiNumber === null && m) {
+    const q = parsePythonFloat(labelQuery);
+    uiNumber = q === null ? null : Math.trunc(q);
+  }
   const labelHits = stack.filter((e) => {
     const label2 = e.label.trim().toLowerCase();
     return label2 === labelQuery || label2 === low;
@@ -49697,9 +53018,9 @@ function normalizeTrackOrLayerArg(raw, layers) {
       error: `Error: Ambiguous track label ${pyReprString(text4)} matches multiple layers. Pass layer_number from list_layers_tool / TRACK_STACK_JSON.`
     };
   }
-  const contains = stack.filter((e) => labelQuery && e.label.trim().toLowerCase().includes(labelQuery));
+  const contains = stack.filter((e) => labelQuery && uiNumber === null && e.label.trim().toLowerCase().includes(labelQuery));
   if (contains.length === 1) return { layer: contains[0].layer_number };
-  if (n !== null && n >= 1 && n <= stack.length) return { layer: stack[n - 1].layer_number };
+  if (uiNumber !== null && uiNumber >= 1 && uiNumber <= stack.length) return { layer: stack[uiNumber - 1].layer_number };
   return {
     error: `Error: Unknown track or layer ${pyReprString(text4)}. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label.`
   };
@@ -50385,6 +53706,8 @@ async function executeTool(tool, impl, ctx, rawArgs) {
     const message = issue2 ? invalidArgumentsMessage(name, issue2, args) : `Error: Invalid arguments for ${name}.`;
     return resultFor(refused(name, message));
   }
+  const pendingArg = tool.contract ? pendingArgumentIn(name, parsed.data, tool.inputSchema) : void 0;
+  if (pendingArg) return resultFor(refused(name, pendingArgumentMessage(name, pendingArg)));
   const missing = missingCapabilities(tool.requires, ctx.host);
   if (missing.length > 0) {
     const needs = missing.map(capabilityName).join(" and ");
@@ -50496,6 +53819,7 @@ var init_define = __esm({
     init_errors();
     init_schemas_gen();
     init_coerce();
+    init_pending();
     init_receipt();
     init_snapshot();
     ALL_SURFACES = ["mcp", "cli", "editor"];
@@ -52992,6 +56316,10 @@ function t2vDims(width, height) {
   if (aspect < 0.8) return [1080, 1920];
   return [1440, 1440];
 }
+function narrationName(text4) {
+  const words2 = text4.split(/\s+/).filter(Boolean);
+  return `Narration - ${words2.slice(0, 6).join(" ")}${words2.length > 6 ? "..." : ""}`;
+}
 function base64ToBytes(b64) {
   const binary = globalThis.atob(b64);
   const out = new Uint8Array(binary.length);
@@ -53006,7 +56334,6 @@ var init_generation = __esm({
     init_files();
     init_backend2();
     init_define();
-    init_placement();
     init_pyfmt();
     init_receipt();
     init_tracks2();
@@ -53088,13 +56415,12 @@ var init_generation = __esm({
           if (!narration) return "Error: No text provided for narration.";
           const writeGenerated = call.host.media.writeGenerated;
           if (!writeGenerated) return unavailable("generate_tts_and_add_to_timeline_tool", "it cannot store generated audio.");
-          let position;
-          try {
-            position = parseSecondsArg(input2.position, 0, "position") ?? 0;
-          } catch (error62) {
-            if (error62 instanceof TimeArgError) return `Error: ${error62.message}`;
-            throw error62;
+          const asked = input2.position_seconds ?? null;
+          const older = input2.position ?? null;
+          if (asked !== null && older !== null && Math.abs(asked - older) > 1e-6) {
+            return `Error: position (${pyFloat(older)}) and position_seconds (${pyFloat(asked)}) disagree; pass position_seconds only.`;
           }
+          const position = Math.max(0, asked ?? older ?? playheadSeconds(call));
           const project = call.doc.project;
           let layer2 = defaultUnderlayLayerNumber(project.layers);
           if (input2.track !== void 0 && String(input2.track).trim() !== "") {
@@ -53113,7 +56439,7 @@ var init_generation = __esm({
           if (bytes.length === 0) return "Error: TTS returned empty audio.";
           const path38 = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
           const info = await call.host.media.probe(path38);
-          const media = { path: path38, info: { ...info, media_type: "audio" }, name: "Narration" };
+          const media = { path: path38, info: { ...info, media_type: "audio" }, name: text(input2.name) || narrationName(narration) };
           const clip2 = call.commit((tx) => {
             const file3 = addFile(tx, media, { dedupe: false, mediaType: "audio" });
             return addClip(tx, { fileId: String(file3.id), position, layer: layer2 });
@@ -53558,7 +56884,7 @@ var init_media3 = __esm({
         annotations: IMPORT,
         requires: ["media"],
         run: async (call, input2) => {
-          const entries = [input2.paths, input2.path, input2.folder].flatMap((v) => v ? coercePathList(v) : []);
+          const entries = [input2.paths, input2.files, input2.path, input2.folder].flatMap((v) => v ? coercePathList(v) : []);
           if (entries.length === 0) {
             return 'Error: paths is required for MCP/harness import. Pass the media files or folders to import, e.g. paths=["/clips/dialog_test"]. This tool never opens a file dialog.';
           }
@@ -54432,10 +57758,31 @@ var init_motion = __esm({
 });
 
 // ../engine/src/tools/catalog/phase3.ts
-var KEYFRAME_PROPERTIES, phase3Tools;
+function clipTime(clip2, fps) {
+  const rate = fps.num / fps.den;
+  const start = Number(clip2.start) || 0;
+  const end = Number(clip2.end) || 0;
+  const position = Number(clip2.position) || 0;
+  const first = pyRound(start * rate) + 1;
+  const last = Math.max(first, pyRound(end * rate) + 1);
+  const duration3 = Math.max(0, end - start);
+  return {
+    first,
+    last,
+    frameOf(unit, amount) {
+      if (unit === "frame") return amount;
+      if (unit === "seconds") return pyRound((start + amount) * rate) + 1;
+      if (unit === "timeline_seconds") return pyRound((start + amount - position) * rate) + 1;
+      return pyRound(amount * rate) + 1;
+    },
+    ranges: `frames ${first}-${last}, seconds 0-${duration3.toFixed(3)} from the clip's start, timeline_seconds ${position.toFixed(3)}-${(position + duration3).toFixed(3)}, source_seconds ${start.toFixed(3)}-${end.toFixed(3)}`
+  };
+}
+var KEYFRAME_PROPERTIES, TIME_UNITS, INTERPOLATIONS2, phase3Tools;
 var init_phase3 = __esm({
   "../engine/src/tools/catalog/phase3.ts"() {
     "use strict";
+    init_rounding();
     init_types();
     init_registry();
     init_effects2();
@@ -54444,10 +57791,17 @@ var init_phase3 = __esm({
     init_time();
     init_define();
     init_frame_time();
+    init_pending();
     init_pyfmt();
     init_receipt();
     init_common();
     KEYFRAME_PROPERTIES = ["volume", "alpha", "location_x", "location_y", "scale_x", "scale_y", "rotation"];
+    TIME_UNITS = ["frame", "seconds", "timeline_seconds", "source_seconds"];
+    INTERPOLATIONS2 = {
+      bezier: Interpolation.BEZIER,
+      linear: Interpolation.LINEAR,
+      constant: Interpolation.CONSTANT
+    };
     phase3Tools = [
       contractTool("add_effect_tool", {
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -54469,6 +57823,12 @@ var init_phase3 = __esm({
             return refused(tool, `Error: unknown effect ${pyReprString(name)}. Examples: ${sample}.`);
           }
           const clipId2 = String(resolved.clip.id);
+          const existing = (resolved.clip.effects ?? []).find((e) => e.class_name === def.className);
+          if (existing && (input2.if_exists ?? "update") === "update") {
+            return unchanged(tool, `${def.name} is already on 1 clip(s) with these settings; nothing changed.`, {
+              data: { effect: def.className, effectId: existing.id, timeline_clip_id: clipId2, changed: false }
+            });
+          }
           const effect2 = call.commit((tx) => addEffect(tx, clipId2, def.className));
           return applied(
             tool,
@@ -54482,6 +57842,9 @@ var init_phase3 = __esm({
       }),
       contractTool("set_keyframes_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
+        // zenvi-core develop editor_tools/clip_props.py set_keyframes / _build_points, for the
+        // seven properties below. Ease presets and points without a value (pinning the curve's
+        // current value) are not ported yet and are refused.
         run: async (call, input2) => {
           const tool = "set_keyframes_tool";
           const prop = String(input2.property ?? "").trim();
@@ -54490,40 +57853,38 @@ var init_phase3 = __esm({
           }
           const points = input2.points;
           if (!Array.isArray(points) || points.length === 0) {
-            return refused(tool, "Error: points must be a non-empty array of {frame|seconds, value} objects.");
+            return refused(tool, 'Error: points must list at least one keyframe, e.g. [{"seconds": 0, "value": 1}].');
           }
           const resolved = await resolveClip(call, input2);
           if (!resolved.ok) return failed(tool, resolved.error || "Error: could not resolve a timeline clip.");
-          const fps = projectFps(call.doc.project);
+          const clipId2 = String(resolved.clip.id);
+          const time3 = clipTime(resolved.clip, projectFps(call.doc.project));
           const built = [];
+          const seen = /* @__PURE__ */ new Map();
           for (const [i, raw] of points.entries()) {
-            const value = Number(raw.value);
-            if (!Number.isFinite(value)) return refused(tool, `Error: points[${i}].value must be a number.`);
-            let x;
-            if (raw.frame !== void 0 && raw.frame !== null) {
-              x = Math.trunc(Number(raw.frame));
-              if (x < 1) return refused(tool, `Error: points[${i}].frame must be >= 1.`);
-            } else if (raw.seconds !== void 0 && raw.seconds !== null) {
-              x = keyframeX(Number(raw.seconds), fps);
-            } else {
-              return refused(tool, `Error: points[${i}] needs frame or seconds.`);
+            const units = TIME_UNITS.filter((unit2) => raw[unit2] !== void 0 && raw[unit2] !== null);
+            if (units.length !== 1) return refused(tool, `Error: points[${i}] needs exactly one of frame, seconds, timeline_seconds or source_seconds.`);
+            const unit = units[0];
+            const x = time3.frameOf(unit, Number(raw[unit]));
+            if (x < time3.first || x > time3.last) {
+              return refused(tool, `Error: points[${i}] (${unit}=${pyRepr2(raw[unit])}) lands on frame ${x}, outside clip ${clipId2}; valid: ${time3.ranges}.`);
             }
-            built.push({ frame: x, value });
+            if (seen.has(x)) return refused(tool, `Error: points[${seen.get(x)}] and points[${i}] land on the same frame ${x}.`);
+            seen.set(x, i);
+            if (raw.ease) return refused(tool, pendingArgumentMessage(tool, `points[${i}].ease`));
+            if (raw.value === void 0 || raw.value === null) {
+              return refused(tool, `Error: points[${i}] needs a value here (keeping the curve's current value is not ported to this Zenvi surface yet).`);
+            }
+            const value = typeof raw.value === "boolean" ? Number.NaN : Number(raw.value);
+            if (!Number.isFinite(value)) return refused(tool, `Error: points[${i}].value must be a number.`);
+            built.push({ frame: x, value, interpolation: INTERPOLATIONS2[raw.interpolation || input2.interpolation || "bezier"] });
           }
           built.sort((a, b) => a.frame - b.frame);
-          const clipId2 = String(resolved.clip.id);
-          call.commit(
-            (tx) => setClipKeyframes(
-              tx,
-              clipId2,
-              prop,
-              built.map((p) => ({ frame: p.frame, value: p.value, interpolation: Interpolation.CONSTANT })),
-              { mode: "replace" }
-            )
-          );
+          const mode = input2.mode ?? "replace";
+          call.commit((tx) => setClipKeyframes(tx, clipId2, prop, built, { mode }));
           return applied(tool, `Set ${built.length} keyframe(s) on ${prop} for timeline_clip_id=${clipId2}.`, {
             clips: [{ id: clipId2 }],
-            data: { timeline_clip_id: clipId2, property: prop, points: built }
+            data: { timeline_clip_id: clipId2, property: prop, mode, points: built.map((p) => ({ frame: p.frame, value: p.value })) }
           });
         }
       }),
@@ -54534,24 +57895,15 @@ var init_phase3 = __esm({
           const project = call.doc.project;
           const patch = {};
           let fps = null;
-          if (input2.fps_num !== void 0 || input2.fps_den !== void 0) {
-            const num11 = Math.trunc(Number(input2.fps_num ?? 30));
-            const den2 = Math.trunc(Number(input2.fps_den ?? 1));
-            if (!Number.isFinite(num11) || !Number.isFinite(den2)) return refused(tool, "Error: fps_num/fps_den must be integers.");
-            fps = { num: num11, den: den2 };
-          } else if (input2.fps !== void 0 && String(input2.fps).trim() !== "") {
-            const rate = Number(String(input2.fps).trim());
-            if (!Number.isFinite(rate)) return refused(tool, `Error: fps must be a number (got ${pyRepr2(input2.fps)}).`);
-            if (rate <= 0) return refused(tool, "Error: fps must be positive.");
-            fps = fpsFromRate(rate);
+          if (input2.fps_num != null || input2.fps_den != null) {
+            fps = { num: input2.fps_num ?? 30, den: input2.fps_den ?? 1 };
+          } else if (input2.fps != null) {
+            fps = fpsFromRate(input2.fps);
           }
-          if (fps) {
-            if (fps.num <= 0 || fps.den <= 0) return refused(tool, "Error: fps_num and fps_den must be positive.");
-            patch.fps = fps;
-          }
-          if (input2.width !== void 0) patch.width = input2.width;
-          if (input2.height !== void 0) patch.height = input2.height;
-          if (input2.sample_rate !== void 0) patch.sampleRate = input2.sample_rate;
+          if (fps) patch.fps = fps;
+          if (input2.width != null) patch.width = input2.width;
+          if (input2.height != null) patch.height = input2.height;
+          if (input2.sample_rate != null) patch.sampleRate = input2.sample_rate;
           const current = projectFps(project);
           const same = (!patch.fps || typeof patch.fps === "object" && patch.fps.num === current.num && patch.fps.den === current.den) && (patch.width === void 0 || patch.width === project.width) && (patch.height === void 0 || patch.height === project.height) && (patch.sampleRate === void 0 || patch.sampleRate === project.sample_rate);
           if (same) return unchanged(tool, "Settings already matched.", { data: { changed: false } });
@@ -54572,6 +57924,9 @@ function startPlaying(call) {
   const player = call.host.player;
   if (!player.playing) player.play();
 }
+function playheadText(call) {
+  return `${call.host.player.playhead.toFixed(2)} s`;
+}
 var VIEW3, playbackTools;
 var init_playback = __esm({
   "../engine/src/tools/catalog/playback.ts"() {
@@ -54587,9 +57942,50 @@ var init_playback = __esm({
       contractTool("play_tool", {
         annotations: VIEW3,
         requires: ["player"],
-        run: (call) => {
-          call.host.player.toggle();
-          return "Playback toggled.";
+        // zenvi-core develop editor_tools/tracks_nav.py play / _start_transport. Hosts play
+        // at normal speed only, so fast_forward, rewind and other speeds are refused.
+        run: (call, input2) => {
+          let action = input2.action ?? "toggle";
+          const speed = input2.speed ?? null;
+          const frames = input2.frames ?? 1;
+          if (speed !== null && action !== "play" && action !== "toggle") return "Error: speed only applies to action='play'.";
+          if (speed === 0) return "Error: speed 0 is a pause; use action='pause'.";
+          if (frames !== 1 && action !== "step_forward" && action !== "step_back") return "Error: frames only applies to step_forward / step_back.";
+          if (speed !== null && action === "toggle") action = "play";
+          if (action === "fast_forward" || action === "rewind" || speed !== null && speed !== 1) {
+            return unavailable("play_tool", "this player plays at normal speed only (no fast forward, rewind or other speeds).");
+          }
+          const player = call.host.player;
+          const project = call.doc.project;
+          if (action === "toggle") {
+            const wasPlaying = player.playing;
+            if (!wasPlaying && project.clips.length === 0) return "Error: the timeline is empty: there is nothing to play.";
+            player.toggle();
+            return wasPlaying ? `Paused at ${playheadText(call)}.` : `Playing at 1x, now at ${playheadText(call)}.`;
+          }
+          if (action === "play") {
+            if (player.playing) return `Already playing at 1x (now at ${playheadText(call)}).`;
+            if (project.clips.length === 0) return "Error: the timeline is empty: there is nothing to play.";
+            player.play();
+            return `Playing at 1x, now at ${playheadText(call)}.`;
+          }
+          if (action === "pause") {
+            if (!player.playing) return `Already paused at ${playheadText(call)}.`;
+            player.pause();
+            return `Paused at ${playheadText(call)}.`;
+          }
+          if (action === "stop") {
+            player.pause();
+            player.seek(timelineStart(project));
+            return `Stopped: paused at the start (${playheadText(call)}).`;
+          }
+          const fps = projectFps(project);
+          const frame = Math.round(player.playhead * fps.num / fps.den) + 1;
+          const target = Math.max(1, frame + (action === "step_forward" ? frames : -frames));
+          if (target === frame) return "Error: already at the first frame; nothing to step back to.";
+          player.pause();
+          player.seek((target - 1) * fps.den / fps.num);
+          return `Stepped to ${playheadText(call)} (frame ${target}), paused.`;
         }
       }),
       contractTool("go_to_start_tool", {
@@ -54692,6 +58088,12 @@ var init_playback = __esm({
 });
 
 // ../engine/src/tools/catalog/project.ts
+async function saveCurrent(call, tool) {
+  const storage = call.host.storage;
+  if (!storage) return unavailable(tool, "save_first needs project storage, which this host does not provide.");
+  await storage.save(call.doc.toJSON());
+  return null;
+}
 function timelineSignature(project) {
   const out = /* @__PURE__ */ new Map();
   const r3 = (v) => Math.round((Number(v) || 0) * 1e3) / 1e3;
@@ -54835,7 +58237,11 @@ var init_project2 = __esm({
       }),
       contractTool("new_project_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
-        run: (call) => {
+        run: async (call, input2) => {
+          if (input2.save_first) {
+            const refusal = await saveCurrent(call, "new_project_tool");
+            if (refusal) return refusal;
+          }
           const current = call.doc.project;
           let project;
           try {
@@ -54862,8 +58268,12 @@ var init_project2 = __esm({
         requires: ["storage"],
         run: async (call, input2) => {
           const path38 = text(input2.file_path);
-          if (!path38) return "Error: file_path is required.";
+          if (!path38) return "Error: give file_path (a .zvn project) or recent_index.";
           const project = await call.host.storage.open(path38);
+          if (input2.save_first) {
+            const refusal = await saveCurrent(call, "open_project_tool");
+            if (refusal) return refusal;
+          }
           call.doc.load(project);
           return `Opened project ${path38}.`;
         }
@@ -55943,8 +59353,17 @@ async function deleteOneClip(call, args) {
   const locked = lockedTrackError(layer2, project.layers);
   if (locked) return locked;
   const trackLabel = formatTrackLabelForLlm(layer2, project.layers);
-  call.commit((tx) => deleteClips(tx, [String(clip2.id)]));
-  return `Deleted timeline clip ${String(clip2.id)} (${pyReprString(title)}) from track ${trackLabel} at ${pyFixed(position, 2)}s. Other clips on that track are unchanged (gap left, no ripple). 1 undo step.`;
+  const ripple = boolArg(args.ripple);
+  const positions = (p) => new Map([...p.clips, ...p.effects].filter((item) => layerOf3(item.layer) === layer2).map((item) => [String(item.id), Number(item.position)]));
+  const before = positions(project);
+  call.commit((tx) => deleteClips(tx, [String(clip2.id)], { ripple }));
+  const head = `Deleted timeline clip ${String(clip2.id)} (${pyReprString(title)}) from track ${trackLabel} at ${pyFixed(position, 2)}s`;
+  if (ripple) {
+    const after = positions(call.doc.project);
+    const moved = [...after].filter(([id, pos]) => before.get(id) !== pos).length;
+    return `${head} and closed the gap: ${moved} later item(s) on that track moved left. 1 undo step.`;
+  }
+  return `${head}. Other clips on that track are unchanged (gap left, no ripple). 1 undo step.`;
 }
 function deleteWholeTrack(call, track2, includeTransitions) {
   const project = call.doc.project;
@@ -55988,7 +59407,13 @@ async function deleteFromTimeline(call, args) {
   }
   return deleteOneClip(call, args);
 }
-var DESTRUCTIVE, ADDITIVE, timelineTools;
+function trackTitle(project, layerId) {
+  const stack = sortedLayers(project);
+  const index = stack.findIndex((l) => l.id === layerId);
+  const label2 = stack[index]?.label;
+  return `track ${index + 1}${label2 ? ` (${pyReprString(label2)})` : ""}`;
+}
+var DESTRUCTIVE, ADDITIVE, TRACK_REF, timelineTools;
 var init_timeline2 = __esm({
   "../engine/src/tools/catalog/timeline.ts"() {
     "use strict";
@@ -55996,6 +59421,7 @@ var init_timeline2 = __esm({
     init_markers();
     init_tracks();
     init_transitions();
+    init_queries();
     init_define();
     init_pyfmt();
     init_tracks2();
@@ -56003,18 +59429,56 @@ var init_timeline2 = __esm({
     init_placement();
     DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADDITIVE = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    TRACK_REF = "a UI track number (1 = bottom), track name, track id (L3) or layer number";
     timelineTools = [
+      // zenvi-core develop editor_tools/tracks_nav.py add_track (track_ops.insert_track).
       contractTool("add_track_tool", {
         annotations: ADDITIVE,
         run: (call, input2) => {
-          const label2 = text(input2.label);
-          const selected = selectedTrack(call);
-          call.commit(
-            (tx) => addTrack(tx, selected ? { below: Math.trunc(Number(selected.number)), label: label2 || void 0 } : { label: label2 || void 0 })
-          );
-          return "Track added.";
+          const position = input2.position ?? "top";
+          const relativeTo = text(input2.relative_to);
+          const name = text(input2.name) || text(input2.label);
+          const count = input2.count ?? 1;
+          let relative2;
+          let relativeId = "";
+          if (position === "above" || position === "below") {
+            if (!relativeTo) return `Error: position='${position}' needs relative_to: the track to add it ${position} (${TRACK_REF}).`;
+            const resolved = normalizeTrackOrLayerArg(relativeTo, call.doc.project.layers);
+            if (resolved.error) return resolved.error;
+            const reference = call.doc.project.layers.find((l) => l.number === resolved.layer);
+            if (!reference) return `Error: Unknown track ${pyReprString(relativeTo)}.`;
+            relative2 = reference.number;
+            relativeId = reference.id;
+          } else if (relativeTo) {
+            return `Error: relative_to only applies to position 'above' or 'below'; got position='${position}'.`;
+          }
+          const upward = position === "top" || position === "above";
+          const created = call.commit((tx) => {
+            const ids2 = [];
+            for (let i = 0; i < count; i += 1) {
+              const label2 = (count > 1 && name ? `${name} ${upward ? i + 1 : count - i}` : name) || void 0;
+              let at = {};
+              if (ids2.length > 0) {
+                const previous = tx.project.layers.find((l) => l.id === ids2[ids2.length - 1]);
+                at = upward ? { above: previous.number } : { below: previous.number };
+              } else if (position === "bottom") {
+                const lowest = sortedLayers(tx.project)[0];
+                if (lowest) at = { below: lowest.number };
+              } else if (relative2 !== void 0) {
+                at = position === "above" ? { above: relative2 } : { below: relative2 };
+              }
+              ids2.push(addTrack(tx, { ...at, label: label2 }).id);
+            }
+            return ids2;
+          });
+          const project = call.doc.project;
+          const titles = created.map((id) => trackTitle(project, id));
+          const where = relativeId ? `${position} ${trackTitle(project, relativeId)}` : `at the ${position}`;
+          const head = created.length === 1 ? `Added ${titles[0]} ${where}.` : `Added ${created.length} tracks (${titles.join(", ")}) ${where}.`;
+          return `${head} Track numbers count from the bottom.`;
         }
       }),
+      // zenvi-core develop editor_tools/tracks_nav.py add_marker.
       contractTool("add_marker_tool", {
         annotations: ADDITIVE,
         run: (call, input2) => {
@@ -56025,8 +59489,9 @@ var init_timeline2 = __esm({
             if (error62 instanceof TimeArgError) return `Error: ${error62.message}`;
             throw error62;
           }
-          const label2 = text(input2.label) || text(input2.text);
-          call.commit((tx) => addMarker(tx, Math.max(0, position), label2 || void 0));
+          const label2 = text(input2.name) || text(input2.label) || text(input2.text);
+          const color3 = input2.color ?? "blue";
+          call.commit((tx) => addMarker(tx, Math.max(0, position), label2 || void 0, { icon: `${color3}.png`, vector: color3 }));
           return "Marker added.";
         }
       }),
@@ -56422,11 +59887,26 @@ function buildCatalog() {
     if (byName2.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName2.set(tool.name, tool);
   }
-  const missing = CONTRACT_TOOL_NAMES.filter((name) => !byName2.has(name));
-  if (missing.length > 0) throw new Error(`tool catalog: contract tools without an implementation: ${missing.join(", ")}`);
   const extra = implemented.filter((tool) => !tool.contract);
   if (extra.length > 0) throw new Error(`tool catalog: non-contract tools outside the direct list: ${extra.map((t) => t.name).join(", ")}`);
-  return [...CONTRACT_TOOL_NAMES.map((name) => byName2.get(name)), ...directTools];
+  const contract = [];
+  const problems = [];
+  for (const name of CONTRACT_TOOL_NAMES) {
+    const tool = byName2.get(name);
+    if (PENDING_DESKTOP_TOOLS.has(name)) {
+      if (tool) problems.push(`${name} is implemented: remove it from PENDING_DESKTOP_TOOLS`);
+    } else if (DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name)) {
+      if (!tool || tool.contract) problems.push(`${name} is not a direct tool: remove it from DESKTOP_NAMES_ON_DIRECT_TOOLS`);
+    } else if (!tool) {
+      problems.push(`${name} has no implementation: port it or add it to PENDING_DESKTOP_TOOLS`);
+    } else if (!tool.contract) {
+      problems.push(`direct tool ${name} has a desktop tool's name: add it to DESKTOP_NAMES_ON_DIRECT_TOOLS`);
+    } else {
+      contract.push(tool);
+    }
+  }
+  if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
+  return [...contract, ...directTools];
 }
 function getTool(name) {
   return TOOLS_BY_NAME.get(name);
@@ -56473,6 +59953,7 @@ var init_registry4 = __esm({
     init_titles2();
     init_transitions3();
     init_define();
+    init_pending();
     init_receipt();
     init_schemas_gen();
     allTools = buildCatalog();
@@ -56511,17 +59992,21 @@ function onSurface(tool, surface) {
   if (missing.length > 0) return { level: "no", note: `needs ${[...new Set(missing)].map(needName).join(" and ")}` };
   const conditions = [...tool.requires ?? []].map((cap) => profile.conditional?.[cap]).filter((c) => Boolean(c));
   const lacking = (needs.optional ?? []).filter((n) => !has(profile, n));
+  const pendingArgs = tool.contract ? PENDING_DESKTOP_ARGS[tool.name] ?? [] : [];
   const notes = [
     ...needs.webNote ? [needs.webNote] : [],
     ...lacking.length > 0 && needs.partialNote ? [needs.partialNote] : [],
+    ...pendingArgs.length > 0 ? [`only Zenvi desktop takes ${pendingArgs.join(", ")} so far`] : [],
     ...conditions.length > 0 ? [`only when ${conditions.join(" and ")}`] : []
   ];
-  if (needs.webNote || lacking.length > 0) return { level: "partial", note: notes.join("; ") };
+  if (needs.webNote || lacking.length > 0 || pendingArgs.length > 0) return { level: "partial", note: notes.join("; ") };
   return conditions.length > 0 ? { level: "yes", note: notes.join("; ") } : { level: "yes" };
 }
 function toolAvailability(tool) {
   const out = { editor: "no", cli: "no", cloud: "no", desktop: tool.contract ? "yes" : "no", notes: {} };
-  if (!tool.contract) out.notes.desktop = "web-only direct tool";
+  if (!tool.contract) {
+    out.notes.desktop = DESKTOP_NAMES_ON_DIRECT_TOOLS.has(tool.name) ? "web-only direct tool; Zenvi desktop's tool of this name takes other arguments (not ported yet)" : "web-only direct tool";
+  }
   for (const surface of ["editor", "cli", "cloud"]) {
     const { level, note } = onSurface(tool, surface);
     out[surface] = level;
@@ -56537,6 +60022,7 @@ var init_availability = __esm({
   "../engine/src/tools/availability.ts"() {
     "use strict";
     init_define();
+    init_pending();
     WATCH = ["frames", "backend"];
     WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
     TOOL_NEEDS = {
@@ -56709,11 +60195,13 @@ __export(tools_exports, {
   CONTRACT_REF: () => CONTRACT_REF,
   CONTRACT_TOOL_NAMES: () => CONTRACT_TOOL_NAMES,
   CONTRACT_VERSION: () => CONTRACT_VERSION,
+  DESKTOP_NAMES_ON_DIRECT_TOOLS: () => DESKTOP_NAMES_ON_DIRECT_TOOLS,
   HIDDEN_PARAMS: () => HIDDEN_PARAMS,
   MUTATION_CLIP_LIMIT: () => MUTATION_CLIP_LIMIT,
+  PENDING_DESKTOP_ARGS: () => PENDING_DESKTOP_ARGS,
+  PENDING_DESKTOP_TOOLS: () => PENDING_DESKTOP_TOOLS,
   RECEIPT_OUTPUT_SCHEMA: () => RECEIPT_OUTPUT_SCHEMA,
   SHIFT_GROUP_MINIMUM: () => SHIFT_GROUP_MINIMUM,
-  SNAPSHOT_REF: () => SNAPSHOT_REF,
   SURFACE_PROFILES: () => SURFACE_PROFILES,
   TOOL_NEEDS: () => TOOL_NEEDS,
   allTools: () => allTools,
@@ -56734,6 +60222,7 @@ __export(tools_exports, {
   missingCapabilities: () => missingCapabilities,
   normalizeArgs: () => normalizeArgs,
   parseReceipt: () => parseReceipt,
+  pendingArgumentMessage: () => pendingArgumentMessage,
   pickPexelsHdLink: () => pickPexelsHdLink,
   refused: () => refused,
   resultFor: () => resultFor,
@@ -56756,6 +60245,7 @@ var init_tools = __esm({
     init_json_schema2();
     init_coerce();
     init_schemas_gen();
+    init_pending();
     init_reports();
     init_define();
     init_registry4();

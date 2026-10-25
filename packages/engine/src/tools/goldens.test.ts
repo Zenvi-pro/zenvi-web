@@ -3,7 +3,10 @@
  *
  * __fixtures__/desktop-goldens.json is recorded by
  * scripts/gen-tool-goldens.py, which runs the desktop's real handlers
- * (contract ref b63c39be7) headlessly over __fixtures__/golden-project.json.
+ * (contract ref 1f80cb3d0) headlessly over __fixtures__/golden-project.json.
+ * develop replaced get_project_info and list_markers with editor tools that
+ * answer structured receipts; until those are re-ported the engine keeps
+ * their earlier text, recorded at b63c39be7 (LEGACY below).
  */
 
 import { describe, expect, it } from "vitest";
@@ -28,9 +31,15 @@ import { formatTrackLabelForLlm, normalizeTrackOrLayerArg, trackStackJson } from
 
 const project = fixture as unknown as Project;
 
+/** zenvi-core b63c39be7 tool_handlers.get_project_info / list_markers on the golden project. */
+const LEGACY = {
+  get_project_info: "Project: profile=HD 720p 30 fps, fps=30/1, duration=300, scale=15.0",
+  list_markers: "Markers (1):\n  id=MARKER0001 position=12.5 name=",
+};
+
 describe("desktop parity: read tool text", () => {
   it("get_project_info_tool", () => {
-    expect(projectInfoText(project)).toBe(goldens.get_project_info);
+    expect(projectInfoText(project)).toBe(LEGACY.get_project_info);
   });
 
   it("list_files_tool", () => {
@@ -52,7 +61,7 @@ describe("desktop parity: read tool text", () => {
   });
 
   it("list_markers_tool", () => {
-    expect(listMarkersText(project)).toBe(goldens.list_markers);
+    expect(listMarkersText(project)).toBe(LEGACY.list_markers);
   });
 
   it("get_timeline_state_tool text and structured data", () => {

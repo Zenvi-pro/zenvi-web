@@ -148,6 +148,15 @@ Two families, one registry (`packages/engine/src/tools`):
 Every mutating tool returns a receipt: `{ ok, text, data }` where `data` lists
 created/changed ids, so agents can chain calls without re-reading the timeline.
 
+The desktop contract is generated, not written: `packages/engine/scripts/gen-tool-schemas.py`
+reads every tool Zenvi desktop lists at a zenvi-core develop commit (`TOOL_SCHEMAS`, the
+editor tool manifest vendored in `docs/specs/desktop-editor-tools-manifest.json`, the
+MCP-only extras) into `schemas.gen.ts`. Desktop tools not ported yet, and desktop
+arguments a ported tool does not handle yet, are listed in `src/tools/pending.ts`: no
+surface lists a pending tool and a call to one is refused like an unknown name; a
+pending argument is refused, never ignored. Porting one removes its line.
+`docs/TOOLS.md` ("Not ported yet") lists both.
+
 ## 4. Hosts and handoffs (`zenvi mcp`, Zenvi Link)
 
 `zenvi mcp` drives four **hosts** (contract: the handoff SPEC §3.8):

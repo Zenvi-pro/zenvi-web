@@ -4,14 +4,15 @@
  *
  * Ports of zenvi-core src/classes/tool_handlers.py (ref b63c39be7):
  * get_project_info, list_files, list_clips, list_layers, list_markers,
- * save_project, open_project, _undo_redo.
+ * save_project, open_project, _undo_redo; save_first and open's optional
+ * file_path from develop 1f80cb3d0 editor_tools/project_export.py.
  */
 
 import type { ChangeEvent, UpdateAction } from "../../history/document.js";
 import { createProject } from "../../model/defaults.js";
 import type { Project } from "../../model/types.js";
-import { contractTool, type CatalogTool, type ToolCall } from "../define.js";
-import { applied, failed } from "../receipt.js";
+import { contractTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
+import { applied, failed, type ToolReceipt } from "../receipt.js";
 import { listClipsReport, listFilesText, listLayersText, listMarkersText, projectInfoText } from "../reports.js";
 import { timelineDelta, timelineSnapshot } from "../snapshot.js";
 import { normalizeTrackOrLayerArg } from "../tracks.js";
@@ -20,6 +21,19 @@ import { coerceSteps, text } from "./common.js";
 const READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true } as const;
 
 const PROJECT_EXTS = [".zvn", ".osp", ".flow"];
+
+/**
+ * save_first (zenvi-core develop project_export.new_project / open_project):
+ * save the current project where it already is before replacing it. A
+ * refusal when this host cannot. discard_unsaved needs nothing: no Zenvi web
+ * surface keeps edits unsaved (they autosave), so there is nothing to guard.
+ */
+async function saveCurrent(call: ToolCall, tool: string): Promise<ToolReceipt | null> {
+  const storage = call.host.storage;
+  if (!storage) return unavailable(tool, "save_first needs project storage, which this host does not provide.");
+  await storage.save(call.doc.toJSON());
+  return null;
+}
 
 export const projectTools: CatalogTool[] = [
   contractTool("get_project_info_tool", {
@@ -66,7 +80,11 @@ export const projectTools: CatalogTool[] = [
 
   contractTool("new_project_tool", {
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
-    run: (call) => {
+    run: async (call, input) => {
+      if (input.save_first) {
+        const refusal = await saveCurrent(call, "new_project_tool");
+        if (refusal) return refusal;
+      }
       // project.new(): the default project with this project's profile; history starts empty.
       const current = call.doc.project;
       let project: Project;
@@ -96,8 +114,12 @@ export const projectTools: CatalogTool[] = [
     requires: ["storage"],
     run: async (call, input) => {
       const path = text(input.file_path);
-      if (!path) return "Error: file_path is required.";
+      if (!path) return "Error: give file_path (a .zvn project) or recent_index.";
       const project: Project = await call.host.storage!.open(path);
+      if (input.save_first) {
+        const refusal = await saveCurrent(call, "open_project_tool");
+        if (refusal) return refusal;
+      }
       call.doc.load(project);
       return `Opened project ${path}.`;
     },

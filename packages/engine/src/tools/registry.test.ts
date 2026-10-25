@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import backendTools from "../../../../docs/specs/backend-frontend-tools.json";
 import { normalizeArgs } from "./coerce.js";
 import type { JsonSchema } from "./json-schema.js";
+import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_TOOLS } from "./pending.js";
 import { allTools, getTool, listTools, runTool } from "./registry.js";
 import { CONTRACT_TOOL_NAMES, contractMeta } from "./schemas.gen.js";
 import { fakeHost } from "./test-support/fake-host.js";
@@ -40,11 +41,12 @@ function stringForm(schema: JsonSchema): string | undefined {
 }
 
 describe("tool catalog", () => {
-  it("registers every contract-3 tool, in TOOL_SCHEMAS order, then the direct tools", () => {
-    expect(CONTRACT_TOOL_NAMES).toHaveLength(73);
-    expect(allTools.map((t) => t.name)).toEqual([...CONTRACT_TOOL_NAMES, ...DIRECT_TOOLS]);
+  it("registers every ported desktop tool, in the contract's order, then the direct tools", () => {
+    const ported = CONTRACT_TOOL_NAMES.filter((name) => !PENDING_DESKTOP_TOOLS.has(name) && !DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name));
+    expect(ported).toHaveLength(73);
+    expect(allTools.map((t) => t.name)).toEqual([...ported, ...DIRECT_TOOLS]);
     expect(new Set(allTools.map((t) => t.name)).size).toBe(allTools.length);
-    for (const name of CONTRACT_TOOL_NAMES) expect(getTool(name)?.contract).toBe(true);
+    for (const name of ported) expect(getTool(name)?.contract).toBe(true);
     for (const name of DIRECT_TOOLS) expect(getTool(name)?.contract).toBe(false);
   });
 

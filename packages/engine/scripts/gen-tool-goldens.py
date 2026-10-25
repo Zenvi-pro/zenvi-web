@@ -8,8 +8,12 @@ packages/engine/src/tools/__fixtures__/golden-project.json, runs the real
 handlers and writes their text to __fixtures__/desktop-goldens.json. The
 TypeScript tests compare the web tools' output with it byte for byte.
 
+develop replaced tool_handlers.get_project_info and list_markers with editor
+tools (structured receipts the engine does not produce yet); goldens.test.ts
+keeps their earlier text (b63c39be7) inline until those tools are re-ported.
+
 Usage:  python3 packages/engine/scripts/gen-tool-goldens.py [project.json] [out.json]
-Env:    ZENVI_DESKTOP_REPO (default ~/Projects/zenvi), ZENVI_CONTRACT_REF (default b63c39be7).
+Env:    ZENVI_DESKTOP_REPO (default ~/Projects/zenvi), ZENVI_CONTRACT_REF (default 1f80cb3d0).
 Runs with HOME pointed at a temp dir so desktop modules cannot write into the
 real home directory.
 """
@@ -29,7 +33,7 @@ from unittest.mock import MagicMock
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(os.path.dirname(HERE), "src", "tools", "__fixtures__")
 REPO = os.environ.get("ZENVI_DESKTOP_REPO", os.path.join(os.path.expanduser("~"), "Projects", "zenvi"))
-REF = os.environ.get("ZENVI_CONTRACT_REF", "b63c39be7")
+REF = os.environ.get("ZENVI_CONTRACT_REF", "1f80cb3d0")
 
 
 def export_desktop(dest: str) -> None:
@@ -126,13 +130,11 @@ def main() -> None:
     from classes import clip_resolver as cr
 
     out: dict[str, object] = {"ref": REF}
-    out["get_project_info"] = th.get_project_info()
     out["list_files"] = th.list_files()
     out["list_clips"] = as_json(th.list_clips())
     out["list_clips_voice"] = as_json(th.list_clips(layer="Voice"))
     out["list_clips_bad_track"] = th.list_clips(layer="nope")
     out["list_layers"] = th.list_layers()
-    out["list_markers"] = th.list_markers()
     state = as_json(th.get_timeline_state())
     out["get_timeline_state"] = state
 

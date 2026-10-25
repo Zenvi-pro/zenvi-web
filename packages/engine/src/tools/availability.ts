@@ -5,11 +5,14 @@
  * the pipeline), the optional host methods it needs at run time
  * (`TOOL_NEEDS`), and what each surface's host provides (`SURFACE_PROFILES`,
  * a description of the host implementations in this repo). Zenvi desktop
- * runs all 73 contract tools itself (it is the reference implementation);
- * the direct tools exist only on the web surfaces.
+ * runs every contract tool itself (it is the reference implementation);
+ * the direct tools exist only on the web surfaces. A ported tool with desktop
+ * arguments not ported yet (pending.ts) is partial on the web surfaces.
  */
 
 import { capabilityName, type CatalogTool } from "./define.js";
+import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_ARGS } from "./pending.js";
+import type { ContractToolName } from "./schemas.gen.js";
 import type { HostCapability } from "./types.js";
 
 export type AvailabilitySurface = "editor" | "cli" | "cloud" | "desktop";
@@ -196,19 +199,25 @@ function onSurface(tool: CatalogTool, surface: Exclude<AvailabilitySurface, "des
   if (missing.length > 0) return { level: "no", note: `needs ${[...new Set(missing)].map(needName).join(" and ")}` };
   const conditions = [...(tool.requires ?? [])].map((cap) => profile.conditional?.[cap]).filter((c): c is string => Boolean(c));
   const lacking = (needs.optional ?? []).filter((n) => !has(profile, n));
+  const pendingArgs = tool.contract ? (PENDING_DESKTOP_ARGS[tool.name as ContractToolName] ?? []) : [];
   const notes = [
     ...(needs.webNote ? [needs.webNote] : []),
     ...(lacking.length > 0 && needs.partialNote ? [needs.partialNote] : []),
+    ...(pendingArgs.length > 0 ? [`only Zenvi desktop takes ${pendingArgs.join(", ")} so far`] : []),
     ...(conditions.length > 0 ? [`only when ${conditions.join(" and ")}`] : []),
   ];
-  if (needs.webNote || lacking.length > 0) return { level: "partial", note: notes.join("; ") };
+  if (needs.webNote || lacking.length > 0 || pendingArgs.length > 0) return { level: "partial", note: notes.join("; ") };
   return conditions.length > 0 ? { level: "yes", note: notes.join("; ") } : { level: "yes" };
 }
 
 /** Where one tool works. */
 export function toolAvailability(tool: CatalogTool): ToolAvailability {
   const out: ToolAvailability = { editor: "no", cli: "no", cloud: "no", desktop: tool.contract ? "yes" : "no", notes: {} };
-  if (!tool.contract) out.notes.desktop = "web-only direct tool";
+  if (!tool.contract) {
+    out.notes.desktop = DESKTOP_NAMES_ON_DIRECT_TOOLS.has(tool.name as ContractToolName)
+      ? "web-only direct tool; Zenvi desktop's tool of this name takes other arguments (not ported yet)"
+      : "web-only direct tool";
+  }
   for (const surface of ["editor", "cli", "cloud"] as const) {
     const { level, note } = onSurface(tool, surface);
     out[surface] = level;

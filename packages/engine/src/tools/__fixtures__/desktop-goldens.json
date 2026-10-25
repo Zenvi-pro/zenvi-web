@@ -1,6 +1,5 @@
 {
- "ref": "b63c39be7",
- "get_project_info": "Project: profile=HD 720p 30 fps, fps=30/1, duration=300, scale=15.0",
+ "ref": "1f80cb3d0",
  "list_files": "Media bin files (4):\n  media_bin_file_id=FILEINTRVW name='interview.mp4' duration=60.00s analyzed=True indexed=True summary_preview='Founder interview in a sunlit studio' path=interview.mp4\n  media_bin_file_id=FILEMUSIC1 name='music_bed.mp3' duration=120.00s analyzed=True indexed=False summary_preview='Upbeat synth music bed' path=music_bed.mp3\n  media_bin_file_id=FILELOGO01 name='logo.png' duration=3600.00s analyzed=False indexed=False summary_preview='' path=logo.png\n  media_bin_file_id=FILEBROLL1 name=\"Tom's b-roll\" duration=30.00s analyzed=True indexed=True summary_preview='Drone b-roll sweeping over a misty mountain ridge at sunrise with pine forests b' path=broll.mov",
  "list_clips": {
   "contract": 3,
@@ -136,7 +135,6 @@
  },
  "list_clips_bad_track": "Error: Unknown track or layer 'nope'. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label.",
  "list_layers": "Layers (5). Z-ORDER uses layer_number only (higher covers lower). Track labels/names are cosmetic — they can be anything and do NOT imply priority.\nBOTTOM (drawn under): layer_number=1000000 label=''\nTOP (covers all below): layer_number=5000000 label='Titles'\nStack bottom→top:\n  layer_number=1000000 ui_track=1 z_from_bottom=0 label='' track_id='L1' lock=False\n  layer_number=2000000 ui_track=2 z_from_bottom=1 label='Voice' track_id='L2' lock=False\n  layer_number=3000000 ui_track=3 z_from_bottom=2 label='Música' track_id='L3' lock=False\n  layer_number=4000000 ui_track=4 z_from_bottom=3 label='B-roll' track_id='L4' lock=True\n  layer_number=5000000 ui_track=5 z_from_bottom=4 label='Titles' track_id='L5' lock=False\nTRACK_STACK_JSON=[{\"layer_number\":1000000,\"ui_track\":1,\"z_from_bottom\":0,\"label\":\"\",\"track_id\":\"L1\"},{\"layer_number\":2000000,\"ui_track\":2,\"z_from_bottom\":1,\"label\":\"Voice\",\"track_id\":\"L2\"},{\"layer_number\":3000000,\"ui_track\":3,\"z_from_bottom\":2,\"label\":\"M\\u00fasica\",\"track_id\":\"L3\"},{\"layer_number\":4000000,\"ui_track\":4,\"z_from_bottom\":3,\"label\":\"B-roll\",\"track_id\":\"L4\"},{\"layer_number\":5000000,\"ui_track\":5,\"z_from_bottom\":4,\"label\":\"Titles\",\"track_id\":\"L5\"}]",
- "list_markers": "Markers (1):\n  id=MARKER0001 position=12.5 name=",
  "get_timeline_state": {
   "contract": 3,
   "status": "applied",
@@ -397,8 +395,8 @@
    null
   ],
   "ui track 2": [
-   null,
-   "Error: Unknown track or layer 'ui track 2'. Call list_layers_tool and use layer_number (preferred), track_id, ui_track (1=bottom), or the exact label."
+   2000000,
+   null
   ],
   "3": [
    3000000,
