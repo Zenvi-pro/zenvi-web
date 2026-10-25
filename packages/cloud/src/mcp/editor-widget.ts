@@ -178,15 +178,22 @@ export const EDITOR_WIDGET_HTML = `<!doctype html>
     state.frame = frame;
     state.ready = false;
     size();
-    // A host that cannot frame the editor (no frame-domain support) leaves it blank: offer a tab instead.
+    // A host that cannot frame the editor (no frame-domain support) leaves it blank: offer a tab too. The frame stays,
+    // since a slow network can take longer than this to load an editor that would still appear.
     setTimeout(function () {
-      if (state.frame === frame && !state.ready) message("The editor could not open inside this chat.", editor.url + "#" + hash, "Open the Zenvi editor");
+      if (state.frame !== frame || state.ready) return;
+      var link = editor.url + "#" + hash;
+      var a = document.createElement("a");
+      a.id = "fallback"; a.className = "card"; a.textContent = "Editor not showing? Open it in a new tab";
+      a.href = link; a.target = "_blank"; a.rel = "noopener";
+      a.addEventListener("click", function (event) { event.preventDefault(); openLink(link); });
+      root.insertBefore(a, frame);
     }, READY_MS);
   }
   function refreshToken() {
     if (state.refreshing || !state.projectId) return;
     state.refreshing = true;
-    callTool("open_in_editor", { project_id: state.projectId }).then(function (result) {
+    callTool("open_in_editor", { project_id: state.projectId, refresh: true }).then(function (result) {
       state.refreshing = false;
       var editor = editorMeta(result && (result._meta || result.meta));
       if (editor) { state.editor = editor; toFrame({ type: "zenvi:token", token: editor.token }); }
@@ -208,6 +215,8 @@ export const EDITOR_WIDGET_HTML = `<!doctype html>
       if (event.origin !== state.origin || !msg || typeof msg.type !== "string") return;
       if (msg.type === "zenvi:ready") {
         state.ready = true;
+        var fallback = document.getElementById("fallback");
+        if (fallback) fallback.remove();
         toFrame({ type: "zenvi:display-mode", mode: state.mode });
         if (state.theme) toFrame({ type: "zenvi:theme", theme: state.theme });
       } else if (msg.type === "zenvi:request-display-mode") requestMode(msg.mode === "fullscreen" ? "fullscreen" : "inline");

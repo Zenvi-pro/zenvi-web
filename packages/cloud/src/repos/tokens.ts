@@ -33,6 +33,8 @@ export interface TokenRecord {
   resource?: string;
   /** OAuth grant id shared by an access/refresh token family. */
   familyId?: string;
+  /** Embed tokens minted through a personal access token: its id (revoking that token ends them too). */
+  parentPatId?: string;
   createdAt: string;
   lastUsedAt?: string;
   expiresAt?: string;
@@ -70,6 +72,7 @@ interface LookupRow extends TableEntity {
   scopes: string;
   resource?: string;
   familyId?: string;
+  parentPatId?: string;
   createdAt: string;
   lastUsedAt?: string;
   expiresAt?: string;
@@ -128,6 +131,7 @@ function toRecord(row: LookupRow): TokenRecord {
     scopes: parseList(row.scopes),
     resource: row.resource ?? undefined,
     familyId: row.familyId ?? undefined,
+    parentPatId: row.parentPatId ?? undefined,
     createdAt: row.createdAt,
     lastUsedAt: row.lastUsedAt ?? undefined,
     expiresAt: row.expiresAt ?? undefined,
@@ -149,6 +153,7 @@ function toRow(record: TokenRecord): LookupRow {
     scopes: JSON.stringify(record.scopes),
     resource: record.resource,
     familyId: record.familyId,
+    parentPatId: record.parentPatId,
     createdAt: record.createdAt,
     lastUsedAt: record.lastUsedAt,
     expiresAt: record.expiresAt,
@@ -169,6 +174,7 @@ function parseList(value: string | undefined): string[] {
 
 export class TokenRepo {
   private readonly cache = new Map<string, { record: TokenRecord; until: number }>();
+  /** Whether an OAuth grant (`<user>/<familyId>`) or a personal token (`<user>/pat:<id>`) is revoked. */
   private readonly grantCache = new Map<string, { revoked: boolean; until: number }>();
   private readonly touched = new Map<string, number>();
   /** Called after a grant is revoked (the account page, or a reused refresh token). */
@@ -284,8 +290,8 @@ export class TokenRepo {
   /**
    * A token for the editor embedded in a chat (the MCP editor widget): it
    * reads and saves one project and its media, for a few hours. Minted under
-   * the connection's OAuth grant (`familyId`), so disconnecting the app ends
-   * it too; personal-token connections have no grant and rely on the expiry.
+   * the connection's OAuth grant (`familyId`) or personal access token
+   * (`parentPatId`), so disconnecting the app or revoking the token ends it too.
    */
   async issueEmbed(input: {
     userId: string;
@@ -294,6 +300,7 @@ export class TokenRepo {
     clientName: string;
     scopes: string[];
     familyId?: string;
+    parentPatId?: string;
     ttlSeconds: number;
   }): Promise<{ token: string; record: TokenRecord }> {
     const now = this.clock.now();
@@ -308,6 +315,7 @@ export class TokenRepo {
       scopes: input.scopes,
       resource: embedResource(input.projectId),
       familyId: input.familyId,
+      parentPatId: input.parentPatId,
       createdAt: isoAt(now),
       expiresAt: isoAt(now + input.ttlSeconds * 1000),
       revoked: false,
@@ -347,8 +355,21 @@ export class TokenRepo {
     if (record.kind !== kind || record.revoked) return null;
     if (record.expiresAt && Date.parse(record.expiresAt) <= now) return null;
     if (record.familyId && (await this.isGrantRevoked(record.userId, record.familyId))) return null;
+    if (record.parentPatId && (await this.isPatRevoked(record.userId, record.parentPatId))) return null;
     this.touch(record);
     return record;
+  }
+
+  /** Whether a personal access token is revoked or expired: `revokePat` deletes its owner-index row. */
+  async isPatRevoked(userId: string, patId: string): Promise<boolean> {
+    const key = `${userId}/pat:${patId}`;
+    const now = this.clock.now();
+    const cached = this.grantCache.get(key);
+    if (cached && cached.until > now) return cached.revoked;
+    const row = await this.tables.get<IndexRow>(TABLE, userPk(userId), `pat:${patId}`);
+    const revoked = !row || row.revoked === true || (row.expiresAt !== undefined && Date.parse(row.expiresAt) <= now);
+    this.grantCache.set(key, { revoked, until: now + CACHE_MS });
+    return revoked;
   }
 
   async isGrantRevoked(userId: string, familyId: string): Promise<boolean> {
@@ -402,6 +423,9 @@ export class TokenRepo {
   /** Revoke a personal access token owned by `userId`. False when not found. */
   async revokePat(userId: string, id: string): Promise<boolean> {
     const row = await this.tables.get<IndexRow>(TABLE, userPk(userId), `pat:${id}`);
+    // The editor tokens minted through it stop at once, here and after the cache.
+    this.grantCache.set(`${userId}/pat:${id}`, { revoked: true, until: this.clock.now() + CACHE_MS });
+    for (const [hash, entry] of this.cache) if (entry.record.parentPatId === id) this.cache.delete(hash);
     if (!row) return false;
     if (row.tokenHash) await this.revokeHash(row.tokenHash);
     await this.tables.delete(TABLE, row.partitionKey, row.rowKey);

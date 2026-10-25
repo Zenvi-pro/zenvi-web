@@ -23,7 +23,7 @@ and Claude connect to (see [CONNECTORS.md](CONNECTORS.md)).
 | Supabase access token (ES256 JWT, `aud=authenticated`) | web editor, website, desktop (existing Supabase session) | `/v1/*`, `/oauth/consent` (not `/mcp`) |
 | `zvn_pat_…` personal access token | CLI and desktop after device login, account page | `/v1/*` except `/v1/tokens`, and `/mcp` |
 | `zvn_oat_…` OAuth access token (1 h) | MCP connectors | `/mcp` only (audience-bound, RFC 8707) |
-| `zvn_emb_…` embedded-editor token (12 h) | the editor inside a chat (minted by `open_in_editor`, handed to the MCP view in the result's `_meta`) | its one project only: `GET`/`PUT /v1/projects/:id`, `GET …/revision`, renders, and `/v1/media/*`. Another project answers `404`, any other route `403`, `/mcp` `401`. It carries the connection's scopes and ends when the connection's OAuth grant is revoked |
+| `zvn_emb_…` embedded-editor token (12 h) | the editor inside a chat (minted by `open_in_editor`, handed to the MCP view in the result's `_meta`) | its one project only: `GET`/`PUT /v1/projects/:id`, `GET …/revision`, renders, and `/v1/media/*`. Another project answers `404`, any other route `403`, `/mcp` `401`. It carries the connection's scopes and ends when the connection's OAuth grant or personal access token is revoked |
 
 Tokens are never accepted in query strings. Zenvi tokens are 32 random bytes
 behind a prefix; only their SHA-256 is stored. Personal tokens carry the scopes

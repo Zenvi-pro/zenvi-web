@@ -11,7 +11,7 @@ import { bindRegistry, probe } from "../editor/render";
 import { SessionProvider } from "../editor/session/context";
 import { EditorSession } from "../editor/session/EditorSession";
 import { MediaLibrary } from "../editor/session/media";
-import { EmbedBridge, embedFetch, takeLaunch } from "./bridge";
+import { EmbedBridge, embedFetch, takeLaunch, type EmbedLaunch } from "./bridge";
 import { EmbedLayout } from "./EmbedLayout";
 import { followRemote } from "./followRemote";
 
@@ -30,9 +30,15 @@ function newMediaLibrary(cloud: CloudClient, cloudMedia: CloudMediaEntry[]): Med
  * keeps nothing in this browser (the cloud copy is the project), and follows
  * the edits the chat's tools make.
  */
+/**
+ * The launch, read once per page: takeLaunch clears the token from the address, and React may run a memo factory
+ * twice (StrictMode in development), which would find the token gone.
+ */
+let launch: EmbedLaunch | undefined;
+
 export default function EmbedRoute() {
   const { projectId = "" } = useParams();
-  const bridge = useMemo(() => new EmbedBridge(takeLaunch()), []);
+  const bridge = useMemo(() => new EmbedBridge((launch ??= takeLaunch())), []);
   const cloud = useMemo(
     () => new HttpCloudClient(window.location.origin, async () => bridge.currentToken(), embedFetch(bridge)),
     [bridge],
