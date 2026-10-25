@@ -38,6 +38,10 @@ import { overlayTools } from "./catalog/overlays.js";
 import { phase3Tools } from "./catalog/phase3.js";
 import { playbackTools } from "./catalog/playback.js";
 import { projectTools } from "./catalog/project.js";
+import { projectExportTools } from "./catalog/project-export.js";
+import { projectPrefsTools } from "./catalog/project-export-prefs.js";
+import { projectProfileTools } from "./catalog/project-export-profiles.js";
+import { projectRenderTools } from "./catalog/project-export-render.js";
 import { reelTools } from "./catalog/reels.js";
 import { searchTools } from "./catalog/search.js";
 import { speechTools } from "./catalog/speech-tools.js";
@@ -95,6 +99,10 @@ function buildCatalog(): readonly CatalogTool[] {
     ...effectsColorLookTools,
     ...effectsColorAnalysisTools,
     ...colorAgentTools,
+    ...projectExportTools,
+    ...projectProfileTools,
+    ...projectRenderTools,
+    ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
   for (const tool of [...implemented, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools]) {

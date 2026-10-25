@@ -217,6 +217,33 @@ export async function chooseCodecs(options: ChooseOptions, support: EncodeSuppor
   return finish(container, videoCodec, audioCodec, notes, options);
 }
 
+/**
+ * Whether this browser can export `format` with these encoders, named the
+ * way the desktop's export presets name them ("" = none): what
+ * list_export_presets_tool reports as `available` (the desktop asks
+ * FFmpegWriter.IsValidCodec). `chooseCodecs` may still export such a preset
+ * with another codec; this says whether it exports as the preset says.
+ */
+export async function canEncodeNamed(format: ContainerFormat, videoCodec: string, audioCodec: string, support: EncodeSupport): Promise<boolean> {
+  let container: WebContainer;
+  try {
+    container = webContainer(format);
+  } catch {
+    return false;
+  }
+  if (videoCodec) {
+    const codec = videoCodecFromName(videoCodec);
+    if (!codec || !CONTAINER_VIDEO_ALLOWED[container].includes(codec)) return false;
+    if (!(await support.canEncodeVideo(codec, { width: 1280, height: 720, frameRate: 30 }))) return false;
+  }
+  if (audioCodec) {
+    const codec = audioCodecFromName(audioCodec);
+    if (!codec || !CONTAINER_AUDIO[container].includes(codec)) return false;
+    if (!(await support.canEncodeAudio(codec, { sampleRate: 48000, numberOfChannels: 2 }))) return false;
+  }
+  return true;
+}
+
 /** The choice with the codec's size constraint applied (H.264/HEVC need even dimensions). */
 function finish(container: WebContainer, videoCodec: VideoCodec, audioCodec: AudioCodec | null, notes: string[], options: ChooseOptions): CodecChoice {
   const width = evenFor(videoCodec, options.width);

@@ -52,6 +52,7 @@ export { mixWindow } from "./audio/mixdown.js";
 
 // Export
 export {
+  canExportWith,
   exportProject,
   exportProjectTo,
   exportFrame,
@@ -60,7 +61,7 @@ export {
   type ExportRunOptions,
   type StreamedExport,
 } from "./export/export-project.js";
-export { chooseCodecs, ExportError, type CodecChoice, type EncodeSupport } from "./export/codecs.js";
+export { canEncodeNamed, chooseCodecs, ExportError, type CodecChoice, type EncodeSupport } from "./export/codecs.js";
 export { FrameRenderer } from "./export/frame-renderer.js";
 
 // Timeline helpers

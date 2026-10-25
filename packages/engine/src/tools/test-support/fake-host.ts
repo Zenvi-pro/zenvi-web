@@ -11,11 +11,17 @@ import { folderAndName, sequenceFramesPresent } from "../../ops/project-files.js
 import { isDirectMediaUrl, isYoutubeUrl, type WebVideoDownload, type WebVideoRequest } from "../../web-video/web-video.js";
 import type {
   AudioEnvelope,
+  ContainerFormat,
+  EditorLayout,
   EditorSelection,
   ExportOptions,
   HostCapability,
   ImportedMedia,
+  MediaMove,
   PathListing,
+  PreferenceEntry,
+  RecentProject,
+  RecoveryCopy,
   TimelineView,
   ToolHost,
   ToolImage,
@@ -42,7 +48,18 @@ export type OptionalMethod =
   | "ui.setSelection"
   | "ui.timelineView"
   | "ui.showTimelineRange"
-  | "ui.setTimelineMode";
+  | "ui.setTimelineMode"
+  | "ui.layout"
+  | "ui.preferences"
+  | "ui.clearPlaybackCache"
+  | "storage.writeBytes"
+  | "storage.exportMedia"
+  | "storage.currentPath"
+  | "storage.recentProjects"
+  | "storage.recoveryCopies"
+  | "storage.customProfiles"
+  | "media.collect"
+  | "exporter.supports";
 
 export interface BackendCall {
   path: string;
@@ -85,10 +102,42 @@ export interface FakeHostOptions {
    * recorded in `calls` as `fetchWebVideo <url> <intent> subs=<bool>`.
    */
   webVideo?: (request: WebVideoRequest) => Promise<WebVideoDownload>;
+  /** Where the open project is saved (`storage.currentPath`; default /projects/current.zvn, null = never saved). */
+  projectPath?: string | null;
+  /** `storage.recentProjects`. */
+  recent?: RecentProject[];
+  /** `storage.recoveryCopies`, newest first, with the project each copy restores. */
+  recovery?: (RecoveryCopy & { project: Project })[];
+  /** Custom profile files by name (`storage.customProfiles`); the fake writes and deletes here. */
+  profiles?: Record<string, string>;
+  /** The editor's settings (`ui.preferences`); the fake stores values here. */
+  preferences?: PreferenceEntry[];
+  /** The editor's panels (`ui.layout`; default `fakeLayout()`). */
+  layout?: EditorLayout;
+  /** `exporter.supports` (default: every codec but `prores_ks` and `h264_nvenc`). */
+  encodable?: (format: ContainerFormat, videoCodec: string, audioCodec: string) => boolean;
+}
+
+/** A small editor layout like the web editor's: one left and one right panel group, the preview and the timeline. */
+export function fakeLayout(): EditorLayout {
+  return {
+    view: "simple",
+    panels: [
+      { name: "Project Files", open: true, closable: true, group: "left" },
+      { name: "Effects", open: false, closable: true, group: "left" },
+      { name: "Properties", open: true, closable: true, group: "right" },
+      { name: "Assistant", open: false, closable: true, group: "right" },
+      { name: "Video Preview", open: true, closable: false },
+      { name: "Timeline", open: true, closable: false },
+    ],
+    toolbarVisible: true,
+    fullscreen: false,
+  };
 }
 
 /** The disk a fake host reads: listings in the CLI host's walk order, and what exists. */
-function fakeDisk(paths: readonly string[]) {
+function fakeDisk(initial: readonly string[]) {
+  const paths = [...initial];
   const files = new Set(paths);
   const under = (folder: string) => paths.filter((p) => p.startsWith(`${folder}/`));
   const isDir = (entry: string) => under(entry).length > 0;
@@ -102,6 +151,15 @@ function fakeDisk(paths: readonly string[]) {
   const names = (folder: string) => under(folder).map((p) => p.slice(folder.length + 1)).filter((r) => !r.includes("/"));
   return {
     has: (path: string) => files.has(path),
+    add: (path: string) => {
+      if (!files.has(path)) paths.push(path);
+      files.add(path);
+    },
+    remove: (path: string) => {
+      files.delete(path);
+      const at = paths.indexOf(path);
+      if (at >= 0) paths.splice(at, 1);
+    },
     list: (entry: string): PathListing => {
       const path = entry.replace(/\/+$/, "");
       if (files.has(path)) return { kind: "file", files: [path], path };
@@ -152,6 +210,10 @@ export function fakeWebVideoDownload(request: WebVideoRequest, overrides: Partia
 
 export interface FakeHost extends ToolHost {
   readonly calls: string[];
+  /** The fake disk's files (when `disk` was given). */
+  readonly disk: { has(path: string): boolean } | null;
+  /** Custom profile files by name. */
+  readonly profiles: Record<string, string>;
   readonly backendCalls: BackendCall[];
   readonly written: Map<string, Uint8Array | string>;
   readonly exports: ExportOptions[];
@@ -222,10 +284,13 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
   let playing = false;
   const editor = { selection: { clips: [], transitions: [], effects: [] } as EditorSelection, view: fakeView(options.view) };
 
-  const host: FakeHost = { calls, backendCalls, written, exports, editor, log: () => {} };
+  const disk = options.disk ? fakeDisk(options.disk) : null;
+  const contents = { ...(options.contents ?? {}) };
+  const profiles = { ...(options.profiles ?? {}) };
+  const host: FakeHost = { calls, backendCalls, written, exports, editor, disk, profiles, log: () => {} };
+  const projectPath = options.projectPath === undefined ? "/projects/current.zvn" : options.projectPath;
 
   if (!without.has("media")) {
-    const disk = options.disk ? fakeDisk(options.disk) : null;
     const imported = (path: string, name?: string): ImportedMedia => (name === undefined ? { path, info: infoForPath(path) } : { path, info: infoForPath(path), name });
     host.media = {
       probe: async (path) => {
@@ -271,6 +336,52 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
       };
     }
     if (!omit.has("media.pickFiles")) host.media.pickFiles = async () => [];
+    if (!omit.has("media.collect")) {
+      // media_collect on the fake disk: copies go to <project>_assets/media.
+      const assets = `${(projectPath ?? "/projects/untitled.zvn").replace(/\.[^./]+$/, "")}_assets`;
+      // Without a disk, sources exist unless "missing" and the assets folder holds what was copied.
+      const copies = new Set<string>();
+      const exists = (path: string) => (disk ? disk.has(path) : path.startsWith(`${assets}/`) ? copies.has(path) : !path.includes("missing"));
+      host.media.collect = async (files) => {
+        calls.push(`collect ${files.length}`);
+        const out = { copied: [] as string[], skipped: [] as string[], errors: [] as string[], moves: [] as MediaMove[] };
+        for (const f of files) {
+          if (!f.path || f.path.includes("%") || !exists(f.path) || f.path.startsWith(`${assets}/`)) {
+            out.skipped.push(f.path || "(empty)");
+            continue;
+          }
+          const dest = `${assets}/media/${f.path.split("/").pop()}`;
+          if (exists(dest)) out.skipped.push(f.path);
+          else {
+            disk?.add(dest);
+            copies.add(dest);
+            if (contents[f.path] !== undefined) contents[dest] = contents[f.path]!;
+            out.copied.push(dest);
+          }
+          out.moves.push({ fileId: f.id, from: f.path, to: dest });
+        }
+        return out;
+      };
+      host.media.reclaimable = async (files) => {
+        calls.push(`reclaimable ${files.length}`);
+        const out = { moves: [] as MediaMove[], kept: [] as string[], errors: [] as string[] };
+        for (const f of files) {
+          if (!f.path.startsWith(`${assets}/media/`)) continue;
+          if (!exists(f.path) || !exists(f.original)) out.kept.push(f.path);
+          else if (contents[f.path] !== undefined && contents[f.path] === contents[f.original]) out.moves.push({ fileId: f.id, from: f.path, to: f.original });
+          else out.kept.push(f.path);
+        }
+        return out;
+      };
+      host.media.removeCopies = async (paths) => {
+        calls.push(`removeCopies ${paths.join(",")}`);
+        for (const p of paths) {
+          disk?.remove(p);
+          copies.delete(p);
+        }
+        return { removed: [...paths], errors: [] };
+      };
+    }
     if (!omit.has("media.writeGenerated")) {
       host.media.writeGenerated = async (name, bytes) => {
         const path = `/generated/${name}`;
@@ -346,6 +457,31 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         editor.view = { ...editor.view, [mode]: on };
       };
     }
+    if (!omit.has("ui.layout")) {
+      let layout = structuredClone(options.layout ?? fakeLayout());
+      host.ui.layout = () => structuredClone(layout);
+      host.ui.setLayout = (change) => {
+        calls.push(`layout ${JSON.stringify(change)}`);
+        if (change.view === "simple") layout = fakeLayout();
+        for (const name of change.show ?? []) {
+          const panel = layout.panels.find((p) => p.name === name)!;
+          for (const p of layout.panels) if (panel.group && p.group === panel.group) p.open = false;
+          panel.open = true;
+        }
+        for (const name of change.hide ?? []) layout.panels.find((p) => p.name === name)!.open = false;
+        layout.view = change.view ?? "";
+        return structuredClone(layout);
+      };
+    }
+    if (!omit.has("ui.preferences")) {
+      const prefs = structuredClone(options.preferences ?? []);
+      host.ui.preferences = () => structuredClone(prefs);
+      host.ui.setPreference = (key, value) => {
+        calls.push(`setPreference ${key}=${String(value)}`);
+        prefs.find((p) => p.key === key)!.value = value;
+      };
+    }
+    if (!omit.has("ui.clearPlaybackCache")) host.ui.clearPlaybackCache = () => calls.push("clearPlaybackCache");
   }
   if (!without.has("exporter")) {
     host.exporter = {
@@ -356,6 +492,10 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         return { location: exportOptions.output ?? "/exports/export.mp4", bytes: 1234, mimeType: "video/mp4", durationSeconds: 1 };
       },
     };
+    if (!omit.has("exporter.supports")) {
+      const encodable = options.encodable ?? ((_f: ContainerFormat, v: string) => v !== "prores_ks" && v !== "h264_nvenc");
+      host.exporter.supports = async (format, videoCodec, audioCodec) => encodable(format, videoCodec, audioCodec);
+    }
   }
   if (!without.has("frames")) {
     host.frames = {
@@ -402,6 +542,57 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         calls.push(`writeText ${path}`);
         written.set(path, textValue);
         return path;
+      };
+    }
+    // Relative paths start at the project's folder, like the CLI host's.
+    const folderOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf("/")));
+    const resolved = (path: string) => (path.startsWith("/") ? path : `${folderOf(projectPath ?? "/projects/untitled.zvn")}/${path}`);
+    if (!omit.has("storage.writeBytes")) {
+      host.storage.writeBytes = async (path, bytes, _type, opts) => {
+        const target = resolved(path);
+        calls.push(`writeBytes ${target}`);
+        if (!opts?.overwrite && (written.has(target) || disk?.has(target))) throw Object.assign(new Error(`EEXIST: ${target}`), { code: "EEXIST", path: target });
+        written.set(target, bytes);
+        disk?.add(target);
+        return target;
+      };
+    }
+    if (!omit.has("storage.exportMedia")) {
+      host.storage.exportMedia = async (file, name, folder, render) => {
+        const dir = resolved(folder || ".").replace(/\/\.$/, "");
+        const target = `${dir}/${name}`;
+        calls.push(`exportMedia ${file.id} ${target}${render ? " render" : ""}`);
+        if (written.has(target) || disk?.has(target)) return { location: target, folder: dir, existed: true };
+        if (render) {
+          if (!host.exporter) throw new Error("no exporter");
+          await host.exporter.export(render.project, { ...render.options, output: target });
+        }
+        written.set(target, String(file.path));
+        disk?.add(target);
+        return { location: target, folder: dir, existed: false };
+      };
+    }
+    if (!omit.has("storage.currentPath")) host.storage.currentPath = () => projectPath;
+    if (!omit.has("storage.recentProjects")) host.storage.recentProjects = async () => structuredClone(options.recent ?? []);
+    if (!omit.has("storage.recoveryCopies")) {
+      host.storage.recoveryCopies = async () => (options.recovery ?? []).map(({ project: _project, ...copy }) => copy);
+      host.storage.restoreRecoveryCopy = async (copy) => {
+        calls.push(`restore ${copy}`);
+        const found = (options.recovery ?? []).find((c) => c.path === copy);
+        if (!found) throw new Error(`no copy ${copy}`);
+        return { project: structuredClone(found.project), path: projectPath ?? "", backup: `${(projectPath ?? "").replace(/\.zvn$/, "")}-1-backup.zvn` };
+      };
+    }
+    if (!omit.has("storage.customProfiles")) {
+      host.storage.customProfiles = async () => Object.entries(profiles).map(([name, text]) => ({ name, text, path: `/profiles/${name}` }));
+      host.storage.writeCustomProfile = async (name, text) => {
+        calls.push(`writeProfile ${name}`);
+        profiles[name] = text;
+        return `/profiles/${name}`;
+      };
+      host.storage.removeCustomProfile = async (name) => {
+        calls.push(`removeProfile ${name}`);
+        delete profiles[name];
       };
     }
   }

@@ -226,6 +226,54 @@ const DIVERGENCES: [string, string][] = [
     "Refused on every web surface. The ComfyUI tools drive the ComfyUI server on the person's own computer that Zenvi desktop connects to (Preferences > AI > ComfyUI URL, blank = off) through its template registry, generation queue and workflow graphs; no web surface has that integration, and Zenvi Cloud and the browser cannot reach a local server. prepare_recording_tool sets up the desktop's Recording dock (microphone, screen and webcam capture). The refusals name what works here: generate_image_and_add_to_timeline_tool, generate_video_and_add_to_timeline_tool and generate_tts_and_add_to_timeline_tool.",
   ],
   [
+    "list_recent_projects_tool / open_project_tool recent_index",
+    "Each surface lists what it has as recent projects: the CLI reads Zenvi desktop's File > Recent Projects on the same computer (its settings file; projects the CLI opens are not added, since only the desktop app writes that file); the web editor lists the projects stored in this browser and Zenvi Cloud the person's cloud projects, most recently edited first, at most 10, with the project id as `path`. `current_path` is the open project's file or id. recent_index opens one where open_project_tool works (the CLI).",
+  ],
+  [
+    "forget_recent_projects_tool",
+    "Refused on every web surface: the web editor's and Zenvi Cloud's lists are the projects themselves (forgetting one would delete it), and the CLI's is Zenvi desktop's, kept in a settings file only the desktop app writes (zenvi-core keeps even its own headless sessions from writing it).",
+  ],
+  [
+    "list_recovery_versions_tool / restore_recovery_version_tool",
+    "The CLI lists and restores the copies Zenvi desktop zips into its recovery folder each time it saves the project (matched by the project's exact name, newest first); the CLI's own saves make no copies, so a project only the CLI has saved has none. Restoring keeps the current file as `<name>-<time>-backup.zvn` and reopens the project, like the desktop; discard_unsaved is accepted and unused (every web surface saves each change). The web editor and Zenvi Cloud keep only the latest version of a project, with its undo history, and refuse.",
+  ],
+  [
+    "export_project_file_tool / import_project_file_tool",
+    "Refused on the web surfaces: EDL and Final Cut Pro XML are conversions of the Zenvi format, implemented once in Zenvi desktop (docs/ARCHITECTURE.md §4, the handoff rule). zenvi and zenvi mcp run the call in the desktop app while it has the project open.",
+  ],
+  [
+    "consolidate_project_media_tool",
+    "The CLI only (local files next to a saved project): collect copies outside media into `<project>_assets/media` (one undo step points back at the originals) and reclaim deletes copies whose recorded original is byte-identical, saving the project before it deletes anything, like the desktop. Media in the web editor and in Zenvi Cloud is stored with the project already, so they refuse.",
+  ],
+  [
+    "reset_caches_and_history_tool",
+    "playback_cache clears the web editor's filmstrips and waveforms and redraws the preview; the CLI and Zenvi Cloud render every frame from the project, keep no cache and answer `unchanged`. waveforms drops the desktop's stored waveform samples (`ui.audio_data`) as one undo step; web timelines draw waveforms from the media and store none. undo_history forgets every step, and the next save writes no history.",
+  ],
+  [
+    "get_editor_layout_tool / set_editor_layout_tool",
+    "The web editor's panels: Project Files, Effects, Transitions, Titles, Stock and Generate share the left side (one shows at a time), Properties and Assistant the right; Video Preview and Timeline always stay. The `simple` view is the editor's starting arrangement, and the desktop's dock names and aliases work for the panels both editors have. It has no Color Grade or Recording view, scopes, saved custom views, floating panels (dock_all changes nothing) or toolbar to hide, and a browser enters fullscreen only from a click or a key press: those are refused before anything moves. The CLI and Zenvi Cloud have no editor window and refuse.",
+  ],
+  [
+    "get_preferences_tool / set_preference_tool",
+    "The web editor's own settings, in the desktop's entry shape: Snapping (Timeline) can change; Enable Autosave (always on), History Limit (50), Backend URL and the keyboard shortcuts (Zenvi desktop's defaults) are read-only and say why. Values are checked with the desktop's rules (types, ranges, choices, shortcut syntax and conflicts). Zenvi desktop's other preferences (cache, decoders, theme, autosave interval…) do not exist here and are refused as unknown. The CLI and Zenvi Cloud have no editor settings and refuse.",
+  ],
+  [
+    "video profiles: list_project_profiles_tool, set_project_profile_tool, manage_custom_profiles_tool, new_project_tool profile",
+    "Custom profiles live where Zenvi desktop reads them, its profiles folder (`~/.openshot_qt/profiles`): the CLI lists, creates, edits and deletes them there, so a profile made on either shows on the other, and a size or frame rate no built-in profile has gets a `Custom WxH fps` profile like the desktop's. The desktop re-applies a project's named profile when it opens it (HD 720p 30 fps when it does not know the name), so the web editor and Zenvi Cloud, which cannot reach that folder, list the built-in profiles only and refuse to make a custom one, and manage_custom_profiles_tool. set_default is refused everywhere: the default profile is a desktop preference in its settings file. delete checks the open project's profile, not the desktop's default one.",
+  ],
+  [
+    "list_export_presets_tool",
+    "`available` means the engine's exporters write the preset's container (mp4, mov, mkv, webm, gif, mp3, wav; not AVI, MPEG, OGG or DVD) and the host can encode its codecs (AAC always counts, as on the desktop): the CLI asks its ffmpeg, the web editor its browser. Zenvi Cloud renders with render_project and does not list the tool. export_video_tool takes a preset only in Zenvi desktop so far; the web editor's Export dialog offers them.",
+  ],
+  [
+    "save_frame_image_tool",
+    "The frame is rendered at the project's size by the host's renderer. The CLI writes the file (a relative or empty file_path starts at the project's folder; the desktop's default is its export folder); the web editor downloads it (a download never replaces a file); Zenvi Cloud keeps it with the project's exports, answers with a download link (24 hours) and renders PNG only (a .jpg request is saved as .png, with a warning). A host that saves no files attaches the frame to the result instead. An existing file is found when writing, after the frame is rendered (the desktop checks first).",
+  ],
+  [
+    "export_files_to_folder_tool",
+    "Files keep the desktop's export names. The CLI copies into the folder (relative to the project's folder; empty = the project's folder) and renders sub-clips and image sequences to H.264/AAC MP4 at the file's size and rate (quality 22, written under a staged name, then moved into place); the web editor downloads each file, rendering sub-clips in the browser; Zenvi Cloud answers with a download link per file (24 hours) and refuses sub-clips and image sequences (render_project renders timelines). The receipt's `folder` says where they went.",
+  ],
+  [
     "summary previews",
     "`…` is written as U+2026; the desktop's file had the mojibake `ΓÇª` (ai_metadata_utils.build_summary_preview).",
   ],

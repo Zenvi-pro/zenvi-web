@@ -26,14 +26,18 @@ import { withSuffix } from "../projects/files.js";
 import { displayName, fileSha256, isBundledAsset } from "../projects/model.js";
 import { filesByPath } from "../render/resolve.js";
 import { attachmentDisposition, cleanFileName, normalizeContentType } from "../services/media.js";
-import { exportPath } from "../services/paths.js";
+import { exportPath, mediaPath } from "../services/paths.js";
 import { sha256Hex } from "../util/crypto.js";
 import type { Services } from "../container.js";
 import type { McpCallContext } from "./types.js";
 
 const GENERATED_MAX_BYTES = 20 * 1024 * 1024;
 const TEXT_MAX_BYTES = 2 * 1024 * 1024;
+/** Saved frames and other binary exports (save_frame_image_tool). */
+const BYTES_MAX_BYTES = 64 * 1024 * 1024;
 const EXPORT_URL_SECONDS = 24 * 3600;
+/** File > Recent Projects holds the last 10 (project_data.add_to_recent_files). */
+const RECENT_PROJECTS = 10;
 
 export interface CloudHost {
   host: ToolHost;
@@ -195,9 +199,54 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
     };
   }
 
+  /** An export blob of this project and its download link (24 h). */
+  const exportLink = async (name: string, type: string): Promise<string> =>
+    services.blobs.signUrl(exportPath(userId, projectId, name), {
+      permission: "read",
+      expiresInSeconds: EXPORT_URL_SECONDS,
+      contentType: type,
+      contentDisposition: attachmentDisposition(name),
+    });
+
   host.storage = {
     save: async () => {
       throw new ApiError(400, "unsupported", "Zenvi Cloud saves the project after every edit; there is no file to save it to.");
+    },
+    currentPath: () => projectId,
+    // The person's cloud projects, most recently edited first (list_projects).
+    recentProjects: async () =>
+      (await services.projects.list(userId)).slice(0, RECENT_PROJECTS).map((p) => ({
+        path: p.id,
+        name: p.name,
+        exists: true,
+        modifiedAt: Number.isFinite(Date.parse(p.updatedAt)) ? Date.parse(p.updatedAt) / 1000 : null,
+      })),
+    // A saved frame: an export of this project, answered with its download link.
+    writeBytes: async (path, bytes, contentType, options) => {
+      if (bytes.byteLength > BYTES_MAX_BYTES) throw tooLarge("The file is too large to export.");
+      const name = exportName(path, "export.bin");
+      const blobPath = exportPath(userId, projectId, name);
+      if (!options?.overwrite && (await services.blobs.head(blobPath))) {
+        throw Object.assign(new Error(`${name} already exists in this project's exports`), { code: "EEXIST", path: name });
+      }
+      await services.media.assertFits(userId, bytes.byteLength);
+      await services.blobs.write(blobPath, bytes, { contentType, contentDisposition: attachmentDisposition(name) });
+      services.media.invalidateUsage(userId);
+      return exportLink(name, contentType);
+    },
+    // A project file's media: a download link to its bytes in Zenvi Cloud, under the export's name.
+    exportMedia: async (file, name, _folder, render) => {
+      if (render) throw new ApiError(400, "unsupported", "a sub-clip or image sequence is rendered to MP4, which Zenvi Cloud does only with render_project");
+      const sha256 = fileSha256(file);
+      if (!sha256 || isBundledAsset(file)) throw new ApiError(400, "invalid_request", `"${displayName(file)}" is not uploaded to Zenvi Cloud`);
+      const type = normalizeContentType(typeof file.cloud?.content_type === "string" ? file.cloud.content_type : "") ?? "application/octet-stream";
+      const location = await services.blobs.signUrl(mediaPath(userId, sha256), {
+        permission: "read",
+        expiresInSeconds: EXPORT_URL_SECONDS,
+        contentType: type,
+        contentDisposition: attachmentDisposition(name),
+      });
+      return { location, folder: "Zenvi Cloud download links (valid 24 hours)", existed: false };
     },
     open: async () => {
       throw new ApiError(400, "unsupported", "Open cloud projects with open_project.");

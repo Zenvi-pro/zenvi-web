@@ -15,7 +15,7 @@
  */
 
 import type { ProjectDocument, Transaction } from "../history/document.js";
-import type { Fraction, Project } from "../model/types.js";
+import { Gravity, ScaleMode, type Fraction, type Project } from "../model/types.js";
 import { findProfile, type Profile } from "../model/profiles.js";
 import { isAudioOnlyMedia } from "../model/media.js";
 import { pyRound } from "../model/rounding.js";
@@ -138,15 +138,39 @@ export function setProfile(tx: Transaction, profileKey: string): Profile {
   if (typeof profileKey !== "string" || profileKey.trim() === "") throw invalid("profileKey is required.");
   const profile = findProfile(profileKey);
   if (!profile) throw new OpError("not_found", `No profile named ${profileKey}.`, { profile: profileKey });
-  const project = tx.project;
-  const oldFps = project.fps;
-  const changed =
+  applyProfile(tx, profile);
+  return profile;
+}
+
+/**
+ * Whether switching to `profile` changes the project (`project_profile.profile_differs`):
+ * its name, size, frame rate or ratios.
+ */
+export function profileDiffers(project: Project, profile: Profile): boolean {
+  const fps = project.fps;
+  const ratio = (value: unknown, expected: Fraction): boolean =>
+    !isRecord(value) || value.num !== expected.num || value.den !== expected.den;
+  return (
     project.profile !== profile.description ||
     project.width !== profile.width ||
     project.height !== profile.height ||
-    !oldFps ||
-    oldFps.num !== profile.fps.num ||
-    oldFps.den !== profile.fps.den;
+    !fps ||
+    fps.num !== profile.fps.num ||
+    fps.den !== profile.fps.den ||
+    ratio(project.display_ratio, profile.display_ratio) ||
+    ratio(project.pixel_ratio, profile.pixel_ratio)
+  );
+}
+
+/**
+ * Switch the project to a profile record (a built-in one, or a custom one
+ * the host keeps), with the side effects of `setProfile`. Returns whether
+ * anything changed; nothing is recorded when it already uses it.
+ */
+export function applyProfile(tx: Transaction, profile: Profile): boolean {
+  const project = tx.project;
+  const oldFps = project.fps;
+  const changed = profileDiffers(project, profile);
   const fields = changedFields(project as Record<string, unknown>, {
     profile: profile.description,
     width: profile.width,
@@ -160,7 +184,105 @@ export function setProfile(tx: Transaction, profileKey: string): Profile {
     applyFrameRateChange(tx, project, oldFps, profile.fps, profile);
     if (project.export_settings !== null && "export_settings" in project) tx.replace(["export_settings"], null);
   }
-  return profile;
+  return changed;
+}
+
+// ---------------------------------------------------------------------------
+// Reframe (zenvi-core develop editor_tools/project_export_profiles.py plan_reframe)
+// ---------------------------------------------------------------------------
+
+export type ReframeMode = "keep" | "fit" | "fill";
+
+export interface ReframePlan {
+  /** Clips to set to crop-to-fill (fill) or fit, centred. */
+  changes: { id: string; scale: number; gravity: number }[];
+  skipped: { timeline_clip_id: string; reason: string }[];
+  /** Fitted clips of another shape that will show bars (mode keep). */
+  letterboxed: string[];
+  /** Clips with a picture on the timeline. */
+  videoClips: number;
+}
+
+/** `_constant`: a keyframe curve that holds `value` everywhere (or has no points). */
+function holds(curve: unknown, value: number): boolean {
+  const points = isRecord(curve) && Array.isArray(curve.Points) ? (curve.Points as unknown[]) : null;
+  if (!points || points.length === 0) return true;
+  return points.every((p) => {
+    const co = isRecord(p) && isRecord(p.co) ? p.co : {};
+    const y = co.Y === undefined ? value : Number(co.Y);
+    return Math.abs(y - value) < 1e-6;
+  });
+}
+
+/** `_source_aspect`: the clip's media shape (display ratio, else pixels), or null. */
+function sourceAspect(clip: Record<string, unknown>): number | null {
+  const reader = isRecord(clip.reader) ? clip.reader : {};
+  const dar = isRecord(reader.display_ratio) ? reader.display_ratio : {};
+  const num = Number(dar.num);
+  const den = Number(dar.den);
+  if (num && den) return num / den;
+  const w = Number(reader.width);
+  const h = Number(reader.height);
+  if (w && h) return w / h;
+  return null;
+}
+
+/** Whether a clip has a picture (`reader.has_video` defaults to true; audio files have none). */
+function showsPicture(clip: Record<string, unknown>): boolean {
+  const reader = isRecord(clip.reader) ? clip.reader : {};
+  const hasVideo = "has_video" in reader ? reader.has_video : true;
+  return Boolean(hasVideo) && reader.media_type !== "audio";
+}
+
+/**
+ * Which clips to reframe for a `width`×`height` frame: full-frame clips of
+ * another shape are set to crop-to-fill (`fill`) or fit (`fit`), centred;
+ * titles (SVG), picture-in-picture clips (scaled or moved) and clips on
+ * locked tracks are never changed, and `keep` only lists the fitted clips
+ * that will show bars. Changes nothing.
+ */
+export function planReframe(project: Project, mode: ReframeMode, width: number, height: number): ReframePlan {
+  const target = width / height;
+  const plan: ReframePlan = { changes: [], skipped: [], letterboxed: [], videoClips: 0 };
+  const locked = new Set(project.layers.filter((l) => l.lock).map((l) => Number(l.number)));
+  for (const raw of project.clips) {
+    const clip = raw as Record<string, unknown>;
+    if (!showsPicture(clip)) continue;
+    plan.videoClips += 1;
+    const id = String(clip.id);
+    const reader = isRecord(clip.reader) ? clip.reader : {};
+    const path = String(reader.path || clip.title || "").toLowerCase();
+    const aspect = sourceAspect(clip);
+    if (aspect === null || Math.abs(aspect - target) / target < 0.01) continue;
+    const scale = Math.trunc(Number(clip.scale ?? ScaleMode.FIT));
+    const svg = path.endsWith(".svg");
+    if (mode === "keep") {
+      if (scale === ScaleMode.FIT && !svg) plan.letterboxed.push(id);
+      continue;
+    }
+    if (svg) {
+      plan.skipped.push({ timeline_clip_id: id, reason: "title (SVG) kept as designed" });
+      continue;
+    }
+    const fullFrame = holds(clip.scale_x, 1) && holds(clip.scale_y, 1) && holds(clip.location_x, 0) && holds(clip.location_y, 0);
+    if (!fullFrame) {
+      plan.skipped.push({ timeline_clip_id: id, reason: "resized or moved (picture-in-picture) clip kept" });
+      continue;
+    }
+    const want = mode === "fill" ? ScaleMode.CROP : ScaleMode.FIT;
+    if (scale === want && Math.trunc(Number(clip.gravity ?? Gravity.CENTER)) === Gravity.CENTER) continue;
+    if (locked.has(Math.trunc(Number(clip.layer) || 0))) {
+      plan.skipped.push({ timeline_clip_id: id, reason: "track is locked" });
+      continue;
+    }
+    plan.changes.push({ id, scale: want, gravity: Gravity.CENTER });
+  }
+  return plan;
+}
+
+/** Record a reframe plan's clip changes (part of the caller's transaction). */
+export function applyReframe(tx: Transaction, plan: ReframePlan): void {
+  for (const change of plan.changes) tx.update(["clips", { id: change.id }], { scale: change.scale, gravity: change.gravity });
 }
 
 /** Arguments of `set_project_setting_tool` (all optional; at least one). */

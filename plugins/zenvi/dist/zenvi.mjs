@@ -504,7 +504,7 @@ var init_client = __esm({
       token;
       fetchImpl;
       userAgent;
-      async request(method, path40, init = {}) {
+      async request(method, path42, init = {}) {
         const token = await this.token();
         if (!token) throw new CliError("You are not signed in to Zenvi.", 1, "Run `zenvi login` (or `zenvi login --device` on a machine without a browser).");
         const headers = { Accept: "application/json", Authorization: `Bearer ${token}`, "User-Agent": this.userAgent, ...init.headers };
@@ -515,7 +515,7 @@ var init_client = __esm({
         }
         let response;
         try {
-          response = await this.fetchImpl(`${this.baseUrl}${path40}`, { method, headers, body, signal: AbortSignal.timeout(12e4) });
+          response = await this.fetchImpl(`${this.baseUrl}${path42}`, { method, headers, body, signal: AbortSignal.timeout(12e4) });
         } catch (error62) {
           throw new CloudError(`Cannot reach Zenvi Cloud at ${this.baseUrl}: ${error62.message}`, 0, void 0, void 0);
         }
@@ -704,6 +704,104 @@ function clipsUsingFile(project, fileId) {
 var init_query = __esm({
   "../engine/src/model/query.ts"() {
     "use strict";
+  }
+});
+
+// ../engine/src/model/rounding.ts
+function roundHalfAway(x) {
+  if (!Number.isFinite(x)) return x;
+  const a = Math.abs(x);
+  const f3 = Math.floor(a);
+  const r = a - f3 >= 0.5 ? f3 + 1 : f3;
+  return x < 0 && r !== 0 ? -r : r;
+}
+function pyRound(x) {
+  if (!Number.isFinite(x)) return x;
+  const f3 = Math.floor(x);
+  const diff2 = x - f3;
+  let r;
+  if (diff2 > 0.5) r = f3 + 1;
+  else if (diff2 < 0.5) r = f3;
+  else r = f3 % 2 === 0 ? f3 : f3 + 1;
+  return r === 0 ? 0 : r;
+}
+function truncInt(x) {
+  const t = Math.trunc(x);
+  return t === 0 ? 0 : t;
+}
+var init_rounding = __esm({
+  "../engine/src/model/rounding.ts"() {
+    "use strict";
+  }
+});
+
+// ../engine/src/timeline/time.ts
+function fpsFloat(fps2) {
+  return fps2.num / fps2.den;
+}
+function frameContaining(seconds2, fps2) {
+  return Math.floor(seconds2 * fpsFloat(fps2) + 1e-9) + 1;
+}
+function samplesPerFrame(frame, fps2, sampleRate, channels) {
+  const fpsRate = fps2.den / fps2.num;
+  let previous = sampleRate * fpsRate * (frame - 1);
+  previous -= previous % channels;
+  let total = sampleRate * fpsRate * frame;
+  total -= total % channels;
+  const count2 = roundHalfAway(total - previous);
+  return count2 < 0 ? 0 : count2;
+}
+function frameSampleOffset(frame, fps2, sampleRate, channels) {
+  let total = sampleRate * (fps2.den / fps2.num) * (frame - 1);
+  total -= total % channels;
+  return roundHalfAway(total);
+}
+function fpsFromRate(rate) {
+  if (Math.abs(rate - 23.976) < 0.01) return { num: 24e3, den: 1001 };
+  if (Math.abs(rate - 29.97) < 0.01) return { num: 3e4, den: 1001 };
+  if (Math.abs(rate - 59.94) < 0.01) return { num: 6e4, den: 1001 };
+  if (rate === Math.trunc(rate)) return { num: rate, den: 1 };
+  return limitDenominator(rate, 1001);
+}
+function limitDenominator(x, maxDen) {
+  const [num15, den2] = exactRatio(x);
+  const max = BigInt(maxDen);
+  if (den2 <= max) return { num: Number(num15), den: Number(den2) };
+  let p0 = 0n, q0 = 1n, p1 = 1n, q1 = 0n;
+  let n = num15, d = den2;
+  for (; ; ) {
+    const a = n / d;
+    const q2 = q0 + a * q1;
+    if (q2 > max) break;
+    [p0, q0, p1, q1] = [p1, q1, p0 + a * p1, q2];
+    [n, d] = [d, n - a * d];
+  }
+  const k = (max - q0) / q1;
+  if (2n * d * (q0 + k * q1) <= den2) return { num: Number(p1), den: Number(q1) };
+  return { num: Number(p0 + k * p1), den: Number(q0 + k * q1) };
+}
+function exactRatio(x) {
+  let v = x;
+  let k = 0;
+  while (!Number.isInteger(v)) {
+    v *= 2;
+    k += 1;
+  }
+  let n = BigInt(v);
+  let d = 1n << BigInt(k);
+  while (d > 1n && n % 2n === 0n) {
+    n /= 2n;
+    d /= 2n;
+  }
+  return [n, d];
+}
+function sameFps(a, b) {
+  return a.num * b.den === b.num * a.den;
+}
+var init_time = __esm({
+  "../engine/src/timeline/time.ts"() {
+    "use strict";
+    init_rounding();
   }
 });
 
@@ -1253,10 +1351,104 @@ function findProfile(keyOrDescription) {
   if (legacy) return currentByKey.get(profileKey(legacy)) ?? legacy;
   return void 0;
 }
-var PROFILES, DEFAULT_PROFILE_DESCRIPTION, byKey, currentByKey, currentByDescription, legacyByDescription;
+function profileInt(text5) {
+  const t = (text5 ?? "").trim();
+  return /^[+-]?\d+$/.test(t) ? Number.parseInt(t, 10) : null;
+}
+function parseProfileFile(text5, key2) {
+  const values = /* @__PURE__ */ new Map();
+  for (const line2 of text5.split(/\r\n|\r|\n/)) {
+    const eq = line2.indexOf("=");
+    if (eq < 0) continue;
+    values.set(line2.slice(0, eq).trim(), line2.slice(eq + 1).trim());
+  }
+  const width = profileInt(values.get("width"));
+  const height = profileInt(values.get("height"));
+  const fpsNum = profileInt(values.get("frame_rate_num"));
+  const fpsDen = values.get("frame_rate_den") === "" ? 1 : profileInt(values.get("frame_rate_den"));
+  const description = values.get("description") ?? "";
+  if (width === null || height === null || fpsNum === null || fpsDen === null || !description) return null;
+  if (width <= 0 || height <= 0 || fpsNum <= 0 || fpsDen <= 0) return null;
+  const sarNum = profileInt(values.get("sample_aspect_num") || "1") ?? 1;
+  const sarDen = profileInt(values.get("sample_aspect_den") || "1") ?? 1;
+  const darNum = profileInt(values.get("display_aspect_num") || String(width * sarNum)) ?? width * sarNum;
+  const darDen = profileInt(values.get("display_aspect_den") || String(height * sarDen)) ?? height * sarDen;
+  return {
+    key: key2,
+    description,
+    width,
+    height,
+    fps: { num: fpsNum, den: fpsDen },
+    progressive: (values.get("progressive") ?? "1") !== "0",
+    pixel_ratio: { num: sarNum, den: sarDen },
+    display_ratio: { num: darNum, den: darDen },
+    spherical: (values.get("spherical") ?? "0") === "1"
+  };
+}
+function profileFileText(profile) {
+  return [
+    `description=${profile.description}`,
+    `frame_rate_num=${profile.fps.num}`,
+    `frame_rate_den=${profile.fps.den}`,
+    `width=${profile.width}`,
+    `height=${profile.height}`,
+    `progressive=${profile.progressive ? 1 : 0}`,
+    `sample_aspect_num=${profile.pixel_ratio.num}`,
+    `sample_aspect_den=${profile.pixel_ratio.den}`,
+    `display_aspect_num=${profile.display_ratio.num}`,
+    `display_aspect_den=${profile.display_ratio.den}`,
+    `spherical=${profile.spherical ? 1 : 0}`
+  ].join("\n").concat("\n");
+}
+function profileFpsFraction(rate) {
+  if (!(rate > 0) || !Number.isFinite(rate)) throw new RangeError("fps must be positive");
+  for (const [approx, fraction5] of NTSC_PROFILE_RATES) if (Math.abs(rate - approx) < 0.011) return { ...fraction5 };
+  if (Math.abs(rate - Math.round(rate)) < 1e-6) return { num: Math.round(rate), den: 1 };
+  return limitDenominator(rate, 1001);
+}
+function gcd(a, b) {
+  let x = Math.abs(Math.trunc(a));
+  let y = Math.abs(Math.trunc(b));
+  while (y) [x, y] = [y, x % y];
+  return x;
+}
+function aspectText(width, height) {
+  const g = gcd(width, height) || 1;
+  return `${Math.trunc(width) / g}:${Math.trunc(height) / g}`;
+}
+function orientationOf(width, height) {
+  const w = Math.trunc(width || 0);
+  const h = Math.trunc(height || 0);
+  if (w === h) return "square";
+  return h > w ? "portrait" : "landscape";
+}
+function reducedDisplayRatio(width, height, pixelNum = 1, pixelDen = 1) {
+  const num15 = Math.trunc(width) * Math.trunc(pixelNum);
+  const den2 = Math.trunc(height) * Math.trunc(pixelDen);
+  const g = gcd(num15, den2) || 1;
+  return { num: num15 / g, den: den2 / g };
+}
+function describeProfile(profile) {
+  return {
+    name: profile.description,
+    key: profile.key,
+    width: profile.width,
+    height: profile.height,
+    fps: Math.round(profile.fps.num / profile.fps.den * 1e3) / 1e3,
+    fps_num: profile.fps.num,
+    fps_den: profile.fps.den,
+    aspect: aspectText(profile.display_ratio.num, profile.display_ratio.den),
+    orientation: orientationOf(profile.width, profile.height),
+    interlaced: !profile.progressive,
+    spherical: Boolean(profile.spherical),
+    user: Boolean(profile.user)
+  };
+}
+var PROFILES, DEFAULT_PROFILE_DESCRIPTION, byKey, currentByKey, currentByDescription, legacyByDescription, NTSC_PROFILE_RATES;
 var init_profiles = __esm({
   "../engine/src/model/profiles.ts"() {
     "use strict";
+    init_time();
     init_profiles_data();
     PROFILES = PROFILE_TABLE;
     DEFAULT_PROFILE_DESCRIPTION = "HD 720p 30 fps";
@@ -1272,34 +1464,180 @@ var init_profiles = __esm({
         currentByDescription.set(k, profile);
       }
     }
+    NTSC_PROFILE_RATES = [
+      [23.976, { num: 24e3, den: 1001 }],
+      [23.98, { num: 24e3, den: 1001 }],
+      [29.97, { num: 3e4, den: 1001 }],
+      [47.95, { num: 48e3, den: 1001 }],
+      [59.94, { num: 6e4, den: 1001 }],
+      [119.88, { num: 12e4, den: 1001 }]
+    ];
   }
 });
 
-// ../engine/src/model/rounding.ts
-function roundHalfAway(x) {
-  if (!Number.isFinite(x)) return x;
-  const a = Math.abs(x);
-  const f3 = Math.floor(a);
-  const r = a - f3 >= 0.5 ? f3 + 1 : f3;
-  return x < 0 && r !== 0 ? -r : r;
+// ../engine/src/model/profile-requests.ts
+function norm(text5) {
+  return String(text5 ?? "").trim().toLowerCase().replace(/[\s\-/]+/g, "_").replace(/^_+|_+$/g, "");
 }
-function pyRound(x) {
-  if (!Number.isFinite(x)) return x;
-  const f3 = Math.floor(x);
-  const diff2 = x - f3;
-  let r;
-  if (diff2 > 0.5) r = f3 + 1;
-  else if (diff2 < 0.5) r = f3;
-  else r = f3 % 2 === 0 ? f3 : f3 + 1;
-  return r === 0 ? 0 : r;
+function socialPreset(name) {
+  const key2 = norm(name).replace(/_(profile|preset|format|video)$/, "");
+  const found = Object.entries(SOCIAL_PRESETS).find(([k2]) => k2 === key2) ?? Object.entries(SOCIAL_PRESETS).find(([, spec]) => spec[4].some((alias) => norm(alias) === key2));
+  if (!found) return null;
+  const [k, [width, height, fps2, exportPreset]] = found;
+  return { key: k, width, height, fps: fps2, exportPreset };
 }
-function truncInt(x) {
-  const t = Math.trunc(x);
-  return t === 0 ? 0 : t;
+function profileCatalog(custom2 = []) {
+  const user = [...custom2].sort((a, b) => pyCompare(b.key, a.key)).map((p) => ({ ...p, user: true }));
+  const builtIn = PROFILES.filter((p) => !p.legacy).slice().sort((a, b) => pyCompare(b.key, a.key)).map((p) => ({ ...p, user: false }));
+  return [...user, ...builtIn];
 }
-var init_rounding = __esm({
-  "../engine/src/model/rounding.ts"() {
+function fpsValue(profile) {
+  return profile.fps.num / profile.fps.den;
+}
+function matchProfile(catalog, width, height, fps2) {
+  let candidates = catalog.filter((p) => p.width === Math.trunc(width) && p.height === Math.trunc(height));
+  if (fps2) {
+    const exact = candidates.filter((p) => Math.abs(fpsValue(p) - fps2) < 0.011);
+    if (exact.length === 0) return null;
+    candidates = exact;
+  }
+  if (candidates.length === 0) return null;
+  const rank = (p) => [
+    Number(!p.progressive),
+    Number(Boolean(p.spherical)),
+    Number(!isSquarePixels(p)),
+    Number(p.user),
+    Number(p.description.toLowerCase().includes("anamorphic")),
+    p.description.length
+  ];
+  return candidates.map((p, i) => ({ p, i, r: rank(p) })).sort((a, b) => {
+    for (let k = 0; k < a.r.length; k += 1) if (a.r[k] !== b.r[k]) return a.r[k] - b.r[k];
+    return a.i - b.i;
+  })[0].p;
+}
+function fpsText(fps2) {
+  return fps2.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+function ensureProfile(ctx, width, height, fps2) {
+  const found = matchProfile(ctx.catalog, width, height, fps2.num / fps2.den);
+  if (found) return { profile: found, create: false };
+  const description = `Custom ${width}x${height} ${fpsText(fps2.num / fps2.den)} fps`;
+  const named = ctx.catalog.find((p) => p.description === description);
+  if (named) return { profile: named, create: false };
+  const record5 = {
+    description,
+    width: Math.trunc(width),
+    height: Math.trunc(height),
+    fps: { num: Math.trunc(fps2.num), den: Math.trunc(fps2.den) },
+    progressive: true,
+    pixel_ratio: { num: 1, den: 1 },
+    display_ratio: reducedDisplayRatio(width, height),
+    spherical: false
+  };
+  return { profile: { ...record5, key: profileKey(record5), user: true }, create: true };
+}
+function sizeFor(ctx, width, height, fps2) {
+  for (const want of [fps2, fps2 ? null : ctx.projectFps, fps2 ? null : 30]) {
+    if (!want) continue;
+    const found = matchProfile(ctx.catalog, width, height, want);
+    if (found) return { profile: found, create: false };
+  }
+  if (fps2) return ensureProfile(ctx, width, height, profileFpsFraction(fps2));
+  const any2 = matchProfile(ctx.catalog, width, height);
+  return any2 ? { profile: any2, create: false } : null;
+}
+function resolveProfileRequest(ctx, request, fps2 = null) {
+  const text5 = String(request ?? "").trim();
+  if (!text5) throw new ProfileRequestError("name a profile or social preset (see list_project_profiles_tool)");
+  const social = socialPreset(text5);
+  if (social) {
+    const found = sizeFor(ctx, social.width, social.height, fps2 || social.fps);
+    if (!found) throw new ProfileRequestError(`no profile is ${social.width}x${social.height}`);
+    return found;
+  }
+  const lowered = text5.toLowerCase();
+  for (const p of ctx.catalog) {
+    if (p.description.toLowerCase() === lowered || p.key.toLowerCase() === lowered) {
+      if (fps2 && Math.abs(fpsValue(p) - fps2) > 0.011) {
+        const resized = sizeFor(ctx, p.width, p.height, fps2);
+        if (!resized) throw new ProfileRequestError(`no profile is ${p.width}x${p.height}`);
+        return resized;
+      }
+      return { profile: p, create: false };
+    }
+  }
+  const m = SIZE_RE.exec(text5);
+  if (m) {
+    const want = fps2 || (m[3] ? Number(m[3]) : null);
+    const found = sizeFor(ctx, Number(m[1]), Number(m[2]), want);
+    if (found) return found;
+  }
+  const tokens = lowered.split(/[\s,]+/).filter(Boolean);
+  let hits = ctx.catalog.filter((p) => tokens.every((t) => p.description.toLowerCase().includes(t)));
+  if (fps2) {
+    const sameRate = hits.filter((p) => Math.abs(fpsValue(p) - fps2) < 0.011);
+    if (sameRate.length > 0) hits = sameRate;
+  }
+  if (hits.length === 1) return { profile: hits[0], create: false };
+  if (hits.length > 1) {
+    const names2 = [...new Set(hits.map((h) => h.description))].sort(pyCompare).slice(0, 6).join(", ");
+    throw new ProfileRequestError(`'${text5}' matches ${hits.length} profiles (${names2}...); use the exact name or add fps`);
+  }
+  throw new ProfileRequestError(
+    `no profile or social preset matches '${text5}'. Social presets: ${Object.keys(SOCIAL_PRESETS).join(", ")}. Or give WIDTHxHEIGHT, e.g. '1080x1920'.`
+  );
+}
+function flipProfile(ctx, choice, orientation, fps2) {
+  let w = choice.profile.width;
+  let h = choice.profile.height;
+  if (orientation === "square") {
+    const side = Math.min(w, h);
+    w = side;
+    h = side;
+  } else if (orientation === "portrait" && w > h) {
+    [w, h] = [h, w];
+  } else if (orientation === "landscape" && h > w) {
+    [w, h] = [h, w];
+  } else {
+    return choice;
+  }
+  const found = sizeFor(ctx, w, h, fps2 || fpsValue(choice.profile));
+  if (!found) throw new ProfileRequestError(`no profile is ${w}x${h}`);
+  return found;
+}
+var SOCIAL_PRESETS, ProfileRequestError, pyCompare, isSquarePixels, SIZE_RE;
+var init_profile_requests = __esm({
+  "../engine/src/model/profile-requests.ts"() {
     "use strict";
+    init_profiles();
+    SOCIAL_PRESETS = {
+      instagram_reel: [1080, 1920, null, "Instagram Reels", ["instagram reels", "ig reel", "ig reels", "reel", "reels", "instagram_reels"]],
+      instagram_story: [1080, 1920, null, "Instagram Reels", ["instagram stories", "ig story", "story", "stories", "instagram_stories"]],
+      tiktok: [1080, 1920, null, "TikTok", ["tik tok", "tik_tok"]],
+      youtube_shorts: [1080, 1920, null, "YouTube Shorts", ["shorts", "youtube short", "yt shorts", "yt_shorts", "youtube_short"]],
+      snapchat: [1080, 1920, null, "Snapchat", ["snap", "snapchat spotlight"]],
+      facebook_reel: [1080, 1920, null, "Facebook", ["facebook reels", "fb reel", "facebook story"]],
+      vertical: [1080, 1920, null, "MP4 (h.264)", ["9:16", "portrait", "vertical video", "phone", "9x16"]],
+      instagram_post: [1080, 1080, null, "Instagram", ["instagram square", "ig post", "instagram feed", "square", "1:1", "1x1", "instagram"]],
+      instagram_portrait: [1080, 1350, null, "MP4 (h.264)", ["4:5", "4x5", "instagram 4:5", "ig portrait", "portrait post", "instagram feed portrait"]],
+      youtube: [1920, 1080, null, "YouTube", ["youtube 1080p", "youtube hd", "yt", "youtube_1080p", "youtube_hd", "1080p"]],
+      youtube_2k: [2560, 1440, null, "YouTube (2K)", ["youtube 1440p", "1440p", "2k", "qhd", "wqhd"]],
+      youtube_4k: [3840, 2160, null, "YouTube (4K)", ["youtube 2160p", "yt 4k", "4k youtube"]],
+      facebook: [1920, 1080, null, "Facebook", ["fb", "facebook video"]],
+      x: [1920, 1080, null, "Twitter / X", ["twitter", "x twitter", "x_twitter", "tweet"]],
+      linkedin: [1920, 1080, null, "LinkedIn", ["linked in"]],
+      vimeo: [1920, 1080, null, "Vimeo", []],
+      landscape: [1920, 1080, null, "MP4 (h.264)", ["16:9", "16x9", "widescreen", "hd", "full hd", "fhd"]],
+      hd_720p: [1280, 720, null, "MP4 (h.264)", ["720p", "hd 720p"]],
+      "4k": [3840, 2160, null, "MP4 (h.264)", ["uhd", "4k uhd", "2160p", "ultra hd"]],
+      cinema: [1920, 1080, 24, "MP4 (h.264)", ["film", "cinematic", "movie", "24fps", "24 fps"]],
+      cinema_4k: [3840, 2160, 24, "MP4 (h.264)", ["4k cinema", "4k film", "cinematic 4k", "4k 24 fps"]]
+    };
+    ProfileRequestError = class extends Error {
+    };
+    pyCompare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+    isSquarePixels = (p) => p.pixel_ratio.num === 1 && p.pixel_ratio.den === 1;
+    SIZE_RE = /(\d{3,5})\s*[x×*]\s*(\d{3,5})(?:\D+(\d+(?:\.\d+)?)\s*(?:fps|p)?)?/i;
   }
 });
 
@@ -1359,23 +1697,23 @@ function isRecord(value) {
 function lowerPath(value) {
   return String(value ?? "").toLowerCase();
 }
-function isAudioPath(path40) {
-  const p = lowerPath(path40).split("?")[0];
+function isAudioPath(path42) {
+  const p = lowerPath(path42).split("?")[0];
   return AUDIO_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function isImagePath(path40) {
-  const p = lowerPath(path40);
+function isImagePath(path42) {
+  const p = lowerPath(path42);
   return IMAGE_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function hasExtension(path40) {
-  const base = path40.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
+function hasExtension(path42) {
+  const base = path42.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
   return /\.[a-z0-9]{1,5}$/i.test(base);
 }
 function getMediaType(file3, name) {
-  let path40 = String(file3.path ?? "");
-  if (name && !hasExtension(path40)) path40 = name;
-  if (isAudioPath(path40)) return "audio";
-  const image = isImagePath(path40);
+  let path42 = String(file3.path ?? "");
+  if (name && !hasExtension(path42)) path42 = name;
+  if (isAudioPath(path42)) return "audio";
+  const image = isImagePath(path42);
   if (file3.has_video && !image) return "video";
   if (file3.has_video && image) return "image";
   if (file3.has_audio && !file3.has_video) return "audio";
@@ -1391,8 +1729,8 @@ function isAudioOnlyMedia(file3) {
 function isAudioMedia(source2) {
   const data = isRecord(source2) ? source2 : {};
   if (String(data.media_type ?? "").trim().toLowerCase() === "audio") return true;
-  const path40 = lowerPath(data.path ?? data.file_path ?? "").trim();
-  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path40.endsWith(ext))) return true;
+  const path42 = lowerPath(data.path ?? data.file_path ?? "").trim();
+  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path42.endsWith(ext))) return true;
   return data.has_audio === true && data.has_video === false;
 }
 function isSingleImageMedia(source2) {
@@ -1724,8 +2062,8 @@ function libopenshotClipDefaults() {
   json2.rotation = libopenshotKeyframe(0);
   return json2;
 }
-function basename(path40) {
-  const clean2 = path40.split(/[?#]/)[0] ?? path40;
+function basename(path42) {
+  const clean2 = path42.split(/[?#]/)[0] ?? path42;
   const parts = clean2.split(/[\\/]/);
   return parts[parts.length - 1] || clean2;
 }
@@ -1844,76 +2182,6 @@ var init_defaults = __esm({
       6: ChannelLayout.FIVE_POINT_ONE,
       8: ChannelLayout.SEVEN_POINT_ONE
     };
-  }
-});
-
-// ../engine/src/timeline/time.ts
-function fpsFloat(fps2) {
-  return fps2.num / fps2.den;
-}
-function frameContaining(seconds2, fps2) {
-  return Math.floor(seconds2 * fpsFloat(fps2) + 1e-9) + 1;
-}
-function samplesPerFrame(frame, fps2, sampleRate, channels) {
-  const fpsRate = fps2.den / fps2.num;
-  let previous = sampleRate * fpsRate * (frame - 1);
-  previous -= previous % channels;
-  let total = sampleRate * fpsRate * frame;
-  total -= total % channels;
-  const count2 = roundHalfAway(total - previous);
-  return count2 < 0 ? 0 : count2;
-}
-function frameSampleOffset(frame, fps2, sampleRate, channels) {
-  let total = sampleRate * (fps2.den / fps2.num) * (frame - 1);
-  total -= total % channels;
-  return roundHalfAway(total);
-}
-function fpsFromRate(rate) {
-  if (Math.abs(rate - 23.976) < 0.01) return { num: 24e3, den: 1001 };
-  if (Math.abs(rate - 29.97) < 0.01) return { num: 3e4, den: 1001 };
-  if (Math.abs(rate - 59.94) < 0.01) return { num: 6e4, den: 1001 };
-  if (rate === Math.trunc(rate)) return { num: rate, den: 1 };
-  return limitDenominator(rate, 1001);
-}
-function limitDenominator(x, maxDen) {
-  const [num15, den2] = exactRatio(x);
-  const max = BigInt(maxDen);
-  if (den2 <= max) return { num: Number(num15), den: Number(den2) };
-  let p0 = 0n, q0 = 1n, p1 = 1n, q1 = 0n;
-  let n = num15, d = den2;
-  for (; ; ) {
-    const a = n / d;
-    const q2 = q0 + a * q1;
-    if (q2 > max) break;
-    [p0, q0, p1, q1] = [p1, q1, p0 + a * p1, q2];
-    [n, d] = [d, n - a * d];
-  }
-  const k = (max - q0) / q1;
-  if (2n * d * (q0 + k * q1) <= den2) return { num: Number(p1), den: Number(q1) };
-  return { num: Number(p0 + k * p1), den: Number(q0 + k * q1) };
-}
-function exactRatio(x) {
-  let v = x;
-  let k = 0;
-  while (!Number.isInteger(v)) {
-    v *= 2;
-    k += 1;
-  }
-  let n = BigInt(v);
-  let d = 1n << BigInt(k);
-  while (d > 1n && n % 2n === 0n) {
-    n /= 2n;
-    d /= 2n;
-  }
-  return [n, d];
-}
-function sameFps(a, b) {
-  return a.num * b.den === b.num * a.den;
-}
-var init_time = __esm({
-  "../engine/src/timeline/time.ts"() {
-    "use strict";
-    init_rounding();
   }
 });
 
@@ -2761,14 +3029,14 @@ function listLuts() {
 function builtinLutByRelativePath(relative2) {
   return BY_RELATIVE.get(relative2.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase());
 }
-function builtinLutForPath(path40) {
-  const normalized2 = String(path40 ?? "").trim().replaceAll("\\", "/");
+function builtinLutForPath(path42) {
+  const normalized2 = String(path42 ?? "").trim().replaceAll("\\", "/");
   if (normalized2.startsWith(LUT_ALIAS)) return builtinLutByRelativePath(normalized2.slice(LUT_ALIAS.length));
   const at = normalized2.toLowerCase().lastIndexOf("/colors/");
   return at >= 0 ? builtinLutByRelativePath(normalized2.slice(at + "/colors/".length)) : void 0;
 }
-function isAbsoluteFilePath(path40) {
-  return path40.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path40) || path40.startsWith("\\\\");
+function isAbsoluteFilePath(path42) {
+  return path42.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path42) || path42.startsWith("\\\\");
 }
 var BUILTIN_LUTS, LUT_ALIAS, LUTS, BY_RELATIVE;
 var init_luts = __esm({
@@ -2832,13 +3100,13 @@ var init_luts = __esm({
     ];
     LUT_ALIAS = "@colors/";
     LUTS = BUILTIN_LUTS.flatMap(
-      ([folder, names2]) => names2.map((stem6) => ({
-        id: `${folder}/${stem6}`,
-        name: pretty(stem6),
+      ([folder, names2]) => names2.map((stem7) => ({
+        id: `${folder}/${stem7}`,
+        name: pretty(stem7),
         category: pretty(folder),
         folder,
-        path: `${LUT_ALIAS}${folder}/${stem6}.cube`,
-        assetPath: `colors/${folder}/${stem6}.cube`,
+        path: `${LUT_ALIAS}${folder}/${stem7}.cube`,
+        assetPath: `colors/${folder}/${stem7}.cube`,
         builtin: true
       }))
     );
@@ -3352,12 +3620,12 @@ function matches(item, match) {
   }
   return true;
 }
-function resolveKey(root, path40) {
-  if (path40.length === 0) return void 0;
+function resolveKey(root, path42) {
+  if (path42.length === 0) return void 0;
   let parent = root;
   let slot = "";
   let value = root;
-  for (const part of path40) {
+  for (const part of path42) {
     if (typeof part === "string") {
       if (!isRecord8(value)) return void 0;
       const key2 = findKey(value, part);
@@ -3376,8 +3644,8 @@ function resolveKey(root, path40) {
   }
   return { parent, slot, value };
 }
-function formatKey(path40) {
-  return path40.map(
+function formatKey(path42) {
+  return path42.map(
     (part) => typeof part === "string" ? part : `{${Object.entries(part).map(([k, v]) => `${k}:${String(v)}`).join(",")}}`
   ).join("/");
 }
@@ -3400,17 +3668,17 @@ function defaultTransactionId() {
   fallbackCounter += 1;
   return `tx-${Date.now().toString(36)}-${fallbackCounter.toString(36)}`;
 }
-function writeThrough(root, path40, mutate) {
-  const resolved = resolveKey(root, path40);
-  if (!resolved) throw new KeyNotFoundError(path40);
+function writeThrough(root, path42, mutate) {
+  const resolved = resolveKey(root, path42);
+  if (!resolved) throw new KeyNotFoundError(path42);
   const newRoot = { ...root };
   let src = root;
   let dst = newRoot;
-  for (let i = 0; i < path40.length; i += 1) {
-    const partial2 = resolveKey(src, [path40[i]]);
-    if (!partial2) throw new KeyNotFoundError(path40);
+  for (let i = 0; i < path42.length; i += 1) {
+    const partial2 = resolveKey(src, [path42[i]]);
+    if (!partial2) throw new KeyNotFoundError(path42);
     const { slot, value } = partial2;
-    if (i === path40.length - 1) {
+    if (i === path42.length - 1) {
       mutate(dst, slot);
       break;
     }
@@ -3578,6 +3846,23 @@ var init_document = __esm({
           actions: [{ type: "load", key: [], value: null, old_values: null, transaction: "load" }]
         });
       }
+      /**
+       * Forget every undo and redo step and keep the project as it is (Edit >
+       * Clear > History, the desktop's `UpdateManager.reset`). Not an undo step;
+       * listeners get an untracked change, so hosts save the project without the
+       * old history. Returns how many steps each stack held.
+       */
+      clearHistory() {
+        const counts = { undo: this.undoStack.length, redo: this.redoStack.length };
+        if (counts.undo === 0 && counts.redo === 0) return counts;
+        this.undoStack = [];
+        this.redoStack = [];
+        const before = this.current;
+        this.current = { ...this.current, history: { ...isRecord9(this.current.history) ? this.current.history : {}, undo: [], redo: [] } };
+        this.revision += 1;
+        this.emit({ project: this.current, previous: before, source: "untracked", actions: [] });
+        return counts;
+      }
       /** Undo `steps` transactions. Returns the labels undone, most recent first. */
       undo(steps = 1) {
         const done = [];
@@ -3603,7 +3888,7 @@ var init_document = __esm({
           const before = this.current;
           const reapplied = [];
           for (const applied2 of entry.actions) {
-            reapplied.push(this.perform(applied2.action.type, applied2.action.key, applied2.action.value, entry.transaction, applied2.index));
+            reapplied.push(this.perform(applied2.action.type, applied2.action.key, applied2.action.value, entry.transaction, applied2.index, applied2.replace));
           }
           entry.actions = reapplied;
           this.undoStack.push(entry);
@@ -3702,7 +3987,9 @@ var init_document = __esm({
             container[slot] = next;
           });
           this.revision += 1;
-          return { action: { type, key: key2, value: clone(value), old_values: previous, transaction }, previous };
+          const applied2 = { action: { type, key: key2, value: clone(value), old_values: previous, transaction }, previous };
+          if (replace) applied2.replace = true;
+          return applied2;
         }
         throw new TypeError(`unsupported action type in transaction: ${type}`);
       }
@@ -4207,9 +4494,9 @@ function pyRepr(value) {
   if (isRecord11(value)) return `{${Object.entries(value).map(([k, v]) => `${pyRepr(k)}: ${pyRepr(v)}`).join(", ")}}`;
   return String(value);
 }
-function valueAt(root, path40) {
+function valueAt(root, path42) {
   let current = root;
-  for (const part of path40) {
+  for (const part of path42) {
     if (Array.isArray(current) && typeof part === "number" && part < current.length) current = current[part];
     else if (isRecord11(current) && typeof part === "string" && part in current) current = current[part];
     else return { found: false, value: void 0 };
@@ -4217,14 +4504,14 @@ function valueAt(root, path40) {
   return { found: true, value: current };
 }
 function formatIssue(issue2, payload) {
-  const path40 = issue2.path.map(String).join(".") || "(root)";
+  const path42 = issue2.path.map(String).join(".") || "(root)";
   const at = valueAt(payload, issue2.path);
   const shown = pyRepr(at.value);
   switch (issue2.code) {
     case "unrecognized_keys": {
       const keys = issue2.keys.map(pyRepr).join(", ");
       const verb = issue2.keys.length === 1 ? "was" : "were";
-      return { message: `Additional properties are not allowed (${keys} ${verb} unexpected)`, path: path40 };
+      return { message: `Additional properties are not allowed (${keys} ${verb} unexpected)`, path: path42 };
     }
     case "invalid_type": {
       if (!at.found && issue2.path.length > 0) {
@@ -4232,27 +4519,27 @@ function formatIssue(issue2, payload) {
         return { message: `${pyRepr(String(issue2.path[issue2.path.length - 1]))} is a required property`, path: parentPath };
       }
       const expected = JSON_TYPE_NAMES[issue2.expected] ?? issue2.expected;
-      return { message: `${shown} is not of type '${expected}'`, path: path40 };
+      return { message: `${shown} is not of type '${expected}'`, path: path42 };
     }
     case "invalid_value":
-      return { message: `${shown} is not one of [${issue2.values.map(pyRepr).join(", ")}]`, path: path40 };
+      return { message: `${shown} is not one of [${issue2.values.map(pyRepr).join(", ")}]`, path: path42 };
     case "invalid_union":
-      return { message: `${shown} is not valid under any of the given schemas`, path: path40 };
+      return { message: `${shown} is not valid under any of the given schemas`, path: path42 };
     case "too_small":
       if (issue2.origin === "array") {
-        return { message: Number(issue2.minimum) <= 1 ? `${shown} should be non-empty` : `${shown} is too short`, path: path40 };
+        return { message: Number(issue2.minimum) <= 1 ? `${shown} should be non-empty` : `${shown} is too short`, path: path42 };
       }
-      return { message: `${shown} is less than ${issue2.inclusive === false ? "or equal to " : ""}the minimum of ${pyRepr(Number(issue2.minimum))}`, path: path40 };
+      return { message: `${shown} is less than ${issue2.inclusive === false ? "or equal to " : ""}the minimum of ${pyRepr(Number(issue2.minimum))}`, path: path42 };
     case "too_big":
-      if (issue2.origin === "array") return { message: `${shown} is too long`, path: path40 };
-      return { message: `${shown} is greater than ${issue2.inclusive === false ? "or equal to " : ""}the maximum of ${pyRepr(Number(issue2.maximum))}`, path: path40 };
+      if (issue2.origin === "array") return { message: `${shown} is too long`, path: path42 };
+      return { message: `${shown} is greater than ${issue2.inclusive === false ? "or equal to " : ""}the maximum of ${pyRepr(Number(issue2.maximum))}`, path: path42 };
     default:
-      return { message: issue2.message, path: path40 };
+      return { message: issue2.message, path: path42 };
   }
 }
 function invalidArgumentsMessage(tool, issue2, payload) {
-  const { message, path: path40 } = formatIssue(issue2, payload);
-  return `Error: Invalid arguments for ${tool}: ${message} (at ${path40}).`;
+  const { message, path: path42 } = formatIssue(issue2, payload);
+  return `Error: Invalid arguments for ${tool}: ${message} (at ${path42}).`;
 }
 var HIDDEN_PARAMS, INTEGER_TEXT, FLOAT_TEXT, JSON_TYPE_NAMES;
 var init_coerce = __esm({
@@ -4525,8 +4812,8 @@ function orZero(value) {
 function fileLooksLikeImage(file3) {
   const data = isRecord12(file3) ? file3 : {};
   if (String(data.media_type ?? "").toLowerCase() === "image") return true;
-  const path40 = String(data.path || data.name || "");
-  const ext = path40.includes(".") ? path40.slice(path40.lastIndexOf(".") + 1).toLowerCase() : "";
+  const path42 = String(data.path || data.name || "");
+  const ext = path42.includes(".") ? path42.slice(path42.lastIndexOf(".") + 1).toLowerCase() : "";
   return IMAGE_EXTS.has(ext);
 }
 function quantizePlacementSeconds(start, end, fps2) {
@@ -4647,8 +4934,8 @@ function placementWatchQuery(file3, query2 = "", extra = "") {
   if (typeof tags === "string") tagText = tags.replaceAll(",", " ").trim();
   else if (Array.isArray(tags)) tagText = tags.filter((t) => String(t).trim()).map(String).join(" ").trim();
   if (tagText) return Array.from(tagText).slice(0, 200).join("");
-  const stem6 = basenameStem(String(data.name || data.path || ""));
-  if (stem6) return Array.from(stem6).slice(0, 200).join("");
+  const stem7 = basenameStem(String(data.name || data.path || ""));
+  if (stem7) return Array.from(stem7).slice(0, 200).join("");
   return DEFAULT_WATCH_QUERY;
 }
 function shouldWatchPlacement(options) {
@@ -5822,11 +6109,11 @@ function matchTransition(name) {
 function normName(text5) {
   return text5.trim().toLowerCase().replaceAll("_", " ").replaceAll("-", " ").split(/\s+/).filter(Boolean).join(" ");
 }
-function withoutExtension(path40) {
-  const slash = Math.max(path40.lastIndexOf("/"), path40.lastIndexOf("\\"));
-  const base = path40.slice(slash + 1);
+function withoutExtension(path42) {
+  const slash = Math.max(path42.lastIndexOf("/"), path42.lastIndexOf("\\"));
+  const base = path42.slice(slash + 1);
   const dot = base.lastIndexOf(".");
-  return dot > 0 && base.slice(0, dot).replace(/\.+/g, "") !== "" ? path40.slice(0, slash + 1 + dot) : path40;
+  return dot > 0 && base.slice(0, dot).replace(/\.+/g, "") !== "" ? path42.slice(0, slash + 1 + dot) : path42;
 }
 function transitionKey(entry) {
   return stem(entry.file).toLowerCase();
@@ -5846,18 +6133,18 @@ function lookupTransition(name) {
   if (partial2.length === 1) return { entry: partial2[0], candidates: [] };
   return { entry: void 0, candidates: partial2.slice(0, 12).map(transitionKey) };
 }
-function resolveTransitionAsset(path40) {
-  const match = /(?:^@transitions|(?:^|[\\/])transitions)[\\/](common|extra)[\\/]([^\\/]+)$/.exec(path40 ?? "");
+function resolveTransitionAsset(path42) {
+  const match = /(?:^@transitions|(?:^|[\\/])transitions)[\\/](common|extra)[\\/]([^\\/]+)$/.exec(path42 ?? "");
   return match ? BY_LOCATION.get(`${match[1]}/${match[2]}`) : void 0;
 }
-function gcd(a, b) {
+function gcd2(a, b) {
   let x = Math.abs(a);
   let y = Math.abs(b);
   while (y) [x, y] = [y, x % y];
   return x || 1;
 }
 function transitionReader(entry) {
-  const divisor = gcd(entry.width, entry.height);
+  const divisor = gcd2(entry.width, entry.height);
   const fields = {
     ...structuredClone(MASK_READER_TEMPLATE),
     display_ratio: { den: entry.height / divisor, num: entry.width / divisor },
@@ -5928,22 +6215,22 @@ function resolveTransitionMask(query2) {
   const entry = matchTransition(q);
   return entry ? fromEntry(entry) : void 0;
 }
-function gcd2(a, b) {
+function gcd3(a, b) {
   let x = Math.abs(Math.trunc(a));
   let y = Math.abs(Math.trunc(b));
   while (y) [x, y] = [y, x % y];
   return x || 1;
 }
-function maskReader(path40, width = 720, height = 576) {
-  const entry = resolveTransitionAsset(path40);
+function maskReader(path42, width = 720, height = 576) {
+  const entry = resolveTransitionAsset(path42);
   if (entry) return transitionReader(entry);
-  const divisor = gcd2(width, height);
+  const divisor = gcd3(width, height);
   const fields = {
     ...structuredClone(MASK_READER_TEMPLATE),
     display_ratio: { den: height / divisor, num: width / divisor },
     file_size: width * height * 4,
     height,
-    path: path40,
+    path: path42,
     width
   };
   return Object.fromEntries(Object.keys(fields).sort().map((key2) => [key2, fields[key2]]));
@@ -5962,13 +6249,13 @@ function requireDuration(duration3) {
   if (!(d > 0)) throw invalid(`duration must be > 0 (got ${d}).`);
   return d;
 }
-function resolveMask(maskId, path40) {
-  if (maskId !== void 0 && path40 !== void 0) throw invalid("Give maskId or path, not both.");
-  if (path40 !== void 0) {
-    if (typeof path40 !== "string" || path40 === "") throw invalid("path must be a non-empty string.");
-    const known = resolveTransitionMask(path40);
-    const stem6 = (path40.split(/[\\/]/).pop() ?? path40).replace(/\.[^.]+$/, "");
-    return known ?? { path: path40, title: stem6, width: 720, height: 576 };
+function resolveMask(maskId, path42) {
+  if (maskId !== void 0 && path42 !== void 0) throw invalid("Give maskId or path, not both.");
+  if (path42 !== void 0) {
+    if (typeof path42 !== "string" || path42 === "") throw invalid("path must be a non-empty string.");
+    const known = resolveTransitionMask(path42);
+    const stem7 = (path42.split(/[\\/]/).pop() ?? path42).replace(/\.[^.]+$/, "");
+    return known ?? { path: path42, title: stem7, width: 720, height: 576 };
   }
   if (maskId === void 0) throw invalid("Give maskId or path.");
   const found = resolveTransitionMask(maskId);
@@ -7662,6 +7949,96 @@ function applyFrameRateChange(tx, project, oldFps, newFps, profile) {
     }
   }
 }
+function profileDiffers(project, profile) {
+  const fps2 = project.fps;
+  const ratio = (value, expected) => !isRecord10(value) || value.num !== expected.num || value.den !== expected.den;
+  return project.profile !== profile.description || project.width !== profile.width || project.height !== profile.height || !fps2 || fps2.num !== profile.fps.num || fps2.den !== profile.fps.den || ratio(project.display_ratio, profile.display_ratio) || ratio(project.pixel_ratio, profile.pixel_ratio);
+}
+function applyProfile(tx, profile) {
+  const project = tx.project;
+  const oldFps = project.fps;
+  const changed = profileDiffers(project, profile);
+  const fields = changedFields(project, {
+    profile: profile.description,
+    width: profile.width,
+    height: profile.height,
+    display_ratio: { num: profile.display_ratio.num, den: profile.display_ratio.den },
+    pixel_ratio: { num: profile.pixel_ratio.num, den: profile.pixel_ratio.den },
+    fps: { num: profile.fps.num, den: profile.fps.den }
+  });
+  for (const [key2, value] of Object.entries(fields)) tx.replace([key2], value);
+  if (changed) {
+    applyFrameRateChange(tx, project, oldFps, profile.fps, profile);
+    if (project.export_settings !== null && "export_settings" in project) tx.replace(["export_settings"], null);
+  }
+  return changed;
+}
+function holds(curve2, value) {
+  const points2 = isRecord10(curve2) && Array.isArray(curve2.Points) ? curve2.Points : null;
+  if (!points2 || points2.length === 0) return true;
+  return points2.every((p) => {
+    const co = isRecord10(p) && isRecord10(p.co) ? p.co : {};
+    const y = co.Y === void 0 ? value : Number(co.Y);
+    return Math.abs(y - value) < 1e-6;
+  });
+}
+function sourceAspect(clip2) {
+  const reader = isRecord10(clip2.reader) ? clip2.reader : {};
+  const dar = isRecord10(reader.display_ratio) ? reader.display_ratio : {};
+  const num15 = Number(dar.num);
+  const den2 = Number(dar.den);
+  if (num15 && den2) return num15 / den2;
+  const w = Number(reader.width);
+  const h = Number(reader.height);
+  if (w && h) return w / h;
+  return null;
+}
+function showsPicture(clip2) {
+  const reader = isRecord10(clip2.reader) ? clip2.reader : {};
+  const hasVideo = "has_video" in reader ? reader.has_video : true;
+  return Boolean(hasVideo) && reader.media_type !== "audio";
+}
+function planReframe(project, mode, width, height) {
+  const target = width / height;
+  const plan = { changes: [], skipped: [], letterboxed: [], videoClips: 0 };
+  const locked = new Set(project.layers.filter((l) => l.lock).map((l) => Number(l.number)));
+  for (const raw of project.clips) {
+    const clip2 = raw;
+    if (!showsPicture(clip2)) continue;
+    plan.videoClips += 1;
+    const id = String(clip2.id);
+    const reader = isRecord10(clip2.reader) ? clip2.reader : {};
+    const path42 = String(reader.path || clip2.title || "").toLowerCase();
+    const aspect = sourceAspect(clip2);
+    if (aspect === null || Math.abs(aspect - target) / target < 0.01) continue;
+    const scale = Math.trunc(Number(clip2.scale ?? ScaleMode.FIT));
+    const svg = path42.endsWith(".svg");
+    if (mode === "keep") {
+      if (scale === ScaleMode.FIT && !svg) plan.letterboxed.push(id);
+      continue;
+    }
+    if (svg) {
+      plan.skipped.push({ timeline_clip_id: id, reason: "title (SVG) kept as designed" });
+      continue;
+    }
+    const fullFrame = holds(clip2.scale_x, 1) && holds(clip2.scale_y, 1) && holds(clip2.location_x, 0) && holds(clip2.location_y, 0);
+    if (!fullFrame) {
+      plan.skipped.push({ timeline_clip_id: id, reason: "resized or moved (picture-in-picture) clip kept" });
+      continue;
+    }
+    const want = mode === "fill" ? ScaleMode.CROP : ScaleMode.FIT;
+    if (scale === want && Math.trunc(Number(clip2.gravity ?? Gravity.CENTER)) === Gravity.CENTER) continue;
+    if (locked.has(Math.trunc(Number(clip2.layer) || 0))) {
+      plan.skipped.push({ timeline_clip_id: id, reason: "track is locked" });
+      continue;
+    }
+    plan.changes.push({ id, scale: want, gravity: Gravity.CENTER });
+  }
+  return plan;
+}
+function applyReframe(tx, plan) {
+  for (const change of plan.changes) tx.update(["clips", { id: change.id }], { scale: change.scale, gravity: change.gravity });
+}
 function requireInt(value, what, min, max) {
   if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value)) {
     throw invalid(`${what} must be an integer (got ${String(value)}).`);
@@ -7743,6 +8120,7 @@ var INT_EXPORT_KEYS;
 var init_project = __esm({
   "../engine/src/ops/project.ts"() {
     "use strict";
+    init_types();
     init_profiles();
     init_media();
     init_rounding();
@@ -7938,8 +8316,8 @@ function cropBaseSize(pw, ph, sw, sh) {
   const w = positive(sw, pw);
   const h = positive(sh, ph);
   const projectAspect = pw / ph;
-  const sourceAspect = w / h;
-  return sourceAspect >= projectAspect ? [ph * sourceAspect, ph] : [pw, pw / sourceAspect];
+  const sourceAspect2 = w / h;
+  return sourceAspect2 >= projectAspect ? [ph * sourceAspect2, ph] : [pw, pw / sourceAspect2];
 }
 function safeLocation(canvas, base, scale) {
   const scaled = Math.max(1e-4, base * Math.max(1e-3, scale));
@@ -8629,22 +9007,22 @@ function repeatClip(tx, clipId2, opts) {
   const cache5 = next.repeat_cache;
   for (const [prop, original] of Object.entries(cache5.properties ?? {})) {
     if (prop === "time") continue;
-    let norm3 = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
-    let span4 = norm3.length ? pyRound(norm3[norm3.length - 1].co.X) : 0;
+    let norm4 = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
+    let span4 = norm4.length ? pyRound(norm4[norm4.length - 1].co.X) : 0;
     if (!span4) continue;
     if (span4 !== timeSpan) {
       const s = timeSpan / span4;
-      const firstX = Number(norm3[0].co.X ?? 1);
-      for (const p of norm3) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
+      const firstX = Number(norm4[0].co.X ?? 1);
+      for (const p of norm4) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
       span4 = timeSpan;
     }
     const latest = /* @__PURE__ */ new Map();
-    for (const p of norm3) {
+    for (const p of norm4) {
       p.co.X = pyRound(p.co.X ?? 1);
       latest.set(p.co.X, p);
     }
-    norm3 = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
-    const [points2, used] = repeatCurve(norm3, span4, dirSign, opts.passes, delay2, ramp, opts.pattern);
+    norm4 = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
+    const [points2, used] = repeatCurve(norm4, span4, dirSign, opts.passes, delay2, ramp, opts.pattern);
     next[prop] = { Points: points2 };
     total = Math.max(total, used);
   }
@@ -9261,8 +9639,8 @@ var init_add_to_timeline = __esm({
 });
 
 // ../engine/src/ops/project-files.ts
-function folderAndName(path40) {
-  const p = String(path40 ?? "");
+function folderAndName(path42) {
+  const p = String(path42 ?? "");
   const cut2 = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
   return cut2 < 0 ? { folder: "", name: p } : { folder: p.slice(0, cut2), name: p.slice(cut2 + 1) };
 }
@@ -9279,13 +9657,13 @@ function detectImageSequence(filePath, folderNames) {
   const { folder, name } = folderAndName(filePath);
   const match = SEQUENCE_NAME_RE.exec(name);
   if (!match) return null;
-  const baseName2 = match[1] ?? "";
+  const baseName4 = match[1] ?? "";
   const zeros = match[2] ?? "";
   const number4 = Number.parseInt(match[3], 10);
   const digits = zeros.length + match[3].length;
   const extension = match[4];
   const hasDigitCount = (count2) => {
-    const rx = new RegExp(`^${escapeRegExp(baseName2)}[0-9]{${count2}}\\.${escapeRegExp(extension)}$`);
+    const rx = new RegExp(`^${escapeRegExp(baseName4)}[0-9]{${count2}}\\.${escapeRegExp(extension)}$`);
     for (const n of folderNames) if (rx.test(n)) return true;
     return false;
   };
@@ -9293,14 +9671,14 @@ function detectImageSequence(filePath, folderNames) {
   let neighbour = false;
   for (let x = Math.max(0, number4 - 100); x < Math.min(number4 + 101, 5e4); x += 1) {
     const numbered = fixlen ? String(x).padStart(digits, "0") : String(x);
-    if (x !== number4 && folderNames.has(`${baseName2}${numbered}.${extension}`)) {
+    if (x !== number4 && folderNames.has(`${baseName4}${numbered}.${extension}`)) {
       neighbour = true;
       break;
     }
   }
   if (!neighbour) return null;
-  const pattern = `${baseName2}${fixlen ? `%0${digits}d` : "%d"}.${extension}`;
-  return { folder_path: folder, base_name: baseName2, fixlen, digits, extension, pattern, path: joinFolder(folder, pattern) };
+  const pattern = `${baseName4}${fixlen ? `%0${digits}d` : "%d"}.${extension}`;
+  return { folder_path: folder, base_name: baseName4, fixlen, digits, extension, pattern, path: joinFolder(folder, pattern) };
 }
 function sequenceFrameNumbers(sequence, folderNames) {
   const digits = sequence.fixlen ? `(\\d{${Math.trunc(sequence.digits) || 1}})` : "(\\d+)";
@@ -9331,12 +9709,12 @@ function isImageSequence(file3) {
 }
 function sequenceFramesPresent(patternPath, folderNames) {
   const { name } = folderAndName(patternPath);
-  const stem6 = name.split("%", 1)[0] ?? "";
+  const stem7 = name.split("%", 1)[0] ?? "";
   const dot = name.lastIndexOf(".");
   const extension = dot > 0 ? name.slice(dot) : "";
   for (const n of folderNames) {
-    if (n.startsWith(".") && !stem6.startsWith(".")) continue;
-    if (n.length >= stem6.length + extension.length && n.startsWith(stem6) && n.endsWith(extension)) return true;
+    if (n.startsWith(".") && !stem7.startsWith(".")) continue;
+    if (n.length >= stem7.length + extension.length && n.startsWith(stem7) && n.endsWith(extension)) return true;
   }
   return false;
 }
@@ -9430,6 +9808,70 @@ var init_project_files = __esm({
   }
 });
 
+// ../engine/src/ops/waveforms.ts
+function withoutWaveform(ui) {
+  const out = {};
+  for (const [key2, value] of Object.entries(ui)) if (!WAVEFORM_UI_KEYS.includes(key2)) out[key2] = value;
+  return out;
+}
+function clearWaveformData(tx) {
+  let files = 0;
+  let clips = 0;
+  for (const file3 of tx.project.files) {
+    if (!isRecord10(file3.ui) || !("audio_data" in file3.ui)) continue;
+    tx.update(["files", { id: file3.id }], { ui: withoutWaveform(file3.ui) });
+    files += 1;
+  }
+  for (const clip2 of tx.project.clips) {
+    if (!isRecord10(clip2.ui) || !("audio_data" in clip2.ui)) continue;
+    tx.update(["clips", { id: clip2.id }], { ui: withoutWaveform(clip2.ui) });
+    clips += 1;
+  }
+  return { files, clips };
+}
+var WAVEFORM_UI_KEYS;
+var init_waveforms = __esm({
+  "../engine/src/ops/waveforms.ts"() {
+    "use strict";
+    init_internal();
+    WAVEFORM_UI_KEYS = ["audio_data", "audio_data_format", "audio_data_rms", "audio_data_rate"];
+  }
+});
+
+// ../engine/src/ops/media-collect.ts
+function mediaRepoint(project, moves, keepOriginal) {
+  const byId = new Map(moves.filter((m) => m.fileId).map((m) => [m.fileId, m]));
+  const byPath = new Map(moves.map((m) => [m.from, m.to]));
+  const out = { files: [], clips: [] };
+  for (const file3 of project.files) {
+    const path42 = typeof file3.path === "string" ? file3.path : "";
+    const next = byId.get(file3.id)?.to ?? (path42 ? byPath.get(path42) : void 0);
+    if (next === void 0) continue;
+    const original = typeof file3.original_path === "string" && file3.original_path ? file3.original_path : keepOriginal ? path42 : void 0;
+    if (next === path42 && original === file3.original_path) continue;
+    out.files.push(original === void 0 ? { id: file3.id, path: next } : { id: file3.id, path: next, original_path: original });
+  }
+  for (const clip2 of project.clips) {
+    const reader = isRecord10(clip2.reader) ? clip2.reader : null;
+    if (!reader) continue;
+    const readerPath2 = typeof reader.path === "string" ? reader.path : "";
+    const next = (clip2.file_id ? byId.get(clip2.file_id)?.to : void 0) ?? (readerPath2 ? byPath.get(readerPath2) : void 0);
+    if (next === void 0 || next === readerPath2) continue;
+    out.clips.push({ id: clip2.id, reader: { ...reader, path: next } });
+  }
+  return out;
+}
+function applyMediaRepoint(tx, repoint) {
+  for (const { id, ...values } of repoint.files) tx.update(["files", { id }], values);
+  for (const { id, reader } of repoint.clips) tx.update(["clips", { id }], { reader });
+}
+var init_media_collect = __esm({
+  "../engine/src/ops/media-collect.ts"() {
+    "use strict";
+    init_internal();
+  }
+});
+
 // ../engine/src/ops/index.ts
 var init_ops = __esm({
   "../engine/src/ops/index.ts"() {
@@ -9455,6 +9897,8 @@ var init_ops = __esm({
     init_sequence();
     init_add_to_timeline();
     init_project_files();
+    init_waveforms();
+    init_media_collect();
   }
 });
 
@@ -9466,9 +9910,9 @@ function describeIssues(issues) {
   const more = issues.length > 1 ? ` (and ${issues.length - 1} more)` : "";
   return `Invalid project: ${where}${first.message}${more}`;
 }
-function formatIssuePath(path40) {
+function formatIssuePath(path42) {
   let out = "";
-  for (const part of path40) {
+  for (const part of path42) {
     if (typeof part === "number") out += `[${part}]`;
     else out += out ? `.${String(part)}` : String(part);
   }
@@ -9710,10 +10154,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path40) {
-  if (!path40)
+function getElementAtPath(obj, path42) {
+  if (!path42)
     return obj;
-  return path40.reduce((acc, key2) => acc?.[key2], obj);
+  return path42.reduce((acc, key2) => acc?.[key2], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -9972,11 +10416,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path40, issues) {
+function prefixIssues(path42, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path40);
+    iss.path.unshift(path42);
     return iss;
   });
 }
@@ -10497,16 +10941,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path40 = []) => {
+  const processError = (error63, path42 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path40, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path42, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path40, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path42, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path40, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path42, ...issue2.path]);
       } else {
-        const fullpath = [...path40, ...issue2.path];
+        const fullpath = [...path42, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -10545,17 +10989,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result2 = { errors: [] };
-  const processError = (error63, path40 = []) => {
+  const processError = (error63, path42 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path40, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path42, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path40, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path42, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path40, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path42, ...issue2.path]);
       } else {
-        const fullpath = [...path40, ...issue2.path];
+        const fullpath = [...path42, ...issue2.path];
         if (fullpath.length === 0) {
           result2.errors.push(mapper(issue2));
           continue;
@@ -10594,8 +11038,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path40 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path40) {
+  const path42 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path42) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -24841,13 +25285,13 @@ function _promise(Class2, innerType) {
 }
 // @__NO_SIDE_EFFECTS__
 function _custom(Class2, fn, _params) {
-  const norm3 = normalizeParams(_params);
-  norm3.abort ?? (norm3.abort = true);
+  const norm4 = normalizeParams(_params);
+  norm4.abort ?? (norm4.abort = true);
   const schema = new Class2({
     type: "custom",
     check: "custom",
     fn,
-    ...norm3
+    ...norm4
   });
   return schema;
 }
@@ -28591,13 +29035,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path40 = ref.slice(1).split("/").filter(Boolean);
-  if (path40.length === 0) {
+  const path42 = ref.slice(1).split("/").filter(Boolean);
+  if (path42.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path40[0] === defsKey) {
-    const key2 = path40[1] === void 0 ? void 0 : decodeJSONPointerSegment(path40[1]);
+  if (path42[0] === defsKey) {
+    const key2 = path42[1] === void 0 ? void 0 : decodeJSONPointerSegment(path42[1]);
     if (!key2 || !ctx.defs[key2]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -29853,11 +30297,11 @@ function isRecord15(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function checkKeyframes(value, ctx) {
-  const check2 = (candidate, path40) => {
+  const check2 = (candidate, path42) => {
     const result2 = keyframe.safeParse(candidate);
     if (result2.success) return;
     for (const issue2 of result2.error.issues) {
-      ctx.addIssue({ code: "custom", message: issue2.message, path: [...path40, ...issue2.path] });
+      ctx.addIssue({ code: "custom", message: issue2.message, path: [...path42, ...issue2.path] });
     }
   };
   for (const [key2, prop] of Object.entries(value)) {
@@ -30372,8 +30816,8 @@ function serializeProject(project) {
   return JSON.stringify({ ...project, version: { ...version2, ...PROJECT_FORMAT_VERSION } }, null, 1);
 }
 function fillDefaults(data) {
-  const profileName = typeof data.profile === "string" && findProfile(data.profile) ? data.profile : void 0;
-  const defaults = createProject({ profile: profileName, id: "T0" });
+  const profileName2 = typeof data.profile === "string" && findProfile(data.profile) ? data.profile : void 0;
+  const defaults = createProject({ profile: profileName2, id: "T0" });
   if (!isRecord17(data.version)) data.version = { "openshot-qt": BETA_VERSION, libopenshot: BETA_VERSION };
   for (const [key2, value] of Object.entries(defaults)) {
     if (!(key2 in data)) data[key2] = value;
@@ -30404,12 +30848,12 @@ var init_parse3 = __esm({
 });
 
 // ../engine/src/io/paths.ts
-function posixNormalize(path40) {
-  if (path40 === "") return ".";
-  let initialSlashes = path40.startsWith("/") ? 1 : 0;
-  if (initialSlashes && path40.startsWith("//") && !path40.startsWith("///")) initialSlashes = 2;
+function posixNormalize(path42) {
+  if (path42 === "") return ".";
+  let initialSlashes = path42.startsWith("/") ? 1 : 0;
+  if (initialSlashes && path42.startsWith("//") && !path42.startsWith("///")) initialSlashes = 2;
   const comps = [];
-  for (const comp of path40.split("/")) {
+  for (const comp of path42.split("/")) {
     if (comp === "" || comp === ".") continue;
     if (comp !== ".." || !initialSlashes && comps.length === 0 || comps.length > 0 && comps[comps.length - 1] === "..") {
       comps.push(comp);
@@ -30454,15 +30898,15 @@ function components(ops, p) {
   const { drive, rest } = ops.splitRoot(ops.normalize(p));
   return { drive, parts: rest.split(ops.sep).filter((part) => part !== "" && part !== ".") };
 }
-function isUnder(ops, path40, root) {
-  const p = components(ops, path40);
+function isUnder(ops, path42, root) {
+  const p = components(ops, path42);
   const r = components(ops, root);
   if (p.drive !== r.drive || r.parts.length > p.parts.length) return false;
   return r.parts.every((part, i) => part === p.parts[i]);
 }
-function relative(ops, start, path40) {
+function relative(ops, start, path42) {
   const s = components(ops, start).parts;
-  const p = components(ops, path40).parts;
+  const p = components(ops, path42).parts;
   let i = 0;
   while (i < s.length && i < p.length && s[i] === p[i]) i += 1;
   const rel = [...Array(s.length - i).fill(".."), ...p.slice(i)];
@@ -30486,11 +30930,11 @@ function matchAlias(p) {
 function requireAbsoluteDir(ops, projectDir) {
   if (!isAbsolute(ops, projectDir)) throw new TypeError(`projectDir must be an absolute path: ${projectDir}`);
 }
-function toStoredPath(path40, projectDir, roots = {}) {
+function toStoredPath(path42, projectDir, roots = {}) {
   const ops = opsFor(projectDir);
   requireAbsoluteDir(ops, projectDir);
-  if (path40 === "" || hasScheme(path40) || matchAlias(path40)) return path40;
-  const abs = ops.normalize(isAbsolute(ops, path40) ? path40 : ops.join(projectDir, path40));
+  if (path42 === "" || hasScheme(path42) || matchAlias(path42)) return path42;
+  const abs = ops.normalize(isAbsolute(ops, path42) ? path42 : ops.join(projectDir, path42));
   const { head: folder, tail: file3 } = split(ops, abs);
   const under = (root) => Boolean(root) && isUnder(ops, folder, root);
   if (under(roots.thumbnails)) return `thumbnail/${file3}`;
@@ -30503,17 +30947,17 @@ function toStoredPath(path40, projectDir, roots = {}) {
   }
   return relative(ops, projectDir, abs);
 }
-function fromStoredPath(path40, projectDir, roots = {}) {
+function fromStoredPath(path42, projectDir, roots = {}) {
   const ops = opsFor(projectDir);
   requireAbsoluteDir(ops, projectDir);
-  if (path40 === "") return "";
-  const alias = matchAlias(path40);
+  if (path42 === "") return "";
+  const alias = matchAlias(path42);
   if (alias) {
     const root = roots[alias.name];
-    return root ? ops.normalize(alias.rest ? ops.join(root, alias.rest) : root) : path40;
+    return root ? ops.normalize(alias.rest ? ops.join(root, alias.rest) : root) : path42;
   }
-  if (hasScheme(path40)) return path40;
-  return ops.normalize(ops.join(projectDir, path40));
+  if (hasScheme(path42)) return path42;
+  return ops.normalize(ops.join(projectDir, path42));
 }
 function setOwn(container, key2, value) {
   if (Array.isArray(container)) container[key2] = value;
@@ -30563,19 +31007,19 @@ function rewritePaths(root, rewrite2) {
 }
 function toStoredPaths(project, projectDir, roots = {}) {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
-  return rewritePaths(project, (path40) => toStoredPath(path40, projectDir, roots));
+  return rewritePaths(project, (path42) => toStoredPath(path42, projectDir, roots));
 }
 function fromStoredPaths(project, projectDir, roots = {}) {
   requireAbsoluteDir(opsFor(projectDir), projectDir);
-  return rewritePaths(project, (path40) => fromStoredPath(path40, projectDir, roots));
+  return rewritePaths(project, (path42) => fromStoredPath(path42, projectDir, roots));
 }
 function projectAssetsDir(projectFilePath) {
   const ops = opsFor(projectFilePath);
   const { head: dir, tail: name } = split(ops, projectFilePath);
   const leadingDots = /^\.*/.exec(name)[0].length;
   const dot = name.lastIndexOf(".");
-  const stem6 = dot >= leadingDots ? name.slice(0, dot) : name;
-  const folder = `${Array.from(stem6).slice(0, 248).join("")}_assets`;
+  const stem7 = dot >= leadingDots ? name.slice(0, dot) : name;
+  const folder = `${Array.from(stem7).slice(0, 248).join("")}_assets`;
   return dir ? ops.join(dir, folder) : folder;
 }
 var PATH_KEYS, PATH_KEY_SET, ALIASES2, posix, win32;
@@ -30601,8 +31045,8 @@ var init_paths = __esm({
       sep: "\\",
       splitRoot: winSplitRoot,
       /** ntpath.normpath. */
-      normalize(path40) {
-        const { drive, root, rest } = winSplitRoot(path40);
+      normalize(path42) {
+        const { drive, root, rest } = winSplitRoot(path42);
         const comps = rest.split("\\");
         let i = 0;
         while (i < comps.length) {
@@ -30917,8 +31361,8 @@ function getTitleTemplate(template) {
   if (!ref) return DEFAULT_TITLE_TEMPLATE;
   if (isAbsolutePath(ref)) return void 0;
   const base = (ref.split(/[\\/]/).pop() ?? "").toLowerCase();
-  const stem6 = base.endsWith(".svg") ? base.slice(0, -4) : base;
-  return TITLE_TEMPLATES.find((t) => t.id.toLowerCase() === stem6 || t.name.toLowerCase() === base);
+  const stem7 = base.endsWith(".svg") ? base.slice(0, -4) : base;
+  return TITLE_TEMPLATES.find((t) => t.id.toLowerCase() === stem7 || t.name.toLowerCase() === base);
 }
 var DEFAULT_PREFERENCE, defaultFile, TITLE_TEMPLATES, DEFAULT_TITLE_TEMPLATE;
 var init_templates = __esm({
@@ -31017,6 +31461,9 @@ function getExportPreset(ref) {
   const key2 = (ref ?? "").trim().toLowerCase();
   return EXPORT_PRESETS.find((p) => p.id.toLowerCase() === key2) ?? EXPORT_PRESETS.find((p) => p.title.toLowerCase() === key2);
 }
+function presetExportType(preset) {
+  return EXPORT_TYPES.includes(preset.exportTo ?? "") ? preset.exportTo : "Video & Audio";
+}
 function rateFor(rates, quality) {
   return quality === "Low" ? rates.low : quality === "Med" ? rates.med : rates.high;
 }
@@ -31056,7 +31503,7 @@ function presetRates(preset, quality, frame) {
   }
   return { video, audio };
 }
-var EXPORT_TYPES, EXPORT_PRESETS, ALL_FORMATS, DEFAULT_EXPORT_PRESET, pyCompare, DIALOG_PROFILES, ALL_FORMATS_BPP;
+var EXPORT_TYPES, EXPORT_PRESETS, ALL_FORMATS, DEFAULT_EXPORT_PRESET, pyCompare2, DIALOG_PROFILES, ALL_FORMATS_BPP;
 var init_catalog2 = __esm({
   "../engine/src/presets/catalog.ts"() {
     "use strict";
@@ -31067,8 +31514,8 @@ var init_catalog2 = __esm({
     EXPORT_PRESETS = EXPORT_PRESET_TABLE;
     ALL_FORMATS = "All Formats";
     DEFAULT_EXPORT_PRESET = EXPORT_PRESETS.find((p) => p.title === "MP4 (h.264)");
-    pyCompare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-    DIALOG_PROFILES = PROFILES.filter((p) => !p.legacy).sort((a, b) => pyCompare(b.key, a.key)).map((profile) => ({ profile, label: `${profile.description} (${profile.width}x${profile.height})` }));
+    pyCompare2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+    DIALOG_PROFILES = PROFILES.filter((p) => !p.legacy).sort((a, b) => pyCompare2(b.key, a.key)).map((profile) => ({ profile, label: `${profile.description} (${profile.width}x${profile.height})` }));
     ALL_FORMATS_BPP = { Low: 0.055, Med: 0.08, High: 0.12 };
   }
 });
@@ -35455,6 +35902,7 @@ var init_src = __esm({
     init_ids();
     init_query();
     init_profiles();
+    init_profile_requests();
     init_rounding();
     init_fma();
     init_media();
@@ -37059,9 +37507,9 @@ function jpegOrientation(bytes) {
   }
   return 1;
 }
-async function imageOrientation(path40) {
-  if (!/\.(jpe?g|jpe)$/i.test(path40)) return 1;
-  const handle = await open3(path40, "r");
+async function imageOrientation(path42) {
+  if (!/\.(jpe?g|jpe)$/i.test(path42)) return 1;
+  const handle = await open3(path42, "r");
   try {
     const buffer = new Uint8Array(128 * 1024);
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
@@ -37362,14 +37810,14 @@ import path7 from "node:path";
 function isSequencePattern(file3) {
   return /%0?\d*d/.test(path7.basename(file3));
 }
-function gcd3(a, b) {
+function gcd4(a, b) {
   a = Math.abs(a);
   b = Math.abs(b);
   while (b) [a, b] = [b, a % b];
   return a;
 }
 function reduce(num15, den2) {
-  const g = gcd3(num15, den2);
+  const g = gcd4(num15, den2);
   return g > 0 ? { num: num15 / g, den: den2 / g } : { num: num15, den: den2 };
 }
 function parseRatio(text5, sep = "/") {
@@ -37719,9 +38167,9 @@ var init_probe = __esm({
     init_ffprobe();
     init_pixfmt_gen();
     ProbeError = class extends Error {
-      constructor(message, path40) {
+      constructor(message, path42) {
         super(message);
-        this.path = path40;
+        this.path = path42;
         this.name = "ProbeError";
       }
       path;
@@ -37775,12 +38223,12 @@ var init_probe = __esm({
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { open as open4, stat as stat4 } from "node:fs/promises";
-async function fingerprint(path40) {
-  if (!path40 || path40.includes("%")) return void 0;
+async function fingerprint(path42) {
+  if (!path42 || path42.includes("%")) return void 0;
   let size;
   let mtime;
   try {
-    const st = await stat4(path40);
+    const st = await stat4(path42);
     if (!st.isFile()) return void 0;
     size = st.size;
     mtime = st.mtimeMs / 1e3;
@@ -37789,7 +38237,7 @@ async function fingerprint(path40) {
   }
   const digest = createHash("sha256");
   digest.update(String(size), "ascii");
-  const handle = await open4(path40, "r");
+  const handle = await open4(path42, "r");
   try {
     const head = Buffer.alloc(Math.min(SAMPLE_BYTES, size));
     const { bytesRead } = await handle.read(head, 0, head.length, 0);
@@ -37805,11 +38253,11 @@ async function fingerprint(path40) {
   }
   return { size, mtime, sha256: digest.digest("hex") };
 }
-async function sha256File(path40, options = {}) {
-  const total = (await stat4(path40)).size;
+async function sha256File(path42, options = {}) {
+  const total = (await stat4(path42)).size;
   const digest = createHash("sha256");
   let bytes = 0;
-  const stream = createReadStream(path40, { highWaterMark: 1024 * 1024, signal: options.signal });
+  const stream = createReadStream(path42, { highWaterMark: 1024 * 1024, signal: options.signal });
   for await (const chunk2 of stream) {
     digest.update(chunk2);
     bytes += chunk2.length;
@@ -37892,7 +38340,7 @@ var init_png = __esm({
 });
 
 // ../render-node/src/decode/video.ts
-function fpsValue(fps2) {
+function fpsValue2(fps2) {
   return fps2.num > 0 && fps2.den > 0 ? fps2.num / fps2.den : 30;
 }
 function scaleFlags(quality) {
@@ -37903,15 +38351,15 @@ function isImageSequence2(file3) {
   return /%0?\d*d/.test(name);
 }
 function videoDecodeArgs(source2, startFrame, size, quality = "export") {
-  const fps2 = fpsValue(source2.fps);
+  const fps2 = fpsValue2(source2.fps);
   const sequence = isImageSequence2(source2.path);
   const nominal = (source2.videoStart ?? 0) - (source2.formatStart ?? 0) + startFrame / fps2;
   const seek = sequence ? Math.floor(Math.max(0, nominal) * 1e6) / 1e6 : Math.max(0, nominal - 0.25 / fps2);
   const shift2 = sequence ? 0 : nominal - seek;
-  const fpsText = `${source2.fps.num > 0 ? source2.fps.num : 30}/${source2.fps.den > 0 ? source2.fps.den : 1}`;
+  const fpsText2 = `${source2.fps.num > 0 ? source2.fps.num : 30}/${source2.fps.den > 0 ? source2.fps.den : 1}`;
   const filters = [
     shift2 > 0 ? `setpts=PTS-${shift2.toFixed(9)}/TB` : "setpts=PTS",
-    `fps=fps=${fpsText}:start_time=0:round=near`,
+    `fps=fps=${fpsText2}:start_time=0:round=near`,
     `scale=${size.width}:${size.height}:flags=${scaleFlags(quality)}`,
     "format=rgba"
   ];
@@ -37921,7 +38369,7 @@ function videoDecodeArgs(source2, startFrame, size, quality = "export") {
     "error",
     "-nostdin",
     ...source2.autorotate === false ? ["-noautorotate"] : [],
-    ...sequence ? ["-framerate", fpsText] : [],
+    ...sequence ? ["-framerate", fpsText2] : [],
     ...seek > 0 ? ["-ss", seek.toFixed(6)] : [],
     "-i",
     source2.path,
@@ -38034,7 +38482,7 @@ var init_video = __esm({
         this.options = options;
         const frameBytes = size.width * size.height * 4;
         this.cacheFrames = options.cacheFrames ?? Math.max(2, Math.min(24, Math.floor(96 * 1024 * 1024 / Math.max(1, frameBytes))));
-        this.maxSkip = options.maxSkip ?? Math.max(30, Math.round(fpsValue(source2.fps) * 2));
+        this.maxSkip = options.maxSkip ?? Math.max(30, Math.round(fpsValue2(source2.fps) * 2));
       }
       source;
       size;
@@ -39279,8 +39727,8 @@ function hexColorRgb(c) {
 function readerPath(params, key2) {
   const v = params[key2];
   if (!isRecord20(v)) return void 0;
-  const path40 = v.path;
-  return typeof path40 === "string" && path40.length > 0 ? path40 : void 0;
+  const path42 = v.path;
+  return typeof path42 === "string" && path42.length > 0 ? path42 : void 0;
 }
 var init_params = __esm({
   "../engine/src/render/kernels/params.ts"() {
@@ -41320,29 +41768,29 @@ function pointsEqual(x1, y1, x2, y2) {
   const ey = y1 === 0 || y2 === 0 ? fuzzyIsNull(y1 - y2) : fuzzyCompare2(y1, y2);
   return ex && ey;
 }
-function moveTo(path40, x, y) {
-  const n = path40.types.length;
-  if (n > 0 && path40.types[n - 1] === MOVE_TO) {
-    path40.pts[(n - 1) * 2] = x;
-    path40.pts[(n - 1) * 2 + 1] = y;
+function moveTo(path42, x, y) {
+  const n = path42.types.length;
+  if (n > 0 && path42.types[n - 1] === MOVE_TO) {
+    path42.pts[(n - 1) * 2] = x;
+    path42.pts[(n - 1) * 2 + 1] = y;
     return;
   }
-  path40.types.push(MOVE_TO);
-  path40.pts.push(x, y);
+  path42.types.push(MOVE_TO);
+  path42.pts.push(x, y);
 }
-function lineTo(path40, x, y) {
-  const n = path40.types.length;
-  if (n > 0 && pointsEqual(x, y, path40.pts[(n - 1) * 2], path40.pts[(n - 1) * 2 + 1])) return;
-  path40.types.push(LINE_TO);
-  path40.pts.push(x, y);
+function lineTo(path42, x, y) {
+  const n = path42.types.length;
+  if (n > 0 && pointsEqual(x, y, path42.pts[(n - 1) * 2], path42.pts[(n - 1) * 2 + 1])) return;
+  path42.types.push(LINE_TO);
+  path42.pts.push(x, y);
 }
-function cubicTo(path40, c1x, c1y, c2x, c2y, ex, ey) {
-  const n = path40.types.length;
-  const lx = path40.pts[(n - 1) * 2];
-  const ly = path40.pts[(n - 1) * 2 + 1];
+function cubicTo(path42, c1x, c1y, c2x, c2y, ex, ey) {
+  const n = path42.types.length;
+  const lx = path42.pts[(n - 1) * 2];
+  const ly = path42.pts[(n - 1) * 2 + 1];
   if (pointsEqual(lx, ly, c1x, c1y) && pointsEqual(c1x, c1y, c2x, c2y) && pointsEqual(c2x, c2y, ex, ey)) return;
-  path40.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
-  path40.pts.push(c1x, c1y, c2x, c2y, ex, ey);
+  path42.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
+  path42.pts.push(c1x, c1y, c2x, c2y, ex, ey);
 }
 function line(x1, y1, x2, y2) {
   return { x1, y1, x2, y2 };
@@ -41831,17 +42279,17 @@ function curvesForArc(x, y, w, h, startAngle, sweepIn) {
   curves[curves.length - 1] = epy;
   return { sx: spx, sy: spy, curves };
 }
-function strokePath(path40, style, forceOpen) {
+function strokePath(path42, style, forceOpen) {
   const stroker = new Stroker(style.width, style.cap, style.join, forceOpen);
   let els = [];
   const flush = () => {
     if (els.length > 1) stroker.processSubpath(els);
     els = [];
   };
-  for (let i = 0; i < path40.types.length; i += 1) {
-    const type = path40.types[i];
-    const x = path40.pts[i * 2];
-    const y = path40.pts[i * 2 + 1];
+  for (let i = 0; i < path42.types.length; i += 1) {
+    const type = path42.types[i];
+    const x = path42.pts[i * 2];
+    const y = path42.pts[i * 2 + 1];
     if (type === MOVE_TO) {
       flush();
       els.push({ type: MOVE_TO, x, y });
@@ -41850,7 +42298,7 @@ function strokePath(path40, style, forceOpen) {
   flush();
   return stroker.out;
 }
-function flattenPath(path40, device) {
+function flattenPath(path42, device) {
   const contours = [];
   let current = null;
   const close = () => {
@@ -41862,11 +42310,11 @@ function flattenPath(path40, device) {
     current = null;
   };
   const inside = (x, y) => x >= 0 && x <= device.width && y >= 0 && y <= device.height;
-  const count2 = path40.types.length;
+  const count2 = path42.types.length;
   for (let i = 0; i < count2; i += 1) {
-    const type = path40.types[i];
-    const x = path40.pts[i * 2];
-    const y = path40.pts[i * 2 + 1];
+    const type = path42.types[i];
+    const x = path42.pts[i * 2];
+    const y = path42.pts[i * 2 + 1];
     if (type === MOVE_TO) {
       if (i === count2 - 1) continue;
       close();
@@ -41877,7 +42325,7 @@ function flattenPath(path40, device) {
     } else if (type === CURVE_TO) {
       current ??= [0, 0];
       const n = current.length;
-      const b = [current[n - 2], current[n - 1], x, y, path40.pts[(i + 1) * 2], path40.pts[(i + 1) * 2 + 1], path40.pts[(i + 2) * 2], path40.pts[(i + 2) * 2 + 1]];
+      const b = [current[n - 2], current[n - 1], x, y, path42.pts[(i + 1) * 2], path42.pts[(i + 1) * 2 + 1], path42.pts[(i + 2) * 2], path42.pts[(i + 2) * 2 + 1]];
       i += 2;
       let outside = false;
       if (!inside(b[6], b[7])) {
@@ -42596,9 +43044,9 @@ var init_audio_visualization_cosmetic = __esm({
         if (implicitClose) this.stroke(px2, py, movedX, movedY, 0);
       }
       /** `drawPath` for a path with element types (QPainterPath: lines and cubics). */
-      drawPath(path40) {
-        const types = path40.types;
-        const pts = path40.pts;
+      drawPath(path42) {
+        const types = path42.types;
+        const pts = path42.pts;
         const end = types.length;
         let t = 0;
         while (t < end) {
@@ -43195,8 +43643,8 @@ var init_audio_visualization_paint = __esm({
        * then qgrayraster (antialiased; its spans are the runs of equal coverage,
        * flushed every 256) or QRasterizer's scan converter (aliased).
        */
-      fillPath(path40, brush, evenOdd) {
-        const contours = flattenPath(path40, this);
+      fillPath(path42, brush, evenOdd) {
+        const contours = flattenPath(path42, this);
         if (contours.length === 0) return;
         const p = prepare2(brush);
         if (this.antialias) {
@@ -43225,21 +43673,21 @@ var init_audio_visualization_paint = __esm({
           this.cosmetic(pen2, (c) => c.drawPolygon(points2, false));
           return;
         }
-        const path40 = { types: [], pts: [] };
+        const path42 = { types: [], pts: [] };
         for (let i = 0; i < points2.length; i += 2) {
-          path40.types.push(i === 0 ? MOVE_TO : LINE_TO);
-          path40.pts.push(points2[i], points2[i + 1]);
+          path42.types.push(i === 0 ? MOVE_TO : LINE_TO);
+          path42.pts.push(points2[i], points2[i + 1]);
         }
-        this.fillPath(strokePath(path40, pen2, true), pen2.brush, false);
+        this.fillPath(strokePath(path42, pen2, true), pen2.brush, false);
       }
       /** `QPainter::drawPath` with no brush. */
-      drawPath(path40, pen2) {
-        if (path40.types.length === 0) return;
+      drawPath(path42, pen2) {
+        if (path42.types.length === 0) return;
         if (pen2.width <= 1) {
-          this.cosmetic(pen2, (c) => c.drawPath(path40));
+          this.cosmetic(pen2, (c) => c.drawPath(path42));
           return;
         }
-        this.fillPath(strokePath(path40, pen2, false), pen2.brush, false);
+        this.fillPath(strokePath(path42, pen2, false), pen2.brush, false);
       }
       /** `QPainter::drawLine(QPointF, QPointF)`. */
       drawLine(x1, y1, x2, y2, pen2) {
@@ -43247,8 +43695,8 @@ var init_audio_visualization_paint = __esm({
           this.cosmetic(pen2, (c) => c.drawLine(x1, y1, x2, y2));
           return;
         }
-        const path40 = { types: [MOVE_TO, LINE_TO], pts: [x1, y1, x2, y2] };
-        this.fillPath(strokePath(path40, pen2, false), pen2.brush, false);
+        const path42 = { types: [MOVE_TO, LINE_TO], pts: [x1, y1, x2, y2] };
+        this.fillPath(strokePath(path42, pen2, false), pen2.brush, false);
       }
       /** `QPainter::drawEllipse(center, rx, ry)` with no pen. */
       fillEllipse(cx, cy, rx, ry, brush) {
@@ -43266,12 +43714,12 @@ var init_audio_visualization_paint = __esm({
         }
         const arc = curvesForArc(x, y, w, h, 0, -360);
         if (arc.curves.length === 0) return;
-        const path40 = { types: [MOVE_TO], pts: [arc.sx, arc.sy] };
+        const path42 = { types: [MOVE_TO], pts: [arc.sx, arc.sy] };
         for (let i = 0; i < arc.curves.length; i += 6) {
-          path40.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
-          path40.pts.push(...arc.curves.slice(i, i + 6));
+          path42.types.push(CURVE_TO, CURVE_DATA, CURVE_DATA);
+          path42.pts.push(...arc.curves.slice(i, i + 6));
         }
-        this.fillPath(path40, brush, true);
+        this.fillPath(path42, brush, true);
       }
       /** `drawImage(0, 0, image)` with SourceOver (the `qBlendFunctions` fast path). */
       drawImageSourceOver(image) {
@@ -45578,9 +46026,9 @@ function applyCubeLut(image, lut, intensity, intensityR, intensityG, intensityB)
     d[i + 2] = constrainByte(f328(f328(alpha * fmaf2(lb, tB, f328(bn * keepB))) * 255));
   }
 }
-function lutForPath(ctx, path40) {
-  if (path40 === "") return null;
-  const text5 = ctx.texts?.get(path40);
+function lutForPath(ctx, path42) {
+  if (path42 === "") return null;
+  const text5 = ctx.texts?.get(path42);
   return text5 === void 0 ? null : cachedCubeLut(text5);
 }
 var f328, INV_2552, colorMap;
@@ -45765,9 +46213,9 @@ function curveLut(curve2) {
   }
   return lut;
 }
-function lutStage(image, ctx, path40, intensity) {
-  if (path40 === "" || !(intensity > 0)) return;
-  const lut = lutForPath(ctx, path40);
+function lutStage(image, ctx, path42, intensity) {
+  if (path42 === "" || !(intensity > 0)) return;
+  const lut = lutForPath(ctx, path42);
   if (lut) applyCubeLut(image, lut, intensity, 1, 1, 1);
 }
 var f329, INV_2553, EPSILON2, LUMA_R, LUMA_G, LUMA_B, TINT_G, TINT_RB, RECOVERY, INV_ALPHA3, EXP2_TABLE, EXP2_C0, EXP2_C1, EXP2_SHIFT, exp2Bits, NAMED_COLORS, namedColors, WHITE, NO_BIAS, identityTable, colorGrade;
@@ -46408,13 +46856,13 @@ function grayTable(brightness2, contrast) {
   return table;
 }
 function displaceKernel(image, params, ctx) {
-  const path40 = displaceMapPath(params);
-  if (!path40) return;
-  const source2 = ctx.images.get(path40);
+  const path42 = displaceMapPath(params);
+  if (!path42) return;
+  const source2 = ctx.images.get(path42);
   const width = image.width;
   const height = image.height;
   if (!source2 || source2.width <= 0 || source2.height <= 0 || width <= 0 || height <= 0) return;
-  const map2 = scaledPremul(source2, width, height, ctx.imageSizes?.[path40]).data;
+  const map2 = scaledPremul(source2, width, height, ctx.imageSizes?.[path42]).data;
   const strength = f3211(num8(params, "strength", 1));
   const xAmount = f3211(f3211(f3211(num8(params, "horizontal", 0.05)) * width) * strength);
   const yAmount = f3211(f3211(f3211(num8(params, "vertical", 0)) * height) * strength);
@@ -47699,9 +48147,9 @@ var init_mask = __esm({
       supported: true,
       handlesMask: true,
       run(image, params, ctx) {
-        const path40 = readerPath(params, "mask_reader") ?? readerPath(params, "reader");
-        if (!path40) return;
-        const source2 = ctx.images.get(path40);
+        const path42 = readerPath(params, "mask_reader") ?? readerPath(params, "reader");
+        if (!path42) return;
+        const source2 = ctx.images.get(path42);
         if (!source2) return;
         applyMaskFromSource(image, source2, {
           brightness: num8(params, "brightness", 0),
@@ -50254,9 +50702,9 @@ function scaleSize(w, h, scale, tw, th) {
       return { width: w, height: h };
   }
 }
-function lowerExt(path40) {
-  const dot = path40.lastIndexOf(".");
-  return dot < 0 ? "" : path40.slice(dot + 1).toLowerCase();
+function lowerExt(path42) {
+  const dot = path42.lastIndexOf(".");
+  return dot < 0 ? "" : path42.slice(dot + 1).toLowerCase();
 }
 function sourceKind(reader) {
   if (!reader || typeof reader.path !== "string") return "unsupported";
@@ -51256,7 +51704,7 @@ function flatten(out, b0, threshold) {
     }
   }
 }
-function outlineContours(path40, transform2) {
+function outlineContours(path42, transform2) {
   const scale = transformScale(transform2);
   const threshold = scale === 0 ? 0.25 : 0.25 / scale;
   const contours = [];
@@ -51266,7 +51714,7 @@ function outlineContours(path40, transform2) {
     const n = current.length;
     if (current[n - 2] !== current[0] || current[n - 1] !== current[1]) current.push(current[0], current[1]);
   };
-  const els = path40.elements;
+  const els = path42.elements;
   for (let i = 0; i < els.length; i += 1) {
     const e = els[i];
     if (e.type === MoveTo) {
@@ -51809,9 +52257,9 @@ function drawImage(dst, src, state) {
       const width = noShear ? h / w : Math.abs(t.m22 * h / (t.m11 * w));
       rasterizeLine(ax, ay, bx, by, width, state.antialias, rasterizerBox(device, clip2), sink);
     } else if (state.antialias) {
-      const path40 = new PainterPath();
-      path40.addRect(0, 0, w, h);
-      const mask2 = grayRasterize(outlineContours(path40, t), true, dst.width, dst.height);
+      const path42 = new PainterPath();
+      path42.addRect(0, 0, w, h);
+      const mask2 = grayRasterize(outlineContours(path42, t), true, dst.width, dst.height);
       spans2 = mask2 ? maskSpans2(mask2) : [];
     } else {
       const poly = [];
@@ -51837,9 +52285,9 @@ function drawImage(dst, src, state) {
   deliverSpans(spans2, clip2, (chunk2) => handleSpans(chunk2, intOpacity, fetch2, process4));
 }
 function roundedRectClip(w, h, radius, transform2, width, height) {
-  const path40 = new PainterPath();
-  path40.addRoundedRect(0, 0, w, h, radius, radius);
-  return ClipData.fromMask(grayRasterize(outlineContours(path40, transform2), true, width, height));
+  const path42 = new PainterPath();
+  path42.addRoundedRect(0, 0, w, h, radius, radius);
+  return ClipData.fromMask(grayRasterize(outlineContours(path42, transform2), true, width, height));
 }
 var FIXED, HALF;
 var init_draw_image = __esm({
@@ -52605,8 +53053,8 @@ function exportFrameRange(project, fps2, range) {
 function pngPattern(output2) {
   if (/%0?\d*d/.test(output2)) return output2;
   const ext = path12.extname(output2);
-  const stem6 = ext ? output2.slice(0, -ext.length) : output2;
-  return `${stem6}_%05d.png`;
+  const stem7 = ext ? output2.slice(0, -ext.length) : output2;
+  return `${stem7}_%05d.png`;
 }
 function ffmpegMajor() {
   versionPromise ??= binaryVersion("ffmpeg").then((v) => ffmpegMajorVersion(v.version)).catch(() => 99);
@@ -52626,9 +53074,9 @@ async function renderProject(project, opts) {
   const { first, last } = exportFrameRange(project, fps2, options.range);
   const frames = last - first + 1;
   if (frames <= 0) throw new RenderError("Nothing to render: the timeline is empty.");
-  const fpsValue2 = fps2.num / fps2.den;
-  const start = (first - 1) / fpsValue2;
-  const end = last / fpsValue2;
+  const fpsValue3 = fps2.num / fps2.den;
+  const start = (first - 1) / fpsValue3;
+  const end = last / fpsValue3;
   const sampleRate = options.sampleRate ?? project.sample_rate ?? 48e3;
   const channels = options.channels ?? project.channels ?? 2;
   const withAudio = info.audio && channels > 0;
@@ -52773,7 +53221,7 @@ async function renderProject(project, opts) {
     return {
       location: destination2,
       bytes,
-      durationSeconds: frames / fpsValue2,
+      durationSeconds: frames / fpsValue3,
       mimeType: info.mimeType,
       frames: info.video ? frames : 0,
       warnings,
@@ -53135,14 +53583,14 @@ async function transcribeMediaFile(file3, options) {
   let envelope;
   if (duration3 > format.chunkSeconds) envelope = await analyzeAudio(file3, { signal });
   const pieces = planSpeechChunks(duration3, format.chunkSeconds, envelope);
-  const stem6 = path13.basename(file3, path13.extname(file3)).replace(/[^\w.-]+/g, "_").slice(0, 60) || "speech";
+  const stem7 = path13.basename(file3, path13.extname(file3)).replace(/[^\w.-]+/g, "_").slice(0, 60) || "speech";
   const parts = [];
   for (const [i, [start, end]] of pieces.entries()) {
     if (signal?.aborted) throw new AbortedError();
     const bytes = await extractSpeechAudio(file3, { start, duration: end - start }, format, signal);
     const piece = {
       bytes,
-      fileName: `${stem6}${pieces.length > 1 ? `-${i + 1}` : ""}.${format.extension}`,
+      fileName: `${stem7}${pieces.length > 1 ? `-${i + 1}` : ""}.${format.extension}`,
       contentType: format.contentType,
       offset: start
     };
@@ -53930,9 +54378,9 @@ function safeName(name) {
 }
 async function uniquePath(dir, name) {
   const ext = path17.extname(name);
-  const stem6 = ext ? name.slice(0, -ext.length) : name;
+  const stem7 = ext ? name.slice(0, -ext.length) : name;
   for (let n = 1; n < 1e4; n += 1) {
-    const candidate = path17.join(dir, n === 1 ? name : `${stem6} (${n})${ext}`);
+    const candidate = path17.join(dir, n === 1 ? name : `${stem7} (${n})${ext}`);
     try {
       await stat8(candidate);
     } catch {
@@ -54153,50 +54601,393 @@ var init_backend = __esm({
   }
 });
 
-// ../render-node/src/host/node-host.ts
-import { mkdir as mkdir6, readFile as readFile7, stat as stat9 } from "node:fs/promises";
+// ../render-node/src/host/zip.ts
+import { inflateRawSync } from "node:zlib";
+function endOfCentralDirectory(zip) {
+  for (let at = zip.length - 22; at >= Math.max(0, zip.length - 22 - 65535); at -= 1) {
+    if (zip.readUInt32LE(at) === EOCD) return at;
+  }
+  throw new ZipError("not a zip file (no end of central directory)");
+}
+function readZipEntries(zip) {
+  if (zip.length < 22) throw new ZipError("not a zip file (too short)");
+  const eocd = endOfCentralDirectory(zip);
+  const count2 = zip.readUInt16LE(eocd + 10);
+  let at = zip.readUInt32LE(eocd + 16);
+  const entries = [];
+  for (let i = 0; i < count2; i += 1) {
+    if (at + 46 > zip.length || zip.readUInt32LE(at) !== CENTRAL) throw new ZipError("damaged central directory");
+    const method = zip.readUInt16LE(at + 10);
+    const compressed = zip.readUInt32LE(at + 20);
+    const size = zip.readUInt32LE(at + 24);
+    const nameLength = zip.readUInt16LE(at + 28);
+    const extraLength = zip.readUInt16LE(at + 30);
+    const commentLength = zip.readUInt16LE(at + 32);
+    const local = zip.readUInt32LE(at + 42);
+    const name = zip.subarray(at + 46, at + 46 + nameLength).toString("utf8");
+    at += 46 + nameLength + extraLength + commentLength;
+    entries.push({
+      name,
+      data: () => {
+        if (local + 30 > zip.length || zip.readUInt32LE(local) !== LOCAL) throw new ZipError(`damaged entry ${name}`);
+        const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
+        const raw = zip.subarray(start, start + compressed);
+        if (raw.length !== compressed) throw new ZipError(`truncated entry ${name}`);
+        const bytes = method === 0 ? Buffer.from(raw) : method === 8 ? inflateRawSync(raw) : null;
+        if (!bytes) throw new ZipError(`entry ${name} uses compression method ${method}`);
+        if (bytes.length !== size) throw new ZipError(`entry ${name} is ${bytes.length} bytes, expected ${size}`);
+        return bytes;
+      }
+    });
+  }
+  return entries;
+}
+var ZipError, EOCD, CENTRAL, LOCAL;
+var init_zip = __esm({
+  "../render-node/src/host/zip.ts"() {
+    "use strict";
+    ZipError = class extends Error {
+      name = "ZipError";
+    };
+    EOCD = 101010256;
+    CENTRAL = 33639248;
+    LOCAL = 67324752;
+  }
+});
+
+// ../render-node/src/host/desktop-files.ts
+import { mkdir as mkdir6, readdir as readdir5, readFile as readFile7, rename as rename5, rm as rm6, stat as stat9 } from "node:fs/promises";
 import path18 from "node:path";
+async function isFile2(file3) {
+  return (await stat9(file3).catch(() => void 0))?.isFile() ?? false;
+}
+function stem3(file3) {
+  const name = path18.basename(file3);
+  const ext = path18.extname(name);
+  return ext ? name.slice(0, -ext.length) : name;
+}
+async function desktopRecentProjects(desktopDir) {
+  const settings = path18.join(desktopDir, "openshot.settings");
+  const st = await stat9(settings).catch(() => void 0);
+  if (!st?.isFile() || st.size > MAX_SETTINGS_BYTES) return [];
+  let entries;
+  try {
+    entries = JSON.parse(await readFile7(settings, "utf8"));
+  } catch {
+    return [];
+  }
+  const entry = Array.isArray(entries) ? entries.find((e) => e && typeof e === "object" && e.setting === "recent_projects") : void 0;
+  const value = entry?.value;
+  const paths = Array.isArray(value) ? value.filter((p) => typeof p === "string" && p !== "") : [];
+  const out = [];
+  for (const file3 of paths.reverse()) {
+    const info = await stat9(file3).catch(() => void 0);
+    const exists4 = info?.isFile() ?? false;
+    out.push({ path: file3, name: stem3(file3), exists: exists4, modifiedAt: exists4 ? info.mtimeMs / 1e3 : null });
+  }
+  return out;
+}
+async function restorable(file3) {
+  try {
+    if (!file3.endsWith(".zip")) return ((await stat9(file3)).size ?? 0) > 0;
+    return readZipEntries(await readFile7(file3)).length === 1;
+  } catch {
+    return false;
+  }
+}
+async function recoveryCopiesFor(desktopDir, projectFile) {
+  const dir = path18.join(desktopDir, "recovery");
+  const names2 = await readdir5(dir).catch(() => []);
+  const base = stem3(projectFile);
+  const wanted = /* @__PURE__ */ new Set([`${base}.zip`, ...PROJECT_EXTS.map((ext) => `${base}${ext}`)]);
+  const found = [];
+  for (const name of names2) {
+    const dash = name.indexOf("-");
+    if (dash < 0 || !wanted.has(name.slice(dash + 1))) continue;
+    const stamp = name.slice(0, dash).trim();
+    if (!/^[+-]?\d+$/.test(stamp)) continue;
+    const file3 = path18.join(dir, name);
+    if (!await restorable(file3)) continue;
+    found.push({ savedAt: Number.parseInt(stamp, 10), path: file3, size: (await stat9(file3)).size });
+  }
+  found.sort((a, b) => b.savedAt - a.savedAt || (a.path < b.path ? 1 : a.path > b.path ? -1 : 0));
+  return found.map((f3) => ({ path: f3.path, savedAt: f3.savedAt, sizeBytes: f3.size }));
+}
+async function restoreRecoveryCopy(desktopDir, projectFile, copy) {
+  const recovery = path18.resolve(desktopDir, "recovery");
+  const source2 = path18.resolve(copy);
+  if (path18.dirname(source2) !== recovery) throw new Error(`${copy} is not one of Zenvi desktop's recovery copies`);
+  let bytes;
+  if (source2.endsWith(".zip")) {
+    let entries;
+    try {
+      entries = readZipEntries(await readFile7(source2));
+    } catch (error62) {
+      throw new Error(error62 instanceof ZipError ? `${path18.basename(source2)} is not a readable zip: ${error62.message}` : String(error62));
+    }
+    if (entries.length !== 1) throw new Error("Unexpected number of files in recovery zip.");
+    bytes = entries[0].data();
+  } else {
+    bytes = await readFile7(source2);
+  }
+  const backup = path18.join(path18.dirname(projectFile), `${stem3(projectFile)}-${Math.trunc(Date.now() / 1e3)}-backup.zvn`);
+  const hadFile = await isFile2(projectFile);
+  if (hadFile) await rename5(projectFile, backup);
+  try {
+    await writeFileAtomic(projectFile, bytes);
+  } catch (error62) {
+    if (hadFile && !await isFile2(projectFile)) await rename5(backup, projectFile);
+    throw error62;
+  }
+  return hadFile ? backup : null;
+}
+function profileName(name) {
+  if (!/^[A-Za-z0-9._ -]+$/.test(name) || name === "." || name === "..") throw new Error(`"${name}" is not a profile file name`);
+  return name;
+}
+async function customProfileFiles(desktopDir) {
+  const dir = path18.join(desktopDir, "profiles");
+  const names2 = await readdir5(dir).catch(() => []);
+  const out = [];
+  for (const name of names2.sort()) {
+    const file3 = path18.join(dir, name);
+    const st = await stat9(file3).catch(() => void 0);
+    if (!st?.isFile() || st.size > MAX_PROFILE_BYTES) continue;
+    out.push({ name, text: await readFile7(file3, "utf8"), path: file3 });
+  }
+  return out;
+}
+async function writeCustomProfileFile(desktopDir, name, text5) {
+  const dir = path18.join(desktopDir, "profiles");
+  await mkdir6(dir, { recursive: true });
+  const file3 = path18.join(dir, profileName(name));
+  await writeFileAtomic(file3, text5);
+  return file3;
+}
+async function removeCustomProfileFile(desktopDir, name) {
+  await rm6(path18.join(desktopDir, "profiles", profileName(name)));
+}
+var PROJECT_EXTS, MAX_PROFILE_BYTES, MAX_SETTINGS_BYTES;
+var init_desktop_files = __esm({
+  "../render-node/src/host/desktop-files.ts"() {
+    "use strict";
+    init_zip();
+    init_storage();
+    PROJECT_EXTS = [".zvn", ".osp", ".flow"];
+    MAX_PROFILE_BYTES = 64 * 1024;
+    MAX_SETTINGS_BYTES = 16 * 1024 * 1024;
+  }
+});
+
+// ../render-node/src/host/files-out.ts
+import { createHash as createHash3, randomBytes as randomBytes4 } from "node:crypto";
+import { constants as fsConstants, createReadStream as createReadStream2 } from "node:fs";
+import { copyFile as copyFile2, mkdir as mkdir7, rename as rename6, rm as rm7, stat as stat10 } from "node:fs/promises";
+import path19 from "node:path";
+async function isFile3(file3) {
+  return (await stat10(file3).catch(() => void 0))?.isFile() ?? false;
+}
+async function exists(file3) {
+  return await stat10(file3).catch(() => void 0) !== void 0;
+}
+function alreadyExists(file3) {
+  return Object.assign(new Error(`${file3} already exists`), { code: "EEXIST", path: file3 });
+}
+async function writeBytesFile(file3, bytes, overwrite = false) {
+  if (!overwrite && await exists(file3)) throw alreadyExists(file3);
+  await mkdir7(path19.dirname(file3), { recursive: true });
+  await writeFileAtomic(file3, bytes);
+  return file3;
+}
+async function exportMediaFile(opts) {
+  const dest = path19.join(opts.folder, opts.name);
+  if (await exists(dest)) return { location: dest, folder: opts.folder, existed: true };
+  await mkdir7(opts.folder, { recursive: true });
+  if (!opts.render) {
+    if (!await isFile3(opts.source)) throw new Error(`file not found: ${opts.source}`);
+    await copyFile2(opts.source, dest, fsConstants.COPYFILE_EXCL);
+    return { location: dest, folder: opts.folder, existed: false };
+  }
+  const ext = path19.extname(dest);
+  const staged = path19.join(opts.folder, `${path19.basename(dest, ext)}.partial-${randomBytes4(4).toString("hex")}${ext}`);
+  try {
+    await renderProject(opts.render.project, {
+      resolveMedia: opts.resolveMedia,
+      output: staged,
+      options: opts.render.options,
+      engine: opts.engine,
+      signal: opts.signal
+    });
+    await rename6(staged, dest);
+  } finally {
+    await rm7(staged, { force: true });
+  }
+  return { location: dest, folder: opts.folder, existed: false };
+}
+async function uniqueMediaDest(dir, name, fileId, source2) {
+  const same = async (candidate) => {
+    const [a, b] = await Promise.all([stat10(source2).catch(() => void 0), stat10(candidate).catch(() => void 0)]);
+    return Boolean(a && b && a.dev === b.dev && a.ino === b.ino);
+  };
+  const first = path19.join(dir, name);
+  if (!await isFile3(first) || await same(first)) return first;
+  const ext = path19.extname(name);
+  const stemName = ext ? name.slice(0, -ext.length) : name;
+  for (let n = 0; n < 1e5; n += 1) {
+    const candidate = path19.join(dir, n === 0 ? `${stemName}_${fileId || "file"}${ext}` : `${stemName}_${fileId || "file"}_${n}${ext}`);
+    if (!await isFile3(candidate) || await same(candidate)) return candidate;
+  }
+  throw new Error(`no free name for ${name} in ${dir}`);
+}
+async function collectMedia(files, opts) {
+  const out = { copied: [], skipped: [], errors: [], moves: [] };
+  if (files.length === 0) return out;
+  const assets = projectAssetsDir(path19.resolve(opts.projectFile));
+  const mediaDir = path19.join(assets, "media");
+  try {
+    await mkdir7(mediaDir, { recursive: true });
+  } catch (error62) {
+    out.errors.push(error62 instanceof Error ? error62.message : String(error62));
+    return out;
+  }
+  for (const file3 of files) {
+    if (!file3.path || file3.path.includes("%")) {
+      out.skipped.push(file3.path || "(empty)");
+      continue;
+    }
+    const source2 = path19.resolve(opts.resolveMedia(file3.path));
+    if (!await isFile3(source2) || isInside(source2, assets) || opts.engineAssetsDir && isInside(source2, opts.engineAssetsDir)) {
+      out.skipped.push(source2);
+      continue;
+    }
+    const dest = await uniqueMediaDest(mediaDir, path19.basename(source2), file3.id, source2);
+    if (await isFile3(dest)) {
+      out.skipped.push(source2);
+    } else {
+      try {
+        await copyFile2(source2, dest, fsConstants.COPYFILE_EXCL);
+      } catch (error62) {
+        out.errors.push(`${source2}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+        continue;
+      }
+      out.copied.push(dest);
+    }
+    out.moves.push({ fileId: file3.id, from: file3.path, to: dest });
+  }
+  return out;
+}
+async function sha256Of(file3) {
+  const hash2 = createHash3("sha256");
+  for await (const chunk2 of createReadStream2(file3)) hash2.update(chunk2);
+  return hash2.digest("hex");
+}
+async function filesIdentical(a, b) {
+  const [sa, sb] = await Promise.all([stat10(a).catch(() => void 0), stat10(b).catch(() => void 0)]);
+  if (!sa?.isFile() || !sb?.isFile() || sa.size !== sb.size) return false;
+  const [ha, hb] = await Promise.all([sha256Of(a), sha256Of(b)]);
+  return ha === hb;
+}
+async function reclaimableMedia(files, opts) {
+  const out = { moves: [], kept: [], errors: [] };
+  const mediaDir = path19.join(projectAssetsDir(path19.resolve(opts.projectFile)), "media");
+  for (const file3 of files) {
+    const copy = path19.resolve(opts.resolveMedia(file3.path));
+    if (!isInside(copy, mediaDir)) continue;
+    if (!await isFile3(copy) || !await isFile3(file3.original)) {
+      out.kept.push(copy);
+      continue;
+    }
+    try {
+      if (await filesIdentical(copy, file3.original)) out.moves.push({ fileId: file3.id, from: file3.path, to: file3.original });
+      else out.kept.push(copy);
+    } catch (error62) {
+      out.errors.push(`${copy}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+    }
+  }
+  return out;
+}
+async function removeMediaCopies(paths, opts) {
+  const assets = projectAssetsDir(path19.resolve(opts.projectFile));
+  const removed = [];
+  const errors = [];
+  for (const p of paths) {
+    const file3 = path19.resolve(opts.resolveMedia(p));
+    if (!isInside(file3, assets)) {
+      errors.push(`${file3}: not in the project's assets folder`);
+      continue;
+    }
+    try {
+      await rm7(file3);
+      removed.push(file3);
+    } catch (error62) {
+      errors.push(`${file3}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+    }
+  }
+  return { removed, errors };
+}
+var init_files_out = __esm({
+  "../render-node/src/host/files-out.ts"() {
+    "use strict";
+    init_src();
+    init_render_project();
+    init_paths2();
+    init_storage();
+  }
+});
+
+// ../render-node/src/host/node-host.ts
+import { mkdir as mkdir8, readFile as readFile8, stat as stat11 } from "node:fs/promises";
+import path20 from "node:path";
 function createAssetHost(dir) {
-  const root = path18.resolve(dir);
+  const root = path20.resolve(dir);
   return {
     async readText(assetPath) {
-      const file3 = path18.resolve(root, assetPath);
-      const rel = path18.relative(root, file3);
-      if (!rel || rel.startsWith("..") || path18.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
-      if ((await stat9(file3)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
-      return readFile7(file3, "utf8");
+      const file3 = path20.resolve(root, assetPath);
+      const rel = path20.relative(root, file3);
+      if (!rel || rel.startsWith("..") || path20.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
+      if ((await stat11(file3)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
+      return readFile8(file3, "utf8");
     }
   };
 }
 function createNodeHost(options = {}) {
   const current = () => {
     const p = typeof options.projectFile === "function" ? options.projectFile() : options.projectFile;
-    return p ? path18.resolve(p) : void 0;
+    return p ? path20.resolve(p) : void 0;
   };
   const assets = options.engineAssetsDir ?? engineAssetsDir();
   const resolveMedia = (value) => createMediaResolver({ projectFile: current(), engineAssetsDir: assets })(value);
   const baseDir = () => {
     const p = current();
-    return p ? path18.dirname(p) : process.cwd();
+    return p ? path20.dirname(p) : process.cwd();
   };
-  const inProject = (p) => path18.isAbsolute(p) ? p : path18.resolve(baseDir(), p);
+  const inProject = (p) => path20.isAbsolute(p) ? p : path20.resolve(baseDir(), p);
   const defaultOutput = (options_) => {
     const ext = FORMATS[options_.format]?.extension ?? "mp4";
     const project = current();
-    const stem6 = project ? path18.basename(project, path18.extname(project)) : "zenvi-export";
-    return path18.join(baseDir(), `${stem6}.${ext}`);
+    const stem7 = project ? path20.basename(project, path20.extname(project)) : "zenvi-export";
+    return path20.join(baseDir(), `${stem7}.${ext}`);
   };
+  const saved = () => {
+    const file3 = current();
+    if (!file3) throw new Error("The project has not been saved yet: give a file path (e.g. my-edit.zvn).");
+    return file3;
+  };
+  const collectOptions = () => ({ projectFile: saved(), engineAssetsDir: assets, resolveMedia });
   const host = {
     resolveMedia,
     projectFile: current,
     media: {
       ...createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes, env: options.env }),
-      missing: (files) => missingOnDisk(files, resolveMedia)
+      missing: (files) => missingOnDisk(files, resolveMedia),
+      collect: (files) => collectMedia(files, collectOptions()),
+      reclaimable: (files) => reclaimableMedia(files, collectOptions()),
+      removeCopies: (paths) => removeMediaCopies(paths, collectOptions())
     },
     exporter: {
       async export(project, exportOptions, onProgress) {
         const output2 = exportOptions.output ? inProject(exportOptions.output) : defaultOutput(exportOptions);
-        await mkdir6(path18.dirname(output2), { recursive: true });
+        await mkdir8(path20.dirname(output2), { recursive: true });
         return renderProject(project, {
           resolveMedia,
           output: output2,
@@ -54208,6 +54999,12 @@ function createNodeHost(options = {}) {
             options.onRenderProgress?.(p);
           }
         });
+      },
+      // The containers this exporter writes, with encoders the local ffmpeg has (FFmpegWriter.IsValidCodec).
+      async supports(format, videoCodec, audioCodec) {
+        if (!FORMATS[format]) return false;
+        const encoders = await encoderNames().catch(() => /* @__PURE__ */ new Set());
+        return (!videoCodec || encoders.has(videoCodec)) && (!audioCodec || encoders.has(audioCodec));
       }
     },
     frames: {
@@ -54232,25 +55029,54 @@ function createNodeHost(options = {}) {
       async save(project, target) {
         const file3 = target ? inProject(target) : current();
         if (!file3) throw new Error("The project has not been saved yet: give a file path (e.g. my-edit.zvn).");
-        await mkdir6(path18.dirname(file3), { recursive: true });
+        await mkdir8(path20.dirname(file3), { recursive: true });
         return writeProjectFile(file3, project, { engineAssetsDir: assets });
       },
       open: (p) => readProjectFile(inProject(p)),
       async readText(p) {
         const file3 = inProject(p);
-        if ((await stat9(file3)).size > MAX_TEXT_BYTES) throw new Error(`${file3} is larger than ${MAX_TEXT_BYTES} bytes.`);
-        return readFile7(file3, "utf8");
+        if ((await stat11(file3)).size > MAX_TEXT_BYTES) throw new Error(`${file3} is larger than ${MAX_TEXT_BYTES} bytes.`);
+        return readFile8(file3, "utf8");
       },
       async writeText(p, text5) {
         const file3 = inProject(p);
-        await mkdir6(path18.dirname(file3), { recursive: true });
+        await mkdir8(path20.dirname(file3), { recursive: true });
         await writeFileAtomic(file3, text5);
         return file3;
-      }
+      },
+      writeBytes: (p, bytes, _contentType, opts) => writeBytesFile(inProject(p), bytes, opts?.overwrite),
+      exportMedia: (file3, name, folder, render3) => exportMediaFile({
+        source: resolveMedia(String(file3.path ?? "")),
+        folder: folder ? inProject(folder) : baseDir(),
+        name,
+        render: render3,
+        resolveMedia,
+        engine: options.renderEngine,
+        signal: options.signal
+      }),
+      currentPath: () => current() ?? null
     },
     log: options.log
   };
   if (assets) host.assets = createAssetHost(assets);
+  const desktopDir = options.desktopDir;
+  if (desktopDir) {
+    Object.assign(host.storage, {
+      recentProjects: () => desktopRecentProjects(desktopDir),
+      recoveryCopies: async () => {
+        const file3 = current();
+        return file3 ? recoveryCopiesFor(desktopDir, file3) : [];
+      },
+      restoreRecoveryCopy: async (copy) => {
+        const file3 = saved();
+        const backup = await restoreRecoveryCopy(desktopDir, file3, copy);
+        return { project: await readProjectFile(file3), path: file3, backup };
+      },
+      customProfiles: () => customProfileFiles(desktopDir),
+      writeCustomProfile: (name, text5) => writeCustomProfileFile(desktopDir, name, text5),
+      removeCustomProfile: (name) => removeCustomProfileFile(desktopDir, name)
+    });
+  }
   if (options.backend) {
     host.backend = createBackendHost(options.backend);
     const upload = backendSpeechUpload(options.backend);
@@ -54265,12 +55091,15 @@ var init_node_host = __esm({
     init_analyze();
     init_speech();
     init_resources();
+    init_capabilities();
     init_encoder();
     init_render_frame();
     init_render_project();
     init_backend();
     init_media2();
     init_paths2();
+    init_desktop_files();
+    init_files_out();
     init_storage();
     MAX_TEXT_BYTES = 16 * 1024 * 1024;
   }
@@ -54465,8 +55294,8 @@ var init_src2 = __esm({
 });
 
 // src/cloud/upload.ts
-import { createReadStream as createReadStream2 } from "node:fs";
-import { stat as stat10 } from "node:fs/promises";
+import { createReadStream as createReadStream3 } from "node:fs";
+import { stat as stat12 } from "node:fs/promises";
 import http from "node:http";
 import https from "node:https";
 function put(url2, headers, body, length) {
@@ -54494,11 +55323,11 @@ function withQuery(url2, extra) {
   return u.toString();
 }
 async function uploadFile(file3, url2, options = {}) {
-  const size = (await stat10(file3)).size;
+  const size = (await stat12(file3)).size;
   const headers = options.headers ?? { "x-ms-blob-type": "BlockBlob" };
   if (size <= SINGLE_SHOT_MAX) {
     let sent = 0;
-    const stream = createReadStream2(file3, { highWaterMark: 1024 * 1024 });
+    const stream = createReadStream3(file3, { highWaterMark: 1024 * 1024 });
     stream.on("data", (c) => {
       sent += c.length;
       options.onProgress?.(sent, size);
@@ -54516,7 +55345,7 @@ async function uploadFile(file3, url2, options = {}) {
     let lastError;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const chunk2 = createReadStream2(file3, { start: offset, end: offset + length - 1 });
+        const chunk2 = createReadStream3(file3, { start: offset, end: offset + length - 1 });
         const res2 = await put(withQuery(url2, { comp: "block", blockid: id }), blockHeaders, chunk2, length);
         if (res2.status >= 200 && res2.status < 300) {
           lastError = void 0;
@@ -54547,22 +55376,22 @@ var init_upload = __esm({
 });
 
 // src/cloud/sync.ts
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash4 } from "node:crypto";
 import { createWriteStream as createWriteStream3 } from "node:fs";
-import { mkdir as mkdir7, readFile as readFile8, realpath, rename as rename5, rm as rm6, stat as stat11 } from "node:fs/promises";
-import path19 from "node:path";
+import { mkdir as mkdir9, readFile as readFile9, realpath, rename as rename7, rm as rm8, stat as stat13 } from "node:fs/promises";
+import path21 from "node:path";
 import { Readable as Readable3 } from "node:stream";
 import { pipeline as pipeline3 } from "node:stream/promises";
 function linksPath(config2) {
-  return path19.join(config2.configDir, "cloud-links.json");
+  return path21.join(config2.configDir, "cloud-links.json");
 }
 async function linkKey(config2, projectFile) {
-  const real3 = await realpath(projectFile).catch(() => path19.resolve(projectFile));
+  const real3 = await realpath(projectFile).catch(() => path21.resolve(projectFile));
   return `${config2.cloudUrl}|${real3}`;
 }
 async function readLinks(config2) {
   try {
-    const parsed = JSON.parse(await readFile8(linksPath(config2), "utf8"));
+    const parsed = JSON.parse(await readFile9(linksPath(config2), "utf8"));
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -54574,19 +55403,19 @@ async function getLink(config2, projectFile) {
 async function setLink(config2, projectFile, link) {
   const links = await readLinks(config2);
   links[await linkKey(config2, projectFile)] = link;
-  await mkdir7(config2.configDir, { recursive: true, mode: 448 });
+  await mkdir9(config2.configDir, { recursive: true, mode: 448 });
   await writeFileAtomic(linksPath(config2), `${JSON.stringify(links, null, 2)}
 `);
 }
 function textSha256(text5) {
-  return createHash3("sha256").update(text5).digest("hex");
+  return createHash4("sha256").update(text5).digest("hex");
 }
 async function markSynced(config2, projectFile) {
   const link = await getLink(config2, projectFile);
   if (!link) return;
   let bytes;
   try {
-    bytes = await readFile8(projectFile);
+    bytes = await readFile9(projectFile);
   } catch {
     return;
   }
@@ -54595,7 +55424,7 @@ async function markSynced(config2, projectFile) {
 async function localProjectState(config2, projectFile, projectId) {
   let bytes;
   try {
-    bytes = await readFile8(projectFile);
+    bytes = await readFile9(projectFile);
   } catch (error62) {
     if (error62.code === "ENOENT") return { kind: "missing" };
     throw error62;
@@ -54613,7 +55442,7 @@ async function localProjectState(config2, projectFile, projectId) {
   return { kind: "same", unsynced };
 }
 function contentTypeFor(file3) {
-  return CONTENT_TYPES[path19.extname(file3).slice(1).toLowerCase()] ?? "application/octet-stream";
+  return CONTENT_TYPES[path21.extname(file3).slice(1).toLowerCase()] ?? "application/octet-stream";
 }
 function cloudRef(file3, m) {
   const previous = file3.cloud && typeof file3.cloud === "object" ? file3.cloud : {};
@@ -54626,10 +55455,10 @@ function reusableHash(file3, size, mtime) {
   return c.sha256;
 }
 function uniqueName(name, taken) {
-  const ext = path19.extname(name);
-  const stem6 = ext ? name.slice(0, -ext.length) : name;
+  const ext = path21.extname(name);
+  const stem7 = ext ? name.slice(0, -ext.length) : name;
   let candidate = name;
-  for (let n = 2; taken.has(candidate.toLowerCase()); n += 1) candidate = `${stem6} (${n})${ext}`;
+  for (let n = 2; taken.has(candidate.toLowerCase()); n += 1) candidate = `${stem7} (${n})${ext}`;
   taken.add(candidate.toLowerCase());
   return candidate;
 }
@@ -54644,9 +55473,9 @@ function cloudProjectJson(project, media, warn) {
     if (!value || isPortableAssetPath(value) || /^https?:\/\//i.test(value)) return value;
     const hit = byPath.get(value);
     if (hit) return hit.cloudName;
-    if (path19.isAbsolute(value)) {
+    if (path21.isAbsolute(value)) {
       unmapped.add(value);
-      return path19.basename(value);
+      return path21.basename(value);
     }
     return value;
   });
@@ -54655,7 +55484,7 @@ function cloudProjectJson(project, media, warn) {
     if (m) file3.cloud = cloudRef(file3, { ...m, name: m.cloudName });
   }
   for (const value of unmapped) {
-    if (!/[\\/]thumbnail[\\/]/.test(value)) warn?.(`${path19.basename(value)} is referenced by the project but is not a project file; it was not uploaded.`);
+    if (!/[\\/]thumbnail[\\/]/.test(value)) warn?.(`${path21.basename(value)} is referenced by the project but is not a project file; it was not uploaded.`);
   }
   const { [CLOUD_MARKER_KEY]: _marker, ...upload } = mapped;
   return upload;
@@ -54670,11 +55499,11 @@ async function pushProject(options) {
   let done = 0;
   for (const file3 of candidates) {
     const local = String(file3.path);
-    options.onProgress?.({ phase: "hashing", file: path19.basename(local), done, total: candidates.length });
+    options.onProgress?.({ phase: "hashing", file: path21.basename(local), done, total: candidates.length });
     let size;
     let mtime;
     try {
-      const st = await stat11(local);
+      const st = await stat13(local);
       if (!st.isFile()) throw new Error("not a file");
       size = st.size;
       mtime = st.mtimeMs / 1e3;
@@ -54686,11 +55515,11 @@ async function pushProject(options) {
     const contentType2 = contentTypeFor(local);
     if (contentType2 === "application/octet-stream") {
       skipped.push(local);
-      warn(`${path19.basename(local)} is not a media type Zenvi Cloud stores; skipped.`);
+      warn(`${path21.basename(local)} is not a media type Zenvi Cloud stores; skipped.`);
       continue;
     }
     const sha256 = reusableHash(file3, size, mtime) ?? await sha256File(local);
-    const displayName3 = typeof file3.name === "string" && file3.name && path19.extname(file3.name) ? file3.name : path19.basename(local);
+    const displayName3 = typeof file3.name === "string" && file3.name && path21.extname(file3.name) ? file3.name : path21.basename(local);
     media.push({ file: file3, local, sha256, size, mtime, contentType: contentType2, cloudName: uniqueName(displayName3, taken) });
     done += 1;
   }
@@ -54711,7 +55540,7 @@ async function pushProject(options) {
   }
   options.onProgress?.({ phase: "saving", done: 0, total: 1 });
   const body = JSON.parse(serializeProject(cloudProjectJson(project, media, warn)));
-  const name = options.name ?? path19.basename(options.projectFile, path19.extname(options.projectFile));
+  const name = options.name ?? path21.basename(options.projectFile, path21.extname(options.projectFile));
   const link = await getLink(config2, options.projectFile);
   let projectId;
   let revision;
@@ -54765,13 +55594,13 @@ async function pullDestination(options, id, name) {
     throw new CliError(`${projectFile} belongs to ${whose}; pulling ${id} would replace it.`, 1, "Pull into another folder, or use --force to replace it.");
   };
   if (options.dir !== void 0) {
-    const projectFile = path19.join(path19.resolve(options.cwd, options.dir), `${name}.zvn`);
+    const projectFile = path21.join(path21.resolve(options.cwd, options.dir), `${name}.zvn`);
     await check2(projectFile, true);
     return projectFile;
   }
   for (let n = 1; n < 1e3; n += 1) {
-    const dir = path19.resolve(options.cwd, n === 1 ? name : `${name} (${n})`);
-    const projectFile = path19.join(dir, `${name}.zvn`);
+    const dir = path21.resolve(options.cwd, n === 1 ? name : `${name} (${n})`);
+    const projectFile = path21.join(dir, `${name}.zvn`);
     if (await check2(projectFile, false) === "use") return projectFile;
   }
   throw new CliError(`Too many folders named ${name} here; pull into a folder of your choice.`, 2);
@@ -54787,7 +55616,7 @@ function safeFileName(name) {
 }
 async function sameContent(file3, sha256, size) {
   try {
-    const st = await stat11(file3);
+    const st = await stat13(file3);
     if (size !== void 0 && st.size !== size) return false;
     return await sha256File(file3) === sha256;
   } catch {
@@ -54796,17 +55625,17 @@ async function sameContent(file3, sha256, size) {
 }
 async function download(url2, dest, sha256, doFetch) {
   const response = await doFetch(url2, { signal: AbortSignal.timeout(30 * 6e4) });
-  if (!response.ok || !response.body) throw new CliError(`Download failed (HTTP ${response.status}) for ${path19.basename(dest)}.`);
+  if (!response.ok || !response.body) throw new CliError(`Download failed (HTTP ${response.status}) for ${path21.basename(dest)}.`);
   const tmp = `${dest}.${process.pid}.part`;
-  const hash2 = createHash3("sha256");
+  const hash2 = createHash4("sha256");
   const source2 = Readable3.fromWeb(response.body);
   source2.on("data", (chunk2) => hash2.update(chunk2));
   try {
     await pipeline3(source2, createWriteStream3(tmp));
-    if (hash2.digest("hex") !== sha256) throw new CliError(`${path19.basename(dest)} did not match its SHA-256 after download.`);
-    await rename5(tmp, dest);
+    if (hash2.digest("hex") !== sha256) throw new CliError(`${path21.basename(dest)} did not match its SHA-256 after download.`);
+    await rename7(tmp, dest);
   } catch (error62) {
-    await rm6(tmp, { force: true });
+    await rm8(tmp, { force: true });
     throw error62;
   }
 }
@@ -54817,8 +55646,8 @@ async function pullProject(options) {
   const remote = await client.getProject(id);
   const name = safeFileName(remote.name || id);
   const projectFile = await pullDestination(options, id, name);
-  const mediaDir = path19.join(projectAssetsDir(projectFile), "media");
-  await mkdir7(mediaDir, { recursive: true });
+  const mediaDir = path21.join(projectAssetsDir(projectFile), "media");
+  await mkdir9(mediaDir, { recursive: true });
   const project = remote.project;
   const byFile = new Map(remote.media.map((m) => [m.fileId, m]));
   const localFor = /* @__PURE__ */ new Map();
@@ -54830,7 +55659,7 @@ async function pullProject(options) {
     const entry = byFile.get(file3.id);
     if (!entry) continue;
     options.onProgress?.({ file: entry.name, done, total: remote.media.length });
-    const dest = path19.join(mediaDir, uniqueName(safeFileName(entry.name || `${file3.id}${path19.extname(String(file3.path ?? ""))}`), taken));
+    const dest = path21.join(mediaDir, uniqueName(safeFileName(entry.name || `${file3.id}${path21.extname(String(file3.path ?? ""))}`), taken));
     if (await sameContent(dest, entry.sha256, entry.size)) reused += 1;
     else {
       await download(entry.url, dest, entry.sha256, options.fetchImpl ?? fetch);
@@ -54852,7 +55681,7 @@ async function pullProject(options) {
     if (!dest) continue;
     file3.path = dest;
     const entry = byFile.get(file3.id);
-    const st = await stat11(dest);
+    const st = await stat13(dest);
     if (entry) file3.cloud = cloudRef(file3, { sha256: entry.sha256, size: st.size, contentType: entry.contentType ?? file3.cloud?.content_type ?? contentTypeFor(dest), name: entry.name, mtime: st.mtimeMs / 1e3 });
   }
   const marker2 = { project_id: id, revision: remote.revision ?? "" };
@@ -54863,7 +55692,7 @@ async function pullProject(options) {
     revision: remote.revision ?? "",
     editorUrl: remote.editorUrl,
     syncedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    fileSha256: textSha256(await readFile8(projectFile))
+    fileSha256: textSha256(await readFile9(projectFile))
   });
   return { projectFile, projectId: id, revision: remote.revision ?? "", downloaded, reused, missing };
 }
@@ -54917,23 +55746,23 @@ var init_sync = __esm({
 });
 
 // src/project/select.ts
-import { readdir as readdir5 } from "node:fs/promises";
-import path20 from "node:path";
+import { readdir as readdir6 } from "node:fs/promises";
+import path22 from "node:path";
 function isProjectPath(file3) {
-  return PROJECT_EXTENSIONS.includes(path20.extname(file3).toLowerCase());
+  return PROJECT_EXTENSIONS.includes(path22.extname(file3).toLowerCase());
 }
 async function findProject(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const named = options.flag ?? options.env?.ZENVI_PROJECT ?? process.env.ZENVI_PROJECT;
-  if (named?.trim()) return path20.resolve(cwd, named.trim());
+  if (named?.trim()) return path22.resolve(cwd, named.trim());
   let names2;
   try {
-    names2 = await readdir5(cwd);
+    names2 = await readdir6(cwd);
   } catch {
     return void 0;
   }
-  const candidates = names2.filter((n) => path20.extname(n).toLowerCase() === ".zvn" && !n.startsWith(".")).sort();
-  if (candidates.length === 1) return path20.join(cwd, candidates[0]);
+  const candidates = names2.filter((n) => path22.extname(n).toLowerCase() === ".zvn" && !n.startsWith(".")).sort();
+  if (candidates.length === 1) return path22.join(cwd, candidates[0]);
   if (candidates.length > 1) {
     throw new CliError(
       `This folder has ${candidates.length} projects (${candidates.slice(0, 4).join(", ")}${candidates.length > 4 ? ", \u2026" : ""}).`,
@@ -54960,8 +55789,8 @@ var init_select = __esm({
 });
 
 // src/desktop/discovery.ts
-import { readFile as readFile9, realpath as realpath2 } from "node:fs/promises";
-import path21 from "node:path";
+import { readFile as readFile10, realpath as realpath2 } from "node:fs/promises";
+import path23 from "node:path";
 function pidAlive2(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
@@ -54981,23 +55810,23 @@ function isLoopbackUrl(value) {
 }
 async function readToken(file3) {
   try {
-    const token = (await readFile9(file3, "utf8")).trim();
+    const token = (await readFile10(file3, "utf8")).trim();
     return token || void 0;
   } catch {
     return void 0;
   }
 }
 async function fromFile(config2, name, kind, options) {
-  const file3 = path21.join(config2.desktopDir, name);
+  const file3 = path23.join(config2.desktopDir, name);
   let data;
   try {
-    data = JSON.parse(await readFile9(file3, "utf8"));
+    data = JSON.parse(await readFile10(file3, "utf8"));
   } catch {
     return void 0;
   }
   const pid = Number(data.pid);
   if (typeof data.url !== "string" || !isLoopbackUrl(data.url) || !pidAlive2(pid)) return void 0;
-  const tokenFile = typeof data.token_file === "string" && data.token_file ? path21.isAbsolute(data.token_file) ? data.token_file : path21.join(config2.desktopDir, data.token_file) : path21.join(config2.desktopDir, "mcp_token");
+  const tokenFile = typeof data.token_file === "string" && data.token_file ? path23.isAbsolute(data.token_file) ? data.token_file : path23.join(config2.desktopDir, data.token_file) : path23.join(config2.desktopDir, "mcp_token");
   const token = await readToken(tokenFile);
   if (!token) return void 0;
   if (options.verify !== false && !await probeEndpoint(data.url, token, options)) return void 0;
@@ -55051,7 +55880,7 @@ async function probeEndpoint(url2, token, options = {}) {
 }
 async function desktopProcessAlive(config2, kind = "gui") {
   try {
-    const data = JSON.parse(await readFile9(path21.join(config2.desktopDir, `${kind}_mcp.json`), "utf8"));
+    const data = JSON.parse(await readFile10(path23.join(config2.desktopDir, `${kind}_mcp.json`), "utf8"));
     return pidAlive2(Number(data.pid));
   } catch {
     return false;
@@ -55067,7 +55896,7 @@ async function discoverDesktop(config2, options = {}) {
     if (endpoint) found.push(endpoint);
   }
   if (found.length === 0 && options.legacy) {
-    const tokenFile = path21.join(config2.desktopDir, "mcp_token");
+    const tokenFile = path23.join(config2.desktopDir, "mcp_token");
     const token = await readToken(tokenFile);
     if (token && await probeLegacy(token, options)) {
       found.push({ kind: "legacy", url: LEGACY_URL, token, source: tokenFile });
@@ -55076,7 +55905,7 @@ async function discoverDesktop(config2, options = {}) {
   return found;
 }
 async function canonical(file3) {
-  const abs = path21.resolve(file3);
+  const abs = path23.resolve(file3);
   try {
     return await realpath2(abs);
   } catch {
@@ -60240,27 +61069,9 @@ var init_pending = __esm({
     "use strict";
     PENDING_DESKTOP_TOOLS = /* @__PURE__ */ new Set([
       "capture_editor_screenshot_tool",
-      "consolidate_project_media_tool",
-      "export_files_to_folder_tool",
-      "export_project_file_tool",
-      "forget_recent_projects_tool",
-      "get_editor_layout_tool",
       "get_log_paths_tool",
-      "get_preferences_tool",
-      "import_project_file_tool",
-      "list_export_presets_tool",
-      "list_project_profiles_tool",
-      "list_recent_projects_tool",
-      "list_recovery_versions_tool",
-      "manage_custom_profiles_tool",
       "mcp_health_tool",
-      "reset_caches_and_history_tool",
-      "restore_recovery_version_tool",
-      "save_frame_image_tool",
       "send_assistant_prompt_tool",
-      "set_editor_layout_tool",
-      "set_preference_tool",
-      "set_project_profile_tool",
       "wait_for_editor_job_tool",
       "zenvi_api_request"
     ]);
@@ -60302,8 +61113,6 @@ var init_pending = __esm({
         "video_codec",
         "width"
       ],
-      new_project_tool: ["profile"],
-      open_project_tool: ["recent_index"],
       set_export_setting_tool: ["clear"],
       set_keyframes_tool: ["ease"],
       set_project_setting_tool: ["channels", "orientation", "preset", "profile", "reframe", "save_as_default"]
@@ -60397,8 +61206,8 @@ function filterTagsForWindow(tags, windowScenes) {
     for (const value of values) {
       const text5 = String(value ?? "").trim();
       if (!text5) continue;
-      const norm3 = text5.toLowerCase();
-      if (corpus.includes(norm3) || norm3.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text5);
+      const norm4 = text5.toLowerCase();
+      if (corpus.includes(norm4) || norm4.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text5);
     }
     filtered[key2] = kept;
   }
@@ -60730,14 +61539,14 @@ var init_tracks2 = __esm({
 function isRecord24(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function basename2(path40) {
-  const parts = String(path40 ?? "").split(/[\\/]/);
+function basename2(path42) {
+  const parts = String(path42 ?? "").split(/[\\/]/);
   return parts[parts.length - 1] ?? "";
 }
-function normPath(path40) {
+function normPath(path42) {
   const segments2 = [];
-  const absolute = path40.startsWith("/");
-  for (const part of path40.split("/")) {
+  const absolute = path42.startsWith("/");
+  for (const part of path42.split("/")) {
     if (part === "" || part === ".") continue;
     if (part === ".." && segments2.length > 0 && segments2[segments2.length - 1] !== "..") segments2.pop();
     else segments2.push(part);
@@ -60755,12 +61564,12 @@ function resolveParentFileId(project, fileData, fileId = "") {
   const explicit = String(data.parent_file_id ?? "").trim();
   if (explicit) return explicit;
   if (!data.zenvi_subclip) return fid || String(data.id ?? "");
-  const path40 = String(data.path ?? "");
-  if (path40 && fid) {
+  const path42 = String(data.path ?? "");
+  if (path42 && fid) {
     for (const candidate of project.files ?? []) {
       if (candidate.zenvi_subclip) continue;
       const candPath = String(candidate.path ?? "");
-      if (candPath && normPath(candPath) === normPath(path40)) return String(candidate.id ?? "");
+      if (candPath && normPath(candPath) === normPath(path42)) return String(candidate.id ?? "");
     }
   }
   return fid || String(data.id ?? "");
@@ -60795,12 +61604,12 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
     rebased: true
   });
   const file3 = isRecord24(fileData) ? fileData : void 0;
-  const path40 = file3 ? String(file3.path ?? "") : "";
+  const path42 = file3 ? String(file3.path ?? "") : "";
   const rawLayer = clipData.layer;
   const layerNum = rawLayer === null || rawLayer === void 0 || rawLayer === "" ? null : Math.trunc(Number(rawLayer));
   const layer2 = layerNum !== null && Number.isFinite(layerNum) ? layerNum : null;
   const uiTrack2 = layer2 !== null ? layerNumberToDisplayIndex(layer2, options.layers ?? []) : null;
-  const fileName2 = String(file3?.name || basename2(path40) || "").trim();
+  const fileName2 = String(file3?.name || basename2(path42) || "").trim();
   const title = String(clipData.title || clipData.label || fileName2 || "Clip").trim();
   let tlMeta = getIndexBlock(parentData ?? {});
   if (Object.keys(tlMeta).length === 0) tlMeta = getIndexBlock(file3 ?? {});
@@ -60816,7 +61625,7 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
     timelineClipId: String(clip2.id ?? clipData.id ?? ""),
     fileId: fid,
     parentFileId: parentId,
-    sourcePath: path40,
+    sourcePath: path42,
     sourceStart,
     sourceEnd,
     timelinePosition,
@@ -61214,14 +62023,14 @@ function acceptsEmptyString(schema) {
   const fallback = schema.default;
   return kindsOf(schema).includes("string") && (fallback === void 0 || fallback === null || fallback === "");
 }
-function coerceKind(path40, value, kind, schema) {
+function coerceKind(path42, value, kind, schema) {
   if (kind === "boolean") {
     if (typeof value === "boolean") return value;
     if (typeof value === "number") return value !== 0;
     const s = String(value).trim().toLowerCase();
     if (TRUE.has(s)) return true;
     if (FALSE.has(s)) return false;
-    throw new EditorArgError(`argument '${path40}' must be true or false`);
+    throw new EditorArgError(`argument '${path42}' must be true or false`);
   }
   if (kind === "number" || kind === "integer") {
     let f3;
@@ -61229,14 +62038,14 @@ function coerceKind(path40, value, kind, schema) {
     else if (typeof value === "string") {
       f3 = parsePythonFloat(value.trim().replace(/s+$/, ""));
     } else {
-      throw new EditorArgError(`argument '${path40}' must be a number`);
+      throw new EditorArgError(`argument '${path42}' must be a number`);
     }
-    if (f3 === null) throw new EditorArgError(`argument '${path40}' must be a finite number`);
+    if (f3 === null) throw new EditorArgError(`argument '${path42}' must be a finite number`);
     if (kind === "integer") {
-      if (!Number.isInteger(f3)) throw new EditorArgError(`argument '${path40}' must be a whole number`);
+      if (!Number.isInteger(f3)) throw new EditorArgError(`argument '${path42}' must be a whole number`);
     }
-    if (schema.minimum !== void 0 && f3 < schema.minimum) throw new EditorArgError(`argument '${path40}' is below the minimum`);
-    if (schema.maximum !== void 0 && f3 > schema.maximum) throw new EditorArgError(`argument '${path40}' is above the maximum`);
+    if (schema.minimum !== void 0 && f3 < schema.minimum) throw new EditorArgError(`argument '${path42}' is below the minimum`);
+    if (schema.maximum !== void 0 && f3 > schema.maximum) throw new EditorArgError(`argument '${path42}' is above the maximum`);
     return f3;
   }
   if (kind === "string") {
@@ -61253,7 +62062,7 @@ function coerceKind(path40, value, kind, schema) {
         try {
           parsed = JSON.parse(s);
         } catch {
-          throw new EditorArgError(`argument '${path40}' is not a valid JSON list`);
+          throw new EditorArgError(`argument '${path42}' is not a valid JSON list`);
         }
         list2 = Array.isArray(parsed) ? parsed : [parsed];
       } else {
@@ -61265,7 +62074,7 @@ function coerceKind(path40, value, kind, schema) {
       list2 = [value];
     }
     const items = schema.items;
-    if (items && Object.keys(items).length > 0) return list2.map((v, i) => coerceEditorValue(`${path40}[${i}]`, v, items));
+    if (items && Object.keys(items).length > 0) return list2.map((v, i) => coerceEditorValue(`${path42}[${i}]`, v, items));
     return list2;
   }
   if (kind === "object") {
@@ -61276,30 +62085,30 @@ function coerceKind(path40, value, kind, schema) {
       try {
         obj = JSON.parse(s);
       } catch {
-        throw new EditorArgError(`argument '${path40}' is not a valid JSON object`);
+        throw new EditorArgError(`argument '${path42}' is not a valid JSON object`);
       }
     }
-    if (!isRecord26(obj)) throw new EditorArgError(`argument '${path40}' must be an object`);
+    if (!isRecord26(obj)) throw new EditorArgError(`argument '${path42}' must be an object`);
     const props = schema.properties;
     if (!props || Object.keys(props).length === 0) return obj;
     const out = {};
     for (const [key2, v] of Object.entries(obj)) {
       const prop = props[key2];
-      if (prop) out[key2] = coerceEditorValue(`${path40}.${key2}`, v, prop);
-      else if (schema.additionalProperties === false) throw new EditorArgError(`argument '${path40}' has unknown key '${key2}'`);
+      if (prop) out[key2] = coerceEditorValue(`${path42}.${key2}`, v, prop);
+      else if (schema.additionalProperties === false) throw new EditorArgError(`argument '${path42}' has unknown key '${key2}'`);
       else out[key2] = v;
     }
     for (const key2 of schema.required ?? []) {
-      if (!(key2 in out)) throw new EditorArgError(`argument '${path40}' needs key '${key2}'`);
+      if (!(key2 in out)) throw new EditorArgError(`argument '${path42}' needs key '${key2}'`);
     }
     return out;
   }
   return value;
 }
-function coerceEditorValue(path40, value, schema) {
+function coerceEditorValue(path42, value, schema) {
   if (value === null || value === void 0) {
     if (acceptsNull(schema)) return null;
-    throw new EditorArgError(`argument '${path40}' must not be null`);
+    throw new EditorArgError(`argument '${path42}' must not be null`);
   }
   if (schema.enum) {
     const choices = schema.enum;
@@ -61313,13 +62122,13 @@ function coerceEditorValue(path40, value, schema) {
       const hit = choices.find((c) => typeof c === "string" && c === String(value));
       if (hit !== void 0) return hit;
     }
-    throw new EditorArgError(`argument '${path40}' is not one of the choices`);
+    throw new EditorArgError(`argument '${path42}' is not one of the choices`);
   }
   const kinds = kindsOf(schema);
   let last;
   for (const kind of kinds) {
     try {
-      return coerceKind(path40, value, kind, schema);
+      return coerceKind(path42, value, kind, schema);
     } catch (error62) {
       if (!(error62 instanceof EditorArgError)) throw error62;
       last = error62;
@@ -62195,9 +63004,9 @@ function freeName(prefix, offset, taken, limit = 1e3) {
   return null;
 }
 function versionName(current, taken) {
-  const stem6 = (String(current).split(/[\\/]/).pop() ?? "").replace(/\.[^.]*$/, "");
-  const m = /^(.*?) v(\d+)$/.exec(stem6);
-  const [base, n] = m ? [m[1], Number(m[2])] : [stem6, 1];
+  const stem7 = (String(current).split(/[\\/]/).pop() ?? "").replace(/\.[^.]*$/, "");
+  const m = /^(.*?) v(\d+)$/.exec(stem7);
+  const [base, n] = m ? [m[1], Number(m[2])] : [stem7, 1];
   const used = new Set([...taken].map((name) => name.toLowerCase()));
   for (let k = n + 1; k < n + 1e3; k += 1) {
     const name = `${base} v${k}.svg`;
@@ -62907,14 +63716,14 @@ async function prepareOverlayCarrier(call) {
   const media = call.host.media;
   if (!media?.writeGenerated) toolError("this Zenvi surface cannot store the transparent overlay image a timer or caption overlay needs");
   const name = overlayFileName(w, h);
-  let path40;
+  let path42;
   try {
-    path40 = await media.writeGenerated(name, new TextEncoder().encode(overlaySvgText(w, h)), "image/svg+xml");
+    path42 = await media.writeGenerated(name, new TextEncoder().encode(overlaySvgText(w, h)), "image/svg+xml");
   } catch (error62) {
     return toolError(`could not write the overlay image: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
   try {
-    return { media: { path: path40, info: await media.probe(path40), name } };
+    return { media: { path: path42, info: await media.probe(path42), name } };
   } catch (error62) {
     return toolError(`could not import ${name} into Project Files: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
@@ -63076,14 +63885,14 @@ function projectFileChoices(files) {
 }
 async function writeSvg(call, name, svg) {
   const media = call.host.media;
-  let path40;
+  let path42;
   try {
-    path40 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path42 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return toolError(`could not write the animated title: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
   try {
-    return { path: path40, info: await media.probe(path40), name };
+    return { path: path42, info: await media.probe(path42), name };
   } catch (error62) {
     return toolError(`the animated title could not be imported: ${error62 instanceof Error ? error62.message : String(error62)}`);
   }
@@ -63590,8 +64399,8 @@ function fileById(project, id) {
 function fileOfClip(project, clip2) {
   const byId = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
   if (byId) return byId;
-  const path40 = String((isRecord28(clip2.reader) ? clip2.reader.path : "") ?? "");
-  return path40 ? project.files.find((f3) => f3.path === path40) : void 0;
+  const path42 = String((isRecord28(clip2.reader) ? clip2.reader.path : "") ?? "");
+  return path42 ? project.files.find((f3) => f3.path === path42) : void 0;
 }
 function clipTarget(project, clip2) {
   const file3 = fileOfClip(project, clip2);
@@ -63628,9 +64437,9 @@ async function wordsFor(call, target, request) {
   if (request.estimatesOk && !force && target.indexed) return fromIndex(target, warnings);
   if (!fileHasAudio(file3)) return { kind: "no_audio", message: NO_AUDIO_MESSAGE };
   if (transcribe) {
-    const path40 = mediaPathOf(file3);
+    const path42 = mediaPathOf(file3);
     try {
-      const result2 = await transcribe.call(call.host.audio, path40, { language: requested, prompt: transcriptionPrompt(requested), signal: call.signal });
+      const result2 = await transcribe.call(call.host.audio, path42, { language: requested, prompt: transcriptionPrompt(requested), signal: call.signal });
       const record5 = {
         modelId: result2.model,
         language: result2.language || requested,
@@ -63770,8 +64579,8 @@ function fmtPositionMmss(pos) {
   const s = Math.floor(pos % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-function basenameOf(path40) {
-  const parts = String(path40 ?? "").split(/[\\/]/);
+function basenameOf(path42) {
+  const parts = String(path42 ?? "").split(/[\\/]/);
   return parts[parts.length - 1] ?? "";
 }
 function scoreContextAgainstQuery(ctx, query2, preferPositionNear = 0) {
@@ -64012,10 +64821,10 @@ var init_resolve = __esm({
 function isRecord30(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-async function backendRequest(backend, path40, init = {}) {
+async function backendRequest(backend, path42, init = {}) {
   if (!backend) return { ok: false, error: "The Zenvi backend is not available on this surface (sign in to Zenvi)." };
   try {
-    const data = await backend.request(path40, init);
+    const data = await backend.request(path42, init);
     return { ok: true, data };
   } catch (error62) {
     return { ok: false, error: error62 instanceof Error ? error62.message : String(error62) };
@@ -64551,13 +65360,13 @@ function writeVolumePoints(tx, clipId2, points2) {
 }
 async function vadWindows(call, entry) {
   const audio = call.host.audio;
-  const path40 = String(entry.clip.reader?.path ?? entry.file?.path ?? "");
-  if (!audio || !path40) return [];
+  const path42 = String(entry.clip.reader?.path ?? entry.file?.path ?? "");
+  if (!audio || !path42) return [];
   try {
-    const envelope = await audio.analyzeAudio(path40, { signal: call.signal });
+    const envelope = await audio.analyzeAudio(path42, { signal: call.signal });
     return speechWindowsFromSource(energyVadWindows(envelope, { minSpeechSec: 0.12, minSilenceSec: 0.35 }), entry.clip);
   } catch (error62) {
-    call.host.log?.(`analyzeAudio(${path40}) failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
+    call.host.log?.(`analyzeAudio(${path42}) failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
     return [];
   }
 }
@@ -65343,20 +66152,20 @@ function hasTimeCurve(clip2) {
   const points2 = typeof time3 === "object" && time3 !== null ? time3.Points : void 0;
   return Array.isArray(points2) && points2.length > 1;
 }
-function basename3(path40) {
-  return path40.split(/[\\/]/).pop() || path40;
+function basename3(path42) {
+  return path42.split(/[\\/]/).pop() || path42;
 }
-async function readSubtitleFile(call, path40) {
+async function readSubtitleFile(call, path42) {
   let raw;
   try {
-    raw = await call.host.storage.readText(path40);
+    raw = await call.host.storage.readText(path42);
   } catch {
-    return toolError(`subtitle file not found: ${path40}`);
+    return toolError(`subtitle file not found: ${path42}`);
   }
   if (raw.length > MAX_SUBTITLE_CHARS) toolError("subtitle file is larger than 5 MB");
   const cues = parseSubtitles(raw);
   if (cues.length === 0) {
-    toolError(`no cues found in ${basename3(path40)} (expected SRT or WebVTT timings like 00:00:01,000 --> 00:00:03,000)`);
+    toolError(`no cues found in ${basename3(path42)} (expected SRT or WebVTT timings like 00:00:01,000 --> 00:00:03,000)`);
   }
   return cues;
 }
@@ -66004,7 +66813,7 @@ var init_timeline_edit_common = __esm({
 });
 
 // ../engine/src/tools/clip-props-model.ts
-function norm(text5) {
+function norm2(text5) {
   return String(text5).trim().toLowerCase().replace(/[\s_\-/()]+/g, "");
 }
 function isRecord32(value) {
@@ -66051,9 +66860,9 @@ function resolveKey2(name) {
   if (raw in PROPS || SHAPE_KEYS.has(raw)) {
     key2 = raw;
   } else {
-    const wanted = norm(raw);
-    key2 = Object.keys(PROPS).find((k) => norm(k) === wanted);
-    key2 ??= Object.entries(PROPS).find(([, meta3]) => norm(meta3.name ?? "") === wanted)?.[0];
+    const wanted = norm2(raw);
+    key2 = Object.keys(PROPS).find((k) => norm2(k) === wanted);
+    key2 ??= Object.entries(PROPS).find(([, meta3]) => norm2(meta3.name ?? "") === wanted)?.[0];
     key2 ??= PROPERTY_ALIASES[raw.toLowerCase()] ?? PROPERTY_ALIASES[wanted];
     if (!key2 && NOT_RENDERED.test(raw.toLowerCase())) key2 = raw.toLowerCase();
   }
@@ -66091,8 +66900,8 @@ function propertyInfo(key2, clip2, project) {
     [lo, hi] = override;
   } else if (SCALE_KEYS.has(key2)) {
     const reader = isRecord32(data.reader) ? data.reader : {};
-    const path40 = String(reader.path ?? "").toLowerCase();
-    const m = maxTransformMultiple(project.width, project.height, path40.endsWith(".svg"));
+    const path42 = String(reader.path ?? "").toLowerCase();
+    const m = maxTransformMultiple(project.width, project.height, path42.endsWith(".svg"));
     [lo, hi] = [-m, m];
   } else if (key2 === "time") {
     let frames = videoLengthToProjectFrames(isRecord32(data.reader) ? data.reader : {}, project.fps);
@@ -66155,8 +66964,8 @@ function coerceChoice(info, value, where) {
   const names2 = info.choices.map(([name]) => name);
   let wanted;
   if (typeof value === "boolean") {
-    wanted = norm(value ? "on" : "off");
-    if (info.key === "waveform") wanted = norm(value ? "yes" : "no");
+    wanted = norm2(value ? "on" : "off");
+    if (info.key === "waveform") wanted = norm2(value ? "yes" : "no");
   } else if (typeof value === "number") {
     for (const [, val] of info.choices) if (Number(val) === value) return storedChoice(val);
     throw new ToolError(`${where} must be one of ${pyRepr2(names2)} (or their values), got ${pyRepr2(value)}`);
@@ -66167,11 +66976,11 @@ function coerceChoice(info, value, where) {
       for (const [, val] of info.choices) if (Number(val) === number4) return storedChoice(val);
       throw new ToolError(`${where} must be one of ${pyRepr2(names2)} (or their values), got ${pyFloat(number4)}`);
     }
-    wanted = norm(text5);
+    wanted = norm2(text5);
   }
   const alias = CHOICE_ALIASES[info.key]?.[wanted];
   for (const [name, val] of info.choices) {
-    if (norm(name) === wanted || alias !== void 0 && name === alias) return storedChoice(val);
+    if (norm2(name) === wanted || alias !== void 0 && name === alias) return storedChoice(val);
   }
   throw new ToolError(`${where} must be one of ${pyRepr2(names2)}, got ${pyRepr2(value ?? null)}`);
 }
@@ -67690,8 +68499,8 @@ function positiveIntArg(value) {
   const i = Math.trunc(n);
   return i > 0 ? i : null;
 }
-function stem3(path40) {
-  const base = String(path40 ?? "").split(/[\\/]/).pop() ?? "";
+function stem4(path42) {
+  const base = String(path42 ?? "").split(/[\\/]/).pop() ?? "";
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(0, dot) : base;
 }
@@ -67826,7 +68635,7 @@ var init_clips2 = __esm({
             if (entry.tags) entry.tags = filterTagsStringForWindow(String(entry.tags), effective);
           }
           const t = secondsToTimeParts(s, fpsNum, fpsDen);
-          const clipName = text(input4.name) || `${stem3(String(data.path || data.name || "clip"))} (${t.hour}:${t.min}:${t.sec}:${t.frame})`;
+          const clipName = text(input4.name) || `${stem4(String(data.path || data.name || "clip"))} (${t.hour}:${t.min}:${t.sec}:${t.frame})`;
           entry.zenvi_subclip = true;
           if (watchRecord) {
             entry.zenvi_watch_confirmed = !watchRecord.used_fallback;
@@ -68198,11 +69007,14 @@ function decodePng(bytes) {
   }
   return { width, height, data: out };
 }
-function decodePngBase64(base643) {
+function bytesFromBase64(base643) {
   const binary = globalThis.atob(base643);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return decodePng(bytes);
+  return bytes;
+}
+function decodePngBase64(base643) {
+  return decodePng(bytesFromBase64(base643));
 }
 var PngDecodeError, LENGTH_BASE, LENGTH_EXTRA, DIST_BASE, DIST_EXTRA, CODE_LENGTH_ORDER, fixedLitLen, fixedDist, Inflater, SIGNATURE, CHANNELS, ALLOWED_DEPTHS, ADAM7;
 var init_png2 = __esm({
@@ -69993,7 +70805,7 @@ var init_difflib = __esm({
 });
 
 // ../engine/src/tools/luts.ts
-function norm2(text5) {
+function norm3(text5) {
   return Array.from(String(text5).toLowerCase().replaceAll("&", "and")).filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("");
 }
 function resolveLut(value) {
@@ -70008,13 +70820,13 @@ function resolveLut(value) {
     return { kind: "file", path: text5 };
   }
   const luts = listLuts();
-  const key2 = norm2(text5.toLowerCase().endsWith(".cube") ? text5.slice(0, -5) : text5);
+  const key2 = norm3(text5.toLowerCase().endsWith(".cube") ? text5.slice(0, -5) : text5);
   for (const field2 of ["id", "name"]) {
     for (const lut of luts) {
-      if (norm2(lut[field2]) === key2 || norm2(stem4(lut)) === key2) return { kind: "builtin", path: lut.path, lut };
+      if (norm3(lut[field2]) === key2 || norm3(stem5(lut)) === key2) return { kind: "builtin", path: lut.path, lut };
     }
   }
-  const partial2 = luts.filter((lut) => key2 && norm2(lut.id).includes(key2));
+  const partial2 = luts.filter((lut) => key2 && norm3(lut.id).includes(key2));
   if (partial2.length === 1) return { kind: "builtin", path: partial2[0].path, lut: partial2[0] };
   const close = getCloseMatches(text5, luts.map((lut) => lut.id), 5, 0.3);
   const hints = close.length > 0 ? close : partial2.slice(0, 5).map((lut) => lut.id);
@@ -70036,23 +70848,23 @@ function lutFileUnsupported(call) {
   if (call.host.media?.importPath && call.host.storage?.readText) return null;
   return "a .cube file outside the built-in LUTs needs local file access (Zenvi desktop or the zenvi CLI); use a built-in LUT (list_luts_tool)";
 }
-async function checkLutFile(call, path40) {
+async function checkLutFile(call, path42) {
   const unsupported2 = lutFileUnsupported(call);
   if (unsupported2) throw new LutError(unsupported2);
   let text5;
   try {
-    text5 = await call.host.storage.readText(path40);
+    text5 = await call.host.storage.readText(path42);
   } catch {
-    throw new LutError(`LUT file not found or not a .cube file: ${path40}`);
+    throw new LutError(`LUT file not found or not a .cube file: ${path42}`);
   }
-  if (!parseCubeLut(text5)) throw new LutError(`${path40} is not a LUT libopenshot can load (no LUT_3D_SIZE / LUT_1D_SIZE table)`);
+  if (!parseCubeLut(text5)) throw new LutError(`${path42} is not a LUT libopenshot can load (no LUT_3D_SIZE / LUT_1D_SIZE table)`);
 }
 async function resolveCheckedLut(call, value) {
   const resolved = resolveLut(value);
   if (resolved.kind === "file") await checkLutFile(call, resolved.path);
   return resolved.path;
 }
-var LutError, stem4;
+var LutError, stem5;
 var init_luts2 = __esm({
   "../engine/src/tools/luts.ts"() {
     "use strict";
@@ -70063,7 +70875,7 @@ var init_luts2 = __esm({
     LutError = class extends Error {
       name = "LutError";
     };
-    stem4 = (lut) => lut.id.slice(lut.id.indexOf("/") + 1);
+    stem5 = (lut) => lut.id.slice(lut.id.indexOf("/") + 1);
   }
 });
 
@@ -70619,14 +71431,14 @@ async function profileMediaFile(call, file3) {
   }
   return { profile: buildLookProfile(scopes), scopes_samples: scopes.length, sample_frames: frames, preview, duration_s: duration3 };
 }
-async function profileLocalPath(call, path40) {
+async function profileLocalPath(call, path42) {
   try {
-    const info = await call.host.media.probe(path40);
-    const file3 = { ...info, id: "ZENVIREFIMG", path: path40 };
+    const info = await call.host.media.probe(path42);
+    const file3 = { ...info, id: "ZENVIREFIMG", path: path42 };
     return await profileMediaFile(call, file3);
   } catch (error62) {
     const reason = error62 instanceof Error ? error62.message : String(error62);
-    return { profile: { present: false, error: `file not found: ${path40} (${reason})` }, scopes_samples: 0, sample_frames: [], preview: null, duration_s: 0 };
+    return { profile: { present: false, error: `file not found: ${path42} (${reason})` }, scopes_samples: 0, sample_frames: [], preview: null, duration_s: 0 };
   }
 }
 function pyIntOr(value, fallback) {
@@ -71746,8 +72558,8 @@ function points(ctx, clip2, kfs, defaultInterp, convert) {
   }
   return [...byFrame.keys()].sort((a, b) => a - b).map((k) => keyframePoint2(...byFrame.get(k)));
 }
-function basename4(path40) {
-  return path40.split(/[\\/]/).pop() ?? path40;
+function basename4(path42) {
+  return path42.split(/[\\/]/).pop() ?? path42;
 }
 function fileReader(ctx, value) {
   const key2 = value === null || value === void 0 || value === false || value === 0 ? "" : String(value).trim();
@@ -71756,8 +72568,8 @@ function fileReader(ctx, value) {
   let file3 = files.find((f3) => String(f3.id) === key2);
   if (!file3) {
     file3 = files.find((f3) => {
-      const path40 = String(f3.path ?? "");
-      return basename4(path40).toLowerCase() === key2.toLowerCase() || path40 === key2;
+      const path42 = String(f3.path ?? "");
+      return basename4(path42).toLowerCase() === key2.toLowerCase() || path42 === key2;
     });
   }
   if (!file3) throw new ToolError(`no project file ${pyRepr2(value)} for the image/video input (use a file id from list_files_tool)`);
@@ -72897,8 +73709,8 @@ var init_export2 = __esm({
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
         run: async (call, input4) => {
           const openUi = !["0", "false", "no"].includes(String(input4.show_dialog ?? "true").toLowerCase().trim());
-          const path40 = text(input4.output_path);
-          if (openUi && !path40 && call.host.ui?.openExportDialog) {
+          const path42 = text(input4.output_path);
+          if (openUi && !path42 && call.host.ui?.openExportDialog) {
             call.host.ui.openExportDialog();
             return "Export video dialog opened.";
           }
@@ -72906,7 +73718,7 @@ var init_export2 = __esm({
           if (!exporter) return unavailable("export_video_tool", "it needs video rendering, which this host does not provide.");
           const project = call.doc.toJSON();
           const settings = getDefaultExportSettings(project);
-          const output2 = path40 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
+          const output2 = path42 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
           if (output2 && (project.files ?? []).some((f3) => f3.path === output2)) {
             return "Error: Export failed: Output path is an input file. Choose a different path.";
           }
@@ -73143,15 +73955,15 @@ var init_generation = __esm({
           if (bytes.length === 0) return "Error: The backend returned no image data.";
           const { ext, contentType: contentType2 } = generatedImageType(result2.mimeType);
           const name = `generated_${generateId(void 0, 12).toLowerCase()}${ext}`;
-          let path40;
+          let path42;
           try {
-            path40 = await writeGenerated.call(media, name, bytes, contentType2);
+            path42 = await writeGenerated.call(media, name, bytes, contentType2);
           } catch (error62) {
             return `Error: Could not save the generated image: ${error62 instanceof Error ? error62.message : String(error62)}`;
           }
           let imported;
           try {
-            imported = { path: path40, info: await media.probe(path40) };
+            imported = { path: path42, info: await media.probe(path42) };
           } catch {
             return "Error: Image generated but failed to import into project files.";
           }
@@ -73205,9 +74017,9 @@ var init_generation = __esm({
           if ("error" in res) return `Error: ${res.error}`;
           const bytes = res.audioBase64 ? base64ToBytes(res.audioBase64) : new Uint8Array();
           if (bytes.length === 0) return "Error: TTS returned empty audio.";
-          const path40 = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
-          const info = await call.host.media.probe(path40);
-          const media = { path: path40, info: { ...info, media_type: "audio" }, name: text(input4.name) || narrationName(narration) };
+          const path42 = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
+          const info = await call.host.media.probe(path42);
+          const media = { path: path42, info: { ...info, media_type: "audio" }, name: text(input4.name) || narrationName(narration) };
           const clip2 = call.commit((tx) => {
             const file3 = addFile(tx, media, { dedupe: false, mediaType: "audio" });
             return addClip(tx, { fileId: String(file3.id), position, layer: layer2 });
@@ -73436,8 +74248,8 @@ var init_inspect = __esm({
           if (!fileId) return refused(tool, "Error: fileId is required.");
           const file3 = fileById2(project, fileId);
           if (!file3) return refused(tool, `Error: Unknown fileId '${fileId}'.`);
-          const path40 = String(file3.path ?? "");
-          if (!path40) return refused(tool, `Error: Media file not on disk: ${fileId}`);
+          const path42 = String(file3.path ?? "");
+          if (!path42) return refused(tool, `Error: Media file not on disk: ${fileId}`);
           const mediaType = String(file3.media_type ?? "").toLowerCase();
           const isImage = mediaType === "image" || mediaType === "photo" || fileLooksLikeImage(file3);
           const isAudio = file3.has_video === false && Boolean(file3.has_audio) || mediaType === "audio";
@@ -73519,8 +74331,8 @@ function importTruthy(value, fallback = false) {
   if (!t) return fallback;
   return ["1", "true", "yes", "y", "on"].includes(t);
 }
-function importMediaKind(path40) {
-  const ext = extOf(path40);
+function importMediaKind(path42) {
+  const ext = extOf(path42);
   if (IMPORT_VIDEO_EXTS.includes(ext)) return "video";
   if (IMPORT_AUDIO_EXTS.includes(ext)) return "audio";
   if (IMPORT_IMAGE_EXTS.includes(ext)) return "image";
@@ -73554,15 +74366,15 @@ function fromFileUrl(entry) {
   const t = entry.trim();
   if (!t.startsWith("file://")) return t;
   try {
-    let path40 = decodeURIComponent(new URL(t).pathname);
-    if (/^\/[A-Za-z]:/.test(path40)) path40 = path40.slice(1);
-    return path40 || t;
+    let path42 = decodeURIComponent(new URL(t).pathname);
+    if (/^\/[A-Za-z]:/.test(path42)) path42 = path42.slice(1);
+    return path42 || t;
   } catch {
     return t;
   }
 }
-function extOf(path40) {
-  const base = path40.split(/[\\/]/).pop() ?? "";
+function extOf(path42) {
+  const base = path42.split(/[\\/]/).pop() ?? "";
   const dot = base.lastIndexOf(".");
   return dot >= 0 ? base.slice(dot).toLowerCase() : "";
 }
@@ -73685,11 +74497,11 @@ var init_media3 = __esm({
           }
           const imported = [];
           const failures = [];
-          for (const path40 of resolved) {
+          for (const path42 of resolved) {
             try {
-              imported.push(await importPath.call(call.host.media, path40));
+              imported.push(await importPath.call(call.host.media, path42));
             } catch (error62) {
-              failures.push(`${path40}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+              failures.push(`${path42}: ${error62 instanceof Error ? error62.message : String(error62)}`);
             }
           }
           if (imported.length === 0) {
@@ -73912,9 +74724,9 @@ function tagsOf(data) {
   return out;
 }
 function kindOf(data) {
-  const path40 = String(data.path || "");
-  if (path40.includes("%")) return "image_sequence";
-  if (path40.toLowerCase().endsWith(".svg") && !path40.toLowerCase().includes("emoji")) return "title";
+  const path42 = String(data.path || "");
+  if (path42.includes("%")) return "image_sequence";
+  if (path42.toLowerCase().endsWith(".svg") && !path42.toLowerCase().includes("emoji")) return "title";
   const mediaType = String(data.media_type || "").toLowerCase();
   return ["video", "audio", "image"].includes(mediaType) ? mediaType : "video";
 }
@@ -74013,9 +74825,9 @@ function queryScore(file3, q, words3) {
   const data = file3;
   const name = displayName(data).toLowerCase();
   const base = baseName(data).toLowerCase();
-  const stem6 = stemOf(base);
+  const stem7 = stemOf(base);
   const tags = tagsOf(data).map((t) => t.toLowerCase());
-  if ([String(file3.id).toLowerCase(), name, base, stem6].includes(q) || tags.includes(q)) return 3;
+  if ([String(file3.id).toLowerCase(), name, base, stem7].includes(q) || tags.includes(q)) return 3;
   if (name.includes(q) || base.includes(q)) return 2;
   const corpus = [name, base, ...tags].join(" ");
   if (words3.length > 0 && words3.every((w) => corpus.includes(w))) return 1;
@@ -74112,7 +74924,7 @@ function listPathsOf(call) {
   if (!media || !list2) throw new ToolError("listing folders is not available here");
   return (entry) => list2.call(media, entry);
 }
-async function relinkTarget(call, data, path40, searchFolder) {
+async function relinkTarget(call, data, path42, searchFolder) {
   const list2 = listPathsOf(call);
   const wasSequence = isImageSequence(data);
   const oldName = folderAndName(String(data.path || "")).name;
@@ -74133,22 +74945,22 @@ async function relinkTarget(call, data, path40, searchFolder) {
     const found = listing2.files.find((f3) => folderAndName(f3).name === oldName);
     return found ? { mediaPath: found, sequence: null } : null;
   }
-  const listing = await list2(path40);
+  const listing = await list2(path42);
   if (wasSequence) {
     if (listing.kind === "directory") {
       const folder2 = listing.path ?? folderAndName(listing.files[0] ?? "").folder;
       const found = firstSequenceFrame(folder2, namesIn(folder2, listing.files));
-      if (!found) throw new ToolError(`no numbered image sequence in ${pyReprString(path40)}`);
+      if (!found) throw new ToolError(`no numbered image sequence in ${pyReprString(path42)}`);
       return { mediaPath: found.first, sequence: found.sequence };
     }
-    const file3 = listing.kind === "file" ? listing.files[0] : listing.path ?? path40;
+    const file3 = listing.kind === "file" ? listing.files[0] : listing.path ?? path42;
     const folder = folderAndName(file3).folder;
     const folderListing = folder ? await list2(folder) : null;
     const sequence = folderListing?.kind === "directory" ? detectImageSequence(file3, namesIn(folder, folderListing.files)) : null;
-    if (!sequence) throw new ToolError(`${pyReprString(path40)} is not a frame of a numbered image sequence (this file is a sequence)`);
+    if (!sequence) throw new ToolError(`${pyReprString(path42)} is not a frame of a numbered image sequence (this file is a sequence)`);
     return { mediaPath: file3, sequence };
   }
-  if (listing.kind !== "file") throw new ToolError(`no file at ${pyReprString(path40)}`);
+  if (listing.kind !== "file") throw new ToolError(`no file at ${pyReprString(path42)}`);
   return { mediaPath: listing.files[0], sequence: null };
 }
 async function relinked(call, data, target) {
@@ -74184,14 +74996,14 @@ async function relinked(call, data, target) {
   const sameContent2 = !(oldSha && fingerprint2) ? null : oldSha === fingerprint2.sha256;
   return { mediaPath: imported.path, record: record5, sameContent: sameContent2 };
 }
-async function probeReader(call, path40) {
+async function probeReader(call, path42) {
   let info;
   try {
-    info = await call.host.media.probe(path40);
+    info = await call.host.media.probe(path42);
   } catch {
-    throw new ToolError(`libopenshot cannot read ${pyReprString(path40)} as media`);
+    throw new ToolError(`libopenshot cannot read ${pyReprString(path42)} as media`);
   }
-  if (!(Number(info.duration) > 0)) throw new ToolError(`libopenshot cannot read ${pyReprString(path40)} as media`);
+  if (!(Number(info.duration) > 0)) throw new ToolError(`libopenshot cannot read ${pyReprString(path42)} as media`);
   const { media_type: _mt, ...reader } = info;
   return reader;
 }
@@ -74204,9 +75016,9 @@ async function updateProjectFiles(call, input4) {
   const startArg = input4.source_start_seconds ?? null;
   const endArg = input4.source_end_seconds ?? null;
   const inOut = startArg !== null || endArg !== null;
-  const path40 = String(input4.path ?? "").trim();
+  const path42 = String(input4.path ?? "").trim();
   const searchFolder = String(input4.search_folder ?? "").trim();
-  const relink = Boolean(path40 || searchFolder);
+  const relink = Boolean(path42 || searchFolder);
   const resetInOut = input4.reset_in_out ?? false;
   const fps2 = input4.fps ?? 0;
   const renameClips = input4.rename_clips ?? false;
@@ -74215,7 +75027,7 @@ async function updateProjectFiles(call, input4) {
       "nothing to change: pass name, tags/add_tags/remove_tags, path or search_folder, source_start/end_seconds, reset_in_out or fps"
     );
   }
-  const single3 = [["name", name], ["path", path40], ["source_start/end_seconds", inOut]].filter(([, used]) => used).map(([label2]) => label2);
+  const single3 = [["name", name], ["path", path42], ["source_start/end_seconds", inOut]].filter(([, used]) => used).map(([label2]) => label2);
   if (single3.length > 0 && files.length > 1) throw new ToolError(`${single3.join(" and ")} apply to one file; ${files.length} were chosen`);
   if (input4.path && input4.search_folder) throw new ToolError("pass path or search_folder, not both");
   if (inOut && resetInOut) throw new ToolError("pass source_start/end_seconds or reset_in_out, not both");
@@ -74238,7 +75050,7 @@ async function updateProjectFiles(call, input4) {
       );
     }
     for (const f3 of files) {
-      const target = await relinkTarget(call, f3, path40, searchFolder);
+      const target = await relinkTarget(call, f3, path42, searchFolder);
       if (!target) {
         notFound.push(displayName(f3));
         continue;
@@ -74621,14 +75433,14 @@ function maskTransitions(project) {
 function byStart(items) {
   return items.map((t, i) => ({ t, i })).sort((x, y) => span3(x.t)[0] - span3(y.t)[0] || layerOf3(x.t) - layerOf3(y.t) || x.i - y.i).map(({ t }) => t);
 }
-function stem5(path40) {
-  const base = path40.split(/[\\/]/).pop() ?? path40;
+function stem6(path42) {
+  const base = path42.split(/[\\/]/).pop() ?? path42;
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(0, dot) : base;
 }
 function maskName(data) {
-  const path40 = String(transitionMaskReader(data).path || data.resource || "");
-  return path40 ? stem5(path40) : "";
+  const path42 = String(transitionMaskReader(data).path || data.resource || "");
+  return path42 ? stem6(path42) : "";
 }
 function firstValue(kf) {
   const points2 = kf && typeof kf === "object" && Array.isArray(kf.Points) ? kf.Points : [];
@@ -74777,8 +75589,8 @@ function ensureUnlocked2(project, items) {
   const locked = [...new Set(items.filter((i) => lockedLayers.has(layerOf3(i))).map((i) => uiTrack(project, layerOf3(i)) || layerOf3(i)))].sort((a, b) => a - b);
   if (locked.length > 0) throw new ToolError(`track(s) ${pyRepr2(locked)} are locked; unlock them first`);
 }
-function isAbsolutePath2(path40) {
-  return path40.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path40) || path40.startsWith("\\\\");
+function isAbsolutePath2(path42) {
+  return path42.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path42) || path42.startsWith("\\\\");
 }
 async function pickMask(call, name) {
   const raw = name.trim();
@@ -74786,7 +75598,7 @@ async function pickMask(call, name) {
     const probed = await call.host.media.probe(raw).catch(() => null);
     if (probed) {
       const { media_type: _mediaType, ...reader } = probed;
-      return { reader, title: stem5(raw).toLowerCase() };
+      return { reader, title: stem6(raw).toLowerCase() };
     }
   }
   const { entry, candidates } = lookupTransition(name);
@@ -74892,7 +75704,7 @@ async function updateTransition(call, input4) {
     if (!["image", "video"].includes(String(file3.media_type || ""))) throw new ToolError("the mask must be an image or video file");
     const { ai_metadata: _ai, ...reader } = structuredClone(file3);
     newReader = reader;
-    newTitle = stem5(String(file3.path || ""));
+    newTitle = stem6(String(file3.path || ""));
   }
   const project = call.doc.project;
   const fps2 = projectFps2(project);
@@ -75566,12 +76378,12 @@ function segmentIndex(url2) {
   return m ? Number.parseInt(m[1], 10) : 1e6;
 }
 function mgFileName(url2) {
-  const path40 = url2.split("?")[0].replace(/\/+$/, "");
-  let raw = decodeURIComponent(path40.split("/").pop() || "motion_segment.mp4");
+  const path42 = url2.split("?")[0].replace(/\/+$/, "");
+  let raw = decodeURIComponent(path42.split("/").pop() || "motion_segment.mp4");
   const dot = raw.lastIndexOf(".");
   const ext = dot >= 0 ? raw.slice(dot).toLowerCase() : "";
   if (![".mp4", ".webm", ".mov", ".mkv", ".avi"].includes(ext)) {
-    raw = `${(dot >= 0 ? raw.slice(0, dot) : raw) || "motion_segment"}${path40.toLowerCase().endsWith(".webm") || path40.toLowerCase().includes("/output.webm") ? ".webm" : ".mp4"}`;
+    raw = `${(dot >= 0 ? raw.slice(0, dot) : raw) || "motion_segment"}${path42.toLowerCase().endsWith(".webm") || path42.toLowerCase().includes("/output.webm") ? ".webm" : ".mp4"}`;
   }
   return raw;
 }
@@ -76026,14 +76838,14 @@ function canTrackBeats(call) {
 async function beatsOfFile(call, file3) {
   const decode4 = call.host.audio?.decodePcm;
   if (!decode4) return "Error: this Zenvi surface cannot decode audio for beat tracking.";
-  const path40 = String(file3.path ?? "");
-  if (!path40) return `Error: file ${file3.id} has no media path.`;
+  const path42 = String(file3.path ?? "");
+  if (!path42) return `Error: file ${file3.id} has no media path.`;
   try {
-    const { samples, sampleRate } = await decode4(path40, { sampleRate: BEAT_SAMPLE_RATE, maxSeconds: MAX_SECONDS, signal: call.signal });
+    const { samples, sampleRate } = await decode4(path42, { sampleRate: BEAT_SAMPLE_RATE, maxSeconds: MAX_SECONDS, signal: call.signal });
     return { ...detectBeats(samples, sampleRate), duration: samples.length / sampleRate };
   } catch (error62) {
     const message = error62 instanceof Error ? error62.message : String(error62);
-    call.host.log?.(`decodePcm(${path40}) failed: ${message}`);
+    call.host.log?.(`decodePcm(${path42}) failed: ${message}`);
     return /no audio stream/i.test(message) ? `Error: ${file3.id} has no audio.` : `Error: Beat detection failed: ${message}`;
   }
 }
@@ -76112,8 +76924,8 @@ async function writeDrawings(call, plan, prefix) {
     if (layer2.source.kind !== "svg") continue;
     const name = `${prefix}-${layer2.source.name}.svg`;
     try {
-      const path40 = await media.writeGenerated(name, new TextEncoder().encode(layer2.source.svg), "image/svg+xml");
-      out.set(layer2.name, { path: path40, info: await media.probe(path40), name });
+      const path42 = await media.writeGenerated(name, new TextEncoder().encode(layer2.source.svg), "image/svg+xml");
+      out.set(layer2.name, { path: path42, info: await media.probe(path42), name });
     } catch (error62) {
       return `Error: could not write the template's drawing ${name}: ${error62 instanceof Error ? error62.message : String(error62)}`;
     }
@@ -76891,15 +77703,15 @@ var init_playback = __esm({
             startPlaying(call);
             return `Loaded and playing: ${basename2(String(file3.path ?? "")) || fileId}`;
           }
-          const path40 = text(input4.file_path);
-          if (!path40) return "Error: watch_clip_tool needs timeline_clip_id, query, file_id or file_path.";
+          const path42 = text(input4.file_path);
+          if (!path42) return "Error: watch_clip_tool needs timeline_clip_id, query, file_id or file_path.";
           const importPath = call.host.media?.importPath;
           if (!importPath) return unavailable("watch_clip_tool", "it cannot open local file paths; pass file_id or timeline_clip_id.");
           let media;
           try {
-            media = await importPath.call(call.host.media, path40);
+            media = await importPath.call(call.host.media, path42);
           } catch (error62) {
-            return `Error: Could not import file into media bin: ${path40} (${error62 instanceof Error ? error62.message : String(error62)})`;
+            return `Error: Could not import file into media bin: ${path42} (${error62 instanceof Error ? error62.message : String(error62)})`;
           }
           const existing = (call.doc.project.files ?? []).find((f3) => f3.path === media.path);
           if (existing) {
@@ -76911,8 +77723,322 @@ var init_playback = __esm({
           }
           player.seek(timelineStart(call.doc.project));
           startPlaying(call);
-          return `Loaded and playing: ${basename2(path40)}`;
+          return `Loaded and playing: ${basename2(path42)}`;
         }
+      })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/project-export-profiles.ts
+async function customProfiles(call) {
+  const storage = call.host.storage;
+  if (!storage?.customProfiles) return [];
+  const out = [];
+  for (const file3 of await storage.customProfiles()) {
+    const profile = parseProfileFile(file3.text, file3.name);
+    if (profile) out.push({ ...profile, user: true, path: file3.path });
+  }
+  return out;
+}
+async function profileContext(call) {
+  const fps2 = projectFps(call.doc.project);
+  return { catalog: profileCatalog(await customProfiles(call)), projectFps: fps2.num / fps2.den };
+}
+function resolving(body) {
+  try {
+    return body();
+  } catch (error62) {
+    if (error62 instanceof ProfileRequestError) throw new ToolError(error62.message);
+    throw error62;
+  }
+}
+function fpsWords(profile) {
+  return fpsValue(profile).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+async function keepCustomProfile(call, choice) {
+  if (!choice.create) return choice.profile;
+  const { profile } = choice;
+  const what = `no built-in profile is ${profile.width}x${profile.height} at ${fpsWords(profile)} fps and a custom one could not be saved`;
+  const storage = call.host.storage;
+  if (!storage?.writeCustomProfile) throw new ToolError(`${what}: ${CUSTOM_PROFILE_HOME}. Pick a built-in size (list_project_profiles_tool)`);
+  try {
+    const path42 = await storage.writeCustomProfile(profile.key, profileFileText(profile));
+    return { ...profile, user: true, path: path42 };
+  } catch (error62) {
+    throw new ToolError(`${what}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+  }
+}
+function currentProfile(project) {
+  const fps2 = projectFps(project);
+  const dar = project.display_ratio ?? reducedDisplayRatio(project.width, project.height);
+  const record5 = {
+    description: String(project.profile ?? ""),
+    width: Math.trunc(project.width),
+    height: Math.trunc(project.height),
+    fps: fps2,
+    progressive: true,
+    pixel_ratio: project.pixel_ratio ? { num: project.pixel_ratio.num, den: project.pixel_ratio.den } : { num: 1, den: 1 },
+    display_ratio: { num: dar.num, den: dar.den },
+    spherical: false
+  };
+  return { ...record5, key: profileKey(record5), user: false };
+}
+function targetProfile(call, ctx, args) {
+  const project = call.doc.project;
+  const fps2 = Number(args.fps) || null;
+  return resolving(() => {
+    if (args.fromFileId) {
+      const file3 = fileById2(project, args.fromFileId.trim());
+      if (!file3) throw new ToolError(`no project file with id=${pyReprString(args.fromFileId)}`);
+      if (!file3.has_video || file3.media_type === "audio") throw new ToolError("that file has no picture; pick a video or image file");
+      const fw = Math.trunc(Number(file3.width) || 0);
+      const fh = Math.trunc(Number(file3.height) || 0);
+      if (!fw || !fh) throw new ToolError("that file's picture size is unknown; give width and height");
+      const ffps = file3.fps ?? {};
+      const fileFps2 = fps2 || (file3.media_type === "video" ? (Number(ffps.num) || 30) / (Number(ffps.den) || 1) : ctx.projectFps);
+      return ensureProfile(ctx, fw, fh, profileFpsFraction(fileFps2));
+    }
+    let choice;
+    if (args.width || args.height) {
+      if (!(args.width && args.height)) throw new ToolError("give both width and height");
+      if (args.width % 2 || args.height % 2) throw new ToolError("width and height must be even numbers (H.264 needs even sizes)");
+      choice = ensureProfile(ctx, args.width, args.height, profileFpsFraction(fps2 || ctx.projectFps));
+    } else if (args.profile.trim()) {
+      choice = resolveProfileRequest(ctx, args.profile, fps2);
+    } else {
+      const found = matchProfile(ctx.catalog, project.width, project.height, fps2 || ctx.projectFps);
+      choice = found ? { profile: found, create: false } : fps2 ? ensureProfile(ctx, project.width, project.height, profileFpsFraction(fps2)) : { profile: currentProfile(project), create: false };
+    }
+    return args.orientation ? flipProfile(ctx, choice, args.orientation, fps2) : choice;
+  });
+}
+function profileSnapshot(project) {
+  const fps2 = projectFps(project);
+  const dar = project.display_ratio ?? reducedDisplayRatio(project.width, project.height);
+  return {
+    profile: String(project.profile ?? ""),
+    width: project.width,
+    height: project.height,
+    fps: Math.round(fps2.num / fps2.den * 1e3) / 1e3,
+    aspect: aspectText(dar.num, dar.den)
+  };
+}
+function profileReceipt(call, result2, before, profile, reframe, socialKey) {
+  const after = describeProfile(profile);
+  let social = socialKey && SOCIAL_PRESETS[socialKey] ? SOCIAL_PRESETS[socialKey][3] : null;
+  if (social === null) {
+    for (const spec of Object.values(SOCIAL_PRESETS)) {
+      if (spec[0] === after.width && spec[1] === after.height) {
+        social = spec[3];
+        break;
+      }
+    }
+  }
+  const parts = [];
+  if (result2.changed) parts.push(`Project is now ${after.name} (${after.width}x${after.height} ${after.aspect}, ${pyFloat(after.fps)} fps)`);
+  else parts.push(`Project already uses ${after.name}`);
+  if (result2.reframed.length > 0) parts.push(`${result2.reframed.length} clip(s) set to ${reframe === "fill" ? "crop-to-fill" : "fit"}`);
+  if (result2.letterboxed.length > 0) {
+    parts.push(`${result2.letterboxed.length} clip(s) of another shape will show bars; call again with reframe='fill' to crop them to fill the frame`);
+  }
+  if (reframe === "fill" && !result2.videoClips) {
+    parts.push(
+      "the timeline has no video clips yet, so nothing was reframed: clips placed later are fitted with bars when their shape differs, so call set_project_profile_tool(reframe='fill') again once they are on the timeline"
+    );
+  }
+  const data = {
+    changed: result2.changed,
+    profile: after,
+    previous_profile: before,
+    reframe,
+    reframed_clip_ids: result2.reframed,
+    skipped: result2.skipped,
+    letterboxed_clip_ids: result2.letterboxed,
+    suggested_export_preset: social
+  };
+  const summary = `${parts.join("; ")}.`;
+  return result2.changed || result2.reframed.length > 0 ? ok(call, summary, data) : nothingChanged(call, summary, data);
+}
+var READ9, EDIT8, CUSTOM_PROFILE_HOME, PIXEL_RATIO_RE, projectProfileTools;
+var init_project_export_profiles = __esm({
+  "../engine/src/tools/catalog/project-export-profiles.ts"() {
+    "use strict";
+    init_profiles();
+    init_profile_requests();
+    init_project();
+    init_define();
+    init_frame_time();
+    init_pyfmt();
+    init_common();
+    init_timeline_edit_common();
+    READ9 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    EDIT8 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    CUSTOM_PROFILE_HOME = "custom profiles live in Zenvi desktop's profiles folder, which Zenvi desktop and the zenvi CLI on the same computer use; a project whose profile Zenvi desktop does not know opens there as HD 720p 30 fps";
+    PIXEL_RATIO_RE = /^\s*(\d+)\s*[:/]\s*(\d+)\s*$/;
+    projectProfileTools = [
+      contractTool("list_project_profiles_tool", {
+        annotations: READ9,
+        run: async (call, input4) => {
+          const ctx = await profileContext(call);
+          const tokens = (input4.query ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
+          const width = input4.width ?? 0;
+          const height = input4.height ?? 0;
+          const fps2 = input4.fps ?? 0;
+          const aspect = (input4.aspect ?? "").replaceAll("x", ":").trim();
+          const orientation = input4.orientation ?? "";
+          const rows = [];
+          for (const p of ctx.catalog) {
+            const d = describeProfile(p);
+            if (tokens.length > 0 && !tokens.every((t) => `${p.description} ${p.key}`.toLowerCase().includes(t))) continue;
+            if (width && d.width !== width || height && d.height !== height) continue;
+            if (fps2 && Math.abs(d.fps - fps2) > 0.011) continue;
+            if (aspect && d.aspect !== aspect) continue;
+            if (orientation && d.orientation !== orientation) continue;
+            rows.push(d);
+          }
+          const total = rows.length;
+          rows.sort((a, b) => Number(!a.user) - Number(!b.user) || b.width * b.height - a.width * a.height || a.fps - b.fps);
+          const limit = input4.limit ?? 30;
+          const out = { profiles: rows.slice(0, limit), total_matches: total, current: call.doc.project.profile || "" };
+          if (input4.include_social_presets ?? true) {
+            out.social_presets = Object.entries(SOCIAL_PRESETS).map(([name, [w, h, f3, preset, aliases]]) => ({
+              name,
+              width: w,
+              height: h,
+              fps: f3 ?? "project fps",
+              export_preset: preset,
+              aliases: aliases.slice(0, 4)
+            }));
+          }
+          const showing = total > limit ? `; showing ${Math.min(total, limit)}` : "";
+          return ok(call, `${total} profile(s) match${showing}.`, out);
+        }
+      }),
+      contractTool("set_project_profile_tool", {
+        annotations: EDIT8,
+        run: (call, input4) => editorRun(async () => {
+          const reframe = input4.reframe ?? "keep";
+          const args = {
+            profile: text(input4.profile),
+            width: input4.width ?? 0,
+            height: input4.height ?? 0,
+            fps: input4.fps ?? 0,
+            orientation: input4.orientation ?? "",
+            fromFileId: text(input4.from_file_id)
+          };
+          if (!args.profile && !args.width && !args.height && !args.fps && !args.orientation && !args.fromFileId && reframe === "keep") {
+            throw new ToolError("say what to change: profile (name or social preset), width+height, fps, orientation, from_file_id, or reframe");
+          }
+          const ctx = await profileContext(call);
+          const profile = await keepCustomProfile(call, targetProfile(call, ctx, args));
+          const project = call.doc.project;
+          const before = profileSnapshot(project);
+          const plan = planReframe(project, reframe, profile.width, profile.height);
+          const changed = profileDiffers(project, profile);
+          if (changed || plan.changes.length > 0) {
+            call.commit((tx) => {
+              applyProfile(tx, profile);
+              applyReframe(tx, plan);
+            }, "Set project format");
+          }
+          const socialKey = args.profile ? socialPreset(args.profile)?.key ?? null : null;
+          return profileReceipt(
+            call,
+            { changed, reframed: plan.changes.map((c) => c.id), skipped: plan.skipped, letterboxed: plan.letterboxed, videoClips: plan.videoClips },
+            before,
+            profile,
+            reframe,
+            socialKey
+          );
+        })
+      }),
+      contractTool("manage_custom_profiles_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        run: (call, input4) => editorRun(async () => {
+          const storage = call.host.storage;
+          if (!storage?.customProfiles || !storage.writeCustomProfile || !storage.removeCustomProfile) {
+            return unavailable(call.tool, `${CUSTOM_PROFILE_HOME}. The built-in profiles work everywhere (list_project_profiles_tool).`);
+          }
+          const action = input4.action;
+          if (action === "set_default") {
+            return unavailable(
+              call.tool,
+              "the default profile for new projects is a Zenvi desktop preference (Preferences > Default Profile), kept in its settings file, which only the desktop app writes; set it there. New projects here take a profile when they are made (zenvi new --profile, new_project_tool)."
+            );
+          }
+          const ctx = await profileContext(call);
+          const profileArg = text(input4.profile);
+          const base = profileArg ? await keepCustomProfile(call, resolving(() => resolveProfileRequest(ctx, profileArg))) : null;
+          if ((action === "duplicate" || action === "edit" || action === "delete") && !base) {
+            throw new ToolError(`${action} needs 'profile' (an existing profile name or key)`);
+          }
+          if ((action === "edit" || action === "delete") && !base.user) {
+            throw new ToolError(`'${base.description}' is a built-in profile; duplicate it to make a custom copy`);
+          }
+          if (action === "delete") {
+            if (base.description.trim() === String(call.doc.project.profile ?? "").trim()) {
+              throw new ToolError("you cannot delete the current project's profile or the default profile");
+            }
+            try {
+              await storage.removeCustomProfile(base.key);
+            } catch (error62) {
+              throw new ToolError(`could not delete ${base.path ?? base.key}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+            }
+            return ok(call, `Deleted the custom profile '${base.description}'. No clip changed.`, { deleted: base.description, path: base.path ?? base.key });
+          }
+          const src = base;
+          const w = input4.width || src?.width || 0;
+          const h = input4.height || src?.height || 0;
+          if (!(w && h)) throw new ToolError("give width and height (or a 'profile' to start from)");
+          if (w % 2 || h % 2) throw new ToolError("width and height must be even");
+          const fps2 = input4.fps ? profileFpsFraction(input4.fps) : src ? { ...src.fps } : { num: 30, den: 1 };
+          let par = { num: 1, den: 1 };
+          const parText = text(input4.pixel_ratio);
+          if (parText) {
+            const m = PIXEL_RATIO_RE.exec(parText);
+            if (!m || !Number(m[1]) || !Number(m[2])) throw new ToolError("pixel_ratio must look like '1:1' or '10:11'");
+            par = { num: Number(m[1]), den: Number(m[2]) };
+          } else if (src) {
+            par = { ...src.pixel_ratio };
+          }
+          let desc = text(input4.name);
+          if (action === "edit" && !desc) desc = src.description;
+          if (action === "duplicate" && !desc) desc = `${src.description} (copy)`;
+          if (!desc) desc = `Custom ${w}x${h} ${(fps2.num / fps2.den).toFixed(2).replace(/0+$/, "").replace(/\.$/, "")} fps`;
+          for (const p of ctx.catalog) {
+            if (p.description.trim() === desc && !(action === "edit" && p.user && p.key === src?.key)) {
+              throw new ToolError(`a profile named '${desc}' already exists; pick a unique name`);
+            }
+          }
+          const record5 = {
+            description: desc,
+            width: w,
+            height: h,
+            fps: fps2,
+            progressive: !input4.interlaced,
+            pixel_ratio: par,
+            display_ratio: reducedDisplayRatio(w, h, par.num, par.den),
+            spherical: Boolean(input4.spherical)
+          };
+          let name = action === "edit" ? src.key : profileKey(record5);
+          if (action !== "edit") {
+            const taken = new Set(ctx.catalog.filter((p) => p.user).map((p) => p.key));
+            const stem7 = name;
+            for (let suffix = 1; taken.has(name); suffix += 1) name = `${stem7}-${suffix}`;
+          }
+          let path42;
+          try {
+            path42 = await storage.writeCustomProfile(name, profileFileText({ ...record5, key: name }));
+          } catch (error62) {
+            throw new ToolError(`could not save the profile: ${error62 instanceof Error ? error62.message : String(error62)}`);
+          }
+          const verb = action === "edit" ? "Updated" : "Created";
+          return ok(call, `${verb} custom profile '${desc}' (${w}x${h}, ${pyG(fps2.num / fps2.den, 3)} fps).`, {
+            profile: describeProfile({ ...record5, key: name, user: true }),
+            path: path42
+          });
+        })
       })
     ];
   }
@@ -77034,7 +78160,7 @@ function undoRedo(call, direction2, steps) {
   const changed = timelineDelta(timelineSnapshot(beforeProject), timelineSnapshot(doc.project));
   return applied(`${direction2}_tool`, summary, { ...changed, data: { steps: done, labels } }, 0);
 }
-var READ9, PROJECT_EXTS, projectTools, SIGNATURE_SKIP_KEYS;
+var READ10, PROJECT_EXTS2, projectTools, SIGNATURE_SKIP_KEYS;
 var init_project2 = __esm({
   "../engine/src/tools/catalog/project.ts"() {
     "use strict";
@@ -77045,19 +78171,22 @@ var init_project2 = __esm({
     init_snapshot();
     init_tracks2();
     init_common();
-    READ9 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
-    PROJECT_EXTS = [".zvn", ".osp", ".flow"];
+    init_project_export_profiles();
+    init_profile_requests();
+    init_timeline_edit_common();
+    READ10 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    PROJECT_EXTS2 = [".zvn", ".osp", ".flow"];
     projectTools = [
       contractTool("get_project_info_tool", {
-        annotations: READ9,
+        annotations: READ10,
         run: (call) => projectInfoText(call.doc.project)
       }),
       contractTool("list_files_tool", {
-        annotations: READ9,
+        annotations: READ10,
         run: (call) => listFilesText(call.doc.project)
       }),
       contractTool("list_clips_tool", {
-        annotations: READ9,
+        annotations: READ10,
         run: (call, input4) => {
           const project = call.doc.project;
           let layer2;
@@ -77078,16 +78207,19 @@ var init_project2 = __esm({
         }
       }),
       contractTool("list_layers_tool", {
-        annotations: READ9,
+        annotations: READ10,
         run: (call) => listLayersText(call.doc.project)
       }),
       contractTool("list_markers_tool", {
-        annotations: READ9,
+        annotations: READ10,
         run: (call) => listMarkersText(call.doc.project)
       }),
       contractTool("new_project_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
-        run: async (call, input4) => {
+        run: (call, input4) => editorRun(async () => {
+          const asked = text(input4.profile);
+          const ctx = asked ? await profileContext(call) : void 0;
+          const profile = ctx ? await keepCustomProfile(call, resolving(() => resolveProfileRequest(ctx, asked))) : void 0;
           if (input4.save_first) {
             const refusal = await saveCurrent(call, "new_project_tool");
             if (refusal) return refusal;
@@ -77095,37 +78227,45 @@ var init_project2 = __esm({
           const current = call.doc.project;
           let project;
           try {
-            project = createProject({ profile: current.profile || void 0, sampleRate: current.sample_rate, channels: current.channels });
+            project = createProject({ profile: profile ?? (current.profile || void 0), sampleRate: current.sample_rate, channels: current.channels });
           } catch {
-            project = createProject();
+            project = createProject(profile ? { profile } : {});
           }
           call.doc.load(project);
-          return "New project created.";
-        }
+          return profile ? `New project created (${profile.description}, ${project.width}x${project.height}).` : "New project created.";
+        })
       }),
       contractTool("save_project_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
         requires: ["storage"],
         run: async (call, input4) => {
-          let path40 = text(input4.path) || text(input4.file_path);
-          if (path40 && !PROJECT_EXTS.some((ext) => path40.endsWith(ext))) path40 += ".zvn";
-          const location = await call.host.storage.save(call.doc.toJSON(), path40 || void 0);
-          return `Project saved to ${location || path40}.`;
+          let path42 = text(input4.path) || text(input4.file_path);
+          if (path42 && !PROJECT_EXTS2.some((ext) => path42.endsWith(ext))) path42 += ".zvn";
+          const location = await call.host.storage.save(call.doc.toJSON(), path42 || void 0);
+          return `Project saved to ${location || path42}.`;
         }
       }),
       contractTool("open_project_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
         requires: ["storage"],
         run: async (call, input4) => {
-          const path40 = text(input4.file_path);
-          if (!path40) return "Error: give file_path (a .zvn project) or recent_index.";
-          const project = await call.host.storage.open(path40);
+          let path42 = text(input4.file_path);
+          const index = input4.recent_index ?? 0;
+          if (index > 0) {
+            const storage = call.host.storage;
+            if (!storage.recentProjects) return "Error: recent_index needs a list of recent projects, which this Zenvi surface does not keep; give file_path.";
+            const recent = await storage.recentProjects();
+            if (index > recent.length) return `Error: there are only ${recent.length} recent projects`;
+            path42 = recent[index - 1].path;
+          }
+          if (!path42) return "Error: give file_path (a .zvn project) or recent_index.";
+          const project = await call.host.storage.open(path42);
           if (input4.save_first) {
             const refusal = await saveCurrent(call, "open_project_tool");
             if (refusal) return refusal;
           }
           call.doc.load(project);
-          return `Opened project ${path40}.`;
+          return `Opened project ${path42}.`;
         }
       }),
       contractTool("undo_tool", {
@@ -77138,6 +78278,830 @@ var init_project2 = __esm({
       })
     ];
     SIGNATURE_SKIP_KEYS = /* @__PURE__ */ new Set(["id", "layer", "position", "start", "end", "reader", "ui", "ai_metadata"]);
+  }
+});
+
+// ../engine/src/tools/catalog/project-export.ts
+function localIso(seconds2, unit2) {
+  const d = new Date(seconds2 * 1e3);
+  const pad3 = (n) => String(n).padStart(2, "0");
+  const base = `${d.getFullYear()}-${pad3(d.getMonth() + 1)}-${pad3(d.getDate())}T${pad3(d.getHours())}:${pad3(d.getMinutes())}`;
+  return unit2 === "seconds" ? `${base}:${pad3(d.getSeconds())}` : base;
+}
+function baseName2(path42) {
+  return path42.split(/[\\/]/).pop() ?? path42;
+}
+function projectCounts(project) {
+  const files = project.files.filter((f3) => !f3.zenvi_subclip);
+  return {
+    files: files.length,
+    clips: project.clips.length,
+    tracks: project.layers.length,
+    locked_tracks: project.layers.filter((l) => l.lock).length,
+    transitions: project.effects.length,
+    markers: project.markers.length,
+    clip_effects: project.clips.reduce((n, c) => n + (c.effects?.length ?? 0), 0)
+  };
+}
+function currentPath(call) {
+  return call.host.storage?.currentPath?.() ?? null;
+}
+function messageOf(error62) {
+  return error62 instanceof Error ? error62.message : String(error62);
+}
+async function recoveryVersions(call) {
+  const copies = await call.host.storage.recoveryCopies();
+  const now = Date.now() / 1e3;
+  return copies.map((c, i) => ({
+    version: i + 1,
+    path: c.path,
+    saved_at: localIso(c.savedAt, "seconds"),
+    minutes_ago: Number(pyFixed((now - c.savedAt) / 60, 1)),
+    size_bytes: c.sizeBytes
+  }));
+}
+function repointUntracked(call, repoint) {
+  const doc = call.doc;
+  const ids2 = (list2) => new Set(list2.map((x) => x.id));
+  const files = doc.project.files.filter((f3) => ids2(repoint.files).has(f3.id));
+  const clips = doc.project.clips.filter((c) => ids2(repoint.clips).has(c.id));
+  for (const { id, ...values } of repoint.files) {
+    const file3 = files.find((f3) => f3.id === id);
+    doc.setUntracked(["files", { id }], { ...file3, ...values });
+  }
+  for (const { id, reader } of repoint.clips) {
+    const clip2 = clips.find((c) => c.id === id);
+    doc.setUntracked(["clips", { id }], { ...clip2, reader });
+  }
+  return () => {
+    for (const file3 of files) doc.setUntracked(["files", { id: file3.id }], file3);
+    for (const clip2 of clips) doc.setUntracked(["clips", { id: clip2.id }], clip2);
+  };
+}
+var READ11, DESKTOP_CONVERSION, NO_RECENT, NO_RECOVERY, NO_FORGET, NO_COLLECT, projectExportTools;
+var init_project_export = __esm({
+  "../engine/src/tools/catalog/project-export.ts"() {
+    "use strict";
+    init_media_collect();
+    init_waveforms();
+    init_internal();
+    init_define();
+    init_pyfmt();
+    init_timeline_edit_common();
+    READ11 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    DESKTOP_CONVERSION = "Zenvi desktop converts timelines to and from EDL and Final Cut Pro XML (every conversion of the Zenvi format is implemented once, in the desktop app). Open the project in Zenvi desktop (File > Export Project / Import Project); zenvi and zenvi mcp run this tool there while the desktop app has the project open.";
+    NO_RECENT = "this surface keeps no list of recent projects";
+    NO_RECOVERY = "this surface keeps no recovery copies: the web editor and Zenvi Cloud keep the latest version of a project with its undo history (undo_tool steps back). Zenvi desktop zips a copy each time it saves a project, and the zenvi CLI lists and restores those";
+    NO_FORGET = "the recent projects listed here are the projects themselves (the web editor's projects in this browser, the person's Zenvi Cloud projects) or Zenvi desktop's own list, which only the desktop app writes; nothing can be forgotten without deleting a project. Clear the list in Zenvi desktop (File > Recent Projects), or delete projects on the Zenvi projects page";
+    NO_COLLECT = "collecting media copies local files into a saved project's folder (the zenvi CLI, Zenvi desktop). Media in the web editor and in Zenvi Cloud is already stored with the project";
+    projectExportTools = [
+      contractTool("list_recent_projects_tool", {
+        annotations: READ11,
+        run: async (call) => {
+          const storage = call.host.storage;
+          if (!storage?.recentProjects) return unavailable(call.tool, NO_RECENT);
+          const projects = (await storage.recentProjects()).map((p, i) => ({
+            index: i + 1,
+            path: p.path,
+            name: p.name,
+            exists: p.exists,
+            modified: p.exists && p.modifiedAt !== null ? localIso(p.modifiedAt, "minutes") : null
+          }));
+          if (projects.length === 0) return ok(call, "No recent projects.", { projects: [] });
+          return ok(call, `${projects.length} recent project(s); most recent: ${projects[0].name}.`, { projects, current_path: currentPath(call) });
+        }
+      }),
+      contractTool("forget_recent_projects_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        run: (call) => unavailable(call.tool, NO_FORGET)
+      }),
+      contractTool("list_recovery_versions_tool", {
+        annotations: READ11,
+        run: async (call) => {
+          if (!call.host.storage?.recoveryCopies) return unavailable(call.tool, NO_RECOVERY);
+          const path42 = currentPath(call);
+          if (!path42) return ok(call, "The project has never been saved, so it has no recovery versions.", { versions: [] });
+          const versions = await recoveryVersions(call);
+          if (versions.length === 0) return ok(call, "No recovery versions exist for this project yet.", { versions: [], project_path: path42 });
+          return ok(call, `${versions.length} recovery version(s); newest saved ${pyFloat(Number(versions[0].minutes_ago))} min ago.`, { versions, project_path: path42 });
+        }
+      }),
+      contractTool("restore_recovery_version_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        run: (call, input4) => editorRun(async () => {
+          const storage = call.host.storage;
+          if (!storage?.recoveryCopies || !storage.restoreRecoveryCopy) return unavailable(call.tool, NO_RECOVERY);
+          if (!currentPath(call)) throw new ToolError("the project has never been saved, so it has no recovery versions");
+          const versions = await recoveryVersions(call);
+          if (versions.length === 0) throw new ToolError("no recovery versions exist for this project yet");
+          const version2 = input4.version ?? 1;
+          if (version2 > versions.length) throw new ToolError(`there are only ${versions.length} recovery versions`);
+          const chosen = versions[version2 - 1];
+          let restored;
+          try {
+            restored = await storage.restoreRecoveryCopy(String(chosen.path));
+          } catch (error62) {
+            throw new ToolError(`could not restore ${String(chosen.path)}: ${messageOf(error62)}`);
+          }
+          call.doc.load(restored.project);
+          const counts = projectCounts(call.doc.project);
+          const kept = restored.backup ? baseName2(restored.backup) : "nothing (it was missing)";
+          return ok(call, `Restored the version saved ${pyFloat(Number(chosen.minutes_ago))} min ago (${counts.clips} clips); the previous file was kept as ${kept}.`, {
+            path: restored.path,
+            restored_from: chosen.path,
+            backup_of_previous: restored.backup,
+            counts
+          });
+        })
+      }),
+      contractTool("import_project_file_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        run: (call) => unavailable(call.tool, DESKTOP_CONVERSION)
+      }),
+      contractTool("export_project_file_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        run: (call) => unavailable(call.tool, DESKTOP_CONVERSION)
+      }),
+      contractTool("consolidate_project_media_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        run: (call, input4) => editorRun(async () => {
+          const media = call.host.media;
+          const storage = call.host.storage;
+          if (!media?.collect || !media.reclaimable || !media.removeCopies || !storage) return unavailable(call.tool, NO_COLLECT);
+          if (!currentPath(call)) throw new ToolError("save the project first (save_project_tool); media is collected next to the project file");
+          const action = input4.action;
+          const project = call.doc.project;
+          let done = [];
+          let other = [];
+          let errors = [];
+          let filesRepointed = 0;
+          let clipsRepointed = 0;
+          if (action === "collect") {
+            const result2 = await media.collect(project.files.map((f3) => ({ id: f3.id, path: typeof f3.path === "string" ? f3.path : "" })));
+            const repoint = mediaRepoint(call.doc.project, result2.moves, true);
+            if (repoint.files.length > 0 || repoint.clips.length > 0) call.commit((tx) => applyMediaRepoint(tx, repoint), "Collect media");
+            ({ copied: done, skipped: other, errors } = result2);
+            filesRepointed = repoint.files.length;
+            clipsRepointed = repoint.clips.length;
+          } else {
+            const candidates = project.files.filter((f3) => typeof f3.path === "string" && f3.path && typeof f3.original_path === "string" && f3.original_path).map((f3) => ({ id: f3.id, path: String(f3.path), original: String(f3.original_path) }));
+            const found = await media.reclaimable(candidates);
+            other = found.kept;
+            errors = found.errors;
+            if (found.moves.length > 0) {
+              const repoint = mediaRepoint(call.doc.project, found.moves, false);
+              const undo = repointUntracked(call, repoint);
+              try {
+                await storage.save(call.doc.toJSON());
+              } catch (error62) {
+                undo();
+                throw new ToolError(`Project not saved, nothing removed: ${messageOf(error62)}`);
+              }
+              const removed = await media.removeCopies(found.moves.map((m) => m.from));
+              done = removed.removed;
+              errors = [...errors, ...removed.errors];
+              filesRepointed = repoint.files.length;
+              clipsRepointed = repoint.clips.length;
+            }
+          }
+          const verb = action === "collect" ? "Copied" : "Removed";
+          let summary = `${verb} ${done.length} file(s); ${action === "collect" ? "skipped" : "kept"} ${other.length}${errors.length ? `; ${errors.length} error(s)` : ""}.`;
+          if (done.length === 0 && filesRepointed === 0) {
+            summary = action === "collect" ? "Nothing to collect: all media is already in the project folder or unavailable." : "Nothing to reclaim: no asset copy has an identical original.";
+          }
+          const data = {
+            action,
+            files: done.slice(0, 100),
+            count: done.length,
+            errors: errors.slice(0, 20),
+            files_repointed: filesRepointed,
+            clips_repointed: clipsRepointed,
+            undoable: action === "collect" && filesRepointed + clipsRepointed > 0
+          };
+          return done.length === 0 && filesRepointed === 0 ? nothingChanged(call, summary, data) : ok(call, summary, data);
+        })
+      }),
+      contractTool("reset_caches_and_history_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        run: (call, input4) => editorRun(() => {
+          const target = input4.target;
+          if (target === "playback_cache") {
+            const clear2 = call.host.ui?.clearPlaybackCache;
+            if (!clear2) {
+              return nothingChanged(call, "Nothing to clear: this Zenvi surface keeps no playback cache (every frame is rendered from the project).", { target });
+            }
+            call.host.ui.clearPlaybackCache();
+            return ok(call, "Cleared the playback cache; preview frames will re-render.", { target });
+          }
+          if (target === "waveforms") {
+            const has2 = (ui) => isRecord10(ui) && "audio_data" in ui;
+            const project = call.doc.project;
+            if (!project.files.some((f3) => has2(f3.ui)) && !project.clips.some((c) => has2(c.ui))) {
+              return nothingChanged(call, "No file or clip has stored waveform data; nothing cleared.", { target, files: 0, clips: 0 });
+            }
+            const cleared2 = call.commit((tx) => clearWaveformData(tx), "Clear waveform data");
+            return ok(call, `Dropped waveform data from ${cleared2.files} file(s) and ${cleared2.clips} clip(s).`, { target, files: cleared2.files, clips: cleared2.clips });
+          }
+          if (!input4.confirm) throw new ToolError("clearing the undo history cannot be undone; ask the user, then pass confirm=true");
+          const doc = call.doc;
+          if (doc.undoLabels.length === 0 && doc.redoLabels.length === 0) {
+            return nothingChanged(call, "The undo history is already empty.", { target, undo_steps_cleared: 0 });
+          }
+          const cleared = doc.clearHistory();
+          return ok(call, `Cleared the undo history (${cleared.undo} undo and ${cleared.redo} redo step(s)).`, {
+            target,
+            undo_steps_cleared: cleared.undo,
+            redo_steps_cleared: cleared.redo
+          });
+        })
+      })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/project-export-prefs.ts
+function preferenceList(call) {
+  const ui = call.host.ui;
+  return ui?.preferences ? ui.preferences() : null;
+}
+function reprValue(entry, value) {
+  return entry.type === "spinner" && typeof value === "number" ? pyFloat(value) : pyRepr2(value);
+}
+function findPreference(items, key2) {
+  const wanted = key2.trim().toLowerCase();
+  const byKey2 = items.find((d) => d.key.toLowerCase() === wanted);
+  if (byKey2) return byKey2;
+  const byTitle = items.find((d) => d.title.trim().toLowerCase() === wanted);
+  if (byTitle) return byTitle;
+  const close = items.filter((d) => wanted && (d.key.toLowerCase().includes(wanted) || d.title.toLowerCase().includes(wanted))).map((d) => d.key);
+  const hint = close.length > 0 ? ` Did you mean: ${close.slice(0, 6).join(", ")}?` : " Use get_preferences_tool to list them.";
+  throw new ToolError(`no preference named '${key2}' in this editor.${hint}`);
+}
+function describePreference(entry) {
+  const out = {
+    key: entry.key,
+    title: entry.title,
+    tab: entry.tab,
+    type: entry.type,
+    value: entry.value,
+    default: entry.default,
+    restart_required: Boolean(entry.restartRequired)
+  };
+  if (entry.min !== void 0) out.min = entry.min;
+  if (entry.max !== void 0) out.max = entry.max;
+  if (entry.type === "dropdown") out.choices = entry.choices ?? [];
+  if (entry.readOnly) {
+    out.read_only = true;
+    out.read_only_reason = entry.readOnly;
+  }
+  return out;
+}
+function shortcutConflicts(items, key2, sequences) {
+  const clashes = [];
+  for (const d of items) {
+    if (d.tab !== "Keyboard" || d.key === key2) continue;
+    const theirs = new Set(
+      String(d.value ?? "").split("|").map((s) => s.trim().toLowerCase()).filter(Boolean)
+    );
+    for (const seq of sequences) if (theirs.has(seq.toLowerCase())) clashes.push(`${seq} is already ${d.title || d.key}`);
+  }
+  return clashes;
+}
+function parsePreferenceValue(items, entry, value) {
+  const key2 = entry.key;
+  const t = value.trim();
+  if (entry.type === "bool") {
+    const low = t.toLowerCase();
+    if (["true", "1", "yes", "on"].includes(low)) return true;
+    if (["false", "0", "no", "off"].includes(low)) return false;
+    throw new ToolError(`${key2} is on/off: give true or false`);
+  }
+  if (entry.type === "spinner" || entry.type === "spinner-int") {
+    const num15 = t === "" ? Number.NaN : Number(t);
+    if (!Number.isFinite(num15)) throw new ToolError(`${key2} needs a number, got ${pyReprString(value)}`);
+    if (entry.type === "spinner-int" && num15 !== Math.trunc(num15)) throw new ToolError(`${key2} needs a whole number, got ${pyReprString(value)}`);
+    const lo = entry.min;
+    const hi = entry.max;
+    if (lo !== void 0 && num15 < lo || hi !== void 0 && num15 > hi) {
+      const bound = (n) => n === void 0 ? "None" : entry.type === "spinner" ? pyFloat(n) : String(n);
+      throw new ToolError(`${key2} must be between ${bound(lo)} and ${bound(hi)}, got ${pyReprString(value)}`);
+    }
+    return num15;
+  }
+  if (entry.type === "dropdown") {
+    const choices = entry.choices ?? [];
+    for (const c of choices) {
+      if (String(c.value).toLowerCase() === t.toLowerCase() || String(c.name ?? "").toLowerCase() === t.toLowerCase()) return c.value;
+    }
+    throw new ToolError(`${key2} must be one of: ${choices.map((c) => `${String(c.value)} (${c.name})`).join(", ")}`);
+  }
+  if (entry.tab === "Keyboard") {
+    const sequences = t.split("|").map((s) => s.trim()).filter(Boolean);
+    for (const s of sequences) {
+      if (!SHORTCUT_RE.test(s)) throw new ToolError(`'${s}' is not a key sequence like 'Ctrl+Shift+K' or 'F5'`);
+    }
+    const clashes = shortcutConflicts(items, key2, sequences);
+    if (clashes.length > 0) throw new ToolError(`shortcut conflict: ${clashes.join("; ")}`);
+    return sequences.join(" | ");
+  }
+  if (entry.type === "text" || entry.type === "browse") return value;
+  throw new ToolError(`${key2} (${String(entry.type)}) cannot be changed here`);
+}
+function findPanel(layout, name) {
+  const wanted = name.trim().toLowerCase();
+  const exact = layout.panels.find((p) => p.name.toLowerCase() === wanted);
+  if (exact) return exact;
+  const alias = PANEL_ALIASES[wanted];
+  const aliased = alias ? layout.panels.find((p) => p.name === alias) : void 0;
+  if (aliased) return aliased;
+  const hits = layout.panels.filter((p) => wanted && p.name.toLowerCase().includes(wanted));
+  if (hits.length === 1) return hits[0];
+  const names2 = [...new Set(layout.panels.map((p) => p.name))].sort(pyCompare3);
+  throw new ToolError(`no panel named '${name}'; panels: ${names2.join(", ")}`);
+}
+function layoutReport(layout) {
+  return {
+    active_view: layout.view,
+    custom_views: [],
+    open_panels: layout.panels.filter((p) => p.open).map((p) => p.name).sort(pyCompare3),
+    closed_panels: layout.panels.filter((p) => !p.open).map((p) => p.name).sort(pyCompare3),
+    toolbar_visible: layout.toolbarVisible,
+    fullscreen: layout.fullscreen
+  };
+}
+var READ12, SETTINGS, NO_SETTINGS, NO_LAYOUT, SHORTCUT_RE, VIEW_ALIASES, PANEL_ALIASES, pyCompare3, projectPrefsTools;
+var init_project_export_prefs = __esm({
+  "../engine/src/tools/catalog/project-export-prefs.ts"() {
+    "use strict";
+    init_define();
+    init_pyfmt();
+    init_common();
+    init_timeline_edit_common();
+    READ12 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    SETTINGS = { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    NO_SETTINGS = "there is no editor window here, so no editor settings: Zenvi desktop's Preferences and the web editor's own settings belong to those editors";
+    NO_LAYOUT = "there is no editor window here, so no panels to arrange: the layout belongs to Zenvi desktop and the web editor";
+    SHORTCUT_RE = /^((Ctrl|Shift|Alt|Meta|Cmd)\+)*([A-Za-z0-9]|F\d{1,2}|[^\s+]|Left|Right|Up|Down|Home|End|PgUp|PgDown|Space|Tab|Return|Enter|Esc|Escape|Del|Delete|Backspace|Ins|Insert)$/;
+    VIEW_ALIASES = {
+      default: "simple",
+      editing: "simple",
+      edit: "simple",
+      "color grade": "color",
+      "color grading": "color",
+      colour: "color",
+      grading: "color",
+      record: "recording",
+      "recording view": "recording",
+      "color view": "color",
+      "simple view": "simple"
+    };
+    PANEL_ALIASES = {
+      files: "Project Files",
+      "project files": "Project Files",
+      media: "Project Files",
+      preview: "Video Preview",
+      video: "Video Preview",
+      "video preview": "Video Preview",
+      viewer: "Video Preview",
+      timeline: "Timeline",
+      transitions: "Transitions",
+      effects: "Effects",
+      properties: "Properties",
+      chat: "Assistant",
+      assistant: "Assistant",
+      agents: "Assistant",
+      "ai chat": "Assistant",
+      titles: "Titles",
+      stock: "Stock",
+      generate: "Generate"
+    };
+    pyCompare3 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+    projectPrefsTools = [
+      contractTool("get_preferences_tool", {
+        annotations: READ12,
+        run: (call, input4) => editorRun(() => {
+          const items = preferenceList(call);
+          if (!items) return unavailable(call.tool, NO_SETTINGS);
+          const key2 = text(input4.key);
+          if (key2) {
+            const item = findPreference(items, key2);
+            return ok(call, `${item.title} = ${reprValue(item, item.value)} (default ${reprValue(item, item.default)}).`, { preference: describePreference(item) });
+          }
+          const tab = input4.tab ?? "";
+          const tokens = (input4.query ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
+          const rows = [];
+          for (const d of items) {
+            if (tab && d.tab !== tab) continue;
+            if (d.tab === "Keyboard" && !(tab === "Keyboard" || tokens.length > 0)) continue;
+            const words3 = `${d.key} ${d.title}`.toLowerCase();
+            if (tokens.length > 0 && !tokens.every((t) => words3.includes(t))) continue;
+            rows.push(describePreference(d));
+          }
+          return ok(call, `${rows.length} preference(s)${tab ? ` on ${tab}` : ""}.`, { preferences: rows });
+        })
+      }),
+      contractTool("set_preference_tool", {
+        annotations: SETTINGS,
+        run: (call, input4) => editorRun(() => {
+          const items = preferenceList(call);
+          const ui = call.host.ui;
+          if (!items || !ui?.setPreference) return unavailable(call.tool, NO_SETTINGS);
+          const key2 = text(input4.key);
+          const tab = input4.restore_tab ?? "";
+          if (tab) {
+            if (key2) throw new ToolError("give either key/value or restore_tab, not both");
+            let restart2 = false;
+            const restored = [];
+            for (const d of items) {
+              if (d.tab !== tab || d.readOnly || d.default === null || d.value === d.default) continue;
+              ui.setPreference(d.key, d.default);
+              restored.push(d.key);
+              restart2 ||= Boolean(d.restartRequired);
+            }
+            return ok(call, `Restored the ${tab} preferences to their defaults${restart2 ? "; restart Zenvi for all of them to take effect." : "."}`, {
+              tab,
+              restored,
+              restart_required: restart2
+            });
+          }
+          if (!key2) throw new ToolError("give key and value (see get_preferences_tool), or restore_tab");
+          const item = findPreference(items, key2);
+          if (item.readOnly) throw new ToolError(`'${item.key}' is protected: ${item.readOnly}`);
+          const next = parsePreferenceValue(items, item, input4.value ?? "");
+          const previous = item.value;
+          const label2 = item.title || item.key;
+          if (next === previous) return nothingChanged(call, `${label2} is already ${reprValue(item, next)}.`, { key: item.key, value: next });
+          try {
+            ui.setPreference(item.key, next);
+          } catch (error62) {
+            throw new ToolError(`could not apply ${item.key}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+          }
+          const restart = Boolean(item.restartRequired);
+          return ok(call, `Set ${label2} to ${reprValue(item, next)} (was ${reprValue(item, previous)})${restart ? "; restart Zenvi for it to take effect." : "."}`, {
+            key: item.key,
+            value: next,
+            previous,
+            changed: true,
+            restart_required: restart
+          });
+        })
+      }),
+      contractTool("get_editor_layout_tool", {
+        annotations: READ12,
+        run: (call) => editorRun(() => {
+          const ui = call.host.ui;
+          if (!ui?.layout) return unavailable(call.tool, NO_LAYOUT);
+          const report2 = layoutReport(ui.layout());
+          const open7 = report2.open_panels.length;
+          return ok(call, `View '${String(report2.active_view) || "custom"}' with ${open7} open panel(s).`, report2);
+        })
+      }),
+      contractTool("set_editor_layout_tool", {
+        annotations: SETTINGS,
+        run: (call, input4) => editorRun(() => {
+          const view = text(input4.view);
+          const show = (input4.show_panels ?? []).map(String).filter((s) => s.trim());
+          const hide2 = (input4.hide_panels ?? []).map(String).filter((s) => s.trim());
+          const scopes = input4.scopes ?? "";
+          const toolbar = input4.toolbar ?? "";
+          const fullscreen = input4.fullscreen ?? "";
+          const saveAs = text(input4.save_view_as);
+          const deleteView = text(input4.delete_view);
+          if (!view && show.length === 0 && hide2.length === 0 && !scopes && !toolbar && !fullscreen && !input4.dock_all && !saveAs && !input4.update_active_view && !deleteView) {
+            throw new ToolError(
+              "say what to change (view, show_panels, hide_panels, scopes, toolbar, fullscreen, dock_all, save_view_as, update_active_view, delete_view); get_editor_layout_tool reads it"
+            );
+          }
+          const ui = call.host.ui;
+          if (!ui?.layout || !ui.setLayout) return unavailable(call.tool, NO_LAYOUT);
+          const before = ui.layout();
+          let builtin;
+          if (view) {
+            const wanted = view.trim().toLowerCase();
+            const key2 = VIEW_ALIASES[wanted] ?? wanted;
+            if (key2 === "simple") builtin = "simple";
+            else if (key2 === "color") throw new ToolError("this editor has no Color Grade view (no scopes or Color Wheels); views: simple");
+            else if (key2 === "recording") throw new ToolError("this editor has no Recording view; views: simple");
+            else throw new ToolError(`no view named '${view}'; views: simple`);
+          }
+          const toShow = show.map((n) => findPanel(before, n));
+          const toHide = hide2.map((n) => findPanel(before, n));
+          for (const panel of toHide) {
+            if (!panel.closable) throw new ToolError(`the ${panel.name} panel always stays open in this editor`);
+          }
+          if (scopes) throw new ToolError("this editor has no scopes (Histogram, Luma Waveform, Vectorscope, Audio Levels)");
+          if (toolbar === "hide") throw new ToolError("this editor's toolbar cannot be hidden");
+          if (fullscreen && fullscreen === "on" !== before.fullscreen) {
+            throw new ToolError("a browser enters or leaves fullscreen only from a click or a key press: press F11 or use the browser's fullscreen button");
+          }
+          if (saveAs || input4.update_active_view || deleteView) throw new ToolError("this editor has no saved custom views");
+          const done = [];
+          let after = before;
+          if (builtin || toShow.length > 0 || toHide.length > 0) {
+            after = ui.setLayout({
+              ...builtin ? { view: builtin } : {},
+              show: toShow.map((p) => p.name),
+              hide: toHide.map((p) => p.name)
+            });
+          }
+          if (builtin) done.push(`${builtin} view`);
+          if (input4.dock_all) done.push("docked all panels");
+          if (toShow.length > 0) done.push(`opened ${toShow.map((p) => p.name).join(", ")}`);
+          if (toHide.length > 0) done.push(`closed ${toHide.map((p) => p.name).join(", ")}`);
+          if (toolbar === "show") done.push("toolbar shown");
+          if (fullscreen) done.push(`fullscreen ${fullscreen}`);
+          const warnings = [];
+          for (const panel of toShow) {
+            const now = after.panels.find((p) => p.name === panel.name);
+            if (now && !now.open) {
+              const winner = after.panels.find((p) => p.open && p.group !== void 0 && p.group === now.group);
+              warnings.push(`${panel.name} shares its place with ${winner ? winner.name : "another panel"}, which is shown instead.`);
+            }
+          }
+          const receipt2 = ok(call, `Layout: ${done.join("; ")}.`, layoutReport(after));
+          receipt2.warnings = warnings;
+          return receipt2;
+        })
+      })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/project-export-render.ts
+async function presetAvailable(call, preset) {
+  const exportTo = presetExportType(preset);
+  const container = exportContainer(preset.videoFormat, exportTo);
+  if (!container) return false;
+  const supports = call.host.exporter?.supports;
+  if (!supports) return true;
+  const video = exportTo === "Audio Only" ? "" : preset.videoCodec;
+  const audio = exportTo === "Video Only" || preset.audioCodec === "aac" ? "" : preset.audioCodec;
+  return call.host.exporter.supports(container, video, audio);
+}
+function timelineBounds(project) {
+  if (project.clips.length === 0) return null;
+  let start = Number.POSITIVE_INFINITY;
+  let end = 0;
+  for (const c of project.clips) {
+    const position = Number(c.position) || 0;
+    start = Math.min(start, position);
+    end = Math.max(end, position + Math.max(0, (Number(c.end) || 0) - (Number(c.start) || 0)));
+  }
+  return [start, end];
+}
+function extensionOf(path42) {
+  const name = path42.split(/[\\/]/).pop() ?? "";
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(dot).toLowerCase() : "";
+}
+function hasCode(error62, code) {
+  return typeof error62 === "object" && error62 !== null && error62.code === code;
+}
+function baseName3(path42) {
+  return path42.split(/[\\/]/).pop() ?? path42;
+}
+function splitExt(path42) {
+  const name = baseName3(path42);
+  const leading = /^\.*/.exec(name)[0].length;
+  const dot = name.lastIndexOf(".");
+  if (dot < leading) return [path42, ""];
+  const cut2 = path42.length - (name.length - dot);
+  return [path42.slice(0, cut2), path42.slice(cut2)];
+}
+function legalFileName(name) {
+  return name.toLowerCase().replace(/[^\p{L}\p{N}\p{M}_\s-]/gu, "").trim();
+}
+function isSubclip(file3) {
+  return "start" in file3 && "end" in file3;
+}
+function isSequence(file3) {
+  return SEQUENCE_FORMAT_RE.test(baseName3(String(file3.path ?? "")));
+}
+function fileFps(file3) {
+  const fps2 = file3.fps ?? {};
+  const num15 = Math.trunc(Number(fps2.num)) || 30;
+  const den2 = Math.trunc(Number(fps2.den)) || 1;
+  return { num: num15, den: den2 };
+}
+function fileDurationSeconds(file3) {
+  const fps2 = fileFps(file3);
+  return Math.trunc(Number(file3.video_length) || 0) / (fps2.num / fps2.den);
+}
+function exportedFileName(file3) {
+  const path42 = String(file3.path ?? "");
+  if (isSubclip(file3)) {
+    const fallback = splitExt(path42 || "openshot_clip")[0];
+    const name = legalFileName("name" in file3 ? String(file3.name ?? "") : fallback);
+    return `${name} [${pyFixed(Number(file3.start), 2)} - ${pyFixed(Number(file3.end), 2)}].mp4`;
+  }
+  const seconds2 = pyFixed(fileDurationSeconds(file3), 2);
+  if (isSequence(file3)) {
+    let name = splitExt(baseName3(path42))[0];
+    if ("name" in file3) name = String(file3.name ?? "");
+    name = legalFileName(splitExt(name)[0].replace(new RegExp(SEQUENCE_FORMAT_RE.source, "g"), ""));
+    return `${name} [0.00 - ${seconds2}].mp4`;
+  }
+  const [root, ext] = splitExt(baseName3(path42));
+  return `${legalFileName(root)} [0.00 - ${seconds2}]${ext}`;
+}
+function positiveInt2(value, fallback) {
+  const n = Math.trunc(Number(value));
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+function partRender(file3) {
+  const fps2 = fileFps(file3);
+  const rate = fps2.num / fps2.den;
+  const inPoint = isSubclip(file3) ? Number(file3.start) || 0 : 0;
+  const outPoint = isSubclip(file3) ? Number(file3.end) || inPoint : fileDurationSeconds(file3);
+  const startFrame = Math.max(1, pyRound(inPoint * rate) + 1);
+  const endFrame = Math.max(startFrame - 1, pyRound(outPoint * rate));
+  if (endFrame < startFrame) throw new ToolError("it is shorter than one frame");
+  const width = positiveInt2(file3.width, 1280);
+  const height = positiveInt2(file3.height, 720);
+  const pixel = file3.pixel_ratio ?? { num: 1, den: 1 };
+  const record5 = {
+    description: "Export",
+    width,
+    height,
+    fps: fps2,
+    progressive: true,
+    pixel_ratio: { num: positiveInt2(pixel.num, 1), den: positiveInt2(pixel.den, 1) },
+    display_ratio: reducedDisplayRatio(width, height, positiveInt2(pixel.num, 1), positiveInt2(pixel.den, 1))
+  };
+  const profile = { ...record5, key: profileKey(record5) };
+  const doc = new ProjectDocument(createProject({ profile }));
+  const layer2 = doc.project.layers[0]?.number ?? 1e6;
+  doc.transaction("Export", (tx) => {
+    tx.insert(["files"], structuredClone(file3));
+    addClip(tx, { fileId: file3.id, position: 0, layer: layer2, start: (startFrame - 1) / rate, end: endFrame / rate });
+  });
+  const hasAudio2 = Boolean(file3.has_audio);
+  const options = { format: "mp4", width, height, fps: fps2, videoCodec: "libx264", crf: 22, channels: 0 };
+  if (hasAudio2) {
+    options.audioCodec = "aac";
+    options.audioBitrate = positiveInt2(file3.audio_bit_rate, 192e3);
+    options.sampleRate = positiveInt2(file3.sample_rate, 48e3);
+    options.channels = positiveInt2(file3.channels, 2);
+  }
+  return { project: doc.project, options };
+}
+var READ13, pyCompare4, SEQUENCE_FORMAT_RE, projectRenderTools;
+var init_project_export_render = __esm({
+  "../engine/src/tools/catalog/project-export-render.ts"() {
+    "use strict";
+    init_document();
+    init_png2();
+    init_defaults();
+    init_profiles();
+    init_rounding();
+    init_clips();
+    init_catalog2();
+    init_export();
+    init_define();
+    init_frame_time();
+    init_pyfmt();
+    init_common();
+    init_timeline_edit_common();
+    READ13 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    pyCompare4 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+    SEQUENCE_FORMAT_RE = /%(?:0\d+)?d/;
+    projectRenderTools = [
+      contractTool("list_export_presets_tool", {
+        annotations: READ13,
+        requires: ["exporter"],
+        run: async (call, input4) => {
+          const category = input4.category ?? "";
+          const tokens = (input4.query ?? "").toLowerCase().split(/[\s,()]+/).filter(Boolean);
+          const rows = [];
+          const seen = /* @__PURE__ */ new Set();
+          for (const p of EXPORT_PRESETS) {
+            if (seen.has(p.title)) continue;
+            if (category && p.type !== category) continue;
+            if (tokens.length > 0 && !tokens.every((t) => p.title.toLowerCase().includes(t))) continue;
+            const available = await presetAvailable(call, p);
+            if (!available && !input4.include_unavailable) continue;
+            seen.add(p.title);
+            const qualities = {};
+            for (const [q, key2] of [["low", "low"], ["med", "med"], ["high", "high"]]) {
+              const video = p.videoBitrate[key2];
+              const audio = p.audioBitrate[key2];
+              if (video || audio) qualities[q] = { video, audio };
+            }
+            rows.push({
+              title: p.title,
+              category: p.type,
+              export_to: presetExportType(p),
+              format: p.videoFormat,
+              video_codec: p.videoCodec,
+              audio_codec: p.audioCodec,
+              available,
+              qualities,
+              profiles: p.profiles.length > 0 ? [...p.profiles] : "any",
+              user: false
+            });
+          }
+          rows.sort(
+            (a, b) => Number(a.category !== "Web") - Number(b.category !== "Web") || pyCompare4(String(a.category), String(b.category)) || pyCompare4(String(a.title), String(b.title))
+          );
+          return ok(call, `${rows.length} export preset(s).`, { presets: rows });
+        }
+      }),
+      contractTool("save_frame_image_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        requires: ["frames"],
+        run: (call, input4) => editorRun(async () => {
+          const project = call.doc.project;
+          const bounds2 = timelineBounds(project);
+          if (!bounds2) throw new ToolError("the timeline is empty");
+          const time3 = input4.time ?? -1;
+          const seconds2 = time3 < 0 ? playheadSeconds(call) : time3;
+          if (seconds2 > bounds2[1]) throw new ToolError(`${pyFixed(seconds2, 3)}s is after the end of the last clip (${pyFixed(bounds2[1], 3)}s)`);
+          const fps2 = projectFps(project);
+          const rate = fps2.num / fps2.den;
+          const frame = pyRound(Math.max(0, seconds2) * rate) + 1;
+          const frameName = `Frame-${String(frame).padStart(5, "0")}.png`;
+          let path42 = text(input4.file_path);
+          if (!path42) path42 = frameName;
+          else if (/[\\/]$/.test(path42)) path42 += frameName;
+          let ext = extensionOf(path42);
+          if (![".png", ".jpg", ".jpeg"].includes(ext)) {
+            path42 += ".png";
+            ext = ".png";
+          }
+          const format = ext === ".png" ? "png" : "jpeg";
+          const at = (frame - 1) / rate;
+          const image = await call.host.frames.renderFrame(project, at, { width: project.width, format });
+          const warnings = [];
+          if (image.mimeType === "image/png" && format === "jpeg") {
+            path42 = `${path42.slice(0, path42.length - ext.length)}.png`;
+            warnings.push("This Zenvi surface renders frames as PNG: saved as .png.");
+          }
+          const bytes = bytesFromBase64(image.data);
+          const data = { path: path42, frame, time: Number(pyFixed(at, 3)), width: project.width, height: project.height, size_bytes: bytes.length };
+          const storage = call.host.storage;
+          if (!storage?.writeBytes) {
+            warnings.push(`This Zenvi surface writes no files: the frame is attached to this result instead of saved to ${path42}.`);
+            const receipt3 = ok(call, `Rendered frame ${frame} (${pyFixed(at, 3)}s); attached to this result.`, { ...data, frame_attached: true });
+            receipt3.warnings = warnings;
+            return { receipt: receipt3, images: [image] };
+          }
+          let location;
+          try {
+            location = await storage.writeBytes(path42, bytes, image.mimeType, { overwrite: Boolean(input4.overwrite) });
+          } catch (error62) {
+            if (hasCode(error62, "EEXIST")) throw new ToolError(`${error62.path ?? path42} already exists; pass overwrite=true`);
+            throw new ToolError(`the frame could not be saved to ${path42}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+          }
+          const receipt2 = ok(call, `Saved frame ${frame} (${pyFixed(at, 3)}s) as ${location}.`, { ...data, path: location });
+          receipt2.warnings = warnings;
+          return receipt2;
+        })
+      }),
+      contractTool("export_files_to_folder_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        run: (call, input4) => editorRun(async () => {
+          const project = call.doc.project;
+          const files = [];
+          for (const raw of input4.file_ids ?? []) {
+            const file3 = fileById2(project, String(raw).trim());
+            if (!file3) throw new ToolError(`no project file with id=${pyReprString(String(raw))}`);
+            files.push(file3);
+          }
+          if (files.length === 0) throw new ToolError("give at least one file id");
+          const storage = call.host.storage;
+          if (!storage?.exportMedia) {
+            return unavailable(call.tool, "it needs a place to put copies of media (local files, downloads or download links), which this host does not provide.");
+          }
+          const folder = text(input4.folder);
+          let where = folder;
+          const results = [];
+          for (const file3 of files) {
+            const entry = { file_id: file3.id, source: file3.path ?? null };
+            try {
+              const name = exportedFileName(file3);
+              const render3 = isSubclip(file3) || isSequence(file3) ? partRender(file3) : void 0;
+              if (render3 && !call.host.exporter) throw new Error("a sub-clip or image sequence is rendered to MP4, which needs video rendering (this host has none)");
+              const done2 = await storage.exportMedia(file3, name, folder, render3);
+              entry.path = done2.location;
+              entry.status = done2.existed ? "skipped (exists)" : render3 ? "rendered" : "copied";
+              where = done2.folder;
+            } catch (error62) {
+              entry.status = "error";
+              entry.error = error62 instanceof Error ? error62.message : String(error62);
+            }
+            results.push(entry);
+          }
+          const errors = results.filter((r) => r.status === "error");
+          const done = results.filter((r) => r.status === "copied" || r.status === "rendered");
+          if (errors.length > 0 && done.length === 0) {
+            throw new ToolError(`could not export: ${errors.map((r) => `${String(r.source)}: ${String(r.error)}`).join("; ")}`);
+          }
+          const already = results.length - done.length - errors.length;
+          const summary = `Exported ${done.length} file(s) to ${where}` + (already ? `; ${already} already there` : "") + (errors.length ? `; ${errors.length} failed` : "") + ".";
+          return ok(call, summary, { folder: where, files: results });
+        })
+      })
+    ];
   }
 });
 
@@ -77230,8 +79194,8 @@ async function buildMotionReel(call, input4) {
         if (layer2.source.kind !== "svg") continue;
         const name = `reel-${scene.name}-${i + 1}-${layer2.source.name}.svg`;
         try {
-          const path40 = await call.host.media.writeGenerated(name, new TextEncoder().encode(layer2.source.svg), "image/svg+xml");
-          written.set(layer2.name, { path: path40, info: await call.host.media.probe(path40), name });
+          const path42 = await call.host.media.writeGenerated(name, new TextEncoder().encode(layer2.source.svg), "image/svg+xml");
+          written.set(layer2.name, { path: path42, info: await call.host.media.probe(path42), name });
         } catch (error62) {
           return failed(TOOL2, `Error: failed to write the reel's drawings: ${error62 instanceof Error ? error62.message : String(error62)}`);
         }
@@ -77459,8 +79423,8 @@ function flashIndexes(style, shots) {
 }
 async function writeCard(call, name, svg) {
   const media = call.host.media;
-  const path40 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
-  return { path: path40, info: await media.probe(path40), name };
+  const path42 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+  return { path: path42, info: await media.probe(path42), name };
 }
 function reelTracks(tx) {
   while (tx.project.layers.length < TRACKS.length) addTrack(tx, {});
@@ -78829,8 +80793,8 @@ var init_speech_tools = __esm({
           const project = call.doc.project;
           const clip2 = (project.clips ?? []).find((c) => String(c.id) === clipId2);
           if (!clip2) return refused(tool, `Error: Unknown clipId '${clipId2}'.`);
-          const path40 = mediaPathOf(fileOfClip(project, clip2), clip2);
-          if (!path40) return refused(tool, "Error: Clip has no readable media path.");
+          const path42 = mediaPathOf(fileOfClip(project, clip2), clip2);
+          if (!path42) return refused(tool, "Error: Clip has no readable media path.");
           const minPause = input4.minPauseSec ?? 0.4;
           const pad3 = input4.padSec ?? 0.08;
           const maxFrac = input4.maxRemoveFraction ?? 0.85;
@@ -78844,7 +80808,7 @@ var init_speech_tools = __esm({
           if (duration3 <= 0) return unchanged(tool, "Clip has zero duration.");
           let speech;
           try {
-            const envelope = await call.host.audio.analyzeAudio(path40, { signal: call.signal });
+            const envelope = await call.host.audio.analyzeAudio(path42, { signal: call.signal });
             speech = energyVadWindows(envelope, { minSpeechSec: 0.12, minSilenceSec: minPause });
           } catch (error62) {
             return failed(tool, `Error: VAD failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
@@ -78882,8 +80846,8 @@ var init_speech_tools = __esm({
         requires: ["storage"],
         run: async (call, input4) => {
           const tool = "export_captions_tool";
-          const path40 = text(input4.path);
-          if (!path40) return refused(tool, "Error: path is required.");
+          const path42 = text(input4.path);
+          if (!path42) return refused(tool, "Error: path is required.");
           const writeText = call.host.storage.writeText;
           if (!writeText) return unavailable(tool, "this host cannot write files.");
           const transcript = await runTranscript(
@@ -78900,17 +80864,17 @@ var init_speech_tools = __esm({
           const body = format === "vtt" ? cuesToVtt(cues, fps2) : cuesToSrt(cues, fps2);
           let location;
           try {
-            location = await writeText.call(call.host.storage, path40, body, format === "vtt" ? "text/vtt" : "application/x-subrip");
+            location = await writeText.call(call.host.storage, path42, body, format === "vtt" ? "text/vtt" : "application/x-subrip");
           } catch (error62) {
             return failed(tool, `Error: write failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
           }
           const data = record4(transcript.receipt.data);
           return applied(
             tool,
-            `Exported ${cues.length} cue(s) to ${location || path40}.`,
+            `Exported ${cues.length} cue(s) to ${location || path42}.`,
             {
               warnings: transcript.receipt.warnings,
-              data: { path: location || path40, format, count: cues.length, transcriptionSource: data.transcriptionSource ?? INDEX_SOURCE, wordTiming: data.wordTiming }
+              data: { path: location || path42, format, count: cues.length, transcriptionSource: data.transcriptionSource ?? INDEX_SOURCE, wordTiming: data.wordTiming }
             },
             0
           );
@@ -79932,7 +81896,7 @@ async function alignClips(call, input4) {
     overlaps: hits
   });
 }
-var EDIT8, ADD2, timelineEditTools;
+var EDIT9, ADD2, timelineEditTools;
 var init_timeline_edit = __esm({
   "../engine/src/tools/catalog/timeline-edit.ts"() {
     "use strict";
@@ -79952,16 +81916,16 @@ var init_timeline_edit = __esm({
     init_tracks2();
     init_common();
     init_timeline_edit_common();
-    EDIT8 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT9 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD2 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     timelineEditTools = [
       contractTool("add_clips_to_timeline_tool", { annotations: ADD2, run: (call, input4) => editorRun(() => addClipsToTimeline(call, input4)) }),
-      contractTool("move_clips_tool", { annotations: EDIT8, run: (call, input4) => editorRun(() => moveClips(call, input4)) }),
-      contractTool("trim_clips_tool", { annotations: EDIT8, run: (call, input4) => editorRun(() => trimClips(call, input4)) }),
-      contractTool("slice_clips_tool", { annotations: EDIT8, run: (call, input4) => editorRun(() => sliceClips(call, input4)) }),
-      contractTool("remove_gaps_tool", { annotations: EDIT8, run: (call, input4) => editorRun(() => removeGaps(call, input4)) }),
+      contractTool("move_clips_tool", { annotations: EDIT9, run: (call, input4) => editorRun(() => moveClips(call, input4)) }),
+      contractTool("trim_clips_tool", { annotations: EDIT9, run: (call, input4) => editorRun(() => trimClips(call, input4)) }),
+      contractTool("slice_clips_tool", { annotations: EDIT9, run: (call, input4) => editorRun(() => sliceClips(call, input4)) }),
+      contractTool("remove_gaps_tool", { annotations: EDIT9, run: (call, input4) => editorRun(() => removeGaps(call, input4)) }),
       contractTool("duplicate_clips_tool", { annotations: ADD2, run: (call, input4) => editorRun(() => duplicateClips(call, input4)) }),
-      contractTool("align_clips_tool", { annotations: EDIT8, run: (call, input4) => editorRun(() => alignClips(call, input4)) })
+      contractTool("align_clips_tool", { annotations: EDIT9, run: (call, input4) => editorRun(() => alignClips(call, input4)) })
     ];
   }
 });
@@ -80308,7 +82272,7 @@ async function reverseClip(call, input4) {
   call.commit((tx) => applyClipPreset(tx, clip2.id, reverse ? "time.reverse" : "time.none"));
   return `${reverse ? "Reversed" : "Reset time on"} timeline_clip_id=${clip2.id}.`;
 }
-var EDIT9, ADD3, MIN_SPEED3, MAX_SPEED, AV, timelineTimeTools;
+var EDIT10, ADD3, MIN_SPEED3, MAX_SPEED, AV, timelineTimeTools;
 var init_timeline_time = __esm({
   "../engine/src/tools/catalog/timeline-time.ts"() {
     "use strict";
@@ -80323,18 +82287,18 @@ var init_timeline_time = __esm({
     init_pyfmt();
     init_common();
     init_timeline_edit_common();
-    EDIT9 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT10 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD3 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     MIN_SPEED3 = 0.0625;
     MAX_SPEED = 16;
     AV = { on: 1, off: 0, auto: -1 };
     timelineTimeTools = [
-      contractTool("reverse_clip_tool", { annotations: EDIT9, run: (call, input4) => reverseClip(call, input4) }),
-      contractTool("set_clip_speed_tool", { annotations: EDIT9, run: (call, input4) => editorRun(() => setClipSpeed2(call, input4)) }),
-      contractTool("repeat_clip_tool", { annotations: EDIT9, run: (call, input4) => editorRun(() => repeatClips(call, input4)) }),
-      contractTool("freeze_frame_tool", { annotations: EDIT9, run: (call, input4) => editorRun(() => freezeFrame(call, input4)) }),
+      contractTool("reverse_clip_tool", { annotations: EDIT10, run: (call, input4) => reverseClip(call, input4) }),
+      contractTool("set_clip_speed_tool", { annotations: EDIT10, run: (call, input4) => editorRun(() => setClipSpeed2(call, input4)) }),
+      contractTool("repeat_clip_tool", { annotations: EDIT10, run: (call, input4) => editorRun(() => repeatClips(call, input4)) }),
+      contractTool("freeze_frame_tool", { annotations: EDIT10, run: (call, input4) => editorRun(() => freezeFrame(call, input4)) }),
       contractTool("separate_clip_audio_tool", { annotations: ADD3, run: (call, input4) => editorRun(() => separateClipAudio(call, input4)) }),
-      contractTool("set_clip_audio_video_tool", { annotations: EDIT9, run: (call, input4) => editorRun(() => setClipAudioVideo(call, input4)) })
+      contractTool("set_clip_audio_video_tool", { annotations: EDIT10, run: (call, input4) => editorRun(() => setClipAudioVideo(call, input4)) })
     ];
   }
 });
@@ -80991,7 +82955,7 @@ async function getPlayheadAndSelection(call) {
   const selected = selection ? `${count2} item(s) selected` : "the selection is not available here";
   return ok(call, `${head}, ${state.playing ? "playing" : "paused"}; ${selected}.`, data);
 }
-var EDIT10, VIEW4, READ10, SAVED_NOTE, tracksNavTools;
+var EDIT11, VIEW4, READ14, SAVED_NOTE, tracksNavTools;
 var init_tracks_nav = __esm({
   "../engine/src/tools/catalog/tracks-nav.ts"() {
     "use strict";
@@ -81008,26 +82972,26 @@ var init_tracks_nav = __esm({
     init_clip_props_model();
     init_common();
     init_timeline_edit_common();
-    EDIT10 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT11 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     VIEW4 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
-    READ10 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ14 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     SAVED_NOTE = "saved with the project; there is no preview player here";
     tracksNavTools = [
-      contractTool("update_track_tool", { annotations: EDIT10, run: (call, input4) => run2(() => updateTrack(call, input4)) }),
-      contractTool("remove_track_tool", { annotations: EDIT10, run: (call, input4) => run2(() => removeTrackTool(call, input4)) }),
-      contractTool("update_marker_tool", { annotations: EDIT10, run: (call, input4) => run2(() => updateMarkerTool(call, input4)) }),
-      contractTool("remove_marker_tool", { annotations: EDIT10, run: (call, input4) => run2(() => removeMarkerTool(call, input4)) }),
+      contractTool("update_track_tool", { annotations: EDIT11, run: (call, input4) => run2(() => updateTrack(call, input4)) }),
+      contractTool("remove_track_tool", { annotations: EDIT11, run: (call, input4) => run2(() => removeTrackTool(call, input4)) }),
+      contractTool("update_marker_tool", { annotations: EDIT11, run: (call, input4) => run2(() => updateMarkerTool(call, input4)) }),
+      contractTool("remove_marker_tool", { annotations: EDIT11, run: (call, input4) => run2(() => removeMarkerTool(call, input4)) }),
       contractTool("seek_playhead_tool", { annotations: VIEW4, run: (call, input4) => run2(() => seekPlayhead(call, input4)) }),
       contractTool("select_timeline_items_tool", { annotations: VIEW4, requires: ["ui"], run: (call, input4) => run2(() => selectTimelineItems(call, input4)) }),
       contractTool("set_timeline_view_tool", { annotations: VIEW4, requires: ["ui"], run: (call, input4) => run2(() => setTimelineView(call, input4)) }),
-      contractTool("get_playhead_and_selection_tool", { annotations: READ10, run: (call) => run2(() => getPlayheadAndSelection(call)) })
+      contractTool("get_playhead_and_selection_tool", { annotations: READ14, run: (call) => run2(() => getPlayheadAndSelection(call)) })
     ];
   }
 });
 
 // ../engine/src/tools/catalog/title-templates.ts
-function basename5(path40) {
-  return String(path40 ?? "").split(/[\\/]/).pop() ?? "";
+function basename5(path42) {
+  return String(path42 ?? "").split(/[\\/]/).pop() ?? "";
 }
 function errorMessage(error62) {
   return error62 instanceof Error ? error62.message : String(error62);
@@ -81118,11 +83082,11 @@ function titleFiles(project) {
   return project.files.filter((f3) => String(f3.path ?? "").toLowerCase().endsWith(".svg") && f3.zenvi_role !== OVERLAY_ROLE);
 }
 async function readProjectSvg(call, file3) {
-  const path40 = String(file3.path ?? "");
-  if (path40.startsWith("@emojis/") && call.host.assets) return call.host.assets.readText(`emojis/${path40.slice("@emojis/".length)}`);
+  const path42 = String(file3.path ?? "");
+  if (path42.startsWith("@emojis/") && call.host.assets) return call.host.assets.readText(`emojis/${path42.slice("@emojis/".length)}`);
   const readText = call.host.storage?.readText;
   if (!readText) throw new Error("this Zenvi surface cannot read project files");
-  return readText.call(call.host.storage, path40);
+  return readText.call(call.host.storage, path42);
 }
 function clipsOf(project, fileId) {
   return project.clips.filter((c) => c.file_id === fileId);
@@ -81131,8 +83095,8 @@ async function projectTitles(call, query2) {
   const project = call.doc.project;
   const out = [];
   for (const f3 of titleFiles(project)) {
-    const path40 = String(f3.path);
-    const entry = { file_id: f3.id, name: f3.name || basename5(path40), path: path40 };
+    const path42 = String(f3.path);
+    const entry = { file_id: f3.id, name: f3.name || basename5(path42), path: path42 };
     try {
       const doc = parseTitleSvg(await readProjectSvg(call, f3));
       entry.fields = fieldRows(titleFields(doc));
@@ -81150,8 +83114,8 @@ async function projectTitles(call, query2) {
   return out;
 }
 function svgTitle(file3) {
-  const path40 = String(file3.path ?? "");
-  if (!path40.toLowerCase().endsWith(".svg")) toolError(`${pyReprString(String(file3.name || basename5(path40)))} is not a title (only .svg titles can be edited)`);
+  const path42 = String(file3.path ?? "");
+  if (!path42.toLowerCase().endsWith(".svg")) toolError(`${pyReprString(String(file3.name || basename5(path42)))} is not a title (only .svg titles can be edited)`);
   if (file3.zenvi_role === OVERLAY_ROLE) toolError("that clip is a caption/timer overlay; use edit_captions_tool or add_timer_tool");
   return file3;
 }
@@ -81206,14 +83170,14 @@ async function resolveTitle(call, clipId2, fileId, titleQuery) {
 }
 async function writeTitle(call, name, svg) {
   const media = call.host.media;
-  let path40;
+  let path42;
   try {
-    path40 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path42 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return toolError(`failed to write title SVG: ${errorMessage(error62)}`);
   }
   try {
-    return { path: path40, info: await media.probe(path40), name };
+    return { path: path42, info: await media.probe(path42), name };
   } catch {
     return toolError(`could not import ${name} into Project Files`);
   }
@@ -81468,11 +83432,11 @@ var init_title_templates = __esm({
 });
 
 // ../engine/src/tools/catalog/titles.ts
-function basename6(path40) {
-  return String(path40).split(/[\\/]/).pop() ?? "";
+function basename6(path42) {
+  return String(path42).split(/[\\/]/).pop() ?? "";
 }
-function isAbsolutePath3(path40) {
-  return path40.startsWith("/") || path40.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path40);
+function isAbsolutePath3(path42) {
+  return path42.startsWith("/") || path42.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path42);
 }
 async function loadTitleTemplate(call, template) {
   const tmpl = template.trim();
@@ -81508,19 +83472,19 @@ function titleFileName(body, fileName2) {
 async function prepareTitle(call, template, body, options) {
   const media = call.host.media;
   const name = titleFileName(body, options.fileName);
-  let path40;
+  let path42;
   try {
     const svg = setSvgText(template.svg, body);
-    path40 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+    path42 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
   } catch (error62) {
     return `Error: failed to write title SVG: ${error62 instanceof Error ? error62.message : String(error62)}`;
   }
   let imported;
   try {
-    const info = await media.probe(path40);
-    imported = { path: path40, info, name };
+    const info = await media.probe(path42);
+    imported = { path: path42, info, name };
   } catch {
-    return `Error: could not import title into media bin: ${path40}`;
+    return `Error: could not import title into media bin: ${path42}`;
   }
   const placed = await planPlacement(call, provisionalFile(imported), {
     position_seconds: options.position,
@@ -81616,7 +83580,7 @@ function durationArg(value) {
   const n = parsePythonFloat(String(value ?? "").trim());
   return n === null ? 1 : n;
 }
-var READ11, transitionTools;
+var READ15, transitionTools;
 var init_transitions3 = __esm({
   "../engine/src/tools/catalog/transitions.ts"() {
     "use strict";
@@ -81626,10 +83590,10 @@ var init_transitions3 = __esm({
     init_define();
     init_pyfmt();
     init_common();
-    READ11 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+    READ15 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
     transitionTools = [
       contractTool("list_transitions_tool", {
-        annotations: READ11,
+        annotations: READ15,
         run: (_call, input4) => {
           const category = (text(input4.category) || "all").toLowerCase();
           const list2 = category === "all" || category === "common" || category === "extra" ? listTransitions(category) : [];
@@ -81640,7 +83604,7 @@ var init_transitions3 = __esm({
         }
       }),
       contractTool("search_transitions_tool", {
-        annotations: READ11,
+        annotations: READ15,
         run: (_call, input4) => {
           const query2 = String(input4.query ?? "");
           const matches3 = searchTransitions(query2);
@@ -82052,7 +84016,11 @@ function buildCatalog2() {
     ...effectsColorTools,
     ...effectsColorLookTools,
     ...effectsColorAnalysisTools,
-    ...colorAgentTools
+    ...colorAgentTools,
+    ...projectExportTools,
+    ...projectProfileTools,
+    ...projectRenderTools,
+    ...projectPrefsTools
   ];
   const byName2 = /* @__PURE__ */ new Map();
   for (const tool of [...implemented, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools]) {
@@ -82131,6 +84099,10 @@ var init_registry4 = __esm({
     init_phase3();
     init_playback();
     init_project2();
+    init_project_export();
+    init_project_export_prefs();
+    init_project_export_profiles();
+    init_project_export_render();
     init_reels();
     init_search();
     init_speech_tools();
@@ -82176,7 +84148,18 @@ function needName(need) {
     "ui.setSelection": "selecting in the editor",
     "ui.timelineView": "reading the timeline view",
     "ui.showTimelineRange": "zooming the timeline to a range",
-    "ui.setTimelineMode": "the timeline toolbar's modes"
+    "ui.setTimelineMode": "the timeline toolbar's modes",
+    "ui.layout": "an editor window's panels",
+    "ui.preferences": "an editor's settings",
+    "ui.clearPlaybackCache": "a playback cache",
+    "storage.writeBytes": "saving files (images)",
+    "storage.exportMedia": "copying media out (to a folder, a download or a link)",
+    "storage.currentPath": "knowing where the project is saved",
+    "storage.recentProjects": "a list of recent projects",
+    "storage.recoveryCopies": "Zenvi desktop's recovery copies",
+    "storage.customProfiles": "Zenvi desktop's custom profiles folder",
+    "media.collect": "copying media into the project's folder",
+    "exporter.supports": "checking which codecs it can encode"
   };
   return names2[need];
 }
@@ -82351,7 +84334,72 @@ var init_availability = __esm({
       create_media_with_comfyui_tool: { desktopOnly: COMFYUI },
       enhance_file_with_comfyui_tool: { desktopOnly: COMFYUI },
       cancel_comfyui_job_tool: { desktopOnly: COMFYUI },
-      prepare_recording_tool: { desktopOnly: "the Recording dock (microphone, screen and webcam capture)" }
+      prepare_recording_tool: { desktopOnly: "the Recording dock (microphone, screen and webcam capture)" },
+      // Project and export (editor_tools/project_export*.py): each surface's own projects, files and settings.
+      list_recent_projects_tool: {
+        methods: ["storage.recentProjects"],
+        webNote: "the CLI lists Zenvi desktop's recent projects (its File > Recent Projects on this computer); the web editor the projects in this browser; Zenvi Cloud the person's cloud projects"
+      },
+      forget_recent_projects_tool: { desktopOnly: "its own recent projects list (File > Recent Projects)" },
+      list_recovery_versions_tool: {
+        methods: ["storage.recoveryCopies", "storage.currentPath"],
+        webNote: "the copies Zenvi desktop zips each time it saves the project; the CLI's own saves make none"
+      },
+      restore_recovery_version_tool: {
+        methods: ["storage.recoveryCopies", "storage.currentPath"],
+        webNote: "the copies Zenvi desktop zips each time it saves the project; the CLI's own saves make none"
+      },
+      import_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
+      export_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
+      consolidate_project_media_tool: { methods: ["media.collect", "storage.currentPath"] },
+      reset_caches_and_history_tool: {
+        optional: ["ui.clearPlaybackCache"],
+        partialNote: "target=playback_cache has nothing to clear: every frame is rendered from the project"
+      },
+      get_editor_layout_tool: {
+        methods: ["ui.layout"],
+        webNote: "the web editor's panels; it has no Color Grade or Recording view, scopes, saved custom views, floating panels or hidden toolbar"
+      },
+      set_editor_layout_tool: {
+        methods: ["ui.layout"],
+        webNote: "the web editor's panels; it has no Color Grade or Recording view, scopes, saved custom views, floating panels or hidden toolbar, and fullscreen needs a click"
+      },
+      get_preferences_tool: {
+        methods: ["ui.preferences"],
+        webNote: "the web editor's own settings (timeline snapping; autosave, undo depth, backend and shortcuts are read-only), not Zenvi desktop's Preferences"
+      },
+      set_preference_tool: {
+        methods: ["ui.preferences"],
+        webNote: "the web editor's own settings (timeline snapping; autosave, undo depth, backend and shortcuts are read-only), not Zenvi desktop's Preferences"
+      },
+      list_project_profiles_tool: {
+        optional: ["storage.customProfiles"],
+        partialNote: "the built-in profiles only: custom profiles live in Zenvi desktop's profiles folder (Zenvi desktop and the zenvi CLI)"
+      },
+      set_project_profile_tool: {
+        optional: ["storage.customProfiles"],
+        partialNote: "a size or frame rate no built-in profile has needs a custom profile, which only Zenvi desktop and the zenvi CLI keep"
+      },
+      manage_custom_profiles_tool: {
+        methods: ["storage.customProfiles"],
+        webNote: "Zenvi desktop's profiles folder on this computer; set_default is refused (the default profile is a Zenvi desktop preference)"
+      },
+      list_export_presets_tool: {
+        optional: ["exporter.supports"],
+        partialNote: "without a codec check, every preset whose container the engine's exporters write counts as available",
+        webNote: "export_video_tool takes a preset only in Zenvi desktop so far; the web editor's Export dialog offers them"
+      },
+      save_frame_image_tool: {
+        optional: ["storage.writeBytes"],
+        partialNote: "without file saving the frame is attached to the result",
+        webNote: "the CLI writes the file (a relative path starts at the project's folder, the desktop's default is its export folder); the web editor downloads it; Zenvi Cloud answers with a download link and renders PNG only"
+      },
+      export_files_to_folder_tool: {
+        methods: ["storage.exportMedia"],
+        optional: ["exporter"],
+        partialNote: "sub-clips and image sequences are rendered to MP4, which needs video rendering",
+        webNote: "the CLI copies into the folder (relative to the project's folder; default the project's folder); the web editor downloads each file; Zenvi Cloud answers with download links"
+      }
     };
     SURFACE_PROFILES = {
       editor: {
@@ -82364,6 +84412,11 @@ var init_availability = __esm({
           "media.writeGenerated",
           "media.missing",
           "storage.readText",
+          "storage.writeText",
+          "storage.writeBytes",
+          "storage.exportMedia",
+          "storage.currentPath",
+          "storage.recentProjects",
           "ui.openExportDialog",
           "audio.decodePcm",
           "audio.transcribe",
@@ -82371,7 +84424,11 @@ var init_availability = __esm({
           "ui.setSelection",
           "ui.timelineView",
           "ui.showTimelineRange",
-          "ui.setTimelineMode"
+          "ui.setTimelineMode",
+          "ui.layout",
+          "ui.preferences",
+          "ui.clearPlaybackCache",
+          "exporter.supports"
         ],
         conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" }
       },
@@ -82389,8 +84446,16 @@ var init_availability = __esm({
           "storage.open",
           "storage.readText",
           "storage.writeText",
+          "storage.writeBytes",
+          "storage.exportMedia",
+          "storage.currentPath",
+          "storage.recentProjects",
+          "storage.recoveryCopies",
+          "storage.customProfiles",
+          "media.collect",
           "audio.decodePcm",
-          "audio.transcribe"
+          "audio.transcribe",
+          "exporter.supports"
         ],
         conditional: { backend: "signed in with zenvi login", "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks" }
       },
@@ -82398,7 +84463,19 @@ var init_availability = __esm({
         title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
         host: "packages/cloud/src/mcp/engine.ts",
         capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
-        methods: ["media.importUrl", "media.writeGenerated", "media.missing", "storage.readText", "storage.writeText", "audio.decodePcm", "audio.transcribe"],
+        methods: [
+          "media.importUrl",
+          "media.writeGenerated",
+          "media.missing",
+          "storage.readText",
+          "storage.writeText",
+          "storage.writeBytes",
+          "storage.exportMedia",
+          "storage.currentPath",
+          "storage.recentProjects",
+          "audio.decodePcm",
+          "audio.transcribe"
+        ],
         conditional: {
           frames: "the render worker is configured",
           media: "ffprobe is available",
@@ -82419,6 +84496,10 @@ var init_availability = __esm({
           "zoom_out_tool",
           "center_on_playhead_tool",
           "watch_clip_tool",
+          "get_editor_layout_tool",
+          "set_editor_layout_tool",
+          "get_preferences_tool",
+          "set_preference_tool",
           // Slower than a ChatGPT tool call. The cloud server starts generate_video instead.
           "generate_video_and_add_to_timeline_tool"
         ]
@@ -82981,8 +85062,8 @@ var init_parseUtil = __esm({
     init_errors5();
     init_en2();
     makeIssue = (params) => {
-      const { data, path: path40, errorMaps, issueData } = params;
-      const fullPath = [...path40, ...issueData.path || []];
+      const { data, path: path42, errorMaps, issueData } = params;
+      const fullPath = [...path42, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -83266,11 +85347,11 @@ var init_types5 = __esm({
     init_parseUtil();
     init_util2();
     ParseInputLazyPath = class {
-      constructor(parent, value, path40, key2) {
+      constructor(parent, value, path42, key2) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value;
-        this._path = path40;
+        this._path = path42;
         this._key = key2;
       }
       get path() {
@@ -86726,11 +88807,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path40) {
-  if (path40.length === 0) {
+function getDotPath(path42) {
+  if (path42.length === 0) {
     return "object root";
   }
-  return path40.reduce((acc, seg, index) => {
+  return path42.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -88414,11 +90495,11 @@ var init_Refs = __esm({
     init_Options();
     getRefs = (options) => {
       const _options = getDefaultOptions(options);
-      const currentPath = _options.name !== void 0 ? [..._options.basePath, _options.definitionPath, _options.name] : _options.basePath;
+      const currentPath2 = _options.name !== void 0 ? [..._options.basePath, _options.definitionPath, _options.name] : _options.basePath;
       return {
         ..._options,
         flags: { hasReferencedOpenAiAnyType: false },
-        currentPath,
+        currentPath: currentPath2,
         propertyPath: void 0,
         seen: new Map(Object.entries(_options.definitions).map(([name, def]) => [
           def._def,
@@ -94182,8 +96263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path40) {
-      let input4 = path40;
+    function removeDotSegments(path42) {
+      let input4 = path42;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -94592,8 +96673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path40 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path40 && path40 !== "/" ? path40 : void 0;
+        const path42 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path42 && path42 !== "/" ? path42 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -104774,8 +106855,8 @@ async function random2(size) {
   const evenDistCutoff = Math.pow(2, 8) - Math.pow(2, 8) % mask2.length;
   let result2 = "";
   while (result2.length < size) {
-    const randomBytes5 = await getRandomValues(size - result2.length);
-    for (const randomByte of randomBytes5) {
+    const randomBytes6 = await getRandomValues(size - result2.length);
+    for (const randomByte of randomBytes6) {
       if (randomByte < evenDistCutoff) {
         result2 += mask2[randomByte % mask2.length];
       }
@@ -106383,7 +108464,7 @@ var init_client4 = __esm({
 });
 
 // src/project/session.ts
-import path22 from "node:path";
+import path24 from "node:path";
 function sameState(a, b) {
   return a?.mtimeMs === b?.mtimeMs && a?.size === b?.size;
 }
@@ -106397,7 +108478,7 @@ var init_session2 = __esm({
     ProjectSession = class _ProjectSession {
       constructor(project, file3, options) {
         this.options = options;
-        this.fileValue = file3 ? path22.resolve(file3) : void 0;
+        this.fileValue = file3 ? path24.resolve(file3) : void 0;
         this.doc = this.makeDoc(project);
         const base = createNodeHost({ ...options.host, projectFile: () => this.fileValue });
         const storage = base.storage;
@@ -106406,7 +108487,7 @@ var init_session2 = __esm({
           storage: {
             ...storage,
             open: async (p) => {
-              const target = path22.resolve(this.fileValue ? path22.dirname(this.fileValue) : process.cwd(), p);
+              const target = path24.resolve(this.fileValue ? path24.dirname(this.fileValue) : process.cwd(), p);
               const loaded = await storage.open(target);
               this.fileValue = target;
               this.openedDuringCall = true;
@@ -106414,7 +108495,7 @@ var init_session2 = __esm({
               return loaded;
             },
             save: async (project2, p) => {
-              const target = p ? path22.resolve(this.fileValue ? path22.dirname(this.fileValue) : process.cwd(), p) : this.fileValue;
+              const target = p ? path24.resolve(this.fileValue ? path24.dirname(this.fileValue) : process.cwd(), p) : this.fileValue;
               if (!target) return storage.save(project2, p);
               const saved = await withProjectLock(target, () => writeProjectFile(target, project2, { engineAssetsDir: this.assetsDir() }));
               this.fileValue = saved;
@@ -106423,6 +108504,15 @@ var init_session2 = __esm({
             }
           }
         };
+        const restore = storage.restoreRecoveryCopy;
+        if (restore) {
+          this.host.storage.restoreRecoveryCopy = async (copy) => {
+            const restored = await restore(copy);
+            this.openedDuringCall = true;
+            this.diskState = await fileState(restored.path);
+            return restored;
+          };
+        }
       }
       options;
       host;
@@ -106443,7 +108533,7 @@ var init_session2 = __esm({
       }
       /** Open an existing project file. */
       static async open(file3, options) {
-        const abs = path22.resolve(file3);
+        const abs = path24.resolve(file3);
         const project = await readProjectFile(abs);
         const session = new _ProjectSession(project, abs, options);
         session.diskState = await fileState(abs);
@@ -106471,7 +108561,7 @@ var init_session2 = __esm({
       }
       /** Write the document (history included) to the session's file. */
       async save(target) {
-        const file3 = target ? path22.resolve(target) : this.fileValue;
+        const file3 = target ? path24.resolve(target) : this.fileValue;
         if (!file3) throw new Error("This project has no file yet.");
         await withProjectLock(file3, () => writeProjectFile(file3, this.doc.toJSON(), { engineAssetsDir: this.assetsDir() }));
         this.fileValue = file3;
@@ -106480,7 +108570,7 @@ var init_session2 = __esm({
       }
       /** Switch to another project (open it, or create it from `project`). */
       async switchTo(file3, project) {
-        const abs = path22.resolve(file3);
+        const abs = path24.resolve(file3);
         const loaded = project ?? await readProjectFile(abs);
         this.doc = this.makeDoc(loaded);
         this.fileValue = abs;
@@ -106636,6 +108726,8 @@ function hostOptions(ctx) {
   return {
     backend: { baseUrl: ctx.config.backendUrl, token: () => ctx.auth.backendToken(), userAgent: `zenvi-cli/${VERSION}` },
     env: ctx.env,
+    // Zenvi desktop's folder on this computer: its recent projects, recovery copies and custom profiles.
+    desktopDir: ctx.config.desktopDir,
     log: ctx.env.ZENVI_DEBUG ? (m) => ctx.out.info(`[debug] ${m}`) : void 0
   };
 }
@@ -106745,7 +108837,7 @@ var init_context = __esm({
 });
 
 // src/commands/account.ts
-import path23 from "node:path";
+import path25 from "node:path";
 function cloudClient(ctx) {
   return new CloudClient(ctx.config.cloudUrl, () => ctx.auth.cloudToken(), fetch, `zenvi-cli/${VERSION}`);
 }
@@ -106805,7 +108897,7 @@ If no browser opens, paste that link into one. Waiting for you to sign in\u2026`
     ctx.out.endProgress();
     await keepCloudRefs(ctx, session, result2.cloudRefs);
     if (opts.open !== false) await openUrl(result2.editorUrl, ctx.env);
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pushed ${path23.basename(file3)} to Zenvi Cloud`, engine: "portable", project: file3, ...result2 });
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Pushed ${path25.basename(file3)} to Zenvi Cloud`, engine: "portable", project: file3, ...result2 });
     else {
       ctx.out.line(`${ctx.out.style("\u2713", "green")} Pushed to Zenvi Cloud: ${result2.editorUrl}`);
       ctx.out.line(ctx.out.style(`  ${result2.uploaded} media uploaded, ${result2.reused} already there${result2.skipped.length ? `, ${result2.skipped.length} skipped` : ""}`, "dim"));
@@ -106885,7 +108977,7 @@ var init_account = __esm({
 
 // src/commands/edit.ts
 import { existsSync as existsSync5 } from "node:fs";
-import path24 from "node:path";
+import path26 from "node:path";
 function parseTime(text5) {
   if (text5 === void 0) return void 0;
   const t = text5.trim().toLowerCase();
@@ -106930,14 +109022,14 @@ function fileLength(file3) {
 }
 function registerEditCommands(program2, ctx) {
   program2.command("import").description("add media files (or folders, globs) to the project bin").argument("<paths...>", "files, folders or globs").option("--index", "also send the media to the Zenvi backend for AI indexing (needs `zenvi login`)").action(async (paths, opts) => {
-    const abs = paths.map((p) => /[*?[{]/.test(p) || /^[a-z]+:\/\//i.test(p) ? p : path24.resolve(ctx.cwd, p));
+    const abs = paths.map((p) => /[*?[{]/.test(p) || /^[a-z]+:\/\//i.test(p) ? p : path26.resolve(ctx.cwd, p));
     await runToolCommand(ctx, "import_files_tool", { paths: JSON.stringify(abs), skip_indexing: opts.index ? "false" : "true" });
   });
   program2.command("add").description("put a file on the timeline (imports it first when given a path)").argument("<file>", "file id from `zenvi files`, or a media path").option("--at <time>", "timeline position (default: after the last clip on the track)").option("-t, --track <track>", "track number from the bottom, or layer").option("--start <time>", "source in point").option("--end <time>", "source out point").option("--duration <time>", "how much of the file to use, from --start (default: the whole file)").action(async (file3, opts) => {
     await withExecutor(ctx, async (executor) => {
       let fileId = file3;
       let query2;
-      const local = path24.resolve(ctx.cwd, file3);
+      const local = path26.resolve(ctx.cwd, file3);
       if (existsSync5(local)) {
         const imported = await executor.call("import_files_tool", { paths: JSON.stringify([local]), skip_indexing: "true" });
         if (!imported.ok) {
@@ -106947,10 +109039,10 @@ function registerEditCommands(program2, ctx) {
         fileId = void 0;
         if (executor instanceof PortableExecutor) {
           const files = executor.session.doc.project.files;
-          const base = path24.basename(local);
-          fileId = files.find((f3) => f3.path === local)?.id ?? [...files].reverse().find((f3) => path24.basename(String(f3.path)) === base)?.id;
+          const base = path26.basename(local);
+          fileId = files.find((f3) => f3.path === local)?.id ?? [...files].reverse().find((f3) => path26.basename(String(f3.path)) === base)?.id;
         }
-        if (!fileId) query2 = path24.basename(local);
+        if (!fileId) query2 = path26.basename(local);
       }
       const flags = { start: parseTime(opts.start), end: parseTime(opts.end), duration: parseTime(opts.duration) };
       const known = executor instanceof PortableExecutor && fileId ? executor.session.doc.project.files.find((f3) => f3.id === fileId) : void 0;
@@ -108488,10 +110580,10 @@ var init_receipt2 = __esm({
 });
 
 // ../adobe-link/src/discovery.ts
-import { readFile as readFile10, unlink } from "node:fs/promises";
-import path25 from "node:path";
+import { readFile as readFile11, unlink } from "node:fs/promises";
+import path27 from "node:path";
 function linkDirOf(desktopDir) {
-  return path25.join(desktopDir, "link");
+  return path27.join(desktopDir, "link");
 }
 function pidAlive3(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -108548,11 +110640,11 @@ async function removeQuietly(file3) {
 }
 async function inspectHost(desktopDir, host, options = {}) {
   const dir = linkDirOf(desktopDir);
-  const file3 = path25.join(dir, `${host}.json`);
+  const file3 = path27.join(dir, `${host}.json`);
   const result2 = (status, detail2, endpoint2) => ({ host, status, detail: detail2, file: file3, ...endpoint2 ? { endpoint: endpoint2 } : {} });
   let raw;
   try {
-    raw = await readFile10(file3, "utf8");
+    raw = await readFile11(file3, "utf8");
   } catch {
     return result2("absent", "no discovery file (the app is not running, or Zenvi Link is not installed)");
   }
@@ -108572,17 +110664,17 @@ async function inspectHost(desktopDir, host, options = {}) {
   }
   if (!isLinkUrl(url2)) return result2("invalid", `refusing a non-loopback URL (${url2})`);
   const tokenFile = text3(data.token_file);
-  const tokenPath = tokenFile ? path25.isAbsolute(tokenFile) ? tokenFile : path25.join(dir, tokenFile) : path25.join(dir, `${host}.token`);
+  const tokenPath = tokenFile ? path27.isAbsolute(tokenFile) ? tokenFile : path27.join(dir, tokenFile) : path27.join(dir, `${host}.token`);
   if (!pidAlive3(pid)) {
     if (options.removeStale) {
       await removeQuietly(file3);
-      if (path25.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path25.basename(tokenPath))) await removeQuietly(tokenPath);
+      if (path27.dirname(tokenPath) === dir && new RegExp(`^${host}(\\.\\d+)?\\.token$`).test(path27.basename(tokenPath))) await removeQuietly(tokenPath);
     }
     return result2("dead", `process ${pid} is gone (left over from a crash)`);
   }
   let token;
   try {
-    token = (await readFile10(tokenPath, "utf8")).trim();
+    token = (await readFile11(tokenPath, "utf8")).trim();
   } catch {
     return result2("invalid", `cannot read the token file ${tokenPath}`);
   }
@@ -108614,7 +110706,7 @@ function inspectHosts(desktopDir, options = {}) {
           host,
           status: "invalid",
           detail: `could not read the discovery file: ${error62 instanceof Error ? error62.message : String(error62)}`,
-          file: path25.join(linkDirOf(desktopDir), `${host}.json`)
+          file: path27.join(linkDirOf(desktopDir), `${host}.json`)
         })
       )
     )
@@ -108720,20 +110812,20 @@ var init_client5 = __esm({
 });
 
 // ../adobe-link/src/install.ts
-import { randomBytes as randomBytes4 } from "node:crypto";
+import { randomBytes as randomBytes5 } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { cpSync, lstatSync, mkdirSync, realpathSync, renameSync, rmSync, symlinkSync } from "node:fs";
-import path26 from "node:path";
+import path28 from "node:path";
 function extensionsDir({ platform, home, appData }) {
-  if (platform === "darwin") return path26.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions");
-  if (platform === "win32") return path26.win32.join(appData ?? path26.win32.join(home, "AppData", "Roaming"), "Adobe", "CEP", "extensions");
+  if (platform === "darwin") return path28.posix.join(home, "Library", "Application Support", "Adobe", "CEP", "extensions");
+  if (platform === "win32") return path28.win32.join(appData ?? path28.win32.join(home, "AppData", "Roaming"), "Adobe", "CEP", "extensions");
   throw new Error(`Adobe CEP extensions run on macOS and Windows, not ${platform}`);
 }
 function systemExtensionsDirs(platform, env2 = {}) {
   if (platform === "darwin") return ["/Library/Application Support/Adobe/CEP/extensions"];
   if (platform === "win32") {
     const roots = [env2["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", env2.ProgramFiles ?? "C:\\Program Files"];
-    return [...new Set(roots)].map((root) => path26.win32.join(root, "Common Files", "Adobe", "CEP", "extensions"));
+    return [...new Set(roots)].map((root) => path28.win32.join(root, "Common Files", "Adobe", "CEP", "extensions"));
   }
   return [];
 }
@@ -108743,7 +110835,7 @@ function debugModeCommands(platform, enable) {
   );
 }
 function planExtensionInstall({ platform, home, appData, source: source2, uninstall = false, copy = false }) {
-  const target = (platform === "win32" ? path26.win32 : path26.posix).join(extensionsDir({ platform, home, appData }), BUNDLE_ID);
+  const target = (platform === "win32" ? path28.win32 : path28.posix).join(extensionsDir({ platform, home, appData }), BUNDLE_ID);
   if (uninstall) {
     return {
       target,
@@ -108767,7 +110859,7 @@ function planExtensionInstall({ platform, home, appData, source: source2, uninst
 function describeAction(action) {
   switch (action.kind) {
     case "build":
-      return `build ${path26.join(action.outDir, BUNDLE_ID)}`;
+      return `build ${path28.join(action.outDir, BUNDLE_ID)}`;
     case "remove":
       return `remove ${action.path}`;
     case "link":
@@ -108779,11 +110871,11 @@ function describeAction(action) {
   }
 }
 function systemCommand(command, platform = process.platform, env2 = process.env) {
-  if (platform === "win32" && command.toLowerCase() === "reg") return path26.win32.join(env2.SystemRoot ?? env2.windir ?? "C:\\Windows", "System32", "reg.exe");
+  if (platform === "win32" && command.toLowerCase() === "reg") return path28.win32.join(env2.SystemRoot ?? env2.windir ?? "C:\\Windows", "System32", "reg.exe");
   if (platform === "darwin" && ["defaults", "mdfind", "open"].includes(command)) return `/usr/bin/${command}`;
   return command;
 }
-function exists(file3) {
+function exists2(file3) {
   try {
     lstatSync(file3);
     return true;
@@ -108796,14 +110888,14 @@ function runInstallAction(action, options = {}) {
     case "build":
       throw new Error("runInstallAction does not build; build the extension first");
     case "remove":
-      if (exists(action.path)) rmSync(action.path, { recursive: true, force: true });
+      if (exists2(action.path)) rmSync(action.path, { recursive: true, force: true });
       return;
     case "link":
-      mkdirSync(path26.dirname(action.to), { recursive: true });
+      mkdirSync(path28.dirname(action.to), { recursive: true });
       symlinkSync(action.from, action.to, action.type);
       return;
     case "copy":
-      mkdirSync(path26.dirname(action.to), { recursive: true });
+      mkdirSync(path28.dirname(action.to), { recursive: true });
       cpSync(action.from, action.to, { recursive: true });
       return;
     default: {
@@ -108819,12 +110911,12 @@ function real(file3) {
   try {
     return realpathSync(file3);
   } catch {
-    return path26.resolve(file3);
+    return path28.resolve(file3);
   }
 }
 function replaceInstall(action) {
   const from = real(action.from);
-  const to = path26.join(real(path26.dirname(action.to)), path26.basename(action.to));
+  const to = path28.join(real(path28.dirname(action.to)), path28.basename(action.to));
   const targetIsLink = (() => {
     try {
       return lstatSync(action.to).isSymbolicLink();
@@ -108832,11 +110924,11 @@ function replaceInstall(action) {
       return false;
     }
   })();
-  if (!targetIsLink && (from === to || from.startsWith(to + path26.sep))) {
+  if (!targetIsLink && (from === to || from.startsWith(to + path28.sep))) {
     throw new Error(`the extension to install (${action.from}) is the installed copy itself (${action.to}); build it somewhere else first`);
   }
-  mkdirSync(path26.dirname(action.to), { recursive: true });
-  const tag = `${process.pid}-${randomBytes4(4).toString("hex")}`;
+  mkdirSync(path28.dirname(action.to), { recursive: true });
+  const tag = `${process.pid}-${randomBytes5(4).toString("hex")}`;
   const staging = `${action.to}.zenvi-new-${tag}`;
   const old = `${action.to}.zenvi-old-${tag}`;
   try {
@@ -108846,12 +110938,12 @@ function replaceInstall(action) {
     rmSync(staging, { recursive: true, force: true });
     throw error62;
   }
-  const hadOld = exists(action.to);
+  const hadOld = exists2(action.to);
   try {
     if (hadOld) renameSync(action.to, old);
     renameSync(staging, action.to);
   } catch (error62) {
-    if (hadOld && !exists(action.to) && exists(old)) renameSync(old, action.to);
+    if (hadOld && !exists2(action.to) && exists2(old)) renameSync(old, action.to);
     rmSync(staging, { recursive: true, force: true });
     throw error62;
   }
@@ -108906,9 +110998,9 @@ var init_unknown_args = __esm({
 });
 
 // src/hosts/extension.ts
-import { lstat, readdir as readdir6, readFile as readFile11, stat as stat12 } from "node:fs/promises";
+import { lstat, readdir as readdir7, readFile as readFile12, stat as stat14 } from "node:fs/promises";
 import { createRequire as createRequire2 } from "node:module";
-import path27 from "node:path";
+import path29 from "node:path";
 function defaultDetectDeps(home, env2) {
   return {
     platform: process.platform,
@@ -108916,14 +111008,14 @@ function defaultDetectDeps(home, env2) {
     env: env2,
     exists: async (file3) => {
       try {
-        await stat12(file3);
+        await stat14(file3);
         return true;
       } catch {
         return false;
       }
     },
-    listDir: async (dir) => readdir6(dir).catch(() => void 0),
-    readText: async (file3) => readFile11(file3, "utf8").catch(() => void 0),
+    listDir: async (dir) => readdir7(dir).catch(() => void 0),
+    readText: async (file3) => readFile12(file3, "utf8").catch(() => void 0),
     isLink: async (file3) => (await lstat(file3).catch(() => void 0))?.isSymbolicLink() ?? false
   };
 }
@@ -108931,7 +111023,7 @@ function manifestVersion(xml) {
   return xml ? /\bExtensionBundleVersion\s*=\s*"([^"]+)"/.exec(xml)?.[1] : void 0;
 }
 async function readCopy(deps, dir) {
-  const xml = await deps.readText(path27.join(dir, "CSXS", "manifest.xml"));
+  const xml = await deps.readText(path29.join(dir, "CSXS", "manifest.xml"));
   if (xml === void 0) return void 0;
   return { dir, version: manifestVersion(xml) };
 }
@@ -108941,7 +111033,7 @@ async function findInstalledExtensions(deps) {
     [extensionsDir({ platform: deps.platform, home: deps.home, appData: deps.env.APPDATA }), "user"],
     ...systemExtensionsDirs(deps.platform, deps.env).map((dir) => [dir, "system"])
   ];
-  const join = deps.platform === "win32" ? path27.win32.join : path27.posix.join;
+  const join = deps.platform === "win32" ? path29.win32.join : path29.posix.join;
   const found = [];
   for (const [folder, scope] of folders) {
     const dir = join(folder, BUNDLE_ID);
@@ -108956,11 +111048,11 @@ async function bundledExtension(deps) {
   if (override) candidates.push(override);
   else {
     const bundle = bundleDir();
-    if (bundle) candidates.push(path27.join(bundle, "adobe", BUNDLE_ID));
+    if (bundle) candidates.push(path29.join(bundle, "adobe", BUNDLE_ID));
     else {
       try {
         const entry = createRequire2(import.meta.url).resolve("@zenvi/adobe-link");
-        candidates.push(path27.join(path27.dirname(path27.dirname(entry)), "dist", BUNDLE_ID));
+        candidates.push(path29.join(path29.dirname(path29.dirname(entry)), "dist", BUNDLE_ID));
       } catch {
       }
     }
@@ -108972,7 +111064,7 @@ async function bundledExtension(deps) {
   return void 0;
 }
 async function findAdobeApps(deps) {
-  const dirs = deps.platform === "darwin" ? ["/Applications", path27.posix.join(deps.home, "Applications")] : deps.platform === "win32" ? [.../* @__PURE__ */ new Set([deps.env.ProgramFiles ?? "C:\\Program Files", deps.env.ProgramW6432 ?? deps.env.ProgramFiles ?? "C:\\Program Files"])].map((root) => path27.win32.join(root, "Adobe")) : [];
+  const dirs = deps.platform === "darwin" ? ["/Applications", path29.posix.join(deps.home, "Applications")] : deps.platform === "win32" ? [.../* @__PURE__ */ new Set([deps.env.ProgramFiles ?? "C:\\Program Files", deps.env.ProgramW6432 ?? deps.env.ProgramFiles ?? "C:\\Program Files"])].map((root) => path29.win32.join(root, "Adobe")) : [];
   const apps = { aftereffects: [], premiere: [] };
   let looked = false;
   for (const dir of dirs) {
@@ -108999,7 +111091,7 @@ var init_extension = __esm({
 });
 
 // src/hosts/policy.ts
-import path28 from "node:path";
+import path30 from "node:path";
 function adobeMode(env2) {
   const value = env2.ZENVI_MCP_ADOBE?.trim().toLowerCase();
   return value === "on" || value === "off" ? value : "auto";
@@ -109020,7 +111112,7 @@ async function decideFamilies(desktopDir, deps) {
   const { apps } = installed ? await findAdobeApps(deps) : { apps: { aftereffects: [], premiere: [] } };
   const anyApp = HOST_IDS.some((host) => apps[host].length > 0);
   for (const host of HOST_IDS) {
-    if (await deps.exists(path28.join(linkDirOf(desktopDir), `${host}.json`))) {
+    if (await deps.exists(path30.join(linkDirOf(desktopDir), `${host}.json`))) {
       decisions[host] = { listed: true, reason: `Zenvi Link runs in ${APP_LABEL[host]} on this machine` };
     } else if (installed && apps[host].length > 0) {
       decisions[host] = { listed: true, reason: `Zenvi Link and ${apps[host][0]} are installed` };
@@ -109043,7 +111135,7 @@ async function decideHandoff(desktopDir, deps) {
   if (mode === "on") return { listed: true, reason: "ZENVI_MCP_HANDOFF=on" };
   if (mode === "off") return { listed: false, reason: "ZENVI_MCP_HANDOFF=off", enable: "Unset ZENVI_MCP_HANDOFF (or set it to auto or on) in this server's environment." };
   for (const name of ["gui_mcp.json", "headless_mcp.json"]) {
-    if (await deps.exists(path28.join(desktopDir, name))) return { listed: true, reason: "the Zenvi desktop app runs on this machine" };
+    if (await deps.exists(path30.join(desktopDir, name))) return { listed: true, reason: "the Zenvi desktop app runs on this machine" };
   }
   if (await deps.appInstalled()) return { listed: true, reason: "the Zenvi desktop app is installed" };
   return {
@@ -109063,8 +111155,8 @@ var init_policy = __esm({
 });
 
 // src/hosts/registry.ts
-import { readFile as readFile12, stat as stat13 } from "node:fs/promises";
-import path29 from "node:path";
+import { readFile as readFile13, stat as stat15 } from "node:fs/promises";
+import path31 from "node:path";
 function toolCount(host) {
   return catalogFor(host).length;
 }
@@ -109088,7 +111180,7 @@ function howToConnect(host, discovery) {
 }
 function describeHosts(report2) {
   const name = (entry) => {
-    const project = typeof entry.project === "string" && entry.project ? ` (${path29.basename(entry.project)})` : "";
+    const project = typeof entry.project === "string" && entry.project ? ` (${path31.basename(entry.project)})` : "";
     const version2 = typeof entry.app_version === "string" && entry.app_version ? ` ${entry.app_version}` : "";
     return `${entry.label}${version2}${project}`;
   };
@@ -109158,7 +111250,7 @@ var init_registry5 = __esm({
           ]);
           const desktopTouched = /* @__PURE__ */ new Map();
           for (const endpoint of desktop) {
-            const info = await stat13(endpoint.source).catch(() => void 0);
+            const info = await stat15(endpoint.source).catch(() => void 0);
             if (info) desktopTouched.set(endpoint.source, info.mtimeMs);
           }
           return { desktop, desktopTouched, adobe };
@@ -109275,10 +111367,10 @@ var init_registry5 = __esm({
        * process lives; otherwise the file is checked again (one initialize).
        */
       async connect(host) {
-        const file3 = path29.join(linkDirOf(this.desktopDir), `${host}.json`);
+        const file3 = path31.join(linkDirOf(this.desktopDir), `${host}.json`);
         const cached4 = this.clients.get(host);
         if (cached4) {
-          const raw = await readFile12(file3, "utf8").catch(() => "");
+          const raw = await readFile13(file3, "utf8").catch(() => "");
           let key2 = "";
           try {
             const data = JSON.parse(raw);
@@ -109514,8 +111606,8 @@ var init_adobe_tools = __esm({
 
 // src/desktop/launcher.ts
 import { execFile as execFile2, spawn as spawn3 } from "node:child_process";
-import { readdir as readdir7, readFile as readFile14, realpath as realpath3, stat as stat15 } from "node:fs/promises";
-import path33 from "node:path";
+import { readdir as readdir8, readFile as readFile15, realpath as realpath3, stat as stat17 } from "node:fs/promises";
+import path35 from "node:path";
 import { promisify as promisify2 } from "node:util";
 function defaultLauncherDeps() {
   const self = [process.argv[1]].filter((p) => typeof p === "string");
@@ -109525,14 +111617,14 @@ function defaultLauncherDeps() {
     home: process.env.HOME || process.env.USERPROFILE || "",
     exists: async (file3) => {
       try {
-        await stat15(file3);
+        await stat17(file3);
         return true;
       } catch {
         return false;
       }
     },
-    readText: async (file3) => readFile14(file3, "utf8").catch(() => void 0),
-    listDir: async (dir) => readdir7(dir).catch(() => []),
+    readText: async (file3) => readFile15(file3, "utf8").catch(() => void 0),
+    listDir: async (dir) => readdir8(dir).catch(() => []),
     run: async (command, args) => {
       try {
         const { stdout } = await execFileAsync2(systemCommand(command), args, { timeout: 5e3, windowsHide: true, maxBuffer: 1024 * 1024 });
@@ -109586,7 +111678,7 @@ async function which(deps, name) {
   const exts = deps.platform === "win32" ? (deps.env.PATHEXT || ".EXE;.CMD;.BAT").split(";") : [""];
   for (const dir of dirs) {
     for (const ext of exts) {
-      const candidate = path33.join(dir, name + ext.toLowerCase());
+      const candidate = path35.join(dir, name + ext.toLowerCase());
       if (await deps.exists(candidate)) return candidate;
     }
   }
@@ -109600,7 +111692,7 @@ async function isSelf(deps, file3) {
   return /^#!.*\bnode\b/.test(head) || /\bzenvi\.mjs\b/.test(real3);
 }
 async function findMac(deps) {
-  const candidates = ["/Applications/Zenvi.app", path33.join(deps.home, "Applications", "Zenvi.app")];
+  const candidates = ["/Applications/Zenvi.app", path35.join(deps.home, "Applications", "Zenvi.app")];
   for (const app2 of candidates) {
     if (await deps.exists(app2)) return { kind: "macos-app", location: app2, command: "open", args: ["-a", app2, "--args"] };
   }
@@ -109625,7 +111717,7 @@ async function findWindows(deps) {
     if (code !== 0) continue;
     const location = regValue(stdout, "InstallLocation");
     if (location) {
-      const file3 = path33.win32.join(location.replace(/^"|"$/g, ""), "zenvi.exe");
+      const file3 = path35.win32.join(location.replace(/^"|"$/g, ""), "zenvi.exe");
       if (await deps.exists(file3)) return exe(file3);
     }
     const icon = regValue(stdout, "DisplayIcon")?.replace(/^"|"$/g, "").replace(/,\d+$/, "");
@@ -109635,40 +111727,40 @@ async function findWindows(deps) {
   const command = /REG_(?:SZ|EXPAND_SZ)\s+(.+?)\s*$/m.exec(assoc.stdout)?.[1];
   const fromAssoc = command ? /^"([^"]+)"/.exec(command)?.[1] ?? command.split(/\s+/)[0] : void 0;
   if (fromAssoc && await deps.exists(fromAssoc)) return exe(fromAssoc);
-  const roots = [deps.env.ProgramFiles, deps.env["ProgramFiles(x86)"], deps.env.LOCALAPPDATA && path33.win32.join(deps.env.LOCALAPPDATA, "Programs")];
+  const roots = [deps.env.ProgramFiles, deps.env["ProgramFiles(x86)"], deps.env.LOCALAPPDATA && path35.win32.join(deps.env.LOCALAPPDATA, "Programs")];
   for (const root of roots) {
     if (!root) continue;
-    const file3 = path33.win32.join(root, "Zenvi", "zenvi.exe");
+    const file3 = path35.win32.join(root, "Zenvi", "zenvi.exe");
     if (await deps.exists(file3)) return exe(file3);
   }
   return void 0;
 }
 function xdgDataDirs(deps) {
-  const home = deps.env.XDG_DATA_HOME || path33.join(deps.home, ".local", "share");
+  const home = deps.env.XDG_DATA_HOME || path35.join(deps.home, ".local", "share");
   const system = (deps.env.XDG_DATA_DIRS || "/usr/local/share:/usr/share").split(":").filter(Boolean);
-  return [home, ...system, "/var/lib/flatpak/exports/share", path33.join(deps.home, ".local", "share", "flatpak", "exports", "share")];
+  return [home, ...system, "/var/lib/flatpak/exports/share", path35.join(deps.home, ".local", "share", "flatpak", "exports", "share")];
 }
 async function findLinux(deps) {
   const bin = await which(deps, "zenvi-desktop");
   if (bin && !await isSelf(deps, bin)) return { kind: "linux-bin", location: bin, command: bin, args: [] };
-  const appImageDirs = [path33.join(deps.home, "Applications"), path33.join(deps.home, ".local", "bin"), path33.join(deps.home, "bin"), "/opt", "/opt/zenvi", "/usr/local/bin"];
+  const appImageDirs = [path35.join(deps.home, "Applications"), path35.join(deps.home, ".local", "bin"), path35.join(deps.home, "bin"), "/opt", "/opt/zenvi", "/usr/local/bin"];
   for (const dir of appImageDirs) {
     const names2 = (await deps.listDir(dir)).filter((n) => /^zenvi.*\.appimage$/i.test(n)).sort().reverse();
     if (names2[0]) {
-      const file3 = path33.join(dir, names2[0]);
+      const file3 = path35.join(dir, names2[0]);
       return { kind: "linux-appimage", location: file3, command: file3, args: [] };
     }
   }
   for (const dataDir of xdgDataDirs(deps)) {
     for (const name of ["org.zenvi.Zenvi.desktop", "zenvi.desktop"]) {
-      const file3 = path33.join(dataDir, "applications", name);
+      const file3 = path35.join(dataDir, "applications", name);
       const text5 = await deps.readText(file3);
       const exec = text5 && /^Exec\s*=\s*(.+)$/m.exec(text5)?.[1];
       if (!exec) continue;
       const argv = parseDesktopExec(exec);
       const head = argv[0];
       if (!head) continue;
-      const resolved = path33.isAbsolute(head) ? head : await which(deps, head);
+      const resolved = path35.isAbsolute(head) ? head : await which(deps, head);
       if (!resolved || await isSelf(deps, resolved)) continue;
       return { kind: "linux-desktop-entry", location: file3, command: resolved, args: argv.slice(1) };
     }
@@ -111573,8 +113665,8 @@ never WebM (Zenvi drops VP9 alpha).
 
 // src/commands/project.ts
 import { existsSync as existsSync6 } from "node:fs";
-import { mkdir as mkdir9 } from "node:fs/promises";
-import path34 from "node:path";
+import { mkdir as mkdir11 } from "node:fs/promises";
+import path36 from "node:path";
 function newProject(profile) {
   const create = createProject;
   if (!create) throw new CliError("This build's engine cannot create projects (createProject is not exported).");
@@ -111593,18 +113685,18 @@ function registerProjectCommands(program2, ctx) {
       return;
     }
     const named = ctx.flags().project ?? ctx.env.ZENVI_PROJECT?.trim() ?? void 0;
-    const asFile = (value) => path34.resolve(ctx.cwd, isProjectPath(value) ? value : `${value}.zvn`);
+    const asFile = (value) => path36.resolve(ctx.cwd, isProjectPath(value) ? value : `${value}.zvn`);
     if (positional && named && asFile(positional) !== asFile(named)) {
       throw new CliError(`Two different project files given: ${asFile(positional)} and ${asFile(named)} (-p/ZENVI_PROJECT).`, 2, "Pass only one.");
     }
     const file3 = asFile(positional ?? named ?? "untitled.zvn");
     if (existsSync6(file3) && !opts.force) throw new CliError(`${file3} already exists.`, 1, "Pass --force to replace it.");
     const project = newProject(opts.profile);
-    await mkdir9(path34.dirname(file3), { recursive: true });
+    await mkdir11(path36.dirname(file3), { recursive: true });
     const session = ProjectSession.fromProject(project, file3, { registry: ctx.registry, host: hostOptions(ctx) });
     await session.save();
     const info = { project: file3, id: project.id, profile: project.profile, width: project.width, height: project.height, fps: project.fps };
-    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Created ${path34.basename(file3)}`, engine: "portable", ...info });
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Created ${path36.basename(file3)}`, engine: "portable", ...info });
     else {
       ctx.out.line(`${ctx.out.style("\u2713", "green")} Created ${file3}`);
       ctx.out.line(ctx.out.style(`  ${project.profile}, ${project.width}x${project.height}`, "dim"));
@@ -111634,7 +113726,7 @@ function registerProjectCommands(program2, ctx) {
     });
   }
   program2.command("save").description("save the project (optionally to a new file)").argument("[file]", "save as this file").action(async (file3) => {
-    await runToolCommand(ctx, "save_project_tool", file3 ? { file_path: path34.resolve(ctx.cwd, file3) } : {});
+    await runToolCommand(ctx, "save_project_tool", file3 ? { file_path: path36.resolve(ctx.cwd, file3) } : {});
   });
 }
 var init_project3 = __esm({
@@ -111651,7 +113743,7 @@ var init_project3 = __esm({
 
 // src/commands/render.ts
 import { writeFile as writeFile10 } from "node:fs/promises";
-import path35 from "node:path";
+import path37 from "node:path";
 function parseFps(text5) {
   if (!text5) return void 0;
   const m = /^(\d+)(?:\/(\d+))?$/.exec(text5.trim());
@@ -111728,7 +113820,7 @@ function formatBytes(n) {
 function registerRenderCommands(program2, ctx) {
   program2.command("render").description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav) or PNG frames").argument("[output]", "output file (default: <project>.mp4 next to the project)").option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav or png (default: from the file name)").option("--quality <quality>", "low, medium, high or lossless", "high").option("--width <px>", "output width (height follows the project aspect)").option("--height <px>", "output height").option("--fps <rate>", "frame rate, e.g. 30 or 30000/1001 (default: the project's)").option("--start <time>", "render from this timeline time").option("--end <time>", "render up to this timeline time").option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)").option("--audio-bitrate <rate>", "e.g. 192k").option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)").option("--encoder-preset <preset>", "encoder speed: ultrafast \u2026 veryslow (default veryfast; the desktop app encodes at medium)").option("--open", "open the result when done").action(async (outputArg, flags) => {
     await withExecutor(ctx, async (executor) => {
-      const output2 = outputArg ? path35.resolve(ctx.cwd, outputArg) : void 0;
+      const output2 = outputArg ? path37.resolve(ctx.cwd, outputArg) : void 0;
       if (!(executor instanceof PortableExecutor)) {
         printOutcome(ctx, await exportOnDesktop(executor, output2));
         return;
@@ -111762,7 +113854,7 @@ function registerRenderCommands(program2, ctx) {
   program2.command("frame").description("render one timeline frame to an image (PNG or JPEG)").argument("<time>", "timeline time (seconds or timecode)").argument("[output]", "image file (default: frame-<time>.png)").option("--width <px>", "image width", "1280").option("--jpeg", "write JPEG instead of PNG").option("--grid", "draw the 0-1 coordinate grid and a frame caption (what inspect tools show models)").action(async (timeArg2, outputArg, flags) => {
     const seconds2 = parseTime(timeArg2);
     const format = flags.jpeg || /\.jpe?g$/i.test(outputArg ?? "") ? "jpeg" : "png";
-    const output2 = path35.resolve(ctx.cwd, outputArg ?? `frame-${seconds2.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
+    const output2 = path37.resolve(ctx.cwd, outputArg ?? `frame-${seconds2.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
     await withExecutor(ctx, async (executor) => {
       let data;
       let mimeType;
@@ -111810,7 +113902,7 @@ var init_render2 = __esm({
 
 // src/mcp/extra-tools.ts
 import { existsSync as existsSync7 } from "node:fs";
-import path36 from "node:path";
+import path38 from "node:path";
 function text4(v) {
   return typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : void 0;
 }
@@ -111848,7 +113940,7 @@ function extraTools(ctx) {
         const tool = "open_project_file";
         const raw = text4(args.path);
         if (!raw) return { receipt: refused(tool, "path is required") };
-        const file3 = path36.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
+        const file3 = path38.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
         if (existsSync7(file3)) {
           await state.switchTo(file3);
           return { receipt: applied(tool, `Opened ${file3}`, { data: projectSummary(state) }, 0) };
@@ -111886,7 +113978,7 @@ function extraTools(ctx) {
         const tool = "render_video";
         const desktop = await state.desktopExecutor();
         const requested = text4(args.output) ?? text4(args.output_path);
-        const output2 = requested ? path36.resolve(ctx.cwd, requested) : void 0;
+        const output2 = requested ? path38.resolve(ctx.cwd, requested) : void 0;
         if (desktop) {
           const outcome = await exportOnDesktop(desktop, output2);
           return { receipt: outcome.receipt ?? (outcome.ok ? applied(tool, outcome.text, {}, 0) : failed(tool, outcome.text)), engine: "desktop" };
@@ -111979,7 +114071,7 @@ function extraTools(ctx) {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       async run(state, args) {
         const tool = "launch_editor";
-        const file3 = text4(args.path) ? path36.resolve(ctx.cwd, text4(args.path)) : state.session.file;
+        const file3 = text4(args.path) ? path38.resolve(ctx.cwd, text4(args.path)) : state.session.file;
         if (!file3) return { receipt: refused(tool, "This project has no file yet: call open_project_file first.") };
         try {
           const result2 = await openInDesktop({ config: ctx.config, project: file3, deps: state.launcher, clientVersion: VERSION });
@@ -112779,14 +114871,14 @@ media. One undo step restores the link.`,
 
 // src/hosts/handoff.ts
 import { homedir as homedir3 } from "node:os";
-import path37 from "node:path";
+import path39 from "node:path";
 function resolvePathArgs(args, cwd, home = homedir3()) {
   const out = { ...args };
   for (const [key2, value] of Object.entries(args)) {
     if (!PATH_ARGS.has(key2) || typeof value !== "string" || !value.trim()) continue;
     const text5 = value.trim();
-    const expanded = text5 === "~" ? home : text5.startsWith("~/") || text5.startsWith("~\\") ? path37.join(home, text5.slice(2)) : text5;
-    out[key2] = path37.isAbsolute(expanded) || path37.win32.isAbsolute(expanded) ? expanded : path37.resolve(cwd, expanded);
+    const expanded = text5 === "~" ? home : text5.startsWith("~/") || text5.startsWith("~\\") ? path39.join(home, text5.slice(2)) : text5;
+    out[key2] = path39.isAbsolute(expanded) || path39.win32.isAbsolute(expanded) ? expanded : path39.resolve(cwd, expanded);
   }
   return out;
 }
@@ -113275,7 +115367,7 @@ var init_host_tools = __esm({
 });
 
 // src/mcp/state.ts
-import { stat as stat16 } from "node:fs/promises";
+import { stat as stat18 } from "node:fs/promises";
 function launcherDeps(ctx) {
   return { ...defaultLauncherDeps(), env: ctx.env, home: ctx.config.home };
 }
@@ -113360,7 +115452,7 @@ var init_state = __esm({
         if (this.handoffCache && now - this.handoffCache.at <= 2e3) return this.handoffCache.value;
         const value = decideHandoff(this.ctx.config.desktopDir, {
           env: this.ctx.env,
-          exists: (file3) => stat16(file3).then(
+          exists: (file3) => stat18(file3).then(
             () => true,
             () => false
           ),
@@ -115758,10 +117850,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
   _executeSubCommand(subcommand, args) {
     args = args.slice();
     const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
-    function findFile2(baseDir, baseName2) {
-      const localBin = path.resolve(baseDir, baseName2);
+    function findFile2(baseDir, baseName4) {
+      const localBin = path.resolve(baseDir, baseName4);
       if (fs.existsSync(localBin)) return localBin;
-      if (sourceExt.includes(path.extname(baseName2))) return void 0;
+      if (sourceExt.includes(path.extname(baseName4))) return void 0;
       const foundExt = sourceExt.find(
         (ext) => fs.existsSync(`${localBin}${ext}`)
       );
@@ -116731,9 +118823,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [path]
    * @return {(string|null|Command)}
    */
-  executableDir(path40) {
-    if (path40 === void 0) return this._executableDir;
-    this._executableDir = path40;
+  executableDir(path42) {
+    if (path42 === void 0) return this._executableDir;
+    this._executableDir = path42;
     return this;
   }
   /**
@@ -116997,7 +119089,7 @@ init_edit2();
 init_src3();
 init_adobe_tools();
 import { lstat as lstat2, writeFile as writeFile8 } from "node:fs/promises";
-import path30 from "node:path";
+import path32 from "node:path";
 
 // src/hosts/doctor.ts
 init_src3();
@@ -117275,8 +119367,8 @@ function hostToolName(host, tool) {
 }
 async function saveImages(ctx, images, out) {
   if (!out || images.length === 0) return [];
-  const target = path30.resolve(ctx.cwd, out);
-  const ext = path30.extname(target);
+  const target = path32.resolve(ctx.cwd, out);
+  const ext = path32.extname(target);
   const saved = [];
   for (const [i, image] of images.entries()) {
     const file3 = images.length === 1 ? target : `${target.slice(0, target.length - ext.length)}-${i + 1}${ext}`;
@@ -117414,15 +119506,15 @@ function registerHostCommands(program2, ctx) {
 // src/commands/integrations.ts
 init_src3();
 init_src2();
-import { readFile as readFile15 } from "node:fs/promises";
-import path38 from "node:path";
+import { readFile as readFile16 } from "node:fs/promises";
+import path40 from "node:path";
 
 // src/agents/mcp-config.ts
 init_src2();
 init_output();
 import { execFile } from "node:child_process";
-import { copyFile as copyFile2, mkdir as mkdir8, readFile as readFile13, rename as rename6, stat as stat14, writeFile as writeFile9 } from "node:fs/promises";
-import path31 from "node:path";
+import { copyFile as copyFile3, mkdir as mkdir10, readFile as readFile14, rename as rename8, stat as stat16, writeFile as writeFile9 } from "node:fs/promises";
+import path33 from "node:path";
 import { promisify } from "node:util";
 
 // src/agents/toml.ts
@@ -117541,12 +119633,12 @@ function shellQuote(arg) {
   return /^[A-Za-z0-9_./:@%+=,-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`;
 }
 function claudeDesktopConfigPath(home, platform, env2) {
-  if (platform === "darwin") return path31.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
-  if (platform === "win32") return path31.join(env2.APPDATA || path31.join(home, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
-  return path31.join(env2.XDG_CONFIG_HOME || path31.join(home, ".config"), "Claude", "claude_desktop_config.json");
+  if (platform === "darwin") return path33.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+  if (platform === "win32") return path33.join(env2.APPDATA || path33.join(home, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
+  return path33.join(env2.XDG_CONFIG_HOME || path33.join(home, ".config"), "Claude", "claude_desktop_config.json");
 }
 function codexConfigPath(home, env2) {
-  return path31.join(env2.CODEX_HOME || path31.join(home, ".codex"), "config.toml");
+  return path33.join(env2.CODEX_HOME || path33.join(home, ".codex"), "config.toml");
 }
 function isZenviStdio(entry) {
   if (!entry || typeof entry !== "object") return false;
@@ -117558,31 +119650,31 @@ function isZenviStdio(entry) {
 function sameJson4(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
-async function exists2(file3) {
+async function exists3(file3) {
   try {
-    await stat14(file3);
+    await stat16(file3);
     return true;
   } catch {
     return false;
   }
 }
 async function writeWithBackup(file3, text5, hadFile) {
-  await mkdir8(path31.dirname(file3), { recursive: true });
+  await mkdir10(path33.dirname(file3), { recursive: true });
   let backup;
   if (hadFile) {
     backup = `${file3}.zenvi-backup`;
-    await copyFile2(file3, backup);
+    await copyFile3(file3, backup);
   }
   const tmp = `${file3}.${process.pid}.tmp`;
   await writeFile9(tmp, text5);
-  await rename6(tmp, file3);
+  await rename8(tmp, file3);
   return backup;
 }
 async function mergeJsonServer(file3, name, entry, force) {
-  const hadFile = await exists2(file3);
+  const hadFile = await exists3(file3);
   let root = {};
   if (hadFile) {
-    const text5 = await readFile13(file3, "utf8");
+    const text5 = await readFile14(file3, "utf8");
     if (text5.trim()) {
       try {
         const parsed = JSON.parse(text5);
@@ -117620,9 +119712,9 @@ function codexSection(name, command) {
   ].join("\n");
 }
 async function defaultRunClaude(env2, home) {
-  const candidates = [whichSync("claude", env2), path31.join(home, ".local", "bin", "claude"), path31.join(home, ".claude", "local", "claude")];
+  const candidates = [whichSync("claude", env2), path33.join(home, ".local", "bin", "claude"), path33.join(home, ".claude", "local", "claude")];
   let claude;
-  for (const c of candidates) if (c && await exists2(c)) {
+  for (const c of candidates) if (c && await exists3(c)) {
     claude = c;
     break;
   }
@@ -117651,7 +119743,7 @@ async function mcpConfig(options) {
       const scope = options.scope ?? "user";
       const entry = { type: "stdio", ...stdioEntry, env: {} };
       if (scope === "project") {
-        const file3 = path31.join(cwd, ".mcp.json");
+        const file3 = path33.join(cwd, ".mcp.json");
         const snippet2 = JSON.stringify({ mcpServers: { [name]: entry } }, null, 2);
         if (!options.install) return { ...base, scope, file: file3, snippet: snippet2, message: `Add this to ${file3} (Claude Code asks you to approve project servers).` };
         const { changed, backup } = await mergeJsonServer(file3, name, entry, options.force ?? false);
@@ -117683,7 +119775,7 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
     }
     case "cursor": {
       const scope = options.scope ?? "user";
-      const file3 = scope === "project" ? path31.join(cwd, ".cursor", "mcp.json") : path31.join(options.home, ".cursor", "mcp.json");
+      const file3 = scope === "project" ? path33.join(cwd, ".cursor", "mcp.json") : path33.join(options.home, ".cursor", "mcp.json");
       const snippet = JSON.stringify({ mcpServers: { [name]: stdioEntry } }, null, 2);
       if (!options.install) return { ...base, scope, file: file3, snippet, message: `Merge this into ${file3}.` };
       const { changed, backup } = await mergeJsonServer(file3, name, stdioEntry, options.force ?? false);
@@ -117697,8 +119789,8 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
 
 # or: codex mcp add ${shellQuote(name)} -- ${[command.command, ...command.args].map(shellQuote).join(" ")}`;
       if (!options.install) return { ...base, file: file3, snippet, message: `Add this to ${file3}.` };
-      const hadFile = await exists2(file3);
-      const original = hadFile ? await readFile13(file3, "utf8") : "";
+      const hadFile = await exists3(file3);
+      const original = hadFile ? await readFile14(file3, "utf8") : "";
       let current;
       try {
         current = readTable(original, table);
@@ -117720,7 +119812,7 @@ ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.")
 // src/agents/self-command.ts
 init_src2();
 import { realpathSync as realpathSync2 } from "node:fs";
-import path32 from "node:path";
+import path34 from "node:path";
 function real2(file3) {
   try {
     return realpathSync2(file3);
@@ -117740,7 +119832,7 @@ function selfMcpCommand(env2 = process.env, argv = process.argv) {
     const parts = override.split(/\s+/);
     return { command: parts[0], args: [...parts.slice(1), "mcp"] };
   }
-  const entry = argv[1] ? path32.resolve(argv[1]) : "";
+  const entry = argv[1] ? path34.resolve(argv[1]) : "";
   if (/\.m?js$/.test(entry)) return { command: stableNodePath(env2), args: [real2(entry), "mcp"] };
   return { command: process.execPath, args: [...process.execArgv, real2(entry), "mcp"] };
 }
@@ -117760,7 +119852,7 @@ init_account();
 init_context();
 function registerIntegrationCommands(program2, ctx) {
   program2.command("open").description("show the project in the Zenvi desktop app (or in the web editor with --web)").argument("[project]", "project file (default: the selected project)").option("--web", "push to Zenvi Cloud and open it in the web editor instead").action(async (projectArg, opts) => {
-    const project = projectArg ? path38.resolve(ctx.cwd, projectArg) : await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env });
+    const project = projectArg ? path40.resolve(ctx.cwd, projectArg) : await findProject({ flag: ctx.flags().project, cwd: ctx.cwd, env: ctx.env });
     if (opts.web) {
       if (!project) throw new CliError("No project to open.", 2, "Pass a .zvn file.");
       const session = await openSession(ctx, project);
@@ -117905,11 +119997,11 @@ async function runDoctor(ctx) {
   const configured = [];
   const configFiles = [
     ["claude-desktop", claudeDesktopConfigPath(ctx.config.home, process.platform, ctx.env)],
-    ["cursor", path38.join(ctx.config.home, ".cursor", "mcp.json")],
+    ["cursor", path40.join(ctx.config.home, ".cursor", "mcp.json")],
     ["codex", codexConfigPath(ctx.config.home, ctx.env)]
   ];
   for (const [name, file3] of configFiles) {
-    const text5 = await readFile15(file3, "utf8").catch(() => "");
+    const text5 = await readFile16(file3, "utf8").catch(() => "");
     if (/zenvi[^\n]*\bmcp\b|mcp_servers\.zenvi\b|"zenvi"\s*:/.test(text5)) configured.push(name);
   }
   checks.push({ name: "agent configs", level: "ok", detail: configured.length ? `zenvi configured for ${configured.join(", ")}` : "none yet (see `zenvi mcp-config`)" });
@@ -117922,7 +120014,7 @@ init_render2();
 
 // src/config.ts
 import { homedir as homedir4 } from "node:os";
-import path39 from "node:path";
+import path41 from "node:path";
 var DEFAULTS2 = {
   website: "https://zenvi.pro",
   editor: "https://zenvi.pro/editor",
@@ -117941,7 +120033,7 @@ function env(e, ...keys) {
 var trim = (url2) => url2.replace(/\/+$/, "");
 function loadConfig(e = process.env) {
   const home = e.HOME || e.USERPROFILE || homedir4();
-  const configDir = env(e, "ZENVI_CONFIG_DIR") ?? (process.platform === "win32" ? path39.join(e.APPDATA || path39.join(home, "AppData", "Roaming"), "zenvi") : path39.join(e.XDG_CONFIG_HOME || path39.join(home, ".config"), "zenvi"));
+  const configDir = env(e, "ZENVI_CONFIG_DIR") ?? (process.platform === "win32" ? path41.join(e.APPDATA || path41.join(home, "AppData", "Roaming"), "zenvi") : path41.join(e.XDG_CONFIG_HOME || path41.join(home, ".config"), "zenvi"));
   return {
     websiteUrl: trim(env(e, "ZENVI_WEBSITE", "ZENVI_WEBSITE_URL") ?? DEFAULTS2.website),
     editorUrl: trim(env(e, "ZENVI_EDITOR_URL") ?? DEFAULTS2.editor),
@@ -117950,7 +120042,7 @@ function loadConfig(e = process.env) {
     supabaseUrl: trim(env(e, "ZENVI_SUPABASE_URL", "SUPABASE_URL") ?? DEFAULTS2.supabaseUrl),
     supabaseAnonKey: env(e, "ZENVI_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY") ?? DEFAULTS2.supabaseAnonKey,
     configDir,
-    desktopDir: env(e, "ZENVI_DESKTOP_DIR") ?? path39.join(home, ".openshot_qt"),
+    desktopDir: env(e, "ZENVI_DESKTOP_DIR") ?? path41.join(home, ".openshot_qt"),
     home
   };
 }

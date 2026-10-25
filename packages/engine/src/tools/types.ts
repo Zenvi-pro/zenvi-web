@@ -102,6 +102,17 @@ export interface MediaHost {
    * contents by media extension.
    */
   listPaths?(entry: string): Promise<PathListing>;
+  /**
+   * Copy media stored outside the project's folder into its assets folder
+   * (`<project>_assets/media`), keeping the originals (File > Collect Media).
+   * Skips files already in the assets folder, bundled assets, image
+   * sequences and missing files. Changes nothing in the project.
+   */
+  collect?(files: readonly { id: string; path: string }[]): Promise<CollectedMedia>;
+  /** Asset copies whose recorded original (`original_path`) is still there, byte for byte. Reads only. */
+  reclaimable?(files: readonly { id: string; path: string; original: string }[]): Promise<ReclaimableMedia>;
+  /** Delete asset copies (once the project is saved pointing at their originals). */
+  removeCopies?(paths: readonly string[]): Promise<{ removed: string[]; errors: string[] }>;
   /** Download a URL and make it available to the project. */
   importUrl?(url: string, options?: { filename?: string; signal?: AbortSignal }): Promise<ImportedMedia>;
   /** Ask the person to pick files (web). */
@@ -180,6 +191,62 @@ export interface UiHost {
   openImportDialog?(): void;
   openExportDialog?(): void;
   notify?(message: string, level?: "info" | "warning" | "error"): void;
+  /** The editor's panels and window state (View menu). */
+  layout?(): EditorLayout;
+  /** Open or close panels, or put them back where they start ("simple"). Returns the layout after. */
+  setLayout?(change: LayoutChange): EditorLayout;
+  /** The editor's own settings, as Preferences entries. */
+  preferences?(): PreferenceEntry[];
+  /** Store one setting the engine validated against its entry, and apply it. */
+  setPreference?(key: string, value: PreferenceValue): void;
+  /** Drop cached preview frames, filmstrips and waveforms; they are drawn again when shown. */
+  clearPlaybackCache?(): void;
+}
+
+/** A panel of an editor window (the desktop's docks). */
+export interface EditorPanel {
+  /** What show_panels / hide_panels take, e.g. "Project Files", "Properties". */
+  name: string;
+  open: boolean;
+  /** False for panels that always stay (the preview, the timeline). */
+  closable: boolean;
+  /** Panels that share one place on screen and show one at a time (e.g. "left"). */
+  group?: string;
+}
+
+export interface EditorLayout {
+  /** The built-in view the panels are in ("simple"), or "" after changes by hand. */
+  view: string;
+  panels: EditorPanel[];
+  toolbarVisible: boolean;
+  fullscreen: boolean;
+}
+
+export interface LayoutChange {
+  /** Put every panel where it starts. */
+  view?: "simple";
+  /** Panel names as `layout()` reports them. */
+  show?: string[];
+  hide?: string[];
+}
+
+export type PreferenceValue = string | number | boolean;
+
+/** One editor setting, shaped like a desktop Preferences entry (settings/_default.settings). */
+export interface PreferenceEntry {
+  key: string;
+  title: string;
+  /** The desktop Preferences tab it belongs on (General, Timeline, Autosave, Keyboard, AI…). */
+  tab: string;
+  type: "bool" | "spinner" | "spinner-int" | "dropdown" | "text" | "browse";
+  value: PreferenceValue | null;
+  default: PreferenceValue | null;
+  min?: number;
+  max?: number;
+  choices?: { value: PreferenceValue; name: string }[];
+  restartRequired?: boolean;
+  /** Why it cannot be changed here; set_preference_tool refuses with it. */
+  readOnly?: string;
 }
 
 export type ContainerFormat = "mp4" | "webm" | "mov" | "mkv" | "gif" | "mp3" | "wav" | "png-sequence";
@@ -215,6 +282,13 @@ export interface ExportResult {
 
 export interface ExportHost {
   export(project: Project, options: ExportOptions, onProgress?: (fraction: number) => void): Promise<ExportResult>;
+  /**
+   * Whether this host can encode a container with these FFmpeg encoder names
+   * (an export preset's videocodec / audiocodec; "" = none), like the
+   * desktop's FFmpegWriter.IsValidCodec. Without it, every container the
+   * engine's exporters write counts as encodable.
+   */
+  supports?(format: ContainerFormat, videoCodec: string, audioCodec: string): Promise<boolean>;
 }
 
 /** Drawn over an inspect frame (zenvi-core agent_tools/inspect_overlay.py). Hosts may ignore it. */
@@ -298,6 +372,116 @@ export interface StorageHost {
   readText?(path: string): Promise<string>;
   /** Write a small text file (exported subtitles). Returns where it went. */
   writeText?(path: string, text: string, contentType?: string): Promise<string>;
+  /**
+   * Write a binary file (a saved frame) where the person gets it: the CLI
+   * writes the path (relative to the project's folder), Zenvi Cloud answers
+   * with a download link, the web editor downloads it. Returns where it went.
+   * Refuses to replace an existing file unless `overwrite`.
+   */
+  writeBytes?(path: string, bytes: Uint8Array, contentType: string, options?: { overwrite?: boolean }): Promise<string>;
+  /**
+   * Give the person a copy of a project file's media (Project Files > Export
+   * Selected Clips) named `name`: the CLI copies it into `folder` (relative
+   * to the project's folder; "" = the project's folder) and skips a file
+   * that is already there, Zenvi Cloud answers with a download link, the web
+   * editor downloads it. With `render`, the copy is that project rendered
+   * with those options instead (hosts without an exporter refuse it).
+   */
+  exportMedia?(file: ProjectFile, name: string, folder: string, render?: MediaRender): Promise<ExportedMedia>;
+  /** Where the open project is kept (a local path, a project id), or null when it never was. */
+  currentPath?(): string | null;
+  /** The projects this surface lists as recent (File > Recent Projects), most recent first. */
+  recentProjects?(): Promise<RecentProject[]>;
+  /** The open project's recovery copies (File > Recovery), newest first; none when it has no file. */
+  recoveryCopies?(): Promise<RecoveryCopy[]>;
+  /**
+   * Put a recovery copy in place of the open project's file, keeping the
+   * current file next to it as `<name>-<time>-backup.zvn`, and read the
+   * restored project (the call then opens it).
+   */
+  restoreRecoveryCopy?(copy: string): Promise<RestoredProject>;
+  /** The user's custom video profiles (the profile editor's files). */
+  customProfiles?(): Promise<ProfileFile[]>;
+  /** Create or replace a custom profile file (`name` = the profile key). Returns its path. */
+  writeCustomProfile?(name: string, text: string): Promise<string>;
+  /** Delete a custom profile file. */
+  removeCustomProfile?(name: string): Promise<void>;
+}
+
+/** A project a surface lists as recent. */
+export interface RecentProject {
+  /** What opens it on this surface: a local path (CLI), a project id (Zenvi Cloud, the web editor). */
+  path: string;
+  name: string;
+  /** False when the file is gone. */
+  exists: boolean;
+  /** Last change, Unix seconds, when known. */
+  modifiedAt: number | null;
+}
+
+/** An automatic copy of the open project saved with it (File > Recovery). */
+export interface RecoveryCopy {
+  path: string;
+  /** When it was saved, Unix seconds. */
+  savedAt: number;
+  sizeBytes: number | null;
+}
+
+export interface RestoredProject {
+  project: Project;
+  /** The project file the copy now fills. */
+  path: string;
+  /** Where the replaced file was kept, or null when there was none. */
+  backup: string | null;
+}
+
+/** A custom profile file: libopenshot `key=value` text (description, frame rate, size, ratios). */
+export interface ProfileFile {
+  /** File name, the profile's key (e.g. `01000x1000p0030_01-01`). */
+  name: string;
+  text: string;
+  /** Where the file is. */
+  path: string;
+}
+
+/** A file's part rendered instead of copied (a sub-clip or an image sequence as MP4). */
+export interface MediaRender {
+  project: Project;
+  options: ExportOptions;
+}
+
+/** Where a copy of a project file's media went. */
+export interface ExportedMedia {
+  /** A local path, a download link or a download name. */
+  location: string;
+  /** Where the copies go, for the summary: a local folder, the browser's downloads, Zenvi Cloud links. */
+  folder: string;
+  /** The destination already had a file of that name, which was kept (nothing written). */
+  existed: boolean;
+}
+
+/** One media file moving between its original and the project's assets folder. */
+export interface MediaMove {
+  fileId: string;
+  from: string;
+  to: string;
+}
+
+/** What collecting media into the project's assets folder did (media_collect.copy_media_into_project). */
+export interface CollectedMedia {
+  copied: string[];
+  skipped: string[];
+  errors: string[];
+  /** Every file to point at its copy (already there or just copied). */
+  moves: MediaMove[];
+}
+
+/** Asset copies byte-identical to their recorded original (media_collect.find_reclaimable_media). */
+export interface ReclaimableMedia {
+  /** From the copy to the original. */
+  moves: MediaMove[];
+  kept: string[];
+  errors: string[];
 }
 
 /** Files bundled with the engine (`packages/engine/assets/…`), such as the title templates. */

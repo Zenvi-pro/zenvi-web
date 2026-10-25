@@ -17,6 +17,9 @@ import { listClipsReport, listFilesText, listLayersText, listMarkersText, projec
 import { timelineDelta, timelineSnapshot } from "../snapshot.js";
 import { normalizeTrackOrLayerArg } from "../tracks.js";
 import { coerceSteps, text } from "./common.js";
+import { keepCustomProfile, profileContext as contextFor, resolving } from "./project-export-profiles.js";
+import { resolveProfileRequest } from "../../model/profile-requests.js";
+import { editorRun } from "./timeline-edit-common.js";
 
 const READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true } as const;
 
@@ -80,22 +83,27 @@ export const projectTools: CatalogTool[] = [
 
   contractTool("new_project_tool", {
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
-    run: async (call, input) => {
-      if (input.save_first) {
-        const refusal = await saveCurrent(call, "new_project_tool");
-        if (refusal) return refusal;
-      }
-      // project.new(): the default project with this project's profile; history starts empty.
-      const current = call.doc.project;
-      let project: Project;
-      try {
-        project = createProject({ profile: current.profile || undefined, sampleRate: current.sample_rate, channels: current.channels });
-      } catch {
-        project = createProject();
-      }
-      call.doc.load(project);
-      return "New project created.";
-    },
+    run: (call, input) =>
+      editorRun(async () => {
+        // develop project_export.new_project: an unknown profile is refused before anything changes.
+        const asked = text(input.profile);
+        const ctx = asked ? await contextFor(call) : undefined;
+        const profile = ctx ? await keepCustomProfile(call, resolving(() => resolveProfileRequest(ctx, asked))) : undefined;
+        if (input.save_first) {
+          const refusal = await saveCurrent(call, "new_project_tool");
+          if (refusal) return refusal;
+        }
+        // project.new(): the default project with this project's profile (or the one asked for); history starts empty.
+        const current = call.doc.project;
+        let project: Project;
+        try {
+          project = createProject({ profile: profile ?? (current.profile || undefined), sampleRate: current.sample_rate, channels: current.channels });
+        } catch {
+          project = createProject(profile ? { profile } : {});
+        }
+        call.doc.load(project);
+        return profile ? `New project created (${profile.description}, ${project.width}x${project.height}).` : "New project created.";
+      }),
   }),
 
   contractTool("save_project_tool", {
@@ -113,7 +121,16 @@ export const projectTools: CatalogTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["storage"],
     run: async (call, input) => {
-      const path = text(input.file_path);
+      let path = text(input.file_path);
+      // develop project_export.open_project: recent_index picks from File > Recent Projects (1 = most recent).
+      const index = input.recent_index ?? 0;
+      if (index > 0) {
+        const storage = call.host.storage!;
+        if (!storage.recentProjects) return "Error: recent_index needs a list of recent projects, which this Zenvi surface does not keep; give file_path.";
+        const recent = await storage.recentProjects();
+        if (index > recent.length) return `Error: there are only ${recent.length} recent projects`;
+        path = recent[index - 1]!.path;
+      }
       if (!path) return "Error: give file_path (a .zvn project) or recent_index.";
       const project: Project = await call.host.storage!.open(path);
       if (input.save_first) {
