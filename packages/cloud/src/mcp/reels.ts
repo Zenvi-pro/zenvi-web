@@ -244,6 +244,8 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
         for (const url of args.media_urls ?? []) jobs.push({ label: url, run: fetch(url, undefined, "visual") });
         if (wantsStock && backendEnabled) {
           const used = new Set<number>();
+          // Few searches: take two clips from each, so a fast cut does not show the same shot over and over.
+          const perQuery = args.stock_queries!.length <= 4 ? 2 : 1;
           const searches = await Promise.allSettled(
             args.stock_queries!.map((query) =>
               ctx.services.backendSessions.request<{ videos?: PexelsVideo[]; error?: string }>(userId, `/api/v1/pexels/search?query=${encodeURIComponent(query)}&per_page=15`, { signal: ctx.signal }),
@@ -255,16 +257,18 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
               warnings.push(`Stock search "${query}" failed: ${result.status === "rejected" ? message(result.reason) : result.value.error}`);
               return;
             }
-            const video = pickStockVideo(result.value.videos ?? [], portrait, used);
-            const link = video ? pickStockFile(video, frameWidth, portrait) : undefined;
-            if (!video || !link) {
-              warnings.push(`No stock clip found for "${query}".`);
-              return;
+            for (let n = 0; n < perQuery; n += 1) {
+              const video = pickStockVideo(result.value.videos ?? [], portrait, used);
+              const link = video ? pickStockFile(video, frameWidth, portrait) : undefined;
+              if (!video || !link) {
+                if (n === 0) warnings.push(`No stock clip found for "${query}".`);
+                return;
+              }
+              used.add(video.id);
+              // Named by what it shows (the brief's story reads these names).
+              const name = `${query.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, " ").slice(0, 60) || "stock clip"}${n > 0 ? ` ${n + 1}` : ""}.mp4`;
+              jobs.push({ label: n > 0 ? `${query} (2)` : query, run: fetch(link, name, "visual", { name: query, credit: video.user_name ? `${video.user_name} on Pexels` : "Pexels", source: video.url ?? `https://www.pexels.com/video/${video.id}/` }) });
             }
-            used.add(video.id);
-            // Named by what it shows (the brief's story reads these names).
-            const name = `${query.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, " ").slice(0, 60) || "stock clip"}.mp4`;
-            jobs.push({ label: query, run: fetch(link, name, "visual", { name: query, credit: video.user_name ? `${video.user_name} on Pexels` : "Pexels", source: video.url ?? `https://www.pexels.com/video/${video.id}/` }) });
           });
         }
         // Music first: the cut follows its beats, so it should never be the file that misses the deadline.

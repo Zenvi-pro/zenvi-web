@@ -30,8 +30,10 @@ import { applied, failed, refused } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
 
 const TOOL = "build_reel_tool";
-/** How long a white flash fades, seconds (about four frames at 30 fps). */
-const FLASH_SECONDS = 0.14;
+/** How long a white flash fades, seconds (three frames at 30 fps). */
+const FLASH_SECONDS = 0.1;
+/** Flash at most once per this many seconds: a flash on every bar strobes. */
+const FLASH_SPACING_SECONDS = 3;
 /** Tracks the reel uses, bottom to top. */
 const TRACKS = ["music", "video", "flash", "labels", "titles"] as const;
 type TrackRole = (typeof TRACKS)[number];
@@ -111,10 +113,18 @@ function storyLine(plan: ReelPlan, names: Map<string, string>): string {
   return [unique[0], ...middle].join(", ") + `, ends on ${last}`;
 }
 
-function shouldFlash(style: ReelStyle, shot: PlannedShot, index: number): boolean {
-  if (index === 0 || !shot.onDownbeat) return false;
-  if (style.flash === "downbeats") return true;
-  return style.flash === "climax_downbeats" && shot.climax;
+/** The shots whose cut flashes: downbeats (in the climax only, for some styles), spaced so it never strobes. */
+function flashIndexes(style: ReelStyle, shots: readonly PlannedShot[]): Set<number> {
+  const out = new Set<number>();
+  let last = -Infinity;
+  shots.forEach((shot, index) => {
+    if (index === 0 || !shot.onDownbeat || style.flash === "none") return;
+    if (style.flash === "climax_downbeats" && !shot.climax) return;
+    if (shot.start - last < FLASH_SPACING_SECONDS) return;
+    out.add(index);
+    last = shot.start;
+  });
+  return out;
 }
 
 interface Prepared {
@@ -237,6 +247,7 @@ export const reelTools: CatalogTool[] = [
 
       // Title images (written through the host before the edit is recorded).
       const prepared: Prepared = { labels: new Map() };
+      const flashes = flashIndexes(style, plan.shots);
       const width = Number(project.width) || 1920;
       const height = Number(project.height) || 1080;
       const card = (text: string, role: CardRole, subtitle?: string) => cardSvg({ width, height, text, role, typography: style.typography, subtitle });
@@ -244,7 +255,7 @@ export const reelTools: CatalogTool[] = [
         try {
           if (args.hook?.trim()) prepared.hook = await writeCard(call, "reel-hook.svg", card(args.hook, "hook"));
           if (args.end_card?.trim()) prepared.end = await writeCard(call, "reel-end.svg", card(args.end_card, "end", args.end_card_subtitle));
-          if (plan.shots.some((s, i) => shouldFlash(style, s, i))) prepared.flash = await writeCard(call, "reel-flash.svg", flashSvg(width, height));
+          if (flashes.size > 0) prepared.flash = await writeCard(call, "reel-flash.svg", flashSvg(width, height));
           for (const label of new Set(plan.shots.map((s) => s.label).filter((l): l is string => Boolean(l)))) {
             prepared.labels.set(label, await writeCard(call, `reel-label-${prepared.labels.size + 1}.svg`, card(label, "label")));
           }
@@ -292,9 +303,9 @@ export const reelTools: CatalogTool[] = [
           const current = tx.project.clips.find((c) => c.id === clip.id)!;
           if (index === 0 && style.fadeIn) fadeAlpha(tx, current, 0, 1, shot.start, shot.start + Math.min(0.6, length / 2));
           if (index === plan.shots.length - 1 && style.fadeOut) fadeAlpha(tx, current, 1, 0, shot.end - Math.min(0.8, length / 2), shot.end);
-          if (prepared.flash && shouldFlash(style, shot, index)) {
+          if (prepared.flash && flashes.has(index)) {
             const flash = addTitleClip(tx, { file: prepared.flash, position: shot.start, duration: FLASH_SECONDS, layer: track.flash, title: "Flash" }).clip;
-            fadeAlpha(tx, flash, 0.9, 0, shot.start, shot.start + FLASH_SECONDS);
+            fadeAlpha(tx, flash, 0.75, 0, shot.start, shot.start + FLASH_SECONDS);
           }
           const label = shot.label ? prepared.labels.get(shot.label) : undefined;
           if (label) placeTitle(tx, label, shot.start, length, track.labels, null);
