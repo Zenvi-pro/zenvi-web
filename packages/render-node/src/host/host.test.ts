@@ -8,7 +8,7 @@ import { analyzeAudio, NoAudioError } from "../audio/analyze.js";
 import { probe } from "../probe/probe.js";
 import { makeAudio, makeImage, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
 import { createBackendHost } from "./backend.js";
-import { createNodeMediaHost, globToRegExp, listPaths } from "./media.js";
+import { createNodeMediaHost, globToRegExp, listPaths, missingOnDisk } from "./media.js";
 import { createMediaResolver, isPortableAssetPath, mapPathValues } from "./paths.js";
 import { parseProjectFileText, readProjectFile, serializeProjectFile, withProjectLock, writeProjectFile } from "./storage.js";
 
@@ -175,12 +175,33 @@ describe("media host", () => {
     const root = path.join(dir, "tree");
     await mkdir(path.join(root, "sub"), { recursive: true });
     for (const f of ["b.mp4", "a.png", "sub/c.mp4", ".hidden"]) await writeFile(path.join(root, f), "x");
-    expect(await listPaths(path.join(root, "a.png"))).toEqual({ kind: "file", files: [path.join(root, "a.png")] });
+    expect(await listPaths(path.join(root, "a.png"))).toEqual({ kind: "file", files: [path.join(root, "a.png")], path: path.join(root, "a.png") });
     expect((await listPaths(root)).files).toEqual([path.join(root, "a.png"), path.join(root, "b.mp4"), path.join(root, "sub", "c.mp4")]);
     expect((await listPaths(path.join(root, "**/*.mp4"))).files).toEqual([path.join(root, "b.mp4"), path.join(root, "sub", "c.mp4")]);
     expect((await listPaths(`file://${path.join(root, "b.mp4")}`)).kind).toBe("file");
-    expect(await listPaths(path.join(root, "nope.mov"))).toEqual({ kind: "missing", files: [] });
+    expect(await listPaths(path.join(root, "nope.mov"))).toEqual({ kind: "missing", files: [], path: path.join(root, "nope.mov") });
+    expect((await listPaths(`${root}/`)).path).toBe(root);
     expect(globToRegExp("*.{mp4,mov}").test("x.MOV")).toBe(process.platform !== "linux");
+  });
+
+  it("tells which project files' media is missing on disk (media_missing), image sequences by their frames", async () => {
+    const root = path.join(dir, "missing-check");
+    await mkdir(path.join(root, "seq"), { recursive: true });
+    for (const f of ["here.mp4", "seq/f_0001.png", "seq/f_0002.png"]) await writeFile(path.join(root, f), "x");
+    const fileAt = (id: string, p: string) => ({ id, path: p, media_type: "video" as const });
+    const files = [
+      fileAt("A", path.join(root, "here.mp4")),
+      fileAt("B", path.join(root, "gone.mp4")),
+      fileAt("C", path.join(root, "seq", "f_%04d.png")),
+      fileAt("D", path.join(root, "seq", "g_%04d.png")),
+      fileAt("E", path.join(root, "nofolder", "f_%04d.png")),
+      fileAt("F", "@transitions/common/fade.svg"),
+      fileAt("G", ""),
+    ];
+    const resolve = createMediaResolver({ projectFile: path.join(root, "p.zvn"), engineAssetsDir: path.join(root, "assets") });
+    await mkdir(path.join(root, "assets", "transitions", "common"), { recursive: true });
+    await writeFile(path.join(root, "assets", "transitions", "common", "fade.svg"), "<svg/>");
+    expect(await missingOnDisk(files as never, resolve)).toEqual([false, true, false, true, true, false, true]);
   });
 
   it("downloads URLs into the assets folder with a size cap", async () => {
@@ -215,6 +236,15 @@ describe("backend host", () => {
     await expect(backend.request("/api/v1/private")).rejects.toThrow(/401: Not authenticated.*zenvi login/);
     const down = createBackendHost({ baseUrl: "http://127.0.0.1:9" });
     await expect(down.request("/api/v1/ok")).rejects.toThrow(/Cannot reach/);
+  });
+
+  it("shows a credit or tier refusal in the backend's own words (detail.message)", async () => {
+    const message = "Out of credits for image generation. Need 3, have 0. Upgrade your plan or enable overage to continue.";
+    const backend = createBackendHost({
+      baseUrl,
+      fetchImpl: async () => new Response(JSON.stringify({ detail: { code: "insufficient_credits", required: 3, balance: 0, message } }), { status: 402 }),
+    });
+    await expect(backend.request("/api/v1/generation/image", { body: { prompt: "a fox" } })).rejects.toMatchObject({ status: 402, message: `Zenvi backend 402: ${message}` });
   });
 });
 

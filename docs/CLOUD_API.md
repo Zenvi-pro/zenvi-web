@@ -23,6 +23,7 @@ and Claude connect to (see [CONNECTORS.md](CONNECTORS.md)).
 | Supabase access token (ES256 JWT, `aud=authenticated`) | web editor, website, desktop (existing Supabase session) | `/v1/*`, `/oauth/consent` (not `/mcp`) |
 | `zvn_pat_…` personal access token | CLI and desktop after device login, account page | `/v1/*` except `/v1/tokens`, and `/mcp` |
 | `zvn_oat_…` OAuth access token (1 h) | MCP connectors | `/mcp` only (audience-bound, RFC 8707) |
+| `zvn_emb_…` embedded-editor token (12 h) | the editor inside a chat (minted by `open_in_editor`, handed to the MCP view in the result's `_meta`) | its one project only: `GET`/`PUT /v1/projects/:id`, `GET …/revision`, renders, and `/v1/media/*`. Another project answers `404`, any other route `403`, `/mcp` `401`. It carries the connection's scopes and ends when the connection's OAuth grant or personal access token is revoked |
 
 Tokens are never accepted in query strings. Zenvi tokens are 32 random bytes
 behind a prefix; only their SHA-256 is stored. Personal tokens carry the scopes
@@ -87,6 +88,7 @@ ETag is the project's **revision**. Unknown keys are preserved.
 | GET | `/v1/projects` | | `{ projects: Summary[] }`, most recently updated first |
 | POST | `/v1/projects` | `{ name?, project? }` | `201 Summary` + `ETag`. No `project` = empty desktop default project (HD 720p 30 fps) |
 | GET | `/v1/projects/:id` | | `Summary & { project, media, missingMedia }` + `ETag` |
+| GET | `/v1/projects/:id/revision` | | `{ id, revision }` + `ETag`: a one-blob-HEAD change check for editors following edits made elsewhere |
 | PUT | `/v1/projects/:id` | project JSON, header `If-Match: <revision>` | `{ id, revision, updatedAt, stats }` + `ETag` |
 | PATCH | `/v1/projects/:id` | `{ name }` | `Summary` |
 | DELETE | `/v1/projects/:id` | | `204`; deletes the project, its renders and frames (media stays: it is shared by hash) |
@@ -205,7 +207,7 @@ open `editorUrl`.
 
 Presets: `mp4` (project size, default), `mp4-2160p`, `mp4-1080p`, `mp4-720p`,
 `webm`, `gif` (360p), `mp3`, `wav`. `options` (all optional) override the
-preset: `format` (`mp4 webm mov mkv gif mp3 wav`), `width`, `height` (the
+preset: `format` (`mp4 webm mov mkv gif mp3 wav flac m4a`), `width`, `height` (the
 other follows the project aspect), `fps {num,den}`, `quality`
 (`low medium high lossless`), `videoBitrate`, `audioBitrate`, `sampleRate`,
 `channels`, `range {start,end}` (seconds).
@@ -347,7 +349,7 @@ the same JSON as text, ChatGPT status strings):
 | `import_media_from_url {url, name?}` | server-side download (https, public addresses only, pinned DNS, redirects re-checked, 512 MB, media types only), content-addressed, added to the bin; idempotent |
 | `import_attached_file {file}` | a file attached in ChatGPT (`openai/fileParams`: `{download_url, file_id, mime_type?, file_name?}`), imported like a URL |
 | `get_upload_link` | `${editor}/p/<id>?upload=1` for files on the person's device |
-| `open_in_editor` | `${editor}/p/<id>` |
+| `open_in_editor` | the Zenvi editor in the chat (MCP Apps view `ui://zenvi/editor-v1.html`, which frames `<origin>/editor/embed/<id>`; the token travels in `_meta["zenvi/editor"]`), plus `${editor}/p/<id>` |
 | `render_project {preset?, format?, height?, quality?, start_seconds?, end_seconds?}` | starts a render, returns `render_id` at once; idempotent |
 | `get_render_status {render_id, wait_seconds?}` | status/progress; download link when done (waits up to 45 s) |
 | `preview_frame {time_seconds, width?}` | PNG of one frame as image content + a 1 h link |
@@ -360,7 +362,9 @@ Host capabilities the catalog gets in the cloud (`GET /health` →
 `hostCapabilities`): `media` (probe project media; URL imports;
 `writeGenerated` stores generated files such as title SVGs as
 content-addressed media at `@assets/title/<name>` with `file.cloud`, so they
-render in cloud renders and travel with the project), `frames`, `assets` (the
+render in cloud renders and travel with the project; `missing` names the
+files whose bytes are not uploaded, as `GET /v1/projects/:id` lists them in
+`missingMedia`), `frames`, `assets` (the
 engine's bundled title templates), `audio` (loudness analysis for
 `remove_silence_tool`) and `storage` (`readText` of project media;
 `writeText` stores an export such as captions under the project and returns a
@@ -393,6 +397,7 @@ with `If-Match`, replaying the change if someone else saved in between.
 | `MAX_PROJECT_BYTES`, `MAX_FILE_BYTES`, `MAX_USER_BYTES`, `IMPORT_MAX_BYTES`, `VERIFY_HASH_MAX_BYTES`, `MAX_RENDER_MEDIA_BYTES` | 20 MB, 4 GB, 20 GB, 512 MB, 64 MB, 3 GB | |
 | `RENDER_TMP_DIR` | OS temp | render scratch + frame media cache (2 GB) |
 | `ZENVI_CLOUD_VERSION` | `dev` | set to the image tag by deploy.sh |
+| `ZENVI_RENDER_QUEUE` | | Azure Storage queue of render workers (below); unset = renders run in this process |
 
 Storage (account `zenvicloud`): blob container `zenvi` —
 `u/{userId}/p/{projectId}/{project.json,meta.json,renders/…,frames/…,exports/…}`,
@@ -403,8 +408,18 @@ declarations), `u/{userId}/mcp/{connection}.json` (open project). Tables —
 `oauthcodes` (`req/<id>`, `code/<sha256>`), `devicecodes` (`d/<user code>`),
 `renders` (`<userId>/<renderId>`, plus idempotency keys `<userId>/key:<projectId>:<hash>`); blob prefix `verify/` holds pending upload hash checks. Expired rows are swept every 6 h.
 
-Deploy: `scripts/azure/deploy.sh` (ACR build of the committed tree, roll the
-app, wait for `/health`); configuration: `scripts/azure/provision.sh`; live
+Render workers: `scripts/azure/render-jobs.sh` creates the queue
+`render-jobs` and the Container Apps job `zenvi-render` (4 vCPU, 8 GiB,
+consumption: billed only while it renders). With `ZENVI_RENDER_QUEUE` set,
+the service posts each new render on the queue and the platform starts one
+job execution per message (`dist/render-job.mjs`); the service renders in its
+own process only a job no worker claims within five minutes, and re-queues a
+worker's job when its heartbeat stops. Executions:
+`az containerapp job execution list -g zenvi-rg -n zenvi-render -o table`.
+
+Deploy: `scripts/azure/deploy.sh` (ACR build of the committed tree, move the
+render job to it, roll the app, wait for `/health`); configuration:
+`scripts/azure/provision.sh`; live
 end-to-end check (OAuth, device login, uploads, MCP tools, a real render):
 `npx tsx packages/cloud/scripts/e2e-live.mjs` (test user from
 `~/.config/zenvi-dev/test-user.env`).
@@ -412,9 +427,10 @@ Logs: `az containerapp logs show -g zenvi-rg -n zenvi-cloud --tail 100`
 (JSON lines; tokens, codes, query strings and signed URLs are never logged).
 Local run: `STORAGE=memory PUBLIC_BASE_URL=http://localhost:8080 npm run dev -w @zenvi/cloud`.
 
-Known limits of this release: one replica (in-process render queue and rate
-limits; render jobs are claimed with ETags and heartbeat, so an overlapping
-instance during a deploy never renders a job twice); renders need every
+Known limits of this release: one replica (in-process rate limits, and the
+in-process render queue when there are no render workers; render jobs are
+claimed with ETags and heartbeat, so an overlapping instance or a duplicate
+worker never renders a job twice); renders need every
 clip's media in the cloud; projects are listed by scanning the user's blob
 prefix; orphaned media (no project uses them) and unused dynamically
 registered OAuth clients are not garbage-collected yet.

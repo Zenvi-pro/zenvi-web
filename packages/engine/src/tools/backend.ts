@@ -4,13 +4,14 @@
  * Ports of zenvi-core src/classes/api_client.py (ref b63c39be7):
  * `search`, `watch_window`, `is_indexing_configured`, `get_project_catalog`,
  * `generate_video`, `generate_tts`, `summarize_indexed_video`,
- * `pick_pexels_hd_link`; and of classes/project_tl_index.py
+ * `pick_pexels_hd_link` (and develop 1f80cb3d0's `generate_image`); and of classes/project_tl_index.py
  * (the project's shared video index) and classes/twelvelabs_match.py (hit
  * selection). Like the desktop client, failures come back as `{ error }`
  * instead of throwing.
  */
 
 import type { Project } from "../model/types.js";
+import type { FreesoundSound, PexelsVideo } from "../stock/stock.js";
 import type { ToolCall } from "./define.js";
 import { getIndexBlock, isIndexed } from "./ai-metadata.js";
 import type { TimelineClipContext } from "./clip-context.js";
@@ -155,8 +156,29 @@ export async function generateVideo(
     signal: call.signal,
   });
   if (!res.ok) return { error: res.error };
-  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: bareError(res.data.error, "Video generation failed") };
   return { videoUrl: String(res.data.video_url ?? "") };
+}
+
+/**
+ * POST /api/v1/generation/image (api_client.generate_image, zenvi-core
+ * develop): a still from a text prompt, charged by the backend. Only the
+ * aspect of width/height is used. The image comes back inline (base64).
+ */
+export async function generateImage(
+  call: ToolCall,
+  prompt: string,
+  size: { width: number; height: number },
+): Promise<{ imageBase64: string; mimeType: string } | { error: string }> {
+  const res = await backendRequest<Record<string, unknown>>(call.host.backend, "/api/v1/generation/image", {
+    method: "POST",
+    body: { prompt, width: size.width, height: size.height },
+    signal: call.signal,
+  });
+  if (!res.ok) return { error: res.error };
+  if (!isRecord(res.data)) return { error: "Unexpected response from the Zenvi backend" };
+  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  return { imageBase64: String(res.data.image_base64 ?? ""), mimeType: String(res.data.mime_type ?? "") };
 }
 
 /** POST /api/v1/generation/tts (api_client.generate_tts): MP3 bytes as base64. */
@@ -170,8 +192,35 @@ export async function generateTts(
     signal: call.signal,
   });
   if (!res.ok) return { error: res.error };
-  if (!res.data.success) return { error: String(res.data.error || "TTS generation failed") };
+  if (!res.data.success) return { error: bareError(res.data.error, "TTS generation failed") };
   return { audioBase64: String(res.data.audio_base64 ?? "") };
+}
+
+/** A backend error without the "Error:" some backend paths put in front: the tools add their own. */
+function bareError(value: unknown, fallback: string): string {
+  return String(value || fallback).trim().replace(/^error:\s*/i, "") || fallback;
+}
+
+/** GET /api/v1/pexels/search: Pexels videos for a query (the backend holds the API key). */
+export async function searchPexelsVideos(call: ToolCall, search: string, perPage: number): Promise<{ videos: PexelsVideo[]; total: number } | { error: string }> {
+  const res = await backendRequest<Record<string, unknown>>(call.host.backend, `/api/v1/pexels/search${query({ query: search, per_page: perPage, page: 1 })}`, { signal: call.signal });
+  if (!res.ok) return { error: res.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  const videos = Array.isArray(res.data.videos) ? (res.data.videos.filter(isRecord) as unknown as PexelsVideo[]) : [];
+  return { videos, total: Number(res.data.total_results ?? videos.length) || videos.length };
+}
+
+/** GET /api/v1/freesound/search: Freesound sounds for a query, at least `minSeconds` long. */
+export async function searchFreesound(call: ToolCall, search: string, pageSize: number, minSeconds: number): Promise<{ sounds: FreesoundSound[]; total: number } | { error: string }> {
+  const res = await backendRequest<Record<string, unknown>>(
+    call.host.backend,
+    `/api/v1/freesound/search${query({ query: search, page_size: pageSize, min_duration: minSeconds > 0 ? Math.round(minSeconds) : undefined })}`,
+    { signal: call.signal },
+  );
+  if (!res.ok) return { error: res.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
+  const sounds = Array.isArray(res.data.sounds) ? (res.data.sounds.filter(isRecord) as unknown as FreesoundSound[]) : [];
+  return { sounds, total: Number(res.data.count ?? sounds.length) || sounds.length };
 }
 
 /** The HD file of a Pexels video, else its first file (api_client.pick_pexels_hd_link). */

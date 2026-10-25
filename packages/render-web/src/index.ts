@@ -15,7 +15,7 @@ export {
 } from "./media/registry.js";
 export { type MediaSourceSpec, sourceName } from "./media/source.js";
 export { probeMedia, mediaKind, sourceKind, ProbeError, type MediaKind, type ProbeOptions } from "./media/probe.js";
-export { parseSvgSize, type SvgRasterizer, type SvgSize } from "./media/svg.js";
+export { parseSvgSize, type SvgRasterizer, type SvgSize, withGenericFontFallbacks } from "./media/svg.js";
 export { createImageElementSvgRasterizer } from "./media/svg-dom.js";
 export { StillCache, type StillCacheOptions, type StillRequest } from "./media/stills.js";
 
@@ -52,6 +52,7 @@ export { mixWindow } from "./audio/mixdown.js";
 
 // Export
 export {
+  canExportWith,
   exportProject,
   exportProjectTo,
   exportFrame,
@@ -60,7 +61,7 @@ export {
   type ExportRunOptions,
   type StreamedExport,
 } from "./export/export-project.js";
-export { chooseCodecs, ExportError, type CodecChoice, type EncodeSupport } from "./export/codecs.js";
+export { canEncodeNamed, chooseCodecs, ExportError, type CodecChoice, type EncodeSupport } from "./export/codecs.js";
 export { FrameRenderer } from "./export/frame-renderer.js";
 
 // Timeline helpers

@@ -44,6 +44,28 @@ function renderJson(job: RenderJob | RenderJobView): Record<string, unknown> {
   };
 }
 
+const EMBED_ROUTES: { method: string; pattern: RegExp }[] = [
+  { method: "GET", pattern: /^\/v1\/projects\/([^/]+)$/ },
+  { method: "PUT", pattern: /^\/v1\/projects\/([^/]+)$/ },
+  { method: "GET", pattern: /^\/v1\/projects\/([^/]+)\/revision$/ },
+  { method: "POST", pattern: /^\/v1\/projects\/([^/]+)\/renders$/ },
+  { method: "GET", pattern: /^\/v1\/projects\/([^/]+)\/renders(?:\/[^/]+)?$/ },
+  { method: "POST", pattern: /^\/v1\/media\/check$/ },
+  { method: "POST", pattern: /^\/v1\/media$/ },
+  { method: "POST", pattern: /^\/v1\/media\/[^/]+\/complete$/ },
+  { method: "GET", pattern: /^\/v1\/media\/[^/]+\/url$/ },
+];
+
+/** The route an embed token may call (with the project it names), or null. */
+export function embedRoute(method: string, path: string): { projectId?: string } | null {
+  for (const route of EMBED_ROUTES) {
+    if (route.method !== method) continue;
+    const match = route.pattern.exec(path);
+    if (match) return match[1] !== undefined ? { projectId: decodeURIComponent(match[1]) } : {};
+  }
+  return null;
+}
+
 export function v1Routes(services: Services): Hono<AppEnv> {
   const { projects, media, renders, tokens, config, sessions } = services;
   const app = new Hono<AppEnv>();
@@ -58,13 +80,26 @@ export function v1Routes(services: Services): Hono<AppEnv> {
     editorUrl: editorUrl(p.id),
   });
 
-  app.use("*", requireAuth(services.auth, { allow: ["supabase", "pat"] }));
+  app.use("*", requireAuth(services.auth, { allow: ["supabase", "pat", "embed"] }));
 
   // Scope gate: personal tokens carry both scopes today; a narrower one is refused writes.
   app.use("*", async (c, next) => {
     const principal = c.get("principal");
     const needs = c.req.method === "GET" || c.req.method === "HEAD" ? SCOPE_READ : SCOPE_WRITE;
     if (!principal.scopes.includes(needs)) throw new ApiError(403, "insufficient_scope", `This token lacks ${needs}.`);
+    await next();
+  });
+
+  // The embedded editor's token opens, saves, polls and renders its one project
+  // and handles media; nothing else. Another project answers 404 (it is not
+  // this token's to know about).
+  app.use("*", async (c, next) => {
+    const principal = c.get("principal");
+    if (principal.kind === "embed") {
+      const route = embedRoute(c.req.method, c.req.path);
+      if (route === null) throw new ApiError(403, "forbidden", "The embedded editor cannot use this endpoint.");
+      if (route.projectId !== undefined && route.projectId !== principal.projectId) throw notFound("Project");
+    }
     await next();
   });
 
@@ -115,6 +150,15 @@ export function v1Routes(services: Services): Hono<AppEnv> {
     }
     c.header("ETag", `"${loaded.revision}"`);
     return c.json({ ...summary({ ...loaded.meta, revision: loaded.revision }), project: loaded.project, media: mediaList, missingMedia: missing });
+  });
+
+  // Cheap change check (one blob HEAD) for editors that follow edits made elsewhere.
+  app.get("/projects/:id/revision", async (c) => {
+    const id = projectId(c.req.param("id"));
+    const revision = await projects.revision(c.get("principal").userId, id);
+    c.header("ETag", `"${revision}"`);
+    c.header("Cache-Control", "no-store");
+    return c.json({ id, revision });
   });
 
   app.put("/projects/:id", async (c) => {

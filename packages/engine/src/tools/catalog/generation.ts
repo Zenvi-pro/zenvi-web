@@ -1,12 +1,16 @@
 /**
  * AI generation tools: generate_video_and_add_to_timeline_tool,
+ * generate_image_and_add_to_timeline_tool,
  * generate_tts_and_add_to_timeline_tool, modify_clip_tool,
  * generate_transition_clip_tool.
  *
  * Ports of zenvi-core src/classes/tool_handlers.py (ref b63c39be7):
  * generate_video_and_add_to_timeline (+ _snap_kling_o1_duration,
  * _project_kling_o1_t2v_dims), generate_tts_and_add_to_timeline /
- * add_tts_audio_to_timeline, modify_clip, generate_transition_clip.
+ * add_tts_audio_to_timeline (with develop 1f80cb3d0's position_seconds,
+ * playhead default and narration name), modify_clip, generate_transition_clip;
+ * and of develop 1f80cb3d0's generate_image_and_add_to_timeline
+ * (+ _stamp_generated_video_metadata).
  *
  * Credits are enforced by the backend on /generation/* (api/credit_gate.py),
  * so the desktop's client-side credit pre-check is not repeated here.
@@ -15,18 +19,19 @@
  * are refused as not available.
  */
 
+import { generateId } from "../../model/ids.js";
 import type { ProjectFile } from "../../model/types.js";
 import { addClip, moveClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
-import { generateTts, generateVideo } from "../backend.js";
+import { generateImage, generateTts, generateVideo } from "../backend.js";
 import { contractTool, unavailable, type CatalogTool } from "../define.js";
 import { parseSecondsArg, TimeArgError } from "../placement.js";
-import { pyFloat } from "../pyfmt.js";
+import { pyFloat, pyG, pySlice } from "../pyfmt.js";
 import { applied } from "../receipt.js";
-import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, normalizeTrackOrLayerArg } from "../tracks.js";
+import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, lockedTrackError, normalizeTrackOrLayerArg } from "../tracks.js";
 import type { ImportedMedia } from "../types.js";
-import { applyPlacement, planPlacement, provisionalFile, placementText } from "./clips.js";
-import { record, text } from "./common.js";
+import { applyPlacement, planPlacement, provisionalFile, placementText, type PlacementArgs } from "./clips.js";
+import { playheadSeconds, record, text } from "./common.js";
 
 /** Kling O1 Pro durations: 5 s unless 10 s is clearly asked for (>= 8). */
 export function snapKlingDuration(duration: unknown): number {
@@ -43,11 +48,71 @@ export function t2vDims(width: number, height: number): [number, number] {
   return [1440, 1440];
 }
 
+/** Project Files name of a narration (zenvi-core develop ai_generation_tts.default_name). */
+export function narrationName(text: string): string {
+  const words = text.split(/\s+/).filter(Boolean);
+  return `Narration - ${words.slice(0, 6).join(" ")}${words.length > 6 ? "..." : ""}`;
+}
+
 function base64ToBytes(b64: string): Uint8Array {
   const binary = globalThis.atob(b64);
   const out = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
   return out;
+}
+
+/** Bytes of strict base64 (Python `b64decode(validate=True)`), empty when it is not. */
+function strictBase64(b64: string): Uint8Array {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64) || b64.length % 4 !== 0) return new Uint8Array();
+  try {
+    return base64ToBytes(b64);
+  } catch {
+    return new Uint8Array();
+  }
+}
+
+/** The generated image's file type, from the backend's MIME type (JPEG unless PNG or WebP). */
+export function generatedImageType(mimeType: string): { ext: ".png" | ".webp" | ".jpg"; contentType: string } {
+  const mime = mimeType.trim().toLowerCase();
+  if (mime === "image/png") return { ext: ".png", contentType: mime };
+  if (mime === "image/webp") return { ext: ".webp", contentType: mime };
+  return { ext: ".jpg", contentType: "image/jpeg" };
+}
+
+function tagList(tags: unknown): string[] {
+  const items = typeof tags === "string" ? tags.split(",") : Array.isArray(tags) ? tags.map(String) : [];
+  return items.map((t) => t.trim()).filter(Boolean);
+}
+
+/**
+ * What a generated clip's Project Files entry gets (tool_handlers
+ * _stamp_generated_video_metadata): the `ai_generated` tag, the prompt as
+ * its summary and description (analyzed, so scene search and the Scene
+ * panel show it: generated media is never indexed), the source, and the
+ * prompt as its name when it has none.
+ */
+export function generatedMediaStamp(prompt: string, source: string, existing: Partial<ProjectFile> = {}): Partial<ProjectFile> {
+  const summary = prompt.trim();
+  if (!summary) return {};
+  const tags = tagList(existing.tags);
+  if (!tags.includes("ai_generated")) tags.push("ai_generated");
+  const stamp: Partial<ProjectFile> = {
+    tags: tags.join(", "),
+    ai_metadata: {
+      ...record(existing.ai_metadata),
+      short_summary: pySlice(summary, 0, 400),
+      description: pySlice(summary, 0, 400),
+      analyzed: true,
+      source,
+    },
+  };
+  if (!existing.name) stamp.name = pySlice(summary, 0, 120);
+  return stamp;
+}
+
+/** A still as the planner sees it before it exists (libopenshot readers give images 3600 s). */
+function plannedStill(width: number, height: number): ProjectFile {
+  return { id: "", path: "generated.jpg", media_type: "image", has_video: true, has_audio: false, duration: 3600, width, height } as ProjectFile;
 }
 
 export const generationTools: CatalogTool[] = [
@@ -129,6 +194,82 @@ export const generationTools: CatalogTool[] = [
     },
   }),
 
+  contractTool("generate_image_and_add_to_timeline_tool", {
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    requires: ["backend", "media"],
+    run: async (call, input) => {
+      const tool = "generate_image_and_add_to_timeline_tool";
+      const prompt = text(input.prompt);
+      if (Array.from(prompt).length < 2) return "Error: Prompt must be at least 2 characters.";
+      let seconds: number;
+      try {
+        seconds = parseSecondsArg(input.duration_seconds, 5, "duration_seconds") ?? 5;
+      } catch (error) {
+        if (error instanceof TimeArgError) return `Error: ${error.message}`;
+        throw error;
+      }
+      if (!(seconds > 0)) return "Error: duration_seconds must be greater than 0.";
+      const media = call.host.media!;
+      const writeGenerated = media.writeGenerated;
+      if (!writeGenerated) return unavailable(tool, "it cannot store generated images.");
+      const project = call.doc.project;
+      const args: PlacementArgs = {
+        position_seconds: input.position_seconds ?? "",
+        track: input.track ?? "",
+        query: prompt,
+        duration_seconds: pyG(seconds),
+      };
+      // Where it would go is checked before any credits are spent (the desktop checks after).
+      const planned = await planPlacement(call, plannedStill(project.width, project.height), args);
+      if (typeof planned === "string") return planned;
+      const locked = lockedTrackError(planned.layer, project.layers);
+      if (locked) return locked;
+
+      const [width, height] = t2vDims(project.width, project.height);
+      const result = await generateImage(call, prompt, { width, height });
+      if ("error" in result) return `Error: ${result.error}`;
+      const bytes = strictBase64(result.imageBase64);
+      if (bytes.length === 0) return "Error: The backend returned no image data.";
+      const { ext, contentType } = generatedImageType(result.mimeType);
+      // tool_handlers names it like classes.assets.durable_media_path: generated_<12 random>.<ext>.
+      const name = `generated_${generateId(undefined, 12).toLowerCase()}${ext}`;
+      let path: string;
+      try {
+        path = await writeGenerated.call(media, name, bytes, contentType);
+      } catch (error) {
+        return `Error: Could not save the generated image: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      let imported: ImportedMedia;
+      try {
+        imported = { path, info: await media.probe(path) };
+      } catch {
+        return "Error: Image generated but failed to import into project files.";
+      }
+
+      const stamp = generatedMediaStamp(prompt, "ai_image_generation");
+      const plan = await planPlacement(call, provisionalFile(imported, { ...stamp, media_type: "image" }), args);
+      const placementError = typeof plan === "string" ? plan : lockedTrackError(plan.layer, call.doc.project.layers);
+      const placed = call.commit((tx) => {
+        const file = addFile(tx, imported, { dedupe: true, mediaType: "image" });
+        tx.update(["files", { id: file.id }], stamp);
+        if (placementError || typeof plan === "string") return { file, clip: undefined };
+        return { file, clip: applyPlacement(tx, String(file.id), plan) };
+      });
+      if (!placed.clip || typeof plan === "string") {
+        // The paid-for image stays in Project Files: never generate it again.
+        const fileId = String(placed.file.id);
+        return applied(
+          tool,
+          `Image imported (file_id=${fileId}) but timeline placement failed: ${placementError || "unknown"}. ` +
+            `Do NOT regenerate — call add_clip_to_timeline_tool(file_id='${fileId}', ` +
+            `track=<layer_number from list_layers_tool>, position_seconds=..., duration_seconds=${pyG(seconds)}).`,
+          { data: { file_id: fileId } },
+        );
+      }
+      return placementText(call.doc.project, plan, placed.clip);
+    },
+  }),
+
   contractTool("generate_tts_and_add_to_timeline_tool", {
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     requires: ["backend", "media"],
@@ -137,13 +278,14 @@ export const generationTools: CatalogTool[] = [
       if (!narration) return "Error: No text provided for narration.";
       const writeGenerated = call.host.media!.writeGenerated;
       if (!writeGenerated) return unavailable("generate_tts_and_add_to_timeline_tool", "it cannot store generated audio.");
-      let position: number;
-      try {
-        position = parseSecondsArg(input.position, 0, "position") ?? 0;
-      } catch (error) {
-        if (error instanceof TimeArgError) return `Error: ${error.message}`;
-        throw error;
+      // zenvi-core develop editor_tools/ai_generation_tts.py _start_seconds: position is the
+      // older name of position_seconds; neither means the playhead.
+      const asked = input.position_seconds ?? null;
+      const older = input.position ?? null;
+      if (asked !== null && older !== null && Math.abs(asked - older) > 1e-6) {
+        return `Error: position (${pyFloat(older)}) and position_seconds (${pyFloat(asked)}) disagree; pass position_seconds only.`;
       }
+      const position = Math.max(0, asked ?? older ?? playheadSeconds(call));
       const project = call.doc.project;
       let layer = defaultUnderlayLayerNumber(project.layers);
       if (input.track !== undefined && String(input.track).trim() !== "") {
@@ -162,7 +304,7 @@ export const generationTools: CatalogTool[] = [
       if (bytes.length === 0) return "Error: TTS returned empty audio.";
       const path = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
       const info = await call.host.media!.probe(path);
-      const media: ImportedMedia = { path, info: { ...info, media_type: "audio" }, name: "Narration" };
+      const media: ImportedMedia = { path, info: { ...info, media_type: "audio" }, name: text(input.name) || narrationName(narration) };
       const clip = call.commit((tx) => {
         const file = addFile(tx, media, { dedupe: false, mediaType: "audio" });
         return addClip(tx, { fileId: String(file.id), position, layer });

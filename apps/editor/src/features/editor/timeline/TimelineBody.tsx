@@ -39,7 +39,8 @@ import { fileDisplayName } from "../session/media";
 import { clickSelect, EMPTY_SELECTION, type Selection } from "../session/uiStore";
 import { ClipView, TransitionView, type ClipGeometry } from "./ClipView";
 import { computeMove, computeTrim, edgeAt, marqueeHits, normalizeRect, type Box, type DragItem, type MoveResult, type Rect, type SnapSettings, type TrimResult, type TrimSubject } from "./dragMath";
-import { anchoredScroll, contentWidth, HEADER_WIDTH, RULER_HEIGHT, trackIndexAt, zoomStep, zoomToFit } from "./geometry";
+import { anchoredScroll, clampZoom, contentWidth, fittedTrackHeight, HEADER_WIDTH, NARROW_HEADER_WIDTH, RULER_HEIGHT, trackIndexAt, zoomStep, zoomToFit } from "./geometry";
+import { useMediaQuery } from "../layout/useMediaQuery";
 import { clipMenu, emptyAreaMenu, markerMenu, transitionMenu } from "./menus";
 import { Ruler, type RulerHandle } from "./Ruler";
 import { TrackHeaders } from "./TrackHeaders";
@@ -77,6 +78,7 @@ export function TimelineBody() {
   const project = useProject();
   const pps = useUi((s) => s.pxPerSecond);
   const trackHeight = useUi((s) => s.trackHeight);
+  const narrow = useMediaQuery("(max-width: 639px)");
   const selection = useUi((s) => s.selection);
   const tool = useUi((s) => s.tool);
   const mediaStatus = useStore(session.media.status);
@@ -183,6 +185,23 @@ export function TimelineBody() {
     revealContent();
   }, [revealContent]);
 
+  // With a track fit (the editor in a chat), the tracks share the visible height, as the timeline and the tracks change.
+  const trackFit = useUi((s) => s.trackFit);
+  useLayoutEffect(() => {
+    const el = viewport.current;
+    if (!el || !trackFit) return;
+    const fit = () => {
+      const next = fittedTrackHeight(el.clientHeight, sortedLayers(session.project).length, trackFit);
+      if (next === session.ui.getState().trackHeight) return;
+      session.ui.setState({ trackHeight: next });
+      revealContent();
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [session, trackFit, tracks.length, revealContent]);
+
   // Timeline controller for commands (=, -, \, Shift+C).
   useEffect(() => {
     session.views.timeline = {
@@ -205,6 +224,27 @@ export function TimelineBody() {
         if (!el) return;
         const x = seconds * session.ui.getState().pxPerSecond;
         if (x < el.scrollLeft || x > el.scrollLeft + el.clientWidth - 24) el.scrollLeft = Math.max(0, x - el.clientWidth * 0.2);
+      },
+      // A zoom applies its scroll after the next render: report the view it is heading to.
+      visibleRange: () => {
+        const el = viewport.current;
+        const pps = session.ui.getState().pxPerSecond;
+        if (!el || !(pps > 0)) return { start: 0, end: 0 };
+        const left = pendingScroll.current ?? el.scrollLeft;
+        return { start: left / pps, end: (left + el.clientWidth) / pps };
+      },
+      showRange: (start, end) => {
+        const el = viewport.current;
+        if (!el || !(end > start)) return;
+        const next = clampZoom(el.clientWidth / (end - start));
+        const left = Math.max(0, start * next);
+        if (next === session.ui.getState().pxPerSecond) {
+          el.scrollLeft = left;
+          return;
+        }
+        pendingScroll.current = left;
+        session.ui.setState({ pxPerSecond: next });
+        session.autosave.notify();
       },
     };
     session.views.focusTimeline = () => viewport.current?.focus();
@@ -777,7 +817,7 @@ export function TimelineBody() {
   return (
     <div className="flex min-h-0 flex-1">
       {/* Track headers */}
-      <div className="flex shrink-0 flex-col border-r border-line bg-raised" style={{ width: HEADER_WIDTH }}>
+      <div className="flex shrink-0 flex-col border-r border-line bg-raised" style={{ width: narrow ? NARROW_HEADER_WIDTH : HEADER_WIDTH }}>
         <div className="flex shrink-0 items-center border-b border-line px-3 text-2xs font-medium uppercase tracking-wider text-fg-faint" style={{ height: RULER_HEIGHT }}>
           Tracks
         </div>

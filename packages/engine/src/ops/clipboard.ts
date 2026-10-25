@@ -12,22 +12,23 @@
 
 import type { Transaction } from "../history/document.js";
 import type { Clip, Effect, Project, Transition } from "../model/types.js";
+import { COPY_KEYFRAME_GROUPS } from "../keyframe/rules.js";
 import { findClip, findTransition } from "../model/query.js";
 import { OpError, invalid, requireFinite, requireUnlocked } from "./errors.js";
 import { ensureLayer, ids, isRecord, patchClip, patchTransition, reassignEffectIds, sameJson } from "./internal.js";
 import { trackBelowOrCreate } from "./tracks.js";
 import type { ClipboardData, CopyPart } from "./types.js";
 
-/** Clip keys each Copy ▸ Keyframes submenu copies (Copy_Triggered). */
+/** Clip keys each Copy ▸ Keyframes submenu copies (Copy_Triggered, keyframe_rules.COPY_KEYFRAME_GROUPS). */
 const CLIP_PARTS: Record<Exclude<CopyPart, "all" | "brightness" | "contrast">, readonly string[]> = {
-  keyframes: ["alpha", "gravity", "scale_x", "scale_y", "shear_x", "shear_y", "rotation", "location_x", "location_y", "time", "volume"],
-  alpha: ["alpha"],
-  scale: ["gravity", "scale_x", "scale_y"],
-  shear: ["shear_x", "shear_y"],
-  rotation: ["gravity", "rotation"],
-  location: ["gravity", "location_x", "location_y"],
-  time: ["time"],
-  volume: ["volume"],
+  keyframes: COPY_KEYFRAME_GROUPS.all,
+  alpha: COPY_KEYFRAME_GROUPS.alpha,
+  scale: COPY_KEYFRAME_GROUPS.scale,
+  shear: COPY_KEYFRAME_GROUPS.shear,
+  rotation: COPY_KEYFRAME_GROUPS.rotation,
+  location: COPY_KEYFRAME_GROUPS.location,
+  time: COPY_KEYFRAME_GROUPS.time,
+  volume: COPY_KEYFRAME_GROUPS.volume,
   effects: ["effects"],
 };
 

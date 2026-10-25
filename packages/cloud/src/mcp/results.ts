@@ -9,7 +9,13 @@
 import type { ToolImage } from "@zenvi/engine";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
-export function okResult(text: string, structured: Record<string, unknown>, images: ToolImage[] = []): CallToolResult {
+/**
+ * `meta` becomes the result's `_meta`: hosts hand it to the tool's view
+ * (ChatGPT `toolResponseMetadata`, MCP Apps `ui/notifications/tool-result`)
+ * and never to the model, so view-only secrets (the embedded editor's token)
+ * travel there.
+ */
+export function okResult(text: string, structured: Record<string, unknown>, images: ToolImage[] = [], meta?: Record<string, unknown>): CallToolResult {
   return {
     content: [
       { type: "text", text },
@@ -17,6 +23,7 @@ export function okResult(text: string, structured: Record<string, unknown>, imag
       ...images.map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType })),
     ],
     structuredContent: structured,
+    ...(meta ? { _meta: meta } : {}),
   };
 }
 

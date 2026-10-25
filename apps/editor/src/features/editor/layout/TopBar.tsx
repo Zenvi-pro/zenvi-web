@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Cloud, CloudAlert, CloudOff, Download, Redo2, Share2, Undo2 } from "lucide-react";
+import { AlertTriangle, Check, Cloud, CloudAlert, CloudOff, Download, Redo2, Share2, Undo2, WandSparkles } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "zustand";
@@ -94,7 +94,7 @@ function ProjectName() {
   );
 }
 
-function SaveStatus() {
+export function SaveStatus() {
   const session = useSession();
   const [status, setStatus] = useState(session.autosave.current);
   useEffect(() => session.autosave.subscribe(setStatus), [session]);
@@ -152,7 +152,7 @@ function SaveStatus() {
           className={cn("inline-flex items-center gap-1 rounded-sm text-xs outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent", tone)}
         >
           {icon}
-          {text}
+          <span className="max-sm:sr-only">{text}</span>
         </button>
       </Tooltip>
     );
@@ -161,7 +161,7 @@ function SaveStatus() {
     <Tooltip label={detail}>
       <span role="status" className={cn("inline-flex items-center gap-1 text-xs", tone)}>
         {icon}
-        {text}
+        <span className="max-sm:sr-only">{text}</span>
       </span>
     </Tooltip>
   );
@@ -319,6 +319,9 @@ export function TopBar() {
         <Redo2 size={16} />
       </IconButton>
       <div className="mx-1.5 h-4 w-px bg-line-strong" />
+      <Button variant="ghost" size="sm" icon={<WandSparkles size={14} />} onClick={() => run("actionMakeReel")}>
+        Make a reel
+      </Button>
       {authEnabled() ? (
         <Button variant="ghost" size="sm" icon={<Share2 size={14} />} onClick={() => session.ui.setState({ dialog: "share" })}>
           Share

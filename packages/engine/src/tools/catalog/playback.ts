@@ -2,7 +2,8 @@
  * Playback and view tools: play_tool, go_to_start_tool, go_to_end_tool,
  * zoom_in_tool, zoom_out_tool, center_on_playhead_tool, watch_clip_tool.
  *
- * Ports of zenvi-core src/classes/tool_handlers.py (ref b63c39be7): play,
+ * Ports of zenvi-core: play (develop 1f80cb3d0 editor_tools/tracks_nav.py), and
+ * from src/classes/tool_handlers.py (ref b63c39be7)
  * go_to_start / go_to_end (main_window.py actionJumpStart_trigger seeks to
  * the first frame with content, actionJumpEnd_trigger to the last),
  * zoom_in / zoom_out / center_on_playhead, watch_clip_and_play.
@@ -22,13 +23,60 @@ function startPlaying(call: ToolCall): void {
   if (!player.playing) player.play();
 }
 
+function playheadText(call: ToolCall): string {
+  return `${call.host.player!.playhead.toFixed(2)} s`;
+}
+
 export const playbackTools: CatalogTool[] = [
   contractTool("play_tool", {
     annotations: VIEW,
     requires: ["player"],
-    run: (call) => {
-      call.host.player!.toggle();
-      return "Playback toggled.";
+    // zenvi-core develop editor_tools/tracks_nav.py play / _start_transport. Hosts play
+    // at normal speed only, so fast_forward, rewind and other speeds are refused.
+    run: (call, input) => {
+      let action = input.action ?? "toggle";
+      const speed = input.speed ?? null;
+      const frames = input.frames ?? 1;
+      if (speed !== null && action !== "play" && action !== "toggle") return "Error: speed only applies to action='play'.";
+      if (speed === 0) return "Error: speed 0 is a pause; use action='pause'.";
+      if (frames !== 1 && action !== "step_forward" && action !== "step_back") return "Error: frames only applies to step_forward / step_back.";
+      if (speed !== null && action === "toggle") action = "play";
+      if (action === "fast_forward" || action === "rewind" || (speed !== null && speed !== 1)) {
+        return unavailable("play_tool", "this player plays at normal speed only (no fast forward, rewind or other speeds).");
+      }
+      const player = call.host.player!;
+      const project = call.doc.project;
+      if (action === "toggle") {
+        // Described from the state before the toggle: a host's player may update asynchronously.
+        const wasPlaying = player.playing;
+        if (!wasPlaying && project.clips.length === 0) return "Error: the timeline is empty: there is nothing to play.";
+        player.toggle();
+        return wasPlaying ? `Paused at ${playheadText(call)}.` : `Playing at 1x, now at ${playheadText(call)}.`;
+      }
+      if (action === "play") {
+        if (player.playing) return `Already playing at 1x (now at ${playheadText(call)}).`;
+        if (project.clips.length === 0) return "Error: the timeline is empty: there is nothing to play.";
+        player.play();
+        return `Playing at 1x, now at ${playheadText(call)}.`;
+      }
+      if (action === "pause") {
+        if (!player.playing) return `Already paused at ${playheadText(call)}.`;
+        player.pause();
+        return `Paused at ${playheadText(call)}.`;
+      }
+      if (action === "stop") {
+        player.pause();
+        player.seek(timelineStart(project));
+        return `Stopped: paused at the start (${playheadText(call)}).`;
+      }
+      // step_forward / step_back: pause and move by `frames` (1-based frames, like the desktop).
+      const fps = projectFps(project);
+      const frame = Math.round((player.playhead * fps.num) / fps.den) + 1;
+      const target = Math.max(1, frame + (action === "step_forward" ? frames : -frames));
+      if (target === frame) return "Error: already at the first frame; nothing to step back to.";
+      player.pause();
+      player.seek(((target - 1) * fps.den) / fps.num);
+      return `Stepped to ${playheadText(call)} (frame ${target}), paused.`;
     },
   }),
 

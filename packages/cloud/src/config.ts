@@ -23,6 +23,8 @@ export interface Limits {
   verifyHashMaxBytes: number;
   /** Total media a single render may download, bytes. */
   maxRenderMediaBytes: number;
+  /** How long create_reel waits for downloads before cutting with what arrived, ms. */
+  reelFetchDeadlineMs: number;
   /** On-disk cache of media for frame previews, bytes. */
   mediaCacheBytes: number;
 }
@@ -58,6 +60,13 @@ export interface Config {
     devicePatDays: number;
   };
   renderTmpDir: string;
+  /**
+   * Azure Storage queue that hands renders to render workers in their own containers (`render/dispatch.ts`), or null
+   * to render in this process. Needs Azure storage.
+   */
+  renderQueue: string | null;
+  /** The web editor build this service hosts for the editor embedded in chats (`/editor/embed/…`), or null. */
+  editorDist: string | null;
   version: string;
   /** Log verbosity. */
   logLevel: "debug" | "info" | "warn" | "error";
@@ -143,6 +152,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ]),
   ];
 
+  const renderQueue = env.ZENVI_RENDER_QUEUE?.trim() || null;
+  // Azure queue names: 3-63 lowercase letters, digits and single dashes.
+  if (renderQueue && !/^[a-z0-9](?:[a-z0-9]|-(?!-)){1,61}[a-z0-9]$/.test(renderQueue)) throw new Error(`invalid ZENVI_RENDER_QUEUE: ${renderQueue}`);
+  if (renderQueue && storage.kind !== "azure") throw new Error("ZENVI_RENDER_QUEUE needs Azure storage");
   const logLevel = (env.LOG_LEVEL ?? "info") as Config["logLevel"];
   if (!["debug", "info", "warn", "error"].includes(logLevel)) throw new Error(`invalid LOG_LEVEL: ${env.LOG_LEVEL}`);
 
@@ -165,6 +178,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       verifyHashMaxBytes: bytes(env.VERIFY_HASH_MAX_BYTES, 64 * MiB),
       // The container has 4 GiB of ephemeral disk: renders + cache + imports must fit.
       maxRenderMediaBytes: bytes(env.MAX_RENDER_MEDIA_BYTES, 2 * GiB),
+      // A chat gives a tool call about a minute; the rest of create_reel needs ~10 s.
+      reelFetchDeadlineMs: Math.min(45_000, Math.max(5_000, Number(env.REEL_FETCH_DEADLINE_MS) || 32_000)),
       mediaCacheBytes: bytes(env.MEDIA_CACHE_BYTES, 512 * MiB),
     },
     tokens: {
@@ -174,6 +189,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       devicePatDays: 365,
     },
     renderTmpDir: env.RENDER_TMP_DIR ?? tmpdir(),
+    renderQueue,
+    editorDist: env.ZENVI_EDITOR_DIST?.trim() || null,
     version: env.ZENVI_CLOUD_VERSION ?? "dev",
     logLevel,
   };

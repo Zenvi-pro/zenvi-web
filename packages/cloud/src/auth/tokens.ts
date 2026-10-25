@@ -4,6 +4,7 @@
  *   zvn_pat_…  personal access token (CLI device login, account page)
  *   zvn_oat_…  OAuth access token (remote MCP connectors), 1 h
  *   zvn_ort_…  OAuth refresh token, rotated on every use
+ *   zvn_emb_…  embedded-editor token: one project, a few hours (MCP widget)
  *
  * Only the SHA-256 of a token is ever stored. The prefix lets us reject
  * foreign tokens without a lookup and lets secret scanners recognise leaks.
@@ -11,12 +12,13 @@
 
 import { randomSecret, sha256Hex } from "../util/crypto.js";
 
-export type TokenKind = "pat" | "oauth_access" | "oauth_refresh";
+export type TokenKind = "pat" | "oauth_access" | "oauth_refresh" | "embed";
 
 export const TOKEN_PREFIX: Record<TokenKind, string> = {
   pat: "zvn_pat_",
   oauth_access: "zvn_oat_",
   oauth_refresh: "zvn_ort_",
+  embed: "zvn_emb_",
 };
 
 const TOKEN_BODY = /^[A-Za-z0-9_-]{43}$/;

@@ -8,7 +8,8 @@
  */
 
 import path from "node:path";
-import { encoderRates, type ContainerFormat, type ExportOptions, type Fraction, type VideoRate } from "@zenvi/engine";
+import { encoderRates, isSequenceFormat, type ContainerFormat, type ExportOptions, type Fraction, type VideoRate } from "@zenvi/engine";
+import { ffmpegThreads } from "../limits.js";
 import type { AudioGraph } from "./audio-graph.js";
 
 export type Quality = NonNullable<ExportOptions["quality"]>;
@@ -28,15 +29,54 @@ export const FORMATS: Record<ContainerFormat, FormatInfo> = {
   gif: { video: true, audio: false, mimeType: "image/gif", extension: "gif" },
   mp3: { video: false, audio: true, mimeType: "audio/mpeg", extension: "mp3" },
   wav: { video: false, audio: true, mimeType: "audio/wav", extension: "wav" },
+  flac: { video: false, audio: true, mimeType: "audio/flac", extension: "flac" },
+  m4a: { video: false, audio: true, mimeType: "audio/mp4", extension: "m4a" },
   "png-sequence": { video: true, audio: false, mimeType: "image/png", extension: "png" },
+  "jpg-sequence": { video: true, audio: false, mimeType: "image/jpeg", extension: "jpg" },
+  "bmp-sequence": { video: true, audio: false, mimeType: "image/bmp", extension: "bmp" },
+  "tiff-sequence": { video: true, audio: false, mimeType: "image/tiff", extension: "tiff" },
 };
 
-/** Format implied by an output file name, if any. */
+/** Format implied by an output file name, if any (an image name means a sequence of them). */
 export function formatFromPath(file: string): ContainerFormat | undefined {
   const ext = path.extname(file).slice(1).toLowerCase();
-  if (ext === "png") return "png-sequence";
   if (ext === "m4v") return "mp4";
+  if (ext === "jpeg") return "jpg-sequence";
+  if (ext === "tif") return "tiff-sequence";
   return (Object.keys(FORMATS) as ContainerFormat[]).find((f) => FORMATS[f].extension === ext);
+}
+
+/**
+ * Encoders each container takes in ffmpeg's muxers, where it is picky (a
+ * codec it does not take fails when the file is opened); others take any.
+ */
+const CONTAINER_CODECS: Partial<Record<ContainerFormat, { video?: RegExp; audio?: RegExp }>> = {
+  webm: { video: /^(libvpx|libvpx-vp9|vp8|vp9|libaom-av1|libsvtav1|librav1e|av1|(vp8|vp9|av1)_\w+)$/, audio: /^(libopus|opus|libvorbis|vorbis)$/ },
+  mp4: { audio: /^(?!pcm_)/ },
+  gif: { video: /^gif$/ },
+  mp3: { audio: /^(libmp3lame|mp3\w*)$/ },
+  wav: { audio: /^pcm_/ },
+  flac: { audio: /^flac$/ },
+  m4a: { audio: /^(aac|aac_at|libfdk_aac|alac|alac_at)$/ },
+  "png-sequence": { video: /^png$/ },
+  "jpg-sequence": { video: /^mjpeg$/ },
+  "bmp-sequence": { video: /^bmp$/ },
+  "tiff-sequence": { video: /^tiff$/ },
+};
+
+/**
+ * Whether this exporter writes `format` with these FFmpeg encoders ("" =
+ * none): the container is one it writes, the build has the encoders
+ * (`ffmpeg -encoders`, FFmpegWriter.IsValidCodec) and the muxer takes them.
+ */
+export function ffmpegCanWrite(format: ContainerFormat, videoCodec: string, audioCodec: string, encoders: ReadonlySet<string>): boolean {
+  const info = FORMATS[format];
+  if (!info) return false;
+  if ((videoCodec && !info.video) || (audioCodec && !info.audio)) return false;
+  const rules = CONTAINER_CODECS[format];
+  if (videoCodec && (!encoders.has(videoCodec) || (rules?.video && !rules.video.test(videoCodec)))) return false;
+  if (audioCodec && (!encoders.has(audioCodec) || (rules?.audio && !rules.audio.test(audioCodec)))) return false;
+  return true;
 }
 
 /**
@@ -66,7 +106,7 @@ const OPUS_MAX_BITRATE = 510_000;
 
 export interface EncodeJob {
   format: ContainerFormat;
-  /** File (or `%05d` pattern for png-sequence) ffmpeg writes. */
+  /** File (or `%05d` pattern for an image sequence) ffmpeg writes. */
   output: string;
   video?: { width: number; height: number; fps: Fraction };
   audio?: { graph: AudioGraph; sampleRate: number; channels: number };
@@ -82,6 +122,9 @@ export interface EncodeCommand {
   /** Write this file before spawning when set. */
   script?: { path: string; contents: string };
 }
+
+/** Numbered image files, the first one 1 (like libopenshot's image sequences). */
+const IMAGE_SEQUENCE = ["-f", "image2", "-start_number", "1"];
 
 /** Raw frames must have even sizes for 4:2:0 codecs; pad instead of scaling. */
 const PAD_EVEN = "pad=ceil(iw/2)*2:ceil(ih/2)*2";
@@ -127,7 +170,16 @@ function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
         codecArgs: ["-loop", "0"],
       };
     case "png-sequence":
-      return { chain: `[0:v]format=rgba[vout]`, codecArgs: ["-c:v", "png", "-f", "image2", "-start_number", "1"] };
+      return { chain: `[0:v]format=rgba[vout]`, codecArgs: ["-c:v", "png", ...IMAGE_SEQUENCE] };
+    case "jpg-sequence": {
+      // ffmpeg's -q:v scale (2 is near the best JPEG it writes).
+      const q = quality === "low" ? "10" : quality === "medium" ? "5" : quality === "high" ? "2" : "1";
+      return { chain: `[0:v]format=yuvj420p[vout]`, codecArgs: ["-c:v", "mjpeg", "-q:v", q, ...IMAGE_SEQUENCE] };
+    }
+    case "bmp-sequence":
+      return { chain: `[0:v]format=bgr24[vout]`, codecArgs: ["-c:v", "bmp", ...IMAGE_SEQUENCE] };
+    case "tiff-sequence":
+      return { chain: `[0:v]format=rgba[vout]`, codecArgs: ["-c:v", "tiff", ...IMAGE_SEQUENCE] };
     case "webm": {
       const codec = job.options.videoCodec ?? "libvpx-vp9";
       return {
@@ -160,6 +212,8 @@ function audioCodecArgs(job: EncodeJob): string[] {
   switch (job.format) {
     case "wav":
       return ["-c:a", job.options.audioCodec ?? "pcm_s16le"];
+    case "flac":
+      return ["-c:a", job.options.audioCodec ?? "flac"];
     case "mp3":
       return ["-c:a", job.options.audioCodec ?? "libmp3lame", "-b:a", bitrate];
     case "webm":
@@ -185,7 +239,14 @@ function muxerArgs(format: ContainerFormat): string[] {
       return ["-f", "mp3"];
     case "wav":
       return ["-f", "wav"];
+    case "flac":
+      return ["-f", "flac"];
+    case "m4a":
+      return ["-movflags", "+faststart", "-f", "mp4"];
     case "png-sequence":
+    case "jpg-sequence":
+    case "bmp-sequence":
+    case "tiff-sequence":
       return [];
   }
 }
@@ -242,8 +303,8 @@ export function encoderCommand(job: EncodeJob): EncodeCommand {
   } else if (graph) {
     args.push("-filter_complex", graph);
   }
-  args.push(...maps, ...videoCodec, ...audioCodec);
-  if (info.video && job.video && job.format !== "png-sequence") args.push("-r", `${job.video.fps.num}/${job.video.fps.den}`);
+  args.push(...maps, ...videoCodec, ...audioCodec, ...(videoCodec.length > 0 ? ffmpegThreads("encode") : []));
+  if (info.video && job.video && !isSequenceFormat(job.format)) args.push("-r", `${job.video.fps.num}/${job.video.fps.den}`);
   args.push("-metadata", "comment=Made with Zenvi", ...muxerArgs(job.format), job.output);
   return { args, script };
 }

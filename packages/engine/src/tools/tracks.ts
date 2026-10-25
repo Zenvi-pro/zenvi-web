@@ -83,6 +83,12 @@ export function normalizeTrackOrLayerArg(raw: string | number | null | undefined
   const low = text.toLowerCase();
   const m = /^(?:ui\s*)?track\s*[#:]?\s*(.+)$/i.exec(low);
   const labelQuery = (m ? m[1]!.trim() : low).trim();
+  // "2", "track 2" and "Track #2" all name UI track 2 unless a label says otherwise (develop 1f80cb3d0).
+  let uiNumber = n;
+  if (uiNumber === null && m) {
+    const q = parsePythonFloat(labelQuery);
+    uiNumber = q === null ? null : Math.trunc(q);
+  }
   const labelHits = stack.filter((e) => {
     const label = e.label.trim().toLowerCase();
     return label === labelQuery || label === low;
@@ -95,11 +101,12 @@ export function normalizeTrackOrLayerArg(raw: string | number | null | undefined
         "Pass layer_number from list_layers_tool / TRACK_STACK_JSON.",
     };
   }
-  const contains = stack.filter((e) => labelQuery && e.label.trim().toLowerCase().includes(labelQuery));
+  // A number never matches part of a name: "1" is UI track 1, not "Music 1".
+  const contains = stack.filter((e) => labelQuery && uiNumber === null && e.label.trim().toLowerCase().includes(labelQuery));
   if (contains.length === 1) return { layer: contains[0]!.layer_number };
 
   // 4) ui_track counted from the bottom
-  if (n !== null && n >= 1 && n <= stack.length) return { layer: stack[n - 1]!.layer_number };
+  if (uiNumber !== null && uiNumber >= 1 && uiNumber <= stack.length) return { layer: stack[uiNumber - 1]!.layer_number };
 
   return {
     error:

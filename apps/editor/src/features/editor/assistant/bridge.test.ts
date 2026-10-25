@@ -1,4 +1,4 @@
-import { addClip, addFile, createProject, findProfile, type ReaderInfo } from "@zenvi/engine";
+import { addClip, addEffect, addFile, createProject, findProfile, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryMediaStore } from "@/lib/storage/media";
 import { MemoryProjectRepository } from "@/lib/storage/projects";
@@ -63,6 +63,53 @@ describe("Assistant bridge → engine runTool", () => {
     const wire = await runAssistantTool(session, createToolHost(session, async () => []), "no_such_tool", {}, new AbortController().signal);
     expect(wire.result).toMatch(/^Error: no_such_tool is not available/);
     expect(session.doc.undoLabels.length).toBe(before);
+  });
+});
+
+describe("editor state tools drive the session", () => {
+  const signal = new AbortController().signal;
+  const receipt = (wire: { result: string }) => JSON.parse(wire.result) as { status: string; summary: string; data: Record<string, unknown> };
+
+  it("selects clips and effects (an effect with its clip) and shows Properties", async () => {
+    const { session, clip } = sessionWithClip();
+    const host = createToolHost(session, async () => []);
+    session.ui.setState({ rightTab: "assistant" });
+    const before = session.doc.undoLabels.length;
+    let wire = await runAssistantTool(session, host, "select_timeline_items_tool", { timeline_clip_ids: [clip.id], show_properties: "true" }, signal);
+    expect(receipt(wire).summary).toBe("Selection: 1 clip.");
+    expect(session.ui.getState().selection.clips).toEqual([clip.id]);
+    expect(session.ui.getState().rightTab).toBe("properties");
+    const effect = session.edit("Blur", (tx) => addEffect(tx, clip.id, "Blur"))!;
+    await runAssistantTool(session, host, "select_timeline_items_tool", { mode: "none" }, signal);
+    wire = await runAssistantTool(session, host, "select_timeline_items_tool", { effect_ids: [effect.id] }, signal);
+    expect(session.ui.getState().selection).toMatchObject({ clips: [clip.id], effect: effect.id });
+    expect(receipt(wire).summary).toBe("Selection: 1 clip, 1 effect.");
+    expect(session.doc.undoLabels.length).toBe(before + 1); // only the Blur
+  });
+
+  it("moves the editor's playhead, reports where it stops, and reads it back", async () => {
+    const { session } = sessionWithClip();
+    const host = createToolHost(session, async () => []);
+    let wire = await runAssistantTool(session, host, "seek_playhead_tool", { seconds: "2" }, signal);
+    expect(receipt(wire).summary).toBe("Playhead at 00:00:02,00, frame 61.");
+    expect(session.playback.getState().time).toBeCloseTo(2, 9);
+    // The web editor's playhead stops at the end of the last clip (4 s).
+    wire = await runAssistantTool(session, host, "seek_playhead_tool", { seconds: "10" }, signal);
+    expect(receipt(wire).data.note).toBe("the preview stops at the end of the last clip (00:00:04,00); the playhead is there");
+    expect(session.playback.getState().time).toBe(4);
+    wire = await runAssistantTool(session, host, "get_playhead_and_selection_tool", {}, signal);
+    expect(receipt(wire).data).toMatchObject({ playhead: { frame: 121, seconds: 4 }, playback: { playing: false, speed: 0 }, view: null });
+    expect(session.project.playhead_position).toBe(0); // the session saves its own playhead; the tool leaves the project alone
+  });
+
+  it("switches snapping and razor; the timeline view needs the timeline on screen", async () => {
+    const { session } = sessionWithClip();
+    const host = createToolHost(session, async () => []);
+    host.ui!.setTimelineMode!("razor", true);
+    host.ui!.setTimelineMode!("snapping", false);
+    expect([session.ui.getState().tool, session.ui.getState().snapping]).toEqual(["razor", false]);
+    const wire = await runAssistantTool(session, host, "set_timeline_view_tool", { zoom: "fit" }, signal);
+    expect(wire.result).toBe("Error: the timeline is not ready yet");
   });
 });
 

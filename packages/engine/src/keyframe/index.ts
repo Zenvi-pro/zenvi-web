@@ -7,3 +7,4 @@ export * from "./points.js";
 export * from "./evaluate.js";
 export * from "./edit.js";
 export * from "./color.js";
+export * from "./rules.js";

@@ -80,6 +80,84 @@ describe("fade / volume / rotate / layout", () => {
   });
 });
 
+describe("develop 1f80cb3d0: fade and motion lengths, in-and-out, crop, no transform, flip", () => {
+  it("fadeSeconds sets Fast and Slow alike and widens the zone old fades are cleared from", () => {
+    const doc = setup();
+    const c = doc.transaction("fade", (tx) => applyClipPreset(tx, "C", "fade.in_slow", { fadeSeconds: 2 }));
+    expect(xy(c.alpha)).toEqual([
+      [1, 0],
+      [61, 1],
+    ]);
+    const out = doc.transaction("out", (tx) => applyClipPreset(tx, "C", "volume.fade_out_fast", { fadeSeconds: 4 }));
+    expect(xy(out.volume).slice(-2)).toEqual([
+      [481, 1],
+      [601, 0],
+    ]);
+  });
+
+  it("in-and-out clears both zones first, gives each fade at most a third, and aims for the clip's level", () => {
+    const doc = setup();
+    // A short clip: 3 s = 90 frames, so 1 s fades of at most 30 frames each.
+    doc.transaction("trim", (tx) => tx.update(["clips", { id: "C" }], { end: 3 }));
+    const c = doc.transaction("fade", (tx) => applyClipPreset(tx, "C", "fade.in_out_slow"));
+    expect(xy(c.alpha)).toEqual([
+      [1, 0],
+      [31, 1],
+      [61, 1],
+      [91, 0],
+    ]);
+    // Re-applying Fast over a ducked level restores the level, not a value read mid-ramp.
+    doc.transaction("duck", (tx) => tx.update(["clips", { id: "C" }], { end: 20, volume: { Points: [{ co: { X: 1, Y: 0.5 }, interpolation: 0 }] } }));
+    const v = doc.transaction("vol", (tx) => applyClipPreset(tx, "C", "volume.fade_in_out_slow"));
+    const fast = doc.transaction("fast", (tx) => applyClipPreset(tx, "C", "volume.fade_in_out_fast"));
+    expect(xy(v.volume).map(([, y]) => y)).toEqual([0, 0.5, 0.5, 0]);
+    expect(xy(fast.volume)).toEqual([
+      [1, 0],
+      [31, 0.5],
+      [571, 0.5],
+      [601, 0],
+    ]);
+  });
+
+  it("zoneSeconds sets the In/Out/Emphasis length; the emphasis playhead snaps to a frame", () => {
+    const doc = setup(0);
+    const c = doc.transaction("slide", (tx) => applyClipPreset(tx, "C", "animate.slide_in_left", { zoneSeconds: 2 }));
+    expect(xy(c.location_x).map(([x]) => x)).toEqual([1, 61]);
+    const p = doc.transaction("pulse", (tx) => applyClipPreset(tx, "C", "animate.pulse", { playhead: 4.99, zoneSeconds: 0.5 }));
+    // 4.99 s is timeline frame 151 (4.9933 s): clip frame 151, a 15-frame zone.
+    expect(p.scale_x.Points.map((pt) => pt.co.X).filter((x) => x > 100)).toEqual(expect.arrayContaining([151, 166]));
+  });
+
+  it("wipe-out circles use the reversed masks (OpenShot ac9621a02)", () => {
+    const doc = setup();
+    const c = doc.transaction("wipe", (tx) => applyClipPreset(tx, "C", "animate.wipe_out_circle_shrink"));
+    expect((c.effects[0]!.reader as { path: string }).path).toBe("@transitions/common/circle_in_to_out.svg");
+  });
+
+  it("crop adds or reuses a Crop effect, none removes it; no transform also resets rotation and layout", () => {
+    const doc = setup();
+    const c = doc.transaction("crop", (tx) => applyClipPreset(tx, "C", "crop.crop"));
+    expect(c.effects.map((e) => [e.class_name, e.resize])).toEqual([["Crop", false]]);
+    const r = doc.transaction("resize", (tx) => applyClipPreset(tx, "C", "crop.resize"));
+    expect(r.effects.map((e) => [e.id, e.resize])).toEqual([[c.effects[0]!.id, true]]);
+    doc.transaction("turn", (tx) => applyClipPreset(tx, "C", "rotate.right_90"));
+    doc.transaction("pip", (tx) => applyClipPreset(tx, "C", "layout.top_left"));
+    const none = doc.transaction("none", (tx) => applyClipPreset(tx, "C", "transform.none"));
+    expect([none.effects, evaluate(none.rotation, 1), none.gravity, none.scale_x.Points[0]!.co.Y]).toEqual([[], 0, Gravity.CENTER, 1]);
+  });
+
+  it("flip negates every point of the axis", () => {
+    const doc = setup();
+    doc.transaction("zoom", (tx) => tx.update(["clips", { id: "C" }], { scale_y: { Points: [{ co: { X: 1, Y: 1 }, interpolation: 0 }, { co: { X: 61, Y: 1.5 }, interpolation: 0 }] } }));
+    const c = doc.transaction("flip", (tx) => applyClipPreset(tx, "C", "flip.vertical"));
+    expect(xy(c.scale_y)).toEqual([
+      [1, -1],
+      [61, -1.5],
+    ]);
+    expect(xy(c.scale_x)).toEqual([[1, 1]]);
+  });
+});
+
 describe("time presets", () => {
   it("forward/backward speeds, reverse and reset", () => {
     const doc = setup();

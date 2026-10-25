@@ -193,7 +193,8 @@ export const mediaTools: CatalogTool[] = [
     annotations: IMPORT,
     requires: ["media"],
     run: async (call, input) => {
-      const entries = [input.paths, input.path, input.folder].flatMap((v) => (v ? coercePathList(v) : []));
+      // files: develop's alias of paths.
+      const entries = [input.paths, input.files, input.path, input.folder].flatMap((v) => (v ? coercePathList(v) : []));
       if (entries.length === 0) {
         return (
           "Error: paths is required for MCP/harness import. Pass the media " +

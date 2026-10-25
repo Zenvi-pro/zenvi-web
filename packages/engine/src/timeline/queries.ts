@@ -157,22 +157,35 @@ export interface Gap {
   end: number;
 }
 
+/** Positions closer than this are the same instant (zenvi-core timeline_ops.EPSILON). */
+const GAP_EPSILON = 1e-6;
+
 /**
- * The first empty stretch on `layer` that ends after `atSeconds`, like the
- * desktop timeline context menu (timeline.py ShowTimelineMenu): walk items
- * by position, tracking the furthest right edge; the first item that starts
- * after both that edge and `atSeconds` closes the gap. Null when none (the
- * open space after the last item is not a gap).
+ * Every empty stretch on `layer` that ends after `afterSeconds`
+ * (zenvi-core develop timeline_ops.list_gaps): walk items by position,
+ * tracking the furthest right edge; an item that starts after both that edge
+ * and `afterSeconds` closes a gap. A gap before the first item counts; the
+ * open space after the last item does not.
  */
-export function findGap(project: Project, layer: number, atSeconds: number): Gap | null {
+export function listGaps(project: Project, layer: number, afterSeconds = 0): Gap[] {
+  const gaps: Gap[] = [];
   let foundStart = 0;
   for (const item of itemsOnLayer(project, layer)) {
     const left = item.position;
-    const right = left + (item.end - item.start);
-    if (left > foundStart && left > atSeconds) return { start: foundStart, end: left };
+    const right = left + Math.max(0, item.end - item.start);
+    if (left > foundStart + GAP_EPSILON && left > afterSeconds) gaps.push({ start: foundStart, end: left });
     foundStart = Math.max(foundStart, right);
   }
-  return null;
+  return gaps;
+}
+
+/**
+ * The first empty stretch on `layer` that ends after `atSeconds`, like the
+ * desktop timeline context menu (timeline.py ShowTimelineMenu,
+ * timeline_ops.find_gap). Null when none.
+ */
+export function findGap(project: Project, layer: number, atSeconds: number): Gap | null {
+  return listGaps(project, layer, atSeconds)[0] ?? null;
 }
 
 /** Every gap on a layer, from the timeline start. */

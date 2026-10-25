@@ -1,4 +1,4 @@
-import type { Fraction, Marker } from "@zenvi/engine";
+import { markerName, type Fraction, type Marker } from "@zenvi/engine";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { cn } from "@/ui/cn";
 import { RULER_HEIGHT, rulerLabel, rulerScale, rulerTicks, visibleRange } from "./geometry";
@@ -36,6 +36,7 @@ const MARKER_COLORS: Record<string, string> = {
   orange: "var(--color-marker-orange)",
   cyan: "var(--color-marker-cyan)",
   pink: "var(--color-marker-pink)",
+  white: "var(--color-marker-white)",
 };
 
 export function markerColor(marker: Marker): string {
@@ -131,8 +132,8 @@ export const Ruler = forwardRef<RulerHandle, RulerProps>(function Ruler(
           <button
             key={marker.id}
             type="button"
-            aria-label={`Marker at ${marker.position.toFixed(2)} s${marker.label ? `: ${marker.label}` : ""}`}
-            title={marker.label ? String(marker.label) : undefined}
+            aria-label={`Marker at ${marker.position.toFixed(2)} s${markerName(marker) ? `: ${markerName(marker)}` : ""}`}
+            title={markerName(marker) || undefined}
             onPointerDown={(e) => {
               e.stopPropagation();
               onMarkerPointerDown(marker, e);

@@ -102,6 +102,34 @@ describe("ProjectDocument", () => {
     expect(doc.project.clips[0]).not.toHaveProperty("title");
   });
 
+  it("redo of a replace replaces again (fields it dropped stay dropped)", () => {
+    const doc = new ProjectDocument(project(), { newTransactionId: ids });
+    doc.transaction("ui", (tx) => tx.update(["clips", { id: "A" }], { ui: { audio_data: [1], keep: 1 } }));
+    doc.transaction("drop", (tx) => tx.replace(["clips", { id: "A" }, "ui"], { keep: 1 }));
+    doc.undo();
+    expect(getAt(doc.project, ["clips", { id: "A" }, "ui"])).toEqual({ audio_data: [1], keep: 1 });
+    doc.redo();
+    expect(getAt(doc.project, ["clips", { id: "A" }, "ui"])).toEqual({ keep: 1 });
+  });
+
+  it("clearHistory forgets every step and keeps the project", () => {
+    const doc = new ProjectDocument(project(), { newTransactionId: ids });
+    doc.transaction("one", (tx) => tx.update(["clips", { id: "A" }], { position: 1 }));
+    doc.transaction("two", (tx) => tx.update(["clips", { id: "B" }], { position: 9 }));
+    doc.undo();
+    const sources: string[] = [];
+    doc.subscribe((event) => sources.push(event.source));
+    const revision = doc.revision;
+    expect(doc.clearHistory()).toEqual({ undo: 1, redo: 1 });
+    expect([doc.canUndo, doc.canRedo, doc.revision > revision]).toEqual([false, false, true]);
+    expect(getAt(doc.project, ["clips", { id: "A" }, "position"])).toBe(1);
+    expect(doc.toJSON().history).toMatchObject({ undo: [], redo: [] });
+    expect(new ProjectDocument(doc.project).canUndo).toBe(false);
+    expect(sources).toEqual(["untracked"]);
+    expect(doc.clearHistory()).toEqual({ undo: 0, redo: 0 });
+    expect(sources).toHaveLength(1);
+  });
+
   it("nested transactions join the outer one", () => {
     const doc = new ProjectDocument(project(), { newTransactionId: ids });
     doc.transaction("outer", (tx) => {

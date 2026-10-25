@@ -1,7 +1,8 @@
 /**
  * `MediaHost` for local disk: probe, import (reference or copy), expand
- * folders and globs, download URLs with a size cap, and write generated
- * media into the project's `<name>_assets` folder like the desktop.
+ * folders and globs, download URLs with a size cap, write generated media
+ * into the project's `<name>_assets` folder like the desktop, and fetch web
+ * page videos with yt-dlp (host/web-video.ts).
  */
 
 import { createWriteStream } from "node:fs";
@@ -11,16 +12,19 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
-import type { ImportedMedia, MediaHost, PathListing } from "@zenvi/engine";
+import type { ImportedMedia, MediaHost, PathListing, ProjectFile, WebVideoDownload, WebVideoRequest } from "@zenvi/engine";
 import { fingerprint } from "../probe/fingerprint.js";
 import { probe } from "../probe/probe.js";
-import { projectAssetsDir } from "@zenvi/engine";
+import { projectAssetsDir, sequenceFramesPresent } from "@zenvi/engine";
+import { cacheDir } from "../svg/fonts.js";
 import { isInside } from "./paths.js";
+import { createWebVideoFetcher } from "./web-video.js";
 
 /**
  * reference: keep media where it is (desktop default). copy: copy into
- * `<project>_assets/media`. auto: copy files from the OS temp folder (they
- * get cleaned up) unless the project itself lives there.
+ * `<project>_assets/media`. auto: copy files from the OS temp folder and
+ * from Zenvi's cache folder (web videos; both get cleaned up) unless the
+ * project itself lives there.
  */
 export type ImportPolicy = "reference" | "copy" | "auto";
 
@@ -34,6 +38,12 @@ export interface NodeMediaOptions {
   scratchDir?: string;
   /** The OS temp folder for the auto policy (tests). */
   tempRoot?: string;
+  /** Zenvi's cache folder for the auto policy (default `cacheDir(env)`). */
+  cacheRoot?: string;
+  /** Environment for finding yt-dlp, ffmpeg and the cache folder (default `process.env`). */
+  env?: NodeJS.ProcessEnv;
+  /** How web page videos are fetched (default: yt-dlp into `<cacheRoot>/web-video-cache`). */
+  fetchWebVideo?: (request: WebVideoRequest) => Promise<WebVideoDownload>;
   fetchImpl?: typeof fetch;
 }
 
@@ -100,11 +110,11 @@ export async function listPaths(entry: string): Promise<PathListing> {
   const target = localPath(entry);
   try {
     const st = await stat(target);
-    if (st.isFile()) return { kind: "file", files: [target] };
+    if (st.isFile()) return { kind: "file", files: [target], path: target };
     if (st.isDirectory()) {
       const files: string[] = [];
       await walkFiles(target, files);
-      return { kind: "directory", files };
+      return { kind: "directory", files, path: target };
     }
   } catch {
     // Not a plain path: maybe a glob.
@@ -117,9 +127,47 @@ export async function listPaths(entry: string): Promise<PathListing> {
     const all: string[] = [];
     await walkFiles(base.split("/").join(path.sep) || path.sep, all);
     const files = all.filter((f) => pattern.test(f.split(path.sep).join("/").slice(base.length)));
-    return { kind: "glob", files };
+    return { kind: "glob", files, path: target };
   }
-  return { kind: "missing", files: [] };
+  return { kind: "missing", files: [], path: target };
+}
+
+/**
+ * Which project files' media is not on this disk (zenvi-core
+ * media_files.media_missing): a file that does not exist, or an image
+ * sequence (`frame_%04d.png`) whose folder holds none of its frames.
+ * `resolve` maps a path as the project holds it to a local file.
+ */
+export async function missingOnDisk(files: readonly ProjectFile[], resolve: (projectPath: string) => string): Promise<boolean[]> {
+  const folders = new Map<string, Promise<string[] | null>>();
+  const namesIn = (folder: string): Promise<string[] | null> => {
+    let hit = folders.get(folder);
+    if (!hit) {
+      hit = readdir(folder).catch(() => null);
+      folders.set(folder, hit);
+    }
+    return hit;
+  };
+  return Promise.all(
+    files.map(async (file) => {
+      const stored = typeof file.path === "string" ? file.path : "";
+      if (!stored) return true;
+      let local: string;
+      try {
+        local = resolve(stored);
+      } catch {
+        return true;
+      }
+      if (local.includes("%")) {
+        const names = await namesIn(path.dirname(local));
+        return names === null || !sequenceFramesPresent(local, names);
+      }
+      return stat(local).then(
+        () => false,
+        () => true,
+      );
+    }),
+  );
 }
 
 function safeName(name: string): string {
@@ -189,9 +237,11 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
     const info = await probe(source);
     const project = options.projectFile();
     const inAssets = project !== undefined && isInside(source, projectAssetsDir(project));
-    const temp = options.tempRoot ?? tmpdir();
-    const projectInTemp = project !== undefined && isInside(project, temp);
-    const copy = !inAssets && (policy === "copy" || (policy === "auto" && isInside(source, temp) && !projectInTemp));
+    // Files in a folder that gets cleaned up are copied, unless the project lives there too.
+    const cleanedUp = [options.tempRoot ?? tmpdir(), options.cacheRoot ?? cacheDir(options.env)].some(
+      (folder) => isInside(source, folder) && !(project !== undefined && isInside(project, folder)),
+    );
+    const copy = !inAssets && (policy === "copy" || (policy === "auto" && cleanedUp));
     if (!copy) return imported(source, undefined, info);
     const dest = await uniquePath(await mediaDir("media"), safeName(path.basename(source)));
     await copyFile(source, dest);
@@ -231,6 +281,14 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
         throw error;
       }
     },
+
+    fetchWebVideo:
+      options.fetchWebVideo ??
+      createWebVideoFetcher({
+        ...(options.cacheRoot ? { cacheRoot: path.join(options.cacheRoot, "web-video-cache") } : {}),
+        env: options.env,
+        fetchImpl: options.fetchImpl,
+      }),
 
     async writeGenerated(name, bytes, contentType) {
       const sub = contentType === "image/svg+xml" || name.toLowerCase().endsWith(".svg") ? "title" : "media";

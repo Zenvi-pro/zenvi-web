@@ -36,6 +36,20 @@ Education on the web; workspace admins may have to allow it).
    e.g. "List my Zenvi projects", "Create a vertical 30 fps project called
    Launch teaser and import https://example.com/clip.mp4", "Render it".
 
+**The Zenvi editor in the chat.** Ask "open it in the editor" (or ChatGPT
+calls `open_in_editor` after building an edit): the Zenvi editor opens in the
+conversation with the project's preview and timeline. **Edit full screen**
+(the arrows at the top right) turns it into the whole editor beside the chat:
+library (files, titles, effects, transitions), preview, properties, timeline,
+undo. Everything ChatGPT changes with its tools appears in the open editor
+within a couple of seconds ("Updated from the chat", one undo step each), and
+what you change in it is what ChatGPT's next tool call sees. **Export**
+renders in Zenvi Cloud and hands you the MP4; **Open in Zenvi** opens the same
+cloud project at zenvi.pro/editor. The editor runs from Zenvi Cloud's own
+origin with a token for that one project (12 h; it renews itself through the
+chat), so nothing about your zenvi.pro sign-in is involved. If the chat
+cannot show it inline, the card offers to open it in a new tab.
+
 Media: attach a video, audio or image file in the chat and ask Zenvi to use
 it (ChatGPT hands the file to `import_attached_file`), give a direct https
 link, or ask for an upload link to drop files in the web editor.
@@ -47,10 +61,17 @@ calls `generate_video`, then `get_generation_status` until the clip is on
 the timeline.
 
 Notes: ChatGPT gives each tool call about a minute, so renders and AI video
-run in the background — `render_project` then `get_render_status`, or
-`generate_video` then `get_generation_status`. Write tools ask for
+run in the background — `render_project` (or `export_video_tool`, which takes
+Zenvi desktop's export arguments: preset, quality, range, size, fps, codecs)
+then `get_render_status`, or `generate_video` then `get_generation_status`. Write tools ask for
 confirmation unless you allow them. Frame previews come back as a link (and
 an image where the host shows images) and in the Zenvi preview panel.
+
+Testing the editor view without ChatGPT: `npm run build -w @zenvi/editor`,
+then `AZURE_STORAGE_CONNECTION_STRING=… npx tsx packages/cloud/scripts/e2e-embed.ts`
+runs a local Zenvi Cloud and a stand-in chat host that speaks MCP Apps, and
+checks the whole loop in Chromium (`--headed` to watch, `--shots <dir>` for
+screenshots).
 
 These stay on the desktop app, because they need on-device speech, beat
 tracking, or the desktop's ffmpeg splice: transcribe, remove words, detect

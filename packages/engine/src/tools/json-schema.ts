@@ -1,18 +1,26 @@
 /**
  * The JSON Schema subset tool input schemas use (draft 2020-12). The contract
- * schemas are generated from zenvi-core TOOL_SCHEMAS (schemas.gen.ts); MCP
- * servers publish them as `inputSchema`, and argument coercion reads their
- * property types the way zenvi-core `normalize_args` does.
+ * schemas are generated from zenvi-core's TOOL_SCHEMAS and editor tool
+ * schemas (schemas.gen.ts); MCP servers publish them as `inputSchema`, and
+ * argument coercion reads their property types the way zenvi-core
+ * `normalize_args` does.
  */
 
 export type JsonSchemaType = "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
+
+export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 
 export interface JsonSchema {
   type?: JsonSchemaType | readonly JsonSchemaType[];
   description?: string;
   enum?: readonly (string | number | boolean | null)[];
   /** Documentation only: handlers apply their own defaults. */
-  default?: string | number | boolean;
+  default?: JsonValue;
+  /**
+   * OpenAPI's keyword, which zenvi-core's editor tools set next to a `type`
+   * that lists "null". Not a JSON Schema keyword: validation reads `type`.
+   */
+  nullable?: boolean;
   minimum?: number;
   maximum?: number;
   minItems?: number;

@@ -110,3 +110,29 @@ export function svgRasterSize(svgSize: SvgSize, box: SvgSize): SvgSize {
   if (rw <= box.width) return { width: Math.max(1, rw), height: Math.max(1, box.height) };
   return { width: Math.max(1, box.width), height: Math.max(1, Math.trunc((box.width * svgSize.height) / svgSize.width)) };
 }
+
+const GENERIC_FAMILIES = new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui"]);
+
+function genericFor(family: string): string {
+  if (/mono|courier|consol|menlo/i.test(family)) return "monospace";
+  if ((/serif/i.test(family) && !/sans/i.test(family)) || /times|georgia|garamond|palatino/i.test(family)) return "serif";
+  return "sans-serif";
+}
+
+function withGeneric(list: string): string {
+  const families = list.split(",").map((f) => f.trim().replace(/^['"]|['"]$/g, ""));
+  if (families.some((f) => GENERIC_FAMILIES.has(f.toLowerCase()))) return list;
+  return `${list.trimEnd()}, ${genericFor(families[0] ?? "")}`;
+}
+
+/**
+ * Font lists with a generic family last, for the browser's SVG renderer. An SVG drawn as an image can use only fonts
+ * installed on the computer, and for a missing family with no generic one browsers fall back to a serif face, where
+ * QtSvg (Zenvi desktop) and render-node fall back to a sans: title templates name "DejaVu Sans", which most Macs and
+ * PCs lack. Display only: Qt reads a font-family list as one name, so files keep their single family.
+ */
+export function withGenericFontFallbacks(svg: string): string {
+  return svg
+    .replace(/(font-family\s*:\s*)([^;"]+)/gi, (_m, head: string, list: string) => head + withGeneric(list))
+    .replace(/(font-family\s*=\s*")([^"]*)(")/gi, (_m, head: string, list: string, tail: string) => head + withGeneric(list) + tail);
+}

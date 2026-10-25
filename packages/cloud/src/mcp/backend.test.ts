@@ -307,6 +307,39 @@ describe("backend tools on the remote MCP server", () => {
     await client.close();
   });
 
+  it("generates an image into the project as the connected person, and shows the backend's credit refusal in its own words", async () => {
+    const h = await harness({ engine: await loadEngineRegistry(), prober: fakeProber, network, config: { backendAuth: { kind: "assertion", secret: SECRET } } });
+    const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    let credits = 1;
+    const bodies: unknown[] = [];
+    h.services.backendSessions.fetchImpl = async (url, init) => {
+      expect(String(url)).toBe("https://api.zenvi.pro/api/v1/generation/image");
+      bodies.push(JSON.parse(String(init?.body)));
+      if (credits-- > 0) return jsonResponse({ image_base64: png, mime_type: "image/png" });
+      const message = "Out of credits for image generation. Need 3, have 0. Upgrade your plan or enable overage to continue.";
+      return jsonResponse({ detail: { code: "insufficient_credits", required: 3, balance: 0, message } }, 402);
+    };
+    const client = await connect(h);
+    await call(client, "create_project", { name: "P", format: "vertical_1080p" });
+    const made = await call(client, "generate_image_and_add_to_timeline_tool", { prompt: "a red fox in snow" });
+    expect(made.isError, made.content[0]?.text).toBeFalsy();
+    expect(made.content[0]?.text).toMatch(/^Added clip to timeline at position 0\.0s on track .*timeline_clip_id=\w+/);
+    expect(bodies[0]).toEqual({ prompt: "a red fox in snow", width: 1080, height: 1920 });
+    const projectId = String(made.structuredContent?.project_id);
+    const stored = (await h.services.projects.get(USER_A, projectId)).project;
+    const image = stored.files.at(-1)!;
+    expect(image).toMatchObject({ media_type: "image", name: "a red fox in snow", tags: "ai_generated", cloud: { content_type: "image/png" } });
+    expect(String(image.path)).toMatch(/^@assets\/generated\/generated_[a-z0-9]{12}\.png$/);
+    expect(stored.clips.some((c) => c.file_id === image.id)).toBe(true);
+
+    const refused = await call(client, "generate_image_and_add_to_timeline_tool", { prompt: "a red fox" });
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0]?.text).toBe(
+      "Error: Zenvi backend returned HTTP 402: Out of credits for image generation. Need 3, have 0. Upgrade your plan or enable overage to continue.",
+    );
+    await client.close();
+  });
+
   it("sends the assertion from the background job too", async () => {
     const h = await harness({ prober: fakeProber, network, config: { backendAuth: { kind: "assertion", secret: SECRET } } });
     const port = await mediaPort();

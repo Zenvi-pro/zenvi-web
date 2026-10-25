@@ -39,6 +39,12 @@ export function filesByPath(project: Project): Map<string, ProjectFile> {
 export function projectPathResolver(project: Project, deps: ResolveDeps): PathResolver {
   const byPath = filesByPath(project);
   return async (projectPath) => {
+    // A bin file can point at a bundled asset (an emoji sticker is `@emojis/<file>`, as the desktop
+    // stores it): those bytes ship with the renderer, so they need no upload.
+    if (projectPath.startsWith("@")) {
+      const bundled = deps.resolveAsset?.(projectPath);
+      if (bundled) return bundled;
+    }
     const file = byPath.get(projectPath);
     if (file) {
       const sha = fileSha256(file);

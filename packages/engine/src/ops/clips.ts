@@ -242,6 +242,35 @@ export function trimClipEdge(tx: Transaction, clipId: string, edge: Edge, timeli
   return patchClip(tx, clipId, out);
 }
 
+export interface ClipTimingInput {
+  /** Timeline start, seconds (>= 0). */
+  position?: number;
+  /** Source in point, seconds (>= 0). */
+  start?: number;
+  /** Source out point, seconds (after `start`). */
+  end?: number;
+}
+
+/**
+ * Set a clip's position and source in/out exactly as given: no snapping and
+ * no media clamp. For edits that move the in point together with the
+ * position so the picture stays where it was on the timeline, which can land
+ * between frames (crossfade handles, add_transitions_between_clips_tool
+ * method=handles). The caller keeps the range inside the media.
+ */
+export function setClipTiming(tx: Transaction, clipId: string, timing: ClipTimingInput): Clip {
+  const clip = requireEditableClip(tx.project, clipId);
+  requireObject(timing, "setClipTiming timing");
+  const patch: Record<string, unknown> = {};
+  if (timing.position !== undefined) patch.position = requireNonNegative(timing.position, "position");
+  if (timing.start !== undefined) patch.start = requireNonNegative(timing.start, "start");
+  if (timing.end !== undefined) patch.end = requireNonNegative(timing.end, "end");
+  const start = (patch.start as number | undefined) ?? clip.start;
+  const end = (patch.end as number | undefined) ?? clip.end;
+  if (!(end > start)) throw invalid(`end (${end}) must be after start (${start}).`);
+  return patchClip(tx, clipId, patch);
+}
+
 // ---------------------------------------------------------------------------
 // Split / delete / duplicate
 // ---------------------------------------------------------------------------
@@ -340,19 +369,60 @@ export function splitClip(
   if (!opts.ripple) return splitAt(tx, clip, at, keep);
   // timeline.py Slice_Triggered(ripple=True): trim, then ripple_delete_gap (position >= cut).
   const originalPosition = Number(clip.position);
-  const start = Number(clip.start);
-  const end = Number(clip.end);
-  const newEdge = start + (at - originalPosition);
-  const removed = keep === "left" ? end - start - (newEdge - start) : end - start - (end - newEdge);
-  const later = (p: number): boolean => p >= at;
+  const removed = removedBySlice(clip, at, keep);
   const result = splitAt(tx, clip, at, keep);
   if (keep === "right") patchClip(tx, clipId, { position: originalPosition });
-  for (const c of tx.project.clips.filter((c) => c.layer === clip.layer && c.id !== clipId && later(Number(c.position)))) {
-    tx.update(["clips", { id: c.id }], { position: Number(c.position) - removed });
+  rippleDeleteGap(tx, clip.layer, at, removed, clipId);
+  return result;
+}
+
+/** Source seconds a keep-left / keep-right slice at `at` drops from an item. */
+function removedBySlice(item: { position: number; start: number; end: number }, at: number, keep: SliceKeep): number {
+  const newEdge = Number(item.start) + (at - Number(item.position));
+  return keep === "left" ? Number(item.end) - newEdge : newEdge - Number(item.start);
+}
+
+/** timeline.py `ripple_delete_gap`: clips and transitions on `layer` starting at/after `from` move left by `gap`. */
+function rippleDeleteGap(tx: Transaction, layer: number, from: number, gap: number, excludeId: string): void {
+  for (const c of tx.project.clips.filter((c) => c.layer === layer && c.id !== excludeId && Number(c.position) >= from)) {
+    tx.update(["clips", { id: c.id }], { position: Number(c.position) - gap });
   }
-  for (const t of tx.project.effects.filter((t) => t.layer === clip.layer && later(Number(t.position)))) {
-    tx.update(["effects", { id: t.id }], { position: Number(t.position) - removed });
+  for (const t of tx.project.effects.filter((t) => t.layer === layer && t.id !== excludeId && Number(t.position) >= from)) {
+    tx.update(["effects", { id: t.id }], { position: Number(t.position) - gap });
   }
+}
+
+/**
+ * Cut a transition at timeline time `atSeconds` (the transition branch of
+ * desktop Slice_Triggered): `both` keeps the original as the left part and
+ * adds a new transition for the right part; `left`/`right` keep one side,
+ * and `ripple` then closes the gap like `splitClip`. The cut snaps to the
+ * frame grid (keep-left includes the frame at the cut) and must fall
+ * strictly inside the transition.
+ */
+export function splitTransition(
+  tx: Transaction,
+  transitionId: string,
+  atSeconds: number,
+  keep: SliceKeep = "both",
+  opts: SplitClipOptions = {},
+): SplitClipResult {
+  const project = tx.project;
+  const transition = findTransition(project, transitionId);
+  if (!transition) throw new OpError("not_found", `No transition with id ${transitionId}.`, { id: transitionId });
+  requireUnlocked(project, transition.layer);
+  requireKeep(keep);
+  if (opts.ripple && keep === "both") throw invalid("A ripple slice keeps one side (left or right).");
+  const at = slicePoint(project, requireFinite(atSeconds, "atSeconds"), keep);
+  if (!(transition.position < at && at < itemEnd(transition))) {
+    throw invalid(`Time ${atSeconds} s is not inside transition ${transitionId} (${transition.position}..${itemEnd(transition)} s).`);
+  }
+  if (!opts.ripple) return sliceTransition(tx, transitionId, at, keep);
+  const originalPosition = Number(transition.position);
+  const removed = removedBySlice(transition, at, keep);
+  const result = sliceTransition(tx, transitionId, at, keep);
+  if (keep === "right") patchTransition(tx, transitionId, { position: originalPosition });
+  rippleDeleteGap(tx, transition.layer, at, removed, transitionId);
   return result;
 }
 
@@ -444,14 +514,24 @@ export function deleteClips(tx: Transaction, clipIds: readonly string[], opts: D
   return unique;
 }
 
-/** main_window.py `ripple_delete_gap`: items on `layer` strictly after `from` move left by `gap`. */
+const RIPPLE_EPSILON = 1e-6;
+
+/**
+ * zenvi-core timeline_ops.close_gap_at (develop 1f80cb3d0, also behind
+ * main_window.py `ripple_delete_gap`): items on `layer` starting after `from`
+ * move left by the room actually freed, `gap` but never further than the
+ * first of them starts past `from`, so a clip that overlapped the removed one
+ * (a crossfade partner) lands where the removed clip began.
+ */
 function rippleShift(tx: Transaction, layer: number, from: number, gap: number): void {
-  for (const c of tx.project.clips.filter((c) => c.layer === layer && c.position > from)) {
-    tx.update(["clips", { id: c.id }], { position: c.position - gap });
-  }
-  for (const t of tx.project.effects.filter((t) => t.layer === layer && t.position > from)) {
-    tx.update(["effects", { id: t.id }], { position: t.position - gap });
-  }
+  const later = [
+    ...tx.project.clips.filter((c) => c.layer === layer && c.position > from + RIPPLE_EPSILON).map((c) => ["clips", c] as const),
+    ...tx.project.effects.filter((t) => t.layer === layer && t.position > from + RIPPLE_EPSILON).map((t) => ["effects", t] as const),
+  ];
+  if (later.length === 0 || gap <= RIPPLE_EPSILON) return;
+  const shift = Math.min(gap, Math.min(...later.map(([, item]) => item.position)) - from);
+  if (shift <= RIPPLE_EPSILON) return;
+  for (const [kind, item] of later) tx.update([kind, { id: item.id }], { position: item.position - shift });
 }
 
 export interface DuplicateClipOptions {
@@ -499,14 +579,27 @@ export function removeGap(tx: Transaction, layer: number, atSeconds: number): nu
   requireUnlocked(project, layer);
   const gap = findGap(project, layer, atSeconds);
   if (!gap) return 0;
-  const size = gap.end - gap.start;
+  closeGap(tx, layer, gap.start, gap.end);
+  return gap.end - gap.start;
+}
+
+/**
+ * zenvi-core develop timeline_ops.close_gap (Remove Gap): every clip and
+ * transition on `layer` that starts after `gapStart` moves left by the gap's
+ * length. Returns the moved ids.
+ */
+export function closeGap(tx: Transaction, layer: number, gapStart: number, gapEnd: number): string[] {
+  const project = tx.project;
+  if (!findLayer(project, layer)) throw new OpError("not_found", `No track with number ${layer}.`, { layer });
+  requireUnlocked(project, layer);
+  const size = requireFinite(gapEnd, "gapEnd") - requireFinite(gapStart, "gapStart");
+  if (!(size > 0)) return [];
   const clipIds = new Set(project.clips.map((c) => c.id));
-  for (const item of itemsOnLayer(project, layer)) {
-    if (item.position > gap.start) {
-      tx.update([clipIds.has(item.id) ? "clips" : "effects", { id: item.id }], { position: item.position - size });
-    }
+  const later = itemsOnLayer(project, layer).filter((item) => item.position > gapStart);
+  for (const item of later) {
+    tx.update([clipIds.has(item.id) ? "clips" : "effects", { id: item.id }], { position: item.position - size });
   }
-  return size;
+  return later.map((item) => item.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -627,8 +720,10 @@ export interface SetKeyframesOptions {
    * `replace` (default): the property's points become exactly `points`.
    * `merge`: each point replaces an existing point at the same frame or is
    * inserted; other points stay.
+   * `replace_range`: existing points between the first and last new point
+   * are dropped, the rest stay (zenvi-core develop clip_props._merge_curve).
    */
-  mode?: "replace" | "merge";
+  mode?: "replace" | "merge" | "replace_range";
 }
 
 /** Build a JSON point from a `KeyframePointInput` (frame or time resolved against the clip). */
@@ -660,12 +755,47 @@ export function setClipKeyframes(
   if (!CLIP_KEYFRAME_KEYS.includes(prop)) throw invalid(`${prop} is not a keyframed clip property.`);
   if (!Array.isArray(points) || points.length === 0) throw invalid("points must be a non-empty array.");
   const mode = opts.mode ?? "replace";
-  if (mode !== "replace" && mode !== "merge") throw invalid(`mode must be replace or merge.`);
+  if (mode !== "replace" && mode !== "merge" && mode !== "replace_range") throw invalid(`mode must be replace, merge or replace_range.`);
   const built = points.map((p, i) => pointFromInput(project, clip, p, i));
+  const eases = points.map((p, i) => (p.ease === undefined ? undefined : requireEase(p.ease, i)));
   if (prop === "time") for (const p of built) p.co.Y = Math.trunc(p.co.Y);
   const current = clip[prop] as Keyframe | undefined;
-  const base: Keyframe = mode === "merge" && current ? current : { ...(current ?? {}), Points: [] };
-  return patchClip(tx, clipId, { [prop]: setKeyframePoints(base, built) });
+  let base: Keyframe = { ...(current ?? {}), Points: [] };
+  if (mode === "merge" && current) base = current;
+  if (mode === "replace_range" && current) {
+    const xs = built.map((p) => p.co.X);
+    const lo = Math.min(...xs);
+    const hi = Math.max(...xs);
+    base = { ...current, Points: (current.Points ?? []).filter((p) => p.co.X < lo || p.co.X > hi) };
+  }
+  const curve = setKeyframePoints(base, built);
+  built.forEach((point, i) => {
+    const ease = eases[i];
+    if (ease) applyEase(curve.Points, curve.Points.findIndex((p) => p.co.X === point.co.X), ease);
+  });
+  return patchClip(tx, clipId, { [prop]: curve });
+}
+
+function requireEase(ease: unknown, index: number): readonly [number, number, number, number] {
+  if (!Array.isArray(ease) || ease.length !== 4 || ease.some((v) => typeof v !== "number" || !Number.isFinite(v))) {
+    throw invalid(`points[${index}].ease must be four finite numbers [x1, y1, x2, y2].`);
+  }
+  return ease as unknown as readonly [number, number, number, number];
+}
+
+/**
+ * clip_props_model.apply_ease: shape the segment that ends at `points[index]`
+ * with a cubic-bezier preset: that point becomes BEZIER with handle_left
+ * (x2, y2), and the point before it (whatever its interpolation) gets
+ * handle_right (x1, y1). The Properties panel's menu sets the earlier
+ * handle only on a BEZIER point (ops/keyframes.ts setKeyframeInterpolation).
+ */
+function applyEase(points: KeyframePoint[], index: number, ease: readonly [number, number, number, number]): void {
+  const [x1, y1, x2, y2] = ease;
+  const point = points[index]!;
+  point.interpolation = Interpolation.BEZIER;
+  point.handle_left = { X: x2, Y: y2 };
+  if (index > 0) points[index - 1]!.handle_right = { X: x1, Y: y1 };
 }
 
 // ---------------------------------------------------------------------------
@@ -895,6 +1025,12 @@ export function setClipVolume(tx: Transaction, clipId: string, opts: SetClipVolu
 export interface SeparateAudioOptions {
   /** One audio clip per channel (desktop Separate Audio ▸ Multiple). Default false (single clip). */
   perChannel?: boolean;
+  /**
+   * Track for the new audio clip of a clip with video (single clip only;
+   * separate_clip_audio_tool `to_track`). Default: the track below, created
+   * when there is none.
+   */
+  layer?: number;
 }
 
 /**
@@ -921,8 +1057,13 @@ export function separateAudio(tx: Transaction, clipId: string, opts: SeparateAud
     throw invalid(`Clip ${clipId} has no audio to separate.`);
   }
   if (opts.perChannel && channelCount === null) throw invalid(`Clip ${clipId} does not report its channel count.`);
+  if (opts.layer !== undefined) {
+    if (opts.perChannel || !hasVideo) throw invalid("A destination track applies to a single audio clip split from a clip with video.");
+    if (!findLayer(project, opts.layer)) throw new OpError("not_found", `No track with number ${opts.layer}.`, { layer: opts.layer });
+    requireUnlocked(project, opts.layer);
+  }
   // Validate before recording: the existing tracks the new clips land on must be unlocked.
-  const needed = hasVideo ? (opts.perChannel ? channelCount! : 1) : opts.perChannel ? channelCount! - 1 : 0;
+  const needed = opts.layer !== undefined ? 0 : hasVideo ? (opts.perChannel ? channelCount! : 1) : opts.perChannel ? channelCount! - 1 : 0;
   for (const layer of project.layers
     .filter((l) => l.number < clip.layer)
     .sort((a, b) => b.number - a.number)
@@ -963,7 +1104,7 @@ export function separateAudio(tx: Transaction, clipId: string, opts: SeparateAud
 
   const base = { ...clip, has_audio: constant(-1.0) } as Record<string, unknown>;
   if (!opts.perChannel) {
-    const layer = trackBelowOrCreate(tx, clip.layer);
+    const layer = opts.layer ?? trackBelowOrCreate(tx, clip.layer);
     insertCopy({
       ...base,
       channel_filter: constant(-1.0),

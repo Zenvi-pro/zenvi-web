@@ -10,6 +10,7 @@
  * (it would flip every clip's alpha on open).
  */
 
+import { isPortableAssetPath } from "@zenvi/render-node";
 import { parseProject, ProjectParseError, type Project, type ProjectFile } from "@zenvi/engine";
 import { ApiError } from "../http/errors.js";
 
@@ -87,11 +88,21 @@ export function displayName(file: ProjectFile): string {
   return path.split(/[\\/]/).pop() || file.id;
 }
 
-/** Every project file with a cloud content address, plus the ones without (not in the cloud). */
+/**
+ * A file that points at an asset every Zenvi renderer ships, as the desktop
+ * stores it (`@emojis/1F525.svg` for an emoji sticker): its bytes come with
+ * the renderer, so it is never uploaded and never missing.
+ */
+export function isBundledAsset(file: ProjectFile): boolean {
+  return typeof file.path === "string" && isPortableAssetPath(file.path);
+}
+
+/** Every project file with a cloud content address, plus the ones without (not in the cloud). Bundled assets are neither. */
 export function projectMedia(project: Project): { refs: MediaRef[]; unhashed: { fileId: string; name: string }[] } {
   const refs: MediaRef[] = [];
   const unhashed: { fileId: string; name: string }[] = [];
   for (const file of project.files) {
+    if (isBundledAsset(file)) continue;
     const sha256 = fileSha256(file);
     if (!sha256) {
       unhashed.push({ fileId: file.id, name: displayName(file) });

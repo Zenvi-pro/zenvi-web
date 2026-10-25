@@ -3,7 +3,7 @@
  * (the same catalog the Assistant uses), executed through the Assistant
  * bridge so results and undo steps are identical.
  */
-import { CONTRACT_TOOL_NAMES, contractMeta, HIDDEN_PARAMS, type ContractToolName } from "@zenvi/engine/tools";
+import { CONTRACT_TOOL_NAMES, contractMeta, getTool, HIDDEN_PARAMS, type ContractToolName } from "@zenvi/engine/tools";
 import { useMemo, useState } from "react";
 import { Button } from "@/ui/Button";
 import { Switch } from "@/ui/Controls";
@@ -29,11 +29,16 @@ export interface ToolEntry {
   description: string;
 }
 
+/** Desktop tools the catalog runs with the desktop's arguments (not the ones still pending a port). */
+function runnable(name: string): name is ContractToolName {
+  return getTool(name)?.contract === true;
+}
+
 /** Tools a person can run from the palette (the Assistant's own catalog). */
 export function toolEntries(): ToolEntry[] {
-  return CONTRACT_TOOL_NAMES.map((name) => ({ name, title: contractMeta[name].title || name, description: contractMeta[name].description })).sort((a, b) =>
-    a.title.localeCompare(b.title),
-  );
+  return CONTRACT_TOOL_NAMES.filter(runnable)
+    .map((name) => ({ name, title: contractMeta[name].title || name, description: contractMeta[name].description }))
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 function kindOf(schema: FieldSchema): "boolean" | "number" | "enum" | "text" {
@@ -46,7 +51,7 @@ function kindOf(schema: FieldSchema): "boolean" | "number" | "enum" | "text" {
 
 export function ToolRunnerDialog({ name: requested, onClose }: { name: string | null; onClose: () => void }) {
   const session = useSession();
-  const name = requested && requested in contractMeta ? (requested as ContractToolName) : null;
+  const name = requested && runnable(requested) ? requested : null;
   const meta = name ? contractMeta[name] : null;
   const fields = useMemo(() => {
     if (!meta) return [];

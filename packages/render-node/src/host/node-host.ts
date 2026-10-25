@@ -5,23 +5,31 @@
  */
 
 import { mkdir, readFile, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
-import { analyzeAudio } from "../audio/analyze.js";
+import { analyzeAudio, decodePcm } from "../audio/analyze.js";
+import { transcribeMediaFile } from "../audio/speech.js";
 import { engineAssetsDir } from "../resources.js";
-import { FORMATS } from "../render/encoder.js";
+import { encoderNames } from "../ffmpeg/capabilities.js";
+import { ffmpegCanWrite, FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
 import { renderFrame } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
-import { createBackendHost, type BackendHostOptions } from "./backend.js";
-import { createNodeMediaHost, type ImportPolicy } from "./media.js";
+import { installedFontFamilies } from "../svg/fonts.js";
+import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
+import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createMediaResolver } from "./paths.js";
+import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
+import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
 
 export interface NodeHostOptions {
   /** The open project file, or a getter (MCP sessions switch projects). */
   projectFile?: string | (() => string | undefined);
   importPolicy?: ImportPolicy;
+  /** Environment for finding yt-dlp, ffmpeg and Zenvi's cache folder (default `process.env`). */
+  env?: NodeJS.ProcessEnv;
   /** Bundled engine assets (transition masks, emojis); defaults to the package/bundle copy. */
   engineAssetsDir?: string;
   backend?: BackendHostOptions;
@@ -30,6 +38,12 @@ export interface NodeHostOptions {
   renderEngine?: RenderEngine;
   /** Progress of `exporter.export`, with frame counts. */
   onRenderProgress?: (progress: RenderProgress) => void;
+  /**
+   * Zenvi desktop's user folder (`~/.openshot_qt`): with it the host reads the
+   * desktop's recent projects and recovery copies and keeps custom profiles
+   * where the desktop finds them.
+   */
+  desktopDir?: string;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
@@ -73,6 +87,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     return p ? path.dirname(p) : process.cwd();
   };
   const inProject = (p: string): string => (path.isAbsolute(p) ? p : path.resolve(baseDir(), p));
+  /** An export path: `~` is the home folder (the desktop's normalize_path), relative paths start at the project's folder. */
+  const exportPath = (p: string): string => inProject(/^~(?=$|[\\/])/.test(p) ? path.join(homedir(), p.slice(1)) : p);
 
   const defaultOutput = (options_: ExportOptions): string => {
     const ext = FORMATS[options_.format]?.extension ?? "mp4";
@@ -81,13 +97,39 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     return path.join(baseDir(), `${stem}.${ext}`);
   };
 
+  /** The open project file, for what only a saved project has. */
+  const saved = (): string => {
+    const file = current();
+    if (!file) throw new Error("The project has not been saved yet: give a file path (e.g. my-edit.zvn).");
+    return file;
+  };
+  const collectOptions = () => ({ projectFile: saved(), engineAssetsDir: assets, resolveMedia });
+
   const host: NodeHost = {
     resolveMedia,
     projectFile: current,
-    media: createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes }),
+    media: {
+      ...createNodeMediaHost({ projectFile: current, policy: options.importPolicy, maxDownloadBytes: options.maxDownloadBytes, env: options.env }),
+      missing: (files) => missingOnDisk(files, resolveMedia),
+      collect: (files) => collectMedia(files, collectOptions()),
+      reclaimable: (files) => reclaimableMedia(files, collectOptions()),
+      removeCopies: (paths) => removeMediaCopies(paths, collectOptions()),
+    },
     exporter: {
+      delivery: "files",
+      // The desktop names an export after the project file (else "Untitled Project").
+      defaultName: () => {
+        const file = current();
+        return file ? path.basename(file, path.extname(file)) : "Untitled Project";
+      },
+      async isFolder(p) {
+        return stat(exportPath(p)).then(
+          (s) => s.isDirectory(),
+          () => false,
+        );
+      },
       async export(project, exportOptions, onProgress) {
-        const output = exportOptions.output ? inProject(exportOptions.output) : defaultOutput(exportOptions);
+        const output = exportOptions.output ? exportPath(exportOptions.output) : defaultOutput(exportOptions);
         await mkdir(path.dirname(output), { recursive: true });
         return renderProject(project, {
           resolveMedia,
@@ -100,6 +142,11 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
             options.onRenderProgress?.(p);
           },
         });
+      },
+      // The containers this exporter writes, with encoders the local ffmpeg has (FFmpegWriter.IsValidCodec) and the muxer takes.
+      async supports(format, videoCodec, audioCodec) {
+        const encoders = await encoderNames().catch(() => new Set<string>());
+        return ffmpegCanWrite(format, videoCodec, audioCodec, encoders);
       },
     },
     frames: {
@@ -115,9 +162,12 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         });
         return { mimeType: format === "jpeg" ? "image/jpeg" : "image/png", data: bytes.toString("base64") };
       },
+      // The fonts SVG titles render with here (this computer's fonts and the bundled Lato).
+      fontFamilies: () => installedFontFamilies(),
     },
     audio: {
       analyzeAudio: (p, o) => analyzeAudio(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
+      decodePcm: (p, o) => decodePcm(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
     },
     storage: {
       async save(project, target) {
@@ -138,10 +188,45 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         await writeFileAtomic(file, text);
         return file;
       },
+      writeBytes: (p, bytes, _contentType, opts) => writeBytesFile(inProject(p), bytes, opts?.overwrite),
+      exportMedia: (file, name, folder, render) =>
+        exportMediaFile({
+          source: resolveMedia(String(file.path ?? "")),
+          folder: folder ? inProject(folder) : baseDir(),
+          name,
+          render,
+          resolveMedia,
+          engine: options.renderEngine,
+          signal: options.signal,
+        }),
+      currentPath: () => current() ?? null,
     },
     log: options.log,
   };
   if (assets) host.assets = createAssetHost(assets);
-  if (options.backend) host.backend = createBackendHost(options.backend);
+  const desktopDir = options.desktopDir;
+  if (desktopDir) {
+    Object.assign(host.storage!, {
+      recentProjects: () => desktopRecentProjects(desktopDir),
+      recoveryCopies: async () => {
+        const file = current();
+        return file ? recoveryCopiesFor(desktopDir, file) : [];
+      },
+      restoreRecoveryCopy: async (copy: string) => {
+        const file = saved();
+        const backup = await restoreRecoveryCopy(desktopDir, file, copy);
+        return { project: await readProjectFile(file), path: file, backup };
+      },
+      customProfiles: () => customProfileFiles(desktopDir),
+      writeCustomProfile: (name: string, text: string) => writeCustomProfileFile(desktopDir, name, text),
+      removeCustomProfile: (name: string) => removeCustomProfileFile(desktopDir, name),
+    } satisfies Partial<NonNullable<ToolHost["storage"]>>);
+  }
+  if (options.backend) {
+    host.backend = createBackendHost(options.backend);
+    // Speech recognition through the Zenvi backend, as the person `zenvi login` signed in.
+    const upload = backendSpeechUpload(options.backend);
+    host.audio!.transcribe = (p, o) => transcribeMediaFile(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal, upload });
+  }
   return host;
 }

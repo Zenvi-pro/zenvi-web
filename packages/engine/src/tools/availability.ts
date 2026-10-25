@@ -5,11 +5,14 @@
  * the pipeline), the optional host methods it needs at run time
  * (`TOOL_NEEDS`), and what each surface's host provides (`SURFACE_PROFILES`,
  * a description of the host implementations in this repo). Zenvi desktop
- * runs all 73 contract tools itself (it is the reference implementation);
- * the direct tools exist only on the web surfaces.
+ * runs every contract tool itself (it is the reference implementation);
+ * the direct tools exist only on the web surfaces. A ported tool with desktop
+ * arguments not ported yet (pending.ts) is partial on the web surfaces.
  */
 
 import { capabilityName, type CatalogTool } from "./define.js";
+import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_ARGS } from "./pending.js";
+import type { ContractToolName } from "./schemas.gen.js";
 import type { HostCapability } from "./types.js";
 
 export type AvailabilitySurface = "editor" | "cli" | "cloud" | "desktop";
@@ -24,10 +27,31 @@ export type HostMethod =
   | "media.importUrl"
   | "media.pickFiles"
   | "media.writeGenerated"
+  | "media.missing"
+  | "media.fetchWebVideo"
   | "storage.open"
   | "storage.readText"
   | "storage.writeText"
-  | "ui.openExportDialog";
+  | "ui.openExportDialog"
+  | "audio.decodePcm"
+  | "audio.transcribe"
+  | "ui.selection"
+  | "ui.setSelection"
+  | "ui.timelineView"
+  | "ui.showTimelineRange"
+  | "ui.setTimelineMode"
+  | "ui.layout"
+  | "ui.preferences"
+  | "ui.clearPlaybackCache"
+  | "storage.writeBytes"
+  | "storage.exportMedia"
+  | "storage.currentPath"
+  | "storage.recentProjects"
+  | "storage.recoveryCopies"
+  | "storage.customProfiles"
+  | "media.collect"
+  | "exporter.supports"
+  | "frames.fontFamilies";
 
 export interface ToolNeeds {
   /** All of these, or the tool refuses. */
@@ -44,7 +68,15 @@ export interface ToolNeeds {
 }
 
 const WATCH = ["frames", "backend"] as (HostCapability | HostMethod)[];
+/** How the web surfaces transcribe (zenvi-backend POST /api/v1/transcription). */
+const SERVER_ASR =
+  "speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free";
 const WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
+/** Where a host cannot list its fonts (the browser), a title's font is taken as given, as the desktop does without Qt's list. */
+const FONTS_UNCHECKED =
+  "a font is not checked against the installed fonts (the browser does not list them): one it does not have falls back to another, and a template font it lacks is kept";
+/** The desktop's ComfyUI integration: a server on the person's computer, set in its preferences. */
+const COMFYUI = "the local ComfyUI server Zenvi desktop drives (Preferences > AI > ComfyUI URL)";
 
 /** Run-time needs beyond `requires`, per tool. */
 export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
@@ -53,9 +85,17 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   split_file_add_clip_tool: { optional: WATCH, partialNote: WATCH_NOTE },
   search_clip_scenes_tool: { optional: ["backend", "frames"], partialNote: "without the Zenvi backend only chapter and scene descriptions are searched" },
   slice_clip_at_best_match_tool: { optional: ["backend", "frames"], partialNote: "without the Zenvi backend only explicit times and scene descriptions work" },
-  duck_under_speech_tool: { optional: ["audio"], partialNote: "without audio analysis only indexed transcript cues find the speech" },
+  duck_under_speech_tool: {
+    optional: ["audio", "audio.transcribe"],
+    partialNote: "without audio analysis and speech recognition only indexed transcript cues find the speech",
+  },
   watch_clip_tool: { optional: ["media.importPath"], partialNote: "file_path needs local file access" },
-  export_video_tool: { anyOf: ["exporter", "ui.openExportDialog"] },
+  export_video_tool: {
+    anyOf: ["exporter", "ui.openExportDialog"],
+    webNote:
+      "interlaced is refused (no web encoder interlaces); the CLI renders with ffmpeg and writes files (relative paths and the default folder start at the project's folder), " +
+      "the web editor renders MP4, MOV, MKV, WebM or WAV in the browser and downloads the file (no folders), Zenvi Cloud starts a render job (get_render_status gives the download link; no image sequences)",
+  },
   save_project_tool: {},
   open_project_tool: { methods: ["storage.open"] },
   import_files_tool: { methods: ["media.importPath"], optional: ["media.listPaths"], partialNote: "folders and globs need path listing" },
@@ -65,27 +105,195 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   fetch_motion_graphics_video_tool: { methods: ["media.importUrl"] },
   fetch_remotion_video_from_supabase_tool: { methods: ["media.importUrl"] },
   generate_video_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
+  generate_image_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
+  // Hosted surfaces do not download third-party pages (terms of service, blocked server addresses): only the person's own computer does.
+  ingest_web_video_tool: { methods: ["media.fetchWebVideo"] },
   generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
-  add_title_tool: { methods: ["media.writeGenerated"] },
-  add_captions_tool: {
+  add_title_tool: {
     methods: ["media.writeGenerated"],
-    optional: ["storage.readText"],
-    partialNote: "srtPath needs file reading",
-    webNote: "captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device",
+    optional: ["frames.fontFamilies"],
+    partialNote: FONTS_UNCHECKED,
   },
-  export_captions_tool: { methods: ["storage.writeText"], webNote: "captions come from indexed transcripts (no on-device ASR)" },
-  get_transcript_tool: { webNote: "indexed transcript cues with estimated word timings (no on-device ASR)" },
+  add_captions_tool: {
+    optional: ["media.writeGenerated", "storage.readText", "audio.transcribe"],
+    partialNote: "captions not tied to a clip need stored generated media; srtPath needs file reading; media Zenvi has not indexed needs speech recognition",
+  },
+  export_captions_tool: {
+    methods: ["storage.writeText"],
+    optional: ["audio.transcribe"],
+    partialNote: "without speech recognition only media Zenvi indexed has a transcript",
+    webNote: SERVER_ASR,
+  },
+  list_title_templates_tool: { optional: ["storage.readText"], partialNote: "kind=project needs reading project files" },
+  edit_title_tool: {
+    methods: ["media.writeGenerated", "storage.readText"],
+    optional: ["frames.fontFamilies"],
+    partialNote: FONTS_UNCHECKED,
+    webNote: "the edited version is a new Project Files entry (new file_id) in every clip",
+  },
+  add_animated_title_tool: {
+    methods: ["media.writeGenerated"],
+    webNote: "2D keyframed versions of the Blender templates (no 3D depth or particles); earth, magic_wand, snow and picture_frames_4 need Zenvi desktop",
+  },
+  add_timer_tool: { optional: ["media.writeGenerated"], partialNote: "without storing generated images only timeline_clip_id works" },
+  get_transcript_tool: {
+    optional: ["audio.transcribe"],
+    partialNote: "without speech recognition only media Zenvi indexed has a transcript (word timings estimated)",
+    webNote: SERVER_ASR,
+  },
   reindex_project_file_tool: { webNote: "reports files that are already indexed; uploading for indexing runs in Zenvi desktop" },
   wait_until_project_indexed_tool: { webNote: "reports indexing status once; does not wait" },
   remove_silence_tool: { webNote: "energy VAD on the host's audio analysis" },
-  transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
-  remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
-  detect_beats_tool: { desktopOnly: "on-device beat tracking" },
+  set_clip_audio_video_tool: {
+    webNote: "waveform=show changes nothing, since the web timeline draws the waveform of every clip with sound; waveform=hide is refused",
+  },
+  seek_playhead_tool: {
+    optional: ["player"],
+    partialNote: "without a preview player it moves the playhead saved with the project (where the editors open); play=true needs the web editor",
+  },
+  get_playhead_and_selection_tool: {
+    optional: ["player", "ui.selection", "ui.timelineView"],
+    partialNote: "without an editor open it reports the playhead saved with the project; selection, playback and the timeline view exist only in an editor",
+  },
+  select_timeline_items_tool: { methods: ["ui.selection", "ui.setSelection"] },
+  set_timeline_view_tool: {
+    methods: ["ui.timelineView", "ui.showTimelineRange", "ui.setTimelineMode"],
+    webNote: "the web editor has no timing (retime-by-drag) mode, so timing=true is refused",
+  },
+  // Colour: frames rendered by the host; LUT files outside the 50 built-ins need local files.
+  analyze_frame_colors_tool: { webNote: "save_frame_path attaches the frame to the result instead of writing a file; frames are measured at most 960 px wide" },
+  chroma_key_clip_tool: {
+    optional: ["frames"],
+    partialNote: "without frame rendering key_color='auto' is refused, 'green'/'blue' key the stock shade and keyed_pct is not measured",
+  },
+  color_grade_clip_tool: { optional: ["media.importPath"], partialNote: "a .cube file outside the built-in LUTs needs local file access" },
+  update_effect_tool: { optional: ["media.importPath"], partialNote: "a lut_path .cube file outside the built-in LUTs needs local file access" },
+  apply_color_tool: {
+    optional: ["frames", "media.importPath"],
+    partialNote: "without frame rendering there is no after preview; a .cube file outside the built-in LUTs needs local file access",
+  },
+  apply_look_tool: {
+    optional: ["frames", "media.importPath"],
+    partialNote: "without frame rendering there is no after preview; a .cube file outside the built-in LUTs needs local file access",
+  },
+  match_color_to_reference_tool: { optional: ["media.importPath"], partialNote: "referenceImagePath needs local file access" },
+  list_luts_tool: { webNote: "the 50 built-in LUTs; the desktop also lists the user's LUT folder" },
+  process_clip_effect_tool: { desktopOnly: "OpenCV clip analysis (Stabilizer, Tracker, Object Detector, Object Mask)" },
+  add_effect_tool: {
+    webNote: "Stabilizer, Tracker, Object Detector and Object Mask need Zenvi desktop's OpenCV analysis and are refused; Outline is kept for Zenvi desktop to draw",
+  },
+  set_keyframes_tool: {
+    webNote:
+      "animates volume, alpha, location_x/y, scale_x/y and rotation (Zenvi desktop: any keyframable clip property) and needs a value for every point (the desktop keeps the curve's value at a point without one)",
+  },
+  transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
+  remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
+  detect_beats_tool: { methods: ["audio.decodePcm"] },
+  build_reel_tool: {
+    optional: ["audio.decodePcm", "media.writeGenerated"],
+    partialNote:
+      "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes, and the motion styles (ui_promo, editorial_motion, product_callout, tutorial) are refused",
+  },
+  add_motion_template_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.decodePcm"],
+    partialNote: "without audio decoding the entrances follow `beats` or `bpm` (default 120 BPM), not the music on the timeline",
+  },
   diarize_media_tool: { desktopOnly: "on-device speaker diarization" },
   search_media_local_tool: { desktopOnly: "the on-device visual index" },
   modify_clip_tool: { desktopOnly: "the desktop's ffmpeg cut, upload and splice pipeline" },
   generate_transition_clip_tool: { desktopOnly: "the desktop's ffmpeg pipeline (clip A + AI morph + clip B)" },
   suggest_motion_graphics_placements_tool: { desktopOnly: "deprecated on the desktop too; use propose_overlay_windows_tool" },
+  // Project Files: missing media is the host's check; relinking and image sequences read local folders.
+  list_project_files_tool: {
+    optional: ["media.missing"],
+    partialNote: "without a media check every file reports missing=null and missing_only is refused",
+    webNote: "optimized_preview is always none: only Zenvi desktop makes and plays optimized previews",
+  },
+  remove_files_from_project_tool: { optional: ["media.missing"], partialNote: "scope='missing' needs a media check" },
+  update_project_files_tool: {
+    optional: ["media.importPath", "media.listPaths"],
+    partialNote: "relinking (path, search_folder) needs local file access",
+  },
+  import_image_sequence_tool: { methods: ["media.listPaths"] },
+  manage_optimized_previews_tool: { desktopOnly: "the optimized previews (proxies) Zenvi desktop builds and plays" },
+  list_comfyui_templates_tool: { desktopOnly: COMFYUI },
+  list_comfyui_jobs_tool: { desktopOnly: COMFYUI },
+  create_media_with_comfyui_tool: { desktopOnly: COMFYUI },
+  enhance_file_with_comfyui_tool: { desktopOnly: COMFYUI },
+  cancel_comfyui_job_tool: { desktopOnly: COMFYUI },
+  prepare_recording_tool: { desktopOnly: "the Recording dock (microphone, screen and webcam capture)" },
+  // Project and export (editor_tools/project_export*.py): each surface's own projects, files and settings.
+  list_recent_projects_tool: {
+    methods: ["storage.recentProjects"],
+    webNote: "the CLI lists Zenvi desktop's recent projects (its File > Recent Projects on this computer); the web editor the projects in this browser; Zenvi Cloud the person's cloud projects",
+  },
+  forget_recent_projects_tool: { desktopOnly: "its own recent projects list (File > Recent Projects)" },
+  list_recovery_versions_tool: {
+    methods: ["storage.recoveryCopies", "storage.currentPath"],
+    webNote: "the copies Zenvi desktop zips each time it saves the project; the CLI's own saves make none",
+  },
+  restore_recovery_version_tool: {
+    methods: ["storage.recoveryCopies", "storage.currentPath"],
+    webNote: "the copies Zenvi desktop zips each time it saves the project; the CLI's own saves make none",
+  },
+  import_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
+  export_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
+  consolidate_project_media_tool: { methods: ["media.collect", "storage.currentPath"] },
+  reset_caches_and_history_tool: {
+    optional: ["ui.clearPlaybackCache"],
+    partialNote: "target=playback_cache has nothing to clear: every frame is rendered from the project",
+  },
+  get_editor_layout_tool: {
+    methods: ["ui.layout"],
+    webNote: "the web editor's panels; it has no Color Grade or Recording view, scopes, saved custom views, floating panels or hidden toolbar",
+  },
+  set_editor_layout_tool: {
+    methods: ["ui.layout"],
+    webNote: "the web editor's panels; it has no Color Grade or Recording view, scopes, saved custom views, floating panels or hidden toolbar, and fullscreen needs a click",
+  },
+  get_preferences_tool: {
+    methods: ["ui.preferences"],
+    webNote: "the web editor's own settings (timeline snapping; autosave, undo depth, backend and shortcuts are read-only), not Zenvi desktop's Preferences",
+  },
+  set_preference_tool: {
+    methods: ["ui.preferences"],
+    webNote: "the web editor's own settings (timeline snapping; autosave, undo depth, backend and shortcuts are read-only), not Zenvi desktop's Preferences",
+  },
+  list_project_profiles_tool: {
+    optional: ["storage.customProfiles"],
+    partialNote: "the built-in profiles only: custom profiles live in Zenvi desktop's profiles folder (Zenvi desktop and the zenvi CLI)",
+  },
+  set_project_profile_tool: {
+    optional: ["storage.customProfiles"],
+    partialNote: "a size or frame rate no built-in profile has needs a custom profile, which only Zenvi desktop and the zenvi CLI keep",
+  },
+  set_project_setting_tool: {
+    optional: ["storage.customProfiles"],
+    partialNote: "a size or frame rate no built-in profile has needs a custom profile, which only Zenvi desktop and the zenvi CLI keep",
+    webNote:
+      "save_as_default is refused: the web editor's settings have no default sample rate or channels for new projects, and the CLI and Zenvi Cloud have no editor settings",
+  },
+  manage_custom_profiles_tool: {
+    methods: ["storage.customProfiles"],
+    webNote: "Zenvi desktop's profiles folder on this computer; set_default is refused (the default profile is a Zenvi desktop preference)",
+  },
+  list_export_presets_tool: {
+    optional: ["exporter.supports"],
+    partialNote: "without a codec check, every preset whose container the engine's exporters write counts as available",
+    webNote: "the built-in presets (Zenvi desktop also lists the user's own presets folder)",
+  },
+  save_frame_image_tool: {
+    optional: ["storage.writeBytes"],
+    partialNote: "without file saving the frame is attached to the result",
+    webNote: "the CLI writes the file (a relative path starts at the project's folder, the desktop's default is its export folder); the web editor downloads it; Zenvi Cloud answers with a download link and renders PNG only",
+  },
+  export_files_to_folder_tool: {
+    methods: ["storage.exportMedia"],
+    optional: ["exporter"],
+    partialNote: "sub-clips and image sequences are rendered to MP4, which needs video rendering",
+    webNote: "the CLI copies into the folder (relative to the project's folder; default the project's folder); the web editor downloads each file; Zenvi Cloud answers with download links",
+  },
 };
 
 export interface SurfaceProfile {
@@ -94,8 +302,8 @@ export interface SurfaceProfile {
   host: string;
   capabilities: readonly HostCapability[];
   methods: readonly HostMethod[];
-  /** Capabilities present only in some sessions (signed in, browser support). */
-  conditional?: Partial<Record<HostCapability, string>>;
+  /** Capabilities and methods present only in some sessions (signed in, browser support, an installed program). */
+  conditional?: Partial<Record<HostCapability | HostMethod, string>>;
   /** Tools the surface does not expose at all. */
   hidden?: readonly string[];
 }
@@ -105,34 +313,85 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   editor: {
     title: "Web editor (Zenvi Assistant, command palette)",
     host: "apps/editor/src/features/editor/assistant/host.ts",
-    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage"],
-    methods: ["media.importUrl", "media.pickFiles", "media.writeGenerated", "ui.openExportDialog"],
+    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
+    methods: [
+      "media.importUrl",
+      "media.pickFiles",
+      "media.writeGenerated",
+      "media.missing",
+      "storage.readText",
+      "storage.writeText",
+      "storage.writeBytes",
+      "storage.exportMedia",
+      "storage.currentPath",
+      "storage.recentProjects",
+      "ui.openExportDialog",
+      "audio.decodePcm",
+      "audio.transcribe",
+      "ui.selection",
+      "ui.setSelection",
+      "ui.timelineView",
+      "ui.showTimelineRange",
+      "ui.setTimelineMode",
+      "ui.layout",
+      "ui.preferences",
+      "ui.clearPlaybackCache",
+      "exporter.supports",
+    ],
     conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" },
   },
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
     methods: [
       "media.importPath",
       "media.listPaths",
       "media.importUrl",
       "media.writeGenerated",
+      "media.missing",
+      "media.fetchWebVideo",
       "storage.open",
       "storage.readText",
       "storage.writeText",
+      "storage.writeBytes",
+      "storage.exportMedia",
+      "storage.currentPath",
+      "storage.recentProjects",
+      "storage.recoveryCopies",
+      "storage.customProfiles",
+      "media.collect",
+      "audio.decodePcm",
+      "audio.transcribe",
+      "exporter.supports",
+      "frames.fontFamilies",
     ],
-    conditional: { backend: "signed in with zenvi login" },
+    conditional: { backend: "signed in with zenvi login", "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks" },
   },
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
-    capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
-    methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText"],
+    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
+    methods: [
+      "media.importUrl",
+      "media.writeGenerated",
+      "media.missing",
+      "storage.readText",
+      "storage.writeText",
+      "storage.writeBytes",
+      "storage.exportMedia",
+      "storage.currentPath",
+      "storage.recentProjects",
+      "audio.decodePcm",
+      "audio.transcribe",
+      "frames.fontFamilies",
+      "exporter.supports",
+    ],
     conditional: {
       frames: "the render worker is configured",
+      exporter: "the render worker is configured",
       media: "ffprobe is available",
-      assets: "title templates are bundled",
+      assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
       backend: "the server is set up to call the Zenvi backend",
     },
@@ -141,7 +400,6 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "open_project_tool",
       "save_project_tool",
       "import_files_tool",
-      "export_video_tool",
       "play_tool",
       "go_to_start_tool",
       "go_to_end_tool",
@@ -149,6 +407,10 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "zoom_out_tool",
       "center_on_playhead_tool",
       "watch_clip_tool",
+      "get_editor_layout_tool",
+      "set_editor_layout_tool",
+      "get_preferences_tool",
+      "set_preference_tool",
       // Slower than a ChatGPT tool call. The cloud server starts generate_video instead.
       "generate_video_and_add_to_timeline_tool",
     ],
@@ -176,10 +438,31 @@ function needName(need: HostCapability | HostMethod): string {
     "media.importUrl": "URL downloads",
     "media.pickFiles": "a file picker",
     "media.writeGenerated": "storing generated media",
+    "media.missing": "checking for missing media",
+    "media.fetchWebVideo": "fetching videos from web pages, which only runs on the person's own computer (the zenvi CLI with yt-dlp)",
     "storage.open": "opening project files",
     "storage.readText": "reading files",
     "storage.writeText": "writing files",
     "ui.openExportDialog": "an export dialog",
+    "audio.decodePcm": "audio decoding",
+    "audio.transcribe": "speech recognition",
+    "ui.selection": "reading the editor's selection",
+    "ui.setSelection": "selecting in the editor",
+    "ui.timelineView": "reading the timeline view",
+    "ui.showTimelineRange": "zooming the timeline to a range",
+    "ui.setTimelineMode": "the timeline toolbar's modes",
+    "ui.layout": "an editor window's panels",
+    "ui.preferences": "an editor's settings",
+    "ui.clearPlaybackCache": "a playback cache",
+    "storage.writeBytes": "saving files (images)",
+    "storage.exportMedia": "copying media out (to a folder, a download or a link)",
+    "storage.currentPath": "knowing where the project is saved",
+    "storage.recentProjects": "a list of recent projects",
+    "storage.recoveryCopies": "Zenvi desktop's recovery copies",
+    "storage.customProfiles": "Zenvi desktop's custom profiles folder",
+    "media.collect": "copying media into the project's folder",
+    "exporter.supports": "checking which codecs it can encode",
+    "frames.fontFamilies": "listing the fonts titles render with",
   };
   return names[need as HostMethod];
 }
@@ -194,21 +477,27 @@ function onSurface(tool: CatalogTool, surface: Exclude<AvailabilitySurface, "des
   const missing = [...(tool.requires ?? []), ...(needs.methods ?? [])].filter((n) => !has(profile, n));
   if (needs.anyOf && !needs.anyOf.some((n) => has(profile, n))) missing.push(...needs.anyOf);
   if (missing.length > 0) return { level: "no", note: `needs ${[...new Set(missing)].map(needName).join(" and ")}` };
-  const conditions = [...(tool.requires ?? [])].map((cap) => profile.conditional?.[cap]).filter((c): c is string => Boolean(c));
+  const conditions = [...(tool.requires ?? []), ...(needs.methods ?? [])].map((need) => profile.conditional?.[need]).filter((c): c is string => Boolean(c));
   const lacking = (needs.optional ?? []).filter((n) => !has(profile, n));
+  const pendingArgs = tool.contract ? (PENDING_DESKTOP_ARGS[tool.name as ContractToolName] ?? []) : [];
   const notes = [
     ...(needs.webNote ? [needs.webNote] : []),
     ...(lacking.length > 0 && needs.partialNote ? [needs.partialNote] : []),
+    ...(pendingArgs.length > 0 ? [`only Zenvi desktop takes ${pendingArgs.join(", ")} so far`] : []),
     ...(conditions.length > 0 ? [`only when ${conditions.join(" and ")}`] : []),
   ];
-  if (needs.webNote || lacking.length > 0) return { level: "partial", note: notes.join("; ") };
+  if (needs.webNote || lacking.length > 0 || pendingArgs.length > 0) return { level: "partial", note: notes.join("; ") };
   return conditions.length > 0 ? { level: "yes", note: notes.join("; ") } : { level: "yes" };
 }
 
 /** Where one tool works. */
 export function toolAvailability(tool: CatalogTool): ToolAvailability {
   const out: ToolAvailability = { editor: "no", cli: "no", cloud: "no", desktop: tool.contract ? "yes" : "no", notes: {} };
-  if (!tool.contract) out.notes.desktop = "web-only direct tool";
+  if (!tool.contract) {
+    out.notes.desktop = DESKTOP_NAMES_ON_DIRECT_TOOLS.has(tool.name as ContractToolName)
+      ? "web-only direct tool; Zenvi desktop's tool of this name takes other arguments (not ported yet)"
+      : "web-only direct tool";
+  }
   for (const surface of ["editor", "cli", "cloud"] as const) {
     const { level, note } = onSurface(tool, surface);
     out[surface] = level;

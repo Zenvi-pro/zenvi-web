@@ -3,6 +3,9 @@
  * with Web Audio (resampled to the asked rate, 16 kHz by default like the
  * desktop's VAD), mix to mono and measure the RMS of each frame (480 samples,
  * 30 ms). Feeds remove_silence_tool and duck_under_speech_tool.
+ *
+ * `AudioHost.decodePcm`: the same decode, returning the mono samples
+ * (22050 Hz by default) for beat tracking (detect_beats_tool, build_reel_tool).
  */
 import type { AudioEnvelope } from "@zenvi/engine";
 import type { MediaSourceSpec } from "../session/media";
@@ -10,7 +13,8 @@ import type { MediaSourceSpec } from "../session/media";
 /** Web Audio decodes whole files in memory; past this, ask for the desktop app. */
 export const MAX_ANALYZE_BYTES = 768 * 1024 * 1024;
 
-async function blobOf(spec: MediaSourceSpec, signal?: AbortSignal): Promise<Blob> {
+/** The bytes behind a media source (in memory, OPFS or a signed URL). */
+export async function blobOf(spec: MediaSourceSpec, signal?: AbortSignal): Promise<Blob> {
   switch (spec.kind) {
     case "blob":
       return spec.blob;
@@ -48,17 +52,13 @@ export function mixToMono(channels: readonly Float32Array[]): Float32Array {
   return mono;
 }
 
-export async function analyzeAudio(
-  spec: MediaSourceSpec,
-  options: { sampleRate?: number; frameSize?: number; signal?: AbortSignal } = {},
-): Promise<AudioEnvelope> {
-  const sampleRate = options.sampleRate ?? 16000;
-  const frameSize = options.frameSize ?? 480;
+/** Decode `spec`'s audio, resampled to `sampleRate` and mixed to mono. */
+export async function decodeMono(spec: MediaSourceSpec, sampleRate: number, signal?: AbortSignal): Promise<Float32Array> {
   if (typeof OfflineAudioContext === "undefined") throw new Error("this browser cannot decode audio");
-  const blob = await blobOf(spec, options.signal);
+  const blob = await blobOf(spec, signal);
   if (blob.size > MAX_ANALYZE_BYTES) throw new Error("the file is too large to analyze in the browser; use Zenvi desktop");
   const bytes = await blob.arrayBuffer();
-  options.signal?.throwIfAborted();
+  signal?.throwIfAborted();
   // decodeAudioData resamples to the context's rate.
   const context = new OfflineAudioContext(1, 1, sampleRate);
   let decoded: AudioBuffer;
@@ -67,6 +67,26 @@ export async function analyzeAudio(
   } catch {
     throw new Error("the file has no audio this browser can decode");
   }
-  const channels = Array.from({ length: decoded.numberOfChannels }, (_, c) => decoded.getChannelData(c));
-  return { sampleRate: decoded.sampleRate, frameSize, rms: rmsFrames(mixToMono(channels), frameSize) };
+  return mixToMono(Array.from({ length: decoded.numberOfChannels }, (_, c) => decoded.getChannelData(c)));
+}
+
+export async function decodePcm(
+  spec: MediaSourceSpec,
+  options: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal } = {},
+): Promise<{ sampleRate: number; samples: Float32Array }> {
+  const sampleRate = options.sampleRate ?? 22050;
+  const mono = await decodeMono(spec, sampleRate, options.signal);
+  const from = Math.max(0, Math.round((options.startSeconds ?? 0) * sampleRate));
+  const to = options.maxSeconds !== undefined ? Math.min(mono.length, from + Math.round(options.maxSeconds * sampleRate)) : mono.length;
+  return { sampleRate, samples: from === 0 && to === mono.length ? mono : mono.slice(from, to) };
+}
+
+export async function analyzeAudio(
+  spec: MediaSourceSpec,
+  options: { sampleRate?: number; frameSize?: number; signal?: AbortSignal } = {},
+): Promise<AudioEnvelope> {
+  const sampleRate = options.sampleRate ?? 16000;
+  const frameSize = options.frameSize ?? 480;
+  const mono = await decodeMono(spec, sampleRate, options.signal);
+  return { sampleRate, frameSize, rms: rmsFrames(mono, frameSize) };
 }

@@ -12,10 +12,10 @@
 import { once } from "node:events";
 import { performance } from "node:perf_hooks";
 import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { frameContaining, maxFrame, type ExportResult, type FramePlan, type Fraction, type Project, type RgbaImage } from "@zenvi/engine";
+import { frameContaining, isSequenceFormat, maxFrame, projectAtFrameRate, type ExportResult, type FramePlan, type Fraction, type Project, type RgbaImage } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { binaryVersion } from "../ffmpeg/capabilities.js";
 import { AbortedError, spawnManaged } from "../ffmpeg/process.js";
@@ -23,6 +23,7 @@ import { SourceManager, type MediaResolver } from "../decode/sources.js";
 import type { ScaleQuality } from "../decode/video.js";
 import { streamStarts } from "../probe/starts.js";
 import { buildAudioGraph } from "./audio-graph.js";
+import { processLimits } from "../limits.js";
 import { CompositePool, compositeThreads } from "./composite-pool.js";
 import { encoderCommand, ffmpegMajorVersion, FORMATS, type NodeExportOptions } from "./encoder.js";
 import { nodeTextRasterizer } from "../svg/text.js";
@@ -38,7 +39,7 @@ export interface RenderProgress {
 
 export interface RenderProjectOptions {
   resolveMedia: MediaResolver;
-  /** Destination file (png-sequence: `name.png` → `name_00001.png`…, or a `%05d` pattern). */
+  /** Destination file (an image sequence: `name.png` → `name_00001.png`…, or a `%05d` pattern). */
   output: string;
   /** Export options; `encoderPreset` sets the encoder speed (default veryfast). */
   options: NodeExportOptions;
@@ -98,11 +99,11 @@ export function exportFrameRange(project: Project, fps: Fraction, range?: { star
   return { first, last };
 }
 
-function pngPattern(output: string): string {
+function sequencePattern(output: string, extension: string): string {
   if (/%0?\d*d/.test(output)) return output;
   const ext = path.extname(output);
   const stem = ext ? output.slice(0, -ext.length) : output;
-  return `${stem}_%05d.png`;
+  return `${stem}_%05d.${extension}`;
 }
 
 let versionPromise: Promise<number> | undefined;
@@ -113,12 +114,14 @@ function ffmpegMajor(): Promise<number> {
   return versionPromise;
 }
 
-export async function renderProject(project: Project, opts: RenderProjectOptions): Promise<RenderResult> {
+export async function renderProject(source: Project, opts: RenderProjectOptions): Promise<RenderResult> {
   const { options } = opts;
   const format = options.format;
   const info = FORMATS[format];
   if (!info) throw new RenderError(`Unsupported export format: ${String(format)}`);
-  const fps = validFps(options.fps, project.fps);
+  const fps = validFps(options.fps, source.fps);
+  // Frames are planned at the export's rate: keyframes rescaled to it, as the desktop's export does.
+  const project = projectAtFrameRate(source, fps);
   const width = Math.round(options.width || project.width);
   const height = Math.round(options.height || project.height);
   if (!(width >= 16 && height >= 16 && width <= 16384 && height <= 16384)) {
@@ -140,11 +143,12 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
   const signal = opts.signal;
   if (signal?.aborted) throw new AbortedError();
 
-  const destination = path.resolve(format === "png-sequence" ? pngPattern(opts.output) : opts.output);
+  const sequence = isSequenceFormat(format);
+  const destination = path.resolve(sequence ? sequencePattern(opts.output, info.extension) : opts.output);
   const outDir = path.dirname(destination);
   await mkdir(outDir, { recursive: true });
   const token = `${process.pid}-${randomBytes(4).toString("hex")}`;
-  const stagingDir = format === "png-sequence" ? path.join(outDir, `.zenvi-render-${token}`) : undefined;
+  const stagingDir = sequence ? path.join(outDir, `.zenvi-render-${token}`) : undefined;
   if (stagingDir) await mkdir(stagingDir, { recursive: true });
   const staged = stagingDir
     ? path.join(stagingDir, path.basename(destination))
@@ -200,6 +204,11 @@ export async function renderProject(project: Project, opts: RenderProjectOptions
       const needsText = projectNeedsText(project);
       const text = needsText ? await nodeTextRasterizer() : undefined;
       const threads = opts.engine ? 0 : (opts.threads ?? compositeThreads(frames));
+      const limits = processLimits();
+      opts.log?.(
+        `rendering ${frames} frames with ${threads} compositor worker(s); host CPUs ${availableParallelism()}, ` +
+          `container CPUs ${limits.cpus ?? "unlimited"}, memory limit ${limits.memoryBytes ? `${Math.round(limits.memoryBytes / 1048576)} MB` : "unlimited"}`,
+      );
       pool = await CompositePool.start(threads, opts.log);
       stats.threads = pool?.size ?? 0;
       // Frames composited ahead of the encoder (each holds one canvas).

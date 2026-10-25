@@ -3,7 +3,9 @@
  * and the clip Crop menu.
  *
  * Ported from zenvi-core src/windows/views/timeline.py (Nudge_Triggered,
- * Align_Triggered, RemoveAllGaps_Triggered, Crop_Triggered).
+ * Align_Triggered, RemoveAllGaps_Triggered, Crop_Triggered); the align and
+ * gap rules are develop 1f80cb3d0's timeline_ops.aligned_positions and
+ * close_all_gaps, which the menus and the timeline-edit tools share.
  */
 
 import type { Transaction } from "../history/document.js";
@@ -44,32 +46,57 @@ export function nudgeItems(tx: Transaction, itemIds: readonly string[], frames: 
   return items.map((e) => e.item.id);
 }
 
+interface Spanned {
+  id: string;
+  position: number;
+  start: number;
+  end: number;
+}
+
+/**
+ * New positions that line up the starts (or, with `alignRight`, the ends) of
+ * clips/transitions: at the earliest start / latest end among them, or at
+ * `toSeconds` (zenvi-core develop timeline_ops.aligned_positions, behind Clip
+ * menu ▸ Align Left / Right and align_clips_tool). Pure.
+ */
+export function alignedPositions(items: readonly Spanned[], alignRight: boolean, toSeconds?: number): Map<string, number> {
+  const spans = items.map((item) => {
+    const start = Number(item.position) || 0;
+    return { id: item.id, start, end: start + Math.max(0, (Number(item.end) || 0) - (Number(item.start) || 0)) };
+  });
+  const out = new Map<string, number>();
+  if (spans.length === 0) return out;
+  const target =
+    toSeconds !== undefined
+      ? requireFinite(toSeconds, "toSeconds")
+      : alignRight
+        ? Math.max(...spans.map((s) => s.end))
+        : Math.min(...spans.map((s) => s.start));
+  for (const span of spans) out.set(span.id, alignRight ? span.start + (target - span.end) : target);
+  return out;
+}
+
 /** Align a selection's left edges to the left-most item, or right edges to the right-most (desktop Align). */
 export function alignItems(tx: Transaction, itemIds: readonly string[], edge: "left" | "right"): string[] {
   if (edge !== "left" && edge !== "right") throw invalid('edge must be "left" or "right".');
   const items = selection(tx, itemIds);
-  let left = -1;
-  let right = -1;
-  for (const { item } of items) {
-    const position = Number(item.position);
-    const end = position + (Number(item.end) - Number(item.start));
-    if (position < left || left === -1) left = position;
-    if (end > right || right === -1) right = end;
-  }
-  for (const entry of items) {
-    const position = Number(entry.item.position);
-    const end = position + (Number(entry.item.end) - Number(entry.item.start));
-    move(tx, entry, edge === "left" ? left : position + (right - end));
-  }
+  const positions = alignedPositions(
+    items.map((e) => e.item),
+    edge === "right",
+  );
+  for (const entry of items) move(tx, entry, positions.get(entry.item.id)!);
   return items.map((e) => e.item.id);
 }
 
+/** Positions closer than this are the same instant (timeline_ops.EPSILON). */
+const EPSILON = 1e-6;
+
 /**
- * Close every gap on `layer` from `fromSeconds` on (desktop Remove All
- * Gaps): items that overlap travel together as a group. Returns the total
- * time removed (0 records nothing).
+ * zenvi-core develop timeline_ops.close_all_gaps: pack `layer` from
+ * `fromSeconds` on, moving overlapping items (crossfades) together as a
+ * group. Returns the time removed and the moved item ids.
  */
-export function removeAllGaps(tx: Transaction, layer: number, fromSeconds = 0): number {
+function packTrack(tx: Transaction, layer: number, fromSeconds: number): { removed: number; moved: string[] } {
   const project = tx.project;
   requireFinite(fromSeconds, "fromSeconds");
   if (!findLayer(project, layer)) throw new OpError("not_found", `No track with number ${layer}.`, { layer });
@@ -90,6 +117,7 @@ export function removeAllGaps(tx: Transaction, layer: number, fromSeconds = 0): 
   }
   let lastEnd = fromSeconds;
   let offset = 0;
+  const moved: string[] = [];
   for (const group of groups) {
     if (group.end <= fromSeconds) {
       lastEnd = Math.max(lastEnd, group.end);
@@ -97,14 +125,29 @@ export function removeAllGaps(tx: Transaction, layer: number, fromSeconds = 0): 
     }
     const shiftedStart = group.start - offset;
     if (shiftedStart > lastEnd) offset += shiftedStart - lastEnd;
-    if (offset > 0) {
+    if (offset > EPSILON) {
       for (const item of group.items) {
         tx.update([clipIds.has(item.id) ? "clips" : "effects", { id: item.id }], { position: Number(item.position) - offset });
+        moved.push(item.id);
       }
     }
     lastEnd = group.end - offset;
   }
-  return offset;
+  return { removed: offset > EPSILON ? offset : 0, moved };
+}
+
+/**
+ * Close every gap on `layer` from `fromSeconds` on (desktop Remove All
+ * Gaps): items that overlap travel together as a group. Returns the total
+ * time removed (0 records nothing).
+ */
+export function removeAllGaps(tx: Transaction, layer: number, fromSeconds = 0): number {
+  return packTrack(tx, layer, fromSeconds).removed;
+}
+
+/** `removeAllGaps`, returning the ids of the clips and transitions it moved (remove_gaps_tool). */
+export function closeAllGaps(tx: Transaction, layer: number, fromSeconds = 0): string[] {
+  return packTrack(tx, layer, fromSeconds).moved;
 }
 
 /**

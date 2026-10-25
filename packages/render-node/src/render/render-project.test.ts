@@ -6,7 +6,7 @@ import { liveChildCount } from "../ffmpeg/process.js";
 import { createRgba } from "../image/rgba.js";
 import { audioRms, ffprobeJson, makeAudio, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
 import { atempoChain, channelPan, gainExpression, simplifyGain } from "./audio-graph.js";
-import { encoderCommand, type EncodeJob } from "./encoder.js";
+import { encoderCommand, ffmpegCanWrite, formatFromPath, type EncodeJob } from "./encoder.js";
 import type { RenderEngine } from "./engine.js";
 import { exportFrameRange, renderProject } from "./render-project.js";
 
@@ -202,6 +202,59 @@ describe("renderProject", () => {
     expect((await readdir(path.join(dir, "seq"))).sort()).toEqual(["shot_00001.png", "shot_00002.png", "shot_00003.png", "shot_00004.png", "shot_00005.png"]);
   });
 
+  it.each([
+    ["jpg-sequence", "mjpeg", "jpg"],
+    ["bmp-sequence", "bmp", "bmp"],
+    ["tiff-sequence", "tiff", "tiff"],
+  ] as const)("writes numbered frames as %s (export_video_tool image_format)", async (format, codec, extension) => {
+    const folder = path.join(dir, `seq-${extension}`);
+    const result = await renderProject(project(0.2), {
+      resolveMedia: (p) => p,
+      output: path.join(folder, `still-%05d.${extension}`),
+      options: { format, width: 160, height: 90, fps: { num: 25, den: 1 } },
+      engine: engine(),
+    });
+    expect(result.frames).toBe(5);
+    expect((await readdir(folder)).sort()).toEqual([1, 2, 3, 4, 5].map((n) => `still-0000${n}.${extension}`));
+    const probe = await ffprobeJson(path.join(folder, `still-00001.${extension}`));
+    expect(probe.streams[0]!.codec_name).toBe(codec);
+    expect([probe.streams[0]!.width, probe.streams[0]!.height]).toEqual([160, 90]);
+  });
+
+  it.each([
+    ["flac", "flac"],
+    ["m4a", "aac"],
+  ] as const)("writes audio-only %s", async (format, codec) => {
+    const out = path.join(dir, `sound.${format}`);
+    await renderProject(project(1), {
+      resolveMedia: (p) => p,
+      output: out,
+      options: { format, width: 160, height: 90, fps: { num: 25, den: 1 } },
+      engine: engine([segment({ duration: 1 })]),
+    });
+    const probe = await ffprobeJson(out);
+    expect(probe.streams.map((s) => [s.codec_type, s.codec_name])).toEqual([["audio", codec]]);
+    expect(Math.abs(Number(probe.format.duration) - 1)).toBeLessThan(0.05);
+  });
+
+  it("plans frames at the export's frame rate, with the keyframes rescaled to it", async () => {
+    const seen: Project[] = [];
+    const base = engine();
+    const counting: RenderEngine = { ...base, planFrame: (p, frame, size, options) => (seen.push(p), base.planFrame(p, frame, size, options)) };
+    const source = project(1);
+    source.clips[0] = { ...source.clips[0]!, alpha: { Points: [{ co: { X: 1, Y: 0 }, interpolation: 1 }, { co: { X: 25, Y: 1 }, interpolation: 1 }] } } as unknown as Project["clips"][number];
+    const result = await renderProject(source, {
+      resolveMedia: (p) => p,
+      output: path.join(dir, "fifty.mp4"),
+      options: { format: "mp4", width: 160, height: 90, fps: { num: 50, den: 1 }, channels: 0 },
+      engine: counting,
+    });
+    expect(result.frames).toBe(50);
+    expect(seen[0]!.fps).toEqual({ num: 50, den: 1 });
+    expect((seen[0]!.clips[0] as unknown as { alpha: { Points: { co: { X: number } }[] } }).alpha.Points.map((p) => p.co.X)).toEqual([1, 50]);
+    expect(source.fps).toEqual({ num: 25, den: 1 });
+  });
+
   it("cancels cleanly: rejects, kills children, leaves no partial file", async () => {
     const out = path.join(dir, "cancelled.mp4");
     const controller = new AbortController();
@@ -252,6 +305,40 @@ describe("renderProject", () => {
     await expect(
       renderProject(empty, { resolveMedia: (p) => p, output: path.join(dir, "e.mp4"), options: { format: "mp4", width: 160, height: 90, fps: { num: 25, den: 1 } }, engine: engine() }),
     ).rejects.toThrow(/empty/);
+  });
+});
+
+describe("what the ffmpeg exporter writes (ExportHost.supports)", () => {
+  const encoders = new Set(["libx264", "libvpx-vp9", "libopus", "aac", "pcm_s16le", "flac", "gif", "png", "mjpeg", "libmp3lame", "prores_ks"]);
+
+  it("needs the encoders, in a container whose muxer takes them", () => {
+    expect(ffmpegCanWrite("mp4", "libx264", "aac", encoders)).toBe(true);
+    expect(ffmpegCanWrite("mp4", "libx265", "", encoders)).toBe(false);
+    expect(ffmpegCanWrite("webm", "libx264", "", encoders)).toBe(false);
+    expect(ffmpegCanWrite("webm", "libvpx-vp9", "libopus", encoders)).toBe(true);
+    expect(ffmpegCanWrite("webm", "", "aac", encoders)).toBe(false);
+    expect(ffmpegCanWrite("mp4", "", "pcm_s16le", encoders)).toBe(false);
+    expect(ffmpegCanWrite("mov", "prores_ks", "pcm_s16le", encoders)).toBe(true);
+    expect(ffmpegCanWrite("wav", "", "pcm_s16le", encoders)).toBe(true);
+    expect(ffmpegCanWrite("wav", "", "libmp3lame", encoders)).toBe(false);
+    expect(ffmpegCanWrite("flac", "", "flac", encoders)).toBe(true);
+    expect(ffmpegCanWrite("m4a", "", "aac", encoders)).toBe(true);
+    expect(ffmpegCanWrite("mp3", "libx264", "", encoders)).toBe(false);
+    expect(ffmpegCanWrite("jpg-sequence", "mjpeg", "", encoders)).toBe(true);
+    expect(ffmpegCanWrite("png-sequence", "mjpeg", "", encoders)).toBe(false);
+    expect(ffmpegCanWrite("gif", "gif", "", encoders)).toBe(true);
+    expect(ffmpegCanWrite("tiff-sequence", "", "", encoders)).toBe(true);
+  });
+
+  it("names the format an output file implies", () => {
+    expect([formatFromPath("a.png"), formatFromPath("a.jpeg"), formatFromPath("a.tif"), formatFromPath("a.m4a"), formatFromPath("a.flac"), formatFromPath("a.m4v")]).toEqual([
+      "png-sequence",
+      "jpg-sequence",
+      "tiff-sequence",
+      "m4a",
+      "flac",
+      "mp4",
+    ]);
   });
 });
 

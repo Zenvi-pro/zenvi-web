@@ -7,6 +7,8 @@ import type { Fraction } from "@zenvi/engine";
 import { MAX_PX_PER_SECOND, MIN_PX_PER_SECOND } from "../session/uiStore";
 
 export const HEADER_WIDTH = 176;
+/** The track-name column on a phone-width editor (the embed in a chat app). */
+export const NARROW_HEADER_WIDTH = 84;
 export const RULER_HEIGHT = 28;
 /** Room after the last item so there is always somewhere to drop. */
 export const TRAILING_SECONDS = 30;
@@ -134,6 +136,12 @@ export function anchoredScroll(anchorTime: number, anchorX: number, newPxPerSeco
 /** Total scrollable width for a timeline of `duration` seconds. */
 export function contentWidth(duration: number, pxPerSecond: number, viewportWidth: number): number {
   return Math.max(viewportWidth, Math.ceil((duration + TRAILING_SECONDS) * pxPerSecond));
+}
+
+/** The track height that shows `count` tracks in `visible` px, within [min, max]. */
+export function fittedTrackHeight(visible: number, count: number, [min, max]: readonly [number, number]): number {
+  if (count <= 0 || !(visible > 0)) return max;
+  return Math.max(min, Math.min(max, Math.floor(visible / count)));
 }
 
 /** Which track row (index from the top) a y coordinate falls in, or -1. */

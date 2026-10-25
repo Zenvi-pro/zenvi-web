@@ -6,7 +6,7 @@
  * - Ops are synchronous and take a `Transaction` (history/document.ts). Call
  *   them inside one transaction per user intent:
  *   `doc.transaction("Split clip", (tx) => splitClip(tx, id, 12.5))`.
- *   (`setExportSetting` is the exception: export overrides are not an undo
+ *   (`storeExportOverrides` is the exception: export overrides are not an undo
  *   step on the desktop, so it takes the document and writes untracked.)
  * - Ops validate every input first and throw `OpError` (`code`, `message`)
  *   before recording anything, so a failed op leaves history untouched.
@@ -30,5 +30,13 @@ export * from "./tracks.js";
 export * from "./markers.js";
 export * from "./project.js";
 export * from "./titles.js";
+export * from "./overlays.js";
 export * from "./clipboard.js";
 export * from "./presets.js";
+export * from "./clip-props.js";
+export * from "./sequence.js";
+export * from "./add-to-timeline.js";
+export { timeCurveIsReversed } from "./retime.js";
+export * from "./project-files.js";
+export * from "./waveforms.js";
+export * from "./media-collect.js";

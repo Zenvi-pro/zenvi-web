@@ -117,6 +117,20 @@ function finalizeTimePoints(points: KeyframePoint[], startX: number, newEndX: nu
 }
 
 /**
+ * retime.py `time_curve_is_reversed`: true when a clip's `time` curve maps
+ * forward timeline frames to decreasing source frames (it plays backwards).
+ */
+export function timeCurveIsReversed(time: unknown): boolean {
+  const points = typeof time === "object" && time !== null ? (time as Keyframe).Points : undefined;
+  if (!Array.isArray(points) || points.length < 2) return false;
+  const ordered = [...points].sort((a, b) => Number(a?.co?.X ?? 0) - Number(b?.co?.X ?? 0));
+  const first = Number(ordered[0]?.co?.Y ?? 0);
+  const last = Number(ordered[ordered.length - 1]?.co?.Y ?? 0);
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return false;
+  return first > last + 1e-6;
+}
+
+/**
  * `retime_clip(clip, new_end, new_position, direction)`. Returns the retimed
  * clip, or null when `newEnd` does not leave a positive length.
  */

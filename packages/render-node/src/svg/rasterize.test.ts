@@ -63,7 +63,32 @@ describe("svg rasterization", () => {
     expect(resolved.files).toEqual(expect.arrayContaining(["/f/verdana.ttf", "/f/arial.ttf"]));
   });
 
-  it("reads family names from the OpenType name table", async () => {
-    expect(await readFontFamilies(path.join(bundledFontsDir(), "Lato-Regular.ttf"))).toContain("lato");
+  it("reads family names from the OpenType name table, as the font spells them", async () => {
+    expect(await readFontFamilies(path.join(bundledFontsDir(), "Lato-Regular.ttf"))).toContain("Lato");
+  });
+
+  it("lists the fonts an installed metric twin draws in their place, as rendering resolves them", () => {
+    const index = new FontIndex([
+      { path: "/f/liberation-sans.ttf", families: ["Liberation Sans"], size: 10 },
+      { path: "/f/lato.ttf", families: ["Lato"], size: 10 },
+    ]);
+    expect(index.renderableFamilyNames()).toEqual(["Arial", "Helvetica", "Lato", "Liberation Sans"]);
+    const resolved = resolveFonts(index, [["Arial"], ["Helvetica"]]);
+    expect(resolved.fallbackFor(["Arial"])).toBe("liberation sans");
+    expect(resolved.fallbackFor(["Helvetica"])).toBe("liberation sans");
+    // Nothing stands in for Georgia: not listed.
+    expect(index.renderableFamilyNames()).not.toContain("Georgia");
+  });
+
+  it("lists the installed families once each, in the fonts' spelling, without hidden system faces", () => {
+    const index = new FontIndex([
+      { path: "/f/lato.ttf", families: ["Lato"], size: 10 },
+      { path: "/f/lato-bold.ttf", families: ["lato"], size: 12 },
+      { path: "/f/sf.ttf", families: [".SF NS"], size: 10 },
+      { path: "/f/arial-black.ttf", families: ["Arial Black", "Arial"], size: 10 },
+    ]);
+    expect(index.familyNames()).toEqual(["Arial", "Arial Black", "Lato"]);
+    expect(index.has("LATO")).toBe(true);
+    expect(index.files("lato")).toEqual(["/f/lato.ttf", "/f/lato-bold.ttf"]);
   });
 });

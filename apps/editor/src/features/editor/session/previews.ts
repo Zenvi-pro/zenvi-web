@@ -93,6 +93,16 @@ export class PreviewCache {
     this.emit();
   }
 
+  /** Drop every cached preview; they are made again when shown (Clear playback cache). */
+  clear(): void {
+    for (const sprite of this.spriteValues.values()) if (sprite) URL.revokeObjectURL(sprite.url);
+    this.sprites.clear();
+    this.spriteValues.clear();
+    this.waves.clear();
+    this.waveValues.clear();
+    this.emit();
+  }
+
   dispose(): void {
     for (const sprite of this.spriteValues.values()) if (sprite) URL.revokeObjectURL(sprite.url);
     this.sprites.clear();

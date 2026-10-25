@@ -477,7 +477,7 @@ export async function importAndPlace(
 // ---------------------------------------------------------------------------
 
 /** time_parts.secondsToTime → "HH:MM:SS:FF" parts used in subclip names. */
-function secondsToTimeParts(secs: number, fpsNum: number, fpsDen: number): { hour: string; min: string; sec: string; frame: string } {
+export function secondsToTimeParts(secs: number, fpsNum: number, fpsDen: number): { hour: string; min: string; sec: string; frame: string } {
   const ms = secs * 1000;
   let sec = Math.floor(ms / 1000);
   const milli = ((ms % 1000) + 1000) % 1000;

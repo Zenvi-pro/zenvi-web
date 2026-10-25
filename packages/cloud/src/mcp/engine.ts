@@ -6,7 +6,8 @@
  *
  * Tools that only make sense next to a local app (file dialogs, playback, UI
  * zoom, local save/open) or that the cloud replaces with its own
- * (`preview_frame`, renders, new/open project) are not exposed.
+ * (`preview_frame`, the CLI's render_video, new/open project) are not
+ * exposed. export_video_tool is: its renders are render jobs (mcp/host.ts).
  */
 
 import type { AnyTool, HostCapability, ToolContext, ToolResult } from "@zenvi/engine";
@@ -30,10 +31,9 @@ export const HIDDEN_ENGINE_TOOLS = new Set([
   "open_project_tool",
   "save_project_tool",
   "import_files_tool",
-  "export_video_tool",
   "render_video",
   "render_video_tool",
-  // Playback and timeline-view state belong to an open editor window.
+  // Playback, timeline-view state, panels and editor settings belong to an open editor window.
   "play_tool",
   "go_to_start_tool",
   "go_to_end_tool",
@@ -41,6 +41,10 @@ export const HIDDEN_ENGINE_TOOLS = new Set([
   "zoom_out_tool",
   "center_on_playhead_tool",
   "watch_clip_tool",
+  "get_editor_layout_tool",
+  "set_editor_layout_tool",
+  "get_preferences_tool",
+  "set_preference_tool",
   // Kling is slower than ChatGPT's tool budget. generate_video starts a job instead.
   "generate_video_and_add_to_timeline_tool",
 ]);

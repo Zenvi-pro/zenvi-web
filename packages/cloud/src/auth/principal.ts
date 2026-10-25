@@ -8,7 +8,7 @@ import { SCOPE_READ, SCOPE_WRITE } from "./scopes.js";
 import type { SupabaseVerifier } from "./supabase.js";
 import { looksLikeJwt } from "./supabase.js";
 import { tokenKind } from "./tokens.js";
-import type { TokenRepo } from "../repos/tokens.js";
+import { embedProjectId, type TokenRepo } from "../repos/tokens.js";
 
 export type Principal =
   | { kind: "supabase"; userId: string; email?: string; scopes: string[] }
@@ -24,7 +24,9 @@ export type Principal =
       resource: string;
       familyId: string;
       expiresAt?: string;
-    };
+    }
+  /** The editor embedded in a chat: one project and its media, for a few hours. */
+  | { kind: "embed"; userId: string; email?: string; tokenId: string; projectId: string; scopes: string[]; familyId?: string };
 
 export type PrincipalKind = Principal["kind"];
 
@@ -57,6 +59,10 @@ export class Authenticator {
           expiresAt: record.expiresAt,
         };
       }
+      const projectId = record.kind === "embed" ? embedProjectId(record.resource) : null;
+      if (projectId) {
+        return { kind: "embed", userId: record.userId, email: record.email, tokenId: record.id, projectId, scopes: record.scopes, familyId: record.familyId };
+      }
       return null;
     }
     if (!looksLikeJwt(token)) return null;
@@ -71,6 +77,7 @@ export function connectionKey(principal: Principal): string {
     case "oauth":
       return principal.familyId;
     case "pat":
+    case "embed":
       return principal.tokenId;
     case "supabase":
       return "web";

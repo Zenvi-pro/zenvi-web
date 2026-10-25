@@ -115,7 +115,7 @@ export function PreviewPanel() {
       </div>
 
       <div className="flex h-10 shrink-0 items-center gap-1 border-t border-line bg-base px-2">
-        <div className="w-[132px]">
+        <div className="w-[132px] max-sm:hidden">
           <LiveTimecode className="text-sm text-fg" />
         </div>
         <div className="flex flex-1 items-center justify-center gap-0.5">
@@ -141,15 +141,15 @@ export function PreviewPanel() {
             <SkipForward size={15} />
           </IconButton>
         </div>
-        <div className="flex w-[132px] items-center justify-end gap-0.5">
-          <IconButton label={loop ? "Loop on" : "Loop off"} active={loop} onClick={() => session.setLoop(!loop)}>
+        <div className="flex w-[132px] items-center justify-end gap-0.5 max-sm:w-auto">
+          <IconButton label={loop ? "Loop on" : "Loop off"} active={loop} onClick={() => session.setLoop(!loop)} className="max-sm:hidden">
             <Repeat size={14} />
           </IconButton>
           <Select<Zoom>
             ariaLabel="Preview zoom"
             value={zoom}
             onChange={setZoom}
-            className="w-[64px]"
+            className="w-[64px] max-sm:hidden"
             options={[
               { value: "fit", label: "Fit" },
               { value: "0.5", label: "50%" },

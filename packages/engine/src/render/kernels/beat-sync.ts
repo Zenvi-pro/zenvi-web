@@ -108,6 +108,7 @@ const LAST_FRAME = "BeatSync.lastFrame";
 export const beatSync: KernelSpec = {
   type: "BeatSync",
   supported: true,
+  sequential: true,
   run(image: PremulImage, params: Params, ctx: KernelContext): PremulImage {
     const frame = ctx.frame;
     let width = Math.max(1, image.width);

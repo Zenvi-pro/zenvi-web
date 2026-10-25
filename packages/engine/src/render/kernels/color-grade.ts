@@ -61,6 +61,12 @@ function sampleCurve(lut: Float32Array, v: number): number {
   return lut[Math.trunc(f32(v * 255 + 0.5))]!;
 }
 
+/**
+ * Results kept per call: an opaque pixel's grade is a pure function of its 8-bit RGB, and pictures repeat colours, so a
+ * repeat skips the arithmetic. Direct-mapped by a multiplicative hash of the RGB; the bytes are the same either way.
+ */
+const MEMO_BITS = 16;
+
 /** `inv_alpha[i] = 255.0f / i` (ColorGrade.cpp:264-270). */
 const INV_ALPHA: Float32Array = (() => {
   const t = new Float32Array(256);
@@ -411,13 +417,26 @@ export const colorGrade: KernelSpec = {
     const minusTint = -tint;
 
     const d = image.data;
+    const memoRgb = new Int32Array(1 << MEMO_BITS).fill(-1);
+    const memoOut = new Int32Array(1 << MEMO_BITS);
     for (let i = 0; i < d.length; i += 4) {
       const A = d[i + 3]!;
       if (A === 0) continue;
       let R: number;
       let G: number;
       let B: number;
+      let rgb = -1;
+      let slot = 0;
       if (A === 255) {
+        rgb = (d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!;
+        slot = Math.imul(rgb, 0x9e3779b1) >>> (32 - MEMO_BITS);
+        if (memoRgb[slot] === rgb) {
+          const out = memoOut[slot]!;
+          d[i] = out >>> 16;
+          d[i + 1] = (out >>> 8) & 255;
+          d[i + 2] = out & 255;
+          continue;
+        }
         R = f32(d[i]! * INV_255);
         G = f32(d[i + 1]! * INV_255);
         B = f32(d[i + 2]! * INV_255);
@@ -506,9 +525,14 @@ export const colorGrade: KernelSpec = {
       G = clamp01(fmaf(origG, inverseMix, f32(G * mix)));
       B = clamp01(fmaf(origB, inverseMix, f32(B * mix)));
       if (A === 255) {
-        d[i] = clampByte(f32(R * 255));
-        d[i + 1] = clampByte(f32(G * 255));
-        d[i + 2] = clampByte(f32(B * 255));
+        const r8 = clampByte(f32(R * 255));
+        const g8 = clampByte(f32(G * 255));
+        const b8 = clampByte(f32(B * 255));
+        d[i] = r8;
+        d[i + 1] = g8;
+        d[i + 2] = b8;
+        memoRgb[slot] = rgb;
+        memoOut[slot] = (r8 << 16) | (g8 << 8) | b8;
       } else {
         const ap = f32(A * INV_255);
         d[i] = clampByte(f32(f32(R * 255) * ap));

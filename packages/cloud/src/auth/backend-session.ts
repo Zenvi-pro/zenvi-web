@@ -124,6 +124,38 @@ export class BackendSessions {
     }
   }
 
+  /**
+   * An authenticated multipart request (speech audio for transcription).
+   * Answers the status and the parsed body instead of throwing on HTTP
+   * errors, so the caller can say what each one means; throws a user-facing
+   * Error when the backend cannot be reached or the person cannot be
+   * signed in.
+   */
+  async send(userId: string, path: string, init: { method?: string; form: FormData; signal?: AbortSignal }): Promise<{ status: number; body: unknown }> {
+    if (!this.enabled) throw new Error("The Zenvi backend is not configured on this server.");
+    const token = await this.accessToken(userId);
+    let response: Response;
+    try {
+      response = await this.fetchImpl(`${this.options.backendUrl}${path}`, {
+        method: init.method ?? "POST",
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+        body: init.form,
+        signal: init.signal,
+      });
+    } catch (error) {
+      if (isAbort(error)) throw error;
+      throw new Error(`Could not reach the Zenvi backend (${error instanceof Error ? error.message : String(error)}).`);
+    }
+    const text = await response.text();
+    let body: unknown = text;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      // Plain text (a proxy's error page).
+    }
+    return { status: response.status, body };
+  }
+
   private async assertion(userId: string, secret: string): Promise<string> {
     const now = Math.floor(this.clock.now() / 1000);
     return new SignJWT({})
@@ -242,6 +274,8 @@ function httpError(status: number, body: string): string {
     const parsed = JSON.parse(body) as { error?: unknown; detail?: unknown; message?: unknown };
     const raw = parsed.detail ?? parsed.message ?? parsed.error;
     if (typeof raw === "string") detail = raw;
+    // Credit and tier refusals (api/credit_gate.py, HTTP 402/429) carry the words to show in detail.message.
+    else if (raw && typeof raw === "object" && typeof (raw as { message?: unknown }).message === "string") detail = (raw as { message: string }).message;
   } catch {
     detail = body.replace(/\s+/g, " ").trim();
   }

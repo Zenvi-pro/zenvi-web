@@ -4,6 +4,9 @@
  * Desktop: zenvi-core src/windows/models/files_model.py (`add_files`) builds a
  * file entry from `openshot.Clip(path).Reader().Json()` plus `media_type` and
  * an id; "Remove from Project" deletes the file and every clip that plays it.
+ * develop 1f80cb3d0 src/classes/project_files.py `save_file_and_sync_clips`
+ * (File Properties' accept) and editor_tools/media_files.py `create_subclips`
+ * (the Split Clip dialog) are `writeFile` and `addSubclipFiles`.
  */
 
 import type { Transaction } from "../history/document.js";
@@ -12,8 +15,8 @@ import { clipsUsingFile } from "../model/query.js";
 import { idFactory } from "../model/ids.js";
 import { getMediaType, isAudioOnlyMedia } from "../model/media.js";
 import type { ImportedMedia } from "../tools/types.js";
-import { OpError, invalid, requireFile } from "./errors.js";
-import { sameJson } from "./internal.js";
+import { OpError, invalid, requireFile, requireNonNegative } from "./errors.js";
+import { changedFields, ids, isRecord, patchClip, sameJson } from "./internal.js";
 
 export interface AddFileOptions {
   /** Explicit id (tests, deterministic imports). Must not be in use. */
@@ -137,4 +140,98 @@ export function updateFile(tx: Transaction, fileId: string, patch: Partial<Proje
   if (changed.length === 0) return file;
   tx.update(["files", { id: fileId }], Object.fromEntries(changed));
   return requireFile(tx.project, fileId);
+}
+
+export interface WriteFileOptions {
+  /** Also give every clip that plays the file this title (update_project_files_tool rename_clips). */
+  clipTitle?: string;
+}
+
+export interface WriteFileResult {
+  file: ProjectFile;
+  /** Every clip that plays the file, in project order: their reader, duration and end follow it. */
+  updatedClipIds: string[];
+  /** The clips whose title became `clipTitle`. */
+  renamedClipIds: string[];
+}
+
+/**
+ * Save a file's new record and refresh the clips that play it
+ * (project_files.save_file_and_sync_clips): keys the record no longer has
+ * are deleted; each clip's `reader` becomes a copy of the record, its
+ * `duration` the file's and its `end` is clamped to it. Like the desktop's
+ * File Properties, this follows the file into clips on locked tracks too.
+ * The id cannot change.
+ */
+export function writeFile(tx: Transaction, fileId: string, next: Record<string, unknown>, opts: WriteFileOptions = {}): WriteFileResult {
+  const current = requireFile(tx.project, fileId);
+  if (!isRecord(next)) throw invalid("writeFile needs the file's record.");
+  if (next.id !== fileId) throw invalid("File id cannot be changed.");
+  if (next.media_type !== undefined && !["video", "audio", "image"].includes(next.media_type as string)) {
+    throw invalid(`media_type must be video, audio or image (got ${String(next.media_type)}).`);
+  }
+  if (opts.clipTitle !== undefined && typeof opts.clipTitle !== "string") throw invalid("clipTitle must be a string.");
+  const changed = changedFields(current as Record<string, unknown>, next);
+  if (Object.keys(changed).length > 0) tx.update(["files", { id: fileId }], changed);
+  for (const key of Object.keys(current)) {
+    if (!(key in next)) tx.delete(["files", { id: fileId }, key]);
+  }
+  const file = requireFile(tx.project, fileId);
+  const duration = Number(file.duration);
+  const updatedClipIds: string[] = [];
+  const renamedClipIds: string[] = [];
+  for (const clip of clipsUsingFile(tx.project, fileId)) {
+    const patch: Record<string, unknown> = { reader: structuredClone(file), duration: file.duration };
+    if (Number(clip.end) > duration) patch.end = file.duration;
+    if (opts.clipTitle !== undefined && clip.title !== opts.clipTitle) {
+      patch.title = opts.clipTitle;
+      renamedClipIds.push(clip.id);
+    }
+    patchClip(tx, clip.id, patch);
+    updatedClipIds.push(clip.id);
+  }
+  return { file, updatedClipIds, renamedClipIds };
+}
+
+export interface SubclipInput {
+  /** Source in point, seconds. */
+  start: number;
+  /** Source out point, seconds (after `start`). */
+  end: number;
+  /** Display name in Project Files. */
+  name: string;
+  /** Replaces the copied `ai_metadata` (the source's, trimmed to the range). */
+  aiMetadata?: Record<string, unknown>;
+}
+
+/**
+ * New Project Files entries that each play one range of a file
+ * (media_files.create_subclips, the Split Clip dialog): a copy of the file's
+ * record without its name and id, with `start`/`end`, `ai_metadata` replaced
+ * when given, the new name and a new id. Nothing goes on the timeline.
+ * Returns the new files in order.
+ */
+export function addSubclipFiles(tx: Transaction, sourceId: string, subclips: readonly SubclipInput[]): ProjectFile[] {
+  const source = requireFile(tx.project, sourceId);
+  if (!Array.isArray(subclips) || subclips.length === 0) throw invalid("Give at least one sub-clip.");
+  for (const sub of subclips) {
+    const start = requireNonNegative(sub?.start, "start");
+    const end = requireNonNegative(sub?.end, "end");
+    if (!(end > start)) throw invalid(`A sub-clip must end after it starts (got ${start}..${end}).`);
+    if (typeof sub.name !== "string") throw invalid("A sub-clip needs a name.");
+    if (sub.aiMetadata !== undefined && !isRecord(sub.aiMetadata)) throw invalid("aiMetadata must be an object.");
+  }
+  const created: ProjectFile[] = [];
+  for (const sub of subclips) {
+    const { name: _name, id: _id, ...rest } = structuredClone(source) as Record<string, unknown>;
+    const entry: Record<string, unknown> = rest;
+    entry.start = sub.start;
+    entry.end = sub.end;
+    if (sub.aiMetadata !== undefined) entry.ai_metadata = structuredClone(sub.aiMetadata);
+    entry.name = sub.name;
+    entry.id = ids(tx.project)();
+    tx.insert(["files"], entry);
+    created.push(requireFile(tx.project, entry.id as string));
+  }
+  return created;
 }

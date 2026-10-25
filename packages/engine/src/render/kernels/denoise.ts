@@ -248,6 +248,7 @@ function resetHistory(h: DenoiseHistory): void {
 export const denoiseImage: KernelSpec = {
   type: "DenoiseImage",
   supported: true,
+  sequential: true,
   run(image: PremulImage, params: Params, ctx: KernelContext): void {
     const state = history(ctx);
     const strength = clamp01(f32(num(params, "strength", 0.78)));

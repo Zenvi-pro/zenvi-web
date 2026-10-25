@@ -7,7 +7,7 @@
 import type { ContainerFormat, ExportOptions, Project } from "@zenvi/engine";
 import { z } from "zod";
 
-export const RENDER_FORMATS = ["mp4", "webm", "mov", "mkv", "gif", "mp3", "wav"] as const satisfies readonly ContainerFormat[];
+export const RENDER_FORMATS = ["mp4", "webm", "mov", "mkv", "gif", "mp3", "wav", "flac", "m4a"] as const satisfies readonly ContainerFormat[];
 export type RenderFormat = (typeof RENDER_FORMATS)[number];
 
 export const PRESETS = {
@@ -32,7 +32,14 @@ export const CONTENT_TYPES: Record<RenderFormat, string> = {
   gif: "image/gif",
   mp3: "audio/mpeg",
   wav: "audio/wav",
+  flac: "audio/flac",
+  m4a: "audio/mp4",
 };
+
+/** Whether a Zenvi Cloud render writes this format (one file: no image sequences). */
+export function isRenderFormat(format: ContainerFormat): format is RenderFormat {
+  return (RENDER_FORMATS as readonly ContainerFormat[]).includes(format);
+}
 
 const even = (n: number): number => Math.max(2, Math.round(n / 2) * 2);
 

@@ -11,18 +11,25 @@ import { StockPanel } from "./StockPanel";
 import { TitlesPanel } from "./TitlesPanel";
 import { TransitionsPanel } from "./TransitionsPanel";
 
-const TABS: { id: LeftTab; label: string; icon: ReactNode }[] = [
-  { id: "files", label: "Project files", icon: <Clapperboard size={18} /> },
-  { id: "effects", label: "Effects", icon: <Sparkles size={18} /> },
-  { id: "transitions", label: "Transitions", icon: <Blend size={18} /> },
-  { id: "titles", label: "Titles", icon: <Type size={18} /> },
-  { id: "stock", label: "Stock media", icon: <Images size={18} /> },
-  { id: "generate", label: "Generate with AI", icon: <WandSparkles size={18} /> },
+const TABS: { id: LeftTab; label: string; short: string; icon: ReactNode }[] = [
+  { id: "files", label: "Project files", short: "Media", icon: <Clapperboard size={18} /> },
+  { id: "effects", label: "Effects", short: "Effects", icon: <Sparkles size={18} /> },
+  { id: "transitions", label: "Transitions", short: "Transitions", icon: <Blend size={18} /> },
+  { id: "titles", label: "Titles", short: "Text", icon: <Type size={18} /> },
+  { id: "stock", label: "Stock media", short: "Stock", icon: <Images size={18} /> },
+  { id: "generate", label: "Generate with AI", short: "AI", icon: <WandSparkles size={18} /> },
 ];
 
-export function LeftPanel({ width }: { width: number }) {
+/**
+ * `tabs` limits the sections (the chat embed has no Zenvi sign-in, so no
+ * stock or AI generation); `labeled` puts a short name under each icon (the
+ * embed's rail, where people meet the editor for the first time).
+ */
+export function LeftPanel({ width, tabs, labeled = false }: { width: number; tabs?: readonly LeftTab[]; labeled?: boolean }) {
   const session = useSession();
-  const tab = useUi((s) => s.leftTab);
+  const shown = tabs ? TABS.filter((t) => tabs.includes(t.id)) : TABS;
+  const chosen = useUi((s) => s.leftTab);
+  const tab = shown.some((t) => t.id === chosen) ? chosen : (shown[0]?.id ?? chosen);
   const collapsed = useUi((s) => s.panels.leftCollapsed);
   const choose = (id: LeftTab) => {
     const panels = session.ui.getState().panels;
@@ -31,8 +38,8 @@ export function LeftPanel({ width }: { width: number }) {
   };
   return (
     <aside className="flex shrink-0 border-r border-line bg-base" aria-label="Library">
-      <nav aria-label="Library sections" className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line py-2">
-        {TABS.map((t) => {
+      <nav aria-label="Library sections" className={cn("flex shrink-0 flex-col items-center gap-1 border-r border-line py-2", labeled ? "w-16" : "w-12")}>
+        {shown.map((t) => {
           const active = t.id === tab && !collapsed;
           return (
             <Tooltip key={t.id} label={t.label} side="right">
@@ -42,12 +49,14 @@ export function LeftPanel({ width }: { width: number }) {
                 aria-pressed={active}
                 onClick={() => choose(t.id)}
                 className={cn(
-                  "relative inline-flex h-9 w-9 items-center justify-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent",
+                  "relative inline-flex items-center justify-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent",
+                  labeled ? "h-12 w-14 flex-col gap-0.5" : "h-9 w-9",
                   active ? "bg-white/[0.08] text-fg" : "text-fg-subtle hover:bg-white/[0.05] hover:text-fg-muted",
                 )}
               >
-                {active ? <span aria-hidden className="absolute -left-[7px] top-2 bottom-2 w-[2px] rounded-full bg-accent" /> : null}
+                {active ? <span aria-hidden className={cn("absolute top-2 bottom-2 w-[2px] rounded-full bg-accent", labeled ? "-left-[3px]" : "-left-[7px]")} /> : null}
                 {t.icon}
+                {labeled ? <span className="text-[10px] leading-none">{t.short}</span> : null}
               </button>
             </Tooltip>
           );

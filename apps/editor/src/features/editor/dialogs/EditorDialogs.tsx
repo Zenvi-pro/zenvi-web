@@ -4,6 +4,7 @@ import { ShareDialog } from "./ShareDialog";
 import { CloudConflictDialog, CommandPalette, ProjectFormatDialog, RelinkDialog, ShortcutsDialog } from "./SimpleDialogs";
 import { TitleDialog } from "./TitleDialog";
 import { ToolRunnerDialog } from "./ToolRunner";
+import { ReelDialog } from "./ReelDialog";
 import { UploadDialog } from "./UploadDialog";
 
 /** Every editor dialog, driven by `ui.dialog`. */
@@ -24,6 +25,7 @@ export function EditorDialogs() {
       <CloudConflictDialog open={dialog === "cloudConflict"} onClose={close} />
       <UploadDialog open={dialog === "upload"} onClose={close} />
       <ToolRunnerDialog name={dialog === "tool" ? toolName : null} onClose={close} />
+      <ReelDialog open={dialog === "reel"} onClose={close} />
     </>
   );
 }
