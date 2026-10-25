@@ -12,6 +12,7 @@ import type { Clip, Fraction, Transition } from "../../model/types.js";
 import { addClip } from "../../ops/clips.js";
 import { addEffect } from "../../ops/effects.js";
 import { addFile } from "../../ops/files.js";
+import { addMarker } from "../../ops/markers.js";
 import { addTransition } from "../../ops/transitions.js";
 import type { ToolReceipt } from "../receipt.js";
 import { runTool } from "../registry.js";
@@ -84,6 +85,29 @@ export class EditHarness {
 
   lockTrack(layer: number, lock = true): void {
     this.doc.setUntracked(["layers", { number: layer }, "lock"], lock);
+  }
+
+  /** Change a clip's data as setup (keyframe curves, gravity…). */
+  setClip(id: string, values: Record<string, unknown>): void {
+    this.setup((tx) => tx.update(["clips", { id }], values));
+  }
+
+  /** A marker like the desktop's (`name`, colour icon/vector), or the web's add_marker_tool (`label`). */
+  addMarker(position: number, name = "", opts: { color?: string; label?: boolean } = {}): string {
+    const color = opts.color ?? "blue";
+    return this.setup((tx) => {
+      const marker = addMarker(tx, position, opts.label && name ? name : undefined, { icon: `${color}.png`, vector: color });
+      if (name && !opts.label) tx.update(["markers", { id: marker.id }], { name });
+      return marker.id;
+    });
+  }
+
+  /** Replace the track stack with tracks of these numbers (untracked, like opening such a project). */
+  setLayers(numbers: number[]): void {
+    this.doc.setUntracked(
+      ["layers"],
+      numbers.map((n, i) => ({ id: `T${i + 1}`, number: n, y: 0, label: "", lock: false })),
+    );
   }
 
   selectIds(ids: string[]): void {

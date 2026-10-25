@@ -30,7 +30,12 @@ export type HostMethod =
   | "storage.open"
   | "storage.readText"
   | "storage.writeText"
-  | "ui.openExportDialog";
+  | "ui.openExportDialog"
+  | "ui.selection"
+  | "ui.setSelection"
+  | "ui.timelineView"
+  | "ui.showTimelineRange"
+  | "ui.setTimelineMode";
 
 export interface ToolNeeds {
   /** All of these, or the tool refuses. */
@@ -94,6 +99,19 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   set_clip_audio_video_tool: {
     webNote: "waveform=show changes nothing, since the web timeline draws the waveform of every clip with sound; waveform=hide is refused",
   },
+  seek_playhead_tool: {
+    optional: ["player"],
+    partialNote: "without a preview player it moves the playhead saved with the project (where the editors open); play=true needs the web editor",
+  },
+  get_playhead_and_selection_tool: {
+    optional: ["player", "ui.selection", "ui.timelineView"],
+    partialNote: "without an editor open it reports the playhead saved with the project; selection, playback and the timeline view exist only in an editor",
+  },
+  select_timeline_items_tool: { methods: ["ui.selection", "ui.setSelection"] },
+  set_timeline_view_tool: {
+    methods: ["ui.timelineView", "ui.showTimelineRange", "ui.setTimelineMode"],
+    webNote: "the web editor has no timing (retime-by-drag) mode, so timing=true is refused",
+  },
   transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
   remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
   detect_beats_tool: { desktopOnly: "on-device beat tracking" },
@@ -122,7 +140,18 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
     title: "Web editor (Zenvi Assistant, command palette)",
     host: "apps/editor/src/features/editor/assistant/host.ts",
     capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets"],
-    methods: ["media.importUrl", "media.pickFiles", "media.writeGenerated", "storage.readText", "ui.openExportDialog"],
+    methods: [
+      "media.importUrl",
+      "media.pickFiles",
+      "media.writeGenerated",
+      "storage.readText",
+      "ui.openExportDialog",
+      "ui.selection",
+      "ui.setSelection",
+      "ui.timelineView",
+      "ui.showTimelineRange",
+      "ui.setTimelineMode",
+    ],
     conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" },
   },
   cli: {
@@ -196,6 +225,11 @@ function needName(need: HostCapability | HostMethod): string {
     "storage.readText": "reading files",
     "storage.writeText": "writing files",
     "ui.openExportDialog": "an export dialog",
+    "ui.selection": "reading the editor's selection",
+    "ui.setSelection": "selecting in the editor",
+    "ui.timelineView": "reading the timeline view",
+    "ui.showTimelineRange": "zooming the timeline to a range",
+    "ui.setTimelineMode": "the timeline toolbar's modes",
   };
   return names[need as HostMethod];
 }

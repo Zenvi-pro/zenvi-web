@@ -17,6 +17,7 @@
 import { animatedTitleTools } from "./catalog/animated-titles.js";
 import { audioTools } from "./catalog/audio.js";
 import { captionTools } from "./catalog/captions.js";
+import { clipPropsTools } from "./catalog/clip-props.js";
 import { clipTools } from "./catalog/clips.js";
 import { directTools } from "./catalog/direct.js";
 import { exportTools } from "./catalog/export.js";
@@ -34,6 +35,7 @@ import { speechTools } from "./catalog/speech-tools.js";
 import { timelineTools } from "./catalog/timeline.js";
 import { timelineEditTools } from "./catalog/timeline-edit.js";
 import { timelineTimeTools } from "./catalog/timeline-time.js";
+import { tracksNavTools } from "./catalog/tracks-nav.js";
 import { titleTemplateTools } from "./catalog/title-templates.js";
 import { titleTools } from "./catalog/titles.js";
 import { transitionTools } from "./catalog/transitions.js";
@@ -72,6 +74,8 @@ function buildCatalog(): readonly CatalogTool[] {
     ...animatedTitleTools,
     ...captionTools,
     ...overlayTools,
+    ...clipPropsTools,
+    ...tracksNavTools,
   ];
   const byName = new Map<string, CatalogTool>();
   for (const tool of [...implemented, ...directTools]) {

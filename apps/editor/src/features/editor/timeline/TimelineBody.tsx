@@ -39,7 +39,7 @@ import { fileDisplayName } from "../session/media";
 import { clickSelect, EMPTY_SELECTION, type Selection } from "../session/uiStore";
 import { ClipView, TransitionView, type ClipGeometry } from "./ClipView";
 import { computeMove, computeTrim, edgeAt, marqueeHits, normalizeRect, type Box, type DragItem, type MoveResult, type Rect, type SnapSettings, type TrimResult, type TrimSubject } from "./dragMath";
-import { anchoredScroll, contentWidth, HEADER_WIDTH, RULER_HEIGHT, trackIndexAt, zoomStep, zoomToFit } from "./geometry";
+import { anchoredScroll, clampZoom, contentWidth, HEADER_WIDTH, RULER_HEIGHT, trackIndexAt, zoomStep, zoomToFit } from "./geometry";
 import { clipMenu, emptyAreaMenu, markerMenu, transitionMenu } from "./menus";
 import { Ruler, type RulerHandle } from "./Ruler";
 import { TrackHeaders } from "./TrackHeaders";
@@ -205,6 +205,27 @@ export function TimelineBody() {
         if (!el) return;
         const x = seconds * session.ui.getState().pxPerSecond;
         if (x < el.scrollLeft || x > el.scrollLeft + el.clientWidth - 24) el.scrollLeft = Math.max(0, x - el.clientWidth * 0.2);
+      },
+      // A zoom applies its scroll after the next render: report the view it is heading to.
+      visibleRange: () => {
+        const el = viewport.current;
+        const pps = session.ui.getState().pxPerSecond;
+        if (!el || !(pps > 0)) return { start: 0, end: 0 };
+        const left = pendingScroll.current ?? el.scrollLeft;
+        return { start: left / pps, end: (left + el.clientWidth) / pps };
+      },
+      showRange: (start, end) => {
+        const el = viewport.current;
+        if (!el || !(end > start)) return;
+        const next = clampZoom(el.clientWidth / (end - start));
+        const left = Math.max(0, start * next);
+        if (next === session.ui.getState().pxPerSecond) {
+          el.scrollLeft = left;
+          return;
+        }
+        pendingScroll.current = left;
+        session.ui.setState({ pxPerSecond: next });
+        session.autosave.notify();
       },
     };
     session.views.focusTimeline = () => viewport.current?.focus();

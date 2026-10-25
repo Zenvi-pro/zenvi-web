@@ -8,10 +8,12 @@
 import type { Project } from "../../model/types.js";
 import type {
   AudioEnvelope,
+  EditorSelection,
   ExportOptions,
   HostCapability,
   ImportedMedia,
   PathListing,
+  TimelineView,
   ToolHost,
   ToolImage,
 } from "../types.js";
@@ -29,7 +31,12 @@ export type OptionalMethod =
   | "storage.readText"
   | "storage.writeText"
   | "ui.openExportDialog"
-  | "ui.selectedIds";
+  | "ui.selectedIds"
+  | "ui.selection"
+  | "ui.setSelection"
+  | "ui.timelineView"
+  | "ui.showTimelineRange"
+  | "ui.setTimelineMode";
 
 export interface BackendCall {
   path: string;
@@ -50,6 +57,8 @@ export interface FakeHostOptions {
   assets?: Record<string, string>;
   /** Player position, seconds. */
   playhead?: number;
+  /** The editor's timeline view (default `fakeView()`: 0-30 s visible, snapping on, no timing mode). */
+  view?: Partial<TimelineView>;
 }
 
 export interface FakeHost extends ToolHost {
@@ -57,6 +66,13 @@ export interface FakeHost extends ToolHost {
   readonly backendCalls: BackendCall[];
   readonly written: Map<string, Uint8Array | string>;
   readonly exports: ExportOptions[];
+  /** The fake editor's selection and timeline view (what the ui methods read and change). */
+  readonly editor: { selection: EditorSelection; view: TimelineView };
+}
+
+/** A timeline view showing 0-30 s at 3 s per 100 px with snapping on, like the desktop tests' zoom slider. */
+export function fakeView(view: Partial<TimelineView> = {}): TimelineView {
+  return { secondsPer100px: 3, visibleSeconds: 30, visibleRange: [0, 30], snapping: true, razor: false, timing: null, ...view };
 }
 
 /** A tiny title template: one text line, like the desktop's Bar_1.svg. */
@@ -114,8 +130,9 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
   const routes = { ...defaultRoutes(), ...(options.routes ?? {}) };
   let playhead = options.playhead ?? 1;
   let playing = false;
+  const editor = { selection: { clips: [], transitions: [], effects: [] } as EditorSelection, view: fakeView(options.view) };
 
-  const host: FakeHost = { calls, backendCalls, written, exports, log: () => {} };
+  const host: FakeHost = { calls, backendCalls, written, exports, editor, log: () => {} };
 
   if (!without.has("media")) {
     const imported = (path: string, name?: string): ImportedMedia => (name === undefined ? { path, info: infoForPath(path) } : { path, info: infoForPath(path), name });
@@ -166,6 +183,9 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
       get playing() {
         return playing;
       },
+      get rate() {
+        return 1;
+      },
       play: () => {
         calls.push("play");
         playing = true;
@@ -191,8 +211,29 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
       centerOnPlayhead: () => calls.push("centerOnPlayhead"),
       notify: (message) => calls.push(`notify ${message}`),
     };
-    if (!omit.has("ui.selectedIds")) host.ui.selectedIds = () => [];
+    if (!omit.has("ui.selectedIds")) host.ui.selectedIds = () => [...editor.selection.clips, ...editor.selection.transitions];
     if (!omit.has("ui.openExportDialog")) host.ui.openExportDialog = () => calls.push("openExportDialog");
+    if (!omit.has("ui.selection")) host.ui.selection = () => structuredClone(editor.selection);
+    if (!omit.has("ui.setSelection")) {
+      host.ui.setSelection = (selection) => {
+        calls.push(`select ${[...selection.clips, ...selection.transitions, ...selection.effects].join(",")}`);
+        editor.selection = structuredClone(selection);
+      };
+    }
+    host.ui.showProperties = () => calls.push("showProperties");
+    if (!omit.has("ui.timelineView")) host.ui.timelineView = () => structuredClone(editor.view);
+    if (!omit.has("ui.showTimelineRange")) {
+      host.ui.showTimelineRange = (start, end) => {
+        calls.push(`showRange ${start.toFixed(3)}-${end.toFixed(3)}`);
+        editor.view = { ...editor.view, visibleRange: [start, end], visibleSeconds: end - start, secondsPer100px: (end - start) / 10 };
+      };
+    }
+    if (!omit.has("ui.setTimelineMode")) {
+      host.ui.setTimelineMode = (mode, on) => {
+        calls.push(`mode ${mode} ${on}`);
+        editor.view = { ...editor.view, [mode]: on };
+      };
+    }
   }
   if (!without.has("exporter")) {
     host.exporter = {

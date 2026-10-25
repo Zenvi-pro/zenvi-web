@@ -1240,8 +1240,8 @@ var init_profiles_data = __esm({
 // ../engine/src/model/profiles.ts
 function profileKey(profile) {
   const code = profile.fps.den === 1 ? profile.fps.num : Math.trunc(profile.fps.num * 100 / profile.fps.den + 0.5);
-  const pad2 = (n, width) => String(n).padStart(width, "0");
-  return `${pad2(profile.width, 5)}x${pad2(profile.height, 4)}${profile.progressive ? "p" : "i"}${pad2(code, 4)}_${pad2(profile.display_ratio.num, 2)}-${pad2(profile.display_ratio.den, 2)}` + (profile.spherical ? "_360" : "");
+  const pad3 = (n, width) => String(n).padStart(width, "0");
+  return `${pad3(profile.width, 5)}x${pad3(profile.height, 4)}${profile.progressive ? "p" : "i"}${pad3(code, 4)}_${pad3(profile.display_ratio.num, 2)}-${pad3(profile.display_ratio.den, 2)}` + (profile.spherical ? "_360" : "");
 }
 function findProfile(keyOrDescription) {
   const k = keyOrDescription.trim().toLowerCase();
@@ -1286,10 +1286,10 @@ function roundHalfAway(x) {
 function pyRound(x) {
   if (!Number.isFinite(x)) return x;
   const f3 = Math.floor(x);
-  const diff = x - f3;
+  const diff2 = x - f3;
   let r;
-  if (diff > 0.5) r = f3 + 1;
-  else if (diff < 0.5) r = f3;
+  if (diff2 > 0.5) r = f3 + 1;
+  else if (diff2 < 0.5) r = f3;
   else r = f3 % 2 === 0 ? f3 : f3 + 1;
   return r === 0 ? 0 : r;
 }
@@ -2351,6 +2351,9 @@ function evaluate(kf, frame, fallback) {
   if ((kf === void 0 || kf === null) && fallback !== void 0) return fallback;
   return valueAtResolved(resolvePoints(kf), truncInt(frame));
 }
+function evaluateAtX(kf, x) {
+  return valueAtResolved(resolvePoints(kf), x);
+}
 function getInt(kf, frame, fallback) {
   return truncInt(roundHalfAway(evaluate(kf, frame, fallback)));
 }
@@ -2420,8 +2423,8 @@ var init_evaluate = __esm({
         else if (index >= length) index = length - 1;
         const current = this.value(index);
         for (let attempts = 1; attempts < 600 && index + attempts <= length; attempts += 1) {
-          const diff = this.value(index + attempts) - current;
-          if (Math.abs(diff) > 1e-4) return diff >= 0;
+          const diff2 = this.value(index + attempts) - current;
+          if (Math.abs(diff2) > 1e-4) return diff2 >= 0;
         }
         return true;
       }
@@ -2455,9 +2458,11 @@ function parseHexColor(hex4, order = "rgba") {
   if (order === "argb") return [bytes[1], bytes[2], bytes[3], bytes[0]];
   return [bytes[0], bytes[1], bytes[2], bytes[3]];
 }
+var COLOR_CHANNELS;
 var init_color = __esm({
   "../engine/src/keyframe/color.ts"() {
     "use strict";
+    COLOR_CHANNELS = ["red", "green", "blue", "alpha"];
   }
 });
 
@@ -2726,6 +2731,95 @@ var init_effects = __esm({
   }
 });
 
+// ../engine/src/keyframe/rules.ts
+function defaultKeyframeValue(key, channel) {
+  if (key === "wave_color") return WAVE_COLOR_DEFAULTS[String(channel ?? "")];
+  if (channel) return void 0;
+  return EMPTY_CURVE_DEFAULTS[key];
+}
+function maxTransformMultiple(projectWidth, projectHeight, isSvg = false) {
+  let multiple = isSvg ? 15 : 50;
+  const width = Number(projectWidth) || 0;
+  const height = Number(projectHeight) || 0;
+  if (width > 0 && height > 0) multiple = pyRound(2e3 * multiple / Math.max(width, height));
+  return multiple;
+}
+function isRecord6(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function curvePoints(curve2) {
+  const points = isRecord6(curve2) && Array.isArray(curve2.Points) ? curve2.Points : [];
+  const valid = points.filter((p) => isRecord6(p) && isRecord6(p.co));
+  return valid.map((point3, index) => ({ point: point3, index })).sort((a, b) => pointX(a.point) - pointX(b.point) || a.index - b.index).map((entry) => entry.point);
+}
+function pointX(point3) {
+  return Number(point3.co?.X ?? 0);
+}
+function pointY(point3) {
+  return Number(point3.co?.Y ?? 0);
+}
+function keyframeValue(curve2, frame, fallback = 0) {
+  if (typeof curve2 === "number") return curve2;
+  const points = curvePoints(curve2);
+  if (points.length === 0) return fallback;
+  return evaluateAtX({ Points: points }, frame);
+}
+function curvePlateau(curve2, firstFrame, lastFrame2, fallback = 1) {
+  const values = [keyframeValue(curve2, firstFrame, fallback), keyframeValue(curve2, lastFrame2, fallback)];
+  for (const point3 of curvePoints(curve2)) {
+    const x = pointX(point3);
+    if (firstFrame <= x && x <= lastFrame2) values.push(pointY(point3));
+  }
+  return Math.max(...values);
+}
+function editorPoint(frame, value, interpolation2 = Interpolation.BEZIER) {
+  return {
+    co: { X: frame, Y: value },
+    interpolation: interpolation2,
+    handle_type: 0,
+    handle_left: { X: 0.5, Y: 1 },
+    handle_right: { X: 0.5, Y: 0 }
+  };
+}
+var COPY_KEYFRAME_GROUPS, EMPTY_CURVE_DEFAULTS, WAVE_COLOR_DEFAULTS;
+var init_rules = __esm({
+  "../engine/src/keyframe/rules.ts"() {
+    "use strict";
+    init_types();
+    init_rounding();
+    init_evaluate();
+    COPY_KEYFRAME_GROUPS = {
+      all: ["alpha", "gravity", "scale_x", "scale_y", "shear_x", "shear_y", "rotation", "location_x", "location_y", "time", "volume"],
+      alpha: ["alpha"],
+      scale: ["gravity", "scale_x", "scale_y"],
+      shear: ["shear_x", "shear_y"],
+      rotation: ["gravity", "rotation"],
+      location: ["gravity", "location_x", "location_y"],
+      time: ["time"],
+      volume: ["volume"]
+    };
+    EMPTY_CURVE_DEFAULTS = {
+      alpha: 1,
+      scale_x: 1,
+      scale_y: 1,
+      time: 1,
+      volume: 1,
+      origin_x: 0.5,
+      origin_y: 0.5,
+      location_x: 0,
+      location_y: 0,
+      rotation: 0,
+      shear_x: 0,
+      shear_y: 0,
+      has_audio: -1,
+      has_video: -1,
+      channel_filter: -1,
+      channel_mapping: -1
+    };
+    WAVE_COLOR_DEFAULTS = { red: 0, green: 123, blue: 255, alpha: 255 };
+  }
+});
+
 // ../engine/src/keyframe/index.ts
 var init_keyframe = __esm({
   "../engine/src/keyframe/index.ts"() {
@@ -2734,6 +2828,7 @@ var init_keyframe = __esm({
     init_evaluate();
     init_edit();
     init_color();
+    init_rules();
   }
 });
 
@@ -2834,9 +2929,18 @@ var init_queries = __esm({
 });
 
 // ../engine/src/timeline/duration.ts
+function projectDuration(project) {
+  const desired = Math.max(MIN_PROJECT_DURATION, timelineEnd(project) + DURATION_PADDING);
+  const current = typeof project.duration === "number" && Number.isFinite(project.duration) ? project.duration : 0;
+  return desired > current + 1e-3 ? desired : current;
+}
+var MIN_PROJECT_DURATION, DURATION_PADDING;
 var init_duration = __esm({
   "../engine/src/timeline/duration.ts"() {
     "use strict";
+    init_queries();
+    MIN_PROJECT_DURATION = 300;
+    DURATION_PADDING = 10;
   }
 });
 
@@ -2844,6 +2948,120 @@ var init_duration = __esm({
 var init_snap = __esm({
   "../engine/src/timeline/snap.ts"() {
     "use strict";
+  }
+});
+
+// ../engine/src/timeline/navigation.ts
+function isRecord7(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function fpsFloat2(project) {
+  const num12 = Number(project.fps?.num) || 30;
+  const den2 = Number(project.fps?.den) || 1;
+  return num12 / den2;
+}
+function keyframeTimes(value, toSeconds2, lower, upper, out) {
+  if (isRecord7(value)) {
+    if (Array.isArray(value.Points)) {
+      for (const point3 of value.Points) {
+        const x = isRecord7(point3) && isRecord7(point3.co) ? Number(point3.co.X) : Number.NaN;
+        if (!Number.isFinite(x)) continue;
+        const t = toSeconds2(x);
+        if (lower < t && t < upper) out.push(t);
+      }
+      return;
+    }
+    for (const child of Object.values(value)) keyframeTimes(child, toSeconds2, lower, upper, out);
+  } else if (Array.isArray(value)) {
+    for (const child of value) keyframeTimes(child, toSeconds2, lower, upper, out);
+  }
+}
+function objectPositions(item, fps) {
+  const frame = 1 / fps;
+  const startTime = Number(item.position) || 0;
+  const start = Number(item.start) || 0;
+  const stopTime = startTime - start + (Number(item.end) || 0) - frame;
+  const positions = [startTime, stopTime];
+  for (const value of Object.values(item)) {
+    keyframeTimes(value, (x) => (x - 1) / fps - start + startTime, startTime, stopTime, positions);
+  }
+  return positions;
+}
+function navigationPositions(project, selection = {}, lastFrame2) {
+  const fps = fpsFloat2(project);
+  const frame = 1 / fps;
+  const clips = selection.clips ?? [];
+  const transitions = selection.transitions ?? [];
+  const effects = selection.effects ?? [];
+  const positions = [0];
+  if (clips.length === 0 && transitions.length === 0 && effects.length === 0 && lastFrame2 !== void 0) {
+    positions.push((lastFrame2 - 1) / fps);
+  }
+  for (const marker2 of project.markers ?? []) {
+    const position = Number(marker2.position);
+    if (Number.isFinite(position)) positions.push(position);
+  }
+  if (effects.length > 0) {
+    for (const effectId of effects) {
+      const parent = project.clips.find((c) => (c.effects ?? []).some((e) => e.id === effectId));
+      const effect3 = parent?.effects.find((e) => e.id === effectId);
+      if (!parent || !effect3) continue;
+      const startTime = Number(parent.position) || 0;
+      const origin = startTime - (Number(parent.start) || 0);
+      const stopTime = origin + (Number(parent.end) || 0) - frame;
+      positions.push(startTime, stopTime);
+      for (const value of Object.values(effect3)) keyframeTimes(value, (x) => (x - 1) / fps + origin, startTime, stopTime, positions);
+    }
+  } else {
+    for (const id of clips) {
+      const clip2 = project.clips.find((c) => c.id === id);
+      if (clip2) positions.push(...objectPositions(clip2, fps));
+    }
+    for (const id of transitions) {
+      const transition2 = project.effects.find((t) => t.id === id);
+      if (transition2) positions.push(...objectPositions(transition2, fps));
+    }
+  }
+  return [...new Set(positions)];
+}
+function clipEdges(project, layer2) {
+  const edges = [];
+  for (const clip2 of project.clips) {
+    if (layer2 !== void 0 && Math.trunc(Number(clip2.layer) || 0) !== layer2) continue;
+    const position = Number(clip2.position) || 0;
+    edges.push(position, position + Math.max(0, (Number(clip2.end) || 0) - (Number(clip2.start) || 0)));
+  }
+  return edges;
+}
+function adjacentPosition(positions, current, direction2) {
+  let best;
+  for (const p of positions) {
+    if (Math.abs(p - current) <= NAVIGATION_EPSILON) continue;
+    if (direction2 < 0 ? p < current && (best === void 0 || p > best) : p > current && (best === void 0 || p < best)) best = p;
+  }
+  return best;
+}
+function secondsToSeekFrame(project, seconds2, lastFrame2) {
+  let frame = pyRound(seconds2 * fpsFloat2(project)) + 1;
+  if (lastFrame2 !== void 0) frame = Math.min(frame, lastFrame2);
+  return Math.max(1, frame);
+}
+function pickAdjacent(project, candidates, currentSeconds, currentFrame, direction2, lastFrame2) {
+  let remaining = [...new Set(candidates)];
+  for (; ; ) {
+    const target = adjacentPosition(remaining, currentSeconds, direction2);
+    if (target === void 0) return void 0;
+    const frame = secondsToSeekFrame(project, target, lastFrame2);
+    if (frame !== currentFrame) return [target, frame];
+    remaining = remaining.filter((p) => p !== target);
+  }
+}
+var NAVIGATION_EPSILON;
+var init_navigation = __esm({
+  "../engine/src/timeline/navigation.ts"() {
+    "use strict";
+    init_rounding();
+    NAVIGATION_EPSILON = 1e-3;
   }
 });
 
@@ -2856,6 +3074,7 @@ var init_timeline = __esm({
     init_queries();
     init_duration();
     init_snap();
+    init_navigation();
   }
 });
 
@@ -2988,7 +3207,7 @@ var init_svg = __esm({
 });
 
 // ../engine/src/history/keypath.ts
-function isRecord6(value) {
+function isRecord8(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function findKey(obj, part) {
@@ -2998,7 +3217,7 @@ function findKey(obj, part) {
   return Object.keys(obj).find((k) => k.toLowerCase() === lower);
 }
 function matches(item, match) {
-  if (!isRecord6(item)) return false;
+  if (!isRecord8(item)) return false;
   for (const [k, v] of Object.entries(match)) {
     const key = findKey(item, k);
     if (key === void 0 || item[key] !== v) return false;
@@ -3012,7 +3231,7 @@ function resolveKey(root, path38) {
   let value = root;
   for (const part of path38) {
     if (typeof part === "string") {
-      if (!isRecord6(value)) return void 0;
+      if (!isRecord8(value)) return void 0;
       const key = findKey(value, part);
       if (key === void 0) return void 0;
       parent = value;
@@ -3041,7 +3260,7 @@ var init_keypath = __esm({
 });
 
 // ../engine/src/history/document.ts
-function isRecord7(value) {
+function isRecord9(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function clone(value) {
@@ -3076,7 +3295,7 @@ function writeThrough(root, path38, mutate) {
 }
 function stripHistory(action) {
   const strip = (v) => {
-    if (isRecord7(v) && "history" in v) {
+    if (isRecord9(v) && "history" in v) {
       const { history: _history, ...rest } = v;
       return rest;
     }
@@ -3089,7 +3308,7 @@ function groupSaved(saved) {
   const entries = [];
   const byId = /* @__PURE__ */ new Map();
   for (const raw of saved) {
-    if (!isRecord7(raw)) continue;
+    if (!isRecord9(raw)) continue;
     const type = raw.type;
     let key = raw.key;
     if (type === "load" || !Array.isArray(key) || key[0] === "history") continue;
@@ -3334,7 +3553,7 @@ var init_document = __esm({
               const list2 = [...holder];
               list2.splice(at, 1);
               container[slot] = list2;
-            } else if (isRecord7(holder)) {
+            } else if (isRecord9(holder)) {
               const obj = { ...holder };
               delete obj[at];
               container[slot] = obj;
@@ -3349,7 +3568,7 @@ var init_document = __esm({
         }
         if (type === "update") {
           const previous = clone(target.value);
-          const merge2 = !replace && isRecord7(target.value) && isRecord7(value);
+          const merge2 = !replace && isRecord9(target.value) && isRecord9(value);
           const next = merge2 ? { ...target.value, ...clone(value) } : clone(value);
           this.current = writeThrough(root, key, (container, slot) => {
             container[slot] = next;
@@ -3364,7 +3583,7 @@ var init_document = __esm({
         const { action } = applied2;
         const root = this.current;
         if (action.type === "insert") {
-          const id = isRecord7(action.value) ? action.value.id : void 0;
+          const id = isRecord9(action.value) ? action.value.id : void 0;
           const key = id !== void 0 ? [...action.key, { id }] : action.key;
           const target = resolveKey(root, key);
           if (target) {
@@ -3385,7 +3604,7 @@ var init_document = __esm({
               const at = applied2.index !== void 0 && applied2.index <= list2.length ? applied2.index : list2.length;
               list2.splice(at, 0, clone(applied2.previous));
               container[slot] = list2;
-            } else if (isRecord7(holder)) {
+            } else if (isRecord9(holder)) {
               const last = action.key[action.key.length - 1];
               if (typeof last === "string") {
                 container[slot] = { ...holder, [last]: clone(applied2.previous) };
@@ -3454,6 +3673,11 @@ function requireTransition(project, id) {
   if (!transition2) throw new OpError("not_found", `No transition with id ${id}.`, { id });
   return transition2;
 }
+function requireMarker(project, id) {
+  const marker2 = findMarker(project, id);
+  if (!marker2) throw new OpError("not_found", `No marker with id ${id}.`, { id });
+  return marker2;
+}
 function requireLayer(project, layer2) {
   const found = findLayer(project, layer2);
   if (!found) throw new OpError("not_found", `No track with number ${layer2}.`, { layer: layer2 });
@@ -3497,7 +3721,7 @@ var init_types3 = __esm({
 });
 
 // ../engine/src/ops/internal.ts
-function isRecord8(value) {
+function isRecord10(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function fpsOf(project) {
@@ -3575,7 +3799,7 @@ function patchTransition(tx, id, patch) {
 function reassignEffectIds(clip2, nextId) {
   const effects = clip2.effects;
   if (!Array.isArray(effects)) return;
-  clip2.effects = effects.map((effect3) => isRecord8(effect3) ? { ...effect3, id: nextId() } : effect3);
+  clip2.effects = effects.map((effect3) => isRecord10(effect3) ? { ...effect3, id: nextId() } : effect3);
 }
 function ids(project) {
   return idFactory(project);
@@ -3594,7 +3818,7 @@ function resolveClipFrame(project, clip2, at) {
 }
 function mapKeyframesDeep(value, fn) {
   if (Array.isArray(value)) return value.map((v) => mapKeyframesDeep(v, fn));
-  if (!isRecord8(value)) return value;
+  if (!isRecord10(value)) return value;
   if (Array.isArray(value.Points)) return fn(value);
   const out = {};
   for (const [k, v] of Object.entries(value)) out[k] = mapKeyframesDeep(v, fn);
@@ -3606,7 +3830,7 @@ function replaceClip(tx, before, after) {
   return requireClip(tx.project, before.id);
 }
 function fadeTargets(clip2) {
-  const reader = isRecord8(clip2.reader) ? clip2.reader : {};
+  const reader = isRecord10(clip2.reader) ? clip2.reader : {};
   return {
     alpha: Boolean(reader.has_video ?? true) || Boolean(clip2.waveform),
     volume: Boolean(reader.has_audio ?? true)
@@ -3708,7 +3932,7 @@ var init_files = __esm({
 });
 
 // ../engine/src/tools/coerce.ts
-function isRecord9(value) {
+function isRecord11(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function topLevelTypes(prop) {
@@ -3775,7 +3999,7 @@ function coerceValue(value, prop) {
 }
 function normalizeArgs(schema, args) {
   if (args === null || args === void 0) return {};
-  if (!isRecord9(args)) return args;
+  if (!isRecord11(args)) return args;
   const out = {};
   const props = schema?.properties ?? {};
   for (const [key, value] of Object.entries(args)) {
@@ -3799,14 +4023,14 @@ function pyRepr(value) {
     return quote + (quote === "'" ? body.replaceAll("'", "\\'") : body) + quote;
   }
   if (Array.isArray(value)) return `[${value.map(pyRepr).join(", ")}]`;
-  if (isRecord9(value)) return `{${Object.entries(value).map(([k, v]) => `${pyRepr(k)}: ${pyRepr(v)}`).join(", ")}}`;
+  if (isRecord11(value)) return `{${Object.entries(value).map(([k, v]) => `${pyRepr(k)}: ${pyRepr(v)}`).join(", ")}}`;
   return String(value);
 }
 function valueAt(root, path38) {
   let current = root;
   for (const part of path38) {
     if (Array.isArray(current) && typeof part === "number" && part < current.length) current = current[part];
-    else if (isRecord9(current) && typeof part === "string" && part in current) current = current[part];
+    else if (isRecord11(current) && typeof part === "string" && part in current) current = current[part];
     else return { found: false, value: void 0 };
   }
   return { found: true, value: current };
@@ -3888,7 +4112,7 @@ function requireFinite2(value, name) {
   }
   return value;
 }
-function fpsFloat2(fps) {
+function fpsFloat3(fps) {
   requireRate(fps);
   return num3(fps) / den(fps);
 }
@@ -3899,7 +4123,7 @@ function roundHalfUp(value) {
 }
 function toFrame(seconds2, fps) {
   requireFinite2(seconds2, "seconds");
-  return roundHalfUp(seconds2 * fpsFloat2(fps));
+  return roundHalfUp(seconds2 * fpsFloat3(fps));
 }
 function toSeconds(frame, fps) {
   requireRate(fps);
@@ -3916,7 +4140,7 @@ function durationFrames(start, end, fps) {
     if (end === start) return 1;
     return Math.max(1, toFrame(end, fps) - toFrame(start, fps));
   }
-  return Math.max(1, roundHalfUp((end - start) * fpsFloat2(fps)));
+  return Math.max(1, roundHalfUp((end - start) * fpsFloat3(fps)));
 }
 function quantizeSpan(position, start, end, fps) {
   const posFrame = toFrame(position, fps);
@@ -4099,7 +4323,7 @@ var init_pyfmt = __esm({
 });
 
 // ../engine/src/tools/placement.ts
-function isRecord10(value) {
+function isRecord12(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function float(value) {
@@ -4113,7 +4337,7 @@ function orZero(value) {
   return float(value) ?? 0;
 }
 function fileLooksLikeImage(file3) {
-  const data = isRecord10(file3) ? file3 : {};
+  const data = isRecord12(file3) ? file3 : {};
   if (String(data.media_type ?? "").toLowerCase() === "image") return true;
   const path38 = String(data.path || data.name || "");
   const ext = path38.includes(".") ? path38.slice(path38.lastIndexOf(".") + 1).toLowerCase() : "";
@@ -4124,13 +4348,13 @@ function quantizePlacementSeconds(start, end, fps) {
   return [s, e];
 }
 function sourceWindowForFile(file3, eps = 1e-3) {
-  const data = isRecord10(file3) ? file3 : {};
+  const data = isRecord12(file3) ? file3 : {};
   const fStart = orZero(data.start);
   const fEnd = orZero(data.end);
   if (fEnd > fStart + eps) return [fStart, fEnd];
   let fileDur = orZero(data.duration);
   if (fileDur <= fStart + eps) {
-    const reader = isRecord10(data.reader) ? data.reader : {};
+    const reader = isRecord12(data.reader) ? data.reader : {};
     fileDur = orZero(reader.duration);
   }
   if (fileDur > fStart + eps) return [fStart, fileDur];
@@ -4224,8 +4448,8 @@ function basenameStem(name) {
 function placementWatchQuery(file3, query2 = "", extra = "") {
   const q = String(query2 ?? "").trim();
   if (q) return Array.from(q).slice(0, 200).join("");
-  const data = isRecord10(file3) ? file3 : {};
-  const ai = isRecord10(data.ai_metadata) ? data.ai_metadata : {};
+  const data = isRecord12(file3) ? file3 : {};
+  const ai = isRecord12(data.ai_metadata) ? data.ai_metadata : {};
   for (const key of ["prompt", "short_summary", "description"]) {
     const text4 = String(ai[key] ?? "").trim();
     if (text4) return Array.from(text4).slice(0, 200).join("");
@@ -4306,7 +4530,7 @@ var init_placement = __esm({
 });
 
 // ../engine/src/tools/audio-mix.ts
-function isRecord11(value) {
+function isRecord13(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function f(value, fallback) {
@@ -4324,8 +4548,8 @@ function gainToDb(gain) {
   const g = f(gain, 0);
   return g <= 0 ? -120 : 20 * Math.log10(g);
 }
-function fpsFloat3(fps) {
-  if (isRecord11(fps)) {
+function fpsFloat4(fps) {
+  if (isRecord13(fps)) {
     const num12 = f(fps.num, 30);
     const den2 = f(fps.den, 1);
     return den2 ? num12 / den2 : 30;
@@ -4333,29 +4557,29 @@ function fpsFloat3(fps) {
   return f(fps, 30) || 30;
 }
 function clipSourceFrameRange(clip2, fps) {
-  const rate = fpsFloat3(fps);
-  const data = isRecord11(clip2) ? clip2 : {};
+  const rate = fpsFloat4(fps);
+  const data = isRecord13(clip2) ? clip2 : {};
   const first = pyRound(f(data.start, 0) * rate) + 1;
   let last = pyRound(f(data.end, 0) * rate) + 1;
   if (last < first) last = first;
   return [first, last];
 }
 function clipTimelineExtent(clip2) {
-  const data = isRecord11(clip2) ? clip2 : {};
+  const data = isRecord13(clip2) ? clip2 : {};
   const pos = f(data.position, 0);
   const dur = Math.max(0, f(data.end, 0) - f(data.start, 0));
   return [pos, pos + dur];
 }
 function timelineToSourceFrame(tTimeline, clip2, fps) {
-  const data = isRecord11(clip2) ? clip2 : {};
-  const rate = fpsFloat3(fps);
+  const data = isRecord13(clip2) ? clip2 : {};
+  const rate = fpsFloat4(fps);
   const sourceSeconds = f(tTimeline, 0) - f(data.position, 0) + f(data.start, 0);
   const frame = pyRound(sourceSeconds * rate) + 1;
   const [first, last] = clipSourceFrameRange(data, fps);
   return Math.max(first, Math.min(last, frame));
 }
 function sourceToTimelineSeconds(tSource, clip2) {
-  const data = isRecord11(clip2) ? clip2 : {};
+  const data = isRecord13(clip2) ? clip2 : {};
   return f(tSource, 0) - f(data.start, 0) + f(data.position, 0);
 }
 function mergeWindows(windows, gap = 0) {
@@ -4398,20 +4622,20 @@ function invertWindows(windows, lo, hi) {
   return gaps.filter(([s, e]) => e - s > EPS);
 }
 function readerOf(clip2, file3) {
-  const data = isRecord11(clip2) ? clip2 : {};
+  const data = isRecord13(clip2) ? clip2 : {};
   const reader = data.reader;
-  if (isRecord11(reader) && Object.keys(reader).length > 0) return reader;
-  if (isRecord11(file3)) {
+  if (isRecord13(reader) && Object.keys(reader).length > 0) return reader;
+  if (isRecord13(file3)) {
     const nested = file3.reader;
-    if (isRecord11(nested) && Object.keys(nested).length > 0) return nested;
+    if (isRecord13(nested) && Object.keys(nested).length > 0) return nested;
     return file3;
   }
   return {};
 }
 function hasAudioStream(clip2, file3) {
   const reader = readerOf(clip2, file3);
-  const hasAudio = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
-  if (!hasAudio) return false;
+  const hasAudio2 = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
+  if (!hasAudio2) return false;
   const channels = reader.channels;
   if (channels !== void 0 && channels !== null) {
     const n = Math.trunc(Number(channels));
@@ -4423,7 +4647,7 @@ function hasVideoStream(clip2, file3) {
   const reader = readerOf(clip2, file3);
   const probe2 = { ...reader };
   for (const key of ["path", "media_type"]) {
-    const value = isRecord11(file3) ? file3[key] : void 0;
+    const value = isRecord13(file3) ? file3[key] : void 0;
     if (value && !probe2[key]) probe2[key] = value;
   }
   if (isAudioOnlyMedia(probe2)) return false;
@@ -4432,16 +4656,16 @@ function hasVideoStream(clip2, file3) {
   return true;
 }
 function cuesOf(effective) {
-  const cues = isRecord11(effective) ? effective.transcript_cues : void 0;
-  return Array.isArray(cues) ? cues.filter(isRecord11) : [];
+  const cues = isRecord13(effective) ? effective.transcript_cues : void 0;
+  return Array.isArray(cues) ? cues.filter(isRecord13) : [];
 }
 function classifyClipAudioRole(clip2, file3, effective) {
   if (!hasAudioStream(clip2, file3)) return "silent";
-  const meta3 = isRecord11(effective) ? effective : {};
+  const meta3 = isRecord13(effective) ? effective : {};
   if (cuesOf(meta3).length > 0 || meta3.has_speech === true) return "speech";
   if (!meta3.analyzed) return "unknown";
   if (!hasVideoStream(clip2, file3)) {
-    const data = isRecord11(clip2) ? clip2 : {};
+    const data = isRecord13(clip2) ? clip2 : {};
     const duration3 = Math.max(0, f(data.end, 0) - f(data.start, 0));
     return duration3 >= MUSIC_MIN_DURATION ? "music" : "sfx";
   }
@@ -4456,7 +4680,7 @@ function cueBounds(cue) {
 function snapCutOutOfSpeech(cutSource, cues, maxShift = null) {
   const cut2 = f(cutSource, 0);
   for (const cue of cues ?? []) {
-    if (!isRecord11(cue)) continue;
+    if (!isRecord13(cue)) continue;
     const bounds2 = cueBounds(cue);
     if (!bounds2) continue;
     const [start, end] = bounds2;
@@ -4468,14 +4692,14 @@ function snapCutOutOfSpeech(cutSource, cues, maxShift = null) {
   return [cut2, null];
 }
 function speechWindows(aiMetadata) {
-  const meta3 = isRecord11(aiMetadata) ? aiMetadata : {};
-  return Array.isArray(meta3.transcript_cues) ? meta3.transcript_cues.filter(isRecord11) : [];
+  const meta3 = isRecord13(aiMetadata) ? aiMetadata : {};
+  return Array.isArray(meta3.transcript_cues) ? meta3.transcript_cues.filter(isRecord13) : [];
 }
 function chapterEdges(aiMetadata) {
-  const meta3 = isRecord11(aiMetadata) ? aiMetadata : {};
+  const meta3 = isRecord13(aiMetadata) ? aiMetadata : {};
   const edges = /* @__PURE__ */ new Set();
   for (const ch of Array.isArray(meta3.chapters) ? meta3.chapters : []) {
-    if (!isRecord11(ch)) continue;
+    if (!isRecord13(ch)) continue;
     for (const key of ["start", "end"]) {
       const value = f(ch[key], null);
       if (value !== null) edges.add(Number(pyFixed(value, 4)));
@@ -4488,7 +4712,7 @@ function cueCoverage(cues, start, end) {
   if (span2 <= 0) return 0;
   let covered = 0;
   for (const cue of cues ?? []) {
-    if (!isRecord11(cue)) continue;
+    if (!isRecord13(cue)) continue;
     const bounds2 = cueBounds(cue);
     if (!bounds2) continue;
     covered += Math.max(0, Math.min(bounds2[1], end) - Math.max(bounds2[0], start));
@@ -4498,7 +4722,7 @@ function cueCoverage(cues, start, end) {
 function snapCutToPhraseEdge(cut2, cues, preferLater, maxShift = MAX_CUE_SHIFT_SEC) {
   const value = f(cut2, 0);
   for (const cue of cues ?? []) {
-    if (!isRecord11(cue)) continue;
+    if (!isRecord13(cue)) continue;
     const bounds2 = cueBounds(cue);
     if (!bounds2) continue;
     const [c0, c1] = bounds2;
@@ -4551,7 +4775,7 @@ function snapWindowToBoundaries(start, end, aiMetadata, maxShift = MAX_CUE_SHIFT
   return [s1, e1, sMoved || eMoved];
 }
 function speechWindowsFromCues(clip2, effective) {
-  const data = isRecord11(clip2) ? clip2 : {};
+  const data = isRecord13(clip2) ? clip2 : {};
   const [tlStart, tlEnd] = clipTimelineExtent(data);
   const srcStart = f(data.start, 0);
   const windows = [];
@@ -4571,7 +4795,7 @@ function speechWindowsFromCues(clip2, effective) {
   return clampWindows(mergeWindows(windows), tlStart, tlEnd);
 }
 function speechWindowsFromSource(sourceWindows, clip2) {
-  const data = isRecord11(clip2) ? clip2 : {};
+  const data = isRecord13(clip2) ? clip2 : {};
   const [tlStart, tlEnd] = clipTimelineExtent(data);
   const srcStart = f(data.start, 0);
   const srcEnd = f(data.end, srcStart);
@@ -4585,8 +4809,8 @@ function speechWindowsFromSource(sourceWindows, clip2) {
   return clampWindows(mergeWindows(windows), tlStart, tlEnd);
 }
 function speechWindowsFromEnergy(clip2, threshold = DEFAULT_ENERGY_THRESHOLD, minRun = DEFAULT_ENERGY_MIN_RUN) {
-  const data = isRecord11(clip2) ? clip2 : {};
-  const ui = isRecord11(data.ui) ? data.ui : {};
+  const data = isRecord13(clip2) ? clip2 : {};
+  const ui = isRecord13(data.ui) ? data.ui : {};
   const samples = Array.isArray(ui.audio_data) ? ui.audio_data : [];
   if (samples.length < 2) return [];
   const [tlStart, tlEnd] = clipTimelineExtent(data);
@@ -4608,8 +4832,8 @@ function speechWindowsFromEnergy(clip2, threshold = DEFAULT_ENERGY_THRESHOLD, mi
     }
   });
   if (runStart !== null) windows.push([tlStart + runStart * step, tlEnd]);
-  const run = Math.max(0, f(minRun, DEFAULT_ENERGY_MIN_RUN));
-  return mergeWindows(windows, run).filter(([s, e]) => e - s >= run);
+  const run3 = Math.max(0, f(minRun, DEFAULT_ENERGY_MIN_RUN));
+  return mergeWindows(windows, run3).filter(([s, e]) => e - s >= run3);
 }
 function refineWindowsWithEnergy(windows, clip2, threshold = DEFAULT_ENERGY_THRESHOLD, minRun = DEFAULT_ENERGY_MIN_RUN) {
   const base = mergeWindows(windows);
@@ -4629,14 +4853,14 @@ function makePoint(x, y, interpolation2 = Interpolation.LINEAR) {
     interpolation: Math.trunc(interpolation2)
   };
 }
-function curvePoints(clip2) {
-  const volume = isRecord11(clip2) ? clip2.volume : void 0;
-  const points = isRecord11(volume) ? volume.Points : void 0;
+function curvePoints2(clip2) {
+  const volume = isRecord13(clip2) ? clip2.volume : void 0;
+  const points = isRecord13(volume) ? volume.Points : void 0;
   if (!Array.isArray(points)) return [];
-  return points.filter((p) => isRecord11(p) && isRecord11(p.co)).map((p, i) => ({ p, i })).sort((a, b) => f(a.p.co.X, 0) - f(b.p.co.X, 0) || a.i - b.i).map(({ p }) => p);
+  return points.filter((p) => isRecord13(p) && isRecord13(p.co)).map((p, i) => ({ p, i })).sort((a, b) => f(a.p.co.X, 0) - f(b.p.co.X, 0) || a.i - b.i).map(({ p }) => p);
 }
 function evaluateVolumeCurve(points, x, fallback = 1) {
-  const pts = (points ?? []).filter((p) => isRecord11(p) && isRecord11(p.co));
+  const pts = (points ?? []).filter((p) => isRecord13(p) && isRecord13(p.co));
   if (pts.length === 0) return f(fallback, 1);
   const sorted = pts.map((p, i) => ({ p, i })).sort((a, b) => f(a.p.co.X, 0) - f(b.p.co.X, 0) || a.i - b.i).map(({ p }) => p);
   const target = f(x, 1);
@@ -4661,13 +4885,13 @@ function autoDuckDb(bedLevel, speechLevel = null, headroomDb = AUTO_DUCK_HEADROO
   return Math.max(floorDb, Math.min(ceilingDb, needed));
 }
 function currentStaticLevel(clip2) {
-  const pts = curvePoints(clip2);
+  const pts = curvePoints2(clip2);
   if (pts.length === 0) return 1;
   const values = new Set(pts.map((p) => Number(pyFixed(f(p.co.Y, 1), 6))));
   return values.size === 1 ? [...values][0] : null;
 }
 function duckedWindows(clip2, windows, env2 = {}) {
-  const data = isRecord11(clip2) ? clip2 : {};
+  const data = isRecord13(clip2) ? clip2 : {};
   const attack = env2.attack ?? DEFAULT_ATTACK;
   const release = env2.release ?? DEFAULT_RELEASE;
   const padBefore = env2.padBefore ?? DEFAULT_PAD_BEFORE;
@@ -4678,13 +4902,13 @@ function duckedWindows(clip2, windows, env2 = {}) {
   return clampWindows(mergeWindows(padded, gap), tlStart, tlEnd);
 }
 function buildDuckPoints(clip2, fps, windows, duckGain, env2 = {}) {
-  const data = isRecord11(clip2) ? clip2 : {};
+  const data = isRecord13(clip2) ? clip2 : {};
   const attack = env2.attack ?? DEFAULT_ATTACK;
   const release = env2.release ?? DEFAULT_RELEASE;
   const [first, last] = clipSourceFrameRange(data, fps);
   const padded = duckedWindows(data, windows, env2);
   if (padded.length === 0) return [];
-  const existing = curvePoints(data);
+  const existing = curvePoints2(data);
   const gain = Math.max(0, f(duckGain, 1));
   const baseAt = (frame) => evaluateVolumeCurve(existing, frame, 1);
   const ducked = /* @__PURE__ */ new Map();
@@ -4713,14 +4937,14 @@ function buildDuckPoints(clip2, fps, windows, duckGain, env2 = {}) {
   return [...merged.keys()].sort((a, b) => a - b).map((frame) => makePoint(frame, merged.get(frame)));
 }
 function buildStaticLevelPoints(clip2, fps, level, options = {}) {
-  const data = isRecord11(clip2) ? clip2 : {};
+  const data = isRecord13(clip2) ? clip2 : {};
   const [first, last] = clipSourceFrameRange(data, fps);
   const target = Math.max(0, Math.min(MAX_LEVEL, f(level, 1)));
-  const existing = curvePoints(data);
-  const valueAt2 = (frame) => options.scale ? Math.max(0, evaluateVolumeCurve(existing, frame, 1) * target) : target;
+  const existing = curvePoints2(data);
+  const valueAt3 = (frame) => options.scale ? Math.max(0, evaluateVolumeCurve(existing, frame, 1) * target) : target;
   const startSeconds = options.startSeconds ?? null;
   const endSeconds = options.endSeconds ?? null;
-  if (startSeconds === null && endSeconds === null) return [makePoint(first, valueAt2(first))];
+  if (startSeconds === null && endSeconds === null) return [makePoint(first, valueAt3(first))];
   const [tlStart, tlEnd] = clipTimelineExtent(data);
   const s0 = startSeconds !== null ? f(startSeconds, tlStart) : tlStart;
   const e0 = endSeconds !== null ? f(endSeconds, tlEnd) : tlEnd;
@@ -4736,7 +4960,7 @@ function buildStaticLevelPoints(clip2, fps, level, options = {}) {
   if (fOut <= fe && fe < last) fOut = fe + 1;
   const frames = /* @__PURE__ */ new Map();
   for (const frame of [fIn, fOut]) frames.set(frame, evaluateVolumeCurve(existing, frame, 1));
-  for (const frame of [fs2, fe]) frames.set(frame, valueAt2(frame));
+  for (const frame of [fs2, fe]) frames.set(frame, valueAt3(frame));
   return [...frames.keys()].sort((a, b) => a - b).map((frame) => makePoint(frame, frames.get(frame)));
 }
 var DEFAULT_DUCK_DB, DEFAULT_ATTACK, DEFAULT_RELEASE, DEFAULT_PAD_BEFORE, DEFAULT_PAD_AFTER, DEFAULT_RESTORE_MARGIN, DEFAULT_ENERGY_THRESHOLD, DEFAULT_ENERGY_MIN_RUN, MUSIC_MIN_DURATION, MAX_LEVEL, AUTO_DUCK_HEADROOM_DB, AUTO_DUCK_MIN_DB, AUTO_DUCK_MAX_DB, MAX_CUE_SHIFT_SEC, CHAPTER_MAGNET_SEC, EPS, BED_ROLES;
@@ -4905,7 +5129,7 @@ function parseColorInput(value) {
     if (!rgba2) throw invalid(`Not a color: ${value} (use #rrggbb or #rrggbbaa).`);
     return rgba2;
   }
-  if (isRecord8(value)) {
+  if (isRecord10(value)) {
     const channel = (key, fallback) => {
       const v = value[key] ?? fallback;
       if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 255) {
@@ -5703,8 +5927,8 @@ var init_transitions = __esm({
 
 // ../engine/src/ops/tracks.ts
 function renumberWithGap(tx, insertAt) {
-  const tracks = sortedLayers(tx.project);
-  const slots = [...tracks];
+  const tracks2 = sortedLayers(tx.project);
+  const slots = [...tracks2];
   slots.splice(Math.min(Math.max(insertAt, 0), slots.length), 0, null);
   const moves = [];
   let reserved = TRACK_STRIDE;
@@ -5733,22 +5957,22 @@ function addTrack(tx, opts = {}) {
   if (opts.id !== void 0 && project.layers.some((l) => l.id === opts.id)) {
     throw new OpError("conflict", `A track with id ${opts.id} already exists.`, { id: opts.id });
   }
-  const tracks = sortedLayers(project);
+  const tracks2 = sortedLayers(project);
   let number4;
   if (opts.above !== void 0 || opts.below !== void 0) {
     const reference = requireLayer(project, opts.above ?? opts.below);
-    const index = tracks.findIndex((l) => l.id === reference.id);
+    const index = tracks2.findIndex((l) => l.id === reference.id);
     if (opts.above !== void 0) {
-      const next = tracks[index + 1];
+      const next = tracks2[index + 1];
       const delta = next ? Math.abs(reference.number - next.number) : 2 * TRACK_STRIDE;
       number4 = delta > 2 ? reference.number + Math.round(delta / 2) : renumberWithGap(tx, index + 1);
     } else {
-      const previous = index > 0 ? tracks[index - 1] : void 0;
+      const previous = index > 0 ? tracks2[index - 1] : void 0;
       const delta = previous ? Math.abs(reference.number - previous.number) : reference.number;
       number4 = delta > 2 ? reference.number - Math.round(delta / 2) : renumberWithGap(tx, index);
     }
   } else {
-    const top = tracks[tracks.length - 1];
+    const top = tracks2[tracks2.length - 1];
     number4 = top ? top.number + TRACK_STRIDE : TRACK_STRIDE;
   }
   const id = opts.id ?? idFactory(tx.project)();
@@ -5761,6 +5985,33 @@ function addTrack(tx, opts = {}) {
   };
   tx.insert(["layers"], layer2);
   return findLayerById(tx.project, id);
+}
+function removeTrack(tx, layerNumber2) {
+  const project = tx.project;
+  const layer2 = requireLayer(project, layerNumber2);
+  if (project.layers.length <= 1) {
+    throw new OpError("conflict", "You must keep at least 1 track.");
+  }
+  const clips = project.clips.filter((c) => c.layer === layerNumber2).map((c) => c.id);
+  const transitions = project.effects.filter((t) => t.layer === layerNumber2).map((t) => t.id);
+  for (const id of clips) tx.delete(["clips", { id }]);
+  for (const id of transitions) tx.delete(["effects", { id }]);
+  tx.delete(["layers", { id: layer2.id }]);
+  return { layer: layer2, removedClipIds: clips, removedTransitionIds: transitions };
+}
+function renameTrack(tx, layerNumber2, label2) {
+  const layer2 = requireLayer(tx.project, layerNumber2);
+  if (typeof label2 !== "string") throw invalid("label must be a string.");
+  if (layer2.label === label2) return layer2;
+  tx.update(["layers", { id: layer2.id }], { label: label2 });
+  return requireLayer(tx.project, layerNumber2);
+}
+function setTrackLocked(tx, layerNumber2, locked) {
+  const layer2 = requireLayer(tx.project, layerNumber2);
+  if (typeof locked !== "boolean") throw invalid("locked must be a boolean.");
+  if (layer2.lock === locked) return layer2;
+  tx.update(["layers", { id: layer2.id }], { lock: locked });
+  return requireLayer(tx.project, layerNumber2);
 }
 function trackBelowOrCreate(tx, layer2) {
   const numbers2 = tx.project.layers.map((l) => l.number).filter((n) => n > 0).sort((a, b) => a - b);
@@ -6264,11 +6515,11 @@ function setClipVolume(tx, clipId2, opts) {
 function separateAudio(tx, clipId2, opts = {}) {
   const project = tx.project;
   const clip2 = requireEditableClip(project, clipId2);
-  const reader = isRecord8(clip2.reader) ? clip2.reader : {};
-  const hasAudio = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
+  const reader = isRecord10(clip2.reader) ? clip2.reader : {};
+  const hasAudio2 = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
   const channelCount = reader.channels === void 0 || reader.channels === null ? null : Math.trunc(Number(reader.channels));
   const hasVideo = reader.has_video === void 0 || reader.has_video === null ? true : Boolean(reader.has_video);
-  if (!hasAudio || channelCount !== null && !(channelCount > 0)) {
+  if (!hasAudio2 || channelCount !== null && !(channelCount > 0)) {
     throw invalid(`Clip ${clipId2} has no audio to separate.`);
   }
   if (opts.perChannel && channelCount === null) throw invalid(`Clip ${clipId2} does not report its channel count.`);
@@ -6379,9 +6630,40 @@ var init_clips = __esm({
 });
 
 // ../engine/src/ops/keyframes.ts
+var KEYFRAME_BEZIER_PRESETS;
 var init_keyframes = __esm({
   "../engine/src/ops/keyframes.ts"() {
     "use strict";
+    KEYFRAME_BEZIER_PRESETS = [
+      { name: "Ease (Default)", handles: [0.25, 0.1, 0.25, 1] },
+      { name: "Ease In", handles: [0.42, 0, 1, 1] },
+      { name: "Ease Out", handles: [0, 0, 0.58, 1] },
+      { name: "Ease In/Out", handles: [0.42, 0, 0.58, 1] },
+      { name: "Ease In (Quad)", handles: [0.55, 0.085, 0.68, 0.53] },
+      { name: "Ease In (Cubic)", handles: [0.55, 0.055, 0.675, 0.19] },
+      { name: "Ease In (Quart)", handles: [0.895, 0.03, 0.685, 0.22] },
+      { name: "Ease In (Quint)", handles: [0.755, 0.05, 0.855, 0.06] },
+      { name: "Ease In (Sine)", handles: [0.47, 0, 0.745, 0.715] },
+      { name: "Ease In (Expo)", handles: [0.95, 0.05, 0.795, 0.035] },
+      { name: "Ease In (Circ)", handles: [0.6, 0.04, 0.98, 0.335] },
+      { name: "Ease In (Back)", handles: [0.6, -0.28, 0.735, 0.045] },
+      { name: "Ease Out (Quad)", handles: [0.25, 0.46, 0.45, 0.94] },
+      { name: "Ease Out (Cubic)", handles: [0.215, 0.61, 0.355, 1] },
+      { name: "Ease Out (Quart)", handles: [0.165, 0.84, 0.44, 1] },
+      { name: "Ease Out (Quint)", handles: [0.23, 1, 0.32, 1] },
+      { name: "Ease Out (Sine)", handles: [0.39, 0.575, 0.565, 1] },
+      { name: "Ease Out (Expo)", handles: [0.19, 1, 0.22, 1] },
+      { name: "Ease Out (Circ)", handles: [0.075, 0.82, 0.165, 1] },
+      { name: "Ease Out (Back)", handles: [0.175, 0.885, 0.32, 1.275] },
+      { name: "Ease In/Out (Quad)", handles: [0.455, 0.03, 0.515, 0.955] },
+      { name: "Ease In/Out (Cubic)", handles: [0.645, 0.045, 0.355, 1] },
+      { name: "Ease In/Out (Quart)", handles: [0.77, 0, 0.175, 1] },
+      { name: "Ease In/Out (Quint)", handles: [0.86, 0, 0.07, 1] },
+      { name: "Ease In/Out (Sine)", handles: [0.445, 0.05, 0.55, 0.95] },
+      { name: "Ease In/Out (Expo)", handles: [1, 0, 0, 1] },
+      { name: "Ease In/Out (Circ)", handles: [0.785, 0.135, 0.15, 0.86] },
+      { name: "Ease In/Out (Back)", handles: [0.68, -0.55, 0.265, 1.55] }
+    ];
   }
 });
 
@@ -6581,6 +6863,56 @@ var init_effects2 = __esm({
 });
 
 // ../engine/src/ops/markers.ts
+function markerColor(marker2) {
+  const vector = String(marker2.vector ?? "").trim().toLowerCase();
+  if (vector) return vector;
+  const icon = String(marker2.icon ?? "").trim().toLowerCase();
+  return icon.endsWith(".png") ? icon.slice(0, -4) : icon || DEFAULT_MARKER_COLOR;
+}
+function markerName(marker2) {
+  const name = marker2.name;
+  return String(name ?? marker2.label ?? "");
+}
+function markersInTimeOrder(markers) {
+  return markers.map((m) => ({ id: String(m.id), position: Number(m.position) || 0, name: markerName(m), color: markerColor(m) })).sort((a, b) => a.position - b.position || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+function updateMarker(tx, markerId, changes) {
+  const marker2 = requireMarker(tx.project, markerId);
+  const patch = {};
+  const changed = [];
+  if (changes.name !== void 0 && markerName(marker2) !== changes.name) {
+    const data = marker2;
+    const keys = ["name", "label"].filter((k) => k in data);
+    for (const key of keys.length > 0 ? keys : ["label"]) patch[key] = changes.name;
+    changed.push("name");
+  }
+  if (changes.color !== void 0) {
+    if (!MARKER_COLORS.includes(changes.color)) throw invalid(`marker color must be one of ${MARKER_COLORS.join(", ")}`);
+    if (markerColor(marker2) !== changes.color) {
+      patch.icon = `${changes.color}.png`;
+      patch.vector = changes.color;
+      changed.push("color");
+    }
+  }
+  if (changes.position !== void 0) {
+    requireNonNegative(changes.position, "position");
+    if (Math.abs((Number(marker2.position) || 0) - changes.position) > 1e-9) {
+      patch.position = changes.position;
+      changed.push("position");
+    }
+  }
+  if (changed.length > 0) tx.update(["markers", { id: markerId }], patch);
+  return changed;
+}
+function removeMarkers(tx, markerIds) {
+  const removed = [];
+  for (const id of markerIds) {
+    if (!findMarker(tx.project, id)) continue;
+    tx.delete(["markers", { id }]);
+    removed.push(id);
+  }
+  return removed;
+}
 function addMarker(tx, position, label2, opts = {}) {
   requireNonNegative(position, "position");
   if (label2 !== void 0 && typeof label2 !== "string") {
@@ -6600,12 +6932,15 @@ function addMarker(tx, position, label2, opts = {}) {
   tx.insert(["markers"], marker2);
   return findMarker(tx.project, id);
 }
+var MARKER_COLORS, DEFAULT_MARKER_COLOR;
 var init_markers = __esm({
   "../engine/src/ops/markers.ts"() {
     "use strict";
     init_ids();
     init_query();
     init_errors();
+    MARKER_COLORS = ["blue", "red", "green", "yellow", "orange", "purple", "pink", "white"];
+    DEFAULT_MARKER_COLOR = "blue";
   }
 });
 
@@ -6637,7 +6972,7 @@ function snapToFrameRate(items, fps) {
 }
 function rescaleItemKeyframes(item, factor) {
   const scaleProp = (value, scaleY) => {
-    if (!isRecord8(value)) return value;
+    if (!isRecord10(value)) return value;
     if (Array.isArray(value.Points)) {
       const scaled = scaleKeyframe(value, factor, "fps");
       if (!scaleY) return scaled;
@@ -6651,13 +6986,13 @@ function rescaleItemKeyframes(item, factor) {
     }
     const out2 = {};
     for (const [k, v] of Object.entries(value)) {
-      out2[k] = isRecord8(v) ? scaleProp(v, scaleY) : Array.isArray(v) ? v.map((x) => isRecord8(x) ? scaleProp(x, scaleY) : x) : v;
+      out2[k] = isRecord10(v) ? scaleProp(v, scaleY) : Array.isArray(v) ? v.map((x) => isRecord10(x) ? scaleProp(x, scaleY) : x) : v;
     }
     return out2;
   };
   const out = { ...item };
   for (const [key, value] of Object.entries(item)) {
-    if (isRecord8(value)) out[key] = scaleProp(value, key === "time");
+    if (isRecord10(value)) out[key] = scaleProp(value, key === "time");
   }
   return out;
 }
@@ -6852,7 +7187,7 @@ function jsonCopy(value) {
 }
 function replaceClipEffects(tx, clipId2, effects) {
   requireEditableClip(tx.project, clipId2);
-  if (!Array.isArray(effects) || effects.some((e) => !isRecord8(e) || typeof e.id !== "string")) {
+  if (!Array.isArray(effects) || effects.some((e) => !isRecord10(e) || typeof e.id !== "string")) {
     throw invalid("effects must be a list of effect objects with ids.");
   }
   return patchClip(tx, clipId2, { effects: jsonCopy([...effects]) });
@@ -6878,9 +7213,22 @@ var init_overlays = __esm({
 });
 
 // ../engine/src/ops/clipboard.ts
+var CLIP_PARTS;
 var init_clipboard = __esm({
   "../engine/src/ops/clipboard.ts"() {
     "use strict";
+    init_rules();
+    CLIP_PARTS = {
+      keyframes: COPY_KEYFRAME_GROUPS.all,
+      alpha: COPY_KEYFRAME_GROUPS.alpha,
+      scale: COPY_KEYFRAME_GROUPS.scale,
+      shear: COPY_KEYFRAME_GROUPS.shear,
+      rotation: COPY_KEYFRAME_GROUPS.rotation,
+      location: COPY_KEYFRAME_GROUPS.location,
+      time: COPY_KEYFRAME_GROUPS.time,
+      volume: COPY_KEYFRAME_GROUPS.volume,
+      effects: ["effects"]
+    };
   }
 });
 
@@ -7064,30 +7412,49 @@ function spans(clip2, rate) {
   const e = pyRound(Number(clip2.end) * rate) + 1;
   return { s, e };
 }
-function fadeKeyframe(kf, action, range, s, e, rate) {
+function fadeLengths(opts, rate) {
+  const seconds2 = opts.fadeSeconds !== void 0 && opts.fadeSeconds > 0 ? requireFinite(opts.fadeSeconds, "fadeSeconds") : void 0;
+  return { fast: seconds2 ?? 1, slow: seconds2 ?? 3, zone: Math.max(3, seconds2 ?? 0) * rate };
+}
+function fadeKeyframe(kf, action, range, s, e, rate, lengths) {
   if (action === "none") return single(1);
-  const length = action.endsWith("_fast") ? 1 : 3;
+  if (action === "in_out_fast" || action === "in_out_slow") return inOutKeyframe(kf, action, s, e, rate, lengths);
+  const length = action.endsWith("_fast") ? lengths.fast : lengths.slow;
   let startAnimation = s;
   let endAnimation = e;
   if (range === "start") endAnimation = Math.min(s + length * rate, e);
   else if (range === "end") startAnimation = Math.max(1, e - length * rate);
   if (action.startsWith("in")) {
-    const zoneEnd = Math.min(s + 3 * rate, e);
+    const zoneEnd = Math.min(s + lengths.zone, e);
     const target = evaluate(kf, Math.trunc(pyRound(zoneEnd)), 1);
     const cleared2 = removeKeyframePointsInRange(kf, s, zoneEnd);
     return setKeyframePoint(setKeyframePoint(cleared2, openshotPoint(startAnimation, 0)), openshotPoint(endAnimation, target));
   }
-  const zoneStart = Math.max(1, e - 3 * rate);
+  const zoneStart = Math.max(1, e - lengths.zone);
   const source2 = evaluate(kf, Math.trunc(pyRound(zoneStart)), 1);
   const cleared = removeKeyframePointsInRange(kf, zoneStart, e);
   return setKeyframePoint(setKeyframePoint(cleared, openshotPoint(startAnimation, source2)), openshotPoint(endAnimation, 0));
 }
+function inOutKeyframe(kf, action, s, e, rate, lengths) {
+  const seconds2 = action === "in_out_fast" ? lengths.fast : lengths.slow;
+  const fadeFrames = Math.min(seconds2 * rate, Math.max(0, e - s) / 3);
+  const level = curvePlateau(kf, s, e, 1);
+  let next = removeKeyframePointsInRange(kf, s, Math.min(s + lengths.zone, e));
+  next = removeKeyframePointsInRange(next, Math.max(s, e - lengths.zone), e);
+  for (const [x, y] of [
+    [s, 0],
+    [s + fadeFrames, level],
+    [e - fadeFrames, level],
+    [e, 0]
+  ]) {
+    next = setKeyframePoint(next, openshotPoint(x, y));
+  }
+  return next;
+}
 function fadeSteps(preset, range) {
   if (preset === "none") return [["none", range ?? "entire"]];
   if (preset === "in_out_fast" || preset === "in_out_slow") {
-    const speed = preset.endsWith("fast") ? "fast" : "slow";
-    if ((range ?? "entire") === "entire") return [[`in_${speed}`, "start"], [`out_${speed}`, "end"]];
-    return [];
+    return (range ?? "entire") === "entire" ? [[preset, "entire"]] : [];
   }
   const action = preset;
   return [[action, range ?? (action.startsWith("in") ? "start" : "end")]];
@@ -7095,12 +7462,13 @@ function fadeSteps(preset, range) {
 function applyFade(clip2, preset, opts, rate, volumeOnly) {
   const { s, e } = spans(clip2, rate);
   const steps = fadeSteps(preset, opts.range);
+  const lengths = fadeLengths(opts, rate);
   const targets = volumeOnly ? { alpha: false, volume: true } : fadeTargets(clip2);
   let alpha = clip2.alpha;
   let volume = clip2.volume;
   for (const [action, range] of steps) {
-    if (targets.alpha) alpha = fadeKeyframe(alpha, action, range, s, e, rate);
-    if (targets.volume) volume = fadeKeyframe(volume, action, range, s, e, rate);
+    if (targets.alpha) alpha = fadeKeyframe(alpha, action, range, s, e, rate, lengths);
+    if (targets.volume) volume = fadeKeyframe(volume, action, range, s, e, rate, lengths);
   }
   const patch = {};
   if (targets.alpha) patch.alpha = alpha;
@@ -7127,16 +7495,37 @@ function applyLayout(preset) {
     location_y: single(0)
   };
 }
+function applyCrop(clip2, mode, nextId) {
+  const effects = Array.isArray(clip2.effects) ? [...clip2.effects] : [];
+  const index = effects.findIndex((fx) => isRecord10(fx) && fx.class_name === "Crop");
+  if (mode === "none") {
+    if (index < 0) return clip2;
+    effects.splice(index, 1);
+    return { ...clip2, effects };
+  }
+  const crop2 = index >= 0 ? { ...effects[index] } : createEffect("Crop", {}, { id: nextId() });
+  crop2.resize = mode === "resize";
+  if (index >= 0) effects[index] = crop2;
+  else effects.push(crop2);
+  return { ...clip2, effects };
+}
+function applyFlip(clip2, key) {
+  const curve2 = isRecord10(clip2[key]) ? structuredClone(clip2[key]) : { Points: [] };
+  for (const p of Array.isArray(curve2.Points) ? curve2.Points : []) {
+    if (isRecord10(p) && isRecord10(p.co)) p.co.Y = -Number(p.co.Y ?? 0);
+  }
+  return { ...clip2, [key]: curve2 };
+}
 function resetRepeat(clip2) {
   if (!("repeat_cache" in clip2)) return clip2;
   const cache5 = clip2.repeat_cache;
   const next = { ...clip2 };
   delete next.repeat_cache;
-  if (!isRecord8(cache5) || !repeatIsActive(clip2)) return next;
+  if (!isRecord10(cache5) || !repeatIsActive(clip2)) return next;
   next.start = cache5.start ?? clip2.start;
   next.end = cache5.end ?? clip2.end;
   next.duration = cache5.duration ?? clip2.duration;
-  const props = isRecord8(cache5.properties) ? cache5.properties : {};
+  const props = isRecord10(cache5.properties) ? cache5.properties : {};
   for (const [key, value] of Object.entries(props)) next[key] = value;
   if (!("time" in props)) next.time = { Points: [{ co: { X: 1, Y: 1 }, interpolation: Interpolation.LINEAR }] };
   return next;
@@ -7149,7 +7538,7 @@ function applyTime(tx, clip2, requested, opts) {
   if (preset === "freeze" || preset === "freeze_zoom") return freeze(clip2, preset === "freeze_zoom", opts, rate);
   if (preset === "none") {
     const base = resetRepeat(clip2);
-    const reader = isRecord8(base.reader) ? base.reader : {};
+    const reader = isRecord10(base.reader) ? base.reader : {};
     let duration3 = Number(reader.duration ?? 0) || 0;
     if (duration3 <= 0) duration3 = Number(base.duration ?? 0) || 0;
     if (isSingleImageMedia(reader)) duration3 = DEFAULT_IMAGE_LENGTH;
@@ -7217,13 +7606,15 @@ function applyAnimate(tx, original, preset, opts) {
   const project = tx.project;
   const rate = rateOf(project);
   const { s, e } = spans(original, rate);
-  const zone = Math.max(1, pyRound(rate));
+  const zoneSeconds = opts.zoneSeconds !== void 0 && opts.zoneSeconds > 0 ? requireFinite(opts.zoneSeconds, "zoneSeconds") : 1;
+  const zone = Math.max(1, pyRound(rate * zoneSeconds));
   const inEnd = Math.min(s + zone, e);
   const outStart = Math.max(s, e - zone);
   let emphStart = s;
   if (opts.playhead !== void 0) {
-    const playhead = requireFinite(opts.playhead, "playhead");
-    const clipPlayhead = pyRound((Number(original.start) + Math.max(0, playhead) - Number(original.position)) * rate) + 1;
+    const timelineFrame = pyRound(requireFinite(opts.playhead, "playhead") * rate) + 1;
+    const seconds2 = Math.max(0, (timelineFrame - 1) / rate);
+    const clipPlayhead = pyRound((Number(original.start) + seconds2 - Number(original.position)) * rate) + 1;
     if (s <= clipPlayhead && clipPlayhead <= e) emphStart = clipPlayhead;
   }
   const emphEnd = Math.min(emphStart + zone, e);
@@ -7233,7 +7624,7 @@ function applyAnimate(tx, original, preset, opts) {
     const kf = original[prop];
     return kf ? evaluate(kf, Math.trunc(pyRound(frame))) : PROP_IDENTITY[prop] ?? 0;
   };
-  const kfOf = (prop) => isRecord8(clip2[prop]) ? clip2[prop] : { Points: [] };
+  const kfOf = (prop) => isRecord10(clip2[prop]) ? clip2[prop] : { Points: [] };
   const clear2 = (prop, from, to) => {
     clip2[prop] = removeKeyframePointsInRange(kfOf(prop), from, to);
   };
@@ -7260,7 +7651,7 @@ function applyAnimate(tx, original, preset, opts) {
       clip2[prop] = { Points: [point(s, value)] };
     }
     clip2.effects = (clip2.effects ?? []).filter(
-      (fx) => !isRecord8(fx) || !["Blur", "Mask"].includes(String(fx.class_name)) || fx["ui-menu"] === "look"
+      (fx) => !isRecord10(fx) || !["Blur", "Mask"].includes(String(fx.class_name)) || fx["ui-menu"] === "look"
     );
     return clip2;
   }
@@ -7343,8 +7734,8 @@ function applyAnimate(tx, original, preset, opts) {
     clear2("alpha", outStart, e);
     add("alpha", point(outStart, ba), point(e, 0));
   } else if (wipe) {
-    const [, blur2, dir, shape2] = wipe;
-    const file3 = WIPE_SVG[shape2];
+    const [, blur2, dir, shape3] = wipe;
+    const file3 = (dir === "in" ? WIPE_SVG : WIPE_OUT_SVG)[shape3];
     if (file3) {
       if (dir === "in") {
         if (blur2) blurFx(s, 50, inEnd, 0);
@@ -7433,6 +7824,15 @@ function applyClipPreset(tx, clipId2, presetId, opts = {}) {
     case "layout":
       next = { ...clip2, ...applyLayout(name) };
       break;
+    case "crop":
+      next = applyCrop(clip2, name, ids(project));
+      break;
+    case "transform":
+      next = applyCrop({ ...clip2, rotation: single(ROTATIONS.none), ...applyLayout("none") }, "none", ids(project));
+      break;
+    case "flip":
+      next = applyFlip(clip2, name === "horizontal" ? "scale_x" : "scale_y");
+      break;
     case "time":
       next = withClampedTiming(applyTime(tx, clip2, name, opts), project, clip2);
       break;
@@ -7441,9 +7841,43 @@ function applyClipPreset(tx, clipId2, presetId, opts = {}) {
   }
   return replaceClip(tx, clip2, next);
 }
+function layoutShowAll(tx, clipIds, opts = {}) {
+  const project = tx.project;
+  if (!Array.isArray(clipIds) || clipIds.length === 0) throw invalid("Give the clips to arrange.");
+  const wanted = new Set(clipIds);
+  for (const id of wanted) requireEditableClip(project, id);
+  const clips = project.clips.filter((c) => wanted.has(c.id));
+  const count = clips.length;
+  const rows = Math.trunc(Math.sqrt(count));
+  let columns = count / rows;
+  columns = columns > Math.trunc(columns) ? Math.trunc(columns + 1) : Math.trunc(columns);
+  const height = 1 / rows;
+  const width = 1 / columns;
+  const out = [];
+  let index = 0;
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      if (index >= count) continue;
+      const clip2 = clips[index];
+      const [sx, sy] = opts.stretch ? [width, height] : [Math.min(width, height), Math.min(width, height)];
+      const next = {
+        ...clip2,
+        gravity: Gravity.TOP_LEFT,
+        scale: opts.stretch ? ScaleMode.STRETCH : ScaleMode.FIT,
+        scale_x: single(sx),
+        scale_y: single(sy),
+        location_x: single(col * width),
+        location_y: single(row * height)
+      };
+      out.push(replaceClip(tx, clip2, next));
+      index += 1;
+    }
+  }
+  return out;
+}
 function repeatIsActive(clip2) {
   const cache5 = clip2.repeat_cache;
-  if (!isRecord8(cache5) || Object.keys(cache5).length === 0) return false;
+  if (!isRecord10(cache5) || Object.keys(cache5).length === 0) return false;
   const cachedStart = Number(cache5.start ?? 0);
   const cachedEnd = Number(cache5.end ?? 0);
   const start = Number(clip2.start ?? 0);
@@ -7553,7 +7987,7 @@ function repeatClip(tx, clipId2, opts) {
   if (!repeatIsActive(clip2)) {
     const properties = {};
     for (const [key, value] of Object.entries(clip2)) {
-      if (isRecord8(value) && Array.isArray(value.Points) && value.Points.length > 1) properties[key] = structuredClone(value);
+      if (isRecord10(value) && Array.isArray(value.Points) && value.Points.length > 1) properties[key] = structuredClone(value);
     }
     next.repeat_cache = { start: clip2.start ?? 0, end: clip2.end, duration: clip2.duration, properties };
   }
@@ -7564,22 +7998,22 @@ function repeatClip(tx, clipId2, opts) {
   const cache5 = next.repeat_cache;
   for (const [prop, original] of Object.entries(cache5.properties ?? {})) {
     if (prop === "time") continue;
-    let norm = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
-    let span2 = norm.length ? pyRound(norm[norm.length - 1].co.X) : 0;
+    let norm2 = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
+    let span2 = norm2.length ? pyRound(norm2[norm2.length - 1].co.X) : 0;
     if (!span2) continue;
     if (span2 !== timeSpan) {
       const s = timeSpan / span2;
-      const firstX = Number(norm[0].co.X ?? 1);
-      for (const p of norm) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
+      const firstX = Number(norm2[0].co.X ?? 1);
+      for (const p of norm2) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
       span2 = timeSpan;
     }
     const latest = /* @__PURE__ */ new Map();
-    for (const p of norm) {
+    for (const p of norm2) {
       p.co.X = pyRound(p.co.X ?? 1);
       latest.set(p.co.X, p);
     }
-    norm = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
-    const [points, used] = repeatCurve(norm, span2, dirSign, opts.passes, delay2, ramp, opts.pattern);
+    norm2 = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
+    const [points, used] = repeatCurve(norm2, span2, dirSign, opts.passes, delay2, ramp, opts.pattern);
     next[prop] = { Points: points };
     total = Math.max(total, used);
   }
@@ -7590,7 +8024,7 @@ function repeatClip(tx, clipId2, opts) {
   const clamped = withClampedTiming(next, project, clip2);
   return replaceClip(tx, clip2, clamped);
 }
-var FADE_PRESETS, ROTATE_PRESETS, LAYOUT_PRESETS, VOLUME_PRESETS, TIME_PRESETS, ANIMATE_PRESETS, CLIP_PRESET_IDS, point, single, ROTATIONS, LAYOUT_GRAVITY, JSON_ANIM, EMPHASIS, IN_JSON, WIPE_SVG, PROP_IDENTITY, MULTIPLICATIVE;
+var FADE_PRESETS, ROTATE_PRESETS, LAYOUT_PRESETS, VOLUME_PRESETS, TIME_PRESETS, CROP_PRESETS, TRANSFORM_PRESETS, FLIP_PRESETS, ANIMATE_PRESETS, CLIP_PRESET_IDS, point, single, ROTATIONS, LAYOUT_GRAVITY, JSON_ANIM, EMPHASIS, IN_JSON, WIPE_SVG, WIPE_OUT_SVG, PROP_IDENTITY, MULTIPLICATIVE;
 var init_presets = __esm({
   "../engine/src/ops/presets.ts"() {
     "use strict";
@@ -7599,6 +8033,7 @@ var init_presets = __esm({
     init_media();
     init_rounding();
     init_evaluate();
+    init_rules();
     init_edit();
     init_registry();
     init_errors();
@@ -7621,6 +8056,9 @@ var init_presets = __esm({
       "level"
     ];
     TIME_PRESETS = ["none", "forward", "backward", "reverse", "freeze", "freeze_zoom"];
+    CROP_PRESETS = ["none", "crop", "resize"];
+    TRANSFORM_PRESETS = ["none"];
+    FLIP_PRESETS = ["horizontal", "vertical"];
     ANIMATE_PRESETS = [
       "none",
       // In
@@ -7723,7 +8161,10 @@ var init_presets = __esm({
       ...LAYOUT_PRESETS.map((p) => `layout.${p}`),
       ...VOLUME_PRESETS.map((p) => `volume.${p}`),
       ...TIME_PRESETS.map((p) => `time.${p}`),
-      ...ANIMATE_PRESETS.map((p) => `animate.${p}`)
+      ...ANIMATE_PRESETS.map((p) => `animate.${p}`),
+      ...CROP_PRESETS.map((p) => `crop.${p}`),
+      ...TRANSFORM_PRESETS.map((p) => `transform.${p}`),
+      ...FLIP_PRESETS.map((p) => `flip.${p}`)
     ];
     point = (frame, value, interpolation2 = Interpolation.BEZIER) => openshotPoint(Math.trunc(frame), value, interpolation2);
     single = (value) => ({ Points: [openshotPoint(1, value, Interpolation.BEZIER)] });
@@ -7777,6 +8218,11 @@ var init_presets = __esm({
       top: "wipe_top_to_bottom.svg",
       bottom: "wipe_bottom_to_top.svg"
     };
+    WIPE_OUT_SVG = {
+      ...WIPE_SVG,
+      circle_expand: "circle_out_to_in.svg",
+      circle_shrink: "circle_in_to_out.svg"
+    };
     PROP_IDENTITY = {
       scale_x: 1,
       scale_y: 1,
@@ -7788,6 +8234,107 @@ var init_presets = __esm({
       shear_y: 0
     };
     MULTIPLICATIVE = /* @__PURE__ */ new Set(["scale_x", "scale_y", "alpha"]);
+  }
+});
+
+// ../engine/src/ops/clip-props.ts
+function isRecord14(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function sameValue(a, b) {
+  return sameJson(a, b);
+}
+function sortByX(points) {
+  return points.map((point3, index) => ({ point: point3, index })).sort((a, b) => pointX(a.point) - pointX(b.point) || a.index - b.index).map((entry) => entry.point);
+}
+function setCurveValue(curve2, value, frame, interpolation2) {
+  const points = curvePoints(curve2);
+  if (frame === null) {
+    const flattened = points.length > 1 ? points.length : 0;
+    if (points.length === 1 && pointY(points[0]) === value) return { curve: curve2, flattened: 0, changed: false };
+    const next2 = { Points: [editorPoint(1, value, interpolation2)] };
+    return { curve: next2, flattened, changed: !sameJson(next2, curve2) };
+  }
+  const kept = structuredClone(points);
+  for (const point3 of kept) {
+    if (pointX(point3) === frame) {
+      if (pointY(point3) === value) return { curve: curve2, flattened: 0, changed: false };
+      point3.co.Y = value;
+      const next2 = { Points: kept };
+      return { curve: next2, flattened: 0, changed: !sameJson(next2, curve2) };
+    }
+  }
+  kept.push(editorPoint(frame, value, interpolation2));
+  const next = { Points: sortByX(kept) };
+  return { curve: next, flattened: 0, changed: !sameJson(next, curve2) };
+}
+function setColorCurveValue(curve2, rgba2, frame) {
+  const base = isRecord14(curve2) ? curve2 : {};
+  const out = {};
+  let flattened = 0;
+  COLOR_CHANNELS.forEach((channel, i) => {
+    const edit = setCurveValue(base[channel], Number(rgba2[i]), frame, Interpolation.BEZIER);
+    out[channel] = edit.curve;
+    flattened = Math.max(flattened, edit.flattened);
+  });
+  return { curve: out, flattened, changed: !sameJson(out, curve2) };
+}
+function curveWithoutPoints(curve2, lo, hi, key, channel) {
+  const points = structuredClone(curvePoints(curve2));
+  const inRange = (p) => (lo === null || pointX(p) >= lo) && (hi === null || pointX(p) <= hi);
+  let keep2 = points.filter((p) => !inRange(p));
+  const removed = points.length - keep2.length;
+  if (removed && points.length === 1 && lo === null && hi === null) {
+    const fallback = defaultKeyframeValue(key, channel);
+    if (fallback !== void 0 && pointY(points[0]) === fallback) return { curve: { Points: points }, removed: 0 };
+  }
+  let resetTo;
+  if (removed && keep2.length === 0) {
+    resetTo = defaultKeyframeValue(key, channel) ?? pointY(points[0]);
+    keep2 = [editorPoint(1, resetTo, Interpolation.BEZIER)];
+  }
+  return resetTo === void 0 ? { curve: { Points: keep2 }, removed } : { curve: { Points: keep2 }, removed, resetTo };
+}
+function retimeCurvePoints(points, src, dst, timing) {
+  const pts = structuredClone(curvePoints({ Points: Array.isArray(points) ? points : [] }));
+  if (timing === "exact" || pts.length <= 1) return pts;
+  const { first: s0, end: e0 } = src;
+  const { first: s1, end: e1 } = dst;
+  const inside = pts.filter((p) => s0 <= pointX(p) && pointX(p) <= e0);
+  const curve2 = { Points: pts };
+  const xs = new Set(inside.map(pointX));
+  if (!xs.has(s0) && pointX(pts[0]) < s0) inside.unshift(editorPoint(s0, keyframeValue(curve2, s0), Interpolation.BEZIER));
+  if (!xs.has(e0) && pointX(pts[pts.length - 1]) > e0) {
+    const last = pts[pts.length - 1];
+    inside.push(editorPoint(e0, keyframeValue(curve2, e0), Math.trunc(Number(last.interpolation ?? Interpolation.BEZIER))));
+  }
+  const scale = timing === "stretch" && e0 > s0 ? (e1 - s1) / (e0 - s0) : 1;
+  const out = [];
+  for (const point3 of inside) {
+    const x = Math.max(1, pyRound(s1 + (pointX(point3) - s0) * scale));
+    point3.co.X = x;
+    const previous = out[out.length - 1];
+    if (previous && pointX(previous) === x) {
+      if (x === s1) continue;
+      out[out.length - 1] = point3;
+      continue;
+    }
+    out.push(point3);
+  }
+  return out;
+}
+function updateClipValues(tx, clipId2, values) {
+  requireEditableClip(tx.project, clipId2);
+  return patchClip(tx, clipId2, values);
+}
+var init_clip_props = __esm({
+  "../engine/src/ops/clip-props.ts"() {
+    "use strict";
+    init_color();
+    init_rules();
+    init_rounding();
+    init_types();
+    init_internal();
   }
 });
 
@@ -8103,6 +8650,7 @@ var init_ops = __esm({
     init_overlays();
     init_clipboard();
     init_presets();
+    init_clip_props();
     init_sequence();
     init_add_to_timeline();
   }
@@ -8494,9 +9042,9 @@ function stringifyPrimitive(value) {
     return `"${value}"`;
   return `${value}`;
 }
-function optionalKeys(shape2) {
-  return Object.keys(shape2).filter((k) => {
-    return shape2[k]._zod.optin !== void 0 && shape2[k]._zod.optout === "optional";
+function optionalKeys(shape3) {
+  return Object.keys(shape3).filter((k) => {
+    return shape3[k]._zod.optin !== void 0 && shape3[k]._zod.optout === "optional";
   });
 }
 function pick(schema, mask2) {
@@ -8534,33 +9082,33 @@ function omit(schema, mask2) {
   mirrorShape(newShape, schema, Reflect.ownKeys(sourceShape(schema)).filter((key) => !omitted.has(key)));
   return clone2(schema, mergeDefs(currDef, { shape: newShape, checks: [] }));
 }
-function extend(schema, shape2) {
-  if (!isPlainObject(shape2)) {
+function extend(schema, shape3) {
+  if (!isPlainObject(shape3)) {
     throw new Error("Invalid input to extend: expected a plain object");
   }
   const checks = schema._zod.def.checks;
   const hasChecks = checks && checks.length > 0;
   if (hasChecks) {
     const existingShape = sourceShape(schema);
-    for (const key of Reflect.ownKeys(shape2)) {
+    for (const key of Reflect.ownKeys(shape3)) {
       if (Object.getOwnPropertyDescriptor(existingShape, key) !== void 0) {
         throw new Error("Cannot overwrite keys on object schemas containing refinements. Use `.safeExtend()` instead.");
       }
     }
   }
-  return clone2(schema, mergeDefs(schema._zod.def, { shape: extended(schema, shape2) }));
+  return clone2(schema, mergeDefs(schema._zod.def, { shape: extended(schema, shape3) }));
 }
-function extended(schema, shape2) {
+function extended(schema, shape3) {
   const newShape = {};
   mirrorShape(newShape, schema, Reflect.ownKeys(sourceShape(schema)));
-  mirrorProps(newShape, shape2);
+  mirrorProps(newShape, shape3);
   return newShape;
 }
-function safeExtend(schema, shape2) {
-  if (!isPlainObject(shape2)) {
+function safeExtend(schema, shape3) {
+  if (!isPlainObject(shape3)) {
     throw new Error("Invalid input to safeExtend: expected a plain object");
   }
-  return clone2(schema, mergeDefs(schema._zod.def, { shape: extended(schema, shape2) }));
+  return clone2(schema, mergeDefs(schema._zod.def, { shape: extended(schema, shape3) }));
 }
 function merge(a, b) {
   if (!b?._zod?.def) {
@@ -11520,10 +12068,10 @@ var init_schemas = __esm({
       }
       const _normalized = cached(() => normalizeDef(def));
       defineLazyInternal(inst, "propValues", (zod) => {
-        const shape2 = zod.def.shape;
+        const shape3 = zod.def.shape;
         const propValues = {};
-        for (const key in shape2) {
-          const field2 = shape2[key]._zod;
+        for (const key in shape3) {
+          const field2 = shape3[key]._zod;
           if (field2.values) {
             if (!Object.prototype.hasOwnProperty.call(propValues, key)) {
               assignProp(propValues, key, /* @__PURE__ */ new Set());
@@ -11555,7 +12103,7 @@ var init_schemas = __esm({
         }
         payload.value = memo2 ? memo2.alloc(inst, payload, {}, ctx) : {};
         const proms = [];
-        const shape2 = value.shape;
+        const shape3 = value.shape;
         const abortEarly = ctx?.abortEarly;
         let seen = payload.issues.length;
         for (const key of value.allKeys) {
@@ -11566,7 +12114,7 @@ var init_schemas = __esm({
           }
           if (key === "__proto__")
             continue;
-          const el = shape2[key];
+          const el = shape3[key];
           const optin = el._zod.optin;
           const optout = el._zod.optout;
           const r = el._zod.run({ value: input2[key], issues: [] }, ctx);
@@ -11587,10 +12135,10 @@ var init_schemas = __esm({
       const superParse = inst._zod.parse;
       const _normalized = cached(() => normalizeDef(def));
       const memo2 = globalConfig.memoizer;
-      const generateFastpass = (shape2) => {
+      const generateFastpass = (shape3) => {
         const normalized = _normalized.value;
         const syms = normalized.symbolKeys;
-        const doc = new Doc(["payload", "ctx"], { shape: shape2, inst, memo: memo2, syms });
+        const doc = new Doc(["payload", "ctx"], { shape: shape3, inst, memo: memo2, syms });
         const parseStr = (k) => `shape[${k}]._zod.run({ value: input[${k}], issues: [] }, ctx)`;
         const prefixStr = (id, k) => `
           let ${id}_ab = false;
@@ -11617,7 +12165,7 @@ var init_schemas = __esm({
           const id = ids2[key];
           const k = typeof key === "symbol" ? `syms[${syms.indexOf(key)}]` : esc(key);
           const isPresent2 = `${k} in input`;
-          const schema = shape2[key];
+          const schema = shape3[key];
           const optin = schema?._zod?.optin;
           const isOptionalIn = optin !== void 0;
           const isOptionalOut = schema?._zod?.optout === "optional";
@@ -12650,7 +13198,7 @@ function isRecursive(inst, stack, resolve) {
         result2 = answer;
     }
   };
-  const shape2 = (sh, spread2) => {
+  const shape3 = (sh, spread2) => {
     let answer = NONE;
     for (const key of Reflect.ownKeys(sh)) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
@@ -12671,7 +13219,7 @@ function isRecursive(inst, stack, resolve) {
   switch (kind) {
     case "object": {
       const raw = rawShape(def);
-      merge2(raw ? shape2(raw, true) : ASSUMED);
+      merge2(raw ? shape3(raw, true) : ASSUMED);
       check2(def.catchall);
       break;
     }
@@ -21323,12 +21871,12 @@ function generatePropertiesChecks(doc, ctx, def, accessor) {
     throw new ZodCompileUnsupportedError(`check with a custom "when" condition`);
   }
   doc.write(`if (${accessor} == null) return INVALID;`);
-  const shape2 = def.shape;
-  for (const key of Reflect.ownKeys(shape2)) {
+  const shape3 = def.shape;
+  for (const key of Reflect.ownKeys(shape3)) {
     const keyExpr = typeof key === "symbol" ? addConstant(ctx, key) : esc(key);
     const inputVar = newVar(ctx);
     doc.write(`const ${inputVar} = ${accessor}[${keyExpr}];`);
-    compileChild(doc, ctx, shape2[key], inputVar, false);
+    compileChild(doc, ctx, shape3[key], inputVar, false);
   }
 }
 function generatePropertyCheck(doc, ctx, def, accessor) {
@@ -21684,13 +22232,13 @@ function generateDateCheck(doc, accessor) {
 function generateObjectCheck(doc, ctx, schema, accessor, buildsValue = true) {
   const def = schema._zod.def;
   doc.write(`if (typeof ${accessor} !== "object" || ${accessor} === null || Array.isArray(${accessor})) return INVALID;`);
-  const shape2 = def.shape;
-  const keys = Object.keys(shape2);
-  const symbolKeys = Object.getOwnPropertySymbols(shape2);
+  const shape3 = def.shape;
+  const keys = Object.keys(shape3);
+  const symbolKeys = Object.getOwnPropertySymbols(shape3);
   const allKeys = symbolKeys.length ? [...keys, ...symbolKeys] : keys;
   const keyExpr = (k) => typeof k === "symbol" ? addConstant(ctx, k) : esc(k);
   const propKey = (k) => typeof k === "symbol" ? `[${keyExpr(k)}]` : esc(k);
-  const propShape = shape2;
+  const propShape = shape3;
   if (keys.includes("__proto__")) {
     throw new ZodCompileUnsupportedError('object shape key "__proto__"');
   }
@@ -23242,10 +23790,10 @@ function _property(property, schema, params) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function _properties(shape2, params) {
+function _properties(shape3, params) {
   return new $ZodCheckProperties({
     check: "properties",
-    shape: shape2,
+    shape: shape3,
     ...normalizeParams(params)
   });
 }
@@ -23491,13 +24039,13 @@ function _promise(Class2, innerType) {
 }
 // @__NO_SIDE_EFFECTS__
 function _custom(Class2, fn, _params) {
-  const norm = normalizeParams(_params);
-  norm.abort ?? (norm.abort = true);
+  const norm2 = normalizeParams(_params);
+  norm2.abort ?? (norm2.abort = true);
   const schema = new Class2({
     type: "custom",
     check: "custom",
     fn,
-    ...norm
+    ...norm2
   });
   return schema;
 }
@@ -24646,21 +25194,21 @@ var init_json_schema_processors = __esm({
     objectProcessor = (schema, ctx, _json, params) => {
       const json2 = _json;
       const def = schema._zod.def;
-      const shape2 = def.shape;
-      const symbolKeys = Object.getOwnPropertySymbols(shape2);
+      const shape3 = def.shape;
+      const symbolKeys = Object.getOwnPropertySymbols(shape3);
       if (symbolKeys.length && handleUnrepresentable(schema, ctx, json2, params, "Symbol keys cannot be represented in JSON Schema")) {
         return;
       }
       json2.type = "object";
       json2.properties = {};
-      for (const key in shape2) {
-        assignProp(json2.properties, key, processSchema(shape2[key], ctx, {
+      for (const key in shape3) {
+        assignProp(json2.properties, key, processSchema(shape3[key], ctx, {
           ...params,
           path: [...params.path, "properties", key]
         }));
       }
       const requiredKeys = [];
-      for (const key of Object.keys(shape2)) {
+      for (const key of Object.keys(shape3)) {
         const field2 = def.shape[key];
         if (ctx.io === "input" ? inputOptin(field2) === void 0 : field2._zod.optout === void 0) {
           requiredKeys.push(key);
@@ -25848,29 +26396,29 @@ function array(element, params) {
   return _array(ZodArray, element, params);
 }
 function keyof(schema) {
-  const shape2 = schema._zod.def.shape;
-  return _enum2(Object.keys(shape2));
+  const shape3 = schema._zod.def.shape;
+  return _enum2(Object.keys(shape3));
 }
-function object(shape2, params) {
+function object(shape3, params) {
   const def = {
     type: "object",
-    shape: shape2 ?? {},
+    shape: shape3 ?? {},
     ...util_exports.normalizeParams(params)
   };
   return new ZodObject(def);
 }
-function strictObject(shape2, params) {
+function strictObject(shape3, params) {
   return new ZodObject({
     type: "object",
-    shape: shape2,
+    shape: shape3,
     catchall: never(),
     ...util_exports.normalizeParams(params)
   });
 }
-function looseObject(shape2, params) {
+function looseObject(shape3, params) {
   return new ZodObject({
     type: "object",
-    shape: shape2,
+    shape: shape3,
     catchall: unknown(),
     ...util_exports.normalizeParams(params)
   });
@@ -27142,8 +27690,8 @@ var init_schemas2 = __esm({
     ZodInstanceOf = /* @__PURE__ */ $constructor("ZodInstanceOf", (inst, def) => {
       ZodCustom.init(inst, def);
     }, {
-      properties(shape2, params) {
-        return this.check(_properties(shape2, params));
+      properties(shape3, params) {
+        return this.check(_properties(shape3, params));
       }
     });
     stringbool = (...args) => _stringbool({
@@ -27605,13 +28153,13 @@ function convertBaseSchema(schema, ctx) {
       break;
     }
     case "object": {
-      const shape2 = {};
+      const shape3 = {};
       const properties = schema.properties || {};
       const requiredSet = new Set(schema.required || []);
       const additionalSchema = typeof schema.additionalProperties === "object" ? convertSchema(schema.additionalProperties, ctx) : void 0;
       for (const [key, propSchema] of Object.entries(properties)) {
         const propZodSchema = convertSchema(propSchema, ctx);
-        assignProp(shape2, key, requiredSet.has(key) ? propZodSchema : propZodSchema.optional());
+        assignProp(shape3, key, requiredSet.has(key) ? propZodSchema : propZodSchema.optional());
       }
       if (schema.patternProperties) {
         const patternProps = schema.patternProperties;
@@ -27623,8 +28171,8 @@ function convertBaseSchema(schema, ctx) {
           looseRecords.push(z.looseRecord(keySchema, patternValue));
         }
         const schemasToIntersect = [];
-        if (Object.keys(shape2).length > 0) {
-          schemasToIntersect.push(z.object(shape2).passthrough());
+        if (Object.keys(shape3).length > 0) {
+          schemasToIntersect.push(z.object(shape3).passthrough());
         }
         schemasToIntersect.push(...looseRecords);
         if (schemasToIntersect.length === 0) {
@@ -27639,7 +28187,7 @@ function convertBaseSchema(schema, ctx) {
           zodSchema = result2;
         }
         if (schema.additionalProperties === false) {
-          const propertyKeys = Object.keys(shape2);
+          const propertyKeys = Object.keys(shape3);
           const patterns = patternKeys.map((p) => new RegExp(p));
           const basePatternSchema = zodSchema;
           zodSchema = zodSchema.check((payload) => {
@@ -27664,7 +28212,7 @@ function convertBaseSchema(schema, ctx) {
           });
         }
       } else {
-        const objectSchema = z.object(shape2);
+        const objectSchema = z.object(shape3);
         if (schema.additionalProperties === false) {
           zodSchema = objectSchema.strict();
         } else if (additionalSchema) {
@@ -27967,7 +28515,7 @@ function visit(schema, fnOrHandlers) {
     return h ? h(node2, rewritten) : node2;
   };
   const cache5 = /* @__PURE__ */ new Map();
-  function run(s) {
+  function run3(s) {
     const cached3 = cache5.get(s);
     if (cached3 === RESOLVING) {
       return new $ZodLazy({
@@ -27993,21 +28541,21 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newShape = {};
         for (const k of keys) {
-          const mapped = run(oldShape[k]);
+          const mapped = run3(oldShape[k]);
           if (mapped !== oldShape[k])
             changed = true;
           newShape[k] = mapped;
         }
         let newCatchall = def.catchall;
         if (def.catchall) {
-          newCatchall = run(def.catchall);
+          newCatchall = run3(def.catchall);
           if (newCatchall !== def.catchall)
             changed = true;
         }
         return changed ? clone2(s, { ...def, shape: newShape, catchall: newCatchall }) : s;
       }
       case "array": {
-        const mapped = run(def.element);
+        const mapped = run3(def.element);
         return mapped === def.element ? s : clone2(s, { ...def, element: mapped });
       }
       case "tuple": {
@@ -28015,14 +28563,14 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newItems = [];
         for (const item of oldItems) {
-          const mapped = run(item);
+          const mapped = run3(item);
           if (mapped !== item)
             changed = true;
           newItems.push(mapped);
         }
         let newRest = def.rest;
         if (def.rest) {
-          newRest = run(def.rest);
+          newRest = run3(def.rest);
           if (newRest !== def.rest)
             changed = true;
         }
@@ -28030,12 +28578,12 @@ function visit(schema, fnOrHandlers) {
       }
       case "record":
       case "map": {
-        const newKey = run(def.keyType);
-        const newVal = run(def.valueType);
+        const newKey = run3(def.keyType);
+        const newVal = run3(def.valueType);
         return newKey === def.keyType && newVal === def.valueType ? s : clone2(s, { ...def, keyType: newKey, valueType: newVal });
       }
       case "set": {
-        const newVal = run(def.valueType);
+        const newVal = run3(def.valueType);
         return newVal === def.valueType ? s : clone2(s, { ...def, valueType: newVal });
       }
       case "union": {
@@ -28043,7 +28591,7 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newOptions = [];
         for (const opt of oldOptions) {
-          const mapped = run(opt);
+          const mapped = run3(opt);
           if (mapped !== opt)
             changed = true;
           newOptions.push(mapped);
@@ -28051,8 +28599,8 @@ function visit(schema, fnOrHandlers) {
         return changed ? clone2(s, { ...def, options: newOptions }) : s;
       }
       case "intersection": {
-        const newLeft = run(def.left);
-        const newRight = run(def.right);
+        const newLeft = run3(def.left);
+        const newRight = run3(def.right);
         return newLeft === def.left && newRight === def.right ? s : clone2(s, { ...def, left: newLeft, right: newRight });
       }
       case "optional":
@@ -28064,23 +28612,23 @@ function visit(schema, fnOrHandlers) {
       case "nonoptional":
       case "promise":
       case "success": {
-        const newInner = run(def.innerType);
+        const newInner = run3(def.innerType);
         return newInner === def.innerType ? s : clone2(s, { ...def, innerType: newInner });
       }
       case "pipe": {
-        const newIn = run(def.in);
-        const newOut = run(def.out);
+        const newIn = run3(def.in);
+        const newOut = run3(def.out);
         return newIn === def.in && newOut === def.out ? s : clone2(s, { ...def, in: newIn, out: newOut });
       }
       case "function": {
-        const newInput = run(def.input);
-        const newOutput = run(def.output);
+        const newInput = run3(def.input);
+        const newOutput = run3(def.output);
         return newInput === def.input && newOutput === def.output ? s : clone2(s, { ...def, input: newInput, output: newOutput });
       }
       case "lazy": {
         const original = def.getter;
         const { _cachedInner, ...rest } = def;
-        return clone2(s, { ...rest, getter: () => run(original()) });
+        return clone2(s, { ...rest, getter: () => run3(original()) });
       }
       // A leaf by choice: `parts` are regex fragments, not data positions.
       case "template_literal":
@@ -28111,7 +28659,7 @@ function visit(schema, fnOrHandlers) {
       }
     }
   }
-  return run(schema);
+  return run3(schema);
 }
 var RESOLVING;
 var init_visit = __esm({
@@ -28499,7 +29047,7 @@ var init_zod = __esm({
 });
 
 // ../engine/src/io/schema.ts
-function isRecord12(value) {
+function isRecord15(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function checkKeyframes(value, ctx) {
@@ -28511,18 +29059,18 @@ function checkKeyframes(value, ctx) {
     }
   };
   for (const [key, prop] of Object.entries(value)) {
-    if (!isRecord12(prop)) continue;
+    if (!isRecord15(prop)) continue;
     if ("Points" in prop) {
       check2(prop, [key]);
       continue;
     }
     for (const [channel, inner] of Object.entries(prop)) {
-      if (isRecord12(inner) && "Points" in inner) check2(inner, [key, channel]);
+      if (isRecord15(inner) && "Points" in inner) check2(inner, [key, channel]);
     }
   }
 }
 function validateProject(json2) {
-  if (!isRecord12(json2)) return [{ path: "", message: "expected a JSON object" }];
+  if (!isRecord15(json2)) return [{ path: "", message: "expected a JSON object" }];
   const result2 = projectSchema.safeParse(json2);
   if (result2.success) return [];
   return result2.error.issues.map((issue2) => ({ path: formatIssuePath(issue2.path), message: issue2.message }));
@@ -28626,26 +29174,26 @@ var init_schema = __esm({
 });
 
 // ../engine/src/io/migrate.ts
-function isRecord13(value) {
+function isRecord16(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function records(value) {
-  return Array.isArray(value) ? value.filter(isRecord13) : [];
+  return Array.isArray(value) ? value.filter(isRecord16) : [];
 }
 function pointsOf2(keyframe4) {
-  return isRecord13(keyframe4) ? records(keyframe4.Points) : [];
+  return isRecord16(keyframe4) ? records(keyframe4.Points) : [];
 }
 function truthy(value) {
   if (value === null || value === void 0 || value === false || value === 0 || value === "") return false;
   if (Array.isArray(value)) return value.length > 0;
-  if (isRecord13(value)) return Object.keys(value).length > 0;
+  if (isRecord16(value)) return Object.keys(value).length > 0;
   return true;
 }
 function num4(value, fallback) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 function upgradeProjectData(data, options) {
-  const version2 = isRecord13(data.version) ? data.version : {};
+  const version2 = isRecord16(data.version) ? data.version : {};
   const openshotVersion = String(version2["openshot-qt"] ?? BETA_VERSION);
   const libopenshotVersion = String(version2.libopenshot ?? BETA_VERSION);
   if (openshotVersion === BETA_VERSION) {
@@ -28669,18 +29217,18 @@ function flipBetaAlpha(data) {
     for (const point3 of pointsOf2(clip2.alpha)) {
       for (const key of ["co", "handle_left", "handle_right"]) {
         const coord = point3[key];
-        if (isRecord13(coord) && typeof coord.Y === "number") coord.Y = 1 - coord.Y;
+        if (isRecord16(coord) && typeof coord.Y === "number") coord.Y = 1 - coord.Y;
       }
     }
   }
 }
 function resetHandles(points) {
   for (const point3 of points) {
-    if (isRecord13(point3.handle_left)) {
+    if (isRecord16(point3.handle_left)) {
       point3.handle_left.X = 0.5;
       point3.handle_left.Y = 1;
     }
-    if (isRecord13(point3.handle_right)) {
+    if (isRecord16(point3.handle_right)) {
       point3.handle_right.X = 0.5;
       point3.handle_right.Y = 0;
     }
@@ -28691,7 +29239,7 @@ function resetLegacyHandles(data) {
     for (const item of records(data[collection])) {
       for (const object3 of [item, ...records(item.effects)]) {
         for (const value of Object.values(object3)) {
-          if (!isRecord13(value)) continue;
+          if (!isRecord16(value)) continue;
           if ("Points" in value) {
             resetHandles(pointsOf2(value));
           } else if ("red" in value) {
@@ -28703,11 +29251,11 @@ function resetLegacyHandles(data) {
   }
 }
 function isKeyframeChanged(keyframe4, defaultValue) {
-  const points = isRecord13(keyframe4) ? keyframe4.Points : void 0;
+  const points = isRecord16(keyframe4) ? keyframe4.Points : void 0;
   if (!Array.isArray(points) || points.length === 0) return false;
   if (points.length > 1) return true;
   const first = points[0];
-  const co = isRecord13(first) && isRecord13(first.co) ? first.co : {};
+  const co = isRecord16(first) && isRecord16(first.co) ? first.co : {};
   return (co.Y ?? defaultValue) !== defaultValue;
 }
 function migrateLegacyCrop(data, newId) {
@@ -28731,7 +29279,7 @@ function migrateLegacyCrop(data, newId) {
     effect3.bottom = truthy(cropHeight) ? cropHeight : libopenshotKeyframe(1);
     for (const prop of ["right", "bottom"]) {
       for (const point3 of pointsOf2(effect3[prop])) {
-        const co = isRecord13(point3.co) ? point3.co : null;
+        const co = isRecord16(point3.co) ? point3.co : null;
         if (co) co.Y = 1 - num4(co.Y, 0);
       }
     }
@@ -28742,7 +29290,7 @@ function migrateLegacyCrop(data, newId) {
 function flipPoints(points) {
   for (const point3 of points) {
     const co = point3.co;
-    if (isRecord13(co)) co.Y = 1 - num4(co.Y, 1);
+    if (isRecord16(co)) co.Y = 1 - num4(co.Y, 1);
   }
 }
 function migrateTrackedObjectAlpha(data) {
@@ -28752,15 +29300,15 @@ function migrateTrackedObjectAlpha(data) {
       if (effect3.name !== "Tracker" && effect3.name !== "Object Detector") continue;
       if ("display_box_text" in effect3) {
         const keyframe4 = effect3.display_box_text;
-        const points = isRecord13(keyframe4) && Array.isArray(keyframe4.Points) ? keyframe4.Points : null;
+        const points = isRecord16(keyframe4) && Array.isArray(keyframe4.Points) ? keyframe4.Points : null;
         if (points) {
-          flipPoints(points.filter(isRecord13));
+          flipPoints(points.filter(isRecord16));
           if (points.length === 0) points.push({ co: { X: 1, Y: 1 }, interpolation: Interpolation.CONSTANT });
         }
       }
-      const objects = isRecord13(effect3.objects) ? effect3.objects : {};
+      const objects = isRecord16(effect3.objects) ? effect3.objects : {};
       for (const [trackedKey, tracked] of Object.entries(objects)) {
-        if (!isRecord13(tracked)) continue;
+        if (!isRecord16(tracked)) continue;
         const childClipId = tracked.child_clip_id;
         if (truthy(childClipId)) {
           for (const child of clips) {
@@ -28784,14 +29332,14 @@ function repairAudioOnlyProjectData(data) {
   if (audioFiles.size === 0) return 0;
   let repaired = 0;
   for (const clip2 of records(data.clips)) {
-    const reader = isRecord13(clip2.reader) ? clip2.reader : {};
+    const reader = isRecord16(clip2.reader) ? clip2.reader : {};
     const file3 = audioFiles.get(key(clip2.file_id, reader.id));
     if (file3 && applyAudioOnlyOverrides(clip2, file3)) repaired += 1;
   }
   return repaired;
 }
-function keyframeValue(keyframe4, frame, fallback) {
-  if (!isRecord13(keyframe4)) return fallback;
+function keyframeValue2(keyframe4, frame, fallback) {
+  if (!isRecord16(keyframe4)) return fallback;
   if (typeof frame !== "number" || !Number.isFinite(frame)) return fallback;
   return evaluate(keyframe4, pyRound(frame));
 }
@@ -28812,7 +29360,7 @@ function toFloat2(value) {
   return 0;
 }
 function sourceSize(clip2, files) {
-  const reader = isRecord13(clip2.reader) && truthy(clip2.reader) ? clip2.reader : files.get(clip2.file_id) ?? {};
+  const reader = isRecord16(clip2.reader) && truthy(clip2.reader) ? clip2.reader : files.get(clip2.file_id) ?? {};
   return { width: toFloat2(reader.width), height: toFloat2(reader.height) };
 }
 function filesById(data) {
@@ -28838,10 +29386,10 @@ function migrateLegacyCropLocations(data) {
     for (const axis2 of axes) {
       for (const point3 of pointsOf2(clip2[axis2.prop])) {
         const co = point3.co;
-        if (!isRecord13(co) || !("Y" in co) || typeof co.Y !== "number") continue;
+        if (!isRecord16(co) || !("Y" in co) || typeof co.Y !== "number") continue;
         const frame = co.X ?? 1;
         const value = co.Y;
-        const scaleValue = keyframeValue(clip2[axis2.scale], frame, 1);
+        const scaleValue = keyframeValue2(clip2[axis2.scale], frame, 1);
         const factor = legacyLocationFactor(value, axis2.canvas, axis2.base * scaleValue, axis2.align);
         if (factor !== 1) co.Y = value * factor;
       }
@@ -28866,10 +29414,10 @@ function migrate400NonCropLocations(data) {
     for (const axis2 of axes) {
       for (const point3 of pointsOf2(clip2[axis2.prop])) {
         const co = point3.co;
-        if (!isRecord13(co) || !("Y" in co) || typeof co.Y !== "number") continue;
+        if (!isRecord16(co) || !("Y" in co) || typeof co.Y !== "number") continue;
         const frame = co.X ?? 1;
         const value = co.Y;
-        const margin = keyframeValue(clip2.margin, frame, 0);
+        const margin = keyframeValue2(clip2.margin, frame, 0);
         const marginPixels = Math.max(0, Math.min(0.5, margin)) * Math.min(canvasWidth, canvasHeight);
         const layoutSize = Math.max(1, axis2.canvas - 2 * marginPixels);
         let baseSize;
@@ -28882,7 +29430,7 @@ function migrate400NonCropLocations(data) {
           );
           baseSize = axis2.source * fitScale;
         }
-        const clipSize = baseSize * keyframeValue(clip2[axis2.scale], frame, 1);
+        const clipSize = baseSize * keyframeValue2(clip2[axis2.scale], frame, 1);
         const factor = legacyLocationFactor(value, layoutSize, clipSize, axis2.align);
         if (factor) co.Y = value * layoutSize / (factor * axis2.canvas);
       }
@@ -28975,17 +29523,17 @@ var init_repair = __esm({
 });
 
 // ../engine/src/io/parse.ts
-function isRecord14(value) {
+function isRecord17(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function truthy2(value) {
   if (value === null || value === void 0 || value === false || value === 0 || value === "") return false;
   if (Array.isArray(value)) return value.length > 0;
-  if (isRecord14(value)) return Object.keys(value).length > 0;
+  if (isRecord17(value)) return Object.keys(value).length > 0;
   return true;
 }
 function parseProject(json2, options = {}) {
-  if (!isRecord14(json2)) throw new ProjectParseError([{ path: "", message: "expected a JSON object" }]);
+  if (!isRecord17(json2)) throw new ProjectParseError([{ path: "", message: "expected a JSON object" }]);
   let data;
   try {
     data = structuredClone(json2);
@@ -29018,13 +29566,13 @@ function parseProjectText(text4, options = {}) {
   return parseProject(json2, options);
 }
 function serializeProject(project) {
-  const version2 = isRecord14(project.version) ? project.version : {};
+  const version2 = isRecord17(project.version) ? project.version : {};
   return JSON.stringify({ ...project, version: { ...version2, ...PROJECT_FORMAT_VERSION } }, null, 1);
 }
 function fillDefaults(data) {
   const profileName = typeof data.profile === "string" && findProfile(data.profile) ? data.profile : void 0;
   const defaults = createProject({ profile: profileName, id: "T0" });
-  if (!isRecord14(data.version)) data.version = { "openshot-qt": BETA_VERSION, libopenshot: BETA_VERSION };
+  if (!isRecord17(data.version)) data.version = { "openshot-qt": BETA_VERSION, libopenshot: BETA_VERSION };
   for (const [key, value] of Object.entries(defaults)) {
     if (!(key in data)) data[key] = value;
   }
@@ -29724,7 +30272,7 @@ var init_catalog2 = __esm({
 });
 
 // ../engine/src/presets/export.ts
-function isRecord15(value) {
+function isRecord18(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function numberOr(value, fallback) {
@@ -29735,7 +30283,7 @@ function joinPath(folder, name) {
   return /[\\/]$/.test(folder) ? folder + name : `${folder}${folder.includes("\\") && !folder.includes("/") ? "\\" : "/"}${name}`;
 }
 function getDefaultExportSettings(project, options = {}) {
-  const fps = isRecord15(project.fps) && Object.keys(project.fps).length > 0 ? project.fps : { num: 30, den: 1 };
+  const fps = isRecord18(project.fps) && Object.keys(project.fps).length > 0 ? project.fps : { num: 30, den: 1 };
   const video = {
     vformat: "mp4",
     vcodec: "libx264",
@@ -29797,12 +30345,12 @@ function getDefaultExportSettings(project, options = {}) {
   };
   if (Array.isArray(project.export_settings)) {
     for (const widget of project.export_settings) {
-      if (!isRecord15(widget)) continue;
+      if (!isRecord18(widget)) continue;
       const name = String(widget.name ?? "");
       if (Object.hasOwn(widgets, name)) widgets[name](widget.value);
     }
   }
-  const overrides = isRecord15(project.export_overrides) ? project.export_overrides : {};
+  const overrides = isRecord18(project.export_overrides) ? project.export_overrides : {};
   for (const [key, value] of Object.entries(overrides)) {
     if (key === "width" || key === "height" || key === "start_frame" || key === "end_frame") num12((v) => video[key] = v)(value);
     else if (key === "fps_num") num12((v) => video.fps.num = v)(value);
@@ -29874,13 +30422,13 @@ function exportOptionsFromSettings(settings, options = {}) {
   const fps = { num: Math.trunc(video.fps.num), den: Math.trunc(video.fps.den) || 1 };
   const out = { format, width: Math.trunc(video.width), height: Math.trunc(video.height), fps };
   const hasVideo = exportType !== "Audio Only";
-  const hasAudio = exportType === "Video & Audio" || exportType === "Audio Only";
+  const hasAudio2 = exportType === "Video & Audio" || exportType === "Audio Only";
   if (hasVideo && format !== "png-sequence" && format !== "gif" && video.vcodec) out.videoCodec = video.vcodec;
   if (hasVideo && format !== "png-sequence") {
     rateToOptions(parseExportRate(video.video_bitrate), out);
     if (out.crf !== void 0) out.quality = qualityForCrf(out.crf, format, out.videoCodec);
   }
-  if (hasAudio && format !== "gif" && format !== "png-sequence") {
+  if (hasAudio2 && format !== "gif" && format !== "png-sequence") {
     if (audio.acodec) out.audioCodec = audio.acodec;
     const bitrate = audioBitrateOf(audio.audio_bitrate);
     if (bitrate !== void 0) out.audioBitrate = bitrate;
@@ -33715,7 +34263,7 @@ var init_fma2 = __esm({
 });
 
 // ../engine/src/render/kernels/params.ts
-function isRecord16(v) {
+function isRecord19(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 function num7(params, key, fallback) {
@@ -33747,7 +34295,7 @@ function color(params, key, fallback) {
     };
     return [ch(0), ch(1), ch(2), v.length >= 4 ? ch(3) : fallback[3]];
   }
-  if (isRecord16(v)) {
+  if (isRecord19(v)) {
     const ch = (name, i) => {
       const x = v[name];
       return typeof x === "number" && Number.isFinite(x) ? x : fallback[i];
@@ -33758,7 +34306,7 @@ function color(params, key, fallback) {
 }
 function record3(params, key) {
   const v = params[key];
-  return isRecord16(v) ? v : void 0;
+  return isRecord19(v) ? v : void 0;
 }
 function numbers(params, key) {
   const v = params[key];
@@ -33778,7 +34326,7 @@ function hexColorRgb(c) {
 }
 function readerPath(params, key) {
   const v = params[key];
-  if (!isRecord16(v)) return void 0;
+  if (!isRecord19(v)) return void 0;
   const path38 = v.path;
   return typeof path38 === "string" && path38.length > 0 ? path38 : void 0;
 }
@@ -37265,8 +37813,8 @@ function gradientTable(stopsIn) {
       while (dpos > stops[cs + 1].pos) cs += 1;
       current = premul64(stops[cs].color);
       let next = premul64(stops[cs + 1].color);
-      let diff = stops[cs + 1].pos - stops[cs].pos;
-      let c = diff === 0 ? 0 : 256 / diff;
+      let diff2 = stops[cs + 1].pos - stops[cs].pos;
+      let c = diff2 === 0 ? 0 : 256 / diff2;
       let t = (dpos - stops[cs].pos) * c;
       let tDelta = incr * c;
       for (; ; ) {
@@ -37282,8 +37830,8 @@ function gradientTable(stopsIn) {
           cs += skip;
           current = skip === 1 ? next : premul64(stops[cs].color);
           next = premul64(stops[cs + 1].color);
-          diff = stops[cs + 1].pos - stops[cs].pos;
-          c = diff === 0 ? 0 : 256 / diff;
+          diff2 = stops[cs + 1].pos - stops[cs].pos;
+          c = diff2 === 0 ? 0 : 256 / diff2;
           t = (dpos - stops[cs].pos) * c;
           tDelta = incr * c;
         }
@@ -37827,7 +38375,7 @@ function drawWaveform(p, s) {
       };
       if (styledGlow > GLOW_MIN) {
         const glowBrush = rainbow ? horizontal(width, rainbowStops(base, spread2, f323(f323(0.78) * alphaScale))) : solid(alphaColor(lanePalette.glow, f323(f323(0.78) * alphaScale)));
-        const pad2 = Math.max(1, Math.ceil(f323(styledGlow * 5)));
+        const pad3 = Math.max(1, Math.ceil(f323(styledGlow * 5)));
         for (let i = 0; i < size; i += 4) {
           const x0 = Math.floor(i * width / size);
           const x1 = Math.floor(Math.min(i + 4, size) * width / size);
@@ -37836,8 +38384,8 @@ function drawWaveform(p, s) {
             const e = envelopeOf(values[j]);
             if (envelope < e) envelope = e;
           }
-          const y0 = clampi(Math.floor(f323(centerY - envelope)) - pad2, 0, height);
-          const y1 = clampi(Math.ceil(f323(centerY + envelope)) + pad2, y0 + 1, height);
+          const y0 = clampi(Math.floor(f323(centerY - envelope)) - pad3, 0, height);
+          const y1 = clampi(Math.ceil(f323(centerY + envelope)) + pad3, y0 + 1, height);
           p.drawRectI(x0, y0, Math.max(1, x1 - x0), y1 - y0, glowBrush);
         }
       }
@@ -38338,23 +38886,23 @@ var init_audio_visualization = __esm({
 });
 
 // ../engine/src/render/plan/effect-params.ts
-function isRecord17(value) {
+function isRecord20(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function isKeyframe(value) {
-  return isRecord17(value) && Array.isArray(value.Points);
+  return isRecord20(value) && Array.isArray(value.Points);
 }
 function isColor(value) {
-  return isRecord17(value) && isKeyframe(value.red) && isKeyframe(value.green) && isKeyframe(value.blue);
+  return isRecord20(value) && isKeyframe(value.red) && isKeyframe(value.green) && isKeyframe(value.blue);
 }
 function isAnimatedCurve(value) {
-  return isRecord17(value) && Array.isArray(value.nodes);
+  return isRecord20(value) && Array.isArray(value.nodes);
 }
 function clamp01(v) {
   return Math.max(0, Math.min(1, v));
 }
 function readNode(raw) {
-  const n = isRecord17(raw) ? raw : {};
+  const n = isRecord20(raw) ? raw : {};
   const int6 = (v, fallback) => typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : fallback;
   return {
     id: int6(n.id, 0),
@@ -38373,7 +38921,7 @@ function valueOf(v, frame) {
   return evaluate(v, frame);
 }
 function evaluateAnimatedCurve(json2, frame, defaultNodes) {
-  const root = isRecord17(json2) ? json2 : {};
+  const root = isRecord20(json2) ? json2 : {};
   const enabled = root.enabled === void 0 ? 1 : valueOf(root.enabled, frame);
   let rawNodes = Array.isArray(root.nodes) && root.nodes.length > 0 ? root.nodes : [];
   if (rawNodes.length === 0) {
@@ -38433,7 +38981,7 @@ function evaluateValue(value, frame) {
     }
     return out;
   }
-  if (isRecord17(value)) {
+  if (isRecord20(value)) {
     const out = {};
     for (const [k, v] of Object.entries(value)) {
       const e = evaluateValue(v, frame);
@@ -38561,8 +39109,8 @@ var init_beat_sync = __esm({
         }
         const state = ctx.state;
         let envelope = typeof state?.get(ENVELOPE) === "number" ? state.get(ENVELOPE) : 0;
-        const lastFrame = typeof state?.get(LAST_FRAME) === "number" ? state.get(LAST_FRAME) : -1;
-        if (lastFrame >= 0 && Math.abs(frame - lastFrame) >= 2) envelope = 0;
+        const lastFrame2 = typeof state?.get(LAST_FRAME) === "number" ? state.get(LAST_FRAME) : -1;
+        if (lastFrame2 >= 0 && Math.abs(frame - lastFrame2) >= 2) envelope = 0;
         const lowHz = normalizedToHz(f324(num7(params, "frequency_low", 0)));
         const highHz = Math.max(f324(lowHz + 1), normalizedToHz(f324(num7(params, "frequency_high", 1))));
         const gain = Math.max(f324(0.01), f324(num7(params, "intensity", 2)));
@@ -41301,14 +41849,14 @@ function cropRects(params, W, H) {
   const paint2 = { x: left * W, y: top * H, w: Math.max(0, 1 - left - right) * W, h: Math.max(0, 1 - top - bottom) * H };
   const copy = { x: paint2.x + xShift * W, y: paint2.y + yShift * H, w: paint2.w, h: paint2.h };
   const setLeft = (r, pos) => {
-    const diff = pos - r.x;
-    r.x += diff;
-    r.w -= diff;
+    const diff2 = pos - r.x;
+    r.x += diff2;
+    r.w -= diff2;
   };
   const setTop = (r, pos) => {
-    const diff = pos - r.y;
-    r.y += diff;
-    r.h -= diff;
+    const diff2 = pos - r.y;
+    r.y += diff2;
+    r.h -= diff2;
   };
   if (copy.x < 0) {
     setLeft(paint2, paint2.x - copy.x);
@@ -42162,15 +42710,15 @@ function applyScaledMask(image, scaled, settings) {
   const d = image.data;
   for (let i = 0; i < d.length; i += 4) {
     const gray = m[i] * 11 + m[i + 1] * 16 + m[i + 2] * 5 >> 5;
-    const diff = clampU8(m[i + 3] - adjusted[gray]);
+    const diff2 = clampU8(m[i + 3] - adjusted[gray]);
     if (settings.replaceImage) {
-      d[i] = diff;
-      d[i + 1] = diff;
-      d[i + 2] = diff;
-      d[i + 3] = diff;
+      d[i] = diff2;
+      d[i + 1] = diff2;
+      d[i + 2] = diff2;
+      d[i + 3] = diff2;
       continue;
     }
-    const row = (settings.invert ? 255 - diff : diff) * 256;
+    const row = (settings.invert ? 255 - diff2 : diff2) * 256;
     d[i] = MUL_LUT[row + d[i]];
     d[i + 1] = MUL_LUT[row + d[i + 1]];
     d[i + 2] = MUL_LUT[row + d[i + 2]];
@@ -43167,14 +43715,14 @@ function paintTimer(image, layout, ctx) {
   const fill = straightColor(layout.textColor, a);
   const stroke = layout.strokeWidth > 0 ? straightColor(layout.strokeColor, a) : null;
   if (!layout.slotLayout) {
-    const run = layout.runs[0];
-    drawTextPath(image, raster, run.text, run.x, run.y, layout.font, run.ink, fill, stroke, layout.strokeWidth, region);
+    const run3 = layout.runs[0];
+    drawTextPath(image, raster, run3.text, run3.x, run3.y, layout.font, run3.ink, fill, stroke, layout.strokeWidth, region);
     return;
   }
-  for (const run of layout.runs) drawTextPath(image, raster, run.text, run.x, run.y, layout.font, run.ink, fill, null, 0, region);
+  for (const run3 of layout.runs) drawTextPath(image, raster, run3.text, run3.x, run3.y, layout.font, run3.ink, fill, null, 0, region);
   if (!stroke) return;
   const clear2 = [fill[0], fill[1], fill[2], 0];
-  for (const run of layout.runs) drawTextPath(image, raster, run.text, run.x, run.y, layout.font, run.ink, clear2, stroke, layout.strokeWidth, region);
+  for (const run3 of layout.runs) drawTextPath(image, raster, run3.text, run3.x, run3.y, layout.font, run3.ink, clear2, stroke, layout.strokeWidth, region);
 }
 var TimerMode, TimerTimeSource, TimerFormat, Gravity2, DIGIT, timer;
 var init_timer = __esm({
@@ -45122,10 +45670,10 @@ function audioRequest(clip2, n, k, project, fps) {
     sampleRate: rate,
     channels
   };
-  const hasAudio = clip2.has_audio === void 0 || clip2.has_audio === null ? -1 : getInt(clip2.has_audio, n);
+  const hasAudio2 = clip2.has_audio === void 0 || clip2.has_audio === null ? -1 : getInt(clip2.has_audio, n);
   const duration3 = f3223(Number(reader.duration) || 0);
   const mappedLength = duration3 > 0 ? roundHalfAway(duration3 * fpsD) : 0;
-  if (hasAudio === 0 || mappedLength > 0 && n > mappedLength) request.silent = true;
+  if (hasAudio2 === 0 || mappedLength > 0 && n > mappedLength) request.silent = true;
   return request;
 }
 function waveformEffect(clip2, n) {
@@ -45634,19 +46182,19 @@ function planAudio(project, range) {
   const segments2 = [];
   const tolerance = 2.5 / sampleRate;
   for (const [c, frames] of perClip) {
-    let run = [];
+    let run3 = [];
     const flush = () => {
-      if (run.length) segments2.push({ order: c.order, segment: segmentOf(c, run, fps) });
-      run = [];
+      if (run3.length) segments2.push({ order: c.order, segment: segmentOf(c, run3, fps) });
+      run3 = [];
     };
     for (const fr of frames) {
-      const prev = run[run.length - 1];
+      const prev = run3[run3.length - 1];
       if (prev) {
         const expected = prev.span.start + prev.span.rate * (prev.t1 - prev.t0);
         const joins = fr.f === prev.f + 1 && fr.span.rate === prev.span.rate && (c.time ? fr.span.continues : true) && Math.abs(fr.span.start - expected) <= tolerance * Math.max(1, Math.abs(fr.span.rate)) && fr.filter === prev.filter && fr.mapping === prev.mapping && fr.effectsKey === prev.effectsKey;
         if (!joins) flush();
       }
-      run.push(fr);
+      run3.push(fr);
     }
     flush();
   }
@@ -46989,11 +47537,11 @@ var init_text = __esm({
       /** Ink bounds by drawing the text (CFF outlines have no glyph boxes to read). */
       rasterInk(text4, font, advance) {
         const px2 = font.pixelSize;
-        const pad2 = Math.ceil(px2);
-        const w = Math.max(1, Math.ceil(advance + 2 * pad2));
+        const pad3 = Math.ceil(px2);
+        const w = Math.max(1, Math.ceil(advance + 2 * pad3));
         const h = Math.max(1, Math.ceil(3 * px2));
         const baseline = 2 * px2;
-        const image = this.render(text4, font, { x: -pad2, y: -baseline, width: w, height: h }, 0, 0, [255, 255, 255, 255], null, 0);
+        const image = this.render(text4, font, { x: -pad3, y: -baseline, width: w, height: h }, 0, 0, [255, 255, 255, 255], null, 0);
         let x0 = Infinity;
         let y0 = Infinity;
         let x1 = -Infinity;
@@ -47009,7 +47557,7 @@ var init_text = __esm({
           }
         }
         if (!Number.isFinite(x0)) return { x: 0, y: 0, width: 0, height: 0 };
-        return { x: x0 - pad2, y: y0 - baseline, width: x1 - x0, height: y1 - y0 };
+        return { x: x0 - pad3, y: y0 - baseline, width: x1 - x0, height: y1 - y0 };
       }
       /** Rasterize `text` (baseline at x, y in region coordinates) into a region-sized straight-RGBA image. */
       render(text4, font, region, x, y, fill, stroke, strokeWidth) {
@@ -47049,11 +47597,11 @@ var init_text = __esm({
       drawText(target, text4, x, y, font, fill, stroke, strokeWidth, clip2) {
         if (!text4) return;
         const ink = this.inkBounds(text4, font);
-        const pad2 = Math.ceil((stroke ? strokeWidth : 0) + 2);
-        let rx0 = Math.floor(x + ink.x - pad2);
-        let ry0 = Math.floor(y + ink.y - pad2);
-        let rx1 = Math.ceil(x + ink.x + ink.width + pad2);
-        let ry1 = Math.ceil(y + ink.y + ink.height + pad2);
+        const pad3 = Math.ceil((stroke ? strokeWidth : 0) + 2);
+        let rx0 = Math.floor(x + ink.x - pad3);
+        let ry0 = Math.floor(y + ink.y - pad3);
+        let rx1 = Math.ceil(x + ink.x + ink.width + pad3);
+        let ry1 = Math.ceil(y + ink.y + ink.height + pad3);
         rx0 = Math.max(rx0, 0, clip2 ? Math.floor(clip2.x) : 0);
         ry0 = Math.max(ry0, 0, clip2 ? Math.floor(clip2.y) : 0);
         rx1 = Math.min(rx1, target.width, clip2 ? Math.ceil(clip2.x + clip2.width) : target.width);
@@ -49021,7 +49569,7 @@ function fromHandlerText(tool, text4, mutated) {
   if (!mutated && UNCHANGED_PHRASES.some((p) => lower.includes(p))) return unchanged(tool, raw);
   return applied(tool, raw, {}, mutated ? 1 : 0);
 }
-function isRecord18(value) {
+function isRecord21(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function parseReceipt(text4) {
@@ -49031,7 +49579,7 @@ function parseReceipt(text4) {
   } catch {
     return null;
   }
-  if (!isRecord18(payload) || payload.contract !== CONTRACT_VERSION) return null;
+  if (!isRecord21(payload) || payload.contract !== CONTRACT_VERSION) return null;
   if (!("status" in payload) || !("summary" in payload)) return null;
   return payload;
 }
@@ -54069,7 +54617,6 @@ var init_pending = __esm({
       "add_transitions_between_clips_tool",
       "analyze_frame_colors_tool",
       "apply_audio_effect_tool",
-      "apply_clip_preset_tool",
       "apply_color_tool",
       "apply_look_preset_tool",
       "apply_look_tool",
@@ -54078,7 +54625,6 @@ var init_pending = __esm({
       "chroma_key_clip_tool",
       "color_grade_clip_tool",
       "consolidate_project_media_tool",
-      "copy_clip_keyframes_tool",
       "copy_effects_tool",
       "copy_transition_tool",
       "create_media_with_comfyui_tool",
@@ -54089,10 +54635,8 @@ var init_pending = __esm({
       "forget_recent_projects_tool",
       "generate_image_and_add_to_timeline_tool",
       "get_clip_effects_tool",
-      "get_clip_properties_tool",
       "get_editor_layout_tool",
       "get_log_paths_tool",
-      "get_playhead_and_selection_tool",
       "get_preferences_tool",
       "import_image_sequence_tool",
       "import_project_file_tool",
@@ -54115,26 +54659,17 @@ var init_pending = __esm({
       "prepare_recording_tool",
       "process_clip_effect_tool",
       "remove_files_from_project_tool",
-      "remove_keyframes_tool",
-      "remove_marker_tool",
-      "remove_track_tool",
       "remove_transition_tool",
       "reset_caches_and_history_tool",
       "restore_recovery_version_tool",
       "reverse_transition_tool",
       "save_frame_image_tool",
-      "seek_playhead_tool",
-      "select_timeline_items_tool",
       "send_assistant_prompt_tool",
-      "set_clip_properties_tool",
       "set_editor_layout_tool",
       "set_preference_tool",
       "set_project_profile_tool",
-      "set_timeline_view_tool",
       "update_effect_tool",
-      "update_marker_tool",
       "update_project_files_tool",
-      "update_track_tool",
       "update_transition_tool",
       "wait_for_editor_job_tool",
       "zenvi_api_request"
@@ -54208,7 +54743,7 @@ var init_pending = __esm({
 });
 
 // ../engine/src/tools/ai-metadata.ts
-function isRecord19(value) {
+function isRecord22(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function pyNum(value, fallback = 0) {
@@ -54225,13 +54760,13 @@ function list(value) {
   return Array.isArray(value) ? value : [];
 }
 function records2(value) {
-  return list(value).filter(isRecord19);
+  return list(value).filter(isRecord22);
 }
 function getSourceWindow(clipData, fileData) {
-  const data = isRecord19(clipData) ? clipData : {};
+  const data = isRecord22(clipData) ? clipData : {};
   let start = pyNum(data.start);
   let end = pyNum(data.end);
-  if (end <= start + SCENE_EPS && isRecord19(fileData)) {
+  if (end <= start + SCENE_EPS && isRecord22(fileData)) {
     const fileDur = pyNum(fileData.duration);
     if (fileDur > start + SCENE_EPS) {
       end = fileDur;
@@ -54250,10 +54785,10 @@ function getSourceWindow(clipData, fileData) {
   return [start, end];
 }
 function sceneSourceTime(scene, metadata) {
-  if (!isRecord19(scene)) return 0;
+  if (!isRecord22(scene)) return 0;
   if (scene.source_time !== void 0 && scene.source_time !== null) return pyNum(scene.source_time);
   const t = pyNum(scene.time);
-  if (isRecord19(metadata) && isRecord19(metadata.source_window)) {
+  if (isRecord22(metadata) && isRecord22(metadata.source_window)) {
     const ws = pyNum(metadata.source_window.start);
     const we = pyNum(metadata.source_window.end);
     const span2 = Math.max(0, we - ws);
@@ -54279,7 +54814,7 @@ function filterScenesInWindow(scenes, startTime, endTime, rebased, metadata, exc
   return out.sort((a, b) => pyNum(a.source_time) - pyNum(b.source_time));
 }
 function filterTagsForWindow(tags, windowScenes) {
-  if (!isRecord19(tags)) return { objects: [], scenes: [], activities: [], mood: [], quality: {} };
+  if (!isRecord22(tags)) return { objects: [], scenes: [], activities: [], mood: [], quality: {} };
   const corpus = windowScenes.map((s) => String(s.description ?? "").toLowerCase()).join(" ");
   const filtered = {};
   for (const key of ["objects", "scenes", "activities", "mood"]) {
@@ -54292,12 +54827,12 @@ function filterTagsForWindow(tags, windowScenes) {
     for (const value of values) {
       const text4 = String(value ?? "").trim();
       if (!text4) continue;
-      const norm = text4.toLowerCase();
-      if (corpus.includes(norm) || norm.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text4);
+      const norm2 = text4.toLowerCase();
+      if (corpus.includes(norm2) || norm2.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text4);
     }
     filtered[key] = kept;
   }
-  filtered.quality = isRecord19(tags.quality) ? tags.quality : {};
+  filtered.quality = isRecord22(tags.quality) ? tags.quality : {};
   return filtered;
 }
 function filterTimedItems(items, sourceStart, sourceEnd, rebased = true) {
@@ -54324,9 +54859,9 @@ function clone3(value) {
 }
 function materializeClipAiMetadata(rootAi, sourceStart, sourceEnd, options = {}) {
   const rebased = options.rebased ?? true;
-  if (!isRecord19(rootAi) || !rootAi.analyzed) return {};
+  if (!isRecord22(rootAi) || !rootAi.analyzed) return {};
   const scenes = filterScenesInWindow(rootAi.scene_descriptions, sourceStart, sourceEnd, rebased, rootAi, options.exclusiveStart ?? false);
-  const tags = filterTagsForWindow(isRecord19(rootAi.tags) ? rootAi.tags : {}, scenes);
+  const tags = filterTagsForWindow(isRecord22(rootAi.tags) ? rootAi.tags : {}, scenes);
   const chapters = [];
   for (const ch of records2(rootAi.chapters)) {
     const c0 = pyNum(ch.start);
@@ -54341,7 +54876,7 @@ function materializeClipAiMetadata(rootAi, sourceStart, sourceEnd, options = {})
   }
   const cues = filterTimedItems(rootAi.transcript_cues, sourceStart, sourceEnd, rebased);
   const moments = filterTimedItems(rootAi.moments, sourceStart, sourceEnd, rebased);
-  const short = pyText(rootAi.short_summary);
+  const short2 = pyText(rootAi.short_summary);
   let description = pyText(rootAi.description);
   const sounds = pyText(rootAi.sounds);
   const transcript = pyText(rootAi.transcript);
@@ -54353,7 +54888,7 @@ function materializeClipAiMetadata(rootAi, sourceStart, sourceEnd, options = {})
     analysis_version: rootAi.analysis_version ?? "2.0",
     analysis_date: rootAi.analysis_date ?? "",
     provider: rootAi.provider ?? "twelvelabs-pegasus",
-    short_summary: short,
+    short_summary: short2,
     description,
     sounds,
     transcript,
@@ -54372,25 +54907,25 @@ function materializeClipAiMetadata(rootAi, sourceStart, sourceEnd, options = {})
   };
 }
 function clipMetadataIsValid(clipAi, sourceStart, sourceEnd) {
-  if (!isRecord19(clipAi) || !clipAi.analyzed) return false;
+  if (!isRecord22(clipAi) || !clipAi.analyzed) return false;
   const sw = clipAi.source_window;
-  if (!isRecord19(sw)) return false;
+  if (!isRecord22(sw)) return false;
   const ws = pyNum(sw.start, -1) || -1;
   const we = pyNum(sw.end, -1) || -1;
   if (Math.abs(ws - sourceStart) > SCENE_EPS || Math.abs(we - sourceEnd) > SCENE_EPS) return false;
   if (!("transcript_cues" in clipAi)) return false;
   const scenes = list(clipAi.scene_descriptions);
   if (scenes.length === 0) return true;
-  return scenes.every((s) => isRecord19(s) && s.source_time !== void 0 && s.source_time !== null);
+  return scenes.every((s) => isRecord22(s) && s.source_time !== void 0 && s.source_time !== null);
 }
 function getEffectiveAiMetadata(fileData, clipData, options = {}) {
   const rebased = options.rebased ?? true;
   const [startTime, endTime] = getSourceWindow(clipData, fileData);
   let rootAi = options.rootAiMetadata;
-  if ((rootAi === void 0 || rootAi === null) && isRecord19(fileData)) rootAi = fileData.ai_metadata;
-  if (!isRecord19(rootAi) || !rootAi.analyzed) return {};
+  if ((rootAi === void 0 || rootAi === null) && isRecord22(fileData)) rootAi = fileData.ai_metadata;
+  if (!isRecord22(rootAi) || !rootAi.analyzed) return {};
   const clipAi = options.clipAiMetadata;
-  if (clipMetadataIsValid(clipAi, startTime, endTime) && isRecord19(clipAi)) {
+  if (clipMetadataIsValid(clipAi, startTime, endTime) && isRecord22(clipAi)) {
     if (!rebased) return clipAi;
     return {
       ...clipAi,
@@ -54405,10 +54940,10 @@ function getEffectiveAiMetadata(fileData, clipData, options = {}) {
   return materializeClipAiMetadata(rootAi, startTime, endTime, { rebased });
 }
 function buildSummaryPreview(effective, maxItems = 5) {
-  if (!isRecord19(effective)) return "";
+  if (!isRecord22(effective)) return "";
   const parts = [];
-  const short = pyText(effective.short_summary);
-  if (short) parts.push(pySlice(short, 0, 80));
+  const short2 = pyText(effective.short_summary);
+  if (short2) parts.push(pySlice(short2, 0, 80));
   if (parts.length === 0) {
     const desc = pyText(effective.description);
     if (desc) {
@@ -54437,7 +54972,7 @@ function buildSummaryPreview(effective, maxItems = 5) {
     }
   }
   if (parts.length === 0) {
-    const tags = isRecord19(effective.tags) ? effective.tags : {};
+    const tags = isRecord22(effective.tags) ? effective.tags : {};
     for (const key of ["objects", "scenes", "activities"]) {
       const values = tags[key];
       if (Array.isArray(values)) {
@@ -54463,28 +54998,28 @@ function filterTagsStringForWindow(tags, effective) {
   return kept.length > 0 ? kept.join(", ") : buildSummaryPreview(effective);
 }
 function fileIsAnalyzed(fileData) {
-  return isRecord19(fileData) && isRecord19(fileData.ai_metadata) && Boolean(fileData.ai_metadata.analyzed);
+  return isRecord22(fileData) && isRecord22(fileData.ai_metadata) && Boolean(fileData.ai_metadata.analyzed);
 }
 function getIndexBlock(aiMetadata) {
-  if (!isRecord19(aiMetadata)) return {};
-  if (isRecord19(aiMetadata.index) && Object.keys(aiMetadata.index).length > 0) return { ...aiMetadata.index };
-  if (isRecord19(aiMetadata.twelvelabs)) return { ...aiMetadata.twelvelabs };
+  if (!isRecord22(aiMetadata)) return {};
+  if (isRecord22(aiMetadata.index) && Object.keys(aiMetadata.index).length > 0) return { ...aiMetadata.index };
+  if (isRecord22(aiMetadata.twelvelabs)) return { ...aiMetadata.twelvelabs };
   return {};
 }
 function isIndexed(meta3) {
-  if (!isRecord19(meta3)) return false;
+  if (!isRecord22(meta3)) return false;
   let block = meta3;
   if ("index" in meta3 || "twelvelabs" in meta3 || "provider" in meta3) {
-    block = isRecord19(meta3.index) && Object.keys(meta3.index).length > 0 ? meta3.index : isRecord19(meta3.twelvelabs) ? meta3.twelvelabs : meta3;
+    block = isRecord22(meta3.index) && Object.keys(meta3.index).length > 0 ? meta3.index : isRecord22(meta3.twelvelabs) ? meta3.twelvelabs : meta3;
   }
-  if (!isRecord19(block)) return false;
+  if (!isRecord22(block)) return false;
   return String(block.status ?? "").toLowerCase() === "ready" && pyText(block.index_id) !== "" && pyText(block.video_id) !== "";
 }
 function tagCorpusSparse(ai) {
   const combined2 = `${pyText(ai.short_summary)} ${pyText(ai.description)} ${pyText(ai.transcript)} ${pyText(ai.sounds)}`.trim();
   const chapters = list(ai.chapters);
   if (Array.from(combined2).length < 40 && chapters.length <= 1) return true;
-  const tags = isRecord19(ai.tags) ? ai.tags : {};
+  const tags = isRecord22(ai.tags) ? ai.tags : {};
   const unique = new Set([...list(tags.objects), ...list(tags.scenes), ...list(tags.activities)].filter(Boolean).map((x) => String(x).toLowerCase()));
   const sceneCount = list(ai.scene_descriptions).length;
   if (unique.size > 0 && unique.size <= 2 && sceneCount <= 2 && Array.from(combined2).length < 40) return true;
@@ -54492,8 +55027,8 @@ function tagCorpusSparse(ai) {
   return false;
 }
 function inferSearchHint(ai, filename = "") {
-  if (!isRecord19(ai)) return "visual_ok";
-  const tl = isRecord19(ai.twelvelabs) ? ai.twelvelabs : {};
+  if (!isRecord22(ai)) return "visual_ok";
+  const tl = isRecord22(ai.twelvelabs) ? ai.twelvelabs : {};
   if (String(tl.status ?? "").toLowerCase() !== "ready") return "visual_ok";
   const desc = `${String(ai.description ?? "")} ${filename.toLowerCase()}`.toLowerCase();
   if (AUDIO_MARKERS.some((m) => desc.includes(m))) return "prefer_audio_and_visual";
@@ -54622,7 +55157,7 @@ var init_tracks2 = __esm({
 });
 
 // ../engine/src/tools/clip-context.ts
-function isRecord20(value) {
+function isRecord23(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function basename2(path38) {
@@ -54644,7 +55179,7 @@ function findFileData(project, fileId) {
   return (project.files ?? []).find((f3) => String(f3.id) === fileId);
 }
 function resolveParentFileId(project, fileData, fileId = "") {
-  const data = isRecord20(fileData) ? fileData : void 0;
+  const data = isRecord23(fileData) ? fileData : void 0;
   const fid = String(fileId || data?.id || "");
   if (!data) return fid;
   const explicit = String(data.parent_file_id ?? "").trim();
@@ -54661,7 +55196,7 @@ function resolveParentFileId(project, fileData, fileId = "") {
   return fid || String(data.id ?? "");
 }
 function resolveParentFileData(project, fileData, fileId = "") {
-  const data = isRecord20(fileData) ? fileData : void 0;
+  const data = isRecord23(fileData) ? fileData : void 0;
   const fid = String(fileId || data?.id || "");
   const parentId = resolveParentFileId(project, fileData, fid);
   if (!parentId || parentId === fid) return data;
@@ -54669,9 +55204,9 @@ function resolveParentFileData(project, fileData, fileId = "") {
 }
 function resolveRootAiMetadata(project, fileData, fileId = "") {
   const parent = resolveParentFileData(project, fileData, fileId);
-  if (!isRecord20(parent)) return [void 0, void 0];
+  if (!isRecord23(parent)) return [void 0, void 0];
   const rootAi = parent.ai_metadata;
-  if (isRecord20(rootAi) && rootAi.analyzed) return [rootAi, parent];
+  if (isRecord23(rootAi) && rootAi.analyzed) return [rootAi, parent];
   return [void 0, parent];
 }
 function buildTimelineClipContext(project, clip2, fileData, options = {}) {
@@ -54682,14 +55217,14 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
   const rootAi = options.rootAi ?? resolveRootAiMetadata(project, fileData, fid)[0];
   const [sourceStart, sourceEnd] = getSourceWindow(clipData, fileData);
   const timelinePosition = pyNum(clipData.position);
-  const timelineDuration = Math.max(0.01, sourceEnd - sourceStart);
-  const clipAi = isRecord20(clipData.ai_metadata) ? clipData.ai_metadata : void 0;
+  const timelineDuration2 = Math.max(0.01, sourceEnd - sourceStart);
+  const clipAi = isRecord23(clipData.ai_metadata) ? clipData.ai_metadata : void 0;
   const effective = getEffectiveAiMetadata(parentData && Object.keys(parentData).length > 0 ? parentData : fileData, clipData, {
     clipAiMetadata: clipAi,
     rootAiMetadata: rootAi,
     rebased: true
   });
-  const file3 = isRecord20(fileData) ? fileData : void 0;
+  const file3 = isRecord23(fileData) ? fileData : void 0;
   const path38 = file3 ? String(file3.path ?? "") : "";
   const rawLayer = clipData.layer;
   const layerNum = rawLayer === null || rawLayer === void 0 || rawLayer === "" ? null : Math.trunc(Number(rawLayer));
@@ -54699,11 +55234,11 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
   const title = String(clipData.title || clipData.label || fileName2 || "Clip").trim();
   let tlMeta = getIndexBlock(parentData ?? {});
   if (Object.keys(tlMeta).length === 0) tlMeta = getIndexBlock(file3 ?? {});
-  if (Object.keys(tlMeta).length === 0 && isRecord20(parentData)) tlMeta = getIndexBlock(parentData.ai_metadata ?? {});
+  if (Object.keys(tlMeta).length === 0 && isRecord23(parentData)) tlMeta = getIndexBlock(parentData.ai_metadata ?? {});
   if (Object.keys(tlMeta).length === 0 && file3) tlMeta = getIndexBlock(file3.ai_metadata ?? {});
   if (Object.keys(tlMeta).length === 0) {
     const raw = (parentData ?? {}).twelvelabs ?? file3?.twelvelabs;
-    if (isRecord20(raw)) tlMeta = raw;
+    if (isRecord23(raw)) tlMeta = raw;
   }
   let indexStatus = String(tlMeta.status ?? "");
   if (isIndexed(tlMeta)) indexStatus = "ready";
@@ -54715,8 +55250,8 @@ function buildTimelineClipContext(project, clip2, fileData, options = {}) {
     sourceStart,
     sourceEnd,
     timelinePosition,
-    timelineDuration,
-    timelineEnd: timelinePosition + timelineDuration,
+    timelineDuration: timelineDuration2,
+    timelineEnd: timelinePosition + timelineDuration2,
     layer: layer2,
     uiTrack: uiTrack2,
     title,
@@ -54745,7 +55280,7 @@ var init_clip_context = __esm({
 });
 
 // ../engine/src/tools/reports.ts
-function isRecord21(value) {
+function isRecord24(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function fnum(value) {
@@ -54765,7 +55300,7 @@ function fileName(file3) {
 }
 function projectInfoText(project) {
   const profile = project.profile || "unknown";
-  const fps = isRecord21(project.fps) ? project.fps : {};
+  const fps = isRecord24(project.fps) ? project.fps : {};
   const num12 = fps.num ?? "";
   const den2 = fps.den ?? 1;
   const duration3 = project.duration || 0;
@@ -54780,7 +55315,7 @@ function visibleFiles(project) {
 }
 function mediaBinFields(file3) {
   const data = file3;
-  const ai = isRecord21(data.ai_metadata) ? data.ai_metadata : {};
+  const ai = isRecord24(data.ai_metadata) ? data.ai_metadata : {};
   return {
     name: fileName(data) || "?",
     dur: pyFixed(fnum(data.duration), 2),
@@ -55082,7 +55617,7 @@ var init_reports = __esm({
 });
 
 // ../engine/src/tools/editor-args.ts
-function isRecord22(value) {
+function isRecord25(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function kindsOf(schema) {
@@ -55174,7 +55709,7 @@ function coerceKind(path38, value, kind, schema) {
         throw new EditorArgError(`argument '${path38}' is not a valid JSON object`);
       }
     }
-    if (!isRecord22(obj)) throw new EditorArgError(`argument '${path38}' must be an object`);
+    if (!isRecord25(obj)) throw new EditorArgError(`argument '${path38}' must be an object`);
     const props = schema.properties;
     if (!props || Object.keys(props).length === 0) return obj;
     const out = {};
@@ -55225,7 +55760,7 @@ function coerceEditorValue(path38, value, schema) {
 }
 function coerceEditorArgs(schema, args) {
   if (args === null || args === void 0) return {};
-  if (!isRecord22(args)) return args;
+  if (!isRecord25(args)) return args;
   const out = {};
   for (const [key, value] of Object.entries(args)) {
     if (HIDDEN_PARAMS.has(key)) continue;
@@ -55417,7 +55952,7 @@ function capabilityName(capability) {
 function missingCapabilities(requires, host) {
   return (requires ?? []).filter((cap) => host[cap] === void 0 || host[cap] === null);
 }
-function isRecord23(value) {
+function isRecord26(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function resultFor(receipt2, images) {
@@ -55448,7 +55983,7 @@ function receiptForError(tool, error62, host) {
 }
 async function executeTool(tool, impl, ctx, rawArgs) {
   const name = tool.name;
-  const session = isRecord23(rawArgs) && typeof rawArgs.chat_session_id === "string" && rawArgs.chat_session_id.trim() ? rawArgs.chat_session_id.trim() : "default";
+  const session = isRecord26(rawArgs) && typeof rawArgs.chat_session_id === "string" && rawArgs.chat_session_id.trim() ? rawArgs.chat_session_id.trim() : "default";
   const args = isEditorToolHandler(tool.desktopHandler) ? coerceEditorArgs(tool.inputSchema, rawArgs) : normalizeArgs(tool.inputSchema, rawArgs);
   const parsed = tool.input.safeParse(args);
   if (!parsed.success) {
@@ -57006,14 +57541,14 @@ var init_animated_titles = __esm({
           const tool = "add_animated_title_tool";
           const project = call.doc.project;
           const template = findTemplate(input2.template ?? "");
-          const diff = projectFpsDiff(projectFps(project));
-          let values = defaultParams(template, diff);
+          const diff2 = projectFpsDiff(projectFps(project));
+          let values = defaultParams(template, diff2);
           const needsFiles = template.params.some((p) => p.name.includes("project_files"));
           const choices = needsFiles ? projectFileChoices(project.files) : /* @__PURE__ */ new Map();
           const text4 = String(input2.text ?? "");
           values = applyParams(template, values, text4, input2.params ?? {}, choices);
           const multiplier = input2.length_multiplier ?? 1;
-          values.length_multiplier = multiplier * Math.max(1, diff);
+          values.length_multiplier = multiplier * Math.max(1, diff2);
           const base = safeBaseName(String(input2.file_name ?? "") || text4 || template.name, "AnimatedTitle", 40);
           values.file_name = base.replaceAll(" ", "_");
           if (!rendersOnWeb(template.name)) {
@@ -57317,7 +57852,7 @@ var init_speech = __esm({
 });
 
 // ../engine/src/tools/resolve.ts
-function isRecord24(value) {
+function isRecord27(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function optionalFloat(value) {
@@ -57333,21 +57868,21 @@ function tokenize(text4) {
   return (normalizeText(text4).match(/[a-z0-9]+/g) ?? []).filter((t) => t.length > 1);
 }
 function metadataCorpus(ai, maxScenes = 8) {
-  if (!isRecord24(ai)) return "";
+  if (!isRecord27(ai)) return "";
   const parts = [];
   for (const key of ["short_summary", "description", "sounds", "transcript"]) {
     if (ai[key]) parts.push(String(ai[key]));
   }
   for (const ch of (Array.isArray(ai.chapters) ? ai.chapters : []).slice(0, maxScenes)) {
-    if (isRecord24(ch)) {
+    if (isRecord27(ch)) {
       if (ch.title) parts.push(String(ch.title));
       if (ch.summary) parts.push(String(ch.summary));
     }
   }
   for (const sc of (Array.isArray(ai.scene_descriptions) ? ai.scene_descriptions : []).slice(0, maxScenes)) {
-    if (isRecord24(sc) && sc.description) parts.push(String(sc.description));
+    if (isRecord27(sc) && sc.description) parts.push(String(sc.description));
   }
-  const tags = isRecord24(ai.tags) ? ai.tags : {};
+  const tags = isRecord27(ai.tags) ? ai.tags : {};
   for (const key of ["objects", "scenes", "activities", "mood"]) {
     const vals = tags[key];
     if (Array.isArray(vals)) {
@@ -57600,7 +58135,7 @@ var init_resolve = __esm({
 });
 
 // ../engine/src/tools/backend.ts
-function isRecord25(value) {
+function isRecord28(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function backendRequest(backend, path38, init = {}) {
@@ -57628,7 +58163,7 @@ async function searchIndex(call, text4, options = {}) {
   if (options.lookFor) body.look_for = options.lookFor;
   const res = await backendRequest(call.host.backend, "/api/v1/search", { method: "POST", body, signal: call.signal });
   if (!res.ok) return { results: [], error: res.error };
-  const results = Array.isArray(res.data.results) ? res.data.results.filter(isRecord25) : [];
+  const results = Array.isArray(res.data.results) ? res.data.results.filter(isRecord28) : [];
   const error62 = typeof res.data.error === "string" && res.data.error ? res.data.error : void 0;
   return error62 ? { results, error: error62 } : { results };
 }
@@ -57642,14 +58177,14 @@ async function projectCatalog(call, projectId) {
     signal: call.signal
   });
   if (!res.ok) return { items: [], error: res.error };
-  const items = Array.isArray(res.data.items) ? res.data.items.filter(isRecord25) : [];
+  const items = Array.isArray(res.data.items) ? res.data.items.filter(isRecord28) : [];
   const error62 = typeof res.data.error === "string" && res.data.error ? res.data.error : void 0;
   return error62 ? { items, error: error62 } : { items };
 }
 async function watchWindowRequest(call, payload) {
   const res = await backendRequest(call.host.backend, "/api/v1/indexing/watch-window", { method: "POST", body: payload, signal: call.signal });
   if (!res.ok) return { error: res.error };
-  return isRecord25(res.data) ? res.data : { error: "bad watch-window response" };
+  return isRecord28(res.data) ? res.data : { error: "bad watch-window response" };
 }
 async function summarizeIndexedVideo(call, input2) {
   const body = {
@@ -57660,7 +58195,7 @@ async function summarizeIndexedVideo(call, input2) {
   };
   const res = await backendRequest(call.host.backend, "/api/v1/indexing/summarize", { method: "POST", body, signal: call.signal });
   if (!res.ok) return { ok: false, error: res.error };
-  const meta3 = isRecord25(res.data.ai_metadata) ? res.data.ai_metadata : void 0;
+  const meta3 = isRecord28(res.data.ai_metadata) ? res.data.ai_metadata : void 0;
   if (meta3 && (meta3.analyzed || res.data.success)) return { ok: true, aiMetadata: meta3 };
   return { ok: false, error: String(res.data.error || meta3?.error || "Summarize did not complete") };
 }
@@ -57685,7 +58220,7 @@ async function generateTts(call, input2) {
   return { audioBase64: String(res.data.audio_base64 ?? "") };
 }
 function pickPexelsHdLink(video) {
-  const files = Array.isArray(video.video_files) ? video.video_files.filter(isRecord25) : [];
+  const files = Array.isArray(video.video_files) ? video.video_files.filter(isRecord28) : [];
   const pick2 = files.find((f3) => f3.quality === "hd") ?? files[0];
   return String(pick2?.link || "");
 }
@@ -57712,7 +58247,7 @@ function collectProjectIndex(project) {
   const indexNames = [];
   for (const file3 of project.files ?? []) {
     if (file3.zenvi_subclip) continue;
-    const ai = isRecord25(file3.ai_metadata) ? file3.ai_metadata : {};
+    const ai = isRecord28(file3.ai_metadata) ? file3.ai_metadata : {};
     const block = getIndexBlock(ai);
     if (!isIndexed(block)) continue;
     const videoId = String(block.video_id ?? "").trim();
@@ -57793,8 +58328,8 @@ function snapToSliceGrid(seconds2, fpsNum, fpsDen) {
   if (fpsNum <= 0 || fpsDen <= 0) return seconds2;
   const x = seconds2 * fpsNum / fpsDen;
   const f3 = Math.floor(x);
-  const diff = x - f3;
-  const r = diff > 0.5 ? f3 + 1 : diff < 0.5 ? f3 : f3 % 2 === 0 ? f3 : f3 + 1;
+  const diff2 = x - f3;
+  const r = diff2 > 0.5 ? f3 + 1 : diff2 < 0.5 ? f3 : f3 % 2 === 0 ? f3 : f3 + 1;
   return r * fpsDen / fpsNum;
 }
 function indexSearchForResolver(call) {
@@ -57806,7 +58341,7 @@ function indexSearchForResolver(call) {
     if (!indexId) {
       const ids2 = [];
       for (const ctx of contexts) {
-        const tl = isRecord25(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
+        const tl = isRecord28(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
         if (String(tl.status ?? "").toLowerCase() !== "ready") continue;
         const id = String(tl.index_id ?? "").trim();
         if (id) ids2.push(id);
@@ -57818,7 +58353,7 @@ function indexSearchForResolver(call) {
     if (res.error || res.results.length === 0) return [];
     const byVideo = /* @__PURE__ */ new Map();
     for (const ctx of contexts) {
-      const tl = isRecord25(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
+      const tl = isRecord28(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
       if (String(tl.status ?? "").toLowerCase() !== "ready") continue;
       const vid = String(tl.video_id ?? "").trim();
       if (vid) byVideo.set(vid, [...byVideo.get(vid) ?? [], ctx]);
@@ -57857,7 +58392,7 @@ var init_backend2 = __esm({
 });
 
 // ../engine/src/tools/catalog/common.ts
-function isRecord26(value) {
+function isRecord29(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function text(value) {
@@ -57980,7 +58515,7 @@ function forgetFile(call) {
   lastFiles.get(call.doc)?.delete(call.session);
 }
 function record4(value) {
-  return isRecord26(value) ? value : {};
+  return isRecord29(value) ? value : {};
 }
 var MAX_UNDO_STEPS, STEP_WORDS, ORDINALS, lastFiles;
 var init_common = __esm({
@@ -58060,7 +58595,7 @@ function collectTimelineAudio(project, layerFilter) {
       windows,
       windowSource,
       level: currentStaticLevel(clip2),
-      points: curvePoints(clip2).length,
+      points: curvePoints2(clip2).length,
       analyzed: Boolean(effective.analyzed)
     });
   }
@@ -58487,14 +59022,14 @@ function effectColor(effect3, name, fallback) {
 function styleFromEffect(effect3, project) {
   const e = effect3;
   const [w, h] = projectSize(project);
-  const short = Math.min(w, h);
+  const short2 = Math.min(w, h);
   const units = w / 600;
   const kf = (name, fallback) => keyframeValueAt(e[name], 1, fallback);
   const fontPx = kf("font_size", 30) * units;
   const top = kf("top", 0.75);
   const font = e.caption_font;
   return {
-    text_size: short ? pyRoundTo(fontPx / short, 4) : 0.05,
+    text_size: short2 ? pyRoundTo(fontPx / short2, 4) : 0.05,
     font: font === void 0 || font === null || font === "" || font === "sans" ? "" : String(font),
     text_color: effectColor(e, "color", "#ffffff"),
     text_alpha: kf("font_alpha", 1),
@@ -58572,8 +59107,8 @@ var init_caption_style = __esm({
       properties(project, lines2 = 2) {
         const v = this.values;
         const [w, h] = projectSize(project);
-        const short = Math.min(w, h);
-        const fontPx = Math.max(4, Number(v.text_size) * short);
+        const short2 = Math.min(w, h);
+        const fontPx = Math.max(4, Number(v.text_size) * short2);
         const toUnits = 600 / w;
         const lineSpacing = Number(v.line_spacing ?? 1);
         const vertical = isVertical(project);
@@ -58735,13 +59270,13 @@ var init_captions = __esm({
         run: (call, input2) => guarded("list_captions_tool", () => {
           const project = call.doc.project;
           const wanted = String(input2.timeline_clip_id ?? "").trim();
-          const tracks = [];
+          const tracks2 = [];
           for (const clip2 of project.clips) {
             if (wanted && clip2.id !== wanted) continue;
             for (const effect3 of captionEffects(clip2)) {
               const look = styleFromEffect(effect3, project);
               const [start, end] = clipExtent(clip2);
-              tracks.push({
+              tracks2.push({
                 timeline_clip_id: clip2.id,
                 clip_title: clipLabel(clip2),
                 effect_id: effect3.id,
@@ -58754,9 +59289,9 @@ var init_captions = __esm({
               });
             }
           }
-          if (wanted && tracks.length === 0 && !clipById2(project, wanted)) toolError(`no timeline clip with id=${pyReprString(wanted)}`);
-          const total = tracks.reduce((n, t) => n + t.cues.length, 0);
-          return applied("list_captions_tool", `${tracks.length} caption track(s), ${total} cue(s).`, { data: { caption_tracks: tracks } }, 0);
+          if (wanted && tracks2.length === 0 && !clipById2(project, wanted)) toolError(`no timeline clip with id=${pyReprString(wanted)}`);
+          const total = tracks2.reduce((n, t) => n + t.cues.length, 0);
+          return applied("list_captions_tool", `${tracks2.length} caption track(s), ${total} cue(s).`, { data: { caption_tracks: tracks2 } }, 0);
         })
       }),
       contractTool("edit_captions_tool", {
@@ -58933,6 +59468,1282 @@ var init_captions = __esm({
   }
 });
 
+// ../engine/src/tools/catalog/timeline-edit-common.ts
+function failText(message) {
+  const line2 = String(message).split(/\s+/).filter(Boolean).join(" ");
+  return line2.startsWith("Error") ? line2 : `Error: ${line2}`;
+}
+async function editorRun(body) {
+  try {
+    return await body();
+  } catch (error62) {
+    if (error62 instanceof ToolError) return failText(error62.message);
+    throw error62;
+  }
+}
+function oneLine(summary) {
+  return String(summary).split(/\s+/).filter(Boolean).join(" ");
+}
+function ok(call, summary, data) {
+  return applied(call.tool, oneLine(summary), { data });
+}
+function nothingChanged(call, summary, data) {
+  return unchanged(call.tool, oneLine(summary), { data: { changed: false, ...data } });
+}
+function gridOf(project) {
+  const num12 = Math.trunc(Number(project.fps?.num)) || 30;
+  const den2 = Math.trunc(Number(project.fps?.den)) || 1;
+  const fps = num12 / den2;
+  return { fps, frame: 1 / fps, tol: 0.5 / fps, snap: (seconds2) => pyRound(seconds2 * fps) / fps };
+}
+function r3(value) {
+  return Number(pyFixed(Number(value) || 0, 3));
+}
+function f2(value) {
+  return pyFixed(value, 2);
+}
+function spanOf(item) {
+  const position = Number(item.position) || 0;
+  return [position, position + Math.max(0, (Number(item.end) || 0) - (Number(item.start) || 0))];
+}
+function uiTrack(project, layer2) {
+  return layerNumberToDisplayIndex(layer2, project.layers);
+}
+function trackName(project, layer2) {
+  const ui = uiTrack(project, layer2);
+  return ui ? `track ${ui}` : `layer ${layer2}`;
+}
+function resolveLayer2(project, track2) {
+  const text4 = track2 === void 0 || track2 === null ? "" : String(track2).trim();
+  if (!text4) throw new ToolError("a track is required (UI track number, name, or layer number)");
+  const resolved = normalizeTrackOrLayerArg(text4, project.layers);
+  if (resolved.error) throw new ToolError(resolved.error);
+  if (resolved.layer === void 0) throw new ToolError(`no track matches ${pyReprString(String(track2))}`);
+  return resolved.layer;
+}
+function requireUnlockedTracks(project, layers, what = "") {
+  const lockedNumbers = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
+  const locked = [...new Set(layers)].filter((n) => lockedNumbers.has(n)).sort((a, b) => a - b);
+  if (locked.length === 0) return;
+  const names2 = locked.map((n) => trackName(project, n)).join(", ");
+  const [verb, pronoun] = locked.length === 1 ? ["is", "it"] : ["are", "them"];
+  throw new ToolError(`${names2} ${verb} locked${what ? ` (${what})` : ""}; unlock ${pronoun} first (Track menu > Unlock Track)`);
+}
+function layersBottomUp(project) {
+  return [...project.layers].map((l) => l.number).sort((a, b) => a - b);
+}
+function isImageClip(clip2) {
+  const reader = clip2.reader;
+  return Boolean(reader?.has_single_image) || reader?.media_type === "image";
+}
+function clipTitle2(clip2) {
+  return String(clip2.title || clip2.id);
+}
+function clipById3(project, id) {
+  return project.clips.find((c) => c.id === id);
+}
+function describeClip(project, clip2) {
+  const [start, end] = spanOf(clip2);
+  return {
+    timeline_clip_id: String(clip2.id),
+    title: String(clip2.title ?? ""),
+    file_id: String(clip2.file_id ?? ""),
+    track: uiTrack(project, clip2.layer),
+    layer: clip2.layer,
+    position: r3(start),
+    end: r3(end),
+    duration: r3(end - start),
+    source_in: r3(Number(clip2.start) || 0),
+    source_out: r3(Number(clip2.end) || 0)
+  };
+}
+function clipsGiven(target) {
+  return (target.timeline_clip_ids?.length ?? 0) > 0 || Boolean(target.clip_query?.trim()) || Boolean(target.scope?.trim());
+}
+async function targetClip(call, target) {
+  const resolved = await resolveClip(call, target);
+  if (!resolved.ok) throw new ToolError(resolved.error || "could not resolve the timeline clip");
+  return resolved.clip;
+}
+function clipsByIds(project, ids2) {
+  return ids2.map((raw) => {
+    const clip2 = clipById3(project, String(raw).trim());
+    if (!clip2) throw new ToolError(`no timeline clip with id=${pyReprString(String(raw))}`);
+    return clip2;
+  });
+}
+function selectedClipIds(call) {
+  const clips = new Set(call.doc.project.clips.map((c) => c.id));
+  return (call.host.ui?.selectedIds?.() ?? []).filter((id) => clips.has(id));
+}
+async function targetClips(call, target) {
+  const project = call.doc.project;
+  const scope = (target.scope ?? "").trim().toLowerCase();
+  let clips;
+  if ((target.timeline_clip_ids?.length ?? 0) > 0) {
+    clips = clipsByIds(project, target.timeline_clip_ids);
+  } else if (scope === "selected") {
+    const ids2 = selectedClipIds(call);
+    if (ids2.length === 0) throw new ToolError("no clips are selected in the timeline");
+    clips = clipsByIds(project, ids2);
+  } else if (scope === "track" || scope === "all") {
+    clips = [...project.clips];
+    if (scope === "track") {
+      const layer2 = resolveLayer2(project, target.track);
+      clips = clips.filter((c) => c.layer === layer2);
+    }
+    if (clips.length === 0) throw new ToolError(scope === "all" ? "the timeline has no clips" : `track ${pyStr(target.track ?? "")} has no clips`);
+  } else {
+    clips = [await targetClip(call, { clip_query: target.clip_query, track: target.track })];
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const out = clips.filter((c) => seen.has(c.id) ? false : (seen.add(c.id), true));
+  return out.sort((a, b) => Number(a.position) - Number(b.position) || a.layer - b.layer);
+}
+function overlapRow(project, hit) {
+  return {
+    timeline_clip_id: hit.clipId,
+    title: hit.title,
+    overlaps: hit.overlapsId,
+    overlaps_title: hit.overlapsTitle,
+    track: uiTrack(project, hit.layer),
+    seconds: r3(hit.seconds)
+  };
+}
+function newOverlaps(project, changes, newItems = []) {
+  return plannedOverlaps(project, changes, newItems, gridOf(project).tol).map((hit) => overlapRow(project, hit));
+}
+function checkOverlaps(hits, allowOverlap, what, rippleHint = true) {
+  if (hits.length > 0 && !allowOverlap) {
+    const first = hits[0];
+    const more = hits.length > 1 ? ` (+${hits.length - 1} more)` : "";
+    let options = "pass allow_overlap=true to overlap anyway";
+    if (rippleHint) options = `pass ripple=true to push the later clips along, or ${options}`;
+    throw new ToolError(
+      `${what} would overlap ${pyReprString(first.overlaps_title)} (${first.overlaps}) on track ${pyStr(first.track)} by ${pyFloat(first.seconds)} s${more}; ${options}`
+    );
+  }
+  return hits;
+}
+var ToolError;
+var init_timeline_edit_common = __esm({
+  "../engine/src/tools/catalog/timeline-edit-common.ts"() {
+    "use strict";
+    init_rounding();
+    init_sequence();
+    init_pyfmt();
+    init_receipt();
+    init_tracks2();
+    init_common();
+    ToolError = class extends Error {
+    };
+  }
+});
+
+// ../engine/src/tools/clip-props-model.ts
+function norm(text4) {
+  return String(text4).trim().toLowerCase().replace(/[\s_\-/()]+/g, "");
+}
+function isRecord30(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function shape2(key) {
+  return SHAPES[key];
+}
+function propertyDefault(key) {
+  const value = shape2(key);
+  if (isRecord30(value) && Array.isArray(value.Points)) {
+    const first = curvePoints(value)[0];
+    return first ? pointY(first) : 0;
+  }
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  return 0;
+}
+function isChoice(info) {
+  return info.choices.length > 0;
+}
+function choiceName(info, value) {
+  for (const [name, val] of info.choices) {
+    if (Number(val) === Number(value) && value !== null && value !== void 0 && value !== "") return name;
+  }
+  return void 0;
+}
+function describeInfo(info) {
+  const out = { label: info.label, type: info.kind, keyframable: info.keyframable };
+  if (info.choices.length > 0) out.choices = info.choices.map(([name]) => name);
+  else if (info.minimum !== null && (info.kind === "float" || info.kind === "int")) {
+    out.min = info.minimum;
+    out.max = info.maximum;
+  }
+  return out;
+}
+function settableKeys() {
+  return Object.keys(PROPS).filter((key) => !(key in REFUSED)).sort();
+}
+function resolveKey2(name) {
+  const raw = String(name ?? "").trim();
+  if (!raw) throw new ToolError("a property name is required");
+  let key;
+  if (raw in PROPS || SHAPE_KEYS.has(raw)) {
+    key = raw;
+  } else {
+    const wanted = norm(raw);
+    key = Object.keys(PROPS).find((k) => norm(k) === wanted);
+    key ??= Object.entries(PROPS).find(([, meta3]) => norm(meta3.name ?? "") === wanted)?.[0];
+    key ??= PROPERTY_ALIASES[raw.toLowerCase()] ?? PROPERTY_ALIASES[wanted];
+    if (!key && NOT_RENDERED.test(raw.toLowerCase())) key = raw.toLowerCase();
+  }
+  if (!key) throw new ToolError(`unknown clip property ${pyReprString(raw)}; settable: ${settableKeys().join(", ")}`);
+  if (NOT_RENDERED.test(key)) {
+    throw new ToolError(
+      `${key}: libopenshot 1.0 does not render perspective corners, so the editor does not offer them; use scale, shear, rotation or location instead`
+    );
+  }
+  if (key in REFUSED) throw new ToolError(`${key}: ${REFUSED[key]}`);
+  if (!(key in PROPS)) throw new ToolError(`${key} is not a clip property the editor shows; settable: ${settableKeys().join(", ")}`);
+  return key;
+}
+function isCurve2(value) {
+  return isRecord30(value) && (Array.isArray(value.Points) || "red" in value);
+}
+function currentValue(clip2, key) {
+  return key in clip2 ? clip2[key] : shape2(key);
+}
+function projectFpsFloat(project) {
+  const num12 = Math.trunc(Number(project.fps?.num)) || 30;
+  const den2 = Math.trunc(Number(project.fps?.den)) || 1;
+  return num12 / den2;
+}
+function propertyInfo(key, clip2, project) {
+  const meta3 = PROPS[key];
+  const data = clip2;
+  const kind = String(meta3.type || "float");
+  const keyframable = isCurve2(currentValue(data, key)) || isCurve2(shape2(key));
+  const choices = (meta3.choices ?? []).map((c) => [String(c.name), c.value]);
+  let lo = meta3.min;
+  let hi = meta3.max;
+  const override = RANGE_OVERRIDES[key];
+  if (override) {
+    [lo, hi] = override;
+  } else if (SCALE_KEYS.has(key)) {
+    const reader = isRecord30(data.reader) ? data.reader : {};
+    const path38 = String(reader.path ?? "").toLowerCase();
+    const m = maxTransformMultiple(project.width, project.height, path38.endsWith(".svg"));
+    [lo, hi] = [-m, m];
+  } else if (key === "time") {
+    let frames = videoLengthToProjectFrames(isRecord30(data.reader) ? data.reader : {}, project.fps);
+    if (!frames) frames = pyRound((Number(data.end) || 0) * projectFpsFloat(project)) + 1;
+    [lo, hi] = [1, Math.max(1, Math.trunc(frames))];
+  }
+  if (kind === "color") [lo, hi] = [0, 255];
+  return { key, label: String(meta3.name || key), kind, keyframable, choices, minimum: lo, maximum: hi, default: propertyDefault(key) };
+}
+function pythonFloat(text4) {
+  const t = text4.trim().toLowerCase();
+  const special = /^([+-]?)(inf|infinity|nan)$/.exec(t);
+  if (special) return special[2] === "nan" ? Number.NaN : special[1] === "-" ? -Infinity : Infinity;
+  return parsePythonFloat(t);
+}
+function colorValue2(value) {
+  try {
+    return parseEditorColor(value);
+  } catch (error62) {
+    if (error62 instanceof TextToolError) throw new ToolError(error62.message);
+    throw error62;
+  }
+}
+function coerceValue2(info, value, project, clipId2 = "") {
+  const where = clipId2 ? `${info.key} on clip ${clipId2}` : info.key;
+  if (info.kind === "color") return colorValue2(value);
+  if (info.key === "parentObjectId") return coerceParent(value, clipId2, project);
+  if (info.choices.length > 0) return coerceChoice(info, value, where);
+  if (info.kind === "string") return value === null || value === void 0 ? "" : typeof value === "string" ? value : pyStrValue(value);
+  if (typeof value === "boolean" || value === null || value === void 0) {
+    throw new ToolError(`${where} must be a number, got ${pyRepr2(value ?? null)}`);
+  }
+  let number4;
+  if (typeof value === "number") {
+    number4 = value;
+  } else {
+    const text4 = pyStrValue(value).trim();
+    const parsed = pythonFloat(text4.replace(/%+$/, ""));
+    number4 = parsed === null ? null : text4.endsWith("%") ? parsed / 100 : parsed;
+  }
+  if (number4 === null) throw new ToolError(`${where} must be a number, got ${pyRepr2(value)}`);
+  if (!Number.isFinite(number4)) throw new ToolError(`${where} must be finite, got ${pyRepr2(value)}`);
+  if (info.minimum !== null && info.maximum !== null && !(info.minimum - 1e-9 <= number4 && number4 <= info.maximum + 1e-9)) {
+    throw new ToolError(`${where} must be between ${pyG(info.minimum)} and ${pyG(info.maximum)}, got ${pyG(number4)}`);
+  }
+  if (info.kind === "int") {
+    if (Math.abs(number4 - pyRound(number4)) > 1e-9) throw new ToolError(`${where} must be a whole number, got ${pyRepr2(value)}`);
+    return pyRound(number4);
+  }
+  return number4;
+}
+function pyStrValue(value) {
+  return typeof value === "string" ? value : pyRepr2(value);
+}
+function storedChoice(val) {
+  const n = Number(val);
+  return Number.isInteger(n) ? n : val;
+}
+function coerceChoice(info, value, where) {
+  const names2 = info.choices.map(([name]) => name);
+  let wanted;
+  if (typeof value === "boolean") {
+    wanted = norm(value ? "on" : "off");
+    if (info.key === "waveform") wanted = norm(value ? "yes" : "no");
+  } else if (typeof value === "number") {
+    for (const [, val] of info.choices) if (Number(val) === value) return storedChoice(val);
+    throw new ToolError(`${where} must be one of ${pyRepr2(names2)} (or their values), got ${pyRepr2(value)}`);
+  } else {
+    const text4 = value === null || value === void 0 ? "None" : pyStrValue(value);
+    const number4 = pythonFloat(text4);
+    if (number4 !== null) {
+      for (const [, val] of info.choices) if (Number(val) === number4) return storedChoice(val);
+      throw new ToolError(`${where} must be one of ${pyRepr2(names2)} (or their values), got ${pyFloat(number4)}`);
+    }
+    wanted = norm(text4);
+  }
+  const alias = CHOICE_ALIASES[info.key]?.[wanted];
+  for (const [name, val] of info.choices) {
+    if (norm(name) === wanted || alias !== void 0 && name === alias) return storedChoice(val);
+  }
+  throw new ToolError(`${where} must be one of ${pyRepr2(names2)}, got ${pyRepr2(value ?? null)}`);
+}
+function coerceParent(value, clipId2, project) {
+  const text4 = String(value ?? "").trim();
+  if (["", "none", "null"].includes(text4.toLowerCase())) return "";
+  if (text4 === clipId2) throw new ToolError("a clip cannot be its own parent");
+  if (project.clips.some((c) => c.id === text4)) return text4;
+  const effectId = text4.includes("-") ? text4.slice(0, text4.lastIndexOf("-")) : text4;
+  for (const clip2 of project.clips) {
+    for (const effect3 of clip2.effects ?? []) {
+      if (isRecord30(effect3) && effect3.id === effectId && effect3.objects) return text4;
+    }
+  }
+  throw new ToolError(
+    `parentObjectId ${pyReprString(text4)} is neither a timeline clip id nor a tracked object (<tracker effect id>-<object index>)`
+  );
+}
+function storedStatic(info, value, current) {
+  if (typeof current === "boolean" && info.choices.length > 0) return Boolean(value);
+  return value;
+}
+function roundTo(x, digits) {
+  const value = Number(pyFixed(x, digits));
+  return value === 0 ? 0 : value;
+}
+function displayValue(info, raw) {
+  if (info.kind === "color" && Array.isArray(raw)) {
+    return `#${raw.map((c) => Math.trunc(c).toString(16).padStart(2, "0")).join("")}`;
+  }
+  if (info.choices.length > 0) return choiceName(info, raw) ?? raw;
+  if (typeof raw === "number" && !Number.isInteger(raw)) return roundTo(raw, 6);
+  return raw;
+}
+function mirrorBlocker(scaleKey, gravity) {
+  let g = 4;
+  if (typeof gravity === "number" && Number.isFinite(gravity)) g = Math.trunc(gravity);
+  else if (typeof gravity === "boolean") g = Number(gravity);
+  else if (typeof gravity === "string" && /^\s*[+-]?\d+\s*$/.test(gravity)) g = Number.parseInt(gravity, 10);
+  if (CENTERED[scaleKey].includes(g)) return void 0;
+  const axis2 = scaleKey === "scale_x" ? "left/right" : "top/bottom";
+  const fixes = CENTERED[scaleKey].map((i) => GRAVITY_NAMES[i]).join(", ");
+  const name = g >= 0 && g < 9 ? GRAVITY_NAMES[g] : String(g);
+  return `anchored to the ${axis2} edge (gravity ${name}): libopenshot 1.0 draws a mirrored clip from its anchor outward, off-screen; set gravity to ${fixes} (and place it with location_${scaleKey === "scale_x" ? "x" : "y"}) before mirroring`;
+}
+function mirrorWarnings(clip2, values) {
+  const data = clip2;
+  const gravity = "gravity" in values ? values.gravity : "gravity" in data ? data.gravity : 4;
+  const out = [];
+  for (const key of ["scale_x", "scale_y"]) {
+    const curve2 = key in values ? values[key] : data[key];
+    if (curvePoints(curve2).some((p) => Number(p.co.Y ?? 0) < 0)) {
+      const reason = mirrorBlocker(key, gravity);
+      if (reason) out.push(`${key} < 0 mirrors the clip but it is ${reason}`);
+    }
+  }
+  return out;
+}
+function valueAt2(info, clip2, frame) {
+  const data = clip2;
+  const current = currentValue(data, info.key);
+  if (info.kind === "color") {
+    const curves = isRecord30(current) ? current : {};
+    const fallbackCurves = isRecord30(shape2(info.key)) ? shape2(info.key) : {};
+    return COLOR_CHANNELS.map((ch) => {
+      const fallback = keyframeValue(fallbackCurves[ch], 1, ch === "alpha" ? 255 : 0);
+      return pyRound(keyframeValue(curves[ch], frame, fallback));
+    });
+  }
+  if (isCurve2(current)) {
+    const value = keyframeValue(current, frame, Number(info.default) || 0);
+    if (info.kind === "int" || info.choices.length > 0) return pyRound(value);
+    return value;
+  }
+  if (current === null || current === void 0) return info.default;
+  if (typeof current === "boolean") return info.choices.length > 0 ? Number(current) : current;
+  return current;
+}
+function isAnimated(info, clip2) {
+  const current = clip2[info.key];
+  if (info.kind === "color" && isRecord30(current)) return COLOR_CHANNELS.some((ch) => curvePoints(current[ch]).length > 1);
+  return curvePoints(current).length > 1;
+}
+function slug(label2) {
+  const text4 = label2.toLowerCase().replace("(default)", "").replaceAll("/", "_").replaceAll("(", " ").replaceAll(")", " ");
+  return text4.split(/\s+/).filter(Boolean).join("_");
+}
+function easeOf(prev, point3) {
+  if (prev === void 0 || Math.trunc(Number(point3.interpolation ?? Interpolation.BEZIER)) !== Interpolation.BEZIER) return void 0;
+  const hr = isRecord30(prev.handle_right) ? prev.handle_right : {};
+  const hl = isRecord30(point3.handle_left) ? point3.handle_left : {};
+  const handles = [Number(hr.X ?? 0.5), Number(hr.Y ?? 0), Number(hl.X ?? 0.5), Number(hl.Y ?? 1)];
+  if (handles.some((h) => !Number.isFinite(h))) return void 0;
+  const same = (preset) => handles.every((h, i) => Math.abs(h - preset[i]) < 1e-6);
+  if (same(DEFAULT_HANDLES)) return "default";
+  for (const [name, preset] of EASE_PRESETS) if (same(preset)) return name;
+  return "custom";
+}
+function describePoints(curve2, time3) {
+  const points = curvePoints(curve2);
+  return points.map((point3, i) => {
+    const x = pointX(point3);
+    const item = {
+      frame: Number.isInteger(x) ? x : roundTo(x, 3),
+      clip_seconds: time3.clipSeconds(x),
+      timeline_seconds: time3.timelineSeconds(x),
+      value: roundTo(pointY(point3), 6),
+      interpolation: INTERPOLATION_NAMES[Math.trunc(Number(point3.interpolation ?? Interpolation.BEZIER))] ?? "bezier"
+    };
+    const ease = easeOf(i > 0 ? points[i - 1] : void 0, point3);
+    if (ease && ease !== "default") item.ease = ease;
+    if (!time3.contains(x)) item.outside_clip = true;
+    return item;
+  });
+}
+var INTERPOLATION_NAMES, DEFAULT_HANDLES, REFUSED, NOT_RENDERED, MAX_VOLUME, RANGE_OVERRIDES, SCALE_KEYS, PROPERTY_ALIASES, ON_OFF, CHOICE_ALIASES, PROPS, SHAPES, SHAPE_KEYS, GRAVITY_NAMES, CENTERED, EASE_PRESETS, ClipTime;
+var init_clip_props_model = __esm({
+  "../engine/src/tools/clip-props-model.ts"() {
+    "use strict";
+    init_color();
+    init_rules();
+    init_compact();
+    init_libopenshot_defaults_data();
+    init_rounding();
+    init_timing();
+    init_types();
+    init_keyframes();
+    init_timeline_edit_common();
+    init_coerce();
+    init_pyfmt();
+    init_titles_text();
+    INTERPOLATION_NAMES = {
+      [Interpolation.BEZIER]: "bezier",
+      [Interpolation.LINEAR]: "linear",
+      [Interpolation.CONSTANT]: "constant"
+    };
+    DEFAULT_HANDLES = [0.5, 0, 0.5, 1];
+    REFUSED = {
+      id: "the clip id is read-only",
+      duration: "duration is read-only; trim the clip's start/end with the timeline editing tools",
+      position: "position is the clip's place on the timeline; move it with the timeline editing tools",
+      start: "start is the clip's trim in point; trim it with the timeline editing tools",
+      end: "end is the clip's trim out point; trim it with the timeline editing tools",
+      layer: "layer is the clip's track; move it to another track with the timeline editing tools"
+    };
+    NOT_RENDERED = /^perspective_c[1-4]_[xy]$/;
+    MAX_VOLUME = 1.3;
+    RANGE_OVERRIDES = {
+      // Slide presets move a picture-in-picture a full frame past its offset.
+      location_x: [-10, 10],
+      location_y: [-10, 10],
+      // Spin presets add a full turn to the current angle.
+      rotation: [-3600, 3600],
+      volume: [0, MAX_VOLUME]
+    };
+    SCALE_KEYS = /* @__PURE__ */ new Set(["scale_x", "scale_y", "shear_x", "shear_y"]);
+    PROPERTY_ALIASES = {
+      opacity: "alpha",
+      blend: "composite",
+      blend_mode: "composite",
+      blendmode: "composite",
+      parent: "parentObjectId",
+      parent_object_id: "parentObjectId",
+      frame_number: "display",
+      volume_mixing: "mixing",
+      enable_audio: "has_audio",
+      enable_video: "has_video",
+      scale_mode: "scale",
+      fit: "scale",
+      anchor_point: "gravity"
+    };
+    ON_OFF = { true: "On", false: "Off", yes: "On", no: "Off", enabled: "On", disabled: "Off" };
+    CHOICE_ALIASES = {
+      scale: { fit: "Best Fit", contain: "Best Fit", fill: "Crop", cover: "Crop", distort: "Stretch", original: "None" },
+      gravity: { top: "Top Center", bottom: "Bottom Center", centre: "Center", middle: "Center", topmiddle: "Top Center", bottommiddle: "Bottom Center" },
+      composite: {
+        over: "Normal",
+        sourceover: "Normal",
+        plus: "Add",
+        additive: "Add",
+        burn: "Color Burn",
+        dodge: "Color Dodge",
+        colourburn: "Color Burn",
+        colourdodge: "Color Dodge"
+      },
+      has_audio: ON_OFF,
+      has_video: ON_OFF,
+      waveform: { true: "Yes", false: "No", on: "Yes", off: "No", show: "Yes", hide: "No" }
+    };
+    PROPS = LIBOPENSHOT_CLIP_PROPERTIES;
+    SHAPES = Object.freeze(expandCompact(LIBOPENSHOT_CLIP_JSON));
+    SHAPE_KEYS = /* @__PURE__ */ new Set([...Object.keys(SHAPES), "id", "reader"]);
+    GRAVITY_NAMES = ["Top Left", "Top Center", "Top Right", "Left", "Center", "Right", "Bottom Left", "Bottom Center", "Bottom Right"];
+    CENTERED = { scale_x: [1, 4, 7], scale_y: [3, 4, 5] };
+    EASE_PRESETS = new Map(
+      KEYFRAME_BEZIER_PRESETS.map((p) => [slug(p.name), p.handles])
+    );
+    ClipTime = class _ClipTime {
+      constructor(fps, position, start, end) {
+        this.fps = fps;
+        this.position = position;
+        this.start = start;
+        this.end = end;
+      }
+      fps;
+      position;
+      start;
+      end;
+      static of(clip2, project) {
+        return new _ClipTime(projectFpsFloat(project), Number(clip2.position) || 0, Number(clip2.start) || 0, Number(clip2.end) || 0);
+      }
+      /** X of the first visible frame (what the menus call start_of_clip). */
+      get firstFrame() {
+        return pyRound(this.start * this.fps) + 1;
+      }
+      /** X of the clip's end boundary (the menus' end_of_clip). */
+      get endFrame() {
+        return Math.max(this.firstFrame, pyRound(this.end * this.fps) + 1);
+      }
+      get duration() {
+        return Math.max(0, this.end - this.start);
+      }
+      fromClipSeconds(seconds2) {
+        return pyRound((this.start + seconds2) * this.fps) + 1;
+      }
+      fromTimelineSeconds(seconds2) {
+        return pyRound((this.start + seconds2 - this.position) * this.fps) + 1;
+      }
+      fromSourceSeconds(seconds2) {
+        return pyRound(seconds2 * this.fps) + 1;
+      }
+      clipSeconds(frame) {
+        return roundTo((frame - 1) / this.fps - this.start, 4);
+      }
+      timelineSeconds(frame) {
+        return roundTo(this.position + (frame - 1) / this.fps - this.start, 4);
+      }
+      contains(frame) {
+        return this.firstFrame <= frame && frame <= this.endFrame;
+      }
+      rangesText() {
+        return `frames ${this.firstFrame}-${this.endFrame}, seconds 0-${pyFixed(this.duration, 3)} from the clip's start, timeline_seconds ${pyFixed(this.position, 3)}-${pyFixed(this.position + this.duration, 3)}, source_seconds ${pyFixed(this.start, 3)}-${pyFixed(this.end, 3)}`;
+      }
+    };
+  }
+});
+
+// ../engine/src/tools/catalog/clip-props.ts
+async function run(body) {
+  try {
+    return await body();
+  } catch (error62) {
+    if (error62 instanceof ToolError || error62 instanceof TextToolError) return failText(error62.message);
+    throw error62;
+  }
+}
+function isRecord31(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function num42(value) {
+  return typeof value === "number" && !Number.isInteger(value) ? roundTo(value, 4) : value;
+}
+function short(value) {
+  if (typeof value === "number") return Number.isInteger(value) ? String(value) : pyG(value, 4);
+  return pyStr(value);
+}
+function isLocked2(project, layer2) {
+  return project.layers.some((l) => Math.trunc(Number(l.number) || 0) === layer2 && Boolean(l.lock));
+}
+async function resolveClips(call, ids2, clipQuery, track2, scopeArg) {
+  const project = call.doc.project;
+  const scope = scopeArg.trim().toLowerCase();
+  if (ids2.length > 0) {
+    return ids2.map((id) => {
+      const clip2 = clipById3(project, String(id).trim());
+      if (!clip2) throw new ToolError(`no timeline clip with id=${pyReprString(String(id))}`);
+      return clip2;
+    });
+  }
+  if (scope === "selected") {
+    const selected = selectedClipIds(call);
+    if (selected.length === 0) throw new ToolError("no clips are selected in the timeline");
+    return resolveClips(call, selected, "", "", "");
+  }
+  if (scope === "track" || scope === "all") {
+    let clips = [...project.clips];
+    if (scope === "track") {
+      const layer2 = resolveLayer2(project, track2);
+      clips = clips.filter((c) => Math.trunc(Number(c.layer) || 0) === layer2);
+    }
+    clips.sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0) || (Number(a.layer) || 0) - (Number(b.layer) || 0));
+    if (clips.length === 0) throw new ToolError(scope === "all" ? "the timeline has no clips" : `track ${track2} has no clips`);
+    return clips;
+  }
+  return [await targetClip(call, { clip_query: clipQuery, track: track2 })];
+}
+async function resolveTargets(call, target) {
+  const project = call.doc.project;
+  const ids2 = [];
+  for (const raw of target.timeline_clip_ids ?? []) {
+    const id = String(raw).trim();
+    if (id && !ids2.includes(id)) ids2.push(id);
+  }
+  const explicit = ids2.length > 0 || !String(target.scope ?? "").trim();
+  const clips = await resolveClips(call, ids2, target.clip_query ?? "", target.track ?? "", target.scope ?? "");
+  const kept = [];
+  const skipped = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const clip2 of clips) {
+    if (seen.has(clip2.id)) continue;
+    seen.add(clip2.id);
+    const layer2 = Math.trunc(Number(clip2.layer) || 0);
+    if (isLocked2(project, layer2)) {
+      const label2 = uiTrack(project, layer2) || layer2;
+      if (explicit) throw new ToolError(`clip ${clip2.id} is on locked track ${label2}; unlock the track first`);
+      skipped.push({ timeline_clip_id: clip2.id, reason: `track ${label2} is locked` });
+      continue;
+    }
+    kept.push(clip2);
+  }
+  if (kept.length === 0) throw new ToolError("every matching clip is on a locked track; unlock it first");
+  return { clips: kept, skipped };
+}
+function outsideClip(atSeconds, clip2, time3) {
+  return new ToolError(
+    `at_seconds=${pyFloat(atSeconds)} is outside clip ${clip2.id} (timeline ${pyFixed(time3.position, 3)}-${pyFixed(time3.position + time3.duration, 3)} s)`
+  );
+}
+async function getClipProperties(call, input2) {
+  const project = call.doc.project;
+  const clip2 = await targetClip(call, input2);
+  const time3 = ClipTime.of(clip2, project);
+  let frame;
+  if (input2.at_seconds === void 0 || input2.at_seconds === null) {
+    const atPlayhead = time3.fromTimelineSeconds(playheadSeconds(call));
+    frame = time3.contains(atPlayhead) ? atPlayhead : time3.firstFrame;
+  } else {
+    frame = time3.fromTimelineSeconds(input2.at_seconds);
+    if (!time3.contains(frame)) throw outsideClip(input2.at_seconds, clip2, time3);
+  }
+  const names2 = input2.properties ?? [];
+  const keys = names2.length > 0 ? names2.map(resolveKey2) : settableKeys();
+  const includeKeyframes = input2.include_keyframes ?? true;
+  const data = clip2;
+  const out = {};
+  const animatedKeys = [];
+  for (const key of keys) {
+    const info = propertyInfo(key, clip2, project);
+    const entry = { value: displayValue(info, num42(valueAt2(info, clip2, frame))), ...describeInfo(info) };
+    if (info.keyframable) {
+      const animated = isAnimated(info, clip2);
+      entry.animated = animated;
+      if (animated) {
+        animatedKeys.push(key);
+        if (includeKeyframes) {
+          if (info.kind === "color") {
+            const curves = isRecord31(data[key]) ? data[key] : {};
+            entry.keyframes = Object.fromEntries(COLOR_CHANNELS.map((ch) => [ch, describePoints(curves[ch], time3)]));
+          } else {
+            entry.keyframes = describePoints(data[key], time3);
+          }
+        }
+      }
+    }
+    out[key] = entry;
+  }
+  const effects = (clip2.effects ?? []).filter(isRecord31).map((e) => ({ id: e.id ?? null, class_name: e.class_name ?? null, name: e.name ?? null }));
+  const head = describeClip(project, clip2);
+  const shown = SUMMARY_KEYS.filter((k) => k in out).map((k) => `${k} ${short(out[k].value)}`).join(", ");
+  const summary = `Clip ${clip2.id} ${pyReprString(head.title)} (track ${pyStr(head.track)}, ${pyFixed(head.position, 2)}-${pyFixed(head.end, 2)} s) at ${pyFixed(time3.timelineSeconds(frame), 2)} s: ${shown || "see receipt"}. Animated: ${animatedKeys.join(", ") || "nothing"}.` + (effects.length > 0 ? ` Effects: ${effects.map((e) => pyStr(e.class_name)).join(", ")}.` : "");
+  return ok(call, summary, {
+    ...head,
+    frame,
+    at_seconds: time3.timelineSeconds(frame),
+    clip_seconds: time3.clipSeconds(frame),
+    first_frame: time3.firstFrame,
+    end_frame: time3.endFrame,
+    properties: out,
+    effects
+  });
+}
+async function setClipProperties(call, input2) {
+  const properties = input2.properties;
+  if (!isRecord31(properties) || Object.keys(properties).length === 0) {
+    throw new ToolError('properties must be an object such as {"alpha": 0.5}');
+  }
+  const keys = /* @__PURE__ */ new Map();
+  for (const name of Object.keys(properties)) {
+    const key = resolveKey2(name);
+    if ([...keys.values()].includes(key)) throw new ToolError(`${pyReprString(name)} sets ${key}, which is already in properties`);
+    if (key === "time") {
+      throw new ToolError(
+        "time maps clip frames to source frames (speed); change speed with the speed tools, or animate it with set_keyframes_tool(property='time')"
+      );
+    }
+    keys.set(name, key);
+  }
+  const { clips, skipped } = await resolveTargets(call, input2);
+  const project = call.doc.project;
+  const atSeconds = input2.at_seconds ?? null;
+  const plans = [];
+  for (const clip2 of clips) {
+    const data = clip2;
+    const time3 = ClipTime.of(clip2, project);
+    let frame = null;
+    if (atSeconds !== null) {
+      frame = time3.fromTimelineSeconds(atSeconds);
+      if (!time3.contains(frame)) throw outsideClip(atSeconds, clip2, time3);
+    }
+    const plan = { clip: clip2, values: {}, changed: {}, flattened: {}, warnings: [] };
+    for (const [name, raw] of Object.entries(properties)) {
+      const key = keys.get(name);
+      const info = propertyInfo(key, clip2, project);
+      const value = coerceValue2(info, raw, project, clip2.id);
+      const before = valueAt2(info, clip2, frame ?? time3.firstFrame);
+      if (info.keyframable) {
+        const edit = info.kind === "color" ? setColorCurveValue(data[key], value, frame) : setCurveValue(data[key], Number(value), frame, isChoice(info) ? Interpolation.CONSTANT : Interpolation.BEZIER);
+        if (!edit.changed) continue;
+        if (edit.flattened) plan.flattened[key] = edit.flattened;
+        plan.values[key] = edit.curve;
+      } else {
+        if (frame !== null) throw new ToolError(`${key} cannot be animated, so it takes no at_seconds; set it without one`);
+        const stored = storedStatic(info, value, data[key]);
+        if (sameValue(stored, data[key])) continue;
+        plan.values[key] = stored;
+      }
+      plan.changed[key] = {
+        before: displayValue(info, num42(before)),
+        after: displayValue(info, num42(typeof value === "boolean" ? Number(value) : value))
+      };
+    }
+    if (Object.keys(plan.values).length > 0) {
+      plan.warnings = mirrorWarnings(clip2, plan.values);
+      plans.push(plan);
+    }
+  }
+  const names2 = Object.entries(properties).map(([name, value]) => `${keys.get(name)}=${short(value)}`).join(", ");
+  if (plans.length === 0) {
+    return nothingChanged(call, `Nothing to change: ${names2} already set on ${clips.length} clip(s).`, {
+      timeline_clip_ids: clips.map((c) => c.id),
+      skipped
+    });
+  }
+  call.commit((tx) => {
+    for (const plan of plans) updateClipValues(tx, plan.clip.id, plan.values);
+  });
+  const rows = plans.map((p) => ({
+    timeline_clip_id: p.clip.id,
+    changed: p.changed,
+    ...Object.keys(p.flattened).length > 0 ? { flattened_animation: p.flattened } : {},
+    ...p.warnings.length > 0 ? { warnings: p.warnings } : {}
+  }));
+  const flatKeys = [...new Set(plans.flatMap((p) => Object.keys(p.flattened)))].sort();
+  const flatNote = flatKeys.length > 0 ? ` Replaced an animation with a static value on: ${flatKeys.join(", ")}.` : "";
+  const warnNote = plans.flatMap((p) => p.warnings.map((w) => ` Warning (${p.clip.id}): ${w}.`)).join("");
+  const when2 = atSeconds !== null ? ` at ${pyFixed(atSeconds, 3)} s (keyframe)` : "";
+  return ok(call, `Set ${names2}${when2} on ${plans.length} clip(s).${flatNote}${warnNote}`, { changed: true, clips: rows, skipped });
+}
+async function removeKeyframes(call, input2) {
+  const names2 = (input2.properties ?? []).map((p) => String(p).trim()).filter(Boolean);
+  if (names2.length === 0) throw new ToolError('properties must list at least one property, or ["all"]');
+  const wantAll = names2.some((n) => n.toLowerCase() === "all");
+  const keys = wantAll ? [] : [...new Set(names2.map(resolveKey2))];
+  if (keys.includes("time")) throw new ToolError("removing time keyframes changes the clip's speed; use the speed tools to reset it");
+  const { clips, skipped } = await resolveTargets(call, input2);
+  const project = call.doc.project;
+  const start = input2.start_seconds ?? null;
+  const end = input2.end_seconds ?? null;
+  const plans = [];
+  for (const clip2 of clips) {
+    const data = clip2;
+    const time3 = ClipTime.of(clip2, project);
+    const lo = start !== null ? time3.fromTimelineSeconds(start) : null;
+    const hi = end !== null ? time3.fromTimelineSeconds(end) : null;
+    const clipKeys = wantAll ? settableKeys().filter((k) => {
+      if (k === "time") return false;
+      const info = propertyInfo(k, clip2, project);
+      return info.keyframable && isAnimated(info, clip2);
+    }) : keys;
+    const values = {};
+    const report2 = {};
+    for (const key of clipKeys) {
+      const info = propertyInfo(key, clip2, project);
+      if (!info.keyframable) throw new ToolError(`${key} holds a single value and has no keyframes; set it with set_clip_properties_tool`);
+      if (info.kind === "color") {
+        const curves = isRecord31(data[key]) ? structuredClone(data[key]) : {};
+        let removed = 0;
+        for (const ch of COLOR_CHANNELS) {
+          const result3 = curveWithoutPoints(curves[ch], lo, hi, key, ch);
+          curves[ch] = result3.curve;
+          removed = Math.max(removed, result3.removed);
+        }
+        if (removed) {
+          values[key] = curves;
+          report2[key] = { removed };
+        }
+        continue;
+      }
+      const result2 = curveWithoutPoints(data[key], lo, hi, key);
+      if (result2.removed) {
+        values[key] = result2.curve;
+        report2[key] = { removed: result2.removed, remaining: result2.curve.Points.length };
+        if (result2.resetTo !== void 0) report2[key].reset_to = result2.resetTo;
+      }
+    }
+    if (Object.keys(values).length > 0) plans.push({ clip: clip2, values, report: report2 });
+  }
+  if (plans.length === 0) {
+    const where = start === null && end === null ? "" : " in that time range";
+    throw new ToolError(`no keyframes to remove${where} on ${clips.length} clip(s) for ${wantAll ? "any animated property" : keys.join(", ")}`);
+  }
+  call.commit((tx) => {
+    for (const plan of plans) updateClipValues(tx, plan.clip.id, plan.values);
+  });
+  const total = plans.reduce((sum, p) => sum + Object.values(p.report).reduce((s, r) => s + (r.removed ?? 0), 0), 0);
+  return ok(call, `Removed ${total} keyframe(s) from ${plans.length} clip(s).`, {
+    clips: plans.map((p) => ({ timeline_clip_id: p.clip.id, properties: p.report })),
+    skipped
+  });
+}
+async function copyClipKeyframes(call, input2) {
+  const source2 = await targetClip(call, { timeline_clip_id: input2.source_clip_id, clip_query: input2.source_query, track: input2.source_track });
+  const timing = input2.timing ?? "stretch";
+  const wanted = [...new Set((input2.groups ?? ["all"]).map((g) => String(g).trim().toLowerCase()).filter(Boolean))];
+  const unknown2 = wanted.filter((g) => !(g in COPY_KEYFRAME_GROUPS));
+  if (unknown2.length > 0) throw new ToolError(`unknown keyframe group(s) ${pyRepr2(unknown2)}; choose from ${pyRepr2(Object.keys(COPY_KEYFRAME_GROUPS))}`);
+  if (wanted.includes("time") && timing !== "exact") throw new ToolError("the time (speed) curve can only be copied with timing='exact'");
+  let keys = [...new Set(wanted.flatMap((g) => COPY_KEYFRAME_GROUPS[g]))];
+  const notCopied = [];
+  if (keys.includes("time") && timing !== "exact") {
+    keys = keys.filter((k) => k !== "time");
+    notCopied.push("time");
+  }
+  const given = input2.timeline_clip_ids ?? [];
+  const ids2 = given.map((id) => String(id).trim()).filter((id) => id && id !== source2.id);
+  if (given.length > 0 && ids2.length === 0) {
+    throw new ToolError("the only target given is the source clip itself; name other clips to copy onto");
+  }
+  if (ids2.length === 0 && !input2.clip_query && !input2.scope) throw new ToolError("name the target clips (timeline_clip_ids, clip_query or scope)");
+  const resolved = await resolveTargets(call, { ...input2, timeline_clip_ids: ids2 });
+  const targets = resolved.clips.filter((c) => c.id !== source2.id);
+  if (targets.length === 0) throw new ToolError("no target clips other than the source");
+  const project = call.doc.project;
+  const src = source2;
+  const srcTime = ClipTime.of(source2, project);
+  const plans = [];
+  for (const clip2 of targets) {
+    const data = clip2;
+    const dstTime = ClipTime.of(clip2, project);
+    let values = {};
+    for (const key of keys) {
+      if (!(key in src)) continue;
+      let value = src[key];
+      if (isRecord31(value) && Array.isArray(value.Points)) {
+        value = {
+          Points: retimeCurvePoints(
+            value.Points,
+            { first: srcTime.firstFrame, end: srcTime.endFrame },
+            { first: dstTime.firstFrame, end: dstTime.endFrame },
+            timing
+          )
+        };
+      } else {
+        value = structuredClone(value);
+      }
+      if (!sameValue(data[key], value)) values[key] = value;
+    }
+    if ("time" in values) {
+      const trial = { ...structuredClone(data), ...values };
+      const timing2 = clampTimingToMedia(trial, projectFps(project), data);
+      values = { ...values, time: timing2.time ?? trial.time, start: timing2.start, end: timing2.end, duration: timing2.duration };
+    }
+    if (Object.keys(values).length > 0) plans.push({ clip: clip2, values });
+  }
+  const note = notCopied.length > 0 ? ` (${notCopied.join(", ")} not copied: only with timing='exact')` : "";
+  if (plans.length === 0) {
+    return nothingChanged(call, `Nothing to change: the targets already have clip ${source2.id}'s ${wanted.join(", ")} keyframes${note}.`, {
+      source_clip_id: source2.id,
+      timeline_clip_ids: targets.map((c) => c.id),
+      skipped: resolved.skipped
+    });
+  }
+  call.commit((tx) => {
+    for (const plan of plans) updateClipValues(tx, plan.clip.id, plan.values);
+  });
+  return ok(call, `Copied ${wanted.join(", ")} keyframes from clip ${source2.id} to ${plans.length} clip(s) (timing=${timing})${note}.`, {
+    changed: true,
+    source_clip_id: source2.id,
+    timing,
+    clips: plans.map((p) => ({ timeline_clip_id: p.clip.id, properties: Object.keys(p.values).sort() })),
+    skipped: resolved.skipped,
+    not_copied: notCopied
+  });
+}
+function enginePreset(spec) {
+  const [arg = "", position] = spec.args;
+  const lower = arg.toLowerCase();
+  const range = position ? RANGES[position] : void 0;
+  switch (spec.call) {
+    case "fade":
+      return { id: `fade.${lower}`, range };
+    case "volume":
+      return { id: `volume.${lower}`, range };
+    case "animate":
+      return { id: `animate.${lower}` };
+    case "rotate":
+      return { id: `rotate.${lower}` };
+    case "crop":
+      return { id: `crop.${lower}` };
+    case "no_transform":
+      return { id: "transform.none" };
+    case "flip":
+      return { id: arg === "scale_x" ? "flip.horizontal" : "flip.vertical" };
+    case "layout":
+      if (arg === "ALL_WITH_ASPECT") return { grid: "aspect" };
+      if (arg === "ALL_WITHOUT_ASPECT") return { grid: "stretch" };
+      return { id: `layout.${lower}` };
+  }
+}
+function hasVisual(clip2) {
+  const reader = isRecord31(clip2.reader) ? clip2.reader : {};
+  const hasVideo = reader.has_video;
+  return hasVideo === void 0 || hasVideo === null || Boolean(hasVideo) || Boolean(clip2.waveform);
+}
+function hasAudio(clip2) {
+  const reader = isRecord31(clip2.reader) ? clip2.reader : {};
+  return reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
+}
+function presetSkipReason(spec, clip2) {
+  if ((spec.category === "motion" || spec.category === "transform") && !hasVisual(clip2)) return "audio-only clip (no picture to move or transform)";
+  if (spec.category === "volume" && !hasAudio(clip2)) return "clip has no sound";
+  if (spec.call === "flip") return mirrorBlocker(spec.args[0], "gravity" in clip2 ? clip2.gravity : 4);
+  return void 0;
+}
+function singleValue(curve2) {
+  const points = curvePoints(curve2);
+  return points.length === 1 ? pointY(points[0]) : void 0;
+}
+function alreadyApplied(spec, clip2, levelPercent) {
+  if (spec.name === "fade_none") {
+    return (!hasVisual(clip2) || singleValue(clip2.alpha) === 1) && (!hasAudio(clip2) || singleValue(clip2.volume) === 1);
+  }
+  if (spec.name === "volume_reset") return singleValue(clip2.volume) === 1;
+  if (spec.name === "volume_level") return singleValue(clip2.volume) === Number(levelPercent) / 100;
+  return false;
+}
+function snapshot(clip2) {
+  if (!clip2) return {};
+  const { ui: _ui, ...rest } = structuredClone(clip2);
+  return rest;
+}
+function diff(before, after) {
+  const keys = [.../* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])].filter((k) => k !== "effects" && !sameValue(before[k], after[k])).sort();
+  const effectsOf = (clip2) => new Map((Array.isArray(clip2.effects) ? clip2.effects : []).filter(isRecord31).map((e) => [e.id, e]));
+  const old = effectsOf(before);
+  const now = effectsOf(after);
+  const row = (id, e) => ({ id, class_name: e.class_name ?? null });
+  const out = { changed: keys };
+  const added = [...now].filter(([id]) => !old.has(id)).map(([id, e]) => row(id, e));
+  const removed = [...old].filter(([id]) => !now.has(id)).map(([id, e]) => row(id, e));
+  const updated = [...now].filter(([id, e]) => old.has(id) && !sameValue(old.get(id), e)).map(([id, e]) => row(id, e));
+  if (added.length > 0) out.effects_added = added;
+  if (removed.length > 0) out.effects_removed = removed;
+  if (updated.length > 0) out.effects_changed = updated;
+  return out;
+}
+function receiptInfo(call, spec, targets, duration3, at, level) {
+  const info = {};
+  if ((spec.call === "fade" || spec.call === "volume") && spec.zone) {
+    info.fade_seconds = duration3 ? duration3 : spec.args[0].endsWith("SLOW") ? 3 : 1;
+  } else if (spec.zone === "in" || spec.zone === "out" || spec.zone === "emphasis") {
+    info.zone_seconds = duration3 ? duration3 : 1;
+  }
+  if (spec.zone === "emphasis") {
+    const t = at ?? playheadSeconds(call);
+    info.emphasis_starts_at = Object.fromEntries(
+      targets.map((c) => {
+        const time3 = ClipTime.of(c, call.doc.project);
+        return [c.id, roundTo(time3.contains(time3.fromTimelineSeconds(t)) ? t : time3.position, 3)];
+      })
+    );
+  }
+  if (spec.name === "volume_level") info.level_percent = level;
+  return info;
+}
+async function applyClipPresetTool(call, input2) {
+  const preset = input2.preset;
+  const spec = CLIP_MENU_PRESETS.get(preset);
+  if (!spec) throw new ToolError(`unknown preset ${pyReprString(String(preset))}`);
+  const duration3 = input2.duration_seconds ?? null;
+  const at = input2.at_seconds ?? null;
+  const level = input2.level_percent ?? null;
+  if (duration3 !== null && !["in", "out", "emphasis"].includes(spec.zone)) {
+    throw new ToolError(
+      `${preset} takes no duration_seconds: ` + (spec.zone === "whole" ? "camera moves and credits span the whole clip; trim the clip or animate part of it with set_keyframes_tool" : "it has no length")
+    );
+  }
+  if (at !== null && spec.zone !== "emphasis") throw new ToolError(`at_seconds only sets where an Emphasis preset starts; ${preset} is not one`);
+  if (spec.name === "volume_level") {
+    if (level === null) throw new ToolError("volume_level needs level_percent (0-130, 100 = unchanged)");
+  } else if (level !== null) {
+    throw new ToolError("level_percent only goes with preset='volume_level'");
+  }
+  const { clips, skipped } = await resolveTargets(call, input2);
+  const targets = [];
+  for (const clip2 of clips) {
+    const reason = presetSkipReason(spec, clip2);
+    if (reason) skipped.push({ timeline_clip_id: clip2.id, reason });
+    else targets.push(clip2);
+  }
+  if (targets.length === 0) {
+    throw new ToolError(`${preset} does not apply to the chosen clip(s): ${skipped.map((s) => `${s.timeline_clip_id}: ${s.reason}`).join("; ")}`);
+  }
+  const project = call.doc.project;
+  if (at !== null) {
+    const inside = targets.filter((c) => {
+      const time3 = ClipTime.of(c, project);
+      return time3.contains(time3.fromTimelineSeconds(at));
+    });
+    if (inside.length === 0) throw new ToolError(`at_seconds=${pyFloat(at)} is not over any of the chosen clips`);
+  }
+  const pending = targets.filter((c) => !alreadyApplied(spec, c, level));
+  const ids2 = pending.map((c) => c.id);
+  const info = receiptInfo(call, spec, targets, duration3, at, level);
+  if (pending.length === 0) {
+    return nothingChanged(call, `Nothing to change: ${spec.menu} is already how ${targets.length} clip(s) look.`, {
+      preset,
+      timeline_clip_ids: targets.map((c) => c.id),
+      skipped,
+      ...info
+    });
+  }
+  const before = new Map(ids2.map((id) => [id, snapshot(clipById3(project, id))]));
+  const engine = enginePreset(spec);
+  const opts = {};
+  if (duration3 !== null) {
+    if (spec.call === "animate") opts.zoneSeconds = duration3;
+    else opts.fadeSeconds = duration3;
+  }
+  if (spec.zone === "emphasis") opts.playhead = at ?? playheadSeconds(call);
+  if (spec.name === "volume_level") opts.level = Number(level) / 100;
+  const keepGravity = spec.call === "animate" && ["in", "out", "emphasis"].includes(spec.zone);
+  const keptGravity = {};
+  call.commit((tx) => {
+    if ("grid" in engine) {
+      layoutShowAll(tx, ids2, { stretch: engine.grid === "stretch" });
+    } else {
+      for (const id of ids2) applyClipPreset(tx, id, engine.id, { ...opts, ...engine.range ? { range: engine.range } : {} });
+    }
+    if (keepGravity) {
+      for (const id of ids2) {
+        const gravity = before.get(id).gravity;
+        if (gravity !== void 0 && gravity !== null && gravity !== 4) {
+          updateClipValues(tx, id, { gravity });
+          keptGravity[id] = typeof gravity === "number" && Number.isInteger(gravity) && gravity >= 0 && gravity < 9 ? GRAVITY_NAMES[gravity] : gravity;
+        }
+      }
+    }
+  });
+  const after = call.doc.project;
+  const changes = new Map(ids2.map((id) => [id, diff(before.get(id), snapshot(clipById3(after, id)))]));
+  const changedIds = ids2.filter((id) => {
+    const d = changes.get(id);
+    return d.changed.length > 0 || Object.keys(d).length > 1;
+  });
+  if (changedIds.length === 0) {
+    return nothingChanged(call, `Nothing to change: ${spec.menu} left ${ids2.length} clip(s) as they were.`, {
+      preset,
+      timeline_clip_ids: ids2,
+      skipped,
+      ...info
+    });
+  }
+  const props = [...new Set(changedIds.flatMap((id) => changes.get(id).changed))].sort();
+  let note = skipped.length > 0 ? ` Skipped ${skipped.length} clip(s).` : "";
+  const kept = Object.keys(keptGravity).length > 0;
+  if (kept) note += ` Kept gravity ${[...new Set(Object.values(keptGravity).map(String))].sort().join(", ")} (the menu would recentre).`;
+  return ok(call, `Applied ${spec.menu} to ${changedIds.length} clip(s); changed ${props.join(", ") || "effects"}.${note}`, {
+    changed: true,
+    preset,
+    menu: spec.menu,
+    clips: changedIds.map((id) => ({ timeline_clip_id: id, ...changes.get(id) })),
+    skipped,
+    ...kept ? { kept_gravity: keptGravity } : {},
+    ...info
+  });
+}
+var READ, EDIT, SUMMARY_KEYS, CLIP_MENU_PRESETS, RANGES, clipPropsTools;
+var init_clip_props2 = __esm({
+  "../engine/src/tools/catalog/clip-props.ts"() {
+    "use strict";
+    init_rules();
+    init_types();
+    init_clip_props();
+    init_timing();
+    init_presets();
+    init_clip_props_model();
+    init_define();
+    init_frame_time();
+    init_pyfmt();
+    init_titles_text();
+    init_common();
+    init_timeline_edit_common();
+    READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    EDIT = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    SUMMARY_KEYS = ["alpha", "scale", "gravity", "scale_x", "scale_y", "location_x", "location_y", "rotation", "volume", "composite"];
+    CLIP_MENU_PRESETS = (() => {
+      const out = /* @__PURE__ */ new Map();
+      const add = (name, category, menu, call, args = [], zone = "") => {
+        out.set(name, { name, category, menu, call, args, zone });
+      };
+      const title = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+      add("fade_none", "fade", "Fade > No Fade", "fade", ["NONE", "Entire Clip"]);
+      add("fade_in", "fade", "Fade > Fade In (duration_seconds, default 1 s)", "fade", ["IN_FAST", "Start of Clip"], "in");
+      add("fade_in_fast", "fade", "Fade > Fade In > Fast (1 s)", "fade", ["IN_FAST", "Start of Clip"], "in");
+      add("fade_in_slow", "fade", "Fade > Fade In > Slow (3 s)", "fade", ["IN_SLOW", "Start of Clip"], "in");
+      add("fade_out", "fade", "Fade > Fade Out (duration_seconds, default 1 s)", "fade", ["OUT_FAST", "End of Clip"], "out");
+      add("fade_out_fast", "fade", "Fade > Fade Out > Fast (1 s)", "fade", ["OUT_FAST", "End of Clip"], "out");
+      add("fade_out_slow", "fade", "Fade > Fade Out > Slow (3 s)", "fade", ["OUT_SLOW", "End of Clip"], "out");
+      add("fade_in_out", "fade", "Fade > Fade In and Out (duration_seconds, default 1 s)", "fade", ["IN_OUT_FAST", "Entire Clip"], "in");
+      add("fade_in_out_fast", "fade", "Fade > Fade In and Out > Fast (1 s)", "fade", ["IN_OUT_FAST", "Entire Clip"], "in");
+      add("fade_in_out_slow", "fade", "Fade > Fade In and Out > Slow (3 s)", "fade", ["IN_OUT_SLOW", "Entire Clip"], "in");
+      add("motion_none", "motion", "Motion > No Motion", "animate", ["NONE"]);
+      const inDirs = [["bottom", "UP"], ["left", "LEFT"], ["right", "RIGHT"], ["top", "DOWN"]];
+      const outDirs = [["bottom", "DOWN"], ["left", "LEFT"], ["right", "RIGHT"], ["top", "UP"]];
+      const sides = ["bottom", "left", "right", "top"];
+      for (const [dir, e] of inDirs) add(`back_in_from_${dir}`, "motion", `Motion > In > Back In > From ${title(dir)}`, "animate", [`BACK_IN_${e}`], "in");
+      add("blur_in", "motion", "Motion > In > Blur In", "animate", ["BLUR_IN"], "in");
+      add("bounce_in", "motion", "Motion > In > Bounce In > Center", "animate", ["BOUNCE_IN"], "in");
+      for (const [dir, e] of inDirs) add(`bounce_in_from_${dir}`, "motion", `Motion > In > Bounce In > From ${title(dir)}`, "animate", [`BOUNCE_IN_${e}`], "in");
+      add("pop_in", "motion", "Motion > In > Pop In", "animate", ["POP_IN"], "in");
+      for (const dir of sides) add(`slide_in_from_${dir}`, "motion", `Motion > In > Slide In > From ${title(dir)}`, "animate", [`SLIDE_IN_${dir.toUpperCase()}`], "in");
+      add("spiral_in", "motion", "Motion > In > Spiral In", "animate", ["SPIRAL_IN"], "in");
+      for (const [prefix, label2, e] of [["wipe_in", "Wipe In", "WIPE_IN"], ["blur_wipe_in", "Blur Wipe In", "BLUR_WIPE_IN"]]) {
+        add(`${prefix}_circle_expand`, "motion", `Motion > In > ${label2} > Circle Expand`, "animate", [`${e}_CIRCLE_EXPAND`], "in");
+        add(`${prefix}_circle_shrink`, "motion", `Motion > In > ${label2} > Circle Shrink`, "animate", [`${e}_CIRCLE_SHRINK`], "in");
+        for (const dir of sides) add(`${prefix}_from_${dir}`, "motion", `Motion > In > ${label2} > From ${title(dir)}`, "animate", [`${e}_${dir.toUpperCase()}`], "in");
+      }
+      for (const [dir, e] of outDirs) add(`back_out_to_${dir}`, "motion", `Motion > Out > Back Out > To ${title(dir)}`, "animate", [`BACK_OUT_${e}`], "out");
+      add("blur_out", "motion", "Motion > Out > Blur Out", "animate", ["BLUR_OUT"], "out");
+      add("bounce_out", "motion", "Motion > Out > Bounce Out > Center", "animate", ["BOUNCE_OUT"], "out");
+      for (const [dir, e] of outDirs) add(`bounce_out_to_${dir}`, "motion", `Motion > Out > Bounce Out > To ${title(dir)}`, "animate", [`BOUNCE_OUT_${e}`], "out");
+      add("pop_out", "motion", "Motion > Out > Pop Out", "animate", ["POP_OUT"], "out");
+      for (const dir of sides) add(`slide_out_to_${dir}`, "motion", `Motion > Out > Slide Out > To ${title(dir)}`, "animate", [`SLIDE_OUT_${dir.toUpperCase()}`], "out");
+      add("spiral_out", "motion", "Motion > Out > Spiral Out", "animate", ["SPIRAL_OUT"], "out");
+      for (const [prefix, label2, e] of [["wipe_out", "Wipe Out", "WIPE_OUT"], ["blur_wipe_out", "Blur Wipe Out", "BLUR_WIPE_OUT"]]) {
+        add(`${prefix}_circle_expand`, "motion", `Motion > Out > ${label2} > Circle Expand`, "animate", [`${e}_CIRCLE_EXPAND`], "out");
+        add(`${prefix}_circle_shrink`, "motion", `Motion > Out > ${label2} > Circle Shrink`, "animate", [`${e}_CIRCLE_SHRINK`], "out");
+        for (const dir of sides) add(`${prefix}_to_${dir}`, "motion", `Motion > Out > ${label2} > To ${title(dir)}`, "animate", [`${e}_${dir.toUpperCase()}`], "out");
+      }
+      for (const [name, label2, e] of [
+        ["bounce", "Bounce", "BOUNCE"],
+        ["flash", "Flash", "FLASH"],
+        ["heartbeat", "Heartbeat", "HEART_BEAT"],
+        ["jello", "Jello", "JELLO"],
+        ["pulse", "Pulse", "PULSE"],
+        ["rubber_band", "Rubber Band", "RUBBER_BAND"],
+        ["shake_x", "Shake X", "SHAKE_X"],
+        ["shake_y", "Shake Y", "SHAKE_Y"],
+        ["swing", "Swing", "SWING"],
+        ["tada", "Tada", "TADA"],
+        ["wobble", "Wobble", "WOBBLE"]
+      ]) {
+        add(name, "motion", `Motion > Emphasis > ${label2}`, "animate", [e], "emphasis");
+      }
+      add("zoom_in", "motion", "Motion > Camera > Zoom > In (100% -> 120%)", "animate", ["CAM_PUSH_IN"], "whole");
+      add("zoom_out", "motion", "Motion > Camera > Zoom > Out (120% -> 100%)", "animate", ["CAM_PULL_OUT"], "whole");
+      for (const [name, label2, e] of [
+        ["pan_auto", "Auto Direction", "CAM_PAN_AUTO"],
+        ["pan_left_to_right", "Left to Right", "CAM_PAN_RIGHT"],
+        ["pan_right_to_left", "Right to Left", "CAM_PAN_LEFT"],
+        ["pan_top_to_bottom", "Top to Bottom", "CAM_PAN_DOWN"],
+        ["pan_bottom_to_top", "Bottom to Top", "CAM_PAN_UP"]
+      ]) {
+        add(name, "motion", `Motion > Camera > Pan > ${label2}`, "animate", [e], "whole");
+      }
+      for (const [io, ioLabel] of [["in", "In"], ["out", "Out"]]) {
+        add(`ken_burns_${io}`, "motion", `Motion > Camera > Zoom & Pan > ${ioLabel} > Auto Direction`, "animate", [`KEN_BURNS_${io.toUpperCase()}`], "whole");
+        for (const [dir, label2] of [
+          ["left_to_right", "Left to Right"],
+          ["right_to_left", "Right to Left"],
+          ["top_to_bottom", "Top to Bottom"],
+          ["bottom_to_top", "Bottom to Top"]
+        ]) {
+          add(`ken_burns_${io}_${dir}`, "motion", `Motion > Camera > Zoom & Pan > ${ioLabel} > ${label2}`, "animate", [`KEN_BURNS_${io.toUpperCase()}_${dir.toUpperCase()}`], "whole");
+        }
+      }
+      add("credits_scroll_up", "motion", "Motion > Credits > Scroll Up", "animate", ["CREDITS_UP"], "whole");
+      add("credits_scroll_down", "motion", "Motion > Credits > Scroll Down", "animate", ["CREDITS_DOWN"], "whole");
+      add("transform_none", "transform", "Transform > No Transform (no rotation, no crop, reset layout)", "no_transform");
+      add("rotate_none", "transform", "Transform > Rotate > No Rotation", "rotate", ["NONE"]);
+      add("rotate_90_right", "transform", "Transform > Rotate > Rotate 90 (Right)", "rotate", ["RIGHT_90"]);
+      add("rotate_90_left", "transform", "Transform > Rotate > Rotate 90 (Left)", "rotate", ["LEFT_90"]);
+      add("rotate_180", "transform", "Transform > Rotate > Rotate 180 (Flip)", "rotate", ["FLIP_180"]);
+      add("flip_horizontal", "transform", "Mirror left-right (scale_x sign; not in the menu)", "flip", ["scale_x"]);
+      add("flip_vertical", "transform", "Mirror top-bottom (scale_y sign; not in the menu)", "flip", ["scale_y"]);
+      add("crop_none", "transform", "Transform > Crop > No Crop", "crop", ["none"]);
+      add("crop", "transform", "Transform > Crop > Crop (No Resize)", "crop", ["crop"]);
+      add("crop_resize", "transform", "Transform > Crop > Crop (Resize)", "crop", ["resize"]);
+      add("layout_reset", "transform", "Transform > Layout > Reset Layout", "layout", ["NONE"]);
+      for (const [name, label2, e] of [
+        ["center", "Center", "CENTER"],
+        ["top_left", "Top Left", "TOP_LEFT"],
+        ["top_right", "Top Right", "TOP_RIGHT"],
+        ["bottom_left", "Bottom Left", "BOTTOM_LEFT"],
+        ["bottom_right", "Bottom Right", "BOTTOM_RIGHT"]
+      ]) {
+        add(`layout_quarter_${name}`, "transform", `Transform > Layout > 1/4 Size - ${label2}`, "layout", [e]);
+      }
+      add("layout_grid", "transform", "Transform > Layout > Show All (Maintain Ratio)", "layout", ["ALL_WITH_ASPECT"]);
+      add("layout_grid_stretch", "transform", "Transform > Layout > Show All (Distort)", "layout", ["ALL_WITHOUT_ASPECT"]);
+      add("volume_reset", "volume", "Audio > Volume > Reset Volume", "volume", ["NONE", "Entire Clip"]);
+      add("volume_level", "volume", "Audio > Volume > Level (level_percent 0-130)", "volume", ["LEVEL", "Entire Clip"]);
+      add("volume_fade_in", "volume", "Audio > Volume > Fade In (duration_seconds, default 1 s)", "volume", ["FADE_IN_FAST", "Start of Clip"], "in");
+      add("volume_fade_in_fast", "volume", "Audio > Volume > Fade In > Fast", "volume", ["FADE_IN_FAST", "Start of Clip"], "in");
+      add("volume_fade_in_slow", "volume", "Audio > Volume > Fade In > Slow", "volume", ["FADE_IN_SLOW", "Start of Clip"], "in");
+      add("volume_fade_out", "volume", "Audio > Volume > Fade Out (duration_seconds, default 1 s)", "volume", ["FADE_OUT_FAST", "End of Clip"], "out");
+      add("volume_fade_out_fast", "volume", "Audio > Volume > Fade Out > Fast", "volume", ["FADE_OUT_FAST", "End of Clip"], "out");
+      add("volume_fade_out_slow", "volume", "Audio > Volume > Fade Out > Slow", "volume", ["FADE_OUT_SLOW", "End of Clip"], "out");
+      add("volume_fade_in_out", "volume", "Audio > Volume > Fade In and Out (duration_seconds, default 1 s)", "volume", ["FADE_IN_OUT_FAST", "Entire Clip"], "in");
+      add("volume_fade_in_out_fast", "volume", "Audio > Volume > Fade In and Out > Fast", "volume", ["FADE_IN_OUT_FAST", "Entire Clip"], "in");
+      add("volume_fade_in_out_slow", "volume", "Audio > Volume > Fade In and Out > Slow", "volume", ["FADE_IN_OUT_SLOW", "Entire Clip"], "in");
+      return out;
+    })();
+    RANGES = { "Entire Clip": "entire", "Start of Clip": "start", "End of Clip": "end" };
+    clipPropsTools = [
+      contractTool("get_clip_properties_tool", { annotations: READ, run: (call, input2) => run(() => getClipProperties(call, input2)) }),
+      contractTool("set_clip_properties_tool", { annotations: EDIT, run: (call, input2) => run(() => setClipProperties(call, input2)) }),
+      contractTool("remove_keyframes_tool", { annotations: EDIT, run: (call, input2) => run(() => removeKeyframes(call, input2)) }),
+      contractTool("copy_clip_keyframes_tool", { annotations: EDIT, run: (call, input2) => run(() => copyClipKeyframes(call, input2)) }),
+      contractTool("apply_clip_preset_tool", { annotations: EDIT, run: (call, input2) => run(() => applyClipPresetTool(call, input2)) })
+    ];
+  }
+});
+
 // ../engine/src/tools/media-frames.ts
 function fitSize(width, height, longestEdge = 512) {
   const w = Math.max(1, Math.trunc(width));
@@ -59001,9 +60812,9 @@ var init_media_frames = __esm({
 });
 
 // ../engine/src/tools/watch.ts
-function paddedWindow(start, end, duration3 = 0, pad2 = WATCH_PAD_SEC) {
-  const s = Math.max(0, start - pad2);
-  let e = end + pad2;
+function paddedWindow(start, end, duration3 = 0, pad3 = WATCH_PAD_SEC) {
+  const s = Math.max(0, start - pad3);
+  let e = end + pad3;
   if (duration3 > 0) e = Math.min(e, duration3);
   if (e <= s) {
     e = s + 0.04;
@@ -59208,7 +61019,7 @@ var init_watch = __esm({
 });
 
 // ../engine/src/tools/catalog/clips.ts
-function isRecord27(value) {
+function isRecord32(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function windowIsDialogueDriven(file3, start, end) {
@@ -59226,7 +61037,7 @@ function lookupWatchMeta(project, fileId, file3) {
     const parentId = own2 && own2.parent_file_id ? String(own2.parent_file_id) : "";
     data = parentId && fileById(project, parentId) || own2;
   }
-  const ai = isRecord27(data?.ai_metadata) ? data.ai_metadata : {};
+  const ai = isRecord32(data?.ai_metadata) ? data.ai_metadata : {};
   const duration3 = Number(data?.duration) || 0;
   return { file: data, duration: duration3, cues: Array.isArray(ai.transcript_cues) ? ai.transcript_cues : [] };
 }
@@ -59247,19 +61058,19 @@ function sourceDurationSeconds(file3) {
   const readerDuration = parseTimecodeToken(record4(file3.reader).duration);
   if (readerDuration && readerDuration > 0) return readerDuration;
   const frames = parseTimecodeToken(file3.video_length) || 0;
-  const [, , fpsFloat4] = sourceFpsParts(file3);
-  return frames > 0 && fpsFloat4 > 0 ? frames / fpsFloat4 : 0;
+  const [, , fpsFloat5] = sourceFpsParts(file3);
+  return frames > 0 && fpsFloat5 > 0 ? frames / fpsFloat5 : 0;
 }
 function describeFileForLlm(project, fileId, file3) {
   const data = file3;
-  const [num12, den2, fpsFloat4] = sourceFpsParts(data);
+  const [num12, den2, fpsFloat5] = sourceFpsParts(data);
   const duration3 = sourceDurationSeconds(data);
   const pfps = record4(project.fps);
   const pNum = Math.trunc(parseTimecodeToken(pfps.num) || 30);
   const pDen = Math.trunc(parseTimecodeToken(pfps.den) || 1);
   const mediaType = String(data.media_type || (isAudioOnlyMedia(data) ? "audio" : "video"));
   let line2 = `file_id=${fileId} path=${String(data.path ?? "")} duration_seconds=${pyFixed(duration3, 2)} source_fps=${num12}/${den2} project_fps=${pNum}/${pDen} media_type=${mediaType}`;
-  const unreliable = isAudioOnlyMedia(data) || fpsFloat4 <= 2 && duration3 > 2;
+  const unreliable = isAudioOnlyMedia(data) || fpsFloat5 <= 2 && duration3 > 2;
   if (unreliable) {
     line2 += `
 NOTE: source_fps is ${num12}/${den2} and cannot be used for frame math. Pass start_seconds/end_seconds (in source seconds) - never frame numbers.`;
@@ -59394,7 +61205,7 @@ async function planPlacement(call, file3, args) {
     layer2 = resolved.layer ?? defaultUnderlayLayerNumber(layers);
   }
   const fps = projectFps(project);
-  const fpsFloat4 = fps.num / fps.den;
+  const fpsFloat5 = fps.num / fps.den;
   let position;
   if (posArg === null) {
     if (isAudio) position = 0;
@@ -59418,7 +61229,7 @@ async function planPlacement(call, file3, args) {
   };
   const applyTrim = watchedStart !== null || trimDur !== null && trimDur > 0;
   if (applyTrim) {
-    let [start, end] = watchedStart !== null ? [watchedStart, watchedEnd] : computeClipTrimBounds(sourceLen, { trimStart, trimDur, fileStart: srcStart, minDuration: 1 / Math.max(fpsFloat4, 1) });
+    let [start, end] = watchedStart !== null ? [watchedStart, watchedEnd] : computeClipTrimBounds(sourceLen, { trimStart, trimDur, fileStart: srcStart, minDuration: 1 / Math.max(fpsFloat5, 1) });
     const [s, e, snapped] = snapWindowOffBoundaries(fileData, start, end);
     [start, end] = quantizePlacementSeconds(s, e, fps);
     plan.start = start;
@@ -59502,13 +61313,13 @@ function secondsToTimeParts(secs, fpsNum, fpsDen) {
   let hour = Math.floor(minute / 60);
   minute %= 60;
   hour %= 24;
-  const fpsFloat4 = fpsDen ? fpsNum / fpsDen : 0;
-  const x = milli / 1e3 * fpsFloat4;
+  const fpsFloat5 = fpsDen ? fpsNum / fpsDen : 0;
+  const x = milli / 1e3 * fpsFloat5;
   const f3 = Math.floor(x);
   let frame = x - f3 > 0.5 ? f3 + 1 : x - f3 < 0.5 ? f3 : f3 % 2 === 0 ? f3 : f3 + 1;
-  if (fpsFloat4 > 0) frame = Math.max(0, Math.min(frame, Math.trunc(fpsFloat4) - 1));
-  const pad2 = (n) => String(Math.trunc(n)).padStart(2, "0");
-  return { hour: pad2(hour), min: pad2(minute), sec: pad2(sec), frame: pad2(frame) };
+  if (fpsFloat5 > 0) frame = Math.max(0, Math.min(frame, Math.trunc(fpsFloat5) - 1));
+  const pad3 = (n) => String(Math.trunc(n)).padStart(2, "0");
+  return { hour: pad3(hour), min: pad3(minute), sec: pad3(sec), frame: pad3(frame) };
 }
 function positiveIntArg(value) {
   const n = floatArg(value, null);
@@ -59687,7 +61498,7 @@ function resolveTrack(project, raw) {
 function requireClip2(call, id) {
   return (call.doc.project.clips ?? []).find((c) => String(c.id) === id);
 }
-var EDIT, ADD, READ, clipId, track, interpolation, INTERPOLATIONS, directTools;
+var EDIT2, ADD, READ2, clipId, track, interpolation, INTERPOLATIONS, directTools;
 var init_direct = __esm({
   "../engine/src/tools/catalog/direct.ts"() {
     "use strict";
@@ -59702,9 +61513,9 @@ var init_direct = __esm({
     init_frame_time();
     init_receipt();
     init_tracks2();
-    EDIT = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT2 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
-    READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ2 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     clipId = external_exports.string().min(1).describe("Timeline clip id (from describe_project_tool, list_clips_tool or a receipt).");
     track = external_exports.union([external_exports.string(), external_exports.int()]).describe("Track: layer_number (preferred), track id, exact label, or ui_track counted from the bottom (1 = bottom).");
     interpolation = external_exports.enum(["bezier", "linear", "constant"]).describe("Interpolation of a new keyframe point.");
@@ -59715,13 +61526,13 @@ var init_direct = __esm({
         title: "Describe project",
         description: "Compact overview of the whole project for planning edits: settings, tracks bottom to top with their clips (id, file, timeline window, source window, effects), transitions, markers and media-bin files. Use this before editing.",
         input: external_exports.strictObject({}),
-        annotations: READ,
+        annotations: READ2,
         run: (call) => {
           const p = call.doc.project;
           const fps = projectFps(p);
           const files = new Map((p.files ?? []).map((f3) => [String(f3.id), f3]));
           const stack = buildTrackStack(p.layers);
-          const tracks = stack.map((t) => ({
+          const tracks2 = stack.map((t) => ({
             layer: t.layer_number,
             ui_track: t.ui_track,
             label: t.label,
@@ -59744,7 +61555,7 @@ var init_direct = __esm({
             height: p.height,
             fps: `${fps.num}/${fps.den}`,
             duration: timelineEnd(p),
-            tracks,
+            tracks: tracks2,
             transitions: (p.effects ?? []).map((t) => ({ id: t.id, title: t.title ?? "", layer: t.layer, position: t.position, duration: t.end - t.start })),
             markers: (p.markers ?? []).map((m) => ({ id: m.id, position: m.position, label: m.label ?? "" })),
             files: (p.files ?? []).map((f3) => ({
@@ -59755,10 +61566,10 @@ var init_direct = __esm({
               subclip: Boolean(f3.zenvi_subclip)
             }))
           };
-          const clipCount = tracks.reduce((n, t) => n + t.clips.length, 0);
+          const clipCount = tracks2.reduce((n, t) => n + t.clips.length, 0);
           return applied(
             "describe_project_tool",
-            `${p.width}x${p.height} ${data.fps} fps, ${tracks.length} track(s), ${clipCount} clip(s), ${data.transitions.length} transition(s), ${data.files.length} file(s); content ends at ${data.duration.toFixed(2)}s.`,
+            `${p.width}x${p.height} ${data.fps} fps, ${tracks2.length} track(s), ${clipCount} clip(s), ${data.transitions.length} transition(s), ${data.files.length} file(s); content ends at ${data.duration.toFixed(2)}s.`,
             { data },
             0
           );
@@ -59769,7 +61580,7 @@ var init_direct = __esm({
         title: "List effects",
         description: "List the libopenshot effects add_effect_tool accepts (class name, category, whether this surface renders it, parameters).",
         input: external_exports.strictObject({ category: external_exports.enum(["video", "audio"]).optional().describe("Only video or audio effects.") }),
-        annotations: READ,
+        annotations: READ2,
         run: (_call, input2) => {
           const effects = EFFECTS.filter((e) => !input2.category || e.category === input2.category).map((e) => ({
             class_name: e.className,
@@ -59791,7 +61602,7 @@ var init_direct = __esm({
           position_seconds: external_exports.number().min(0).optional().describe("New timeline start, seconds."),
           track: track.optional()
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
           const t = resolveTrack(call.doc.project, input2.track);
@@ -59812,7 +61623,7 @@ var init_direct = __esm({
           edge: external_exports.enum(["left", "right"]).optional().describe("Edge to drag (with at_seconds)."),
           at_seconds: external_exports.number().optional().describe("Timeline seconds to drag the edge to.")
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
           if (input2.edge !== void 0 || input2.at_seconds !== void 0) {
@@ -59835,7 +61646,7 @@ var init_direct = __esm({
           keep: external_exports.enum(["both", "left", "right"]).optional().describe("Which side(s) to keep (default both)."),
           track: track.optional()
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           const keep2 = input2.keep ?? "both";
           if (input2.clip_id) {
@@ -59863,7 +61674,7 @@ var init_direct = __esm({
           frame: external_exports.int().min(1).optional().describe("1-based clip frame of the keyframe."),
           interpolation: interpolation.optional()
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
           if (input2.at_seconds !== void 0 && input2.frame !== void 0) return "Error: Pass at_seconds or frame, not both.";
@@ -59889,7 +61700,7 @@ var init_direct = __esm({
           frame: external_exports.int().min(1).optional().describe("1-based frame of the parent clip."),
           interpolation: interpolation.optional()
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (input2.at_seconds !== void 0 && input2.frame !== void 0) return "Error: Pass at_seconds or frame, not both.";
           call.commit(
@@ -59907,7 +61718,7 @@ var init_direct = __esm({
         title: "Remove effect",
         description: "Remove one effect from its clip.",
         input: external_exports.strictObject({ effect_id: external_exports.string().min(1).describe("Clip effect id.") }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           const result2 = call.commit((tx) => removeEffect(tx, input2.effect_id));
           return applied("remove_effect_tool", `Removed effect ${input2.effect_id} from clip ${result2.clipId}.`, { data: result2 });
@@ -59924,7 +61735,7 @@ var init_direct = __esm({
           video: external_exports.boolean().optional().describe("Fade the picture (default: when the clip has video)."),
           audio: external_exports.boolean().optional().describe("Fade the sound (default: when the clip has audio).")
         }),
-        annotations: EDIT,
+        annotations: EDIT2,
         run: (call, input2) => {
           if (!requireClip2(call, input2.clip_id)) return `Error: No timeline clip with id='${input2.clip_id}'.`;
           if (input2.fade_in_seconds === void 0 && input2.fade_out_seconds === void 0) return "Error: Pass fade_in_seconds and/or fade_out_seconds.";
@@ -59974,7 +61785,7 @@ var init_direct = __esm({
         title: "Probe media",
         description: "Read a media file's stream info (duration, size, fps, codecs, audio) without importing it.",
         input: external_exports.strictObject({ path: external_exports.string().min(1).describe("Media path or URL the host can read.") }),
-        annotations: READ,
+        annotations: READ2,
         requires: ["media"],
         run: async (call, input2) => {
           const info = await call.host.media.probe(input2.path);
@@ -60896,7 +62707,7 @@ ${placed.text}`;
 });
 
 // ../engine/src/tools/catalog/metadata.ts
-function isRecord28(value) {
+function isRecord33(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function pyStr2(value) {
@@ -60918,7 +62729,7 @@ function fullMetadataText(project, level) {
     const name = String(d.name || String(d.path ?? "?").split("/").pop());
     const ai = record4(d.ai_metadata);
     const tl = record4(ai.twelvelabs);
-    const short = pySlice(String(ai.short_summary || ""), 0, 160);
+    const short2 = pySlice(String(ai.short_summary || ""), 0, 160);
     const desc = pySlice(String(ai.description || ""), 0, 400);
     const sounds = pySlice(String(ai.sounds || ""), 0, 160);
     const transcript = pySlice(String(ai.transcript || ""), 0, 200);
@@ -60935,10 +62746,10 @@ function fullMetadataText(project, level) {
     twelvelabs_index_id=${pyStr2(tl.index_id ?? "")}
     twelvelabs_index_name=${pyStr2(tl.index_name ?? "")}
     twelvelabs_video_id=${pyStr2(tl.video_id ?? "")}
-    short_summary=${short}
+    short_summary=${short2}
     description=${desc}`
     );
-    if (!short && !desc) {
+    if (!short2 && !desc) {
       const tags = record4(ai.tags);
       const legacy = [];
       for (const key of ["objects", "scenes", "activities", "mood"]) {
@@ -60959,7 +62770,7 @@ function fullMetadataText(project, level) {
       const n = level === "full" ? chapters.length : Math.min(3, chapters.length);
       lines2.push("    chapter_snippets:");
       for (const raw of chapters.slice(0, n)) {
-        if (!isRecord28(raw) || !(raw.summary || raw.title)) continue;
+        if (!isRecord33(raw) || !(raw.summary || raw.title)) continue;
         const t0 = Number(raw.start) || 0;
         const t1 = Number(raw.end) || t0;
         lines2.push(`      [${fmtMmss(t0)}-${fmtMmss(t1)}] ${String(raw.title ?? "")}: ${pySlice(String(raw.summary ?? ""), 0, 160)}`);
@@ -60969,7 +62780,7 @@ function fullMetadataText(project, level) {
       const n = level === "full" ? scenes.length : Math.min(3, scenes.length);
       lines2.push("    scene_snippets:");
       for (const raw of scenes.slice(0, n)) {
-        if (!isRecord28(raw) || !raw.description) continue;
+        if (!isRecord33(raw) || !raw.description) continue;
         lines2.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
@@ -61008,14 +62819,14 @@ function placementsMetadataText(project, level) {
     if (scenes.length > 0 && limit > 0) {
       lines2.push("    effective_scenes:");
       for (const raw of scenes.slice(0, limit)) {
-        if (!isRecord28(raw) || !raw.description) continue;
+        if (!isRecord33(raw) || !raw.description) continue;
         lines2.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
   }
   return lines2.join("\n");
 }
-var READ2, metadataTools;
+var READ3, metadataTools;
 var init_metadata = __esm({
   "../engine/src/tools/catalog/metadata.ts"() {
     "use strict";
@@ -61026,22 +62837,22 @@ var init_metadata = __esm({
     init_receipt();
     init_reports();
     init_common();
-    READ2 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ3 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     metadataTools = [
       contractTool("get_clips_with_full_metadata_tool", {
-        annotations: READ2,
+        annotations: READ3,
         run: (call, input2) => {
           return fullMetadataText(call.doc.project, (text(input2.detail_level) || "summary").toLowerCase());
         }
       }),
       contractTool("get_timeline_placements_metadata_tool", {
-        annotations: READ2,
+        annotations: READ3,
         run: (call, input2) => {
           return placementsMetadataText(call.doc.project, (text(input2.detail_level) || "summary").toLowerCase());
         }
       }),
       contractTool("get_timeline_state_tool", {
-        annotations: READ2,
+        annotations: READ3,
         run: (call) => {
           const data = timelineStateData(call.doc.project);
           return applied("get_timeline_state_tool", `Timeline: ${data.clips.length} clip(s), ${data.tracks.length} track(s).`, { data }, 0);
@@ -61182,8 +62993,8 @@ function mgStamp(label2, transparent, existing = {}) {
   const ai = { ...record4(existing.ai_metadata), short_summary: summary, description: summary, analyzed: true, source: "hyperframes_motion_graphics", transparent };
   const patch = { tags: tags.join(", "), ai_metadata: ai };
   if (summary !== "HyperFrames motion graphic") {
-    const short = summary.split("(")[0].trim();
-    if (short && Array.from(short).length <= 120) patch.name = Array.from(short).slice(0, 120).join("");
+    const short2 = summary.split("(")[0].trim();
+    if (short2 && Array.from(short2).length <= 120) patch.name = Array.from(short2).slice(0, 120).join("");
   } else if (!existing.name) {
     patch.name = "HyperFrames motion graphic";
     summary = "HyperFrames motion graphic";
@@ -61757,14 +63568,14 @@ var init_overlays2 = __esm({
           const end = position + duration3;
           planOverlayTrack(project, position, end, input2.track);
           const [w, h] = projectSize(project);
-          const short = Math.min(w, h);
+          const short2 = Math.min(w, h);
           const [xOff, yOff] = edgeOffsets(screen, 1);
           const props = {
             gravity: GRAVITY[screen],
             scale_x: constantKeyframe2(size),
             scale_y: constantKeyframe2(size),
-            location_x: constantKeyframe2(pyRoundTo(xOff * margin * short / w, 5)),
-            location_y: constantKeyframe2(pyRoundTo(yOff * margin * short / h, 5))
+            location_x: constantKeyframe2(pyRoundTo(xOff * margin * short2 / w, 5)),
+            location_y: constantKeyframe2(pyRoundTo(yOff * margin * short2 / h, 5))
           };
           const placed = call.commit((tx) => {
             const { layer: layer2, created } = planOverlayTrack(tx.project, position, end, input2.track);
@@ -62244,7 +64055,7 @@ function undoRedo(call, direction2, steps) {
   const changed = timelineDelta(timelineSnapshot(beforeProject), timelineSnapshot(doc.project));
   return applied(`${direction2}_tool`, summary, { ...changed, data: { steps: done, labels } }, 0);
 }
-var READ3, PROJECT_EXTS, projectTools, SIGNATURE_SKIP_KEYS;
+var READ4, PROJECT_EXTS, projectTools, SIGNATURE_SKIP_KEYS;
 var init_project2 = __esm({
   "../engine/src/tools/catalog/project.ts"() {
     "use strict";
@@ -62255,19 +64066,19 @@ var init_project2 = __esm({
     init_snapshot();
     init_tracks2();
     init_common();
-    READ3 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ4 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     PROJECT_EXTS = [".zvn", ".osp", ".flow"];
     projectTools = [
       contractTool("get_project_info_tool", {
-        annotations: READ3,
+        annotations: READ4,
         run: (call) => projectInfoText(call.doc.project)
       }),
       contractTool("list_files_tool", {
-        annotations: READ3,
+        annotations: READ4,
         run: (call) => listFilesText(call.doc.project)
       }),
       contractTool("list_clips_tool", {
-        annotations: READ3,
+        annotations: READ4,
         run: (call, input2) => {
           const project = call.doc.project;
           let layer2;
@@ -62288,11 +64099,11 @@ var init_project2 = __esm({
         }
       }),
       contractTool("list_layers_tool", {
-        annotations: READ3,
+        annotations: READ4,
         run: (call) => listLayersText(call.doc.project)
       }),
       contractTool("list_markers_tool", {
-        annotations: READ3,
+        annotations: READ4,
         run: (call) => listMarkersText(call.doc.project)
       }),
       contractTool("new_project_tool", {
@@ -62352,7 +64163,7 @@ var init_project2 = __esm({
 });
 
 // ../engine/src/tools/catalog/search.ts
-function isRecord29(value) {
+function isRecord34(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function hitPeak(hit, s, e) {
@@ -62370,18 +64181,18 @@ function formatSearchWindow(hit, s, e) {
   return `start_seconds=${pyFixed(s, 3)} end_seconds=${pyFixed(e, 3)} peak_seconds=${pyFixed(hitPeak(hit, s, e), 3)} (${fmtMmss(s)}\u2013${fmtMmss(e)})`;
 }
 async function searchInWindow(call, indexId, query2, pageLimit, videoId) {
-  const run = async (q2) => {
+  const run3 = async (q2) => {
     if (!indexId.trim()) return { items: [], error: "TwelveLabs index_id is missing for this file." };
     const res = await searchIndex(call, q2, { indexId, videoId, pageLimit, topK: pageLimit });
     if (res.error) return { items: [], error: res.error };
     const items = videoId ? res.results.filter((it) => String(it.video_id ?? "") === videoId) : res.results;
     return { items };
   };
-  const first = await run(query2);
+  const first = await run3(query2);
   if (first.error || first.items.length > 0) return first;
   const q = semanticSearchQuery(query2);
   const audioQ = !q ? "spoken dialogue" : /[^\x00-\x7F]/.test(q) ? `spoken words: ${q}` : `spoken dialogue about ${q}`;
-  return audioQ !== query2 ? run(audioQ) : first;
+  return audioQ !== query2 ? run3(audioQ) : first;
 }
 async function applyWatchToMatch(call, match, file3, query2, duration3, cues) {
   let start = Number(match.start ?? match.cut_source ?? 0) || 0;
@@ -62425,7 +64236,7 @@ function clipInfo2(project, clip2) {
   const file3 = fileId ? fileById(project, fileId) : void 0;
   const [clipStart, clipEnd2] = getSourceWindow(clip2, file3);
   const parent = resolveParentFileData(project, file3, fileId);
-  const sourceAi = isRecord29(parent?.ai_metadata) ? parent.ai_metadata : void 0;
+  const sourceAi = isRecord34(parent?.ai_metadata) ? parent.ai_metadata : void 0;
   const block = getIndexBlock(sourceAi ?? {});
   const watchData = parent ?? file3;
   const wai = record4(watchData?.ai_metadata);
@@ -62449,15 +64260,15 @@ function clipInfo2(project, clip2) {
   };
 }
 function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) {
-  const local = isRecord29(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
+  const local = isRecord34(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
   const candidates = [];
   for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-    if (!isRecord29(ch)) continue;
+    if (!isRecord34(ch)) continue;
     const summary = String(ch.summary || ch.title || "").trim();
     if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
   }
   for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-    if (!isRecord29(sc)) continue;
+    if (!isRecord34(sc)) continue;
     const desc = String(sc.description ?? "").trim();
     if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
   }
@@ -62484,7 +64295,7 @@ function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) 
 function clipTranscriptCues(project, clip2) {
   const file3 = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
   const effective = getEffectiveAiMetadata(file3, clip2, { clipAiMetadata: clip2.ai_metadata });
-  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord29) : [];
+  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord34) : [];
 }
 function fpsParts(project) {
   const fps = record4(project.fps);
@@ -62736,12 +64547,12 @@ var init_search = __esm({
           const local = Object.keys(perClip).length > 0 ? perClip : getEffectiveAiMetadata(parent ?? file3, target.clip, { rebased: true });
           const candidates = [];
           for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-            if (!isRecord29(ch)) continue;
+            if (!isRecord34(ch)) continue;
             const summary = String(ch.summary || ch.title || "").trim();
             if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
           }
           for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-            if (!isRecord29(sc)) continue;
+            if (!isRecord34(sc)) continue;
             const desc = String(sc.description ?? "").trim();
             if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
           }
@@ -63008,11 +64819,11 @@ var init_search = __esm({
 });
 
 // ../engine/src/tools/catalog/speech-tools.ts
-function isRecord30(value) {
+function isRecord35(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function wordsFromCues(cues) {
-  const rows = cues.filter(isRecord30).map((c) => ({
+  const rows = cues.filter(isRecord35).map((c) => ({
     text: String(c.text ?? "").trim(),
     start: Number("source_start" in c ? c.source_start : c.start),
     end: Number("source_end" in c ? c.source_end : c.end)
@@ -63306,7 +65117,7 @@ var init_speech_tools = __esm({
           const path38 = mediaPath(project, clip2);
           if (!path38) return refused(tool, "Error: Clip has no readable media path.");
           const minPause = input2.minPauseSec ?? 0.4;
-          const pad2 = input2.padSec ?? 0.08;
+          const pad3 = input2.padSec ?? 0.08;
           const maxFrac = input2.maxRemoveFraction ?? 0.85;
           const pos = Number(clip2.position) || 0;
           const start = Number(clip2.start) || 0;
@@ -63321,7 +65132,7 @@ var init_speech_tools = __esm({
             return failed(tool, `Error: VAD failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
           }
           const clipped = speech.map(([s, e]) => [Math.max(s, start), Math.min(e, end)]).filter(([s, e]) => e > s);
-          const gaps = silenceRangesFromSpeech(clipped, end, minPause, pad2).map(([a, b]) => [Math.max(start, a), Math.min(end, b)]).filter(([a, b]) => b > a);
+          const gaps = silenceRangesFromSpeech(clipped, end, minPause, pad3).map(([a, b]) => [Math.max(start, a), Math.min(end, b)]).filter(([a, b]) => b > a);
           if (gaps.length === 0) return unchanged(tool, "No removable silence found.");
           const fps = projectFps(project);
           const { fragments, removed } = compactFragmentsAfterRemove(pos, start, end, gaps, fps);
@@ -63612,178 +65423,6 @@ var init_timeline2 = __esm({
         }
       })
     ];
-  }
-});
-
-// ../engine/src/tools/catalog/timeline-edit-common.ts
-function failText(message) {
-  const line2 = String(message).split(/\s+/).filter(Boolean).join(" ");
-  return line2.startsWith("Error") ? line2 : `Error: ${line2}`;
-}
-async function editorRun(body) {
-  try {
-    return await body();
-  } catch (error62) {
-    if (error62 instanceof ToolError) return failText(error62.message);
-    throw error62;
-  }
-}
-function oneLine(summary) {
-  return String(summary).split(/\s+/).filter(Boolean).join(" ");
-}
-function ok(call, summary, data) {
-  return applied(call.tool, oneLine(summary), { data });
-}
-function nothingChanged(call, summary, data) {
-  return unchanged(call.tool, oneLine(summary), { data: { changed: false, ...data } });
-}
-function gridOf(project) {
-  const num12 = Math.trunc(Number(project.fps?.num)) || 30;
-  const den2 = Math.trunc(Number(project.fps?.den)) || 1;
-  const fps = num12 / den2;
-  return { fps, frame: 1 / fps, tol: 0.5 / fps, snap: (seconds2) => pyRound(seconds2 * fps) / fps };
-}
-function r3(value) {
-  return Number(pyFixed(Number(value) || 0, 3));
-}
-function f2(value) {
-  return pyFixed(value, 2);
-}
-function spanOf(item) {
-  const position = Number(item.position) || 0;
-  return [position, position + Math.max(0, (Number(item.end) || 0) - (Number(item.start) || 0))];
-}
-function uiTrack(project, layer2) {
-  return layerNumberToDisplayIndex(layer2, project.layers);
-}
-function trackName(project, layer2) {
-  const ui = uiTrack(project, layer2);
-  return ui ? `track ${ui}` : `layer ${layer2}`;
-}
-function resolveLayer2(project, track2) {
-  const text4 = track2 === void 0 || track2 === null ? "" : String(track2).trim();
-  if (!text4) throw new ToolError("a track is required (UI track number, name, or layer number)");
-  const resolved = normalizeTrackOrLayerArg(text4, project.layers);
-  if (resolved.error) throw new ToolError(resolved.error);
-  if (resolved.layer === void 0) throw new ToolError(`no track matches ${pyReprString(String(track2))}`);
-  return resolved.layer;
-}
-function requireUnlockedTracks(project, layers, what = "") {
-  const lockedNumbers = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
-  const locked = [...new Set(layers)].filter((n) => lockedNumbers.has(n)).sort((a, b) => a - b);
-  if (locked.length === 0) return;
-  const names2 = locked.map((n) => trackName(project, n)).join(", ");
-  const [verb, pronoun] = locked.length === 1 ? ["is", "it"] : ["are", "them"];
-  throw new ToolError(`${names2} ${verb} locked${what ? ` (${what})` : ""}; unlock ${pronoun} first (Track menu > Unlock Track)`);
-}
-function layersBottomUp(project) {
-  return [...project.layers].map((l) => l.number).sort((a, b) => a - b);
-}
-function isImageClip(clip2) {
-  const reader = clip2.reader;
-  return Boolean(reader?.has_single_image) || reader?.media_type === "image";
-}
-function clipTitle2(clip2) {
-  return String(clip2.title || clip2.id);
-}
-function clipById3(project, id) {
-  return project.clips.find((c) => c.id === id);
-}
-function describeClip(project, clip2) {
-  const [start, end] = spanOf(clip2);
-  return {
-    timeline_clip_id: String(clip2.id),
-    title: String(clip2.title ?? ""),
-    file_id: String(clip2.file_id ?? ""),
-    track: uiTrack(project, clip2.layer),
-    layer: clip2.layer,
-    position: r3(start),
-    end: r3(end),
-    duration: r3(end - start),
-    source_in: r3(Number(clip2.start) || 0),
-    source_out: r3(Number(clip2.end) || 0)
-  };
-}
-function clipsGiven(target) {
-  return (target.timeline_clip_ids?.length ?? 0) > 0 || Boolean(target.clip_query?.trim()) || Boolean(target.scope?.trim());
-}
-async function targetClip(call, target) {
-  const resolved = await resolveClip(call, target);
-  if (!resolved.ok) throw new ToolError(resolved.error || "could not resolve the timeline clip");
-  return resolved.clip;
-}
-function clipsByIds(project, ids2) {
-  return ids2.map((raw) => {
-    const clip2 = clipById3(project, String(raw).trim());
-    if (!clip2) throw new ToolError(`no timeline clip with id=${pyReprString(String(raw))}`);
-    return clip2;
-  });
-}
-function selectedClipIds(call) {
-  const clips = new Set(call.doc.project.clips.map((c) => c.id));
-  return (call.host.ui?.selectedIds?.() ?? []).filter((id) => clips.has(id));
-}
-async function targetClips(call, target) {
-  const project = call.doc.project;
-  const scope = (target.scope ?? "").trim().toLowerCase();
-  let clips;
-  if ((target.timeline_clip_ids?.length ?? 0) > 0) {
-    clips = clipsByIds(project, target.timeline_clip_ids);
-  } else if (scope === "selected") {
-    const ids2 = selectedClipIds(call);
-    if (ids2.length === 0) throw new ToolError("no clips are selected in the timeline");
-    clips = clipsByIds(project, ids2);
-  } else if (scope === "track" || scope === "all") {
-    clips = [...project.clips];
-    if (scope === "track") {
-      const layer2 = resolveLayer2(project, target.track);
-      clips = clips.filter((c) => c.layer === layer2);
-    }
-    if (clips.length === 0) throw new ToolError(scope === "all" ? "the timeline has no clips" : `track ${pyStr(target.track ?? "")} has no clips`);
-  } else {
-    clips = [await targetClip(call, { clip_query: target.clip_query, track: target.track })];
-  }
-  const seen = /* @__PURE__ */ new Set();
-  const out = clips.filter((c) => seen.has(c.id) ? false : (seen.add(c.id), true));
-  return out.sort((a, b) => Number(a.position) - Number(b.position) || a.layer - b.layer);
-}
-function overlapRow(project, hit) {
-  return {
-    timeline_clip_id: hit.clipId,
-    title: hit.title,
-    overlaps: hit.overlapsId,
-    overlaps_title: hit.overlapsTitle,
-    track: uiTrack(project, hit.layer),
-    seconds: r3(hit.seconds)
-  };
-}
-function newOverlaps(project, changes, newItems = []) {
-  return plannedOverlaps(project, changes, newItems, gridOf(project).tol).map((hit) => overlapRow(project, hit));
-}
-function checkOverlaps(hits, allowOverlap, what, rippleHint = true) {
-  if (hits.length > 0 && !allowOverlap) {
-    const first = hits[0];
-    const more = hits.length > 1 ? ` (+${hits.length - 1} more)` : "";
-    let options = "pass allow_overlap=true to overlap anyway";
-    if (rippleHint) options = `pass ripple=true to push the later clips along, or ${options}`;
-    throw new ToolError(
-      `${what} would overlap ${pyReprString(first.overlaps_title)} (${first.overlaps}) on track ${pyStr(first.track)} by ${pyFloat(first.seconds)} s${more}; ${options}`
-    );
-  }
-  return hits;
-}
-var ToolError;
-var init_timeline_edit_common = __esm({
-  "../engine/src/tools/catalog/timeline-edit-common.ts"() {
-    "use strict";
-    init_rounding();
-    init_sequence();
-    init_pyfmt();
-    init_receipt();
-    init_tracks2();
-    init_common();
-    ToolError = class extends Error {
-    };
   }
 });
 
@@ -64433,7 +66072,7 @@ async function alignClips(call, input2) {
     overlaps: hits
   });
 }
-var EDIT2, ADD2, timelineEditTools;
+var EDIT3, ADD2, timelineEditTools;
 var init_timeline_edit = __esm({
   "../engine/src/tools/catalog/timeline-edit.ts"() {
     "use strict";
@@ -64453,16 +66092,16 @@ var init_timeline_edit = __esm({
     init_tracks2();
     init_common();
     init_timeline_edit_common();
-    EDIT2 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT3 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD2 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     timelineEditTools = [
       contractTool("add_clips_to_timeline_tool", { annotations: ADD2, run: (call, input2) => editorRun(() => addClipsToTimeline(call, input2)) }),
-      contractTool("move_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => moveClips(call, input2)) }),
-      contractTool("trim_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => trimClips(call, input2)) }),
-      contractTool("slice_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => sliceClips(call, input2)) }),
-      contractTool("remove_gaps_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => removeGaps(call, input2)) }),
+      contractTool("move_clips_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => moveClips(call, input2)) }),
+      contractTool("trim_clips_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => trimClips(call, input2)) }),
+      contractTool("slice_clips_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => sliceClips(call, input2)) }),
+      contractTool("remove_gaps_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => removeGaps(call, input2)) }),
       contractTool("duplicate_clips_tool", { annotations: ADD2, run: (call, input2) => editorRun(() => duplicateClips(call, input2)) }),
-      contractTool("align_clips_tool", { annotations: EDIT2, run: (call, input2) => editorRun(() => alignClips(call, input2)) })
+      contractTool("align_clips_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => alignClips(call, input2)) })
     ];
   }
 });
@@ -64479,15 +66118,15 @@ function readerOf3(project, clip2) {
 }
 function mediaHasAudio(project, clip2) {
   const reader = readerOf3(project, clip2);
-  const hasAudio = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
+  const hasAudio2 = reader.has_audio === void 0 || reader.has_audio === null ? true : Boolean(reader.has_audio);
   const channels = reader.channels === void 0 || reader.channels === null ? null : Math.trunc(Number(reader.channels));
-  return hasAudio && (channels === null || Number.isNaN(channels) || channels > 0);
+  return hasAudio2 && (channels === null || Number.isNaN(channels) || channels > 0);
 }
 function mediaHasVideo(project, clip2) {
   const reader = readerOf3(project, clip2);
   return reader.has_video === void 0 || reader.has_video === null ? true : Boolean(reader.has_video);
 }
-function keyframeValue2(kf, fallback = -1) {
+function keyframeValue3(kf, fallback = -1) {
   const points = kf?.Points;
   const y = Array.isArray(points) && points.length > 0 ? Number(points[0]?.co?.Y) : NaN;
   return Number.isFinite(y) ? y : fallback;
@@ -64691,7 +66330,7 @@ async function separateClipAudio(call, input2) {
   for (const clip2 of clips) {
     const name = pyReprString(clipTitle2(clip2));
     if (!mediaHasAudio(project, clip2)) throw new ToolError(`${name} has no audio to separate`);
-    if (keyframeValue2(clip2.has_audio) === 0) {
+    if (keyframeValue3(clip2.has_audio) === 0) {
       throw new ToolError(`${name} already has its audio off (separated before?); turn it back on with set_clip_audio_video_tool(audio='auto') first`);
     }
     if (!mediaHasVideo(project, clip2) && !perChannel) throw new ToolError(`${name} is already audio-only; use per_channel=true to split its channels`);
@@ -64721,17 +66360,17 @@ async function separateClipAudio(call, input2) {
   const after = call.doc.project;
   const created = after.clips.filter((c) => !before.has(c.id)).map((c) => c.id).sort().map((id) => {
     const clip2 = clipById3(after, id);
-    return { ...describeClip(after, clip2), video: keyframeValue2(clip2.has_video) === 0 ? "off" : "auto" };
+    return { ...describeClip(after, clip2), video: keyframeValue3(clip2.has_video) === 0 ? "off" : "auto" };
   });
   const originals = clips.map((clip2) => ({
     timeline_clip_id: clip2.id,
     title: clipTitle2(clip2),
-    audio: keyframeValue2(clipById3(after, clip2.id)?.has_audio) === 0 ? "off" : "on"
+    audio: keyframeValue3(clipById3(after, clip2.id)?.has_audio) === 0 ? "off" : "on"
   }));
-  const tracks = [...new Set(created.map((c) => String(c.track)))].sort();
+  const tracks2 = [...new Set(created.map((c) => String(c.track)))].sort();
   return ok(
     call,
-    `Separated the audio of ${clips.length} clip(s) into ${created.length} audio clip(s) on track(s) ${tracks.join(", ") || "-"}; the originals are muted.`,
+    `Separated the audio of ${clips.length} clip(s) into ${created.length} audio clip(s) on track(s) ${tracks2.join(", ") || "-"}; the originals are muted.`,
     { audio_clips: created, originals }
   );
 }
@@ -64761,8 +66400,8 @@ async function setClipAudioVideo(call, input2) {
   }
   const changes = clips.map((clip2) => {
     const fields = [];
-    if (audio && keyframeValue2(clip2.has_audio) !== AV[audio]) fields.push(["has_audio", AV[audio]]);
-    if (video && keyframeValue2(clip2.has_video) !== AV[video]) fields.push(["has_video", AV[video]]);
+    if (audio && keyframeValue3(clip2.has_audio) !== AV[audio]) fields.push(["has_audio", AV[audio]]);
+    if (video && keyframeValue3(clip2.has_video) !== AV[video]) fields.push(["has_video", AV[video]]);
     return { clip: clip2, fields };
   }).filter((c) => c.fields.length > 0);
   if (changes.length === 0) {
@@ -64779,8 +66418,8 @@ async function setClipAudioVideo(call, input2) {
       timeline_clip_id: clip2.id,
       title: clipTitle2(clip2),
       track: uiTrack(after, clip2.layer),
-      audio: avState(keyframeValue2(now.has_audio)),
-      video: avState(keyframeValue2(now.has_video))
+      audio: avState(keyframeValue3(now.has_audio)),
+      video: avState(keyframeValue3(now.has_video))
     };
   });
   const parts = [];
@@ -64809,7 +66448,7 @@ async function reverseClip(call, input2) {
   call.commit((tx) => applyClipPreset(tx, clip2.id, reverse ? "time.reverse" : "time.none"));
   return `${reverse ? "Reversed" : "Reset time on"} timeline_clip_id=${clip2.id}.`;
 }
-var EDIT3, ADD3, MIN_SPEED, MAX_SPEED, AV, timelineTimeTools;
+var EDIT4, ADD3, MIN_SPEED, MAX_SPEED, AV, timelineTimeTools;
 var init_timeline_time = __esm({
   "../engine/src/tools/catalog/timeline-time.ts"() {
     "use strict";
@@ -64824,18 +66463,704 @@ var init_timeline_time = __esm({
     init_pyfmt();
     init_common();
     init_timeline_edit_common();
-    EDIT3 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    EDIT4 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     ADD3 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     MIN_SPEED = 0.0625;
     MAX_SPEED = 16;
     AV = { on: 1, off: 0, auto: -1 };
     timelineTimeTools = [
-      contractTool("reverse_clip_tool", { annotations: EDIT3, run: (call, input2) => reverseClip(call, input2) }),
-      contractTool("set_clip_speed_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => setClipSpeed(call, input2)) }),
-      contractTool("repeat_clip_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => repeatClips(call, input2)) }),
-      contractTool("freeze_frame_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => freezeFrame(call, input2)) }),
+      contractTool("reverse_clip_tool", { annotations: EDIT4, run: (call, input2) => reverseClip(call, input2) }),
+      contractTool("set_clip_speed_tool", { annotations: EDIT4, run: (call, input2) => editorRun(() => setClipSpeed(call, input2)) }),
+      contractTool("repeat_clip_tool", { annotations: EDIT4, run: (call, input2) => editorRun(() => repeatClips(call, input2)) }),
+      contractTool("freeze_frame_tool", { annotations: EDIT4, run: (call, input2) => editorRun(() => freezeFrame(call, input2)) }),
       contractTool("separate_clip_audio_tool", { annotations: ADD3, run: (call, input2) => editorRun(() => separateClipAudio(call, input2)) }),
-      contractTool("set_clip_audio_video_tool", { annotations: EDIT3, run: (call, input2) => editorRun(() => setClipAudioVideo(call, input2)) })
+      contractTool("set_clip_audio_video_tool", { annotations: EDIT4, run: (call, input2) => editorRun(() => setClipAudioVideo(call, input2)) })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/tracks-nav.ts
+async function run2(body) {
+  try {
+    return await body();
+  } catch (error62) {
+    if (error62 instanceof ToolError) return failText(error62.message);
+    throw error62;
+  }
+}
+function fpsFraction2(project) {
+  const num12 = Math.trunc(Number(project.fps?.num)) || 30;
+  const den2 = Math.trunc(Number(project.fps?.den)) || 1;
+  return { num: num12, den: den2 };
+}
+function fpsOf2(project) {
+  const { num: num12, den: den2 } = fpsFraction2(project);
+  return num12 / den2;
+}
+function secondsToFrame(project, seconds2) {
+  return pyRound(Math.max(0, seconds2) * fpsOf2(project)) + 1;
+}
+function frameToSeconds(project, frame) {
+  return (frame - 1) / fpsOf2(project);
+}
+function pad2(value) {
+  return String(Math.trunc(value)).padStart(2, "0");
+}
+function timecode(project, seconds2) {
+  const { num: num12, den: den2 } = fpsFraction2(project);
+  const ms = Math.max(0, seconds2) * 1e3;
+  let sec = Math.floor(ms / 1e3);
+  const milli = ms % 1e3;
+  let minute = Math.floor(sec / 60);
+  sec %= 60;
+  const hour = Math.floor(minute / 60) % 24;
+  minute %= 60;
+  const fps = den2 ? num12 / den2 : 0;
+  let frame = Math.trunc(pyRound(milli / 1e3 * fps));
+  if (fps > 0) frame = Math.max(0, Math.min(frame, Math.trunc(fps) - 1));
+  return `${pad2(hour)}:${pad2(minute)}:${pad2(sec)},${pad2(frame)}`;
+}
+function when(project, seconds2) {
+  const s = Math.max(0, seconds2);
+  return { seconds: roundTo(s, 3), frame: secondsToFrame(project, s), timecode: timecode(project, s) };
+}
+function contentEnd(project) {
+  return timelineEnd(project);
+}
+function timelineDuration(project) {
+  return projectDuration(project);
+}
+function lastFrame(project) {
+  return Math.max(1, maxFrame(project) - 1);
+}
+function minFrame(project) {
+  return Math.max(1, pyRound(timelineStart(project) * fpsOf2(project)) + 1);
+}
+function playerState(call) {
+  const project = call.doc.project;
+  const player = call.host.player;
+  const frame = secondsToFrame(project, playheadSeconds(call));
+  const playing = Boolean(player?.playing);
+  const speed = playing ? player?.rate ?? 1 : 0;
+  return { playing, speed, ...when(project, frameToSeconds(project, frame)), frame };
+}
+function tracks(project) {
+  const locks = new Map(project.layers.map((l) => [Math.trunc(Number(l.number) || 0), Boolean(l.lock)]));
+  const counts = /* @__PURE__ */ new Map();
+  for (const clip2 of project.clips) {
+    const layer2 = Math.trunc(Number(clip2.layer) || 0);
+    counts.set(layer2, (counts.get(layer2) ?? 0) + 1);
+  }
+  return buildTrackStack(project.layers).map((e) => ({
+    track: e.ui_track,
+    name: e.label,
+    layer: e.layer_number,
+    track_id: e.track_id,
+    locked: locks.get(e.layer_number) ?? false,
+    clips: counts.get(e.layer_number) ?? 0
+  }));
+}
+function trackRow(project, layer2) {
+  return tracks(project).find((r) => r.layer === layer2) ?? { track: null, name: "", layer: layer2, track_id: "", locked: false, clips: 0 };
+}
+function trackTitle2(row) {
+  const number4 = row.track === null ? "None" : String(row.track);
+  return row.name ? `track ${number4} "${row.name}"` : `track ${number4}`;
+}
+function nameClash(project, name, excludeLayer) {
+  if (!name) return "";
+  for (const row of tracks(project)) {
+    if (row.layer !== excludeLayer && row.name.trim().toLowerCase() === name.toLowerCase()) {
+      return `another track (${trackTitle2(row)}) already has this name; refer to tracks by number when names repeat`;
+    }
+  }
+  return "";
+}
+async function updateTrack(call, input2) {
+  const name = input2.name ?? null;
+  const lock = input2.lock ?? null;
+  if (name === null && lock === null) throw new ToolError("nothing to change: pass name and/or lock");
+  const project = call.doc.project;
+  const layer2 = resolveLayer2(project, input2.track);
+  const newName = name === null ? null : name.trim();
+  const warning = nameClash(project, newName ?? "", layer2);
+  const target = project.layers.find((l) => Math.trunc(Number(l.number) || 0) === layer2);
+  const changed = [];
+  if (newName !== null && String(target.label ?? "") !== newName) changed.push("name");
+  if (lock !== null && Boolean(target.lock) !== lock) changed.push("lock");
+  if (changed.length > 0) {
+    call.commit((tx) => {
+      if (changed.includes("name")) renameTrack(tx, layer2, newName);
+      if (changed.includes("lock")) setTrackLocked(tx, layer2, lock);
+    });
+  }
+  const after = call.doc.project;
+  const row = trackRow(after, layer2);
+  const parts = [];
+  if (changed.includes("name")) parts.push(newName ? `renamed to '${newName}'` : "name cleared");
+  if (changed.includes("lock")) parts.push(row.locked ? "locked" : "unlocked");
+  const data = { track: row, changed, tracks: tracks(after) };
+  if (warning && changed.includes("name")) data.warning = warning;
+  if (parts.length > 0) return ok(call, `Track ${row.track ?? "None"} ${parts.join(" and ")}.`, data);
+  const already = [];
+  if (newName !== null) already.push("already has that name");
+  if (lock !== null) already.push(`is already ${row.locked ? "locked" : "unlocked"}`);
+  return unchanged(call.tool, `Nothing changed: ${trackTitle2(row)} ${already.join(" and ")}.`, { data });
+}
+async function removeTrackTool(call, input2) {
+  const project = call.doc.project;
+  const layer2 = resolveLayer2(project, input2.track);
+  const row = trackRow(project, layer2);
+  if (row.locked) throw new ToolError(`${trackTitle2(row)} is locked; unlock it first (update_track_tool lock=false)`);
+  if (project.layers.length <= 1) throw new ToolError("the project must keep at least one track");
+  const clips = project.clips.filter((c) => Math.trunc(Number(c.layer) || 0) === layer2);
+  const transitions = project.effects.filter((t) => Math.trunc(Number(t.layer) || 0) === layer2);
+  if ((clips.length > 0 || transitions.length > 0) && !input2.with_clips) {
+    throw new ToolError(
+      `${trackTitle2(row)} still has ${clips.length} clip(s) and ${transitions.length} transition(s); pass with_clips=true to delete them with the track, or move them to another track first`
+    );
+  }
+  const removed = call.commit((tx) => removeTrack(tx, layer2));
+  const nClips = removed.removedClipIds.length;
+  const nTransitions = removed.removedTransitionIds.length;
+  const extra = nClips || nTransitions ? ` with ${nClips} clip(s) and ${nTransitions} transition(s)` : "";
+  return ok(call, `Removed ${trackTitle2(row)}${extra}. One undo restores it.`, {
+    removed_track: row,
+    deleted_clip_ids: removed.removedClipIds,
+    deleted_transition_ids: removed.removedTransitionIds,
+    tracks: tracks(call.doc.project)
+  });
+}
+function markerRows(project) {
+  return markersInTimeOrder(project.markers ?? []).map((m) => ({
+    marker_id: m.id,
+    name: m.name,
+    color: m.color,
+    ...when(project, m.position)
+  }));
+}
+function markerLabel(row) {
+  return `marker${row.name ? ` '${row.name}'` : ""} at ${row.timecode}`;
+}
+function checkMarkerTime(project, seconds2) {
+  const fps = fpsOf2(project);
+  const snapped = pyRound(Math.max(0, seconds2) * fps) / fps;
+  const duration3 = timelineDuration(project);
+  if (duration3 && snapped > duration3 + 1e-6) {
+    throw new ToolError(`${pyFixed(snapped, 3)} s is past the end of the timeline (${pyFixed(duration3, 3)} s long)`);
+  }
+  return snapped;
+}
+function markersMatching(project, ref) {
+  const wanted = ref.trim();
+  const rows = markerRows(project);
+  const byId = rows.filter((r) => r.marker_id === wanted);
+  if (byId.length > 0) return byId;
+  return wanted ? rows.filter((r) => r.name.trim().toLowerCase() === wanted.toLowerCase()) : [];
+}
+function markerListing(rows, limit = 12) {
+  if (rows.length === 0) return "there are no markers";
+  const text4 = rows.slice(0, limit).map((r) => `${r.name || "unnamed"} (${r.timecode})`).join(", ");
+  return `markers: ${text4}${rows.length > limit ? " ..." : ""}`;
+}
+async function updateMarkerTool(call, input2) {
+  const name = input2.name ?? null;
+  const color3 = input2.color ?? "";
+  const position = input2.position_seconds ?? null;
+  if (name === null && !color3 && position === null) throw new ToolError("nothing to change: pass name, color and/or position_seconds");
+  const project = call.doc.project;
+  const matches3 = markersMatching(project, input2.marker);
+  if (matches3.length === 0) throw new ToolError(`no marker with id or name ${pyReprString(input2.marker)}; ${markerListing(markerRows(project))}`);
+  if (matches3.length > 1) {
+    throw new ToolError(
+      `${matches3.length} markers are named ${pyReprString(input2.marker)} (${matches3.map((r) => `${r.marker_id} at ${r.timecode}`).join(", ")}); pass one marker_id`
+    );
+  }
+  const seconds2 = position === null ? void 0 : checkMarkerTime(project, position);
+  const markerId = matches3[0].marker_id;
+  const changes = { name: name === null ? void 0 : name.trim(), color: color3 || void 0, position: seconds2 };
+  const current = project.markers.find((m) => m.id === markerId);
+  const willChange = changes.name !== void 0 && changes.name !== markerName(current) || changes.color !== void 0 && changes.color !== markerColor(current) || changes.position !== void 0 && Math.abs((Number(current.position) || 0) - changes.position) > 1e-9;
+  const changed = willChange ? call.commit((tx) => updateMarker(tx, markerId, changes)) : [];
+  const row = markerRows(call.doc.project).find((r) => r.marker_id === markerId);
+  if (changed.length === 0) {
+    return unchanged(call.tool, `The ${markerLabel(row)} already looks like that; nothing changed.`, { data: { marker: row, changed: [] } });
+  }
+  return ok(call, `Updated the ${markerLabel(row)} (${changed.join(", ")}).`, { marker: row, changed });
+}
+async function removeMarkerTool(call, input2) {
+  const refs = (input2.markers ?? []).map((m) => String(m).trim()).filter(Boolean);
+  const at = input2.at_seconds ?? null;
+  const all = Boolean(input2.all);
+  const modes = [refs.length > 0, at !== null, all].filter(Boolean).length;
+  if (modes === 0) throw new ToolError("say which markers: markers (ids or names), at_seconds, or all=true");
+  if (modes > 1) throw new ToolError("use only one of markers, at_seconds or all");
+  const project = call.doc.project;
+  const rows = markerRows(project);
+  if (rows.length === 0) throw new ToolError("the timeline has no markers");
+  let targets;
+  if (all) {
+    targets = rows;
+  } else if (at !== null) {
+    const nearest = rows.reduce((best, r) => Math.abs(r.seconds - at) < Math.abs(best.seconds - at) ? r : best);
+    if (Math.abs(nearest.seconds - at) > 0.5) {
+      throw new ToolError(`no marker within 0.5 s of ${pyFixed(at, 3)} s; the nearest is the ${markerLabel(nearest)}`);
+    }
+    targets = rows.filter((r) => r.frame === nearest.frame);
+  } else {
+    targets = [];
+    for (const ref of refs) {
+      const found = markersMatching(project, ref);
+      if (found.length === 0) throw new ToolError(`no marker with id or name ${pyReprString(ref)}; ${markerListing(rows)}`);
+      if (found.length > 1) {
+        throw new ToolError(
+          `${found.length} markers are named ${pyReprString(ref)} (${found.map((r) => `${r.marker_id} at ${r.timecode}`).join(", ")}); pass their marker_ids`
+        );
+      }
+      if (!targets.some((t) => t.marker_id === found[0].marker_id)) targets.push(found[0]);
+    }
+  }
+  const removed = call.commit((tx) => removeMarkers(tx, targets.map((t) => t.marker_id)));
+  const summary = targets.length === 1 ? `Removed the ${markerLabel(targets[0])}.` : `Removed ${removed.length} markers.`;
+  return ok(call, summary, { removed: targets, remaining: markerRows(call.doc.project).length });
+}
+function selectionPairs(selection) {
+  return [
+    ...selection.clips.map((id) => [id, "clip"]),
+    ...selection.transitions.map((id) => [id, "transition"]),
+    ...selection.effects.map((id) => [id, "effect"])
+  ];
+}
+function selectionOf(pairs) {
+  const of = (kind) => pairs.filter((p) => p[1] === kind).map((p) => p[0]);
+  return { clips: of("clip"), transitions: of("transition"), effects: of("effect") };
+}
+function samePair(a, b) {
+  return a[0] === b[0] && a[1] === b[1];
+}
+function itemEnd2(item) {
+  return (Number(item.position) || 0) + Math.max(0, (Number(item.end) || 0) - (Number(item.start) || 0));
+}
+function describeSelection(project, selection) {
+  const clips = selection.clips.map((id) => clipById3(project, id)).filter((c) => Boolean(c)).map((clip2) => {
+    const row = describeClip(project, clip2);
+    const locked = project.layers.some((l) => Math.trunc(Number(l.number) || 0) === row.layer && Boolean(l.lock));
+    return { ...row, locked };
+  });
+  const transitions = selection.transitions.map((id) => project.effects.find((t) => t.id === id)).filter((t) => Boolean(t)).map((t) => {
+    const layer2 = Math.trunc(Number(t.layer) || 0);
+    return { transition_id: t.id, track: trackRow(project, layer2).track, layer: layer2, position: roundTo(Number(t.position) || 0, 3), end: roundTo(itemEnd2(t), 3) };
+  });
+  const effects = [];
+  for (const id of selection.effects) {
+    const clip2 = project.clips.find((c) => (c.effects ?? []).some((e) => e.id === id));
+    const effect3 = clip2?.effects.find((e) => e.id === id);
+    if (clip2 && effect3) effects.push({ effect_id: id, class_name: String(effect3.class_name ?? ""), timeline_clip_id: clip2.id });
+  }
+  return { clips, transitions, effects, count: clips.length + transitions.length + effects.length };
+}
+function hostSelection(call) {
+  const read = call.host.ui?.selection;
+  return read ? read.call(call.host.ui) : null;
+}
+function atEndError(project, state) {
+  return new ToolError(
+    `nothing to play from ${state.timecode}: the playhead is at the end of the timeline (content ends at ${timecode(project, contentEnd(project))}). Play from the start with seek_playhead_tool to='start', play=true`
+  );
+}
+async function seekPlayhead(call, input2) {
+  const marker2 = String(input2.marker ?? "").trim();
+  const track2 = String(input2.track ?? "").trim();
+  const to = input2.to ?? "";
+  const seconds2 = input2.seconds ?? null;
+  const frameArg = input2.frame ?? null;
+  const given = [
+    ["seconds", seconds2 !== null],
+    ["frame", frameArg !== null],
+    ["marker", Boolean(marker2)],
+    ["to", Boolean(to)]
+  ].filter(([, set2]) => set2).map(([name]) => name);
+  if (given.length === 0) throw new ToolError("say where to go: seconds, frame, marker, or to=start/end/next_marker/previous_marker/next_edit/previous_edit");
+  if (given.length > 1) throw new ToolError(`give only one of seconds, frame, marker or to (got ${given.join(", ")})`);
+  if (track2 && to !== "next_edit" && to !== "previous_edit") throw new ToolError("track only applies to to='next_edit' / 'previous_edit'");
+  const project = call.doc.project;
+  const player = call.host.player;
+  if (input2.play && !player) {
+    return unavailable(call.tool, "there is no preview player here to start playback; seek without play=true (the playhead is saved with the project)");
+  }
+  const state = playerState(call);
+  const duration3 = timelineDuration(project);
+  const last = lastFrame(project);
+  let target;
+  let label2;
+  let matched = {};
+  let note = "";
+  if (to === "start") {
+    target = minFrame(project);
+    label2 = "start";
+  } else if (to === "end") {
+    target = last;
+    label2 = "end";
+    if (contentEnd(project) <= 0) note = "the timeline is empty";
+  } else if (seconds2 !== null || frameArg !== null) {
+    const at = frameArg !== null ? frameToSeconds(project, frameArg) : seconds2;
+    if (duration3 && at > duration3 + 1e-6) {
+      throw new ToolError(
+        `${pyFixed(at, 3)} s is past the end of the timeline (${pyFixed(duration3, 3)} s long; content ends at ${timecode(project, contentEnd(project))})`
+      );
+    }
+    target = frameArg !== null ? frameArg : secondsToFrame(project, at);
+    if (at > contentEnd(project) + 1e-6) note = `past the end of the last clip (${timecode(project, contentEnd(project))}): the preview shows black`;
+    label2 = "time";
+  } else if (marker2) {
+    let rows = markersMatching(project, marker2);
+    if (rows.length === 0) {
+      const ref = marker2.toLowerCase();
+      rows = markerRows(project).filter((r) => ref && r.name.toLowerCase().includes(ref));
+    }
+    if (rows.length === 0) throw new ToolError(`no marker with id or name ${pyReprString(marker2)}; ${markerListing(markerRows(project))}`);
+    if (rows.length > 1) note = `${rows.length} markers match ${pyReprString(marker2)} (${rows.map((r) => r.timecode).join(", ")}); went to the first`;
+    matched = rows[0];
+    target = secondsToSeekFrame(project, rows[0].seconds);
+    label2 = "marker";
+  } else {
+    const direction2 = to.startsWith("next") ? 1 : -1;
+    let stops;
+    let what;
+    if (to.endsWith("marker")) {
+      const selection = hostSelection(call) ?? { clips: [], transitions: [], effects: [] };
+      const nothing = selection.clips.length + selection.transitions.length + selection.effects.length === 0;
+      stops = navigationPositions(project, selection, nothing ? last : void 0);
+      what = nothing ? "marker" : "marker, selected-item edge or keyframe";
+    } else {
+      stops = clipEdges(project, track2 ? resolveLayer2(project, track2) : void 0);
+      what = `clip edge${track2 ? " on that track" : ""}`;
+    }
+    const found = pickAdjacent(project, stops, state.seconds, state.frame, direction2, last);
+    if (!found) {
+      throw new ToolError(`no ${what} ${direction2 > 0 ? "after" : "before"} ${state.timecode}; ${markerListing(markerRows(project))}`);
+    }
+    target = found[1];
+    label2 = to;
+    if (to.endsWith("marker")) matched = markerRows(project).find((r) => r.frame === target) ?? {};
+  }
+  if (input2.play && !state.playing) {
+    if (contentEnd(project) <= 0) throw new ToolError("the timeline is empty: there is nothing to play");
+    if (!(target > 0 && target <= last)) throw atEndError(project, { ...state, ...when(project, frameToSeconds(project, target)), frame: target });
+  }
+  const targetSeconds = frameToSeconds(project, target);
+  let saved = false;
+  if (player) {
+    player.seek(targetSeconds);
+    centerIfOffscreen(call, targetSeconds);
+  } else {
+    call.doc.setUntracked(["playhead_position"], roundTo(targetSeconds, 6));
+    saved = true;
+  }
+  let after = playerState(call);
+  if (player && Math.abs(after.frame - target) > (state.playing ? pyRound(fpsOf2(project) * 2 * Math.max(1, Math.abs(state.speed || 1))) : 1)) {
+    if (targetSeconds > contentEnd(project) + 1e-6) {
+      note = `the preview stops at the end of the last clip (${timecode(project, contentEnd(project))}); the playhead is there`;
+    } else {
+      throw new ToolError(`asked the player to go to frame ${target}, but it is at frame ${after.frame} (${after.timecode})`);
+    }
+  }
+  let started = false;
+  if (input2.play && player && !player.playing) {
+    player.play();
+    started = true;
+    after = playerState(call);
+    if (!after.playing) throw new ToolError(`moved to ${after.timecode} but playback did not start`);
+  }
+  let where = after.timecode;
+  if ("name" in matched && matched.name) where += ` (marker '${matched.name}')`;
+  let summary = `Playhead at ${where}, frame ${after.frame}${after.playing ? ", playing" : ""}${saved ? ` (${SAVED_NOTE})` : ""}.`;
+  const data = { ...after, target: label2, started_playing: started };
+  if ("marker_id" in matched) data.marker = matched;
+  if (note) {
+    data.note = note;
+    summary += ` Note: ${note}.`;
+  }
+  if (saved) data.saved = true;
+  return ok(call, summary, data);
+}
+function centerIfOffscreen(call, seconds2) {
+  const ui = call.host.ui;
+  const view = ui?.timelineView?.();
+  if (!ui || !view) return;
+  const [start, end] = view.visibleRange;
+  if (seconds2 < start || seconds2 > end) ui.centerOnPlayhead();
+}
+function zoomState(view) {
+  return {
+    seconds_per_100px: roundTo(view.secondsPer100px, 4),
+    visible_seconds: roundTo(view.visibleSeconds, 3),
+    visible_range: [roundTo(view.visibleRange[0], 3), roundTo(view.visibleRange[1], 3)]
+  };
+}
+function modesOf(view) {
+  return { snapping: view.snapping, razor: view.razor, timing: view.timing };
+}
+async function setTimelineView(call, input2) {
+  const zoom = input2.zoom ?? "";
+  const steps = input2.steps ?? 1;
+  const visible = input2.visible_seconds ?? null;
+  const start = input2.start_seconds ?? null;
+  const end = input2.end_seconds ?? null;
+  const center = Boolean(input2.center_on_playhead);
+  const project = call.doc.project;
+  const ranged = start !== null || end !== null;
+  const zooms = [
+    ["zoom", Boolean(zoom)],
+    ["visible_seconds", visible !== null],
+    ["start_seconds/end_seconds", ranged]
+  ].filter(([, set2]) => set2).map(([name]) => name);
+  if (zooms.length > 1) throw new ToolError(`use only one of ${zooms.join(", ")}`);
+  const duration3 = timelineDuration(project);
+  if (ranged) {
+    if (start === null || end === null) throw new ToolError("give both start_seconds and end_seconds");
+    if (end <= start) throw new ToolError("end_seconds must be after start_seconds");
+    if (duration3 && start >= duration3) throw new ToolError(`start_seconds is past the end of the timeline (${pyFixed(duration3, 3)} s long)`);
+  }
+  if (steps !== 1 && zoom !== "in" && zoom !== "out") throw new ToolError("steps only applies to zoom 'in' / 'out'");
+  const modes = ["snapping", "razor", "timing"].map((key) => [key, input2[key] ?? null]).filter((entry) => entry[1] !== null);
+  if (zooms.length === 0 && !center && modes.length === 0) {
+    throw new ToolError("nothing to change: pass zoom, visible_seconds, start_seconds/end_seconds, center_on_playhead or a mode");
+  }
+  const ui = call.host.ui;
+  if (!ui.timelineView || !ui.showTimelineRange || !ui.setTimelineMode) {
+    return unavailable(call.tool, "this editor does not report or change its timeline view.");
+  }
+  const view = ui.timelineView();
+  if (!view) throw new ToolError("the timeline is not ready yet");
+  for (const [key, value] of modes) {
+    if (view[key] === null && value) return unavailable(call.tool, `this editor has no ${key} mode; leave ${key} out.`);
+  }
+  const done = [];
+  if (zoom === "in" || zoom === "out") {
+    for (let i = 0; i < steps; i += 1) {
+      if (zoom === "in") ui.zoomIn();
+      else ui.zoomOut();
+    }
+    done.push(`zoomed ${zoom} ${steps} step${steps === 1 ? "" : "s"}`);
+  } else if (zoom === "fit") {
+    let last = contentEnd(project);
+    if (last <= 0) {
+      last = duration3;
+      done.push("the timeline is empty; showing all of it");
+    } else {
+      done.push(`fit every clip (0 to ${timecode(project, last)})`);
+    }
+    ui.showTimelineRange(0, last * 1.02);
+  } else if (visible !== null) {
+    const span2 = duration3 ? Math.min(visible, duration3) : visible;
+    let from = Math.max(0, playheadSeconds(call) - span2 / 2);
+    if (duration3) from = Math.max(0, Math.min(from, duration3 - span2));
+    ui.showTimelineRange(from, from + span2);
+    done.push(`showing ${pyG(span2)} s around the playhead`);
+  } else if (ranged) {
+    const until = Math.min(end, duration3 || end);
+    ui.showTimelineRange(start, until);
+    done.push(`showing ${timecode(project, start)} to ${timecode(project, until)}`);
+  }
+  if (center) {
+    ui.centerOnPlayhead();
+    done.push("centered on the playhead");
+  }
+  const before = modesOf(view);
+  for (const [key, value] of modes) {
+    if ((before[key] ?? false) === value) {
+      done.push(`${key} already ${value ? "on" : "off"}`);
+      continue;
+    }
+    ui.setTimelineMode(key, value);
+    done.push(`${key} ${value ? "on" : "off"}`);
+  }
+  const now = ui.timelineView() ?? view;
+  return ok(call, `Timeline view: ${done.join("; ")}.`, { zoom: zoomState(now), modes: modesOf(now) });
+}
+function overlaps(item, start, end) {
+  if (start === null) return true;
+  const position = Number(item.position) || 0;
+  const stop = itemEnd2(item);
+  if (end === null || end <= start) return position <= start && start < stop;
+  return position < end && stop > start;
+}
+async function resolveSelectTargets(call, input2, ids2) {
+  const project = call.doc.project;
+  const targets = [];
+  const add = (pair) => {
+    if (!targets.some((t) => samePair(t, pair))) targets.push(pair);
+  };
+  for (const id of ids2.clips) {
+    if (!clipById3(project, id)) throw new ToolError(`no timeline clip with id ${pyReprString(id)}`);
+    add([id, "clip"]);
+  }
+  for (const id of ids2.transitions) {
+    if (!project.effects.some((t) => t.id === id)) throw new ToolError(`no transition with id ${pyReprString(id)}`);
+    add([id, "transition"]);
+  }
+  for (const id of ids2.effects) {
+    if (!project.clips.some((c) => (c.effects ?? []).some((e) => e.id === id))) throw new ToolError(`no effect with id ${pyReprString(id)} on any clip`);
+    add([id, "effect"]);
+  }
+  const query2 = String(input2.clip_query ?? "").trim();
+  const track2 = String(input2.track ?? "").trim();
+  const start = input2.start_seconds ?? null;
+  const end = input2.end_seconds ?? null;
+  if (query2) {
+    add([(await targetClip(call, { clip_query: query2, track: track2 })).id, "clip"]);
+  } else if (track2 || start !== null) {
+    const layer2 = track2 ? resolveLayer2(project, track2) : null;
+    const found = [];
+    for (const clip2 of project.clips) {
+      if (layer2 !== null && Math.trunc(Number(clip2.layer) || 0) !== layer2) continue;
+      if (overlaps(clip2, start, end)) found.push([Number(clip2.position) || 0, Math.trunc(Number(clip2.layer) || 0), clip2.id, "clip"]);
+    }
+    if (input2.include_transitions) {
+      for (const transition2 of project.effects) {
+        if (layer2 !== null && Math.trunc(Number(transition2.layer) || 0) !== layer2) continue;
+        if (overlaps(transition2, start, end)) found.push([Number(transition2.position) || 0, Math.trunc(Number(transition2.layer) || 0), transition2.id, "transition"]);
+      }
+    }
+    if (found.length === 0) {
+      let where = track2 ? `on track ${track2}` : "on any track";
+      if (start !== null) where += ` between ${timecode(project, start)} and ${timecode(project, end ?? start)}`;
+      throw new ToolError(`nothing to select ${where}`);
+    }
+    found.sort((a, b) => a[0] - b[0] || a[1] - b[1] || (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0) || (a[3] < b[3] ? -1 : a[3] > b[3] ? 1 : 0));
+    for (const [, , id, kind] of found) add([id, kind]);
+  }
+  return targets;
+}
+function rippleFrom(project, [id, kind]) {
+  const items = [...project.clips.map((c) => [c, "clip"]), ...project.effects.map((t) => [t, "transition"])];
+  const seed = items.find(([item, k]) => k === kind && item.id === id)?.[0];
+  if (!seed) return [];
+  const layer2 = seed.layer;
+  const position = Number(seed.position) || 0;
+  return items.filter(([item]) => item.layer === layer2 && (Number(item.position) || 0) >= position).map(([item, k]) => [item.id, k]);
+}
+async function selectTimelineItems(call, input2) {
+  const strip = (list2) => (list2 ?? []).map((i) => String(i).trim()).filter(Boolean);
+  const ids2 = { clips: strip(input2.timeline_clip_ids), transitions: strip(input2.transition_ids), effects: strip(input2.effect_ids) };
+  const mode = input2.mode ?? "replace";
+  const start = input2.start_seconds ?? null;
+  const end = input2.end_seconds ?? null;
+  const hasTarget = Boolean(
+    ids2.clips.length || ids2.transitions.length || ids2.effects.length || String(input2.clip_query ?? "").trim() || String(input2.track ?? "").trim() || start !== null
+  );
+  if (end !== null && start === null) throw new ToolError("end_seconds needs start_seconds");
+  if (start !== null && end !== null && end < start) throw new ToolError("end_seconds must not be before start_seconds");
+  if ((mode === "all" || mode === "none") && hasTarget) {
+    throw new ToolError(`mode='${mode}' takes no targets; use mode='replace' with track/ids to select part of the timeline`);
+  }
+  if ((mode === "replace" || mode === "add" || mode === "remove") && !hasTarget) {
+    throw new ToolError(`mode='${mode}' needs something to select: ids, clip_query, track or a time range`);
+  }
+  const ui = call.host.ui;
+  if (!ui.selection || !ui.setSelection) return unavailable(call.tool, "this editor does not let tools read or change its selection.");
+  const targets = hasTarget ? await resolveSelectTargets(call, input2, ids2) : [];
+  const project = call.doc.project;
+  const before = selectionPairs(ui.selection());
+  let next;
+  if (mode === "none") {
+    next = [];
+  } else if (mode === "all") {
+    if (project.clips.length === 0 && project.effects.length === 0) throw new ToolError("the timeline has no clips or transitions to select");
+    next = [...project.clips.map((c) => [c.id, "clip"]), ...project.effects.map((t) => [t.id, "transition"])];
+  } else if (mode === "replace") {
+    next = targets;
+  } else if (mode === "add") {
+    next = [...before, ...targets.filter((t) => !before.some((b) => samePair(b, t)))];
+  } else if (mode === "remove") {
+    next = before.filter((b) => !targets.some((t) => samePair(b, t)));
+  } else {
+    const seeds = targets.length > 0 ? targets : before.filter((p) => p[1] === "clip" || p[1] === "transition");
+    if (seeds.length === 0) throw new ToolError("mode='ripple' needs clips: pass ids/track, or select something first");
+    next = [...before];
+    for (const seed of seeds) {
+      if (seed[1] !== "clip" && seed[1] !== "transition") continue;
+      for (const pair of [seed, ...rippleFrom(project, seed)]) if (!next.some((p) => samePair(p, pair))) next.push(pair);
+    }
+  }
+  ui.setSelection(selectionOf(next));
+  if (input2.show_properties) ui.showProperties?.();
+  const selection = describeSelection(project, ui.selection());
+  const parts = [];
+  for (const [key, noun] of [
+    ["clips", "clip"],
+    ["transitions", "transition"],
+    ["effects", "effect"]
+  ]) {
+    const n = selection[key].length;
+    if (n) parts.push(`${n} ${noun}${n === 1 ? "" : "s"}`);
+  }
+  let summary = `Selection: ${parts.length > 0 ? parts.join(", ") : "nothing"}.`;
+  if (mode === "remove" && !targets.some((t) => before.some((b) => samePair(b, t)))) summary += " (none of those were selected)";
+  return ok(call, summary, { mode, selection });
+}
+async function getPlayheadAndSelection(call) {
+  const project = call.doc.project;
+  const state = playerState(call);
+  const markers = markerRows(project);
+  const before = markers.filter((r) => r.frame < state.frame);
+  const after = markers.filter((r) => r.frame > state.frame);
+  const read = hostSelection(call);
+  const selection = read ? describeSelection(project, read) : null;
+  const view = call.host.ui?.timelineView?.() ?? null;
+  const editor = Boolean(call.host.player);
+  const data = {
+    playhead: { frame: state.frame, seconds: state.seconds, timecode: state.timecode },
+    playback: { playing: state.playing, speed: state.speed },
+    selection,
+    view: view ? { zoom: zoomState(view), modes: modesOf(view) } : null,
+    timeline: {
+      content_end: when(project, contentEnd(project)),
+      duration: roundTo(timelineDuration(project), 3),
+      markers: markers.length,
+      previous_marker: before[before.length - 1] ?? null,
+      next_marker: after[0] ?? null
+    }
+  };
+  const count = selection ? Number(selection.count) : 0;
+  const head = `Playhead at ${state.timecode} (frame ${state.frame})`;
+  if (!editor) {
+    return ok(call, `${head}, saved with the project: no editor is open here, so there is no playback, selection or timeline view.`, { ...data, saved: true });
+  }
+  const selected = selection ? `${count} item(s) selected` : "the selection is not available here";
+  return ok(call, `${head}, ${state.playing ? "playing" : "paused"}; ${selected}.`, data);
+}
+var EDIT5, VIEW4, READ5, SAVED_NOTE, tracksNavTools;
+var init_tracks_nav = __esm({
+  "../engine/src/tools/catalog/tracks-nav.ts"() {
+    "use strict";
+    init_rounding();
+    init_markers();
+    init_tracks();
+    init_duration();
+    init_navigation();
+    init_queries();
+    init_define();
+    init_pyfmt();
+    init_receipt();
+    init_tracks2();
+    init_clip_props_model();
+    init_common();
+    init_timeline_edit_common();
+    EDIT5 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
+    VIEW4 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    READ5 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    SAVED_NOTE = "saved with the project; there is no preview player here";
+    tracksNavTools = [
+      contractTool("update_track_tool", { annotations: EDIT5, run: (call, input2) => run2(() => updateTrack(call, input2)) }),
+      contractTool("remove_track_tool", { annotations: EDIT5, run: (call, input2) => run2(() => removeTrackTool(call, input2)) }),
+      contractTool("update_marker_tool", { annotations: EDIT5, run: (call, input2) => run2(() => updateMarkerTool(call, input2)) }),
+      contractTool("remove_marker_tool", { annotations: EDIT5, run: (call, input2) => run2(() => removeMarkerTool(call, input2)) }),
+      contractTool("seek_playhead_tool", { annotations: VIEW4, run: (call, input2) => run2(() => seekPlayhead(call, input2)) }),
+      contractTool("select_timeline_items_tool", { annotations: VIEW4, requires: ["ui"], run: (call, input2) => run2(() => selectTimelineItems(call, input2)) }),
+      contractTool("set_timeline_view_tool", { annotations: VIEW4, requires: ["ui"], run: (call, input2) => run2(() => setTimelineView(call, input2)) }),
+      contractTool("get_playhead_and_selection_tool", { annotations: READ5, run: (call) => run2(() => getPlayheadAndSelection(call)) })
     ];
   }
 });
@@ -65314,8 +67639,8 @@ async function loadTitleTemplate(call, template) {
 function titleFileName(body, fileName2) {
   let safe2 = basename4(fileName2.trim());
   if (!safe2) {
-    const slug = pySlice(body.replace(/[^A-Za-z0-9_-]+/g, "_"), 0, 40).replace(/^_+|_+$/g, "") || "title";
-    safe2 = `${slug}_${generateId().slice(0, 8).toLowerCase()}.svg`;
+    const slug2 = pySlice(body.replace(/[^A-Za-z0-9_-]+/g, "_"), 0, 40).replace(/^_+|_+$/g, "") || "title";
+    safe2 = `${slug2}_${generateId().slice(0, 8).toLowerCase()}.svg`;
   }
   if (!safe2.toLowerCase().endsWith(".svg")) safe2 += ".svg";
   return safe2;
@@ -65515,7 +67840,7 @@ function durationArg(value) {
   const n = parsePythonFloat(String(value ?? "").trim());
   return n === null ? 1 : n;
 }
-var READ4, transitionTools;
+var READ6, transitionTools;
 var init_transitions3 = __esm({
   "../engine/src/tools/catalog/transitions.ts"() {
     "use strict";
@@ -65525,10 +67850,10 @@ var init_transitions3 = __esm({
     init_define();
     init_pyfmt();
     init_common();
-    READ4 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+    READ6 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
     transitionTools = [
       contractTool("list_transitions_tool", {
-        annotations: READ4,
+        annotations: READ6,
         run: (_call, input2) => {
           const category = (text(input2.category) || "all").toLowerCase();
           const list2 = category === "all" || category === "common" || category === "extra" ? listTransitions(category) : [];
@@ -65539,7 +67864,7 @@ var init_transitions3 = __esm({
         }
       }),
       contractTool("search_transitions_tool", {
-        annotations: READ4,
+        annotations: READ6,
         run: (_call, input2) => {
           const query2 = String(input2.query ?? "");
           const matches3 = searchTransitions(query2);
@@ -65614,7 +67939,9 @@ function buildCatalog() {
     ...titleTemplateTools,
     ...animatedTitleTools,
     ...captionTools,
-    ...overlayTools
+    ...overlayTools,
+    ...clipPropsTools,
+    ...tracksNavTools
   ];
   const byName2 = /* @__PURE__ */ new Map();
   for (const tool of [...implemented, ...directTools]) {
@@ -65672,6 +67999,7 @@ var init_registry4 = __esm({
     init_animated_titles();
     init_audio3();
     init_captions();
+    init_clip_props2();
     init_clips2();
     init_direct();
     init_export2();
@@ -65689,6 +68017,7 @@ var init_registry4 = __esm({
     init_timeline2();
     init_timeline_edit();
     init_timeline_time();
+    init_tracks_nav();
     init_title_templates();
     init_titles2();
     init_transitions3();
@@ -65716,7 +68045,12 @@ function needName(need) {
     "storage.open": "opening project files",
     "storage.readText": "reading files",
     "storage.writeText": "writing files",
-    "ui.openExportDialog": "an export dialog"
+    "ui.openExportDialog": "an export dialog",
+    "ui.selection": "reading the editor's selection",
+    "ui.setSelection": "selecting in the editor",
+    "ui.timelineView": "reading the timeline view",
+    "ui.showTimelineRange": "zooming the timeline to a range",
+    "ui.setTimelineMode": "the timeline toolbar's modes"
   };
   return names2[need];
 }
@@ -65809,6 +68143,19 @@ var init_availability = __esm({
       set_clip_audio_video_tool: {
         webNote: "waveform=show changes nothing, since the web timeline draws the waveform of every clip with sound; waveform=hide is refused"
       },
+      seek_playhead_tool: {
+        optional: ["player"],
+        partialNote: "without a preview player it moves the playhead saved with the project (where the editors open); play=true needs the web editor"
+      },
+      get_playhead_and_selection_tool: {
+        optional: ["player", "ui.selection", "ui.timelineView"],
+        partialNote: "without an editor open it reports the playhead saved with the project; selection, playback and the timeline view exist only in an editor"
+      },
+      select_timeline_items_tool: { methods: ["ui.selection", "ui.setSelection"] },
+      set_timeline_view_tool: {
+        methods: ["ui.timelineView", "ui.showTimelineRange", "ui.setTimelineMode"],
+        webNote: "the web editor has no timing (retime-by-drag) mode, so timing=true is refused"
+      },
       transcribe_media_tool: { desktopOnly: "on-device speech recognition" },
       remove_words_tool: { desktopOnly: "word timings from on-device speech recognition" },
       detect_beats_tool: { desktopOnly: "on-device beat tracking" },
@@ -65823,7 +68170,18 @@ var init_availability = __esm({
         title: "Web editor (Zenvi Assistant, command palette)",
         host: "apps/editor/src/features/editor/assistant/host.ts",
         capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets"],
-        methods: ["media.importUrl", "media.pickFiles", "media.writeGenerated", "storage.readText", "ui.openExportDialog"],
+        methods: [
+          "media.importUrl",
+          "media.pickFiles",
+          "media.writeGenerated",
+          "storage.readText",
+          "ui.openExportDialog",
+          "ui.selection",
+          "ui.setSelection",
+          "ui.timelineView",
+          "ui.showTimelineRange",
+          "ui.setTimelineMode"
+        ],
         conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" }
       },
       cli: {
@@ -68376,9 +70734,9 @@ var init_types4 = __esm({
       _getCached() {
         if (this._cached !== null)
           return this._cached;
-        const shape2 = this._def.shape();
-        const keys = util.objectKeys(shape2);
-        this._cached = { shape: shape2, keys };
+        const shape3 = this._def.shape();
+        const keys = util.objectKeys(shape3);
+        this._cached = { shape: shape3, keys };
         return this._cached;
       }
       _parse(input2) {
@@ -68393,7 +70751,7 @@ var init_types4 = __esm({
           return INVALID2;
         }
         const { status, ctx } = this._processInputParams(input2);
-        const { shape: shape2, keys: shapeKeys } = this._getCached();
+        const { shape: shape3, keys: shapeKeys } = this._getCached();
         const extraKeys = [];
         if (!(this._def.catchall instanceof ZodNever2 && this._def.unknownKeys === "strip")) {
           for (const key in ctx.data) {
@@ -68404,7 +70762,7 @@ var init_types4 = __esm({
         }
         const pairs = [];
         for (const key of shapeKeys) {
-          const keyValidator = shape2[key];
+          const keyValidator = shape3[key];
           const value = ctx.data[key];
           pairs.push({
             key: { status: "valid", value: key },
@@ -68610,27 +70968,27 @@ var init_types4 = __esm({
         });
       }
       pick(mask2) {
-        const shape2 = {};
+        const shape3 = {};
         for (const key of util.objectKeys(mask2)) {
           if (mask2[key] && this.shape[key]) {
-            shape2[key] = this.shape[key];
+            shape3[key] = this.shape[key];
           }
         }
         return new _ZodObject({
           ...this._def,
-          shape: () => shape2
+          shape: () => shape3
         });
       }
       omit(mask2) {
-        const shape2 = {};
+        const shape3 = {};
         for (const key of util.objectKeys(this.shape)) {
           if (!mask2[key]) {
-            shape2[key] = this.shape[key];
+            shape3[key] = this.shape[key];
           }
         }
         return new _ZodObject({
           ...this._def,
-          shape: () => shape2
+          shape: () => shape3
         });
       }
       /**
@@ -68677,27 +71035,27 @@ var init_types4 = __esm({
         return createZodEnum(util.objectKeys(this.shape));
       }
     };
-    ZodObject2.create = (shape2, params) => {
+    ZodObject2.create = (shape3, params) => {
       return new ZodObject2({
-        shape: () => shape2,
+        shape: () => shape3,
         unknownKeys: "strip",
         catchall: ZodNever2.create(),
         typeName: ZodFirstPartyTypeKind2.ZodObject,
         ...processCreateParams(params)
       });
     };
-    ZodObject2.strictCreate = (shape2, params) => {
+    ZodObject2.strictCreate = (shape3, params) => {
       return new ZodObject2({
-        shape: () => shape2,
+        shape: () => shape3,
         unknownKeys: "strict",
         catchall: ZodNever2.create(),
         typeName: ZodFirstPartyTypeKind2.ZodObject,
         ...processCreateParams(params)
       });
     };
-    ZodObject2.lazycreate = (shape2, params) => {
+    ZodObject2.lazycreate = (shape3, params) => {
       return new ZodObject2({
-        shape: shape2,
+        shape: shape3,
         unknownKeys: "strip",
         catchall: ZodNever2.create(),
         typeName: ZodFirstPartyTypeKind2.ZodObject,
@@ -69978,10 +72336,10 @@ var init_parse4 = __esm({
 
 // ../../node_modules/zod/v4/mini/schemas.js
 // @__NO_SIDE_EFFECTS__
-function object2(shape2, params) {
+function object2(shape3, params) {
   const def = {
     type: "object",
-    shape: shape2 ?? {},
+    shape: shape3 ?? {},
     ...normalizeParams(params)
   };
   return new ZodMiniObject(def);
@@ -70094,16 +72452,16 @@ function isZ4Schema(s) {
   const schema = s;
   return !!schema._zod;
 }
-function objectFromShape(shape2) {
-  const values = Object.values(shape2);
+function objectFromShape(shape3) {
+  const values = Object.values(shape3);
   if (values.length === 0)
     return object2({});
   const allV4 = values.every(isZ4Schema);
   const allV3 = values.every((s) => !isZ4Schema(s));
   if (allV4)
-    return object2(shape2);
+    return object2(shape3);
   if (allV3)
-    return objectType(shape2);
+    return objectType(shape3);
   throw new Error("Mixed Zod versions detected in object shape.");
 }
 function safeParse3(schema, data) {
@@ -72869,9 +75227,9 @@ function parseObjectDef(def, refs) {
     properties: {}
   };
   const required2 = [];
-  const shape2 = def.shape();
-  for (const propName in shape2) {
-    let propDef = shape2[propName];
+  const shape3 = def.shape();
+  for (const propName in shape3) {
+    let propDef = shape3[propName];
     if (propDef === void 0 || propDef._def === void 0) {
       continue;
     }
@@ -73411,8 +75769,8 @@ function toJsonSchemaCompat(schema, opts) {
   });
 }
 function getMethodLiteral(schema) {
-  const shape2 = getObjectShape(schema);
-  const methodSchema = shape2?.method;
+  const shape3 = getObjectShape(schema);
+  const methodSchema = shape3?.method;
   if (!methodSchema) {
     throw new Error("Schema is missing a method literal");
   }
@@ -87657,8 +90015,8 @@ var init_client3 = __esm({
        * Override request handler registration to enforce client-side validation for elicitation.
        */
       setRequestHandler(requestSchema, handler) {
-        const shape2 = getObjectShape(requestSchema);
-        const methodSchema = shape2?.method;
+        const shape3 = getObjectShape(requestSchema);
+        const methodSchema = shape3?.method;
         if (!methodSchema) {
           throw new Error("Schema is missing a method literal");
         }
@@ -90589,8 +92947,8 @@ function registerEditCommands(program2, ctx) {
     await runToolCommand(ctx, "add_marker_tool", { position_seconds: parseTime(time3), ...label2 ? { label: label2 } : {} });
   });
   if (ctx.registry.get("remove_marker_tool")) {
-    marker2.command("rm").argument("<marker>", "marker id").action(async (id) => {
-      await runToolCommand(ctx, "remove_marker_tool", toolArgs(ctx, "remove_marker_tool", [[["marker_id", "id"], id]]));
+    marker2.command("rm").argument("<marker>", "marker id or name").action(async (id) => {
+      await runToolCommand(ctx, "remove_marker_tool", toolArgs(ctx, "remove_marker_tool", [[["markers", "marker_id", "id"], [id]]]));
     });
   }
   const track2 = program2.command("track").description("tracks");
@@ -91440,7 +93798,7 @@ var init_aftereffects = __esm({
 });
 
 // ../adobe-link/src/catalog/premiere.ts
-var UNDO, sequenceRef, clipRef, itemRef, binPath, point2, PREMIERE_SEQUENCE_PRESETS, PREMIERE_BLEND_MODES, PREMIERE_EXPORT_PRESETS, PREMIERE_MARKER_COLORS, premiereGetState, premiereListItems, premiereGetSequence, premiereCaptureFrame, premiereImportFiles, premiereCreateSequence, premiereOpenSequence, premierePlaceClip, premiereEditClip, premiereRazor, premiereSetClipProperties, keyframeValue3, premiereAnimate, premiereApplyEffect, premiereAddTransition, premiereApplyLook, premiereAddText, premiereAddMarker, premiereAddCaptions, premiereAutoReframe, premiereSceneDetect, premiereExport, premiereExportXml, premiereImportXml, premiereSaveProject, premiereRunScript, PREMIERE_TOOLS;
+var UNDO, sequenceRef, clipRef, itemRef, binPath, point2, PREMIERE_SEQUENCE_PRESETS, PREMIERE_BLEND_MODES, PREMIERE_EXPORT_PRESETS, PREMIERE_MARKER_COLORS, premiereGetState, premiereListItems, premiereGetSequence, premiereCaptureFrame, premiereImportFiles, premiereCreateSequence, premiereOpenSequence, premierePlaceClip, premiereEditClip, premiereRazor, premiereSetClipProperties, keyframeValue4, premiereAnimate, premiereApplyEffect, premiereAddTransition, premiereApplyLook, premiereAddText, premiereAddMarker, premiereAddCaptions, premiereAutoReframe, premiereSceneDetect, premiereExport, premiereExportXml, premiereImportXml, premiereSaveProject, premiereRunScript, PREMIERE_TOOLS;
 var init_premiere = __esm({
   "../adobe-link/src/catalog/premiere.ts"() {
     "use strict";
@@ -91628,7 +93986,7 @@ var init_premiere = __esm({
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     });
-    keyframeValue3 = external_exports.union([external_exports.number(), external_exports.array(external_exports.number()).min(2).max(4)]);
+    keyframeValue4 = external_exports.union([external_exports.number(), external_exports.array(external_exports.number()).min(2).max(4)]);
     premiereAnimate = defineHostTool({
       name: "premiere_animate",
       title: "Animate a property",
@@ -91645,7 +94003,7 @@ var init_premiere = __esm({
         keyframes: external_exports.array(
           external_exports.strictObject({
             time: seconds.describe("Seconds from the clip's first frame (0 = where it starts on the timeline)"),
-            value: keyframeValue3.describe("position [x, y] px, scale %, rotation degrees, anchor fractions, opacity %, volume dB; effect parameters as Premiere shows them"),
+            value: keyframeValue4.describe("position [x, y] px, scale %, rotation degrees, anchor fractions, opacity %, volume dB; effect parameters as Premiere shows them"),
             easing: easing.optional().describe("Easing of the segment from this keyframe to the next; default: `easing`")
           })
         ).min(2).max(200).describe("At least two keyframes; sorted by time for you"),
@@ -92831,9 +95189,9 @@ function coerceHostValue(value, schema) {
   }
   if (typeof value === "object") {
     const keys = Object.keys(value);
-    const shape2 = options.find((leaf) => typesOf(leaf).includes("object") && leaf.properties && keys.every((key) => key in leaf.properties));
-    if (!shape2?.properties) return value;
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, coerceHostValue(item, shape2.properties[key])]));
+    const shape3 = options.find((leaf) => typesOf(leaf).includes("object") && leaf.properties && keys.every((key) => key in leaf.properties));
+    if (!shape3?.properties) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, coerceHostValue(item, shape3.properties[key])]));
   }
   return value;
 }
@@ -93468,8 +95826,8 @@ var init_server2 = __esm({
        * Override request handler registration to enforce server-side validation for tools/call.
        */
       setRequestHandler(requestSchema, handler) {
-        const shape2 = getObjectShape(requestSchema);
-        const methodSchema = shape2?.method;
+        const shape3 = getObjectShape(requestSchema);
+        const methodSchema = shape3?.method;
         if (!methodSchema) {
           throw new Error("Schema is missing a method literal");
         }
@@ -93919,10 +96277,10 @@ function getZodSchemaObject(schema) {
   return schema;
 }
 function promptArgumentsFromSchema(schema) {
-  const shape2 = getObjectShape(schema);
-  if (!shape2)
+  const shape3 = getObjectShape(schema);
+  if (!shape3)
     return [];
-  return Object.entries(shape2).map(([name, field2]) => {
+  return Object.entries(shape3).map(([name, field2]) => {
     const description = getSchemaDescription(field2);
     const isOptional = isSchemaOptional(field2);
     return {
@@ -93933,8 +96291,8 @@ function promptArgumentsFromSchema(schema) {
   });
 }
 function getMethodValue(schema) {
-  const shape2 = getObjectShape(schema);
-  const methodSchema = shape2?.method;
+  const shape3 = getObjectShape(schema);
+  const methodSchema = shape3?.method;
   if (!methodSchema) {
     throw new Error("Schema is missing a method literal");
   }
@@ -96220,7 +98578,7 @@ function resolvePathArgs(args, cwd, home = homedir3()) {
 function declaredName(properties, candidates) {
   return candidates.find((name) => Object.prototype.hasOwnProperty.call(properties, name));
 }
-function fpsFraction2(fps) {
+function fpsFraction3(fps) {
   if (fps && typeof fps === "object") {
     const { num: num12, den: den2 } = fps;
     if (typeof num12 === "number" && typeof den2 === "number" && num12 > 0 && den2 > 0) return { num: num12, den: den2 };
@@ -96239,7 +98597,7 @@ function aeRenderLink(data, alpha) {
   if (data.link && typeof data.link === "object" && !Array.isArray(data.link)) {
     return { path: file3, link: { ...data.link, kind: "aftereffects" } };
   }
-  const fps = fpsFraction2(data.fps);
+  const fps = fpsFraction3(data.fps);
   const duration3 = Number(data.duration);
   const codec2 = typeof data.codec === "string" && CODECS.includes(data.codec) ? data.codec : alpha ? "prores4444" : /\.mp4$/i.test(file3) ? "h264" : void 0;
   const render2 = {};
@@ -99637,7 +101995,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
     const negativeNumberArg = (arg) => {
       if (!/^-(\d+|\d*\.\d+)(e[+-]?\d+)?$/.test(arg)) return false;
       return !this._getCommandAndAncestors().some(
-        (cmd) => cmd.options.map((opt) => opt.short).some((short) => /^-\d$/.test(short))
+        (cmd) => cmd.options.map((opt) => opt.short).some((short2) => /^-\d$/.test(short2))
       );
     };
     let activeVariadicOption = null;
@@ -100445,19 +102803,19 @@ var runCommand = (command, args) => {
   const result2 = spawnSync2(systemCommand(command), args, { encoding: "utf8", timeout: 5e3, windowsHide: true });
   return { code: result2.status ?? 1, stdout: result2.stdout ?? "" };
 };
-function debugModeVersions(platform, run) {
+function debugModeVersions(platform, run3) {
   return CSXS_VERSIONS.filter((n) => {
     if (platform === "darwin") {
-      const r2 = run("defaults", ["read", `com.adobe.CSXS.${n}`, "PlayerDebugMode"]);
+      const r2 = run3("defaults", ["read", `com.adobe.CSXS.${n}`, "PlayerDebugMode"]);
       return r2.code === 0 && r2.stdout.trim() === "1";
     }
-    const r = run("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${n}`, "/v", "PlayerDebugMode"]);
+    const r = run3("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${n}`, "/v", "PlayerDebugMode"]);
     return r.code === 0 && /PlayerDebugMode\s+REG_SZ\s+1\b/.test(r.stdout);
   });
 }
 async function adobeDoctor(options) {
   const { detect } = options;
-  const run = options.run ?? runCommand;
+  const run3 = options.run ?? runCommand;
   const checks = [];
   const supported = detect.platform === "darwin" || detect.platform === "win32";
   if (!supported) {
@@ -100487,7 +102845,7 @@ async function adobeDoctor(options) {
         ...stale ? { hint: `This zenvi ships ${want}: run \`zenvi adobe install\` and restart the apps.` } : {}
       });
     }
-    const debug = debugModeVersions(detect.platform, run);
+    const debug = debugModeVersions(detect.platform, run3);
     const missing = CSXS_VERSIONS.filter((n) => !debug.includes(n));
     checks.push({
       name: "debug mode",
@@ -101086,17 +103444,17 @@ async function mcpConfig(options) {
       const json2 = JSON.stringify(entry);
       const snippet = `claude mcp add-json ${shellQuote(name)} ${shellQuote(json2)} --scope user`;
       if (!options.install) return { ...base, scope, snippet, message: "Run this to add Zenvi to Claude Code for your user (or install the Zenvi plugin: /plugin marketplace add Zenvi-pro/zenvi-web)." };
-      const run = options.runClaude ?? await defaultRunClaude(env2, options.home);
-      const existing = await run(["mcp", "get", name]);
+      const run3 = options.runClaude ?? await defaultRunClaude(env2, options.home);
+      const existing = await run3(["mcp", "get", name]);
       if (existing.code === 0) {
         const mentionsOurs = /zenvi/i.test(existing.stdout) && /\bmcp\b/.test(existing.stdout) && !/https?:\/\//.test(existing.stdout);
         if (!options.force && !mentionsOurs) {
           throw new CliError(`Claude Code already has an MCP server named "${name}":
 ${existing.stdout.trim()}`, 1, "Pass --force to replace it, or --name <other>.");
         }
-        await run(["mcp", "remove", name, "--scope", "user"]);
+        await run3(["mcp", "remove", name, "--scope", "user"]);
       }
-      const added = await run(["mcp", "add-json", name, json2, "--scope", "user"]);
+      const added = await run3(["mcp", "add-json", name, json2, "--scope", "user"]);
       if (added.code !== 0) throw new CliError(`claude mcp add-json failed: ${(added.stderr || added.stdout).trim()}`);
       return { ...base, scope, snippet, installed: true, changed: true, message: `Added "${name}" to Claude Code (user scope). Start a new \`claude\` session to use it.` };
     }
