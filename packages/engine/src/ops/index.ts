@@ -37,3 +37,4 @@ export * from "./clip-props.js";
 export * from "./sequence.js";
 export * from "./add-to-timeline.js";
 export { timeCurveIsReversed } from "./retime.js";
+export * from "./project-files.js";

@@ -43,7 +43,7 @@ function stringForm(schema: JsonSchema): string | undefined {
 describe("tool catalog", () => {
   it("registers every ported desktop tool, in the contract's order, then the direct tools", () => {
     const ported = CONTRACT_TOOL_NAMES.filter((name) => !PENDING_DESKTOP_TOOLS.has(name) && !DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name));
-    expect(ported).toHaveLength(125);
+    expect(ported).toHaveLength(137);
     expect(allTools.map((t) => t.name)).toEqual([...ported, ...DIRECT_TOOLS]);
     expect(new Set(allTools.map((t) => t.name)).size).toBe(allTools.length);
     for (const name of ported) expect(getTool(name)?.contract).toBe(true);
@@ -84,6 +84,7 @@ describe("tool catalog", () => {
         if (key in args) continue;
         const type = tool.inputSchema.properties[key]?.type;
         if (key === "points") args[key] = [{ frame: 1, value: 1 }];
+        else if (key === "subclips") args[key] = [{ source_start_seconds: 1, source_end_seconds: 2 }];
         else if (type === "array") args[key] = ["x"];
         // update_effect_tool's properties are an effect's (sigma is Blur's); set_clip_properties_tool takes any object.
         else if (type === "object") args[key] = key === "properties" ? { sigma: 1 } : { x: 1 };

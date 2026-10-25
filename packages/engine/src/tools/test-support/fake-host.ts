@@ -6,6 +6,7 @@
  */
 
 import type { Project } from "../../model/types.js";
+import { folderAndName, sequenceFramesPresent } from "../../ops/project-files.js";
 import type {
   AudioEnvelope,
   EditorSelection,
@@ -17,7 +18,7 @@ import type {
   ToolHost,
   ToolImage,
 } from "../types.js";
-import { TRANSCRIPT_CUES, infoForPath } from "./fixture.js";
+import { TRANSCRIPT_CUES, infoForPath, videoInfo } from "./fixture.js";
 
 /** A 1×1 PNG. */
 export const PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -28,6 +29,7 @@ export type OptionalMethod =
   | "media.importUrl"
   | "media.pickFiles"
   | "media.writeGenerated"
+  | "media.missing"
   | "storage.readText"
   | "storage.writeText"
   | "ui.openExportDialog"
@@ -59,6 +61,56 @@ export interface FakeHostOptions {
   playhead?: number;
   /** The editor's timeline view (default `fakeView()`: 0-30 s visible, snapping on, no timing mode). */
   view?: Partial<TimelineView>;
+  /**
+   * Files on the host's disk (absolute paths). With it, listPaths, importPath,
+   * probe and missing read this disk like the CLI host; without it, a path
+   * containing "missing" is missing.
+   */
+  disk?: string[];
+  /** Content of disk files, for their fingerprints (`fingerprint.sha256` = the content); others have none. */
+  contents?: Record<string, string>;
+}
+
+/** The disk a fake host reads: listings in the CLI host's walk order, and what exists. */
+function fakeDisk(paths: readonly string[]) {
+  const files = new Set(paths);
+  const under = (folder: string) => paths.filter((p) => p.startsWith(`${folder}/`));
+  const isDir = (entry: string) => under(entry).length > 0;
+  /** The CLI host's walk: a folder's files (sorted), then each subfolder's, recursively. */
+  const walk = (folder: string): string[] => {
+    const inside = under(folder).map((p) => p.slice(folder.length + 1));
+    const direct = inside.filter((r) => !r.includes("/")).sort();
+    const subs = [...new Set(inside.filter((r) => r.includes("/")).map((r) => r.split("/")[0]!))].sort();
+    return [...direct.map((n) => `${folder}/${n}`), ...subs.flatMap((d) => walk(`${folder}/${d}`))];
+  };
+  const names = (folder: string) => under(folder).map((p) => p.slice(folder.length + 1)).filter((r) => !r.includes("/"));
+  return {
+    has: (path: string) => files.has(path),
+    list: (entry: string): PathListing => {
+      const path = entry.replace(/\/+$/, "");
+      if (files.has(path)) return { kind: "file", files: [path], path };
+      if (isDir(path)) return { kind: "directory", files: walk(path), path };
+      return { kind: "missing", files: [], path };
+    },
+    present: (path: string): boolean => {
+      if (!path.includes("%")) return files.has(path);
+      const { folder } = folderAndName(path);
+      return isDir(folder) && sequenceFramesPresent(path, names(folder));
+    },
+    /** Frames of a `%` pattern on disk (an image2 sequence from its first frame). */
+    frames: (pattern: string): number => {
+      const { folder, name } = folderAndName(pattern);
+      const m = /%0?(\d*)d/.exec(name);
+      if (!m) return 0;
+      let count = 0;
+      for (let i = 0; i < 100000; i += 1) {
+        const frame = `${folder}/${name.replace(m[0], m[1] ? String(i).padStart(Number(m[1]), "0") : String(i))}`;
+        if (files.has(frame)) count += 1;
+        else if (count > 0 || i > 4) break;
+      }
+      return count;
+    },
+  };
 }
 
 export interface FakeHost extends ToolHost {
@@ -135,27 +187,42 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
   const host: FakeHost = { calls, backendCalls, written, exports, editor, log: () => {} };
 
   if (!without.has("media")) {
+    const disk = options.disk ? fakeDisk(options.disk) : null;
     const imported = (path: string, name?: string): ImportedMedia => (name === undefined ? { path, info: infoForPath(path) } : { path, info: infoForPath(path), name });
     host.media = {
       probe: async (path) => {
         calls.push(`probe ${path}`);
-        if (path.includes("missing")) throw new Error(`No media at ${path}`);
+        if (disk && path.includes("%")) {
+          const frames = disk.frames(path);
+          if (frames === 0) throw new Error(`No media at ${path}`);
+          // FFmpegReader on an image2 pattern: 25 fps, one frame per image.
+          return { ...videoInfo(path, frames / 25, { has_audio: false, channels: 0, sample_rate: 0, acodec: "", vcodec: "png", width: 640, height: 360 }), fps: { num: 25, den: 1 }, video_length: frames };
+        }
+        if (disk ? !disk.has(path) : path.includes("missing")) throw new Error(`No media at ${path}`);
         return infoForPath(path);
       },
     };
     if (!omit.has("media.importPath")) {
       host.media.importPath = async (path) => {
         calls.push(`importPath ${path}`);
-        if (path.includes("missing")) throw new Error(`No such file: ${path}`);
-        return imported(path);
+        if (disk ? !disk.has(path) : path.includes("missing")) throw new Error(`No such file: ${path}`);
+        const content = options.contents?.[path];
+        return content === undefined ? imported(path) : { ...imported(path), fingerprint: { sha256: content, size: content.length } };
       };
     }
     if (!omit.has("media.listPaths")) {
       host.media.listPaths = async (entry): Promise<PathListing> => {
         calls.push(`listPaths ${entry}`);
+        if (disk) return disk.list(entry);
         if (entry.includes("missing")) return { kind: "missing", files: [] };
         if (entry.endsWith("/clips")) return { kind: "directory", files: [`${entry}/a.mp4`, `${entry}/notes.txt`, `${entry}/b.mov`] };
         return { kind: "file", files: [entry] };
+      };
+    }
+    if (!omit.has("media.missing")) {
+      host.media.missing = async (files) => {
+        calls.push(`missing ${files.length}`);
+        return files.map((f) => (disk ? !disk.present(String(f.path)) : String(f.path).includes("missing")));
       };
     }
     if (!omit.has("media.importUrl")) {

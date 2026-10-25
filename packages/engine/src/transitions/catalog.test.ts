@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BUNDLED_MASK_MAX_SIZE,
   TRANSITIONS,
+  lookupTransition,
   matchTransition,
   getTransition,
   listTransitions,
@@ -114,6 +115,49 @@ describe("matchTransition (apply_transition_tool)", () => {
     expect(matchTransition("no such mask")).toBeUndefined();
     // Desktop: an empty name matches the first file.
     expect(matchTransition("")!.id).toBe("common/circle_in_to_out");
+  });
+});
+
+describe("lookupTransition (the transition editor tools)", () => {
+  const key = (name: string) => lookupTransition(name).entry?.id;
+
+  // zenvi-core develop tests/test_transition_ops.py test_find_transition_exact_alias_partial_and_ambiguous,
+  // on the real catalog.
+  it("takes exact keys and names, then aliases, then a unique part of a key", () => {
+    expect(key("Fade")).toBe("common/fade");
+    expect(key("crossfade")).toBe("common/fade");
+    expect(key("Cross Dissolve")).toBe("common/fade");
+    expect(key("wipe right")).toBe("common/wipe_left_to_right");
+    expect(key("Wipe_Left_To_Right.svg")).toBe("common/wipe_left_to_right");
+    expect(key("circle")).toBe("common/circle_in_to_out");
+    expect(key("iris close")).toBe("common/circle_out_to_in");
+    expect(key("fractal 3")).toBe("extra/fractal_3");
+    expect(key("bottom to top")).toBe("common/wipe_bottom_to_top");
+  });
+
+  it("answers candidates when a name matches several masks or none", () => {
+    expect(lookupTransition("fractal")).toEqual({
+      entry: undefined,
+      candidates: ["fractal_1", "fractal_2", "fractal_3", "fractal_4", "fractal_5", "fractal_6", "fractal_7", "fractal_8"],
+    });
+    expect(lookupTransition("wipe").candidates).toEqual([
+      "wipe_bottom_to_top",
+      "wipe_left_to_right",
+      "wipe_right_to_left",
+      "wipe_top_to_bottom",
+      "wipe_diagonal_1",
+      "wipe_diagonal_2",
+      "wipe_diagonal_3",
+      "wipe_diagonal_4",
+    ]);
+    expect(lookupTransition("nothing-like-it")).toEqual({ entry: undefined, candidates: [] });
+    expect(lookupTransition("  ")).toEqual({ entry: undefined, candidates: [] });
+  });
+
+  it("takes the web's own references: ids and stored or installed paths", () => {
+    expect(key("common/fade")).toBe("common/fade");
+    expect(key("@transitions/extra/fractal_1.jpg")).toBe("extra/fractal_1");
+    expect(key("/Applications/Zenvi.app/Contents/Resources/transitions/common/fade.svg")).toBe("common/fade");
   });
 });
 

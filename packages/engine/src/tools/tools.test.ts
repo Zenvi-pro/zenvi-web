@@ -16,6 +16,7 @@ import { fakeHost, type FakeHost, type FakeHostOptions } from "./test-support/fa
 import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf } from "./test-support/fixture.js";
 import { addClip } from "../ops/clips.js";
 import { addFile } from "../ops/files.js";
+import { addTransition } from "../ops/transitions.js";
 import { parseTitleSvg, setFieldText, titleFields, titleSvgText } from "../titles/title-svg.js";
 import type { ToolResult } from "./types.js";
 
@@ -74,6 +75,14 @@ function captionInterview(doc: ProjectDocument): void {
 
 function clipIds(doc: ProjectDocument): string[] {
   return (doc.project.clips ?? []).map((c) => String(c.id));
+}
+
+/** A fade-out at the end of the interview clip and a circle wipe on the b-roll, with known ids. */
+function withTransitions(doc: ProjectDocument): void {
+  doc.transaction("transitions", (tx) => {
+    addTransition(tx, { layer: L1, position: 9, duration: 1, maskId: "common/fade", direction: "out", id: "TRANSFADE1" });
+    addTransition(tx, { layer: L1, position: 12, duration: 1, maskId: "common/circle_in_to_out", id: "TRANSCIRC1" });
+  });
 }
 
 const SPECS: Record<string, Spec> = {
@@ -546,6 +555,74 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { clip1_id: IDS.clipA, clip2_id: IDS.clipB, transition_name: "no such thing" }, summary: /^Error: Transition 'no such thing' not found\. Use search_transitions_tool\.$/ },
   },
+
+  // --- timeline transitions and Project Files (media_files*.py) ---------------------------------------
+  list_timeline_transitions_tool: {
+    happy: { args: { track: "1" }, setup: withTransitions, summary: /^2 transition\(s\) on track 1\.$/, check: ({ receipt }) => expect((receipt.data as { transitions: unknown[] }).transitions).toHaveLength(2) },
+    failure: { args: { track: "nine" }, summary: /^Error/ },
+  },
+  update_transition_tool: {
+    happy: {
+      args: { transition_ids: ["TRANSFADE1"], contrast: "10", audio_crossfade: "true" },
+      setup: withTransitions,
+      summary: /^Updated 1 transition\(s\)\.$/,
+      check: ({ doc }) => expect(doc.project.effects.find((t) => t.id === "TRANSFADE1")?.fade_audio_hint).toBe(true),
+    },
+    failure: { args: { contrast: "5" }, summary: /^Error: the timeline has no transitions$/ },
+  },
+  reverse_transition_tool: {
+    happy: { args: { scope: "all" }, setup: withTransitions, summary: /^Reversed 2 transition\(s\)\.$/ },
+    failure: { args: { scope: "all" }, summary: /^Error: the timeline has no transitions$/ },
+  },
+  remove_transition_tool: {
+    happy: { args: { at_seconds: "9.5" }, setup: withTransitions, summary: /^Removed 1 transition\(s\); the clips were not changed\.$/, check: ({ doc }) => expect(doc.project.effects).toHaveLength(1) },
+    failure: { args: {}, summary: /^Error: the timeline has no transitions$/ },
+  },
+  copy_transition_tool: {
+    happy: {
+      args: { source_transition_id: "TRANSCIRC1", transition_ids: "TRANSFADE1", what: "mask" },
+      setup: withTransitions,
+      summary: /^Copied mask from transition TRANSCIRC1 onto 1 transition\(s\)\.$/,
+      check: ({ doc }) => expect(doc.project.effects.find((t) => t.id === "TRANSFADE1")?.reader.path).toBe("@transitions/common/circle_in_to_out.svg"),
+    },
+    failure: { args: { source_transition_id: "NOPE", scope: "all" }, summary: /^Error: no transition with id='NOPE'$/ },
+  },
+  add_transitions_between_clips_tool: {
+    happy: {
+      args: { track: "1", duration_seconds: "0.5" },
+      summary: /^Added 2 transition\(s\) on track 1; moved 2 clip\(s\) earlier to make the overlaps\.$/,
+      check: ({ doc }) => expect(doc.project.effects).toHaveLength(2),
+    },
+    failure: { args: { track: "2" }, summary: /^Error: track 2 has fewer than two clips to join$/ },
+  },
+  list_project_files_tool: {
+    happy: { args: { usage: "used", detail: "full" }, summary: /^4 of 4 project files match \(used\)\.$/ },
+    failure: { args: { file_ids: "NOPE" }, summary: /^Error: no project file with id\(s\) NOPE$/ },
+  },
+  update_project_files_tool: {
+    happy: { args: { file_ids: IDS.broll, name: "B-roll", add_tags: "b-roll" }, summary: /^Updated 1 file\(s\): renamed, tagged\. Refreshed 1 timeline clip\(s\)\.$/ },
+    failure: { args: { file_ids: IDS.broll }, summary: /^Error: nothing to change/ },
+  },
+  import_image_sequence_tool: {
+    happy: {
+      args: { path: "/renders/intro", fps: "24" },
+      host: { disk: ["/renders/intro/f_0001.png", "/renders/intro/f_0002.png", "/renders/intro/f_0003.png"] },
+      summary: /^Imported 3 frames of f_%04d\.png as one 24 fps sequence \(0\.12s\)\. Place it with add_clip_to_timeline_tool\.$/,
+    },
+    failure: { args: { path: "/renders/none" }, host: { disk: [] }, summary: /^Error: no file or folder at '\/renders\/none'$/ },
+  },
+  remove_files_from_project_tool: {
+    happy: { args: { file_ids: IDS.logo, confirm_remove_clips: "true" }, summary: /^Removed 1 file\(s\) from the project and 1 timeline clip\(s\) that used them\. The media files stay on disk\.$/ },
+    failure: { args: { file_ids: IDS.logo }, summary: /used on the timeline.*confirm_remove_clips=true/ },
+  },
+  create_subclips_tool: {
+    happy: {
+      args: { file_id: IDS.interview, subclips: [{ source_start_seconds: "2", source_end_seconds: "4", name: "Hook" }] },
+      summary: /^Created 1 sub-clip\(s\) of 'interview\.mp4'\. Place one with add_clip_to_timeline_tool\(file_id=\.\.\.\)\.$/,
+    },
+    failure: { args: { file_id: IDS.logo, subclips: [{ source_start_seconds: 0, source_end_seconds: 2 }] }, summary: /^Error: a still image has no time range to split$/ },
+  },
+  manage_optimized_previews_tool: { happy: { args: { action: "optimize", all_videos: "true" }, status: "refused", summary: /not available in this Zenvi surface: optimized previews exist only in Zenvi desktop/ }, failure: null },
   add_title_tool: {
     happy: {
       args: { text: "Chapter One", position_seconds: "3", duration_seconds: "4" },

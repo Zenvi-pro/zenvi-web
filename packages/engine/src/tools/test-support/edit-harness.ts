@@ -16,7 +16,7 @@ import { addMarker } from "../../ops/markers.js";
 import { addTransition } from "../../ops/transitions.js";
 import type { ToolReceipt } from "../receipt.js";
 import { runTool } from "../registry.js";
-import { fakeHost, type FakeHost } from "./fake-host.js";
+import { fakeHost, type FakeHost, type FakeHostOptions } from "./fake-host.js";
 import { L1, audioInfo, imageInfo, videoInfo } from "./fixture.js";
 
 export interface FileOptions {
@@ -34,11 +34,11 @@ export class EditHarness {
   readonly host: FakeHost;
   private markAt = 0;
 
-  constructor(opts: { fps?: Fraction; playhead?: number } = {}) {
+  constructor(opts: { fps?: Fraction; playhead?: number; host?: FakeHostOptions } = {}) {
     const project = createProject({ id: "PROJECT001" });
     if (opts.fps) project.fps = { ...opts.fps };
     this.doc = new ProjectDocument(project, { newTransactionId: () => `tx-${(transactions += 1)}` });
-    this.host = fakeHost({ playhead: opts.playhead ?? 0 });
+    this.host = fakeHost({ playhead: opts.playhead ?? 0, ...opts.host });
   }
 
   private setup<T>(body: (tx: Transaction) => T): T {

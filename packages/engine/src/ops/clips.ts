@@ -242,6 +242,35 @@ export function trimClipEdge(tx: Transaction, clipId: string, edge: Edge, timeli
   return patchClip(tx, clipId, out);
 }
 
+export interface ClipTimingInput {
+  /** Timeline start, seconds (>= 0). */
+  position?: number;
+  /** Source in point, seconds (>= 0). */
+  start?: number;
+  /** Source out point, seconds (after `start`). */
+  end?: number;
+}
+
+/**
+ * Set a clip's position and source in/out exactly as given: no snapping and
+ * no media clamp. For edits that move the in point together with the
+ * position so the picture stays where it was on the timeline, which can land
+ * between frames (crossfade handles, add_transitions_between_clips_tool
+ * method=handles). The caller keeps the range inside the media.
+ */
+export function setClipTiming(tx: Transaction, clipId: string, timing: ClipTimingInput): Clip {
+  const clip = requireEditableClip(tx.project, clipId);
+  requireObject(timing, "setClipTiming timing");
+  const patch: Record<string, unknown> = {};
+  if (timing.position !== undefined) patch.position = requireNonNegative(timing.position, "position");
+  if (timing.start !== undefined) patch.start = requireNonNegative(timing.start, "start");
+  if (timing.end !== undefined) patch.end = requireNonNegative(timing.end, "end");
+  const start = (patch.start as number | undefined) ?? clip.start;
+  const end = (patch.end as number | undefined) ?? clip.end;
+  if (!(end > start)) throw invalid(`end (${end}) must be after start (${start}).`);
+  return patchClip(tx, clipId, patch);
+}
+
 // ---------------------------------------------------------------------------
 // Split / delete / duplicate
 // ---------------------------------------------------------------------------

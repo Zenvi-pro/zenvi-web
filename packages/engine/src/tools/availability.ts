@@ -27,6 +27,7 @@ export type HostMethod =
   | "media.importUrl"
   | "media.pickFiles"
   | "media.writeGenerated"
+  | "media.missing"
   | "storage.open"
   | "storage.readText"
   | "storage.writeText"
@@ -144,6 +145,19 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   modify_clip_tool: { desktopOnly: "the desktop's ffmpeg cut, upload and splice pipeline" },
   generate_transition_clip_tool: { desktopOnly: "the desktop's ffmpeg pipeline (clip A + AI morph + clip B)" },
   suggest_motion_graphics_placements_tool: { desktopOnly: "deprecated on the desktop too; use propose_overlay_windows_tool" },
+  // Project Files: missing media is the host's check; relinking and image sequences read local folders.
+  list_project_files_tool: {
+    optional: ["media.missing"],
+    partialNote: "without a media check every file reports missing=null and missing_only is refused",
+    webNote: "optimized_preview is always none: only Zenvi desktop makes and plays optimized previews",
+  },
+  remove_files_from_project_tool: { optional: ["media.missing"], partialNote: "scope='missing' needs a media check" },
+  update_project_files_tool: {
+    optional: ["media.importPath", "media.listPaths"],
+    partialNote: "relinking (path, search_folder) needs local file access",
+  },
+  import_image_sequence_tool: { methods: ["media.listPaths"] },
+  manage_optimized_previews_tool: { desktopOnly: "the optimized previews (proxies) Zenvi desktop builds and plays" },
 };
 
 export interface SurfaceProfile {
@@ -168,6 +182,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.importUrl",
       "media.pickFiles",
       "media.writeGenerated",
+      "media.missing",
       "storage.readText",
       "ui.openExportDialog",
       "audio.decodePcm",
@@ -188,6 +203,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.listPaths",
       "media.importUrl",
       "media.writeGenerated",
+      "media.missing",
       "storage.open",
       "storage.readText",
       "storage.writeText",
@@ -199,7 +215,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
     capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
-    methods: ["media.importUrl", "media.writeGenerated", "storage.readText", "storage.writeText", "audio.decodePcm"],
+    methods: ["media.importUrl", "media.writeGenerated", "media.missing", "storage.readText", "storage.writeText", "audio.decodePcm"],
     conditional: {
       frames: "the render worker is configured",
       media: "ffprobe is available",
@@ -247,6 +263,7 @@ function needName(need: HostCapability | HostMethod): string {
     "media.importUrl": "URL downloads",
     "media.pickFiles": "a file picker",
     "media.writeGenerated": "storing generated media",
+    "media.missing": "checking for missing media",
     "storage.open": "opening project files",
     "storage.readText": "reading files",
     "storage.writeText": "writing files",

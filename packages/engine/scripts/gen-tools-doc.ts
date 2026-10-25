@@ -178,6 +178,30 @@ const DIVERGENCES: [string, string][] = [
     "Refused on every web surface: Stabilizer, Tracker, Object Detector and Object Mask run OpenCV analysis (libopenshot ClipProcessingJobs) inside Zenvi desktop. The effects it adds play back there; the web renderers pass them through, and list_effects_tool marks them `renders_on_web: false`.",
   ],
   [
+    "list_project_files_tool / remove_files_from_project_tool scope='missing'",
+    "`missing` is the host's check (MediaHost.missing): the CLI looks at the disk (an image sequence by its frames, like the desktop), the web editor at the media it could load (what Project Files offers to relink), Zenvi Cloud at the uploads; a host without the check reports null and refuses missing_only / scope='missing'. `optimized_preview` is always none, since only Zenvi desktop makes and plays optimized previews. `path` is the path as the project holds it (the desktop reports an absolute local path).",
+  ],
+  [
+    "update_project_files_tool",
+    "Relinking (path, search_folder) needs local file access, so the CLI only: the CLI imports the new media under its own rules (a file in the OS temp folder is copied into the project's assets folder, and gets the desktop's fingerprint, so same_content works) and searches at most 5,000 files of a folder (the desktop: 20,000). The web editor relinks with Relink… in Project Files; Zenvi Cloud refuses it.",
+  ],
+  [
+    "import_image_sequence_tool",
+    "Needs a host that reads local folders (the CLI), which probes the `%04d` pattern like FFmpegReader and renders one image per frame at the chosen rate (checked pixel for pixel against libopenshot's Timeline). A sequence is no single file to upload, so the web editor and Zenvi Cloud refuse the import and cannot play one a desktop project brings. skip_indexing is accepted and unused (the web does not index on import). When a folder holds more frames than the CLI lists (5,000), frames and last_frame come from the frames ffmpeg plays.",
+  ],
+  [
+    "update_transition_tool / add_transitions_between_clips_tool masks",
+    "A mask given as an image file path is read only where the host has local files (the CLI); elsewhere the path is matched as a name, so pass mask_file_id with a project image. Masks resolve by the desktop's names and aliases (transition_ops.find_transition) and also by catalog id and `@transitions/` path. duration_seconds=0 uses the engine's default transition length (1 s); the desktop reads its Default Transition Length preference, which ships at 10 s.",
+  ],
+  [
+    "copy_transition_tool",
+    "With fit_duration only the pasted curves are fitted to each target's length; the desktop also rescales the target's other curve in place (media_files_transitions.py:711-716), which moves the inner points of a curve that has more than two.",
+  ],
+  [
+    "transition targets (update/reverse/remove/copy_transition_tool)",
+    "An id given twice in transition_ids is acted on once (the desktop reverses it twice, back to where it was). scope='selected' reads the web editor's selection; without an editor it finds none.",
+  ],
+  [
     "summary previews",
     "`…` is written as U+2026; the desktop's file had the mojibake `ΓÇª` (ai_metadata_utils.build_summary_preview).",
   ],

@@ -28,6 +28,8 @@ import { exportTools } from "./catalog/export.js";
 import { generationTools } from "./catalog/generation.js";
 import { inspectTools } from "./catalog/inspect.js";
 import { mediaTools } from "./catalog/media.js";
+import { mediaFilesTools } from "./catalog/media-files.js";
+import { mediaFilesTransitionTools } from "./catalog/media-files-transitions.js";
 import { metadataTools } from "./catalog/metadata.js";
 import { motionTools } from "./catalog/motion.js";
 import { overlayTools } from "./catalog/overlays.js";
@@ -75,6 +77,8 @@ function buildCatalog(): readonly CatalogTool[] {
     ...speechTools,
     ...generationTools,
     ...transitionTools,
+    ...mediaFilesTransitionTools,
+    ...mediaFilesTools,
     ...titleTools,
     ...titleTemplateTools,
     ...animatedTitleTools,

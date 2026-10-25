@@ -71,6 +71,12 @@ describe("addTransition", () => {
     doc.transaction("lock", (tx) => setTrackLocked(tx, V1, true));
     expectRefused(doc, "locked", (tx) => addTransition(tx, { layer: V1, position: 0, duration: 1, maskId: "fade" }));
   });
+
+  it("creates the track it goes on when there is none, like the desktop's drop", () => {
+    const doc = twoClips();
+    doc.transaction("add", (tx) => addTransition(tx, { layer: 9_000_000, position: 0, duration: 1, maskId: "fade" }));
+    expect(doc.project.layers.some((l) => l.number === 9_000_000)).toBe(true);
+  });
 });
 
 describe("applyTransitionBetween / applyTransitionToClip", () => {
