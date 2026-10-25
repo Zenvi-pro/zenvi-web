@@ -7,13 +7,15 @@ import { backendRequest } from "@/lib/backend";
 import { config } from "@/lib/env";
 import { downloadBlob, safeFileName } from "@/lib/projectFactory";
 import { toast } from "@/ui/Toast";
-import { exportAvailable, extensionForMime, probe, renderFrame, startExport } from "../render";
+import { exportAvailable, extensionForMime, probe, renderFrame, resolveBundledMedia, startExport } from "../render";
 import type { EditorSession } from "../session/EditorSession";
 import { assetUrl } from "../catalog";
-import { analyzeAudio } from "./audioAnalysis";
+import { analyzeAudio, blobOf } from "./audioAnalysis";
 import { contentTypeFor, fileHash, type MediaSourceSpec } from "../session/media";
 
 const MAX_URL_IMPORT_BYTES = 2 * 1024 * 1024 * 1024;
+/** Text files tools read (title SVGs, subtitles); the largest bundled title template is under 5 MB. */
+const MAX_TEXT_BYTES = 16 * 1024 * 1024;
 
 async function fileFromUrl(url: string, filename: string | undefined, signal?: AbortSignal): Promise<File> {
   const parsed = new URL(url);
@@ -148,6 +150,15 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       },
       async open() {
         throw new Error("Open projects from the Zenvi projects page in the web editor.");
+      },
+      // A project file's text (title SVGs to edit, subtitles in the bin), by its path or id.
+      async readText(path) {
+        const file = session.project.files.find((f) => f.path === path || f.id === path);
+        const spec = (file ? session.media.spec(file.id) : undefined) ?? intakeOf(session).specs.get(path) ?? resolveBundledMedia(path);
+        if (!spec) throw new Error(`${path} is not loaded in this project`);
+        const blob = await blobOf(spec);
+        if (blob.size > MAX_TEXT_BYTES) throw new Error(`${path} is too large to read as text`);
+        return blob.text();
       },
       // Exported captions and other text files arrive as downloads.
       async writeText(path, text, contentType) {

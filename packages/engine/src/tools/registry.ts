@@ -14,7 +14,9 @@
  * unexpected failures come back as receipts too.
  */
 
+import { animatedTitleTools } from "./catalog/animated-titles.js";
 import { audioTools } from "./catalog/audio.js";
+import { captionTools } from "./catalog/captions.js";
 import { clipTools } from "./catalog/clips.js";
 import { directTools } from "./catalog/direct.js";
 import { exportTools } from "./catalog/export.js";
@@ -23,12 +25,14 @@ import { inspectTools } from "./catalog/inspect.js";
 import { mediaTools } from "./catalog/media.js";
 import { metadataTools } from "./catalog/metadata.js";
 import { motionTools } from "./catalog/motion.js";
+import { overlayTools } from "./catalog/overlays.js";
 import { phase3Tools } from "./catalog/phase3.js";
 import { playbackTools } from "./catalog/playback.js";
 import { projectTools } from "./catalog/project.js";
 import { searchTools } from "./catalog/search.js";
 import { speechTools } from "./catalog/speech-tools.js";
 import { timelineTools } from "./catalog/timeline.js";
+import { titleTemplateTools } from "./catalog/title-templates.js";
 import { titleTools } from "./catalog/titles.js";
 import { transitionTools } from "./catalog/transitions.js";
 import { missingCapabilities, resultFor, type CatalogTool } from "./define.js";
@@ -60,6 +64,10 @@ function buildCatalog(): readonly CatalogTool[] {
     ...generationTools,
     ...transitionTools,
     ...titleTools,
+    ...titleTemplateTools,
+    ...animatedTitleTools,
+    ...captionTools,
+    ...overlayTools,
   ];
   const byName = new Map<string, CatalogTool>();
   for (const tool of [...implemented, ...directTools]) {

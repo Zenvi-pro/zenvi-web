@@ -172,10 +172,10 @@ var init_output = __esm({
         if (this.json || this.quiet) return;
         const cells = rows.map((r) => r.map((c) => String(c)));
         const widths = headers.map((h, i) => Math.max(h.length, ...cells.map((r) => (r[i] ?? "").length)));
-        const fmt = (r) => r.map((c, i) => i === r.length - 1 ? c : c.padEnd(widths[i])).join("  ");
-        this.out.write(`${this.style(fmt(headers), "bold")}
+        const fmt2 = (r) => r.map((c, i) => i === r.length - 1 ? c : c.padEnd(widths[i])).join("  ");
+        this.out.write(`${this.style(fmt2(headers), "bold")}
 `);
-        for (const r of cells) this.out.write(`${fmt(r)}
+        for (const r of cells) this.out.write(`${fmt2(r)}
 `);
       }
       /** Progress on stderr, rewriting one line on a TTY. */
@@ -645,7 +645,7 @@ function collectIds(project) {
   for (const file3 of project.files ?? []) add(file3.id);
   for (const clip2 of project.clips ?? []) {
     add(clip2.id);
-    for (const effect2 of clip2.effects ?? []) add(effect2.id);
+    for (const effect3 of clip2.effects ?? []) add(effect3.id);
   }
   for (const transition2 of project.effects ?? []) add(transition2.id);
   for (const layer2 of project.layers ?? []) add(layer2.id);
@@ -693,10 +693,13 @@ function findLayerById(project, id) {
 function findClipEffect(project, effectId) {
   for (const clip2 of project.clips) {
     const effects = clip2.effects ?? [];
-    const index = effects.findIndex((effect2) => effect2.id === effectId);
+    const index = effects.findIndex((effect3) => effect3.id === effectId);
     if (index >= 0) return { clip: clip2, effect: effects[index], index };
   }
   return void 0;
+}
+function clipsUsingFile(project, fileId) {
+  return project.clips.filter((clip2) => clip2.file_id === fileId);
 }
 var init_query = __esm({
   "../engine/src/model/query.ts"() {
@@ -1872,11 +1875,11 @@ function fpsFromRate(rate) {
   return limitDenominator(rate, 1001);
 }
 function limitDenominator(x, maxDen) {
-  const [num11, den2] = exactRatio(x);
+  const [num12, den2] = exactRatio(x);
   const max = BigInt(maxDen);
-  if (den2 <= max) return { num: Number(num11), den: Number(den2) };
+  if (den2 <= max) return { num: Number(num12), den: Number(den2) };
   let p0 = 0n, q0 = 1n, p1 = 1n, q1 = 0n;
-  let n = num11, d = den2;
+  let n = num12, d = den2;
   for (; ; ) {
     const a = n / d;
     const q2 = q0 + a * q1;
@@ -1941,9 +1944,9 @@ function positiveFloat(value) {
 function fpsFraction(value) {
   if (typeof value === "number") return value > 0 ? limitDenominator(value, 1e6) : null;
   if (!isRecord3(value)) return null;
-  const num11 = Math.trunc(Number(value.num));
+  const num12 = Math.trunc(Number(value.num));
   const den2 = Math.trunc(Number(value.den));
-  return Number.isFinite(num11) && Number.isFinite(den2) && num11 !== 0 && den2 !== 0 ? { num: num11, den: den2 } : null;
+  return Number.isFinite(num12) && Number.isFinite(den2) && num12 !== 0 && den2 !== 0 ? { num: num12, den: den2 } : null;
 }
 function videoLengthToProjectFrames(media, projectFps2) {
   const data = isRecord3(media) ? media : {};
@@ -2000,8 +2003,8 @@ function clampTimingToMedia(clip2, projectFps2, existing) {
   const reader = isRecord3(clip2.reader) && Object.keys(clip2.reader).length ? clip2.reader : existing?.reader;
   const pick2 = (key) => clip2[key] === void 0 || clip2[key] === null ? existing?.[key] : clip2[key];
   const rate = projectFps2.num / projectFps2.den;
-  const single = isSingleImageMedia(reader) || isSingleImageMedia(clip2) || isSingleImageMedia(clip2.reader) || isSingleImageMedia(existing) || isSingleImageMedia(existing?.reader);
-  if (single) {
+  const single2 = isSingleImageMedia(reader) || isSingleImageMedia(clip2) || isSingleImageMedia(clip2.reader) || isSingleImageMedia(existing) || isSingleImageMedia(existing?.reader);
+  if (single2) {
     let start2 = toFloat(pick2("start"));
     if (start2 === null || start2 < 0) start2 = 0;
     let end2 = toFloat(pick2("end"));
@@ -2643,14 +2646,14 @@ function effectParamJson(param, value) {
 function createEffect(className, overrides, opts) {
   const def = getEffect(className);
   if (!def) throw new EffectParamError(`Unknown effect: ${className}.`);
-  const effect2 = defaultEffectJson(def.className, opts.id);
+  const effect3 = defaultEffectJson(def.className, opts.id);
   for (const [key, value] of Object.entries(overrides)) {
     const param = def.params.find((p) => p.key === key);
     if (!param) throw new EffectParamError(`Effect ${def.className} has no parameter ${key}.`);
     if (param.readonly) throw new EffectParamError(`${key} is read-only.`);
-    effect2[key] = effectParamJson(param, value);
+    effect3[key] = effectParamJson(param, value);
   }
-  return effect2;
+  return effect3;
 }
 var DIALOG_EFFECTS, OPENCV_EFFECTS, COMMON_EFFECT_KEYS, INFO_KEYS, EFFECTS, BY_CLASS, ENTRY_BY_CLASS, EffectParamError;
 var init_registry = __esm({
@@ -2850,28 +2853,28 @@ function scan(xml) {
       i = findTagEnd(xml, i + 2) + 1;
       continue;
     }
-    const tagEnd = findTagEnd(xml, i + 1);
+    const tagEnd2 = findTagEnd(xml, i + 1);
     if (xml[i + 1] === "/") {
-      const name2 = xml.slice(i + 2, tagEnd).trim();
+      const name2 = xml.slice(i + 2, tagEnd2).trim();
       while (stack.length > 0) {
         const open7 = stack.pop();
         open7.closeStart = i;
-        open7.end = tagEnd + 1;
+        open7.end = tagEnd2 + 1;
         if (open7.name === name2) break;
       }
-      i = tagEnd + 1;
+      i = tagEnd2 + 1;
       continue;
     }
-    const nameMatch = /^[^\s/>]+/.exec(xml.slice(i + 1, tagEnd));
+    const nameMatch = /^[^\s/>]+/.exec(xml.slice(i + 1, tagEnd2));
     const name = nameMatch ? nameMatch[0] : "";
-    const selfClosing = xml[tagEnd - 1] === "/";
+    const selfClosing = xml[tagEnd2 - 1] === "/";
     const parent = stack[stack.length - 1] ?? null;
     const span = {
       name,
       start: i,
-      openEnd: tagEnd + 1,
-      closeStart: tagEnd + 1,
-      end: tagEnd + 1,
+      openEnd: tagEnd2 + 1,
+      closeStart: tagEnd2 + 1,
+      end: tagEnd2 + 1,
       selfClosing,
       parent,
       children: []
@@ -2879,7 +2882,7 @@ function scan(xml) {
     parent?.children.push(span);
     all.push(span);
     if (!selfClosing) stack.push(span);
-    i = tagEnd + 1;
+    i = tagEnd2 + 1;
   }
   return all;
 }
@@ -3530,7 +3533,7 @@ function patchTransition(tx, id, patch) {
 function reassignEffectIds(clip2, nextId) {
   const effects = clip2.effects;
   if (!Array.isArray(effects)) return;
-  clip2.effects = effects.map((effect2) => isRecord8(effect2) ? { ...effect2, id: nextId() } : effect2);
+  clip2.effects = effects.map((effect3) => isRecord8(effect3) ? { ...effect3, id: nextId() } : effect3);
 }
 function ids(project) {
   return idFactory(project);
@@ -3620,12 +3623,45 @@ function addFile(tx, media, opts = {}) {
   tx.insert(["files"], entry);
   return requireFile(tx.project, id);
 }
+function removeFile(tx, fileId, opts = {}) {
+  const project = tx.project;
+  requireFile(project, fileId);
+  const clips = clipsUsingFile(project, fileId);
+  if (clips.length > 0 && opts.removeClips === false) {
+    throw new OpError("conflict", `File ${fileId} is used by ${clips.length} clip(s).`, {
+      clipIds: clips.map((c) => c.id)
+    });
+  }
+  for (const clip2 of clips) tx.delete(["clips", { id: clip2.id }]);
+  tx.delete(["files", { id: fileId }]);
+  return { fileId, removedClipIds: clips.map((c) => c.id) };
+}
+function updateFile(tx, fileId, patch) {
+  const file3 = requireFile(tx.project, fileId);
+  if (!patch || typeof patch !== "object") throw invalid("patch must be an object.");
+  for (const key of Object.keys(patch)) {
+    if (IMMUTABLE_FILE_KEYS.has(key) && patch[key] !== file3[key]) {
+      throw invalid(`File ${key} cannot be changed.`);
+    }
+  }
+  if (patch.media_type !== void 0 && !["video", "audio", "image"].includes(patch.media_type)) {
+    throw invalid(`media_type must be video, audio or image (got ${String(patch.media_type)}).`);
+  }
+  const changed = Object.entries(patch).filter(([key, value]) => !sameJson(file3[key], value));
+  if (changed.length === 0) return file3;
+  tx.update(["files", { id: fileId }], Object.fromEntries(changed));
+  return requireFile(tx.project, fileId);
+}
+var IMMUTABLE_FILE_KEYS;
 var init_files = __esm({
   "../engine/src/ops/files.ts"() {
     "use strict";
+    init_query();
     init_ids();
     init_media();
     init_errors();
+    init_internal();
+    IMMUTABLE_FILE_KEYS = /* @__PURE__ */ new Set(["id"]);
   }
 });
 
@@ -3902,12 +3938,12 @@ function pyFixed(x, digits) {
   if (Number.isNaN(x)) return "nan";
   if (!Number.isFinite(x)) return x > 0 ? "inf" : "-inf";
   const { negative, mant, exp } = decompose(x);
-  let num11 = mant * 10n ** BigInt(digits);
+  let num12 = mant * 10n ** BigInt(digits);
   let den2 = 1n;
-  if (exp >= 0) num11 <<= BigInt(exp);
+  if (exp >= 0) num12 <<= BigInt(exp);
   else den2 <<= BigInt(-exp);
-  let q = num11 / den2;
-  const twice = num11 % den2 * 2n;
+  let q = num12 / den2;
+  const twice = num12 % den2 * 2n;
   if (twice > den2 || twice === den2 && (q & 1n) === 1n) q += 1n;
   const s = q.toString().padStart(digits + 1, "0");
   const body = digits > 0 ? `${s.slice(0, s.length - digits)}.${s.slice(s.length - digits)}` : s;
@@ -3951,14 +3987,14 @@ function pyG(x, precision = 6) {
   const { mant, exp } = decompose(Math.abs(x));
   const roundAt = (e102) => {
     const shift2 = p - 1 - e102;
-    let num11 = mant;
+    let num12 = mant;
     let den2 = 1n;
-    if (exp >= 0) num11 <<= BigInt(exp);
+    if (exp >= 0) num12 <<= BigInt(exp);
     else den2 <<= BigInt(-exp);
-    if (shift2 >= 0) num11 *= 10n ** BigInt(shift2);
+    if (shift2 >= 0) num12 *= 10n ** BigInt(shift2);
     else den2 *= 10n ** BigInt(-shift2);
-    let q2 = num11 / den2;
-    const twice = num11 % den2 * 2n;
+    let q2 = num12 / den2;
+    const twice = num12 % den2 * 2n;
     if (twice > den2 || twice === den2 && (q2 & 1n) === 1n) q2 += 1n;
     return q2;
   };
@@ -4112,8 +4148,8 @@ function parseTimecodeToken(token) {
   if (nums.length === 2) return nums[0] * 60 + nums[1];
   return nums[0] * 3600 + nums[1] * 60 + nums[2];
 }
-function parseSecondsArg(value, fallback, field = "") {
-  const label2 = field || "value";
+function parseSecondsArg(value, fallback, field2 = "") {
+  const label2 = field2 || "value";
   if (value === null || value === void 0) return fallback;
   if (typeof value === "boolean") throw new TimeArgError(`${label2}=${value ? "True" : "False"} is not a time in seconds`);
   if (typeof value === "number") {
@@ -4248,9 +4284,9 @@ function gainToDb(gain) {
 }
 function fpsFloat3(fps) {
   if (isRecord11(fps)) {
-    const num11 = f(fps.num, 30);
+    const num12 = f(fps.num, 30);
     const den2 = f(fps.den, 1);
-    return den2 ? num11 / den2 : 30;
+    return den2 ? num12 / den2 : 30;
   }
   return f(fps, 30) || 30;
 }
@@ -5519,18 +5555,18 @@ function applyTransitionBetween(tx, clipAId, clipBId, name, duration3) {
   const transition2 = toolTransition(tx, mask2, layer2, position, snappedDuration, "in");
   return movedClip.position !== clipB.position ? { transition: transition2, movedClip } : { transition: transition2 };
 }
-function applyTransitionToClip(tx, clipId2, name, placement2, duration3) {
+function applyTransitionToClip(tx, clipId2, name, placement3, duration3) {
   const project = tx.project;
   const clip2 = requireClip(project, clipId2);
   requireUnlocked(project, clip2.layer);
-  if (placement2 !== "start" && placement2 !== "end") throw invalid(`placement must be start or end.`);
+  if (placement3 !== "start" && placement3 !== "end") throw invalid(`placement must be start or end.`);
   const dur = requireDuration(duration3);
   const mask2 = resolveMask(name, void 0);
   const snappedDuration = snapSeconds(dur, project);
   if (!(snappedDuration > 0)) throw invalid("duration is shorter than one frame.");
-  const raw = placement2 === "end" ? clip2.position + (clip2.end - clip2.start) - dur : clip2.position;
+  const raw = placement3 === "end" ? clip2.position + (clip2.end - clip2.start) - dur : clip2.position;
   const position = snapSeconds(Math.max(0, raw), project);
-  return toolTransition(tx, mask2, clip2.layer, position, snappedDuration, placement2 === "end" ? "out" : "in");
+  return toolTransition(tx, mask2, clip2.layer, position, snappedDuration, placement3 === "end" ? "out" : "in");
 }
 function removeTransition(tx, transitionId) {
   const transition2 = requireTransition(tx.project, transitionId);
@@ -6237,15 +6273,15 @@ function addEffect(tx, clipId2, className, params = {}, opts = {}) {
   if (!Number.isInteger(index) || index < 0 || index > effects.length) {
     throw invalid(`index must be 0..${effects.length} (got ${index}).`);
   }
-  let effect2;
+  let effect3;
   try {
-    effect2 = createEffect(def.className, params, { id: opts.id ?? ids(project)() });
+    effect3 = createEffect(def.className, params, { id: opts.id ?? ids(project)() });
   } catch (error62) {
     paramError(error62);
   }
-  effects.splice(index, 0, effect2);
+  effects.splice(index, 0, effect3);
   patchClip(tx, clipId2, { effects });
-  return findClipEffect(tx.project, effect2.id).effect;
+  return findClipEffect(tx.project, effect3.id).effect;
 }
 function removeEffect(tx, effectId) {
   const { clip: clip2 } = requireClipEffect(tx.project, effectId);
@@ -6253,16 +6289,16 @@ function removeEffect(tx, effectId) {
   patchClip(tx, clip2.id, { effects: clip2.effects.filter((e) => e.id !== effectId) });
   return { clipId: clip2.id, effectId };
 }
-function paramFor(effect2, prop) {
-  return getEffect(effect2.class_name)?.params.find((p) => p.key === prop);
+function paramFor(effect3, prop) {
+  return getEffect(effect3.class_name)?.params.find((p) => p.key === prop);
 }
 function setEffectProperty(tx, effectId, prop, value, at = {}) {
   const project = tx.project;
-  const { clip: clip2, effect: effect2, index } = requireClipEffect(project, effectId);
+  const { clip: clip2, effect: effect3, index } = requireClipEffect(project, effectId);
   requireUnlocked(project, clip2.layer);
   if (IMMUTABLE_EFFECT_KEYS.has(prop)) throw invalid(`Effect ${prop} cannot be changed.`);
-  const param = paramFor(effect2, prop);
-  if (!param) throw invalid(`Effect ${effect2.class_name} has no parameter ${prop}.`);
+  const param = paramFor(effect3, prop);
+  if (!param) throw invalid(`Effect ${effect3.class_name} has no parameter ${prop}.`);
   if (param.readonly) throw invalid(`${prop} is read-only.`);
   const frame = resolveClipFrame(project, clip2, at);
   if (at.interpolation !== void 0 && ![0, 1, 2].includes(at.interpolation)) {
@@ -6270,7 +6306,7 @@ function setEffectProperty(tx, effectId, prop, value, at = {}) {
   }
   let next;
   if (param.type === "color") {
-    next = writeColorKeyframe(effect2[prop], value, frame, at.interpolation);
+    next = writeColorKeyframe(effect3[prop], value, frame, at.interpolation);
   } else if (param.keyframable && (param.type === "keyframe" || param.type === "choice")) {
     const n = typeof value === "boolean" ? value ? 1 : 0 : Number(value);
     if (typeof value !== "number" && typeof value !== "boolean") throw invalid(`${prop} must be a number.`);
@@ -6278,7 +6314,7 @@ function setEffectProperty(tx, effectId, prop, value, at = {}) {
     if (param.choices && !param.choices.some((c) => Number(c.value) === n)) {
       throw invalid(`${prop} must be one of ${param.choices.map((c) => c.value).join(", ")}.`);
     }
-    next = writeKeyframeValue(effect2[prop], n, frame, at.interpolation, param.type === "choice");
+    next = writeKeyframeValue(effect3[prop], n, frame, at.interpolation, param.type === "choice");
   } else {
     if (frame !== void 0) throw invalid(`${prop} is not keyframeable.`);
     try {
@@ -6288,7 +6324,7 @@ function setEffectProperty(tx, effectId, prop, value, at = {}) {
     }
   }
   const effects = [...clip2.effects];
-  effects[index] = { ...effect2, [prop]: next };
+  effects[index] = { ...effect3, [prop]: next };
   patchClip(tx, clip2.id, { effects });
   return findClipEffect(tx.project, effectId).effect;
 }
@@ -6441,11 +6477,11 @@ function setProjectSettings(tx, patch) {
       if (!Number.isFinite(patch.fps) || patch.fps <= 0) throw invalid("fps must be positive.");
       fps = fpsFromRate(patch.fps);
     } else if (typeof patch.fps === "object" && patch.fps !== null) {
-      const { num: num11, den: den2 } = patch.fps;
-      if (!Number.isInteger(num11) || !Number.isInteger(den2) || num11 <= 0 || den2 <= 0) {
+      const { num: num12, den: den2 } = patch.fps;
+      if (!Number.isInteger(num12) || !Number.isInteger(den2) || num12 <= 0 || den2 <= 0) {
         throw invalid("fps num/den must be positive integers.");
       }
-      fps = { num: num11, den: den2 };
+      fps = { num: num12, den: den2 };
     } else {
       throw invalid("fps must be a number or {num, den}.");
     }
@@ -6545,6 +6581,60 @@ var init_titles = __esm({
     init_files();
     init_clips();
     init_svg();
+  }
+});
+
+// ../engine/src/ops/overlays.ts
+function placeOverlayClip(tx, input2) {
+  requireObject(input2, "placeOverlayClip input");
+  const project = tx.project;
+  requireFile(project, input2.fileId);
+  requireNonNegative(input2.position, "position");
+  requirePositive(input2.duration, "duration");
+  if (!Number.isInteger(input2.layer) || input2.layer <= 0) throw invalid(`layer must be a positive track number (got ${input2.layer}).`);
+  requireUnlocked(project, input2.layer);
+  if (input2.props !== void 0) {
+    requireObject(input2.props, "props");
+    const bad = Object.keys(input2.props).filter((key) => PLACEMENT_KEYS.has(key));
+    if (bad.length > 0) throw invalid(`props cannot set ${bad.join(", ")}.`);
+  }
+  if (!findLayer(project, input2.layer)) {
+    const id = generateId((candidate) => tx.project.layers.some((l) => l.id === candidate));
+    tx.insert(["layers"], createLayer(input2.layer, id, input2.newTrackLabel ?? ""));
+  }
+  const clipInput = { fileId: input2.fileId, position: input2.position, layer: input2.layer, start: 0, end: input2.duration };
+  if (input2.title !== void 0) clipInput.title = input2.title;
+  const clip2 = addClip(tx, clipInput);
+  if (input2.props && Object.keys(input2.props).length > 0) return patchClip(tx, clip2.id, jsonCopy({ ...input2.props }));
+  return clip2;
+}
+function jsonCopy(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+function replaceClipEffects(tx, clipId2, effects) {
+  requireEditableClip(tx.project, clipId2);
+  if (!Array.isArray(effects) || effects.some((e) => !isRecord8(e) || typeof e.id !== "string")) {
+    throw invalid("effects must be a list of effect objects with ids.");
+  }
+  return patchClip(tx, clipId2, { effects: jsonCopy([...effects]) });
+}
+function useFileForClip(tx, clipId2, fileId) {
+  requireEditableClip(tx.project, clipId2);
+  const file3 = requireFile(tx.project, fileId);
+  patchClip(tx, clipId2, { file_id: file3.id, reader: structuredClone(file3) });
+  return requireClip(tx.project, clipId2);
+}
+var PLACEMENT_KEYS;
+var init_overlays = __esm({
+  "../engine/src/ops/overlays.ts"() {
+    "use strict";
+    init_defaults();
+    init_ids();
+    init_query();
+    init_clips();
+    init_errors();
+    init_internal();
+    PLACEMENT_KEYS = /* @__PURE__ */ new Set(["id", "file_id", "position", "layer", "start", "end", "duration", "reader"]);
   }
 });
 
@@ -6707,6 +6797,7 @@ var init_ops = __esm({
     init_markers();
     init_project();
     init_titles();
+    init_overlays();
     init_clipboard();
     init_presets();
   }
@@ -6927,7 +7018,7 @@ function putProp(target, key, value) {
   else
     target[key] = value;
 }
-function mirrorShape(target, source2, keys, wrap) {
+function mirrorShape(target, source2, keys, wrap2) {
   const raw = sourceShape(source2);
   for (const key of keys) {
     const desc = Object.getOwnPropertyDescriptor(raw, key);
@@ -6936,10 +7027,10 @@ function mirrorShape(target, source2, keys, wrap) {
     if (desc.get) {
       deferProp(target, key, () => {
         const value = source2._zod.def.shape[key];
-        return wrap ? wrap(value, key) : value;
+        return wrap2 ? wrap2(value, key) : value;
       });
     } else
-      putProp(target, key, wrap ? wrap(desc.value, key) : desc.value);
+      putProp(target, key, wrap2 ? wrap2(desc.value, key) : desc.value);
   }
 }
 function mirrorProps(target, source2) {
@@ -6982,14 +7073,14 @@ function promiseAllObject(promisesObj) {
 }
 function randomString(length = 10) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
-  let str3 = "";
+  let str4 = "";
   for (let i = 0; i < length; i++) {
-    str3 += chars[Math.floor(Math.random() * chars.length)];
+    str4 += chars[Math.floor(Math.random() * chars.length)];
   }
-  return str3;
+  return str4;
 }
-function esc(str3) {
-  return JSON.stringify(str3);
+function esc(str4) {
+  return JSON.stringify(str4);
 }
 function slugify(input2) {
   return input2.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -7033,8 +7124,8 @@ function numKeys(data) {
   }
   return keyCount;
 }
-function escapeRegex(str3) {
-  return str3.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegex(str4) {
+  return str4.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function clone2(inst, def, params) {
   const cl = new inst._zod.constr(def ?? inst._zod.def);
@@ -7276,13 +7367,13 @@ function getSizableOrigin(input2) {
     return "file";
   return "unknown";
 }
-function codePointLength(str3) {
-  const units = str3.length;
-  if (!highSurrogate.test(str3))
+function codePointLength(str4) {
+  const units = str4.length;
+  if (!highSurrogate.test(str4))
     return units;
   let count = units;
   for (let i = 0; i < units - 1; i++) {
-    if ((str3.charCodeAt(i) & 64512) === 55296 && (str3.charCodeAt(i + 1) & 64512) === 56320) {
+    if ((str4.charCodeAt(i) & 64512) === 55296 && (str4.charCodeAt(i + 1) & 64512) === 56320) {
       count--;
       i++;
     }
@@ -7865,14 +7956,14 @@ function toDotPath(_path) {
   return segs.join("");
 }
 function prettifyError(error62) {
-  const lines = [];
+  const lines2 = [];
   const issues = [...error62.issues].sort((a, b) => (a.path ?? []).length - (b.path ?? []).length);
   for (const issue2 of issues) {
-    lines.push(`\u2716 ${issue2.message}`);
+    lines2.push(`\u2716 ${issue2.message}`);
     if (issue2.path?.length)
-      lines.push(`  \u2192 at ${toDotPath(issue2.path)}`);
+      lines2.push(`  \u2192 at ${toDotPath(issue2.path)}`);
   }
-  return lines.join("\n");
+  return lines2.join("\n");
 }
 var _messageDesc, _issuesDesc, _installedToString, initializer, $ZodError, $ZodRealError;
 var init_errors3 = __esm({
@@ -8774,9 +8865,9 @@ var init_doc = __esm({
           return;
         }
         const content = arg;
-        const lines = content.split("\n").filter((x) => x);
-        const minIndent = Math.min(...lines.map((x) => x.length - x.trimStart().length));
-        const dedented = lines.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
+        const lines2 = content.split("\n").filter((x) => x);
+        const minIndent = Math.min(...lines2.map((x) => x.length - x.trimStart().length));
+        const dedented = lines2.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
         for (const line2 of dedented) {
           this.content.push(line2);
         }
@@ -9089,16 +9180,16 @@ function handleUnionResults(results, final, inst, ctx) {
   return final;
 }
 function handleExclusiveUnionResults(results, final, inst, ctx) {
-  const matches2 = [];
+  const matches3 = [];
   for (let i = 0; i < results.length; i++) {
     if (results[i].issues.length === 0)
-      matches2.push(i);
+      matches3.push(i);
   }
-  if (matches2.length === 1) {
-    final.value = results[matches2[0]].value;
+  if (matches3.length === 1) {
+    final.value = results[matches3[0]].value;
     return final;
   }
-  if (matches2.length === 0) {
+  if (matches3.length === 0) {
     final.issues.push({
       code: "invalid_union",
       input: final.value,
@@ -9112,7 +9203,7 @@ function handleExclusiveUnionResults(results, final, inst, ctx) {
       inst,
       errors: [],
       inclusive: false,
-      matches: matches2
+      matches: matches3
     });
   }
   return final;
@@ -10127,14 +10218,14 @@ var init_schemas = __esm({
         const shape2 = zod.def.shape;
         const propValues = {};
         for (const key in shape2) {
-          const field = shape2[key]._zod;
-          if (field.values) {
+          const field2 = shape2[key]._zod;
+          if (field2.values) {
             if (!Object.prototype.hasOwnProperty.call(propValues, key)) {
               assignProp(propValues, key, /* @__PURE__ */ new Set());
             }
-            for (const v of field.values)
+            for (const v of field2.values)
               propValues[key].add(v);
-            if (field.optin !== void 0)
+            if (field2.optin !== void 0)
               propValues[key].add(void 0);
           }
         }
@@ -19991,45 +20082,45 @@ function generateCustomRefineCheck(doc, ctx, check2, accessor) {
   throw new ZodCompileUnsupportedError("custom check without a predicate or check function");
 }
 function generateStringFormatCheck(doc, ctx, def, accessor, needsValue = true) {
-  const fmt = def.format;
-  if (fmt === "base64") {
+  const fmt2 = def.format;
+  if (fmt2 === "base64") {
     const validator = addConstant(ctx, isValidBase64);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "base64url") {
+  if (fmt2 === "base64url") {
     const validator = addConstant(ctx, isValidBase64URL);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "jwt") {
+  if (fmt2 === "jwt") {
     const validator = addConstant(ctx, isValidJWT);
     const alg = addConstant(ctx, def.alg ?? null);
     doc.write(`if (!${validator}(${accessor}, ${alg})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "ipv6") {
+  if (fmt2 === "ipv6") {
     const validator = addConstant(ctx, isValidIPv6);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "cidrv6") {
+  if (fmt2 === "cidrv6") {
     const validator = addConstant(ctx, isValidCIDRv6);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "credit_card") {
+  if (fmt2 === "credit_card") {
     const validator = addConstant(ctx, isValidCreditCard);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "iban") {
+  if (fmt2 === "iban") {
     const validator = addConstant(ctx, isValidIBAN);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
   const formatDef = def;
-  if (fmt === "url" || fmt === "httpurl" || formatDef.normalize || formatDef.hostname !== void 0 || formatDef.protocol !== void 0) {
+  if (fmt2 === "url" || fmt2 === "httpurl" || formatDef.normalize || formatDef.hostname !== void 0 || formatDef.protocol !== void 0) {
     const parseConst = addConstant(ctx, validateURL);
     const defConst = addConstant(ctx, def);
     const trimVar = newVar(ctx);
@@ -20055,12 +20146,12 @@ function generateStringFormatCheck(doc, ctx, def, accessor, needsValue = true) {
   const customFn = def.fn;
   if (customFn) {
     if (isAsyncFunction(customFn))
-      throw new ZodCompileUnsupportedError(`async string format ${fmt}`);
+      throw new ZodCompileUnsupportedError(`async string format ${fmt2}`);
     const fnConst = addConstant(ctx, customFn);
     doc.write(`if (!${fnConst}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (PATTERN_IS_COMPLETE.has(fmt) && def.pattern) {
+  if (PATTERN_IS_COMPLETE.has(fmt2) && def.pattern) {
     const patternConst = addConstant(ctx, def.pattern);
     doc.write(`${patternConst}.lastIndex = 0;`);
     doc.write(`if (!${patternConst}.test(${accessor})) return INVALID;`);
@@ -23265,8 +23356,8 @@ var init_json_schema_processors = __esm({
       }
       const requiredKeys = [];
       for (const key of Object.keys(shape2)) {
-        const field = def.shape[key];
-        if (ctx.io === "input" ? inputOptin(field) === void 0 : field._zod.optout === void 0) {
+        const field2 = def.shape[key];
+        if (ctx.io === "input" ? inputOptin(field2) === void 0 : field2._zod.optout === void 0) {
           requiredKeys.push(key);
         }
       }
@@ -25990,20 +26081,20 @@ function checkArrayGuards(arraySchema, guards) {
     if (guards.containsSchema) {
       const minContains = guards.minContains ?? 1;
       const ceiling = guards.maxContains !== void 0 ? guards.maxContains + 1 : Number.POSITIVE_INFINITY;
-      let matches2 = 0;
+      let matches3 = 0;
       for (const item of items) {
-        if (guards.containsSchema.safeParse(item).success && ++matches2 >= ceiling)
+        if (guards.containsSchema.safeParse(item).success && ++matches3 >= ceiling)
           break;
       }
-      if (matches2 < minContains) {
+      if (matches3 < minContains) {
         payload.issues.push({
           code: "custom",
-          message: `Array must contain at least ${minContains} matching ${plural(minContains)}; found ${matches2}`,
+          message: `Array must contain at least ${minContains} matching ${plural(minContains)}; found ${matches3}`,
           input: items,
           continue: true
         });
       }
-      if (guards.maxContains !== void 0 && matches2 > guards.maxContains) {
+      if (guards.maxContains !== void 0 && matches3 > guards.maxContains) {
         payload.issues.push({
           code: "custom",
           message: `Array must contain at most ${guards.maxContains} matching ${plural(guards.maxContains)}`,
@@ -27328,19 +27419,19 @@ function migrateLegacyCrop(data, newId) {
     if (!isKeyframeChanged(cropX, 0) && !isKeyframeChanged(cropY, 0) && !isKeyframeChanged(cropWidth, 1) && !isKeyframeChanged(cropHeight, 1)) {
       continue;
     }
-    const effect2 = defaultEffectJson("Crop", newId());
-    effect2.x = truthy(cropX) ? cropX : libopenshotKeyframe(0);
-    effect2.y = truthy(cropY) ? cropY : libopenshotKeyframe(0);
-    effect2.right = truthy(cropWidth) ? cropWidth : libopenshotKeyframe(1);
-    effect2.bottom = truthy(cropHeight) ? cropHeight : libopenshotKeyframe(1);
+    const effect3 = defaultEffectJson("Crop", newId());
+    effect3.x = truthy(cropX) ? cropX : libopenshotKeyframe(0);
+    effect3.y = truthy(cropY) ? cropY : libopenshotKeyframe(0);
+    effect3.right = truthy(cropWidth) ? cropWidth : libopenshotKeyframe(1);
+    effect3.bottom = truthy(cropHeight) ? cropHeight : libopenshotKeyframe(1);
     for (const prop of ["right", "bottom"]) {
-      for (const point2 of pointsOf2(effect2[prop])) {
+      for (const point2 of pointsOf2(effect3[prop])) {
         const co = isRecord13(point2.co) ? point2.co : null;
         if (co) co.Y = 1 - num4(co.Y, 0);
       }
     }
     if (!Array.isArray(clip2.effects)) clip2.effects = [];
-    clip2.effects.push(effect2);
+    clip2.effects.push(effect3);
   }
 }
 function flipPoints(points) {
@@ -27352,17 +27443,17 @@ function flipPoints(points) {
 function migrateTrackedObjectAlpha(data) {
   const clips = records(data.clips);
   for (const clip2 of clips) {
-    for (const effect2 of records(clip2.effects)) {
-      if (effect2.name !== "Tracker" && effect2.name !== "Object Detector") continue;
-      if ("display_box_text" in effect2) {
-        const keyframe4 = effect2.display_box_text;
+    for (const effect3 of records(clip2.effects)) {
+      if (effect3.name !== "Tracker" && effect3.name !== "Object Detector") continue;
+      if ("display_box_text" in effect3) {
+        const keyframe4 = effect3.display_box_text;
         const points = isRecord13(keyframe4) && Array.isArray(keyframe4.Points) ? keyframe4.Points : null;
         if (points) {
           flipPoints(points.filter(isRecord13));
           if (points.length === 0) points.push({ co: { X: 1, Y: 1 }, interpolation: Interpolation.CONSTANT });
         }
       }
-      const objects = isRecord13(effect2.objects) ? effect2.objects : {};
+      const objects = isRecord13(effect3.objects) ? effect3.objects : {};
       for (const [trackedKey, tracked] of Object.entries(objects)) {
         if (!isRecord13(tracked)) continue;
         const childClipId = tracked.child_clip_id;
@@ -27897,6 +27988,193 @@ var init_paths = __esm({
   }
 });
 
+// ../engine/src/io/emojis.ts
+function capitalize2(text4) {
+  return text4.charAt(0).toUpperCase() + text4.slice(1).toLowerCase();
+}
+function field(meta3, key) {
+  const value = meta3[key];
+  return value === void 0 || value === null ? "" : String(value);
+}
+function buildEmojiCatalog(files, metadata) {
+  const out = [];
+  for (const file3 of [...files].sort((a, b) => a < b ? -1 : a > b ? 1 : 0)) {
+    if (file3.startsWith(".") || file3.toLowerCase().includes("thumbs.db")) continue;
+    const dot = file3.lastIndexOf(".");
+    const id = dot > 0 ? file3.slice(0, dot) : file3;
+    const meta3 = Object.hasOwn(metadata, id) ? metadata[id] : {};
+    const annotation = typeof meta3.annotation === "string" ? meta3.annotation : id;
+    const groupId = typeof meta3.group === "string" ? meta3.group : "user";
+    out.push({
+      id,
+      name: capitalize2(annotation),
+      group: capitalize2(groupId.split("-")[0]),
+      groupId,
+      file: file3,
+      storedPath: `@emojis/${file3}`,
+      char: field(meta3, "emoji"),
+      tags: ["tags", "openmoji_tags", "subgroups"].map((key) => field(meta3, key)).join(" "),
+      skintone: field(meta3, "skintone")
+    });
+  }
+  return out;
+}
+function emojiReaderInfo(storedPath) {
+  const fields = {
+    ...structuredClone(MASK_READER_TEMPLATE),
+    display_ratio: { den: 1, num: 1 },
+    file_size: 1080 * 1080 * 4,
+    height: 72,
+    path: storedPath,
+    width: 72
+  };
+  return Object.fromEntries(Object.keys(fields).sort().map((key) => [key, fields[key]]));
+}
+function parseBundledEmojiCatalog(json2) {
+  const data = JSON.parse(json2);
+  if (!Array.isArray(data.files) || typeof data.metadata !== "object" || data.metadata === null) {
+    throw new Error("emoji catalog: expected files and metadata");
+  }
+  return buildEmojiCatalog(data.files.map(String), data.metadata);
+}
+function stripVariationSelectors(text4) {
+  return text4.replace(/[︎️]/g, "");
+}
+function words2(text4) {
+  return text4.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+}
+function pyLen(text4) {
+  return [...text4].length;
+}
+function scoreEmoji(entry, query2) {
+  const q = String(query2 ?? "").trim();
+  if (!q) return 1;
+  const ql = q.toLowerCase();
+  if (entry.char && stripVariationSelectors(entry.char) === stripVariationSelectors(q)) return 100;
+  const code = ql.replaceAll("u+", "").replaceAll(" ", "-");
+  const own2 = entry.id.toLowerCase();
+  if (own2 === code || own2.replaceAll("-fe0f", "") === code) return 100;
+  const name = entry.name.toLowerCase();
+  const alias = Object.hasOwn(ALIASES2, ql) ? ALIASES2[ql] : void 0;
+  const penalty = entry.skintone ? 5 : 0;
+  if (alias && name === alias.toLowerCase()) return 95;
+  if (name === ql) return 90 - penalty;
+  const qw = words2(ql);
+  const nw = words2(name);
+  if (qw.length > 0 && qw.every((w) => nw.includes(w))) return 70 - penalty - nw.length * 0.5 - pyLen(name) / 100;
+  if (name.startsWith(ql)) return 60 - penalty - pyLen(name) / 100;
+  const tw = words2(entry.tags);
+  if (qw.length > 0 && qw.every((w) => tw.includes(w) || nw.includes(w))) return 40 - penalty - nw.length * 0.5;
+  if (name.includes(ql) || entry.tags.toLowerCase().includes(ql)) return 20 - penalty;
+  return 0;
+}
+function inGroup(entry, group) {
+  if (!group) return true;
+  const g = group.trim().toLowerCase().replaceAll(" ", "-").replaceAll("&", "");
+  return entry.groupId.startsWith(g) || entry.group.toLowerCase().startsWith(g) || entry.groupId.includes(g);
+}
+function searchEmojis(catalog, query2, group = "", limit = 10) {
+  const ranked = [];
+  for (const entry of catalog) {
+    if (!inGroup(entry, group)) continue;
+    const score = scoreEmoji(entry, query2);
+    if (score > 0) ranked.push({ score, entry });
+  }
+  ranked.sort((a, b) => b.score - a.score || (a.entry.name < b.entry.name ? -1 : a.entry.name > b.entry.name ? 1 : 0));
+  return ranked.slice(0, Math.max(1, Math.trunc(limit)));
+}
+var EMOJI_CATALOG_ASSET, ALIASES2;
+var init_emojis = __esm({
+  "../engine/src/io/emojis.ts"() {
+    "use strict";
+    init_catalog_data();
+    EMOJI_CATALOG_ASSET = "emojis/catalog.json";
+    ALIASES2 = {
+      heart: "red heart",
+      love: "red heart",
+      lol: "face with tears of joy",
+      laugh: "face with tears of joy",
+      laughing: "face with tears of joy",
+      joy: "face with tears of joy",
+      lit: "fire",
+      flame: "fire",
+      "100": "hundred points",
+      party: "party popper",
+      tada: "party popper",
+      celebrate: "party popper",
+      cry: "loudly crying face",
+      sad: "crying face",
+      smile: "grinning face",
+      happy: "grinning face",
+      wow: "astonished face",
+      shocked: "face screaming in fear",
+      money: "money bag",
+      check: "check mark button",
+      tick: "check mark",
+      angry: "enraged face",
+      cool: "smiling face with sunglasses",
+      kiss: "face blowing a kiss",
+      thinking: "thinking face",
+      think: "thinking face",
+      poop: "pile of poo",
+      star: "star",
+      sparkle: "sparkles",
+      shine: "sparkles",
+      rocket: "rocket",
+      sun: "sun",
+      moon: "crescent moon",
+      rain: "cloud with rain",
+      snow: "snowflake",
+      coffee: "hot beverage",
+      pizza: "pizza",
+      cake: "birthday cake",
+      birthday: "birthday cake",
+      gift: "wrapped gift",
+      music: "musical notes",
+      camera: "camera",
+      plane: "airplane",
+      car: "automobile",
+      home: "house",
+      world: "globe showing Europe-Africa",
+      earth: "globe showing Europe-Africa",
+      warning: "warning",
+      question: "red question mark",
+      exclamation: "red exclamation mark",
+      arrow: "right arrow",
+      "mind blown": "exploding head",
+      skull: "skull",
+      dead: "skull",
+      crown: "crown",
+      king: "crown",
+      trophy: "trophy",
+      win: "trophy",
+      gold: "1st place medal",
+      idea: "light bulb",
+      bulb: "light bulb",
+      hot: "hot face",
+      cold: "cold face",
+      sleep: "sleeping face",
+      tired: "tired face",
+      devil: "smiling face with horns",
+      angel: "smiling face with halo",
+      ghost: "ghost",
+      alien: "alien",
+      robot: "robot",
+      dog: "dog face",
+      cat: "cat face",
+      unicorn: "unicorn",
+      boom: "collision",
+      explosion: "collision",
+      lightning: "high voltage",
+      zap: "high voltage",
+      bomb: "bomb",
+      starstruck: "star-struck",
+      "party face": "partying face",
+      glow: "glowing star"
+    };
+  }
+});
+
 // ../engine/src/io/index.ts
 var init_io = __esm({
   "../engine/src/io/index.ts"() {
@@ -28178,36 +28456,36 @@ function getDefaultExportSettings(project, options = {}) {
   };
   let exportType = EXPORT_TYPES[0];
   let defaultPath = joinPath(options.exportFolder ?? "", "export.mp4");
-  const num11 = (set2) => (v) => {
+  const num12 = (set2) => (v) => {
     if (typeof v === "number" && Number.isFinite(v)) set2(v);
   };
-  const str3 = (set2) => (v) => {
+  const str4 = (set2) => (v) => {
     if (typeof v === "string") set2(v);
   };
   const rate = (set2) => (v) => {
     if (typeof v === "number" && Number.isFinite(v) || typeof v === "string") set2(v);
   };
   const widgets = {
-    txtVideoFormat: str3((v) => video.vformat = v),
-    txtVideoCodec: str3((v) => video.vcodec = v),
-    txtWidth: num11((v) => video.width = v),
-    txtHeight: num11((v) => video.height = v),
-    txtFrameRateNum: num11((v) => video.fps.num = v),
-    txtFrameRateDen: num11((v) => video.fps.den = v),
-    txtPixelRatioNum: num11((v) => video.pixel_ratio.num = v),
-    txtPixelRatioDen: num11((v) => video.pixel_ratio.den = v),
+    txtVideoFormat: str4((v) => video.vformat = v),
+    txtVideoCodec: str4((v) => video.vcodec = v),
+    txtWidth: num12((v) => video.width = v),
+    txtHeight: num12((v) => video.height = v),
+    txtFrameRateNum: num12((v) => video.fps.num = v),
+    txtFrameRateDen: num12((v) => video.fps.den = v),
+    txtPixelRatioNum: num12((v) => video.pixel_ratio.num = v),
+    txtPixelRatioDen: num12((v) => video.pixel_ratio.den = v),
     txtVideoBitRate: rate((v) => video.video_bitrate = v),
-    txtStartFrame: num11((v) => video.start_frame = v),
-    txtEndFrame: num11((v) => video.end_frame = v),
-    txtAudioCodec: str3((v) => audio.acodec = v),
-    txtSampleRate: num11((v) => audio.sample_rate = v),
-    txtChannels: num11((v) => audio.channels = v),
+    txtStartFrame: num12((v) => video.start_frame = v),
+    txtEndFrame: num12((v) => video.end_frame = v),
+    txtAudioCodec: str4((v) => audio.acodec = v),
+    txtSampleRate: num12((v) => audio.sample_rate = v),
+    txtChannels: num12((v) => audio.channels = v),
     txtAudioBitrate: rate((v) => audio.audio_bitrate = v),
-    cboChannelLayout: num11((v) => {
+    cboChannelLayout: num12((v) => {
       const layout = CHANNEL_LAYOUT_CHOICES[v];
       if (layout !== void 0) audio.channel_layout = layout;
     }),
-    cboExportTo: num11((v) => {
+    cboExportTo: num12((v) => {
       const type = EXPORT_TYPES[v];
       if (Number.isInteger(v) && type) exportType = type;
     })
@@ -28221,15 +28499,15 @@ function getDefaultExportSettings(project, options = {}) {
   }
   const overrides = isRecord15(project.export_overrides) ? project.export_overrides : {};
   for (const [key, value] of Object.entries(overrides)) {
-    if (key === "width" || key === "height" || key === "start_frame" || key === "end_frame") num11((v) => video[key] = v)(value);
-    else if (key === "fps_num") num11((v) => video.fps.num = v)(value);
-    else if (key === "fps_den") num11((v) => video.fps.den = v)(value);
-    else if (key === "video_codec" || key === "vcodec") str3((v) => video.vcodec = v)(value);
-    else if (key === "vformat" || key === "format") str3((v) => video.vformat = v)(value);
-    else if (key === "audio_codec" || key === "acodec") str3((v) => audio.acodec = v)(value);
-    else if (key === "sample_rate") num11((v) => audio.sample_rate = v)(value);
-    else if (key === "channels") num11((v) => audio.channels = v)(value);
-    else if (key === "output_path" || key === "path") str3((v) => defaultPath = v)(value);
+    if (key === "width" || key === "height" || key === "start_frame" || key === "end_frame") num12((v) => video[key] = v)(value);
+    else if (key === "fps_num") num12((v) => video.fps.num = v)(value);
+    else if (key === "fps_den") num12((v) => video.fps.den = v)(value);
+    else if (key === "video_codec" || key === "vcodec") str4((v) => video.vcodec = v)(value);
+    else if (key === "vformat" || key === "format") str4((v) => video.vformat = v)(value);
+    else if (key === "audio_codec" || key === "acodec") str4((v) => audio.acodec = v)(value);
+    else if (key === "sample_rate") num12((v) => audio.sample_rate = v)(value);
+    else if (key === "channels") num12((v) => audio.channels = v)(value);
+    else if (key === "output_path" || key === "path") str4((v) => defaultPath = v)(value);
   }
   return { video, audio, exportType, defaultPath };
 }
@@ -28499,9 +28777,9 @@ function installExitHook() {
 function liveChildCount() {
   return live.size;
 }
-function stderrSummary(stderr, lines = 6) {
+function stderrSummary(stderr, lines2 = 6) {
   const kept = stderr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0 && !/^frame=|^size=|^video:|^\[out#/.test(l));
-  return kept.slice(-lines).join("\n");
+  return kept.slice(-lines2).join("\n");
 }
 function spawnManaged(binary, args, options = {}) {
   installExitHook();
@@ -28666,10 +28944,10 @@ var init_process = __esm({
 
 // ../render-node/src/ffmpeg/capabilities.ts
 function parseCodecList(text4) {
-  const lines = text4.split(/\r?\n/);
-  const start = lines.findIndex((l) => l.trim().startsWith("------"));
+  const lines2 = text4.split(/\r?\n/);
+  const start = lines2.findIndex((l) => l.trim().startsWith("------"));
   const entries = [];
-  for (const line2 of lines.slice(start + 1)) {
+  for (const line2 of lines2.slice(start + 1)) {
     const m = /^\s*([VASD.][F.][S.][X.][B.][D.])\s+(\S+)\s+(.*)$/.exec(line2);
     if (!m) continue;
     const flags = m[1];
@@ -29641,7 +29919,7 @@ function resolveFonts(index, familyLists) {
     const lowered = requested.map((f2) => f2.toLowerCase());
     if (lowered.some((f2) => index.has(f2) || GENERIC_FAMILIES.has(f2))) return void 0;
     for (const family of lowered) {
-      const alias = firstInstalled(index, ALIASES2[family] ?? []);
+      const alias = firstInstalled(index, ALIASES3[family] ?? []);
       if (alias) return alias;
     }
     return sansSerif;
@@ -29670,7 +29948,7 @@ function resolveFonts(index, familyLists) {
   if (files.size === 0) use("lato");
   return { files: [...files], fallbackFor, sansSerif, serif, monospace };
 }
-var CACHE_VERSION, FONT_EXTS, MAX_FONT_BYTES, FontIndex, shared, bufferCache, GENERIC_FAMILIES, ALIASES2, DEFAULT_SANS, DEFAULT_SERIF, DEFAULT_MONO;
+var CACHE_VERSION, FONT_EXTS, MAX_FONT_BYTES, FontIndex, shared, bufferCache, GENERIC_FAMILIES, ALIASES3, DEFAULT_SANS, DEFAULT_SERIF, DEFAULT_MONO;
 var init_fonts = __esm({
   "../render-node/src/svg/fonts.ts"() {
     "use strict";
@@ -29734,7 +30012,7 @@ var init_fonts = __esm({
     };
     bufferCache = /* @__PURE__ */ new Map();
     GENERIC_FAMILIES = /* @__PURE__ */ new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy"]);
-    ALIASES2 = {
+    ALIASES3 = {
       "dejavu sans": ["verdana", "bitstream vera sans"],
       "bitstream vera sans": ["dejavu sans", "verdana"],
       sans: ["dejavu sans", "verdana"],
@@ -30292,16 +30570,16 @@ function gcd3(a, b) {
   while (b) [a, b] = [b, a % b];
   return a;
 }
-function reduce(num11, den2) {
-  const g = gcd3(num11, den2);
-  return g > 0 ? { num: num11 / g, den: den2 / g } : { num: num11, den: den2 };
+function reduce(num12, den2) {
+  const g = gcd3(num12, den2);
+  return g > 0 ? { num: num12 / g, den: den2 / g } : { num: num12, den: den2 };
 }
 function parseRatio(text4, sep = "/") {
   if (!text4) return void 0;
   const [a, b] = text4.split(sep);
-  const num11 = Number(a);
+  const num12 = Number(a);
   const den2 = Number(b);
-  return Number.isFinite(num11) && Number.isFinite(den2) ? { num: num11, den: den2 } : void 0;
+  return Number.isFinite(num12) && Number.isFinite(den2) ? { num: num12, den: den2 } : void 0;
 }
 function toDouble(f2) {
   return f2.num / f2.den;
@@ -31390,9 +31668,9 @@ var init_sources = __esm({
         const textPaths = /* @__PURE__ */ new Set();
         for (const layer2 of plan.layers) {
           for (const mask2 of layer2.masks) if (mask2.maskPath) imagePaths.add(mask2.maskPath);
-          for (const effect2 of layer2.effects) {
-            for (const p of effect2.images ?? []) imagePaths.add(p);
-            for (const p of effect2.texts ?? []) textPaths.add(p);
+          for (const effect3 of layer2.effects) {
+            for (const p of effect3.images ?? []) imagePaths.add(p);
+            for (const p of effect3.texts ?? []) textPaths.add(p);
           }
         }
         const [layers, images, texts, audio] = await Promise.all([
@@ -31506,7 +31784,7 @@ async function renderSegmentEffects(job) {
       const floats = new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + frames * channels * 4));
       const planar = Array.from({ length: channels }, () => new Float32Array(frames));
       for (let i = 0; i < frames; i += 1) for (let c = 0; c < channels; c += 1) planar[c][i] = floats[i * channels + c];
-      for (const { effect: effect2, kernel, state } of kernels) kernel(planar, job.sampleRate, effect2.params, state);
+      for (const { effect: effect3, kernel, state } of kernels) kernel(planar, job.sampleRate, effect3.params, state);
       for (let i = 0; i < frames; i += 1) for (let c = 0; c < channels; c += 1) floats[i * channels + c] = planar[c][i];
       const out = Buffer.from(floats.buffer, floats.byteOffset, frames * channels * 4);
       writeQueue.push(handle.write(out, 0, out.length, 44 + written));
@@ -32336,7 +32614,7 @@ var init_analog_tape = __esm({
         const h = image.height;
         if (w <= 0 || h <= 0) return;
         const Uw = w + 1 >> 1;
-        const px = image.data;
+        const px2 = image.data;
         let Y = new Float32Array(w * h);
         let U = new Float32Array(Uw * h);
         let V = new Float32Array(Uw * h);
@@ -32347,17 +32625,17 @@ var init_analog_tape = __esm({
           for (let x2 = 0; x2 < Uw; x2 += 1) {
             const x0 = x2 * 2;
             const i0 = (y * w + x0) * 4;
-            const r0 = f322(px[i0 + 2] / BYTE_MAX);
-            const g0 = f322(px[i0 + 1] / BYTE_MAX);
-            const b0 = f322(px[i0] / BYTE_MAX);
+            const r0 = f322(px2[i0 + 2] / BYTE_MAX);
+            const g0 = f322(px2[i0 + 1] / BYTE_MAX);
+            const b0 = f322(px2[i0] / BYTE_MAX);
             Y[y * w + x0] = fmaf(b0, Y_B, fmaf(r0, Y_R, f322(g0 * Y_G)));
             let u = fmaf(b0, U_B, fmaf(r0, U_R, f322(g0 * U_G)));
             let v = fmaf(b0, V_B, fmaf(r0, V_R, f322(g0 * V_G)));
             if (x0 + 1 < w) {
               const i1 = i0 + 4;
-              const r1 = f322(px[i1 + 2] / BYTE_MAX);
-              const g1 = f322(px[i1 + 1] / BYTE_MAX);
-              const b1 = f322(px[i1] / BYTE_MAX);
+              const r1 = f322(px2[i1 + 2] / BYTE_MAX);
+              const g1 = f322(px2[i1 + 1] / BYTE_MAX);
+              const b1 = f322(px2[i1] / BYTE_MAX);
               Y[y * w + x0 + 1] = fmaf(b1, Y_B, fmaf(r1, Y_R, f322(g1 * Y_G)));
               u = f322(f322(u + fmaf(b1, U_B, fmaf(r1, U_R, f322(g1 * U_G)))) * 0.5);
               v = f322(f322(v + fmaf(b1, V_B, fmaf(r1, V_R, f322(g1 * V_G)))) * 0.5);
@@ -32559,9 +32837,9 @@ var init_analog_tape = __esm({
             const g = fmaf(v, G_V, fmaf(u, G_U, yv));
             const b = fmaf(u, B_U, yv);
             const i = (yo + x) * 4;
-            px[i + 2] = toByte(r);
-            px[i + 1] = toByte(g);
-            px[i] = toByte(b);
+            px2[i + 2] = toByte(r);
+            px2[i + 1] = toByte(g);
+            px2[i] = toByte(b);
           }
         }
       }
@@ -32902,10 +33180,10 @@ function spectrumBins(audio, bins, gain, smooth2, lowHz, highHz) {
   return result;
 }
 function mt19937Floats(seed, count) {
-  const words2 = 397 + count + 1;
-  const mt = new Uint32Array(words2);
+  const words3 = 397 + count + 1;
+  const mt = new Uint32Array(words3);
   mt[0] = seed >>> 0;
-  for (let i = 1; i < words2; i += 1) {
+  for (let i = 1; i < words3; i += 1) {
     const prev = mt[i - 1];
     mt[i] = Math.imul(1812433253, (prev ^ prev >>> 30) >>> 0) + i >>> 0;
   }
@@ -33443,7 +33721,7 @@ function grayRasterize(contours, oddEven, width, height) {
   let area = 0;
   let cover = 0;
   let invalid2 = true;
-  let px = 0;
+  let px2 = 0;
   let py = 0;
   const divMod = (a, b) => {
     let q = Math.trunc(a / b);
@@ -33546,14 +33824,14 @@ function grayRasterize(contours, oddEven, width, height) {
     const ey2 = toY >> 8;
     const fy1 = py - ey1 * 256;
     const fy2 = toY - ey2 * 256;
-    const dx = toX - px;
+    const dx = toX - px2;
     let dy = toY - py;
     if (ey1 >= maxEy && ey2 >= maxEy || ey1 < minEy && ey2 < minEy) {
     } else if (ey1 === ey2) {
-      renderScanline(ey1, px, fy1, toX, fy2);
+      renderScanline(ey1, px2, fy1, toX, fy2);
     } else if (dx === 0) {
-      const cx = px >> 8;
-      const twoFx = (px - cx * 256) * 2;
+      const cx = px2 >> 8;
+      const twoFx = (px2 - cx * 256) * 2;
       const first = dy < 0 ? 0 : 256;
       let delta = first - fy1;
       area += twoFx * delta;
@@ -33600,8 +33878,8 @@ function grayRasterize(contours, oddEven, width, height) {
         dy = -dy;
       }
       let [delta, mod] = divMod(p, dy);
-      let x = px + delta;
-      renderScanline(ey1, px, fy1, x, first);
+      let x = px2 + delta;
+      renderScanline(ey1, px2, fy1, x, first);
       ey1 += incr;
       setCell(x >> 8, ey1);
       if (ey1 !== ey2) {
@@ -33623,7 +33901,7 @@ function grayRasterize(contours, oddEven, width, height) {
       }
       renderScanline(ey1, x, 256 - first, toX, fy2);
     }
-    px = toX;
+    px2 = toX;
     py = toY;
   };
   for (const c of outline) {
@@ -33631,7 +33909,7 @@ function grayRasterize(contours, oddEven, width, height) {
     const sx = c[0] * 4;
     const sy = c[1] * 4;
     startCell(sx >> 8, sy >> 8);
-    px = sx;
+    px2 = sx;
     py = sy;
     for (let i = 2; i + 1 < c.length; i += 2) renderLine(c[i] * 4, c[i + 1] * 4);
     renderLine(sx, sy);
@@ -34104,18 +34382,18 @@ function rasterizePolygonsAliased(subpaths, oddEven, clip2, sink) {
   if (top > bottom) return;
   const leftFP = clip2.left * Q16;
   const rightFP = (clip2.right + 1) * Q16;
-  const lines = [];
+  const lines2 = [];
   const clipEdge = (st, slopeFP, edgeFP, winding) => {
     const right = edgeFP === rightFP;
     if (st.xFP === edgeFP) {
       if (slopeFP > 0 !== right) return false;
-      lines.push({ x: edgeFP, delta: 0, top: st.iTop, bottom: st.iBottom, winding });
+      lines2.push({ x: edgeFP, delta: 0, top: st.iTop, bottom: st.iBottom, winding });
       return true;
     }
     const lastFP = st.xFP + slopeFP * (st.iBottom - st.iTop);
     if (lastFP === edgeFP) {
       if (slopeFP < 0 !== right) return false;
-      lines.push({ x: edgeFP, delta: 0, top: st.iTop, bottom: st.iBottom, winding });
+      lines2.push({ x: edgeFP, delta: 0, top: st.iTop, bottom: st.iBottom, winding });
       return true;
     }
     if (lastFP < edgeFP !== st.xFP < edgeFP) {
@@ -34123,7 +34401,7 @@ function rasterizePolygonsAliased(subpaths, oddEven, clip2, sink) {
       if (st.xFP < edgeFP !== right) {
         const iHeight = q16ToInt(deltaY + 1);
         const iMiddle = st.iTop + iHeight;
-        lines.push({ x: edgeFP, delta: 0, top: st.iTop, bottom: iMiddle, winding });
+        lines2.push({ x: edgeFP, delta: 0, top: st.iTop, bottom: iMiddle, winding });
         if (iMiddle !== st.iBottom) {
           st.xFP += slopeFP * (iHeight + 1);
           st.iTop = iMiddle + 1;
@@ -34132,13 +34410,13 @@ function rasterizePolygonsAliased(subpaths, oddEven, clip2, sink) {
         const iHeight = q16ToInt(deltaY);
         const iMiddle = st.iTop + iHeight;
         if (iMiddle !== st.iBottom) {
-          lines.push({ x: edgeFP, delta: 0, top: iMiddle + 1, bottom: st.iBottom, winding });
+          lines2.push({ x: edgeFP, delta: 0, top: iMiddle + 1, bottom: st.iBottom, winding });
           st.iBottom = iMiddle;
         }
       }
       return false;
     } else if (st.xFP < edgeFP !== right) {
-      lines.push({ x: edgeFP, delta: 0, top: st.iTop, bottom: st.iBottom, winding });
+      lines2.push({ x: edgeFP, delta: 0, top: st.iTop, bottom: st.iBottom, winding });
       return true;
     }
     return false;
@@ -34155,7 +34433,7 @@ function rasterizePolygonsAliased(subpaths, oddEven, clip2, sink) {
     if (iTop > iBottom) return;
     const aFP = Q16 / 2 + ax * 1024;
     if (bx === ax) {
-      lines.push({ x: Math.min(Math.max(aFP, leftFP), rightFP), delta: 0, top: iTop, bottom: iBottom, winding });
+      lines2.push({ x: Math.min(Math.max(aFP, leftFP), rightFP), delta: 0, top: iTop, bottom: iBottom, winding });
       return;
     }
     const slope = (bx - ax) / (by - ay);
@@ -34163,7 +34441,7 @@ function rasterizePolygonsAliased(subpaths, oddEven, clip2, sink) {
     const st = { xFP: aFP + q16Mul(slopeFP, iTop * Q16 + Q16 / 2 - ay * 1024), iTop, iBottom };
     if (clipEdge(st, slopeFP, leftFP, winding)) return;
     if (clipEdge(st, slopeFP, rightFP, winding)) return;
-    lines.push({ x: st.xFP, delta: slopeFP, top: st.iTop, bottom: st.iBottom, winding });
+    lines2.push({ x: st.xFP, delta: slopeFP, top: st.iTop, bottom: st.iBottom, winding });
   };
   for (const pts of subpaths) {
     const n = pts.length >> 1;
@@ -34173,13 +34451,13 @@ function rasterizePolygonsAliased(subpaths, oddEven, clip2, sink) {
     for (let i = 0; i < n - 1; i += 1) mergeLine(vx(i), vy(i), vx(i + 1), vy(i + 1));
     if (vx(0) !== vx(n - 1) || vy(0) !== vy(n - 1)) mergeLine(vx(n - 1), vy(n - 1), vx(0), vy(0));
   }
-  if (lines.length === 0) return;
-  lines.sort((a, b) => a.top - b.top);
+  if (lines2.length === 0) return;
+  lines2.sort((a, b) => a.top - b.top);
   const mask2 = oddEven ? 1 : ~0;
   const active = [];
   let next = 0;
-  for (let y = lines[0].top; y <= bottom; y += 1) {
-    for (; next < lines.length && lines[next].top === y; next += 1) active.push(lines[next]);
+  for (let y = lines2[0].top; y <= bottom; y += 1) {
+    for (; next < lines2.length && lines2[next].top === y; next += 1) active.push(lines2[next]);
     for (let i = 1; i < active.length; i += 1) {
       const l = active[i];
       let j = i - 1;
@@ -34449,25 +34727,25 @@ function shiftBezier(orig, offset, threshold) {
   const p12 = fuzzyCompare2(orig[0], orig[2]) && fuzzyCompare2(orig[1], orig[3]);
   const p23 = fuzzyCompare2(orig[2], orig[4]) && fuzzyCompare2(orig[3], orig[5]);
   const p34 = fuzzyCompare2(orig[4], orig[6]) && fuzzyCompare2(orig[5], orig[7]);
-  const px = [orig[0]];
+  const px2 = [orig[0]];
   const py = [orig[1]];
   map2[0] = 0;
   if (!p12) {
-    px.push(orig[2]);
+    px2.push(orig[2]);
     py.push(orig[3]);
   }
-  map2[1] = px.length - 1;
+  map2[1] = px2.length - 1;
   if (!p23) {
-    px.push(orig[4]);
+    px2.push(orig[4]);
     py.push(orig[5]);
   }
-  map2[2] = px.length - 1;
+  map2[2] = px2.length - 1;
   if (!p34) {
-    px.push(orig[6]);
+    px2.push(orig[6]);
     py.push(orig[7]);
   }
-  map2[3] = px.length - 1;
-  const np = px.length;
+  map2[3] = px2.length - 1;
+  const np = px2.length;
   const empty = [0, 0, 0, 0, 0, 0, 0, 0];
   if (np === 1) return { result: SHIFT_DISCARD, curve: empty };
   const bb = bounds(orig);
@@ -34478,25 +34756,25 @@ function shiftBezier(orig, offset, threshold) {
   }
   const sx = new Array(np).fill(0);
   const sy = new Array(np).fill(0);
-  let prev = line(0, 0, px[1] - px[0], py[1] - py[0]);
+  let prev = line(0, 0, px2[1] - px2[0], py[1] - py[0]);
   if (!lineLength(prev)) return { result: SHIFT_DISCARD, curve: empty };
   let prevNormal = unitVector(normalVector(prev));
   let pnx = prevNormal.x2;
   let pny = prevNormal.y2;
-  sx[0] = px[0] + offset * pnx;
+  sx[0] = px2[0] + offset * pnx;
   sy[0] = py[0] + offset * pny;
   for (let i = 1; i < np - 1; i += 1) {
-    const next = line(0, 0, px[i + 1] - px[i], py[i + 1] - py[i]);
+    const next = line(0, 0, px2[i + 1] - px2[i], py[i + 1] - py[i]);
     const nextNormal = unitVector(normalVector(next));
     const nnx = nextNormal.x2;
     const nny = nextNormal.y2;
     const r = 1 + pnx * nnx + pny * nny;
     if (fuzzyIsNull(r)) {
-      sx[i] = px[i] + offset * pnx;
+      sx[i] = px2[i] + offset * pnx;
       sy[i] = py[i] + offset * pny;
     } else {
       const k = offset / r;
-      sx[i] = px[i] + k * (pnx + nnx);
+      sx[i] = px2[i] + k * (pnx + nnx);
       sy[i] = py[i] + k * (pny + nny);
     }
     pnx = nnx;
@@ -34504,11 +34782,11 @@ function shiftBezier(orig, offset, threshold) {
     prev = next;
     prevNormal = nextNormal;
   }
-  sx[np - 1] = px[np - 1] + offset * pnx;
+  sx[np - 1] = px2[np - 1] + offset * pnx;
   sy[np - 1] = py[np - 1] + offset * pny;
-  const curve = [sx[map2[0]], sy[map2[0]], sx[map2[1]], sy[map2[1]], sx[map2[2]], sy[map2[2]], sx[map2[3]], sy[map2[3]]];
-  if (np > 2) return { result: goodOffset(orig, curve, offset, threshold), curve };
-  return { result: SHIFT_OK, curve };
+  const curve2 = [sx[map2[0]], sy[map2[0]], sx[map2[1]], sy[map2[1]], sx[map2[2]], sy[map2[2]], sx[map2[3]], sy[map2[3]]];
+  if (np > 2) return { result: goodOffset(orig, curve2, offset, threshold), curve: curve2 };
+  return { result: SHIFT_OK, curve: curve2 };
 }
 function addCircle(b, offset) {
   const normals = [
@@ -34647,11 +34925,11 @@ function ellipseCoords(rx, ry, rw, rh, angle, length) {
     const aa = bb * mt;
     bb *= 3 * t;
     c *= 3 * mt;
-    let px = aa + bb + c * KAPPA;
+    let px2 = aa + bb + c * KAPPA;
     let py = d + c + bb * KAPPA;
-    if (quadrant === 1 || quadrant === 2) px = -px;
+    if (quadrant === 1 || quadrant === 2) px2 = -px2;
     if (quadrant === 0 || quadrant === 1) py = -py;
-    out.push(rx + rw / 2 + w2 * px, ry + rh / 2 + h2 * py);
+    out.push(rx + rw / 2 + w2 * px2, ry + rh / 2 + h2 * py);
   }
   return [out[0], out[1], out[2], out[3]];
 }
@@ -34689,7 +34967,7 @@ function curvesForArc(x, y, w, h, startAngle, sweepIn) {
     x + w,
     y + h2
   ];
-  const px = (i) => P[i * 2];
+  const px2 = (i) => P[i * 2];
   const py = (i) => P[i * 2 + 1];
   let sweep = sweepIn;
   if (sweep > 360) sweep = 360;
@@ -34697,12 +34975,12 @@ function curvesForArc(x, y, w, h, startAngle, sweepIn) {
   const curves = [];
   if (startAngle === 0) {
     if (sweep === 360) {
-      for (let i = 11; i >= 0; i -= 1) curves.push(px(i), py(i));
-      return { sx: px(12), sy: py(12), curves };
+      for (let i = 11; i >= 0; i -= 1) curves.push(px2(i), py(i));
+      return { sx: px2(12), sy: py(12), curves };
     }
     if (sweep === -360) {
-      for (let i = 1; i <= 12; i += 1) curves.push(px(i), py(i));
-      return { sx: px(0), sy: py(0), curves };
+      for (let i = 1; i <= 12; i += 1) curves.push(px2(i), py(i));
+      return { sx: px2(0), sy: py(0), curves };
     }
   }
   let startSegment = Math.floor(startAngle / 90);
@@ -34730,13 +35008,13 @@ function curvesForArc(x, y, w, h, startAngle, sweepIn) {
   if (startSegment === end) {
     const quadrant = 3 - (startSegment % 4 + 4) % 4;
     const j = 3 * quadrant;
-    return delta > 0 ? { sx: px(j + 3), sy: py(j + 3), curves } : { sx: px(j), sy: py(j), curves };
+    return delta > 0 ? { sx: px2(j + 3), sy: py(j + 3), curves } : { sx: px2(j), sy: py(j), curves };
   }
   const [spx, spy, epx, epy] = ellipseCoords(x, y, w, h, startAngle, sweep);
   for (let i = startSegment; i !== end; i += delta) {
     const quadrant = 3 - (i % 4 + 4) % 4;
     const j = 3 * quadrant;
-    let b = delta > 0 ? [px(j + 3), py(j + 3), px(j + 2), py(j + 2), px(j + 1), py(j + 1), px(j), py(j)] : [px(j), py(j), px(j + 1), py(j + 1), px(j + 2), py(j + 2), px(j + 3), py(j + 3)];
+    let b = delta > 0 ? [px2(j + 3), py(j + 3), px2(j + 2), py(j + 2), px2(j + 1), py(j + 1), px2(j), py(j)] : [px2(j), py(j), px2(j + 1), py(j + 1), px2(j + 2), py(j + 2), px2(j + 3), py(j + 3)];
     if (startSegment === endSegment && fuzzyCompare2(startT, endT)) return { sx: spx, sy: spy, curves };
     if (i === startSegment) {
       if (i === endSegment && splitAtEnd) b = bezierOnInterval(b, startT, endT);
@@ -35476,9 +35754,9 @@ var init_audio_visualization_cosmetic = __esm({
       drawPolygon(points, implicitClose) {
         const n = points.length >> 1;
         if (n === 0) return;
-        let px = points[0];
+        let px2 = points[0];
         let py = points[1];
-        const movedX = px;
+        const movedX = px2;
         const movedY = py;
         this.lastX = INT_MIN;
         this.lastY = INT_MIN;
@@ -35496,21 +35774,21 @@ var init_audio_visualization_cosmetic = __esm({
             p2x = endX;
             p2y = endY;
           }
-          this.calculateLastPoint(p2x, p2y, px, py);
+          this.calculateLastPoint(p2x, p2y, px2, py);
         }
         const fastPenAliased = !this.antialiased;
         for (let i = 1; i < n; i += 1) {
           const qx = points[i * 2];
           const qy = points[i * 2 + 1];
           if (!closed && this.drawCaps && i === n - 1) caps |= CAP_END;
-          const moveNextStart = this.stroke(px, py, qx, qy, caps);
+          const moveNextStart = this.stroke(px2, py, qx, qy, caps);
           if (!fastPenAliased || moveNextStart || i === 1 || i === n - 1) {
-            px = qx;
+            px2 = qx;
             py = qy;
           }
           caps = 0;
         }
-        if (implicitClose) this.stroke(px, py, movedX, movedY, 0);
+        if (implicitClose) this.stroke(px2, py, movedX, movedY, 0);
       }
       /** `drawPath` for a path with element types (QPainterPath: lines and cubics). */
       drawPath(path38) {
@@ -35519,7 +35797,7 @@ var init_audio_visualization_cosmetic = __esm({
         const end = types.length;
         let t = 0;
         while (t < end) {
-          let px = pts[t * 2];
+          let px2 = pts[t * 2];
           let py = pts[t * 2 + 1];
           this.lastX = INT_MIN;
           this.lastY = INT_MIN;
@@ -35538,8 +35816,8 @@ var init_audio_visualization_cosmetic = __esm({
             const qy = pts[i * 2 + 1];
             if (type === LINE_TO) {
               if (!closed && this.drawCaps && i === e - 1) caps |= CAP_END;
-              this.stroke(px, py, qx, qy, caps);
-              px = qx;
+              this.stroke(px2, py, qx, qy, caps);
+              px2 = qx;
               py = qy;
               i += 1;
             } else if (type === CURVE_TO) {
@@ -35548,8 +35826,8 @@ var init_audio_visualization_cosmetic = __esm({
               const p3y = pts[(i + 1) * 2 + 1];
               const p4x = pts[(i + 2) * 2];
               const p4y = pts[(i + 2) * 2 + 1];
-              this.renderCubic(px, py, qx, qy, p3x, p3y, p4x, p4y, caps);
-              px = p4x;
+              this.renderCubic(px2, py, qx, qy, p3x, p3y, p4x, p4y, caps);
+              px2 = p4x;
               py = p4y;
               i += 3;
             } else i += 1;
@@ -35735,16 +36013,16 @@ function frsqrte(x) {
   F32[0] = x;
   const bits2 = U32[0];
   let exp = bits2 >>> 23 & 255;
-  let fraction4 = bits2 & 8388607;
+  let fraction5 = bits2 & 8388607;
   if (exp === 0) {
-    if (fraction4 === 0) return Infinity;
-    while ((fraction4 & 4194304) === 0) {
-      fraction4 <<= 1;
+    if (fraction5 === 0) return Infinity;
+    while ((fraction5 & 4194304) === 0) {
+      fraction5 <<= 1;
       exp -= 1;
     }
-    fraction4 = fraction4 << 1 & 8388607;
+    fraction5 = fraction5 << 1 & 8388607;
   }
-  const scaled = exp & 1 ? 128 | fraction4 >> 16 : 256 | fraction4 >> 15;
+  const scaled = exp & 1 ? 128 | fraction5 >> 16 : 256 | fraction5 >> 15;
   const resultExp = Math.floor((380 - exp) / 2);
   const estimate = recipSqrtEstimate(scaled);
   U32[0] = (resultExp & 255) << 23 | (estimate & 255) << 15;
@@ -36313,23 +36591,23 @@ function drawSpectrum(p, s) {
   const { width, height, styledGlow, style, spread: spread2, base, palette } = s;
   const count = clampi(lround(fmaf(s.detail, 220, 56)), 40, Math.max(40, Math.floor(width / 2)));
   const bins = spectrumBins(s.audio, count, s.gain, s.smoothing, s.lowHz, s.highHz);
-  const px = [];
+  const px2 = [];
   const py = [];
   for (let i = 0; i < count; i += 1) {
-    px.push(f323(i * width / Math.max(1, count - 1)));
+    px2.push(f323(i * width / Math.max(1, count - 1)));
     const hh = f323(f323(bins[i] * height) * f323(0.84));
     py.push(f323(height - (hh > 1 ? hh : 1)));
   }
   const ridge = newPath();
-  moveTo(ridge, px[0], py[0]);
+  moveTo(ridge, px2[0], py[0]);
   for (let i = 0; i + 1 < count; i += 1) {
     const i0 = i === 0 ? i : i - 1;
     const i3 = Math.min(i + 2, count - 1);
-    const c1x = (px[i + 1] - px[i0]) / 6 + px[i];
+    const c1x = (px2[i + 1] - px2[i0]) / 6 + px2[i];
     const c1y = (py[i + 1] - py[i0]) / 6 + py[i];
-    const c2x = px[i + 1] - (px[i3] - px[i]) / 6;
+    const c2x = px2[i + 1] - (px2[i3] - px2[i]) / 6;
     const c2y = py[i + 1] - (py[i3] - py[i]) / 6;
-    cubicTo(ridge, c1x, c1y, c2x, c2y, px[i + 1], py[i + 1]);
+    cubicTo(ridge, c1x, c1y, c2x, c2y, px2[i + 1], py[i + 1]);
   }
   const terrain = s.colorMode === RAINBOW ? horizontal(width, rainbowStops(base, spread2, styleFillAlpha(style))) : fillBrush(verticalStyleFill(0, 0, 0, height, palette, style));
   if (count > 1) {
@@ -36566,7 +36844,7 @@ function drawParticles(p, s) {
     const ribbon = f323(ribbonAmp * wave2);
     const sinO = f323(Math.sin(orbit));
     const cosO = f323(Math.cos(orbit));
-    const px = fma2(-sinO, ribbon, fma2(cosO, radius, cx));
+    const px2 = fma2(-sinO, ribbon, fma2(cosO, radius, cx));
     const py = fma2(cosO, ribbon, fma2(sinO, radius, cy));
     const fade = f323(Math.sin(age * PI));
     let c = s.colorMode === RAINBOW ? rainbowColor(base, fmodOne(f323(armFrac + age)), spread2) : mixColor(palette.base, palette.light, f323(spreadTerm * fade));
@@ -36574,19 +36852,19 @@ function drawParticles(p, s) {
     const size = fmaf(fade, sizeTerm, f323(0.42));
     const tw = f323(trailWidthTerm * size);
     const trailPen = pen(solid(alphaColor(c, trailAlpha)), tw > f323(0.45) ? tw : f323(0.45), "round");
-    const tailX = fma2(ribbon * sinO, k035, fma2(-cosO, trail, px));
+    const tailX = fma2(ribbon * sinO, k035, fma2(-cosO, trail, px2));
     const tailY = fma2(-(ribbon * cosO), k035, fma2(-sinO, trail, py));
-    p.drawLine(tailX, tailY, px, py, trailPen);
+    p.drawLine(tailX, tailY, px2, py, trailPen);
     let brush;
     if (style === STYLE_MINIMAL) brush = solid(alphaColor(c, 1));
     else {
       const stops = [];
       setColorAt(stops, 0, c);
       setColorAt(stops, 1, alphaColor(c, 0));
-      brush = { kind: "radial", cx: px, cy: py, radius: f323(gradTerm * size), stops };
+      brush = { kind: "radial", cx: px2, cy: py, radius: f323(gradTerm * size), stops };
     }
     const r2 = f323(size + size);
-    p.fillEllipse(px, py, r2, r2, brush);
+    p.fillEllipse(px2, py, r2, r2, brush);
   }
 }
 function fmodOne(x) {
@@ -36824,11 +37102,11 @@ function evaluateAnimatedCurve(json2, frame, defaultNodes) {
   for (let i = 0; i < 256; i += 1) table.push(clamp01(valueAtResolved(points, i)));
   return { enabled, table };
 }
-function sampleCurve(curve, input2) {
+function sampleCurve(curve2, input2) {
   const v = clamp01(input2);
-  if (curve.enabled < 0.5) return Math.fround(v);
+  if (curve2.enabled < 0.5) return Math.fround(v);
   const i = Math.round(v * 255);
-  return Math.fround(curve.table[i] ?? v);
+  return Math.fround(curve2.table[i] ?? v);
 }
 function evaluateValue(value, frame) {
   if (value === null || value === void 0) return void 0;
@@ -36860,10 +37138,10 @@ function evaluateValue(value, frame) {
   }
   return void 0;
 }
-function evaluateEffectParams(effect2, frame) {
+function evaluateEffectParams(effect3, frame) {
   const out = {};
-  const curveDefaults = CURVE_DEFAULTS[String(effect2.type ?? effect2.class_name ?? "")];
-  for (const [k, v] of Object.entries(effect2)) {
+  const curveDefaults = CURVE_DEFAULTS[String(effect3.type ?? effect3.class_name ?? "")];
+  for (const [k, v] of Object.entries(effect3)) {
     const nodes = curveDefaults?.[k];
     if (nodes && isAnimatedCurve(v)) {
       const c = evaluateAnimatedCurve(v, frame, [...nodes]);
@@ -37599,9 +37877,9 @@ function fillRoundedRect(image, rect, radius, color3, region) {
     const from = Math.max(x, region.x0);
     const to = Math.min(x + len, region.x1);
     if (y < region.y0 || y >= region.y1) return;
-    for (let px = from; px < to; px += 1) {
-      const cov = clipCoverage(region, px, y, coverage);
-      if (cov > 0) blendSolidPixel(d, (y * W + px) * 4, color3, cov);
+    for (let px2 = from; px2 < to; px2 += 1) {
+      const cov = clipCoverage(region, px2, y, coverage);
+      if (cov > 0) blendSolidPixel(d, (y * W + px2) * 4, color3, cov);
     }
   };
   if (!(radius > 0)) {
@@ -37775,21 +38053,21 @@ var init_text_layout = __esm({
     DESCENDER = /[gjpqyQ,;()[\]{}|@$]/u;
     approximateMetrics = {
       fontMetrics(font) {
-        const px = font.pixelSize;
-        return { ascent: px * 0.93, descent: px * 0.23, lineSpacing: px * 1.16 };
+        const px2 = font.pixelSize;
+        return { ascent: px2 * 0.93, descent: px2 * 0.23, lineSpacing: px2 * 1.16 };
       },
       advance: approximateAdvance,
       bounds(text4, font) {
-        const px = font.pixelSize;
-        return { x: 0, y: -px * 0.93, width: approximateAdvance(text4, font), height: px * 1.16 };
+        const px2 = font.pixelSize;
+        return { x: 0, y: -px2 * 0.93, width: approximateAdvance(text4, font), height: px2 * 1.16 };
       },
       inkBounds(text4, font) {
         if (INVISIBLE.test(text4)) return { x: 0, y: 0, width: 0, height: 0 };
-        const px = font.pixelSize;
+        const px2 = font.pixelSize;
         const top = TALL.test(text4) ? 0.716 : 0.519;
         const bottom = DESCENDER.test(text4) ? 0.21 : 0.012;
         const adv = approximateAdvance(text4, font);
-        return { x: px * 0.05, y: -top * px, width: Math.max(0, adv - px * 0.1), height: (top + bottom) * px };
+        return { x: px2 * 0.05, y: -top * px2, width: Math.max(0, adv - px2 * 0.1), height: (top + bottom) * px2 };
       }
     };
   }
@@ -37812,8 +38090,8 @@ function parseCaptions(text4) {
   for (const m of prepared.matchAll(CUE_PATTERN)) {
     const start = groupValue(m[1]) * 3600 + groupValue(m[2]) * 60 + groupValue(m[3]) + fraction2(m[4]);
     const end = groupValue(m[5]) * 3600 + groupValue(m[6]) * 60 + groupValue(m[7]) + fraction2(m[8]);
-    const lines = (m[9] ?? "").split("\n").filter((line2) => !line2.startsWith("NOTE") && line2.length > 1);
-    cues.push({ start, end, lines });
+    const lines2 = (m[9] ?? "").split("\n").filter((line2) => !line2.startsWith("NOTE") && line2.length > 1);
+    cues.push({ start, end, lines: lines2 });
   }
   if (cueCache.size >= CUE_CACHE_LIMIT) cueCache.delete(cueCache.keys().next().value);
   cueCache.set(text4, cues);
@@ -37867,7 +38145,7 @@ function layoutCaption(params, width, height, frame, fps, measure) {
   const captionAreaWidth = rightMarginX - leftMarginX;
   const bottomMarginY = fusedMulAdd(-height, bottomValue, height);
   const clip2 = { x: leftMarginX, y: topMarginY, width: captionAreaWidth, height: Math.max(bottomMarginY - topMarginY, 0) };
-  const lines = [];
+  const lines2 = [];
   let fadeIn = 0;
   let fadeOut = 0;
   const lineHeight = metricsLineSpacing * lineSpacingValue;
@@ -37887,24 +38165,24 @@ function layoutCaption(params, width, height, frame, fps, measure) {
     for (const line2 of cue.lines) {
       fadeIn = fadeInValue > 0 ? f3225(f3225(frame) - f3225(first)) / fadeInValue : 1;
       fadeOut = fadeOutValue > 0 ? 1 - (f3225(frame) - (f3225(last) - fadeOutValue)) / fadeOutValue : -1;
-      let words2 = line2.split(" ");
+      let words3 = line2.split(" ");
       let useSpaces = true;
-      if (line2.length > 20 && words2.length === 1) {
-        words2 = ["", ...line2.split(""), ""];
+      if (line2.length > 20 && words3.length === 1) {
+        words3 = ["", ...line2.split(""), ""];
         useSpaces = false;
       }
-      while (words2.length > 0) {
+      while (words3.length > 0) {
         let displayed = false;
-        for (let wordIndex = words2.length; wordIndex > 0; wordIndex -= 1) {
-          const part = words2.slice(0, wordIndex);
+        for (let wordIndex = words3.length; wordIndex > 0; wordIndex -= 1) {
+          const part = words3.slice(0, wordIndex);
           if (measureWidth(part.join(" ")) <= captionAreaWidth) {
             const text4 = useSpaces ? part.join(" ") : part.join("");
             const x = Math.trunc(leftMarginX);
             const y = Math.trunc(currentY);
             const ink = text4.length > 0 ? measure.inkBounds(text4, font) : { x: 0, y: 0, width: 0, height: 0 };
             const bounds2 = pathBounds(ink, text4, x, y);
-            lines.push({ text: text4, x, y, ink, bounds: bounds2 });
-            words2 = words2.slice(wordIndex);
+            lines2.push({ text: text4, x, y, ink, bounds: bounds2 });
+            words3 = words3.slice(wordIndex);
             displayed = true;
             currentY += lineHeight;
             if (bounds2.width > maxTextWidth) maxTextWidth = bounds2.width;
@@ -37924,14 +38202,14 @@ function layoutCaption(params, width, height, frame, fps, measure) {
     width: maxTextWidth + paddingValue,
     height: bottomY - topY + paddingValue
   };
-  for (const line2 of lines) line2.x += alignmentOffset;
+  for (const line2 of lines2) line2.x += alignmentOffset;
   const backgroundAlphaValue = num7(params, "background_alpha", 0);
   const fontAlphaValue = num7(params, "font_alpha", 1);
   const fade = fadeIn < 1 ? fadeIn : fadeOut >= 0 && fadeOut <= 1 ? fadeOut : null;
   return {
     font,
     clip: clip2,
-    lines,
+    lines: lines2,
     background,
     cornerRadius: cornerValue,
     backgroundColor: hexColor(color(params, "background", [0, 0, 0, 255])),
@@ -38304,12 +38582,12 @@ function qtToInt(token) {
 function readLines(text4) {
   let body = text4.charCodeAt(0) === 65279 ? text4.slice(1) : text4;
   body = body.replace(/\r/g, "");
-  const lines = body.split("\n");
-  if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-  return lines.map(qtTrimmed);
+  const lines2 = body.split("\n");
+  if (lines2.length > 0 && lines2[lines2.length - 1] === "") lines2.pop();
+  return lines2.map(qtTrimmed);
 }
 function parseCubeLut(text4) {
-  const lines = readLines(text4);
+  const lines2 = readLines(text4);
   const domainMin = [0, 0, 0];
   const domainMax = [1, 1, 1];
   const parseDomainLine = (line2) => {
@@ -38325,8 +38603,8 @@ function parseCubeLut(text4) {
   const tryParse = (keyword, want3d) => {
     let i = 0;
     let detected = 0;
-    while (i < lines.length) {
-      const line2 = lines[i++];
+    while (i < lines2.length) {
+      const line2 = lines2[i++];
       parseDomainLine(line2);
       if (line2.startsWith(keyword)) {
         const parts = splitTokens(line2);
@@ -38338,11 +38616,11 @@ function parseCubeLut(text4) {
     const entries = want3d ? detected * detected * detected : detected;
     const need = entries * 3;
     if (need > MAX_VALUES) return null;
-    if (need > (lines.length - i) * 3) return null;
+    if (need > (lines2.length - i) * 3) return null;
     const data = new Float32Array(need);
     let count = 0;
-    while (i < lines.length && count < need) {
-      const line2 = lines[i++];
+    while (i < lines2.length && count < need) {
+      const line2 = lines2[i++];
       if (line2 === "" || line2.startsWith("#") || line2.startsWith("TITLE")) continue;
       if (line2.startsWith("DOMAIN_MIN") || line2.startsWith("DOMAIN_MAX")) {
         parseDomainLine(line2);
@@ -38673,12 +38951,12 @@ function curveParam(params, key) {
   const table = numbers(v, "table");
   return { enabled: num7(v, "enabled", 1), table: table && table.length >= 256 ? table : identityTable };
 }
-function curveLut(curve) {
+function curveLut(curve2) {
   const lut = new Float32Array(256);
-  if (curve.enabled < 0.5) {
+  if (curve2.enabled < 0.5) {
     for (let i = 0; i < 256; i += 1) lut[i] = f329(i * INV_2553);
   } else {
-    for (let i = 0; i < 256; i += 1) lut[i] = f329(curve.table[i]);
+    for (let i = 0; i < 256; i += 1) lut[i] = f329(curve2.table[i]);
   }
   return lut;
 }
@@ -39000,10 +39278,10 @@ function smoothstep(edge0, edge1, value) {
 }
 function responseLut(params) {
   const lut = new Float32Array(256);
-  const curve = record3(params, "response_curve");
-  const enabled = curve ? num7(curve, "enabled", 1) : 1;
+  const curve2 = record3(params, "response_curve");
+  const enabled = curve2 ? num7(curve2, "enabled", 1) : 1;
   if (enabled < 0.5) return lut.fill(1);
-  let table = curve ? numbers(curve, "table") : void 0;
+  let table = curve2 ? numbers(curve2, "table") : void 0;
   if (!table || table.length < 256) {
     defaultResponse ??= evaluateAnimatedCurve(void 0, 1, [...DENOISE_RESPONSE_NODES]).table;
     table = defaultResponse;
@@ -39357,9 +39635,9 @@ function displaceKernel(image, params, ctx) {
       continue;
     }
     const signed = f3211(f3211(processed - 127.5) / 127.5);
-    const px = i % width;
-    const py = (i - px) / width;
-    const x = cfmax(0, cfmin(fmaf(signed, xAmount, px), maxX));
+    const px2 = i % width;
+    const py = (i - px2) / width;
+    const x = cfmax(0, cfmin(fmaf(signed, xAmount, px2), maxX));
     const y = cfmax(0, cfmin(fmaf(signed, yAmount, py), maxY));
     const x0 = Math.floor(x);
     const y0 = Math.floor(y);
@@ -39715,8 +39993,8 @@ function cropRects(params, W, H) {
   const bottom = num7(params, "bottom", 0);
   const xShift = num7(params, "x", 0);
   const yShift = num7(params, "y", 0);
-  const paint = { x: left * W, y: top * H, w: Math.max(0, 1 - left - right) * W, h: Math.max(0, 1 - top - bottom) * H };
-  const copy = { x: paint.x + xShift * W, y: paint.y + yShift * H, w: paint.w, h: paint.h };
+  const paint2 = { x: left * W, y: top * H, w: Math.max(0, 1 - left - right) * W, h: Math.max(0, 1 - top - bottom) * H };
+  const copy = { x: paint2.x + xShift * W, y: paint2.y + yShift * H, w: paint2.w, h: paint2.h };
   const setLeft = (r, pos) => {
     const diff = pos - r.x;
     r.x += diff;
@@ -39728,27 +40006,27 @@ function cropRects(params, W, H) {
     r.h -= diff;
   };
   if (copy.x < 0) {
-    setLeft(paint, paint.x - copy.x);
+    setLeft(paint2, paint2.x - copy.x);
     setLeft(copy, 0);
   }
   if (copy.x + copy.w > W) {
-    paint.w = paint.x + paint.w - (copy.x + copy.w - W) - paint.x;
+    paint2.w = paint2.x + paint2.w - (copy.x + copy.w - W) - paint2.x;
     copy.w = W - copy.x;
   }
   if (copy.y < 0) {
-    setTop(paint, paint.y - copy.y);
+    setTop(paint2, paint2.y - copy.y);
     setTop(copy, 0);
   }
   if (copy.y + copy.h > H) {
-    paint.h = paint.y + paint.h - (copy.y + copy.h - H) - paint.y;
+    paint2.h = paint2.y + paint2.h - (copy.y + copy.h - H) - paint2.y;
     copy.h = H - copy.y;
   }
-  return { paint, copy };
+  return { paint: paint2, copy };
 }
 function cropOutputSize(params, W, H) {
   if (!bool(params, "resize", false)) return { width: W, height: H };
-  const { paint } = cropRects(params, W, H);
-  const r = toRect({ x: paint.x, y: paint.y, width: paint.w, height: paint.h });
+  const { paint: paint2 } = cropRects(params, W, H);
+  const r = toRect({ x: paint2.x, y: paint2.y, width: paint2.w, height: paint2.h });
   if (r.width === 0 && r.height === 0) return { width: W, height: H };
   if (r.width <= 0 || r.height <= 0) return { width: 0, height: 0 };
   return { width: r.width, height: r.height };
@@ -39771,11 +40049,11 @@ var init_geometry = __esm({
       run(image, params) {
         const W = image.width;
         const H = image.height;
-        const { paint, copy } = cropRects(params, W, H);
+        const { paint: paint2, copy } = cropRects(params, W, H);
         const cropped = createPremul(W, H);
-        drawImageRect(cropped, image, { x: paint.x, y: paint.y, width: paint.w, height: paint.h }, { x: copy.x, y: copy.y, width: copy.w, height: copy.h });
+        drawImageRect(cropped, image, { x: paint2.x, y: paint2.y, width: paint2.w, height: paint2.h }, { x: copy.x, y: copy.y, width: copy.w, height: copy.h });
         if (!bool(params, "resize", false)) return cropped;
-        const r = toRect({ x: paint.x, y: paint.y, width: paint.w, height: paint.h });
+        const r = toRect({ x: paint2.x, y: paint2.y, width: paint2.w, height: paint2.h });
         if (r.width === 0 && r.height === 0) return cropped;
         if (r.width <= 0 || r.height <= 0) return createPremul(0, 0);
         const out = createPremul(r.width, r.height);
@@ -39929,7 +40207,7 @@ var init_geometry = __esm({
         const left = Math.trunc(clamp015(num7(params, "left", 0)) * W);
         const right = Math.trunc(clamp015(num7(params, "right", 0)) * W);
         const d = image.data;
-        const paint = (row, from, to) => {
+        const paint2 = (row, from, to) => {
           for (let x = from; x < to; x += 1) {
             const i = (row * W + x) * 4;
             d[i] = r;
@@ -39940,10 +40218,10 @@ var init_geometry = __esm({
         };
         for (let row = 0; row < H; row += 1) {
           if (top > 0 && row <= top || bottom > 0 && row >= H - bottom) {
-            paint(row, 0, W);
+            paint2(row, 0, W);
           } else {
-            if (left > 0) paint(row, 0, left);
-            if (right > 0) paint(row, W - right, W);
+            if (left > 0) paint2(row, 0, left);
+            if (right > 0) paint2(row, W - right, W);
           }
         }
       }
@@ -40367,9 +40645,9 @@ function lensFlareKernel(image, params) {
   const SP = f3215(num7(params, "spread", 1));
   const halfW = f3215(w * 0.5);
   const halfH = f3215(h * 0.5);
-  const px = f3215(fmaf(X, 0.5, 0.5) * w);
+  const px2 = f3215(fmaf(X, 0.5, 0.5) * w);
   const py = f3215(fmaf(Y, 0.5, 0.5) * h);
-  const DX = f3215(f3215(halfW - px) * SP);
+  const DX = f3215(f3215(halfW - px2) * SP);
   const DY = f3215(f3215(halfH - py) * SP);
   const c = color(params, "color", [255, 255, 255, 255]);
   const ch = (v) => Math.min(255, Math.max(0, v)) / 255;
@@ -40438,7 +40716,7 @@ function lensFlareKernel(image, params) {
       let r = 0;
       let g = 0;
       let b = 0;
-      const ddx = f3215(xx - px);
+      const ddx = f3215(xx - px2);
       const d2 = f3215(Math.sqrt(ddx * ddx + ddy2));
       let p;
       if (d2 < scolor) {
@@ -41624,11 +41902,11 @@ function unsupported(type) {
 function registerKernels(specs) {
   for (const spec of specs) BY_TYPE.set(spec.type, spec);
 }
-function processEffect(image, effect2, ctx) {
-  const spec = BY_TYPE.get(effect2.type);
+function processEffect(image, effect3, ctx) {
+  const spec = BY_TYPE.get(effect3.type);
   if (!spec || !spec.supported) return image;
-  const kctx = ctx.frame === effect2.frame ? ctx : { ...ctx, frame: effect2.frame };
-  const params = effect2.params;
+  const kctx = ctx.frame === effect3.frame ? ctx : { ...ctx, frame: effect3.frame };
+  const params = effect3.params;
   const maskPath = spec.handlesMask ? void 0 : readerPath(params, "mask_reader");
   const maskSource = maskPath ? ctx.images.get(maskPath) : void 0;
   if (!maskSource) return spec.run(image, params, kctx) ?? image;
@@ -41752,10 +42030,10 @@ function runRing(channels, ring, d, echo2) {
       let index = Math.floor(position);
       if (index >= n) index -= n;
       if (index !== write) {
-        const fraction4 = f3220(position - index);
+        const fraction5 = f3220(position - index);
         const d1 = buffer[index];
         const d2 = buffer[(index + 1) % n];
-        const out = fmaf(fraction4, f3220(d2 - d1), d1);
+        const out = fmaf(fraction5, f3220(d2 - d1), d1);
         if (echo2) {
           data[s] = fmaf(echo2.mix, f3220(out - input2), input2);
           buffer[write] = fmaf(out, echo2.feedback, input2);
@@ -42881,39 +43159,39 @@ var init_audio2 = __esm({
 function defaultApplyBeforeClip(type) {
   return !(type === "Shadow" || type === "Glow");
 }
-function applyBeforeClip(effect2) {
-  const v = effect2.apply_before_clip;
+function applyBeforeClip(effect3) {
+  const v = effect3.apply_before_clip;
   if (typeof v === "boolean") return v;
   if (typeof v === "number") return v !== 0;
-  return defaultApplyBeforeClip(String(effect2.type ?? effect2.class_name ?? ""));
+  return defaultApplyBeforeClip(String(effect3.type ?? effect3.class_name ?? ""));
 }
 function num8(v, fallback = 0) {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 function sortEffects(effects) {
-  return effects.map((effect2, index) => ({ effect: effect2, index })).sort(
+  return effects.map((effect3, index) => ({ effect: effect3, index })).sort(
     (a, b) => num8(a.effect.layer) - num8(b.effect.layer) || Math.fround(num8(a.effect.position)) - Math.fround(num8(b.effect.position)) || num8(b.effect.order) - num8(a.effect.order) || a.index - b.index
   ).map((e) => e.effect);
 }
-function resolveParentEffect(effect2, project) {
-  const parentId = effect2.parent_effect_id;
-  if (typeof parentId !== "string" || parentId === "" || parentId === effect2.id) return effect2;
+function resolveParentEffect(effect3, project) {
+  const parentId = effect3.parent_effect_id;
+  if (typeof parentId !== "string" || parentId === "" || parentId === effect3.id) return effect3;
   for (const clip2 of project.clips) {
     for (const candidate of clip2.effects ?? []) {
-      if (candidate.id === parentId && candidate !== effect2) {
-        return { ...candidate, id: effect2.id, parent_effect_id: parentId };
+      if (candidate.id === parentId && candidate !== effect3) {
+        return { ...candidate, id: effect3.id, parent_effect_id: parentId };
       }
     }
   }
-  return effect2;
+  return effect3;
 }
 function readerOf2(value) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return void 0;
   const r = value;
   return typeof r.path === "string" && r.path !== "" && typeof r.type === "string" ? r : void 0;
 }
-function maskReaderOf(effect2) {
-  const json2 = effect2.mask_reader !== void 0 && effect2.mask_reader !== null ? effect2.mask_reader : effect2.type === "Displace" ? void 0 : effect2.reader;
+function maskReaderOf(effect3) {
+  const json2 = effect3.mask_reader !== void 0 && effect3.mask_reader !== null ? effect3.mask_reader : effect3.type === "Displace" ? void 0 : effect3.reader;
   return readerOf2(json2);
 }
 function fraction3(v) {
@@ -42925,15 +43203,15 @@ function intOf(v) {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number.parseFloat(v) : Number.NaN;
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
-function mapMaskFrame(effect2, reader, n, hostFps, timelineEffect) {
+function mapMaskFrame(effect3, reader, n, hostFps, timelineEffect) {
   const host = hostFps.num / hostFps.den;
-  const start = Math.fround(num8(effect2.start));
-  const end = Math.fround(num8(effect2.end));
+  const start = Math.fround(num8(effect3.start));
+  const end = Math.fround(num8(effect3.end));
   let index = Math.max(0, n - 1);
   if (timelineEffect) index = Math.max(0, index - Math.trunc(roundHalfAway(Math.max(0, start) * host)));
   let mapped = index;
   const maskFps = fraction3(reader.fps);
-  const timeMode = effect2.mask_time_mode === 0 ? 0 : 1;
+  const timeMode = effect3.mask_time_mode === 0 ? 0 : 1;
   if (timeMode === 1 && maskFps) {
     mapped = Math.trunc(roundHalfAway(index / host * (maskFps.num / maskFps.den)));
   }
@@ -42948,7 +43226,7 @@ function mapMaskFrame(effect2, reader, n, hostFps, timelineEffect) {
   if (rangeEnd < rangeStart) rangeEnd = rangeStart;
   const rangeLen = Math.max(1, rangeEnd - rangeStart + 1);
   let rangeIndex;
-  const loop = typeof effect2.mask_loop_mode === "number" && effect2.mask_loop_mode >= 0 && effect2.mask_loop_mode <= 2 ? effect2.mask_loop_mode : 0;
+  const loop = typeof effect3.mask_loop_mode === "number" && effect3.mask_loop_mode >= 0 && effect3.mask_loop_mode <= 2 ? effect3.mask_loop_mode : 0;
   if (loop === 1) rangeIndex = mapped % rangeLen;
   else if (loop === 2) {
     if (rangeLen > 1) {
@@ -42962,8 +43240,8 @@ function mapMaskFrame(effect2, reader, n, hostFps, timelineEffect) {
   if (sourceLen > 0) frame = Math.min(Math.max(1, frame), sourceLen);
   return Math.max(1, frame);
 }
-function displaceMapReader(effect2) {
-  const json2 = effect2.map_reader !== void 0 && effect2.map_reader !== null ? effect2.map_reader : effect2.reader;
+function displaceMapReader(effect3) {
+  const json2 = effect3.map_reader !== void 0 && effect3.map_reader !== null ? effect3.map_reader : effect3.reader;
   return readerOf2(json2);
 }
 function displaceMapFrame(reader, n, hostFps) {
@@ -42974,20 +43252,20 @@ function displaceMapFrame(reader, n, hostFps) {
   const mapped = Math.floor(seconds2 * (fps.num / fps.den)) + 1;
   return Math.min(Math.max(1, mapped), length);
 }
-function effectResources(effect2, n, hostFps, timelineEffect) {
+function effectResources(effect3, n, hostFps, timelineEffect) {
   const refs = { images: [], texts: [], imageFrames: {} };
   const addReader = (reader) => {
     if (!reader) return;
     if (!refs.images.includes(reader.path)) refs.images.push(reader.path);
     if (reader.type === "FFmpegReader" && !reader.has_single_image) {
-      const frame = mapMaskFrame(effect2, reader, n, hostFps, timelineEffect);
+      const frame = mapMaskFrame(effect3, reader, n, hostFps, timelineEffect);
       const fps = fraction3(reader.fps);
       refs.imageFrames[reader.path] = { frame, time: fps ? (frame - 1) / (fps.num / fps.den) : (frame - 1) / 30 };
     }
   };
-  addReader(maskReaderOf(effect2));
-  if (effect2.type === "Displace") {
-    const map2 = displaceMapReader(effect2);
+  addReader(maskReaderOf(effect3));
+  if (effect3.type === "Displace") {
+    const map2 = displaceMapReader(effect3);
     if (map2 && !refs.images.includes(map2.path)) refs.images.push(map2.path);
     if (map2 && map2.type === "FFmpegReader" && !map2.has_single_image) {
       const frame = displaceMapFrame(map2, n, hostFps);
@@ -42995,22 +43273,22 @@ function effectResources(effect2, n, hostFps, timelineEffect) {
       refs.imageFrames[map2.path] = { frame, time: fps ? (frame - 1) / (fps.num / fps.den) : (frame - 1) / 30 };
     }
   }
-  const lut = effect2.lut_path;
+  const lut = effect3.lut_path;
   if (typeof lut === "string" && lut !== "") refs.texts.push(lut);
   return refs;
 }
-function effectInstance(effect2, n, hostFps, timelineEffect) {
-  const type = String(effect2.type ?? effect2.class_name ?? "");
-  const params = evaluateEffectParams(effect2, n);
-  const refs = effectResources(effect2, n, hostFps, timelineEffect);
-  const instance = { id: String(effect2.id ?? ""), type, frame: n, params, applyBeforeClip: applyBeforeClip(effect2) };
+function effectInstance(effect3, n, hostFps, timelineEffect) {
+  const type = String(effect3.type ?? effect3.class_name ?? "");
+  const params = evaluateEffectParams(effect3, n);
+  const refs = effectResources(effect3, n, hostFps, timelineEffect);
+  const instance = { id: String(effect3.id ?? ""), type, frame: n, params, applyBeforeClip: applyBeforeClip(effect3) };
   if (refs.images.length) instance.images = refs.images;
   if (refs.texts.length) instance.texts = refs.texts;
   if (Object.keys(refs.imageFrames).length) instance.imageFrames = refs.imageFrames;
   return instance;
 }
-function effectValue(effect2, key, n, fallback) {
-  const v = effect2[key];
+function effectValue(effect3, key, n, fallback) {
+  const v = effect3[key];
   if (v === void 0 || v === null) return fallback;
   if (typeof v === "number") return v;
   return evaluate(v, n);
@@ -43095,21 +43373,21 @@ function buildFrameMapping(source2, target, videoLength) {
     }
     let frame = 1;
     const numberOfFields = videoLength * 2;
-    for (let field = 1; field <= numberOfFields; field += 1) {
+    for (let field2 = 1; field2 <= numberOfFields; field2 += 1) {
       if (difference === 0) {
         fields.push(frame);
       } else if (difference > 0) {
         fields.push(frame);
-        if (field % frameInterval === 0) {
+        if (field2 % frameInterval === 0) {
           fields.push(frame);
           fields.push(frame);
         }
       } else if (frame % fieldInterval === 0) {
-        field += 1;
+        field2 += 1;
       } else {
         fields.push(frame);
       }
-      if (field % 2 === 0 && field > 0) frame += 1;
+      if (field2 % 2 === 0 && field2 > 0) frame += 1;
     }
   } else {
     const rateDiff = target.num / target.den / (source2.num / source2.den);
@@ -43211,8 +43489,8 @@ function maxScale(kf) {
   return p ? f3221(p.y) : -1;
 }
 function resizingCrop(clip2) {
-  for (const effect2 of clip2.effects ?? []) {
-    if (effect2.type === "Crop" && (effect2.resize === true || effect2.resize === 1)) return effect2;
+  for (const effect3 of clip2.effects ?? []) {
+    if (effect3.type === "Crop" && (effect3.resize === true || effect3.resize === 1)) return effect3;
   }
   return void 0;
 }
@@ -43487,8 +43765,8 @@ function bool2(v, fallback = false) {
 }
 function fractionOf(v, fallback) {
   if (typeof v === "object" && v !== null) {
-    const { num: num11, den: den2 } = v;
-    if (typeof num11 === "number" && typeof den2 === "number" && num11 > 0 && den2 > 0) return { num: num11, den: den2 };
+    const { num: num12, den: den2 } = v;
+    if (typeof num12 === "number" && typeof den2 === "number" && num12 > 0 && den2 > 0) return { num: num12, den: den2 };
   }
   return fallback;
 }
@@ -43572,11 +43850,11 @@ function waveformEffect(clip2, n) {
     }
   };
 }
-function parentedImageSizes(clip2, effect2, decode3) {
+function parentedImageSizes(clip2, effect3, decode4) {
   const out = {};
-  for (const reader of [maskReaderOf(effect2), effect2.type === "Displace" ? displaceMapReader(effect2) : void 0]) {
+  for (const reader of [maskReaderOf(effect3), effect3.type === "Displace" ? displaceMapReader(effect3) : void 0]) {
     if (!reader) continue;
-    const delivered = deliveredSource({ ...clip2, reader }, decode3);
+    const delivered = deliveredSource({ ...clip2, reader }, decode4);
     if (delivered.kind === "unsupported") continue;
     if (delivered.width !== int4(reader.width) || delivered.height !== int4(reader.height)) out[reader.path] = { width: delivered.width, height: delivered.height };
   }
@@ -43584,34 +43862,34 @@ function parentedImageSizes(clip2, effect2, decode3) {
 }
 function timelineEffects(project, layer2, f2, fps, before, after) {
   for (const raw of sortEffects(project.effects ?? [])) {
-    const effect2 = raw;
-    if (int4(effect2.layer) !== layer2) continue;
-    const window = frameWindow({ position: Number(effect2.position ?? 0), start: Number(effect2.start ?? 0), end: Number(effect2.end ?? 0) }, fps);
+    const effect3 = raw;
+    if (int4(effect3.layer) !== layer2) continue;
+    const window = frameWindow({ position: Number(effect3.position ?? 0), start: Number(effect3.start ?? 0), end: Number(effect3.end ?? 0) }, fps);
     if (!windowContains(window, f2)) continue;
     const lf = localFrame(window, f2);
-    const stage = applyBeforeClip(effect2) ? before : after;
-    if (effect2.type === "Mask") {
-      const reader = maskReaderOf(effect2);
+    const stage = applyBeforeClip(effect3) ? before : after;
+    if (effect3.type === "Mask") {
+      const reader = maskReaderOf(effect3);
       if (!reader) continue;
       const mask2 = {
-        transitionId: String(effect2.id ?? ""),
+        transitionId: String(effect3.id ?? ""),
         maskPath: reader.path,
-        brightness: effectValue(effect2, "brightness", lf, 0),
-        contrast: effectValue(effect2, "contrast", lf, 0),
-        replaceImage: bool2(effect2.replace_image),
-        invert: bool2(effect2.mask_invert),
-        applyBeforeClip: applyBeforeClip(effect2),
+        brightness: effectValue(effect3, "brightness", lf, 0),
+        contrast: effectValue(effect3, "contrast", lf, 0),
+        replaceImage: bool2(effect3.replace_image),
+        invert: bool2(effect3.mask_invert),
+        applyBeforeClip: applyBeforeClip(effect3),
         frame: lf
       };
       if (reader.type === "FFmpegReader" && !reader.has_single_image) {
-        const frame = mapMaskFrame(effect2, reader, lf, fps, true);
+        const frame = mapMaskFrame(effect3, reader, lf, fps, true);
         const mfps = fractionOf(reader.fps, { num: 30, den: 1 });
         mask2.maskFrame = frame;
         mask2.maskTime = (frame - 1) / (mfps.num / mfps.den);
       }
       stage.masks.push(mask2);
-    } else if (VIDEO_EFFECT_TYPES.has(String(effect2.type))) {
-      stage.effects.push(effectInstance(effect2, lf, fps, true));
+    } else if (VIDEO_EFFECT_TYPES.has(String(effect3.type))) {
+      stage.effects.push(effectInstance(effect3, lf, fps, true));
     }
   }
 }
@@ -43627,10 +43905,10 @@ function planLayer(project, clip2, window, f2, isTop, canvas, fps) {
   const clipEffects = sortEffects(clip2.effects ?? []).map((e) => resolveParentEffect(e, project)).filter((e) => VIDEO_EFFECT_TYPES.has(String(e.type)));
   const before = { effects: [], masks: [] };
   const after = { effects: [], masks: [] };
-  const decode3 = { previewWidth: canvas.width, previewHeight: canvas.height, timelineWidth: canvas.timelineWidth };
+  const decode4 = { previewWidth: canvas.width, previewHeight: canvas.height, timelineWidth: canvas.timelineWidth };
   for (const e of clipEffects) {
     const instance = effectInstance(e, n, fps, false);
-    const sizes3 = parentedImageSizes(clip2, e, decode3);
+    const sizes3 = parentedImageSizes(clip2, e, decode4);
     if (sizes3) instance.imageSizes = sizes3;
     (applyBeforeClip(e) ? before : after).effects.push(instance);
   }
@@ -43784,8 +44062,8 @@ function int5(v, fallback = 0) {
 }
 function fractionOf2(v, fallback) {
   if (typeof v === "object" && v !== null) {
-    const { num: num11, den: den2 } = v;
-    if (typeof num11 === "number" && typeof den2 === "number" && num11 > 0 && den2 > 0) return { num: num11, den: den2 };
+    const { num: num12, den: den2 } = v;
+    if (typeof num12 === "number" && typeof den2 === "number" && num12 > 0 && den2 > 0) return { num: num12, den: den2 };
   }
   return fallback;
 }
@@ -43963,10 +44241,10 @@ function planAudio(project, range) {
   const channels = int5(project.channels, 2) || 2;
   const grid = new Grid(fps, sampleRate, channels);
   const clips = sortClips(project.clips ?? []).map((c, i) => clipInfo(c, i, fps, project));
-  let timelineEnd2 = 0;
-  for (const c of clips) if (c.window.endFrame >= c.window.startFrame) timelineEnd2 = Math.max(timelineEnd2, grid.time(c.window.endFrame + 1));
+  let timelineEnd3 = 0;
+  for (const c of clips) if (c.window.endFrame >= c.window.startFrame) timelineEnd3 = Math.max(timelineEnd3, grid.time(c.window.endFrame + 1));
   const start = Math.max(0, range?.start ?? 0);
-  const end = Math.max(start, range?.end ?? timelineEnd2);
+  const end = Math.max(start, range?.end ?? timelineEnd3);
   const plan = { sampleRate, channels, start, end, segments: [] };
   if (!(end > start)) return plan;
   let fA = Math.max(1, Math.floor(start * fpsD) + 1);
@@ -43978,11 +44256,11 @@ function planAudio(project, range) {
   const relevant = clips.filter((c) => c.window.endFrame >= Math.max(fA, c.window.startFrame) && c.window.startFrame <= fB);
   const masks = [];
   for (const e of project.effects ?? []) {
-    const effect2 = e;
-    if (effect2.type !== "Mask" || !(effect2.fade_audio_hint === true || effect2.fade_audio_hint === 1)) continue;
+    const effect3 = e;
+    if (effect3.type !== "Mask" || !(effect3.fade_audio_hint === true || effect3.fade_audio_hint === 1)) continue;
     masks.push({
-      layer: int5(effect2.layer),
-      window: frameWindow({ position: Number(effect2.position ?? 0), start: Number(effect2.start ?? 0), end: Number(effect2.end ?? 0) }, fps)
+      layer: int5(effect3.layer),
+      window: frameWindow({ position: Number(effect3.position ?? 0), start: Number(effect3.start ?? 0), end: Number(effect3.end ?? 0) }, fps)
     });
   }
   const perClip = /* @__PURE__ */ new Map();
@@ -44115,11 +44393,11 @@ function ellipsePoint(r, angle) {
   const quadrant = Math.trunc(theta / 90);
   if (theta / 90 - quadrant !== 0) throw new RangeError("ellipsePoint: angle must be a multiple of 90");
   const t = quadrant & 1 ? 1 : 0;
-  let px = t === 0 ? 1 : 0;
+  let px2 = t === 0 ? 1 : 0;
   let py = t === 0 ? 0 : 1;
-  if (quadrant === 1 || quadrant === 2) px = -px;
+  if (quadrant === 1 || quadrant === 2) px2 = -px2;
   if (quadrant === 0 || quadrant === 1) py = -py;
-  return [r.x + r.w / 2 + w2 * px, r.y + r.h / 2 + h2 * py];
+  return [r.x + r.w / 2 + w2 * px2, r.y + r.h / 2 + h2 * py];
 }
 function transformScale(t) {
   const type = t.type();
@@ -44574,11 +44852,11 @@ function fetchBilinear(src, m, x, y, length, out) {
   let fx = sourceX(m, cx, cy);
   let fy = sourceY(m, cx, cy);
   for (let i = 0; i < length; i += 1) {
-    const px = fx - 0.5;
+    const px2 = fx - 0.5;
     const py = fy - 0.5;
-    const x1 = Math.trunc(px) - (px < 0 ? 1 : 0);
+    const x1 = Math.trunc(px2) - (px2 < 0 ? 1 : 0);
     const y1 = Math.trunc(py) - (py < 0 ? 1 : 0);
-    const distx = Math.trunc((px - x1) * 256);
+    const distx = Math.trunc((px2 - x1) * 256);
     const disty = Math.trunc((py - y1) * 256);
     sampleBilinear(src, x1, y1, distx, disty, out, i * 4);
     fx += m.m11;
@@ -44591,8 +44869,8 @@ function fetchNearest(src, m, x, y, length, out) {
   const s = src.data;
   const cx = x + 0.5;
   const cy = y + 0.5;
-  const put2 = (px, py, i) => {
-    const sx = px < 0 ? 0 : px > w - 1 ? w - 1 : px;
+  const put2 = (px2, py, i) => {
+    const sx = px2 < 0 ? 0 : px2 > w - 1 ? w - 1 : px2;
     const sy = py < 0 ? 0 : py > h - 1 ? h - 1 : py;
     const si = (sy * w + sx) * 4;
     out[i * 4] = s[si];
@@ -44732,14 +45010,14 @@ function drawImage(dst, src, state) {
       spans = mask2 ? maskSpans2(mask2) : [];
     } else {
       const poly = [];
-      for (const [px, py] of [
+      for (const [px2, py] of [
         [0, 0],
         [w, 0],
         [w, h],
         [0, h],
         [0, 0]
       ]) {
-        const [mx, my] = t.map(px, py);
+        const [mx, my] = t.map(px2, py);
         poly.push(mx, my);
       }
       rasterizePolygonsAliased([poly], true, rasterizerBox(device, clip2), sink);
@@ -44779,27 +45057,27 @@ var init_draw_image = __esm({
 function createCompositorState() {
   return { effects: /* @__PURE__ */ new Map() };
 }
-function kernelContext(plan, layer2, effect2, extras) {
+function kernelContext(plan, layer2, effect3, extras) {
   const ctx = {
-    frame: effect2.frame,
+    frame: effect3.frame,
     canvasWidth: plan.width,
     canvasHeight: plan.height,
     images: extras.images ?? EMPTY_IMAGES,
-    effectId: effect2.id,
+    effectId: effect3.id,
     timelineWidth: plan.timelineWidth ?? plan.width,
     timelineHeight: plan.timelineHeight ?? plan.height
   };
   if (extras.texts) ctx.texts = extras.texts;
-  if (effect2.imageSizes) ctx.imageSizes = effect2.imageSizes;
+  if (effect3.imageSizes) ctx.imageSizes = effect3.imageSizes;
   if (plan.fps) ctx.fps = plan.fps;
   if (layer2.clip) ctx.clip = layer2.clip;
   if (extras.audio) ctx.audio = extras.audio;
   if (extras.text) ctx.text = extras.text;
   if (extras.state) {
-    let map2 = extras.state.effects.get(effect2.id);
+    let map2 = extras.state.effects.get(effect3.id);
     if (!map2) {
       map2 = /* @__PURE__ */ new Map();
-      extras.state.effects.set(effect2.id, map2);
+      extras.state.effects.set(effect3.id, map2);
     }
     ctx.state = map2;
   }
@@ -44843,9 +45121,9 @@ function drawLayer(canvas, plan, layer2, index, sources) {
   const request = layer2.audio;
   const audio = request?.silent ? { sampleRate: request.sampleRate, channels: Array.from({ length: request.channels }, () => new Float32Array(request.samples)) } : sources.audio?.[index] ?? null;
   const extras = { images, texts: sources.texts, text: sources.text, state: sources.state, audio };
-  for (const effect2 of layer2.effects) {
-    if (effect2.applyBeforeClip === false) continue;
-    image = processEffect(image, effect2, kernelContext(plan, layer2, effect2, extras));
+  for (const effect3 of layer2.effects) {
+    if (effect3.applyBeforeClip === false) continue;
+    image = processEffect(image, effect3, kernelContext(plan, layer2, effect3, extras));
     if (image.width <= 0 || image.height <= 0) return;
   }
   applyMasks(
@@ -44869,8 +45147,8 @@ function drawLayer(canvas, plan, layer2, index, sources) {
   }
   let layerCanvas = createPremul(canvas.width, canvas.height);
   drawImage(layerCanvas, image, state);
-  for (const effect2 of afterEffects) {
-    layerCanvas = processEffect(layerCanvas, effect2, kernelContext(plan, layer2, effect2, extras));
+  for (const effect3 of afterEffects) {
+    layerCanvas = processEffect(layerCanvas, effect3, kernelContext(plan, layer2, effect3, extras));
   }
   applyMasks(layerCanvas, afterMasks, images);
   drawImage(canvas, layerCanvas, { transform: new QTransform(), smooth: false, antialias: false, opacity: 1, mode, clip: null });
@@ -45405,11 +45683,11 @@ var init_text = __esm({
       }
       /** Ink bounds by drawing the text (CFF outlines have no glyph boxes to read). */
       rasterInk(text4, font, advance) {
-        const px = font.pixelSize;
-        const pad2 = Math.ceil(px);
+        const px2 = font.pixelSize;
+        const pad2 = Math.ceil(px2);
         const w = Math.max(1, Math.ceil(advance + 2 * pad2));
-        const h = Math.max(1, Math.ceil(3 * px));
-        const baseline = 2 * px;
+        const h = Math.max(1, Math.ceil(3 * px2));
+        const baseline = 2 * px2;
         const image = this.render(text4, font, { x: -pad2, y: -baseline, width: w, height: h }, 0, 0, [255, 255, 255, 255], null, 0);
         let x0 = Infinity;
         let y0 = Infinity;
@@ -45444,15 +45722,15 @@ var init_text = __esm({
         try {
           const out = renderer.render();
           try {
-            const px = out.pixels;
-            const data = new Uint8ClampedArray(px.length);
-            for (let i = 0; i < px.length; i += 4) {
-              const a = px[i + 3];
+            const px2 = out.pixels;
+            const data = new Uint8ClampedArray(px2.length);
+            for (let i = 0; i < px2.length; i += 4) {
+              const a = px2[i + 3];
               if (a === 0) continue;
               const k = 255 / a;
-              data[i] = px[i] * k;
-              data[i + 1] = px[i + 1] * k;
-              data[i + 2] = px[i + 2] * k;
+              data[i] = px2[i] * k;
+              data[i + 1] = px2[i + 1] * k;
+              data[i + 2] = px2[i + 2] * k;
               data[i + 3] = a;
             }
             return { width: out.width, height: out.height, data };
@@ -45763,14 +46041,14 @@ function overlaySvg(width, height, overlay) {
     const ticks = Array.from({ length: 21 }, (_, i) => i / 20);
     const stroke = (lineWidth, gray, alpha, major) => {
       const color3 = gray === 0 ? "#000" : "#fff";
-      const lines = [];
+      const lines2 = [];
       ticks.forEach((t, i) => {
         if (i % 10 === 0 !== major) return;
         const x = Math.trunc(Math.min(Math.max(0.5, t * w), w - 0.5));
         const y = Math.trunc(Math.min(Math.max(0.5, t * h), h - 0.5));
-        lines.push(`M${x} 0V${h}`, `M0 ${y}H${w}`);
+        lines2.push(`M${x} 0V${h}`, `M0 ${y}H${w}`);
       });
-      parts.push(`<path d="${lines.join("")}" stroke="${color3}" stroke-opacity="${(alpha / 255).toFixed(3)}" stroke-width="${lineWidth}" fill="none"/>`);
+      parts.push(`<path d="${lines2.join("")}" stroke="${color3}" stroke-opacity="${(alpha / 255).toFixed(3)}" stroke-width="${lineWidth}" fill="none"/>`);
     };
     stroke(2, 0, 140, false);
     stroke(1, 255, 190, false);
@@ -50497,7 +50775,7 @@ var init_schemas_gen = __esm({
       add_animated_title_tool: {
         name: "add_animated_title_tool",
         title: "Add animated title",
-        description: 'Render a 3D animated title with Blender and place it on the timeline (Title > Animated Title).\n\nUse for "animated title", "3D flying title", "neon title", "space movie intro". Needs Blender (Preferences > General > Blender Command); without it the call is refused with setup steps -- offer add_title_tool (static SVG titles with fades) instead. Rendering runs in the background and takes from tens of seconds to several minutes; the result is a transparent image-sequence clip on the lowest free track above the video. list_title_templates_tool kind=animated lists the templates and their parameters. One undo step removes the clip and file.\n\nExample: {"template": "fly_by_1", "text": "Tokyo Day 1", "params": {"diffuse_color": "#ffcc00"}, "position_seconds": 0}.',
+        description: 'Add an animated title to the timeline (Title > Animated Title): the text flies toward the camera, spins, slides across, zooms in on a clapboard, glows like neon, dissolves or bursts, or a space-movie opening crawl. Use for "animated title", "flying title", "neon title", "space movie intro". Zenvi desktop renders these templates in 3D with Blender; this surface draws a 2D version of each with keyframes and effects (no Blender needed), on the lowest free track above the video, where it stays editable. earth, magic_wand, snow and picture_frames_4 are 3D scenes only Zenvi desktop renders. list_title_templates_tool kind=animated lists the templates, their parameters and how each looks here. One undo step removes the clips and files. Example: {"template": "fly_by_1", "text": "Tokyo Day 1", "params": {"diffuse_color": "#ffcc00"}, "position_seconds": 0}.',
         assistant: false,
         desktopReadOnly: false,
         handler: "src/classes/editor_tools/titles_text_animated.py:add_animated_title",
@@ -52477,10 +52755,7 @@ var init_pending = __esm({
   "../engine/src/tools/pending.ts"() {
     "use strict";
     PENDING_DESKTOP_TOOLS = /* @__PURE__ */ new Set([
-      "add_animated_title_tool",
       "add_clips_to_timeline_tool",
-      "add_emoji_tool",
-      "add_timer_tool",
       "add_transitions_between_clips_tool",
       "align_clips_tool",
       "analyze_frame_colors_tool",
@@ -52500,8 +52775,6 @@ var init_pending = __esm({
       "create_media_with_comfyui_tool",
       "create_subclips_tool",
       "duplicate_clips_tool",
-      "edit_captions_tool",
-      "edit_title_tool",
       "enhance_file_with_comfyui_tool",
       "export_files_to_folder_tool",
       "export_project_file_tool",
@@ -52518,7 +52791,6 @@ var init_pending = __esm({
       "import_project_file_tool",
       "ingest_web_video_tool",
       "inspect_color_tool",
-      "list_captions_tool",
       "list_comfyui_jobs_tool",
       "list_comfyui_templates_tool",
       "list_export_presets_tool",
@@ -52529,7 +52801,6 @@ var init_pending = __esm({
       "list_recent_projects_tool",
       "list_recovery_versions_tool",
       "list_timeline_transitions_tool",
-      "list_title_templates_tool",
       "manage_custom_profiles_tool",
       "manage_optimized_previews_tool",
       "match_color_to_reference_tool",
@@ -52537,7 +52808,6 @@ var init_pending = __esm({
       "move_clips_tool",
       "prepare_recording_tool",
       "process_clip_effect_tool",
-      "remove_captions_tool",
       "remove_files_from_project_tool",
       "remove_gaps_tool",
       "remove_keyframes_tool",
@@ -52550,7 +52820,6 @@ var init_pending = __esm({
       "reverse_clip_tool",
       "reverse_transition_tool",
       "save_frame_image_tool",
-      "search_emojis_tool",
       "seek_playhead_tool",
       "select_timeline_items_tool",
       "send_assistant_prompt_tool",
@@ -53199,11 +53468,11 @@ function fileName(file3) {
 function projectInfoText(project) {
   const profile = project.profile || "unknown";
   const fps = isRecord21(project.fps) ? project.fps : {};
-  const num11 = fps.num ?? "";
+  const num12 = fps.num ?? "";
   const den2 = fps.den ?? 1;
   const duration3 = project.duration || 0;
   const scale = project.scale || 0;
-  return `Project: profile=${String(profile)}, fps=${String(num11)}/${String(den2)}, duration=${pyNumber(Number(duration3))}, scale=${scale ? pyFloat(Number(scale)) : "0"}`;
+  return `Project: profile=${String(profile)}, fps=${String(num12)}/${String(den2)}, duration=${pyNumber(Number(duration3))}, scale=${scale ? pyFloat(Number(scale)) : "0"}`;
 }
 function fileSummaryPreview(file3, clip2) {
   return buildSummaryPreview(getEffectiveAiMetadata(file3, clip2, { rebased: true }));
@@ -53225,12 +53494,12 @@ function mediaBinFields(file3) {
 function listFilesText(project) {
   const files = visibleFiles(project);
   if (files.length === 0) return "No files in project.";
-  const lines = files.map((file3) => {
+  const lines2 = files.map((file3) => {
     const m = mediaBinFields(file3);
     return `  media_bin_file_id=${file3.id} name=${pyReprString(m.name)} duration=${m.dur}s analyzed=${m.analyzed} indexed=${m.indexed} summary_preview=${pyReprString(m.preview)} path=${basename2(String(file3.path ?? ""))}`;
   });
   return `Media bin files (${files.length}):
-` + lines.join("\n");
+` + lines2.join("\n");
 }
 function structuredClip(clip2, layers) {
   const data = clip2;
@@ -53259,7 +53528,7 @@ function listClipsReport(project, layerFilter) {
       dupes.set(key, [...dupes.get(key) ?? [], c]);
     }
   }
-  const lines = clips.map((c) => {
+  const lines2 = clips.map((c) => {
     const data = c;
     const lidRaw = data.layer ?? "";
     const lidNum = lidRaw === "" || lidRaw === null ? null : Math.trunc(Number(lidRaw));
@@ -53276,7 +53545,7 @@ function listClipsReport(project, layerFilter) {
     let role = "";
     let sourceStart = data.start ?? 0;
     let sourceEnd = data.end ?? 0;
-    let timelineEnd2 = fnum(data.position);
+    let timelineEnd3 = fnum(data.position);
     const file3 = fid ? findFileData(project, fid) : void 0;
     if (file3) {
       fname = fileName(file3);
@@ -53285,7 +53554,7 @@ function listClipsReport(project, layerFilter) {
       parentFileId = ctx.parentFileId;
       sourceStart = ctx.sourceStart;
       sourceEnd = ctx.sourceEnd;
-      timelineEnd2 = ctx.timelineEnd;
+      timelineEnd3 = ctx.timelineEnd;
       role = classifyClipAudioRole(c, file3, ctx.effectiveMetadata);
     }
     const summaryPart = summary ? ` summary_preview=${pyReprString(summary)}` : "";
@@ -53298,11 +53567,11 @@ function listClipsReport(project, layerFilter) {
     }
     const parentPart = parentFileId && parentFileId !== fid ? ` parent_file_id=${parentFileId}` : "";
     const layerText = lidInt !== null ? String(lidInt) : String(lidRaw);
-    return `  timeline_clip_id=${c.id} media_bin_file_id=${fid}${parentPart} title=${pyReprString(title)} file=${pyReprString(fname)}${summaryPart}${occHint} layer_number=${layerText}${uiPart}${tidPart} position=${pyFloat(fnum(data.position))} timeline_end=${pyFixed(timelineEnd2, 2)} source_start=${pyFloat(fnum(sourceStart))} source_end=${pyFloat(fnum(sourceEnd))}` + (role ? ` audio_role=${role}` : "");
+    return `  timeline_clip_id=${c.id} media_bin_file_id=${fid}${parentPart} title=${pyReprString(title)} file=${pyReprString(fname)}${summaryPart}${occHint} layer_number=${layerText}${uiPart}${tidPart} position=${pyFloat(fnum(data.position))} timeline_end=${pyFixed(timelineEnd3, 2)} source_start=${pyFloat(fnum(sourceStart))} source_end=${pyFloat(fnum(sourceEnd))}` + (role ? ` audio_role=${role}` : "");
   });
   return {
     text: `Timeline clips (${clips.length}):
-` + lines.join("\n"),
+` + lines2.join("\n"),
     clips: clips.map((c) => structuredClip(c, layers))
   };
 }
@@ -53313,31 +53582,31 @@ function listLayersText(project) {
   const lock = new Map(layers.map((L) => [Math.trunc(Number(L.number || 0)), Boolean(L.lock)]));
   const bottom = stack[0];
   const top = stack[stack.length - 1];
-  const lines = [
+  const lines2 = [
     `Layers (${stack.length}). Z-ORDER uses layer_number only (higher covers lower). Track labels/names are cosmetic \u2014 they can be anything and do NOT imply priority.`,
     `BOTTOM (drawn under): layer_number=${bottom?.layer_number} label=${pyReprString(bottom?.label ?? "")}`,
     `TOP (covers all below): layer_number=${top?.layer_number} label=${pyReprString(top?.label ?? "")}`,
     "Stack bottom\u2192top:"
   ];
   for (const e of stack) {
-    lines.push(
+    lines2.push(
       `  layer_number=${e.layer_number} ui_track=${e.ui_track} z_from_bottom=${e.z_from_bottom} label=${pyReprString(e.label)} track_id=${pyReprString(e.track_id)} lock=${pyBool(lock.get(e.layer_number) ?? false)}`
     );
   }
-  lines.push(`TRACK_STACK_JSON=${trackStackJson(layers)}`);
-  return lines.join("\n");
+  lines2.push(`TRACK_STACK_JSON=${trackStackJson(layers)}`);
+  return lines2.join("\n");
 }
 function listMarkersText(project) {
   const markers = project.markers ?? [];
   if (markers.length === 0) return "No markers in project.";
-  const lines = markers.map((m) => {
+  const lines2 = markers.map((m) => {
     const data = m;
     const position = data.position ?? 0;
     const name = data.name ?? data.label ?? "";
     return `  id=${String(data.id ?? "")} position=${typeof position === "number" ? pyFloat(position) : String(position)} name=${String(name)}`;
   });
   return `Markers (${markers.length}):
-` + lines.join("\n");
+` + lines2.join("\n");
 }
 function trackHeading(layerNum, layers, layer2) {
   const ui = layerNumberToDisplayIndex(layerNum, layers);
@@ -53363,11 +53632,11 @@ function timelineStateText(project) {
     const key = Number(c.layer ?? 0);
     byLayer.set(key, [...byLayer.get(key) ?? [], c]);
   }
-  const lines = ["=== TIMELINE STATE ==="];
-  lines.push(
+  const lines2 = ["=== TIMELINE STATE ==="];
+  lines2.push(
     "Z-ORDER: higher layer_number covers lower. Track labels are cosmetic names only \u2014 never infer priority from the label text. Call list_layers_tool for TRACK_STACK_JSON before multi-track placement. Hero/foreground \u2192 highest layer_number; backgrounds \u2192 lowest."
   );
-  if (clips.length === 0 && effects.length === 0) lines.push("Timeline is empty \u2014 no clips or effects have been added yet.");
+  if (clips.length === 0 && effects.length === 0) lines2.push("Timeline is empty \u2014 no clips or effects have been added yet.");
   const byPosition = (list2) => [...list2].sort((a, b) => fnum(a.position) - fnum(b.position));
   const asc = layersSortedByNumber(layers);
   const emitted = /* @__PURE__ */ new Set();
@@ -53375,11 +53644,11 @@ function timelineStateText(project) {
     for (const L of [...asc].reverse()) {
       const layerNum = Math.trunc(Number(L.number || 0));
       emitted.add(layerNum);
-      lines.push(`
+      lines2.push(`
 ${trackHeading(layerNum, layers, L)}:`);
       const layerClips = byLayer.get(layerNum) ?? [];
       if (layerClips.length === 0) {
-        lines.push("  (empty)");
+        lines2.push("  (empty)");
         continue;
       }
       for (const c of byPosition(layerClips)) {
@@ -53404,49 +53673,49 @@ ${trackHeading(layerNum, layers, L)}:`);
           rolePart = ` audio_role=${classifyClipAudioRole(c, file3, ctx.effectiveMetadata)}`;
           if (!fileIsAnalyzed(file3)) analyzedPart = " analyzed=False";
         }
-        lines.push(
+        lines2.push(
           `  timeline_clip_id=${c.id} media_bin_file_id=${String(data.file_id ?? "")} file=${pyReprString(fname)} title=${pyReprString(String(data.title || data.label || ""))}${summaryPart}${analyzedPart}${sourcePart}${rolePart} @ ${fixed2(data.position)}s\u2013${pyFixed(clipEnd2, 2)}s (dur=${pyFixed(clipDur, 2)}s)`
         );
       }
     }
   } else {
-    lines.push("\n(No layers/tracks in project.)");
+    lines2.push("\n(No layers/tracks in project.)");
   }
   for (const layerNum of [...byLayer.keys()].sort((a, b) => b - a)) {
     if (emitted.has(Math.trunc(layerNum))) continue;
-    lines.push(`
+    lines2.push(`
 ${trackHeading(layerNum, layers)}:`);
     for (const c of byPosition(byLayer.get(layerNum))) {
       const data = c;
       const clipDur = fnum(data.end) - fnum(data.start);
       const clipEnd2 = fnum(data.position) + clipDur;
-      lines.push(
+      lines2.push(
         `  timeline_clip_id=${c.id} media_bin_file_id=${String(data.file_id ?? "")} file=${pyReprString(String(data.file_id ?? ""))} title=${pyReprString(String(data.title || data.label || ""))} @ ${fixed2(data.position)}s\u2013${pyFixed(clipEnd2, 2)}s (dur=${pyFixed(clipDur, 2)}s)`
       );
     }
   }
   if (effects.length > 0) {
-    lines.push(`
+    lines2.push(`
 Effects/Transitions (${effects.length}):`);
     for (const e of effects) {
       const data = e;
       const title = "title" in data ? data.title : "?";
       const layer2 = data.layer ?? "";
-      lines.push(
+      lines2.push(
         `  id=${String(data.id ?? "")} title=${pyRepr2(title)} layer=${typeof layer2 === "number" ? pyNumber(layer2) : String(layer2)} @ ${fixed2(data.position)}s end=${fixed2(data.end)}s`
       );
     }
   }
   if (clips.length === 0) {
-    lines.push("\nTotal timeline duration: 0.00s");
+    lines2.push("\nTotal timeline duration: 0.00s");
   } else {
     const ends = clips.map((c) => Number(c.position ?? 0) + (Number(c.end ?? 0) - Number(c.start ?? 0)));
-    lines.push(`
+    lines2.push(`
 Total timeline duration: ${pyFixed(Math.max(...ends), 2)}s`);
   }
-  lines.push(`
+  lines2.push(`
 TRACK_STACK_JSON=${trackStackJson(layers)}`);
-  return lines.join("\n");
+  return lines2.join("\n");
 }
 function timelineStateData(project) {
   const layers = project.layers ?? [];
@@ -53514,6 +53783,189 @@ var init_reports = __esm({
   }
 });
 
+// ../engine/src/tools/editor-args.ts
+function isRecord22(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function kindsOf(schema) {
+  const t = schema.type;
+  if (Array.isArray(t)) {
+    const kinds = t.filter((k) => k !== "null");
+    return kinds.length > 0 ? kinds : ["null"];
+  }
+  if (typeof t === "string") return [t];
+  for (const key of ["anyOf", "oneOf"]) {
+    const branches = schema[key];
+    if (branches) return branches.flatMap((branch) => kindsOf(branch));
+  }
+  return [];
+}
+function acceptsNull(schema) {
+  if (schema.nullable) return true;
+  const t = schema.type;
+  if (t === "null" || Array.isArray(t) && t.includes("null")) return true;
+  return [...schema.anyOf ?? [], ...schema.oneOf ?? []].some(acceptsNull);
+}
+function acceptsEmptyString(schema) {
+  if (schema.enum) return schema.enum.includes("");
+  const fallback = schema.default;
+  return kindsOf(schema).includes("string") && (fallback === void 0 || fallback === null || fallback === "");
+}
+function coerceKind(path38, value, kind, schema) {
+  if (kind === "boolean") {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    const s = String(value).trim().toLowerCase();
+    if (TRUE.has(s)) return true;
+    if (FALSE.has(s)) return false;
+    throw new EditorArgError(`argument '${path38}' must be true or false`);
+  }
+  if (kind === "number" || kind === "integer") {
+    let f2;
+    if (typeof value === "number") f2 = Number.isFinite(value) ? value : null;
+    else if (typeof value === "string") {
+      f2 = parsePythonFloat(value.trim().replace(/s+$/, ""));
+    } else {
+      throw new EditorArgError(`argument '${path38}' must be a number`);
+    }
+    if (f2 === null) throw new EditorArgError(`argument '${path38}' must be a finite number`);
+    if (kind === "integer") {
+      if (!Number.isInteger(f2)) throw new EditorArgError(`argument '${path38}' must be a whole number`);
+    }
+    if (schema.minimum !== void 0 && f2 < schema.minimum) throw new EditorArgError(`argument '${path38}' is below the minimum`);
+    if (schema.maximum !== void 0 && f2 > schema.maximum) throw new EditorArgError(`argument '${path38}' is above the maximum`);
+    return f2;
+  }
+  if (kind === "string") {
+    if (typeof value === "object" && value !== null) return JSON.stringify(value);
+    return String(value);
+  }
+  if (kind === "array") {
+    let list2;
+    if (typeof value === "string") {
+      const s = value.trim();
+      if (!s) list2 = [];
+      else if (s.startsWith("[")) {
+        let parsed;
+        try {
+          parsed = JSON.parse(s);
+        } catch {
+          throw new EditorArgError(`argument '${path38}' is not a valid JSON list`);
+        }
+        list2 = Array.isArray(parsed) ? parsed : [parsed];
+      } else {
+        list2 = s.split(",").map((p) => p.trim()).filter(Boolean);
+      }
+    } else if (Array.isArray(value)) {
+      list2 = value;
+    } else {
+      list2 = [value];
+    }
+    const items = schema.items;
+    if (items && Object.keys(items).length > 0) return list2.map((v, i) => coerceEditorValue(`${path38}[${i}]`, v, items));
+    return list2;
+  }
+  if (kind === "object") {
+    let obj = value;
+    if (typeof value === "string") {
+      const s = value.trim();
+      if (!s) return {};
+      try {
+        obj = JSON.parse(s);
+      } catch {
+        throw new EditorArgError(`argument '${path38}' is not a valid JSON object`);
+      }
+    }
+    if (!isRecord22(obj)) throw new EditorArgError(`argument '${path38}' must be an object`);
+    const props = schema.properties;
+    if (!props || Object.keys(props).length === 0) return obj;
+    const out = {};
+    for (const [key, v] of Object.entries(obj)) {
+      const prop = props[key];
+      if (prop) out[key] = coerceEditorValue(`${path38}.${key}`, v, prop);
+      else if (schema.additionalProperties === false) throw new EditorArgError(`argument '${path38}' has unknown key '${key}'`);
+      else out[key] = v;
+    }
+    for (const key of schema.required ?? []) {
+      if (!(key in out)) throw new EditorArgError(`argument '${path38}' needs key '${key}'`);
+    }
+    return out;
+  }
+  return value;
+}
+function coerceEditorValue(path38, value, schema) {
+  if (value === null || value === void 0) {
+    if (acceptsNull(schema)) return null;
+    throw new EditorArgError(`argument '${path38}' must not be null`);
+  }
+  if (schema.enum) {
+    const choices = schema.enum;
+    if (choices.includes(value)) return value;
+    if (typeof value === "string") {
+      const wanted = value.trim().toLowerCase();
+      const hit = choices.find((c) => typeof c === "string" && c.toLowerCase() === wanted);
+      if (hit !== void 0) return hit;
+    }
+    if (typeof value === "number") {
+      const hit = choices.find((c) => typeof c === "string" && c === String(value));
+      if (hit !== void 0) return hit;
+    }
+    throw new EditorArgError(`argument '${path38}' is not one of the choices`);
+  }
+  const kinds = kindsOf(schema);
+  let last;
+  for (const kind of kinds) {
+    try {
+      return coerceKind(path38, value, kind, schema);
+    } catch (error62) {
+      if (!(error62 instanceof EditorArgError)) throw error62;
+      last = error62;
+    }
+  }
+  if (last) throw last;
+  return value;
+}
+function coerceEditorArgs(schema, args) {
+  if (args === null || args === void 0) return {};
+  if (!isRecord22(args)) return args;
+  const out = {};
+  for (const [key, value] of Object.entries(args)) {
+    if (HIDDEN_PARAMS.has(key)) continue;
+    const prop = schema.properties[key];
+    if (!prop) {
+      if (value !== "" && value !== void 0) out[key] = value;
+      continue;
+    }
+    if (value === void 0) continue;
+    if (value === null) {
+      if (acceptsNull(prop)) out[key] = null;
+      continue;
+    }
+    if (value === "" && !acceptsEmptyString(prop)) continue;
+    try {
+      out[key] = coerceEditorValue(key, value, prop);
+    } catch (error62) {
+      if (!(error62 instanceof EditorArgError)) throw error62;
+      out[key] = value;
+    }
+  }
+  return out;
+}
+function isEditorToolHandler(handler) {
+  return typeof handler === "string" && handler.startsWith("src/classes/editor_tools/");
+}
+var EditorArgError, TRUE, FALSE;
+var init_editor_args = __esm({
+  "../engine/src/tools/editor-args.ts"() {
+    "use strict";
+    init_coerce();
+    EditorArgError = class extends Error {
+    };
+    TRUE = /* @__PURE__ */ new Set(["true", "1", "yes", "y", "on"]);
+    FALSE = /* @__PURE__ */ new Set(["false", "0", "no", "n", "off"]);
+  }
+});
+
 // ../engine/src/tools/snapshot.ts
 function num9(value, fallback = 0) {
   const n = typeof value === "number" ? value : Number(value);
@@ -53558,17 +54010,17 @@ function timelineSnapshot(project, fps = projectFps(project)) {
     markers
   };
 }
-function clipRow(placement2, requestedFrame) {
+function clipRow(placement3, requestedFrame) {
   const row = {
-    id: placement2.clipId,
-    track: placement2.track,
-    layer: placement2.layer,
-    position: placement2.position,
-    start: placement2.start,
-    end: placement2.end,
-    durationFrames: placement2.durationFrames,
-    landedFrame: placement2.startFrame,
-    title: placement2.title
+    id: placement3.clipId,
+    track: placement3.track,
+    layer: placement3.layer,
+    position: placement3.position,
+    start: placement3.start,
+    end: placement3.end,
+    durationFrames: placement3.durationFrames,
+    landedFrame: placement3.startFrame,
+    title: placement3.title
   };
   if (requestedFrame !== void 0) row.requestedFrame = requestedFrame;
   return row;
@@ -53582,11 +54034,11 @@ function timelineDelta(before, after, options = {}) {
   for (const id of touched) if (after.placements.has(id)) changed.add(id);
   for (const id of after.placements.keys()) if (!before.placements.has(id)) changed.add(id);
   const pureShifts = /* @__PURE__ */ new Map();
-  for (const [id, placement2] of after.placements) {
+  for (const [id, placement3] of after.placements) {
     const prior = before.placements.get(id);
-    if (!prior || samePlace(prior, placement2) || changed.has(id)) continue;
-    if (prior.track === placement2.track && prior.durationFrames === placement2.durationFrames) {
-      pureShifts.set(id, { from: prior.startFrame, delta: placement2.startFrame - prior.startFrame });
+    if (!prior || samePlace(prior, placement3) || changed.has(id)) continue;
+    if (prior.track === placement3.track && prior.durationFrames === placement3.durationFrames) {
+      pureShifts.set(id, { from: prior.startFrame, delta: placement3.startFrame - prior.startFrame });
     } else {
       changed.add(id);
     }
@@ -53667,7 +54119,7 @@ function capabilityName(capability) {
 function missingCapabilities(requires, host) {
   return (requires ?? []).filter((cap) => host[cap] === void 0 || host[cap] === null);
 }
-function isRecord22(value) {
+function isRecord23(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function resultFor(receipt2, images) {
@@ -53698,8 +54150,8 @@ function receiptForError(tool, error62, host) {
 }
 async function executeTool(tool, impl, ctx, rawArgs) {
   const name = tool.name;
-  const session = isRecord22(rawArgs) && typeof rawArgs.chat_session_id === "string" && rawArgs.chat_session_id.trim() ? rawArgs.chat_session_id.trim() : "default";
-  const args = normalizeArgs(tool.inputSchema, rawArgs);
+  const session = isRecord23(rawArgs) && typeof rawArgs.chat_session_id === "string" && rawArgs.chat_session_id.trim() ? rawArgs.chat_session_id.trim() : "default";
+  const args = isEditorToolHandler(tool.desktopHandler) ? coerceEditorArgs(tool.inputSchema, rawArgs) : normalizeArgs(tool.inputSchema, rawArgs);
   const parsed = tool.input.safeParse(args);
   if (!parsed.success) {
     const issue2 = parsed.error.issues[0];
@@ -53819,6 +54271,7 @@ var init_define = __esm({
     init_errors();
     init_schemas_gen();
     init_coerce();
+    init_editor_args();
     init_pending();
     init_receipt();
     init_snapshot();
@@ -53832,8 +54285,1504 @@ var init_define = __esm({
       backend: "the Zenvi backend (sign in to Zenvi)",
       storage: "project storage",
       audio: "audio analysis",
-      assets: "the bundled title templates"
+      assets: "the bundled title templates and emoji"
     };
+  }
+});
+
+// ../engine/src/titles/animated-templates.data.ts
+var ANIMATED_TITLE_DATA;
+var init_animated_templates_data = __esm({
+  "../engine/src/titles/animated-templates.data.ts"() {
+    "use strict";
+    ANIMATED_TITLE_DATA = [
+      { "name": "blinds", "title": "Blinds (Two Titles)", "description": "Blinds (Two Titles)", "service": "blinds.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "Title", "title": "Title", "description": "", "name": "title", "type": "text", "values": {} }, { "default": "Sub Title", "title": "Sub Title", "description": "", "name": "sub_title", "type": "text", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#270F00", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "210", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "210", "max": "210", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "colors", "title": "Color Tiles", "description": "Different Colored Tiles with Text", "service": "colors.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "Title 1", "title": "Title 1", "description": "", "name": "title1", "type": "multiline", "values": {} }, { "default": "Title 2", "title": "Title 2", "description": "", "name": "title2", "type": "multiline", "values": {} }, { "default": "Title 3", "title": "Title 3", "description": "", "name": "title3", "type": "multiline", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#ffffff", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "#ffffff", "title": "Background: Specular Color", "description": "", "name": "specular_color_bg", "type": "color", "values": {} }, { "default": "1.0", "title": "Background: Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity_bg", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "No", "title": "Background: Shadeless", "description": "", "name": "shadeless", "type": "dropdown", "values": { "Yes": "Yes", "No": "No" } }, { "default": "#008BE7", "title": "Tile 1: Diffuse Color", "description": "", "name": "diffuse_color_t1", "type": "color", "values": {} }, { "default": "#E700C0", "title": "Tile 2: Diffuse Color", "description": "", "name": "diffuse_color_t2", "type": "color", "values": {} }, { "default": "#F3AD00", "title": "Tile 3: Diffuse Color", "description": "", "name": "diffuse_color_t3", "type": "color", "values": {} }, { "default": "#000000", "title": "Tile 4: Diffuse Color", "description": "", "name": "diffuse_color_t4", "type": "color", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "300", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "300", "max": "300", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "dissolve", "title": "Dissolving Text", "description": "Dissolving Text", "service": "dissolve.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "My Title", "title": "Title", "description": "", "name": "title", "type": "text", "values": {} }, { "default": "0.05", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.01", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "2.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "0.5", "title": "Wind Field Strength", "description": "", "name": "wind_field_strength", "type": "spinner", "min": "0.0", "max": "15.0", "values": {} }, { "default": "2.5", "title": "Wind Field Noise", "description": "", "name": "wind_field_noise", "type": "spinner", "min": "0.0", "max": "15.0", "values": {} }, { "default": "10.0", "title": "Turbulence Field Strength", "description": "", "name": "turbulence_field_strength", "type": "spinner", "min": "0.0", "max": "30.0", "values": {} }, { "default": "1.5", "title": "Turbulence Field Size", "description": "", "name": "turbulence_field_size", "type": "spinner", "min": "0.0", "max": "15.0", "values": {} }, { "default": "#7F7F7F", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "160", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "160", "max": "160", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "earth", "title": "World Map", "description": "World Map", "service": "earth.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "New York", "title": "Depart Title", "description": "", "name": "depart_title", "type": "text", "values": {} }, { "default": "N", "title": "Depart Latitude (Equator)", "description": "", "name": "depart_lat_dir", "type": "dropdown", "values": { "North": "N", "South": "S" } }, { "default": "40", "title": "Depart Latitude (degrees)", "description": "", "name": "depart_lat_deg", "type": "spinner", "min": "0", "max": "90", "values": {} }, { "default": "42", "title": "Depart Latitude (minutes)", "description": "", "name": "depart_lat_min", "type": "spinner", "min": "0", "max": "60", "values": {} }, { "default": "51", "title": "Depart Latitude (seconds)", "description": "", "name": "depart_lat_sec", "type": "spinner", "min": "0", "max": "60", "values": {} }, { "default": "W", "title": "Depart Longitude (Prime Meridian)", "description": "", "name": "depart_lon_dir", "type": "dropdown", "values": { "East": "E", "West": "W" } }, { "default": "74", "title": "Depart Longitude (degrees)", "description": "", "name": "depart_lon_deg", "type": "spinner", "min": "0", "max": "180", "values": {} }, { "default": "0", "title": "Depart Longitude (minutes)", "description": "", "name": "depart_lon_min", "type": "spinner", "min": "0", "max": "180", "values": {} }, { "default": "23", "title": "Depart Longitude (seconds)", "description": "", "name": "depart_lon_sec", "type": "spinner", "min": "0", "max": "180", "values": {} }, { "default": "Paris", "title": "Arrival Title", "description": "", "name": "arrive_title", "type": "text", "values": {} }, { "default": "N", "title": "Arrival Latitude (Equator)", "description": "", "name": "arrive_lat_dir", "type": "dropdown", "values": { "North": "N", "South": "S" } }, { "default": "48", "title": "Arrival Latitude (degrees)", "description": "", "name": "arrive_lat_deg", "type": "spinner", "min": "0", "max": "90", "values": {} }, { "default": "51", "title": "Arrival Latitude (minutes)", "description": "", "name": "arrive_lat_min", "type": "spinner", "min": "0", "max": "60", "values": {} }, { "default": "24", "title": "Arrival Latitude (seconds)", "description": "", "name": "arrive_lat_sec", "type": "spinner", "min": "0", "max": "60", "values": {} }, { "default": "E", "title": "Arrival Longitude (Prime Meridian)", "description": "", "name": "arrive_lon_dir", "type": "dropdown", "values": { "East": "E", "West": "W" } }, { "default": "2", "title": "Arrival Longitude (degrees)", "description": "", "name": "arrive_lon_deg", "type": "spinner", "min": "0", "max": "180", "values": {} }, { "default": "21", "title": "Arrival Longitude (minutes)", "description": "", "name": "arrive_lon_min", "type": "spinner", "min": "0", "max": "180", "values": {} }, { "default": "7", "title": "Arrival Longitude (seconds)", "description": "", "name": "arrive_lon_sec", "type": "spinner", "min": "0", "max": "180", "values": {} }, { "default": "", "title": "Custom Texture (Equirectangular)", "description": "", "name": "map_texture", "type": "text", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#FF0000", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "100", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "100", "max": "100", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "explode", "title": "Exploding Text", "description": "Exploding Text", "service": "explode.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "My Title", "title": "Title", "description": "", "name": "title", "type": "text", "values": {} }, { "default": "100", "title": "Particle Number", "description": "", "name": "particle_number", "type": "spinner", "min": "10", "max": "1000", "values": {} }, { "default": "1", "title": "Display Ground", "description": "", "name": "ground_on_off", "type": "dropdown", "values": { "On": "1", "Off": "0" } }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#7F7F7F", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "150", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "150", "max": "150", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "fly_by_1", "title": "Fly Towards Camera", "description": "Fly Towards Camera", "service": "fly_by_1.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "My Title", "title": "Title", "description": "", "name": "title", "type": "multiline", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#7F7F7F", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "80", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "80", "max": "80", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "fly_by_two_titles", "title": "Fly Towards Camera (Two Titles)", "description": "Fly Towards Camera (Two Titles)", "service": "fly_by_two_titles.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "Title", "title": "Title", "description": "", "name": "title", "type": "text", "values": {} }, { "default": "Sub Title", "title": "Sub Title", "description": "", "name": "sub_title", "type": "text", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#7F7F7F", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "250", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "250", "max": "250", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "glare", "title": "Glare", "description": "Glare", "service": "glare.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "My Title", "title": "Title", "description": "", "name": "title", "type": "multiline", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#ffffff", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "GHOSTS", "title": "Glare Type", "description": "", "name": "glare_type", "type": "dropdown", "values": { "Ghosts": "GHOSTS", "Streaks": "STREAKS", "Simple Star": "SIMPLE_STAR", "Sun Beams": "SUN_BEAMS" } }, { "default": "Yes", "title": "Use Alpha", "description": "", "name": "use_alpha", "type": "dropdown", "values": { "Yes": "Yes", "No": "No" } }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "250", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "250", "max": "250", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "glass_slider", "title": "Glass Slider", "description": "Transparent glass background with title", "service": "glass_slider.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "Title 1", "title": "Title", "description": "", "name": "title1", "type": "text", "values": {} }, { "default": "0.0", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "-2.4", "title": "X Coordinate", "description": "", "name": "start_x", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "0.60", "title": "Z Coordinate", "description": "", "name": "start_z", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#ffffff", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "#DFDCE7", "title": "Background: Diffuse Color", "description": "", "name": "diffuse_color_bg", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Background: Specular Color", "description": "", "name": "specular_color_bg", "type": "color", "values": {} }, { "default": "1.0", "title": "Background: Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity_bg", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "0.733", "title": "Background: Alpha", "description": "", "name": "alpha_bg", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "180", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "180", "max": "180", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "lens_flare", "title": "Lens Flare", "description": "Lens Flare", "service": "lens_flare.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "3.8", "title": "Start: X", "description": "", "name": "start_x", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "4.13", "title": "Start: Y", "description": "", "name": "start_y", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "2.65", "title": "Start: Z", "description": "", "name": "start_z", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "-4.6", "title": "End: X", "description": "", "name": "end_x", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "4.13", "title": "End: Y", "description": "", "name": "end_y", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "3.21", "title": "End: Z", "description": "", "name": "end_z", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Alpha", "description": "", "name": "alpha", "type": "spinner", "min": "0.0", "max": "0.0", "values": {} }, { "default": "#ffffff", "title": "Emission Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "0.75", "title": "Emission Strength", "description": "", "name": "strength", "type": "spinner", "min": "0.0", "max": "30.0", "values": {} }, { "default": "Ghosts", "title": "Glare 1: Type of Glare", "description": "", "name": "glare1_type", "type": "dropdown", "values": { "Ghosts": "Ghosts", "Streaks": "Streaks", "Simple Star": "Simple Star", "Fog Glow": "Fog Glow" } }, { "default": "4", "title": "Glare 1: Number of Streaks", "description": "", "name": "glare1_streaks", "type": "spinner", "min": "2", "max": "16", "values": {} }, { "default": "0.250", "title": "Glare 1: Color Threshold", "description": "", "name": "glare1_color", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.0", "title": "Glare 1: Angle Offset", "description": "", "name": "glare1_angle", "type": "spinner", "min": "0.0", "max": "180.0", "values": {} }, { "default": "Streaks", "title": "Glare 2: Type of Glare", "description": "", "name": "glare2_type", "type": "dropdown", "values": { "Ghosts": "Ghosts", "Streaks": "Streaks", "Simple Star": "Simple Star", "Fog Glow": "Fog Glow" } }, { "default": "4", "title": "Glare 2: Number of Streaks", "description": "", "name": "glare2_streaks", "type": "spinner", "min": "2", "max": "16", "values": {} }, { "default": "0.250", "title": "Glare 2: Color Threshold", "description": "", "name": "glare2_color", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.0", "title": "Glare 2: Angle Offset", "description": "", "name": "glare2_angle", "type": "spinner", "min": "0.0", "max": "180.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "250", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "250", "max": "250", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "magic_wand", "title": "Magic Wand", "description": "Magic Wand", "service": "magic_wand.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "5000.0", "title": "Particles: Amount", "description": "", "name": "particles_count", "type": "spinner", "min": "0.0", "max": "100000.0", "values": {} }, { "default": "0.0", "title": "Start: X", "description": "", "name": "start_x", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "0.0", "title": "Start: Y", "description": "", "name": "start_y", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "3.0", "title": "Start: Z", "description": "", "name": "start_z", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "0.0", "title": "End: X", "description": "", "name": "end_x", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "0.0", "title": "End: Y", "description": "", "name": "end_y", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "3.0", "title": "End: Z", "description": "", "name": "end_z", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "#FFCF00", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "1", "title": "Strength", "description": "", "name": "strength", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "STREAKS", "title": "Glare Type", "description": "", "name": "glare_type", "type": "dropdown", "values": { "Streaks": "STREAKS", "Ghosts": "GHOSTS", "Fog Glow": "FOG_GLOW", "Simple Star": "SIMPLE_STAR" } }, { "default": "0.03", "title": "Particle Scale", "description": "", "name": "particle_scale", "type": "spinner", "min": "0.0", "max": "3.0", "values": {} }, { "default": "50.0", "title": "Particles: Lifetime", "description": "", "name": "particles_lifetime", "type": "spinner", "min": "0.0", "max": "255.0", "values": {} }, { "default": "1.0", "title": "Particles: Gravity", "description": "", "name": "particles_gravity", "type": "spinner", "min": "-3.0", "max": "3.0", "values": {} }, { "default": "0.0", "title": "Velocity: X", "description": "", "name": "velocity_x", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "0.0", "title": "Velocity: Y", "description": "", "name": "velocity_y", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "0.0", "title": "Velocity: Z", "description": "", "name": "velocity_z", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "250", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "250", "max": "250", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "neon_curves", "title": "Neon Curves", "description": "Neon Curves", "service": "neon_curves.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "Title", "title": "Title", "description": "", "name": "title", "type": "multiline", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#FFAB00", "title": "Title Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "1", "title": "Strength", "description": "", "name": "strength", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "GHOSTS", "title": "Glare Type", "description": "", "name": "glare_type", "type": "dropdown", "values": { "Streaks": "STREAKS", "Ghosts": "GHOSTS", "Fog Glow": "FOG_GLOW", "Simple Star": "SIMPLE_STAR" } }, { "default": "#67BCFF", "title": "Line 1 Color", "description": "", "name": "line1_diffuse_color", "type": "color", "values": {} }, { "default": "#0069FF", "title": "Line 2 Color", "description": "", "name": "line2_diffuse_color", "type": "color", "values": {} }, { "default": "#82BAFF", "title": "Line 3 Color", "description": "", "name": "line3_diffuse_color", "type": "color", "values": {} }, { "default": "#FFDD00", "title": "Line 4 Color", "description": "", "name": "line4_diffuse_color", "type": "color", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "250", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "250", "max": "250", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "picture_frames_4", "title": "Picture Frames (4 pictures)", "description": "Picture Frames (4 pictures)", "service": "picture_frames_4.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "", "title": "Picture 1", "description": "", "name": "project_files1", "type": "dropdown", "values": { "": "" } }, { "default": "", "title": "Picture 2", "description": "", "name": "project_files2", "type": "dropdown", "values": { "": "" } }, { "default": "", "title": "Picture 3", "description": "", "name": "project_files3", "type": "dropdown", "values": { "": "" } }, { "default": "", "title": "Picture 4", "description": "", "name": "project_files4", "type": "dropdown", "values": { "": "" } }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "230", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "230", "max": "230", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "rotate_360", "title": "Rotate 360 Degrees", "description": "Rotate 360 Degrees", "service": "rotate_360.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "My Title", "title": "Title", "description": "", "name": "title", "type": "multiline", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#7F7F7F", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "180", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "180", "max": "180", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "slide_left_to_right", "title": "Slide Left to Right", "description": "Slide Left to Right.", "service": "slide_left_to_right.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "My Title", "title": "Title", "description": "", "name": "title", "type": "multiline", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#7F7F7F", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "250", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "250", "max": "250", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "snow", "title": "Snow", "description": "Snow", "service": "snow.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "3000.0", "title": "Number of Snow Flakes", "description": "", "name": "particles_count", "type": "spinner", "min": "0.0", "max": "100000.0", "values": {} }, { "default": "#ffffff", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "2.0", "title": "Size", "description": "", "name": "size", "type": "spinner", "min": "1.00", "max": "20.0", "values": {} }, { "default": "-0.100", "title": "Gravity: X", "description": "", "name": "gravity_x", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "0.070", "title": "Gravity: Y", "description": "", "name": "gravity_y", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "-0.180", "title": "Gravity: Z", "description": "", "name": "gravity_z", "type": "spinner", "min": "-10.0", "max": "10.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "900", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "900", "max": "900", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "spacemovie_intro", "title": "Space Movie Intro", "description": "Space Movie Intro", "service": "spacemovie_intro.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "multiline", "values": {} }, { "default": "A long time ago in a video\neditor far, far away...", "title": "First Title", "description": "", "name": "Alongtimeago", "type": "multiline", "values": {} }, { "default": "open\nshot", "title": "Flying Title", "description": "", "name": "TitleSpaceMovie", "type": "multiline", "values": {} }, { "default": "Episode IV", "title": "Episode", "description": "", "name": "Episode", "type": "multiline", "values": {} }, { "default": "A NEW OPENSHOT", "title": "Episode Title", "description": "", "name": "EpisodeTitle", "type": "multiline", "values": {} }, { "default": "It is a period of software war. Free software developers have won some battles with free, and open-source applications. They leave the source code available for everybody in the Galaxy, allowing people to access software knowledge and truth.\n\nBut the EULA Galactic Empire is not dead and prepares its revenge with an ultimate weapon: the blue screen of DEATH. This armored system can anihilate an entire device by a simple segfault.\n\nBut the rebel hackers have a secret weapon too: an atomic penguin which protects them from almost all digital injuries...", "title": "Main Text", "description": "", "name": "MainText", "type": "multiline", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "2232", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "2232", "max": "2232", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "wireframe_text", "title": "Wireframe Text", "description": "Wireframe Text", "service": "wireframe_text.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "My Title", "title": "Title", "description": "", "name": "title", "type": "multiline", "values": {} }, { "default": "0.259", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.016", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "0.01", "title": "Wireframe Size", "description": "", "name": "thickness", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "#0074E7", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#00BDFF", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "250", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "250", "max": "250", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] },
+      { "name": "zoom_clapboard", "title": "Zoom to Clapboard", "description": "Zoom to Clapboard", "service": "zoom_clapboard.blend", "params": [{ "default": "TitleFileName", "title": "File Name", "description": "", "name": "file_name", "type": "text", "values": {} }, { "default": "My Title", "title": "Title", "description": "", "name": "title", "type": "text", "values": {} }, { "default": "0.1", "title": "Extrude", "description": "", "name": "extrude", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "0.02", "title": "Bevel Depth", "description": "", "name": "bevel_depth", "type": "spinner", "min": "0.0", "max": "1.0", "values": {} }, { "default": "Bfont", "title": "Font Name", "description": "", "name": "fontname", "type": "dropdown", "values": { "Bfont": "Bfont", "FreeMono": "FreeMono", "FreeMonoBold": "FreeMonoBold", "FreeSans": "FreeSans", "FreeSansBold": "FreeSansBold", "FreeSansBoldOblique": "FreeSansBoldOblique", "WenQuanYiMicroHei (Unicode)": "WenQuanYiMicroHei" } }, { "default": "CENTER", "title": "Text Alignment", "description": "", "name": "spacemode", "type": "dropdown", "values": { "CENTER": "CENTER", "LEFT": "LEFT", "RIGHT": "RIGHT" } }, { "default": "1.0", "title": "Text Size", "description": "", "name": "text_size", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "1.0", "title": "Text Width", "description": "", "name": "width", "type": "spinner", "min": "0.0", "max": "10.0", "values": {} }, { "default": "#ffffff", "title": "Diffuse Color", "description": "", "name": "diffuse_color", "type": "color", "values": {} }, { "default": "#ffffff", "title": "Specular Color", "description": "", "name": "specular_color", "type": "color", "values": {} }, { "default": "1.0", "title": "Specular Intensity", "description": "IOR for Principled BSDF (1-5)", "name": "specular_intensity", "type": "spinner", "min": "1.0", "max": "5.0", "values": {} }, { "default": "Yes", "title": "Use Alpha", "description": "", "name": "use_alpha", "type": "dropdown", "values": { "Yes": "Yes", "No": "No" } }, { "default": "1", "title": "Start Frame", "description": "", "name": "start_frame", "type": "spinner", "min": "1", "max": "1", "values": {} }, { "default": "120", "title": "End Frame", "description": "", "name": "end_frame", "type": "spinner", "min": "120", "max": "120", "values": {} }, { "default": "1", "title": "Animation Length", "description": "", "name": "length_multiplier", "type": "dropdown", "values": { "Default": "1", "2X": "2", "3X": "3", "4X": "4", "5X": "5" } }] }
+    ];
+  }
+});
+
+// ../engine/src/titles/xml.ts
+function decode3(text4) {
+  return text4.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (whole, ref) => {
+    if (!ref.startsWith("#")) return NAMED[ref];
+    const code = ref[1] === "x" || ref[1] === "X" ? Number.parseInt(ref.slice(2), 16) : Number.parseInt(ref.slice(1), 10);
+    return code <= 1114111 ? String.fromCodePoint(code) : whole;
+  });
+}
+function attributeValue(raw) {
+  return decode3(raw.replace(/\r\n?/g, "\n").replace(/[\t\n]/g, " "));
+}
+function escapeText(text4) {
+  return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function escapeAttr(text4) {
+  return escapeText(text4).replace(/"/g, "&quot;").replace(/\n/g, "&#10;").replace(/\r/g, "&#13;").replace(/\t/g, "&#9;");
+}
+function tagEnd(xml, from) {
+  let quote = null;
+  for (let i = from; i < xml.length; i += 1) {
+    const ch = xml[i];
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === ">") return i;
+  }
+  throw new Error("Malformed SVG: unterminated tag.");
+}
+function parseAttrs(tag) {
+  const out = [];
+  const re = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  for (let m = re.exec(tag); m; m = re.exec(tag)) out.push([m[1], attributeValue(m[2] ?? m[3] ?? "")]);
+  return out;
+}
+function parseXml(xml) {
+  let root = null;
+  let rootStart = -1;
+  let rootEnd = -1;
+  const stack = [];
+  const append = (node2) => {
+    const parent = stack[stack.length - 1];
+    if (!parent) return;
+    node2.parent = parent;
+    parent.children.push(node2);
+  };
+  let i = 0;
+  while (i < xml.length) {
+    const lt = xml.indexOf("<", i);
+    const textEnd = lt < 0 ? xml.length : lt;
+    if (textEnd > i && stack.length > 0) append({ kind: "text", data: decode3(xml.slice(i, textEnd)), cdata: false, parent: null });
+    if (lt < 0) break;
+    if (xml.startsWith("<!--", lt)) {
+      const close = xml.indexOf("-->", lt + 4);
+      if (close < 0) throw new Error("Malformed SVG: unterminated comment.");
+      if (stack.length > 0) append({ kind: "other", raw: xml.slice(lt, close + 3), parent: null });
+      i = close + 3;
+      continue;
+    }
+    if (xml.startsWith("<![CDATA[", lt)) {
+      const close = xml.indexOf("]]>", lt + 9);
+      if (close < 0) throw new Error("Malformed SVG: unterminated CDATA.");
+      if (stack.length > 0) append({ kind: "text", data: xml.slice(lt + 9, close), cdata: true, parent: null });
+      i = close + 3;
+      continue;
+    }
+    if (xml.startsWith("<?", lt)) {
+      const close = xml.indexOf("?>", lt + 2);
+      if (close < 0) throw new Error("Malformed SVG: unterminated processing instruction.");
+      if (stack.length > 0) append({ kind: "other", raw: xml.slice(lt, close + 2), parent: null });
+      i = close + 2;
+      continue;
+    }
+    if (xml.startsWith("<!", lt)) {
+      let j = lt + 2;
+      let depth = 0;
+      for (; j < xml.length; j += 1) {
+        if (xml[j] === "[") depth += 1;
+        else if (xml[j] === "]") depth -= 1;
+        else if (xml[j] === ">" && depth <= 0) break;
+      }
+      i = j + 1;
+      continue;
+    }
+    const end = tagEnd(xml, lt + 1);
+    if (xml[lt + 1] === "/") {
+      const name2 = xml.slice(lt + 2, end).trim();
+      const open7 = stack.pop();
+      if (!open7 || open7.name !== name2) throw new Error(`Malformed SVG: </${name2}> does not close <${open7?.name ?? ""}>.`);
+      if (stack.length === 0) rootEnd = end + 1;
+      i = end + 1;
+      continue;
+    }
+    const tag = xml.slice(lt, end + 1);
+    const name = /^<([^\s/>]+)/.exec(tag)?.[1] ?? "";
+    const selfClosing = xml[end - 1] === "/";
+    const element = { kind: "element", name, attrs: parseAttrs(tag.slice(name.length + 1, selfClosing ? -2 : -1)), children: [], parent: null };
+    if (stack.length === 0) {
+      if (root) throw new Error("Malformed SVG: more than one root element.");
+      root = element;
+      rootStart = lt;
+      if (selfClosing) rootEnd = end + 1;
+    } else append(element);
+    if (!selfClosing) stack.push(element);
+    i = end + 1;
+  }
+  if (stack.length > 0) throw new Error(`Malformed SVG: <${stack[stack.length - 1].name}> is not closed.`);
+  if (!root) throw new Error("Malformed SVG: no root element.");
+  return { prolog: xml.slice(0, rootStart), root, epilog: xml.slice(rootEnd) };
+}
+function serializeNode(node2, out) {
+  if (node2.kind === "text") {
+    out.push(node2.cdata ? `<![CDATA[${node2.data}]]>` : escapeText(node2.data));
+    return;
+  }
+  if (node2.kind === "other") {
+    out.push(node2.raw);
+    return;
+  }
+  out.push(`<${node2.name}`);
+  for (const [key, value] of node2.attrs) out.push(` ${key}="${escapeAttr(value)}"`);
+  if (node2.children.length === 0) {
+    out.push("/>");
+    return;
+  }
+  out.push(">");
+  for (const child of node2.children) serializeNode(child, out);
+  out.push(`</${node2.name}>`);
+}
+function serializeXml(doc) {
+  const out = [doc.prolog];
+  serializeNode(doc.root, out);
+  out.push(doc.epilog);
+  return out.join("");
+}
+function getAttr(el, name) {
+  return el.attrs.find(([key]) => key === name)?.[1] ?? "";
+}
+function hasAttr(el, name) {
+  return el.attrs.some(([key]) => key === name);
+}
+function setAttr(el, name, value) {
+  const at = el.attrs.findIndex(([key]) => key === name);
+  if (at >= 0) el.attrs[at] = [name, value];
+  else el.attrs.push([name, value]);
+}
+function elementsByTagName(from, name) {
+  const out = [];
+  const visit2 = (el) => {
+    for (const child of el.children) {
+      if (child.kind !== "element") continue;
+      if (child.name === name) out.push(child);
+      visit2(child);
+    }
+  };
+  if ("root" in from) {
+    if (from.root.name === name) out.push(from.root);
+    visit2(from.root);
+  } else visit2(from);
+  return out;
+}
+var NAMED;
+var init_xml = __esm({
+  "../engine/src/titles/xml.ts"() {
+    "use strict";
+    NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+  }
+});
+
+// ../engine/src/titles/title-svg.ts
+function parseTitleSvg(svg) {
+  return parseXml(svg);
+}
+function titleSvgText(doc) {
+  return serializeXml(doc);
+}
+function parseStyle(style) {
+  const out = /* @__PURE__ */ new Map();
+  for (const part of String(style ?? "").split(";")) {
+    const at = part.indexOf(":");
+    if (at < 0) continue;
+    const key = part.slice(0, at).trim();
+    if (key) out.set(key, part.slice(at + 1).trim());
+  }
+  return out;
+}
+function formatStyle(style) {
+  return [...style.entries()].map(([k, v]) => `${k}:${v}`).join(";") + ";";
+}
+function nodeStyle(node2) {
+  return parseStyle(getAttr(node2, "style"));
+}
+function setNodeStyle(node2, style) {
+  const text4 = formatStyle(style);
+  setAttr(node2, "style", text4);
+  return text4;
+}
+function nodeProperty(node2, name, inherit = true) {
+  for (let current = node2; current; current = current.parent) {
+    let value = nodeStyle(current).get(name);
+    if ((value === void 0 || value === "") && hasAttr(current, name)) value = getAttr(current, name);
+    if (value !== void 0 && value !== "") return value;
+    if (!inherit) break;
+  }
+  return void 0;
+}
+function px(value) {
+  if (value === void 0 || value === "") return null;
+  const m = /^(-?[0-9]*\.?[0-9]+)\s*(px|pt)?$/.exec(value.trim().toLowerCase());
+  if (!m) return null;
+  const n = Number(m[1]);
+  return m[2] === "pt" ? n * 96 / 72 : n;
+}
+function textNodes(doc) {
+  return elementsByTagName(doc, "text");
+}
+function tspanNodes(doc) {
+  return elementsByTagName(doc, "tspan");
+}
+function rectNodes(doc) {
+  return elementsByTagName(doc, "rect");
+}
+function firstTextChild(node2) {
+  const first = node2.children[0];
+  return first && first.kind === "text" && !first.cdata ? first : null;
+}
+function lineNodes(doc) {
+  return tspanNodes(doc).filter((n) => firstTextChild(n) !== null);
+}
+function lineText(node2) {
+  return firstTextChild(node2)?.data ?? "";
+}
+function replaceText(node2, text4) {
+  const fresh = { kind: "text", data: String(text4), cdata: false, parent: node2 };
+  const old = firstTextChild(node2);
+  if (old) node2.children[0] = fresh;
+  else node2.children.unshift(fresh);
+}
+function artboardSize(doc) {
+  const svg = doc.root;
+  let width = px(getAttr(svg, "width"));
+  let height = px(getAttr(svg, "height"));
+  if (!(width && height)) {
+    const box = getAttr(svg, "viewBox").trim().split(/[\s,]+/).filter(Boolean);
+    if (box.length === 4) {
+      const w = parsePythonFloat(box[2]);
+      const h = parsePythonFloat(box[3]);
+      [width, height] = w === null || h === null ? [null, null] : [w, h];
+    }
+  }
+  return [width || 1920, height || 1080];
+}
+function fmt(value) {
+  return pyFixed(value, 4).replace(/0+$/, "").replace(/\.$/, "");
+}
+function opacityText(alpha) {
+  return fmt(Math.max(0, Math.min(1, alpha)));
+}
+function applyFont(nodes, change) {
+  const ratio = change.sizeRatio ?? 1;
+  for (const node2 of nodes) {
+    const style = nodeStyle(node2);
+    if (change.family) style.set("font-family", `'${String(change.family).replace(/^['"]+|['"]+$/g, "")}'`);
+    if (change.italic !== void 0 && change.italic !== null) style.set("font-style", change.italic ? "italic" : "normal");
+    if (change.bold !== void 0 && change.bold !== null) style.set("font-weight", change.bold ? "bold" : "normal");
+    if (ratio && Math.abs(ratio - 1) > 1e-9) {
+      let size = px(style.get("font-size"));
+      if (size === null && hasAttr(node2, "font-size")) size = px(getAttr(node2, "font-size"));
+      if (size !== null) style.set("font-size", `${fmt(size * ratio)}px`);
+    }
+    setNodeStyle(node2, style);
+  }
+}
+function setTextColor(doc, color3, alpha = 1) {
+  const opacity = opacityText(alpha);
+  for (const node2 of [...textNodes(doc), ...tspanNodes(doc)]) {
+    const style = nodeStyle(node2);
+    style.set("fill", color3);
+    const textWithTspans = node2.name === "text" && elementsByTagName(node2, "tspan").length > 0;
+    style.set("opacity", textWithTspans ? "1" : opacity);
+    setNodeStyle(node2, style);
+  }
+}
+function setBackground(doc, color3, alpha = 1) {
+  const rect = rectNodes(doc)[0];
+  if (!rect) return false;
+  const style = nodeStyle(rect);
+  style.set("fill", color3);
+  style.set("opacity", opacityText(alpha));
+  setNodeStyle(rect, style);
+  return true;
+}
+function refColor(doc, refId) {
+  const defs = elementsByTagName(doc, "defs")[0];
+  if (!defs) return "";
+  const seen = /* @__PURE__ */ new Set();
+  let id = refId;
+  while (id && !seen.has(id)) {
+    seen.add(id);
+    const target = defs.children.find((n) => n.kind === "element" && getAttr(n, "id") === id);
+    if (!target) return "";
+    const href = getAttr(target, "xlink:href") || getAttr(target, "href");
+    if (href) {
+      id = href.replace(/^#+/, "");
+      continue;
+    }
+    for (const stop of target.children) {
+      if (stop.kind !== "element" || stop.name !== "stop") continue;
+      const color3 = parseStyle(getAttr(stop, "style")).get("stop-color") || getAttr(stop, "stop-color");
+      if (color3) return color3;
+    }
+    return "";
+  }
+  return "";
+}
+function resolvePaint(doc, value, fallback) {
+  const v = (value ?? "").trim();
+  if (v.startsWith("url(#")) return refColor(doc, v.slice(5).replace(/\)+$/, "")) || fallback;
+  if (!v || v === "none") return fallback;
+  return v;
+}
+function pyFloatOr(value, fallback) {
+  if (value === void 0) return fallback;
+  return parsePythonFloat(value);
+}
+function textColor(doc, node2) {
+  const lines2 = lineNodes(doc);
+  const target = node2 ?? lines2[lines2.length - 1];
+  if (!target) return ["#ffffff", 1];
+  const fill = resolvePaint(doc, nodeProperty(target, "fill"), "#ffffff");
+  let opacity = 1;
+  for (let current = target; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
+    const value = pyFloatOr(nodeProperty(current, "opacity", false), 1);
+    if (value !== null) opacity *= value;
+  }
+  return [fill, opacity];
+}
+function backgroundColor(doc) {
+  const rect = rectNodes(doc)[0];
+  if (!rect) return ["", 0];
+  const raw = nodeProperty(rect, "fill", false);
+  const fill = resolvePaint(doc, raw, "#000000");
+  let opacity = pyFloatOr(nodeProperty(rect, "opacity", false), 1) ?? 1;
+  if ((raw ?? "") === "none") opacity = 0;
+  return [fill, opacity];
+}
+function fontFamily(doc) {
+  for (const node2 of lineNodes(doc)) {
+    const family = nodeProperty(node2, "font-family");
+    if (family) return family.replace(/^['"]+|['"]+$/g, "");
+  }
+  return "";
+}
+function floatAttr(node2, name) {
+  for (let current = node2; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
+    const raw = getAttr(current, name);
+    if (raw) return parsePythonFloat(raw.trim().split(/[\s,]+/)[0] ?? "");
+  }
+  return null;
+}
+function isMirrored(node2) {
+  for (let current = node2; current && (current.name === "tspan" || current.name === "text"); current = current.parent) {
+    if (getAttr(current, "transform").replace(/ /g, "").includes("scale(1,-1)")) return true;
+  }
+  return false;
+}
+function assignRoles(slots) {
+  if (slots.length === 0) return;
+  const ranked = [...slots].sort((a, b) => (b.fontSize ?? 0) - (a.fontSize ?? 0) || a.index - b.index);
+  const main = ranked.find((s) => !s.text.toLowerCase().includes("sub")) ?? ranked[0];
+  main.role = "title";
+  const rest = ranked.filter((s) => s !== main);
+  const sub = rest.find((s) => s.text.toLowerCase().includes("sub")) ?? rest[0];
+  if (sub) sub.role = "subtitle";
+}
+function titleFields(doc) {
+  const slots = [];
+  const byText = /* @__PURE__ */ new Map();
+  for (const node2 of lineNodes(doc)) {
+    const text4 = lineText(node2);
+    const key = text4.trim();
+    let slot = key ? byText.get(key) : void 0;
+    if (!slot) {
+      slot = { index: slots.length + 1, text: text4, nodes: [], fontSize: null, role: "line", x: null, y: null, anchor: "start" };
+      slots.push(slot);
+      if (key) byText.set(key, slot);
+    }
+    slot.nodes.push(node2);
+  }
+  for (const slot of slots) {
+    const primary = slot.nodes.find((n) => !isMirrored(n)) ?? slot.nodes[0];
+    slot.fontSize = px(nodeProperty(primary, "font-size"));
+    slot.x = floatAttr(primary, "x");
+    slot.y = floatAttr(primary, "y");
+    slot.anchor = nodeProperty(primary, "text-anchor") || "start";
+  }
+  assignRoles(slots);
+  return slots;
+}
+function fieldByRole(slots, role) {
+  return slots.find((s) => s.role === role);
+}
+function setFieldText(slot, text4) {
+  const value = String(text4 ?? "").split("\n").join(" ").trim() || BLANK;
+  for (const node2 of slot.nodes) replaceText(node2, value);
+  slot.text = value;
+}
+function textZone(slots, artboardHeight) {
+  const main = fieldByRole(slots, "title") ?? slots[0];
+  if (!main || main.y === null || !artboardHeight) return "center";
+  const y = Math.abs(main.y) / artboardHeight;
+  if (y < 0.3) return "top";
+  if (y > 0.7) return "bottom";
+  return "center";
+}
+function estimatedTextWidth(text4, fontPx, bold = true) {
+  let wide = 0;
+  let narrow = 0;
+  let total = 0;
+  for (const ch of text4) {
+    total += 1;
+    if (new RegExp("\\p{Lu}", "u").test(ch) || "MWmw@%".includes(ch)) wide += 1;
+    else if (" .,:;'!|il1".includes(ch)) narrow += 1;
+  }
+  const normal = Math.max(0, total - wide - narrow);
+  const per = bold ? 0.62 : 0.56;
+  return fontPx * (normal * per + wide * (per + 0.14) + narrow * 0.3);
+}
+function availableWidth(slot, artboardWidth) {
+  const x = Math.max(0, Math.min(artboardWidth, slot.x ?? artboardWidth / 2));
+  if (slot.anchor === "middle") return 2 * Math.min(x, artboardWidth - x) * 0.94;
+  if (slot.anchor === "end") return x * 0.96;
+  return (artboardWidth - x) * 0.96;
+}
+function fitField(slot, artboardWidth, minRatio = 0.35) {
+  if (!slot.text.trim() || !slot.fontSize) return 1;
+  const bold = slot.nodes.some((n) => ["bold", "700", "800", "900"].includes(String(nodeProperty(n, "font-weight") ?? "normal").toLowerCase()));
+  const width = estimatedTextWidth(slot.text.trim(), slot.fontSize, bold);
+  const room = availableWidth(slot, artboardWidth);
+  if (width <= room || width <= 0) return 1;
+  const ratio = Math.max(minRatio, room / width);
+  applyFont(slot.nodes, { sizeRatio: ratio });
+  slot.fontSize *= ratio;
+  return ratio;
+}
+function withoutBadChars(text4) {
+  let out = "";
+  for (const ch of text4) out += ch.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(ch) ? " " : ch;
+  return out;
+}
+function safeBaseName(text4, fallback = "Title", limit = 60) {
+  let base = withoutBadChars(String(text4 ?? ""));
+  base = base.split(/\s+/).filter(Boolean).join(" ").replace(/^[ .]+|[ .]+$/g, "");
+  if (base.toLowerCase().endsWith(".svg")) base = base.slice(0, -4).replace(/^[ .]+|[ .]+$/g, "");
+  if ([...base].length > limit) base = [...base].slice(0, limit).join("").replace(/[ .]+$/, "");
+  return base || fallback;
+}
+function duplicatePattern(fileName2) {
+  let name = String(fileName2).split(/[\\/]/).pop() ?? "";
+  if (!name.toLowerCase().endsWith(".svg")) name += ".svg";
+  const m = /^(.+?)(\s*)(\(([0-9]*)\))?\.svg$/i.exec(name);
+  if (!m) return [`${name.replace(/\.[^.]*$/, "")} (`, 0];
+  if (m[4]) return [`${m[1]}${m[2]}(`, Number(m[4])];
+  return [`${m[1]} (`, 0];
+}
+function freeName(prefix, offset, taken, limit = 1e3) {
+  const used = new Set([...taken].map((n) => n.toLowerCase()));
+  for (let i = 1; i < limit; i += 1) {
+    const name = `${prefix}${offset + i})`;
+    if (!used.has(`${name}.svg`.toLowerCase())) return name;
+  }
+  return null;
+}
+function versionName(current, taken) {
+  const stem4 = (String(current).split(/[\\/]/).pop() ?? "").replace(/\.[^.]*$/, "");
+  const m = /^(.*?) v(\d+)$/.exec(stem4);
+  const [base, n] = m ? [m[1], Number(m[2])] : [stem4, 1];
+  const used = new Set([...taken].map((name) => name.toLowerCase()));
+  for (let k = n + 1; k < n + 1e3; k += 1) {
+    const name = `${base} v${k}.svg`;
+    if (!used.has(name.toLowerCase())) return name;
+  }
+  return null;
+}
+var BLANK;
+var init_title_svg = __esm({
+  "../engine/src/titles/title-svg.ts"() {
+    "use strict";
+    init_coerce();
+    init_pyfmt();
+    init_xml();
+    BLANK = " ";
+  }
+});
+
+// ../engine/src/titles/animated.ts
+function templateFrames(template) {
+  const end = template.params.find((p) => p.name === "end_frame");
+  return Math.trunc(Number(end?.default || 0)) || 0;
+}
+function projectFpsDiff(fps) {
+  return pyRound(fps.num / (fps.den || 1) / TITLE_FPS);
+}
+function colorValue(hex4, name) {
+  let h = hex4.trim().replace(/^#/, "");
+  if (h.length === 3) h = [...h].map((c) => c + c).join("");
+  const channel = (i) => Number.parseInt(h.slice(i, i + 2), 16) / 255;
+  const value = [channel(0), channel(2), channel(4)];
+  if (name.includes("diffuse_color")) value.push(h.length === 8 ? channel(6) : 1);
+  return value;
+}
+function defaultParams(template, fpsDiff = 1) {
+  const params = {};
+  for (const p of template.params) {
+    const def = p.default ?? "";
+    if (p.name === "start_frame" || p.name === "end_frame") params[p.name] = Math.trunc(Number(def));
+    else if (p.type === "spinner") params[p.name] = Number(def);
+    else if (p.type === "text" || p.type === "multiline") params[p.name] = def;
+    else if (p.type === "dropdown") {
+      const values = Object.values(p.values);
+      const sorted = Object.entries(p.values).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+      const value = values.includes(def) ? def : sorted[0]?.[1] ?? "";
+      params[p.name] = p.name === "length_multiplier" ? Number(value || 1) * fpsDiff : value;
+    } else if (p.type === "color") params[p.name] = colorValue(def || "#ffffff", p.name);
+  }
+  return params;
+}
+function curve(points, frames) {
+  const last = Math.max(1, frames);
+  const byFrame = /* @__PURE__ */ new Map();
+  for (const [t, value, interp] of points) {
+    const x = 1 + Math.round(Math.max(0, Math.min(1, t)) * (last - 1));
+    byFrame.set(x, [value, interp ?? Interpolation.BEZIER]);
+  }
+  return {
+    Points: [...byFrame.entries()].sort((a, b) => a[0] - b[0]).map(([x, [y, interp]]) => makeKeyframePoint(x, y, interp))
+  };
+}
+function escape2(text4) {
+  return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function hex22(n) {
+  return Math.max(0, Math.min(255, Math.round(n * 255))).toString(16).padStart(2, "0");
+}
+function paint(value, fallback) {
+  if (!Array.isArray(value) || value.length < 3) return [fallback, 1];
+  return [`#${hex22(value[0])}${hex22(value[1])}${hex22(value[2])}`, value.length > 3 ? Math.max(0, Math.min(1, value[3])) : 1];
+}
+function shade(hex4, factor) {
+  const c = (i) => Math.round(Number.parseInt(hex4.slice(i, i + 2), 16) * factor).toString(16).padStart(2, "0");
+  return `#${c(1)}${c(3)}${c(5)}`;
+}
+function num10(value, fallback) {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+function str2(value) {
+  return typeof value === "string" ? value : value === void 0 ? "" : String(value);
+}
+function fontSpec(name, bold = true) {
+  const mono = "'FreeMono', 'Liberation Mono', 'Courier New', monospace";
+  const sans = "'FreeSans', 'Liberation Sans', Arial, sans-serif";
+  switch (name) {
+    case "FreeMono":
+      return { family: mono, weight: "normal", style: "normal" };
+    case "FreeMonoBold":
+      return { family: mono, weight: "bold", style: "normal" };
+    case "FreeSans":
+      return { family: sans, weight: "normal", style: "normal" };
+    case "FreeSansBold":
+      return { family: sans, weight: "bold", style: "normal" };
+    case "FreeSansBoldOblique":
+      return { family: sans, weight: "bold", style: "italic" };
+    case "WenQuanYiMicroHei":
+      return { family: "'WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'PingFang SC', sans-serif", weight: bold ? "bold" : "normal", style: "normal" };
+    default:
+      return { family: "'DejaVu Sans', 'Liberation Sans', Arial, sans-serif", weight: bold ? "bold" : "normal", style: "normal" };
+  }
+}
+function textBlock(lines2, o) {
+  const lh = (o.lineHeight ?? 1.2) * o.size;
+  const first = o.y - (lines2.length - 1) * lh / 2 + 0.35 * o.size;
+  const attrs = (fill, dx, dy) => [
+    `x="${(o.x + dx).toFixed(1)}"`,
+    `y="${(first + dy).toFixed(1)}"`,
+    `font-family="${o.font.family}"`,
+    `font-size="${o.size.toFixed(1)}"`,
+    `font-weight="${o.font.weight}"`,
+    `font-style="${o.font.style}"`,
+    `text-anchor="${o.anchor ?? "middle"}"`,
+    o.letterSpacing ? `letter-spacing="${o.letterSpacing.toFixed(2)}"` : "",
+    fill === "none" ? 'fill="none"' : `fill="${fill}"`,
+    o.opacity !== void 0 && o.opacity < 1 ? `fill-opacity="${o.opacity.toFixed(3)}"` : "",
+    o.stroke ? `stroke="${o.stroke}" stroke-width="${(o.strokeWidth ?? 2).toFixed(1)}" stroke-linejoin="round"` : ""
+  ].filter(Boolean).join(" ");
+  const tspans = (dx) => lines2.map((line2, i) => `<tspan x="${(o.x + dx).toFixed(1)}" dy="${i === 0 ? 0 : lh.toFixed(1)}">${escape2(line2)}</tspan>`).join("");
+  const depth = o.depth ?? 0;
+  const back = depth > 0.5 && o.fill !== "none" ? `<text ${attrs(shade(o.fill, 0.45), depth, depth)}>${tspans(depth)}</text>` : "";
+  return `${back}<text ${attrs(o.fill, 0, 0)}>${tspans(0)}</text>`;
+}
+function svgDoc(width, height, body) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>
+`;
+}
+function lines(text4) {
+  const out = String(text4 ?? "").replace(/\r\n?/g, "\n").split("\n").map((l) => l.trim());
+  while (out.length > 1 && !out[out.length - 1]) out.pop();
+  return out.length > 0 ? out : [""];
+}
+function wrap(text4, size, width, bold) {
+  const out = [];
+  for (const para of String(text4 ?? "").replace(/\r\n?/g, "\n").split("\n")) {
+    const words3 = para.split(/\s+/).filter(Boolean);
+    if (words3.length === 0) {
+      out.push("");
+      continue;
+    }
+    let line2 = "";
+    for (const word of words3) {
+      const next = line2 ? `${line2} ${word}` : word;
+      if (line2 && estimatedTextWidth(next, size, bold) > width) {
+        out.push(line2);
+        line2 = word;
+      } else line2 = next;
+    }
+    out.push(line2);
+  }
+  return out;
+}
+function placement(v, width, height, sizeFactor = 0.12) {
+  const size = sizeFactor * height * Math.max(0.05, num10(v.text_size, 1));
+  const spacing = (num10(v.width, 1) - 1) * 0.25 * size;
+  const mode = str2(v.spacemode);
+  if (mode === "LEFT") return { x: width * 0.08, anchor: "start", size, spacing };
+  if (mode === "RIGHT") return { x: width * 0.92, anchor: "end", size, spacing };
+  return { x: width / 2, anchor: "middle", size, spacing };
+}
+function effect2(className, overrides) {
+  const { id: _id, ...json2 } = defaultEffectJson(className, "TEMPLATE00");
+  return { ...json2, ...overrides };
+}
+function constant(value) {
+  return { Points: [makeKeyframePoint(1, value, Interpolation.BEZIER)] };
+}
+function colorKeyframe(hex4, alpha = 1) {
+  const c = (i) => Number.parseInt(hex4.slice(i, i + 2), 16);
+  return { red: constant(c(1)), green: constant(c(3)), blue: constant(c(5)), alpha: constant(Math.round(alpha * 255)) };
+}
+function fadeInOut(frames, fadeIn = 0.08, fadeOut = 0.08) {
+  return curve(
+    [
+      [0, 0],
+      [fadeIn, 1],
+      [1 - fadeOut, 1, LINEAR],
+      [1, 0]
+    ],
+    frames
+  );
+}
+function single(input2, svg, props, effects = () => []) {
+  const frames = input2.framesOf(0, 1);
+  return [{ from: 0, to: 1, svg, props: props(frames), effects: effects(frames) }];
+}
+function solidTitle(input2, textLines, opts = {}) {
+  const { v, width, height } = input2;
+  const p = placement(v, width, height, opts.sizeFactor);
+  const [fill, opacity] = paint(v.diffuse_color, "#7f7f7f");
+  const font = fontSpec(str2(v.fontname), opts.bold ?? true);
+  const depth = Math.min(0.08, Math.max(0, num10(v.extrude, 0.1))) * p.size * 0.6;
+  let body;
+  if (opts.sub) {
+    const subSize = p.size * 0.55;
+    const gap = p.size * 0.35;
+    const titleH = textLines.length * p.size * 1.2;
+    const total = titleH + gap + subSize * 1.2;
+    const top = height / 2 - total / 2;
+    body = textBlock(textLines, { x: p.x, y: top + titleH / 2, size: p.size, fill, opacity, font, anchor: p.anchor, letterSpacing: p.spacing, depth }) + textBlock([opts.sub], { x: p.x, y: top + titleH + gap + subSize * 1.2 / 2, size: subSize, fill, opacity, font, anchor: p.anchor, letterSpacing: p.spacing * 0.55, depth: depth * 0.55 });
+  } else {
+    body = textBlock(textLines, { x: p.x, y: height / 2, size: p.size, fill, opacity, font, anchor: p.anchor, letterSpacing: p.spacing, depth });
+  }
+  return svgDoc(width, height, body);
+}
+function rendersOnWeb(name) {
+  return Object.hasOwn(RECIPES, name);
+}
+function buildAnimatedTitle(name, values, size, frames) {
+  const recipe = RECIPES[name];
+  if (!recipe) throw new Error(`no 2D version of the animated title ${name}`);
+  const total = Math.max(1, Math.trunc(frames));
+  const framesOf = (from, to) => Math.max(1, Math.round(to * total) - Math.round(from * total));
+  return recipe({ v: values, width: size.width, height: size.height, framesOf });
+}
+var TITLE_FPS, HIDDEN_PARAMS2, ANIMATED_TITLES, WEB_LOOKS, DESKTOP_ONLY_TITLES, LINEAR, RECIPES;
+var init_animated = __esm({
+  "../engine/src/titles/animated.ts"() {
+    "use strict";
+    init_types();
+    init_registry();
+    init_edit();
+    init_rounding();
+    init_animated_templates_data();
+    init_title_svg();
+    TITLE_FPS = 25;
+    HIDDEN_PARAMS2 = /* @__PURE__ */ new Set(["start_frame", "end_frame", "file_name", "length_multiplier"]);
+    ANIMATED_TITLES = ANIMATED_TITLE_DATA;
+    WEB_LOOKS = {
+      blinds: "title and subtitle on horizontal bands that open and close like blinds",
+      colors: "three colour tiles one after another, each with its title",
+      dissolve: "the title fades in, holds, then blurs, drifts and fades away",
+      explode: "the title holds, then bursts outward (scale, blur, fade)",
+      fly_by_1: "the title flies toward the camera from far away and past it",
+      fly_by_two_titles: "title and subtitle fly in from far away, hold, then fly past the camera",
+      glare: "the title with a pulsing glow",
+      glass_slider: "a translucent glass bar with the title slides in from the left, holds and slides out",
+      lens_flare: "a lens flare that moves across the frame (no text)",
+      neon_curves: "a glowing neon title over four coloured curves",
+      rotate_360: "the title spins once around its vertical axis",
+      slide_left_to_right: "the title slides in from the left, holds, and leaves to the right",
+      spacemovie_intro: "the opening crawl: the 'long time ago' line, the logo shrinking away, then the text scrolling up (flat, no perspective)",
+      wireframe_text: "outlined (wireframe) title that slowly pushes in",
+      zoom_clapboard: "a clapboard with the title, zooming in"
+    };
+    DESKTOP_ONLY_TITLES = {
+      earth: "a flight path on a 3D globe",
+      magic_wand: "a particle trail",
+      picture_frames_4: "four pictures in 3D frames",
+      snow: "falling snow particles"
+    };
+    LINEAR = Interpolation.LINEAR;
+    RECIPES = {
+      fly_by_1: (input2) => single(input2, solidTitle(input2, lines(str2(input2.v.title))), (n) => {
+        const scale = curve([[0, 0.04], [0.45, 0.8, LINEAR], [0.7, 1, LINEAR], [1, 2, LINEAR]], n);
+        return { scale_x: scale, scale_y: scale, alpha: fadeInOut(n, 0.08, 0.15) };
+      }),
+      fly_by_two_titles: (input2) => single(input2, solidTitle(input2, lines(str2(input2.v.title)), { sub: str2(input2.v.sub_title) }), (n) => {
+        const scale = curve([[0, 0.04], [0.3, 1], [0.75, 1, LINEAR], [1, 2, LINEAR]], n);
+        return { scale_x: scale, scale_y: scale, alpha: fadeInOut(n, 0.06, 0.15) };
+      }),
+      rotate_360: (input2) => single(input2, solidTitle(input2, lines(str2(input2.v.title))), (n) => {
+        const turn = Array.from({ length: 17 }, (_, i) => [0.1 + 0.8 * i / 16, Math.round(Math.cos(2 * Math.PI * i / 16) * 1e3) / 1e3, LINEAR]);
+        return { scale_x: curve([[0, 1], ...turn, [1, 1, LINEAR]], n), alpha: fadeInOut(n, 0.06, 0.06) };
+      }),
+      slide_left_to_right: (input2) => single(input2, solidTitle(input2, lines(str2(input2.v.title))), (n) => ({
+        location_x: curve([[0, -1], [0.25, 0], [0.75, 0, LINEAR], [1, 1]], n)
+      })),
+      dissolve: (input2) => single(
+        input2,
+        solidTitle(input2, lines(str2(input2.v.title))),
+        (n) => {
+          const drift = 0.02 + Math.min(15, num10(input2.v.wind_field_strength, 0.5)) * 0.01;
+          return {
+            alpha: curve([[0, 0], [0.12, 1], [0.5, 1, LINEAR], [1, 0, LINEAR]], n),
+            scale_x: curve([[0, 1], [0.5, 1, LINEAR], [1, 1.12, LINEAR]], n),
+            scale_y: curve([[0, 1], [0.5, 1, LINEAR], [1, 1.12, LINEAR]], n),
+            location_x: curve([[0, 0], [0.5, 0, LINEAR], [1, drift, LINEAR]], n),
+            location_y: curve([[0, 0], [0.5, 0, LINEAR], [1, -drift, LINEAR]], n)
+          };
+        },
+        (n) => {
+          const radius = curve([[0, 0], [0.5, 0, LINEAR], [1, 12 + Math.min(30, num10(input2.v.turbulence_field_strength, 10)), LINEAR]], n);
+          return [effect2("Blur", { horizontal_radius: radius, vertical_radius: radius })];
+        }
+      ),
+      explode: (input2) => single(
+        input2,
+        solidTitle(input2, lines(str2(input2.v.title))),
+        (n) => {
+          const scale = curve([[0, 1], [0.55, 1, LINEAR], [0.8, 1.8, LINEAR], [1, 1.8, LINEAR]], n);
+          return { scale_x: scale, scale_y: scale, alpha: curve([[0, 0], [0.1, 1], [0.55, 1, LINEAR], [0.8, 0, LINEAR], [1, 0, LINEAR]], n) };
+        },
+        (n) => {
+          const radius = curve([[0, 0], [0.55, 0, LINEAR], [0.8, 30, LINEAR]], n);
+          return [effect2("Blur", { horizontal_radius: radius, vertical_radius: radius })];
+        }
+      ),
+      glare: (input2) => {
+        const { v, width, height } = input2;
+        const opaque = str2(v.use_alpha) === "No";
+        const svg = solidTitle(input2, lines(str2(v.title)));
+        const withBg = opaque ? svg.replace(/(<svg[^>]*>)/, `$1<rect width="${width}" height="${height}" fill="#000000"/>`) : svg;
+        const [fill] = paint(v.diffuse_color, "#ffffff");
+        return single(
+          input2,
+          withBg,
+          (n) => ({ alpha: fadeInOut(n, 0.1, 0.1) }),
+          (n) => [
+            effect2("Glow", {
+              color: colorKeyframe(fill),
+              blur_radius: constant(30),
+              spread: constant(0.3),
+              opacity: curve([[0, 0], [0.25, 0.9], [0.5, 0.5], [0.75, 0.9], [1, 0.4]], n)
+            })
+          ]
+        );
+      },
+      neon_curves: (input2) => {
+        const { v, width, height } = input2;
+        const p = placement(v, width, height);
+        const [fill] = paint(v.diffuse_color, "#ffab00");
+        const strength = Math.max(0, Math.min(1, num10(v.strength, 1)));
+        const curves = [v.line1_diffuse_color, v.line2_diffuse_color, v.line3_diffuse_color, v.line4_diffuse_color].map((c, i) => {
+          const [stroke] = paint(c, "#67bcff");
+          const y = height * (0.3 + i * 0.13);
+          const amp = height * (0.12 + 0.03 * i) * (i % 2 === 0 ? 1 : -1);
+          return `<path d="M${-0.05 * width},${y.toFixed(1)} C${(0.3 * width).toFixed(1)},${(y - amp).toFixed(1)} ${(0.7 * width).toFixed(1)},${(y + amp).toFixed(1)} ${(1.05 * width).toFixed(1)},${(y - amp / 3).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="${(height * 6e-3).toFixed(1)}" stroke-linecap="round" opacity="0.85"/>`;
+        }).join("");
+        const text4 = textBlock(lines(str2(v.title)), { x: p.x, y: height / 2, size: p.size, fill, font: fontSpec(str2(v.fontname)), anchor: p.anchor, letterSpacing: p.spacing, stroke: "#ffffff", strokeWidth: Math.max(1, p.size * 0.02) });
+        return single(
+          input2,
+          svgDoc(width, height, curves + text4),
+          (n) => ({ alpha: fadeInOut(n, 0.12, 0.1) }),
+          (n) => [
+            effect2("Glow", {
+              color: colorKeyframe(fill),
+              blur_radius: constant(25),
+              spread: constant(0.25),
+              opacity: curve([[0, 0.5 * strength], [0.5, 0.85 * strength], [1, 0.6 * strength]], n)
+            })
+          ]
+        );
+      },
+      wireframe_text: (input2) => {
+        const { v, width, height } = input2;
+        const p = placement(v, width, height);
+        const [stroke] = paint(v.diffuse_color, "#0074e7");
+        const [glint] = paint(v.specular_color, "#00bdff");
+        const strokeWidth = Math.max(1, Math.min(12, num10(v.thickness, 0.01) * 300 * (height / 1080)));
+        const text4 = textBlock(lines(str2(v.title)), { x: p.x, y: height / 2, size: p.size, fill: glint, opacity: 0.15, font: fontSpec(str2(v.fontname)), anchor: p.anchor, letterSpacing: p.spacing, stroke, strokeWidth });
+        return single(input2, svgDoc(width, height, text4), (n) => {
+          const scale = curve([[0, 0.85], [1, 1.05, LINEAR]], n);
+          return { scale_x: scale, scale_y: scale, rotation: curve([[0, -3], [1, 3, LINEAR]], n), alpha: fadeInOut(n, 0.1, 0.1) };
+        });
+      },
+      zoom_clapboard: (input2) => {
+        const { v, width, height } = input2;
+        const p = placement(v, width, height, 0.09);
+        const [fill] = paint(v.diffuse_color, "#ffffff");
+        const bw = width * 0.42;
+        const bh = height * 0.42;
+        const bx = (width - bw) / 2;
+        const by = height * 0.36;
+        const barH = bh * 0.12;
+        const striped = (x, y) => `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${barH.toFixed(1)}" fill="#111111"/>` + Array.from({ length: 8 }, (_, i) => {
+          const sx = x + i * bw / 8;
+          const pts = [
+            [sx + barH * 0.5, y],
+            [sx + bw / 16 + barH * 0.5, y],
+            [sx + bw / 16, y + barH],
+            [sx, y + barH]
+          ];
+          return `<polygon points="${pts.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(" ")}" fill="#f2f2f2"/>`;
+        }).join("");
+        const clapperY = by - barH * 1.1;
+        const clapper = `<g transform="rotate(-10 ${bx.toFixed(1)} ${(clapperY + barH).toFixed(1)})">${striped(bx, clapperY)}</g>`;
+        const board = `<rect x="${bx.toFixed(1)}" y="${(by + barH).toFixed(1)}" width="${bw.toFixed(1)}" height="${(bh - barH).toFixed(1)}" rx="${(bh * 0.03).toFixed(1)}" fill="#2a2a2a" stroke="#555555" stroke-width="${(height * 3e-3).toFixed(1)}"/>`;
+        const text4 = textBlock([str2(v.title)], { x: width / 2, y: by + barH + (bh - barH) / 2, size: p.size, fill, font: fontSpec(str2(v.fontname)), letterSpacing: p.spacing, depth: p.size * 0.04 });
+        const bg = str2(v.use_alpha) === "No" ? `<rect width="${width}" height="${height}" fill="#000000"/>` : "";
+        return single(input2, svgDoc(width, height, bg + board + striped(bx, by) + clapper + text4), (n) => {
+          const scale = curve([[0, 2], [0.35, 1], [1, 1, LINEAR]], n);
+          return { scale_x: scale, scale_y: scale, alpha: fadeInOut(n, 0.08, 0.08) };
+        });
+      },
+      blinds: (input2) => {
+        const { v, width, height } = input2;
+        const [fill, opacity] = paint(v.diffuse_color, "#270f00");
+        const tint2 = (white) => `#${[1, 3, 5].map((i) => Math.round(Number.parseInt(fill.slice(i, i + 2), 16) * (1 - white) + 255 * white).toString(16).padStart(2, "0")).join("")}`;
+        const bands = `<rect width="${width}" height="${height}" fill="${tint2(0.48)}"/>` + Array.from({ length: 4 }, (_, i) => `<rect x="0" y="${(2 * i * height / 8).toFixed(1)}" width="${width}" height="${(height / 8).toFixed(1)}" fill="${tint2(0.55)}"/>`).join("");
+        const p = placement(v, width, height);
+        const font = fontSpec(str2(v.fontname));
+        const title = textBlock([str2(v.title)], { x: p.x, y: height * 0.47, size: p.size, fill, opacity, font, anchor: p.anchor, letterSpacing: p.spacing });
+        const sub = textBlock([str2(v.sub_title)], { x: p.x, y: height * 0.47 + p.size * 1.15, size: p.size * 0.6, fill, opacity, font, anchor: p.anchor, letterSpacing: p.spacing * 0.6 });
+        return single(input2, svgDoc(width, height, bands + title + sub), (n) => ({
+          scale_y: curve([[0, 0], [0.12, 1], [0.88, 1, LINEAR], [1, 0]], n)
+        }));
+      },
+      colors: (input2) => {
+        const { v, width, height } = input2;
+        const [fill, opacity] = paint(v.diffuse_color, "#ffffff");
+        const p = placement(v, width, height);
+        const font = fontSpec(str2(v.fontname));
+        const tiles = [
+          [v.diffuse_color_t1, str2(v.title1)],
+          [v.diffuse_color_t2, str2(v.title2)],
+          [v.diffuse_color_t3, str2(v.title3)]
+        ];
+        return tiles.map(([tile, title], i) => {
+          const [color3] = paint(tile, "#008be7");
+          const svg = svgDoc(
+            width,
+            height,
+            `<rect width="${width}" height="${height}" fill="${color3}"/>` + textBlock(lines(title), { x: p.x, y: height / 2, size: p.size, fill, opacity, font, anchor: p.anchor, letterSpacing: p.spacing })
+          );
+          const from = i / 3;
+          const to = (i + 1) / 3;
+          const n = input2.framesOf(from, to);
+          const scale = curve([[0, 1.08], [0.15, 1], [1, 1, LINEAR]], n);
+          return { from, to, svg, props: { scale_x: scale, scale_y: scale, alpha: fadeInOut(n, 0.1, 0.1) }, effects: [] };
+        });
+      },
+      glass_slider: (input2) => {
+        const { v, width, height } = input2;
+        const [fill, opacity] = paint(v.diffuse_color, "#ffffff");
+        const [glass] = paint(v.diffuse_color_bg, "#dfdce7");
+        const alpha = Math.max(0, Math.min(1, num10(v.alpha_bg, 0.733)));
+        const size = 0.07 * height * Math.max(0.05, num10(v.text_size, 1));
+        const bar = `<ellipse cx="${(width * 0.4).toFixed(1)}" cy="${(height * 0.9).toFixed(1)}" rx="${(width * 0.46).toFixed(1)}" ry="${(height * 0.13).toFixed(1)}" fill="${glass}" fill-opacity="${alpha.toFixed(3)}"/>`;
+        const text4 = textBlock(lines(str2(v.title1)), { x: width * 0.03, y: height * 0.9, size, fill, opacity, font: fontSpec(str2(v.fontname)), anchor: "start", letterSpacing: (num10(v.width, 1) - 1) * 0.25 * size });
+        return single(input2, svgDoc(width, height, bar + text4), (n) => ({
+          location_x: curve([[0, -1], [0.2, 0], [0.8, 0, LINEAR], [1, -1]], n)
+        }));
+      },
+      lens_flare: (input2) => {
+        const { v } = input2;
+        const fx = (x) => Math.max(-1, Math.min(1, x / 6));
+        const fy = (z2) => Math.max(-1, Math.min(1, -(z2 - 1) / 3));
+        const [color3] = paint(v.diffuse_color, "#ffffff");
+        const brightness2 = Math.max(0, Math.min(1, num10(v.strength, 0.75)));
+        return single(
+          input2,
+          null,
+          (n) => ({ alpha: fadeInOut(n, 0.1, 0.1) }),
+          (n) => [
+            effect2("LensFlare", {
+              x: curve([[0, fx(num10(v.start_x, 3.8))], [1, fx(num10(v.end_x, -4.6)), LINEAR]], n),
+              y: curve([[0, fy(num10(v.start_z, 2.65))], [1, fy(num10(v.end_z, 3.21)), LINEAR]], n),
+              brightness: constant(brightness2),
+              color: colorKeyframe(color3)
+            })
+          ]
+        );
+      },
+      spacemovie_intro: (input2) => {
+        const { v, width, height } = input2;
+        const blue = "#4bd5ee";
+        const yellow = "#ffe81f";
+        const sans = fontSpec("FreeSans", false);
+        const bold = fontSpec("FreeSansBold");
+        const introSize = height * 0.05;
+        const intro = svgDoc(width, height, textBlock(lines(str2(v.Alongtimeago)), { x: width * 0.22, y: height / 2, size: introSize, fill: blue, font: sans, anchor: "start", lineHeight: 1.3 }));
+        const logoSize = height * 0.2;
+        const logo = svgDoc(width, height, textBlock(lines(str2(v.TitleSpaceMovie)).map((l) => l.toUpperCase()), { x: width / 2, y: height / 2, size: logoSize, fill: "none", font: bold, stroke: yellow, strokeWidth: logoSize * 0.035, lineHeight: 0.95, letterSpacing: logoSize * 0.05 }));
+        const crawlWidth = width * 0.6;
+        let size = height * 0.05;
+        let body = [];
+        for (let i = 0; i < 6; i += 1) {
+          body = wrap(str2(v.MainText), size, crawlWidth, true);
+          const total = (body.length + 4) * size * 1.35;
+          if (total <= height * 0.98) break;
+          size *= Math.max(0.6, height * 0.98 / total);
+        }
+        const lh = size * 1.35;
+        const blockLines = 3 + body.length;
+        const top = (height - blockLines * lh) / 2;
+        const crawl = svgDoc(
+          width,
+          height,
+          textBlock([str2(v.Episode)], { x: width / 2, y: top + lh / 2, size, fill: yellow, font: bold }) + textBlock([str2(v.EpisodeTitle)], { x: width / 2, y: top + lh * 1.6, size: size * 1.3, fill: yellow, font: bold }) + textBlock(body, { x: (width - crawlWidth) / 2, y: top + lh * 3 + body.length * lh / 2, size, fill: yellow, font: bold, anchor: "start", lineHeight: 1.35 })
+        );
+        const segments2 = [
+          [0, 0.08, intro, (n) => ({ alpha: fadeInOut(n, 0.2, 0.2) })],
+          [
+            0.08,
+            0.2,
+            logo,
+            (n) => {
+              const scale = curve([[0, 1.6], [1, 0.05, LINEAR]], n);
+              return { scale_x: scale, scale_y: scale, alpha: curve([[0, 1], [0.85, 1, LINEAR], [1, 0, LINEAR]], n) };
+            }
+          ],
+          [0.2, 1, crawl, (n) => ({ location_y: curve([[0, 1], [1, -1.05, LINEAR]], n), alpha: curve([[0, 1], [0.9, 1, LINEAR], [1, 0, LINEAR]], n) })]
+        ];
+        return segments2.map(([from, to, svg, props]) => ({ from, to, svg, props: props(input2.framesOf(from, to)), effects: [] }));
+      }
+    };
+  }
+});
+
+// ../engine/src/tools/titles-text.ts
+function toolError(message) {
+  throw new TextToolError(message);
+}
+function errorText(message) {
+  const collapsed = message.split(/\s+/).filter(Boolean).join(" ");
+  return collapsed.startsWith("Error") ? collapsed : `Error: ${collapsed}`;
+}
+async function guarded(tool, body) {
+  try {
+    return await body();
+  } catch (error62) {
+    if (error62 instanceof TextToolError) return refused(tool, errorText(error62.message));
+    throw error62;
+  }
+}
+function summaryLine(text4) {
+  return text4.split(/\s+/).filter(Boolean).join(" ");
+}
+function pyRoundTo(x, digits) {
+  const value = Number(pyFixed(x, digits));
+  return value === 0 ? 0 : value;
+}
+function pyFloat2(text4) {
+  const t = text4.trim();
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(t)) return null;
+  return Number(t);
+}
+function parseEditorColor(value) {
+  const raw = String(value ?? "").trim();
+  const s = COLOR_NAMES[raw.toLowerCase()] ?? raw;
+  if (s.startsWith("#")) {
+    let h = s.slice(1);
+    if (h.length === 3 || h.length === 4) h = [...h].map((ch) => ch + ch).join("");
+    if ((h.length === 6 || h.length === 8) && /^[0-9a-fA-F]+$/.test(h)) {
+      const byte = (i) => Number.parseInt(h.slice(i, i + 2), 16);
+      return [byte(0), byte(2), byte(4), h.length === 8 ? byte(6) : 255];
+    }
+  }
+  if (s.toLowerCase().startsWith("rgb") && s.includes("(") && s.includes(")")) {
+    const parts = s.slice(s.indexOf("(") + 1, s.lastIndexOf(")")).split(",");
+    const nums = parts.map(pyFloat2);
+    if (nums.length >= 3 && nums.every((n) => n !== null)) {
+      const clamp2 = (n) => Math.max(0, Math.min(255, n));
+      const [r, g, b] = nums.slice(0, 3).map((n) => Math.trunc(clamp2(pyRound(n))));
+      let a = 255;
+      if (nums.length > 3) a = nums[3] <= 1 ? pyRound(nums[3] * 255) : Math.trunc(nums[3]);
+      return [r, g, b, clamp2(a)];
+    }
+  }
+  return toolError(`unrecognised color ${pyReprString(String(value ?? ""))}; use #RRGGBB, #RRGGBBAA, rgb(r,g,b) or a basic color name`);
+}
+function colorHexAlpha(value, what) {
+  let rgba2;
+  try {
+    rgba2 = parseEditorColor(value);
+  } catch (error62) {
+    if (error62 instanceof TextToolError) return toolError(`${what}: ${error62.message}`);
+    throw error62;
+  }
+  const hex4 = `#${rgba2.slice(0, 3).map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+  return [hex4, pyRoundTo(rgba2[3] / 255, 4)];
+}
+function keyframeOf(points) {
+  const pts = points.map((p) => makeKeyframePoint(p[0], p[1], p[2] ?? Interpolation.BEZIER));
+  pts.sort((a, b) => a.co.X - b.co.X);
+  return { Points: pts };
+}
+function constantKeyframe2(value) {
+  return keyframeOf([[1, value]]);
+}
+function colorKeyframes(hex4, alpha = 1) {
+  const h = hex4.replace(/^#/, "");
+  const byte = (i) => Number.parseInt(h.slice(i, i + 2), 16);
+  return {
+    red: keyframeOf([[1, byte(0)]]),
+    green: keyframeOf([[1, byte(2)]]),
+    blue: keyframeOf([[1, byte(4)]]),
+    alpha: keyframeOf([[1, pyRound(255 * Math.max(0, Math.min(1, alpha)))]])
+  };
+}
+function keyframeValueAt(kf, frame, fallback = 0) {
+  if (typeof kf === "number" && Number.isFinite(kf)) return kf;
+  const pts = kf?.Points;
+  if (!Array.isArray(pts) || pts.length === 0) return fallback;
+  const sorted = [...pts].sort((a, b) => Number(a?.co?.X) - Number(b?.co?.X));
+  const x = (p) => Number(p?.co?.X);
+  const y = (p) => Number(p?.co?.Y);
+  if (frame <= x(sorted[0])) return y(sorted[0]);
+  for (let i = 0; i + 1 < sorted.length; i += 1) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    if (x(a) <= frame && frame <= x(b)) {
+      if (Number(a.interpolation ?? Interpolation.BEZIER) === Interpolation.CONSTANT || x(b) === x(a)) return y(a);
+      const t = (frame - x(a)) / (x(b) - x(a));
+      return y(a) + t * (y(b) - y(a));
+    }
+  }
+  return y(sorted[sorted.length - 1]);
+}
+function fpsOfProject(project) {
+  const fps = projectFps(project);
+  return fps.num / fps.den;
+}
+function frameSecondsOf(project) {
+  return 1 / Math.max(1, fpsOfProject(project));
+}
+function snapToFrame(project, seconds2) {
+  return snapSeconds(seconds2, project);
+}
+function projectSize(project) {
+  const w = Math.trunc(Number(project.width));
+  const h = Math.trunc(Number(project.height));
+  return [w > 0 ? w : 1920, h > 0 ? h : 1080];
+}
+function isVertical(project) {
+  const [w, h] = projectSize(project);
+  return h > w;
+}
+function uiTrackNumber(project, layer2) {
+  return buildTrackStack(project.layers).find((e) => e.layer_number === Math.trunc(layer2))?.ui_track ?? null;
+}
+function isLocked(project, layer2) {
+  return Boolean(project.layers.find((l) => Math.trunc(Number(l.number)) === Math.trunc(layer2))?.lock);
+}
+function ensureUnlocked(project, layer2) {
+  if (isLocked(project, layer2)) toolError(`track ${uiTrackNumber(project, layer2) ?? layer2} is locked; unlock it first`);
+}
+function resolveLayer(project, track2) {
+  const raw = String(track2 ?? "").trim();
+  if (!raw) toolError("a track is required (UI track number, name, or layer number)");
+  const res = normalizeTrackOrLayerArg(raw, project.layers);
+  if (res.error) toolError(res.error);
+  if (res.layer === void 0) toolError(`no track matches ${pyReprString(raw)}`);
+  return res.layer;
+}
+function trackInfo(project, layer2) {
+  return { track: uiTrackNumber(project, layer2), layer: Math.trunc(layer2), track_label: formatTrackLabelForLlm(layer2, project.layers) };
+}
+function clipExtent(clip2) {
+  const position = Number(clip2.position) || 0;
+  const duration3 = Math.max(0, (Number(clip2.end) || 0) - (Number(clip2.start) || 0));
+  return [position, position + duration3, duration3];
+}
+function isVisual(clip2) {
+  const reader = clip2.reader ?? {};
+  if (reader.has_video === false || reader.media_type === "audio") return false;
+  const hv = clip2.has_video;
+  const pts = hv && typeof hv === "object" ? hv.Points ?? [] : [];
+  if (pts.length === 1 && Number(pts[0]?.co?.Y ?? 1) === 0) return false;
+  return true;
+}
+function clipsInWindow(project, layer2, start, end, exclude = /* @__PURE__ */ new Set()) {
+  const tol = ONE_FRAME_TOLERANCE * frameSecondsOf(project);
+  return project.clips.filter((clip2) => {
+    if (exclude.has(clip2.id)) return false;
+    if (layer2 !== null && Math.trunc(Number(clip2.layer) || 0) !== Math.trunc(layer2)) return false;
+    const [s, e] = clipExtent(clip2);
+    return s < end - tol && e > start + tol;
+  });
+}
+function planOverlayTrack(project, start, end, track2, exclude = /* @__PURE__ */ new Set()) {
+  if (String(track2 ?? "").trim()) {
+    const layer2 = resolveLayer(project, track2);
+    ensureUnlocked(project, layer2);
+    const busy = clipsInWindow(project, layer2, start, end, exclude);
+    if (busy.length > 0) {
+      const [s, e] = clipExtent(busy[0]);
+      const name = pyReprString(String(busy[0].title || busy[0].id));
+      toolError(
+        `track ${uiTrackNumber(project, layer2) ?? layer2} already has ${name} at ${pyFixed(s, 2)}-${pyFixed(e, 2)}s during ${pyFixed(start, 2)}-${pyFixed(end, 2)}s; pick another track or leave track empty to use the first free track above the video`
+      );
+    }
+    return { layer: layer2, created: false };
+  }
+  const numbers2 = project.layers.map((l) => Math.trunc(Number(l.number) || 0)).sort((a, b) => a - b);
+  const visual = clipsInWindow(project, null, start, end, exclude).filter(isVisual);
+  const floor = visual.length > 0 ? Math.max(...visual.map((c) => Math.trunc(Number(c.layer) || 0))) : null;
+  for (const num12 of numbers2) {
+    if (floor !== null && num12 <= floor) continue;
+    if (isLocked(project, num12)) continue;
+    if (clipsInWindow(project, num12, start, end, exclude).length === 0) return { layer: num12, created: false };
+  }
+  const top = numbers2.length > 0 ? numbers2[numbers2.length - 1] : 0;
+  return { layer: top + TRACK_STEP, created: true };
+}
+function overlaySvgText(width, height) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#000000" fill-opacity="0"/></svg>
+`;
+}
+function overlayFileName(width, height) {
+  return `Text Overlay ${width}x${height}.svg`;
+}
+function existingCarrier(project, width, height) {
+  const name = overlayFileName(width, height).toLowerCase();
+  return project.files.find((f2) => {
+    if (f2.zenvi_role !== OVERLAY_ROLE) return false;
+    const base = String(f2.path ?? "").split(/[\\/]/).pop()?.toLowerCase() ?? "";
+    return base === name || Number(f2.width) === width && Number(f2.height) === height;
+  });
+}
+async function prepareOverlayCarrier(call) {
+  const [w, h] = projectSize(call.doc.project);
+  const found = existingCarrier(call.doc.project, w, h);
+  if (found) return { file: found };
+  const media = call.host.media;
+  if (!media?.writeGenerated) toolError("this Zenvi surface cannot store the transparent overlay image a timer or caption overlay needs");
+  const name = overlayFileName(w, h);
+  let path38;
+  try {
+    path38 = await media.writeGenerated(name, new TextEncoder().encode(overlaySvgText(w, h)), "image/svg+xml");
+  } catch (error62) {
+    return toolError(`could not write the overlay image: ${error62 instanceof Error ? error62.message : String(error62)}`);
+  }
+  try {
+    return { media: { path: path38, info: await media.probe(path38), name } };
+  } catch (error62) {
+    return toolError(`could not import ${name} into Project Files: ${error62 instanceof Error ? error62.message : String(error62)}`);
+  }
+}
+function carrierFile(tx, carrier) {
+  if ("file" in carrier) return carrier.file;
+  const file3 = addFile(tx, carrier.media, { name: OVERLAY_FILE_NAME, mediaType: "image" });
+  return updateFile(tx, file3.id, { name: OVERLAY_FILE_NAME, zenvi_role: OVERLAY_ROLE });
+}
+var TextToolError, COLOR_NAMES, GRAVITY, TRACK_STEP, ONE_FRAME_TOLERANCE, OVERLAY_ROLE, OVERLAY_FILE_NAME;
+var init_titles_text = __esm({
+  "../engine/src/tools/titles-text.ts"() {
+    "use strict";
+    init_types();
+    init_edit();
+    init_rounding();
+    init_files();
+    init_internal();
+    init_frame_time();
+    init_pyfmt();
+    init_receipt();
+    init_tracks2();
+    TextToolError = class extends Error {
+      name = "TextToolError";
+    };
+    COLOR_NAMES = {
+      white: "#ffffff",
+      black: "#000000",
+      red: "#ff0000",
+      green: "#00ff00",
+      blue: "#0000ff",
+      yellow: "#ffff00",
+      cyan: "#00ffff",
+      magenta: "#ff00ff",
+      orange: "#ffa500",
+      purple: "#800080",
+      pink: "#ffc0cb",
+      gray: "#808080",
+      grey: "#808080",
+      transparent: "#00000000"
+    };
+    GRAVITY = {
+      top_left: 0,
+      top_center: 1,
+      top_right: 2,
+      center_left: 3,
+      center: 4,
+      center_right: 5,
+      bottom_left: 6,
+      bottom_center: 7,
+      bottom_right: 8
+    };
+    TRACK_STEP = 1e6;
+    ONE_FRAME_TOLERANCE = 0.5;
+    OVERLAY_ROLE = "text_overlay";
+    OVERLAY_FILE_NAME = "Text Overlay.svg";
+  }
+});
+
+// ../engine/src/tools/catalog/animated-titles.ts
+function paramRow(p) {
+  const row = { name: p.name, type: p.type, title: p.title ?? "", default: p.default ?? "" };
+  if (p.min !== void 0) row.min = p.min;
+  if (p.max !== void 0) row.max = p.max;
+  if (Object.keys(p.values).length > 0) {
+    row.values = p.name.includes("project_files") ? "a Project Files id (image or video)" : Object.values(p.values).sort();
+  }
+  return row;
+}
+function animatedCatalog(query2) {
+  const words3 = String(query2 ?? "").toLowerCase().replaceAll("_", " ").split(/\s+/).filter(Boolean);
+  const rows = [];
+  for (const t of ANIMATED_TITLES) {
+    const frames = templateFrames(t);
+    const hay = `${t.name} ${t.title}`.toLowerCase().replaceAll("_", " ");
+    if (!words3.every((w) => hay.includes(w))) continue;
+    const web = rendersOnWeb(t.name);
+    rows.push({
+      name: t.name,
+      title: t.title,
+      frames_at_25fps: frames,
+      seconds: pyRoundTo(frames / TITLE_FPS, 2),
+      params: t.params.filter((p) => !HIDDEN_PARAMS2.has(p.name)).map(paramRow),
+      renders_here: web,
+      look: web ? WEB_LOOKS[t.name] : `needs Blender (Zenvi desktop): ${DESKTOP_ONLY_TITLES[t.name] ?? "a 3D scene"}`
+    });
+  }
+  const renderer = {
+    blender: false,
+    renders: "2D keyframed titles (SVG text, clip keyframes, Glow/Blur/LensFlare effects); Zenvi desktop renders these templates in 3D with Blender"
+  };
+  return { rows, renderer };
+}
+function findTemplate(name) {
+  const raw = String(name ?? "").trim();
+  if (!raw) toolError("template is required (list_title_templates_tool kind=animated lists them)");
+  const key = raw.toLowerCase().replaceAll(" ", "_").replace(".xml", "").replace(".blend", "");
+  for (const t of ANIMATED_TITLES) {
+    if ([t.name.toLowerCase(), t.title.toLowerCase().replaceAll(" ", "_"), t.service.toLowerCase().replace(".blend", "")].includes(key)) return t;
+  }
+  return toolError(`unknown animated title ${pyReprString(raw)}; available: ${ANIMATED_TITLES.map((t) => `${t.name} (${t.title})`).join(", ")}`);
+}
+function spinnerNumber(value) {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const text4 = String(value ?? "").trim();
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(text4)) return null;
+  return Number(text4);
+}
+function applyParams(t, values, text4, overrides, fileChoices) {
+  const byName2 = new Map(t.params.map((p) => [p.name, p]));
+  const editable = t.params.filter((p) => !HIDDEN_PARAMS2.has(p.name));
+  if (text4) {
+    const main = editable.find((p) => p.type === "text" || p.type === "multiline");
+    if (!main) toolError("this animated title has no text; drop text");
+    values[main.name] = text4;
+  }
+  for (const [name, value] of Object.entries(overrides ?? {})) {
+    const p = byName2.get(name);
+    if (!p || HIDDEN_PARAMS2.has(name)) toolError(`unknown parameter ${pyReprString(name)}; this template takes: ${editable.map((q) => q.name).join(", ")}`);
+    if (p.type === "spinner") {
+      const v = spinnerNumber(value);
+      if (v === null) toolError(`${name} must be a number`);
+      const lo = p.min !== void 0 ? Number(p.min) : v;
+      const hi = p.max !== void 0 ? Number(p.max) : v;
+      if (!(lo <= v && v <= hi)) toolError(`${name} must be between ${pyG(lo)} and ${pyG(hi)}`);
+      values[name] = v;
+    } else if (p.type === "text" || p.type === "multiline") {
+      values[name] = typeof value === "string" ? value : typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
+    } else if (p.type === "color") {
+      const [hex4, alpha] = colorHexAlpha(value, name);
+      values[name] = colorValue(hex4 + pyRound(alpha * 255).toString(16).padStart(2, "0"), name);
+    } else if (p.type === "dropdown") {
+      if (name.includes("project_files")) {
+        const choice = fileChoices.get(String(value));
+        if (choice === void 0) toolError(`${name} takes the id of an image or video in Project Files`);
+        values[name] = choice;
+        continue;
+      }
+      const options = Object.entries(p.values);
+      const v = String(value);
+      const byLabel = new Map(options.map(([label2, num12]) => [label2.toLowerCase(), num12]));
+      if (options.some(([, num12]) => num12 === v)) values[name] = v;
+      else if (byLabel.has(v.toLowerCase())) values[name] = byLabel.get(v.toLowerCase());
+      else toolError(`${name} must be one of [${options.map(([, num12]) => num12).sort().map((n) => `'${n}'`).join(", ")}]`);
+    }
+  }
+  return values;
+}
+function projectFileChoices(files) {
+  const out = /* @__PURE__ */ new Map();
+  for (const f2 of files) {
+    if ((f2.media_type === "image" || f2.media_type === "video") && !String(f2.path ?? "").toLowerCase().endsWith(".svg")) {
+      const fps = f2.fps ?? { num: 25, den: 1 };
+      out.set(String(f2.id), [f2.path, f2.height, f2.width, f2.media_type, String(fps.num / (fps.den || 1))].map(String).join("|"));
+    }
+  }
+  return out;
+}
+async function writeSvg(call, name, svg) {
+  const media = call.host.media;
+  let path38;
+  try {
+    path38 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+  } catch (error62) {
+    return toolError(`could not write the animated title: ${error62 instanceof Error ? error62.message : String(error62)}`);
+  }
+  try {
+    return { path: path38, info: await media.probe(path38), name };
+  } catch (error62) {
+    return toolError(`the animated title could not be imported: ${error62 instanceof Error ? error62.message : String(error62)}`);
+  }
+}
+var animatedTitleTools;
+var init_animated_titles = __esm({
+  "../engine/src/tools/catalog/animated-titles.ts"() {
+    "use strict";
+    init_ids();
+    init_rounding();
+    init_files();
+    init_overlays();
+    init_animated();
+    init_title_svg();
+    init_define();
+    init_frame_time();
+    init_pyfmt();
+    init_receipt();
+    init_titles_text();
+    animatedTitleTools = [
+      contractTool("add_animated_title_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        requires: ["media"],
+        run: (call, input2) => guarded("add_animated_title_tool", async () => {
+          const tool = "add_animated_title_tool";
+          const project = call.doc.project;
+          const template = findTemplate(input2.template ?? "");
+          const diff = projectFpsDiff(projectFps(project));
+          let values = defaultParams(template, diff);
+          const needsFiles = template.params.some((p) => p.name.includes("project_files"));
+          const choices = needsFiles ? projectFileChoices(project.files) : /* @__PURE__ */ new Map();
+          const text4 = String(input2.text ?? "");
+          values = applyParams(template, values, text4, input2.params ?? {}, choices);
+          const multiplier = input2.length_multiplier ?? 1;
+          values.length_multiplier = multiplier * Math.max(1, diff);
+          const base = safeBaseName(String(input2.file_name ?? "") || text4 || template.name, "AnimatedTitle", 40);
+          values.file_name = base.replaceAll(" ", "_");
+          if (!rendersOnWeb(template.name)) {
+            return unavailable(
+              tool,
+              `${template.title} is a 3D scene (${DESKTOP_ONLY_TITLES[template.name] ?? "Blender"}) that only Zenvi desktop renders, with Blender. The other animated titles render here (list_title_templates_tool kind=animated); add_title_tool makes static titles with fades.`
+            );
+          }
+          if (!call.host.media.writeGenerated) return unavailable(tool, "it cannot store generated title images.");
+          const frames = Math.trunc(Number(values.end_frame) || 1) * Math.max(1, pyRound(Number(values.length_multiplier)));
+          const fps = fpsOfProject(project);
+          const position = snapToFrame(project, input2.position_seconds ?? 0);
+          const duration3 = Math.max(1 / fps, frames / fps);
+          planOverlayTrack(project, position, position + duration3, input2.track);
+          const [width, height] = projectSize(project);
+          const segments2 = buildAnimatedTitle(template.name, values, { width, height }, frames);
+          const prepared = [];
+          for (const [i, seg] of segments2.entries()) {
+            const startFrame = Math.round(seg.from * frames);
+            const endFrame = Math.max(startFrame + 1, Math.round(seg.to * frames));
+            const source2 = seg.svg === null ? { carrier: await prepareOverlayCarrier(call) } : { media: await writeSvg(call, `${values.file_name}${segments2.length > 1 ? `_${i + 1}` : ""}.svg`, seg.svg) };
+            prepared.push({ position: position + startFrame / fps, duration: (endFrame - startFrame) / fps, source: source2, props: seg.props, effects: seg.effects });
+          }
+          const placed = call.commit((tx) => {
+            const { layer: layer2, created } = planOverlayTrack(tx.project, position, position + duration3, input2.track);
+            const nextId = idFactory(tx.project);
+            const clips = prepared.map((seg) => {
+              const file3 = "media" in seg.source ? addFile(tx, seg.source.media, { mediaType: "image" }) : carrierFile(tx, seg.source.carrier);
+              const props = { ...seg.props };
+              if (seg.effects.length > 0) props.effects = seg.effects.map((e) => ({ ...e, id: nextId() }));
+              const clip2 = placeOverlayClip(tx, { fileId: file3.id, position: seg.position, duration: seg.duration, layer: layer2, newTrackLabel: "Titles", title: template.title, props });
+              return { clip: clip2, fileId: file3.id };
+            });
+            return { clips, layer: layer2, created };
+          });
+          const t = trackInfo(call.doc.project, placed.layer);
+          const first = placed.clips[0];
+          const data = {
+            timeline_clip_id: first.clip.id,
+            file_id: first.fileId,
+            template: template.name,
+            frames,
+            position: pyRoundTo(position, 3),
+            duration: pyRoundTo(duration3, 3),
+            new_track: placed.created,
+            renderer: "keyframes",
+            look: WEB_LOOKS[template.name],
+            params: values,
+            ...t
+          };
+          if (placed.clips.length > 1) {
+            data.timeline_clip_ids = placed.clips.map((c) => c.clip.id);
+            data.file_ids = placed.clips.map((c) => c.fileId);
+          }
+          return applied(
+            tool,
+            summaryLine(
+              `Added animated title ${pyReprString(template.title)} (a 2D keyframed title, ${frames} frames) on track ${t.track} at ${pyFixed(position, 2)}-${pyFixed(position + duration3, 2)}s.`
+            ),
+            {
+              data,
+              notes: ["Zenvi desktop renders this template in 3D with Blender; this surface draws a 2D version of it with keyframes, which stays editable."]
+            }
+          );
+        })
+      })
+    ];
   }
 });
 
@@ -53943,7 +55892,7 @@ function compactFragmentsAfterRemove(position, start, end, removeRanges, fps) {
   }
   return { fragments, removed: Math.max(0, originalDur - keptDur) };
 }
-function phraseWords(words2, fps, options = {}) {
+function phraseWords(words3, fps, options = {}) {
   const maxWords = options.maxWords ?? 8;
   const maxChars = options.maxChars ?? 42;
   const maxGap = options.maxGapSec ?? 0.8;
@@ -53971,7 +55920,7 @@ function phraseWords(words2, fps, options = {}) {
     });
     bucket = [];
   };
-  for (const w of words2) {
+  for (const w of words3) {
     const t = String(w.text ?? "").trim();
     if (!t) continue;
     if (bucket.length === 0) {
@@ -54004,12 +55953,12 @@ function cueTimes(cue, fps) {
   return [t0, t1];
 }
 function cuesToSrt(cues, fps) {
-  const lines = [];
+  const lines2 = [];
   cues.forEach((cue, i) => {
     const [t0, t1] = cueTimes(cue, fps);
-    lines.push(String(i + 1), `${tsSrt(t0)} --> ${tsSrt(t1)}`, String(cue.text ?? "").trim(), "");
+    lines2.push(String(i + 1), `${tsSrt(t0)} --> ${tsSrt(t1)}`, String(cue.text ?? "").trim(), "");
   });
-  return lines.length > 0 ? lines.join("\n").trimEnd() + "\n" : "";
+  return lines2.length > 0 ? lines2.join("\n").trimEnd() + "\n" : "";
 }
 function cuesToVtt(cues, fps) {
   const out = ["WEBVTT", ""];
@@ -54028,22 +55977,22 @@ function parseSrtOrVtt(text4, fps) {
   if (body.trimStart().toUpperCase().startsWith("WEBVTT")) body = body.replace(/^WEBVTT[^\n]*\n/i, "");
   const cues = [];
   for (const block of body.trim().split(/\n\s*\n/)) {
-    let lines = block.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.trim() !== "");
-    if (lines.length === 0) continue;
-    if (/^\d+$/.test(lines[0]) && lines.length >= 2) lines = lines.slice(1);
-    const m = TIME_RE.exec(lines[0]);
+    let lines2 = block.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.trim() !== "");
+    if (lines2.length === 0) continue;
+    if (/^\d+$/.test(lines2[0]) && lines2.length >= 2) lines2 = lines2.slice(1);
+    const m = TIME_RE.exec(lines2[0]);
     if (!m) continue;
     const t0 = snap(parseTs(m[1], m[2], m[3], m[4]), fps);
     let t1 = snap(parseTs(m[5], m[6], m[7], m[8]), fps);
     if (t1 <= t0) t1 = toSeconds(toFrame(t0, fps) + 1, fps);
-    const caption2 = lines.slice(1).join(" ").trim();
+    const caption2 = lines2.slice(1).join(" ").trim();
     if (!caption2) continue;
     cues.push({ text: caption2, startSec: t0, endSec: t1, startFrame: toFrame(t0, fps), endFrame: toFrame(t1, fps) });
   }
   return cues;
 }
-function wordsToScript(words2) {
-  const texts = words2.map((w) => String(w.text ?? "").trim()).filter(Boolean);
+function wordsToScript(words3) {
+  const texts = words3.map((w) => String(w.text ?? "").trim()).filter(Boolean);
   if (texts.length === 0) return "";
   const parts = [];
   let buf = [];
@@ -54070,7 +56019,7 @@ var init_speech = __esm({
 });
 
 // ../engine/src/tools/resolve.ts
-function isRecord23(value) {
+function isRecord24(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function optionalFloat(value) {
@@ -54086,21 +56035,21 @@ function tokenize(text4) {
   return (normalizeText(text4).match(/[a-z0-9]+/g) ?? []).filter((t) => t.length > 1);
 }
 function metadataCorpus(ai, maxScenes = 8) {
-  if (!isRecord23(ai)) return "";
+  if (!isRecord24(ai)) return "";
   const parts = [];
   for (const key of ["short_summary", "description", "sounds", "transcript"]) {
     if (ai[key]) parts.push(String(ai[key]));
   }
   for (const ch of (Array.isArray(ai.chapters) ? ai.chapters : []).slice(0, maxScenes)) {
-    if (isRecord23(ch)) {
+    if (isRecord24(ch)) {
       if (ch.title) parts.push(String(ch.title));
       if (ch.summary) parts.push(String(ch.summary));
     }
   }
   for (const sc of (Array.isArray(ai.scene_descriptions) ? ai.scene_descriptions : []).slice(0, maxScenes)) {
-    if (isRecord23(sc) && sc.description) parts.push(String(sc.description));
+    if (isRecord24(sc) && sc.description) parts.push(String(sc.description));
   }
-  const tags = isRecord23(ai.tags) ? ai.tags : {};
+  const tags = isRecord24(ai.tags) ? ai.tags : {};
   for (const key of ["objects", "scenes", "activities", "mood"]) {
     const vals = tags[key];
     if (Array.isArray(vals)) {
@@ -54204,17 +56153,17 @@ function candidateFrom(ctx) {
   };
 }
 function formatCandidatesError(candidates, prefix) {
-  const lines = [prefix];
+  const lines2 = [prefix];
   candidates.slice(0, 3).forEach((c, i) => {
     const trackPart = c.uiTrack !== null ? ` ui_track=${c.uiTrack}` : "";
-    lines.push(
+    lines2.push(
       `  ${i + 1}. timeline_clip_id=${c.timelineClipId} title=${pyReprString(c.title)} track=${c.layer === null ? "None" : c.layer}${trackPart} file=${pyReprString(c.fileName)} source=${pyFixed(c.sourceStart, 1)}-${pyFixed(c.sourceEnd, 1)}s score=${pyFixed(c.score, 2)}`
     );
   });
-  lines.push(
+  lines2.push(
     "Pass timeline_clip_id from list_clips_tool, or disambiguate with track, occurrence (1-based), or position_near (timeline seconds)."
   );
-  return lines.join("\n");
+  return lines2.join("\n");
 }
 function checkAmbiguity(scored, trackFilter, occurrence, positionNear) {
   if (scored.length === 0 || occurrence > 0 || positionNear !== null) return null;
@@ -54353,7 +56302,7 @@ var init_resolve = __esm({
 });
 
 // ../engine/src/tools/backend.ts
-function isRecord24(value) {
+function isRecord25(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function backendRequest(backend, path38, init = {}) {
@@ -54381,7 +56330,7 @@ async function searchIndex(call, text4, options = {}) {
   if (options.lookFor) body.look_for = options.lookFor;
   const res = await backendRequest(call.host.backend, "/api/v1/search", { method: "POST", body, signal: call.signal });
   if (!res.ok) return { results: [], error: res.error };
-  const results = Array.isArray(res.data.results) ? res.data.results.filter(isRecord24) : [];
+  const results = Array.isArray(res.data.results) ? res.data.results.filter(isRecord25) : [];
   const error62 = typeof res.data.error === "string" && res.data.error ? res.data.error : void 0;
   return error62 ? { results, error: error62 } : { results };
 }
@@ -54395,14 +56344,14 @@ async function projectCatalog(call, projectId) {
     signal: call.signal
   });
   if (!res.ok) return { items: [], error: res.error };
-  const items = Array.isArray(res.data.items) ? res.data.items.filter(isRecord24) : [];
+  const items = Array.isArray(res.data.items) ? res.data.items.filter(isRecord25) : [];
   const error62 = typeof res.data.error === "string" && res.data.error ? res.data.error : void 0;
   return error62 ? { items, error: error62 } : { items };
 }
 async function watchWindowRequest(call, payload) {
   const res = await backendRequest(call.host.backend, "/api/v1/indexing/watch-window", { method: "POST", body: payload, signal: call.signal });
   if (!res.ok) return { error: res.error };
-  return isRecord24(res.data) ? res.data : { error: "bad watch-window response" };
+  return isRecord25(res.data) ? res.data : { error: "bad watch-window response" };
 }
 async function summarizeIndexedVideo(call, input2) {
   const body = {
@@ -54413,7 +56362,7 @@ async function summarizeIndexedVideo(call, input2) {
   };
   const res = await backendRequest(call.host.backend, "/api/v1/indexing/summarize", { method: "POST", body, signal: call.signal });
   if (!res.ok) return { ok: false, error: res.error };
-  const meta3 = isRecord24(res.data.ai_metadata) ? res.data.ai_metadata : void 0;
+  const meta3 = isRecord25(res.data.ai_metadata) ? res.data.ai_metadata : void 0;
   if (meta3 && (meta3.analyzed || res.data.success)) return { ok: true, aiMetadata: meta3 };
   return { ok: false, error: String(res.data.error || meta3?.error || "Summarize did not complete") };
 }
@@ -54438,7 +56387,7 @@ async function generateTts(call, input2) {
   return { audioBase64: String(res.data.audio_base64 ?? "") };
 }
 function pickPexelsHdLink(video) {
-  const files = Array.isArray(video.video_files) ? video.video_files.filter(isRecord24) : [];
+  const files = Array.isArray(video.video_files) ? video.video_files.filter(isRecord25) : [];
   const pick2 = files.find((f2) => f2.quality === "hd") ?? files[0];
   return String(pick2?.link || "");
 }
@@ -54465,7 +56414,7 @@ function collectProjectIndex(project) {
   const indexNames = [];
   for (const file3 of project.files ?? []) {
     if (file3.zenvi_subclip) continue;
-    const ai = isRecord24(file3.ai_metadata) ? file3.ai_metadata : {};
+    const ai = isRecord25(file3.ai_metadata) ? file3.ai_metadata : {};
     const block = getIndexBlock(ai);
     if (!isIndexed(block)) continue;
     const videoId = String(block.video_id ?? "").trim();
@@ -54559,7 +56508,7 @@ function indexSearchForResolver(call) {
     if (!indexId) {
       const ids2 = [];
       for (const ctx of contexts) {
-        const tl = isRecord24(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
+        const tl = isRecord25(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
         if (String(tl.status ?? "").toLowerCase() !== "ready") continue;
         const id = String(tl.index_id ?? "").trim();
         if (id) ids2.push(id);
@@ -54571,7 +56520,7 @@ function indexSearchForResolver(call) {
     if (res.error || res.results.length === 0) return [];
     const byVideo = /* @__PURE__ */ new Map();
     for (const ctx of contexts) {
-      const tl = isRecord24(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
+      const tl = isRecord25(ctx.effectiveMetadata.twelvelabs) ? ctx.effectiveMetadata.twelvelabs : {};
       if (String(tl.status ?? "").toLowerCase() !== "ready") continue;
       const vid = String(tl.video_id ?? "").trim();
       if (vid) byVideo.set(vid, [...byVideo.get(vid) ?? [], ctx]);
@@ -54610,7 +56559,7 @@ var init_backend2 = __esm({
 });
 
 // ../engine/src/tools/catalog/common.ts
-function isRecord25(value) {
+function isRecord26(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function text(value) {
@@ -54671,8 +56620,8 @@ function detectOrdinal(query2) {
 function parseOccurrence(occurrence, query2) {
   const n = floatArg(occurrence, null);
   if (n !== null && Math.trunc(n) > 0) return Math.trunc(n);
-  const words2 = String(query2 ?? "").toLowerCase().split(/\s+/);
-  for (const [word, value] of Object.entries(ORDINALS)) if (words2.includes(word)) return value;
+  const words3 = String(query2 ?? "").toLowerCase().split(/\s+/);
+  for (const [word, value] of Object.entries(ORDINALS)) if (words3.includes(word)) return value;
   return 0;
 }
 function semanticSearchQuery(query2) {
@@ -54733,7 +56682,7 @@ function forgetFile(call) {
   lastFiles.get(call.doc)?.delete(call.session);
 }
 function record4(value) {
-  return isRecord25(value) ? value : {};
+  return isRecord26(value) ? value : {};
 }
 var MAX_UNDO_STEPS, STEP_WORDS, ORDINALS, lastFiles;
 var init_common = __esm({
@@ -54902,32 +56851,32 @@ var init_audio3 = __esm({
           }
           if (entries.length === 0) return "No timeline clips with audio.";
           const showWindows = String(input2.detail ?? "").trim().toLowerCase() === "windows";
-          const lines = [`Timeline audio (${entries.length} clip(s) with sound):`];
+          const lines2 = [`Timeline audio (${entries.length} clip(s) with sound):`];
           for (const entry of entries) {
-            lines.push(describeAudioClip(entry));
+            lines2.push(describeAudioClip(entry));
             if (showWindows && entry.windows.length > 0) {
-              lines.push(`    speech windows (${entry.windowSource}, timeline s): ${fmtWindows(entry.windows)}`);
+              lines2.push(`    speech windows (${entry.windowSource}, timeline s): ${fmtWindows(entry.windows)}`);
             }
           }
           const speech = entries.filter((e) => e.role === "speech");
           const beds = entries.filter((e) => e.role === "music" || e.role === "sfx");
           const unknown2 = entries.filter((e) => e.role === "unknown");
-          lines.push(`Summary: ${speech.length} speech, ${beds.length} music/sfx bed(s), ${unknown2.length} unknown.`);
+          lines2.push(`Summary: ${speech.length} speech, ${beds.length} music/sfx bed(s), ${unknown2.length} unknown.`);
           if (unknown2.length > 0) {
-            lines.push("  unknown = source not indexed yet; index it or pass the clip id explicitly to mix it.");
+            lines2.push("  unknown = source not indexed yet; index it or pass the clip id explicitly to mix it.");
           }
           for (const [a, b] of speechOverlaps(entries)) {
-            lines.push(
+            lines2.push(
               `WARNING: speech clips ${a.id} and ${b.id} overlap in time (${pyFixed(Math.max(a.start, b.start), 2)}s-${pyFixed(Math.min(a.end, b.end), 2)}s). Two voices at once cannot be fixed by ducking \u2014 move or trim one.`
             );
           }
           for (const bed of beds) {
             const higher = speech.filter((s) => s.layer < bed.layer && Math.min(s.end, bed.end) - Math.max(s.start, bed.start) > 0.05);
             if (higher.length > 0) {
-              lines.push(`NOTE: bed ${bed.id} sits above speech on track ${bed.trackLabel}. Duck its level instead of restacking tracks.`);
+              lines2.push(`NOTE: bed ${bed.id} sits above speech on track ${bed.trackLabel}. Duck its level instead of restacking tracks.`);
             }
           }
-          return lines.join("\n");
+          return lines2.join("\n");
         }
       }),
       contractTool("set_clip_volume_tool", {
@@ -55105,42 +57054,582 @@ var init_audio3 = __esm({
           }
           const dryRun = boolArg(input2.dry_run);
           const header = `${dryRun ? "Would duck" : "Ducked"} ${planned.length} bed clip(s) under ${speech.length} speech clip(s). ` + (fixedGain === null ? "duck=auto (per bed, from measured levels)" : `duck=${signed1(gainToDb(fixedGain))} dB (gain ${pyFixed(fixedGain, 3)})`);
-          const lines = [header, ""];
+          const lines2 = [header, ""];
           for (const { bed, points, held, gain } of planned) {
-            lines.push(`bed timeline_clip_id=${bed.id} track=${bed.trackLabel} title=${pyReprString(bed.title)}`);
+            lines2.push(`bed timeline_clip_id=${bed.id} track=${bed.trackLabel} title=${pyReprString(bed.title)}`);
             if (bed.level !== null) {
-              lines.push(`  role=${bed.role} base=${pyFixed(bed.level, 2)} -> ${pyFixed(bed.level * gain, 2)} (${signed1(gainToDb(gain))} dB)`);
+              lines2.push(`  role=${bed.role} base=${pyFixed(bed.level, 2)} -> ${pyFixed(bed.level * gain, 2)} (${signed1(gainToDb(gain))} dB)`);
             } else {
-              lines.push(`  role=${bed.role} base=automated (existing curve scaled by ${pyFixed(gain, 3)} under speech)`);
+              lines2.push(`  role=${bed.role} base=automated (existing curve scaled by ${pyFixed(gain, 3)} under speech)`);
             }
-            lines.push(`  ${held.length} duck window(s), ${points.length} volume points`);
-            lines.push(`  ducked (timeline s): ${fmtWindows(held)}`);
+            lines2.push(`  ${held.length} duck window(s), ${points.length} volume points`);
+            lines2.push(`  ducked (timeline s): ${fmtWindows(held)}`);
             const gaps = invertWindows(held, bed.start, bed.end);
-            if (gaps.length > 0) lines.push(`  restored (timeline s): ${fmtWindows(gaps)}`);
+            if (gaps.length > 0) lines2.push(`  restored (timeline s): ${fmtWindows(gaps)}`);
           }
           if (boosted.length > 0) {
-            lines.push(`speech boosted by ${signed1(boostDb)} dB on: ${boosted.map((b) => b.entry.id).join(", ")}`);
+            lines2.push(`speech boosted by ${signed1(boostDb)} dB on: ${boosted.map((b) => b.entry.id).join(", ")}`);
           }
-          lines.push(
+          lines2.push(
             "speech sources: " + speech.map((e) => `${e.id} (${e.windowSource || "declared"}, ${e.windows.length} windows)`).join(", ")
           );
           const skipped = entries.filter((e) => e.role === "unknown");
-          if (skipped.length > 0) lines.push("skipped: " + skipped.slice(0, 5).map((e) => `${e.id} role=unknown (not indexed)`).join(", "));
-          lines.push(...warnings);
+          if (skipped.length > 0) lines2.push("skipped: " + skipped.slice(0, 5).map((e) => `${e.id} role=unknown (not indexed)`).join(", "));
+          lines2.push(...warnings);
           for (const [a, b] of speechOverlaps(entries)) {
-            lines.push(`WARNING: speech clips ${a.id} and ${b.id} overlap; ducking cannot separate two voices \u2014 move or trim one.`);
+            lines2.push(`WARNING: speech clips ${a.id} and ${b.id} overlap; ducking cannot separate two voices \u2014 move or trim one.`);
           }
           if (dryRun) {
-            lines.push("", "dry_run=true \u2014 nothing was written.");
-            return lines.join("\n");
+            lines2.push("", "dry_run=true \u2014 nothing was written.");
+            return lines2.join("\n");
           }
           call.commit((tx) => {
             for (const { bed, points } of planned) writeVolumePoints(tx, bed.id, points);
             for (const { entry, points } of boosted) writeVolumePoints(tx, entry.id, points);
           });
-          lines.push("", "No clip changed track, position or trim. One undo reverts the whole mix.");
-          return lines.join("\n");
+          lines2.push("", "No clip changed track, position or trim. One undo reverts the whole mix.");
+          return lines2.join("\n");
         }
+      })
+    ];
+  }
+});
+
+// ../engine/src/tools/caption-cues.ts
+function formatCueTime(seconds2) {
+  const ms = Math.trunc(pyRound(Math.max(0, Number(seconds2) || 0) * 1e3));
+  const hours = Math.floor(ms / 36e5);
+  const minutes = Math.floor(ms % 36e5 / 6e4);
+  const secs = Math.floor(ms % 6e4 / 1e3);
+  const milli = ms % 1e3;
+  const two = (n) => String(n).padStart(2, "0");
+  return `${two(hours)}:${two(minutes)}:${two(secs)}:${String(milli).padStart(3, "0")}`;
+}
+function fraction4(group) {
+  return Number((group ?? "").padEnd(3, "0").slice(0, 3)) / 1e3;
+}
+function parseCaptionText(captionText) {
+  let prepared = String(captionText ?? "");
+  if (!prepared.endsWith("\n\n")) prepared += "\n\n";
+  const cues = [];
+  for (const m of prepared.matchAll(CAPTION_RE)) {
+    const start = Number(m[1] ?? 0) * 3600 + Number(m[2]) * 60 + Number(m[3]) + fraction4(m[4]);
+    const end = Number(m[5] ?? 0) * 3600 + Number(m[6]) * 60 + Number(m[7]) + fraction4(m[8]);
+    const body = (m[9] ?? "") + (m[10] ?? "");
+    const text4 = body.split("\n").map((line2) => line2.trim()).filter(Boolean).join("\n");
+    cues.push({ start, end, text: text4 });
+  }
+  return cues;
+}
+function safeLine(line2) {
+  let out = line2.replace(TIME_IN_TEXT, `${ZERO_WIDTH}:`);
+  if (out.startsWith("NOTE")) out = ZERO_WIDTH + out;
+  if (out.length === 1) out += ZERO_WIDTH;
+  return out;
+}
+function safeText(text4) {
+  const lines2 = String(text4 ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").map((line2) => line2.trim());
+  const kept = lines2.filter(Boolean);
+  const result = kept.map(safeLine).join("\n");
+  return [result, result !== kept.join("\n")];
+}
+function displayText(text4) {
+  return String(text4 ?? "").replaceAll(ZERO_WIDTH, "").replaceAll(RATIO_COLON, ":");
+}
+function buildCaptionText(cues) {
+  const blocks = [...cues].sort((a, b) => a.start - b.start || a.end - b.end).map((cue) => `${formatCueTime(cue.start)} --> ${formatCueTime(cue.end)}
+${cue.text}`);
+  return blocks.join("\n\n") + (blocks.length > 0 ? "\n\n" : "");
+}
+var ZERO_WIDTH, RATIO_COLON, CAPTION_RE, TIME_IN_TEXT;
+var init_caption_cues = __esm({
+  "../engine/src/tools/caption-cues.ts"() {
+    "use strict";
+    init_rounding();
+    ZERO_WIDTH = "\u200B";
+    RATIO_COLON = "\u2236";
+    CAPTION_RE = /(\d{2})?:*(\d{2}):(\d{2})[^\n](\d{2,3})\s*-->\s*(\d{2})?:*(\d{2}):(\d{2})[^\n](\d{2,3})([\s\S]*?)([^\n]*?)(?=\d{2}:\d{2,3}|$(?![\s\S]))/gu;
+    TIME_IN_TEXT = /(?<=\d\d):(?=\d\d)/g;
+  }
+});
+
+// ../engine/src/tools/caption-style.ts
+function isHeavyFont(font) {
+  const low = String(font ?? "").toLowerCase();
+  return HEAVY_FONT_HINTS.some((hint) => low.includes(hint));
+}
+function restyleRequested(args) {
+  return Boolean(
+    args.style || args.font || args.text_size || String(args.text_color ?? "").trim() || String(args.stroke_color ?? "").trim() || (args.stroke_width ?? -1) >= 0 || String(args.background_color ?? "").trim() || (args.background_opacity ?? -1) >= 0 || args.position || (args.fade_seconds ?? -1) >= 0
+  );
+}
+function captionTop(position, fontPx, lineSpacing, height, lines2, vertical) {
+  const ls = 1.2 * fontPx;
+  const h = height;
+  let top;
+  if (position === "top") {
+    const safe2 = vertical ? 0.12 : 0.06;
+    top = safe2 - 0.45 * fontPx / h;
+  } else if (position === "center") {
+    top = 0.5 - (ls - 0.25 * fontPx) / h;
+  } else {
+    const safe2 = vertical ? 0.2 : 0.08;
+    const block = ls + Math.max(0, lines2 - 1) * ls * lineSpacing + 0.3 * fontPx;
+    top = 1 - safe2 - block / h;
+  }
+  return Math.max(0, Math.min(0.95, top));
+}
+function effectColor(effect3, name, fallback) {
+  const c = effect3[name];
+  if (typeof c !== "object" || c === null) return fallback;
+  const channels = ["red", "green", "blue"].map((k) => keyframeValueAt(c[k], 1, 0));
+  if (channels.some((n) => !Number.isFinite(n))) return fallback;
+  return `#${channels.map((n) => Math.max(0, Math.min(255, pyRound(n))).toString(16).padStart(2, "0")).join("")}`;
+}
+function styleFromEffect(effect3, project) {
+  const e = effect3;
+  const [w, h] = projectSize(project);
+  const short = Math.min(w, h);
+  const units = w / 600;
+  const kf = (name, fallback) => keyframeValueAt(e[name], 1, fallback);
+  const fontPx = kf("font_size", 30) * units;
+  const top = kf("top", 0.75);
+  const font = e.caption_font;
+  return {
+    text_size: short ? pyRoundTo(fontPx / short, 4) : 0.05,
+    font: font === void 0 || font === null || font === "" || font === "sans" ? "" : String(font),
+    text_color: effectColor(e, "color", "#ffffff"),
+    text_alpha: kf("font_alpha", 1),
+    stroke_color: effectColor(e, "stroke", "#000000"),
+    stroke_width: fontPx ? pyRoundTo(kf("stroke_width", 0) * units / fontPx, 4) : 0,
+    background_color: effectColor(e, "background", "#000000"),
+    background_opacity: kf("background_alpha", 0),
+    position: top < 0.3 ? "top" : top < 0.6 ? "center" : "bottom",
+    padding: fontPx ? pyRoundTo(kf("background_padding", 20) * units / fontPx, 4) : 0.35,
+    corner: fontPx ? pyRoundTo(kf("background_corner", 10) * units / fontPx, 4) : 0.15,
+    fade: kf("fade_in", 0),
+    line_spacing: kf("line_spacing", 1)
+  };
+}
+var CAPTION_STYLES, CAPTION_POSITIONS, HEAVY_FONT_HINTS, THIN_OUTLINE, CaptionStyle;
+var init_caption_style = __esm({
+  "../engine/src/tools/caption-style.ts"() {
+    "use strict";
+    init_rounding();
+    init_titles_text();
+    CAPTION_STYLES = {
+      classic: { text_size: 0.05, text_color: "#ffffff", stroke_color: "#000000", stroke_width: 0, background_color: "#000000", background_opacity: 0.6, position: "bottom", font: "", padding: 0.35, corner: 0.15, fade: 0 },
+      reels: { text_size: 0.075, text_color: "#ffffff", stroke_color: "#000000", stroke_width: 0.09, background_color: "#000000", background_opacity: 0, position: "bottom", font: "Arial Black", padding: 0.3, corner: 0.15, fade: 0 },
+      minimal: { text_size: 0.045, text_color: "#ffffff", stroke_color: "#202020", stroke_width: 0.035, background_color: "#000000", background_opacity: 0, position: "bottom", font: "", padding: 0.3, corner: 0.15, fade: 0.1 },
+      yellow: { text_size: 0.055, text_color: "#ffe14d", stroke_color: "#000000", stroke_width: 0.07, background_color: "#000000", background_opacity: 0, position: "bottom", font: "Arial Black", padding: 0.3, corner: 0.15, fade: 0 },
+      boxed: { text_size: 0.05, text_color: "#ffffff", stroke_color: "#000000", stroke_width: 0, background_color: "#000000", background_opacity: 0.85, position: "bottom", font: "", padding: 0.45, corner: 0.05, fade: 0 }
+    };
+    CAPTION_POSITIONS = ["bottom", "center", "top"];
+    HEAVY_FONT_HINTS = ["black", "heavy", "impact", "extrabold", "ultra"];
+    THIN_OUTLINE = 0.035;
+    CaptionStyle = class {
+      values;
+      textAlpha;
+      explicitStroke;
+      constructor(args, base) {
+        const preset = args.style ?? "classic";
+        if (preset && !(preset in CAPTION_STYLES)) toolError(`style must be one of [${Object.keys(CAPTION_STYLES).sort().map((s) => `'${s}'`).join(", ")}]`);
+        const values = { ...base ?? CAPTION_STYLES[preset || "classic"] };
+        if (preset && base !== void 0) {
+          Object.assign(values, CAPTION_STYLES[preset]);
+          values.text_alpha = 1;
+        }
+        if (args.text_size) values.text_size = Number(args.text_size);
+        if (args.font) values.font = String(args.font).trim();
+        if (String(args.text_color ?? "").trim()) [values.text_color, values.text_alpha] = colorHexAlpha(args.text_color, "text_color");
+        if (String(args.stroke_color ?? "").trim()) values.stroke_color = colorHexAlpha(args.stroke_color, "stroke_color")[0];
+        this.explicitStroke = (args.stroke_width ?? -1) >= 0;
+        if (this.explicitStroke) values.stroke_width = Number(args.stroke_width);
+        if (String(args.background_color ?? "").trim()) {
+          const [hex4, alpha] = colorHexAlpha(args.background_color, "background_color");
+          values.background_color = hex4;
+          if (alpha < 1) values.background_opacity = alpha;
+          else if ((Number(values.background_opacity) || 0) <= 0) values.background_opacity = 0.6;
+        }
+        if ((args.background_opacity ?? -1) >= 0) values.background_opacity = Number(args.background_opacity);
+        this.textAlpha = Number(values.text_alpha ?? 1);
+        if (args.position) {
+          if (!CAPTION_POSITIONS.includes(args.position)) toolError(`position must be one of ['bottom', 'center', 'top']`);
+          values.position = args.position;
+        }
+        if ((args.fade_seconds ?? -1) >= 0) values.fade = Number(args.fade_seconds);
+        this.values = values;
+      }
+      /**
+       * `resolve_font` with no font list (web hosts cannot tell which fonts are
+       * installed): the font is kept as given; a preset outline is thinned on a
+       * font that is not heavy unless the caller asked for that outline.
+       */
+      resolveFont() {
+        const v = this.values;
+        if (v.font) v.font = v.font.trim().replace(/^['"]+|['"]+$/g, "");
+        if (!this.explicitStroke && !isHeavyFont(v.font) && (Number(v.stroke_width) || 0) > THIN_OUTLINE) v.stroke_width = THIN_OUTLINE;
+      }
+      /** The Caption effect properties for this look on `project` (`properties`). */
+      properties(project, lines2 = 2) {
+        const v = this.values;
+        const [w, h] = projectSize(project);
+        const short = Math.min(w, h);
+        const fontPx = Math.max(4, Number(v.text_size) * short);
+        const toUnits = 600 / w;
+        const lineSpacing = Number(v.line_spacing ?? 1);
+        const vertical = isVertical(project);
+        const top = captionTop(v.position, fontPx, lineSpacing, h, lines2, vertical);
+        const margin = vertical ? 0.06 : 0.08;
+        return {
+          caption_font: v.font || "sans",
+          font_size: constantKeyframe2(pyRoundTo(fontPx * toUnits, 3)),
+          font_alpha: constantKeyframe2(pyRoundTo(this.textAlpha, 4)),
+          color: colorKeyframes(v.text_color),
+          stroke: colorKeyframes(v.stroke_color),
+          stroke_width: constantKeyframe2(pyRoundTo(Number(v.stroke_width) * fontPx * toUnits, 3)),
+          background: colorKeyframes(v.background_color),
+          background_alpha: constantKeyframe2(pyRoundTo(Number(v.background_opacity), 4)),
+          background_padding: constantKeyframe2(pyRoundTo(Number(v.padding ?? 0.35) * fontPx * toUnits, 3)),
+          background_corner: constantKeyframe2(pyRoundTo(Number(v.corner ?? 0.15) * fontPx * toUnits, 3)),
+          left: constantKeyframe2(margin),
+          right: constantKeyframe2(margin),
+          top: constantKeyframe2(pyRoundTo(top, 4)),
+          bottom: constantKeyframe2(0),
+          line_spacing: constantKeyframe2(lineSpacing),
+          fade_in: constantKeyframe2(Number(v.fade ?? 0)),
+          fade_out: constantKeyframe2(Number(v.fade ?? 0)),
+          apply_before_clip: false
+        };
+      }
+      /** `summary`: the look as the receipt reports it. */
+      summary() {
+        const v = this.values;
+        return {
+          text_size: v.text_size,
+          font: v.font || "sans",
+          text_color: v.text_color,
+          stroke_color: v.stroke_color,
+          stroke_width: v.stroke_width,
+          background_color: v.background_color,
+          background_opacity: v.background_opacity,
+          position: v.position,
+          fade_seconds: v.fade ?? 0
+        };
+      }
+    };
+  }
+});
+
+// ../engine/src/tools/catalog/captions.ts
+function captionEffects(clip2) {
+  return (clip2.effects ?? []).filter((e) => typeof e === "object" && e !== null && (e.class_name === "Caption" || e.type === "Caption"));
+}
+function clipWindow(clip2) {
+  return [Number(clip2.position) || 0, Number(clip2.start) || 0, Number(clip2.end) || 0];
+}
+function timelineToCaption(clip2, t) {
+  const [position, start] = clipWindow(clip2);
+  return t - position + start;
+}
+function captionToTimeline(clip2, t) {
+  const [position, start] = clipWindow(clip2);
+  return position + t - start;
+}
+function clipLabel(clip2) {
+  return String(clip2.title || clip2.id);
+}
+function cueRows(clip2, cues) {
+  const [, start, end] = clipWindow(clip2);
+  return [...cues].sort((a, b) => a.start - b.start || a.end - b.end).map((cue, i) => ({
+    index: i + 1,
+    start: pyRoundTo(captionToTimeline(clip2, cue.start), 3),
+    end: pyRoundTo(captionToTimeline(clip2, cue.end), 3),
+    source_start: pyRoundTo(cue.start, 3),
+    source_end: pyRoundTo(cue.end, 3),
+    text: displayText(cue.text),
+    visible: cue.end > start && cue.start < end
+  }));
+}
+function givenCues(cues, what = "cues") {
+  const out = [];
+  (cues ?? []).forEach((c, i) => {
+    const n = i + 1;
+    if (typeof c !== "object" || c === null || Array.isArray(c)) toolError(`${what}[${n}] must be an object with start, end and text`);
+    const item = c;
+    const text4 = String(item.text ?? "").trim();
+    const start = Number(item.start);
+    const end = Number(item.end);
+    if (item.start === null || item.end === null || !Number.isFinite(start) || !Number.isFinite(end)) {
+      toolError(`${what}[${n}] needs numeric start and end seconds`);
+    }
+    if (!text4) toolError(`${what}[${n}] has no text`);
+    if (start < 0 || end <= start) toolError(`${what}[${n}] must have 0 <= start < end (got ${pyFloat(start)}-${pyFloat(end)})`);
+    out.push({ start, end, text: text4 });
+  });
+  return out;
+}
+function prepareCues(cues, uppercase2) {
+  const out = [];
+  let changed = 0;
+  for (const cue of cues) {
+    const [safe2, wasChanged] = safeText(uppercase2 ? cue.text.toUpperCase() : cue.text);
+    if (!safe2) continue;
+    if (wasChanged) changed += 1;
+    out.push({ start: cue.start, end: cue.end, text: safe2 });
+  }
+  return [out, changed];
+}
+async function clipByQuery(call, clipQuery) {
+  const res = await resolveClip(call, { clip_query: clipQuery });
+  if (!res.ok) return toolError(res.error || "could not resolve the timeline clip");
+  return res.clip;
+}
+function clipById2(project, id) {
+  return project.clips.find((c) => c.id === id);
+}
+async function findCaptionEffect(call, effectId, clipId2, clipQuery) {
+  const project = call.doc.project;
+  const candidates = [];
+  for (const clip2 of project.clips) for (const effect3 of captionEffects(clip2)) candidates.push([clip2, effect3]);
+  if (effectId) {
+    const hit = candidates.find(([, e]) => e.id === effectId);
+    if (hit) return hit;
+    return toolError(`no Caption effect with id=${pyReprString(effectId)}`);
+  }
+  if (clipId2 || clipQuery) {
+    const clip2 = clipId2 ? clipById2(project, clipId2) : await clipByQuery(call, clipQuery);
+    if (!clip2) return toolError(`no timeline clip with id=${pyReprString(clipId2)}`);
+    const effects = captionEffects(clip2);
+    if (effects.length === 0) toolError(`clip ${clip2.id} (${clipLabel(clip2)}) has no captions; add them with add_captions_tool`);
+    if (effects.length > 1) toolError(`clip ${clip2.id} has ${effects.length} Caption effects; pass effect_id (${effects.map((e) => e.id).join(", ")})`);
+    return [clip2, effects[0]];
+  }
+  if (candidates.length === 1) return candidates[0];
+  if (candidates.length === 0) return toolError("there are no captions in the project; add them with add_captions_tool");
+  return toolError(
+    "which captions? pass effect_id or timeline_clip_id: " + candidates.slice(0, 6).map(([c, e]) => `${e.id} on ${c.id} (${clipLabel(c)})`).join(", ")
+  );
+}
+function sameJson3(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+function countOf(text4, find) {
+  return text4.split(find).length - 1;
+}
+var CAPTION_ROLE, LOOK_KEYS, captionTools;
+var init_captions = __esm({
+  "../engine/src/tools/catalog/captions.ts"() {
+    "use strict";
+    init_overlays();
+    init_define();
+    init_pyfmt();
+    init_receipt();
+    init_caption_cues();
+    init_caption_style();
+    init_titles_text();
+    init_common();
+    CAPTION_ROLE = "captions";
+    LOOK_KEYS = ["text_size", "font", "text_color", "stroke_color", "stroke_width", "background_color", "background_opacity", "position", "fade"];
+    captionTools = [
+      contractTool("list_captions_tool", {
+        annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+        run: (call, input2) => guarded("list_captions_tool", () => {
+          const project = call.doc.project;
+          const wanted = String(input2.timeline_clip_id ?? "").trim();
+          const tracks = [];
+          for (const clip2 of project.clips) {
+            if (wanted && clip2.id !== wanted) continue;
+            for (const effect3 of captionEffects(clip2)) {
+              const look = styleFromEffect(effect3, project);
+              const [start, end] = clipExtent(clip2);
+              tracks.push({
+                timeline_clip_id: clip2.id,
+                clip_title: clipLabel(clip2),
+                effect_id: effect3.id,
+                overlay: clip2.zenvi_role === CAPTION_ROLE,
+                track: uiTrackNumber(project, clip2.layer),
+                clip_start: pyRoundTo(start, 3),
+                clip_end: pyRoundTo(end, 3),
+                cues: cueRows(clip2, parseCaptionText(String(effect3.caption_text ?? ""))),
+                look: Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]]))
+              });
+            }
+          }
+          if (wanted && tracks.length === 0 && !clipById2(project, wanted)) toolError(`no timeline clip with id=${pyReprString(wanted)}`);
+          const total = tracks.reduce((n, t) => n + t.cues.length, 0);
+          return applied("list_captions_tool", `${tracks.length} caption track(s), ${total} cue(s).`, { data: { caption_tracks: tracks } }, 0);
+        })
+      }),
+      contractTool("edit_captions_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        run: (call, input2) => guarded("edit_captions_tool", async () => {
+          const tool = "edit_captions_tool";
+          const edits = input2.cue_edits ?? [];
+          const extra = givenCues(input2.add_cues, "cues");
+          const find = input2.find ?? "";
+          const replace = input2.replace ?? "";
+          const shift2 = input2.shift_seconds ?? 0;
+          const uppercase2 = input2.uppercase ?? false;
+          const styleArgs = {
+            style: input2.style ?? "",
+            font: input2.font ?? "",
+            text_size: input2.text_size ?? 0,
+            text_color: input2.text_color ?? "",
+            stroke_color: input2.stroke_color ?? "",
+            stroke_width: input2.stroke_width ?? -1,
+            background_color: input2.background_color ?? "",
+            background_opacity: input2.background_opacity ?? -1,
+            position: input2.position ?? "",
+            fade_seconds: input2.fade_seconds ?? -1
+          };
+          const restyle = restyleRequested(styleArgs);
+          if (replace && !find) toolError("replace needs find (the text to replace)");
+          if (!(edits.length > 0 || extra.length > 0 || find || shift2 || restyle || uppercase2)) {
+            toolError("nothing to change: pass cue_edits, add_cues, find/replace, shift_seconds, uppercase or style fields");
+          }
+          const [clip2, effect3] = await findCaptionEffect(call, String(input2.effect_id ?? "").trim(), String(input2.timeline_clip_id ?? "").trim(), String(input2.clip_query ?? "").trim());
+          if (isLocked(call.doc.project, clip2.layer)) toolError(`clip ${clip2.id} is on a locked track; unlock it first`);
+          let cues = parseCaptionText(String(effect3.caption_text ?? "")).sort((a, b) => a.start - b.start || a.end - b.end);
+          const count = cues.length;
+          const changes = [];
+          const deleted = /* @__PURE__ */ new Set();
+          edits.forEach((ed, i) => {
+            const n = i + 1;
+            const idx = Math.trunc(Number(ed.index) || 0);
+            if (idx < 1 || idx > count) toolError(`cue_edits[${n}]: there is no cue ${idx} (the captions have ${count})`);
+            const cue = cues[idx - 1];
+            if (ed.delete) {
+              deleted.add(idx - 1);
+              changes.push(`deleted cue ${idx}`);
+              return;
+            }
+            if (ed.text !== void 0) {
+              const newText = String(ed.text ?? "").trim();
+              if (!newText) toolError(`cue_edits[${n}]: empty text (use delete=true to remove the cue)`);
+              cue.text = newText;
+              changes.push(`cue ${idx} text`);
+            }
+            const start = ed.start !== void 0 && ed.start !== null ? timelineToCaption(clip2, Number(ed.start)) : cue.start;
+            const end = ed.end !== void 0 && ed.end !== null ? timelineToCaption(clip2, Number(ed.end)) : cue.end;
+            if (end <= start) toolError(`cue_edits[${n}]: end must be after start`);
+            if (start !== cue.start || end !== cue.end) {
+              cue.start = start;
+              cue.end = end;
+              changes.push(`cue ${idx} timing`);
+            }
+          });
+          cues = cues.filter((_, i) => !deleted.has(i));
+          const [, srcStart, srcEnd] = clipWindow(clip2);
+          for (const q of extra) {
+            const s = timelineToCaption(clip2, q.start);
+            const e = timelineToCaption(clip2, q.end);
+            if (e <= srcStart || s >= srcEnd) {
+              toolError(
+                `the new cue at ${pyFixed(q.start, 2)}-${pyFixed(q.end, 2)}s is outside clip ${clip2.id} (${pyFixed(captionToTimeline(clip2, srcStart), 2)}-${pyFixed(captionToTimeline(clip2, srcEnd), 2)}s)`
+              );
+            }
+            cues.push({ start: Math.max(s, srcStart), end: Math.min(e, srcEnd), text: q.text });
+            changes.push("added a cue");
+          }
+          if (find) {
+            let hits = 0;
+            for (const q of cues) {
+              const shown = displayText(q.text);
+              if (shown.includes(find)) {
+                hits += countOf(shown, find);
+                q.text = shown.split(find).join(replace);
+              }
+            }
+            if (!hits) toolError(`no caption contains ${pyReprString(find)}`);
+            changes.push(`replaced ${hits} x ${pyReprString(find)}`);
+          }
+          if (shift2) {
+            for (const q of cues) {
+              q.start += shift2;
+              q.end += shift2;
+            }
+            cues = cues.filter((q) => q.end > 0);
+            for (const q of cues) q.start = Math.max(0, q.start);
+            changes.push(`shifted ${shift2 >= 0 ? "+" : ""}${pyFixed(shift2, 2)}s`);
+          }
+          if (uppercase2) {
+            for (const q of cues) q.text = displayText(q.text).toUpperCase();
+            changes.push("uppercase");
+          }
+          const [ready2] = prepareCues(
+            cues.map((q) => ({ start: q.start, end: q.end, text: displayText(q.text) })),
+            false
+          );
+          if (ready2.length === 0) toolError("that would leave no captions; use remove_captions_tool to remove them");
+          const newEffect = { ...structuredClone(effect3), caption_text: buildCaptionText(ready2) };
+          let look;
+          if (restyle) {
+            const style = new CaptionStyle(styleArgs, styleFromEffect(effect3, call.doc.project));
+            style.resolveFont();
+            Object.assign(newEffect, structuredClone(style.properties(call.doc.project, 2)));
+            look = style.summary();
+            changes.push("restyled");
+          }
+          if (sameJson3(newEffect, effect3)) toolError("the captions already look like that; nothing changed");
+          const effects = (clip2.effects ?? []).map((e) => e.id === effect3.id ? newEffect : e);
+          const after = call.commit((tx) => replaceClipEffects(tx, clip2.id, effects));
+          const rows = cueRows(after, parseCaptionText(String(newEffect.caption_text)));
+          const data = { timeline_clip_id: clip2.id, effect_id: effect3.id, changes, cues: rows };
+          if (look) data.look = look;
+          return applied(tool, summaryLine(`Updated captions on ${clip2.id}: ${changes.join(", ")} (${rows.length} cue(s)).`), { data });
+        })
+      }),
+      contractTool("remove_captions_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        run: (call, input2) => guarded("remove_captions_tool", async () => {
+          const project = call.doc.project;
+          const targets = /* @__PURE__ */ new Map();
+          const effectId = String(input2.effect_id ?? "").trim();
+          const clipId2 = String(input2.timeline_clip_id ?? "").trim();
+          const clipQuery = String(input2.clip_query ?? "").trim();
+          if (input2.all_captions) {
+            for (const clip2 of project.clips) {
+              const effects = captionEffects(clip2);
+              if (effects.length > 0) targets.set(clip2.id, [clip2, new Set(effects.map((e) => e.id))]);
+            }
+            if (targets.size === 0) toolError("there are no captions in the project");
+          } else if (effectId) {
+            const [clip2, effect3] = await findCaptionEffect(call, effectId, "", "");
+            targets.set(clip2.id, [clip2, /* @__PURE__ */ new Set([effect3.id])]);
+          } else if (clipId2 || clipQuery) {
+            const clip2 = clipId2 ? clipById2(project, clipId2) : await clipByQuery(call, clipQuery);
+            if (!clip2) return toolError(`no timeline clip with id=${pyReprString(clipId2)}`);
+            const effects = captionEffects(clip2);
+            if (effects.length === 0) toolError(`clip ${clip2.id} has no captions`);
+            targets.set(clip2.id, [clip2, new Set(effects.map((e) => e.id))]);
+          } else {
+            const [clip2, effect3] = await findCaptionEffect(call, "", "", "");
+            targets.set(clip2.id, [clip2, /* @__PURE__ */ new Set([effect3.id])]);
+          }
+          const locked = [...targets.values()].filter(([c]) => isLocked(project, c.layer)).map(([c]) => c.id);
+          if (locked.length > 0) toolError(`clip(s) on locked tracks: ${locked.join(", ")}; unlock first`);
+          const removed = [];
+          const overlays = [];
+          call.commit((tx) => {
+            for (const [id, [clip2, ids2]] of targets) {
+              replaceClipEffects(
+                tx,
+                id,
+                (clip2.effects ?? []).filter((e) => !ids2.has(e.id))
+              );
+              removed.push(...ids2);
+              if (clip2.zenvi_role === CAPTION_ROLE) overlays.push(id);
+            }
+          });
+          const data = { removed_effect_ids: [...removed].sort(), timeline_clip_ids: [...targets.keys()].sort() };
+          let summary = `Removed ${removed.length} caption track(s) from ${targets.size} clip(s).`;
+          if (overlays.length > 0) {
+            data.empty_overlay_clip_ids = overlays;
+            summary += " The transparent Captions overlay clip(s) remain; delete them with delete_from_timeline_tool.";
+          }
+          return applied("remove_captions_tool", summary, { data });
+        })
       })
     ];
   }
@@ -55157,9 +57646,9 @@ function fitSize(width, height, longestEdge = 512) {
 }
 function validFps2(value) {
   if (typeof value !== "object" || value === null) return void 0;
-  const num11 = Math.trunc(Number(value.num));
+  const num12 = Math.trunc(Number(value.num));
   const den2 = Math.trunc(Number(value.den));
-  return num11 > 0 && den2 > 0 && num11 / den2 > 2 ? { num: num11, den: den2 } : void 0;
+  return num12 > 0 && den2 > 0 && num12 / den2 > 2 ? { num: num12, den: den2 } : void 0;
 }
 function singleFileProject(project, file3) {
   const width = Number(file3.width) > 0 ? Number(file3.width) : project.width;
@@ -55365,15 +57854,15 @@ async function confirmWatchWindow(call, input2) {
   const data = await watchWindowRequest(call, payload);
   if (typeof data.error === "string" && data.error) return soft(data.error, winStart, winEnd, plan.warning, plan.sparse);
   const clamp2 = (v) => Math.max(winStart, Math.min(v, winEnd));
-  const num11 = (v) => {
+  const num12 = (v) => {
     const n = Number(v);
     return v === null || v === void 0 || !Number.isFinite(n) ? null : n;
   };
-  let cut2 = clamp2(num11(data.cut_source) ?? fallback);
+  let cut2 = clamp2(num12(data.cut_source) ?? fallback);
   const matched = Boolean(data.matched);
   const usedFallback = Boolean(data.used_fallback) || !matched;
-  let inS = num11(data.in_source) !== null ? clamp2(num11(data.in_source)) : fbIn;
-  let outS = num11(data.out_source) !== null ? clamp2(num11(data.out_source)) : fbOut;
+  let inS = num12(data.in_source) !== null ? clamp2(num12(data.in_source)) : fbIn;
+  let outS = num12(data.out_source) !== null ? clamp2(num12(data.out_source)) : fbOut;
   if (usedFallback && !matched) {
     cut2 = clamp2(fallback);
     inS = fbIn;
@@ -55421,7 +57910,7 @@ var init_watch = __esm({
 });
 
 // ../engine/src/tools/catalog/clips.ts
-function isRecord26(value) {
+function isRecord27(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function windowIsDialogueDriven(file3, start, end) {
@@ -55439,17 +57928,17 @@ function lookupWatchMeta(project, fileId, file3) {
     const parentId = own2 && own2.parent_file_id ? String(own2.parent_file_id) : "";
     data = parentId && fileById(project, parentId) || own2;
   }
-  const ai = isRecord26(data?.ai_metadata) ? data.ai_metadata : {};
+  const ai = isRecord27(data?.ai_metadata) ? data.ai_metadata : {};
   const duration3 = Number(data?.duration) || 0;
   return { file: data, duration: duration3, cues: Array.isArray(ai.transcript_cues) ? ai.transcript_cues : [] };
 }
 function sourceFpsParts(file3) {
   const fps = record4(file3.fps);
-  let num11 = parseTimecodeToken(fps.num) || 30;
+  let num12 = parseTimecodeToken(fps.num) || 30;
   let den2 = parseTimecodeToken(fps.den) || 1;
-  if (num11 <= 0) num11 = 30;
+  if (num12 <= 0) num12 = 30;
   if (den2 <= 0) den2 = 1;
-  return [Math.trunc(num11), Math.trunc(den2), num11 / den2];
+  return [Math.trunc(num12), Math.trunc(den2), num12 / den2];
 }
 function sourceDurationSeconds(file3) {
   const start = parseTimecodeToken(file3.start) || 0;
@@ -55465,17 +57954,17 @@ function sourceDurationSeconds(file3) {
 }
 function describeFileForLlm(project, fileId, file3) {
   const data = file3;
-  const [num11, den2, fpsFloat4] = sourceFpsParts(data);
+  const [num12, den2, fpsFloat4] = sourceFpsParts(data);
   const duration3 = sourceDurationSeconds(data);
   const pfps = record4(project.fps);
   const pNum = Math.trunc(parseTimecodeToken(pfps.num) || 30);
   const pDen = Math.trunc(parseTimecodeToken(pfps.den) || 1);
   const mediaType = String(data.media_type || (isAudioOnlyMedia(data) ? "audio" : "video"));
-  let line2 = `file_id=${fileId} path=${String(data.path ?? "")} duration_seconds=${pyFixed(duration3, 2)} source_fps=${num11}/${den2} project_fps=${pNum}/${pDen} media_type=${mediaType}`;
+  let line2 = `file_id=${fileId} path=${String(data.path ?? "")} duration_seconds=${pyFixed(duration3, 2)} source_fps=${num12}/${den2} project_fps=${pNum}/${pDen} media_type=${mediaType}`;
   const unreliable = isAudioOnlyMedia(data) || fpsFloat4 <= 2 && duration3 > 2;
   if (unreliable) {
     line2 += `
-NOTE: source_fps is ${num11}/${den2} and cannot be used for frame math. Pass start_seconds/end_seconds (in source seconds) - never frame numbers.`;
+NOTE: source_fps is ${num12}/${den2} and cannot be used for frame math. Pass start_seconds/end_seconds (in source seconds) - never frame numbers.`;
   }
   return line2;
 }
@@ -56277,7 +58766,7 @@ var init_export2 = __esm({
           const project = call.doc.project;
           const { video, audio, exportType, defaultPath } = getDefaultExportSettings(project);
           const fps = record4(video.fps);
-          const lines = [
+          const lines2 = [
             `Export type: ${exportType}`,
             `Default path: ${defaultPath}`,
             `Video: ${String(video.width)}x${String(video.height)}, ${String(fps.num)}/${String(fps.den)} fps, codec ${video.vcodec}, format ${video.vformat}, bitrate ${String(video.video_bitrate)}`,
@@ -56285,8 +58774,8 @@ var init_export2 = __esm({
             `Frame range: ${String(video.start_frame)} - ${String(video.end_frame)}`
           ];
           const overrides = record4(project.export_overrides);
-          if (Object.keys(overrides).length > 0) lines.push(`Overrides: ${pyRepr2(overrides)}`);
-          return lines.join("\n");
+          if (Object.keys(overrides).length > 0) lines2.push(`Overrides: ${pyRepr2(overrides)}`);
+          return lines2.join("\n");
         }
       }),
       contractTool("set_export_setting_tool", {
@@ -56317,8 +58806,8 @@ function t2vDims(width, height) {
   return [1440, 1440];
 }
 function narrationName(text4) {
-  const words2 = text4.split(/\s+/).filter(Boolean);
-  return `Narration - ${words2.slice(0, 6).join(" ")}${words2.length > 6 ? "..." : ""}`;
+  const words3 = text4.split(/\s+/).filter(Boolean);
+  return `Narration - ${words3.slice(0, 6).join(" ")}${words3.length > 6 ? "..." : ""}`;
 }
 function base64ToBytes(b64) {
   const binary = globalThis.atob(b64);
@@ -56758,10 +59247,10 @@ function importMediaKind(path38) {
   if (IMPORT_IMAGE_EXTS.includes(ext)) return "image";
   return "other";
 }
-function cappedLines(lines, cap = IMPORT_RESULT_LINE_CAP) {
-  if (lines.length <= cap) return lines.join("\n");
-  return `${lines.slice(0, cap).join("\n")}
-... and ${lines.length - cap} more. Use list_files_tool to see the rest.`;
+function cappedLines(lines2, cap = IMPORT_RESULT_LINE_CAP) {
+  if (lines2.length <= cap) return lines2.join("\n");
+  return `${lines2.slice(0, cap).join("\n")}
+... and ${lines2.length - cap} more. Use list_files_tool to see the rest.`;
 }
 function coercePathList(value) {
   if (value === null || value === void 0) return [];
@@ -56899,21 +59388,21 @@ var init_media3 = __esm({
           if (importTruthy(input2.dry_run)) {
             const counts = { video: 0, audio: 0, image: 0, other: 0 };
             for (const p of resolved) counts[importMediaKind(p)] += 1;
-            const lines2 = [
+            const lines3 = [
               "dry_run=true \u2014 nothing imported.",
               `resolved=${entries.map(fromFileUrl).join(", ")}`,
               `would_import=${resolved.length} (video=${counts.video} audio=${counts.audio} image=${counts.image})`
             ];
             const mt = String(input2.media_types ?? "all").trim() || "all";
-            if (!["all", "*", "any", "media"].includes(mt.toLowerCase())) lines2.push(`media_types=${mt}`);
-            lines2.push("sample:");
+            if (!["all", "*", "any", "media"].includes(mt.toLowerCase())) lines3.push(`media_types=${mt}`);
+            lines3.push("sample:");
             const sample = cappedLines(resolved.map((p) => `  ${p.split(/[\\/]/).pop() ?? p}`));
-            if (sample) lines2.push(sample);
-            lines2.push(`skipped_non_media=${skippedNonMedia}`);
-            if (missing.length > 0) lines2.push(`not found: ${missing.join(", ")}`);
-            if (notes.length > 0) lines2.push("Notes: " + notes.join("; "));
-            lines2.push("Ask the user to confirm, then call again with dry_run=false.");
-            return lines2.join("\n");
+            if (sample) lines3.push(sample);
+            lines3.push(`skipped_non_media=${skippedNonMedia}`);
+            if (missing.length > 0) lines3.push(`not found: ${missing.join(", ")}`);
+            if (notes.length > 0) lines3.push("Notes: " + notes.join("; "));
+            lines3.push("Ask the user to confirm, then call again with dry_run=false.");
+            return lines3.join("\n");
           }
           const imported = [];
           const failures = [];
@@ -56929,7 +59418,7 @@ var init_media3 = __esm({
             return `Error: Nothing was added to the media bin (${detail2}).`;
           }
           const files = call.commit((tx) => imported.map((media) => addFile(tx, media)));
-          const lines = files.map((f2, i) => `file_id=${f2.id} path=${imported[i].path}`);
+          const lines2 = files.map((f2, i) => `file_id=${f2.id} path=${imported[i].path}`);
           rememberFile(call, String(files[files.length - 1].id));
           let head = `Imported ${files.length} file(s). indexing_started=false`;
           if (skippedNonMedia > 0) head += ` skipped_non_media=${skippedNonMedia}`;
@@ -56938,7 +59427,7 @@ var init_media3 = __esm({
           if (allNotes.length > 0) head += "\nNotes: " + allNotes.join("; ");
           return applied(
             "import_files_tool",
-            head + "\n" + cappedLines(lines),
+            head + "\n" + cappedLines(lines2),
             {
               data: { fileIds: files.map((f2) => String(f2.id)) },
               notes: ["This Zenvi surface does not run AI indexing; files keep any index they already have."]
@@ -57125,7 +59614,7 @@ ${placed.text}`;
 });
 
 // ../engine/src/tools/catalog/metadata.ts
-function isRecord27(value) {
+function isRecord28(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function pyStr2(value) {
@@ -57137,7 +59626,7 @@ function pyStr2(value) {
 function fullMetadataText(project, level) {
   const files = project.files ?? [];
   if (files.length === 0) return "No files in project.";
-  const lines = ["Project files with full metadata:"];
+  const lines2 = ["Project files with full metadata:"];
   for (const f2 of files) {
     const d = f2;
     if (d.zenvi_subclip && level !== "full") continue;
@@ -57156,7 +59645,7 @@ function fullMetadataText(project, level) {
 ` : "";
     const chapters = Array.isArray(ai.chapters) ? ai.chapters : [];
     const scenes = Array.isArray(ai.scene_descriptions) ? ai.scene_descriptions : [];
-    lines.push(
+    lines2.push(
       `
   media_bin_file_id=${String(f2.id)}  name=${name}  type=${pyStr2(d.media_type ?? "?")}  duration=${m}:${String(s).padStart(2, "0")}
 ` + alias + `    analyzed=${pyStr2(ai.analyzed ?? false)}  indexed=${pyStr2(isIndexed(tl))}  chapter_count=${chapters.length}  scene_count=${scenes.length}
@@ -57174,36 +59663,36 @@ function fullMetadataText(project, level) {
         const vals = tags[key];
         if (Array.isArray(vals) && vals.length > 0) legacy.push(`${key}=[${vals.slice(0, 8).filter(Boolean).map(String).join(", ")}]`);
       }
-      if (legacy.length > 0) lines.push(`    legacy_tags=${legacy.join(" ")}`);
+      if (legacy.length > 0) lines2.push(`    legacy_tags=${legacy.join(" ")}`);
       else if (sounds || transcript) {
-        if (sounds) lines.push(`    sounds=${sounds}`);
-        if (transcript) lines.push(`    transcript=${transcript}`);
+        if (sounds) lines2.push(`    sounds=${sounds}`);
+        if (transcript) lines2.push(`    transcript=${transcript}`);
       }
     }
     if (level === "full") {
-      if (sounds) lines.push(`    sounds=${sounds}`);
-      if (transcript) lines.push(`    transcript=${transcript}`);
+      if (sounds) lines2.push(`    sounds=${sounds}`);
+      if (transcript) lines2.push(`    transcript=${transcript}`);
     }
     if (chapters.length > 0) {
       const n = level === "full" ? chapters.length : Math.min(3, chapters.length);
-      lines.push("    chapter_snippets:");
+      lines2.push("    chapter_snippets:");
       for (const raw of chapters.slice(0, n)) {
-        if (!isRecord27(raw) || !(raw.summary || raw.title)) continue;
+        if (!isRecord28(raw) || !(raw.summary || raw.title)) continue;
         const t0 = Number(raw.start) || 0;
         const t1 = Number(raw.end) || t0;
-        lines.push(`      [${fmtMmss(t0)}-${fmtMmss(t1)}] ${String(raw.title ?? "")}: ${pySlice(String(raw.summary ?? ""), 0, 160)}`);
+        lines2.push(`      [${fmtMmss(t0)}-${fmtMmss(t1)}] ${String(raw.title ?? "")}: ${pySlice(String(raw.summary ?? ""), 0, 160)}`);
       }
     }
     if (scenes.length > 0 && chapters.length === 0) {
       const n = level === "full" ? scenes.length : Math.min(3, scenes.length);
-      lines.push("    scene_snippets:");
+      lines2.push("    scene_snippets:");
       for (const raw of scenes.slice(0, n)) {
-        if (!isRecord27(raw) || !raw.description) continue;
-        lines.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
+        if (!isRecord28(raw) || !raw.description) continue;
+        lines2.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
   }
-  return lines.join("\n");
+  return lines2.join("\n");
 }
 function placementsMetadataText(project, level) {
   const contexts = enumerateTimelineContexts(project);
@@ -57213,7 +59702,7 @@ function placementsMetadataText(project, level) {
     const key = `${ctx.fileId}:${pyStr2(ctx.layer)}`;
     groups.set(key, [...groups.get(key) ?? [], ctx]);
   }
-  const lines = [`Timeline placements (${contexts.length}):`];
+  const lines2 = [`Timeline placements (${contexts.length}):`];
   const sorted = contexts.map((c, i) => ({ c, i })).sort((a, b) => (a.c.layer ?? 0) - (b.c.layer ?? 0) || a.c.timelinePosition - b.c.timelinePosition || a.i - b.i).map(({ c }) => c);
   for (const ctx of sorted) {
     const key = `${ctx.fileId}:${pyStr2(ctx.layer)}`;
@@ -57227,7 +59716,7 @@ function placementsMetadataText(project, level) {
     const groupId = dupes.length > 1 ? key : "";
     const scenes = Array.isArray(ctx.effectiveMetadata.scene_descriptions) ? ctx.effectiveMetadata.scene_descriptions : [];
     const limit = level === "full" ? scenes.length : Math.min(3, scenes.length);
-    lines.push(
+    lines2.push(
       `
   timeline_clip_id=${ctx.timelineClipId} file_id=${ctx.fileId} parent_file_id=${ctx.parentFileId}${occ}
     title=${pyReprString(ctx.title)} track=${pyStr2(ctx.layer)} ui_track=${pyStr2(ctx.uiTrack)} position=${pyFixed(ctx.timelinePosition, 2)}s timeline_end=${pyFixed(ctx.timelineEnd, 2)}s
@@ -57235,14 +59724,14 @@ function placementsMetadataText(project, level) {
     summary_preview=${pyReprString(ctx.summaryPreview)}`
     );
     if (scenes.length > 0 && limit > 0) {
-      lines.push("    effective_scenes:");
+      lines2.push("    effective_scenes:");
       for (const raw of scenes.slice(0, limit)) {
-        if (!isRecord27(raw) || !raw.description) continue;
-        lines.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
+        if (!isRecord28(raw) || !raw.description) continue;
+        lines2.push(`      [${fmtMmss(Number(raw.time) || 0)}] ${pySlice(String(raw.description), 0, 160)}`);
       }
     }
   }
-  return lines.join("\n");
+  return lines2.join("\n");
 }
 var READ2, metadataTools;
 var init_metadata = __esm({
@@ -57447,8 +59936,8 @@ async function fetchMotionGraphics(call, input2) {
     if (ids3.length === 0 || ids3.some((id) => !id || !fileById(call.doc.project, id))) return null;
     return `Already imported file_id=${ids3[0]} (file_ids: ${pyRepr2(ids3)}) \u2014 place only if missing. Do NOT re-download these URLs.`;
   };
-  const single = text(input2.supabase_url) || text(input2.url);
-  const urls = segs.length > 0 ? [...segs].map((u, i) => ({ u, i })).sort((a, b) => segmentIndex(a.u) - segmentIndex(b.u) || a.i - b.i).map((x) => x.u) : single ? [single] : [];
+  const single2 = text(input2.supabase_url) || text(input2.url);
+  const urls = segs.length > 0 ? [...segs].map((u, i) => ({ u, i })).sort((a, b) => segmentIndex(a.u) - segmentIndex(b.u) || a.i - b.i).map((x) => x.u) : single2 ? [single2] : [];
   if (urls.length === 0) return "Error: segment_urls or supabase_url is required.";
   const cached3 = alreadyImported(urls);
   if (cached3) return cached3;
@@ -57542,11 +60031,11 @@ var init_motion = __esm({
           }
           const segments2 = [];
           const windows = [];
-          let timelineEnd2 = 0;
+          let timelineEnd3 = 0;
           for (const ctx of contexts) {
             const pos = ctx.timelinePosition || 0;
             const end = ctx.timelineEnd || pos + 1;
-            timelineEnd2 = Math.max(timelineEnd2, end);
+            timelineEnd3 = Math.max(timelineEnd3, end);
             const ai = ctx.effectiveMetadata ?? {};
             const srcStart = ctx.sourceStart || 0;
             const clipDur = Math.max(0.1, end - pos);
@@ -57598,17 +60087,17 @@ var init_motion = __esm({
               }
             }
           } else {
-            timelineEnd2 = 24;
+            timelineEnd3 = 24;
             for (const t of [0, 6, 12, 18, 22]) windows.push({ t, score: 1, avoid: false, prefer: true, label: "" });
           }
-          if (timelineEnd2 <= 0) timelineEnd2 = 24;
-          const anchors = n === 1 ? [timelineEnd2 < 1 ? 0 : Math.min(1, timelineEnd2 * 0.1)] : Array.from({ length: n }, (_, i) => timelineEnd2 * (i / (n - 1)));
+          if (timelineEnd3 <= 0) timelineEnd3 = 24;
+          const anchors = n === 1 ? [timelineEnd3 < 1 ? 0 : Math.min(1, timelineEnd3 * 0.1)] : Array.from({ length: n }, (_, i) => timelineEnd3 * (i / (n - 1)));
           const used = [];
           const snapTo = (target) => {
-            const tt = Math.max(0, Math.min(timelineEnd2, target));
+            const tt = Math.max(0, Math.min(timelineEnd3, target));
             const cands = [...windows].sort((a, b) => Math.abs(a.t - tt) - Math.abs(b.t - tt) || b.score - a.score);
             for (const w of cands) {
-              const t = Math.max(0, Math.min(timelineEnd2, w.t));
+              const t = Math.max(0, Math.min(timelineEnd3, w.t));
               if (preferTr && w.avoid && w.score < 0) continue;
               if (used.every((u) => Math.abs(t - u) >= 1.2)) {
                 const conf = w.prefer || w.score >= 2 ? "high" : w.avoid ? "low" : "medium";
@@ -57630,7 +60119,7 @@ var init_motion = __esm({
             let isGap = false;
             if (useGap && gaps.length > 0) {
               for (const g0 of gaps) {
-                const g = Math.max(0, Math.min(timelineEnd2, g0));
+                const g = Math.max(0, Math.min(timelineEnd3, g0));
                 if (used.every((u) => Math.abs(g - u) >= 1)) {
                   pos = g;
                   label2 = "gap \u2014 opaque plate candidate";
@@ -57647,7 +60136,7 @@ var init_motion = __esm({
               trackHint = overlayLayer;
               isGap = false;
             }
-            pos = Math.round(Math.max(0, Math.min(timelineEnd2, pos)) * 100) / 100;
+            pos = Math.round(Math.max(0, Math.min(timelineEnd3, pos)) * 100) / 100;
             used.push(pos);
             const suggestTr = preferTr && trackHint === overlayLayer && !isGap;
             out.push({
@@ -57664,7 +60153,7 @@ var init_motion = __esm({
             });
           }
           const payload = {
-            timeline_end: Math.round(timelineEnd2 * 100) / 100,
+            timeline_end: Math.round(timelineEnd3 * 100) / 100,
             clip_count: segments2.length,
             windows: out,
             guidance: "For each beat: decide transparent vs opaque first. layout_region \u2192 bake into session/draft.html (lower_third/corner_* = non-blocking overlay HTML; full_frame = sting; mid_plate = opaque plate). publish_session_draft_tool(transparent=true|false) matching suggest_transparent. Then place_motion_graphic_tool(mode=overlay|gap|cut_in) \u2014 never stack opaque plates over hero footage with add_clip on the top overlay track."
@@ -57757,6 +60246,276 @@ var init_motion = __esm({
   }
 });
 
+// ../engine/src/tools/catalog/overlays.ts
+function edgeOffsets(position, margin) {
+  const x = position.endsWith("right") ? -margin : position.endsWith("left") ? margin : 0;
+  const y = position.startsWith("top") ? margin : position.startsWith("bottom") ? -margin : 0;
+  return [x, y];
+}
+function timelineEnd2(project) {
+  return project.clips.reduce((end, clip2) => Math.max(end, clipExtent(clip2)[1]), 0);
+}
+function wholeFrames(project, seconds2) {
+  const fps = fpsOfProject(project);
+  return Math.max(1, pyRound(seconds2 * fps)) / fps;
+}
+function fontName(font) {
+  return String(font ?? "").trim().replace(/^['"]+|['"]+$/g, "");
+}
+function emojiCatalog(call) {
+  const assets = call.host.assets;
+  let pending = catalogs.get(assets);
+  if (!pending) {
+    pending = assets.readText(EMOJI_CATALOG_ASSET).then(parseBundledEmojiCatalog);
+    pending.catch(() => catalogs.delete(assets));
+    catalogs.set(assets, pending);
+  }
+  return pending;
+}
+async function loadEmojis(call) {
+  try {
+    return await emojiCatalog(call);
+  } catch (error62) {
+    return toolError(`the emoji catalog could not be read: ${error62 instanceof Error ? error62.message : String(error62)}`);
+  }
+}
+function emojiRow(entry) {
+  return { code: entry.id, emoji: entry.char, name: entry.name, group: entry.groupId, source: "bundled" };
+}
+var TIMER_ROLE, TIMER_MODES, TIMER_FORMATS, TIME_CLIP, TIME_SOURCE, catalogs, overlayTools;
+var init_overlays2 = __esm({
+  "../engine/src/tools/catalog/overlays.ts"() {
+    "use strict";
+    init_registry();
+    init_defaults();
+    init_ids();
+    init_rounding();
+    init_emojis();
+    init_files();
+    init_overlays();
+    init_define();
+    init_pyfmt();
+    init_receipt();
+    init_titles_text();
+    TIMER_ROLE = "timer";
+    TIMER_MODES = { count_up: 0, count_down: 1, clock: 2, timecode: 3, frame_number: 4 };
+    TIMER_FORMATS = { "mm:ss": 0, "hh:mm:ss": 1, "hh:mm:ss.mmm": 2, timecode: 3, frames: 4 };
+    TIME_CLIP = 0;
+    TIME_SOURCE = 1;
+    catalogs = /* @__PURE__ */ new WeakMap();
+    overlayTools = [
+      contractTool("add_timer_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        run: (call, input2) => guarded("add_timer_tool", async () => {
+          const tool = "add_timer_tool";
+          const project = call.doc.project;
+          const mode = input2.mode ?? "count_down";
+          const format = input2.format ?? "mm:ss";
+          const screen = input2.screen_position ?? "bottom_center";
+          const countdownFrom = input2.countdown_from_seconds ?? 0;
+          const startAt = input2.start_at_seconds ?? 0;
+          const font = fontName(input2.font);
+          const [fg, fgAlpha] = colorHexAlpha(input2.text_color ?? "#ffffff", "text_color");
+          const strokeHex = colorHexAlpha(input2.stroke_color ?? "#000000", "stroke_color")[0];
+          const [bgHex, bgAlpha] = colorHexAlpha(input2.background_color ?? "#000000", "background_color");
+          const backgroundOpacity = bgAlpha < 1 ? bgAlpha : input2.background_opacity ?? 0.45;
+          const attachId = String(input2.timeline_clip_id ?? "").trim();
+          const position = snapToFrame(project, input2.position_seconds ?? 0);
+          let attached;
+          let duration3 = 0;
+          if (attachId) {
+            attached = project.clips.find((c) => c.id === attachId);
+            if (!attached) toolError(`no timeline clip with id=${pyReprString(attachId)}`);
+            if (isLocked(project, attached.layer)) toolError(`clip ${attached.id} is on locked track ${uiTrackNumber(project, attached.layer)}; unlock it first`);
+          } else {
+            let length;
+            if (input2.duration_seconds) length = input2.duration_seconds;
+            else if (mode === "count_down") length = countdownFrom || 10;
+            else {
+              const toEnd = timelineEnd2(project) - position;
+              length = toEnd > 1 ? toEnd : 10;
+            }
+            duration3 = wholeFrames(project, length);
+            planOverlayTrack(project, position, position + duration3, input2.track);
+          }
+          const [w, h] = projectSize(project);
+          const fontPx = (input2.text_size ?? 0.07) * Math.min(w, h);
+          const units = 600 / w;
+          const [xOff, yOff] = edgeOffsets(screen, input2.margin_percent ?? 3);
+          const props = {
+            mode: TIMER_MODES[mode],
+            format: TIMER_FORMATS[format],
+            clamp: 1,
+            gravity: GRAVITY[screen],
+            show_background: input2.background ?? true ? 1 : 0,
+            font_name: font || "sans",
+            prefix: String(input2.prefix ?? ""),
+            suffix: String(input2.suffix ?? ""),
+            color: colorKeyframes(fg),
+            font_alpha: constantKeyframe2(fgAlpha),
+            stroke: colorKeyframes(strokeHex),
+            stroke_width: constantKeyframe2(pyRoundTo((input2.stroke_width ?? 0.03) * fontPx * units, 3)),
+            background: colorKeyframes(bgHex),
+            background_alpha: constantKeyframe2(backgroundOpacity),
+            background_padding: constantKeyframe2(pyRoundTo(0.25 * fontPx * units, 3)),
+            background_corner: constantKeyframe2(pyRoundTo(0.15 * fontPx * units, 3)),
+            font_size: constantKeyframe2(pyRoundTo(fontPx * units, 3)),
+            x_offset: constantKeyframe2(xOff),
+            y_offset: constantKeyframe2(yOff),
+            apply_before_clip: false
+          };
+          const newTimer = (id, timeSource2, startTime) => ({
+            ...defaultEffectJson("Timer", id),
+            ...structuredClone(props),
+            time_source: timeSource2,
+            start_time: constantKeyframe2(startTime),
+            end_time: constantKeyframe2(countdownFrom || 0)
+          });
+          const what = mode.replaceAll("_", " ");
+          const where = screen.replaceAll("_", " ");
+          if (attached) {
+            const clip2 = attached;
+            const start = Number(clip2.start) || 0;
+            const length = (Number(clip2.end) || 0) - start;
+            const offset = mode === "count_up" || mode === "count_down" ? startAt - start : startAt;
+            const effect3 = call.commit((tx) => {
+              const timer2 = newTimer(idFactory(tx.project)(), TIME_SOURCE, offset);
+              replaceClipEffects(tx, clip2.id, [...clip2.effects ?? [], timer2]);
+              return timer2;
+            });
+            return applied(tool, summaryLine(`Added a ${what} timer to clip ${clip2.id} (${where}).`), {
+              data: {
+                timeline_clip_id: clip2.id,
+                effect_id: effect3.id,
+                overlay: false,
+                mode,
+                format,
+                position: pyRoundTo(Number(clip2.position) || 0, 3),
+                duration: pyRoundTo(length, 3),
+                screen_position: screen,
+                track: uiTrackNumber(call.doc.project, clip2.layer)
+              }
+            });
+          }
+          const end = position + duration3;
+          const carrier = await prepareOverlayCarrier(call);
+          const placed = call.commit((tx) => {
+            const { layer: layer2, created } = planOverlayTrack(tx.project, position, end, input2.track);
+            const file3 = carrierFile(tx, carrier);
+            const timer2 = newTimer(idFactory(tx.project)(), TIME_CLIP, startAt);
+            const clip2 = placeOverlayClip(tx, {
+              fileId: file3.id,
+              position,
+              duration: duration3,
+              layer: layer2,
+              newTrackLabel: "Timer",
+              title: "Timer",
+              props: { zenvi_role: TIMER_ROLE, effects: [timer2] }
+            });
+            return { clip: clip2, timer: timer2, layer: layer2, created };
+          });
+          const t = trackInfo(call.doc.project, placed.layer);
+          return applied(tool, summaryLine(`Added a ${what} timer on track ${t.track} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s (${where}).`), {
+            data: {
+              timeline_clip_id: placed.clip.id,
+              effect_id: placed.timer.id,
+              overlay: true,
+              mode,
+              format,
+              position: pyRoundTo(position, 3),
+              duration: pyRoundTo(duration3, 3),
+              end: pyRoundTo(end, 3),
+              countdown_from: countdownFrom || (mode === "count_down" ? duration3 : 0),
+              screen_position: screen,
+              new_track: placed.created,
+              ...t
+            }
+          });
+        })
+      }),
+      contractTool("search_emojis_tool", {
+        annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+        requires: ["assets"],
+        run: (call, input2) => guarded("search_emojis_tool", async () => {
+          const q = String(input2.query ?? "").trim();
+          const group = input2.group ?? "";
+          if (!q && !group) toolError("pass a query (e.g. 'fire') or a group");
+          const matches3 = searchEmojis(await loadEmojis(call), q, group, input2.limit ?? 10);
+          if (matches3.length === 0) toolError(`no emoji matches ${pyReprString(q)}${group ? ` in group ${group}` : ""}`);
+          const rows = matches3.map((m) => ({ ...emojiRow(m.entry), score: pyRoundTo(m.score, 1) }));
+          const shown = rows.slice(0, 8).map((r) => `${r.emoji} ${r.name}`).join(", ");
+          return applied("search_emojis_tool", summaryLine(`${rows.length} emoji match ${pyReprString(q || group)}: ${shown}`), { data: { matches: rows } }, 0);
+        })
+      }),
+      contractTool("add_emoji_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        requires: ["assets"],
+        run: (call, input2) => guarded("add_emoji_tool", async () => {
+          const tool = "add_emoji_tool";
+          if (input2.emoji === void 0 || input2.emoji === "") toolError("add_emoji_tool: missing required argument(s) emoji");
+          const query2 = String(input2.emoji ?? "").trim();
+          const group = input2.group ?? "";
+          const matches3 = searchEmojis(await loadEmojis(call), query2, group, 6);
+          if (matches3.length === 0) {
+            toolError(`no emoji matches ${pyReprString(String(input2.emoji ?? ""))}${group ? ` in group ${group}` : ""}; try search_emojis_tool with a simpler word`);
+          }
+          const [best, ...rest] = matches3;
+          if (best.score < 20) {
+            toolError(
+              `no good emoji match for ${pyReprString(String(input2.emoji ?? ""))}; closest: ` + matches3.slice(0, 5).map((m) => `${m.entry.char} ${m.entry.name} (${m.entry.id})`).join(", ")
+            );
+          }
+          const entry = best.entry;
+          const project = call.doc.project;
+          const screen = input2.screen_position ?? "center";
+          const size = input2.size ?? 0.2;
+          const margin = input2.margin ?? 0.04;
+          const position = snapToFrame(project, input2.position_seconds ?? 0);
+          const duration3 = wholeFrames(project, input2.duration_seconds || DEFAULT_IMAGE_LENGTH);
+          const end = position + duration3;
+          planOverlayTrack(project, position, end, input2.track);
+          const [w, h] = projectSize(project);
+          const short = Math.min(w, h);
+          const [xOff, yOff] = edgeOffsets(screen, 1);
+          const props = {
+            gravity: GRAVITY[screen],
+            scale_x: constantKeyframe2(size),
+            scale_y: constantKeyframe2(size),
+            location_x: constantKeyframe2(pyRoundTo(xOff * margin * short / w, 5)),
+            location_y: constantKeyframe2(pyRoundTo(yOff * margin * short / h, 5))
+          };
+          const placed = call.commit((tx) => {
+            const { layer: layer2, created } = planOverlayTrack(tx.project, position, end, input2.track);
+            const file3 = addFile(tx, { path: entry.storedPath, info: emojiReaderInfo(entry.storedPath), name: entry.name }, { mediaType: "image" });
+            const clip2 = placeOverlayClip(tx, { fileId: file3.id, position, duration: duration3, layer: layer2, newTrackLabel: "Emoji", props });
+            return { fileId: file3.id, clip: clip2, layer: layer2, created };
+          });
+          const t = trackInfo(call.doc.project, placed.layer);
+          return applied(
+            tool,
+            summaryLine(`Added ${entry.char} ${entry.name} on track ${t.track} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s (${screen.replaceAll("_", " ")}, size ${pyG(size)}).`),
+            {
+              data: {
+                timeline_clip_id: placed.clip.id,
+                file_id: placed.fileId,
+                emoji: emojiRow(entry),
+                position: pyRoundTo(position, 3),
+                duration: pyRoundTo(duration3, 3),
+                end: pyRoundTo(end, 3),
+                screen_position: screen,
+                size,
+                new_track: placed.created,
+                alternatives: rest.slice(0, 5).map((m) => emojiRow(m.entry)),
+                ...t
+              }
+            }
+          );
+        })
+      })
+    ];
+  }
+});
+
 // ../engine/src/tools/catalog/phase3.ts
 function clipTime(clip2, fps) {
   const rate = fps.num / fps.den;
@@ -57829,13 +60588,13 @@ var init_phase3 = __esm({
               data: { effect: def.className, effectId: existing.id, timeline_clip_id: clipId2, changed: false }
             });
           }
-          const effect2 = call.commit((tx) => addEffect(tx, clipId2, def.className));
+          const effect3 = call.commit((tx) => addEffect(tx, clipId2, def.className));
           return applied(
             tool,
-            `Added effect ${pyReprString(def.className)} to timeline_clip_id=${clipId2} (effect_id=${effect2.id}).`,
+            `Added effect ${pyReprString(def.className)} to timeline_clip_id=${clipId2} (effect_id=${effect3.id}).`,
             {
-              clips: [{ id: clipId2, effect: def.className, effectId: effect2.id }],
-              data: { effect: def.className, effectId: effect2.id, timeline_clip_id: clipId2 }
+              clips: [{ id: clipId2, effect: def.className, effectId: effect3.id }],
+              data: { effect: def.className, effectId: effect3.id, timeline_clip_id: clipId2 }
             }
           );
         }
@@ -58094,23 +60853,42 @@ async function saveCurrent(call, tool) {
   await storage.save(call.doc.toJSON());
   return null;
 }
+function sortedJson(value) {
+  if (Array.isArray(value)) return `[${value.map(sortedJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value).filter(([, v]) => v !== void 0);
+    entries.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${sortedJson(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+function clipContentDigest(clip2) {
+  const rest = {};
+  for (const [key, value] of Object.entries(clip2)) if (!SIGNATURE_SKIP_KEYS.has(key)) rest[key] = value;
+  const reader = clip2.reader ?? {};
+  rest._media = ["path", "duration", "fps", "video_length"].map((k) => reader[k] ?? null);
+  return sortedJson(rest);
+}
 function timelineSignature(project) {
   const out = /* @__PURE__ */ new Map();
   const r3 = (v) => Math.round((Number(v) || 0) * 1e3) / 1e3;
   for (const clip2 of project.clips ?? []) {
     const id = String(clip2.id ?? "");
-    if (id) out.set(id, JSON.stringify([clip2.layer ?? null, r3(clip2.position), r3(clip2.start), r3(clip2.end)]));
+    if (id) out.set(id, { place: JSON.stringify([clip2.layer ?? null, r3(clip2.position), r3(clip2.start), r3(clip2.end)]), content: clipContentDigest(clip2) });
   }
   return out;
 }
 function describeTimelineDelta(before, after) {
   const removed = [...before.keys()].filter((id) => !after.has(id)).sort();
   const added = [...after.keys()].filter((id) => !before.has(id)).sort();
-  const moved = [...before.keys()].filter((id) => after.has(id) && before.get(id) !== after.get(id)).sort();
+  const common = [...before.keys()].filter((id) => after.has(id)).sort();
+  const moved = common.filter((id) => before.get(id).place !== after.get(id).place);
+  const restyled = common.filter((id) => before.get(id).place === after.get(id).place && before.get(id).content !== after.get(id).content);
   const parts = [];
   if (removed.length) parts.push(`removed ${removed.length} clip(s) (${removed.slice(0, 4).join(", ")})`);
   if (added.length) parts.push(`restored ${added.length} clip(s) (${added.slice(0, 4).join(", ")})`);
   if (moved.length) parts.push(`moved/retrimmed ${moved.length} clip(s) (${moved.slice(0, 4).join(", ")})`);
+  if (restyled.length) parts.push(`changed effects/properties of ${restyled.length} clip(s) (${restyled.slice(0, 4).join(", ")})`);
   return parts.join("; ");
 }
 function describeGroup(actions) {
@@ -58184,7 +60962,7 @@ function undoRedo(call, direction2, steps) {
   const changed = timelineDelta(timelineSnapshot(beforeProject), timelineSnapshot(doc.project));
   return applied(`${direction2}_tool`, summary, { ...changed, data: { steps: done, labels } }, 0);
 }
-var READ3, PROJECT_EXTS, projectTools;
+var READ3, PROJECT_EXTS, projectTools, SIGNATURE_SKIP_KEYS;
 var init_project2 = __esm({
   "../engine/src/tools/catalog/project.ts"() {
     "use strict";
@@ -58287,11 +61065,12 @@ var init_project2 = __esm({
         run: (call, input2) => undoRedo(call, "redo", coerceSteps(input2.steps ?? 1))
       })
     ];
+    SIGNATURE_SKIP_KEYS = /* @__PURE__ */ new Set(["id", "layer", "position", "start", "end", "reader", "ui", "ai_metadata"]);
   }
 });
 
 // ../engine/src/tools/catalog/search.ts
-function isRecord28(value) {
+function isRecord29(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function hitPeak(hit, s, e) {
@@ -58364,7 +61143,7 @@ function clipInfo2(project, clip2) {
   const file3 = fileId ? fileById(project, fileId) : void 0;
   const [clipStart, clipEnd2] = getSourceWindow(clip2, file3);
   const parent = resolveParentFileData(project, file3, fileId);
-  const sourceAi = isRecord28(parent?.ai_metadata) ? parent.ai_metadata : void 0;
+  const sourceAi = isRecord29(parent?.ai_metadata) ? parent.ai_metadata : void 0;
   const block = getIndexBlock(sourceAi ?? {});
   const watchData = parent ?? file3;
   const wai = record4(watchData?.ai_metadata);
@@ -58388,15 +61167,15 @@ function clipInfo2(project, clip2) {
   };
 }
 function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) {
-  const local = isRecord28(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
+  const local = isRecord29(sourceAi) ? materializeClipAiMetadata(sourceAi, clipStart, clipEnd2, { rebased: true }) : {};
   const candidates = [];
   for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-    if (!isRecord28(ch)) continue;
+    if (!isRecord29(ch)) continue;
     const summary = String(ch.summary || ch.title || "").trim();
     if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
   }
   for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-    if (!isRecord28(sc)) continue;
+    if (!isRecord29(sc)) continue;
     const desc = String(sc.description ?? "").trim();
     if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
   }
@@ -58423,7 +61202,7 @@ function sceneDescriptionCut(clipStart, clipEnd2, sourceAi, query2, occurrence) 
 function clipTranscriptCues(project, clip2) {
   const file3 = clip2.file_id ? fileById(project, String(clip2.file_id)) : void 0;
   const effective = getEffectiveAiMetadata(file3, clip2, { clipAiMetadata: clip2.ai_metadata });
-  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord28) : [];
+  return Array.isArray(effective.transcript_cues) ? effective.transcript_cues.filter(isRecord29) : [];
 }
 function fpsParts(project) {
   const fps = record4(project.fps);
@@ -58431,7 +61210,7 @@ function fpsParts(project) {
 }
 function sliceAtSourceCut(call, info, cutSource, label2) {
   const project = call.doc.project;
-  const [num11, den2] = fpsParts(project);
+  const [num12, den2] = fpsParts(project);
   let cut2 = cutSource;
   let what = label2;
   const [snappedCut, cue] = snapCutOutOfSpeech(cut2, clipTranscriptCues(project, info.clip));
@@ -58439,8 +61218,8 @@ function sliceAtSourceCut(call, info, cutSource, label2) {
     cut2 = snappedCut;
     what = `${what}, moved off speech`;
   }
-  cut2 = snapToSliceGrid(cut2, num11, den2);
-  const slicePos = snapToSliceGrid(info.clipPos + (cut2 - info.clipStart), num11, den2);
+  cut2 = snapToSliceGrid(cut2, num12, den2);
+  const slicePos = snapToSliceGrid(info.clipPos + (cut2 - info.clipStart), num12, den2);
   const clipTimelineEnd = info.clipPos + (info.clipEnd - info.clipStart);
   if (slicePos <= info.clipPos || slicePos >= clipTimelineEnd) {
     return `Error: Computed slice position (${pyFixed(slicePos, 3)}s) is outside the clip range [${pyFixed(info.clipPos, 3)}s \u2013 ${pyFixed(clipTimelineEnd, 3)}s].`;
@@ -58450,8 +61229,8 @@ function sliceAtSourceCut(call, info, cutSource, label2) {
   return `Sliced at ${fmtMmss(cut2 - info.clipStart)} (${what}).`;
 }
 function sliceAtSourceTimes(call, info, t0, t1) {
-  const [num11, den2] = fpsParts(call.doc.project);
-  const snap2 = (pos) => snapToSliceGrid(pos, num11, den2);
+  const [num12, den2] = fpsParts(call.doc.project);
+  const snap2 = (pos) => snapToSliceGrid(pos, num12, den2);
   const eps = 1e-3;
   const { clipStart, clipEnd: clipEnd2, clipPos } = info;
   const clipTlEnd = clipPos + (clipEnd2 - clipStart);
@@ -58571,7 +61350,7 @@ var init_search = __esm({
             const key = fid || vid || fname || "unknown";
             grouped.set(key, [...grouped.get(key) ?? [], { ...r, _fid: fid, _fname: fname, _vid: vid }]);
           }
-          const lines = [
+          const lines2 = [
             `Found ${results.length} match(es) across ${grouped.size} project media item(s) (index_id=${info.indexId}, index_name=${info.indexName || ""}):`
           ];
           let shown = 0;
@@ -58585,35 +61364,35 @@ var init_search = __esm({
             const sorted = [...hits].sort((a, b) => (Number(a.start) || 0) - (Number(b.start) || 0));
             if (sorted.length === 1 && nth === 0) {
               const r = sorted[0];
-              lines.push(`  \u2022 ${fname}${idPart}${vidPart}${typePart} \u2014 ${formatSearchWindow(r, Number(r.start) || 0, Number(r.end) || 0)} (rank=${pyStr(r.rank ?? null)})`);
+              lines2.push(`  \u2022 ${fname}${idPart}${vidPart}${typePart} \u2014 ${formatSearchWindow(r, Number(r.start) || 0, Number(r.end) || 0)} (rank=${pyStr(r.rank ?? null)})`);
               shown += 1;
               continue;
             }
             if (nth > 0) {
               const r = sorted[Math.min(nth - 1, sorted.length - 1)];
-              lines.push(`  \u2022 ${fname}${idPart}${vidPart} \u2014 occurrence #${nth} ${formatSearchWindow(r, Number(r.start) || 0, Number(r.end) || 0)}`);
+              lines2.push(`  \u2022 ${fname}${idPart}${vidPart} \u2014 occurrence #${nth} ${formatSearchWindow(r, Number(r.start) || 0, Number(r.end) || 0)}`);
             } else {
-              lines.push(`  \u2022 ${fname}${idPart}${vidPart} \u2014 ${sorted.length} occurrences:`);
+              lines2.push(`  \u2022 ${fname}${idPart}${vidPart} \u2014 ${sorted.length} occurrences:`);
               const byRank = [...hits].sort((a, b) => compareNumbers(searchRankKey(a), searchRankKey(b)));
               const best = byRank[0];
               const nthOf = new Map(sorted.map((h, i) => [h, i + 1]));
               const shownRows = [...byRank.slice(0, 8)].sort((a, b) => (Number(a.start) || 0) - (Number(b.start) || 0));
               for (const r of shownRows) {
                 const marker2 = r === best ? "  <-- best match" : "";
-                lines.push(
+                lines2.push(
                   `      ${nthOf.get(r) ?? "?"}. ${formatSearchWindow(r, Number(r.start) || 0, Number(r.end) || 0)} (rank=${pyStr(r.rank ?? null)})${marker2}`
                 );
               }
-              if (sorted.length > 1) lines.push("      Place the best match unless the user asked for a different one (e.g. 'the 2nd time').");
+              if (sorted.length > 1) lines2.push("      Place the best match unless the user asked for a different one (e.g. 'the 2nd time').");
             }
             shown += 1;
           }
           const unmapped = [...grouped.values()].filter((hits) => !hits[0]._fid).length;
-          if (unmapped) lines.push(`Note: ${unmapped} hit group(s) had no media_bin_file_id mapping \u2014 reindex those files into this project index.`);
-          lines.push(
+          if (unmapped) lines2.push(`Note: ${unmapped} hit group(s) had no media_bin_file_id mapping \u2014 reindex those files into this project index.`);
+          lines2.push(
             "To PLACE a moment: place_moment(file_id=..., start_seconds=<keep in>, end_seconds=<keep out>, query=<same description>, track=..., position_seconds=...). Watch+trim+place are built in \u2014 do not call watch_clip_window_tool or convert to frames. To SLICE an already-placed clip: slice_moment(query, clip_query=... or timeline_clip_id=...)."
           );
-          return lines.join("\n");
+          return lines2.join("\n");
         }
       }),
       contractTool("search_clip_scenes_tool", {
@@ -58632,40 +61411,40 @@ var init_search = __esm({
             const searchQuery = semanticSearchQuery(query2);
             const narrow = await searchInWindow(call, info.indexId, searchQuery, Math.max(30, k * 10), info.videoId);
             if (!narrow.error && narrow.items.length > 0) {
-              let matches2 = selectHitsForDisplay(narrow.items, info.clipStart, info.clipEnd, nth, k);
-              if (matches2.length > 0) {
-                matches2 = await Promise.all(matches2.map((m) => applyWatchToMatch(call, m, info.watchFile, query2, info.watchDuration, info.watchCues)));
-                const lines2 = [header];
-                for (const m of matches2) {
+              let matches3 = selectHitsForDisplay(narrow.items, info.clipStart, info.clipEnd, nth, k);
+              if (matches3.length > 0) {
+                matches3 = await Promise.all(matches3.map((m) => applyWatchToMatch(call, m, info.watchFile, query2, info.watchDuration, info.watchCues)));
+                const lines3 = [header];
+                for (const m of matches3) {
                   const inS = m.in_source ?? m.start;
                   const outS = m.out_source ?? m.end;
-                  lines2.push(
+                  lines3.push(
                     `- keep ${fmtMmss(inS - info.clipStart)}-${fmtMmss(outS - info.clipStart)} peak ${fmtMmss((m.cut_source ?? 0) - info.clipStart)} (rank=${pyRepr2(m.rank ?? null)}, overlap=${pyFixed(m.overlap_ratio, 2)})`
                   );
-                  if (m.transcription) lines2.push(`  transcript: ${Array.from(String(m.transcription).trim()).slice(0, 180).join("")}`);
-                  if (m._watch_fallback) lines2.push("  (text-index time; no visual match in watch window)");
+                  if (m.transcription) lines3.push(`  transcript: ${Array.from(String(m.transcription).trim()).slice(0, 180).join("")}`);
+                  if (m._watch_fallback) lines3.push("  (text-index time; no visual match in watch window)");
                 }
-                const warn = matches2.find((m) => m._watch_warning)?._watch_warning;
-                if (warn) lines2.push(`Note: ${warn}`);
-                return lines2.join("\n");
+                const warn = matches3.find((m) => m._watch_warning)?._watch_warning;
+                if (warn) lines3.push(`Note: ${warn}`);
+                return lines3.join("\n");
               }
             }
             const broad = await searchInWindow(call, info.indexId, searchQuery, Math.max(50, k * 15), "");
             if (!broad.error && broad.items.length > 0) {
               const filtered = broad.items.filter((it) => String(it.video_id || it.twelvelabs_video_id || "") === info.videoId);
-              let matches2 = filtered.length > 0 ? selectHitsForDisplay(filtered, info.clipStart, info.clipEnd, nth, k) : [];
-              if (matches2.length > 0) {
-                matches2 = await Promise.all(matches2.map((m) => applyWatchToMatch(call, m, info.watchFile, query2, info.watchDuration, info.watchCues)));
-                const lines2 = [header];
-                for (const m of matches2) {
+              let matches3 = filtered.length > 0 ? selectHitsForDisplay(filtered, info.clipStart, info.clipEnd, nth, k) : [];
+              if (matches3.length > 0) {
+                matches3 = await Promise.all(matches3.map((m) => applyWatchToMatch(call, m, info.watchFile, query2, info.watchDuration, info.watchCues)));
+                const lines3 = [header];
+                for (const m of matches3) {
                   const relCut = (m.cut_source ?? 0) - info.clipStart;
                   const inS = m.in_source ?? (m.start || relCut);
                   const outS = m.out_source ?? (m.end || relCut);
-                  lines2.push(`- keep ${fmtMmss(inS - info.clipStart)}-${fmtMmss(outS - info.clipStart)} peak ${fmtMmss(relCut)} (project search)`);
+                  lines3.push(`- keep ${fmtMmss(inS - info.clipStart)}-${fmtMmss(outS - info.clipStart)} peak ${fmtMmss(relCut)} (project search)`);
                 }
-                const warn = matches2.find((m) => m._watch_warning)?._watch_warning;
-                if (warn) lines2.push(`Note: ${warn}`);
-                return lines2.join("\n");
+                const warn = matches3.find((m) => m._watch_warning)?._watch_warning;
+                if (warn) lines3.push(`Note: ${warn}`);
+                return lines3.join("\n");
               }
             }
           }
@@ -58675,12 +61454,12 @@ var init_search = __esm({
           const local = Object.keys(perClip).length > 0 ? perClip : getEffectiveAiMetadata(parent ?? file3, target.clip, { rebased: true });
           const candidates = [];
           for (const ch of Array.isArray(local.chapters) ? local.chapters : []) {
-            if (!isRecord28(ch)) continue;
+            if (!isRecord29(ch)) continue;
             const summary = String(ch.summary || ch.title || "").trim();
             if (summary) candidates.push({ time: Number(ch.start) || 0, description: summary });
           }
           for (const sc of Array.isArray(local.scene_descriptions) ? local.scene_descriptions : []) {
-            if (!isRecord28(sc)) continue;
+            if (!isRecord29(sc)) continue;
             const desc = String(sc.description ?? "").trim();
             if (desc) candidates.push({ time: Number(sc.time) || 0, description: desc });
           }
@@ -58705,7 +61484,7 @@ var init_search = __esm({
           scored.sort((a, b) => b.score - a.score);
           const results = scored.slice(0, k);
           if (results.length === 0) return "No matches found.";
-          const lines = [`Description matches in '${info.title}':`];
+          const lines2 = [`Description matches in '${info.title}':`];
           for (const r of results) {
             const watched = await confirmWatchWindow(call, {
               file: info.watchFile,
@@ -58716,10 +61495,10 @@ var init_search = __esm({
               duration: info.watchDuration,
               cues: info.watchCues
             });
-            lines.push(`- [${fmtMmss(watched.cut_source)}] score=${pyFixed(r.score, 3)}: ${Array.from(r.description).slice(0, 200).join("")}`);
-            if (watched.warning) lines.push(`  Note: ${watched.warning}`);
+            lines2.push(`- [${fmtMmss(watched.cut_source)}] score=${pyFixed(r.score, 3)}: ${Array.from(r.description).slice(0, 200).join("")}`);
+            if (watched.warning) lines2.push(`  Note: ${watched.warning}`);
           }
-          return lines.join("\n");
+          return lines2.join("\n");
         }
       }),
       contractTool("get_project_catalog_tool", {
@@ -58733,16 +61512,16 @@ var init_search = __esm({
           if (data.items.length === 0) {
             return "Catalog is empty \u2014 index/summarize project videos, images, and audio first, then call get_project_catalog_tool again.";
           }
-          const lines = [`Project catalog (${data.items.length} media items):`];
+          const lines2 = [`Project catalog (${data.items.length} media items):`];
           for (const it of data.items) {
             const name = it.filename || it.file_id || it.video_id;
             const summary = String(it.short_summary ?? "").trim() || "(no summary)";
             const mt = String(it.media_type || "video");
             const dur = it.duration_sec;
             const durPart = typeof dur === "number" && mt !== "image" ? ` [${pyFixed(dur, 1)}s]` : "";
-            lines.push(`- [${mt}] ${String(name)}${durPart} file_id=${String(it.file_id)}: ${summary}`);
+            lines2.push(`- [${mt}] ${String(name)}${durPart} file_id=${String(it.file_id)}: ${summary}`);
           }
-          return lines.join("\n");
+          return lines2.join("\n");
         }
       }),
       contractTool("slice_clip_at_best_match_tool", {
@@ -58887,10 +61666,10 @@ var init_search = __esm({
             if (searchQuery && await isIndexingConfigured(call) && info.indexId && info.videoId) {
               const found = await searchInWindow(call, info.indexId, searchQuery, 30, info.videoId);
               if (!found.error && found.items.length > 0) {
-                const matches2 = selectHitsForDisplay(found.items, info.clipStart, info.clipEnd, parseOccurrence(String(input2.occurrence ?? "0"), query2), 1);
-                if (matches2.length > 0) {
-                  hitStart = Number(matches2[0].start) || 0;
-                  hitEnd = Number(matches2[0].end) || hitStart;
+                const matches3 = selectHitsForDisplay(found.items, info.clipStart, info.clipEnd, parseOccurrence(String(input2.occurrence ?? "0"), query2), 1);
+                if (matches3.length > 0) {
+                  hitStart = Number(matches3[0].start) || 0;
+                  hitEnd = Number(matches3[0].end) || hitStart;
                 }
               }
             }
@@ -58917,7 +61696,7 @@ var init_search = __esm({
           const outS = watched.out_source;
           const clipLo = info.clipStart;
           const clipHi = info.clipEnd;
-          const lines = [
+          const lines2 = [
             `Watched ${watched.frame_times.length} frames of '${info.title || "clip"}' (source seconds; this clip plays ${pyFixed(clipLo, 2)}-${pyFixed(clipHi, 2)}): ${secsList(watched.frame_times) || "none"}.`,
             watched.scene_times.length > 0 ? `Shot cuts in window (source s): ${secsList(watched.scene_times)}.` : "Shot cuts in window: none."
           ];
@@ -58929,17 +61708,17 @@ var init_search = __esm({
             const inC = Math.max(inS, clipLo);
             const outC = Math.min(outS, clipHi);
             const cutC = Math.max(inC, Math.min(cut2, outC));
-            lines.push(
+            lines2.push(
               `Visible ${pyFixed(inC, 3)}s\u2013${pyFixed(outC, 3)}s source; peak ${pyFixed(cutC, 3)}s source (${fmtMmss(cutC - clipLo)} into the clip).` + (visibleInClip.length > 0 ? ` Seen in frames: ${secsList(visibleInClip)}.` : "")
             );
           } else if (seen) {
-            lines.push(`Not visible in this clip's frames${visible.length > 0 ? ` - only outside it, at ${secsList(visible)}s source.` : "."}`);
+            lines2.push(`Not visible in this clip's frames${visible.length > 0 ? ` - only outside it, at ${secsList(visible)}s source.` : "."}`);
           } else {
-            lines.push("Not visible in these frames.");
+            lines2.push("Not visible in these frames.");
           }
-          if (watched.reason) lines.push(watched.reason);
-          if (watched.warning) lines.push(watched.warning);
-          return lines.join("\n");
+          if (watched.reason) lines2.push(watched.reason);
+          if (watched.warning) lines2.push(watched.warning);
+          return lines2.join("\n");
         }
       })
     ];
@@ -58947,11 +61726,11 @@ var init_search = __esm({
 });
 
 // ../engine/src/tools/catalog/speech-tools.ts
-function isRecord29(value) {
+function isRecord30(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function wordsFromCues(cues) {
-  const rows = cues.filter(isRecord29).map((c) => ({
+  const rows = cues.filter(isRecord30).map((c) => ({
     text: String(c.text ?? "").trim(),
     start: Number("source_start" in c ? c.source_start : c.start),
     end: Number("source_end" in c ? c.source_end : c.end)
@@ -58970,13 +61749,13 @@ function wordsFromCues(cues) {
   }
   return out;
 }
-function wordsForClip(words2, clip2, fps) {
+function wordsForClip(words3, clip2, fps) {
   const position = Number(clip2.position) || 0;
   const start = Number(clip2.start) || 0;
   const end = Number(clip2.end) || start;
   const out = [];
   let index = 0;
-  for (const w of words2) {
+  for (const w of words3) {
     if (w.endSec <= start || w.startSec >= end) continue;
     const s = Math.max(start, w.startSec);
     const e = Math.min(end, w.endSec);
@@ -59000,8 +61779,8 @@ function wordsForClip(words2, clip2, fps) {
   }
   return out;
 }
-function fileWords(words2, fps) {
-  return words2.map((w, index) => {
+function fileWords(words3, fps) {
+  return words3.map((w, index) => {
     const startFrame = toFrame(w.startSec, fps);
     let endFrame = toFrame(w.endSec, fps);
     if (endFrame <= startFrame) endFrame = startFrame + 1;
@@ -59018,13 +61797,13 @@ function cuesForFile(file3) {
   const ai = record4(file3.ai_metadata);
   return { cues: Array.isArray(ai.transcript_cues) ? ai.transcript_cues : [], indexed: Boolean(ai.analyzed) };
 }
-function compactRows(words2) {
-  return words2.map((w) => [w.index, w.text, w.startFrame]);
+function compactRows(words3) {
+  return words3.map((w) => [w.index, w.text, w.startFrame]);
 }
-function clipPayload(words2, meta3, includeWords, includeCompact) {
-  const row = { ...meta3, wordCount: words2.length, transcriptGeneration: 1 };
-  if (includeCompact || includeWords) row.compactWords = compactRows(words2);
-  if (includeWords) row.words = words2;
+function clipPayload(words3, meta3, includeWords, includeCompact) {
+  const row = { ...meta3, wordCount: words3.length, transcriptGeneration: 1 };
+  if (includeCompact || includeWords) row.compactWords = compactRows(words3);
+  if (includeWords) row.words = words3;
   return row;
 }
 function transcriptNotes() {
@@ -59155,10 +61934,10 @@ function transcriptFromCues(call, input2, tool = "get_transcript_tool") {
 function fileReceipt(tool, file3, fps, includeWords, includeCompact, warnings, suffix = "") {
   const { cues, indexed } = cuesForFile(file3);
   if (!indexed) return unavailable(tool, NO_TRANSCRIPT);
-  const words2 = fileWords(wordsFromCues(cues), fps);
-  const clips = [clipPayload(words2, { fileId: String(file3.id) }, includeWords, includeCompact)];
-  const summary = words2.length ? shortSummary(words2.length, [], [String(file3.id)], suffix) : `No spoken dialogue found.${suffix ? ` ${suffix}` : ""}`;
-  return applied(tool, summary, { warnings, notes: transcriptNotes(), data: dataPayload(wordsToScript(words2), words2.length, clips) }, 0);
+  const words3 = fileWords(wordsFromCues(cues), fps);
+  const clips = [clipPayload(words3, { fileId: String(file3.id) }, includeWords, includeCompact)];
+  const summary = words3.length ? shortSummary(words3.length, [], [String(file3.id)], suffix) : `No spoken dialogue found.${suffix ? ` ${suffix}` : ""}`;
+  return applied(tool, summary, { warnings, notes: transcriptNotes(), data: dataPayload(wordsToScript(words3), words3.length, clips) }, 0);
 }
 function applyCompactedFragments(tx, clipId2, fragments, removed, fps) {
   const original = tx.project.clips.find((c) => c.id === clipId2);
@@ -59554,8 +62333,450 @@ var init_timeline2 = __esm({
   }
 });
 
-// ../engine/src/tools/catalog/titles.ts
+// ../engine/src/tools/catalog/title-templates.ts
 function basename3(path38) {
+  return String(path38 ?? "").split(/[\\/]/).pop() ?? "";
+}
+function errorMessage(error62) {
+  return error62 instanceof Error ? error62.message : String(error62);
+}
+function fieldRows(slots) {
+  return slots.map((s) => ({ index: s.index, role: s.role, text: s.text.trim() }));
+}
+function pyList(items) {
+  return `[${items.map((s) => pyReprString(s)).join(", ")}]`;
+}
+function assignTexts(slots, text4, subtitle, lines2, name, blankRest) {
+  const values = /* @__PURE__ */ new Map();
+  const count = slots.length;
+  if (lines2.length > 0) {
+    if (lines2.length > count) {
+      toolError(
+        `${name} has ${count} text field(s) ${pyList(slots.map((s) => s.role))} but ${lines2.length} lines were given; pick a template with more lines (Standard_3 has 3, Standard_4 and Post_it have 4)`
+      );
+    }
+    lines2.forEach((value, i) => values.set(slots[i].index, String(value)));
+  } else {
+    const parts = String(text4 ?? "").split("\n").map((p) => p.trim());
+    while (parts.length > 0 && !parts[parts.length - 1]) parts.pop();
+    const sub = fieldByRole(slots, "subtitle");
+    if (subtitle.trim() && !sub) toolError(`${name} has a single text line; drop subtitle or use a two-line template such as Standard_1, Bar_2 or Gray_Box_4`);
+    const main = fieldByRole(slots, "title");
+    let order = [main, sub].filter((s) => s !== void 0);
+    order = [...order, ...slots.filter((s) => !order.includes(s))];
+    if (subtitle.trim()) {
+      order = order.filter((s) => s !== sub);
+      values.set(sub.index, subtitle.trim());
+    }
+    if (parts.length > order.length) {
+      toolError(`${name} has ${count} text field(s) but the text has ${parts.length} lines; use a template with more lines (Standard_3, Standard_4, Post_it) or pass lines=[...]`);
+    }
+    parts.forEach((value, i) => {
+      if (i < order.length) values.set(order[i].index, value);
+    });
+  }
+  if (blankRest) {
+    for (const slot of slots) if (!values.has(slot.index)) values.set(slot.index, "");
+  }
+  return values;
+}
+function templateEntries(call) {
+  const assets = call.host.assets;
+  let pending = templateCache.get(assets);
+  if (!pending) {
+    pending = Promise.all(
+      TITLE_TEMPLATES.map(async (t) => {
+        const entry = { name: t.id, label: t.name, source: "bundled" };
+        let doc;
+        try {
+          doc = parseTitleSvg(await assets.readText(t.assetPath));
+        } catch (error62) {
+          entry.error = `unreadable: ${errorMessage(error62)}`;
+          return entry;
+        }
+        const slots = titleFields(doc);
+        const [, h] = artboardSize(doc);
+        const main = fieldByRole(slots, "title") ?? slots[0];
+        const [color3, alpha] = main ? textColor(doc, main.nodes[0]) : ["", 0];
+        const [bg, bgAlpha] = backgroundColor(doc);
+        Object.assign(entry, {
+          purpose: TEMPLATE_PURPOSE[t.id] ?? "",
+          zone: textZone(slots, h),
+          fields: fieldRows(slots),
+          text_color: color3,
+          background: { color: bg, opacity: pyRoundTo(bgAlpha, 3) },
+          font: fontFamily(doc)
+        });
+        if (alpha < 0.999) entry.text_opacity = pyRoundTo(alpha, 3);
+        return entry;
+      })
+    );
+    pending.catch(() => templateCache.delete(assets));
+    templateCache.set(assets, pending);
+  }
+  return pending;
+}
+function matches2(entry, query2) {
+  if (!query2) return true;
+  const fields = Array.isArray(entry.fields) ? entry.fields : [];
+  const hay = [entry.name, entry.label, entry.purpose, entry.zone, entry.title, ...fields.map((f2) => f2.text)].map((v) => typeof v === "string" ? v : "").join(" ").toLowerCase().replaceAll("_", " ");
+  return query2.toLowerCase().replaceAll("_", " ").split(/\s+/).filter(Boolean).every((word) => hay.includes(word));
+}
+function titleFiles(project) {
+  return project.files.filter((f2) => String(f2.path ?? "").toLowerCase().endsWith(".svg") && f2.zenvi_role !== OVERLAY_ROLE);
+}
+async function readProjectSvg(call, file3) {
+  const path38 = String(file3.path ?? "");
+  if (path38.startsWith("@emojis/") && call.host.assets) return call.host.assets.readText(`emojis/${path38.slice("@emojis/".length)}`);
+  const readText = call.host.storage?.readText;
+  if (!readText) throw new Error("this Zenvi surface cannot read project files");
+  return readText.call(call.host.storage, path38);
+}
+function clipsOf(project, fileId) {
+  return project.clips.filter((c) => c.file_id === fileId);
+}
+async function projectTitles(call, query2) {
+  const project = call.doc.project;
+  const out = [];
+  for (const f2 of titleFiles(project)) {
+    const path38 = String(f2.path);
+    const entry = { file_id: f2.id, name: f2.name || basename3(path38), path: path38 };
+    try {
+      const doc = parseTitleSvg(await readProjectSvg(call, f2));
+      entry.fields = fieldRows(titleFields(doc));
+      entry.text_color = textColor(doc)[0];
+    } catch (error62) {
+      entry.error = `unreadable: ${errorMessage(error62)}`;
+    }
+    entry.clips = clipsOf(project, String(f2.id)).map((c) => {
+      const position = Number(c.position) || 0;
+      const length = (Number(c.end) || 0) - (Number(c.start) || 0);
+      return { timeline_clip_id: c.id, track: uiTrackNumber(project, c.layer), position: pyRoundTo(position, 3), end: pyRoundTo(position + length, 3) };
+    });
+    if (matches2(entry, query2)) out.push(entry);
+  }
+  return out;
+}
+function svgTitle(file3) {
+  const path38 = String(file3.path ?? "");
+  if (!path38.toLowerCase().endsWith(".svg")) toolError(`${pyReprString(String(file3.name || basename3(path38)))} is not a title (only .svg titles can be edited)`);
+  if (file3.zenvi_role === OVERLAY_ROLE) toolError("that clip is a caption/timer overlay; use edit_captions_tool or add_timer_tool");
+  return file3;
+}
+async function resolveTitle(call, clipId2, fileId, titleQuery) {
+  const project = call.doc.project;
+  const fileById2 = (id) => project.files.find((f2) => f2.id === id);
+  if (clipId2) {
+    const clip2 = project.clips.find((c) => c.id === clipId2);
+    if (!clip2) return toolError(`no timeline clip with id=${pyReprString(clipId2)}`);
+    const file3 = fileById2(String(clip2.file_id ?? ""));
+    if (!file3) return toolError(`clip ${clip2.id} has no project file`);
+    return [svgTitle(file3), clip2.id];
+  }
+  if (fileId) {
+    const file3 = fileById2(fileId);
+    if (!file3) return toolError(`no project file with id=${pyReprString(fileId)}`);
+    return [svgTitle(file3), ""];
+  }
+  const titles = titleFiles(project);
+  if (titleQuery) {
+    const q = titleQuery.toLowerCase();
+    const scored = [];
+    for (const f2 of titles) {
+      const name = String(f2.name || basename3(String(f2.path)));
+      let texts = [];
+      try {
+        texts = titleFields(parseTitleSvg(await readProjectSvg(call, f2))).map((s) => s.text.trim());
+      } catch {
+        texts = [];
+      }
+      const hay = [name.toLowerCase(), ...texts.map((t) => t.toLowerCase())];
+      if (hay.some((h) => h === q)) scored.push([2, f2]);
+      else if (hay.some((h) => h.includes(q))) scored.push([1, f2]);
+    }
+    if (scored.length === 0) toolError(`no title in the project matches ${pyReprString(titleQuery)} (list_title_templates_tool kind=project lists them)`);
+    const best = Math.max(...scored.map(([s]) => s));
+    const top = scored.filter(([s]) => s === best).map(([, f2]) => f2);
+    if (top.length > 1) {
+      toolError(
+        `${top.length} titles match ${pyReprString(titleQuery)}: ` + top.slice(0, 6).map((f2) => `${f2.id} (${f2.name || basename3(String(f2.path))})`).join(", ") + "; pass file_id or timeline_clip_id"
+      );
+    }
+    return [top[0], ""];
+  }
+  const selected = (call.host.ui?.selectedIds?.() ?? []).map((id) => project.clips.find((c) => c.id === id)).filter((c) => Boolean(c) && String(c.reader?.path ?? "").toLowerCase().endsWith(".svg"));
+  if (selected.length === 1) {
+    const file3 = fileById2(String(selected[0].file_id ?? ""));
+    if (file3) return [svgTitle(file3), selected[0].id];
+  }
+  if (titles.length === 1) return [titles[0], ""];
+  return toolError(`which title? pass timeline_clip_id, file_id or title_query (${titles.length} titles in the project; list_title_templates_tool kind=project lists them)`);
+}
+async function writeTitle(call, name, svg) {
+  const media = call.host.media;
+  let path38;
+  try {
+    path38 = await media.writeGenerated(name, new TextEncoder().encode(svg), "image/svg+xml");
+  } catch (error62) {
+    return toolError(`failed to write title SVG: ${errorMessage(error62)}`);
+  }
+  try {
+    return { path: path38, info: await media.probe(path38), name };
+  } catch {
+    return toolError(`could not import ${name} into Project Files`);
+  }
+}
+var TEMPLATE_PURPOSE, TitleStyle, templateCache, titleTemplateTools;
+var init_title_templates = __esm({
+  "../engine/src/tools/catalog/title-templates.ts"() {
+    "use strict";
+    init_files();
+    init_overlays();
+    init_templates();
+    init_title_svg();
+    init_define();
+    init_pyfmt();
+    init_receipt();
+    init_titles_text();
+    init_animated_titles();
+    TEMPLATE_PURPOSE = {
+      Bar_1: "centre title on a glossy blue bar, with a reflection",
+      Bar_2: "centre title + subtitle on a glossy blue bar",
+      Bar_3: "lower third: gold title on a dark bar across the bottom",
+      Box: "full-screen card: purple background, cyan frame, title + subtitle",
+      Bubbles_1: "title + subtitle under floating bubbles",
+      Bubbles_2: "title + subtitle with bubbles around the frame",
+      Camera_Border: "camera viewfinder corners around a small title",
+      Cloud_1: "title + subtitle inside a cartoon cloud",
+      Cloud_2: "three lines in three cartoon clouds",
+      Creative_Commons_1: "music credit card (song, author, CC licence) on black",
+      Creative_Commons_2: "music credit card with a URL line, on black",
+      Film_Rating_1: "green 'approved for all audiences' trailer card",
+      Film_Rating_2: "green trailer rating card: R",
+      Film_Rating_3: "green trailer rating card: G",
+      Film_Rating_4: "green trailer rating card: PG-13",
+      Flames: "title + subtitle over flames along the bottom",
+      Flare: "full-screen card: colourful light flare, big title + subtitle",
+      Footer_1: "small footer text, bottom left",
+      Footer_2: "small footer text, bottom centre",
+      Footer_3: "small footer text, bottom right",
+      Gold_1: "gold title, centre",
+      Gold_2: "gold title + subtitle, centre",
+      Gold_Bottom: "gold title, bottom centre",
+      Gold_Top: "gold title, top centre",
+      Gray_Box_1: "title in a grey box, top left",
+      Gray_Box_2: "title + subtitle in a grey box, top left",
+      Gray_Box_3: "lower third: title in a grey box, bottom right",
+      Gray_Box_4: "lower third: name + role in a grey box, bottom right",
+      Header_1: "small header text, top left",
+      Header_2: "small header text, top centre",
+      Header_3: "small header text, top right",
+      OpenShot: "full-screen card: pink-to-blue gradient, white title + subtitle (end card)",
+      Oval_1: "title + subtitle inside a blue oval vignette",
+      Oval_2: "title + subtitle inside a blue oval frame",
+      Oval_3: "title at the top and subtitle at the bottom of a blue oval",
+      Oval_4: "title with reflection inside a blue oval",
+      Post_it: "yellow sticky note with four lines",
+      Ribbon_1: "subtitle + title on a blue ribbon across the top",
+      Ribbon_2: "title + subtitle on a blue ribbon across the top",
+      Ribbon_3: "title ribbon at the top, subtitle ribbon at the bottom",
+      Smoke_1: "title + subtitle between dark smoke at top and bottom",
+      Smoke_2: "title + subtitle with dark smoke",
+      Smoke_3: "title with reflection between dark smoke",
+      Solid_Color: "solid full-screen colour card with no text (set background_color)",
+      Standard_1: "plain title + subtitle, centre",
+      Standard_2: "plain title with a reflection, centre",
+      Standard_3: "three centred lines",
+      Standard_4: "four centred lines (credits)",
+      Sunset: "glowing gradient title, centre",
+      TV_Rating: "small TV rating badge (TV / G), top left"
+    };
+    TitleStyle = class {
+      font;
+      bold;
+      italic;
+      fontScale;
+      textColor;
+      background;
+      fitText;
+      constructor(args) {
+        const weight = args.font_weight ?? "";
+        const style = args.font_style ?? "";
+        if (!["", "bold", "normal"].includes(weight)) toolError("font_weight must be '', 'bold' or 'normal'");
+        if (!["", "italic", "normal"].includes(style)) toolError("font_style must be '', 'italic' or 'normal'");
+        this.font = String(args.font ?? "").trim().replace(/^['"]+|['"]+$/g, "");
+        this.bold = weight === "" ? null : weight === "bold";
+        this.italic = style === "" ? null : style === "italic";
+        this.fontScale = Number(args.font_scale || 1);
+        this.textColor = String(args.text_color ?? "").trim() ? colorHexAlpha(args.text_color, "text_color") : null;
+        this.background = String(args.background_color ?? "").trim() ? colorHexAlpha(args.background_color, "background_color") : null;
+        this.fitText = args.fit_text ?? true;
+      }
+      get changesAnything() {
+        return Boolean(this.font || this.bold !== null || this.italic !== null || Math.abs(this.fontScale - 1) > 1e-9 || this.textColor || this.background);
+      }
+      /** `apply`: write the changes; returns the receipt fields they produce. */
+      apply(doc) {
+        const info = {};
+        const nodes = [...textNodes(doc), ...tspanNodes(doc)];
+        if (this.font || this.bold !== null || this.italic !== null || Math.abs(this.fontScale - 1) > 1e-9) {
+          applyFont(nodes, { family: this.font || null, italic: this.italic, bold: this.bold, sizeRatio: this.fontScale });
+        }
+        if (this.textColor) {
+          setTextColor(doc, ...this.textColor);
+          info.text_color = this.textColor[0];
+        }
+        if (this.background) {
+          if (rectNodes(doc).length === 0) toolError("this title has no background shape to colour");
+          setBackground(doc, ...this.background);
+          info.background_color = this.background[0];
+        }
+        if (this.font) info.font = this.font;
+        return info;
+      }
+      /** `_fit`: shrink fields that would run off the artboard; {field index: ratio}. */
+      fit(doc, slots) {
+        const fitted = {};
+        if (!this.fitText) return fitted;
+        const [width] = artboardSize(doc);
+        for (const slot of slots) {
+          const ratio = fitField(slot, width);
+          if (ratio < 0.999) fitted[String(slot.index)] = pyRoundTo(ratio, 3);
+        }
+        return fitted;
+      }
+    };
+    templateCache = /* @__PURE__ */ new WeakMap();
+    titleTemplateTools = [
+      contractTool("list_title_templates_tool", {
+        annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+        requires: ["assets"],
+        run: (call, input2) => guarded("list_title_templates_tool", async () => {
+          const kind = input2.kind ?? "static";
+          const query2 = String(input2.query ?? "").trim();
+          const data = { kind };
+          const counts = [];
+          if (kind === "static" || kind === "all") {
+            const templates = (await templateEntries(call)).filter((e) => matches2(e, query2));
+            data.templates = templates;
+            counts.push(`${templates.length} title template(s)`);
+          }
+          if (kind === "animated" || kind === "all") {
+            const { rows, renderer } = animatedCatalog(query2);
+            data.animated = rows;
+            data.renderer = renderer;
+            counts.push(`${rows.length} animated title(s) (${rows.filter((r) => r.renders_here).length} render here as 2D keyframed titles)`);
+          }
+          if (kind === "project" || kind === "all") {
+            const titles = await projectTitles(call, query2);
+            data.project_titles = titles;
+            counts.push(`${titles.length} title(s) in the project`);
+          }
+          const summary = `Found ${counts.join(", ")}${query2 ? ` matching ${pyReprString(query2)}` : ""}.`;
+          return applied("list_title_templates_tool", summary, { data }, 0);
+        })
+      }),
+      contractTool("edit_title_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        requires: ["media", "storage"],
+        run: (call, input2) => guarded("edit_title_tool", async () => {
+          const tool = "edit_title_tool";
+          if (!call.host.media.writeGenerated) return unavailable(tool, "it cannot store generated title images.");
+          const lines2 = (input2.lines ?? []).map(String);
+          const text4 = String(input2.text ?? "");
+          const subtitle = String(input2.subtitle ?? "");
+          const scope = input2.scope ?? "all_clips";
+          const style = new TitleStyle(input2);
+          const hasText2 = Boolean(text4.trim() || subtitle.trim() || lines2.length > 0);
+          if (!hasText2 && !style.changesAnything && scope !== "duplicate") {
+            toolError("nothing to change: pass text, subtitle, lines, font, colours or font_scale (or scope='duplicate' to copy the title)");
+          }
+          const [file3, clipId2] = await resolveTitle(call, String(input2.timeline_clip_id ?? "").trim(), String(input2.file_id ?? "").trim(), String(input2.title_query ?? "").trim());
+          const project = call.doc.project;
+          const clips = clipsOf(project, String(file3.id));
+          if (scope === "this_clip" && !clipId2) toolError("scope='this_clip' needs timeline_clip_id (the clip that gets its own copy)");
+          const srcPath = String(file3.path ?? "");
+          let source2;
+          try {
+            source2 = await readProjectSvg(call, file3);
+          } catch (error62) {
+            return toolError(`the title file could not be read: ${srcPath} (${errorMessage(error62)})`);
+          }
+          let doc;
+          try {
+            doc = parseTitleSvg(source2);
+          } catch (error62) {
+            return toolError(`cannot read title SVG ${basename3(srcPath)}: ${errorMessage(error62)}`);
+          }
+          const slots = titleFields(doc);
+          const name = String(file3.name || basename3(srcPath));
+          if (hasText2 && slots.length === 0) toolError(`${name} has no text to change`);
+          const values = hasText2 ? assignTexts(slots, text4, subtitle, lines2, name, false) : /* @__PURE__ */ new Map();
+          const scopeUsed = scope === "this_clip" && clips.length <= 1 ? "all_clips" : scope;
+          const affected = scopeUsed === "all_clips" ? clips : clips.filter((c) => c.id === clipId2);
+          if (scopeUsed !== "duplicate") {
+            const locked = affected.filter((c) => isLocked(project, c.layer));
+            if (locked.length > 0) {
+              toolError(`title clip(s) on locked track(s): ${locked.map((c) => `${c.id} (track ${uiTrackNumber(project, c.layer)})`).join(", ")}; unlock first`);
+            }
+          }
+          const before = titleSvgText(doc);
+          for (const slot of slots) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index));
+          const styleInfo = style.apply(doc);
+          const fitted = style.fit(doc, slots);
+          const after = fieldRows(slots);
+          const svg = titleSvgText(doc);
+          if (scopeUsed !== "duplicate" && svg === before) toolError("the title already looks like that; nothing changed");
+          const taken = titleFiles(project).map((f2) => basename3(String(f2.path)));
+          let outName;
+          if (scopeUsed === "all_clips") outName = versionName(srcPath, taken);
+          else {
+            const [prefix, offset] = duplicatePattern(basename3(srcPath));
+            const free = freeName(prefix, offset, taken);
+            outName = free === null ? null : `${free}.svg`;
+          }
+          if (!outName) toolError(scopeUsed === "all_clips" ? `no free version name for ${pyReprString(basename3(srcPath))}` : "no free name for the copy");
+          const media = await writeTitle(call, outName, svg);
+          const result = call.commit((tx) => {
+            if (scopeUsed === "all_clips") {
+              const fresh2 = addFile(tx, media, { name, mediaType: "image" });
+              const ids2 = clipsOf(tx.project, String(file3.id)).map((c) => useFileForClip(tx, c.id, fresh2.id).id);
+              removeFile(tx, String(file3.id), { removeClips: false });
+              return { fileId: fresh2.id, clipIds: ids2 };
+            }
+            const fresh = addFile(tx, media, { mediaType: "image" });
+            if (scopeUsed === "this_clip") {
+              useFileForClip(tx, clipId2, fresh.id);
+              return { fileId: fresh.id, clipIds: [clipId2] };
+            }
+            return { fileId: fresh.id, clipIds: [] };
+          });
+          const shown = after.map((r) => r.text).filter(Boolean).join(" / ") || name;
+          let summary;
+          if (scopeUsed === "all_clips") summary = `Updated title ${pyReprString(shown)} on ${result.clipIds.length} clip(s).`;
+          else if (scopeUsed === "this_clip") summary = `Gave clip ${clipId2} its own edited title ${pyReprString(shown)}.`;
+          else summary = `Duplicated the title as ${pyReprString(basename3(media.path))} (${pyReprString(shown)}); it is in Project Files.`;
+          const data = {
+            scope: scopeUsed,
+            file_id: result.fileId,
+            source_file_id: file3.id,
+            path: media.path,
+            timeline_clip_ids: result.clipIds,
+            fields: after,
+            ...styleInfo
+          };
+          if (scope !== scopeUsed) data.note = "the title is used by only this clip, so it was edited in place";
+          if (Object.keys(fitted).length > 0) data.text_shrunk_to_fit = fitted;
+          const notes = scopeUsed === "all_clips" ? [`The edited title is a new Project Files entry (${result.fileId}) that replaced ${file3.id} in every clip; use the new file_id from now on.`] : [];
+          return applied(tool, summaryLine(summary), { data, notes });
+        })
+      })
+    ];
+  }
+});
+
+// ../engine/src/tools/catalog/titles.ts
+function basename4(path38) {
   return String(path38).split(/[\\/]/).pop() ?? "";
 }
 function isAbsolutePath2(path38) {
@@ -59568,7 +62789,7 @@ async function loadTitleTemplate(call, template) {
     const storage = call.host.storage;
     if (!tmpl.toLowerCase().endsWith(".svg") || !storage?.readText) return null;
     try {
-      return { file: basename3(tmpl), svg: await storage.readText(tmpl) };
+      return { file: basename4(tmpl), svg: await storage.readText(tmpl) };
     } catch (error62) {
       log(tmpl, error62);
       return null;
@@ -59584,7 +62805,7 @@ async function loadTitleTemplate(call, template) {
   }
 }
 function titleFileName(body, fileName2) {
-  let safe2 = basename3(fileName2.trim());
+  let safe2 = basename4(fileName2.trim());
   if (!safe2) {
     const slug = pySlice(body.replace(/[^A-Za-z0-9_-]+/g, "_"), 0, 40).replace(/^_+|_+$/g, "") || "title";
     safe2 = `${slug}_${generateId().slice(0, 8).toLowerCase()}.svg`;
@@ -59720,13 +62941,13 @@ var init_titles2 = __esm({
             }
             source2 = typeof data.transcriptionSource === "string" && data.transcriptionSource ? data.transcriptionSource : "local";
             generation = data.transcriptGeneration ?? null;
-            const words2 = [];
+            const words3 = [];
             for (const c of Array.isArray(data.clips) ? data.clips : []) {
               const list2 = c.words;
-              if (Array.isArray(list2)) words2.push(...list2);
+              if (Array.isArray(list2)) words3.push(...list2);
             }
-            if (words2.length === 0) return unchanged(tool, "No words to caption.");
-            cues = phraseWords(words2, fps, { maxWords: input2.maxWords ?? 8, maxChars: input2.maxChars ?? 42 });
+            if (words3.length === 0) return unchanged(tool, "No words to caption.");
+            cues = phraseWords(words3, fps, { maxWords: input2.maxWords ?? 8, maxChars: input2.maxChars ?? 42 });
           }
           if (cues.length === 0) return unchanged(tool, "No caption cues produced.");
           const template = await loadTitleTemplate(call, "");
@@ -59814,9 +63035,9 @@ var init_transitions3 = __esm({
         annotations: READ4,
         run: (_call, input2) => {
           const query2 = String(input2.query ?? "");
-          const matches2 = searchTransitions(query2);
-          if (matches2.length === 0) return `No transitions found matching '${query2}'.`;
-          return JSON.stringify({ query: query2, matches: matches2.length, transitions: matches2.map(toolRow) }, null, 2);
+          const matches3 = searchTransitions(query2);
+          if (matches3.length === 0) return `No transitions found matching '${query2}'.`;
+          return JSON.stringify({ query: query2, matches: matches3.length, transitions: matches3.map(toolRow) }, null, 2);
         }
       }),
       contractTool("apply_transition_tool", {
@@ -59880,7 +63101,11 @@ function buildCatalog() {
     ...speechTools,
     ...generationTools,
     ...transitionTools,
-    ...titleTools
+    ...titleTools,
+    ...titleTemplateTools,
+    ...animatedTitleTools,
+    ...captionTools,
+    ...overlayTools
   ];
   const byName2 = /* @__PURE__ */ new Map();
   for (const tool of [...implemented, ...directTools]) {
@@ -59935,7 +63160,9 @@ var allTools, TOOLS_BY_NAME;
 var init_registry4 = __esm({
   "../engine/src/tools/registry.ts"() {
     "use strict";
+    init_animated_titles();
     init_audio3();
+    init_captions();
     init_clips2();
     init_direct();
     init_export2();
@@ -59944,12 +63171,14 @@ var init_registry4 = __esm({
     init_media3();
     init_metadata();
     init_motion();
+    init_overlays2();
     init_phase3();
     init_playback();
     init_project2();
     init_search();
     init_speech_tools();
     init_timeline2();
+    init_title_templates();
     init_titles2();
     init_transitions3();
     init_define();
@@ -60052,6 +63281,16 @@ var init_availability = __esm({
         webNote: "captions come from indexed transcripts or an SRT/VTT file; the desktop also transcribes on device"
       },
       export_captions_tool: { methods: ["storage.writeText"], webNote: "captions come from indexed transcripts (no on-device ASR)" },
+      list_title_templates_tool: { optional: ["storage.readText"], partialNote: "kind=project needs reading project files" },
+      edit_title_tool: {
+        methods: ["media.writeGenerated", "storage.readText"],
+        webNote: "the edited version is a new Project Files entry (new file_id) in every clip; fonts are not checked against installed fonts"
+      },
+      add_animated_title_tool: {
+        methods: ["media.writeGenerated"],
+        webNote: "2D keyframed versions of the Blender templates (no 3D depth or particles); earth, magic_wand, snow and picture_frames_4 need Zenvi desktop"
+      },
+      add_timer_tool: { optional: ["media.writeGenerated"], partialNote: "without storing generated images only timeline_clip_id works" },
       get_transcript_tool: { webNote: "indexed transcript cues with estimated word timings (no on-device ASR)" },
       reindex_project_file_tool: { webNote: "reports files that are already indexed; uploading for indexing runs in Zenvi desktop" },
       wait_until_project_indexed_tool: { webNote: "reports indexing status once; does not wait" },
@@ -60069,14 +63308,14 @@ var init_availability = __esm({
       editor: {
         title: "Web editor (Zenvi Assistant, command palette)",
         host: "apps/editor/src/features/editor/assistant/host.ts",
-        capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage"],
-        methods: ["media.importUrl", "media.pickFiles", "media.writeGenerated", "ui.openExportDialog"],
+        capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets"],
+        methods: ["media.importUrl", "media.pickFiles", "media.writeGenerated", "storage.readText", "ui.openExportDialog"],
         conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" }
       },
       cli: {
         title: "CLI and local MCP server (zenvi, zenvi mcp)",
         host: "packages/render-node/src/host/node-host.ts",
-        capabilities: ["media", "exporter", "frames", "audio", "storage", "backend"],
+        capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
         methods: [
           "media.importPath",
           "media.listPaths",
@@ -60096,7 +63335,7 @@ var init_availability = __esm({
         conditional: {
           frames: "the render worker is configured",
           media: "ffprobe is available",
-          assets: "title templates are bundled",
+          assets: "the engine's assets (title templates, emoji) are bundled",
           audio: "ffmpeg is available",
           backend: "the server is set up to call the Zenvi backend"
         },
@@ -60688,15 +63927,15 @@ var init_parseUtil = __esm({
           message: issueData.message
         };
       }
-      let errorMessage = "";
+      let errorMessage2 = "";
       const maps = errorMaps.filter((m) => !!m).slice().reverse();
       for (const map2 of maps) {
-        errorMessage = map2(fullIssue, { data, defaultError: errorMessage }).message;
+        errorMessage2 = map2(fullIssue, { data, defaultError: errorMessage2 }).message;
       }
       return {
         ...issueData,
         path: fullPath,
-        message: errorMessage
+        message: errorMessage2
       };
     };
     ParseStatus = class _ParseStatus {
@@ -63761,7 +67000,7 @@ var init_types4 = __esm({
       }
       _parse(input2) {
         const { status, ctx } = this._processInputParams(input2);
-        const effect2 = this._def.effect || null;
+        const effect3 = this._def.effect || null;
         const checkCtx = {
           addIssue: (arg) => {
             addIssueToContext(ctx, arg);
@@ -63776,8 +67015,8 @@ var init_types4 = __esm({
           }
         };
         checkCtx.addIssue = checkCtx.addIssue.bind(checkCtx);
-        if (effect2.type === "preprocess") {
-          const processed = effect2.transform(ctx.data, checkCtx);
+        if (effect3.type === "preprocess") {
+          const processed = effect3.transform(ctx.data, checkCtx);
           if (ctx.common.async) {
             return Promise.resolve(processed).then(async (processed2) => {
               if (status.value === "aborted")
@@ -63812,9 +67051,9 @@ var init_types4 = __esm({
             return result;
           }
         }
-        if (effect2.type === "refinement") {
+        if (effect3.type === "refinement") {
           const executeRefinement = (acc) => {
-            const result = effect2.refinement(acc, checkCtx);
+            const result = effect3.refinement(acc, checkCtx);
             if (ctx.common.async) {
               return Promise.resolve(result);
             }
@@ -63847,7 +67086,7 @@ var init_types4 = __esm({
             });
           }
         }
-        if (effect2.type === "transform") {
+        if (effect3.type === "transform") {
           if (ctx.common.async === false) {
             const base = this._def.schema._parseSync({
               data: ctx.data,
@@ -63856,7 +67095,7 @@ var init_types4 = __esm({
             });
             if (!isValid(base))
               return INVALID2;
-            const result = effect2.transform(base.value, checkCtx);
+            const result = effect3.transform(base.value, checkCtx);
             if (result instanceof Promise) {
               throw new Error(`Asynchronous transform encountered during synchronous parse operation. Use .parseAsync instead.`);
             }
@@ -63865,21 +67104,21 @@ var init_types4 = __esm({
             return this._def.schema._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx }).then((base) => {
               if (!isValid(base))
                 return INVALID2;
-              return Promise.resolve(effect2.transform(base.value, checkCtx)).then((result) => ({
+              return Promise.resolve(effect3.transform(base.value, checkCtx)).then((result) => ({
                 status: status.value,
                 value: result
               }));
             });
           }
         }
-        util.assertNever(effect2);
+        util.assertNever(effect3);
       }
     };
-    ZodEffects.create = (schema, effect2, params) => {
+    ZodEffects.create = (schema, effect3, params) => {
       return new ZodEffects({
         schema,
         typeName: ZodFirstPartyTypeKind2.ZodEffects,
-        effect: effect2,
+        effect: effect3,
         ...processCreateParams(params)
       });
     };
@@ -66129,19 +69368,19 @@ var init_Refs = __esm({
 });
 
 // ../../node_modules/zod-to-json-schema/dist/esm/errorMessages.js
-function addErrorMessage(res, key, errorMessage, refs) {
+function addErrorMessage(res, key, errorMessage2, refs) {
   if (!refs?.errorMessages)
     return;
-  if (errorMessage) {
+  if (errorMessage2) {
     res.errorMessage = {
       ...res.errorMessage,
-      [key]: errorMessage
+      [key]: errorMessage2
     };
   }
 }
-function setResponseValueAndErrors(res, key, value, errorMessage, refs) {
+function setResponseValueAndErrors(res, key, value, errorMessage2, refs) {
   res[key] = value;
-  addErrorMessage(res, key, errorMessage, refs);
+  addErrorMessage(res, key, errorMessage2, refs);
 }
 var init_errorMessages = __esm({
   "../../node_modules/zod-to-json-schema/dist/esm/errorMessages.js"() {
@@ -67763,8 +71002,8 @@ var init_protocol = __esm({
                       if (queuedMessage.type === "response") {
                         resolver(message);
                       } else {
-                        const errorMessage = message;
-                        const error62 = new McpError(errorMessage.error.code, errorMessage.error.message, errorMessage.error.data);
+                        const errorMessage2 = message;
+                        const error62 = new McpError(errorMessage2.error.code, errorMessage2.error.message, errorMessage2.error.data);
                         resolver(error62);
                       }
                     } else {
@@ -68715,7 +71954,7 @@ var require_code = __commonJS({
     }
     exports._ = _;
     var plus2 = new _Code("+");
-    function str3(strs, ...args) {
+    function str4(strs, ...args) {
       const expr = [safeStringify(strs[0])];
       let i = 0;
       while (i < args.length) {
@@ -68726,7 +71965,7 @@ var require_code = __commonJS({
       optimize(expr);
       return new _Code(expr);
     }
-    exports.str = str3;
+    exports.str = str4;
     function addCodeArg(code, arg) {
       if (arg instanceof _Code)
         code.push(...arg._items);
@@ -68769,7 +72008,7 @@ var require_code = __commonJS({
       return;
     }
     function strConcat(c1, c2) {
-      return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str3`${c1}${c2}`;
+      return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str4`${c1}${c2}`;
     }
     exports.strConcat = strConcat;
     function interpolate(x) {
@@ -69380,9 +72619,9 @@ var require_codegen = __commonJS({
       scopeCode() {
         return this._extScope.scopeCode(this._values);
       }
-      _def(varKind, nameOrPrefix, rhs, constant) {
+      _def(varKind, nameOrPrefix, rhs, constant2) {
         const name = this._scope.toName(nameOrPrefix);
-        if (rhs !== void 0 && constant)
+        if (rhs !== void 0 && constant2)
           this._constants[name.str] = rhs;
         this._leafNode(new Def(varKind, name, rhs));
         return name;
@@ -69731,22 +72970,22 @@ var require_util = __commonJS({
       return (0, codegen_1._)`${topSchemaRef}${schemaPath}${(0, codegen_1.getProperty)(keyword)}`;
     }
     exports.schemaRefOrVal = schemaRefOrVal;
-    function unescapeFragment(str3) {
-      return unescapeJsonPointer(decodeURIComponent(str3));
+    function unescapeFragment(str4) {
+      return unescapeJsonPointer(decodeURIComponent(str4));
     }
     exports.unescapeFragment = unescapeFragment;
-    function escapeFragment(str3) {
-      return encodeURIComponent(escapeJsonPointer(str3));
+    function escapeFragment(str4) {
+      return encodeURIComponent(escapeJsonPointer(str4));
     }
     exports.escapeFragment = escapeFragment;
-    function escapeJsonPointer(str3) {
-      if (typeof str3 == "number")
-        return `${str3}`;
-      return str3.replace(/~/g, "~0").replace(/\//g, "~1");
+    function escapeJsonPointer(str4) {
+      if (typeof str4 == "number")
+        return `${str4}`;
+      return str4.replace(/~/g, "~0").replace(/\//g, "~1");
     }
     exports.escapeJsonPointer = escapeJsonPointer;
-    function unescapeJsonPointer(str3) {
-      return str3.replace(/~1/g, "/").replace(/~0/g, "~");
+    function unescapeJsonPointer(str4) {
+      return str4.replace(/~1/g, "/").replace(/~0/g, "~");
     }
     exports.unescapeJsonPointer = unescapeJsonPointer;
     function eachItem(xs, f2) {
@@ -70771,8 +74010,8 @@ var require_json_schema_traverse = __commonJS({
         post2(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
       }
     }
-    function escapeJsonPtr(str3) {
-      return str3.replace(/~/g, "~0").replace(/\//g, "~1");
+    function escapeJsonPtr(str4) {
+      return str4.replace(/~/g, "~0").replace(/\//g, "~1");
     }
   }
 });
@@ -71408,11 +74647,11 @@ var require_validate = __commonJS({
         jsonPointer = $data;
         data = names_1.default.rootData;
       } else {
-        const matches2 = RELATIVE_JSON_POINTER.exec($data);
-        if (!matches2)
+        const matches3 = RELATIVE_JSON_POINTER.exec($data);
+        if (!matches3)
           throw new Error(`Invalid JSON-pointer: ${$data}`);
-        const up = +matches2[1];
-        jsonPointer = matches2[2];
+        const up = +matches3[1];
+        jsonPointer = matches3[2];
         if (jsonPointer === "#") {
           if (up >= dataLevel)
             throw new Error(errorMsg("property/index", up));
@@ -71511,9 +74750,9 @@ var require_compile = __commonJS({
       if (_sch)
         return _sch;
       const rootId = (0, resolve_1.getFullPath)(this.opts.uriResolver, sch.root.baseId);
-      const { es5, lines } = this.opts.code;
+      const { es5, lines: lines2 } = this.opts.code;
       const { ownProperties } = this.opts;
-      const gen = new codegen_1.CodeGen(this.scope, { es5, lines, ownProperties });
+      const gen = new codegen_1.CodeGen(this.scope, { es5, lines: lines2, ownProperties });
       let _ValidationError;
       if (sch.$async) {
         _ValidationError = gen.scopeValue("Error", {
@@ -71869,10 +75108,10 @@ var require_utils = __commonJS({
         isIPV6: true
       };
     }
-    function findToken(str3, token) {
+    function findToken(str4, token) {
       let ind = 0;
-      for (let i = 0; i < str3.length; i++) {
-        if (str3[i] === token) ind++;
+      for (let i = 0; i < str4.length; i++) {
+        if (str4[i] === token) ind++;
       }
       return ind;
     }
@@ -72299,11 +75538,11 @@ var require_schemes = __commonJS({
         urnComponent.error = "URN can not be parsed";
         return urnComponent;
       }
-      const matches2 = urnComponent.path.match(URN_REG);
-      if (matches2 && matches2[0] === urnComponent.path) {
+      const matches3 = urnComponent.path.match(URN_REG);
+      if (matches3 && matches3[0] === urnComponent.path) {
         const scheme = options.scheme || urnComponent.scheme || "urn";
-        urnComponent.nid = matches2[1].toLowerCase();
-        urnComponent.nss = matches2[2];
+        urnComponent.nid = matches3[1].toLowerCase();
+        urnComponent.nss = matches3[2];
         const urnScheme = `${scheme}:${options.nid || urnComponent.nid}`;
         const schemeHandler = getSchemeHandler(urnScheme);
         urnComponent.path = void 0;
@@ -72617,8 +75856,8 @@ var require_fast_uri = __commonJS({
     var URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u;
     var AUTHORITY_PREFIX = /^(?:[^#/:?]+:)?\/\/([^/?#]*)/;
     var AUTHORITY_INTRODUCER_REGION = /^(?:[^#/:?]+:)?([/\\\t\n\r]*)/;
-    function getParseError(parsed, matches2) {
-      if (matches2[2] !== void 0 && parsed.path && parsed.path[0] !== "/") {
+    function getParseError(parsed, matches3) {
+      if (matches3[2] !== void 0 && parsed.path && parsed.path[0] !== "/") {
         return 'URI path must start with "/" when authority is present.';
       }
       if (typeof parsed.port === "number" && (parsed.port < 0 || parsed.port > 65535)) {
@@ -72640,9 +75879,9 @@ var require_fast_uri = __commonJS({
     function isIPLiteral(host) {
       return host[0] === "[" && host[host.length - 1] === "]";
     }
-    function hasMalformedComponentPercentEncoding(matches2) {
-      const host = matches2[4];
-      return hasMalformedPercentEncoding(matches2[3]) || host !== void 0 && !isIPLiteral(host) && hasMalformedPercentEncoding(host) || hasMalformedPercentEncoding(matches2[6]) || hasMalformedPercentEncoding(matches2[7]) || hasMalformedPercentEncoding(matches2[8]);
+    function hasMalformedComponentPercentEncoding(matches3) {
+      const host = matches3[4];
+      return hasMalformedPercentEncoding(matches3[3]) || host !== void 0 && !isIPLiteral(host) && hasMalformedPercentEncoding(host) || hasMalformedPercentEncoding(matches3[6]) || hasMalformedPercentEncoding(matches3[7]) || hasMalformedPercentEncoding(matches3[8]);
     }
     function canonicalizeHost(parsed, options, schemeHandler, isIP) {
       if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed.host && !isIPLiteral(parsed.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
@@ -72699,15 +75938,15 @@ var require_fast_uri = __commonJS({
           }
         }
       }
-      const matches2 = uri.match(URI_PARSE);
-      if (matches2) {
-        parsed.scheme = matches2[1];
-        parsed.userinfo = matches2[3];
-        parsed.host = matches2[4];
-        parsed.port = parseInt(matches2[5], 10);
-        parsed.path = matches2[6] || "";
-        parsed.query = matches2[7];
-        parsed.fragment = matches2[8];
+      const matches3 = uri.match(URI_PARSE);
+      if (matches3) {
+        parsed.scheme = matches3[1];
+        parsed.userinfo = matches3[3];
+        parsed.host = matches3[4];
+        parsed.port = parseInt(matches3[5], 10);
+        parsed.path = matches3[6] || "";
+        parsed.query = matches3[7];
+        parsed.fragment = matches3[8];
         if (parsed.scheme !== void 0) {
           const decodedScheme = unescape(parsed.scheme);
           if (VALID_SCHEME.test(decodedScheme)) {
@@ -72717,14 +75956,14 @@ var require_fast_uri = __commonJS({
             malformedScheme = true;
           }
         }
-        malformedPercentEncoding = hasMalformedComponentPercentEncoding(matches2);
+        malformedPercentEncoding = hasMalformedComponentPercentEncoding(matches3);
         if (malformedPercentEncoding) {
           parsed.error = parsed.error || "URI contains malformed percent-encoding.";
         }
         if (isNaN(parsed.port)) {
-          parsed.port = matches2[5];
+          parsed.port = matches3[5];
         }
-        const parseError = getParseError(parsed, matches2);
+        const parseError = getParseError(parsed, matches3);
         if (parseError !== void 0) {
           parsed.error = parsed.error || parseError;
           malformedAuthorityOrPort = true;
@@ -72886,7 +76125,7 @@ var require_core = __commonJS({
     var util_1 = require_util();
     var $dataRefSchema = require_data();
     var uri_1 = require_uri();
-    var defaultRegExp = (str3, flags) => new RegExp(str3, flags);
+    var defaultRegExp = (str4, flags) => new RegExp(str4, flags);
     defaultRegExp.code = "new RegExp";
     var META_IGNORE_OPTIONS = ["removeAdditional", "useDefaults", "coerceTypes"];
     var EXT_SCOPE_NAMES = /* @__PURE__ */ new Set([
@@ -72964,8 +76203,8 @@ var require_core = __commonJS({
         this._loading = {};
         this._cache = /* @__PURE__ */ new Map();
         opts = this.opts = { ...opts, ...requiredOptions(opts) };
-        const { es5, lines } = this.opts.code;
-        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines });
+        const { es5, lines: lines2 } = this.opts.code;
+        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines: lines2 });
         this.logger = getLogger(opts.logger);
         const formatOpt = opts.validateFormats;
         opts.validateFormats = false;
@@ -73681,16 +76920,16 @@ var require_ucs2length = __commonJS({
   "../../node_modules/@modelcontextprotocol/sdk/node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    function ucs2length(str3) {
-      const len = str3.length;
+    function ucs2length(str4) {
+      const len = str4.length;
       let length = 0;
       let pos = 0;
       let value;
       while (pos < len) {
         length++;
-        value = str3.charCodeAt(pos++);
+        value = str4.charCodeAt(pos++);
         if (value >= 55296 && value <= 56319 && pos < len) {
-          value = str3.charCodeAt(pos);
+          value = str4.charCodeAt(pos);
           if ((value & 64512) === 56320)
             pos++;
         }
@@ -75073,11 +78312,11 @@ var require_format = __commonJS({
           }
           function getFormat(fmtDef) {
             const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
+            const fmt2 = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
             if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
-              return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
+              return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt2}.validate`];
             }
-            return ["string", fmtDef, fmt];
+            return ["string", fmtDef, fmt2];
           }
           function validCondition() {
             if (typeof formatDef == "object" && !(formatDef instanceof RegExp) && formatDef.async) {
@@ -75573,13 +78812,13 @@ var require_formats = __commonJS({
     }
     var DATE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
     var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    function date5(str3) {
-      const matches2 = DATE.exec(str3);
-      if (!matches2)
+    function date5(str4) {
+      const matches3 = DATE.exec(str4);
+      if (!matches3)
         return false;
-      const year = +matches2[1];
-      const month = +matches2[2];
-      const day = +matches2[3];
+      const year = +matches3[1];
+      const month = +matches3[2];
+      const day = +matches3[3];
       return month >= 1 && month <= 12 && day >= 1 && day <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
     }
     function compareDate(d1, d2) {
@@ -75593,17 +78832,17 @@ var require_formats = __commonJS({
     }
     var TIME = /^(\d\d):(\d\d):(\d\d(?:\.\d+)?)(z|([+-])(\d\d)(?::?(\d\d))?)?$/i;
     function getTime(strictTimeZone) {
-      return function time3(str3) {
-        const matches2 = TIME.exec(str3);
-        if (!matches2)
+      return function time3(str4) {
+        const matches3 = TIME.exec(str4);
+        if (!matches3)
           return false;
-        const hr = +matches2[1];
-        const min = +matches2[2];
-        const sec = +matches2[3];
-        const tz = matches2[4];
-        const tzSign = matches2[5] === "-" ? -1 : 1;
-        const tzH = +(matches2[6] || 0);
-        const tzM = +(matches2[7] || 0);
+        const hr = +matches3[1];
+        const min = +matches3[2];
+        const sec = +matches3[3];
+        const tz = matches3[4];
+        const tzSign = matches3[5] === "-" ? -1 : 1;
+        const tzH = +(matches3[6] || 0);
+        const tzM = +(matches3[7] || 0);
         if (tzH > 23 || tzM > 59 || strictTimeZone && !tz)
           return false;
         if (hr <= 23 && min <= 59 && sec < 60)
@@ -75640,8 +78879,8 @@ var require_formats = __commonJS({
     var DATE_TIME_SEPARATOR = /t|\s/i;
     function getDateTime(strictTimeZone) {
       const time3 = getTime(strictTimeZone);
-      return function date_time(str3) {
-        const dateTime = str3.split(DATE_TIME_SEPARATOR);
+      return function date_time(str4) {
+        const dateTime = str4.split(DATE_TIME_SEPARATOR);
         return dateTime.length === 2 && date5(dateTime[0]) && time3(dateTime[1]);
       };
     }
@@ -75666,13 +78905,13 @@ var require_formats = __commonJS({
     }
     var NOT_URI_FRAGMENT = /\/|:/;
     var URI = /^(?:[a-z][a-z0-9+\-.]*:)(?:\/?\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:]|%[0-9a-f]{2})*@)?(?:\[(?:(?:(?:(?:[0-9a-f]{1,4}:){6}|::(?:[0-9a-f]{1,4}:){5}|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}|(?:(?:[0-9a-f]{1,4}:){0,1}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::)(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?))|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|[Vv][0-9a-f]+\.[a-z0-9\-._~!$&'()*+,;=:]+)\]|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)|(?:[a-z0-9\-._~!$&'()*+,;=]|%[0-9a-f]{2})*)(?::\d*)?(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*|\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)?|(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)(?:\?(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?(?:#(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?$/i;
-    function uri(str3) {
-      return NOT_URI_FRAGMENT.test(str3) && URI.test(str3);
+    function uri(str4) {
+      return NOT_URI_FRAGMENT.test(str4) && URI.test(str4);
     }
     var BYTE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/gm;
-    function byte(str3) {
+    function byte(str4) {
       BYTE.lastIndex = 0;
-      return BYTE.test(str3);
+      return BYTE.test(str4);
     }
     var MIN_INT32 = -(2 ** 31);
     var MAX_INT32 = 2 ** 31 - 1;
@@ -75686,11 +78925,11 @@ var require_formats = __commonJS({
       return true;
     }
     var Z_ANCHOR = /[^\\]\\Z/;
-    function regex(str3) {
-      if (Z_ANCHOR.test(str3))
+    function regex(str4) {
+      if (Z_ANCHOR.test(str4))
         return false;
       try {
-        new RegExp(str3);
+        new RegExp(str4);
         return true;
       } catch (e) {
         return false;
@@ -75767,7 +79006,7 @@ var require_code3 = __commonJS({
     }
     exports._ = _;
     var plus2 = new _Code("+");
-    function str3(strs, ...args) {
+    function str4(strs, ...args) {
       const expr = [safeStringify(strs[0])];
       let i = 0;
       while (i < args.length) {
@@ -75778,7 +79017,7 @@ var require_code3 = __commonJS({
       optimize(expr);
       return new _Code(expr);
     }
-    exports.str = str3;
+    exports.str = str4;
     function addCodeArg(code, arg) {
       if (arg instanceof _Code)
         code.push(...arg._items);
@@ -75821,7 +79060,7 @@ var require_code3 = __commonJS({
       return;
     }
     function strConcat(c1, c2) {
-      return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str3`${c1}${c2}`;
+      return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str4`${c1}${c2}`;
     }
     exports.strConcat = strConcat;
     function interpolate(x) {
@@ -76432,9 +79671,9 @@ var require_codegen2 = __commonJS({
       scopeCode() {
         return this._extScope.scopeCode(this._values);
       }
-      _def(varKind, nameOrPrefix, rhs, constant) {
+      _def(varKind, nameOrPrefix, rhs, constant2) {
         const name = this._scope.toName(nameOrPrefix);
-        if (rhs !== void 0 && constant)
+        if (rhs !== void 0 && constant2)
           this._constants[name.str] = rhs;
         this._leafNode(new Def(varKind, name, rhs));
         return name;
@@ -76783,22 +80022,22 @@ var require_util2 = __commonJS({
       return (0, codegen_1._)`${topSchemaRef}${schemaPath}${(0, codegen_1.getProperty)(keyword)}`;
     }
     exports.schemaRefOrVal = schemaRefOrVal;
-    function unescapeFragment(str3) {
-      return unescapeJsonPointer(decodeURIComponent(str3));
+    function unescapeFragment(str4) {
+      return unescapeJsonPointer(decodeURIComponent(str4));
     }
     exports.unescapeFragment = unescapeFragment;
-    function escapeFragment(str3) {
-      return encodeURIComponent(escapeJsonPointer(str3));
+    function escapeFragment(str4) {
+      return encodeURIComponent(escapeJsonPointer(str4));
     }
     exports.escapeFragment = escapeFragment;
-    function escapeJsonPointer(str3) {
-      if (typeof str3 == "number")
-        return `${str3}`;
-      return str3.replace(/~/g, "~0").replace(/\//g, "~1");
+    function escapeJsonPointer(str4) {
+      if (typeof str4 == "number")
+        return `${str4}`;
+      return str4.replace(/~/g, "~0").replace(/\//g, "~1");
     }
     exports.escapeJsonPointer = escapeJsonPointer;
-    function unescapeJsonPointer(str3) {
-      return str3.replace(/~1/g, "/").replace(/~0/g, "~");
+    function unescapeJsonPointer(str4) {
+      return str4.replace(/~1/g, "/").replace(/~0/g, "~");
     }
     exports.unescapeJsonPointer = unescapeJsonPointer;
     function eachItem(xs, f2) {
@@ -77788,8 +81027,8 @@ var require_json_schema_traverse2 = __commonJS({
         post2(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
       }
     }
-    function escapeJsonPtr(str3) {
-      return str3.replace(/~/g, "~0").replace(/\//g, "~1");
+    function escapeJsonPtr(str4) {
+      return str4.replace(/~/g, "~0").replace(/\//g, "~1");
     }
   }
 });
@@ -78425,11 +81664,11 @@ var require_validate2 = __commonJS({
         jsonPointer = $data;
         data = names_1.default.rootData;
       } else {
-        const matches2 = RELATIVE_JSON_POINTER.exec($data);
-        if (!matches2)
+        const matches3 = RELATIVE_JSON_POINTER.exec($data);
+        if (!matches3)
           throw new Error(`Invalid JSON-pointer: ${$data}`);
-        const up = +matches2[1];
-        jsonPointer = matches2[2];
+        const up = +matches3[1];
+        jsonPointer = matches3[2];
         if (jsonPointer === "#") {
           if (up >= dataLevel)
             throw new Error(errorMsg("property/index", up));
@@ -78528,9 +81767,9 @@ var require_compile2 = __commonJS({
       if (_sch)
         return _sch;
       const rootId = (0, resolve_1.getFullPath)(this.opts.uriResolver, sch.root.baseId);
-      const { es5, lines } = this.opts.code;
+      const { es5, lines: lines2 } = this.opts.code;
       const { ownProperties } = this.opts;
-      const gen = new codegen_1.CodeGen(this.scope, { es5, lines, ownProperties });
+      const gen = new codegen_1.CodeGen(this.scope, { es5, lines: lines2, ownProperties });
       let _ValidationError;
       if (sch.$async) {
         _ValidationError = gen.scopeValue("Error", {
@@ -78784,7 +82023,7 @@ var require_core3 = __commonJS({
     var util_1 = require_util2();
     var $dataRefSchema = require_data2();
     var uri_1 = require_uri2();
-    var defaultRegExp = (str3, flags) => new RegExp(str3, flags);
+    var defaultRegExp = (str4, flags) => new RegExp(str4, flags);
     defaultRegExp.code = "new RegExp";
     var META_IGNORE_OPTIONS = ["removeAdditional", "useDefaults", "coerceTypes"];
     var EXT_SCOPE_NAMES = /* @__PURE__ */ new Set([
@@ -78862,8 +82101,8 @@ var require_core3 = __commonJS({
         this._loading = {};
         this._cache = /* @__PURE__ */ new Map();
         opts = this.opts = { ...opts, ...requiredOptions(opts) };
-        const { es5, lines } = this.opts.code;
-        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines });
+        const { es5, lines: lines2 } = this.opts.code;
+        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines: lines2 });
         this.logger = getLogger(opts.logger);
         const formatOpt = opts.validateFormats;
         opts.validateFormats = false;
@@ -79579,16 +82818,16 @@ var require_ucs2length2 = __commonJS({
   "../../node_modules/ajv-formats/node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    function ucs2length(str3) {
-      const len = str3.length;
+    function ucs2length(str4) {
+      const len = str4.length;
       let length = 0;
       let pos = 0;
       let value;
       while (pos < len) {
         length++;
-        value = str3.charCodeAt(pos++);
+        value = str4.charCodeAt(pos++);
         if (value >= 55296 && value <= 56319 && pos < len) {
-          value = str3.charCodeAt(pos);
+          value = str4.charCodeAt(pos);
           if ((value & 64512) === 56320)
             pos++;
         }
@@ -80971,11 +84210,11 @@ var require_format3 = __commonJS({
           }
           function getFormat(fmtDef) {
             const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
+            const fmt2 = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
             if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
-              return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
+              return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt2}.validate`];
             }
-            return ["string", fmtDef, fmt];
+            return ["string", fmtDef, fmt2];
           }
           function validCondition() {
             if (typeof formatDef == "object" && !(formatDef instanceof RegExp) && formatDef.async) {
@@ -81434,8 +84673,8 @@ var require_limit = __commonJS({
             ref: self.formats,
             code: opts.code.formats
           });
-          const fmt = gen.const("fmt", (0, codegen_1._)`${fmts}[${fCxt.schemaCode}]`);
-          cxt.fail$data((0, codegen_1.or)((0, codegen_1._)`typeof ${fmt} != "object"`, (0, codegen_1._)`${fmt} instanceof RegExp`, (0, codegen_1._)`typeof ${fmt}.compare != "function"`, compareCode(fmt)));
+          const fmt2 = gen.const("fmt", (0, codegen_1._)`${fmts}[${fCxt.schemaCode}]`);
+          cxt.fail$data((0, codegen_1.or)((0, codegen_1._)`typeof ${fmt2} != "object"`, (0, codegen_1._)`${fmt2} instanceof RegExp`, (0, codegen_1._)`typeof ${fmt2}.compare != "function"`, compareCode(fmt2)));
         }
         function validateFormat() {
           const format = fCxt.schema;
@@ -81445,15 +84684,15 @@ var require_limit = __commonJS({
           if (typeof fmtDef != "object" || fmtDef instanceof RegExp || typeof fmtDef.compare != "function") {
             throw new Error(`"${keyword}": format "${format}" does not define "compare" function`);
           }
-          const fmt = gen.scopeValue("formats", {
+          const fmt2 = gen.scopeValue("formats", {
             key: format,
             ref: fmtDef,
             code: opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(format)}` : void 0
           });
-          cxt.fail$data(compareCode(fmt));
+          cxt.fail$data(compareCode(fmt2));
         }
-        function compareCode(fmt) {
-          return (0, codegen_1._)`${fmt}.compare(${data}, ${schemaCode}) ${KWDs[keyword].fail} 0`;
+        function compareCode(fmt2) {
+          return (0, codegen_1._)`${fmt2}.compare(${data}, ${schemaCode}) ${KWDs[keyword].fail} 0`;
         }
       },
       dependencies: ["format"]
@@ -81918,8 +85157,8 @@ var init_client3 = __esm({
           const wrappedHandler = async (request, extra) => {
             const validatedRequest = safeParse3(ElicitRequestSchema, request);
             if (!validatedRequest.success) {
-              const errorMessage = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation request: ${errorMessage}`);
+              const errorMessage2 = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation request: ${errorMessage2}`);
             }
             const { params } = validatedRequest.data;
             params.mode = params.mode ?? "form";
@@ -81934,15 +85173,15 @@ var init_client3 = __esm({
             if (params.task) {
               const taskValidationResult = safeParse3(CreateTaskResultSchema, result);
               if (!taskValidationResult.success) {
-                const errorMessage = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
-                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage}`);
+                const errorMessage2 = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
+                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage2}`);
               }
               return taskValidationResult.data;
             }
             const validationResult = safeParse3(ElicitResultSchema, result);
             if (!validationResult.success) {
-              const errorMessage = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation result: ${errorMessage}`);
+              const errorMessage2 = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation result: ${errorMessage2}`);
             }
             const validatedResult = validationResult.data;
             const requestedSchema = params.mode === "form" ? params.requestedSchema : void 0;
@@ -81962,16 +85201,16 @@ var init_client3 = __esm({
           const wrappedHandler = async (request, extra) => {
             const validatedRequest = safeParse3(CreateMessageRequestSchema, request);
             if (!validatedRequest.success) {
-              const errorMessage = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid sampling request: ${errorMessage}`);
+              const errorMessage2 = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid sampling request: ${errorMessage2}`);
             }
             const { params } = validatedRequest.data;
             const result = await Promise.resolve(handler(request, extra));
             if (params.task) {
               const taskValidationResult = safeParse3(CreateTaskResultSchema, result);
               if (!taskValidationResult.success) {
-                const errorMessage = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
-                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage}`);
+                const errorMessage2 = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
+                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage2}`);
               }
               return taskValidationResult.data;
             }
@@ -81979,8 +85218,8 @@ var init_client3 = __esm({
             const resultSchema = hasTools ? CreateMessageResultWithToolsSchema : CreateMessageResultSchema;
             const validationResult = safeParse3(resultSchema, result);
             if (!validationResult.success) {
-              const errorMessage = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid sampling result: ${errorMessage}`);
+              const errorMessage2 = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid sampling result: ${errorMessage2}`);
             }
             return validationResult.data;
           };
@@ -82390,14 +85629,14 @@ var require_content_type = __commonJS({
       return header;
     }
     function qstring(val) {
-      var str3 = String(val);
-      if (TOKEN_REGEXP.test(str3)) {
-        return str3;
+      var str4 = String(val);
+      if (TOKEN_REGEXP.test(str4)) {
+        return str4;
       }
-      if (str3.length > 0 && !TEXT_REGEXP.test(str3)) {
+      if (str4.length > 0 && !TEXT_REGEXP.test(str4)) {
         throw new TypeError("invalid parameter value");
       }
-      return '"' + str3.replace(QUOTE_REGEXP, "\\$1") + '"';
+      return '"' + str4.replace(QUOTE_REGEXP, "\\$1") + '"';
     }
     function ContentType(type) {
       this.parameters = /* @__PURE__ */ Object.create(null);
@@ -82854,8 +86093,8 @@ async function parseErrorResponse(input2) {
     const errorClass = OAUTH_ERRORS[error62] || ServerError;
     return new errorClass(error_description || "", error_uri);
   } catch (error62) {
-    const errorMessage = `${statusCode ? `HTTP ${statusCode}: ` : ""}Invalid OAuth error response: ${error62}. Raw body: ${body}`;
-    return new ServerError(errorMessage);
+    const errorMessage2 = `${statusCode ? `HTTP ${statusCode}: ` : ""}Invalid OAuth error response: ${error62}. Raw body: ${body}`;
+    return new ServerError(errorMessage2);
   }
 }
 function issuersMatch(a, b) {
@@ -83503,11 +86742,11 @@ ${value2}`, dataLines++;
       processField(line2, "", line2);
       return;
     }
-    const field = line2.slice(0, fieldSeparatorIndex), offset = line2.charCodeAt(fieldSeparatorIndex + 1) === SPACE ? 2 : 1, value = line2.slice(fieldSeparatorIndex + offset);
-    processField(field, value, line2);
+    const field2 = line2.slice(0, fieldSeparatorIndex), offset = line2.charCodeAt(fieldSeparatorIndex + 1) === SPACE ? 2 : 1, value = line2.slice(fieldSeparatorIndex + offset);
+    processField(field2, value, line2);
   }
-  function processField(field, value, line2) {
-    switch (field) {
+  function processField(field2, value, line2) {
+    switch (field2) {
       case "event":
         eventType = value || void 0;
         break;
@@ -83530,8 +86769,8 @@ ${value}`, dataLines++;
       default:
         onError(
           new ParseError(
-            `Unknown field "${field.length > 20 ? `${field.slice(0, 20)}\u2026` : field}"`,
-            { type: "unknown-field", field, value, line: line2 }
+            `Unknown field "${field2.length > 20 ? `${field2.slice(0, 20)}\u2026` : field2}"`,
+            { type: "unknown-field", field: field2, value, line: line2 }
           )
         );
         break;
@@ -84743,17 +87982,17 @@ function registerEditCommands(program2, ctx) {
       ...opts.end !== void 0 ? { end_seconds: parseTime(opts.end) } : {}
     });
   });
-  const effect2 = program2.command("effect").description("clip effects");
-  effect2.command("add").description("add an effect (libopenshot class name, e.g. Blur, Brightness, ChromaKey)").argument("<clip>", "clip id").argument("<effect>", "effect class name").action(async (clip2, name) => {
+  const effect3 = program2.command("effect").description("clip effects");
+  effect3.command("add").description("add an effect (libopenshot class name, e.g. Blur, Brightness, ChromaKey)").argument("<clip>", "clip id").argument("<effect>", "effect class name").action(async (clip2, name) => {
     await runToolCommand(ctx, "add_effect_tool", { timeline_clip_id: clip2, effect: name });
   });
-  effect2.command("list").description("effects you can add (libopenshot catalog)").option("--audio", "only audio effects").option("--video", "only video effects").action(async (opts) => {
+  effect3.command("list").description("effects you can add (libopenshot catalog)").option("--audio", "only audio effects").option("--video", "only video effects").action(async (opts) => {
     await runToolCommand(ctx, "list_effects_tool", opts.audio ? { category: "audio" } : opts.video ? { category: "video" } : {});
   });
-  effect2.command("rm").description("remove an effect (ids are in the clip's receipt or `zenvi clips`)").argument("<effect>", "effect id").action(async (id) => {
+  effect3.command("rm").description("remove an effect (ids are in the clip's receipt or `zenvi clips`)").argument("<effect>", "effect id").action(async (id) => {
     await runToolCommand(ctx, "remove_effect_tool", toolArgs(ctx, "remove_effect_tool", [[["effect_id", "effect"], id]]));
   });
-  effect2.command("set").description("set an effect parameter, optionally as a keyframe at a time").argument("<effect>", "effect id").argument("<assignment>", "property=value").option("--at <time>", "keyframe time (timeline)").action(async (id, assignment, opts) => {
+  effect3.command("set").description("set an effect parameter, optionally as a keyframe at a time").argument("<effect>", "effect id").argument("<assignment>", "property=value").option("--at <time>", "keyframe time (timeline)").action(async (id, assignment, opts) => {
     const eq = assignment.indexOf("=");
     if (eq <= 0) throw new CliError("Use property=value, e.g. sigma=4.", 2);
     await runToolCommand(
@@ -85006,7 +88245,7 @@ function toCatalogJson(host, defs) {
     }))
   };
 }
-var HOST_IDS, HOST_TOOL_PREFIX, DEFAULT_TIMEOUT_MS, seconds, easingName, bezierEasing, easing, hexColor2, rgbColor, color2, layerRef, trackRef, ABSOLUTE_PATH_PATTERN, absolutePath, placement;
+var HOST_IDS, HOST_TOOL_PREFIX, DEFAULT_TIMEOUT_MS, seconds, easingName, bezierEasing, easing, hexColor2, rgbColor, color2, layerRef, trackRef, ABSOLUTE_PATH_PATTERN, absolutePath, placement2;
 var init_types6 = __esm({
   "../adobe-link/src/catalog/types.ts"() {
     "use strict";
@@ -85042,7 +88281,7 @@ var init_types6 = __esm({
     });
     ABSOLUTE_PATH_PATTERN = /^(\/|[A-Za-z]:[\\/]|\\\\[^\\]+\\)/;
     absolutePath = external_exports.string().regex(ABSOLUTE_PATH_PATTERN, "must be an absolute path");
-    placement = external_exports.enum(["center", "lower-third", "top-left", "top-center", "bottom-center"]);
+    placement2 = external_exports.enum(["center", "lower-third", "top-left", "top-center", "bottom-center"]);
   }
 });
 
@@ -85055,7 +88294,7 @@ var init_aftereffects = __esm({
     init_taste();
     init_types6();
     T = TASTE.timing;
-    pct = (fraction4) => `${Math.round(fraction4 * 1e3) / 10} %`;
+    pct = (fraction5) => `${Math.round(fraction5 * 1e3) / 10} %`;
     compRef = external_exports.union([external_exports.int().min(1).describe("Comp item id"), external_exports.string().min(1).describe("Exact comp name")]).describe("Comp id (`comp_id`) or exact name; default: the active comp");
     layerArg = layerRef.describe('Layer: its id (`layer_id`), {"index": n} (1 = top) or exact name');
     propertyPath = external_exports.union([
@@ -85347,7 +88586,7 @@ var init_aftereffects = __esm({
         subtitle: external_exports.string().min(1).max(5e3).optional().describe("Second, smaller line as its own layer below (e.g. the role in a lower third)"),
         name: external_exports.string().min(1).max(255).optional().describe("Layer name (default: the text)"),
         style: external_exports.enum(TEXT_STYLES).optional().describe("Type role (default: lower-third for that placement, caption for bottom-center, subtitle for top placements, else title)"),
-        placement: placement.default("center").describe("Where the text sits; every placement stays inside title-safe"),
+        placement: placement2.default("center").describe("Where the text sits; every placement stays inside title-safe"),
         font: external_exports.string().min(1).optional().describe('PostScript font name, e.g. "Inter-Bold" (falls back with a warning when missing)'),
         size: external_exports.number().min(1).max(1296).optional().describe("Font size in pixels (default: the style's TASTE size)"),
         fill: color2.optional().describe(`Fill colour (default paper ${TASTE.color.palette.paper})`),
@@ -85954,7 +89193,7 @@ var init_premiere = __esm({
         style: external_exports.enum(["headline", "title", "subtitle", "lower-third", "caption"]).default("title").describe("Type scale step"),
         font_size: external_exports.number().min(6).max(1e3).optional().describe("Override the style's size, in pixels at the sequence's size"),
         color: color2.default(TASTE.color.palette.paper).describe("Text colour, #RRGGBB or [r, g, b] 0-1"),
-        placement: placement.optional().describe("Where an image smaller than the frame sits, inside title-safe (9:16: clear of the top 12 % and bottom 20 %); default: lower-third for that style, bottom-center for captions, else center"),
+        placement: placement2.optional().describe("Where an image smaller than the frame sits, inside title-safe (9:16: clear of the top 12 % and bottom 20 %); default: lower-third for that style, bottom-center for captions, else center"),
         time: seconds.optional().describe("Sequence time of the title's first frame; default: the playhead"),
         duration: external_exports.number().positive().max(3600).optional().describe("Seconds on screen; default: reading time"),
         track: external_exports.int().min(0).max(98).optional().describe("Video track index (0 = V1); default: the lowest track above V1 that is free for the whole duration"),
@@ -87005,10 +90244,10 @@ function hostOfTool(name) {
   return HOST_IDS.find((host) => name.startsWith(HOST_TOOL_PREFIX[host]));
 }
 function catalogTools(host) {
-  let tools = catalogs.get(host);
+  let tools = catalogs2.get(host);
   if (!tools) {
     tools = new Map(toCatalogJson(host, catalogFor(host)).tools.map((tool) => [tool.name, tool]));
-    catalogs.set(host, tools);
+    catalogs2.set(host, tools);
   }
   return tools;
 }
@@ -87171,7 +90410,7 @@ async function liveToolSchema(registry2, host, tool) {
   const schema = found.inputSchema ?? {};
   return { properties: schema.properties ?? {} };
 }
-var STATE_TOOL, catalogs, NUMBER_TEXT;
+var STATE_TOOL, catalogs2, NUMBER_TEXT;
 var init_adobe_tools = __esm({
   "src/hosts/adobe-tools.ts"() {
     "use strict";
@@ -87181,7 +90420,7 @@ var init_adobe_tools = __esm({
     init_policy();
     init_registry5();
     STATE_TOOL = { aftereffects: "ae_get_state", premiere: "premiere_get_state" };
-    catalogs = /* @__PURE__ */ new Map();
+    catalogs2 = /* @__PURE__ */ new Map();
     NUMBER_TEXT = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
   }
 });
@@ -87729,23 +90968,23 @@ var init_server2 = __esm({
           const wrappedHandler = async (request, extra) => {
             const validatedRequest = safeParse3(CallToolRequestSchema, request);
             if (!validatedRequest.success) {
-              const errorMessage = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call request: ${errorMessage}`);
+              const errorMessage2 = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call request: ${errorMessage2}`);
             }
             const { params } = validatedRequest.data;
             const result = await Promise.resolve(handler(request, extra));
             if (params.task) {
               const taskValidationResult = safeParse3(CreateTaskResultSchema, result);
               if (!taskValidationResult.success) {
-                const errorMessage = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
-                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage}`);
+                const errorMessage2 = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
+                throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage2}`);
               }
               return taskValidationResult.data;
             }
             const validationResult = safeParse3(CallToolResultSchema, result);
             if (!validationResult.success) {
-              const errorMessage = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call result: ${errorMessage}`);
+              const errorMessage2 = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid tools/call result: ${errorMessage2}`);
             }
             return validationResult.data;
           };
@@ -88169,9 +91408,9 @@ function promptArgumentsFromSchema(schema) {
   const shape2 = getObjectShape(schema);
   if (!shape2)
     return [];
-  return Object.entries(shape2).map(([name, field]) => {
-    const description = getSchemaDescription(field);
-    const isOptional = isSchemaOptional(field);
+  return Object.entries(shape2).map(([name, field2]) => {
+    const description = getSchemaDescription(field2);
+    const isOptional = isSchemaOptional(field2);
     return {
       name,
       description,
@@ -88338,12 +91577,12 @@ var init_mcp = __esm({
        * @param errorMessage - The error message.
        * @returns The tool error result.
        */
-      createToolError(errorMessage) {
+      createToolError(errorMessage2) {
         return {
           content: [
             {
               type: "text",
-              text: errorMessage
+              text: errorMessage2
             }
           ],
           isError: true
@@ -88361,8 +91600,8 @@ var init_mcp = __esm({
         const parseResult = await safeParseAsync3(schemaToParse, args);
         if (!parseResult.success) {
           const error62 = "error" in parseResult ? parseResult.error : "Unknown error";
-          const errorMessage = getParseErrorMessage(error62);
-          throw new McpError(ErrorCode.InvalidParams, `Input validation error: Invalid arguments for tool ${toolName}: ${errorMessage}`);
+          const errorMessage2 = getParseErrorMessage(error62);
+          throw new McpError(ErrorCode.InvalidParams, `Input validation error: Invalid arguments for tool ${toolName}: ${errorMessage2}`);
         }
         return parseResult.data;
       }
@@ -88386,8 +91625,8 @@ var init_mcp = __esm({
         const parseResult = await safeParseAsync3(outputObj, result.structuredContent);
         if (!parseResult.success) {
           const error62 = "error" in parseResult ? parseResult.error : "Unknown error";
-          const errorMessage = getParseErrorMessage(error62);
-          throw new McpError(ErrorCode.InvalidParams, `Output validation error: Invalid structured content for tool ${toolName}: ${errorMessage}`);
+          const errorMessage2 = getParseErrorMessage(error62);
+          throw new McpError(ErrorCode.InvalidParams, `Output validation error: Invalid structured content for tool ${toolName}: ${errorMessage2}`);
         }
       }
       /**
@@ -88478,11 +91717,11 @@ var init_mcp = __esm({
           return EMPTY_COMPLETION_RESULT;
         }
         const promptShape = getObjectShape(prompt.argsSchema);
-        const field = promptShape?.[request.params.argument.name];
-        if (!isCompletable(field)) {
+        const field2 = promptShape?.[request.params.argument.name];
+        if (!isCompletable(field2)) {
           return EMPTY_COMPLETION_RESULT;
         }
-        const completer = getCompleter(field);
+        const completer = getCompleter(field2);
         if (!completer) {
           return EMPTY_COMPLETION_RESULT;
         }
@@ -88599,8 +91838,8 @@ var init_mcp = __esm({
             const parseResult = await safeParseAsync3(argsObj, request.params.arguments);
             if (!parseResult.success) {
               const error62 = "error" in parseResult ? parseResult.error : "Unknown error";
-              const errorMessage = getParseErrorMessage(error62);
-              throw new McpError(ErrorCode.InvalidParams, `Invalid arguments for prompt ${request.params.name}: ${errorMessage}`);
+              const errorMessage2 = getParseErrorMessage(error62);
+              throw new McpError(ErrorCode.InvalidParams, `Invalid arguments for prompt ${request.params.name}: ${errorMessage2}`);
             }
             const args = parseResult.data;
             const cb = prompt.callback;
@@ -88755,8 +91994,8 @@ var init_mcp = __esm({
         };
         this._registeredPrompts[name] = registeredPrompt;
         if (argsSchema) {
-          const hasCompletable = Object.values(argsSchema).some((field) => {
-            const inner = field instanceof ZodOptional ? field._def?.innerType : field;
+          const hasCompletable = Object.values(argsSchema).some((field2) => {
+            const inner = field2 instanceof ZodOptional ? field2._def?.innerType : field2;
             return isCompletable(inner);
           });
           if (hasCompletable) {
@@ -89412,8 +92651,8 @@ function registerRenderCommands(program2, ctx) {
       const project = session.doc.project;
       const options = exportOptionsFrom(project, output2, flags);
       const started = Date.now();
-      const result = await exporter.export(project, options, (fraction4) => {
-        ctx.out.progress(`Rendering ${Math.round(fraction4 * 100)}%`);
+      const result = await exporter.export(project, options, (fraction5) => {
+        ctx.out.progress(`Rendering ${Math.round(fraction5 * 100)}%`);
       });
       ctx.out.endProgress();
       const seconds2 = (Date.now() - started) / 1e3;
@@ -89510,9 +92749,9 @@ function extraTools(ctx) {
       inputSchema: {
         type: "object",
         properties: {
-          path: str2("Project file, e.g. edits/trailer.zvn (relative to the working folder)."),
+          path: str3("Project file, e.g. edits/trailer.zvn (relative to the working folder)."),
           create: bool3("Create the file when it does not exist (default true)."),
-          profile: str2('Video profile for a new project, e.g. "HD 1080p 30 fps" (default "HD 720p 30 fps").')
+          profile: str3('Video profile for a new project, e.g. "HD 1080p 30 fps" (default "HD 720p 30 fps").')
         },
         required: ["path"],
         additionalProperties: false
@@ -89543,15 +92782,15 @@ function extraTools(ctx) {
       inputSchema: {
         type: "object",
         properties: {
-          output: str2("Output file (default: <project name>.<format> next to the project)."),
-          output_path: str2("Same as output (the desktop export_video_tool name)."),
+          output: str3("Output file (default: <project name>.<format> next to the project)."),
+          output_path: str3("Same as output (the desktop export_video_tool name)."),
           format: { type: "string", enum: ["mp4", "webm", "mov", "mkv", "gif", "mp3", "wav", "png"], description: "Container format (default from the file name, else mp4)." },
           quality: { type: "string", enum: ["low", "medium", "high", "lossless"], description: "Default high." },
-          width: num10("Output width in pixels (height follows the project aspect)."),
-          height: num10("Output height in pixels."),
-          fps: str2("Frame rate, e.g. 30 or 30000/1001 (default: the project's)."),
-          start: num10("Render from this timeline time (seconds)."),
-          end: num10("Render up to this timeline time (seconds).")
+          width: num11("Output width in pixels (height follows the project aspect)."),
+          height: num11("Output height in pixels."),
+          fps: str3("Frame rate, e.g. 30 or 30000/1001 (default: the project's)."),
+          start: num11("Render from this timeline time (seconds)."),
+          end: num11("Render up to this timeline time (seconds).")
         },
         additionalProperties: false
       },
@@ -89600,8 +92839,8 @@ function extraTools(ctx) {
       inputSchema: {
         type: "object",
         properties: {
-          seconds: num10("Timeline time in seconds."),
-          width: num10("Image width in pixels (default 768, max 1920)."),
+          seconds: num11("Timeline time in seconds."),
+          width: num11("Image width in pixels (default 768, max 1920)."),
           grid: bool3("Draw a 0-1 coordinate grid and a frame caption (default false)."),
           format: { type: "string", enum: ["jpeg", "png"], description: "Default jpeg." }
         },
@@ -89646,7 +92885,7 @@ function extraTools(ctx) {
       description: "Open the project in the Zenvi desktop app so the person can watch and fine-tune the edit (focuses it if it is already open). Later edits from this session go through the app while it has the project open.",
       inputSchema: {
         type: "object",
-        properties: { path: str2("Project file (default: this session's project).") },
+        properties: { path: str3("Project file (default: this session's project).") },
         additionalProperties: false
       },
       // Not read-only: it starts or focuses the desktop app and can switch its project.
@@ -89670,7 +92909,7 @@ function extraTools(ctx) {
       inputSchema: {
         type: "object",
         properties: {
-          name: str2("Cloud project name (default: the file name)."),
+          name: str3("Cloud project name (default: the file name)."),
           force: bool3("Overwrite edits made in the cloud since the last push.")
         },
         additionalProperties: false
@@ -89701,7 +92940,7 @@ function extraTools(ctx) {
     }
   ];
 }
-var str2, num10, bool3;
+var str3, num11, bool3;
 var init_extra_tools = __esm({
   "src/mcp/extra-tools.ts"() {
     "use strict";
@@ -89716,8 +92955,8 @@ var init_extra_tools = __esm({
     init_render2();
     init_edit2();
     init_version();
-    str2 = (description) => ({ type: "string", description });
-    num10 = (description) => ({ type: "number", description });
+    str3 = (description) => ({ type: "string", description });
+    num11 = (description) => ({ type: "number", description });
     bool3 = (description) => ({ type: "boolean", description });
   }
 });
@@ -90469,8 +93708,8 @@ function declaredName(properties, candidates) {
 }
 function fpsFraction2(fps) {
   if (fps && typeof fps === "object") {
-    const { num: num11, den: den2 } = fps;
-    if (typeof num11 === "number" && typeof den2 === "number" && num11 > 0 && den2 > 0) return { num: num11, den: den2 };
+    const { num: num12, den: den2 } = fps;
+    if (typeof num12 === "number" && typeof den2 === "number" && num12 > 0 && den2 > 0) return { num: num12, den: den2 };
     return void 0;
   }
   const value = Number(fps);
@@ -91882,8 +95121,8 @@ var Help = class {
    * @param {string} str
    * @returns {number}
    */
-  displayWidth(str3) {
-    return stripVTControlCharacters(str3).length;
+  displayWidth(str4) {
+    return stripVTControlCharacters(str4).length;
   }
   /**
    * Style the title for displaying in the help. Called with 'Usage:', 'Options:', etc.
@@ -91891,11 +95130,11 @@ var Help = class {
    * @param {string} str
    * @returns {string}
    */
-  styleTitle(str3) {
-    return str3;
+  styleTitle(str4) {
+    return str4;
   }
-  styleUsage(str3) {
-    return str3.split(" ").map((word) => {
+  styleUsage(str4) {
+    return str4.split(" ").map((word) => {
       if (word === "[options]") return this.styleOptionText(word);
       if (word === "[command]") return this.styleSubcommandText(word);
       if (word[0] === "[" || word[0] === "<")
@@ -91903,46 +95142,46 @@ var Help = class {
       return this.styleCommandText(word);
     }).join(" ");
   }
-  styleCommandDescription(str3) {
-    return this.styleDescriptionText(str3);
+  styleCommandDescription(str4) {
+    return this.styleDescriptionText(str4);
   }
-  styleOptionDescription(str3) {
-    return this.styleDescriptionText(str3);
+  styleOptionDescription(str4) {
+    return this.styleDescriptionText(str4);
   }
-  styleSubcommandDescription(str3) {
-    return this.styleDescriptionText(str3);
+  styleSubcommandDescription(str4) {
+    return this.styleDescriptionText(str4);
   }
-  styleArgumentDescription(str3) {
-    return this.styleDescriptionText(str3);
+  styleArgumentDescription(str4) {
+    return this.styleDescriptionText(str4);
   }
-  styleDescriptionText(str3) {
-    return str3;
+  styleDescriptionText(str4) {
+    return str4;
   }
-  styleOptionTerm(str3) {
-    return this.styleOptionText(str3);
+  styleOptionTerm(str4) {
+    return this.styleOptionText(str4);
   }
-  styleSubcommandTerm(str3) {
-    return str3.split(" ").map((word) => {
+  styleSubcommandTerm(str4) {
+    return str4.split(" ").map((word) => {
       if (word === "[options]") return this.styleOptionText(word);
       if (word[0] === "[" || word[0] === "<")
         return this.styleArgumentText(word);
       return this.styleSubcommandText(word);
     }).join(" ");
   }
-  styleArgumentTerm(str3) {
-    return this.styleArgumentText(str3);
+  styleArgumentTerm(str4) {
+    return this.styleArgumentText(str4);
   }
-  styleOptionText(str3) {
-    return str3;
+  styleOptionText(str4) {
+    return str4;
   }
-  styleArgumentText(str3) {
-    return str3;
+  styleArgumentText(str4) {
+    return str4;
   }
-  styleSubcommandText(str3) {
-    return str3;
+  styleSubcommandText(str4) {
+    return str4;
   }
-  styleCommandText(str3) {
-    return str3;
+  styleCommandText(str4) {
+    return str4;
   }
   /**
    * Calculate the pad width from the maximum term length.
@@ -91965,8 +95204,8 @@ var Help = class {
    * @param {string} str
    * @returns {boolean}
    */
-  preformatted(str3) {
-    return /\n[^\S\r\n]/.test(str3);
+  preformatted(str4) {
+    return /\n[^\S\r\n]/.test(str4);
   }
   /**
    * Format the "item", which consists of a term and description. Pad the term and wrap the description, indenting the following lines.
@@ -92012,9 +95251,9 @@ ${itemIndentStr}`);
    * @param {number} width
    * @returns {string}
    */
-  boxWrap(str3, width) {
-    if (width < this.minWidthToWrap) return str3;
-    const rawLines = str3.split(/\r\n|\n/);
+  boxWrap(str4, width) {
+    if (width < this.minWidthToWrap) return str4;
+    const rawLines = str4.split(/\r\n|\n/);
     const chunkPattern = /[\s]*[^\s]+/g;
     const wrappedLines = [];
     rawLines.forEach((line2) => {
@@ -92304,9 +95543,9 @@ var DualOptions = class {
     return option.negate === (negativeValue === value);
   }
 };
-function camelcase(str3) {
-  return str3.split("-").reduce((str4, word) => {
-    return str4 + word[0].toUpperCase() + word.slice(1);
+function camelcase(str4) {
+  return str4.split("-").reduce((str5, word) => {
+    return str5 + word[0].toUpperCase() + word.slice(1);
   });
 }
 function splitOptionFlags(flags) {
@@ -92466,14 +95705,14 @@ var Command = class _Command extends EventEmitter {
     this._showSuggestionAfterError = true;
     this._savedState = null;
     this._outputConfiguration = {
-      writeOut: (str3) => process2.stdout.write(str3),
-      writeErr: (str3) => process2.stderr.write(str3),
-      outputError: (str3, write) => write(str3),
+      writeOut: (str4) => process2.stdout.write(str4),
+      writeErr: (str4) => process2.stderr.write(str4),
+      outputError: (str4, write) => write(str4),
       getOutHelpWidth: () => process2.stdout.isTTY ? process2.stdout.columns : void 0,
       getErrHelpWidth: () => process2.stderr.isTTY ? process2.stderr.columns : void 0,
       getOutHasColors: () => useColor() ?? (process2.stdout.isTTY && process2.stdout.hasColors?.()),
       getErrHasColors: () => useColor() ?? (process2.stderr.isTTY && process2.stderr.hasColors?.()),
-      stripColor: (str3) => stripVTControlCharacters2(str3)
+      stripColor: (str4) => stripVTControlCharacters2(str4)
     };
     this._hidden = false;
     this._helpOption = void 0;
@@ -94201,18 +97440,18 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [description]
    * @return {(this | string | undefined)} `this` command for chaining, or version string if no arguments
    */
-  version(str3, flags, description) {
-    if (str3 === void 0) return this._version;
-    this._version = str3;
+  version(str4, flags, description) {
+    if (str4 === void 0) return this._version;
+    this._version = str4;
     flags = flags || "-V, --version";
     description = description || "output the version number";
     const versionOption = this.createOption(flags, description);
     this._versionOptionName = versionOption.attributeName();
     this._registerOption(versionOption);
     this.on("option:" + versionOption.name(), () => {
-      this._outputConfiguration.writeOut(`${str3}
+      this._outputConfiguration.writeOut(`${str4}
 `);
-      this._exit(0, "commander.version", str3);
+      this._exit(0, "commander.version", str4);
     });
     return this;
   }
@@ -94223,10 +97462,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {object} [argsDescription]
    * @return {(string|Command)}
    */
-  description(str3, argsDescription) {
-    if (str3 === void 0 && argsDescription === void 0)
+  description(str4, argsDescription) {
+    if (str4 === void 0 && argsDescription === void 0)
       return this._description;
-    this._description = str3;
+    this._description = str4;
     if (argsDescription) {
       this._argsDescription = argsDescription;
     }
@@ -94238,9 +97477,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [str]
    * @return {(string|Command)}
    */
-  summary(str3) {
-    if (str3 === void 0) return this._summary;
-    this._summary = str3;
+  summary(str4) {
+    if (str4 === void 0) return this._summary;
+    this._summary = str4;
     return this;
   }
   /**
@@ -94288,8 +97527,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [str]
    * @return {(string|Command)}
    */
-  usage(str3) {
-    if (str3 === void 0) {
+  usage(str4) {
+    if (str4 === void 0) {
       if (this._usage) return this._usage;
       const args = this.registeredArguments.map((arg) => {
         return humanReadableArgName(arg);
@@ -94300,7 +97539,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
         this.registeredArguments.length ? args : []
       ).join(" ");
     }
-    this._usage = str3;
+    this._usage = str4;
     return this;
   }
   /**
@@ -94309,9 +97548,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [str]
    * @return {(string|Command)}
    */
-  name(str3) {
-    if (str3 === void 0) return this._name;
-    this._name = str3;
+  name(str4) {
+    if (str4 === void 0) return this._name;
+    this._name = str4;
     return this;
   }
   /**
@@ -94445,17 +97684,17 @@ Expecting one of '${allowedValues.join("', '")}'`);
     let hasColors;
     let helpWidth;
     if (error62) {
-      baseWrite = (str3) => this._outputConfiguration.writeErr(str3);
+      baseWrite = (str4) => this._outputConfiguration.writeErr(str4);
       hasColors = this._outputConfiguration.getErrHasColors();
       helpWidth = this._outputConfiguration.getErrHelpWidth();
     } else {
-      baseWrite = (str3) => this._outputConfiguration.writeOut(str3);
+      baseWrite = (str4) => this._outputConfiguration.writeOut(str4);
       hasColors = this._outputConfiguration.getOutHasColors();
       helpWidth = this._outputConfiguration.getOutHelpWidth();
     }
-    const write = (str3) => {
-      if (!hasColors) str3 = this._outputConfiguration.stripColor(str3);
-      return baseWrite(str3);
+    const write = (str4) => {
+      if (!hasColors) str4 = this._outputConfiguration.stripColor(str4);
+      return baseWrite(str4);
     };
     return { error: error62, write, hasColors, helpWidth };
   }
@@ -95228,7 +98467,7 @@ function isZenviStdio(entry) {
   const argv = [e.command, ...Array.isArray(e.args) ? e.args : []].map(String);
   return argv.includes("mcp") && argv.some((a) => /zenvi/i.test(a));
 }
-function sameJson3(a, b) {
+function sameJson4(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 async function exists2(file3) {
@@ -95269,7 +98508,7 @@ async function mergeJsonServer(file3, name, entry, force) {
   const servers = root.mcpServers ?? {};
   if (typeof servers !== "object" || Array.isArray(servers)) throw new CliError(`${file3}: "mcpServers" is not an object; not touching it.`);
   const existing = servers[name];
-  if (existing !== void 0 && sameJson3(existing, entry)) return { changed: false };
+  if (existing !== void 0 && sameJson4(existing, entry)) return { changed: false };
   if (existing !== void 0 && !force && !isZenviStdio(existing)) {
     throw new CliError(
       `${file3} already has a different "${name}" MCP server (${JSON.stringify(existing).slice(0, 120)}).`,

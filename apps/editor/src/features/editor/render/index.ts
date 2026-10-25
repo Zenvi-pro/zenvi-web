@@ -15,7 +15,7 @@ import {
   type ExportProgress,
 } from "@zenvi/render-web";
 import { browserSupport } from "@/lib/capabilities";
-import { resolveTransitionAsset } from "../catalog";
+import { resolveEmojiAsset, resolveTransitionAsset } from "../catalog";
 import type { MediaLibrary, MediaSourceSpec, ProbeFn } from "../session/media";
 import type { PreviewEngine } from "../session/playback";
 
@@ -25,14 +25,18 @@ export const probe: ProbeFn = (spec, options) => probeMedia(spec, { path: option
 const registries = new WeakMap<MediaLibrary, MediaRegistry>();
 let current: MediaRegistry | null = null;
 
-/** Where bundled assets live when a project refers to them by path. */
-function resolvePath(path: string): MediaSourceSpec | undefined {
+/** Where bundled assets live when a project refers to them by path (transition masks, emoji). */
+export function resolveBundledMedia(path: string): MediaSourceSpec | undefined {
   if (path.startsWith("@transitions/") || path.includes("/transitions/")) {
     const url = resolveTransitionAsset(path);
     if (url) return { kind: "url", url, name: path.split("/").pop() ?? path };
   }
+  const emoji = resolveEmojiAsset(path);
+  if (emoji) return { kind: "url", url: emoji, name: path.split("/").pop() ?? path };
   return undefined;
 }
+
+const resolvePath = resolveBundledMedia;
 
 /** Create and attach the registry for a media library. */
 export function bindRegistry(media: MediaLibrary): void {

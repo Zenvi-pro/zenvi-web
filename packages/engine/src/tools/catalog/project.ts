@@ -140,7 +140,35 @@ export const projectTools: CatalogTool[] = [
 // undo / redo (tool_handlers._undo_redo)
 // ---------------------------------------------------------------------------
 
-type Signature = Map<string, string>;
+/** Per clip: where it sits, and a digest of what it looks and sounds like. */
+type Signature = Map<string, { place: string; content: string }>;
+
+/** Clip keys that are caches or bookkeeping, not what the clip looks or sounds like (tool_handlers._SIGNATURE_SKIP_KEYS). */
+const SIGNATURE_SKIP_KEYS = new Set(["id", "layer", "position", "start", "end", "reader", "ui", "ai_metadata"]);
+
+/** `json.dumps(value, sort_keys=True)`: objects with their keys sorted, at any depth. */
+function sortedJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(sortedJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => v !== undefined);
+    entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${sortedJson(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+/**
+ * `_clip_content_digest` (develop): a clip's effects, keyframes and
+ * properties, plus which media its reader plays, so undoing an effect,
+ * property or title edit reads as a change.
+ */
+function clipContentDigest(clip: Project["clips"][number]): string {
+  const rest: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(clip)) if (!SIGNATURE_SKIP_KEYS.has(key)) rest[key] = value;
+  const reader = (clip.reader ?? {}) as Record<string, unknown>;
+  rest._media = ["path", "duration", "fps", "video_length"].map((k) => reader[k] ?? null);
+  return sortedJson(rest);
+}
 
 /** What is on the timeline, comparable before/after (tool_handlers._timeline_signature). */
 function timelineSignature(project: Project): Signature {
@@ -148,20 +176,23 @@ function timelineSignature(project: Project): Signature {
   const r3 = (v: unknown): number => Math.round((Number(v) || 0) * 1000) / 1000;
   for (const clip of project.clips ?? []) {
     const id = String(clip.id ?? "");
-    if (id) out.set(id, JSON.stringify([clip.layer ?? null, r3(clip.position), r3(clip.start), r3(clip.end)]));
+    if (id) out.set(id, { place: JSON.stringify([clip.layer ?? null, r3(clip.position), r3(clip.start), r3(clip.end)]), content: clipContentDigest(clip) });
   }
   return out;
 }
 
-/** "removed 1 clip(s) (A); moved/retrimmed …" or "" (tool_handlers._describe_timeline_delta). */
+/** "removed 1 clip(s) (A); moved/retrimmed …; changed effects/properties of …" or "" (tool_handlers._describe_timeline_delta). */
 function describeTimelineDelta(before: Signature, after: Signature): string {
   const removed = [...before.keys()].filter((id) => !after.has(id)).sort();
   const added = [...after.keys()].filter((id) => !before.has(id)).sort();
-  const moved = [...before.keys()].filter((id) => after.has(id) && before.get(id) !== after.get(id)).sort();
+  const common = [...before.keys()].filter((id) => after.has(id)).sort();
+  const moved = common.filter((id) => before.get(id)!.place !== after.get(id)!.place);
+  const restyled = common.filter((id) => before.get(id)!.place === after.get(id)!.place && before.get(id)!.content !== after.get(id)!.content);
   const parts: string[] = [];
   if (removed.length) parts.push(`removed ${removed.length} clip(s) (${removed.slice(0, 4).join(", ")})`);
   if (added.length) parts.push(`restored ${added.length} clip(s) (${added.slice(0, 4).join(", ")})`);
   if (moved.length) parts.push(`moved/retrimmed ${moved.length} clip(s) (${moved.slice(0, 4).join(", ")})`);
+  if (restyled.length) parts.push(`changed effects/properties of ${restyled.length} clip(s) (${restyled.slice(0, 4).join(", ")})`);
   return parts.join("; ");
 }
 

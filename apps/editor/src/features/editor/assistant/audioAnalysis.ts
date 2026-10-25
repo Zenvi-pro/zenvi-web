@@ -10,7 +10,8 @@ import type { MediaSourceSpec } from "../session/media";
 /** Web Audio decodes whole files in memory; past this, ask for the desktop app. */
 export const MAX_ANALYZE_BYTES = 768 * 1024 * 1024;
 
-async function blobOf(spec: MediaSourceSpec, signal?: AbortSignal): Promise<Blob> {
+/** The bytes behind a media source (in memory, OPFS or a signed URL). */
+export async function blobOf(spec: MediaSourceSpec, signal?: AbortSignal): Promise<Blob> {
   switch (spec.kind) {
     case "blob":
       return spec.blob;

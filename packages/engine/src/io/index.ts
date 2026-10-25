@@ -14,4 +14,17 @@ export {
   toStoredPaths,
   type PathRoots,
 } from "./paths.js";
-export { buildEmojiCatalog, loadEmojiCatalog, type EmojiEntry, type EmojiSource, type OpenMojiMeta } from "./emojis.js";
+export {
+  EMOJI_CATALOG_ASSET,
+  buildEmojiCatalog,
+  emojiReaderInfo,
+  loadEmojiCatalog,
+  parseBundledEmojiCatalog,
+  scoreEmoji,
+  searchEmojis,
+  type BundledEmojiCatalog,
+  type EmojiEntry,
+  type EmojiMatch,
+  type EmojiSource,
+  type OpenMojiMeta,
+} from "./emojis.js";

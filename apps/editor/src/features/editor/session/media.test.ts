@@ -146,6 +146,22 @@ describe("MediaLibrary", () => {
     expect(await spec.refresh()).toBe(`https://blob.example/${"f".repeat(64)}?fresh`);
   });
 
+  it("loads a file that points at a bundled engine asset (an emoji) without storage or the cloud", async () => {
+    const registry = { register: vi.fn(), unregister: vi.fn() };
+    const store = { get: vi.fn() };
+    const library = new MediaLibrary({
+      store: async () => store as never,
+      probe,
+      registry,
+      bundled: (file) => (String(file.path).startsWith("@emojis/") ? { kind: "url", url: "/editor/emojis/1F525.svg" } : undefined),
+    });
+    const fire = projectFile({ id: "EMOJI", path: "@emojis/1F525.svg", media_type: "image", name: "Fire" });
+    await library.sync({ files: [fire] } as never);
+    expect(library.status.getState().EMOJI).toEqual({ status: "ready", origin: "local" });
+    expect(registry.register).toHaveBeenCalledWith("EMOJI", { kind: "url", url: "/editor/emojis/1F525.svg" });
+    expect(store.get).not.toHaveBeenCalled();
+  });
+
   it("reports a file the cloud does not have as missing (not as an error)", async () => {
     const { CloudError } = await import("@/lib/cloud");
     const library = new MediaLibrary({

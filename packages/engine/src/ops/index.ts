@@ -30,5 +30,6 @@ export * from "./tracks.js";
 export * from "./markers.js";
 export * from "./project.js";
 export * from "./titles.js";
+export * from "./overlays.js";
 export * from "./clipboard.js";
 export * from "./presets.js";
