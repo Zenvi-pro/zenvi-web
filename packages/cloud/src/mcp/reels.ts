@@ -76,11 +76,17 @@ export function pickStockFile(video: PexelsVideo, frameWidth: number, portrait: 
   return (big[0] ?? [...files].sort((a, b) => side(b) - side(a))[0])!.link;
 }
 
-/** Music for a reel: long enough, open licences first (CC0, then CC BY). */
+/**
+ * Music for a reel: among the most relevant results, open licences first
+ * (CC0, then CC BY, non-commercial last), then the shortest track that is
+ * long enough (the whole track downloads; stock CDNs can be slow).
+ */
 export function pickMusic(sounds: readonly FreesoundSound[], seconds: number): FreesoundSound | undefined {
-  const usable = sounds.filter((s) => s.duration >= Math.min(seconds + 4, 30) && s.duration <= 360 && (s.previews?.hq_mp3 || s.previews?.lq_mp3));
-  const rank = (s: FreesoundSound) => (/zero|cc0/i.test(s.license ?? "") ? 0 : /noncommercial|nc/i.test(s.license ?? "") ? 2 : 1);
-  return [...usable].sort((a, b) => rank(a) - rank(b))[0];
+  const usable = sounds
+    .slice(0, 8)
+    .filter((s) => s.duration >= Math.min(seconds + 6, 30) && s.duration <= 360 && (s.previews?.hq_mp3 || s.previews?.lq_mp3));
+  const rank = (s: FreesoundSound) => (/zero|cc0/i.test(s.license ?? "") ? 0 : /noncommercial|by-nc|\bnc\b/i.test(s.license ?? "") ? 2 : 1);
+  return [...usable].sort((a, b) => rank(a) - rank(b) || a.duration - b.duration)[0];
 }
 
 /**
