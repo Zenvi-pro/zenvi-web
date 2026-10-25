@@ -20,17 +20,8 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { createApp } from "../src/app.js";
-import { SCOPE_READ, SCOPE_WRITE } from "../src/auth/scopes.js";
-import { createSupabaseVerifier } from "../src/auth/supabase.js";
-import { loadConfig } from "../src/config.js";
-import { createServices } from "../src/container.js";
-import { loadEngineRegistry } from "../src/mcp/engine.js";
-import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeProber, nodeRenderer } from "../src/render/node.js";
-import { AzureBlobStore } from "../src/storage/azure.js";
-import { MemoryTableStore } from "../src/storage/memory.js";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { connectCloud } from "./live-client.js";
 
 type CallResult = { isError?: boolean; content: { type: string; text?: string }[]; structuredContent?: Record<string, unknown> };
 interface Spec extends Record<string, unknown> {
@@ -42,58 +33,8 @@ async function main(): Promise<void> {
   if (!specPath || !outDir) throw new Error("usage: reel-live.ts <specs.json> <out dir> [height] (see the header for the environment)");
   const specs = JSON.parse(readFileSync(specPath, "utf8")) as Spec[];
   mkdirSync(outDir, { recursive: true });
-  const client = process.env.ZENVI_CLOUD_URL ? await remoteClient(process.env.ZENVI_CLOUD_URL, process.env.ZENVI_TOKEN ?? "") : await localClient();
+  const { client } = await connectCloud("reel-live");
   await runSpecs(client, specs, outDir, Number(heightArg) || 1280);
-}
-
-/** A deployed Zenvi Cloud's /mcp with a personal access token. */
-async function remoteClient(base: string, token: string): Promise<Client> {
-  if (!token.startsWith("zvn_")) throw new Error("ZENVI_TOKEN must be a Zenvi personal access token (zvn_pat_…)");
-  const client = new Client({ name: "reel-live", version: "1" });
-  await client.connect(new StreamableHTTPClientTransport(new URL(`${base.replace(/\/+$/, "")}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
-  return client;
-}
-
-/** Zenvi Cloud in this process: real backend and blobs, tokens in memory. */
-async function localClient(): Promise<Client> {
-  const secret = process.env.ZENVI_BACKEND_SERVICE_SECRET;
-  const connection = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  const userId = process.env.USER_ID;
-  if (!secret || !connection || !userId) throw new Error("local mode needs ZENVI_BACKEND_SERVICE_SECRET, AZURE_STORAGE_CONNECTION_STRING and USER_ID");
-
-  const config = loadConfig({
-    STORAGE: "memory",
-    PUBLIC_BASE_URL: "https://cloud.local",
-    ZENVI_EDITOR_URL: "https://zenvi.pro/editor",
-    ZENVI_BACKEND_URL: process.env.ZENVI_BACKEND_URL ?? "https://api.zenvi.pro",
-    ZENVI_BACKEND_SERVICE_SECRET: secret,
-    LOG_LEVEL: "warn",
-  });
-  const { renderer, reason } = await nodeRenderer();
-  if (reason) console.warn(`renderer: ${reason}`);
-  const services = createServices({
-    config,
-    blobs: new AzureBlobStore(connection, "zenvi-e2e"),
-    tables: new MemoryTableStore(),
-    engine: await loadEngineRegistry(),
-    renderer,
-    prober: nodeProber,
-    resolveAsset: nodeAssetResolver(),
-    assets: nodeAssetSource(),
-    analyzeAudio: nodeAnalyzeAudio,
-    decodePcm: nodeDecodePcm,
-    supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl }),
-  });
-  const app = createApp(services);
-  const token = (await services.tokens.createPat({ userId, name: "reel-live", scopes: [SCOPE_READ, SCOPE_WRITE], ttlDays: 1 })).token;
-  const client = new Client({ name: "reel-live", version: "1" });
-  await client.connect(
-    new StreamableHTTPClientTransport(new URL("https://cloud.local/mcp"), {
-      requestInit: { headers: { Authorization: `Bearer ${token}` } },
-      fetch: async (url, init) => app.request(url.toString(), init),
-    }),
-  );
-  return client;
 }
 
 async function runSpecs(client: Client, specs: Spec[], outDir: string, height: number): Promise<void> {
