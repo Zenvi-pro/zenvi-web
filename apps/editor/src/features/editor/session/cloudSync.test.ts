@@ -120,7 +120,7 @@ describe("adoptRemote (edits made elsewhere, e.g. the chat's tools)", () => {
   }
 
   it("takes the cloud's newer revision as one undo step and does not send it back", async () => {
-    const saveProject = vi.fn(async () => ({ revision: "r3" }));
+    const saveProject = vi.fn(async (_id: string, _project: unknown, _revision: string | null) => ({ revision: "r3" }));
     const session = linkedSession(fakeCloud({ saveProject }));
     const remote = remoteWith(session, (p) => {
       p.markers = [{ id: "M1", position: 2, icon: "blue.png", vector: "blue" }];
