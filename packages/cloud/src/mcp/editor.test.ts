@@ -188,6 +188,8 @@ describe("open_in_editor (editor embedded in the chat)", () => {
     // A slow editor keeps loading; a link to a tab appears beside it, and goes when the editor reports ready.
     expect(content.text).toContain("Editor not showing? Open it in a new tab");
     expect(content.text).toContain("root.insertBefore(a, frame)");
+    // A refused token refresh waits before the next try (the page asks on every 401).
+    expect(content.text).toContain("Date.now() < (state.retryAt || 0)");
     expect(content._meta.ui?.csp?.frameDomains).toEqual(["https://cloud.test"]);
     expect(content._meta["openai/widgetCSP"]?.frame_domains).toEqual(["https://cloud.test"]);
     await client.close();
