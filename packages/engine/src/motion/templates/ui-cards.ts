@@ -14,7 +14,8 @@
  * check), then the camera pushes in until the end.
  */
 
-import { cropToAspect, cued, drawing, enter, key, mediaCard, Motion, pose, poseAt, zoomed, type Layout } from "../elements.js";
+import { cropToAspect, cued, drawing, enter, key, mediaCard, Motion, pose, poseAt, zoomed } from "../elements.js";
+import { opticalCentre, typeSize, type Layout } from "../layout.js";
 import { cardFrame, cardFramePad, pointer, type CardFrameStyle } from "../shapes.js";
 import { clampText, ROOMY, textWidth } from "../text.js";
 import { refuse, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
@@ -44,7 +45,9 @@ function cardSize(layout: Layout, count: number): { w: number; h: number } {
 function slots(layout: Layout, count: number): Slot[] {
   const { W, H, portrait } = layout;
   if (portrait) {
-    const ys = count === 1 ? [0.47] : count === 2 ? [0.36, 0.6] : [0.27, 0.49, 0.71];
+    // Centred on the safe area's middle (9:16: above the caption band).
+    const mid = opticalCentre(layout) / H;
+    const ys = (count === 1 ? [0] : count === 2 ? [-0.12, 0.12] : [-0.215, 0, 0.215]).map((dy) => mid + dy);
     const xs = [-0.05, 0.05, -0.03];
     const rots = [-2, 2, -1];
     return ys.map((y, i) => ({ rest: pose(W / 2 + xs[i]! * W, y * H, { rotation: count === 1 ? 0 : rots[i]! }), depth: i }));
@@ -58,18 +61,19 @@ function slots(layout: Layout, count: number): Slot[] {
   ];
 }
 
-/** A text card: surface, title, a muted line, skeleton bars. */
-function paintTextCard(d: Drawing, pad: number, w: number, h: number, frame: CardFrameStyle, palette: Palette, u: number, title: string, line: string): void {
+/** A text card: surface, title, a muted line, skeleton bars; type legible at the card's smallest scale `scale`. */
+function paintTextCard(d: Drawing, pad: number, w: number, h: number, frame: CardFrameStyle, palette: Palette, layout: Layout, scale: number, title: string, line: string): void {
+  const { u } = layout;
   cardFrame(d, pad, pad, w, h, { ...frame, border: undefined });
   d.rect(pad, pad, w, h, { fill: palette.surface, rx: frame.radius, stroke: palette.line, strokeWidth: 2 * u });
   const inset = Math.max(28 * u, w * 0.08);
-  const titleSize = Math.min(48 * u, h * 0.12);
+  const titleSize = Math.ceil(typeSize(layout, "body", Math.min(48 * u, h * 0.12)) / scale);
   d.circle(pad + inset + 14 * u, pad + inset + 14 * u, 14 * u, { fill: palette.accent });
   const titleText = clampText(title, { size: titleSize, font: "sans", bold: true }, (w - 2 * inset) / ROOMY);
   d.text(pad + inset, pad + inset + 28 * u + 22 * u + titleSize * 0.8, titleText, { size: titleSize, font: "sans", bold: true, fill: palette.ink, tracking: -0.01 });
   let y = pad + inset + 50 * u + titleSize * 1.4;
   if (line) {
-    const lineSize = Math.min(30 * u, h * 0.075);
+    const lineSize = Math.ceil(typeSize(layout, "label", Math.min(30 * u, h * 0.075)) / scale);
     d.text(pad + inset, y + lineSize * 0.4, clampText(line, { size: lineSize, font: "sans" }, (w - 2 * inset) / ROOMY), { size: lineSize, font: "sans", fill: palette.muted });
     y += lineSize * 1.6;
   }
@@ -159,17 +163,20 @@ export const uiCards: TemplateSpec = {
       const file = files[i];
       const label = labels[i]?.trim() ?? "";
       const from = enters[i]!;
+      // A card's smallest size once it has landed (fan side cards, receding cards): its type is set for it.
+      const smallest = Math.min(1, ...keys.filter((k) => k.frame >= from + travel).map((k) => k.pose.s));
       if (file) {
         const m = media.get(file) as MotionMedia;
         const crop = cropToAspect(m, w / h);
         const card = mediaCard(`card-${i + 1}`, depth * 3, from, frames, m, frame.fps, { width: w, radius, crop }, keys);
         elements.push(card);
-        const chip = label ? clampText(label, { size: 30 * u, font: "sans", bold: true }, w * (i === front && button && !portrait ? 0.5 : 0.8)) : "";
+        const chipSize = Math.ceil(typeSize(layout, "label", 30 * u) / smallest);
+        const chip = label ? clampText(label, { size: chipSize, font: "sans", bold: true }, w * (i === front && button && !portrait ? 0.5 : 0.8)) : "";
         elements.push(
           drawing(`card-${i + 1}-frame`, depth * 3 + 1, from, card.to, { width: w + 2 * pad, height: h + 2 * pad }, (d) => {
             cardFrame(d, pad, pad, w, h, style);
             if (chip) {
-              const size = 30 * u;
+              const size = chipSize;
               const cw = textWidth(chip, { size, font: "sans", bold: true }) * ROOMY + 2 * size;
               const ch = size * 2;
               const inset = 24 * u;
@@ -182,7 +189,7 @@ export const uiCards: TemplateSpec = {
         );
       } else {
         elements.push(
-          drawing(`card-${i + 1}`, depth * 3 + 1, from, frames, { width: w + 2 * pad, height: h + 2 * pad }, (d) => paintTextCard(d, pad, w, h, style, palette, u, label, content.subtitle?.trim() ?? ""), keys),
+          drawing(`card-${i + 1}`, depth * 3 + 1, from, frames, { width: w + 2 * pad, height: h + 2 * pad }, (d) => paintTextCard(d, pad, w, h, style, palette, layout, smallest, label, content.subtitle?.trim() ?? ""), keys),
         );
       }
     }
@@ -191,7 +198,7 @@ export const uiCards: TemplateSpec = {
     const cues = [...enters];
     if (button) {
       const fr = cardMotion[front]!;
-      const bSize = Math.round(34 * u);
+      const bSize = typeSize(layout, "label", 34 * u);
       const bh = Math.round(bSize * 2.1);
       const bw = textWidth(button, { size: bSize, font: "sans", bold: true }) * ROOMY + bh;
       const inset = 24 * u;

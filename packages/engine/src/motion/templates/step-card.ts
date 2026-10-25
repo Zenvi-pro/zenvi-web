@@ -5,15 +5,22 @@
  * and the text in a bordered label); on the one after, a small label box
  * appears beside the card and an arrow draws from it to a point in the
  * footage (`tag`, `points[0]`).
+ *
+ *   landscape  the card on the left two thirds, the caption beside it, the
+ *              header (hook) along the top
+ *   portrait   a vertical stack filling the safe area: the header on its top
+ *              line, the footage in a tall 4:5 card with the label box on its
+ *              top edge, the caption on the bottom third
  */
 
 import { arrowhead } from "../shapes.js";
-import { cropToAspect, cued, drawing, enter, key, mediaCard, Motion, pose, textBox, textElement, type TextBlock } from "../elements.js";
-import { clampText, fitBlock, fitSize, ROOMY, textWidth } from "../text.js";
+import { cropToAspect, cued, drawing, enter, inWindow, key, mediaCard, Motion, pose, textBox, textElement, type TextBlock } from "../elements.js";
+import { centredWidth, fitType, typeSize } from "../layout.js";
+import { clampText, ROOMY, textWidth } from "../text.js";
 import { refuse, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
 import type { Element, MotionMedia } from "../types.js";
 
-/** Card aspects the footage is cropped into: no taller than 4:5, no wider than 16:9. */
+/** Card aspects the footage is cropped into: no taller than 4:5, no wider than 16:9; portrait cards are 4:5. */
 const TALLEST = 4 / 5;
 const WIDEST = 16 / 9;
 
@@ -21,12 +28,12 @@ export const stepCard: TemplateSpec = {
   id: "step_card",
   summary:
     "A tutorial step: the footage rises into a rounded card with an ink border and a hard shadow, a numbered caption pops in under it, then a small label box appears and an arrow draws from it to a point in the footage.",
-  reads: "file_ids (the step's footage: the first file), text (the caption), step (its number, default 1), tag (the label box's text), points (where the arrow points in the footage, 0-1; default the upper right), subtitle (a still header at the top, e.g. the video's hook)",
+  reads: "file_ids (the step's footage: the first file), text (the caption), step (its number, default 1), tag (the label box's text), points (where the arrow points in the footage, 0-1; the card's crop keeps it in view; default the card's upper right), subtitle (a still header at the top, e.g. the video's hook)",
   media: "required",
   beats: (content) => (content.tag ? 8 : 6),
   build(input: TemplateInput): TemplateOutput {
     const { content, palette, layout, frames, beats, media, frame } = input;
-    const { W, H, u, m, portrait } = layout;
+    const { W, H, u, m, portrait, safe } = layout;
     const file = content.fileIds?.[0];
     if (!file) refuse("step_card needs file_ids: the step's footage");
     const caption = (content.text ?? "").replace(/\s+/g, " ").trim();
@@ -34,24 +41,66 @@ export const stepCard: TemplateSpec = {
     const step = content.step ?? 1;
     const m0 = media.get(file) as MotionMedia;
     const own = m0.width / m0.height;
-    // A portrait frame crops wide footage to 4:3: a bigger card on a phone screen.
-    const aspect = Math.max(TALLEST, Math.min(portrait ? 4 / 3 : WIDEST, own));
-    const crop = cropToAspect(m0, aspect);
-
-    // The card: portrait centred under the hook area; landscape on the left two thirds.
-    const maxW = portrait ? W * 0.86 : W * 0.5;
-    const maxH = portrait ? H * 0.42 : H * 0.62;
-    const cw = Math.min(maxW, maxH * aspect);
-    const ch = cw / aspect;
-    const cx = portrait ? W / 2 : W * 0.37;
-    const cy = portrait ? H * (ch > H * 0.3 ? 0.47 : 0.45) : H * 0.52;
+    const aspect = portrait ? TALLEST : Math.max(TALLEST, Math.min(WIDEST, own));
+    // A point given on the footage keeps its subject in the card: the crop centres on it.
+    const focus = content.points?.[0];
+    const crop = cropToAspect(m0, aspect, focus);
+    const e0 = beats.frame(0);
+    const [e1, e2] = [beats.frame(beats.step), beats.frame(2 * beats.step)];
     const radius = 26 * u;
     const border = 5 * u;
     const off = 14 * u;
-    const e0 = beats.frame(0);
-    const [e1, e2] = [beats.frame(beats.step), beats.frame(2 * beats.step)];
-    const rise = enter(pose(cx, cy), e0, { dy: H * 0.3, s: 0.94, rotation: 3, alpha: 1, frames: 14, ease: "out_back" });
     const elements: Element[] = [];
+
+    // A header (the video's hook) on the top line: still, so it carries across steps.
+    const header = content.subtitle?.replace(/\s+/g, " ").trim();
+    let headerBottom = portrait ? safe.top - 40 * u : m;
+    if (header) {
+      const style = { font: "sans" as const, bold: true, tracking: -0.02 };
+      const fitted = fitType(layout, "heading", header, style, { width: (portrait ? centredWidth(layout) : W - 2.4 * m) / ROOMY, max: (portrait ? 92 : 84) * u, maxLines: 2, leading: 1.04 });
+      const block: TextBlock = { lines: fitted.lines, size: fitted.size, ...style, fill: palette.ink, anchor: portrait ? "middle" : "start", leading: 1.04 };
+      const capTop = portrait ? safe.top : m * 1.2;
+      const box = textBox(block, portrait ? W / 2 : m * 1.2, capTop + 0.75 * fitted.size);
+      elements.push(textElement("step-header", 7, 0, frames, block, box));
+      headerBottom = capTop + 0.75 * fitted.size + (fitted.lines.length - 1) * 1.04 * fitted.size + 0.28 * fitted.size;
+    }
+
+    // The caption's type: a numbered badge and the text (a second line when it is long).
+    const capStyle = { font: "sans" as const, bold: true };
+    const capMax = (portrait ? 64 : 46) * u;
+    const badge = typeSize(layout, "body", capMax) * 1.5;
+    const tag = content.tag?.replace(/\s+/g, " ").trim() ?? "";
+    const tagSize = typeSize(layout, "body", (portrait ? 48 : 34) * u);
+    const tagH = tagSize * 2;
+
+    // The card: portrait as big as the stack allows (label, card, caption), centred under the header; landscape on the left two thirds.
+    let cw: number;
+    let cx: number;
+    let cy: number;
+    let capW: number;
+    if (portrait) {
+      capW = centredWidth(layout);
+      const capFit = fitType(layout, "body", caption, capStyle, { width: (capW - badge - capMax * 1.6) / ROOMY, max: capMax, maxLines: 2 });
+      const capH = Math.max(badge + capFit.size * 0.5, capFit.lines.length * capFit.size * 1.15 + capFit.size * 0.8) + 8 * u;
+      // The label box sits on the card's top edge, a third of it over the footage.
+      const tagRow = tag ? tagH * 0.67 + 24 * u : 0;
+      const stageTop = headerBottom + 40 * u;
+      const room = safe.bottom - stageTop - tagRow - 44 * u - capH;
+      const ch = Math.min(room, (W * 0.84) / aspect);
+      cw = ch * aspect;
+      cx = W / 2;
+      cy = stageTop + (safe.bottom - stageTop - (tagRow + ch + 44 * u + capH)) / 2 + tagRow + ch / 2;
+    } else {
+      const tagRow = tag ? tagH + 40 * u : 0;
+      const cardTop = headerBottom + 30 * u + tagRow;
+      const ch = Math.min(H * 0.62, H - m - cardTop, (W * 0.5) / aspect);
+      cw = ch * aspect;
+      cx = W * 0.37;
+      cy = Math.max(H * 0.52, cardTop + ch / 2);
+      capW = W - cx - cw / 2 - 2 * m;
+    }
+    const ch = cw / aspect;
+    const rise = enter(pose(cx, cy), e0, { dy: H * 0.3, s: 0.94, rotation: 3, alpha: 1, frames: 14, ease: "out_back" });
 
     // A hard shadow (the card's shape in ink, offset), the footage, the border.
     elements.push(
@@ -64,53 +113,43 @@ export const stepCard: TemplateSpec = {
     );
 
     // The caption: a numbered badge and the text in a bordered label.
-    const capSize = Math.round((portrait ? 56 : 46) * u);
-    const badge = capSize * 1.5;
-    const labelMax = portrait ? W - 2 * m : W - cx - cw / 2 - 2 * m;
-    const textMax = labelMax - badge - capSize * 1.6;
-    const size = fitSize([caption], { font: "sans", bold: true }, textMax / ROOMY, capSize, 22 * u);
-    const shown = clampText(caption, { size, font: "sans", bold: true }, textMax / ROOMY);
-    const tw = textWidth(shown, { size, font: "sans", bold: true }) * ROOMY;
-    const lw = badge + tw + capSize * 1.4;
-    const lh = Math.max(badge + capSize * 0.5, size * 1.9);
+    const textMax = capW - badge - capMax * 1.6;
+    const fitted = fitType(layout, "body", caption, capStyle, { width: textMax / ROOMY, max: capMax, maxLines: portrait ? 2 : 1 });
+    const size = fitted.size;
+    const shown = fitted.lines.map((line) => clampText(line, { ...capStyle, size }, textMax / ROOMY));
+    const tw = Math.max(...shown.map((line) => textWidth(line, { ...capStyle, size }))) * ROOMY;
+    const capLead = size * 1.15;
+    const lw = badge + tw + capMax * 1.4;
+    const lh = Math.max(badge + size * 0.5, shown.length * capLead + size * 0.8);
     const lx = portrait ? W / 2 : cx + cw / 2 + m * 0.6 + lw / 2;
-    const ly = portrait ? cy + ch / 2 + 54 * u + lh / 2 : cy - ch * 0.12;
+    const ly = portrait ? cy + ch / 2 + 44 * u + lh / 2 : cy - ch * 0.12;
     const capIn = new Motion(enter(pose(lx, ly), e1, { dy: 34 * u, s: 0.9, frames: 10, ease: "out_back" }));
     elements.push(
       drawing("step-caption", 3, e1, frames, { width: lw + 2 * off, height: lh + 2 * off }, (d) => {
         d.rect(off + 8 * u, off + 8 * u, lw, lh, { fill: palette.ink, rx: 18 * u });
         d.rect(off, off, lw, lh, { fill: palette.surface, stroke: palette.ink, strokeWidth: 4 * u, rx: 18 * u });
-        const bx = off + capSize * 0.45 + badge / 2;
+        const bx = off + capMax * 0.45 + badge / 2;
         const by = off + lh / 2;
+        const badgeSize = badge / 1.5;
         d.circle(bx, by, badge / 2, { fill: palette.accent });
-        d.text(bx, by + capSize * 0.36, String(step), { size: capSize, font: "sans", bold: true, fill: palette.accentInk, anchor: "middle" });
-        d.text(bx + badge / 2 + capSize * 0.45, by + size * 0.36, shown, { size, font: "sans", bold: true, fill: palette.ink });
+        d.text(bx, by + badgeSize * 0.36, String(step), { size: badgeSize, font: "sans", bold: true, fill: palette.accentInk, anchor: "middle" });
+        const first = by - ((shown.length - 1) * capLead) / 2 + size * 0.36;
+        shown.forEach((line, k) => d.text(bx + badge / 2 + capMax * 0.45, first + k * capLead, line, { size, ...capStyle, fill: palette.ink }));
       }, capIn.keys),
     );
 
-    // A header (the video's hook) at the top: still, so it carries across steps.
-    const header = content.subtitle?.replace(/\s+/g, " ").trim();
-    if (header) {
-      const fitted = fitBlock(header, { font: "sans", bold: true, tracking: -0.02 }, (W - 2 * m) / ROOMY, H * (portrait ? 0.11 : 0.14), Math.round((portrait ? 66 : 54) * u), 2, 1.04);
-      const block: TextBlock = { lines: fitted.lines, size: fitted.size, font: "sans", bold: true, tracking: -0.02, fill: palette.ink, anchor: portrait ? "middle" : "start", leading: 1.04 };
-      const box = textBox(block, portrait ? W / 2 : m * 1.2, H * (portrait ? 0.075 : 0.1) + fitted.size * 0.8);
-      elements.push(textElement("step-header", 7, 0, frames, block, box));
-    }
-
     // The label box and its arrow.
     const cues = [e0, e1];
-    const tag = content.tag?.replace(/\s+/g, " ").trim();
     if (tag && e2 + 12 <= frames) {
-      const target = content.points?.[0] ?? { x: 0.7, y: 0.32 };
+      const target = focus ? inWindow(focus, crop) : { x: 0.7, y: 0.32 };
       const tx = cx - cw / 2 + target.x * cw;
       const ty = cy - ch / 2 + target.y * ch;
-      const tagSize = Math.round((portrait ? 38 : 32) * u);
-      const text = clampText(tag, { size: tagSize, font: "sans", bold: true }, W * 0.6);
+      const text = clampText(tag, { size: tagSize, font: "sans", bold: true }, (safe.right - safe.left) * 0.8 - tagSize * 1.4);
       const bw = textWidth(text, { size: tagSize, font: "sans", bold: true }) * ROOMY + tagSize * 1.4;
-      const bh = tagSize * 2;
-      // Above the card (portrait), above-right of the target (landscape), kept in frame.
-      const bx = Math.max(m + bw / 2, Math.min(W - m - bw / 2, portrait ? tx + (target.x > 0.5 ? -bw * 0.15 : bw * 0.15) : tx + cw * 0.18));
-      const by = portrait ? cy - ch / 2 - 96 * u : Math.max(m + bh, cy - ch / 2 - 70 * u);
+      const bh = tagH;
+      // On the card's top edge toward the target (portrait), above-right of the target (landscape), inside the safe area.
+      const bx = Math.max(safe.left + bw / 2, Math.min(safe.right - bw / 2, portrait ? tx + (target.x > 0.5 ? -bw * 0.15 : bw * 0.15) : tx + cw * 0.18));
+      const by = portrait ? cy - ch / 2 - bh * 0.17 : Math.max(headerBottom + 30 * u + bh / 2, cy - ch / 2 - 70 * u);
       elements.push(
         drawing("step-label", 4, e2, frames, { width: bw + 12 * u, height: bh + 12 * u }, (d) => {
           d.rect(8 * u, 8 * u, bw, bh, { fill: palette.ink, rx: 12 * u });

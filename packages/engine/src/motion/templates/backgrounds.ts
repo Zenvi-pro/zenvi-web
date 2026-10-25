@@ -5,11 +5,14 @@
  *   paper      grid paper (minor squares, every fourth line darker), for tutorials
  *   editorial  warm paper, a column grid, ruler ticks along the edges,
  *              registration marks in the corners and up to four corner labels
+ *              (label size; on 9:16 along the safe area's top and bottom
+ *              lines, clear of the platform's UI)
  *   dots       a dark field with a faint dot grid (product callouts)
  *   plain      the palette's flat background
  */
 
-import { backdrop, type Layout } from "../elements.js";
+import { backdrop } from "../elements.js";
+import { typeSize, type Layout } from "../layout.js";
 import { registrationMark } from "../shapes.js";
 import type { Drawing } from "../svg.js";
 import { refuse, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
@@ -75,12 +78,15 @@ export function paintGrid(d: Drawing, variant: GridVariant, palette: Palette, la
     ] as const) {
       registrationMark(d, x, y, r, palette.ink, 1.6 * u);
     }
-    const size = 17 * u;
+    const size = typeSize(layout, "label", 17 * u);
+    const { safe, tall } = layout;
+    const right = Math.min(W - m - colW * 0.12, safe.right);
+    const [topY, bottomY] = tall ? [safe.top + size * 0.95, safe.bottom - size * 0.35] : [m - 16 * u, H - m + 30 * u];
     const corners: [number, number, "start" | "end"][] = [
-      [m + colW * 0.12, m - 16 * u, "start"],
-      [W - m - colW * 0.12, m - 16 * u, "end"],
-      [m + colW * 0.12, H - m + 30 * u, "start"],
-      [W - m - colW * 0.12, H - m + 30 * u, "end"],
+      [m + colW * 0.12, topY, "start"],
+      [right, topY, "end"],
+      [m + colW * 0.12, bottomY, "start"],
+      [right, bottomY, "end"],
     ];
     labels.slice(0, 4).forEach((label, i) => {
       const [x, y, anchor] = corners[i]!;

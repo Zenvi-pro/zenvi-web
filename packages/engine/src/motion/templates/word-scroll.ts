@@ -5,12 +5,14 @@
  * outside the box sit under two bands of the background colour, so only the
  * selected word reads at full strength. An optional lead line (`text`) reads
  * into the word: beside it in landscape ("Made to [Begin]"), above it in
- * portrait.
+ * portrait. The selected line sits on the safe area's optical centre; words
+ * are headings, never under the heading floor (layout.ts).
  */
 
 import { backdrop, cued, drawing, enter, Motion, pose, textBox, textElement, type TextBlock } from "../elements.js";
 import type { Drawing } from "../svg.js";
-import { fitSize, ROOMY, textWidth } from "../text.js";
+import { centredWidth, fitType, opticalCentre, typeSize } from "../layout.js";
+import { clampText, fitSize, ROOMY, textWidth } from "../text.js";
 import { refuse, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
 import type { Element } from "../types.js";
 
@@ -38,15 +40,21 @@ export const wordScroll: TemplateSpec = {
     const lead = content.text?.replace(/\s+/g, " ").trim() ?? "";
     const style = { font: "sans" as const, bold: true, tracking: -0.02 };
     const width = (text: string, size: number) => textWidth(text, { ...style, size });
-    const longest = words.reduce((a, b) => (width(b, 1) > width(a, 1) ? b : a));
-    const side = lead !== "" && !portrait;
-    const S = fitSize(side ? [`${lead}  ${longest}`] : words, style, (W - 2.6 * m) / ROOMY, Math.round((portrait ? 138 : 150) * u), 36 * u);
+    const room = (portrait ? centredWidth(layout) : W - 2.6 * m) / ROOMY;
+    const max = Math.round((portrait ? 176 : 150) * u);
+    // Beside the word in landscape while that keeps the words heading size, else above it.
+    const sideBy = lead !== "" && !portrait ? Math.floor(fitSize([`${lead}  ${words.reduce((a, b) => (width(b, 1) > width(a, 1) ? b : a))}`], style, room, max)) : 0;
+    const side = sideBy >= layout.type.heading;
+    const S = side ? sideBy : typeSize(layout, "heading", Math.floor(fitSize(words, style, room, max)));
+    // A word too long for the frame at the heading floor is cut.
+    const shown = words.map((w) => clampText(w, { ...style, size: S }, room));
+    const longest = shown.reduce((a, b) => (width(b, 1) > width(a, 1) ? b : a));
     const L = Math.round(S * 1.24);
     const capMid = S * 0.36;
     const gapX = S * 0.36;
     const leadW = side ? width(lead, S) : 0;
     const columnLeft = (W - (leadW + gapX + width(longest, S))) / 2 + leadW + gapX;
-    const cy = H * 0.52;
+    const cy = layout.tall ? opticalCentre(layout) : H * 0.52;
     /** Centre x of word `w` on the frame. */
     const wordX = (w: string) => (side ? columnLeft + width(w, S) / 2 : W / 2);
 
@@ -58,7 +66,7 @@ export const wordScroll: TemplateSpec = {
     const listX = side ? columnLeft - pad + listW / 2 : W / 2;
     const at = (k: number) => pose(listX, cy - (firstLine + k * L) + listH / 2);
     const paintList = (d: Drawing) => {
-      words.forEach((w, i) =>
+      shown.forEach((w, i) =>
         d.text(side ? pad : listW / 2, firstLine + i * L + capMid, w, { size: S, ...style, fill: palette.ink, anchor: side ? "start" : "middle" }),
       );
     };
@@ -92,10 +100,10 @@ export const wordScroll: TemplateSpec = {
     // A selection box per word, from its landing to the next scroll.
     const handle = Math.round(16 * u);
     const stroke = Math.max(2, 4 * u);
-    const readout = Math.round(24 * u);
+    const readout = typeSize(layout, "label", 30 * u);
     const last = landed[landed.length - 1]!;
     for (const k of landed) {
-      const word = words[k]!;
+      const word = shown[k]!;
       const bw = width(word, S) * 1.06 + S * 0.5;
       const bh = S * 1.12;
       const label = `${Math.round(bw)} × ${Math.round(bh)}`;
@@ -127,8 +135,9 @@ export const wordScroll: TemplateSpec = {
 
     // The lead line: left of the word (landscape) or above it (portrait).
     if (lead) {
-      const size = side ? S : fitSize([lead], style, (W - 2 * m) / ROOMY, Math.round(S * 0.56), 22 * u);
-      const block: TextBlock = { lines: [lead], size, ...style, fill: palette.muted, anchor: side ? "end" : "middle" };
+      const fitted = side ? { lines: [lead], size: S } : fitType(layout, "body", lead, style, { width: (portrait ? centredWidth(layout) : W - 2 * m) / ROOMY, max: Math.round(S * 0.56) });
+      const size = fitted.size;
+      const block: TextBlock = { lines: fitted.lines, size, ...style, fill: palette.muted, anchor: side ? "end" : "middle" };
       const box = side ? textBox(block, columnLeft - gapX, cy + capMid) : textBox(block, W / 2, cy - gap - S * 0.45);
       elements.push(textElement("scroll-lead", 4, e0, frames, block, box, enter(pose(box.x, box.y), e0, side ? { dx: -24 * u, frames: 10 } : { dy: 16 * u, frames: 10 })));
     }

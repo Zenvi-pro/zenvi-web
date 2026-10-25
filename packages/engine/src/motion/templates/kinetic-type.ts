@@ -12,10 +12,15 @@
  * a wider fallback font moves a line's ragged edge but never runs text into
  * a tile. Every word is drawn in two clips, a cumulative one and the popping
  * newest word, both with the whole block's geometry.
+ *
+ * The headline is set at the heading floor or larger (layout.ts), taking
+ * more lines before it would go under it; on 9:16 it stays inside the safe
+ * area, `center` on its optical centre.
  */
 
 import { cropToAspect, cued, drawing, enter, key, mediaCard, pose } from "../elements.js";
 import type { Drawing, TextRun } from "../svg.js";
+import { opticalCentre, typeSize } from "../layout.js";
 import { textWidth } from "../text.js";
 import { refuse, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
 import { tagElement } from "./end-card.js";
@@ -102,14 +107,15 @@ function breakLines(words: readonly Piece[][], n: number): Piece[][][] {
   return best!.lines;
 }
 
-function layoutWords(words: readonly Piece[][], maxW: number, maxH: number, maxSize: number, maxLines: number): Laid {
+/** Lines and size of a headline: few lines of big type, more lines only for clearly bigger type or to stay at `floor` or above. */
+function layoutWords(words: readonly Piece[][], maxW: number, maxH: number, maxSize: number, maxLines: number, floor: number): Laid {
   let best: Laid = { lines: [], size: 0 };
   for (let n = 1; n <= Math.min(maxLines, words.length); n += 1) {
     const lines = breakLines(words, n);
     const widest = Math.max(...lines.map(lineWidth));
     const size = Math.floor(Math.min(maxSize, maxW / widest, maxH / lines.length));
-    // Each line more only for clearly bigger type (a headline reads best in few lines).
-    if (size > best.size * 1.3 ** (n - best.lines.length)) best = { lines: lines.map((l) => ({ words: l, width: lineWidth(l) })), size };
+    // Each line more only for clearly bigger type (a headline reads best in few lines), or to reach the floor.
+    if ((best.size < floor && size > best.size) || size > best.size * 1.3 ** (n - best.lines.length)) best = { lines: lines.map((l) => ({ words: l, width: lineWidth(l) })), size };
   }
   return best;
 }
@@ -135,14 +141,20 @@ export const kineticType: TemplateSpec = {
     if (content.highlight !== undefined && content.highlight >= words.length) refuse(`kinetic_type: highlight is a word index, 0 to ${words.length - 1}`);
 
     const align = content.align ?? (palette.name === "editorial" ? "left" : "center");
+    const { safe, tall } = layout;
     const left = m * 1.3;
-    const maxW = W - 2 * left;
-    const laid = layoutWords(pieces, maxW / 1.04, H * (portrait ? 0.42 : 0.56), Math.round((portrait ? 210 : 200) * u), portrait ? 4 : 3);
+    // Lines end inside the safe area (9:16: clear of the side buttons).
+    const maxW = align === "left" ? Math.min(W - left, safe.right) - left : 2 * Math.min(W / 2 - left, safe.right - W / 2);
+    const laid = layoutWords(pieces, maxW / 1.04, H * (portrait ? 0.42 : 0.56), Math.round((portrait ? 210 : 200) * u), portrait ? 6 : 3, layout.type.heading);
     const S = laid.size;
     const lead = S * 1.0;
     const blockH = laid.lines.length * lead;
     const position = content.position ?? "center";
-    const top = position === "top" ? H * (portrait ? 0.12 : 0.13) : position === "bottom" ? H * (portrait ? 0.8 : 0.86) - blockH : (H - blockH) / 2;
+    const tagRoom = content.tag?.trim() ? typeSize(layout, "label", S * 0.2) * 2.6 : 0;
+    const top = Math.max(
+      tall ? safe.top + tagRoom : 0,
+      position === "top" ? H * (portrait ? 0.12 : 0.13) : position === "bottom" ? Math.min(H * (portrait ? 0.8 : 0.86), safe.bottom) - blockH : (tall ? opticalCentre(layout) * 2 : H) / 2 - blockH / 2,
+    );
     const capH = S * 0.72;
     const tileH = S * 0.78;
 
@@ -262,7 +274,7 @@ export const kineticType: TemplateSpec = {
     if (content.tag?.trim()) {
       const tagAt = beats.frame(beats.beatAfter(enters[enters.length - 1]!));
       if (tagAt + 6 < frames) {
-        const size = Math.round(Math.max(20, S * 0.2));
+        const size = typeSize(layout, "label", S * 0.2);
         const tagW = textWidth(content.tag.trim().toUpperCase(), { size, font: "mono", tracking: 0.06 }) + size * 1.5;
         const x = align === "left" ? left + tagW / 2 : W / 2;
         const y = top - size * 1.6;
