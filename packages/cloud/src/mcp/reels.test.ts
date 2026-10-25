@@ -54,6 +54,12 @@ describe("stock picks", () => {
     expect(pickMusic(sounds, 15)?.id).toBe(4);
     expect(pickMusic(sounds.slice(0, 3), 15)?.id).toBe(3);
   });
+
+  it("prefer the shortest long-enough track within a licence class (the whole track downloads)", () => {
+    const nc = (id: number, duration: number) => ({ id, name: String(id), duration, license: "http://creativecommons.org/licenses/by-nc/4.0/", previews: { hq_mp3: String(id) } });
+    expect(pickMusic([nc(1, 138), nc(2, 74), nc(3, 32), nc(4, 70)], 15)?.id).toBe(3);
+    expect(pickMusic([nc(1, 138), nc(2, 74), nc(3, 18)], 15)?.id).toBe(2);
+  });
 });
 
 describe("create_reel", () => {
