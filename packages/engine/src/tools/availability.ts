@@ -110,8 +110,8 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   editor: {
     title: "Web editor (Zenvi Assistant, command palette)",
     host: "apps/editor/src/features/editor/assistant/host.ts",
-    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage"],
-    methods: ["media.importUrl", "media.pickFiles", "media.writeGenerated", "ui.openExportDialog"],
+    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "audio"],
+    methods: ["media.importUrl", "media.pickFiles", "media.writeGenerated", "ui.openExportDialog", "audio.decodePcm"],
     conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" },
   },
   cli: {

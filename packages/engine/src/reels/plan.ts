@@ -188,15 +188,20 @@ export function planReel(input: PlanInput): ReelPlan {
   const totalBeats = grid.beats.findIndex((t) => Math.abs(t - duration) < 1e-3);
   const beatsInReel = totalBeats >= 0 ? totalBeats : (duration / (60 / grid.bpm));
 
+  // Cuts sit on the frame grid, so one shot ends exactly where the next begins
+  // (rounding each clip's position and length on its own left one-frame gaps).
+  const fps = input.frameRate && input.frameRate > 0 ? input.frameRate : null;
+  const onFrame = (t: number) => (fps ? Math.round(t * fps) / fps : round3(t));
   const cuts = cutBeats(style, beatsInReel);
   const slots: Slot[] = [];
   for (let i = 0; i + 1 < cuts.length; i += 1) {
-    slots.push({ start: round3(timeAtBeat(grid.beats, cuts[i]!)), end: round3(timeAtBeat(grid.beats, cuts[i + 1]!)), k0: cuts[i]!, k1: cuts[i + 1]! });
+    slots.push({ start: onFrame(timeAtBeat(grid.beats, cuts[i]!)), end: onFrame(timeAtBeat(grid.beats, cuts[i + 1]!)), k0: cuts[i]!, k1: cuts[i + 1]! });
   }
-  if (slots.length > 0) slots[slots.length - 1]!.end = duration;
+  if (slots.length > 0) slots[slots.length - 1]!.end = onFrame(duration);
 
   const cursors = new Map<string, number>();
-  const nextFrom = (m: ReelMedia) => cursors.get(m.fileId) ?? m.start;
+  // A clip's first use starts a third of the way in: stock and phone footage often opens on a rack focus or a shake.
+  const nextFrom = (m: ReelMedia, seconds: number) => cursors.get(m.fileId) ?? m.start + Math.max(0, (m.end - m.start - seconds) * 0.3);
   const fits = (m: ReelMedia, seconds: number) => m.kind === "image" || m.end - m.start >= seconds * MIN_SPEED - EPS;
   // The last item is the payoff: it closes the reel (when there are enough items to tell a story).
   const payoff = media.length >= 3 ? media[media.length - 1]! : null;
@@ -221,7 +226,7 @@ export function planReel(input: PlanInput): ReelPlan {
     if (!chosen) {
       // Nothing is long enough: split on the beat (down to the shortest cut) instead of leaving a gap.
       const mid = (slot.k0 + slot.k1) / 2;
-      const at = round3(timeAtBeat(grid.beats, mid));
+      const at = onFrame(timeAtBeat(grid.beats, mid));
       if (at - slot.start >= MIN_SHOT_SECONDS && slot.end - at >= MIN_SHOT_SECONDS) {
         queue.unshift({ start: slot.start, end: at, k0: slot.k0, k1: mid }, { start: at, end: slot.end, k0: mid, k1: slot.k1 });
         continue;
@@ -234,7 +239,7 @@ export function planReel(input: PlanInput): ReelPlan {
     if (chosen.kind === "video") {
       const length = chosen.end - chosen.start;
       if (length >= seconds - EPS) {
-        sourceStart = nextFrom(chosen);
+        sourceStart = nextFrom(chosen, seconds);
         if (sourceStart + seconds > chosen.end + EPS) sourceStart = chosen.start;
         sourceEnd = sourceStart + seconds;
         // Next time this clip comes back, show a later moment.
@@ -261,7 +266,7 @@ export function planReel(input: PlanInput): ReelPlan {
   }
   shots.sort((a, b) => a.start - b.start);
   return {
-    duration,
+    duration: onFrame(duration),
     bpm: grid.bpm,
     musicStart: grid.musicStart,
     beats: grid.beats.filter((t) => t <= duration + EPS),

@@ -88,6 +88,16 @@ describe("planReel", () => {
     expect(plan.shots[0]!.end - plan.shots[0]!.start).toBeCloseTo((60 / 80) * 4, 3);
   });
 
+  it("puts every cut on the frame grid, so shots meet without a one-frame gap", () => {
+    const fps = 30;
+    const plan = planReel({ style: REEL_STYLES.hype, media: ["a", "b", "c"].map((id) => clip(id)), music: { ...music(), bpm: 140, beats: music().beats.map((t) => t * (120 / 140)), downbeats: music().downbeats.map((t) => t * (120 / 140)) }, seconds: 14, frameRate: fps });
+    for (const shot of plan.shots) {
+      expect(Math.abs(shot.start * fps - Math.round(shot.start * fps))).toBeLessThan(1e-9);
+      expect(Math.abs(shot.end * fps - Math.round(shot.end * fps))).toBeLessThan(1e-9);
+    }
+    for (let i = 1; i < plan.shots.length; i += 1) expect(plan.shots[i]!.start).toBe(plan.shots[i - 1]!.end);
+  });
+
   it("refuses an empty media list", () => {
     expect(() => planReel({ style: REEL_STYLES.hype, media: [], music: null })).toThrow(/at least one/);
   });
