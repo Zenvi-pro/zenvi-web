@@ -24,12 +24,12 @@ import { WIDGET_HTML, WIDGET_MIME, WIDGET_URI, widgetResourceMeta } from "./widg
 
 /** Sent in `initialize`; the first 512 characters matter most (ChatGPT). */
 export const INSTRUCTIONS =
-  "Zenvi edits the person's video projects in Zenvi Cloud. Start with list_projects + open_project, or create_project; editing tools then act on that project (or pass project_id). Bring media in with import_media_from_url (public https links) or get_upload_link (files on their device). Check edits with preview_frame. render_project starts a background render: poll get_render_status for the download link. open_in_editor links to the web editor.";
+  "Zenvi edits the person's video projects in Zenvi Cloud. Start with list_projects + open_project, or create_project; later tools use that project (or pass project_id). Import with import_media_from_url or get_upload_link. Check edits with preview_frame. render_project and generate_video return immediately: poll get_render_status or get_generation_status. open_in_editor opens the web editor.";
 
 const RESOURCE_NOT_FOUND = -32002;
 
 export function buildToolList(services: Services): McpTool[] {
-  const cloud = cloudTools();
+  const cloud = cloudTools({ backend: services.backendSessions.enabled });
   if (!services.engine) return cloud;
   const reserved = new Set(cloud.map((tool) => tool.name));
   const capabilities = cloudCapabilities(services);

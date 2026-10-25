@@ -8,6 +8,10 @@
 # Needs: `az login` on subscription "Azure subscription 1", and
 # ~/.config/zenvi-dev/cloud.env with AZURE_STORAGE_CONNECTION_STRING=… (the
 # storage account already exists; this script never prints the secret).
+# Optional lines there turn on the backend tools (docs/CONNECTORS.md §8):
+# ZENVI_BACKEND_SERVICE_SECRET=… (preferred) or SUPABASE_SERVICE_ROLE_KEY=….
+# Switching to the shared secret leaves the old variable on the app; remove it
+# with `az containerapp update -g zenvi-rg -n zenvi-cloud --remove-env-vars SUPABASE_SERVICE_ROLE_KEY`.
 #
 # Touches only: blob container + tables in the storage account, and the
 # container app `zenvi-cloud` in environment `zenvi-env`. Other apps in the
@@ -22,6 +26,9 @@ BLOB_CONTAINER="${BLOB_CONTAINER:-zenvi}"
 ENV_FILE="${ENV_FILE:-$HOME/.config/zenvi-dev/cloud.env}"
 EDITOR_URL="${ZENVI_EDITOR_URL:-https://zenvi.pro/editor}"
 SUPABASE="${SUPABASE_URL:-https://xktarhzbrdnxkaovtdxj.supabase.co}"
+# Publishable client key (same value the CLI ships). Not a secret.
+ANON="${SUPABASE_ANON_KEY:-sb_publishable_2-FCBkJ96Ss35jqL9krVEQ_otR5iGmA}"
+BACKEND="${ZENVI_BACKEND_URL:-https://api.zenvi.pro}"
 CORS="${CORS_ORIGINS:-https://zenvi.pro,https://www.zenvi.pro,https://*.vercel.app,http://localhost:*,http://127.0.0.1:*}"
 ALIASES="${PUBLIC_BASE_URL_ALIASES:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
@@ -35,10 +42,12 @@ command -v az >/dev/null || die "the Azure CLI (az) is required"
 # The value contains ';' — read it verbatim instead of sourcing the file.
 CONN="$(sed -n 's/^AZURE_STORAGE_CONNECTION_STRING=//p' "$ENV_FILE" | head -n 1)"
 [ -n "$CONN" ] || die "AZURE_STORAGE_CONNECTION_STRING is not set in $ENV_FILE"
+SERVICE_SECRET="$(sed -n 's/^ZENVI_BACKEND_SERVICE_SECRET=//p' "$ENV_FILE" | head -n 1)"
+SERVICE_ROLE="$(sed -n 's/^SUPABASE_SERVICE_ROLE_KEY=//p' "$ENV_FILE" | head -n 1)"
 
 step "Storage: blob container '$BLOB_CONTAINER' (private) and tables"
 az storage container create --name "$BLOB_CONTAINER" --public-access off --connection-string "$CONN" -o none
-for table in tokens oauthclients oauthcodes devicecodes renders; do
+for table in tokens oauthclients oauthcodes devicecodes renders backendsessions generations; do
   az storage table create --name "$table" --connection-string "$CONN" -o none
 done
 
@@ -54,11 +63,22 @@ ENV_VARS=(
   "PUBLIC_BASE_URL=$PUBLIC_BASE_URL"
   "ZENVI_EDITOR_URL=$EDITOR_URL"
   "SUPABASE_URL=$SUPABASE"
+  "SUPABASE_ANON_KEY=$ANON"
+  "ZENVI_BACKEND_URL=$BACKEND"
   "CORS_ORIGINS=$CORS"
   "NODE_ENV=production"
   "LOG_LEVEL=info"
 )
 [ -n "$ALIASES" ] && ENV_VARS+=("PUBLIC_BASE_URL_ALIASES=$ALIASES")
+SECRETS=("$SECRET_NAME=$CONN")
+if [ -n "$SERVICE_SECRET" ]; then
+  SECRETS+=("backend-service-secret=$SERVICE_SECRET")
+  ENV_VARS+=("ZENVI_BACKEND_SERVICE_SECRET=secretref:backend-service-secret")
+fi
+if [ -n "$SERVICE_ROLE" ]; then
+  SECRETS+=("supabase-service-role-key=$SERVICE_ROLE")
+  ENV_VARS+=("SUPABASE_SERVICE_ROLE_KEY=secretref:supabase-service-role-key")
+fi
 [ -n "$IMAGE_TAG" ] && ENV_VARS+=("ZENVI_CLOUD_VERSION=$IMAGE_TAG")
 
 if ! az containerapp show -g "$RG" -n "$APP" -o none 2>/dev/null; then
@@ -71,12 +91,12 @@ if ! az containerapp show -g "$RG" -n "$APP" -o none 2>/dev/null; then
     --registry-server "$ACR_SERVER" --registry-username "$ACR_USER" --registry-password "$ACR_PASS" \
     --ingress external --target-port 8080 --transport auto \
     --min-replicas 1 --max-replicas 1 --cpu 1 --memory 2Gi \
-    --secrets "$SECRET_NAME=$CONN" \
+    --secrets "${SECRETS[@]}" \
     --env-vars "${ENV_VARS[@]}" \
     -o none
 else
   step "Updating container app $APP"
-  az containerapp secret set -g "$RG" -n "$APP" --secrets "$SECRET_NAME=$CONN" -o none
+  az containerapp secret set -g "$RG" -n "$APP" --secrets "${SECRETS[@]}" -o none
   IMAGE_ARGS=()
   [ -n "$IMAGE_TAG" ] && IMAGE_ARGS=(--image "$ACR_SERVER/zenvi-cloud:$IMAGE_TAG")
   az containerapp update -g "$RG" -n "$APP" ${IMAGE_ARGS[@]+"${IMAGE_ARGS[@]}"} \

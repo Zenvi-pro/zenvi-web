@@ -84,7 +84,7 @@ export interface TableQuery {
   where?: FilterClause[];
 }
 
-export type TableName = "tokens" | "oauthclients" | "oauthcodes" | "devicecodes" | "renders";
+export type TableName = "tokens" | "oauthclients" | "oauthcodes" | "devicecodes" | "renders" | "backendsessions" | "generations";
 
 export interface TableStore {
   readonly kind: "azure" | "memory";

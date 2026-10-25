@@ -288,6 +288,19 @@ export class AzureTableStore implements TableStore {
 
   constructor(private readonly connectionString: string) {}
 
+  /** Create every table this service uses. Existing tables are left as they are. */
+  async ensure(): Promise<void> {
+    const names: TableName[] = ["tokens", "oauthclients", "oauthcodes", "devicecodes", "renders", "backendsessions", "generations"];
+    for (const name of names) {
+      try {
+        await this.client(name).createTable();
+      } catch (error) {
+        const status = (error as { statusCode?: number }).statusCode;
+        if (status !== 409) throw error;
+      }
+    }
+  }
+
   private client(table: TableName): TableClient {
     let client = this.clients.get(table);
     if (!client) {

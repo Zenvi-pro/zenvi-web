@@ -28,7 +28,9 @@ async function main(): Promise<void> {
   let tables: TableStore;
   if (config.storage.kind === "azure") {
     blobs = new AzureBlobStore(config.storage.connectionString, config.storage.container);
-    tables = new AzureTableStore(config.storage.connectionString);
+    const azureTables = new AzureTableStore(config.storage.connectionString);
+    await azureTables.ensure();
+    tables = azureTables;
   } else {
     log.warn("using in-memory storage: data is lost on restart");
     blobs = new MemoryBlobStore();
@@ -85,6 +87,10 @@ async function main(): Promise<void> {
       .recover()
       .then((count) => count > 0 && log.info("picked up render jobs", { count }))
       .catch((error: unknown) => log.error("render job recovery failed", { error: errorMessage(error) }));
+    services.generations
+      .recover()
+      .then((count) => count > 0 && log.info("picked up generation jobs", { count }))
+      .catch((error: unknown) => log.error("generation job recovery failed", { error: errorMessage(error) }));
   };
   recoverJobs();
   services.verifier
@@ -111,7 +117,7 @@ async function main(): Promise<void> {
     clearInterval(housekeeping);
     clearInterval(recovery);
     server.close();
-    void services.renders.stop().finally(() => process.exit(0));
+    void Promise.all([services.renders.stop(), services.generations.stop()]).finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 20_000).unref();
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));

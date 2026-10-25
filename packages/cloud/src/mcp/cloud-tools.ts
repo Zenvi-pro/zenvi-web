@@ -5,8 +5,8 @@
  *
  * Hints follow the hosts' review rules (remote-mcp-requirements.md §2.3):
  * every hint explicit; anything that persists data is not read-only; nothing
- * here deletes or overwrites, so nothing is destructive; only the URL import
- * reaches the open internet.
+ * here deletes or overwrites, so nothing is destructive; URL import and AI
+ * video reach the open internet.
  */
 
 import { z } from "zod";
@@ -15,6 +15,7 @@ import { ApiError } from "../http/errors.js";
 import { addMediaFile } from "../projects/files.js";
 import { displayName } from "../projects/model.js";
 import { PROFILE_SHORTHANDS, PROJECT_FORMATS, PROJECT_FPS, profileFor, resolveProfile } from "../projects/profiles.js";
+import { snapKlingDuration, t2vDims } from "../generation/service.js";
 import { PRESET_NAMES, RENDER_FORMATS } from "../render/options.js";
 import type { RenderJobView } from "../render/service.js";
 import { defineTool } from "./define.js";
@@ -473,7 +474,102 @@ const previewFrame = defineTool({
   },
 });
 
-export function cloudTools(): McpTool[] {
-  return [listProjects, createProject, openProject, importMediaFromUrl, importAttachedFile, getUploadLink, openInEditor, renderProject, getRenderStatus, previewFrame];
+const generationStatusShape = z.object({
+  generation_id: z.string(),
+  project_id: z.string(),
+  status: z.enum(["queued", "running", "done", "error"]),
+  prompt: z.string(),
+  duration_seconds: z.number(),
+  file_id: z.string().optional(),
+  clip_id: z.string().optional(),
+  error: z.string().optional(),
+});
+
+function generationData(job: Awaited<ReturnType<McpCallContext["services"]["generations"]["getById"]>>): z.infer<typeof generationStatusShape> {
+  return {
+    generation_id: job.generationId,
+    project_id: job.projectId,
+    status: job.status,
+    prompt: job.prompt,
+    duration_seconds: job.durationSeconds,
+    ...(job.fileId ? { file_id: job.fileId } : {}),
+    ...(job.clipId ? { clip_id: job.clipId } : {}),
+    ...(job.error ? { error: job.error } : {}),
+  };
+}
+
+function generationText(job: Awaited<ReturnType<McpCallContext["services"]["generations"]["getById"]>>): string {
+  switch (job.status) {
+    case "queued":
+      return `Video generation ${job.generationId} is queued. Call get_generation_status with generation_id "${job.generationId}".`;
+    case "running":
+      return `Video generation ${job.generationId} is running. Call get_generation_status again in a little while.`;
+    case "done":
+      return `Video generation ${job.generationId} is on the timeline (file_id=${job.fileId ?? "?"}, timeline_clip_id=${job.clipId ?? "?"}).`;
+    case "error":
+      return `Video generation ${job.generationId} failed: ${job.error ?? "unknown error"}`;
+  }
+}
+
+const generateVideo = defineTool({
+  name: "generate_video",
+  title: "Generate video",
+  description:
+    "Start an AI video from a text prompt and add it to the open project's timeline when it is ready. Returns a generation_id immediately (this takes longer than one chat turn). Follow up with get_generation_status until status is done or error. Asking again with the same prompt on the same project state returns the same job. Needs the Zenvi account connected with Allow.",
+  input: z.object({
+    prompt: z.string().min(2).max(2000).describe("What the video should show."),
+    duration_seconds: z.number().optional().describe("Length in seconds. 5 unless 8 or more is asked for, which becomes 10."),
+    position_seconds: z.number().min(0).optional().describe("Timeline time to place the clip. Omit to put it at the end."),
+    track: z.number().int().positive().optional().describe("Layer number from list_layers_tool. Omit for the bottom track."),
+    project_id: projectIdArg,
+  }),
+  output: generationStatusShape,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  scope: SCOPE_WRITE,
+  invoking: "Starting video generation…",
+  invoked: "Video generation started",
+  async run(ctx, input) {
+    const projectId = await resolveProjectId(ctx, input.project_id);
+    const loaded = await ctx.services.projects.get(ctx.principal.userId, projectId);
+    const [width, height] = t2vDims(loaded.project.width, loaded.project.height);
+    const job = await ctx.services.generations.start(ctx.principal.userId, projectId, {
+      prompt: input.prompt,
+      durationSeconds: snapKlingDuration(input.duration_seconds),
+      width,
+      height,
+      ...(input.position_seconds !== undefined ? { positionSeconds: input.position_seconds } : {}),
+      ...(input.track !== undefined ? { layer: input.track } : {}),
+    });
+    return { text: generationText(job), data: generationData(job) };
+  },
+});
+
+const getGenerationStatus = defineTool({
+  name: "get_generation_status",
+  title: "Get video generation status",
+  description:
+    "Check a video started with generate_video: queued, running, done (file_id and clip_id of the timeline clip) or error. Waits up to wait_seconds for it to finish before answering.",
+  input: z.object({
+    generation_id: z.string().min(1).max(40).describe("The generation_id generate_video returned."),
+    wait_seconds: z.number().int().min(0).max(45).optional().describe("Wait up to this long for generation to finish (default 20)."),
+  }),
+  output: generationStatusShape,
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  scope: SCOPE_READ,
+  invoking: "Checking video generation…",
+  invoked: "Video generation status",
+  async run(ctx, input) {
+    if (!/^g_[a-z0-9]{16}$/.test(input.generation_id)) {
+      throw new ApiError(400, "invalid_request", "generation_id looks like g_… (from generate_video).");
+    }
+    const job = await ctx.services.generations.waitFor(ctx.principal.userId, input.generation_id, (input.wait_seconds ?? 20) * 1000, ctx.signal);
+    return { text: generationText(job), data: generationData(job) };
+  },
+});
+
+export function cloudTools(options: { backend?: boolean } = {}): McpTool[] {
+  const tools = [listProjects, createProject, openProject, importMediaFromUrl, importAttachedFile, getUploadLink, openInEditor, renderProject, getRenderStatus, previewFrame];
+  if (options.backend) tools.push(generateVideo, getGenerationStatus);
+  return tools;
 }
 

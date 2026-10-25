@@ -40,11 +40,22 @@ Media: attach a video, audio or image file in the chat and ask Zenvi to use
 it (ChatGPT hands the file to `import_attached_file`), give a direct https
 link, or ask for an upload link to drop files in the web editor.
 
-Notes: ChatGPT gives each tool call about a minute, so renders run in the
-background — ChatGPT calls `render_project`, then `get_render_status` until
-the download link is ready. Write tools ask for confirmation unless you
-allow them. Frame previews come back as a link (and an image where the host
-shows images) and in the Zenvi preview panel.
+Search, stock footage, catalog, narration, and AI video run as the connected
+Zenvi account and spend that account's credits (§8 explains how the server
+reaches the Zenvi backend). Search and narration answer in the same turn. AI video does not: ChatGPT
+calls `generate_video`, then `get_generation_status` until the clip is on
+the timeline.
+
+Notes: ChatGPT gives each tool call about a minute, so renders and AI video
+run in the background — `render_project` then `get_render_status`, or
+`generate_video` then `get_generation_status`. Write tools ask for
+confirmation unless you allow them. Frame previews come back as a link (and
+an image where the host shows images) and in the Zenvi preview panel.
+
+These stay on the desktop app, because they need on-device speech, beat
+tracking, or the desktop's ffmpeg splice: transcribe, remove words, detect
+beats, diarize, local visual search, modify a clip with AI, and morph
+transitions. Playback and timeline zoom stay in the web editor.
 
 ## 2. Claude (claude.ai, Claude Desktop, Claude mobile)
 
@@ -201,6 +212,18 @@ egress: `openai.com/chatgpt-connectors.json`; Claude: `160.79.104.0/21`).
   The redirect back carries `code`, `state` and `iss`.
 - Tokens are bound to the `resource` (`<origin>/mcp`) and checked on every
   request. Refresh tokens rotate; reusing an old one disconnects the app.
+- Calling the Zenvi backend (search, stock, catalog, narration, AI video)
+  happens server to server; ChatGPT and Claude never see a Zenvi token, and
+  the web editor's own sign-in is never shared with the server. Set one of:
+  - `ZENVI_BACKEND_SERVICE_SECRET` (preferred; at least 32 characters, the
+    same value as the backend's `CLOUD_SERVICE_SECRET`): each call carries a
+    five-minute HS256 JWT with `iss` `zenvi-cloud`, `aud` `zenvi-backend`,
+    `sub` = the person's user id. Only set it once a backend that accepts
+    these is deployed.
+  - `SUPABASE_SERVICE_ROLE_KEY`: the server mints its own Supabase session per
+    person (admin recovery link, no email sent) and is the only one that
+    refreshes it. Disconnecting the person's last app deletes it.
+  - neither: the backend tools are not offered.
 - Redirect URIs known to work: `https://chatgpt.com/connector_platform_oauth_redirect`,
   `https://chatgpt.com/connector/oauth/{id}`, `https://claude.ai/api/mcp/auth_callback`,
   `http://localhost/callback` and `http://127.0.0.1/callback` on any port.
@@ -214,6 +237,7 @@ egress: `openai.com/chatgpt-connectors.json`; Claude: `160.79.104.0/21`).
 | 401 right after connecting on a new domain | Tokens are bound to the URL they were issued for; reconnect with the URL you now use. |
 | 403 `forbidden_origin` | A browser-based client from an origin not in `MCP_ALLOWED_ORIGINS`; add it and re-run provision. |
 | Tools say rendering or previews are not available | That Zenvi Cloud build has no renderer yet; `GET /health` shows `renderer` / `frames`. |
+| Search, stock, narration or AI video says "Zenvi sign-in refused the server's request" or the backend returned 401 | The server's backend credential is wrong or missing on one side (§8, "Calling the Zenvi backend"). |
 | "… is not in Zenvi Cloud" when rendering | A clip's media was never uploaded; use `get_upload_link` or `import_media_from_url`. |
 | `import_media_from_url` refuses a link | Only direct https links to public hosts, up to 512 MB, video/audio/image types. |
 | 429 | Rate limits (registration 30/h/IP, device codes 30/h/IP, token 120/min/IP, imports 30/h/user). |
