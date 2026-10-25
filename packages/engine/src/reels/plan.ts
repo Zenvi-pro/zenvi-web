@@ -241,6 +241,9 @@ export function planReel(input: PlanInput): ReelPlan {
       if (length >= seconds - EPS) {
         sourceStart = nextFrom(chosen, seconds);
         if (sourceStart + seconds > chosen.end + EPS) sourceStart = chosen.start;
+        // On the frame grid too: an in-point and an out-point rounded to frames on their own can lose a frame.
+        sourceStart = onFrame(sourceStart);
+        if (sourceStart + seconds > chosen.end + EPS) sourceStart = Math.max(chosen.start, onFrame(chosen.end - seconds - (fps ? 0.5 / fps : 0)));
         sourceEnd = sourceStart + seconds;
         // Next time this clip comes back, show a later moment.
         cursors.set(chosen.fileId, sourceEnd + Math.min(0.5, seconds / 4));
