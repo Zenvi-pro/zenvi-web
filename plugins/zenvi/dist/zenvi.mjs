@@ -1631,146 +1631,61 @@ var init_profile_requests = __esm({
   }
 });
 
-// ../engine/src/model/fma.ts
-function productError(a, b, p) {
-  let t = SPLITTER * a;
-  const ah = t - (t - a);
-  const al = a - ah;
-  t = SPLITTER * b;
-  const bh = t - (t - b);
-  const bl = b - bh;
-  return ah * bh - p + ah * bl + al * bh + al * bl;
-}
-function roundToOdd(s, err) {
-  if (err === 0 || s === 0) return s;
-  bits[0] = s;
-  if ((words[LOW] & 1) === 1) return s;
-  const awayFromZero = s > 0 === err > 0;
-  if (awayFromZero) {
-    const low = words[LOW] + 1 >>> 0;
-    words[LOW] = low;
-    if (low === 0) words[HIGH] = words[HIGH] + 1 >>> 0;
-  } else {
-    if (words[LOW] === 0) words[HIGH] = words[HIGH] - 1 >>> 0;
-    words[LOW] = words[LOW] - 1 >>> 0;
-  }
-  return bits[0];
-}
-function fma(a, b, c) {
-  const uh = a * b;
-  if (!Number.isFinite(uh) || !Number.isFinite(c)) return uh + c;
-  const ul = productError(a, b, uh);
-  const th = c + uh;
-  const bv = th - c;
-  const tl = c - (th - bv) + (uh - bv);
-  const s = tl + ul;
-  const sv = s - tl;
-  const err = tl - (s - sv) + (ul - sv);
-  return th + roundToOdd(s, err);
-}
-var SPLITTER, bits, words, LOW, HIGH;
-var init_fma = __esm({
-  "../engine/src/model/fma.ts"() {
-    "use strict";
-    SPLITTER = 134217729;
-    bits = new Float64Array(1);
-    words = new Uint32Array(bits.buffer);
-    LOW = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1 ? 0 : 1;
-    HIGH = 1 - LOW;
-  }
-});
-
-// ../engine/src/model/media.ts
+// ../engine/src/model/compact.ts
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function lowerPath(value) {
-  return String(value ?? "").toLowerCase();
+function libopenshotKeyframe(y) {
+  return {
+    Points: [
+      {
+        co: { X: 1, Y: y },
+        handle_left: { X: 0.5, Y: 1 },
+        handle_right: { X: 0.5, Y: 0 },
+        handle_type: HandleType.AUTO,
+        interpolation: Interpolation.BEZIER
+      }
+    ]
+  };
 }
-function isAudioPath(path42) {
-  const p = lowerPath(path42).split("?")[0];
-  return AUDIO_EXTENSIONS.some((ext) => p.endsWith(ext));
+function libopenshotColor(channels) {
+  const [r = 0, g = 0, b = 0, a = 255] = channels;
+  return {
+    red: libopenshotKeyframe(r),
+    green: libopenshotKeyframe(g),
+    blue: libopenshotKeyframe(b),
+    alpha: libopenshotKeyframe(a)
+  };
 }
-function isImagePath(path42) {
-  const p = lowerPath(path42);
-  return IMAGE_EXTENSIONS.some((ext) => p.endsWith(ext));
+function expandCompact(value, id) {
+  return expand(value, id);
 }
-function hasExtension(path42) {
-  const base = path42.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
-  return /\.[a-z0-9]{1,5}$/i.test(base);
+function expand(value, id) {
+  if (Array.isArray(value)) return value.map((v) => expand(v, id));
+  if (isRecord(value)) {
+    const keys = Object.keys(value);
+    if (keys.length === 1 && keys[0] === "$kf" && typeof value.$kf === "number") {
+      return libopenshotKeyframe(value.$kf);
+    }
+    if (keys.length === 1 && keys[0] === "$color" && Array.isArray(value.$color)) {
+      return libopenshotColor(value.$color);
+    }
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[substitute(k, id)] = expand(v, id);
+    return out;
+  }
+  if (typeof value === "string") return substitute(value, id);
+  return value;
 }
-function getMediaType(file3, name) {
-  let path42 = String(file3.path ?? "");
-  if (name && !hasExtension(path42)) path42 = name;
-  if (isAudioPath(path42)) return "audio";
-  const image = isImagePath(path42);
-  if (file3.has_video && !image) return "video";
-  if (file3.has_video && image) return "image";
-  if (file3.has_audio && !file3.has_video) return "audio";
-  return "video";
+function substitute(text5, id) {
+  return id !== void 0 && text5.includes(ID_PLACEHOLDER) ? text5.split(ID_PLACEHOLDER).join(id) : text5;
 }
-function isAudioOnlyMedia(file3) {
-  if (!isRecord(file3)) return false;
-  if (isAudioPath(String(file3.path ?? ""))) return true;
-  const mediaType = String(file3.media_type ?? "").trim().toLowerCase();
-  if (mediaType) return mediaType === "audio";
-  return Boolean(file3.has_audio) && !file3.has_video;
-}
-function isAudioMedia(source2) {
-  const data = isRecord(source2) ? source2 : {};
-  if (String(data.media_type ?? "").trim().toLowerCase() === "audio") return true;
-  const path42 = lowerPath(data.path ?? data.file_path ?? "").trim();
-  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path42.endsWith(ext))) return true;
-  return data.has_audio === true && data.has_video === false;
-}
-function isSingleImageMedia(source2) {
-  const data = isRecord(source2) ? source2 : {};
-  if (data.has_single_image) return !isAudioMedia(data);
-  return String(data.media_type ?? "").toLowerCase() === "image";
-}
-var AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, CLIP_AUDIO_EXTENSIONS;
-var init_media = __esm({
-  "../engine/src/model/media.ts"() {
+var ID_PLACEHOLDER;
+var init_compact = __esm({
+  "../engine/src/model/compact.ts"() {
     "use strict";
-    AUDIO_EXTENSIONS = [
-      ".mp3",
-      ".wav",
-      ".ogg",
-      ".flac",
-      ".aac",
-      ".m4a",
-      ".wma",
-      ".opus",
-      ".aiff",
-      ".aif",
-      ".oga"
-    ];
-    IMAGE_EXTENSIONS = [
-      ".bmp",
-      ".dpx",
-      ".exr",
-      ".jpg",
-      ".jpeg",
-      ".pam",
-      ".pbm",
-      ".pcx",
-      ".pgm",
-      ".png",
-      ".pnm",
-      ".ppm",
-      ".psd",
-      ".sgi",
-      ".svg",
-      ".tga",
-      ".thm",
-      ".tif",
-      ".tiff",
-      ".webp",
-      ".xbm",
-      ".xpm",
-      ".xwd"
-    ];
-    CLIP_AUDIO_EXTENSIONS = [".mp3", ".m4a", ".aac", ".ogg", ".opus", ".flac", ".wav", ".wma"];
+    init_types();
+    ID_PLACEHOLDER = "{{id}}";
   }
 });
 
@@ -1862,103 +1777,97 @@ var init_libopenshot_defaults_data = __esm({
   }
 });
 
-// ../engine/src/model/properties.ts
-function hasChoices(meta3) {
-  return (meta3?.choices?.length ?? 0) > 0;
-}
-var CLIP_PROPERTIES, CLIP_KEYFRAME_KEYS, CLIP_COLOR_KEYS;
-var init_properties = __esm({
-  "../engine/src/model/properties.ts"() {
-    "use strict";
-    init_libopenshot_defaults_data();
-    CLIP_PROPERTIES = LIBOPENSHOT_CLIP_PROPERTIES;
-    CLIP_KEYFRAME_KEYS = [
-      "alpha",
-      "channel_filter",
-      "channel_mapping",
-      "corner_radius",
-      "has_audio",
-      "has_video",
-      "location_x",
-      "location_y",
-      "margin",
-      "origin_x",
-      "origin_y",
-      "perspective_c1_x",
-      "perspective_c1_y",
-      "perspective_c2_x",
-      "perspective_c2_y",
-      "perspective_c3_x",
-      "perspective_c3_y",
-      "perspective_c4_x",
-      "perspective_c4_y",
-      "rotation",
-      "scale_x",
-      "scale_y",
-      "shear_x",
-      "shear_y",
-      "time",
-      "volume"
-    ];
-    CLIP_COLOR_KEYS = ["wave_color"];
-  }
-});
-
-// ../engine/src/model/compact.ts
+// ../engine/src/model/media.ts
 function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function libopenshotKeyframe(y) {
-  return {
-    Points: [
-      {
-        co: { X: 1, Y: y },
-        handle_left: { X: 0.5, Y: 1 },
-        handle_right: { X: 0.5, Y: 0 },
-        handle_type: HandleType.AUTO,
-        interpolation: Interpolation.BEZIER
-      }
-    ]
-  };
+function lowerPath(value) {
+  return String(value ?? "").toLowerCase();
 }
-function libopenshotColor(channels) {
-  const [r = 0, g = 0, b = 0, a = 255] = channels;
-  return {
-    red: libopenshotKeyframe(r),
-    green: libopenshotKeyframe(g),
-    blue: libopenshotKeyframe(b),
-    alpha: libopenshotKeyframe(a)
-  };
+function isAudioPath(path42) {
+  const p = lowerPath(path42).split("?")[0];
+  return AUDIO_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function expandCompact(value, id) {
-  return expand(value, id);
+function isImagePath(path42) {
+  const p = lowerPath(path42);
+  return IMAGE_EXTENSIONS.some((ext) => p.endsWith(ext));
 }
-function expand(value, id) {
-  if (Array.isArray(value)) return value.map((v) => expand(v, id));
-  if (isRecord2(value)) {
-    const keys = Object.keys(value);
-    if (keys.length === 1 && keys[0] === "$kf" && typeof value.$kf === "number") {
-      return libopenshotKeyframe(value.$kf);
-    }
-    if (keys.length === 1 && keys[0] === "$color" && Array.isArray(value.$color)) {
-      return libopenshotColor(value.$color);
-    }
-    const out = {};
-    for (const [k, v] of Object.entries(value)) out[substitute(k, id)] = expand(v, id);
-    return out;
-  }
-  if (typeof value === "string") return substitute(value, id);
-  return value;
+function hasExtension(path42) {
+  const base = path42.split(/[?#]/)[0].split(/[\\/]/).pop() ?? "";
+  return /\.[a-z0-9]{1,5}$/i.test(base);
 }
-function substitute(text5, id) {
-  return id !== void 0 && text5.includes(ID_PLACEHOLDER) ? text5.split(ID_PLACEHOLDER).join(id) : text5;
+function getMediaType(file3, name) {
+  let path42 = String(file3.path ?? "");
+  if (name && !hasExtension(path42)) path42 = name;
+  if (isAudioPath(path42)) return "audio";
+  const image = isImagePath(path42);
+  if (file3.has_video && !image) return "video";
+  if (file3.has_video && image) return "image";
+  if (file3.has_audio && !file3.has_video) return "audio";
+  return "video";
 }
-var ID_PLACEHOLDER;
-var init_compact = __esm({
-  "../engine/src/model/compact.ts"() {
+function isAudioOnlyMedia(file3) {
+  if (!isRecord2(file3)) return false;
+  if (isAudioPath(String(file3.path ?? ""))) return true;
+  const mediaType = String(file3.media_type ?? "").trim().toLowerCase();
+  if (mediaType) return mediaType === "audio";
+  return Boolean(file3.has_audio) && !file3.has_video;
+}
+function isAudioMedia(source2) {
+  const data = isRecord2(source2) ? source2 : {};
+  if (String(data.media_type ?? "").trim().toLowerCase() === "audio") return true;
+  const path42 = lowerPath(data.path ?? data.file_path ?? "").trim();
+  if (CLIP_AUDIO_EXTENSIONS.some((ext) => path42.endsWith(ext))) return true;
+  return data.has_audio === true && data.has_video === false;
+}
+function isSingleImageMedia(source2) {
+  const data = isRecord2(source2) ? source2 : {};
+  if (data.has_single_image) return !isAudioMedia(data);
+  return String(data.media_type ?? "").toLowerCase() === "image";
+}
+var AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, CLIP_AUDIO_EXTENSIONS;
+var init_media = __esm({
+  "../engine/src/model/media.ts"() {
     "use strict";
-    init_types();
-    ID_PLACEHOLDER = "{{id}}";
+    AUDIO_EXTENSIONS = [
+      ".mp3",
+      ".wav",
+      ".ogg",
+      ".flac",
+      ".aac",
+      ".m4a",
+      ".wma",
+      ".opus",
+      ".aiff",
+      ".aif",
+      ".oga"
+    ];
+    IMAGE_EXTENSIONS = [
+      ".bmp",
+      ".dpx",
+      ".exr",
+      ".jpg",
+      ".jpeg",
+      ".pam",
+      ".pbm",
+      ".pcx",
+      ".pgm",
+      ".png",
+      ".pnm",
+      ".ppm",
+      ".psd",
+      ".sgi",
+      ".svg",
+      ".tga",
+      ".thm",
+      ".tif",
+      ".tiff",
+      ".webp",
+      ".xbm",
+      ".xpm",
+      ".xwd"
+    ];
+    CLIP_AUDIO_EXTENSIONS = [".mp3", ".m4a", ".aac", ".ogg", ".opus", ".flac", ".wav", ".wma"];
   }
 });
 
@@ -2172,6 +2081,128 @@ var init_defaults = __esm({
       6: ChannelLayout.FIVE_POINT_ONE,
       8: ChannelLayout.SEVEN_POINT_ONE
     };
+  }
+});
+
+// ../engine/src/model/channel-layouts.ts
+function channelLayoutNamed(text5) {
+  return LAYOUT_BY_NAME[String(text5 ?? "").trim().toLowerCase()] ?? null;
+}
+var LAYOUT_BY_NAME, CHANNEL_LAYOUTS;
+var init_channel_layouts = __esm({
+  "../engine/src/model/channel-layouts.ts"() {
+    "use strict";
+    init_defaults();
+    LAYOUT_BY_NAME = {
+      mono: "mono",
+      "1": "mono",
+      stereo: "stereo",
+      "2": "stereo",
+      surround: "surround",
+      "3": "surround",
+      "5.1": "5.1",
+      "6": "5.1",
+      "7.1": "7.1",
+      "8": "7.1"
+    };
+    CHANNEL_LAYOUTS = {
+      mono: [ChannelLayout.MONO, 1],
+      stereo: [ChannelLayout.STEREO, 2],
+      surround: [ChannelLayout.SURROUND, 3],
+      "5.1": [ChannelLayout.FIVE_POINT_ONE, 6],
+      "7.1": [ChannelLayout.SEVEN_POINT_ONE, 8]
+    };
+  }
+});
+
+// ../engine/src/model/fma.ts
+function productError(a, b, p) {
+  let t = SPLITTER * a;
+  const ah = t - (t - a);
+  const al = a - ah;
+  t = SPLITTER * b;
+  const bh = t - (t - b);
+  const bl = b - bh;
+  return ah * bh - p + ah * bl + al * bh + al * bl;
+}
+function roundToOdd(s, err) {
+  if (err === 0 || s === 0) return s;
+  bits[0] = s;
+  if ((words[LOW] & 1) === 1) return s;
+  const awayFromZero = s > 0 === err > 0;
+  if (awayFromZero) {
+    const low = words[LOW] + 1 >>> 0;
+    words[LOW] = low;
+    if (low === 0) words[HIGH] = words[HIGH] + 1 >>> 0;
+  } else {
+    if (words[LOW] === 0) words[HIGH] = words[HIGH] - 1 >>> 0;
+    words[LOW] = words[LOW] - 1 >>> 0;
+  }
+  return bits[0];
+}
+function fma(a, b, c) {
+  const uh = a * b;
+  if (!Number.isFinite(uh) || !Number.isFinite(c)) return uh + c;
+  const ul = productError(a, b, uh);
+  const th = c + uh;
+  const bv = th - c;
+  const tl = c - (th - bv) + (uh - bv);
+  const s = tl + ul;
+  const sv = s - tl;
+  const err = tl - (s - sv) + (ul - sv);
+  return th + roundToOdd(s, err);
+}
+var SPLITTER, bits, words, LOW, HIGH;
+var init_fma = __esm({
+  "../engine/src/model/fma.ts"() {
+    "use strict";
+    SPLITTER = 134217729;
+    bits = new Float64Array(1);
+    words = new Uint32Array(bits.buffer);
+    LOW = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1 ? 0 : 1;
+    HIGH = 1 - LOW;
+  }
+});
+
+// ../engine/src/model/properties.ts
+function hasChoices(meta3) {
+  return (meta3?.choices?.length ?? 0) > 0;
+}
+var CLIP_PROPERTIES, CLIP_KEYFRAME_KEYS, CLIP_COLOR_KEYS;
+var init_properties = __esm({
+  "../engine/src/model/properties.ts"() {
+    "use strict";
+    init_libopenshot_defaults_data();
+    CLIP_PROPERTIES = LIBOPENSHOT_CLIP_PROPERTIES;
+    CLIP_KEYFRAME_KEYS = [
+      "alpha",
+      "channel_filter",
+      "channel_mapping",
+      "corner_radius",
+      "has_audio",
+      "has_video",
+      "location_x",
+      "location_y",
+      "margin",
+      "origin_x",
+      "origin_y",
+      "perspective_c1_x",
+      "perspective_c1_y",
+      "perspective_c2_x",
+      "perspective_c2_y",
+      "perspective_c3_x",
+      "perspective_c3_y",
+      "perspective_c4_x",
+      "perspective_c4_y",
+      "rotation",
+      "scale_x",
+      "scale_y",
+      "shear_x",
+      "shear_y",
+      "time",
+      "volume"
+    ];
+    CLIP_COLOR_KEYS = ["wave_color"];
   }
 });
 
@@ -7774,6 +7805,18 @@ function rescaleItemKeyframes(item, factor) {
   }
   return out;
 }
+function projectAtFrameRate(project, fps2) {
+  const from = project.fps;
+  const factor = fps2.num / fps2.den / (from.num / from.den);
+  if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return project;
+  const clips = project.clips.map((clip2) => {
+    const next = rescaleItemKeyframes(clip2, factor);
+    if (Array.isArray(next.effects)) next.effects = next.effects.map((e) => rescaleItemKeyframes(e, factor));
+    return next;
+  });
+  const effects = project.effects.map((t) => rescaleItemKeyframes(t, factor));
+  return { ...project, fps: { num: fps2.num, den: fps2.den }, clips, effects };
+}
 function applyFrameRateChange(tx, project, oldFps, newFps, profile) {
   const factor = newFps.num / newFps.den / (oldFps.num / oldFps.den);
   if (factor !== 1) {
@@ -7917,20 +7960,8 @@ function setProjectAudio(tx, audio) {
   for (const [key2, value] of Object.entries(fields)) tx.replace([key2], value);
   return Object.keys(fields);
 }
-function withExportOverride(overrides, key2, value) {
-  if (typeof key2 !== "string" || key2.trim() === "") throw invalid("key is required.");
-  const out = { ...overrides ?? {} };
-  const k = key2.toLowerCase().trim();
-  const text5 = String(value).trim();
-  if (INT_EXPORT_KEYS.has(k)) {
-    if (!/^[+-]?\d+$/.test(text5)) throw invalid(`${k} must be an integer (got ${text5}).`);
-    out[k] = Number.parseInt(text5, 10);
-  } else if (k === "video_codec" || k === "vcodec") out.video_codec = text5;
-  else if (k === "audio_codec" || k === "acodec") out.audio_codec = text5;
-  else if (k === "output_path" || k === "path") out.output_path = text5;
-  else if (k === "vformat" || k === "format") out.vformat = text5;
-  else out[k] = text5;
-  return out;
+function withExportOverrides(overrides, values) {
+  return { ...overrides ?? {}, ...values };
 }
 function withoutExportOverrides(overrides, names2) {
   const out = { ...overrides ?? {} };
@@ -7945,15 +7976,14 @@ function clearExportSettings(doc, names2) {
   doc.setUntracked(["export_overrides"], next);
   return next;
 }
-function setExportSetting(doc, key2, value) {
-  const next = withExportOverride(doc.project.export_overrides, key2, value);
+function storeExportOverrides(doc, values) {
   if (!("export_overrides" in doc.project)) {
     throw new OpError("conflict", "The project has no export_overrides object (open it with parseProject).");
   }
+  const next = withExportOverrides(doc.project.export_overrides, values);
   doc.setUntracked(["export_overrides"], next);
   return next;
 }
-var INT_EXPORT_KEYS;
 var init_project = __esm({
   "../engine/src/ops/project.ts"() {
     "use strict";
@@ -7963,7 +7993,6 @@ var init_project = __esm({
     init_edit();
     init_errors();
     init_internal();
-    INT_EXPORT_KEYS = /* @__PURE__ */ new Set(["width", "height", "fps_num", "fps_den", "start_frame", "end_frame", "sample_rate", "channels"]);
   }
 });
 
@@ -8841,22 +8870,22 @@ function repeatClip(tx, clipId2, opts) {
   const cache5 = next.repeat_cache;
   for (const [prop, original] of Object.entries(cache5.properties ?? {})) {
     if (prop === "time") continue;
-    let norm4 = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
-    let span4 = norm4.length ? pyRound(norm4[norm4.length - 1].co.X) : 0;
+    let norm5 = normalizeToTrim(original.Points ?? [], trimStart, trimSpan);
+    let span4 = norm5.length ? pyRound(norm5[norm5.length - 1].co.X) : 0;
     if (!span4) continue;
     if (span4 !== timeSpan) {
       const s = timeSpan / span4;
-      const firstX = Number(norm4[0].co.X ?? 1);
-      for (const p of norm4) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
+      const firstX = Number(norm5[0].co.X ?? 1);
+      for (const p of norm5) p.co.X = Math.min(Math.max(1, pyRound(1 + (Number(p.co.X ?? 1) - firstX) * s)), timeSpan);
       span4 = timeSpan;
     }
     const latest = /* @__PURE__ */ new Map();
-    for (const p of norm4) {
+    for (const p of norm5) {
       p.co.X = pyRound(p.co.X ?? 1);
       latest.set(p.co.X, p);
     }
-    norm4 = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
-    const [points2, used] = repeatCurve(norm4, span4, dirSign, opts.passes, delay2, ramp, opts.pattern);
+    norm5 = [...latest.keys()].sort((a, b) => a - b).map((x) => latest.get(x));
+    const [points2, used] = repeatCurve(norm5, span4, dirSign, opts.passes, delay2, ramp, opts.pattern);
     next[prop] = { Points: points2 };
     total = Math.max(total, used);
   }
@@ -9491,13 +9520,13 @@ function detectImageSequence(filePath, folderNames) {
   const { folder, name } = folderAndName(filePath);
   const match = SEQUENCE_NAME_RE.exec(name);
   if (!match) return null;
-  const baseName4 = match[1] ?? "";
+  const baseName6 = match[1] ?? "";
   const zeros = match[2] ?? "";
   const number4 = Number.parseInt(match[3], 10);
   const digits = zeros.length + match[3].length;
   const extension = match[4];
   const hasDigitCount = (count2) => {
-    const rx = new RegExp(`^${escapeRegExp(baseName4)}[0-9]{${count2}}\\.${escapeRegExp(extension)}$`);
+    const rx = new RegExp(`^${escapeRegExp(baseName6)}[0-9]{${count2}}\\.${escapeRegExp(extension)}$`);
     for (const n of folderNames) if (rx.test(n)) return true;
     return false;
   };
@@ -9505,14 +9534,14 @@ function detectImageSequence(filePath, folderNames) {
   let neighbour = false;
   for (let x = Math.max(0, number4 - 100); x < Math.min(number4 + 101, 5e4); x += 1) {
     const numbered = fixlen ? String(x).padStart(digits, "0") : String(x);
-    if (x !== number4 && folderNames.has(`${baseName4}${numbered}.${extension}`)) {
+    if (x !== number4 && folderNames.has(`${baseName6}${numbered}.${extension}`)) {
       neighbour = true;
       break;
     }
   }
   if (!neighbour) return null;
-  const pattern = `${baseName4}${fixlen ? `%0${digits}d` : "%d"}.${extension}`;
-  return { folder_path: folder, base_name: baseName4, fixlen, digits, extension, pattern, path: joinFolder(folder, pattern) };
+  const pattern = `${baseName6}${fixlen ? `%0${digits}d` : "%d"}.${extension}`;
+  return { folder_path: folder, base_name: baseName6, fixlen, digits, extension, pattern, path: joinFolder(folder, pattern) };
 }
 function sequenceFrameNumbers(sequence, folderNames) {
   const digits = sequence.fixlen ? `(\\d{${Math.trunc(sequence.digits) || 1}})` : "(\\d+)";
@@ -25119,13 +25148,13 @@ function _promise(Class2, innerType) {
 }
 // @__NO_SIDE_EFFECTS__
 function _custom(Class2, fn, _params) {
-  const norm4 = normalizeParams(_params);
-  norm4.abort ?? (norm4.abort = true);
+  const norm5 = normalizeParams(_params);
+  norm5.abort ?? (norm5.abort = true);
   const schema = new Class2({
     type: "custom",
     check: "custom",
     fn,
-    ...norm4
+    ...norm5
   });
   return schema;
 }
@@ -31440,6 +31469,9 @@ function presetExportType(preset) {
 function rateFor(rates, quality) {
   return quality === "Low" ? rates.low : quality === "Med" ? rates.med : rates.high;
 }
+function presetQualities(preset) {
+  return PRESET_QUALITIES.filter((q) => rateFor(preset.videoBitrate, q) !== "" || rateFor(preset.audioBitrate, q) !== "");
+}
 function parseExportRate(value) {
   if (typeof value === "number") return Number.isFinite(value) ? { kind: "bitrate", bitsPerSecond: Math.trunc(value) } : null;
   if (typeof value !== "string") return null;
@@ -31476,7 +31508,7 @@ function presetRates(preset, quality, frame) {
   }
   return { video, audio };
 }
-var EXPORT_TYPES, EXPORT_PRESETS, ALL_FORMATS, DEFAULT_EXPORT_PRESET, pyCompare2, DIALOG_PROFILES, ALL_FORMATS_BPP;
+var EXPORT_TYPES, PRESET_QUALITIES, EXPORT_PRESETS, ALL_FORMATS, DEFAULT_EXPORT_PRESET, pyCompare2, DIALOG_PROFILES, ALL_FORMATS_BPP;
 var init_catalog2 = __esm({
   "../engine/src/presets/catalog.ts"() {
     "use strict";
@@ -31484,6 +31516,7 @@ var init_catalog2 = __esm({
     init_pyfmt();
     init_export_presets_data();
     EXPORT_TYPES = ["Video & Audio", "Video Only", "Audio Only", "Image Sequence"];
+    PRESET_QUALITIES = ["Low", "Med", "High"];
     EXPORT_PRESETS = EXPORT_PRESET_TABLE;
     ALL_FORMATS = "All Formats";
     DEFAULT_EXPORT_PRESET = EXPORT_PRESETS.find((p) => p.title === "MP4 (h.264)");
@@ -31494,103 +31527,14 @@ var init_catalog2 = __esm({
 });
 
 // ../engine/src/presets/export.ts
-function isRecord18(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function numberOr(value, fallback) {
-  return typeof value === "number" && Number.isFinite(value) && value !== 0 ? value : fallback;
-}
-function joinPath(folder, name) {
-  if (!folder) return name;
-  return /[\\/]$/.test(folder) ? folder + name : `${folder}${folder.includes("\\") && !folder.includes("/") ? "\\" : "/"}${name}`;
-}
-function getDefaultExportSettings(project, options = {}) {
-  const fps2 = isRecord18(project.fps) && Object.keys(project.fps).length > 0 ? project.fps : { num: 30, den: 1 };
-  const video = {
-    vformat: "mp4",
-    vcodec: "libx264",
-    fps: { num: typeof fps2.num === "number" ? fps2.num : 30, den: numberOr(fps2.den, 1) },
-    width: numberOr(project.width, 1920),
-    height: numberOr(project.height, 1080),
-    pixel_ratio: { num: 1, den: 1 },
-    video_bitrate: 2e6,
-    // The desktop uses the duration in seconds as a frame count here; a
-    // headless export then replaces the range with the whole timeline.
-    start_frame: 1,
-    end_frame: Math.max(1, Math.trunc(numberOr(project.duration, 0)) || 1),
-    interlace: false,
-    topfirst: false,
-    spherical: false
-  };
-  const audio = {
-    acodec: "aac",
-    sample_rate: numberOr(project.sample_rate, 48e3),
-    channels: numberOr(project.channels, 2),
-    channel_layout: LAYOUT_STEREO,
-    audio_bitrate: 192e3
-  };
-  let exportType = EXPORT_TYPES[0];
-  let defaultPath = joinPath(options.exportFolder ?? "", "export.mp4");
-  const num15 = (set2) => (v) => {
-    if (typeof v === "number" && Number.isFinite(v)) set2(v);
-  };
-  const str4 = (set2) => (v) => {
-    if (typeof v === "string") set2(v);
-  };
-  const rate = (set2) => (v) => {
-    if (typeof v === "number" && Number.isFinite(v) || typeof v === "string") set2(v);
-  };
-  const widgets = {
-    txtVideoFormat: str4((v) => video.vformat = v),
-    txtVideoCodec: str4((v) => video.vcodec = v),
-    txtWidth: num15((v) => video.width = v),
-    txtHeight: num15((v) => video.height = v),
-    txtFrameRateNum: num15((v) => video.fps.num = v),
-    txtFrameRateDen: num15((v) => video.fps.den = v),
-    txtPixelRatioNum: num15((v) => video.pixel_ratio.num = v),
-    txtPixelRatioDen: num15((v) => video.pixel_ratio.den = v),
-    txtVideoBitRate: rate((v) => video.video_bitrate = v),
-    txtStartFrame: num15((v) => video.start_frame = v),
-    txtEndFrame: num15((v) => video.end_frame = v),
-    txtAudioCodec: str4((v) => audio.acodec = v),
-    txtSampleRate: num15((v) => audio.sample_rate = v),
-    txtChannels: num15((v) => audio.channels = v),
-    txtAudioBitrate: rate((v) => audio.audio_bitrate = v),
-    cboChannelLayout: num15((v) => {
-      const layout = CHANNEL_LAYOUT_CHOICES[v];
-      if (layout !== void 0) audio.channel_layout = layout;
-    }),
-    cboExportTo: num15((v) => {
-      const type = EXPORT_TYPES[v];
-      if (Number.isInteger(v) && type) exportType = type;
-    })
-  };
-  if (Array.isArray(project.export_settings)) {
-    for (const widget of project.export_settings) {
-      if (!isRecord18(widget)) continue;
-      const name = String(widget.name ?? "");
-      if (Object.hasOwn(widgets, name)) widgets[name](widget.value);
-    }
-  }
-  const overrides = isRecord18(project.export_overrides) ? project.export_overrides : {};
-  for (const [key2, value] of Object.entries(overrides)) {
-    if (key2 === "width" || key2 === "height" || key2 === "start_frame" || key2 === "end_frame") num15((v) => video[key2] = v)(value);
-    else if (key2 === "fps_num") num15((v) => video.fps.num = v)(value);
-    else if (key2 === "fps_den") num15((v) => video.fps.den = v)(value);
-    else if (key2 === "video_codec" || key2 === "vcodec") str4((v) => video.vcodec = v)(value);
-    else if (key2 === "vformat" || key2 === "format") str4((v) => video.vformat = v)(value);
-    else if (key2 === "audio_codec" || key2 === "acodec") str4((v) => audio.acodec = v)(value);
-    else if (key2 === "sample_rate") num15((v) => audio.sample_rate = v)(value);
-    else if (key2 === "channels") num15((v) => audio.channels = v)(value);
-    else if (key2 === "output_path" || key2 === "path") str4((v) => defaultPath = v)(value);
-  }
-  return { video, audio, exportType, defaultPath };
-}
 function exportContainer(videoFormat, exportType = "Video & Audio") {
   const format = videoFormat.trim().toLowerCase();
-  if (exportType === "Image Sequence") return "png-sequence";
+  if (exportType === "Image Sequence") return IMAGE_SEQUENCES[format];
   if (exportType === "Audio Only") return AUDIO_CONTAINERS[format];
   return VIDEO_CONTAINERS[format];
+}
+function isSequenceFormat(format) {
+  return format.endsWith("-sequence");
 }
 function rateLadder(format, videoCodec) {
   const codec2 = (videoCodec ?? "").toLowerCase();
@@ -31611,59 +31555,12 @@ function rateLadder(format, videoCodec) {
   }
   return void 0;
 }
-function rateToOptions(rate, target) {
-  if (!rate) return;
-  if (rate.kind === "bitrate") {
-    if (rate.bitsPerSecond > 0) target.videoBitrate = rate.bitsPerSecond;
-  } else {
-    target.crf = rate.value;
-  }
+function crfZeroIsLossless(format, videoCodec) {
+  return rateLadder(format, videoCodec)?.crfZeroLossless === true;
 }
 function audioBitrateOf(value) {
   const rate = parseExportRate(value);
   return rate?.kind === "bitrate" && rate.bitsPerSecond > 0 ? rate.bitsPerSecond : void 0;
-}
-function qualityForCrf(crf, format, videoCodec) {
-  const ladder = rateLadder(format, videoCodec);
-  if (crf === 0 && ladder?.crfZeroLossless) return "lossless";
-  const preset = ladder ? getExportPreset(ladder.preset) : void 0;
-  let best = "medium";
-  let distance = Number.POSITIVE_INFINITY;
-  for (const [level, quality] of [["high", "High"], ["medium", "Med"], ["low", "Low"]]) {
-    const rate = preset ? parseExportRate(quality === "Low" ? preset.videoBitrate.low : quality === "Med" ? preset.videoBitrate.med : preset.videoBitrate.high) : null;
-    if (!rate || rate.kind === "bitrate") continue;
-    const d = Math.abs(rate.value - crf);
-    if (d < distance) [best, distance] = [level, d];
-  }
-  return best;
-}
-function exportOptionsFromSettings(settings, options = {}) {
-  const { video, audio, exportType } = settings;
-  const format = exportContainer(video.vformat, exportType);
-  if (!format) throw new ExportSettingsError(`The engine exporters cannot write ${exportType} as "${video.vformat}".`);
-  const fps2 = { num: Math.trunc(video.fps.num), den: Math.trunc(video.fps.den) || 1 };
-  const out = { format, width: Math.trunc(video.width), height: Math.trunc(video.height), fps: fps2 };
-  const hasVideo = exportType !== "Audio Only";
-  const hasAudio2 = exportType === "Video & Audio" || exportType === "Audio Only";
-  if (hasVideo && format !== "png-sequence" && format !== "gif" && video.vcodec) out.videoCodec = video.vcodec;
-  if (hasVideo && format !== "png-sequence") {
-    rateToOptions(parseExportRate(video.video_bitrate), out);
-    if (out.crf !== void 0) out.quality = qualityForCrf(out.crf, format, out.videoCodec);
-  }
-  if (hasAudio2 && format !== "gif" && format !== "png-sequence") {
-    if (audio.acodec) out.audioCodec = audio.acodec;
-    const bitrate = audioBitrateOf(audio.audio_bitrate);
-    if (bitrate !== void 0) out.audioBitrate = bitrate;
-    out.sampleRate = Math.trunc(audio.sample_rate);
-    out.channels = Math.trunc(audio.channels);
-  } else if (format !== "gif" && format !== "png-sequence") {
-    out.channels = 0;
-  }
-  if (options.useSavedRange) {
-    const rate = fps2.num / fps2.den;
-    out.range = { start: (Math.max(1, video.start_frame) - 1) / rate, end: video.end_frame / rate };
-  }
-  return out;
 }
 function encoderRates(options) {
   const quality = options.quality ?? "high";
@@ -31693,7 +31590,7 @@ function encoderRates(options) {
     }
   }
   let audioBitsPerSecond = null;
-  const compressedAudio = ["mp4", "mov", "mkv", "webm", "mp3"];
+  const compressedAudio = ["mp4", "mov", "mkv", "webm", "mp3", "m4a"];
   if (compressedAudio.includes(options.format)) {
     if (options.audioBitrate !== void 0 && options.audioBitrate > 0) audioBitsPerSecond = Math.trunc(options.audioBitrate);
     else if (rates) audioBitsPerSecond = audioBitrateOf(rates.audio) ?? null;
@@ -31701,16 +31598,11 @@ function encoderRates(options) {
   }
   return { video, audioBitsPerSecond };
 }
-var CHANNEL_LAYOUT_CHOICES, LAYOUT_STEREO, ExportSettingsError, VIDEO_CONTAINERS, AUDIO_CONTAINERS, PRESET_QUALITY_OF;
+var VIDEO_CONTAINERS, AUDIO_CONTAINERS, IMAGE_SEQUENCES, PRESET_QUALITY_OF;
 var init_export = __esm({
   "../engine/src/presets/export.ts"() {
     "use strict";
     init_catalog2();
-    CHANNEL_LAYOUT_CHOICES = [4, 3, 7, 1551, 1599];
-    LAYOUT_STEREO = 3;
-    ExportSettingsError = class extends Error {
-      name = "ExportSettingsError";
-    };
     VIDEO_CONTAINERS = {
       mp4: "mp4",
       m4v: "mp4",
@@ -31720,8 +31612,657 @@ var init_export = __esm({
       webm: "webm",
       gif: "gif"
     };
-    AUDIO_CONTAINERS = { mp3: "mp3", wav: "wav" };
+    AUDIO_CONTAINERS = { mp3: "mp3", wav: "wav", flac: "flac", m4a: "m4a", mp4: "m4a" };
+    IMAGE_SEQUENCES = {
+      png: "png-sequence",
+      jpg: "jpg-sequence",
+      jpeg: "jpg-sequence",
+      bmp: "bmp-sequence",
+      tiff: "tiff-sequence",
+      tif: "tiff-sequence"
+    };
     PRESET_QUALITY_OF = { low: "Low", medium: "Med", high: "High" };
+  }
+});
+
+// ../engine/src/presets/plan.ts
+function planExportType(text5) {
+  const value = String(text5 ?? "").trim();
+  if (Object.hasOwn(TYPE_OF_LABEL, value)) return TYPE_OF_LABEL[value];
+  const key2 = norm2(value);
+  return Object.hasOwn(EXPORT_TYPE_LABELS, key2) ? key2 : void 0;
+}
+function planSummary(plan) {
+  return Object.fromEntries(PLAN_SUMMARY_KEYS.map((key2) => [key2, plan[key2]]));
+}
+function norm2(text5) {
+  return String(text5 ?? "").trim().toLowerCase().replace(/[\s\-/]+/g, "_").replace(/^_+|_+$/g, "");
+}
+function resolveExportPreset(name) {
+  const text5 = String(name ?? "").trim();
+  const byTitle = /* @__PURE__ */ new Map();
+  for (const p of EXPORT_PRESETS) if (!byTitle.has(p.title.toLowerCase())) byTitle.set(p.title.toLowerCase(), p);
+  const direct = byTitle.get(text5.toLowerCase());
+  if (direct) return direct;
+  const alias = PRESET_ALIASES[norm2(text5)] ?? socialPreset(text5)?.exportPreset;
+  const aliased = alias ? byTitle.get(alias.toLowerCase()) : void 0;
+  if (aliased) return aliased;
+  const tokens = text5.toLowerCase().split(/[\s,()]+/).filter(Boolean);
+  const hits = tokens.length > 0 ? EXPORT_PRESETS.filter((p) => tokens.every((t) => p.title.toLowerCase().includes(t))) : [];
+  const titles = [...new Set(hits.map((h) => h.title))];
+  if (titles.length === 1) return hits[0];
+  if (hits.length > 0) throw new ExportPlanError(`'${text5}' matches several presets: ${titles.sort(pyCompare3).join(", ")}`);
+  throw new ExportPlanError(
+    `no export preset matches '${text5}'. Try 'MP4 (h.264)', 'YouTube', 'Instagram Reels', 'TikTok', 'YouTube Shorts', 'GIF', 'MP3', 'WEBM', 'ProRes' (list_export_presets_tool lists all)`
+  );
+}
+function rateFor2(rates, quality) {
+  return quality === "Low" ? rates.low : quality === "Med" ? rates.med : rates.high;
+}
+function isRecord18(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function toInt(value) {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : Number.NaN;
+  return Number.isFinite(n) ? Math.trunc(n) : void 0;
+}
+function toText(value) {
+  return typeof value === "string" || typeof value === "number" ? String(value) : void 0;
+}
+function rateFraction(value) {
+  const rate = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
+  if (!(rate > 0) || !Number.isFinite(rate)) return void 0;
+  return profileFpsFraction(rate);
+}
+function storedExportOverrides(project) {
+  const raw = isRecord18(project.export_overrides) ? project.export_overrides : {};
+  const ov = {};
+  for (const [key2, value] of Object.entries(raw)) if (value !== null && value !== void 0 && value !== "") ov[key2] = value;
+  const out = {};
+  for (const key2 of ["preset", "quality", "video_codec", "audio_codec", "vformat", "video_bitrate", "audio_bitrate", "output_path", "folder", "file_name", "image_format"]) {
+    const text5 = toText(ov[key2]);
+    if (text5 !== void 0) out[key2] = text5;
+  }
+  for (const key2 of ["width", "height", "fps_num", "fps_den", "start_frame", "end_frame", "sample_rate", "channels", "channel_layout"]) {
+    const n = toInt(ov[key2]);
+    if (n !== void 0) out[key2] = n;
+  }
+  const type = planExportType(ov.export_type);
+  if (type) out.export_type = EXPORT_TYPE_LABELS[type];
+  if (out.vformat === void 0 && toText(ov.container) !== void 0) out.vformat = toText(ov.container);
+  if (out.fps_num === void 0 && out.fps_den === void 0) {
+    const fps2 = rateFraction(ov.fps);
+    if (fps2) [out.fps_num, out.fps_den] = [fps2.num, fps2.den];
+  }
+  const pfps = projectRate(project);
+  for (const [key2, frameKey, first] of [["start", "start_frame", 1], ["end", "end_frame", 0]]) {
+    if (out[frameKey] !== void 0) continue;
+    const seconds2 = Number.parseFloat(String(ov[key2] ?? "").replace(/s$/i, ""));
+    if (Number.isFinite(seconds2) && seconds2 >= 0) out[frameKey] = Math.max(1, pyRound(seconds2 * pfps) + first);
+  }
+  if (out.channels !== void 0 && out.channel_layout === void 0) {
+    const layout = channelLayoutNamed(String(out.channels));
+    if (layout) out.channel_layout = CHANNEL_LAYOUTS[layout][0];
+  }
+  return out;
+}
+function projectFraction(project) {
+  const fps2 = isRecord18(project.fps) ? project.fps : {};
+  return { num: Math.trunc(Number(fps2.num) || 30), den: Math.trunc(Number(fps2.den) || 1) };
+}
+function projectRate(project) {
+  const fps2 = projectFraction(project);
+  return fps2.num / fps2.den;
+}
+function projectRecord(project, catalog) {
+  const width = Math.trunc(Number(project.width) || 0);
+  const height = Math.trunc(Number(project.height) || 0);
+  const description = String(project.profile ?? "");
+  const fps2 = projectFraction(project);
+  const same = catalog.find((p) => p.description === description && p.width === width && p.height === height);
+  if (same) return same;
+  const found = matchProfile(catalog, width, height, fps2.num / fps2.den);
+  if (found) return found;
+  const ratio = (value, fallback) => isRecord18(value) ? { num: Math.trunc(Number(value.num) || fallback.num), den: Math.trunc(Number(value.den) || fallback.den) } : fallback;
+  return {
+    key: "",
+    description,
+    width,
+    height,
+    fps: fps2,
+    progressive: true,
+    pixel_ratio: ratio(project.pixel_ratio, { num: 1, den: 1 }),
+    display_ratio: ratio(project.display_ratio, { num: 16, den: 9 }),
+    user: false
+  };
+}
+function pickProfile(preset, record5, catalog) {
+  const allowed = preset.profiles;
+  if (allowed.length === 0) return [record5, null];
+  const byDescription = /* @__PURE__ */ new Map();
+  for (const p of catalog) if (!byDescription.has(p.description)) byDescription.set(p.description, p);
+  const options = allowed.filter((name) => byDescription.has(name)).map((name) => byDescription.get(name));
+  if (options.length === 0) return [record5, null];
+  if (allowed.includes(record5.description)) return [byDescription.get(record5.description) ?? record5, null];
+  const [pw, ph] = [record5.width, record5.height];
+  const pfps = rateOf2(record5);
+  const paspect = pw / ph;
+  const fpsGap = (p) => Math.abs(rateOf2(p) - pfps);
+  const buckets = [
+    options.filter((p) => p.width === pw && p.height === ph),
+    options.filter((p) => Math.abs(p.width / p.height - paspect) < 0.01),
+    options.filter((p) => p.width > p.height === pw > ph && p.width === p.height === (pw === ph)),
+    options
+  ];
+  for (const bucket of buckets) {
+    if (bucket.length === 0) continue;
+    const best = bucket.map((p, i) => ({ p, i })).sort((a, b) => fpsGap(a.p) - fpsGap(b.p) || b.p.width * b.p.height - a.p.width * a.p.height || a.i - b.i)[0].p;
+    let note = null;
+    if (Math.abs(best.width / best.height - paspect) > 0.01) {
+      const sizes3 = [...new Set(options.map((o) => `${o.width}x${o.height}`))].sort(pyCompare3).join(", ");
+      note = `'${preset.title}' only renders ${sizes3}; exporting ${best.width}x${best.height} from a ${pw}x${ph} project re-frames every clip (bars on 'fit' clips, crops on 'fill' clips). For a proper vertical/square edit switch the project with set_project_profile_tool (reframe='fill') first, or pass profile= to keep the project size`;
+    }
+    return [best, note];
+  }
+  return [record5, null];
+}
+function clipBounds(project, ids2) {
+  const clips = (project.clips ?? []).filter((c) => !ids2 || ids2.has(c.id));
+  if (clips.length === 0) return null;
+  let start = Number.POSITIVE_INFINITY;
+  let end = Number.NEGATIVE_INFINITY;
+  for (const c of clips) {
+    const position = Number(c.position) || 0;
+    start = Math.min(start, position);
+    end = Math.max(end, position + Math.max(0, (Number(c.end) || 0) - (Number(c.start) || 0)));
+  }
+  return [start, end];
+}
+function baseName(path42) {
+  return path42.split(/[\\/]/).pop() ?? path42;
+}
+function splitExt(path42) {
+  const name = baseName(path42);
+  const leading = /^\.*/.exec(name)[0].length;
+  const dot = name.lastIndexOf(".");
+  if (dot < leading) return [path42, ""];
+  const cut2 = path42.length - (name.length - dot);
+  return [path42.slice(0, cut2), path42.slice(cut2)];
+}
+function joinPath(folder, name) {
+  if (!folder || /^([\\/]|[A-Za-z]:[\\/]|~)/.test(name)) return name;
+  if (/[\\/]$/.test(folder)) return folder + name;
+  return `${folder}${folder.includes("\\") && !folder.includes("/") ? "\\" : "/"}${name}`;
+}
+function capitalize3(text5) {
+  return text5 ? text5[0].toUpperCase() + text5.slice(1).toLowerCase() : text5;
+}
+function r3(x) {
+  return Number(pyFixed(x, 3));
+}
+function given(value) {
+  if (value === void 0 || value === null || value === "" || value === false) return false;
+  return typeof value !== "number" || value !== 0 && !Number.isNaN(value);
+}
+function firstGiven(...values) {
+  return values.find((v) => given(v));
+}
+function planExport(project, request = {}, context = {}) {
+  const catalog = context.catalog ?? profileCatalog();
+  const ov = storedExportOverrides(project);
+  const notes = [];
+  const p = resolveExportPreset(firstGiven(request.preset?.trim(), ov.preset) ?? "MP4 (h.264)");
+  const qualities = presetQualities(p);
+  const offered = qualities.length > 0 ? qualities : ["High"];
+  let q = capitalize3((firstGiven(request.quality, ov.quality) ?? "high").trim());
+  if (!offered.includes(q)) {
+    notes.push(`'${p.title}' has no ${q} quality; using ${offered[offered.length - 1]}`);
+    q = offered[offered.length - 1];
+  }
+  const asked = request.exportType && request.exportType !== "auto" ? planExportType(request.exportType) : void 0;
+  if (request.exportType && request.exportType !== "auto" && !asked) {
+    throw new ExportPlanError("export_type must be auto, video_audio, video_only, audio_only or image_sequence");
+  }
+  let etype = asked ?? planExportType(ov.export_type) ?? TYPE_OF_LABEL[presetExportType(p)] ?? "video_audio";
+  const record5 = projectRecord(project, catalog);
+  let prof;
+  if (request.profile?.trim()) {
+    try {
+      prof = resolveProfileRequest({ catalog, projectFps: projectRate(project) }, request.profile, null).profile;
+    } catch (error62) {
+      if (error62 instanceof ProfileRequestError) throw new ExportPlanError(error62.message);
+      throw error62;
+    }
+  } else {
+    const [picked, note] = pickProfile(p, record5, catalog);
+    prof = picked;
+    if (note) notes.push(note);
+  }
+  const w = Math.trunc(firstGiven(request.width, ov.width) ?? prof.width);
+  const h = Math.trunc(firstGiven(request.height, ov.height) ?? prof.height);
+  let fps2;
+  if (given(request.fps)) fps2 = profileFpsFraction(request.fps);
+  else if (given(ov.fps_num) && given(ov.fps_den)) fps2 = { num: ov.fps_num, den: ov.fps_den };
+  else fps2 = { num: prof.fps.num, den: prof.fps.den };
+  if (w <= 0 || h <= 0 || w % 2 !== 0 || h % 2 !== 0) {
+    throw new ExportPlanError(`export size ${w}x${h} is invalid; width and height must be positive even numbers`);
+  }
+  const fpsValue3 = fps2.num / fps2.den;
+  let vformat = (firstGiven(request.container, ov.vformat, p.videoFormat) ?? "mp4").toLowerCase().replace(/^\.+/, "");
+  let vcodec = firstGiven(request.videoCodec, ov.video_codec, p.videoCodec) ?? "";
+  let acodec = firstGiven(request.audioCodec, ov.audio_codec, p.audioCodec) ?? "";
+  const namedAudio = given(request.audioCodec) || given(ov.audio_codec);
+  if (etype === "audio_only" && Object.hasOwn(AUDIO_CONTAINERS2, vformat) && !namedAudio && vformat !== p.videoFormat.toLowerCase()) {
+    acodec = AUDIO_CONTAINERS2[vformat];
+  }
+  if (etype === "image_sequence") {
+    const image = (firstGiven(request.imageFormat, ov.image_format) ?? "png").toLowerCase().replace(/^\.+/, "");
+    if (!IMAGE_FORMATS.includes(image)) throw new ExportPlanError("image_format must be png, jpg, bmp, tiff or ppm");
+    vformat = image;
+    vcodec = image === "jpg" || image === "jpeg" ? "mjpeg" : image;
+  }
+  if ((etype === "video_audio" || etype === "video_only" || etype === "image_sequence") && !vcodec) {
+    throw new ExportPlanError(`'${p.title}' has no video codec; use export_type='audio_only' or another preset`);
+  }
+  if ((etype === "video_audio" || etype === "audio_only") && !acodec) {
+    if (etype === "audio_only") throw new ExportPlanError(`'${p.title}' has no audio codec; pick an audio preset such as 'MP3'`);
+    notes.push(`'${p.title}' has no audio; exporting video only`);
+    etype = "video_only";
+  }
+  let vrate = (firstGiven(request.videoBitrate, ov.video_bitrate, rateFor2(p.videoBitrate, q)) ?? "").trim();
+  if (!given(request.videoBitrate) && !given(ov.video_bitrate) && p.type === "All Formats" && vrate && !isQualityModeRate(vrate)) {
+    vrate = allFormatsBitrate(q, { width: w, height: h, fps: fps2 }) ?? vrate;
+  }
+  const arate = (firstGiven(request.audioBitrate, ov.audio_bitrate, rateFor2(p.audioBitrate, q)) ?? "192 kb/s").trim();
+  for (const [rate, label2] of [[vrate, "video_bitrate"], [arate, "audio_bitrate"]]) {
+    if (rate && !RATE_RE.test(rate)) throw new ExportPlanError(`${label2} must look like '8 Mb/s', '192 kb/s' or '23 crf', got ${pyReprString(rate)}`);
+  }
+  let sr = Math.trunc(firstGiven(request.sampleRate, ov.sample_rate, p.sampleRate, Number(project.sample_rate)) ?? 48e3);
+  let ch;
+  let layout;
+  if (request.channels?.trim()) {
+    const named = channelLayoutNamed(request.channels);
+    if (!named) throw new ExportPlanError("channels must be mono, stereo, surround, 5.1 or 7.1");
+    [layout, ch] = CHANNEL_LAYOUTS[named];
+  } else if (given(ov.channels) && given(ov.channel_layout)) {
+    [ch, layout] = [ov.channels, ov.channel_layout];
+  } else {
+    ch = Math.trunc(firstGiven(p.channels, Number(project.channels)) ?? 2);
+    layout = Math.trunc(firstGiven(p.channelLayout) ?? 3);
+  }
+  if (etype === "audio_only" && (!sr || !ch)) [sr, ch, layout] = [sr || 48e3, ch || 2, layout || 3];
+  const bounds2 = clipBounds(project);
+  if (!bounds2) throw new ExportPlanError("the timeline is empty; add clips before exporting");
+  let rmode = (request.range ?? "").trim().toLowerCase();
+  if (rmode && !["whole", "selection", "custom"].includes(rmode)) throw new ExportPlanError("range must be whole, selection or custom");
+  if (!rmode) rmode = given(request.start) || given(request.end) || given(ov.start_frame) || given(ov.end_frame) ? "custom" : "whole";
+  let t0;
+  let t1;
+  if (rmode === "whole") [t0, t1] = bounds2;
+  else if (rmode === "selection") {
+    const selected = clipBounds(project, new Set(context.selectedClipIds ?? []));
+    if (!selected) throw new ExportPlanError("no clips are selected in the timeline; select some or give start/end seconds");
+    [t0, t1] = selected;
+  } else {
+    const pfps = rateOf2(record5);
+    t0 = given(request.start) ? Number(request.start) : given(ov.start_frame) ? (ov.start_frame - 1) / pfps : 0;
+    t1 = given(request.end) ? Number(request.end) : given(ov.end_frame) ? ov.end_frame / pfps : bounds2[1];
+  }
+  if (t1 <= t0) throw new ExportPlanError(`the range ends (${pyFixed(t1, 3)}s) before it starts (${pyFixed(t0, 3)}s)`);
+  if (t0 >= bounds2[1]) throw new ExportPlanError(`the range starts at ${pyFixed(t0, 3)}s, after the last clip ends (${pyFixed(bounds2[1], 3)}s)`);
+  const startFrame = pyRound(t0 * fpsValue3) + 1;
+  const endFrame = Math.max(startFrame + 1, pyRound(t1 * fpsValue3));
+  let ext = vformat;
+  let folder = request.folder ?? "";
+  let out = firstGiven(request.outputPath?.trim(), ov.output_path?.trim()) ?? "";
+  if (out && context.outputIsFolder) [folder, out] = [out, ""];
+  if (!out) {
+    const baseFolder = firstGiven(folder.trim(), ov.folder?.trim()) ?? context.defaultFolder ?? "";
+    const name = firstGiven(request.fileName?.trim(), ov.file_name?.trim()) ?? (context.defaultName?.trim() || "Untitled Project");
+    out = joinPath(baseFolder, name);
+  }
+  if (etype === "image_sequence") {
+    const [stem7, dotted] = splitExt(out);
+    let root = [ext, "png", "jpg"].includes(dotted.toLowerCase().replace(/^\./, "")) ? stem7 : out;
+    if (!baseName(root).includes("%")) root += "-%05d";
+    out = `${root}.${ext}`;
+  } else {
+    const current = splitExt(out)[1].toLowerCase().replace(/^\./, "");
+    if (!current || /^\d+$/.test(current)) out = `${out}.${ext}`;
+    else if (current !== ext) {
+      if (given(request.container?.trim())) out = `${splitExt(out)[0]}.${ext}`;
+      else {
+        if (current === "gif" && etype !== "audio_only" && vcodec !== "gif") {
+          throw new ExportPlanError(`a .gif file needs the GIF preset ('${p.title}' encodes ${vcodec}): pass preset='GIF', or another file extension`);
+        }
+        vformat = ext = current;
+      }
+    }
+  }
+  const projectAspect = record5.width / record5.height;
+  if (Math.abs(w / h - projectAspect) > 0.01 && !notes.some((n) => n.includes("re-frames every clip"))) {
+    notes.push(
+      `export is ${aspectText(w, h)} but the project is ${aspectText(record5.width, record5.height)}: each clip is re-framed by its scale mode (bars on 'fit' clips, crops on 'fill' clips)`
+    );
+  }
+  if (Math.abs(fpsValue3 - rateOf2(record5)) > 0.01) {
+    notes.push(`export frame rate ${pyFixed(fpsValue3, 3)} differs from the project's; keyframes are rescaled for the render`);
+  }
+  const audioOnly = etype === "audio_only";
+  return {
+    preset: p.title,
+    preset_category: p.type,
+    quality: q,
+    export_type: etype,
+    path: out,
+    vformat,
+    vcodec: audioOnly ? "" : vcodec,
+    acodec: etype === "video_audio" || audioOnly ? acodec : "",
+    width: w,
+    height: h,
+    fps_num: fps2.num,
+    fps_den: fps2.den,
+    fps: r3(fpsValue3),
+    pixel_ratio: { num: prof.pixel_ratio.num, den: prof.pixel_ratio.den },
+    video_bitrate: audioOnly ? "" : vrate,
+    audio_bitrate: arate,
+    sample_rate: sr,
+    channels: ch,
+    channel_layout: layout,
+    interlaced: audioOnly ? false : Boolean(request.interlaced),
+    start_seconds: r3(t0),
+    end_seconds: r3(t1),
+    start_frame: startFrame,
+    end_frame: endFrame,
+    range: rmode,
+    profile: prof.description,
+    notes: audioOnly ? notes.filter((n) => !n.includes("re-frame") && !n.includes("differs from the project")) : notes
+  };
+}
+function planContainer(plan) {
+  return exportContainer(plan.vformat, EXPORT_TYPE_LABELS[plan.export_type]);
+}
+function exportOptionsForPlan(plan) {
+  const format = planContainer(plan);
+  if (!format) return void 0;
+  const fps2 = { num: plan.fps_num, den: plan.fps_den };
+  const rate = fps2.num / fps2.den;
+  const options = {
+    format,
+    width: plan.width,
+    height: plan.height,
+    fps: fps2,
+    quality: QUALITY_OF[plan.quality],
+    range: { start: (plan.start_frame - 1) / rate, end: plan.end_frame / rate },
+    output: plan.path
+  };
+  const sequence = isSequenceFormat(format);
+  if (plan.export_type !== "audio_only" && !sequence && format !== "gif") {
+    options.videoCodec = plan.vcodec;
+    const video = parseExportRate(plan.video_bitrate);
+    if (video?.kind === "bitrate") {
+      if (video.bitsPerSecond > 0) options.videoBitrate = video.bitsPerSecond;
+    } else if (video) {
+      options.crf = video.value;
+      if (video.value === 0 && crfZeroIsLossless(format, plan.vcodec)) options.quality = "lossless";
+    }
+  }
+  if (plan.export_type === "video_audio" || plan.export_type === "audio_only") {
+    options.audioCodec = plan.acodec;
+    const audio = parseExportRate(plan.audio_bitrate);
+    if (audio?.kind === "bitrate" && audio.bitsPerSecond > 0) options.audioBitrate = audio.bitsPerSecond;
+    options.sampleRate = plan.sample_rate;
+    options.channels = plan.channels;
+  } else if (!sequence && format !== "gif") {
+    options.channels = 0;
+  }
+  return options;
+}
+var EXPORT_TYPE_LABELS, TYPE_OF_LABEL, ExportPlanError, PLAN_SUMMARY_KEYS, PRESET_ALIASES, pyCompare3, rateOf2, RATE_RE, AUDIO_CONTAINERS2, IMAGE_FORMATS, QUALITY_OF;
+var init_plan = __esm({
+  "../engine/src/presets/plan.ts"() {
+    "use strict";
+    init_channel_layouts();
+    init_profile_requests();
+    init_profiles();
+    init_rounding();
+    init_pyfmt();
+    init_catalog2();
+    init_export();
+    EXPORT_TYPE_LABELS = {
+      video_audio: "Video & Audio",
+      video_only: "Video Only",
+      audio_only: "Audio Only",
+      image_sequence: "Image Sequence"
+    };
+    TYPE_OF_LABEL = Object.fromEntries(
+      Object.entries(EXPORT_TYPE_LABELS).map(([type, label2]) => [label2, type])
+    );
+    ExportPlanError = class extends Error {
+      name = "ExportPlanError";
+    };
+    PLAN_SUMMARY_KEYS = [
+      "preset",
+      "quality",
+      "export_type",
+      "path",
+      "vformat",
+      "vcodec",
+      "acodec",
+      "width",
+      "height",
+      "fps",
+      "video_bitrate",
+      "audio_bitrate",
+      "sample_rate",
+      "channels",
+      "start_seconds",
+      "end_seconds",
+      "start_frame",
+      "end_frame",
+      "range",
+      "profile"
+    ];
+    PRESET_ALIASES = {
+      mp4: "MP4 (h.264)",
+      h264: "MP4 (h.264)",
+      "h.264": "MP4 (h.264)",
+      x264: "MP4 (h.264)",
+      video: "MP4 (h.264)",
+      default: "MP4 (h.264)",
+      hevc: "MP4 (h.265)",
+      h265: "MP4 (h.265)",
+      "h.265": "MP4 (h.265)",
+      gif: "GIF (animated)",
+      animated_gif: "GIF (animated)",
+      mp3: "MP3 (audio only)",
+      audio: "MP3 (audio only)",
+      audio_only: "MP3 (audio only)",
+      webm: "WEBM (vp9)",
+      vp9: "WEBM (vp9)",
+      prores: "MOV (ProRes 422)",
+      mov: "MOV (h.264)",
+      quicktime: "MOV (h.264)",
+      mkv: "MKV (h.264)",
+      avi: "AVI (h.264)",
+      ogg: "OGG (theora/vorbis)",
+      ogv: "OGG (theora/vorbis)",
+      av1: "MP4 (AV1 svt)",
+      lossless: "MP4 (h.264) lossless",
+      dvd: "DVD-NTSC",
+      youtube_4k: "YouTube (4K)",
+      youtube_2k: "YouTube (2K)",
+      youtube_8k: "YouTube (8K)",
+      twitter: "Twitter / X",
+      x: "Twitter / X",
+      instagram_reels: "Instagram Reels",
+      reels: "Instagram Reels"
+    };
+    pyCompare3 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+    rateOf2 = (p) => p.fps.num / p.fps.den;
+    RATE_RE = /^\s*\d+(\.\d+)?\s*(kb\/s|mb\/s|crf|cqp|qp)\s*$/i;
+    AUDIO_CONTAINERS2 = {
+      wav: "pcm_s16le",
+      flac: "flac",
+      mp3: "libmp3lame",
+      m4a: "aac",
+      ogg: "libvorbis",
+      aac: "aac"
+    };
+    IMAGE_FORMATS = ["png", "jpg", "jpeg", "bmp", "tiff", "ppm"];
+    QUALITY_OF = { Low: "low", Med: "medium", High: "high" };
+  }
+});
+
+// ../engine/src/presets/settings.ts
+function normSettingKey(text5) {
+  return String(text5 ?? "").trim().toLowerCase().replace(/[\s\-/]+/g, "_").replace(/^_+|_+$/g, "");
+}
+function exportSettingKey(key2) {
+  const k = normSettingKey(key2);
+  return KEY_ALIASES[k] ?? k;
+}
+function isExportSettingKey(key2) {
+  return Object.hasOwn(EXPORT_SETTING_KEYS, key2);
+}
+function unknownSettingMessage(key2) {
+  return `unknown export setting ${pyReprString(String(key2 ?? ""))}; valid keys: ${Object.keys(EXPORT_SETTING_KEYS).join(", ")}`;
+}
+function parseExportSetting(key2, value, project) {
+  const v = String(value ?? "").trim();
+  if (!v) throw new ExportPlanError(`give a value for ${key2}`);
+  const asInt = (text5, even = false, lo = 1) => {
+    const n = Number(text5);
+    if (text5 === "" || !Number.isFinite(n)) throw new ExportPlanError(`${key2} must be a whole number, got ${pyReprString(text5)}`);
+    const whole = Math.trunc(n);
+    if (whole < lo || even && whole % 2 !== 0) {
+      throw new ExportPlanError(`${key2} must be ${even ? "an even number" : "a number"} >= ${lo}, got ${pyReprString(text5)}`);
+    }
+    return whole;
+  };
+  const fps2 = project.fps ?? { num: 30, den: 1 };
+  const pfps = (Number(fps2.num) || 30) / (Number(fps2.den) || 1);
+  switch (key2) {
+    case "preset":
+      return { preset: resolveExportPreset(v).title };
+    case "quality":
+      if (!["low", "med", "high"].includes(v.toLowerCase())) throw new ExportPlanError("quality must be low, med or high");
+      return { quality: v.toLowerCase() };
+    case "export_type": {
+      const type = planExportType(v);
+      if (!type) throw new ExportPlanError("export_type must be video_audio, video_only, audio_only or image_sequence");
+      return { export_type: EXPORT_TYPE_LABELS[type] };
+    }
+    case "width":
+    case "height":
+      return { [key2]: asInt(v, true, 2) };
+    case "fps": {
+      const rate = Number(v);
+      if (!(rate > 0) || !Number.isFinite(rate)) throw new ExportPlanError(`fps must be a positive number, got ${pyReprString(v)}`);
+      const fraction5 = profileFpsFraction(rate);
+      return { fps_num: fraction5.num, fps_den: fraction5.den };
+    }
+    case "fps_num":
+    case "fps_den":
+    case "start_frame":
+    case "end_frame":
+      return { [key2]: asInt(v) };
+    case "start":
+    case "end": {
+      const seconds2 = Number(v.replace(/s+$/, ""));
+      if (!Number.isFinite(seconds2) || v.replace(/s+$/, "").trim() === "") throw new ExportPlanError(`${key2} must be seconds, got ${pyReprString(v)}`);
+      if (seconds2 < 0) throw new ExportPlanError(`${key2} must be >= 0`);
+      const frame = pyRound(seconds2 * pfps) + (key2 === "start" ? 1 : 0);
+      return { [key2 === "start" ? "start_frame" : "end_frame"]: Math.max(1, frame) };
+    }
+    case "video_codec":
+    case "audio_codec":
+      return { [key2]: v };
+    case "format":
+      return { vformat: v.toLowerCase().replace(/^\.+/, "") };
+    case "video_bitrate":
+    case "audio_bitrate":
+      if (!RATE_RE2.test(v)) throw new ExportPlanError(`${key2} must look like '8 Mb/s', '192 kb/s' or '23 crf'`);
+      return { [key2]: v };
+    case "sample_rate": {
+      const rate = asInt(v);
+      if (!SAMPLE_RATES.includes(rate)) throw new ExportPlanError(`sample_rate must be ${SAMPLE_RATES.slice(0, -1).join(", ")} or ${SAMPLE_RATES[SAMPLE_RATES.length - 1]}`);
+      return { sample_rate: rate };
+    }
+    case "channels": {
+      const layout = channelLayoutNamed(v);
+      if (!layout) throw new ExportPlanError("channels must be mono, stereo, surround, 5.1 or 7.1");
+      const [code, count2] = CHANNEL_LAYOUTS[layout];
+      return { channels: count2, channel_layout: code };
+    }
+    case "output_path":
+    case "folder":
+      return { [key2]: v };
+    case "file_name":
+      if (/[\\/]/.test(v)) throw new ExportPlanError("file_name is only a name; use output_path or folder for folders");
+      return { file_name: v };
+    case "image_format":
+      if (!["png", "jpg", "bmp", "tiff"].includes(v.toLowerCase())) throw new ExportPlanError("image_format must be png, jpg, bmp or tiff");
+      return { image_format: v.toLowerCase() };
+    default:
+      throw new ExportPlanError(`unknown export setting ${pyReprString(key2)}`);
+  }
+}
+var EXPORT_SETTING_KEYS, KEY_ALIASES, EXPORT_SETTING_STORED_AS, RATE_RE2, SAMPLE_RATES;
+var init_settings = __esm({
+  "../engine/src/presets/settings.ts"() {
+    "use strict";
+    init_channel_layouts();
+    init_profiles();
+    init_rounding();
+    init_pyfmt();
+    init_plan();
+    EXPORT_SETTING_KEYS = {
+      preset: "export preset title or alias (e.g. 'YouTube', 'Instagram Reels', 'GIF', 'MP3')",
+      quality: "low | med | high",
+      export_type: "video_audio | video_only | audio_only | image_sequence",
+      width: "even integer pixels",
+      height: "even integer pixels",
+      fps: "frame rate number (e.g. 24, 29.97)",
+      fps_num: "integer",
+      fps_den: "integer",
+      start: "range start, timeline seconds",
+      end: "range end, timeline seconds",
+      start_frame: "range start frame (1-based, project fps)",
+      end_frame: "range end frame",
+      video_codec: "e.g. libx264",
+      audio_codec: "e.g. aac",
+      format: "container, e.g. mp4, mov, webm",
+      video_bitrate: "'8 Mb/s' | '23 crf'",
+      audio_bitrate: "'192 kb/s'",
+      sample_rate: "22050 | 44100 | 48000 | 96000 | 192000",
+      channels: "mono | stereo | surround | 5.1 | 7.1",
+      output_path: "full output file path",
+      folder: "output folder",
+      file_name: "output file name",
+      image_format: "png | jpg | bmp | tiff"
+    };
+    KEY_ALIASES = {
+      vcodec: "video_codec",
+      acodec: "audio_codec",
+      vformat: "format",
+      container: "format",
+      path: "output_path",
+      type: "export_type",
+      target: "preset",
+      bitrate: "video_bitrate",
+      frame_rate: "fps",
+      framerate: "fps"
+    };
+    EXPORT_SETTING_STORED_AS = {
+      start: ["start_frame"],
+      end: ["end_frame"],
+      fps: ["fps_num", "fps_den"],
+      format: ["vformat"],
+      channels: ["channels", "channel_layout"]
+    };
+    RATE_RE2 = /^\s*\d+(\.\d+)?\s*(kb\/s|mb\/s|crf|cqp|qp)\s*$/i;
+    SAMPLE_RATES = [22050, 44100, 48e3, 96e3, 192e3];
   }
 });
 
@@ -31731,6 +32272,8 @@ var init_presets2 = __esm({
     "use strict";
     init_catalog2();
     init_export();
+    init_plan();
+    init_settings();
   }
 });
 
@@ -32603,7 +33146,7 @@ function planReel(input4) {
   };
 }
 var EPS2, MIN_SHOT_SECONDS, MIN_SPEED, round3;
-var init_plan = __esm({
+var init_plan2 = __esm({
   "../engine/src/reels/plan.ts"() {
     "use strict";
     EPS2 = 1e-6;
@@ -33212,7 +33755,7 @@ var ON_BEAT, FASTEST_EVENT, TemplateBeats;
 var init_grid = __esm({
   "../engine/src/motion/grid.ts"() {
     "use strict";
-    init_plan();
+    init_plan2();
     ON_BEAT = 0.02;
     FASTEST_EVENT = 0.38;
     TemplateBeats = class {
@@ -34114,10 +34657,10 @@ var init_callout = __esm({
         const labels = (content.labels ?? []).map((l) => l.replace(/\s+/g, " ").trim().toUpperCase()).filter(Boolean);
         if (labels.length === 0) refuse("callout needs labels: 1 to 4 callout names");
         if (labels.length > MAX_CALLOUTS) refuse(`callout draws at most ${MAX_CALLOUTS} callouts`);
-        const given = content.points && content.points.length > 0 ? content.points : null;
-        if (given && given.length < labels.length) refuse("callout needs a point for every label (or no points, for the default spread)");
-        const focus = given ? { x: mean(given.slice(0, labels.length).map((p) => p.x)), y: mean(given.slice(0, labels.length).map((p) => p.y)) } : void 0;
-        const anchorsOn = (crop2) => labels.map((_, i) => given ? inWindow(given[i], crop2) : DEFAULT_POINTS[i]);
+        const given2 = content.points && content.points.length > 0 ? content.points : null;
+        if (given2 && given2.length < labels.length) refuse("callout needs a point for every label (or no points, for the default spread)");
+        const focus = given2 ? { x: mean(given2.slice(0, labels.length).map((p) => p.x)), y: mean(given2.slice(0, labels.length).map((p) => p.y)) } : void 0;
+        const anchorsOn = (crop2) => labels.map((_, i) => given2 ? inWindow(given2[i], crop2) : DEFAULT_POINTS[i]);
         const values = labels.map((_, i) => content.values?.[i]?.replace(/\s+/g, " ").trim().toUpperCase() ?? "");
         const product = media.get(file3);
         const e0 = beats.frame(0);
@@ -35885,6 +36428,7 @@ var init_src = __esm({
     init_query();
     init_profiles();
     init_profile_requests();
+    init_channel_layouts();
     init_rounding();
     init_fma();
     init_media();
@@ -35907,7 +36451,7 @@ var init_src = __esm({
     init_beats();
     init_transcription();
     init_styles();
-    init_plan();
+    init_plan2();
     init_motion();
     init_stock();
     init_web_video();
@@ -38021,7 +38565,7 @@ async function readerInfoFromFfprobe(file3, probe2, fileSize) {
     info.acodec = await decoderNameFor(audio.codec_name);
     const channels = audio.channels ?? 0;
     info.channels = channels;
-    let layout = audio.channel_layout ? CHANNEL_LAYOUTS[audio.channel_layout] : void 0;
+    let layout = audio.channel_layout ? CHANNEL_LAYOUTS2[audio.channel_layout] : void 0;
     layout ??= DEFAULT_LAYOUTS[channels] ?? 0;
     if (layout === 0) layout = channels === 1 ? LAYOUT_MONO : channels === 2 ? 3 : 0;
     info.channel_layout = layout;
@@ -38170,7 +38714,7 @@ async function probe(filePath, options = {}) {
   }
   return finish(await readerInfoFromFfprobe(file3, result2, size));
 }
-var ProbeError, FFMPEG_EXTS, QT_IMAGE_CODECS, CHANNEL_LAYOUTS, DEFAULT_LAYOUTS, LAYOUT_MONO, ONE_HOUR;
+var ProbeError, FFMPEG_EXTS, QT_IMAGE_CODECS, CHANNEL_LAYOUTS2, DEFAULT_LAYOUTS, LAYOUT_MONO, ONE_HOUR;
 var init_probe = __esm({
   "../render-node/src/probe/probe.ts"() {
     "use strict";
@@ -38190,7 +38734,7 @@ var init_probe = __esm({
     };
     FFMPEG_EXTS = /* @__PURE__ */ new Set(["avi", "flac", "mov", "mkv", "mpg", "mpeg", "mp3", "mp4", "mts", "ogg", "wav", "wmv", "webm", "vob", "gif"]);
     QT_IMAGE_CODECS = /* @__PURE__ */ new Set(["png", "mjpeg", "bmp", "webp", "tiff", "ppm", "pgm", "pgmyuv", "pbm", "pam", "targa", "xbm", "xpm", "jpeg2000", "sgi"]);
-    CHANNEL_LAYOUTS = {
+    CHANNEL_LAYOUTS2 = {
       mono: 4,
       stereo: 3,
       "2.1": 11,
@@ -39301,9 +39845,19 @@ var init_audio_graph = __esm({
 import path10 from "node:path";
 function formatFromPath(file3) {
   const ext = path10.extname(file3).slice(1).toLowerCase();
-  if (ext === "png") return "png-sequence";
   if (ext === "m4v") return "mp4";
+  if (ext === "jpeg") return "jpg-sequence";
+  if (ext === "tif") return "tiff-sequence";
   return Object.keys(FORMATS).find((f3) => FORMATS[f3].extension === ext);
+}
+function ffmpegCanWrite(format, videoCodec, audioCodec, encoders) {
+  const info = FORMATS[format];
+  if (!info) return false;
+  if (videoCodec && !info.video || audioCodec && !info.audio) return false;
+  const rules = CONTAINER_CODECS[format];
+  if (videoCodec && (!encoders.has(videoCodec) || rules?.video && !rules.video.test(videoCodec))) return false;
+  if (audioCodec && (!encoders.has(audioCodec) || rules?.audio && !rules.audio.test(audioCodec))) return false;
+  return true;
 }
 function isEncoderPreset(value) {
   return typeof value === "string" && ENCODER_PRESETS.includes(value);
@@ -39342,7 +39896,15 @@ function videoChain(job) {
         codecArgs: ["-loop", "0"]
       };
     case "png-sequence":
-      return { chain: `[0:v]format=rgba[vout]`, codecArgs: ["-c:v", "png", "-f", "image2", "-start_number", "1"] };
+      return { chain: `[0:v]format=rgba[vout]`, codecArgs: ["-c:v", "png", ...IMAGE_SEQUENCE] };
+    case "jpg-sequence": {
+      const q = quality === "low" ? "10" : quality === "medium" ? "5" : quality === "high" ? "2" : "1";
+      return { chain: `[0:v]format=yuvj420p[vout]`, codecArgs: ["-c:v", "mjpeg", "-q:v", q, ...IMAGE_SEQUENCE] };
+    }
+    case "bmp-sequence":
+      return { chain: `[0:v]format=bgr24[vout]`, codecArgs: ["-c:v", "bmp", ...IMAGE_SEQUENCE] };
+    case "tiff-sequence":
+      return { chain: `[0:v]format=rgba[vout]`, codecArgs: ["-c:v", "tiff", ...IMAGE_SEQUENCE] };
     case "webm": {
       const codec2 = job.options.videoCodec ?? "libvpx-vp9";
       return {
@@ -39374,6 +39936,8 @@ function audioCodecArgs(job) {
   switch (job.format) {
     case "wav":
       return ["-c:a", job.options.audioCodec ?? "pcm_s16le"];
+    case "flac":
+      return ["-c:a", job.options.audioCodec ?? "flac"];
     case "mp3":
       return ["-c:a", job.options.audioCodec ?? "libmp3lame", "-b:a", bitrate];
     case "webm":
@@ -39398,7 +39962,14 @@ function muxerArgs(format) {
       return ["-f", "mp3"];
     case "wav":
       return ["-f", "wav"];
+    case "flac":
+      return ["-f", "flac"];
+    case "m4a":
+      return ["-movflags", "+faststart", "-f", "mp4"];
     case "png-sequence":
+    case "jpg-sequence":
+    case "bmp-sequence":
+    case "tiff-sequence":
       return [];
   }
 }
@@ -39453,11 +40024,11 @@ function encoderCommand(job) {
     args.push("-filter_complex", graph);
   }
   args.push(...maps, ...videoCodec, ...audioCodec, ...videoCodec.length > 0 ? ffmpegThreads("encode") : []);
-  if (info.video && job.video && job.format !== "png-sequence") args.push("-r", `${job.video.fps.num}/${job.video.fps.den}`);
+  if (info.video && job.video && !isSequenceFormat(job.format)) args.push("-r", `${job.video.fps.num}/${job.video.fps.den}`);
   args.push("-metadata", "comment=Made with Zenvi", ...muxerArgs(job.format), job.output);
   return { args, script };
 }
-var FORMATS, ENCODER_PRESETS, DEFAULT_ENCODER_PRESET, VP9_CPU, FALLBACK_AUDIO_BITRATE, OPUS_MAX_BITRATE, PAD_EVEN, TO_YUV, COLOR_TAGS, SCRIPT_THRESHOLD;
+var FORMATS, CONTAINER_CODECS, ENCODER_PRESETS, DEFAULT_ENCODER_PRESET, VP9_CPU, FALLBACK_AUDIO_BITRATE, OPUS_MAX_BITRATE, IMAGE_SEQUENCE, PAD_EVEN, TO_YUV, COLOR_TAGS, SCRIPT_THRESHOLD;
 var init_encoder = __esm({
   "../render-node/src/render/encoder.ts"() {
     "use strict";
@@ -39471,13 +40042,32 @@ var init_encoder = __esm({
       gif: { video: true, audio: false, mimeType: "image/gif", extension: "gif" },
       mp3: { video: false, audio: true, mimeType: "audio/mpeg", extension: "mp3" },
       wav: { video: false, audio: true, mimeType: "audio/wav", extension: "wav" },
-      "png-sequence": { video: true, audio: false, mimeType: "image/png", extension: "png" }
+      flac: { video: false, audio: true, mimeType: "audio/flac", extension: "flac" },
+      m4a: { video: false, audio: true, mimeType: "audio/mp4", extension: "m4a" },
+      "png-sequence": { video: true, audio: false, mimeType: "image/png", extension: "png" },
+      "jpg-sequence": { video: true, audio: false, mimeType: "image/jpeg", extension: "jpg" },
+      "bmp-sequence": { video: true, audio: false, mimeType: "image/bmp", extension: "bmp" },
+      "tiff-sequence": { video: true, audio: false, mimeType: "image/tiff", extension: "tiff" }
+    };
+    CONTAINER_CODECS = {
+      webm: { video: /^(libvpx|libvpx-vp9|vp8|vp9|libaom-av1|libsvtav1|librav1e|av1|(vp8|vp9|av1)_\w+)$/, audio: /^(libopus|opus|libvorbis|vorbis)$/ },
+      mp4: { audio: /^(?!pcm_)/ },
+      gif: { video: /^gif$/ },
+      mp3: { audio: /^(libmp3lame|mp3\w*)$/ },
+      wav: { audio: /^pcm_/ },
+      flac: { audio: /^flac$/ },
+      m4a: { audio: /^(aac|aac_at|libfdk_aac|alac|alac_at)$/ },
+      "png-sequence": { video: /^png$/ },
+      "jpg-sequence": { video: /^mjpeg$/ },
+      "bmp-sequence": { video: /^bmp$/ },
+      "tiff-sequence": { video: /^tiff$/ }
     };
     ENCODER_PRESETS = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"];
     DEFAULT_ENCODER_PRESET = "veryfast";
     VP9_CPU = { ultrafast: 8, superfast: 6, veryfast: 5, faster: 4, fast: 3, medium: 2, slow: 1, slower: 1, veryslow: 0 };
     FALLBACK_AUDIO_BITRATE = 192e3;
     OPUS_MAX_BITRATE = 51e4;
+    IMAGE_SEQUENCE = ["-f", "image2", "-start_number", "1"];
     PAD_EVEN = "pad=ceil(iw/2)*2:ceil(ih/2)*2";
     TO_YUV = (pixFmt) => `scale=out_color_matrix=bt709:out_range=tv,format=${pixFmt}`;
     COLOR_TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
@@ -45682,7 +46272,7 @@ function constrain(v) {
   const t = Number.isNaN(v) ? 0 : v >= 2147483647 ? 2147483647 : v <= -2147483648 ? -2147483648 : Math.trunc(v);
   return t < 0 ? 0 : t > 255 ? 255 : t;
 }
-function toInt(v) {
+function toInt2(v) {
   if (Number.isNaN(v)) return 0;
   if (v >= 2147483647) return 2147483647;
   if (v <= -2147483648) return -2147483648;
@@ -45809,9 +46399,9 @@ var init_color_basic = __esm({
         for (let i = 0; i < d.length; i += 4) {
           const a = d[i + 3];
           const ap = f327(a / 255);
-          const R = toInt(f327(d[i] / ap));
-          const G = toInt(f327(d[i + 1] / ap));
-          const B = toInt(f327(d[i + 2] / ap));
+          const R = toInt2(f327(d[i] / ap));
+          const G = toInt2(f327(d[i + 1] / ap));
+          const B = toInt2(f327(d[i + 2] / ap));
           const r = constrain(f327(B * m2 + f327(R * m0 + f327(G * m1))));
           const g = constrain(f327(B * m1 + f327(R * m2 + f327(G * m0))));
           const b = constrain(f327(B * m0 + f327(R * m1 + f327(G * m2))));
@@ -50739,7 +51329,7 @@ var init_effects3 = __esm({
 function toFloat3(f3) {
   return Math.fround(Math.fround(f3.num) / Math.fround(f3.den));
 }
-function toInt2(f3) {
+function toInt3(f3) {
   return Math.trunc(roundHalfAway(f3.num / f3.den));
 }
 function isSpecial(f3) {
@@ -50749,11 +51339,11 @@ function isSpecial(f3) {
 function buildFrameMapping(source2, target, videoLength) {
   const fields = [];
   if (isSpecial(source2) && isSpecial(target)) {
-    const difference = Math.fround(toInt2(target) - toInt2(source2));
+    const difference = Math.fround(toInt3(target) - toInt3(source2));
     let fieldInterval = 0;
     let frameInterval = 0;
     if (difference !== 0) {
-      fieldInterval = Math.trunc(roundHalfAway(Math.abs(Math.fround(toInt2(source2) / difference))));
+      fieldInterval = Math.trunc(roundHalfAway(Math.abs(Math.fround(toInt3(source2) / difference))));
       frameInterval = Math.trunc(fieldInterval * 2);
     }
     let frame = 1;
@@ -53189,22 +53779,23 @@ function exportFrameRange(project, fps2, range) {
   const last = Math.max(0, Math.ceil(frames - 1e-4));
   return { first, last };
 }
-function pngPattern(output2) {
+function sequencePattern(output2, extension) {
   if (/%0?\d*d/.test(output2)) return output2;
   const ext = path12.extname(output2);
   const stem7 = ext ? output2.slice(0, -ext.length) : output2;
-  return `${stem7}_%05d.png`;
+  return `${stem7}_%05d.${extension}`;
 }
 function ffmpegMajor() {
   versionPromise ??= binaryVersion("ffmpeg").then((v) => ffmpegMajorVersion(v.version)).catch(() => 99);
   return versionPromise;
 }
-async function renderProject(project, opts) {
+async function renderProject(source2, opts) {
   const { options } = opts;
   const format = options.format;
   const info = FORMATS[format];
   if (!info) throw new RenderError(`Unsupported export format: ${String(format)}`);
-  const fps2 = validFps(options.fps, project.fps);
+  const fps2 = validFps(options.fps, source2.fps);
+  const project = projectAtFrameRate(source2, fps2);
   const width = Math.round(options.width || project.width);
   const height = Math.round(options.height || project.height);
   if (!(width >= 16 && height >= 16 && width <= 16384 && height <= 16384)) {
@@ -53223,11 +53814,12 @@ async function renderProject(project, opts) {
   const engine = opts.engine ?? await defaultRenderEngine();
   const signal = opts.signal;
   if (signal?.aborted) throw new AbortedError();
-  const destination2 = path12.resolve(format === "png-sequence" ? pngPattern(opts.output) : opts.output);
+  const sequence = isSequenceFormat(format);
+  const destination2 = path12.resolve(sequence ? sequencePattern(opts.output, info.extension) : opts.output);
   const outDir = path12.dirname(destination2);
   await mkdir3(outDir, { recursive: true });
   const token = `${process.pid}-${randomBytes2(4).toString("hex")}`;
-  const stagingDir = format === "png-sequence" ? path12.join(outDir, `.zenvi-render-${token}`) : void 0;
+  const stagingDir = sequence ? path12.join(outDir, `.zenvi-render-${token}`) : void 0;
   if (stagingDir) await mkdir3(stagingDir, { recursive: true });
   const staged = stagingDir ? path12.join(stagingDir, path12.basename(destination2)) : path12.join(outDir, `.${path12.basename(destination2)}.${token}.partial${path12.extname(destination2)}`);
   const scriptPath = path12.join(outDir, `.zenvi-render-${token}.filtergraph`);
@@ -55081,6 +55673,7 @@ var init_files_out = __esm({
 
 // ../render-node/src/host/node-host.ts
 import { mkdir as mkdir8, readFile as readFile8, stat as stat11 } from "node:fs/promises";
+import { homedir as homedir3 } from "node:os";
 import path20 from "node:path";
 function createAssetHost(dir) {
   const root = path20.resolve(dir);
@@ -55106,6 +55699,7 @@ function createNodeHost(options = {}) {
     return p ? path20.dirname(p) : process.cwd();
   };
   const inProject = (p) => path20.isAbsolute(p) ? p : path20.resolve(baseDir(), p);
+  const exportPath = (p) => inProject(/^~(?=$|[\\/])/.test(p) ? path20.join(homedir3(), p.slice(1)) : p);
   const defaultOutput = (options_) => {
     const ext = FORMATS[options_.format]?.extension ?? "mp4";
     const project = current();
@@ -55129,8 +55723,20 @@ function createNodeHost(options = {}) {
       removeCopies: (paths) => removeMediaCopies(paths, collectOptions())
     },
     exporter: {
+      delivery: "files",
+      // The desktop names an export after the project file (else "Untitled Project").
+      defaultName: () => {
+        const file3 = current();
+        return file3 ? path20.basename(file3, path20.extname(file3)) : "Untitled Project";
+      },
+      async isFolder(p) {
+        return stat11(exportPath(p)).then(
+          (s) => s.isDirectory(),
+          () => false
+        );
+      },
       async export(project, exportOptions, onProgress) {
-        const output2 = exportOptions.output ? inProject(exportOptions.output) : defaultOutput(exportOptions);
+        const output2 = exportOptions.output ? exportPath(exportOptions.output) : defaultOutput(exportOptions);
         await mkdir8(path20.dirname(output2), { recursive: true });
         return renderProject(project, {
           resolveMedia,
@@ -55144,11 +55750,10 @@ function createNodeHost(options = {}) {
           }
         });
       },
-      // The containers this exporter writes, with encoders the local ffmpeg has (FFmpegWriter.IsValidCodec).
+      // The containers this exporter writes, with encoders the local ffmpeg has (FFmpegWriter.IsValidCodec) and the muxer takes.
       async supports(format, videoCodec, audioCodec) {
-        if (!FORMATS[format]) return false;
         const encoders = await encoderNames().catch(() => /* @__PURE__ */ new Set());
-        return (!videoCodec || encoders.has(videoCodec)) && (!audioCodec || encoders.has(audioCodec));
+        return ffmpegCanWrite(format, videoCodec, audioCodec, encoders);
       }
     },
     frames: {
@@ -55318,6 +55923,7 @@ __export(src_exports, {
   extractSpeechAudio: () => extractSpeechAudio,
   faceOffsets: () => faceOffsets,
   fallbackBinaryDirs: () => fallbackBinaryDirs,
+  ffmpegCanWrite: () => ffmpegCanWrite,
   ffmpegMajorVersion: () => ffmpegMajorVersion,
   fileState: () => fileState,
   findYtDlp: () => findYtDlp,
@@ -58121,7 +58727,7 @@ var init_schemas_gen = __esm({
       export_video_tool: {
         name: "export_video_tool",
         title: "Export video",
-        description: "Export the project. Default opens the export dialog; set show_dialog=false to render immediately with optional output_path.",
+        description: `Render the timeline to a file: video, audio only (MP3/WAV/FLAC), animated GIF or an image sequence. Picks the target like the Export dialog: preset (YouTube, Instagram Reels, TikTok, YouTube Shorts, MP4 (h.264), GIF, MP3, WEBM...), quality low/med/high, the preset's video profile (closest to the project), and optional Advanced overrides (size, fps, codecs, bitrates, sample rate, channels, container). Range: the whole timeline (first to last clip), the selected clips, or start/end seconds. Arguments left out use the defaults stored with set_export_setting_tool. In the web editor a call that names nothing to render opens its Export dialog (show_dialog=false renders); the editor downloads the file, Zenvi Cloud answers with a render_id (get_render_status gives the download link), the CLI writes the file next to the project. For social vertical formats, switch the project first with set_project_profile_tool (reframe='fill'), otherwise landscape footage renders with bars. Example: {"preset": "Instagram Reels", "start": 0, "end": 5}`,
         assistant: true,
         desktopReadOnly: false,
         handler: "src/classes/editor_tools/project_export_render.py:export_video",
@@ -61224,30 +61830,7 @@ var init_pending = __esm({
       "zenvi_api_request"
     ]);
     PENDING_DESKTOP_ARGS = {
-      add_effect_tool: ["processing"],
-      export_video_tool: [
-        "audio_bitrate",
-        "audio_codec",
-        "channels",
-        "container",
-        "end",
-        "export_type",
-        "file_name",
-        "folder",
-        "fps",
-        "height",
-        "image_format",
-        "interlaced",
-        "preset",
-        "profile",
-        "quality",
-        "range",
-        "sample_rate",
-        "start",
-        "video_bitrate",
-        "video_codec",
-        "width"
-      ]
+      add_effect_tool: ["processing"]
     };
     DESKTOP_NAMES_ON_DIRECT_TOOLS = /* @__PURE__ */ new Set([]);
   }
@@ -61338,8 +61921,8 @@ function filterTagsForWindow(tags, windowScenes) {
     for (const value of values) {
       const text5 = String(value ?? "").trim();
       if (!text5) continue;
-      const norm4 = text5.toLowerCase();
-      if (corpus.includes(norm4) || norm4.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text5);
+      const norm5 = text5.toLowerCase();
+      if (corpus.includes(norm5) || norm5.split(/\s+/).some((tok) => tok.length > 2 && corpus.includes(tok))) kept.push(text5);
     }
     filtered[key2] = kept;
   }
@@ -66454,10 +67037,10 @@ var init_captions = __esm({
           const timelineArg = String(input4.timeline_clip_id ?? "").trim();
           if (clipIdArg && timelineArg && clipIdArg !== timelineArg) toolError("clipId and timeline_clip_id name different clips; pass one");
           const clipId2 = clipIdArg || timelineArg;
-          const given = givenCues(input4.cues, "cues");
+          const given2 = givenCues(input4.cues, "cues");
           const srtPath = String(input4.srtPath ?? "").trim();
-          if (given.length > 0 && srtPath) toolError("pass either cues or srtPath, not both");
-          const source2 = given.length > 0 ? "cues" : srtPath ? "file" : "transcript";
+          if (given2.length > 0 && srtPath) toolError("pass either cues or srtPath, not both");
+          const source2 = given2.length > 0 ? "cues" : srtPath ? "file" : "transcript";
           const trackIndex = Math.trunc(Number(input4.trackIndex ?? 0)) || 0;
           if (source2 !== "transcript" && trackIndex) {
             toolError("trackIndex picks clips to caption from their transcript; with cues or srtPath pass timeline_clip_id (or nothing, for an overlay over the timeline)");
@@ -66483,7 +67066,7 @@ var init_captions = __esm({
           if (overlayMode && timeBase === "source") toolError("time_base='source' needs the clip whose media the times refer to");
           const overlayTrack = String(input4.overlay_track ?? "");
           const targets = await resolveTargets(call, clipId2, query2, trackIndex, source2 === "transcript");
-          const raw = source2 === "file" ? fileCues : given;
+          const raw = source2 === "file" ? fileCues : given2;
           if (overlayMode) {
             planOverlayTrack(call.doc.project, Math.min(...raw.map((q) => q.start)), Math.max(...raw.map((q) => q.end)), overlayTrack);
           }
@@ -66884,7 +67467,7 @@ function gridOf(project) {
   const fps2 = num15 / den2;
   return { fps: fps2, frame: 1 / fps2, tol: 0.5 / fps2, snap: (seconds2) => pyRound(seconds2 * fps2) / fps2 };
 }
-function r3(value) {
+function r32(value) {
   return Number(pyFixed(Number(value) || 0, 3));
 }
 function f2(value) {
@@ -66938,11 +67521,11 @@ function describeClip(project, clip2) {
     file_id: String(clip2.file_id ?? ""),
     track: uiTrack(project, clip2.layer),
     layer: clip2.layer,
-    position: r3(start),
-    end: r3(end),
-    duration: r3(end - start),
-    source_in: r3(Number(clip2.start) || 0),
-    source_out: r3(Number(clip2.end) || 0)
+    position: r32(start),
+    end: r32(end),
+    duration: r32(end - start),
+    source_in: r32(Number(clip2.start) || 0),
+    source_out: r32(Number(clip2.end) || 0)
   };
 }
 function clipsGiven(target) {
@@ -66995,7 +67578,7 @@ function overlapRow(project, hit) {
     overlaps: hit.overlapsId,
     overlaps_title: hit.overlapsTitle,
     track: uiTrack(project, hit.layer),
-    seconds: r3(hit.seconds)
+    seconds: r32(hit.seconds)
   };
 }
 function newOverlaps(project, changes, newItems = []) {
@@ -67029,7 +67612,7 @@ var init_timeline_edit_common = __esm({
 });
 
 // ../engine/src/tools/clip-props-model.ts
-function norm2(text5) {
+function norm3(text5) {
   return String(text5).trim().toLowerCase().replace(/[\s_\-/()]+/g, "");
 }
 function isRecord32(value) {
@@ -67076,9 +67659,9 @@ function resolveKey2(name) {
   if (raw in PROPS || SHAPE_KEYS.has(raw)) {
     key2 = raw;
   } else {
-    const wanted = norm2(raw);
-    key2 = Object.keys(PROPS).find((k) => norm2(k) === wanted);
-    key2 ??= Object.entries(PROPS).find(([, meta3]) => norm2(meta3.name ?? "") === wanted)?.[0];
+    const wanted = norm3(raw);
+    key2 = Object.keys(PROPS).find((k) => norm3(k) === wanted);
+    key2 ??= Object.entries(PROPS).find(([, meta3]) => norm3(meta3.name ?? "") === wanted)?.[0];
     key2 ??= PROPERTY_ALIASES[raw.toLowerCase()] ?? PROPERTY_ALIASES[wanted];
     if (!key2 && NOT_RENDERED.test(raw.toLowerCase())) key2 = raw.toLowerCase();
   }
@@ -67180,8 +67763,8 @@ function coerceChoice(info, value, where) {
   const names2 = info.choices.map(([name]) => name);
   let wanted;
   if (typeof value === "boolean") {
-    wanted = norm2(value ? "on" : "off");
-    if (info.key === "waveform") wanted = norm2(value ? "yes" : "no");
+    wanted = norm3(value ? "on" : "off");
+    if (info.key === "waveform") wanted = norm3(value ? "yes" : "no");
   } else if (typeof value === "number") {
     for (const [, val] of info.choices) if (Number(val) === value) return storedChoice(val);
     throw new ToolError(`${where} must be one of ${pyRepr2(names2)} (or their values), got ${pyRepr2(value)}`);
@@ -67192,11 +67775,11 @@ function coerceChoice(info, value, where) {
       for (const [, val] of info.choices) if (Number(val) === number4) return storedChoice(val);
       throw new ToolError(`${where} must be one of ${pyRepr2(names2)} (or their values), got ${pyFloat(number4)}`);
     }
-    wanted = norm2(text5);
+    wanted = norm3(text5);
   }
   const alias = CHOICE_ALIASES[info.key]?.[wanted];
   for (const [name, val] of info.choices) {
-    if (norm2(name) === wanted || alias !== void 0 && name === alias) return storedChoice(val);
+    if (norm3(name) === wanted || alias !== void 0 && name === alias) return storedChoice(val);
   }
   throw new ToolError(`${where} must be one of ${pyRepr2(names2)}, got ${pyRepr2(value ?? null)}`);
 }
@@ -67730,9 +68313,9 @@ async function copyClipKeyframes(call, input4) {
     keys = keys.filter((k) => k !== "time");
     notCopied.push("time");
   }
-  const given = input4.timeline_clip_ids ?? [];
-  const ids2 = given.map((id) => String(id).trim()).filter((id) => id && id !== source2.id);
-  if (given.length > 0 && ids2.length === 0) {
+  const given2 = input4.timeline_clip_ids ?? [];
+  const ids2 = given2.map((id) => String(id).trim()).filter((id) => id && id !== source2.id);
+  if (given2.length > 0 && ids2.length === 0) {
     throw new ToolError("the only target given is the source clip itself; name other clips to copy onto");
   }
   if (ids2.length === 0 && !input4.clip_query && !input4.scope) throw new ToolError("name the target clips (timeline_clip_ids, clip_query or scope)");
@@ -70896,7 +71479,7 @@ var init_color_agent = __esm({
 });
 
 // ../engine/src/tools/luts.ts
-function norm3(text5) {
+function norm4(text5) {
   return Array.from(String(text5).toLowerCase().replaceAll("&", "and")).filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("");
 }
 function resolveLut(value) {
@@ -70911,13 +71494,13 @@ function resolveLut(value) {
     return { kind: "file", path: text5 };
   }
   const luts = listLuts();
-  const key2 = norm3(text5.toLowerCase().endsWith(".cube") ? text5.slice(0, -5) : text5);
+  const key2 = norm4(text5.toLowerCase().endsWith(".cube") ? text5.slice(0, -5) : text5);
   for (const field2 of ["id", "name"]) {
     for (const lut of luts) {
-      if (norm3(lut[field2]) === key2 || norm3(stem5(lut)) === key2) return { kind: "builtin", path: lut.path, lut };
+      if (norm4(lut[field2]) === key2 || norm4(stem5(lut)) === key2) return { kind: "builtin", path: lut.path, lut };
     }
   }
-  const partial2 = luts.filter((lut) => key2 && norm3(lut.id).includes(key2));
+  const partial2 = luts.filter((lut) => key2 && norm4(lut.id).includes(key2));
   if (partial2.length === 1) return { kind: "builtin", path: partial2[0].path, lut: partial2[0] };
   const close = getCloseMatches(text5, luts.map((lut) => lut.id), 5, 0.3);
   const hints = close.length > 0 ? close : partial2.slice(0, 5).map((lut) => lut.id);
@@ -71825,13 +72408,13 @@ var init_color_agent2 = __esm({
           let resolved = rawLook ? resolveLookId(rawLook) : { kind: "lut", lut_path: rawLut, id: rawLut };
           if (rawLut && resolved.kind !== "lut") return "Error: pass either lookId or lutPath for a LUT, not both conflicting kinds.";
           if (rawLut) resolved = { kind: "lut", lut_path: rawLut, id: rawLut };
-          const given = (v) => v !== void 0 && v !== null && v !== "";
-          const intensityArg = given(input4.lutIntensity) ? input4.lutIntensity : input4.lut_intensity;
-          const grainArg = [input4.stackGrain, input4.stack_grain, input4.grainPreset, input4.grain_preset].find(given);
-          const lutIntensity = given(intensityArg) ? toFloat5(intensityArg, "lutIntensity") : null;
-          const mix2 = given(input4.mix) ? toFloat5(input4.mix, "mix") : null;
+          const given2 = (v) => v !== void 0 && v !== null && v !== "";
+          const intensityArg = given2(input4.lutIntensity) ? input4.lutIntensity : input4.lut_intensity;
+          const grainArg = [input4.stackGrain, input4.stack_grain, input4.grainPreset, input4.grain_preset].find(given2);
+          const lutIntensity = given2(intensityArg) ? toFloat5(intensityArg, "lutIntensity") : null;
+          const mix2 = given2(input4.mix) ? toFloat5(input4.mix, "mix") : null;
           let grainId = null;
-          if (given(grainArg)) {
+          if (given2(grainArg)) {
             const g = text2(grainArg);
             if (["1", "true", "yes", "on"].includes(g.toLowerCase())) grainId = "35mm_classic";
             else {
@@ -72800,7 +73383,7 @@ function richSummary(ptype, value) {
   if (ptype === "reader") return basename4(String(value.path ?? "")) || null;
   if (ptype === "colorgrade_curve") {
     const nodes = Array.isArray(value.nodes) ? value.nodes : [];
-    return nodes.map((n) => [r3(keyframeValueAt2(n.x, 1)), r3(keyframeValueAt2(n.y, 1))]);
+    return nodes.map((n) => [r32(keyframeValueAt2(n.x, 1)), r32(keyframeValueAt2(n.y, 1))]);
   }
   const out = {};
   for (const w of WHEELS) {
@@ -72823,7 +73406,7 @@ function effectValueSummary(project, className, effect3, clip2) {
       if (pts.length <= 1) out[pname] = pts.length > 0 ? round4(Number(pts[0].co.Y)) : pspec.default ?? null;
       else {
         out[pname] = {
-          keyframes: pts.map((p) => ({ time: r3(position + (Number(p.co.X) - 1) / fps2 - start), value: round4(Number(p.co.Y)) }))
+          keyframes: pts.map((p) => ({ time: r32(position + (Number(p.co.X) - 1) / fps2 - start), value: round4(Number(p.co.Y)) }))
         };
       }
     } else if (isColorValue(value)) {
@@ -73836,152 +74419,799 @@ var init_effects_color_looks = __esm({
   }
 });
 
+// ../engine/src/tools/catalog/project-export-profiles.ts
+async function customProfiles(call) {
+  const storage = call.host.storage;
+  if (!storage?.customProfiles) return [];
+  const out = [];
+  for (const file3 of await storage.customProfiles()) {
+    const profile = parseProfileFile(file3.text, file3.name);
+    if (profile) out.push({ ...profile, user: true, path: file3.path });
+  }
+  return out;
+}
+async function profileContext(call) {
+  const fps2 = projectFps(call.doc.project);
+  return { catalog: profileCatalog(await customProfiles(call)), projectFps: fps2.num / fps2.den };
+}
+function resolving(body) {
+  try {
+    return body();
+  } catch (error62) {
+    if (error62 instanceof ProfileRequestError) throw new ToolError(error62.message);
+    throw error62;
+  }
+}
+function fpsWords(profile) {
+  return fpsValue(profile).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+async function keepCustomProfile(call, choice) {
+  if (!choice.create) return choice.profile;
+  const { profile } = choice;
+  const what = `no built-in profile is ${profile.width}x${profile.height} at ${fpsWords(profile)} fps and a custom one could not be saved`;
+  const storage = call.host.storage;
+  if (!storage?.writeCustomProfile) throw new ToolError(`${what}: ${CUSTOM_PROFILE_HOME}. Pick a built-in size (list_project_profiles_tool)`);
+  try {
+    const path42 = await storage.writeCustomProfile(profile.key, profileFileText(profile));
+    return { ...profile, user: true, path: path42 };
+  } catch (error62) {
+    throw new ToolError(`${what}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+  }
+}
+function currentProfile(project) {
+  const fps2 = projectFps(project);
+  const dar = project.display_ratio ?? reducedDisplayRatio(project.width, project.height);
+  const record5 = {
+    description: String(project.profile ?? ""),
+    width: Math.trunc(project.width),
+    height: Math.trunc(project.height),
+    fps: fps2,
+    progressive: true,
+    pixel_ratio: project.pixel_ratio ? { num: project.pixel_ratio.num, den: project.pixel_ratio.den } : { num: 1, den: 1 },
+    display_ratio: { num: dar.num, den: dar.den },
+    spherical: false
+  };
+  return { ...record5, key: profileKey(record5), user: false };
+}
+function targetProfile(call, ctx, args) {
+  const project = call.doc.project;
+  const fps2 = Number(args.fps) || null;
+  return resolving(() => {
+    if (args.fromFileId) {
+      const file3 = fileById2(project, args.fromFileId.trim());
+      if (!file3) throw new ToolError(`no project file with id=${pyReprString(args.fromFileId)}`);
+      if (!file3.has_video || file3.media_type === "audio") throw new ToolError("that file has no picture; pick a video or image file");
+      const fw = Math.trunc(Number(file3.width) || 0);
+      const fh = Math.trunc(Number(file3.height) || 0);
+      if (!fw || !fh) throw new ToolError("that file's picture size is unknown; give width and height");
+      const ffps = file3.fps ?? {};
+      const fileFps2 = fps2 || (file3.media_type === "video" ? (Number(ffps.num) || 30) / (Number(ffps.den) || 1) : ctx.projectFps);
+      return ensureProfile(ctx, fw, fh, profileFpsFraction(fileFps2));
+    }
+    let choice;
+    if (args.width || args.height) {
+      if (!(args.width && args.height)) throw new ToolError("give both width and height");
+      if (args.width % 2 || args.height % 2) throw new ToolError("width and height must be even numbers (H.264 needs even sizes)");
+      choice = ensureProfile(ctx, args.width, args.height, profileFpsFraction(fps2 || ctx.projectFps));
+    } else if (args.profile.trim()) {
+      choice = resolveProfileRequest(ctx, args.profile, fps2);
+    } else {
+      const found = matchProfile(ctx.catalog, project.width, project.height, fps2 || ctx.projectFps);
+      choice = found ? { profile: found, create: false } : fps2 ? ensureProfile(ctx, project.width, project.height, profileFpsFraction(fps2)) : { profile: currentProfile(project), create: false };
+    }
+    return args.orientation ? flipProfile(ctx, choice, args.orientation, fps2) : choice;
+  });
+}
+function profileSnapshot(project) {
+  const fps2 = projectFps(project);
+  const dar = project.display_ratio ?? reducedDisplayRatio(project.width, project.height);
+  return {
+    profile: String(project.profile ?? ""),
+    width: project.width,
+    height: project.height,
+    fps: Math.round(fps2.num / fps2.den * 1e3) / 1e3,
+    aspect: aspectText(dar.num, dar.den)
+  };
+}
+function profileReceipt(call, result2, before, profile, reframe, socialKey) {
+  const after = describeProfile(profile);
+  let social = socialKey && SOCIAL_PRESETS[socialKey] ? SOCIAL_PRESETS[socialKey][3] : null;
+  if (social === null) {
+    for (const spec of Object.values(SOCIAL_PRESETS)) {
+      if (spec[0] === after.width && spec[1] === after.height) {
+        social = spec[3];
+        break;
+      }
+    }
+  }
+  const parts = [];
+  if (result2.changed) parts.push(`Project is now ${after.name} (${after.width}x${after.height} ${after.aspect}, ${pyFloat(after.fps)} fps)`);
+  else parts.push(`Project already uses ${after.name}`);
+  if (result2.reframed.length > 0) parts.push(`${result2.reframed.length} clip(s) set to ${reframe === "fill" ? "crop-to-fill" : "fit"}`);
+  if (result2.letterboxed.length > 0) {
+    parts.push(`${result2.letterboxed.length} clip(s) of another shape will show bars; call again with reframe='fill' to crop them to fill the frame`);
+  }
+  if (reframe === "fill" && !result2.videoClips) {
+    parts.push(
+      "the timeline has no video clips yet, so nothing was reframed: clips placed later are fitted with bars when their shape differs, so call set_project_profile_tool(reframe='fill') again once they are on the timeline"
+    );
+  }
+  const data = {
+    changed: result2.changed,
+    profile: after,
+    previous_profile: before,
+    reframe,
+    reframed_clip_ids: result2.reframed,
+    skipped: result2.skipped,
+    letterboxed_clip_ids: result2.letterboxed,
+    suggested_export_preset: social
+  };
+  const summary = `${parts.join("; ")}.`;
+  return result2.changed || result2.reframed.length > 0 ? ok(call, summary, data) : nothingChanged(call, summary, data);
+}
+function channelLayoutName(value) {
+  const hit = Object.entries(CHANNEL_LAYOUTS).find(([, [code]]) => value === code);
+  return hit ? hit[0] : value === void 0 || value === null || value === 0 || value === "" ? "" : String(value);
+}
+function defaultAudioSettings(call, sampleRate, layout) {
+  const ui = call.host.ui;
+  const entries = ui?.preferences?.() ?? null;
+  const again = "call again without save_as_default to change only this project";
+  if (entries === null || !ui?.setPreference) {
+    throw new ToolError(
+      `save_as_default keeps the sample rate and channels for new projects in an editor's settings (Zenvi desktop: Preferences > Default Audio Sample Rate / Channels); there is no editor window here, so ${again}`
+    );
+  }
+  const wanted = [];
+  if (sampleRate !== null) wanted.push(["default-samplerate", sampleRate]);
+  if (layout !== null) wanted.push(["default-channellayout", LAYOUT_SETTING[layout]]);
+  for (const [key2] of wanted) {
+    const entry = entries.find((e) => e.key === key2);
+    if (!entry || entry.readOnly) {
+      throw new ToolError(
+        `this editor's settings have no default ${key2 === "default-samplerate" ? "sample rate" : "channels"} for new projects (new projects here start at 48000 Hz stereo; Zenvi desktop keeps them in Preferences), so ${again}`
+      );
+    }
+  }
+  return () => {
+    for (const [key2, value] of wanted) ui.setPreference(key2, value);
+  };
+}
+function settingsSnapshot(project) {
+  const fps2 = projectFps(project);
+  return {
+    width: project.width,
+    height: project.height,
+    fps: Math.round(fps2.num / fps2.den * 1e3) / 1e3,
+    fps_num: fps2.num,
+    fps_den: fps2.den,
+    profile: String(project.profile ?? ""),
+    sample_rate: Math.trunc(Number(project.sample_rate) || 0),
+    channels: Math.trunc(Number(project.channels) || 0),
+    channel_layout: channelLayoutName(project.channel_layout)
+  };
+}
+var READ6, EDIT6, CUSTOM_PROFILE_HOME, PIXEL_RATIO_RE, LAYOUT_SETTING, SAMPLE_RATES2, projectProfileTools;
+var init_project_export_profiles = __esm({
+  "../engine/src/tools/catalog/project-export-profiles.ts"() {
+    "use strict";
+    init_profiles();
+    init_profile_requests();
+    init_channel_layouts();
+    init_project();
+    init_define();
+    init_frame_time();
+    init_pyfmt();
+    init_common();
+    init_timeline_edit_common();
+    READ6 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    EDIT6 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    CUSTOM_PROFILE_HOME = "custom profiles live in Zenvi desktop's profiles folder, which Zenvi desktop and the zenvi CLI on the same computer use; a project whose profile Zenvi desktop does not know opens there as HD 720p 30 fps";
+    PIXEL_RATIO_RE = /^\s*(\d+)\s*[:/]\s*(\d+)\s*$/;
+    LAYOUT_SETTING = {
+      mono: "LAYOUT_MONO",
+      stereo: "LAYOUT_STEREO",
+      surround: "LAYOUT_SURROUND",
+      "5.1": "LAYOUT_5POINT1",
+      "7.1": "LAYOUT_7POINT1"
+    };
+    SAMPLE_RATES2 = [22050, 44100, 48e3, 96e3, 192e3];
+    projectProfileTools = [
+      contractTool("list_project_profiles_tool", {
+        annotations: READ6,
+        run: async (call, input4) => {
+          const ctx = await profileContext(call);
+          const tokens = (input4.query ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
+          const width = input4.width ?? 0;
+          const height = input4.height ?? 0;
+          const fps2 = input4.fps ?? 0;
+          const aspect = (input4.aspect ?? "").replaceAll("x", ":").trim();
+          const orientation = input4.orientation ?? "";
+          const rows = [];
+          for (const p of ctx.catalog) {
+            const d = describeProfile(p);
+            if (tokens.length > 0 && !tokens.every((t) => `${p.description} ${p.key}`.toLowerCase().includes(t))) continue;
+            if (width && d.width !== width || height && d.height !== height) continue;
+            if (fps2 && Math.abs(d.fps - fps2) > 0.011) continue;
+            if (aspect && d.aspect !== aspect) continue;
+            if (orientation && d.orientation !== orientation) continue;
+            rows.push(d);
+          }
+          const total = rows.length;
+          rows.sort((a, b) => Number(!a.user) - Number(!b.user) || b.width * b.height - a.width * a.height || a.fps - b.fps);
+          const limit = input4.limit ?? 30;
+          const out = { profiles: rows.slice(0, limit), total_matches: total, current: call.doc.project.profile || "" };
+          if (input4.include_social_presets ?? true) {
+            out.social_presets = Object.entries(SOCIAL_PRESETS).map(([name, [w, h, f3, preset, aliases]]) => ({
+              name,
+              width: w,
+              height: h,
+              fps: f3 ?? "project fps",
+              export_preset: preset,
+              aliases: aliases.slice(0, 4)
+            }));
+          }
+          const showing = total > limit ? `; showing ${Math.min(total, limit)}` : "";
+          return ok(call, `${total} profile(s) match${showing}.`, out);
+        }
+      }),
+      contractTool("set_project_profile_tool", {
+        annotations: EDIT6,
+        run: (call, input4) => editorRun(async () => {
+          const reframe = input4.reframe ?? "keep";
+          const args = {
+            profile: text(input4.profile),
+            width: input4.width ?? 0,
+            height: input4.height ?? 0,
+            fps: input4.fps ?? 0,
+            orientation: input4.orientation ?? "",
+            fromFileId: text(input4.from_file_id)
+          };
+          if (!args.profile && !args.width && !args.height && !args.fps && !args.orientation && !args.fromFileId && reframe === "keep") {
+            throw new ToolError("say what to change: profile (name or social preset), width+height, fps, orientation, from_file_id, or reframe");
+          }
+          const ctx = await profileContext(call);
+          const profile = await keepCustomProfile(call, targetProfile(call, ctx, args));
+          const project = call.doc.project;
+          const before = profileSnapshot(project);
+          const plan = planReframe(project, reframe, profile.width, profile.height);
+          const changed = profileDiffers(project, profile);
+          if (changed || plan.changes.length > 0) {
+            call.commit((tx) => {
+              applyProfile(tx, profile);
+              applyReframe(tx, plan);
+            }, "Set project format");
+          }
+          const socialKey = args.profile ? socialPreset(args.profile)?.key ?? null : null;
+          return profileReceipt(
+            call,
+            { changed, reframed: plan.changes.map((c) => c.id), skipped: plan.skipped, letterboxed: plan.letterboxed, videoClips: plan.videoClips },
+            before,
+            profile,
+            reframe,
+            socialKey
+          );
+        })
+      }),
+      contractTool("set_project_setting_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
+        run: (call, input4) => editorRun(async () => {
+          const project = call.doc.project;
+          const fpsNum = input4.fps_num ?? null;
+          const fpsDen = input4.fps_den ?? null;
+          let fps2 = input4.fps ?? null;
+          let width = input4.width ?? null;
+          let height = input4.height ?? null;
+          const sampleRate = input4.sample_rate ?? null;
+          const profileArg = text(input4.profile) || text(input4.preset);
+          const orientation = input4.orientation ?? "";
+          const reframe = input4.reframe ?? "keep";
+          const videoRequested = [fps2, fpsNum, fpsDen, width, height].some((v) => v !== null && v !== 0) || Boolean(profileArg) || Boolean(orientation);
+          if (fpsNum !== null || fpsDen !== null) {
+            if (fpsNum === null || fpsDen === null) throw new ToolError("give both fps_num and fps_den");
+            fps2 = fpsNum / fpsDen;
+          }
+          let layout = null;
+          const channels = text(input4.channels);
+          if (channels) {
+            layout = channelLayoutNamed(channels);
+            if (!layout) throw new ToolError("channels must be mono, stereo, surround, 5.1 or 7.1 (or 1, 2, 3, 6, 8)");
+          }
+          if (sampleRate !== null && !SAMPLE_RATES2.includes(sampleRate)) {
+            throw new ToolError(`sample_rate must be one of ${SAMPLE_RATES2.join(", ")}`);
+          }
+          if (!videoRequested && sampleRate === null && !layout && reframe === "keep") {
+            throw new ToolError("nothing to change: pass fps, width/height, profile/preset, orientation, sample_rate or channels");
+          }
+          const storeDefaults = input4.save_as_default && (sampleRate !== null || layout !== null) ? defaultAudioSettings(call, sampleRate, layout) : null;
+          let profile = null;
+          if (videoRequested || reframe !== "keep") {
+            if (width === null !== (height === null)) {
+              width = width ?? project.width;
+              height = height ?? project.height;
+            }
+            const ctx = await profileContext(call);
+            let choice = targetProfile(call, ctx, { profile: profileArg, width: width ?? 0, height: height ?? 0, fps: fps2 ?? 0, orientation, fromFileId: "" });
+            if (fpsNum !== null && fpsDen !== null && (choice.profile.fps.num !== fpsNum || choice.profile.fps.den !== fpsDen)) {
+              const base = choice.profile;
+              choice = resolving(() => ensureProfile(ctx, base.width, base.height, { num: fpsNum, den: fpsDen }));
+            }
+            profile = await keepCustomProfile(call, choice);
+          }
+          const audio = {};
+          if (sampleRate !== null && Math.trunc(Number(project.sample_rate) || 0) !== sampleRate) audio.sampleRate = sampleRate;
+          if (layout) {
+            const [code, count2] = CHANNEL_LAYOUTS[layout];
+            if (project.channel_layout !== code || Math.trunc(Number(project.channels) || 0) !== count2) audio.channels = { count: count2, layout: code };
+          }
+          const plan = profile ? planReframe(project, reframe, profile.width, profile.height) : { changes: [], skipped: [], letterboxed: [], videoClips: 0 };
+          const changedProfile = profile ? profileDiffers(project, profile) : false;
+          const changed = changedProfile || plan.changes.length > 0 || Object.keys(audio).length > 0;
+          if (changed) {
+            call.commit((tx) => {
+              if (profile && (changedProfile || plan.changes.length > 0)) {
+                applyProfile(tx, profile);
+                applyReframe(tx, plan);
+              }
+              setProjectAudio(tx, audio);
+            }, "Set project settings");
+          }
+          storeDefaults?.();
+          const after = settingsSnapshot(call.doc.project);
+          const notes = [];
+          if (changedProfile) notes.push(`${String(after.width)}x${String(after.height)} at ${pyFloat(Number(after.fps))} fps (${String(after.profile)})`);
+          if (plan.changes.length > 0) notes.push(`${plan.changes.length} clip(s) reframed`);
+          if (Object.keys(audio).length > 0) notes.push(`audio ${String(after.sample_rate)} Hz ${String(after.channel_layout)}`);
+          let summary = changed ? `Updated project settings: ${notes.join(", ")}.` : "Settings already matched.";
+          if (plan.letterboxed.length > 0) summary += ` ${plan.letterboxed.length} clip(s) of another shape will show bars; pass reframe='fill' to crop them.`;
+          const data = {
+            changed,
+            ...after,
+            reframed_clip_ids: plan.changes.map((c) => c.id),
+            letterboxed_clip_ids: plan.letterboxed,
+            saved_as_default: storeDefaults !== null
+          };
+          return changed ? ok(call, summary, data) : nothingChanged(call, summary, data);
+        })
+      }),
+      contractTool("manage_custom_profiles_tool", {
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        run: (call, input4) => editorRun(async () => {
+          const storage = call.host.storage;
+          if (!storage?.customProfiles || !storage.writeCustomProfile || !storage.removeCustomProfile) {
+            return unavailable(call.tool, `${CUSTOM_PROFILE_HOME}. The built-in profiles work everywhere (list_project_profiles_tool).`);
+          }
+          const action = input4.action;
+          if (action === "set_default") {
+            return unavailable(
+              call.tool,
+              "the default profile for new projects is a Zenvi desktop preference (Preferences > Default Profile), kept in its settings file, which only the desktop app writes; set it there. New projects here take a profile when they are made (zenvi new --profile, new_project_tool)."
+            );
+          }
+          const ctx = await profileContext(call);
+          const profileArg = text(input4.profile);
+          const base = profileArg ? await keepCustomProfile(call, resolving(() => resolveProfileRequest(ctx, profileArg))) : null;
+          if ((action === "duplicate" || action === "edit" || action === "delete") && !base) {
+            throw new ToolError(`${action} needs 'profile' (an existing profile name or key)`);
+          }
+          if ((action === "edit" || action === "delete") && !base.user) {
+            throw new ToolError(`'${base.description}' is a built-in profile; duplicate it to make a custom copy`);
+          }
+          if (action === "delete") {
+            if (base.description.trim() === String(call.doc.project.profile ?? "").trim()) {
+              throw new ToolError("you cannot delete the current project's profile or the default profile");
+            }
+            try {
+              await storage.removeCustomProfile(base.key);
+            } catch (error62) {
+              throw new ToolError(`could not delete ${base.path ?? base.key}: ${error62 instanceof Error ? error62.message : String(error62)}`);
+            }
+            return ok(call, `Deleted the custom profile '${base.description}'. No clip changed.`, { deleted: base.description, path: base.path ?? base.key });
+          }
+          const src = base;
+          const w = input4.width || src?.width || 0;
+          const h = input4.height || src?.height || 0;
+          if (!(w && h)) throw new ToolError("give width and height (or a 'profile' to start from)");
+          if (w % 2 || h % 2) throw new ToolError("width and height must be even");
+          const fps2 = input4.fps ? profileFpsFraction(input4.fps) : src ? { ...src.fps } : { num: 30, den: 1 };
+          let par = { num: 1, den: 1 };
+          const parText = text(input4.pixel_ratio);
+          if (parText) {
+            const m = PIXEL_RATIO_RE.exec(parText);
+            if (!m || !Number(m[1]) || !Number(m[2])) throw new ToolError("pixel_ratio must look like '1:1' or '10:11'");
+            par = { num: Number(m[1]), den: Number(m[2]) };
+          } else if (src) {
+            par = { ...src.pixel_ratio };
+          }
+          let desc = text(input4.name);
+          if (action === "edit" && !desc) desc = src.description;
+          if (action === "duplicate" && !desc) desc = `${src.description} (copy)`;
+          if (!desc) desc = `Custom ${w}x${h} ${(fps2.num / fps2.den).toFixed(2).replace(/0+$/, "").replace(/\.$/, "")} fps`;
+          for (const p of ctx.catalog) {
+            if (p.description.trim() === desc && !(action === "edit" && p.user && p.key === src?.key)) {
+              throw new ToolError(`a profile named '${desc}' already exists; pick a unique name`);
+            }
+          }
+          const record5 = {
+            description: desc,
+            width: w,
+            height: h,
+            fps: fps2,
+            progressive: !input4.interlaced,
+            pixel_ratio: par,
+            display_ratio: reducedDisplayRatio(w, h, par.num, par.den),
+            spherical: Boolean(input4.spherical)
+          };
+          let name = action === "edit" ? src.key : profileKey(record5);
+          if (action !== "edit") {
+            const taken = new Set(ctx.catalog.filter((p) => p.user).map((p) => p.key));
+            const stem7 = name;
+            for (let suffix = 1; taken.has(name); suffix += 1) name = `${stem7}-${suffix}`;
+          }
+          let path42;
+          try {
+            path42 = await storage.writeCustomProfile(name, profileFileText({ ...record5, key: name }));
+          } catch (error62) {
+            throw new ToolError(`could not save the profile: ${error62 instanceof Error ? error62.message : String(error62)}`);
+          }
+          const verb = action === "edit" ? "Updated" : "Created";
+          return ok(call, `${verb} custom profile '${desc}' (${w}x${h}, ${pyG(fps2.num / fps2.den, 3)} fps).`, {
+            profile: describeProfile({ ...record5, key: name, user: true }),
+            path: path42
+          });
+        })
+      })
+    ];
+  }
+});
+
 // ../engine/src/tools/catalog/export.ts
-function normKey(text5) {
-  return String(text5 ?? "").trim().toLowerCase().replace(/[\s\-/]+/g, "_").replace(/^_+|_+$/g, "");
+function exportArgumentsSet(input4) {
+  const schema = contractMeta.export_video_tool.inputSchema.properties;
+  return EXPORT_ARGUMENTS.filter((name) => {
+    const value = input4[name];
+    if (value === void 0 || value === null || value === "") return false;
+    return JSON.stringify(value) !== JSON.stringify(schema[name]?.default);
+  });
+}
+function requestOf(input4) {
+  const str4 = (name) => typeof input4[name] === "string" ? input4[name] : void 0;
+  const num15 = (name) => typeof input4[name] === "number" ? input4[name] : void 0;
+  return {
+    preset: str4("preset"),
+    quality: str4("quality"),
+    exportType: str4("export_type"),
+    range: str4("range"),
+    start: num15("start"),
+    end: num15("end"),
+    outputPath: str4("output_path"),
+    folder: str4("folder"),
+    fileName: str4("file_name"),
+    profile: str4("profile"),
+    width: num15("width"),
+    height: num15("height"),
+    fps: num15("fps"),
+    container: str4("container"),
+    videoCodec: str4("video_codec"),
+    audioCodec: str4("audio_codec"),
+    videoBitrate: str4("video_bitrate"),
+    audioBitrate: str4("audio_bitrate"),
+    sampleRate: num15("sample_rate"),
+    channels: str4("channels"),
+    interlaced: input4.interlaced === true,
+    imageFormat: str4("image_format")
+  };
+}
+function planning(body) {
+  try {
+    return body();
+  } catch (error62) {
+    if (error62 instanceof ExportPlanError) throw new ToolError(error62.message);
+    throw error62;
+  }
+}
+function baseName2(path42) {
+  return path42.split(/[\\/]/).pop() ?? path42;
+}
+async function defaultExportName(call) {
+  const fromHost = await call.host.exporter?.defaultName?.();
+  if (fromHost?.trim()) return fromHost.trim();
+  const saved = call.host.storage?.currentPath?.() ?? "";
+  const name = baseName2(saved);
+  return /\.(zvn|osp)$/i.test(name) ? name.replace(/\.(zvn|osp)$/i, "") : "Untitled Project";
+}
+async function planFor(call, input4) {
+  const request = requestOf(input4);
+  const exporter = call.host.exporter;
+  const files = (exporter?.delivery ?? "files") === "files";
+  if (request.range?.trim().toLowerCase() === "selection" && !call.host.ui?.selectedIds) {
+    throw new ToolError("range='selection' exports the clips selected in an editor's timeline, and this Zenvi surface has no timeline selection; give start/end seconds instead");
+  }
+  const outputPath = request.outputPath?.trim() || storedExportOverrides(call.doc.project).output_path?.trim() || "";
+  const outputIsFolder = files && outputPath !== "" && exporter?.isFolder ? await exporter.isFolder(outputPath) : false;
+  const { catalog } = await profileContext(call);
+  const defaultName = await defaultExportName(call);
+  return planning(() => planExport(call.doc.project, request, { catalog, selectedClipIds: selectedClipIds(call), defaultName, outputIsFolder }));
+}
+function listWords(items) {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+async function writableFormats(exporter) {
+  const files = [];
+  const frames = [];
+  for (const [format, video, audio] of FORMAT_PROBES) {
+    if (exporter.supports && !await exporter.supports(format, video, audio)) continue;
+    (isSequenceFormat(format) ? frames : files).push(FORMAT_NAMES[format]);
+  }
+  const parts = [listWords(files), frames.length > 0 ? `${listWords(frames)} image sequences` : ""].filter(Boolean);
+  return parts.length > 0 ? `it can export ${parts.join(", and ")}` : "it cannot export anything";
+}
+async function encodable(exporter, format, kind, candidates) {
+  const out = [];
+  for (const codec2 of candidates) {
+    const ok2 = await exporter.supports(format, kind === "video" ? codec2 : "", kind === "audio" ? codec2 : "");
+    if (ok2) out.push(codec2);
+  }
+  return out;
+}
+function formatWords(format) {
+  return isSequenceFormat(format) ? `${FORMAT_NAMES[format]} image sequences` : `${FORMAT_NAMES[format]} files`;
+}
+async function checkEncoders(exporter, plan, format, presetAudio) {
+  const warnings = [];
+  const supports = exporter.supports;
+  if (!supports) return { warnings };
+  const frame = { width: plan.width, height: plan.height, fps: plan.fps };
+  if (!await supports(format, "", "", frame)) {
+    throw new ToolError(`this Zenvi surface cannot write ${formatWords(format)}; ${await writableFormats(exporter)}. Pick one with container= or preset=`);
+  }
+  const video = plan.export_type === "audio_only" ? "" : plan.vcodec;
+  if (video && !await supports(format, video, "", frame)) {
+    const options2 = await encodable(exporter, format, "video", VIDEO_CODECS.filter((c) => c !== video));
+    const there2 = options2.length > 0 ? `it encodes ${listWords(options2)} there` : `it encodes no video in ${FORMAT_NAMES[format]}`;
+    throw new ToolError(`this Zenvi surface cannot encode video codec '${video}' in ${FORMAT_NAMES[format]}; ${there2}. Pass video_codec=, or another preset or container`);
+  }
+  const audio = plan.export_type === "video_audio" || plan.export_type === "audio_only" ? plan.acodec : "";
+  if (!audio || AAC.has(audio.toLowerCase()) || await supports(format, "", audio, frame)) return { warnings };
+  if (presetAudio) {
+    for (const alternative of AUDIO_FALLBACKS[format] ?? []) {
+      if (AAC.has(alternative) || await supports(format, "", alternative, frame)) {
+        warnings.push(`This Zenvi surface cannot encode '${audio}' audio; the sound is ${alternative} instead (the same ${FORMAT_NAMES[format]} file otherwise).`);
+        return { audioCodec: alternative, warnings };
+      }
+    }
+  }
+  const options = await encodable(exporter, format, "audio", AUDIO_CODECS.filter((c) => c !== audio));
+  const there = options.length > 0 ? `it encodes ${listWords(options)} there` : `it encodes no audio in ${FORMAT_NAMES[format]}`;
+  throw new ToolError(`this Zenvi surface cannot encode audio codec '${audio}' in ${FORMAT_NAMES[format]}; ${there}. Pass audio_codec=, or another preset or container`);
+}
+function firstFrameOf(pattern) {
+  return pattern.replace(/%0?(\d*)d/, (_match, width) => "1".padStart(Number(width) || 1, "0"));
+}
+function exportReceipt(call, plan, result2, warnings) {
+  const seconds2 = plan.end_seconds - plan.start_seconds;
+  const what = WHAT[plan.export_type];
+  const frame = plan.export_type === "audio_only" ? "" : `, ${plan.width}x${plan.height} at ${pyFloat(plan.fps)} fps`;
+  const notes = plan.notes.length > 0 ? ` Note: ${plan.notes.join("; ")}.` : "";
+  const summaryOf2 = planSummary(plan);
+  let receipt2;
+  if (result2.job) {
+    const name = baseName2(result2.location);
+    const summary = `Started rendering ${pyFixed(seconds2, 2)}s of ${what} with '${plan.preset}' (${plan.quality})${frame} as ${name}: render ${result2.job.id} is ${result2.job.status}. ${result2.job.followUp}${notes}`;
+    receipt2 = ok(call, summary, {
+      render_id: result2.job.id,
+      status: result2.job.status,
+      duration_seconds: Number(pyFixed(seconds2, 3)),
+      notes: plan.notes,
+      ...summaryOf2,
+      path: name
+    });
+  } else {
+    const size = result2.bytes ?? 0;
+    const summary = `Exported ${pyFixed(seconds2, 2)}s of ${what} with '${plan.preset}' (${plan.quality}) to ${result2.location} (${pyFixed(size / 1048576, 1)} MB)${frame}.${notes}`;
+    const extra = plan.export_type === "image_sequence" ? { frame_files: result2.frames ?? plan.end_frame - plan.start_frame + 1, first_frame: firstFrameOf(result2.location) } : {};
+    receipt2 = ok(call, summary, { size_bytes: size, duration_seconds: Number(pyFixed(seconds2, 3)), notes: plan.notes, ...summaryOf2, path: result2.location, ...extra });
+  }
+  receipt2.warnings = warnings;
+  return receipt2;
+}
+async function exportVideo(call, input4) {
+  const exporter = call.host.exporter;
+  if (!exporter) return unavailable("export_video_tool", "it needs video rendering, which this host does not provide.");
+  if (input4.interlaced === true) {
+    throw new ToolError("this Zenvi surface cannot export interlaced video: its encoders write progressive frames only (Zenvi desktop can). Call it again without interlaced");
+  }
+  const delivery = exporter.delivery ?? "files";
+  if (delivery !== "files" && text(input4.folder)) {
+    const where = delivery === "download" ? "the browser downloads the file" : "Zenvi Cloud answers with a download link";
+    throw new ToolError(`this Zenvi surface has no folders (${where}); call it again without folder (file_name names the file)`);
+  }
+  const plan = await planFor(call, input4);
+  const format = planContainer(plan);
+  if (!format) {
+    const kind = plan.export_type === "image_sequence" ? `${plan.vformat.toUpperCase()} image sequences` : `${plan.vformat.toUpperCase()} files`;
+    throw new ToolError(`this Zenvi surface cannot write ${kind} (Zenvi desktop can); ${await writableFormats(exporter)}. Pick one with container= or preset=`);
+  }
+  const ov = storedExportOverrides(call.doc.project);
+  const presetAudio = !text(input4.audio_codec) && !ov.audio_codec && plan.acodec === resolveExportPreset(plan.preset).audioCodec;
+  const { audioCodec, warnings } = await checkEncoders(exporter, plan, format, presetAudio);
+  const project = call.doc.toJSON();
+  if ((project.files ?? []).some((f3) => f3.path === plan.path)) throw new ToolError(`${plan.path} is one of the project's input files; choose a different name`);
+  const options = exportOptionsForPlan(plan);
+  if (audioCodec) options.audioCodec = audioCodec;
+  if (delivery !== "files" && /[\\/]/.test(plan.path)) {
+    const name = baseName2(plan.path);
+    options.output = name;
+    warnings.push(`This Zenvi surface has no folders: the file is named ${name}.`);
+  }
+  let result2;
+  try {
+    result2 = await exporter.export(project, options);
+  } catch (error62) {
+    throw new ToolError(`export failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
+  }
+  return exportReceipt(call, audioCodec ? { ...plan, acodec: audioCodec } : plan, result2, [...warnings, ...result2.warnings ?? []]);
+}
+function storedOverrides(call) {
+  return Object.fromEntries(Object.entries(record4(call.doc.project.export_overrides)).filter(([, v]) => v !== null && v !== void 0));
 }
 function clearOverrides(call, key2) {
-  const raw = normKey(key2);
-  const k = KEY_ALIASES[raw] ?? raw;
+  const raw = normSettingKey(key2);
+  const k = exportSettingKey(key2);
   const current = record4(call.doc.project.export_overrides);
   const stored = (name) => current[name] !== void 0 && current[name] !== null;
   let targets;
   if (!k) targets = Object.keys(current).filter(stored);
   else {
-    const names2 = [.../* @__PURE__ */ new Set([...STORED_AS[k] ?? [k], k, raw])];
+    const names2 = [.../* @__PURE__ */ new Set([...EXPORT_SETTING_STORED_AS[k] ?? [k], k, raw])];
     targets = names2.filter(stored);
-    if (targets.length === 0 && !SETTING_KEYS.includes(k)) {
-      throw new ToolError(`unknown export setting ${pyReprString(String(key2 ?? ""))}; valid keys: ${SETTING_KEYS.join(", ")}`);
-    }
+    if (targets.length === 0 && !isExportSettingKey(k)) throw new ToolError(unknownSettingMessage(key2));
   }
-  if (targets.length === 0) return nothingChanged(call, "No stored override to clear.", { cleared: [], overrides: current });
-  const left = clearExportSettings(call.doc, targets);
-  return ok(call, `Cleared ${targets.join(", ")}.`, { cleared: targets, overrides: left });
+  if (targets.length === 0) return nothingChanged(call, "No stored override to clear.", { cleared: [], overrides: storedOverrides(call) });
+  clearExportSettings(call.doc, targets);
+  return ok(call, `Cleared ${targets.join(", ")}.`, { cleared: targets, overrides: storedOverrides(call) });
 }
-var SETTING_KEYS, KEY_ALIASES, STORED_AS, exportTools;
+async function storeOverride(call, key2, value) {
+  const k = exportSettingKey(key2);
+  if (!k) throw new ToolError(`give key and value; valid keys: ${Object.keys(EXPORT_SETTING_KEYS).join(", ")}`);
+  if (!isExportSettingKey(k)) throw new ToolError(unknownSettingMessage(key2));
+  const values = planning(() => parseExportSetting(k, value, call.doc.project));
+  const codec2 = k === "video_codec" || k === "audio_codec" ? String(values[k]) : "";
+  const supports = call.host.exporter?.supports;
+  if (codec2 && supports && !(k === "audio_codec" && AAC.has(codec2.toLowerCase()))) {
+    const ok2 = k === "video_codec" ? await supports("mkv", codec2, "") : await supports("mkv", "", codec2);
+    if (!ok2) throw new ToolError(`this Zenvi surface cannot encode '${codec2}'`);
+  }
+  const current = record4(call.doc.project.export_overrides);
+  const shown = String(value ?? "").trim();
+  if (Object.entries(values).every(([name, v]) => current[name] === v)) {
+    return nothingChanged(call, `${k} is already ${shown}.`, { overrides: storedOverrides(call) });
+  }
+  storeExportOverrides(call.doc, values);
+  return ok(call, `Stored export ${k} = ${shown}.`, { changed: true, stored: values, overrides: storedOverrides(call) });
+}
+var EXPORT_ARGUMENTS, FORMAT_NAMES, FORMAT_PROBES, VIDEO_CODECS, AUDIO_CODECS, AAC, AUDIO_FALLBACKS, WHAT, exportTools;
 var init_export2 = __esm({
   "../engine/src/tools/catalog/export.ts"() {
     "use strict";
-    init_project();
     init_export();
-    init_queries();
+    init_plan();
+    init_settings();
+    init_project();
     init_define();
-    init_frame_time();
     init_pyfmt();
-    init_receipt();
+    init_schemas_gen();
     init_common();
+    init_project_export_profiles();
     init_timeline_edit_common();
-    SETTING_KEYS = [
+    EXPORT_ARGUMENTS = [
       "preset",
       "quality",
       "export_type",
+      "range",
+      "start",
+      "end",
+      "output_path",
+      "folder",
+      "file_name",
+      "profile",
       "width",
       "height",
       "fps",
-      "fps_num",
-      "fps_den",
-      "start",
-      "end",
-      "start_frame",
-      "end_frame",
+      "container",
       "video_codec",
       "audio_codec",
-      "format",
       "video_bitrate",
       "audio_bitrate",
       "sample_rate",
       "channels",
-      "output_path",
-      "folder",
-      "file_name",
+      "interlaced",
       "image_format"
     ];
-    KEY_ALIASES = {
-      vcodec: "video_codec",
-      acodec: "audio_codec",
-      vformat: "format",
-      container: "format",
-      path: "output_path",
-      type: "export_type",
-      target: "preset",
-      bitrate: "video_bitrate",
-      frame_rate: "fps",
-      framerate: "fps"
+    FORMAT_NAMES = {
+      mp4: "MP4",
+      mov: "MOV",
+      mkv: "MKV",
+      webm: "WebM",
+      gif: "GIF",
+      mp3: "MP3",
+      wav: "WAV",
+      flac: "FLAC",
+      m4a: "M4A",
+      "png-sequence": "PNG",
+      "jpg-sequence": "JPG",
+      "bmp-sequence": "BMP",
+      "tiff-sequence": "TIFF"
     };
-    STORED_AS = {
-      start: ["start_frame"],
-      end: ["end_frame"],
-      fps: ["fps_num", "fps_den"],
-      format: ["vformat"],
-      channels: ["channels", "channel_layout"]
+    FORMAT_PROBES = [
+      ["mp4", "libx264", ""],
+      ["mov", "libx264", ""],
+      ["mkv", "libx264", ""],
+      ["webm", "libvpx-vp9", "libopus"],
+      ["gif", "gif", ""],
+      ["mp3", "", "libmp3lame"],
+      ["wav", "", "pcm_s16le"],
+      ["flac", "", "flac"],
+      ["m4a", "", ""],
+      ["png-sequence", "png", ""],
+      ["jpg-sequence", "mjpeg", ""],
+      ["bmp-sequence", "bmp", ""],
+      ["tiff-sequence", "tiff", ""]
+    ];
+    VIDEO_CODECS = ["libx264", "libx265", "libvpx-vp9", "libvpx", "libsvtav1", "libaom-av1", "prores_ks", "mpeg4", "gif"];
+    AUDIO_CODECS = ["aac", "libopus", "libvorbis", "libmp3lame", "flac", "pcm_s16le"];
+    AAC = /* @__PURE__ */ new Set(["aac", "libfaac", "libvo_aacenc", "libfdk_aac"]);
+    AUDIO_FALLBACKS = {
+      mp4: ["aac"],
+      mov: ["aac"],
+      mkv: ["aac"],
+      m4a: ["aac"],
+      webm: ["libopus", "libvorbis"],
+      mp3: ["libmp3lame"],
+      wav: ["pcm_s16le"],
+      flac: ["flac"]
+    };
+    WHAT = {
+      video_audio: "video",
+      video_only: "video (no audio)",
+      audio_only: "audio",
+      image_sequence: "image sequence"
     };
     exportTools = [
       contractTool("export_video_tool", {
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-        run: async (call, input4) => {
-          const openUi = !["0", "false", "no"].includes(String(input4.show_dialog ?? "true").toLowerCase().trim());
-          const path42 = text(input4.output_path);
-          if (openUi && !path42 && call.host.ui?.openExportDialog) {
+        run: (call, input4) => editorRun(async () => {
+          const args = input4;
+          const openUi = !["0", "false", "no"].includes(String(args.show_dialog ?? "true").toLowerCase().trim());
+          if (openUi && exportArgumentsSet(args).length === 0 && call.host.ui?.openExportDialog) {
             call.host.ui.openExportDialog();
-            return "Export video dialog opened.";
+            return ok(call, "Opened the Export Video dialog for the user; nothing was rendered.", { dialog_opened: true });
           }
-          const exporter = call.host.exporter;
-          if (!exporter) return unavailable("export_video_tool", "it needs video rendering, which this host does not provide.");
-          const project = call.doc.toJSON();
-          const settings = getDefaultExportSettings(project);
-          const output2 = path42 || (settings.defaultPath !== "export.mp4" ? settings.defaultPath : void 0);
-          if (output2 && (project.files ?? []).some((f3) => f3.path === output2)) {
-            return "Error: Export failed: Output path is an input file. Choose a different path.";
-          }
-          if (maxFrame(project, projectFps(project)) <= 1) {
-            return "Error: Export failed: Invalid range of frames to export.";
-          }
-          let options;
-          try {
-            options = exportOptionsFromSettings(settings);
-          } catch (error62) {
-            if (error62 instanceof ExportSettingsError) return `Error: Export failed: ${error62.message}`;
-            throw error62;
-          }
-          if (output2) options.output = output2;
-          let result2;
-          try {
-            result2 = await exporter.export(project, options);
-          } catch (error62) {
-            return `Error: Export failed: ${error62 instanceof Error ? error62.message : String(error62)}`;
-          }
-          return applied("export_video_tool", `Exported to ${result2.location}.`, { data: { ...result2, options } }, 0);
-        }
+          return exportVideo(call, args);
+        })
       }),
       contractTool("get_export_settings_tool", {
         annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-        run: (call) => {
-          const project = call.doc.project;
-          const { video, audio, exportType, defaultPath } = getDefaultExportSettings(project);
-          const fps2 = record4(video.fps);
-          const lines2 = [
-            `Export type: ${exportType}`,
-            `Default path: ${defaultPath}`,
-            `Video: ${String(video.width)}x${String(video.height)}, ${String(fps2.num)}/${String(fps2.den)} fps, codec ${video.vcodec}, format ${video.vformat}, bitrate ${String(video.video_bitrate)}`,
-            `Audio: codec ${audio.acodec}, ${String(audio.sample_rate)} Hz, ${String(audio.channels)} channels, bitrate ${String(audio.audio_bitrate)}`,
-            `Frame range: ${String(video.start_frame)} - ${String(video.end_frame)}`
-          ];
-          const overrides = record4(project.export_overrides);
-          if (Object.keys(overrides).length > 0) lines2.push(`Overrides: ${pyRepr2(overrides)}`);
-          return lines2.join("\n");
-        }
+        run: (call) => editorRun(async () => {
+          const overrides = storedOverrides(call);
+          let effective = null;
+          let notes;
+          try {
+            const plan = await planFor(call, {});
+            effective = planSummary(plan);
+            notes = plan.notes;
+          } catch (error62) {
+            if (!(error62 instanceof ToolError)) throw error62;
+            notes = [error62.message];
+          }
+          const summary = effective ? `Next export: '${String(effective.preset)}' ${String(effective.quality)} ${String(effective.export_type)} ${String(effective.width)}x${String(effective.height)} ${pyFloat(Number(effective.fps))} fps, ${pyFloat(Number(effective.start_seconds))}-${pyFloat(Number(effective.end_seconds))}s -> ${String(effective.path)}.` : `Nothing to export yet: ${notes.join("; ")}`;
+          return ok(call, summary, { effective, overrides, notes, valid_keys: EXPORT_SETTING_KEYS });
+        })
       }),
       contractTool("set_export_setting_tool", {
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
-        run: (call, input4) => {
-          if (input4.clear) return editorRun(() => clearOverrides(call, input4.key));
-          const key2 = String(input4.key ?? "").trim().toLowerCase();
-          if (!key2) return "Error: key is required.";
-          if (input4.value === void 0 || input4.value === null) return "Error: value is required.";
-          const value = typeof input4.value === "boolean" ? String(input4.value) : input4.value;
-          setExportSetting(call.doc, key2, value);
-          return `Set ${key2} = ${String(value)}.`;
-        }
+        run: (call, input4) => editorRun(() => input4.clear ? clearOverrides(call, input4.key) : storeOverride(call, input4.key, input4.value))
       })
     ];
   }
@@ -74917,11 +76147,11 @@ ${placed.text}`;
 });
 
 // ../engine/src/tools/catalog/media-files.ts
-function baseName(data) {
+function baseName3(data) {
   return folderAndName(String(data.path || "")).name;
 }
 function displayName(data) {
-  return String(data.name || baseName(data) || data.id || "?");
+  return String(data.name || baseName3(data) || data.id || "?");
 }
 function tagsOf(data) {
   const out = [];
@@ -74977,17 +76207,17 @@ function describeFile(file3, usage, missing, full) {
   const out = {
     file_id: String(file3.id),
     name: displayName(data),
-    file_name: baseName(data),
+    file_name: baseName3(data),
     kind,
     // A still has no length of its own (libopenshot reports 3600 s); on the timeline it
     // lasts the Image Length preference unless trimmed.
-    duration: still ? null : r3(Math.max(0, end - start)),
+    duration: still ? null : r32(Math.max(0, end - start)),
     tags: tagsOf(data),
     clip_count: clipIds.length
   };
   if (("start" in data || "end" in data) && !still) {
-    out.source_in = r3(start);
-    out.source_out = r3(end);
+    out.source_in = r32(start);
+    out.source_out = r32(end);
   }
   if (clipIds.length > 0) out.timeline_clip_ids = clipIds.slice(0, 20);
   if (pyTruthy(data.zenvi_subclip) || pyTruthy(data.parent_file_id)) {
@@ -75005,11 +76235,11 @@ function describeFile(file3, usage, missing, full) {
     const ai = data.ai_metadata;
     Object.assign(out, {
       path: String(data.path || ""),
-      media_duration: still ? null : r3(Number(data.duration) || 0),
+      media_duration: still ? null : r32(Number(data.duration) || 0),
       width: data.width ?? null,
       height: data.height ?? null,
       fps: `${num15}/${den2}`,
-      fps_value: num15 ? r3(num15 / den2) : null,
+      fps_value: num15 ? r32(num15 / den2) : null,
       frames: pyTruthy(data.video_length) ? Math.trunc(Number(data.video_length) || 0) : null,
       has_video: pyTruthy(data.has_video),
       has_audio: hasAudio2,
@@ -75036,7 +76266,7 @@ function describeFile(file3, usage, missing, full) {
 function queryScore(file3, q, words3) {
   const data = file3;
   const name = displayName(data).toLowerCase();
-  const base = baseName(data).toLowerCase();
+  const base = baseName3(data).toLowerCase();
   const stem7 = stemOf(base);
   const tags = tagsOf(data).map((t) => t.toLowerCase());
   if ([String(file3.id).toLowerCase(), name, base, stem7].includes(q) || tags.includes(q)) return 3;
@@ -75336,10 +76566,10 @@ async function updateProjectFiles(call, input4) {
     entry.name = displayName(data);
     entry.tags = tagsOf(data);
     const [s, e] = sourceWindowForFile(data);
-    entry.duration = r3(e - s);
+    entry.duration = r32(e - s);
     if ("start" in data) {
-      entry.source_in = r3(s);
-      entry.source_out = r3(e);
+      entry.source_in = r32(s);
+      entry.source_out = r32(e);
     }
     if (fps2) entry.fps = `${sequenceFps.num}/${sequenceFps.den}`;
   }
@@ -75373,8 +76603,8 @@ async function importImageSequence(call, input4) {
     return unavailable(call.tool, "it cannot open local folders of frames. Import image sequences with the zenvi CLI or Zenvi desktop.");
   }
   const list2 = listPathsOf(call);
-  const given = String(input4.path);
-  const listing = await list2(given.trim());
+  const given2 = String(input4.path);
+  const listing = await list2(given2.trim());
   let first;
   let sequence;
   let names2;
@@ -75382,7 +76612,7 @@ async function importImageSequence(call, input4) {
     const folder = listing.path ?? folderAndName(listing.files[0] ?? "").folder;
     names2 = namesIn(folder, listing.files);
     const found = firstSequenceFrame(folder, names2);
-    if (!found) throw new ToolError(`no numbered image sequence (name0001.png, name0002.png...) in ${pyReprString(given)}`);
+    if (!found) throw new ToolError(`no numbered image sequence (name0001.png, name0002.png...) in ${pyReprString(given2)}`);
     first = found.first;
     sequence = found.sequence;
   } else if (listing.kind === "file") {
@@ -75395,7 +76625,7 @@ async function importImageSequence(call, input4) {
     }
     sequence = found;
   } else {
-    throw new ToolError(`no file or folder at ${pyReprString(given)}`);
+    throw new ToolError(`no file or folder at ${pyReprString(given2)}`);
   }
   const frames = sequenceFrameNumbers(sequence, names2);
   if (frames.length < 2) throw new ToolError(`${sequence.pattern} has only ${frames.length} frame(s); a sequence needs at least 2`);
@@ -75443,7 +76673,7 @@ async function importImageSequence(call, input4) {
       first_frame: frames[0],
       last_frame: last,
       fps: `${fps2.num}/${fps2.den}`,
-      duration: r3(duration3),
+      duration: r32(duration3),
       width: data.width ?? null,
       height: data.height ?? null
     }
@@ -75540,10 +76770,10 @@ function createSubclips(call, input4) {
     if (e - s < 1 / rate) throw new ToolError(`sub-clip ${i + 1} is shorter than one frame`);
     plans.push([s, e, String(sub.name ?? "").trim()]);
   });
-  const base = stemOf(baseName(data)) || displayName(data);
+  const base = stemOf(baseName3(data)) || displayName(data);
   const ai = data.ai_metadata;
-  const subclips = plans.map(([s, e, given]) => {
-    let subName = given;
+  const subclips = plans.map(([s, e, given2]) => {
+    let subName = given2;
     if (!subName) {
       const hours = s >= 3600 || e >= 3600;
       const minutes = hours || s >= 60 || e >= 60;
@@ -75557,14 +76787,14 @@ function createSubclips(call, input4) {
     subclips: created.map((f3, i) => ({
       file_id: f3.id,
       name: subclips[i].name,
-      source_in: r3(subclips[i].start),
-      source_out: r3(subclips[i].end),
-      duration: r3(subclips[i].end - subclips[i].start)
+      source_in: r32(subclips[i].start),
+      source_out: r32(subclips[i].end),
+      duration: r32(subclips[i].end - subclips[i].start)
     })),
     parent_file_id: source2.id
   });
 }
-var READ6, EDIT6, REMOVE, LAYOUT_NAMES, mediaFilesTools;
+var READ7, EDIT7, REMOVE, LAYOUT_NAMES, mediaFilesTools;
 var init_media_files = __esm({
   "../engine/src/tools/catalog/media-files.ts"() {
     "use strict";
@@ -75578,8 +76808,8 @@ var init_media_files = __esm({
     init_clips2();
     init_effect_values();
     init_timeline_edit_common();
-    READ6 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
-    EDIT6 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    READ7 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    EDIT7 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     REMOVE = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     LAYOUT_NAMES = {
       0: "unknown",
@@ -75594,15 +76824,15 @@ var init_media_files = __esm({
     };
     mediaFilesTools = [
       contractTool("list_project_files_tool", {
-        annotations: READ6,
+        annotations: READ7,
         run: (call, input4) => editorRun(() => listProjectFiles(call, input4))
       }),
       contractTool("update_project_files_tool", {
-        annotations: EDIT6,
+        annotations: EDIT7,
         run: (call, input4) => editorRun(() => updateProjectFiles(call, input4))
       }),
       contractTool("import_image_sequence_tool", {
-        annotations: EDIT6,
+        annotations: EDIT7,
         requires: ["media"],
         run: (call, input4) => editorRun(() => importImageSequence(call, input4))
       }),
@@ -75611,11 +76841,11 @@ var init_media_files = __esm({
         run: (call, input4) => editorRun(() => removeFilesFromProject(call, input4))
       }),
       contractTool("create_subclips_tool", {
-        annotations: EDIT6,
+        annotations: EDIT7,
         run: (call, input4) => editorRun(() => createSubclips(call, input4))
       }),
       contractTool("manage_optimized_previews_tool", {
-        annotations: EDIT6,
+        annotations: EDIT7,
         // ProxyService builds small H.264 copies on the desktop and its preview plays them;
         // no web renderer has optimized copies (each decodes the original media).
         run: (call) => unavailable(
@@ -75701,9 +76931,9 @@ function describeTransition(project, data) {
     title: String(data.title || ""),
     track: uiTrack(project, layer2),
     layer: layer2,
-    position: r3(t0),
-    end: r3(t1),
-    duration: r3(t1 - t0),
+    position: r32(t0),
+    end: r32(t1),
+    duration: r32(t1 - t0),
     direction: direction2,
     contrast: firstValue(data.contrast),
     audio_crossfade: pyTruthy(data.fade_audio_hint),
@@ -75715,7 +76945,7 @@ function describeTransition(project, data) {
     out.between_clip_ids = [pair[0].id, pair[1].id];
     const forward2 = direction2 === "default" !== out.invert_mask;
     out.order = forward2 ? "earlier_to_later" : "later_first";
-    out.clip_overlap = r3(Math.max(0, span3(pair[0])[1] - span3(pair[1])[0]));
+    out.clip_overlap = r32(Math.max(0, span3(pair[0])[1] - span3(pair[1])[0]));
   } else {
     const edge = clipEdge(project, data);
     if (edge) out[`on_clip_${edge[0]}`] = edge[1].id;
@@ -76233,7 +77463,7 @@ async function addTransitionsBetweenClips(call, input4) {
     if (Math.abs(end.get(c.id) - (Number(c.end) || 0)) > EPS3) changes.end = end.get(c.id);
     if (Object.keys(changes).length > 0) {
       clipChanges.push([c.id, changes]);
-      moved.push({ timeline_clip_id: c.id, ...Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, r3(v)])) });
+      moved.push({ timeline_clip_id: c.id, ...Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, r32(v)])) });
     }
   }
   const replacedIds = new Set(joins.flatMap((j) => j.replaces.map((t) => t.id)));
@@ -76268,7 +77498,7 @@ async function addTransitionsBetweenClips(call, input4) {
   if (skipped.length > 0) summary += `; skipped ${skipped.length} join(s)`;
   return ok(call, summary + ".", { changed: true, added, skipped, moved_clips: moved, replaced_transition_ids: replaced });
 }
-var READ7, EDIT7, REMOVE2, EPS3, PASTE_EXCLUDED, COPY_KEYS, mediaFilesTransitionTools;
+var READ8, EDIT8, REMOVE2, EPS3, PASTE_EXCLUDED, COPY_KEYS, mediaFilesTransitionTools;
 var init_media_files_transitions = __esm({
   "../engine/src/tools/catalog/media-files-transitions.ts"() {
     "use strict";
@@ -76281,8 +77511,8 @@ var init_media_files_transitions = __esm({
     init_pyfmt();
     init_effect_values();
     init_timeline_edit_common();
-    READ7 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
-    EDIT7 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+    READ8 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    EDIT8 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
     REMOVE2 = { readOnlyHint: false, destructiveHint: true, openWorldHint: false };
     EPS3 = 1e-4;
     PASTE_EXCLUDED = /* @__PURE__ */ new Set(["id", "position", "layer", "start", "end", "duration"]);
@@ -76294,15 +77524,15 @@ var init_media_files_transitions = __esm({
     };
     mediaFilesTransitionTools = [
       contractTool("list_timeline_transitions_tool", {
-        annotations: READ7,
+        annotations: READ8,
         run: (call, input4) => editorRun(() => listTimelineTransitions(call, input4))
       }),
       contractTool("update_transition_tool", {
-        annotations: EDIT7,
+        annotations: EDIT8,
         run: (call, input4) => editorRun(() => updateTransition(call, input4))
       }),
       contractTool("reverse_transition_tool", {
-        annotations: EDIT7,
+        annotations: EDIT8,
         run: (call, input4) => editorRun(() => reverseTransitions(call, input4))
       }),
       contractTool("remove_transition_tool", {
@@ -76310,11 +77540,11 @@ var init_media_files_transitions = __esm({
         run: (call, input4) => editorRun(() => removeTransitions(call, input4))
       }),
       contractTool("copy_transition_tool", {
-        annotations: EDIT7,
+        annotations: EDIT8,
         run: (call, input4) => editorRun(() => copyTransition(call, input4))
       }),
       contractTool("add_transitions_between_clips_tool", {
-        annotations: EDIT7,
+        annotations: EDIT8,
         run: (call, input4) => editorRun(() => addTransitionsBetweenClips(call, input4))
       })
     ];
@@ -76441,7 +77671,7 @@ function placementsMetadataText(project, level) {
   }
   return lines2.join("\n");
 }
-var READ8, metadataTools;
+var READ9, metadataTools;
 var init_metadata = __esm({
   "../engine/src/tools/catalog/metadata.ts"() {
     "use strict";
@@ -76452,22 +77682,22 @@ var init_metadata = __esm({
     init_receipt();
     init_reports();
     init_common();
-    READ8 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
+    READ9 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
     metadataTools = [
       contractTool("get_clips_with_full_metadata_tool", {
-        annotations: READ8,
+        annotations: READ9,
         run: (call, input4) => {
           return fullMetadataText(call.doc.project, (text(input4.detail_level) || "summary").toLowerCase());
         }
       }),
       contractTool("get_timeline_placements_metadata_tool", {
-        annotations: READ8,
+        annotations: READ9,
         run: (call, input4) => {
           return placementsMetadataText(call.doc.project, (text(input4.detail_level) || "summary").toLowerCase());
         }
       }),
       contractTool("get_timeline_state_tool", {
-        annotations: READ8,
+        annotations: READ9,
         run: (call) => {
           const data = timelineStateData(call.doc.project);
           return applied("get_timeline_state_tool", `Timeline: ${data.clips.length} clip(s), ${data.tracks.length} track(s).`, { data }, 0);
@@ -77900,471 +79130,6 @@ var init_playback = __esm({
   }
 });
 
-// ../engine/src/tools/catalog/project-export-profiles.ts
-async function customProfiles(call) {
-  const storage = call.host.storage;
-  if (!storage?.customProfiles) return [];
-  const out = [];
-  for (const file3 of await storage.customProfiles()) {
-    const profile = parseProfileFile(file3.text, file3.name);
-    if (profile) out.push({ ...profile, user: true, path: file3.path });
-  }
-  return out;
-}
-async function profileContext(call) {
-  const fps2 = projectFps(call.doc.project);
-  return { catalog: profileCatalog(await customProfiles(call)), projectFps: fps2.num / fps2.den };
-}
-function resolving(body) {
-  try {
-    return body();
-  } catch (error62) {
-    if (error62 instanceof ProfileRequestError) throw new ToolError(error62.message);
-    throw error62;
-  }
-}
-function fpsWords(profile) {
-  return fpsValue(profile).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
-}
-async function keepCustomProfile(call, choice) {
-  if (!choice.create) return choice.profile;
-  const { profile } = choice;
-  const what = `no built-in profile is ${profile.width}x${profile.height} at ${fpsWords(profile)} fps and a custom one could not be saved`;
-  const storage = call.host.storage;
-  if (!storage?.writeCustomProfile) throw new ToolError(`${what}: ${CUSTOM_PROFILE_HOME}. Pick a built-in size (list_project_profiles_tool)`);
-  try {
-    const path42 = await storage.writeCustomProfile(profile.key, profileFileText(profile));
-    return { ...profile, user: true, path: path42 };
-  } catch (error62) {
-    throw new ToolError(`${what}: ${error62 instanceof Error ? error62.message : String(error62)}`);
-  }
-}
-function currentProfile(project) {
-  const fps2 = projectFps(project);
-  const dar = project.display_ratio ?? reducedDisplayRatio(project.width, project.height);
-  const record5 = {
-    description: String(project.profile ?? ""),
-    width: Math.trunc(project.width),
-    height: Math.trunc(project.height),
-    fps: fps2,
-    progressive: true,
-    pixel_ratio: project.pixel_ratio ? { num: project.pixel_ratio.num, den: project.pixel_ratio.den } : { num: 1, den: 1 },
-    display_ratio: { num: dar.num, den: dar.den },
-    spherical: false
-  };
-  return { ...record5, key: profileKey(record5), user: false };
-}
-function targetProfile(call, ctx, args) {
-  const project = call.doc.project;
-  const fps2 = Number(args.fps) || null;
-  return resolving(() => {
-    if (args.fromFileId) {
-      const file3 = fileById2(project, args.fromFileId.trim());
-      if (!file3) throw new ToolError(`no project file with id=${pyReprString(args.fromFileId)}`);
-      if (!file3.has_video || file3.media_type === "audio") throw new ToolError("that file has no picture; pick a video or image file");
-      const fw = Math.trunc(Number(file3.width) || 0);
-      const fh = Math.trunc(Number(file3.height) || 0);
-      if (!fw || !fh) throw new ToolError("that file's picture size is unknown; give width and height");
-      const ffps = file3.fps ?? {};
-      const fileFps2 = fps2 || (file3.media_type === "video" ? (Number(ffps.num) || 30) / (Number(ffps.den) || 1) : ctx.projectFps);
-      return ensureProfile(ctx, fw, fh, profileFpsFraction(fileFps2));
-    }
-    let choice;
-    if (args.width || args.height) {
-      if (!(args.width && args.height)) throw new ToolError("give both width and height");
-      if (args.width % 2 || args.height % 2) throw new ToolError("width and height must be even numbers (H.264 needs even sizes)");
-      choice = ensureProfile(ctx, args.width, args.height, profileFpsFraction(fps2 || ctx.projectFps));
-    } else if (args.profile.trim()) {
-      choice = resolveProfileRequest(ctx, args.profile, fps2);
-    } else {
-      const found = matchProfile(ctx.catalog, project.width, project.height, fps2 || ctx.projectFps);
-      choice = found ? { profile: found, create: false } : fps2 ? ensureProfile(ctx, project.width, project.height, profileFpsFraction(fps2)) : { profile: currentProfile(project), create: false };
-    }
-    return args.orientation ? flipProfile(ctx, choice, args.orientation, fps2) : choice;
-  });
-}
-function profileSnapshot(project) {
-  const fps2 = projectFps(project);
-  const dar = project.display_ratio ?? reducedDisplayRatio(project.width, project.height);
-  return {
-    profile: String(project.profile ?? ""),
-    width: project.width,
-    height: project.height,
-    fps: Math.round(fps2.num / fps2.den * 1e3) / 1e3,
-    aspect: aspectText(dar.num, dar.den)
-  };
-}
-function profileReceipt(call, result2, before, profile, reframe, socialKey) {
-  const after = describeProfile(profile);
-  let social = socialKey && SOCIAL_PRESETS[socialKey] ? SOCIAL_PRESETS[socialKey][3] : null;
-  if (social === null) {
-    for (const spec of Object.values(SOCIAL_PRESETS)) {
-      if (spec[0] === after.width && spec[1] === after.height) {
-        social = spec[3];
-        break;
-      }
-    }
-  }
-  const parts = [];
-  if (result2.changed) parts.push(`Project is now ${after.name} (${after.width}x${after.height} ${after.aspect}, ${pyFloat(after.fps)} fps)`);
-  else parts.push(`Project already uses ${after.name}`);
-  if (result2.reframed.length > 0) parts.push(`${result2.reframed.length} clip(s) set to ${reframe === "fill" ? "crop-to-fill" : "fit"}`);
-  if (result2.letterboxed.length > 0) {
-    parts.push(`${result2.letterboxed.length} clip(s) of another shape will show bars; call again with reframe='fill' to crop them to fill the frame`);
-  }
-  if (reframe === "fill" && !result2.videoClips) {
-    parts.push(
-      "the timeline has no video clips yet, so nothing was reframed: clips placed later are fitted with bars when their shape differs, so call set_project_profile_tool(reframe='fill') again once they are on the timeline"
-    );
-  }
-  const data = {
-    changed: result2.changed,
-    profile: after,
-    previous_profile: before,
-    reframe,
-    reframed_clip_ids: result2.reframed,
-    skipped: result2.skipped,
-    letterboxed_clip_ids: result2.letterboxed,
-    suggested_export_preset: social
-  };
-  const summary = `${parts.join("; ")}.`;
-  return result2.changed || result2.reframed.length > 0 ? ok(call, summary, data) : nothingChanged(call, summary, data);
-}
-function channelLayoutName(value) {
-  const hit = Object.entries(CHANNEL_LAYOUTS2).find(([, [code]]) => value === code);
-  return hit ? hit[0] : value === void 0 || value === null || value === 0 || value === "" ? "" : String(value);
-}
-function defaultAudioSettings(call, sampleRate, layout) {
-  const ui = call.host.ui;
-  const entries = ui?.preferences?.() ?? null;
-  const again = "call again without save_as_default to change only this project";
-  if (entries === null || !ui?.setPreference) {
-    throw new ToolError(
-      `save_as_default keeps the sample rate and channels for new projects in an editor's settings (Zenvi desktop: Preferences > Default Audio Sample Rate / Channels); there is no editor window here, so ${again}`
-    );
-  }
-  const wanted = [];
-  if (sampleRate !== null) wanted.push(["default-samplerate", sampleRate]);
-  if (layout !== null) wanted.push(["default-channellayout", LAYOUT_SETTING[layout]]);
-  for (const [key2] of wanted) {
-    const entry = entries.find((e) => e.key === key2);
-    if (!entry || entry.readOnly) {
-      throw new ToolError(
-        `this editor's settings have no default ${key2 === "default-samplerate" ? "sample rate" : "channels"} for new projects (new projects here start at 48000 Hz stereo; Zenvi desktop keeps them in Preferences), so ${again}`
-      );
-    }
-  }
-  return () => {
-    for (const [key2, value] of wanted) ui.setPreference(key2, value);
-  };
-}
-function settingsSnapshot(project) {
-  const fps2 = projectFps(project);
-  return {
-    width: project.width,
-    height: project.height,
-    fps: Math.round(fps2.num / fps2.den * 1e3) / 1e3,
-    fps_num: fps2.num,
-    fps_den: fps2.den,
-    profile: String(project.profile ?? ""),
-    sample_rate: Math.trunc(Number(project.sample_rate) || 0),
-    channels: Math.trunc(Number(project.channels) || 0),
-    channel_layout: channelLayoutName(project.channel_layout)
-  };
-}
-var READ9, EDIT8, CUSTOM_PROFILE_HOME, PIXEL_RATIO_RE, LAYOUT_BY_NAME, CHANNEL_LAYOUTS2, LAYOUT_SETTING, SAMPLE_RATES, projectProfileTools;
-var init_project_export_profiles = __esm({
-  "../engine/src/tools/catalog/project-export-profiles.ts"() {
-    "use strict";
-    init_profiles();
-    init_profile_requests();
-    init_defaults();
-    init_project();
-    init_define();
-    init_frame_time();
-    init_pyfmt();
-    init_common();
-    init_timeline_edit_common();
-    READ9 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
-    EDIT8 = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
-    CUSTOM_PROFILE_HOME = "custom profiles live in Zenvi desktop's profiles folder, which Zenvi desktop and the zenvi CLI on the same computer use; a project whose profile Zenvi desktop does not know opens there as HD 720p 30 fps";
-    PIXEL_RATIO_RE = /^\s*(\d+)\s*[:/]\s*(\d+)\s*$/;
-    LAYOUT_BY_NAME = {
-      mono: "mono",
-      "1": "mono",
-      stereo: "stereo",
-      "2": "stereo",
-      surround: "surround",
-      "3": "surround",
-      "5.1": "5.1",
-      "6": "5.1",
-      "7.1": "7.1",
-      "8": "7.1"
-    };
-    CHANNEL_LAYOUTS2 = {
-      mono: [ChannelLayout.MONO, 1],
-      stereo: [ChannelLayout.STEREO, 2],
-      surround: [ChannelLayout.SURROUND, 3],
-      "5.1": [ChannelLayout.FIVE_POINT_ONE, 6],
-      "7.1": [ChannelLayout.SEVEN_POINT_ONE, 8]
-    };
-    LAYOUT_SETTING = {
-      mono: "LAYOUT_MONO",
-      stereo: "LAYOUT_STEREO",
-      surround: "LAYOUT_SURROUND",
-      "5.1": "LAYOUT_5POINT1",
-      "7.1": "LAYOUT_7POINT1"
-    };
-    SAMPLE_RATES = [22050, 44100, 48e3, 96e3, 192e3];
-    projectProfileTools = [
-      contractTool("list_project_profiles_tool", {
-        annotations: READ9,
-        run: async (call, input4) => {
-          const ctx = await profileContext(call);
-          const tokens = (input4.query ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
-          const width = input4.width ?? 0;
-          const height = input4.height ?? 0;
-          const fps2 = input4.fps ?? 0;
-          const aspect = (input4.aspect ?? "").replaceAll("x", ":").trim();
-          const orientation = input4.orientation ?? "";
-          const rows = [];
-          for (const p of ctx.catalog) {
-            const d = describeProfile(p);
-            if (tokens.length > 0 && !tokens.every((t) => `${p.description} ${p.key}`.toLowerCase().includes(t))) continue;
-            if (width && d.width !== width || height && d.height !== height) continue;
-            if (fps2 && Math.abs(d.fps - fps2) > 0.011) continue;
-            if (aspect && d.aspect !== aspect) continue;
-            if (orientation && d.orientation !== orientation) continue;
-            rows.push(d);
-          }
-          const total = rows.length;
-          rows.sort((a, b) => Number(!a.user) - Number(!b.user) || b.width * b.height - a.width * a.height || a.fps - b.fps);
-          const limit = input4.limit ?? 30;
-          const out = { profiles: rows.slice(0, limit), total_matches: total, current: call.doc.project.profile || "" };
-          if (input4.include_social_presets ?? true) {
-            out.social_presets = Object.entries(SOCIAL_PRESETS).map(([name, [w, h, f3, preset, aliases]]) => ({
-              name,
-              width: w,
-              height: h,
-              fps: f3 ?? "project fps",
-              export_preset: preset,
-              aliases: aliases.slice(0, 4)
-            }));
-          }
-          const showing = total > limit ? `; showing ${Math.min(total, limit)}` : "";
-          return ok(call, `${total} profile(s) match${showing}.`, out);
-        }
-      }),
-      contractTool("set_project_profile_tool", {
-        annotations: EDIT8,
-        run: (call, input4) => editorRun(async () => {
-          const reframe = input4.reframe ?? "keep";
-          const args = {
-            profile: text(input4.profile),
-            width: input4.width ?? 0,
-            height: input4.height ?? 0,
-            fps: input4.fps ?? 0,
-            orientation: input4.orientation ?? "",
-            fromFileId: text(input4.from_file_id)
-          };
-          if (!args.profile && !args.width && !args.height && !args.fps && !args.orientation && !args.fromFileId && reframe === "keep") {
-            throw new ToolError("say what to change: profile (name or social preset), width+height, fps, orientation, from_file_id, or reframe");
-          }
-          const ctx = await profileContext(call);
-          const profile = await keepCustomProfile(call, targetProfile(call, ctx, args));
-          const project = call.doc.project;
-          const before = profileSnapshot(project);
-          const plan = planReframe(project, reframe, profile.width, profile.height);
-          const changed = profileDiffers(project, profile);
-          if (changed || plan.changes.length > 0) {
-            call.commit((tx) => {
-              applyProfile(tx, profile);
-              applyReframe(tx, plan);
-            }, "Set project format");
-          }
-          const socialKey = args.profile ? socialPreset(args.profile)?.key ?? null : null;
-          return profileReceipt(
-            call,
-            { changed, reframed: plan.changes.map((c) => c.id), skipped: plan.skipped, letterboxed: plan.letterboxed, videoClips: plan.videoClips },
-            before,
-            profile,
-            reframe,
-            socialKey
-          );
-        })
-      }),
-      contractTool("set_project_setting_tool", {
-        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
-        run: (call, input4) => editorRun(async () => {
-          const project = call.doc.project;
-          const fpsNum = input4.fps_num ?? null;
-          const fpsDen = input4.fps_den ?? null;
-          let fps2 = input4.fps ?? null;
-          let width = input4.width ?? null;
-          let height = input4.height ?? null;
-          const sampleRate = input4.sample_rate ?? null;
-          const profileArg = text(input4.profile) || text(input4.preset);
-          const orientation = input4.orientation ?? "";
-          const reframe = input4.reframe ?? "keep";
-          const videoRequested = [fps2, fpsNum, fpsDen, width, height].some((v) => v !== null && v !== 0) || Boolean(profileArg) || Boolean(orientation);
-          if (fpsNum !== null || fpsDen !== null) {
-            if (fpsNum === null || fpsDen === null) throw new ToolError("give both fps_num and fps_den");
-            fps2 = fpsNum / fpsDen;
-          }
-          let layout = null;
-          const channels = text(input4.channels);
-          if (channels) {
-            layout = LAYOUT_BY_NAME[channels.toLowerCase()] ?? null;
-            if (!layout) throw new ToolError("channels must be mono, stereo, surround, 5.1 or 7.1 (or 1, 2, 3, 6, 8)");
-          }
-          if (sampleRate !== null && !SAMPLE_RATES.includes(sampleRate)) {
-            throw new ToolError(`sample_rate must be one of ${SAMPLE_RATES.join(", ")}`);
-          }
-          if (!videoRequested && sampleRate === null && !layout && reframe === "keep") {
-            throw new ToolError("nothing to change: pass fps, width/height, profile/preset, orientation, sample_rate or channels");
-          }
-          const storeDefaults = input4.save_as_default && (sampleRate !== null || layout !== null) ? defaultAudioSettings(call, sampleRate, layout) : null;
-          let profile = null;
-          if (videoRequested || reframe !== "keep") {
-            if (width === null !== (height === null)) {
-              width = width ?? project.width;
-              height = height ?? project.height;
-            }
-            const ctx = await profileContext(call);
-            let choice = targetProfile(call, ctx, { profile: profileArg, width: width ?? 0, height: height ?? 0, fps: fps2 ?? 0, orientation, fromFileId: "" });
-            if (fpsNum !== null && fpsDen !== null && (choice.profile.fps.num !== fpsNum || choice.profile.fps.den !== fpsDen)) {
-              const base = choice.profile;
-              choice = resolving(() => ensureProfile(ctx, base.width, base.height, { num: fpsNum, den: fpsDen }));
-            }
-            profile = await keepCustomProfile(call, choice);
-          }
-          const audio = {};
-          if (sampleRate !== null && Math.trunc(Number(project.sample_rate) || 0) !== sampleRate) audio.sampleRate = sampleRate;
-          if (layout) {
-            const [code, count2] = CHANNEL_LAYOUTS2[layout];
-            if (project.channel_layout !== code || Math.trunc(Number(project.channels) || 0) !== count2) audio.channels = { count: count2, layout: code };
-          }
-          const plan = profile ? planReframe(project, reframe, profile.width, profile.height) : { changes: [], skipped: [], letterboxed: [], videoClips: 0 };
-          const changedProfile = profile ? profileDiffers(project, profile) : false;
-          const changed = changedProfile || plan.changes.length > 0 || Object.keys(audio).length > 0;
-          if (changed) {
-            call.commit((tx) => {
-              if (profile && (changedProfile || plan.changes.length > 0)) {
-                applyProfile(tx, profile);
-                applyReframe(tx, plan);
-              }
-              setProjectAudio(tx, audio);
-            }, "Set project settings");
-          }
-          storeDefaults?.();
-          const after = settingsSnapshot(call.doc.project);
-          const notes = [];
-          if (changedProfile) notes.push(`${String(after.width)}x${String(after.height)} at ${pyFloat(Number(after.fps))} fps (${String(after.profile)})`);
-          if (plan.changes.length > 0) notes.push(`${plan.changes.length} clip(s) reframed`);
-          if (Object.keys(audio).length > 0) notes.push(`audio ${String(after.sample_rate)} Hz ${String(after.channel_layout)}`);
-          let summary = changed ? `Updated project settings: ${notes.join(", ")}.` : "Settings already matched.";
-          if (plan.letterboxed.length > 0) summary += ` ${plan.letterboxed.length} clip(s) of another shape will show bars; pass reframe='fill' to crop them.`;
-          const data = {
-            changed,
-            ...after,
-            reframed_clip_ids: plan.changes.map((c) => c.id),
-            letterboxed_clip_ids: plan.letterboxed,
-            saved_as_default: storeDefaults !== null
-          };
-          return changed ? ok(call, summary, data) : nothingChanged(call, summary, data);
-        })
-      }),
-      contractTool("manage_custom_profiles_tool", {
-        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
-        run: (call, input4) => editorRun(async () => {
-          const storage = call.host.storage;
-          if (!storage?.customProfiles || !storage.writeCustomProfile || !storage.removeCustomProfile) {
-            return unavailable(call.tool, `${CUSTOM_PROFILE_HOME}. The built-in profiles work everywhere (list_project_profiles_tool).`);
-          }
-          const action = input4.action;
-          if (action === "set_default") {
-            return unavailable(
-              call.tool,
-              "the default profile for new projects is a Zenvi desktop preference (Preferences > Default Profile), kept in its settings file, which only the desktop app writes; set it there. New projects here take a profile when they are made (zenvi new --profile, new_project_tool)."
-            );
-          }
-          const ctx = await profileContext(call);
-          const profileArg = text(input4.profile);
-          const base = profileArg ? await keepCustomProfile(call, resolving(() => resolveProfileRequest(ctx, profileArg))) : null;
-          if ((action === "duplicate" || action === "edit" || action === "delete") && !base) {
-            throw new ToolError(`${action} needs 'profile' (an existing profile name or key)`);
-          }
-          if ((action === "edit" || action === "delete") && !base.user) {
-            throw new ToolError(`'${base.description}' is a built-in profile; duplicate it to make a custom copy`);
-          }
-          if (action === "delete") {
-            if (base.description.trim() === String(call.doc.project.profile ?? "").trim()) {
-              throw new ToolError("you cannot delete the current project's profile or the default profile");
-            }
-            try {
-              await storage.removeCustomProfile(base.key);
-            } catch (error62) {
-              throw new ToolError(`could not delete ${base.path ?? base.key}: ${error62 instanceof Error ? error62.message : String(error62)}`);
-            }
-            return ok(call, `Deleted the custom profile '${base.description}'. No clip changed.`, { deleted: base.description, path: base.path ?? base.key });
-          }
-          const src = base;
-          const w = input4.width || src?.width || 0;
-          const h = input4.height || src?.height || 0;
-          if (!(w && h)) throw new ToolError("give width and height (or a 'profile' to start from)");
-          if (w % 2 || h % 2) throw new ToolError("width and height must be even");
-          const fps2 = input4.fps ? profileFpsFraction(input4.fps) : src ? { ...src.fps } : { num: 30, den: 1 };
-          let par = { num: 1, den: 1 };
-          const parText = text(input4.pixel_ratio);
-          if (parText) {
-            const m = PIXEL_RATIO_RE.exec(parText);
-            if (!m || !Number(m[1]) || !Number(m[2])) throw new ToolError("pixel_ratio must look like '1:1' or '10:11'");
-            par = { num: Number(m[1]), den: Number(m[2]) };
-          } else if (src) {
-            par = { ...src.pixel_ratio };
-          }
-          let desc = text(input4.name);
-          if (action === "edit" && !desc) desc = src.description;
-          if (action === "duplicate" && !desc) desc = `${src.description} (copy)`;
-          if (!desc) desc = `Custom ${w}x${h} ${(fps2.num / fps2.den).toFixed(2).replace(/0+$/, "").replace(/\.$/, "")} fps`;
-          for (const p of ctx.catalog) {
-            if (p.description.trim() === desc && !(action === "edit" && p.user && p.key === src?.key)) {
-              throw new ToolError(`a profile named '${desc}' already exists; pick a unique name`);
-            }
-          }
-          const record5 = {
-            description: desc,
-            width: w,
-            height: h,
-            fps: fps2,
-            progressive: !input4.interlaced,
-            pixel_ratio: par,
-            display_ratio: reducedDisplayRatio(w, h, par.num, par.den),
-            spherical: Boolean(input4.spherical)
-          };
-          let name = action === "edit" ? src.key : profileKey(record5);
-          if (action !== "edit") {
-            const taken = new Set(ctx.catalog.filter((p) => p.user).map((p) => p.key));
-            const stem7 = name;
-            for (let suffix = 1; taken.has(name); suffix += 1) name = `${stem7}-${suffix}`;
-          }
-          let path42;
-          try {
-            path42 = await storage.writeCustomProfile(name, profileFileText({ ...record5, key: name }));
-          } catch (error62) {
-            throw new ToolError(`could not save the profile: ${error62 instanceof Error ? error62.message : String(error62)}`);
-          }
-          const verb = action === "edit" ? "Updated" : "Created";
-          return ok(call, `${verb} custom profile '${desc}' (${w}x${h}, ${pyG(fps2.num / fps2.den, 3)} fps).`, {
-            profile: describeProfile({ ...record5, key: name, user: true }),
-            path: path42
-          });
-        })
-      })
-    ];
-  }
-});
-
 // ../engine/src/tools/catalog/project.ts
 async function saveCurrent(call, tool) {
   const storage = call.host.storage;
@@ -78390,10 +79155,10 @@ function clipContentDigest(clip2) {
 }
 function timelineSignature(project) {
   const out = /* @__PURE__ */ new Map();
-  const r32 = (v) => Math.round((Number(v) || 0) * 1e3) / 1e3;
+  const r33 = (v) => Math.round((Number(v) || 0) * 1e3) / 1e3;
   for (const clip2 of project.clips ?? []) {
     const id = String(clip2.id ?? "");
-    if (id) out.set(id, { place: JSON.stringify([clip2.layer ?? null, r32(clip2.position), r32(clip2.start), r32(clip2.end)]), content: clipContentDigest(clip2) });
+    if (id) out.set(id, { place: JSON.stringify([clip2.layer ?? null, r33(clip2.position), r33(clip2.start), r33(clip2.end)]), content: clipContentDigest(clip2) });
   }
   return out;
 }
@@ -78609,7 +79374,7 @@ function localIso(seconds2, unit2) {
   const base = `${d.getFullYear()}-${pad3(d.getMonth() + 1)}-${pad3(d.getDate())}T${pad3(d.getHours())}:${pad3(d.getMinutes())}`;
   return unit2 === "seconds" ? `${base}:${pad3(d.getSeconds())}` : base;
 }
-function baseName2(path42) {
+function baseName4(path42) {
   return path42.split(/[\\/]/).pop() ?? path42;
 }
 function projectCounts(project) {
@@ -78726,7 +79491,7 @@ var init_project_export = __esm({
           }
           call.doc.load(restored.project);
           const counts = projectCounts(call.doc.project);
-          const kept = restored.backup ? baseName2(restored.backup) : "nothing (it was missing)";
+          const kept = restored.backup ? baseName4(restored.backup) : "nothing (it was missing)";
           return ok(call, `Restored the version saved ${pyFloat(Number(chosen.minutes_ago))} min ago (${counts.clips} clips); the previous file was kept as ${kept}.`, {
             path: restored.path,
             restored_from: chosen.path,
@@ -78937,20 +79702,20 @@ function findPanel(layout, name) {
   if (aliased) return aliased;
   const hits = layout.panels.filter((p) => wanted && p.name.toLowerCase().includes(wanted));
   if (hits.length === 1) return hits[0];
-  const names2 = [...new Set(layout.panels.map((p) => p.name))].sort(pyCompare3);
+  const names2 = [...new Set(layout.panels.map((p) => p.name))].sort(pyCompare4);
   throw new ToolError(`no panel named '${name}'; panels: ${names2.join(", ")}`);
 }
 function layoutReport(layout) {
   return {
     active_view: layout.view,
     custom_views: [],
-    open_panels: layout.panels.filter((p) => p.open).map((p) => p.name).sort(pyCompare3),
-    closed_panels: layout.panels.filter((p) => !p.open).map((p) => p.name).sort(pyCompare3),
+    open_panels: layout.panels.filter((p) => p.open).map((p) => p.name).sort(pyCompare4),
+    closed_panels: layout.panels.filter((p) => !p.open).map((p) => p.name).sort(pyCompare4),
     toolbar_visible: layout.toolbarVisible,
     fullscreen: layout.fullscreen
   };
 }
-var READ12, SETTINGS, NO_SETTINGS, NO_LAYOUT, SHORTCUT_RE, VIEW_ALIASES, PANEL_ALIASES, pyCompare3, projectPrefsTools;
+var READ12, SETTINGS, NO_SETTINGS, NO_LAYOUT, SHORTCUT_RE, VIEW_ALIASES, PANEL_ALIASES, pyCompare4, projectPrefsTools;
 var init_project_export_prefs = __esm({
   "../engine/src/tools/catalog/project-export-prefs.ts"() {
     "use strict";
@@ -78996,7 +79761,7 @@ var init_project_export_prefs = __esm({
       stock: "Stock",
       generate: "Generate"
     };
-    pyCompare3 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+    pyCompare4 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
     projectPrefsTools = [
       contractTool("get_preferences_tool", {
         annotations: READ12,
@@ -79178,11 +79943,11 @@ function extensionOf(path42) {
 function hasCode(error62, code) {
   return typeof error62 === "object" && error62 !== null && error62.code === code;
 }
-function baseName3(path42) {
+function baseName5(path42) {
   return path42.split(/[\\/]/).pop() ?? path42;
 }
-function splitExt(path42) {
-  const name = baseName3(path42);
+function splitExt2(path42) {
+  const name = baseName5(path42);
   const leading = /^\.*/.exec(name)[0].length;
   const dot = name.lastIndexOf(".");
   if (dot < leading) return [path42, ""];
@@ -79196,7 +79961,7 @@ function isSubclip(file3) {
   return "start" in file3 && "end" in file3;
 }
 function isSequence(file3) {
-  return SEQUENCE_FORMAT_RE.test(baseName3(String(file3.path ?? "")));
+  return SEQUENCE_FORMAT_RE.test(baseName5(String(file3.path ?? "")));
 }
 function fileFps(file3) {
   const fps2 = file3.fps ?? {};
@@ -79211,18 +79976,18 @@ function fileDurationSeconds(file3) {
 function exportedFileName(file3) {
   const path42 = String(file3.path ?? "");
   if (isSubclip(file3)) {
-    const fallback = splitExt(path42 || "openshot_clip")[0];
+    const fallback = splitExt2(path42 || "openshot_clip")[0];
     const name = legalFileName("name" in file3 ? String(file3.name ?? "") : fallback);
     return `${name} [${pyFixed(Number(file3.start), 2)} - ${pyFixed(Number(file3.end), 2)}].mp4`;
   }
   const seconds2 = pyFixed(fileDurationSeconds(file3), 2);
   if (isSequence(file3)) {
-    let name = splitExt(baseName3(path42))[0];
+    let name = splitExt2(baseName5(path42))[0];
     if ("name" in file3) name = String(file3.name ?? "");
-    name = legalFileName(splitExt(name)[0].replace(new RegExp(SEQUENCE_FORMAT_RE.source, "g"), ""));
+    name = legalFileName(splitExt2(name)[0].replace(new RegExp(SEQUENCE_FORMAT_RE.source, "g"), ""));
     return `${name} [0.00 - ${seconds2}].mp4`;
   }
-  const [root, ext] = splitExt(baseName3(path42));
+  const [root, ext] = splitExt2(baseName5(path42));
   return `${legalFileName(root)} [0.00 - ${seconds2}]${ext}`;
 }
 function positiveInt2(value, fallback) {
@@ -79266,7 +80031,7 @@ function partRender(file3) {
   }
   return { project: doc.project, options };
 }
-var READ13, pyCompare4, SEQUENCE_FORMAT_RE, projectRenderTools;
+var READ13, pyCompare5, SEQUENCE_FORMAT_RE, projectRenderTools;
 var init_project_export_render = __esm({
   "../engine/src/tools/catalog/project-export-render.ts"() {
     "use strict";
@@ -79284,7 +80049,7 @@ var init_project_export_render = __esm({
     init_common();
     init_timeline_edit_common();
     READ13 = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
-    pyCompare4 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+    pyCompare5 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
     SEQUENCE_FORMAT_RE = /%(?:0\d+)?d/;
     projectRenderTools = [
       contractTool("list_export_presets_tool", {
@@ -79322,7 +80087,7 @@ var init_project_export_render = __esm({
             });
           }
           rows.sort(
-            (a, b) => Number(a.category !== "Web") - Number(b.category !== "Web") || pyCompare4(String(a.category), String(b.category)) || pyCompare4(String(a.title), String(b.title))
+            (a, b) => Number(a.category !== "Web") - Number(b.category !== "Web") || pyCompare5(String(a.category), String(b.category)) || pyCompare5(String(a.title), String(b.title))
           );
           return ok(call, `${rows.length} export preset(s).`, { presets: rows });
         }
@@ -79577,7 +80342,7 @@ var init_motion_reels = __esm({
     init_palettes();
     init_styles2();
     init_template();
-    init_plan();
+    init_plan2();
     init_receipt();
     init_motion_templates();
     init_music_bed();
@@ -79784,7 +80549,7 @@ var init_reels = __esm({
     init_titles();
     init_tracks();
     init_transitions();
-    init_plan();
+    init_plan2();
     init_styles();
     init_styles2();
     init_motion_reels();
@@ -81729,13 +82494,13 @@ async function addClipsToTimeline(call, input4) {
     `Placed ${placed.length} clip(s) on ${trackName(after, layer2)} from ${f2(start)} s to ${f2(end)} s (${pyFixed(end - start, 1)} s${how}${fitNote}).`,
     {
       track: uiTrack(after, layer2),
-      start: r3(start),
-      end: r3(end),
-      total_seconds: r3(end - start),
+      start: r32(start),
+      end: r32(end),
+      total_seconds: r32(end - start),
       clips: placed,
       transition_ids: result2.transitionIds,
       trimmed_file_ids: trimmedIds,
-      overlap_seconds: r3(overlap2)
+      overlap_seconds: r32(overlap2)
     }
   );
 }
@@ -81887,8 +82652,8 @@ async function moveClips(call, input4) {
       moved.push({
         timeline_clip_id: id,
         title: clipTitle2(item),
-        from: { track: uiTrack(after, was.layer), position: r3(was.position) },
-        to: { track: uiTrack(after, newLayer), position: r3(g.snap(newPos)) }
+        from: { track: uiTrack(after, was.layer), position: r32(was.position) },
+        to: { track: uiTrack(after, newLayer), position: r32(g.snap(newPos)) }
       });
     } else if (isClip(project, item)) {
       shifted.push(id);
@@ -81968,8 +82733,8 @@ async function trimClips(call, input4) {
   const results = ordered.map((p) => ({
     timeline_clip_id: p.clip.id,
     title: clipTitle2(p.clip),
-    before: { position: r3(p.pos), source_in: r3(p.s), source_out: r3(p.e), duration: r3(p.e - p.s) },
-    after: { position: r3(p.np), source_in: r3(p.ns), source_out: r3(p.ne), duration: r3(p.ne - p.ns) }
+    before: { position: r32(p.pos), source_in: r32(p.s), source_out: r32(p.e), duration: r32(p.e - p.s) },
+    after: { position: r32(p.np), source_in: r32(p.ns), source_out: r32(p.ne), duration: r32(p.ne - p.ns) }
   })).reverse();
   const one = results[0].after;
   const summary = `Trimmed ${results.length} clip(s)` + (results.length === 1 ? `: now ${f2(one.source_in)}-${f2(one.source_out)} s of the source, ${f2(one.duration)} s long` : "") + (shifted.length > 0 ? `; ${shifted.length} later item(s) rippled` : "") + ".";
@@ -82056,7 +82821,7 @@ async function sliceClips(call, input4) {
   });
   const summary = `Sliced ${clips.length} clip(s)` + (transitions.length > 0 ? ` and ${transitions.length} transition(s)` : "") + ` at ${f2(t)} s, kept ${keep2}` + (ripple ? " and closed the gap" : "") + (skipped.length > 0 ? `; skipped ${skipped.length} on locked tracks` : "") + ".";
   return ok(call, summary, {
-    at_seconds: r3(t),
+    at_seconds: r32(t),
     keep: keep2,
     pieces,
     transition_ids: transitions.map((tr) => tr.id),
@@ -82097,8 +82862,8 @@ function removeGaps(call, input4) {
       for (const id of moved) movedIds.add(id);
       closed.push({
         track: uiTrack(project, layer2),
-        gaps: gaps.map((gap) => [r3(gap.start), r3(gap.end)]),
-        closed_seconds: r3(gaps.reduce((sum, gap) => sum + (gap.end - gap.start), 0))
+        gaps: gaps.map((gap) => [r32(gap.start), r32(gap.end)]),
+        closed_seconds: r32(gaps.reduce((sum, gap) => sum + (gap.end - gap.start), 0))
       });
     }
   });
@@ -82172,8 +82937,8 @@ async function duplicateClips(call, input4) {
           timeline_clip_id: copy.id,
           copy_of: of,
           track: uiTrack(tx.project, copy.layer),
-          position: r3(copy.position),
-          end: r3(spanOf(copy)[1])
+          position: r32(copy.position),
+          end: r32(spanOf(copy)[1])
         }))
       );
       newTransitions.push(...result2.transitionIds);
@@ -82207,12 +82972,12 @@ async function alignClips(call, input4) {
   call.commit((tx) => {
     for (const [id, planned] of changes) moveClip(tx, id, { position: planned.start });
   });
-  const moved = clips.filter((c) => changes.has(c.id)).map((c) => ({ timeline_clip_id: c.id, title: clipTitle2(c), from: r3(spanOf(c)[0]), to: r3(changes.get(c.id).start) }));
+  const moved = clips.filter((c) => changes.has(c.id)).map((c) => ({ timeline_clip_id: c.id, title: clipTitle2(c), from: r32(spanOf(c)[0]), to: r32(changes.get(c.id).start) }));
   const firstChange = [...changes.values()][0];
   const at = edge === "start" ? firstChange.start : firstChange.end;
   return ok(call, `Aligned the ${edge}s of ${clips.length} clip(s) at ${f2(at)} s (${moved.length} moved).`, {
     edge,
-    at_seconds: r3(at),
+    at_seconds: r32(at),
     moved,
     overlaps: hits
   });
@@ -82293,12 +83058,12 @@ function timingReceipt(project, clip2, beforeDuration) {
   return {
     timeline_clip_id: clip2.id,
     title: clipTitle2(clip2),
-    duration_before: r3(beforeDuration),
-    duration_after: r3(end - start),
-    effective_speed: speed === null ? null : r3(speed),
+    duration_before: r32(beforeDuration),
+    duration_after: r32(end - start),
+    effective_speed: speed === null ? null : r32(speed),
     direction: direction2,
-    position: r3(start),
-    end: r3(end)
+    position: r32(start),
+    end: r32(end)
   };
 }
 function rippleAfter(tx, clip2, start, oldDuration, g) {
@@ -82462,7 +83227,7 @@ async function freezeFrame(call, input4) {
     return { receipt: timingReceipt(tx.project, clip2, duration3), shifted: moved };
   });
   const summary = `Froze ${name} at ${f2(t)} s for ${f2(hold)} s${zoom ? " with zoom" : ""}; it now ends at ${f2(receipt2.end)} s` + (shifted.length > 0 ? `; ${shifted.length} later item(s) rippled` : "") + (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") + ".";
-  return ok(call, summary, { frozen_at: r3(t), hold_seconds: r3(hold), clip: receipt2, shifted: uniqueSorted(shifted), overlaps: hits });
+  return ok(call, summary, { frozen_at: r32(t), hold_seconds: r32(hold), clip: receipt2, shifted: uniqueSorted(shifted), overlaps: hits });
 }
 async function separateClipAudio(call, input4) {
   const project = call.doc.project;
@@ -82919,14 +83684,14 @@ async function seekPlayhead(call, input4) {
   const to = input4.to ?? "";
   const seconds2 = input4.seconds ?? null;
   const frameArg = input4.frame ?? null;
-  const given = [
+  const given2 = [
     ["seconds", seconds2 !== null],
     ["frame", frameArg !== null],
     ["marker", Boolean(marker2)],
     ["to", Boolean(to)]
   ].filter(([, set2]) => set2).map(([name]) => name);
-  if (given.length === 0) throw new ToolError("say where to go: seconds, frame, marker, or to=start/end/next_marker/previous_marker/next_edit/previous_edit");
-  if (given.length > 1) throw new ToolError(`give only one of seconds, frame, marker or to (got ${given.join(", ")})`);
+  if (given2.length === 0) throw new ToolError("say where to go: seconds, frame, marker, or to=start/end/next_marker/previous_marker/next_edit/previous_edit");
+  if (given2.length > 1) throw new ToolError(`give only one of seconds, frame, marker or to (got ${given2.join(", ")})`);
   if (track2 && to !== "next_edit" && to !== "previous_edit") throw new ToolError("track only applies to to='next_edit' / 'previous_edit'");
   const project = call.doc.project;
   const player = call.host.player;
@@ -83827,9 +84592,9 @@ async function addTitle(call, input4) {
     return toolError(`cannot read title SVG ${template.file}: ${errorMessage2(error62)}`);
   }
   const slots2 = titleFields(doc);
-  const given = Boolean(body.trim() || subtitle.trim() || lines2.some((v) => v.trim()));
-  if (slots2.length === 0 && given) toolError(`${name} has no text; it is a background card (set background_color), or pick a template with text`);
-  if (slots2.length > 0 && !given) toolError("add_title_tool needs text (or subtitle / lines)");
+  const given2 = Boolean(body.trim() || subtitle.trim() || lines2.some((v) => v.trim()));
+  if (slots2.length === 0 && given2) toolError(`${name} has no text; it is a background card (set background_color), or pick a template with text`);
+  if (slots2.length > 0 && !given2) toolError("add_title_tool needs text (or subtitle / lines)");
   const style = new TitleStyle(input4);
   const values = assignTexts(slots2, body, subtitle, lines2, name, true);
   const project = call.doc.project;
@@ -84578,7 +85343,10 @@ var init_availability = __esm({
         partialNote: "without audio analysis and speech recognition only indexed transcript cues find the speech"
       },
       watch_clip_tool: { optional: ["media.importPath"], partialNote: "file_path needs local file access" },
-      export_video_tool: { anyOf: ["exporter", "ui.openExportDialog"] },
+      export_video_tool: {
+        anyOf: ["exporter", "ui.openExportDialog"],
+        webNote: "interlaced is refused (no web encoder interlaces); the CLI renders with ffmpeg and writes files (relative paths and the default folder start at the project's folder), the web editor renders MP4, MOV, MKV, WebM or WAV in the browser and downloads the file (no folders), Zenvi Cloud starts a render job (get_render_status gives the download link; no image sequences)"
+      },
       save_project_tool: {},
       open_project_tool: { methods: ["storage.open"] },
       import_files_tool: { methods: ["media.importPath"], optional: ["media.listPaths"], partialNote: "folders and globs need path listing" },
@@ -84668,7 +85436,6 @@ var init_availability = __esm({
       set_keyframes_tool: {
         webNote: "animates volume, alpha, location_x/y, scale_x/y and rotation (Zenvi desktop: any keyframable clip property) and needs a value for every point (the desktop keeps the curve's value at a point without one)"
       },
-      set_export_setting_tool: { webNote: "stores a key and value as given (Zenvi desktop checks keys and values first)" },
       transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
       remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
       detect_beats_tool: { methods: ["audio.decodePcm"] },
@@ -84762,7 +85529,7 @@ var init_availability = __esm({
       list_export_presets_tool: {
         optional: ["exporter.supports"],
         partialNote: "without a codec check, every preset whose container the engine's exporters write counts as available",
-        webNote: "export_video_tool takes a preset only in Zenvi desktop so far; the web editor's Export dialog offers them"
+        webNote: "the built-in presets (Zenvi desktop also lists the user's own presets folder)"
       },
       save_frame_image_tool: {
         optional: ["storage.writeBytes"],
@@ -84838,7 +85605,7 @@ var init_availability = __esm({
       cloud: {
         title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
         host: "packages/cloud/src/mcp/engine.ts",
-        capabilities: ["media", "frames", "storage", "assets", "audio", "backend"],
+        capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
         methods: [
           "media.importUrl",
           "media.writeGenerated",
@@ -84851,10 +85618,12 @@ var init_availability = __esm({
           "storage.recentProjects",
           "audio.decodePcm",
           "audio.transcribe",
-          "frames.fontFamilies"
+          "frames.fontFamilies",
+          "exporter.supports"
         ],
         conditional: {
           frames: "the render worker is configured",
+          exporter: "the render worker is configured",
           media: "ffprobe is available",
           assets: "the engine's assets (title templates, emoji) are bundled",
           audio: "ffmpeg is available",
@@ -84865,7 +85634,6 @@ var init_availability = __esm({
           "open_project_tool",
           "save_project_tool",
           "import_files_tool",
-          "export_video_tool",
           "play_tool",
           "go_to_start_tool",
           "go_to_end_tool",
@@ -114115,9 +114883,10 @@ function parseFps(text5) {
 }
 function exportOptionsFrom(project, output2, flags) {
   const fromPath = output2 ? formatFromPath(output2) : void 0;
-  const format = flags.format === "png" ? "png-sequence" : flags.format;
+  const image = flags.format === "jpeg" ? "jpg" : flags.format === "tif" ? "tiff" : flags.format;
+  const format = image && ["png", "jpg", "bmp", "tiff"].includes(image) ? `${image}-sequence` : flags.format;
   const chosen = format ?? fromPath ?? "mp4";
-  if (!FORMATS[chosen]) throw new CliError(`Unknown format "${flags.format}" (mp4, webm, mov, mkv, gif, mp3, wav, png).`, 2);
+  if (!FORMATS[chosen]) throw new CliError(`Unknown format "${flags.format}" (mp4, webm, mov, mkv, gif, mp3, wav, flac, m4a, png, jpg, bmp, tiff).`, 2);
   const quality = flags.quality ?? "high";
   if (!QUALITIES.includes(quality)) throw new CliError("--quality must be low, medium, high or lossless.", 2);
   let width = flags.width ? Number(flags.width) : project.width;
@@ -114176,7 +114945,7 @@ function formatBytes(n) {
   return `${Math.round(n / 1e3)} KB`;
 }
 function registerRenderCommands(program2, ctx) {
-  program2.command("render").description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav) or PNG frames").argument("[output]", "output file (default: <project>.mp4 next to the project)").option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav or png (default: from the file name)").option("--quality <quality>", "low, medium, high or lossless", "high").option("--width <px>", "output width (height follows the project aspect)").option("--height <px>", "output height").option("--fps <rate>", "frame rate, e.g. 30 or 30000/1001 (default: the project's)").option("--start <time>", "render from this timeline time").option("--end <time>", "render up to this timeline time").option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)").option("--audio-bitrate <rate>", "e.g. 192k").option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)").option("--encoder-preset <preset>", "encoder speed: ultrafast \u2026 veryslow (default veryfast; the desktop app encodes at medium)").option("--open", "open the result when done").action(async (outputArg, flags) => {
+  program2.command("render").description("render the timeline to a video (mp4, webm, mov, mkv, gif), audio (mp3, wav, flac, m4a) or image frames (png, jpg, bmp, tiff)").argument("[output]", "output file (default: <project>.mp4 next to the project)").option("-f, --format <format>", "mp4, webm, mov, mkv, gif, mp3, wav, flac, m4a, png, jpg, bmp or tiff (default: from the file name)").option("--quality <quality>", "low, medium, high or lossless", "high").option("--width <px>", "output width (height follows the project aspect)").option("--height <px>", "output height").option("--fps <rate>", "frame rate, e.g. 30 or 30000/1001 (default: the project's)").option("--start <time>", "render from this timeline time").option("--end <time>", "render up to this timeline time").option("--video-bitrate <rate>", "e.g. 8M (default: quality-based CRF)").option("--audio-bitrate <rate>", "e.g. 192k").option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)").option("--encoder-preset <preset>", "encoder speed: ultrafast \u2026 veryslow (default veryfast; the desktop app encodes at medium)").option("--open", "open the result when done").action(async (outputArg, flags) => {
     await withExecutor(ctx, async (executor) => {
       const output2 = outputArg ? path37.resolve(ctx.cwd, outputArg) : void 0;
       if (!(executor instanceof PortableExecutor)) {
@@ -114206,7 +114975,7 @@ function registerRenderCommands(program2, ctx) {
         ctx.out.line(ctx.out.style(`  ${options.format}, ${options.width}x${options.height}, ${result2.durationSeconds.toFixed(2)} s, ${formatBytes(result2.bytes)} in ${seconds2.toFixed(1)} s`, "dim"));
         for (const w of result2.warnings) ctx.out.warn(w);
       }
-      if (flags.open && options.format !== "png-sequence") await openUrl(result2.location);
+      if (flags.open && !isSequenceFormat(options.format)) await openUrl(result2.location);
     });
   });
   program2.command("frame").description("render one timeline frame to an image (PNG or JPEG)").argument("<time>", "timeline time (seconds or timecode)").argument("[output]", "image file (default: frame-<time>.png)").option("--width <px>", "image width", "1280").option("--jpeg", "write JPEG instead of PNG").option("--grid", "draw the 0-1 coordinate grid and a frame caption (what inspect tools show models)").action(async (timeArg2, outputArg, flags) => {
@@ -115228,9 +115997,9 @@ media. One undo step restores the link.`,
 });
 
 // src/hosts/handoff.ts
-import { homedir as homedir3 } from "node:os";
+import { homedir as homedir4 } from "node:os";
 import path39 from "node:path";
-function resolvePathArgs(args, cwd, home = homedir3()) {
+function resolvePathArgs(args, cwd, home = homedir4()) {
   const out = { ...args };
   for (const [key2, value] of Object.entries(args)) {
     if (!PATH_ARGS.has(key2) || typeof value !== "string" || !value.trim()) continue;
@@ -118208,10 +118977,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
   _executeSubCommand(subcommand, args) {
     args = args.slice();
     const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
-    function findFile2(baseDir, baseName4) {
-      const localBin = path.resolve(baseDir, baseName4);
+    function findFile2(baseDir, baseName6) {
+      const localBin = path.resolve(baseDir, baseName6);
       if (fs.existsSync(localBin)) return localBin;
-      if (sourceExt.includes(path.extname(baseName4))) return void 0;
+      if (sourceExt.includes(path.extname(baseName6))) return void 0;
       const foundExt = sourceExt.find(
         (ext) => fs.existsSync(`${localBin}${ext}`)
       );
@@ -120371,7 +121140,7 @@ init_project3();
 init_render2();
 
 // src/config.ts
-import { homedir as homedir4 } from "node:os";
+import { homedir as homedir5 } from "node:os";
 import path41 from "node:path";
 var DEFAULTS2 = {
   website: "https://zenvi.pro",
@@ -120390,7 +121159,7 @@ function env(e, ...keys) {
 }
 var trim = (url2) => url2.replace(/\/+$/, "");
 function loadConfig(e = process.env) {
-  const home = e.HOME || e.USERPROFILE || homedir4();
+  const home = e.HOME || e.USERPROFILE || homedir5();
   const configDir = env(e, "ZENVI_CONFIG_DIR") ?? (process.platform === "win32" ? path41.join(e.APPDATA || path41.join(home, "AppData", "Roaming"), "zenvi") : path41.join(e.XDG_CONFIG_HOME || path41.join(home, ".config"), "zenvi"));
   return {
     websiteUrl: trim(env(e, "ZENVI_WEBSITE", "ZENVI_WEBSITE_URL") ?? DEFAULTS2.website),
