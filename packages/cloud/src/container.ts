@@ -20,6 +20,7 @@ import { CIMD_FETCH_LIMIT, ClientRegistry, type JsonFetcher } from "./oauth/clie
 import { OAuthService } from "./oauth/service.js";
 import { GenerationService } from "./generation/service.js";
 import { MediaCache } from "./render/cache.js";
+import type { RenderDispatch } from "./render/dispatch.js";
 import type { AssetSource, AudioAnalyzer, MediaProber, PcmDecoder, Renderer, SpeechTranscriber } from "./render/renderer.js";
 import { unavailableProber, unavailableRenderer } from "./render/renderer.js";
 import { RenderService } from "./render/service.js";
@@ -61,6 +62,8 @@ export interface Dependencies {
   decodePcm?: PcmDecoder;
   /** Extracts speech audio and transcribes it through the backend (the speech tools); absent = index transcripts only. */
   transcribeMedia?: SpeechTranscriber;
+  /** Hands renders to render workers (`render/dispatch.ts`); absent = renders run in this process. */
+  renderDispatch?: RenderDispatch;
 }
 
 export interface Services {
@@ -158,6 +161,7 @@ export function createServices(deps: Dependencies): Services {
       tmpDir: config.renderTmpDir,
       maxRenderMediaBytes: config.limits.maxRenderMediaBytes,
       resolveAsset: deps.resolveAsset,
+      dispatch: deps.renderDispatch,
     }),
     devices: new DeviceService(tables, tokens, clock, config.editorUrl, config.tokens.devicePatDays),
     clients,

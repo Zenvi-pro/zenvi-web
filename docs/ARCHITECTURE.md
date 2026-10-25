@@ -289,7 +289,8 @@ replies with `tool_result`.
 | Piece | Where | How |
 | --- | --- | --- |
 | Web editor | Azure Static Web App `zenvi-site` (`zenvi-rg`), copied into the website's deployment at zenvi.pro/editor | `.github/workflows/deploy-site.yml` on push to `main` (calls the website's `azure-deploy.yml`), or `scripts/deploy-editor.sh` |
-| Zenvi Cloud | Azure Container App `zenvi-cloud` in `zenvi-env` | `az acr build` + `az containerapp update` |
+| Zenvi Cloud | Azure Container App `zenvi-cloud` in `zenvi-env` | `scripts/azure/deploy.sh` (`az acr build` + `az containerapp update`) |
+| Render workers | Azure Container Apps job `zenvi-render` in `zenvi-env`, one execution per message on queue `render-jobs` | `scripts/azure/render-jobs.sh`; deploy.sh keeps its image current |
 | Storage | Azure Storage account (Blob + Tables), `zenvi-rg` | `scripts/azure/provision.sh` |
 | CLI | tarball on GitHub releases / zenvi.pro; npm once the org has an npm account | `npm run build -w @zenvi/cli` |
 | Claude Code plugin | this repo's `.claude-plugin/marketplace.json` | plugin bundle built into `plugins/zenvi/dist` |

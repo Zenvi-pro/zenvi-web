@@ -60,6 +60,11 @@ export interface Config {
     devicePatDays: number;
   };
   renderTmpDir: string;
+  /**
+   * Azure Storage queue that hands renders to render workers in their own containers (`render/dispatch.ts`), or null
+   * to render in this process. Needs Azure storage.
+   */
+  renderQueue: string | null;
   /** The web editor build this service hosts for the editor embedded in chats (`/editor/embed/…`), or null. */
   editorDist: string | null;
   version: string;
@@ -147,6 +152,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ]),
   ];
 
+  const renderQueue = env.ZENVI_RENDER_QUEUE?.trim() || null;
+  // Azure queue names: 3-63 lowercase letters, digits and single dashes.
+  if (renderQueue && !/^[a-z0-9](?:[a-z0-9]|-(?!-)){1,61}[a-z0-9]$/.test(renderQueue)) throw new Error(`invalid ZENVI_RENDER_QUEUE: ${renderQueue}`);
+  if (renderQueue && storage.kind !== "azure") throw new Error("ZENVI_RENDER_QUEUE needs Azure storage");
   const logLevel = (env.LOG_LEVEL ?? "info") as Config["logLevel"];
   if (!["debug", "info", "warn", "error"].includes(logLevel)) throw new Error(`invalid LOG_LEVEL: ${env.LOG_LEVEL}`);
 
@@ -180,6 +189,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       devicePatDays: 365,
     },
     renderTmpDir: env.RENDER_TMP_DIR ?? tmpdir(),
+    renderQueue,
     editorDist: env.ZENVI_EDITOR_DIST?.trim() || null,
     version: env.ZENVI_CLOUD_VERSION ?? "dev",
     logLevel,
