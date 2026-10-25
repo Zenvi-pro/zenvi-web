@@ -67,7 +67,7 @@ describe("create_reel", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  async function setup(): Promise<{ h: Harness; client: Client; searches: string[] }> {
+  async function setup(musicLicense = "Creative Commons 0"): Promise<{ h: Harness; client: Client; searches: string[] }> {
     const h = await harness({
       config: { backendAuth: { kind: "assertion", secret: "s".repeat(40) } },
       engine: await loadEngineRegistry(),
@@ -91,7 +91,7 @@ describe("create_reel", () => {
         return json({ videos: [{ id: name.charCodeAt(0), width: 360, height: 640, duration: 4, url: `https://pexels.test/${name}`, user_name: "Someone", video_files: [{ quality: "hd", file_type: "video/mp4", width: 360, height: 640, link: `${base}/${name}.mp4` }] }] });
       }
       if (u.pathname.endsWith("/freesound/search")) {
-        return json({ sounds: [{ id: 77, name: "Beat loop", duration: 20, username: "maker", license: "Creative Commons 0", previews: { hq_mp3: `${base}/beat.mp3` } }] });
+        return json({ sounds: [{ id: 77, name: "Beat loop", duration: 20, username: "maker", license: musicLicense, previews: { hq_mp3: `${base}/beat.mp3` } }] });
       }
       return new Response("{}", { status: 404 });
     };
@@ -127,6 +127,7 @@ describe("create_reel", () => {
     expect(data.bpm).toBeGreaterThan(110);
     expect(data.bpm).toBeLessThan(130);
     expect(data.music).toMatchObject({ credit: "maker on Freesound", license: "Creative Commons 0" });
+    expect(data.warnings.join(" ")).not.toMatch(/non-commercial/);
     expect(data.footage).toHaveLength(3);
     expect(searches.filter((s) => s.startsWith("/api/v1/pexels"))).toHaveLength(3);
     expect(result.content[0]?.text).toMatch(/^Here's the brief for your reel:/);
@@ -139,6 +140,20 @@ describe("create_reel", () => {
     expect(project.files.some((f) => /reel-label-/.test(String(f.path)))).toBe(true);
     expect(project.clips.length).toBeGreaterThan(data.shots);
     expect(project.history?.undo?.length ?? 0).toBeGreaterThanOrEqual(2);
+    await client.close();
+  }, 60_000);
+
+  it("says when the only music it found is for non-commercial use", async () => {
+    const { client } = await setup("http://creativecommons.org/licenses/by-nc/4.0/");
+    const result = (await client.callTool({
+      name: "create_reel",
+      arguments: { prompt: "A 6 second promo for a bakery", style: "highlight", duration_seconds: 6, stock_queries: ["team huddle", "player dribble"] },
+    })) as CallResult;
+    expect(result.isError, result.content[0]?.text).toBeFalsy();
+    const data = result.structuredContent as { music?: { license: string }; warnings: string[] };
+    expect(data.music?.license).toContain("by-nc");
+    expect(data.warnings.join(" ")).toMatch(/non-commercial use only \(CC BY-NC 4\.0\)/);
+    expect(result.content[0]?.text).toMatch(/Notes: .*non-commercial/);
     await client.close();
   }, 60_000);
 

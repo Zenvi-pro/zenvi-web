@@ -18,6 +18,8 @@
 
 import {
   isMotionStyleId,
+  licenceName,
+  licenceRank,
   MOTION_STYLE_IDS,
   MOTION_STYLES,
   pickMusic,
@@ -320,6 +322,11 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
               const sound = found.error ? undefined : pickMusic(found.sounds ?? [], args.duration_seconds ?? 15);
               const preview = sound?.previews?.hq_mp3 || sound?.previews?.lq_mp3;
               if (sound && preview) {
+                if (licenceRank(sound.license) === 2) {
+                  warnings.push(
+                    `The music is licensed for non-commercial use only (${licenceName(sound.license)}): fine for a personal post, not for an ad or a business's promo. Swap the track before using the reel commercially.`,
+                  );
+                }
                 const name = `${sound.name.replace(/\.[a-z0-9]+$/i, "").replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40) || "music"}.mp3`;
                 musicJobs.push({
                   label: "music",
