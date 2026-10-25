@@ -16,6 +16,8 @@ const ALL_CAPABILITIES: HostCapability[] = ["media", "player", "ui", "exporter",
 /** Minimal valid arguments so a refusal comes from the surface, not from validation. */
 const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   search_clips_tool: { query: "cameras" },
+  search_pexels_videos_tool: { query: "coffee" },
+  search_freesound_music_tool: { query: "lofi" },
   search_clip_scenes_tool: { query: "cameras" },
   slice_clip_at_best_match_tool: { query: "cameras" },
   search_transitions_tool: { query: "fade" },

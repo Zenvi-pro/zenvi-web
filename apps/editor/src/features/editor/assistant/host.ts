@@ -10,7 +10,7 @@ import { toast } from "@/ui/Toast";
 import { exportAvailable, extensionForMime, probe, renderFrame, resolveBundledMedia, startExport } from "../render";
 import type { EditorSession } from "../session/EditorSession";
 import { assetUrl } from "../catalog";
-import { analyzeAudio, blobOf } from "./audioAnalysis";
+import { analyzeAudio, blobOf, decodePcm } from "./audioAnalysis";
 import { contentTypeFor, fileHash, type MediaSourceSpec } from "../session/media";
 
 const MAX_URL_IMPORT_BYTES = 2 * 1024 * 1024 * 1024;
@@ -90,6 +90,13 @@ async function readAsset(path: string): Promise<string> {
 }
 
 export function createToolHost(session: EditorSession, pickFiles: () => Promise<File[]>): ToolHost {
+  // The loaded media of a project file (by path or id), for audio analysis.
+  const specFor = (path: string) => {
+    const file = session.project.files.find((f) => f.path === path || f.id === path);
+    const spec = (file ? session.media.spec(file.id) : undefined) ?? intakeOf(session).specs.get(path);
+    if (!spec) throw new Error(`the media for ${path} is not loaded (relink it first)`);
+    return spec;
+  };
   const host: ToolHost = {
     player: {
       get playhead() {
@@ -169,10 +176,10 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
     },
     audio: {
       async analyzeAudio(path, options) {
-        const file = session.project.files.find((f) => f.path === path || f.id === path);
-        const spec = (file ? session.media.spec(file.id) : undefined) ?? intakeOf(session).specs.get(path);
-        if (!spec) throw new Error(`the media for ${path} is not loaded (relink it first)`);
-        return analyzeAudio(spec, options);
+        return analyzeAudio(specFor(path), options);
+      },
+      async decodePcm(path, options) {
+        return decodePcm(specFor(path), options);
       },
     },
     log: (message) => console.debug(`[zenvi tools] ${message}`),

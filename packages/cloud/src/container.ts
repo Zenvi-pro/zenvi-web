@@ -20,7 +20,7 @@ import { CIMD_FETCH_LIMIT, ClientRegistry, type JsonFetcher } from "./oauth/clie
 import { OAuthService } from "./oauth/service.js";
 import { GenerationService } from "./generation/service.js";
 import { MediaCache } from "./render/cache.js";
-import type { AssetSource, AudioAnalyzer, MediaProber, Renderer } from "./render/renderer.js";
+import type { AssetSource, AudioAnalyzer, MediaProber, PcmDecoder, Renderer } from "./render/renderer.js";
 import { unavailableProber, unavailableRenderer } from "./render/renderer.js";
 import { RenderService } from "./render/service.js";
 import { TokenRepo } from "./repos/tokens.js";
@@ -56,6 +56,8 @@ export interface Dependencies {
   assets?: AssetSource;
   /** Audio loudness analysis for catalog tools (remove_silence_tool). */
   analyzeAudio?: AudioAnalyzer;
+  /** Decodes audio to PCM for beat tracking (detect_beats_tool, build_reel_tool); absent = beats from a fixed tempo. */
+  decodePcm?: PcmDecoder;
 }
 
 export interface Services {
@@ -82,6 +84,7 @@ export interface Services {
   mediaCache: MediaCache;
   assets: AssetSource | null;
   analyzeAudio: AudioAnalyzer | null;
+  decodePcm: PcmDecoder | null;
   limiter: RateLimiter;
   engine: EngineRegistry | null;
   startedAt: number;
@@ -172,6 +175,7 @@ export function createServices(deps: Dependencies): Services {
     mediaCache: cache,
     assets: deps.assets ?? null,
     analyzeAudio: deps.analyzeAudio ?? null,
+    decodePcm: deps.decodePcm ?? null,
     limiter: new RateLimiter(clock),
     engine: deps.engine ?? null,
     startedAt: clock.now(),

@@ -13,7 +13,9 @@
  *   estimated by character length and labelled as such;
  * - remove_silence_tool runs the desktop's energy VAD on the RMS envelope the
  *   host measures (`AudioHost.analyzeAudio`);
- * - word cuts, transcription, beats, diarization and local visual search need
+ * - detect_beats_tool tracks a tempo grid on audio the host decodes
+ *   (`AudioHost.decodePcm`, analysis/beats.ts);
+ * - word cuts, transcription, diarization and local visual search need
  *   on-device models and are refused as not available.
  */
 
@@ -37,6 +39,7 @@ import {
   type Range,
   type TimedWord,
 } from "../speech.js";
+import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { layerNumberToDisplayIndex } from "../tracks.js";
 import { fileById, record, text } from "./common.js";
 
@@ -481,8 +484,45 @@ export const speechTools: CatalogTool[] = [
   }),
 
   contractTool("detect_beats_tool", {
-    annotations: DESKTOP_ONLY,
-    run: () => unavailable("detect_beats_tool", "beat detection runs on-device only in Zenvi desktop."),
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    run: async (call, input) => {
+      const tool = "detect_beats_tool";
+      const project = call.doc.project;
+      const clipId = text(input.clipId) || text(input.timeline_clip_id);
+      const fileId = text(input.fileId) || text(input.file_id);
+      let file: ProjectFile | undefined;
+      if (clipId) {
+        const clip = project.clips.find((c) => String(c.id) === clipId);
+        if (!clip) return refused(tool, `Error: Unknown clipId '${clipId}'.`);
+        file = fileById(project, String(clip.file_id ?? ""));
+      } else if (fileId) {
+        file = fileById(project, fileId);
+        if (!file) return refused(tool, `Error: Unknown fileId '${fileId}'.`);
+      } else {
+        return refused(tool, "Error: Provide fileId or clipId.");
+      }
+      if (!file) return refused(tool, "Error: Media path missing.");
+      if (!canTrackBeats(call)) return unavailable(tool, "this surface cannot decode audio for beat tracking (Zenvi desktop, the CLI and Zenvi Cloud can).");
+      const result = await beatsOfFile(call, file);
+      if (typeof result === "string") return failed(tool, result);
+      const fps = projectFps(project);
+      // Same receipt as zenvi-core speech_extra.detect_beats_tool_handler; beats are a tempo grid here (not energy peaks).
+      return applied(
+        tool,
+        `Detected ${result.beats.length} beat(s), BPM≈${result.bpm.toFixed(1)}.`,
+        {
+          data: {
+            beats: result.beats.map((b) => ({ timeSec: b.timeSec, frame: toFrame(b.timeSec, fps), strength: b.strength })),
+            downbeats: result.downbeats.map((d) => ({ timeSec: d.timeSec, frame: toFrame(d.timeSec, fps) })),
+            bpm: result.bpm,
+            fileId: fileId || "",
+            clipId: clipId || "",
+            provider: "local",
+          },
+        },
+        0,
+      );
+    },
   }),
 
   contractTool("diarize_media_tool", {

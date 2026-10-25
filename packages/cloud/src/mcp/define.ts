@@ -23,6 +23,8 @@ export interface ToolOutcome<O> {
   text: string;
   data: O;
   images?: ToolImage[];
+  /** The result's `_meta`: for the tool's view only, never shown to the model. */
+  meta?: Record<string, unknown>;
 }
 
 export interface ToolSpec<I extends z.ZodObject, O extends z.ZodObject> {
@@ -83,7 +85,7 @@ export function defineTool<I extends z.ZodObject, O extends z.ZodObject>(spec: T
         const parsed = spec.input.safeParse(args);
         if (!parsed.success) return errorResult(`Invalid arguments for ${spec.name}: ${describeIssues(parsed.error)}`);
         const outcome = await spec.run(ctx, parsed.data);
-        return okResult(outcome.text, outcome.data as Record<string, unknown>, outcome.images);
+        return okResult(outcome.text, outcome.data as Record<string, unknown>, outcome.images, outcome.meta);
       }),
   };
 }

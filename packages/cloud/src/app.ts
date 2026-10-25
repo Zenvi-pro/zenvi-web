@@ -11,6 +11,7 @@ import { HTTPException } from "hono/http-exception";
 import type { Services } from "./container.js";
 import { DOCUMENTATION_URL } from "./container.js";
 import type { AppEnv } from "./http/context.js";
+import { EMBED_PREFIX, editorRoutes } from "./http/editor.js";
 import { ApiError } from "./http/errors.js";
 import { errorMessage } from "./http/log.js";
 import { originMatcher, requestOrigin } from "./http/origins.js";
@@ -38,7 +39,8 @@ export function createApp(services: Services): Hono<AppEnv> {
     c.header("X-Request-Id", requestId);
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Referrer-Policy", "no-referrer");
-    c.header("X-Frame-Options", "DENY");
+    // Only the embedded editor's page may be framed (by chat hosts; it sends frame-ancestors itself).
+    if (!c.req.path.startsWith(EMBED_PREFIX)) c.header("X-Frame-Options", "DENY");
     if (c.get("origin").startsWith("https://")) c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     if (!c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-store");
     const path = c.req.path;
@@ -103,6 +105,7 @@ export function createApp(services: Services): Hono<AppEnv> {
   app.route("/v1/device", deviceRoutes(services));
   app.route("/v1", v1Routes(services));
   app.route("/mcp", mcpRoutes(services, tools, mcpAllowed));
+  app.route("/editor", editorRoutes(config.editorDist, config.editorUrl));
 
   app.notFound((c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
 

@@ -29,8 +29,10 @@ import { overlayTools } from "./catalog/overlays.js";
 import { phase3Tools } from "./catalog/phase3.js";
 import { playbackTools } from "./catalog/playback.js";
 import { projectTools } from "./catalog/project.js";
+import { reelTools } from "./catalog/reels.js";
 import { searchTools } from "./catalog/search.js";
 import { speechTools } from "./catalog/speech-tools.js";
+import { stockTools } from "./catalog/stock.js";
 import { timelineTools } from "./catalog/timeline.js";
 import { timelineEditTools } from "./catalog/timeline-edit.js";
 import { timelineTimeTools } from "./catalog/timeline-time.js";
@@ -74,7 +76,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...overlayTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools]) {
+  for (const tool of [...implemented, ...directTools, ...reelTools, ...stockTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -98,7 +100,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools];
+  return [...contract, ...directTools, ...reelTools, ...stockTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */

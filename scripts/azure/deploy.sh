@@ -32,7 +32,7 @@ step "Staging the committed tree ($(git -C "$ROOT" rev-parse --short HEAD)) for 
 MANIFESTS=()
 while IFS= read -r manifest; do MANIFESTS+=("$manifest"); done < <(git -C "$ROOT" ls-files -- 'packages/*/package.json' 'apps/*/package.json')
 git -C "$ROOT" archive HEAD package.json package-lock.json tsconfig.base.json \
-  packages/engine packages/render-node packages/cloud "${MANIFESTS[@]}" | tar -x -C "$CTX"
+  packages/engine packages/render-node packages/cloud packages/render-web apps/editor "${MANIFESTS[@]}" | tar -x -C "$CTX"
 
 step "Building $REGISTRY.azurecr.io/zenvi-cloud:$TAG in ACR"
 az acr build -r "$REGISTRY" -t "zenvi-cloud:$TAG" -f packages/cloud/Dockerfile "$CTX"

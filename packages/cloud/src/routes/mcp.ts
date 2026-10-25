@@ -60,6 +60,7 @@ export function mcpRoutes(services: Services, tools: readonly McpTool[], originA
     };
     if (!principal) return reject("The access token is invalid, expired or revoked.");
     if (principal.kind === "supabase") return reject("Use a Zenvi connector token or a personal access token, not a website session.");
+    if (principal.kind === "embed") return reject("This token only opens the embedded editor for one project.");
     if (principal.kind === "oauth" && principal.resource !== mcpResource(origin)) {
       return reject(`This token was issued for ${principal.resource}, not ${mcpResource(origin)}.`);
     }

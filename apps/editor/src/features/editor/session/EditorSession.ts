@@ -103,6 +103,8 @@ export class EditorSession {
   private cloudSaving: Promise<void> | null = null;
   /** A save asked for while one was in flight (coalesced into one more run). */
   private cloudWanted: { force: boolean } | null = null;
+  /** `cloudContentKey` of a revision just taken from the cloud (`adoptRemote`): a save of exactly that is not sent back. */
+  private adoptedContentKey: string | null = null;
   private disposed = false;
 
   constructor(private readonly options: EditorSessionOptions) {
@@ -407,13 +409,20 @@ export class EditorSession {
     if (status.state === "conflict" && !force) return;
     // Overwriting a conflict: the save must name the cloud's current revision.
     const revision = force && status.state === "conflict" && status.conflictRevision !== undefined ? status.conflictRevision : link.revision;
+    // Exactly the revision just taken from the cloud (plus view state): nothing to send back.
+    if (!force && status.state !== "conflict" && this.adoptedContentKey !== null && cloudContentKey(this.snapshotForSave()) === this.adoptedContentKey) {
+      this.cloudSync.setState({ state: status.missing.length > 0 ? "partial" : "synced", error: null });
+      return;
+    }
     this.cloudSync.setState({ state: "syncing", error: null });
     try {
       // Media first, so the cloud project points at as few missing bytes as possible.
       const media = await this.uploadMedia();
-      const saved = await cloud.saveProject(link.id, this.snapshotForSave(), revision);
+      const snapshot = this.snapshotForSave();
+      const saved = await cloud.saveProject(link.id, snapshot, revision);
       const syncedAt = Date.now();
       const cloudLink = { ...link, revision: saved.revision, syncedAt };
+      this.adoptedContentKey = null;
       this.meta.setState({ ...this.meta.getState(), cloud: cloudLink });
       await this.options.repository.updateMeta(this.meta.getState().id, { cloud: cloudLink });
       this.cloudSync.setState(this.syncedStatus(syncedAt, media));
@@ -461,6 +470,40 @@ export class EditorSession {
   markConflict(cloudRevision: string | null, message = "This project was changed somewhere else."): void {
     this.cloudSync.setState({ state: "conflict", error: message, conflictRevision: cloudRevision });
     this.ui.setState({ dialog: "cloudConflict" });
+  }
+
+  /**
+   * Take a newer cloud revision made elsewhere (the chat's tools, another
+   * tab) as one undo step, without sending it back. Refused (false) while
+   * this copy has edits the cloud does not have yet; the next save then
+   * reports the conflict as usual. `project` must already be parsed
+   * (`parseProject`), like every project the session holds.
+   */
+  adoptRemote(remote: { revision: string; project: Project }, label = "Changes from the chat"): boolean {
+    const link = this.meta.getState().cloud;
+    const state = this.cloudSync.getState().state;
+    if (!link || link.revision === remote.revision) return false;
+    if (this.cloudTimer || this.cloudSaving || (state !== "synced" && state !== "partial")) return false;
+    if (this.autosave.current.state !== "saved") return false;
+    const current = this.doc.project as unknown as Record<string, unknown>;
+    const next = remote.project as unknown as Record<string, unknown>;
+    const changed = Object.keys(next).filter((key) => !VOLATILE_KEYS.has(key) && JSON.stringify(current[key]) !== JSON.stringify(next[key]));
+    this.setDraft(null);
+    if (changed.length > 0) {
+      try {
+        this.doc.transaction(label, (tx) => {
+          for (const key of changed) tx.replace([key], next[key]);
+        });
+      } catch (error) {
+        reportEditError(label, error);
+        return false;
+      }
+    }
+    const cloudLink = { ...link, revision: remote.revision, syncedAt: Date.now() };
+    this.adoptedContentKey = cloudContentKey(this.snapshotForSave());
+    this.meta.setState({ ...this.meta.getState(), cloud: cloudLink });
+    void this.options.repository.updateMeta(this.meta.getState().id, { cloud: cloudLink });
+    return true;
   }
 
   /** Conflict → "Keep mine": overwrite the cloud copy (If-Match: its current revision). */
@@ -529,6 +572,16 @@ export class EditorSession {
     if (event.source !== "load") void this.media.sync(project);
     this.autosave.notify();
   }
+}
+
+/** Project keys that change without changing the edit (view state, the undo slice, the format stamp). */
+const VOLATILE_KEYS = new Set(["history", "playhead_position", "scale", "version"]);
+
+/** What a cloud save would change: the project without its volatile keys. */
+function cloudContentKey(project: Project): string {
+  const content: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(project)) if (!VOLATILE_KEYS.has(key)) content[key] = value;
+  return JSON.stringify(content);
 }
 
 function pixelsPerSecondOf(project: Project): number {

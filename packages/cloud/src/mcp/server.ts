@@ -18,23 +18,26 @@ import type { Services } from "../container.js";
 import { cloudTools } from "./cloud-tools.js";
 import { engineTools } from "./engine.js";
 import { cloudCapabilities } from "./host.js";
+import { reelTools } from "./reels.js";
 import { errorResult } from "./results.js";
 import type { McpCallContext, McpTool } from "./types.js";
+import { EDITOR_WIDGET_HTML, EDITOR_WIDGET_MIME, EDITOR_WIDGET_URI, editorWidgetResourceMeta } from "./editor-widget.js";
 import { WIDGET_HTML, WIDGET_MIME, WIDGET_URI, widgetResourceMeta } from "./widget.js";
 
 /** Sent in `initialize`; the first 512 characters matter most (ChatGPT). */
 export const INSTRUCTIONS =
-  "Zenvi edits the person's video projects in Zenvi Cloud. Start with list_projects + open_project, or create_project; later tools use that project (or pass project_id). Import with import_media_from_url or get_upload_link. Check edits with preview_frame. render_project and generate_video return immediately: poll get_render_status or get_generation_status. open_in_editor opens the web editor.";
+  "Zenvi edits the person's video projects in Zenvi Cloud. Start with list_projects + open_project, or create_project; later tools use that project (or pass project_id). Import with import_media_from_url or get_upload_link. Check edits with preview_frame. render_project and generate_video return immediately: poll get_render_status or get_generation_status. open_in_editor shows the Zenvi editor in the chat; it follows your later edits live, so open it once per project.";
 
 const RESOURCE_NOT_FOUND = -32002;
 
 export function buildToolList(services: Services): McpTool[] {
   const cloud = cloudTools({ backend: services.backendSessions.enabled });
   if (!services.engine) return cloud;
-  const reserved = new Set(cloud.map((tool) => tool.name));
+  const reels = reelTools(services.engine, services.backendSessions.enabled, { fetchDeadlineMs: services.config.limits.reelFetchDeadlineMs });
+  const reserved = new Set([...cloud, ...reels].map((tool) => tool.name));
   const capabilities = cloudCapabilities(services);
   const engine = engineTools(services.engine, capabilities, reserved, (message) => services.log.warn(message));
-  return [...cloud, ...engine];
+  return [...cloud, ...reels, ...engine];
 }
 
 function descriptor(tool: McpTool): Record<string, unknown> {
@@ -57,6 +60,19 @@ export function createMcpServer(tools: readonly McpTool[], ctx: McpCallContext):
   );
   const byName = new Map(tools.map((tool) => [tool.name, tool]));
   const resourceMeta = widgetResourceMeta(blobs.origin);
+  const editorMeta = editorWidgetResourceMeta(ctx.origin);
+  const resources = [
+    { uri: WIDGET_URI, name: "zenvi-preview", title: "Zenvi preview", description: "Shows a previewed frame or a finished render.", mimeType: WIDGET_MIME, text: WIDGET_HTML, _meta: resourceMeta },
+    {
+      uri: EDITOR_WIDGET_URI,
+      name: "zenvi-editor",
+      title: "Zenvi editor",
+      description: "The Zenvi video editor with a project open.",
+      mimeType: EDITOR_WIDGET_MIME,
+      text: EDITOR_WIDGET_HTML,
+      _meta: editorMeta,
+    },
+  ];
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map(descriptor) as never[] }));
 
@@ -70,23 +86,15 @@ export function createMcpServer(tools: readonly McpTool[], ctx: McpCallContext):
   });
 
   server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-    resources: [
-      {
-        uri: WIDGET_URI,
-        name: "zenvi-preview",
-        title: "Zenvi preview",
-        description: "Shows a previewed frame or a finished render.",
-        mimeType: WIDGET_MIME,
-        _meta: resourceMeta,
-      },
-    ],
+    resources: resources.map(({ text: _text, ...listed }) => listed),
   }));
 
   server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({ resourceTemplates: [] }));
 
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    if (request.params.uri !== WIDGET_URI) throw new McpError(RESOURCE_NOT_FOUND, `Resource not found: ${request.params.uri}`);
-    return { contents: [{ uri: WIDGET_URI, mimeType: WIDGET_MIME, text: WIDGET_HTML, _meta: resourceMeta }] };
+    const resource = resources.find((r) => r.uri === request.params.uri);
+    if (!resource) throw new McpError(RESOURCE_NOT_FOUND, `Resource not found: ${request.params.uri}`);
+    return { contents: [{ uri: resource.uri, mimeType: resource.mimeType, text: resource.text, _meta: resource._meta }] };
   });
 
   return server;
