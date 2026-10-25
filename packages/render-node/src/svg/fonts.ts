@@ -247,6 +247,15 @@ export class FontIndex {
     return [...this.spelling.values()].filter((name) => !name.startsWith(".")).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   }
 
+  /** `familyNames`, plus the fonts an installed metric twin draws in their place ("Arial" when Liberation Sans is here). */
+  renderableFamilyNames(): string[] {
+    const names = new Set(this.familyNames());
+    for (const [name, twins] of Object.entries(METRIC_TWINS)) {
+      if (!this.has(name) && twins.some((twin) => this.has(twin))) names.add(name);
+    }
+    return [...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  }
+
   /**
    * Index the fonts in `dirs`. Family names are cached on disk by
    * path/size/mtime, so later processes only list and stat the folders.
@@ -305,9 +314,12 @@ export function sharedFontIndex(): Promise<FontIndex> {
   return shared;
 }
 
-/** The font families SVG titles render with in this process (the shared index's `familyNames`). */
+/**
+ * The font families SVG titles render with in this process: the installed ones, and the fonts an installed metric twin
+ * stands in for (the shared index's `renderableFamilyNames`).
+ */
 export async function installedFontFamilies(): Promise<string[]> {
-  return (await sharedFontIndex()).familyNames();
+  return (await sharedFontIndex()).renderableFamilyNames();
 }
 
 const bufferCache = new Map<string, Promise<Uint8Array>>();
@@ -323,6 +335,19 @@ export function readFontFile(file: string): Promise<Uint8Array> {
 
 /** CSS generic families resvg understands. */
 export const GENERIC_FAMILIES = new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy"]);
+
+/**
+ * Fonts drawn with a metric-compatible face when they are missing: the Liberation and Croscore fonts copy their advance
+ * widths, so text laid out for them keeps its layout. `ALIASES` picks the same faces when rendering.
+ */
+const METRIC_TWINS: Readonly<Record<string, readonly string[]>> = {
+  Arial: ["liberation sans", "arimo"],
+  Helvetica: ["liberation sans", "arimo"],
+  "Times New Roman": ["liberation serif", "tinos"],
+  Times: ["liberation serif", "tinos"],
+  "Courier New": ["liberation mono", "cousine"],
+  Courier: ["liberation mono", "cousine"],
+};
 
 /**
  * Installed families to try when a requested one is missing, closest first.

@@ -74,8 +74,10 @@ export type PcmDecoder = (
 
 /**
  * The font families SVG titles render with in this process
- * (`@zenvi/render-node` `installedFontFamilies`: the image's fonts and the
- * bundled Lato), for title tools that must name an installed font.
+ * (`@zenvi/render-node` `installedFontFamilies`: the image's fonts, the
+ * bundled Lato, and Arial, Helvetica, Times and Courier, which Liberation
+ * draws with the same widths), for title tools that must name an installed
+ * font.
  */
 export type FontLister = () => Promise<string[]>;
 
