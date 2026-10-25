@@ -83,7 +83,7 @@ export const MOTION_STYLES: Readonly<Record<MotionStyleId, MotionStyle>> = {
     id: "tutorial",
     name: "Tutorial cards",
     summary:
-      "A how-to in steps (9:16 first): the hook on grid paper, then one step per clip (the footage in a bordered card, a numbered caption from `labels`, a label box with an arrow from `words`), ending on 'Save this'.",
+      "A how-to in steps (9:16 first): the hook on grid paper, then one step per label (the footage in a bordered card, a numbered caption from `labels`, a label box with an arrow from `words`, one word per step; clips that share a label are one step), ending on 'Save this'.",
     defaultSeconds: 20,
     defaultBpm: 100,
     media: 4,
@@ -190,6 +190,11 @@ function features(words: readonly string[]): { labels: string[]; values: string[
   return { labels, values };
 }
 
+/** Labels in media order without repeats: the clips one stock search found all carry its label. */
+function distinctLabels(labels: readonly string[], count: number): string[] {
+  return [...new Set(labels.slice(0, count).map(clean).filter(Boolean))];
+}
+
 /** The scenes of a motion-led reel. */
 export function storyboard(input: StoryInput): MotionScene[] {
   const media = input.media;
@@ -205,7 +210,7 @@ export function storyboard(input: StoryInput): MotionScene[] {
   switch (input.style) {
     case "ui_promo": {
       // The card captions open as suggestions under the search, then come back as the cards.
-      const suggestions = ids.slice(0, 3).map((_, k) => clean(labels[k])).filter(Boolean);
+      const suggestions = distinctLabels(labels, ids.length).slice(0, 3);
       drafts.push({
         name: "search",
         min: 1,
@@ -294,13 +299,19 @@ export function storyboard(input: StoryInput): MotionScene[] {
     case "tutorial": {
       const title = hook || "How to do it";
       drafts.push({ name: "hook", min: 1, pref: 1, optional: false, templates: [bg("tutorial", "paper"), { template: "kinetic_type", palette: "tutorial", content: { text: title, highlight: Math.max(0, title.split(" ").length - 1), align: "center" } }] });
-      ids.slice(0, 5).forEach((id, i) => {
+      // One step per tip: clips that share a label (one search found several) are one step, shown by the first.
+      const steps: { id: string; label: string }[] = [];
+      ids.forEach((id, i) => {
+        const label = clean(labels[i]);
+        if (!label || label !== steps[steps.length - 1]?.label) steps.push({ id, label });
+      });
+      steps.slice(0, 5).forEach((step, i) => {
         drafts.push({
           name: `step-${i + 1}`,
           min: 1,
           pref: 2,
           optional: i >= 2,
-          templates: [bg("tutorial", "paper"), { template: "step_card", palette: "tutorial", content: { fileIds: [id], step: i + 1, text: clean(labels[i]) || `Step ${i + 1}`, ...(words[i] ? { tag: words[i] } : {}), subtitle: title } }],
+          templates: [bg("tutorial", "paper"), { template: "step_card", palette: "tutorial", content: { fileIds: [step.id], step: i + 1, text: step.label || `Step ${i + 1}`, ...(words[i] ? { tag: words[i] } : {}), subtitle: title } }],
         });
       });
       drafts.push({ name: "save", min: 1, pref: 2, optional: false, templates: [bg("tutorial", "paper"), { template: "end_card", palette: "tutorial", content: { variant: "save", text: end || "Save this", ...(sub ? { subtitle: sub } : { subtitle: "for later" }), backdrop: false } }] });

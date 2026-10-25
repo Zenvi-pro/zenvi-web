@@ -56,6 +56,29 @@ describe("storyboard", () => {
     expect(scenes[2]!.templates[1]!.content).toMatchObject({ step: 2, text: "Step 2" });
   });
 
+  it("makes one step per tip when a search found several clips for it, words following the steps", () => {
+    const media = ["A1", "A2", "B1", "B2", "C1"].map((id): MotionMedia => ({ fileId: id, kind: "video", width: 1080, height: 1920, duration: 8 }));
+    const scenes = storyboard({
+      style: "tutorial",
+      bars: 10,
+      media,
+      hook: "Film better reels",
+      labels: ["Mount your phone", "Mount your phone", "Face the light", "Face the light", "Cut on the beat"],
+      words: ["Eye level", "Soft light", "Every beat"],
+    });
+    const steps = scenes.flatMap((s) => s.templates).filter((t) => t.template === "step_card").map((t) => t.content);
+    expect(steps.map((c) => [c.step, c.text, c.tag, c.fileIds])).toEqual([
+      [1, "Mount your phone", "Eye level", ["A1"]],
+      [2, "Face the light", "Soft light", ["B1"]],
+      [3, "Cut on the beat", "Every beat", ["C1"]],
+    ]);
+  });
+
+  it("does not repeat a search suggestion when one search found several clips", () => {
+    const scenes = storyboard({ style: "ui_promo", bars: 8, media: MEDIA, hook: "Plan", labels: ["Slow pour", "Slow pour", "Ten pages", "Notes"] });
+    expect(scenes[0]!.templates[1]!.content.labels).toEqual(["Slow pour", "Ten pages", "Notes"]);
+  });
+
   it("splits product features 'Name: value' across the products", () => {
     const scenes = storyboard({ style: "product_callout", bars: 10, media: MEDIA.slice(0, 2), hook: "Northwind Press", words: ["Glass carafe: Borosilicate", "Filter: Mesh", "Capacity: 1 litre", "Lid: Locks heat in"] });
     const callouts = scenes.flatMap((s) => s.templates).filter((t) => t.template === "callout");
