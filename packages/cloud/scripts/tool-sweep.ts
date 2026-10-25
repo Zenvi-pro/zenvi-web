@@ -201,6 +201,9 @@ async function setUp(call: (name: string, args: Json) => Promise<CallResult>, re
   const { clips } = await roles();
   const effect = await call("add_effect_tool", { timeline_clip_id: clips.a, effect: "Blur", project_id: projectId });
   console.log(`setup add_effect_tool: ${oneLine(textOf(effect)).slice(0, 140)}`);
+  // Alpha keyframes on clip A for the keyframe tools to copy and remove.
+  const faded = await call("fade_clip_tool", { clip_id: clips.a, fade_in_seconds: "0.5", project_id: projectId });
+  console.log(`setup fade_clip_tool: ${oneLine(textOf(faded)).slice(0, 140)}`);
   // Captions for the caption tools to list, edit and remove (where the surface has edit_captions_tool).
   const captioned = await call("edit_captions_tool", { timeline_clip_id: clips.talk, add_cues: [{ start: 0.2, end: 2.4, text: "Welcome to the Zenvi tool sweep" }], project_id: projectId }).catch(() => undefined);
   if (captioned) console.log(`setup edit_captions_tool: ${oneLine(textOf(captioned)).slice(0, 140)}`);
@@ -319,6 +322,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   analyze_timeline_audio_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
   apply_transition_tool: (c) => ({ clip1_id: c.clips.a, clip2_id: c.clips.b, transition_name: "fade", duration: "1" }),
   build_reel_tool: (c) => ({ style: "hype", duration_seconds: 8, file_ids: [c.files.a, c.files.b, c.files.still], music_file_id: c.files.beat, hook: "Sweep reel", replace: true }),
+  // Clip A fades in (setup): keyframes to copy and remove.
+  copy_clip_keyframes_tool: (c) => ({ source_clip_id: c.clips.a, timeline_clip_ids: [c.clips.b] }),
   delete_from_timeline_tool: (c) => ({ timeline_clip_id: c.clips.b }),
   detect_beats_tool: (c) => ({ file_id: c.files.beat }),
   diarize_media_tool: (c) => ({ file_id: c.files.talk }),
@@ -354,6 +359,10 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   reindex_project_file_tool: (c) => ({ file_id: c.files.a }),
   remove_captions_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
   remove_effect_tool: (c) => ({ effect_id: c.effectId }),
+  remove_keyframes_tool: (c) => ({ timeline_clip_ids: [c.clips.a], properties: ["all"] }),
+  remove_marker_tool: () => ({ markers: ["Sweep marker"] }),
+  // Tracks 4 and 5 are empty in the baseline.
+  remove_track_tool: () => ({ track: "5" }),
   // The still starts at 2 s on track 2: one gap to close.
   remove_gaps_tool: () => ({ track: "2" }),
   remove_silence_tool: (c) => ({ timeline_clip_id: c.clips.talk }),
@@ -366,7 +375,9 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   search_emojis_tool: () => ({ query: "fire" }),
   search_media_local_tool: () => ({ query: "colour bars" }),
   search_transitions_tool: () => ({ query: "fade" }),
+  seek_playhead_tool: () => ({ seconds: 3 }),
   set_clip_audio_video_tool: (c) => ({ timeline_clip_ids: [c.clips.a], audio: "off" }),
+  set_clip_properties_tool: (c) => ({ timeline_clip_ids: [c.clips.a], properties: { alpha: 0.5 } }),
   set_clip_property_tool: (c) => ({ clip_id: c.clips.a, property: "alpha", value: "0.5" }),
   set_clip_speed_tool: (c) => ({ clip_id: c.clips.b, factor: "2" }),
   set_clip_volume_tool: (c) => ({ timeline_clip_id: c.clips.a, level_db: "-6" }),
@@ -381,6 +392,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   transcribe_media_tool: (c) => ({ file_id: c.files.talk }),
   trim_clip_tool: (c) => ({ clip_id: c.clips.a, edge: "right", at_seconds: "5" }),
   trim_clips_tool: (c) => ({ timeline_clip_ids: [c.clips.a], trim_start_seconds: 0.5 }),
+  update_marker_tool: () => ({ marker: "Sweep marker", name: "Renamed marker" }),
+  update_track_tool: () => ({ track: "2", name: "Stills" }),
   wait_until_project_indexed_tool: () => ({ timeout_seconds: 5 }),
   watch_clip_window_tool: (c) => ({ timeline_clip_id: c.clips.a, start: "0", end: "2" }),
 };
