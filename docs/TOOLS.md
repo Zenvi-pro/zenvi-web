@@ -10,14 +10,14 @@ Every call returns a contract-3 receipt (`{contract: 3, status, tool, summary, c
 
 | Surface | Host | Works | Partial | Not available |
 | --- | --- | --- | --- | --- |
-| Web editor (Zenvi Assistant, command palette) | `apps/editor/src/features/editor/assistant/host.ts` | 65 | 7 | 14 |
+| Web editor (Zenvi Assistant, command palette) | `apps/editor/src/features/editor/assistant/host.ts` | 68 | 6 | 12 |
 | CLI and local MCP server (zenvi, zenvi mcp) | `packages/render-node/src/host/node-host.ts` | 65 | 5 | 16 |
 | Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 59 | 7 | 20 |
 | Zenvi desktop | zenvi-core | 73 | 0 | 13 (direct tools are web-only) |
 
 Availability follows each tool's required host capabilities and the host methods it calls at run time; the hosts are described in `SURFACE_PROFILES` (packages/engine/src/tools/availability.ts). Capabilities a session may lack (signed out of Zenvi, no WebCodecs export) are noted per tool.
 
-- **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage; methods media.importUrl, media.pickFiles, media.writeGenerated, ui.openExportDialog; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
+- **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage, audio; methods media.importUrl, media.pickFiles, media.writeGenerated, ui.openExportDialog, audio.decodePcm; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
 - **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, storage.open, storage.readText, storage.writeText, audio.decodePcm; only sometimes: backend (signed in with zenvi login).
 - **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend; methods media.importUrl, media.writeGenerated, storage.readText, storage.writeText, audio.decodePcm; only sometimes: frames (the render worker is configured), media (ffprobe is available), assets (title templates are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend); hides 13 local-app tools.
 
@@ -47,7 +47,7 @@ Availability follows each tool's required host capabilities and the host methods
 | `delete_clips_on_track_tool` (deprecated) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`analyze_timeline_audio_tool`](#analyze_timeline_audio_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`set_clip_volume_tool`](#set_clip_volume_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
-| [`duck_under_speech_tool`](#duck_under_speech_tool) | assistant, mcp, cli, editor | partial | yes | yes | yes |
+| [`duck_under_speech_tool`](#duck_under_speech_tool) | assistant, mcp, cli, editor | yes | yes | yes | yes |
 | [`zoom_in_tool`](#zoom_in_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
 | [`zoom_out_tool`](#zoom_out_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
 | [`center_on_playhead_tool`](#center_on_playhead_tool) | assistant, mcp, cli, editor | yes | — | — | yes |
@@ -92,10 +92,10 @@ Availability follows each tool's required host capabilities and the host methods
 | [`get_transcript_tool`](#get_transcript_tool) | mcp, cli, editor | partial | partial | partial | yes |
 | [`transcribe_media_tool`](#transcribe_media_tool) | mcp, cli, editor | — | — | — | yes |
 | [`remove_words_tool`](#remove_words_tool) | mcp, cli, editor | — | — | — | yes |
-| [`remove_silence_tool`](#remove_silence_tool) | mcp, cli, editor | — | partial | partial | yes |
+| [`remove_silence_tool`](#remove_silence_tool) | mcp, cli, editor | partial | partial | partial | yes |
 | [`add_captions_tool`](#add_captions_tool) | mcp, cli, editor | — | — | partial | yes |
 | [`export_captions_tool`](#export_captions_tool) | mcp, cli, editor | — | partial | partial | yes |
-| [`detect_beats_tool`](#detect_beats_tool) | mcp, cli, editor | — | yes | yes | yes |
+| [`detect_beats_tool`](#detect_beats_tool) | mcp, cli, editor | yes | yes | yes | yes |
 | [`diarize_media_tool`](#diarize_media_tool) | mcp, cli, editor | — | — | — | yes |
 | [`search_media_local_tool`](#search_media_local_tool) | mcp, cli, editor | — | — | — | yes |
 | [`describe_project_tool`](#describe_project_tool) | mcp, cli, editor | yes | yes | yes | — |
@@ -110,7 +110,7 @@ Availability follows each tool's required host capabilities and the host methods
 | [`fade_clip_tool`](#fade_clip_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`add_transition_tool`](#add_transition_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`probe_media_tool`](#probe_media_tool) | mcp, cli, editor | yes | yes | yes | — |
-| [`build_reel_tool`](#build_reel_tool) | mcp, cli, editor | partial | yes | yes | — |
+| [`build_reel_tool`](#build_reel_tool) | mcp, cli, editor | yes | yes | yes | — |
 
 ## Tools
 
@@ -407,7 +407,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 Surfaces: assistant, mcp, cli, editor. edits, destructive.
 
-Availability: editor partial (without audio analysis only indexed transcript cues find the speech); cli yes; cloud yes; desktop yes.
+Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1095,7 +1095,7 @@ Availability: editor — (needs word timings from on-device speech recognition (
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: audio.
 
-Availability: editor — (needs audio analysis); cli partial (energy VAD on the host's audio analysis); cloud partial (energy VAD on the host's audio analysis; only when ffmpeg is available); desktop yes.
+Availability: editor partial (energy VAD on the host's audio analysis); cli partial (energy VAD on the host's audio analysis); cloud partial (energy VAD on the host's audio analysis; only when ffmpeg is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1148,7 +1148,7 @@ Availability: editor — (needs writing files); cli partial (captions come from 
 
 Surfaces: mcp, cli, editor. read-only.
 
-Availability: editor — (needs audio decoding); cli yes; cloud yes; desktop yes.
+Availability: editor yes; cli yes; cloud yes; desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1366,7 +1366,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: media.
 
-Availability: editor partial (without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes); cli yes; cloud yes (only when ffprobe is available); desktop — (web-only direct tool).
+Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
