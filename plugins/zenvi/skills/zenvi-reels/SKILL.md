@@ -1,6 +1,6 @@
 ---
 name: zenvi-reels
-description: Make a finished short-form video (Instagram Reel, TikTok, YouTube Short, ad, teaser, montage, highlight reel, app promo, product reveal, how-to) from one short ask with the Zenvi MCP tools - write a brief, gather the footage and the music, then cut it on the beat in a style with build_reel_tool (footage-led or motion-designed), check the frames and render. Use it whenever the user wants a reel, short, edit "on the beat", hype video, montage, highlight reel, social ad, motion-graphics promo or tutorial, even from a one-line prompt.
+description: Make a finished short-form video (Instagram Reel, TikTok, YouTube Short, ad, teaser, montage, highlight reel, app promo, product reveal, how-to) from one short ask with the Zenvi MCP tools - write a brief, gather the footage and the music, then cut it on the beat in a style with build_reel_tool (footage-led or motion-designed), watch the cut with review_edit_tool, fix what it flags and render. Use it whenever the user wants a reel, short, edit "on the beat", hype video, montage, highlight reel, social ad, motion-graphics promo or tutorial, even from a one-line prompt.
 ---
 
 # One-shot reels with Zenvi
@@ -146,14 +146,35 @@ cut it should punch (zoom blur 0.2-0.4 s into a cut, a 0.3 s glitch on a
 hit) rather than the whole clip, keep one look per section, and remove one
 with `remove_fx_tool` if it reads as a filter instead of a moment.
 
-## 5. Look before you call it done
+## 5. Watch the cut, fix it, watch it again
 
-`preview_frame` at: 0.5 s (the hook reads, nothing is cut off), a cut in the
-middle and one in the climax (no black frame, no letterbox bars), the
-payoff, and the last frame (end card centred, music fading). Text stays in
-the centre 80 % of the width; on 9:16 keep it out of the bottom fifth,
-where the apps put their buttons. Fix with the edit tools (or `undo_tool`
-and build again with other arguments), then look again.
+Frames one at a time never show pacing. After cutting, call
+`review_edit_tool` (CLI: `zenvi review sheet.jpg`): one contact sheet of the
+whole edit at its cut points (each cut's last and first frame, plus frames
+from long shots; a coloured border marks a white flash or a black frame),
+about 1,500 image tokens, and the numbers a viewer feels: shot lengths, cuts
+per second, how many cuts land on a beat or hit, the longest hold, empty and
+black frames, titles on screen, loudness, silences, and a ranked
+`data.problems` list with timestamps and a fix for each.
+
+1. Call it with `pace: "fast"` (the default; reels, hype and flash cuts) or
+   `"medium"` for b-roll and promos. Read the sheet like an editor: does the
+   subject carry across cuts, does every shot earn its place, does anything
+   look like a slideshow?
+2. Fix every `high` and `medium` problem: shorten a held shot, move a cut
+   onto the beat (`detect_beats_tool` gives the times), fill an empty
+   stretch, put sound under a silent one, trim the music so the timeline
+   ends with the picture. Or `undo_tool` and build again with other
+   arguments.
+3. Call `review_edit_tool` again. Stop when no `high` problem is left (a
+   `low` one is a note, not a fault) or after three rounds, and say what you
+   left on purpose. To look closer at one stretch pass `start`/`end` (and
+   `tile_width`); the first sheet samples a long edit evenly.
+
+Then `preview_frame` at what the sheet cannot show: 0.5 s (the hook reads,
+nothing is cut off), the payoff, and the last frame (end card centred, music
+fading). Text stays in the centre 80 % of the width; on 9:16 keep it out of
+the bottom fifth, where the apps put their buttons.
 
 ## 6. Render and hand off
 

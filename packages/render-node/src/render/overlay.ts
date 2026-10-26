@@ -10,7 +10,7 @@ import type { FrameOverlay, RgbaImage } from "@zenvi/engine";
 import { rasterizeSvg } from "../svg/rasterize.js";
 
 /** Advance widths of Helvetica Bold (em), for sizing label chips like QFontMetrics. */
-function textWidth(text: string, size: number): number {
+export function textWidth(text: string, size: number): number {
   let em = 0;
   for (const ch of text) {
     if (/[0-9]/.test(ch)) em += 0.556;
@@ -21,7 +21,7 @@ function textWidth(text: string, size: number): number {
   return Math.ceil(em * size);
 }
 
-function esc(text: string): string {
+export function esc(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 

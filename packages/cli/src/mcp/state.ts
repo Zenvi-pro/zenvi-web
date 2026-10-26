@@ -149,6 +149,20 @@ export class McpState {
     this.lastPortableCall = Date.now();
   }
 
+  /** The project and revision review_edit_tool last looked at. */
+  private reviewed: { doc: ProjectSession["doc"]; revision: number } | undefined;
+
+  noteReview(): void {
+    this.reviewed = { doc: this.session.doc, revision: this.session.doc.revision };
+  }
+
+  /** A cut of several clips that review_edit_tool has not looked at since the last edit. */
+  unreviewedCut(): boolean {
+    const { doc } = this.session;
+    if (doc.project.clips.length < 4) return false;
+    return this.reviewed?.doc !== doc || this.reviewed.revision !== doc.revision;
+  }
+
   /** The desktop app, when it has this session's project open. */
   async desktopExecutor(): Promise<DesktopExecutor | undefined> {
     const file = this.session.file;
