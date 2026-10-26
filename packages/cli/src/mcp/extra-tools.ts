@@ -155,7 +155,13 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
           receipt: applied(
             tool,
             `Rendered ${result.location} (${options.format}, ${options.width}x${options.height}, ${result.durationSeconds.toFixed(2)} s, ${mb.toFixed(1)} MB)`,
-            { data: { ...result, format: options.format, width: options.width, height: options.height }, warnings: result.warnings },
+            {
+              data: { ...result, format: options.format, width: options.width, height: options.height },
+              warnings: result.warnings,
+              ...(state.unreviewedCut() && options.format !== "mp3" && options.format !== "wav"
+                ? { notes: ["This cut has not been reviewed since the last edit: review_edit_tool shows pacing, beat sync, holds and black frames in one image. Fix what it flags and render again."] }
+                : {}),
+            },
             0,
           ),
         };
