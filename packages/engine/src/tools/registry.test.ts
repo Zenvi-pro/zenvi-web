@@ -26,6 +26,7 @@ const DIRECT_TOOLS = [
   "detect_subject_tool",
   "match_cut_montage_tool",
   "unify_grade_tool",
+  "review_edit_tool",
   "add_motion_template_tool",
   "kinetic_captions_tool",
   "list_sfx_tool",

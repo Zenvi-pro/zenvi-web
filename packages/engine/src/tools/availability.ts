@@ -52,7 +52,9 @@ export type HostMethod =
   | "storage.customProfiles"
   | "media.collect"
   | "exporter.supports"
-  | "frames.fontFamilies";
+  | "frames.fontFamilies"
+  | "frames.renderSheet"
+  | "audio.measureMix";
 
 export interface ToolNeeds {
   /** All of these, or the tool refuses. */
@@ -191,6 +193,10 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
   master_audio_tool: { methods: ["audio.mixPcm"] },
+  review_edit_tool: {
+    optional: ["frames.renderSheet", "audio.measureMix", "storage.readText"],
+    partialNote: "without frame composing there is no contact sheet, without audio mixing no loudness, silences or beat alignment, and without file reading no text safe-area check; the timeline numbers always come",
+  },
   build_reel_tool: {
     optional: ["audio.decodePcm", "media.writeGenerated"],
     partialNote:
@@ -401,6 +407,8 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "audio.transcribe",
       "exporter.supports",
       "frames.fontFamilies",
+      "frames.renderSheet",
+      "audio.measureMix",
     ],
     conditional: {
       backend: "signed in with zenvi login",
@@ -509,6 +517,8 @@ function needName(need: HostCapability | HostMethod): string {
     "media.collect": "copying media into the project's folder",
     "exporter.supports": "checking which codecs it can encode",
     "frames.fontFamilies": "listing the fonts titles render with",
+    "frames.renderSheet": "composing contact sheets",
+    "audio.measureMix": "mixing and measuring the audio",
   };
   return names[need as HostMethod];
 }
