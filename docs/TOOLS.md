@@ -3180,7 +3180,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 
 ### unify_grade_tool
 
-**Unify grade** (direct tool). Grade continuity for a whole cut: measures every footage clip's exposure, white balance, saturation and contrast on frames across it, corrects each clip's ColorGrade toward one target (a reference clip/file, or the clips' median look in a neutral band) until it sits within tolerance, then optionally lays one LUT look over all of them.
+**Unify grade** (direct tool). Grade continuity for a whole cut: measures every footage clip's exposure, white balance and contrast on frames across it, corrects each clip's ColorGrade toward one target (a reference clip/file, or the clips' median look in a neutral band) until it sits within tolerance (saturation is reported, not matched), then optionally lays one LUT look over all of them.
 
 Surfaces: mcp, cli, editor. edits. Needs: frames.
 

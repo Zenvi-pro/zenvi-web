@@ -3,9 +3,9 @@
  * measured on frames spread across it (isolated renders, its effects on),
  * corrected on its own ColorGrade toward one target (a reference clip or
  * file, or the clips' median look in a neutral band) until exposure, white
- * balance, saturation and contrast sit within tools/color-unify.ts's
- * tolerance, then one shared LUT look can go on top. Everything is one undo
- * step; the receipt lists every clip's stats before and after.
+ * balance and contrast sit within tools/color-unify.ts's tolerance, then
+ * one shared LUT look can go on top. Everything is one undo step; the
+ * receipt lists every clip's stats before and after.
  *
  * The measuring is match_color_to_reference_tool's (catalog/color-agent.ts:
  * LookProfiles of isolated renders). The correction is solved per clip from
@@ -206,9 +206,9 @@ export const colorUnifyTools: CatalogTool[] = [
     name: TOOL,
     title: "Unify grade",
     description:
-      "Grade continuity for a whole cut: measures every footage clip's exposure, white balance, saturation and contrast on frames across it, " +
+      "Grade continuity for a whole cut: measures every footage clip's exposure, white balance and contrast on frames across it, " +
       "corrects each clip's ColorGrade toward one target (a reference clip/file, or the clips' median look in a neutral band) until it sits within " +
-      "tolerance, then optionally lays one LUT look over all of them. Use after cutting and before the look, so bright daylight and near-black " +
+      "tolerance (saturation is reported, not matched), then optionally lays one LUT look over all of them. Use after cutting and before the look, so bright daylight and near-black " +
       "shots stop jumping on the cut. One undo step; the receipt lists before/after stats per clip.",
     input,
     annotations: {
