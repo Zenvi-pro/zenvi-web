@@ -307,6 +307,7 @@ export const motionTemplateTools: CatalogTool[] = [
         if (error instanceof MotionInputError) return refused(TOOL, `Error: ${error.message}.`);
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
       }
+      warnings.push(...(plan.warnings ?? []));
       const end = start + plan.frames / fps;
       const stack = planOverlayStack(project, start, end, plan.tracks);
       const written = await writeDrawings(call, plan, args.template);

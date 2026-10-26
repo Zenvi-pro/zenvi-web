@@ -124,5 +124,6 @@ export function buildMotionTemplate(input: BuildTemplateInput): MotionPlan {
   const beats = new TemplateBeats(input.grid, input.start, input.frame.fps);
   const layout = layoutOf(input.frame);
   const out = spec.build({ frame: input.frame, layout, frames, beats, palette: input.palette, media: input.media, content: input.content });
-  return planOf(spec.id, frames, out.elements, out.cues, input.frame);
+  const plan = planOf(spec.id, frames, out.elements, out.cues, input.frame);
+  return out.warnings && out.warnings.length > 0 ? { ...plan, warnings: out.warnings } : plan;
 }

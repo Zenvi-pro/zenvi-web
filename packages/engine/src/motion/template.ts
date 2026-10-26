@@ -119,6 +119,8 @@ export interface TemplateInput {
 export interface TemplateOutput {
   elements: Element[];
   cues: number[];
+  /** What the template changed to fit (the tool's receipt warnings). */
+  warnings?: string[];
 }
 
 /** A content problem the caller can fix (the tool refuses with this message). */
