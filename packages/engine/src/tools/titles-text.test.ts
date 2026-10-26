@@ -9,6 +9,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ProjectDocument } from "../history/document.js";
+import { getAttr } from "../titles/xml.js";
 import { toStoredPaths } from "../io/paths.js";
 import { createProject } from "../model/defaults.js";
 import type { Clip, Effect, Keyframe } from "../model/types.js";
@@ -18,11 +19,13 @@ import { addFile } from "../ops/files.js";
 import { setTrackLocked } from "../ops/tracks.js";
 import {
   BLANK,
+  artboardSize,
   backgroundColor,
   editorFontFamily,
   lineTexts,
   nodeStyle,
   parseTitleSvg,
+  textZone,
   setFieldText,
   textColor,
   titleFields,
@@ -454,12 +457,12 @@ function svgOf(h: FakeHost, path: string): string {
 }
 
 describe("list_title_templates_tool", () => {
-  it("lists the 50 templates with their fields, and filters by look", async () => {
+  it("lists the 51 templates with their fields, and filters by look", async () => {
     const doc = newDoc();
     const r = await call(doc, host(), "list_title_templates_tool");
     const templates = data(r).templates as { name: string; zone: string; fields: { role: string }[]; label: string; source: string }[];
-    expect(templates).toHaveLength(50);
-    expect(r.summary).toBe("Found 50 title template(s).");
+    expect(templates).toHaveLength(51);
+    expect(r.summary).toBe("Found 51 title template(s).");
     const gray = templates.find((t) => t.name === "Gray_Box_4")!;
     expect([gray.zone, gray.label, gray.source, gray.fields.map((f) => f.role)]).toEqual(["bottom", "Gray box 4", "bundled", ["title", "subtitle"]]);
     const lower = await call(doc, host(), "list_title_templates_tool", { query: "lower third" });
@@ -732,12 +735,39 @@ describe("add_title_tool", () => {
     const h = host();
     const r = await call(doc, h, "add_title_tool", { template: "Solid_Color", text: "DOUBT", background_color: "#d4141c", text_color: "#ffffff" });
     expect(r.status).toBe("applied");
-    expect(data(r)).toMatchObject({ template: "Standard_1", background_color: "#d4141c" });
+    expect(data(r)).toMatchObject({ template: "Text_Card", background_color: "#d4141c" });
     expect(backgroundColor(written(h, r))).toEqual(["#d4141c", 1]);
     expect(lineTexts(written(h, r))[0]).toBe("DOUBT");
-    expect(r.warnings).toEqual(["Solid_Color has no text; drew the text with Standard_1 over the colour #d4141c"]);
-    expect(r.summary).toContain(" Warning: Solid_Color has no text; drew the text with Standard_1 over the colour #d4141c.");
+    expect(r.warnings).toEqual(["Solid_Color has no text; drew the text with Text_Card over the colour #d4141c"]);
+    expect(r.summary).toContain(" Warning: Solid_Color has no text; drew the text with Text_Card over the colour #d4141c.");
     expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("Text_Card is one centred line on a full-frame colour rect", () => {
+    const doc = parseTitleSvg(readFileSync(new URL("titles/Text_Card.svg", ASSETS), "utf8"));
+    const slots = titleFields(doc);
+    expect(slots.map((f) => f.text)).toEqual(["The Title"]);
+    expect(textZone(slots, artboardSize(doc)[1])).toBe("center");
+    expect(backgroundColor(doc)).toEqual(["#000000", 1]);
+  });
+
+  it("keeps text on a card vertically centred when the font is scaled", async () => {
+    const h = host();
+    const r = await call(newDoc(), h, "add_title_tool", { template: "Solid_Color", text: "DOUBT", font_scale: "2.5" });
+    const doc = written(h, r);
+    const [line] = tspanNodes(doc);
+    expect(nodeStyle(line!).get("font-size")).toBe("400px");
+    expect(Number(getAttr(line!, "y"))).toBeCloseTo(540 + 0.36 * 400, 6);
+  });
+
+  it("carries a translucent card's opacity to the text card", async () => {
+    const card = '<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><g><rect style="opacity:0.5;fill:#112233" width="1920" height="1080" x="0" y="0"/></g></svg>';
+    const h = host({ texts: { "/cards/Glass_Card.svg": card } });
+    const r = await call(newDoc(), h, "add_title_tool", { template: "/cards/Glass_Card.svg", text: "Hi" });
+    expect(r.status).toBe("applied");
+    expect(data(r)).toMatchObject({ template: "Text_Card", background_color: "#112233" });
+    expect(backgroundColor(written(h, r))).toEqual(["#112233", 0.502]);
+    expect(r.warnings).toEqual(["Glass_Card has no text; drew the text with Text_Card over the colour #11223380"]);
   });
 
   it("keeps the card's own colour for text on Solid_Color when no background_color is given", async () => {
