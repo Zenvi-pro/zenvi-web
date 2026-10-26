@@ -53,7 +53,7 @@ export interface BlockManifest {
 export function tokenParams(manifest: Pick<BlockManifest, "tokens">): Record<string, ParamSpec> {
   const t = manifest.tokens ?? {};
   return {
-    palette: { type: "enum", options: [...PALETTE_NAMES], default: t.palette ?? "light", description: "Colour palette: light, dark, cream, forest, mono, sky." },
+    palette: { type: "enum", options: [...PALETTE_NAMES], default: t.palette ?? "light", description: `Colour palette: ${PALETTE_NAMES.join(", ")}.` },
     accent: { type: "color", optional: true, description: "Brand accent colour (#rrggbb); default the palette's." },
     paper: { type: "color", optional: true, description: "Background colour (#rrggbb) replacing the palette's, for a brief's exact colours." },
     ink: { type: "color", optional: true, description: "Text colour (#rrggbb) replacing the palette's." },
