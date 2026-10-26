@@ -142,7 +142,7 @@ Two families, one registry (`packages/engine/src/tools`):
    coding agents need: `move_clip`, `trim_clip`, `split_clip`, `set_clip_property`
    (keyframe-aware), `add_effect`, `set_effect_property`, `remove_effect`,
    `add_title`, `set_clip_speed`, `fade_clip`, `add_transition`, `render_video`,
-   `preview_frame` (returns a PNG so the model can see the frame), `probe_media`,
+   `preview_frame` (returns a PNG so the model can see the frame), `review_edit_tool` (one contact sheet of the whole cut plus pacing, beat and loudness numbers and a ranked problem list: the agent watches its own edit), `probe_media`,
    `list_effects`, `describe_project`.
 
 Every mutating tool returns a receipt: `{ ok, text, data }` where `data` lists
