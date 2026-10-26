@@ -63,14 +63,21 @@ interface Subject {
   warnings: string[];
 }
 
-/** The footage clip and its matte, generating the matte through the host when the file has none. */
-async function subjectOf(call: ToolCall, tool: string, id: string, which: MatteSubject | undefined, scaleArg?: 1 | 0.5): Promise<Subject> {
+/**
+ * The footage clip and its matte, generating the matte through the host when
+ * the file has none. Everything that refuses `composite` is checked first, so
+ * a refusal never costs a matting run.
+ */
+async function subjectOf(call: ToolCall, composite: CompositeTool, id: string, which: MatteSubject | undefined, scaleArg?: 1 | 0.5): Promise<Subject> {
+  const tool = `${composite}_tool`;
   const project = call.doc.project;
   const source = project.clips.find((c) => c.id === id);
   if (!source) toolError(`no timeline clip with id='${id}'`);
   const problem = matteableClipProblem(project, source);
   if (problem) toolError(problem);
   if (isLocked(project, source.layer)) toolError(`clip ${source.id} is on locked track ${uiTrackNumber(project, source.layer)}; unlock it first`);
+  const locked = compositePieces(project, composite, source.id).find((c) => isLocked(project, c.layer));
+  if (locked) toolError(`the ${composite.replaceAll("_", " ")} stack on clip ${source.id} has clip ${locked.id} on locked track ${uiTrackNumber(project, locked.layer)}; unlock it first`);
   const file = project.files.find((f) => f.id === source.file_id)!;
   const kind = which ?? "person";
   const warnings = isTimeRemapped(source) ? [`clip ${source.id} has a time curve: the matte follows source frames before the remap, so it may slip; composite before retiming`] : [];
@@ -134,8 +141,6 @@ function stackData(subj: Subject, matteFile: ProjectFile, stack: StackResult): R
  */
 function commitStack(call: ToolCall, tool: CompositeTool, subj: Subject, specs: (matte: ProjectFile) => PieceSpec[], summary: (stack: StackResult) => string): ToolOutcome {
   const name = `${tool}_tool`;
-  const locked = compositePieces(call.doc.project, tool, subj.source.id).find((c) => isLocked(call.doc.project, c.layer));
-  if (locked) toolError(`the ${tool.replaceAll("_", " ")} stack on clip ${subj.source.id} has clip ${locked.id} on locked track ${uiTrackNumber(call.doc.project, locked.layer)}; unlock it first`);
   const before = timelineState(call.doc.project);
   let out: { matteFile: ProjectFile; stack: StackResult };
   try {
@@ -266,7 +271,7 @@ export const matteTools: CatalogTool[] = [
           if (isLocked(call.doc.project, title.layer)) toolError(`title clip ${title.id} is on a locked track; unlock it first`);
         }
         const textColor = hexOf(input.color, "#ffffff", "color");
-        const subj = await subjectOf(call, "text_behind_subject_tool", input.clip_id, input.subject);
+        const subj = await subjectOf(call, "text_behind_subject", input.clip_id, input.subject);
         const [w, h] = projectSize(call.doc.project);
         const text = input.text
           ? await generatedSvg(call, "behind-text", bigTextSvg(w, h, { text: input.text, color: textColor, font: input.font, size: input.size, y: input.y ?? 0.36 }))
@@ -313,7 +318,7 @@ export const matteTools: CatalogTool[] = [
         } else if (input.file_id) toolError("file_id is only for background=file");
         const top = hexOf(input.color, input.background === "gradient" ? "#1b1464" : "#f4c20d", "color");
         const bottom = hexOf(input.color2, "#e8326d", "color2");
-        const subj = await subjectOf(call, "replace_background_tool", input.clip_id, input.subject);
+        const subj = await subjectOf(call, "replace_background", input.clip_id, input.subject);
         const [w, h] = projectSize(call.doc.project);
         const sourceTitle = String(subj.source.title || subj.source.id);
         let background: PieceSpec;
@@ -375,7 +380,7 @@ export const matteTools: CatalogTool[] = [
         const glowHex = hexOf(input.glow_color, look === "thermal" ? "#ff9a1a" : fill, "glow_color");
         const strength = input.glow ?? (look === "glow" ? 0.85 : 0);
         const behind = input.background ?? (look === "glow" ? "dim" : "cold");
-        const subj = await subjectOf(call, "subject_glow_tool", input.clip_id, input.subject);
+        const subj = await subjectOf(call, "subject_glow", input.clip_id, input.subject);
         const project = call.doc.project;
         const [w, h] = projectSize(project);
         const sourceTitle = String(subj.source.title || subj.source.id);
@@ -436,7 +441,7 @@ export const matteTools: CatalogTool[] = [
         const aspect = input.band_aspect ?? 2.39;
         if (letterboxBarHeight(w, h, aspect) < 1) toolError(`a ${aspect}:1 band fills this ${w}x${h} frame, so there are no bars; pick a wider band_aspect than ${(w / h).toFixed(2)}`);
         const barHex = hexOf(input.bar_color, "#000000", "bar_color");
-        const subj = await subjectOf(call, "pop_out_tool", input.clip_id, input.subject);
+        const subj = await subjectOf(call, "pop_out", input.clip_id, input.subject);
         const bars = await generatedSvg(call, "letterbox", letterboxSvg(w, h, aspect, barHex));
         return commitStack(
           call,
