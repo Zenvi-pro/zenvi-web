@@ -26,7 +26,7 @@ import { WIDGET_HTML, WIDGET_MIME, WIDGET_URI, widgetResourceMeta } from "./widg
 
 /** Sent in `initialize`; the first 512 characters matter most (ChatGPT). */
 export const INSTRUCTIONS =
-  "Zenvi edits the person's video projects in Zenvi Cloud. Start with list_projects + open_project, or create_project; later tools use that project (or pass project_id). Import with import_media_from_url or get_upload_link. Check edits with preview_frame. render_project and generate_video return immediately: poll get_render_status or get_generation_status. open_in_editor shows the Zenvi editor in the chat; it follows your later edits live, so open it once per project.";
+  "Zenvi edits the person's video projects in Zenvi Cloud. Start with list_projects + open_project, or create_project: both show the Zenvi editor in the chat, which follows your later edits live (open_in_editor shows it again, only if asked). Later tools use that project (or pass project_id). Import with import_media_from_url or get_upload_link. Check edits with preview_frame. render_project and generate_video return immediately: poll get_render_status or get_generation_status.";
 
 const RESOURCE_NOT_FOUND = -32002;
 

@@ -90,7 +90,8 @@ const createProject = defineTool({
   name: "create_project",
   title: "Create project",
   description:
-    "Create a new, empty Zenvi Cloud video project and open it, so later editing tools act on it. Use this when the person wants to start a new video. " +
+    "Create a new, empty Zenvi Cloud video project and open it, so later editing tools act on it, and show it in the Zenvi editor in the chat. " +
+    "Use this when the person wants to start a new video. " +
     `Pick the frame with profile: ${PROFILE_SHORTHANDS}. ` +
     "Choose it from where the video will be shown (vertical for Reels/TikTok/Shorts). Progressive profiles are used unless interlaced is asked for; " +
     "when nothing matches, the tool answers with the closest profiles instead of guessing. Alternatively give format + fps. Default: landscape 1080p 30 fps.",
@@ -118,6 +119,7 @@ const createProject = defineTool({
   scope: SCOPE_WRITE,
   invoking: "Creating the project…",
   invoked: "Project created",
+  meta: editorWidgetToolMeta(),
   async run(ctx, input) {
     if (input.profile !== undefined && (input.format !== undefined || input.fps !== undefined)) {
       throw new ApiError(
@@ -141,8 +143,9 @@ const createProject = defineTool({
       editor_url: editorLink(ctx, created.id),
     };
     return {
-      text: `Created "${created.name}" (${created.id}, ${profile.description}, ${profile.width}×${profile.height}) and opened it. Import media with import_media_from_url or get_upload_link.`,
+      text: `Created "${created.name}" (${created.id}, ${profile.description}, ${profile.width}×${profile.height}) and opened it in the Zenvi editor in this chat. Import media with import_media_from_url or get_upload_link.`,
       data,
+      meta: { [EDITOR_META_KEY]: await editorSession(ctx, created.id) },
     };
   },
 });
@@ -151,7 +154,8 @@ const openProject = defineTool({
   name: "open_project",
   title: "Open project",
   description:
-    "Open a cloud project so the editing tools act on it (it stays open for this connection), and return its overview: size, length, tracks and media files. Use this after list_projects when the person names a project.",
+    "Open a cloud project so the editing tools act on it (it stays open for this connection), show it in the Zenvi editor in the chat, and return its overview: " +
+    "size, length, tracks and media files. Use this after list_projects when the person names a project.",
   input: z.object({ project_id: z.string().min(1).max(40).describe("Project id from list_projects (c_…).") }),
   output: z.object({
     project_id: z.string(),
@@ -170,6 +174,7 @@ const openProject = defineTool({
   scope: SCOPE_READ,
   invoking: "Opening the project…",
   invoked: "Project opened",
+  meta: editorWidgetToolMeta(),
   async run(ctx, input) {
     const projectId = await resolveProjectId(ctx, input.project_id);
     const { project, meta } = await ctx.services.projects.get(ctx.principal.userId, projectId);
@@ -194,8 +199,9 @@ const openProject = defineTool({
     };
     const fileLines = files.length === 0 ? "No media yet." : files.map((f) => `- ${f.id} ${f.media_type} "${f.name}"`).join("\n");
     return {
-      text: `Opened "${meta.name}" (${projectId}): ${project.width}×${project.height} at ${data.fps} fps, ${data.clips} clips on ${data.tracks} tracks, ${data.duration_seconds}s long.\nMedia:\n${fileLines}`,
+      text: `Opened "${meta.name}" (${projectId}) in the Zenvi editor in this chat: ${project.width}×${project.height} at ${data.fps} fps, ${data.clips} clips on ${data.tracks} tracks, ${data.duration_seconds}s long.\nMedia:\n${fileLines}`,
       data,
+      meta: { [EDITOR_META_KEY]: await editorSession(ctx, projectId) },
     };
   },
 });
@@ -341,7 +347,8 @@ const openInEditor = defineTool({
   title: "Open in the Zenvi editor",
   description:
     "Show the project in the Zenvi editor right here in the chat, where the person can play it, scrub, trim, add titles, effects and transitions, and export. " +
-    "It follows the edits you make with other tools live, so open it once per project (again only if the person asks). Also returns the link to the full editor on zenvi.pro.",
+    "open_project and create_project already show it, and it follows the edits you make with other tools live, so call this only when the person asks to see the editor again. " +
+    "Also returns the link to the full editor on zenvi.pro.",
   input: z.object({
     project_id: projectIdArg,
     refresh: z
