@@ -104,7 +104,15 @@ describe("zenvi bridge (stdio)", () => {
   });
 });
 
-describe("zenvi tool-run", () => {
+describe("zenvi tool-run / bridge --tools", () => {
+  it("prints the catalog with the protocol", async () => {
+    const r = await zenvi(["bridge", "--tools"], { cwd: work, env: testEnv(home), registry });
+    expect(r.code, r.stderr).toBe(0);
+    const listed = r.json<{ protocol: number; tools: { name: string }[] }>();
+    expect(listed.protocol).toBe(BRIDGE_PROTOCOL);
+    expect(listed.tools.some((t) => t.name === "add_motion_template_tool")).toBe(true);
+  });
+
   it("reads a snapshot file and prints the answer", async () => {
     const snap = path.join(work, "snapshot.json");
     await writeFile(snap, JSON.stringify(snapshot()));

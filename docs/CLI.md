@@ -179,6 +179,7 @@ tools show models.
 | `zenvi pull <id\|editor URL> [dir] [--force]` | Download a cloud project and its media. |
 | `zenvi cloud ls` | Your cloud projects. |
 | `zenvi doctor` | Check the setup. |
+| `zenvi tool-run <tool> --snapshot <json> --project-file <zvn> [--args json]` / `zenvi bridge [--tools]` | For the Zenvi desktop app: run an engine tool on its in-memory project and print the change as desktop update actions (one call per process, or JSON-RPC lines on stdio). See [ENGINE_BRIDGE.md](ENGINE_BRIDGE.md). |
 
 ## Rendering
 

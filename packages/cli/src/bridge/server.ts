@@ -11,14 +11,15 @@
  * Diagnostics go to stderr; stdout carries nothing but answers.
  */
 
+import path from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import type { HostCapability, ToolAnnotations } from "@zenvi/engine";
 import type { JsonSchemaObject } from "@zenvi/engine/tools";
 import { missingCapabilities, type Registry } from "../engine/registry.js";
 import { VERSION } from "../version.js";
-import { BRIDGE_PROTOCOL, bridgeHost, parseBridgeJson, runBridgeCall, type BridgeRequest } from "./run.js";
 import type { NodeHostOptions } from "@zenvi/render-node";
+import { BRIDGE_PROTOCOL, bridgeHost, parseBridgeJson, runBridgeCall, type BridgeRequest } from "./run.js";
 
 export interface BridgeTool {
   name: string;
@@ -32,8 +33,8 @@ export interface BridgeTool {
 }
 
 /** The catalog as the bridge runs it: the `mcp` surface, availability judged on the bridge host. */
-export function bridgeTools(registry: Registry): BridgeTool[] {
-  const host = bridgeHost("/catalog/catalog.zvn", []);
+export function bridgeTools(registry: Registry, options: Omit<NodeHostOptions, "projectFile"> = {}): BridgeTool[] {
+  const host = bridgeHost(path.resolve("catalog.zvn"), [], options);
   return registry.list("mcp", host, { includeUnavailable: true }).map((tool) => {
     const missing = missingCapabilities(tool, host);
     return {
@@ -52,8 +53,8 @@ export interface BridgeServerOptions {
   registry: Registry;
   input: Readable;
   output: Writable;
-  /** Host options for a request (a request may carry the desktop's backend token). */
-  hostFor: (request: BridgeRequest & { backend_token?: string }) => Omit<NodeHostOptions, "projectFile">;
+  /** Host options, with the backend token a request may carry (the desktop's session). */
+  hostFor: (backendToken: string | undefined) => Omit<NodeHostOptions, "projectFile">;
   log?: (message: string) => void;
 }
 
@@ -89,11 +90,11 @@ export async function serveBridge(options: BridgeServerOptions): Promise<void> {
           send({ id, result: { protocol: BRIDGE_PROTOCOL, engine_version: VERSION } });
           break;
         case "tools":
-          send({ id, result: { tools: bridgeTools(registry) } });
+          send({ id, result: { tools: bridgeTools(registry, options.hostFor(undefined)) } });
           break;
         case "run": {
           const request = (message.params ?? {}) as BridgeRequest & { backend_token?: string };
-          send({ id, result: await runBridgeCall(request, { registry, host: options.hostFor(request) }) });
+          send({ id, result: await runBridgeCall(request, { registry, host: options.hostFor(request.backend_token) }) });
           break;
         }
         case "shutdown":

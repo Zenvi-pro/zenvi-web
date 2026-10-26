@@ -8,7 +8,7 @@ import { readFile } from "node:fs/promises";
 import type { Command } from "commander";
 import type { NodeHostOptions } from "@zenvi/render-node";
 import { bridgeTools, serveBridge } from "../bridge/server.js";
-import { parseBridgeJson, runBridgeCall } from "../bridge/run.js";
+import { BRIDGE_PROTOCOL, parseBridgeJson, runBridgeCall } from "../bridge/run.js";
 import { CliError } from "../output.js";
 import { VERSION } from "../version.js";
 import { hostOptions, type CommandContext } from "./context.js";
@@ -55,14 +55,14 @@ export function registerBridgeCommands(program: Command, ctx: CommandContext): v
     .option("--tools", "print the catalog as the bridge runs it (JSON) and exit")
     .action(async (opts: { tools?: boolean }) => {
       if (opts.tools) {
-        ctx.out.data({ engine_version: VERSION, tools: bridgeTools(ctx.registry) });
+        ctx.out.data({ protocol: BRIDGE_PROTOCOL, engine_version: VERSION, tools: bridgeTools(ctx.registry, bridgeHostOptions(ctx, undefined)) });
         return;
       }
       await serveBridge({
         registry: ctx.registry,
         input: process.stdin,
         output: process.stdout,
-        hostFor: (request) => bridgeHostOptions(ctx, request.backend_token),
+        hostFor: (token) => bridgeHostOptions(ctx, token),
         log: (m) => process.stderr.write(`${m}\n`),
       });
     });
