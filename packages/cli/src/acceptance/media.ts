@@ -34,13 +34,12 @@ export function hostHas(program: "ffmpeg" | "say"): boolean {
 export async function makeFixture(dir: string, fixture: Fixture): Promise<string> {
   await mkdir(dir, { recursive: true });
   const out = path.join(dir, fixture.file);
+  const inputs = (fixture.lavfi ?? []).flatMap((src) => ["-f", "lavfi", "-i", src]);
   if (fixture.say) {
     const aiff = `${out}.aiff`;
     await runBinary(whichSync("say")!, ["-o", aiff, fixture.say], { timeoutMs: 60_000 });
-    await ffmpeg(["-i", aiff, ...(fixture.output ?? ["-ar", "48000", "-ac", "2"]), out]);
-    return out;
+    inputs.push("-i", aiff);
   }
-  const inputs = fixture.lavfi!.flatMap((src) => ["-f", "lavfi", "-i", src]);
   const output = fixture.output ?? ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest"];
   await ffmpeg([...inputs, ...output, out]);
   return out;

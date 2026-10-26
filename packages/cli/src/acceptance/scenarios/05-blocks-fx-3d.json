@@ -1,0 +1,52 @@
+{
+  "id": "blocks-fx-3d",
+  "title": "Motion block, Zenvi FX and a 3D scene",
+  "description": "The rendered layers: a Zenvi Motion block (headless Chrome), an ffmpeg FX chain on a clip, and a Blender 3D title. Each is skipped with the host's reason when this machine lacks Chrome, ffmpeg or Blender.",
+  "budgetSeconds": 300,
+  "fixtures": [
+    { "id": "bg", "file": "bg.mp4", "lavfi": ["testsrc2=size=360x640:rate=30:duration=4", "sine=frequency=330:sample_rate=48000:duration=4"] }
+  ],
+  "steps": [
+    { "id": "project", "tool": "open_project_file", "args": { "path": "blocks.zvn" } },
+    { "id": "format", "tool": "set_project_setting_tool", "args": { "width": 360, "height": 640, "fps": 30 } },
+    { "id": "import", "tool": "import_files_tool", "args": { "paths": "[\"${fixtures.bg}\"]", "skip_indexing": "true" } },
+    { "id": "place", "tool": "add_clip_to_timeline_tool", "args": { "file_id": "${import.data.fileIds[0]}", "position_seconds": "0", "full_file": "true" } },
+    {
+      "id": "block",
+      "tool": "add_motion_block_tool",
+      "args": { "block": "kinetic_headline", "params": { "text": "Make it snappy" }, "position_seconds": 0.5, "draft": true },
+      "skipWhen": ["headless Chrome", "zenvi motion setup"],
+      "timeoutSeconds": 600,
+      "expect": { "receipt": { "clips": { "length": { "min": 1 } } } }
+    },
+    {
+      "id": "fx",
+      "tool": "apply_fx_tool",
+      "args": { "clip_id": "${place.clips[0].id}", "effects": [{ "effect": "vignette" }, { "effect": "chromatic_aberration" }] },
+      "skipWhen": ["needs ffmpeg", "ZENVI_FX=0"],
+      "timeoutSeconds": 600
+    },
+    {
+      "id": "scene3d",
+      "tool": "add_3d_scene_tool",
+      "args": { "scene": "title_3d", "params": { "text": "ZENVI" }, "position_seconds": 1, "duration_seconds": 2, "quality": "draft" },
+      "skipWhen": ["Blender"],
+      "timeoutSeconds": 900,
+      "expect": { "receipt": { "clips": { "length": { "min": 1 } } } }
+    },
+    {
+      "id": "frame",
+      "tool": "preview_frame",
+      "args": { "seconds": 2, "width": 180 },
+      "expect": { "image": true },
+      "checks": [{ "kind": "image", "minLuma": 16 }]
+    },
+    {
+      "id": "export",
+      "tool": "render_video",
+      "args": { "output": "blocks.mp4", "quality": "low" },
+      "timeoutSeconds": 600,
+      "checks": [{ "kind": "media", "file": "${work}/blocks.mp4", "durationSeconds": { "min": 3.9, "max": 4.2 }, "streams": ["audio", "video"], "frame": { "at": 2, "minLuma": 16 } }]
+    }
+  ]
+}

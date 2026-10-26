@@ -56,7 +56,6 @@ class ClientTarget implements McpTarget {
     readonly work: string,
     private readonly client: Client,
     private readonly stderr: () => string,
-    private readonly onClose: () => Promise<void> = async () => undefined,
   ) {}
 
   async tools(): Promise<Set<string>> {
@@ -92,7 +91,6 @@ class ClientTarget implements McpTarget {
 
   async close(): Promise<void> {
     await this.client.close().catch(() => undefined);
-    await this.onClose();
   }
 }
 

@@ -105,11 +105,11 @@ const fixtureSchema = z
     lavfi: z.array(z.string()).optional(),
     /** ffmpeg output options (codec, -t…). Default: H.264/AAC, shortest input. */
     output: z.array(z.string()).optional(),
-    /** Speech to synthesise with the OS voice (macOS `say`). */
+    /** Speech to synthesise with the OS voice (macOS `say`), the input after the lavfi ones. */
     say: z.string().optional(),
   })
   .strict()
-  .refine((f) => Boolean(f.lavfi) !== Boolean(f.say), { message: "a fixture needs exactly one of lavfi or say" });
+  .refine((f) => Boolean(f.lavfi?.length) || Boolean(f.say), { message: "a fixture needs lavfi sources or say" });
 export type Fixture = z.infer<typeof fixtureSchema>;
 
 export const scenarioSchema = z
