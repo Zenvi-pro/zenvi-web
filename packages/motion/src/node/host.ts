@@ -8,7 +8,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { copyFile, link, mkdir } from "node:fs/promises";
+import { copyFile, link, mkdir, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { projectAssetsDir, type MotionBlockInfo, type MotionBlockParam, type MotionHost } from "@zenvi/engine";
@@ -79,8 +79,15 @@ export function createMotionHost(options: MotionHostOptions): MotionHost {
         onProgress: options.onProgress,
       });
       const dest = path.join(await linksDir(), `${request.block}-${rendered.fingerprint.slice(0, 16)}${path.extname(rendered.path)}`);
-      // A hard link to the cached render where the filesystem allows (ProRes 4444 is large), else a copy.
-      if (!existsSync(dest)) await link(rendered.path, dest).catch(() => copyFile(rendered.path, dest));
+      // A hard link to the cached render where the filesystem allows (ProRes 4444 is large), else a
+      // copy renamed into place, so an interrupted copy is never mistaken for a finished render.
+      if (!existsSync(dest)) {
+        await link(rendered.path, dest).catch(async () => {
+          const partial = `${dest}.${process.pid}.partial`;
+          await copyFile(rendered.path, partial);
+          await rename(partial, dest);
+        });
+      }
       const info = await probe(dest);
       const fp = await fileFingerprint(dest);
       return {

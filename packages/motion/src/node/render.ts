@@ -16,7 +16,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, rename, rm, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Browser, CDPSession, Page } from "puppeteer-core";
 import { cacheDir, resolveBinary, spawnManaged } from "@zenvi/render-node";
@@ -204,13 +203,13 @@ export async function renderBlock(id: string, raw: Readonly<Record<string, unkno
   if (existsSync(cached)) return deliver(true, 0);
 
   const started = Date.now();
-  const work = await mkdtemp(path.join(tmpdir(), "zenvi-motion-"));
+  // Scratch inside the cache folder so the finished file is renamed into place: a copy across
+  // filesystems (tmpfs /tmp) cut short would leave a truncated file the cache then trusts.
+  const work = await mkdtemp(path.join(dir, ".render-"));
   try {
     const partial = path.join(work, `render${ext}`);
     await capture(fp, frames, partial, work, options);
-    await rename(partial, cached).catch(async () => {
-      await copyFile(partial, cached);
-    });
+    await rename(partial, cached);
   } finally {
     await rm(work, { recursive: true, force: true });
   }
