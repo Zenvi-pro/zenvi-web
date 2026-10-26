@@ -6,6 +6,7 @@
 
 import type { BlockManifest } from "./params.js";
 import counter from "./blocks/counter/block.json" with { type: "json" };
+import dockMagnify from "./blocks/dock_magnify/block.json" with { type: "json" };
 import dotGridReveal from "./blocks/dot_grid_reveal/block.json" with { type: "json" };
 import glassCards from "./blocks/glass_cards/block.json" with { type: "json" };
 import gradientField from "./blocks/gradient_field/block.json" with { type: "json" };
@@ -19,7 +20,7 @@ import promptBar from "./blocks/prompt_bar/block.json" with { type: "json" };
 import textScramble from "./blocks/text_scramble/block.json" with { type: "json" };
 import wordRotator from "./blocks/word_rotator/block.json" with { type: "json" };
 
-export const BLOCKS: readonly BlockManifest[] = [promptBar, kineticHeadline, wordRotator, counter, textScramble, hudCallouts, gradientField, glassCards, particleBurst, hyperspace, dotGridReveal, liquidGlass, masonryGrid] as BlockManifest[];
+export const BLOCKS: readonly BlockManifest[] = [promptBar, kineticHeadline, wordRotator, counter, textScramble, hudCallouts, gradientField, glassCards, particleBurst, hyperspace, dotGridReveal, liquidGlass, masonryGrid, dockMagnify] as BlockManifest[];
 
 export function getBlock(id: string): BlockManifest | undefined {
   return BLOCKS.find((b) => b.id === id);
