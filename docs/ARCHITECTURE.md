@@ -63,6 +63,7 @@ Plus two that already exist and are extended, not replaced:
 packages/engine        @zenvi/engine       model · keyframes · history · ops · tools · frame planner · effect kernels
 packages/render-web    @zenvi/render-web   Mediabunny decode · Canvas2D compositor · Web Audio · WebCodecs export
 packages/render-node   @zenvi/render-node  ffmpeg probe/decode/encode · CPU compositor · resvg-wasm SVG raster
+packages/scenes3d      @zenvi/scenes3d     Zenvi 3D: procedural Blender scenes (bpy) · persistent Blender worker · render cache
 packages/cli           @zenvi/cli          `zenvi` binary · local MCP (stdio) · cloud client · device login
 packages/cloud         @zenvi/cloud        REST /v1 · remote MCP · OAuth 2.1 AS · render jobs · Azure storage
 packages/adobe-link    @zenvi/adobe-link   Zenvi Link: ae_* / premiere_* catalogs (zod) · ExtendScript tools · CEP server/panel · discovery + client
