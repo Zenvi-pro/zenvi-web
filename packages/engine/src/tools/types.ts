@@ -505,12 +505,15 @@ export interface AudioHost {
   /**
    * Decode `path`'s audio to mono float PCM (default 22050 Hz), optionally
    * from `startSeconds` for at most `maxSeconds`: what beat tracking reads.
+   * With `channels: 2`, hosts that can return stereo: `samples` is the left
+   * channel and `right` the right (a mono source repeats it); hosts that
+   * cannot leave `right` out and return the mono mixdown.
    * Rejects when the file has no audio stream.
    */
   decodePcm?(
     path: string,
-    options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
-  ): Promise<{ sampleRate: number; samples: Float32Array }>;
+    options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; channels?: 1 | 2; signal?: AbortSignal },
+  ): Promise<{ sampleRate: number; samples: Float32Array; right?: Float32Array }>;
   /**
    * Mix the project's audio down over `range` (default: all of it) and
    * measure it: loudness, peak, stretches below `silenceDb` (default -50 dBFS)
@@ -569,6 +572,18 @@ export interface StockHost {
   searchPexelsVideos(query: string, options: { perPage: number; signal?: AbortSignal }): Promise<{ videos: PexelsVideo[]; total: number }>;
   /** Sounds at least `minSeconds` long (0: any length). */
   searchFreesound(query: string, options: { pageSize: number; minSeconds: number; signal?: AbortSignal }): Promise<{ sounds: FreesoundSound[]; total: number }>;
+}
+
+/**
+ * Public sound libraries for search_sfx_tool and the library sounds of
+ * add_sfx_tool, create_sound_kit_tool and auto_sound_design_tool: plain
+ * GETs of JSON from the libraries' APIs (Openverse). Hosts reach only the
+ * origins in `SOUND_LIBRARY_ORIGINS`; `fetchLibraryHost` is the shared
+ * implementation over `fetch`. Rejects with an error in words (a refused
+ * origin, a rate limit, a failed request).
+ */
+export interface LibraryHost {
+  getJson(url: string, options?: { signal?: AbortSignal }): Promise<unknown>;
 }
 
 export interface StorageHost {
@@ -892,6 +907,7 @@ export interface ToolHost {
   motion?: MotionHost;
   scenes3d?: Scene3dHost;
   fx?: FxHost;
+  library?: LibraryHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }

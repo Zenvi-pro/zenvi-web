@@ -15,7 +15,8 @@ export type ParamSpec =
   | (ParamBase & { type: "number" | "integer"; default?: number; min?: number; max?: number; optional?: boolean })
   | (ParamBase & { type: "boolean"; default?: boolean })
   | (ParamBase & { type: "color"; default?: string; optional?: boolean })
-  | (ParamBase & { type: "enum"; options: string[]; default?: string })
+  /** `aliases`: values agents send that mean an option (names from before a rename, near misses). */
+  | (ParamBase & { type: "enum"; options: string[]; default?: string; aliases?: Record<string, string> })
   | (ParamBase & { type: "strings"; default?: string[]; minItems?: number; maxItems?: number; maxLength?: number })
   | (ParamBase & { type: "points"; default?: { x: number; y: number }[]; minItems?: number; maxItems?: number })
   /** A bin file (photo or video) by file id; the renderer turns it into a page URL. */
@@ -58,7 +59,8 @@ export function tokenParams(manifest: Pick<BlockManifest, "tokens">): Record<str
     paper: { type: "color", optional: true, description: "Background colour (#rrggbb) replacing the palette's, for a brief's exact colours." },
     ink: { type: "color", optional: true, description: "Text colour (#rrggbb) replacing the palette's." },
     display_font: { type: "enum", options: [...FONT_ROLES], default: t.display ?? "sans", description: "Headline face: sans (Inter), serif (Instrument Serif), mono (JetBrains Mono), display (Anton, condensed)." },
-    radius: { type: "number", min: 0, max: 80, default: t.radius ?? 28, description: "Corner radius of cards and pills, px at 1080." },
+    // A block may default to a pill (logo_reveal_end: 999), so its own default stays in range.
+    radius: { type: "number", min: 0, max: Math.max(80, t.radius ?? 0), default: t.radius ?? 28, description: "Corner radius of cards and pills, px at 1080." },
     exit: { type: "boolean", default: true, description: "Animate out over the last 0.4 s." },
     seed: { type: "integer", min: 0, max: 2147483647, default: 1, description: "Seed for the block's random choices (particles, scramble glyphs)." },
   };
@@ -130,8 +132,13 @@ function coerce(name: string, spec: ParamSpec, v: unknown): Coerced {
     }
     case "enum": {
       const s = typeof v === "string" ? v.trim().toLowerCase() : "";
-      if (!spec.options.includes(s)) return bad(`one of ${spec.options.join(", ")}`);
-      return { value: s };
+      if (spec.options.includes(s)) return { value: s };
+      const aliased = spec.aliases && Object.hasOwn(spec.aliases, s) ? spec.aliases[s] : undefined;
+      if (aliased && spec.options.includes(aliased)) return { value: aliased };
+      // "dot" for "dots" and "lines" for "line": agents get the plural wrong more than the word.
+      const plural = spec.options.find((o) => s && (o === `${s}s` || `${o}s` === s));
+      if (plural) return { value: plural };
+      return bad(`one of ${spec.options.join(", ")}`);
     }
     case "strings": {
       const list = asList(v) ?? (typeof v === "string" ? v.split("|").map((s) => s.trim()) : undefined);

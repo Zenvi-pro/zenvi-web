@@ -42,8 +42,12 @@ export interface NormBox extends NormPoint {
 }
 
 /** How the montage grid reveals a tile on its beat. */
-export const GRID_REVEALS = ["pop", "slide", "wipe", "fade"] as const;
+export const GRID_REVEALS = ["pop", "slide", "wipe", "fade", "cut"] as const;
 export type GridReveal = (typeof GRID_REVEALS)[number];
+
+/** A slow camera move over the whole field: push in, pull out, or pan (the field overscanned so no edge shows). */
+export const GRID_DRIFTS = ["in", "out", "left", "right", "up", "down"] as const;
+export type GridDrift = (typeof GRID_DRIFTS)[number];
 
 /**
  * The grid template's options (layout names and tile counts: tiles.ts). Sizes
@@ -64,6 +68,12 @@ export interface GridOptions {
   merge?: boolean;
   /** The camera pushes into this tile (1-based, in the final layout) until it fills the frame. */
   zoomInto?: number;
+  /** repeat: seconds each copy runs ahead of the one before (copies out of phase); default 0. */
+  phase?: number;
+  /** repeat: alternate copies mirrored so their edges meet (kaleidoscope always is). */
+  mirror?: boolean;
+  /** A slow camera move over the whole field for the template's length. */
+  drift?: GridDrift;
 }
 
 /**
@@ -119,6 +129,8 @@ export interface TemplateInput {
 export interface TemplateOutput {
   elements: Element[];
   cues: number[];
+  /** What the template changed to fit (the tool's receipt warnings). */
+  warnings?: string[];
 }
 
 /** A content problem the caller can fix (the tool refuses with this message). */

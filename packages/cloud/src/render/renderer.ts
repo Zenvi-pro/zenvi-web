@@ -73,8 +73,8 @@ export type AudioAnalyzer = (
 /** Mono float PCM of a local file's audio (`@zenvi/render-node` `decodePcm`), for beat tracking. */
 export type PcmDecoder = (
   filePath: string,
-  options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
-) => Promise<{ sampleRate: number; samples: Float32Array }>;
+  options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; channels?: 1 | 2; signal?: AbortSignal },
+) => Promise<{ sampleRate: number; samples: Float32Array; right?: Float32Array }>;
 
 /**
  * The timeline's mix (or the stem of `clipIds`) through the export's audio

@@ -40,7 +40,7 @@ import { contractTool, unavailable, type CatalogTool, type ToolCall, type ToolOu
 import { parseSecondsArg, TimeArgError } from "../placement.js";
 import { pyFixed, pyLen, pySlice } from "../pyfmt.js";
 import { applied, failed, refused, unchanged } from "../receipt.js";
-import { lockedTrackError, normalizeTrackOrLayerArg } from "../tracks.js";
+import { lockedTrackError, resolvePlacementTrack } from "../tracks.js";
 import type { ImportedMedia, MediaHost } from "../types.js";
 import { applyPlacement, planPlacement, placementText, provisionalFile } from "./clips.js";
 import { text } from "./common.js";
@@ -409,7 +409,7 @@ export const webVideoTools: CatalogTool[] = [
           if (error instanceof TimeArgError) return refuse(error.message, rawUrl, intent);
           throw error;
         }
-        const track = normalizeTrackOrLayerArg(input.track === undefined ? "" : String(input.track), call.doc.project.layers);
+        const track = resolvePlacementTrack(input.track === undefined ? "" : String(input.track), call.doc.project.layers);
         if (track.error) return refuse(track.error, rawUrl, intent);
         if (track.layer !== undefined) {
           const locked = lockedTrackError(track.layer, call.doc.project.layers);

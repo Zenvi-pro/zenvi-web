@@ -42,6 +42,7 @@ import {
   toolError,
   trackInfo,
   uiTrackNumber,
+  warningNote,
   type ScreenPosition,
 } from "../titles-text.js";
 
@@ -214,7 +215,7 @@ export const overlayTools = [
         const end = position + duration;
         const carrier = await prepareOverlayCarrier(call);
         const placed = call.commit((tx) => {
-          const { layer, created } = planOverlayTrack(tx.project, position, end, input.track);
+          const { layer, created, moved } = planOverlayTrack(tx.project, position, end, input.track);
           const file = carrierFile(tx, carrier);
           const timer = newTimer(idFactory(tx.project)(), TIME_CLIP, startAt);
           const clip = placeOverlayClip(tx, {
@@ -226,11 +227,14 @@ export const overlayTools = [
             title: "Timer",
             props: { zenvi_role: TIMER_ROLE, effects: [timer] },
           });
-          return { clip, timer, layer, created };
+          return { clip, timer, layer, created, moved };
         });
         const t = trackInfo(call.doc.project, placed.layer);
-        return applied(tool, summaryLine(`Added a ${what} timer on track ${t.track} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s (${where}).`), {
+        const warnings = placed.moved ? [placed.moved] : [];
+        return applied(tool, summaryLine(`Added a ${what} timer on track ${t.track} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s (${where}).${warningNote(warnings)}`), {
+          warnings,
           data: {
+            ...(warnings.length > 0 ? { warnings } : {}),
             timeline_clip_id: placed.clip.id,
             effect_id: placed.timer.id,
             overlay: true,
@@ -313,16 +317,18 @@ export const overlayTools = [
           location_y: constantKeyframe(pyRoundTo((yOff * margin * short) / h, 5)),
         };
         const placed = call.commit((tx) => {
-          const { layer, created } = planOverlayTrack(tx.project, position, end, input.track);
+          const { layer, created, moved } = planOverlayTrack(tx.project, position, end, input.track);
           const file = addFile(tx, { path: entry.storedPath, info: emojiReaderInfo(entry.storedPath), name: entry.name }, { mediaType: "image" });
           const clip = placeOverlayClip(tx, { fileId: file.id, position, duration, layer, newTrackLabel: "Emoji", props });
-          return { fileId: file.id, clip, layer, created };
+          return { fileId: file.id, clip, layer, created, moved };
         });
         const t = trackInfo(call.doc.project, placed.layer);
+        const warnings = placed.moved ? [placed.moved] : [];
         return applied(
           tool,
-          summaryLine(`Added ${entry.char} ${entry.name} on track ${t.track} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s (${screen.replaceAll("_", " ")}, size ${pyG(size)}).`),
+          summaryLine(`Added ${entry.char} ${entry.name} on track ${t.track} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s (${screen.replaceAll("_", " ")}, size ${pyG(size)}).${warningNote(warnings)}`),
           {
+            warnings,
             data: {
               timeline_clip_id: placed.clip.id,
               file_id: placed.fileId,
@@ -333,6 +339,7 @@ export const overlayTools = [
               screen_position: screen,
               size,
               new_track: placed.created,
+              ...(warnings.length > 0 ? { warnings } : {}),
               alternatives: rest.slice(0, 5).map((m) => emojiRow(m.entry)),
               ...t,
             },

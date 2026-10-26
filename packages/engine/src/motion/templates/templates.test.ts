@@ -154,7 +154,16 @@ function build(id: MotionTemplateId, frame: MotionFrame, bpm = 120, start = 2): 
   return { plan, beats: new TemplateBeats(grid, start, frame.fps) };
 }
 
-describe.each(Object.entries(FRAMES))("motion templates, %s", (_name, frame) => {
+/** Every frame shape a title or card must fill: the two reels frames plus square, feed, 4:3 and 21:9. */
+const ASPECTS: Record<string, MotionFrame> = {
+  ...FRAMES,
+  square: { width: 1080, height: 1080, fps: 30 },
+  feed: { width: 1080, height: 1350, fps: 30 },
+  classic: { width: 1440, height: 1080, fps: 30 },
+  scope: { width: 2560, height: 1080, fps: 30 },
+};
+
+describe.each(Object.entries(ASPECTS))("motion templates, %s", (_name, frame) => {
   it.each(MOTION_TEMPLATE_IDS)("%s: valid SVG, whole frames, entrances on the beat grid, text in the frame", (id) => {
     const { plan, beats } = build(id, frame);
     expect(plan.layers.length).toBeGreaterThan(0);

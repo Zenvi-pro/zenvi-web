@@ -10,6 +10,10 @@
  * free track above the picture (a new "Titles" track on top when none is
  * free), anchored where the template's text sits (or `screen_position`),
  * lifted clear of the platform UI on vertical video, with optional fades.
+ * On a frame that is not 16:9 the artboard grows to the frame's aspect
+ * around the drawing (titles/artboard.ts), with the anchor and the lift
+ * baked in, so a card with a background fills the frame instead of showing
+ * bars (a Zenvi rule the desktop's add_title does not have yet).
  * One undo step adds the file and the clip.
  *
  * Templates are the 50 bundled SVGs (`ToolHost.assets`); the desktop also
@@ -24,9 +28,11 @@
 import { pyRound } from "../../model/rounding.js";
 import { addFile } from "../../ops/files.js";
 import { placeOverlayClip } from "../../ops/overlays.js";
+import { fitArtboardToFrame, type ArtboardPlacement } from "../../titles/artboard.js";
 import { getTitleTemplate, suggestTitleTemplates } from "../../titles/templates.js";
 import {
   artboardSize,
+  backgroundColor,
   parseTitleSvg,
   setFieldText,
   textZone,
@@ -46,12 +52,14 @@ import {
   fpsOfProject,
   guarded,
   isVertical,
+  projectSize,
   planOverlayTrack,
   pyRoundTo,
   snapToFrame,
   summaryLine,
   toolError,
   trackInfo,
+  warningNote,
   type ScreenPosition,
 } from "../titles-text.js";
 import { text } from "./common.js";
@@ -60,6 +68,9 @@ import { TitleStyle, assignTexts, fieldRows, readProjectSvg, writeTitle } from "
 
 /** #183's add_title_tool tried these in order when no template was named (titles_text.DEFAULT_TEMPLATES). */
 const DEFAULT_TEMPLATES = ["Bar_1", "Standard_1", "Footer_1"] as const;
+
+/** The plain two-line template text is drawn with when the named template is a colour card (no text field). */
+const TEXT_OVER_CARD = "Standard_1";
 
 /** Where a template's text zone anchors its artboard (titles_text.ZONE_POSITION). */
 const ZONE_POSITION: Readonly<Record<"top" | "center" | "bottom", ScreenPosition>> = {
@@ -78,6 +89,12 @@ const ZONE_POSITION: Readonly<Record<"top" | "center" | "bottom", ScreenPosition
  * least 1.6 times as tall as wide), so the two are not shared.
  */
 const VERTICAL_SAFE_OFFSET: Readonly<Partial<Record<ScreenPosition, number>>> = { bottom_center: -0.12, top_center: 0.06 };
+
+/** Where Best Fit and `posKey`'s gravity put the artboard on the frame. */
+function placementOf(posKey: ScreenPosition, lift: number): ArtboardPlacement {
+  const [v, h = "center"] = posKey === "center" ? ["center"] : posKey.split("_");
+  return { v: v as ArtboardPlacement["v"], h: h as ArtboardPlacement["h"], lift };
+}
 
 function basename(path: string): string {
   return String(path ?? "").split(/[\\/]/).pop() ?? "";
@@ -140,19 +157,34 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   const lines = (input.lines ?? []).map(String);
   const body = String(input.text ?? "");
   const subtitle = String(input.subtitle ?? "");
-  const template = await loadTemplate(call, String(input.template ?? ""));
-  const name = template.name;
-  let doc: TitleDoc;
-  try {
-    doc = parseTitleSvg(template.svg);
-  } catch (error) {
-    return toolError(`cannot read title SVG ${template.file}: ${errorMessage(error)}`);
-  }
-  const slots = titleFields(doc);
   const given = Boolean(body.trim() || subtitle.trim() || lines.some((v) => v.trim()));
-  if (slots.length === 0 && given) toolError(`${name} has no text; it is a background card (set background_color), or pick a template with text`);
-  if (slots.length > 0 && !given) toolError("add_title_tool needs text (or subtitle / lines)");
-  const style = new TitleStyle(input);
+  const colourCard = !given && Boolean(String(input.background_color ?? "").trim());
+  // A blank title with a background colour is a colour card (agents cut white flash frames this way).
+  let template = await loadTemplate(call, String(input.template ?? "").trim() || (colourCard ? "Solid_Color" : ""));
+  const parse = (t: LoadedTemplate): TitleDoc => {
+    try {
+      return parseTitleSvg(t.svg);
+    } catch (error) {
+      return toolError(`cannot read title SVG ${t.file}: ${errorMessage(error)}`);
+    }
+  };
+  let doc = parse(template);
+  let slots = titleFields(doc);
+  const warnings: string[] = [];
+  let colour = String(input.background_color ?? "");
+  if (slots.length === 0 && given) {
+    // Agents name Solid_Color for "this text on a coloured frame": draw the text on a text template over the card's colour.
+    const card = template;
+    const [cardColour, cardAlpha] = backgroundColor(doc);
+    template = await loadTemplate(call, TEXT_OVER_CARD);
+    doc = parse(template);
+    slots = titleFields(doc);
+    if (!colour.trim() && cardAlpha > 0) colour = cardColour;
+    warnings.push(`${card.name} has no text; drew the text with ${template.name} over ${colour.trim() ? `the colour ${colour.trim()}` : "the video"}`);
+  }
+  const name = template.name;
+  if (slots.length > 0 && !given && !colourCard) toolError("add_title_tool needs text (or subtitle / lines), or a background_color for a blank colour card");
+  const style = new TitleStyle({ ...input, background_color: colour });
   const values = assignTexts(slots, body, subtitle, lines, name, true);
 
   const project = call.doc.project;
@@ -170,11 +202,13 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
 
   for (const slot of slots) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index)!);
   const styleInfo = style.apply(doc, families);
-  const fitted = style.fit(doc, slots);
   const zone = textZone(slots, artboardSize(doc)[1]);
   const wanted = input.screen_position ?? "auto";
   const posKey: ScreenPosition = ZONE_POSITION[wanted === "auto" ? zone : wanted] ?? "center";
   const lift = isVertical(project) ? (VERTICAL_SAFE_OFFSET[posKey] ?? 0) : 0;
+  const [frameW, frameH] = projectSize(project);
+  const reshaped = fitArtboardToFrame(doc, { width: frameW, height: frameH }, placementOf(posKey, lift));
+  const fitted = style.fit(doc, slots);
 
   const firstText = slots.map((s) => values.get(s.index) ?? "").find((v) => v.trim()) || name;
   const fileName = uniqueTitleName(text(input.file_name) || firstText, taken);
@@ -185,14 +219,15 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   const fadeIn = Number(input.fade_in_seconds ?? 0);
   const fadeOut = Number(input.fade_out_seconds ?? 0);
   const placed = call.commit((tx) => {
-    const { layer, created } = planOverlayTrack(tx.project, position, end, track);
+    const { layer, created, moved } = planOverlayTrack(tx.project, position, end, track);
     const file = addFile(tx, media, { mediaType: "image" });
     const props: Record<string, unknown> = { gravity: GRAVITY[posKey] };
-    if (lift) props.location_y = constantKeyframe(lift);
+    // A title fitted to the frame carries its lift in its viewBox.
+    if (lift && !reshaped) props.location_y = constantKeyframe(lift);
     const alpha = fadeAlpha(tx.project, 0, duration, fadeIn, fadeOut);
     if (alpha) props.alpha = alpha;
     const clip = placeOverlayClip(tx, { fileId: file.id, position, duration, layer, newTrackLabel: "Titles", props });
-    return { fileId: file.id, clipId: clip.id, layer, created };
+    return { fileId: file.id, clipId: clip.id, layer, created, moved };
   });
 
   const shown =
@@ -222,7 +257,12 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   if (fadeIn || fadeOut) Object.assign(data, { fade_in: fadeIn, fade_out: fadeOut });
   if (Object.keys(fitted).length > 0) data.text_shrunk_to_fit = fitted;
   if (lift) data.lifted_for_vertical_ui = lift;
-  return applied(tool, summaryLine(summary), { data, warnings: missingGlyphWarnings(outlined.missing) });
+  if (placed.moved) warnings.push(placed.moved);
+  if (warnings.length > 0) data.warnings = warnings;
+  return applied(tool, summaryLine(summary + warningNote(warnings)), {
+    data,
+    warnings: [...warnings, ...missingGlyphWarnings(outlined.missing)],
+  });
 }
 
 export const titleTools: CatalogTool[] = [

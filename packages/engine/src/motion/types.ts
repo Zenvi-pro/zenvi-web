@@ -128,6 +128,8 @@ export interface MediaSource {
   speed: number;
   /** Keep the clip's own sound (default: muted under the music). */
   sound?: boolean;
+  /** Mirrored left-right (x) or top-bottom (y): a negative scale, centred (a kaleidoscope segment). */
+  flip?: { x: boolean; y: boolean };
 }
 
 /** One clip of a template while it is being designed: what it shows, when, and how it moves. */
@@ -196,4 +198,6 @@ export interface MotionPlan {
   layers: MotionLayer[];
   /** Frames where something enters or changes: the template's start or a beat (half beat) of the grid. */
   cues: number[];
+  /** What the template changed to fit its length, when anything. */
+  warnings?: string[];
 }

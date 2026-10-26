@@ -1,0 +1,296 @@
+{
+  "id": "basic",
+  "title": "Basic edit: new project, two clips, split, place, caption, volume, export",
+  "description": "The edits every agent session starts with. Runs offline in well under a minute (CI gate).",
+  "budgetSeconds": 60,
+  "fixtures": [
+    {
+      "id": "a",
+      "file": "a.mp4",
+      "lavfi": [
+        "testsrc2=size=320x180:rate=30:duration=3",
+        "sine=frequency=440:sample_rate=48000:duration=3"
+      ]
+    },
+    {
+      "id": "b",
+      "file": "b.mp4",
+      "lavfi": [
+        "smptebars=size=320x180:rate=30:duration=2",
+        "sine=frequency=660:sample_rate=48000:duration=2"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "id": "project",
+      "tool": "open_project_file",
+      "args": {
+        "path": "basic.zvn"
+      },
+      "on": {
+        "desktop": {
+          "tool": "new_project_tool",
+          "args": {
+            "discard_unsaved": true
+          },
+          "expect": {}
+        }
+      },
+      "expect": {
+        "receipt": {
+          "data.project": {
+            "matches": "basic\\.zvn$"
+          }
+        }
+      }
+    },
+    {
+      "id": "import",
+      "tool": "import_files_tool",
+      "args": {
+        "paths": "[\"${fixtures.a}\", \"${fixtures.b}\"]",
+        "skip_indexing": "true"
+      },
+      "expect": {
+        "receipt": {
+          "data.fileIds": {
+            "length": {
+              "min": 2,
+              "max": 2
+            }
+          }
+        }
+      },
+      "on": {
+        "desktop": {
+          "expect": {
+            "receipt": {
+              "ids": {
+                "length": {
+                  "min": 2
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "place_a",
+      "tool": "add_clip_to_timeline_tool",
+      "args": {
+        "file_id": "${import.data.fileIds[0]}",
+        "position_seconds": "0",
+        "full_file": "true"
+      },
+      "expect": {
+        "receipt": {
+          "clips": {
+            "length": {
+              "min": 1
+            }
+          },
+          "clips[0].position": {
+            "min": 0,
+            "max": 0
+          }
+        }
+      },
+      "on": {
+        "desktop": {
+          "args": {
+            "file_id": "${import.ids[0]}",
+            "position_seconds": "0",
+            "full_file": "true"
+          }
+        }
+      }
+    },
+    {
+      "id": "split",
+      "tool": "split_clip_tool",
+      "args": {
+        "clip_id": "${place_a.clips[0].id}",
+        "at_seconds": "1.5"
+      },
+      "expect": {
+        "receipt": {
+          "clips": {
+            "length": {
+              "min": 2,
+              "max": 2
+            }
+          }
+        }
+      },
+      "on": {
+        "desktop": {
+          "tool": "slice_clips_tool",
+          "args": {
+            "timeline_clip_ids": [
+              "${place_a.clips[0].id}"
+            ],
+            "at_seconds": 1.5
+          }
+        }
+      }
+    },
+    {
+      "id": "place_b",
+      "tool": "add_clip_to_timeline_tool",
+      "args": {
+        "file_id": "${import.data.fileIds[1]}",
+        "position_seconds": "3",
+        "full_file": "true",
+        "track": "1"
+      },
+      "expect": {
+        "receipt": {
+          "clips[0].position": {
+            "min": 2.99,
+            "max": 3.01
+          }
+        }
+      },
+      "checks": [
+        {
+          "kind": "tool",
+          "tool": "list_clips_tool",
+          "expect": {
+            "receipt": {
+              "summary": {
+                "matches": "clips \\(3\\)"
+              }
+            }
+          }
+        }
+      ],
+      "on": {
+        "desktop": {
+          "args": {
+            "file_id": "${import.ids[1]}",
+            "position_seconds": "3",
+            "full_file": "true",
+            "track": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "caption",
+      "tool": "add_captions_tool",
+      "args": {
+        "cues": [
+          {
+            "start": 0.2,
+            "end": 1.4,
+            "text": "Two clips"
+          },
+          {
+            "start": 3.2,
+            "end": 4.6,
+            "text": "one edit"
+          }
+        ],
+        "style": "reels"
+      },
+      "expect": {
+        "receipt": {
+          "clips": {
+            "length": {
+              "min": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "volume",
+      "tool": "set_clip_volume_tool",
+      "args": {
+        "timeline_clip_id": "${place_b.clips[0].id}",
+        "level_db": "-6"
+      }
+    },
+    {
+      "id": "preview",
+      "tool": "preview_frame",
+      "args": {
+        "seconds": 3.5,
+        "width": 320
+      },
+      "expect": {
+        "image": true
+      },
+      "checks": [
+        {
+          "kind": "image",
+          "minLuma": 16
+        }
+      ],
+      "on": {
+        "desktop": {
+          "tool": "save_frame_image_tool",
+          "args": {
+            "file_path": "${work}/frame.png",
+            "time": 3.5,
+            "overwrite": true
+          },
+          "expect": {},
+          "checks": [
+            {
+              "kind": "media",
+              "file": "${work}/frame.png",
+              "frame": {
+                "at": 0,
+                "minLuma": 16
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "export",
+      "tool": "render_video",
+      "args": {
+        "output": "basic.mp4",
+        "width": 320,
+        "quality": "low"
+      },
+      "on": {
+        "desktop": {
+          "tool": "export_video_tool",
+          "args": {
+            "output_path": "${work}/basic.mp4",
+            "width": 320,
+            "height": 180
+          }
+        }
+      },
+      "checks": [
+        {
+          "kind": "media",
+          "file": "${work}/basic.mp4",
+          "durationSeconds": {
+            "min": 4.9,
+            "max": 5.1
+          },
+          "streams": [
+            "audio",
+            "video"
+          ],
+          "loudnessLufs": {
+            "min": -40,
+            "max": 0
+          },
+          "frame": {
+            "at": 1.0,
+            "minLuma": 16
+          }
+        }
+      ]
+    }
+  ]
+}
