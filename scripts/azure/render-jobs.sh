@@ -34,6 +34,8 @@ MAX_EXECUTIONS="${MAX_EXECUTIONS:-4}"
 # Longer than any render the service accepts; a stopped execution's job is re-queued by the service.
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-2700}"
 IMAGE_TAG="${IMAGE_TAG:-}"
+# Space-separated key=value, applied when the job is created (scripts/azure/lab.sh).
+TAGS="${TAGS:-}"
 SECRET_NAME="azure-storage-connection-string"
 
 die() { echo "render-jobs: $*" >&2; exit 1; }
@@ -63,6 +65,9 @@ ENV_VARS=(
   "LOG_LEVEL=info"
 )
 [ -n "$IMAGE_TAG" ] && ENV_VARS+=("ZENVI_CLOUD_VERSION=$IMAGE_TAG")
+TAG_ARGS=()
+# shellcheck disable=SC2206 # space-separated key=value pairs, by design
+[ -n "$TAGS" ] && TAG_ARGS=(--tags $TAGS)
 
 if ! az containerapp job show -g "$RG" -n "$JOB" -o none 2>/dev/null; then
   [ -n "$IMAGE_TAG" ] || die "IMAGE_TAG is required to create $JOB (an image built by scripts/azure/deploy.sh)"
@@ -82,6 +87,7 @@ if ! az containerapp job show -g "$RG" -n "$JOB" -o none 2>/dev/null; then
     --secrets "$SECRET_NAME=$CONN" \
     --env-vars "${ENV_VARS[@]}" \
     --args node dist/render-job.mjs \
+    ${TAG_ARGS[@]+"${TAG_ARGS[@]}"} \
     -o none
 else
   step "Updating job $JOB"
