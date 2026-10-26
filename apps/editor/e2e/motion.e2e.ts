@@ -103,7 +103,7 @@ test("transitions, sound and motion panels, clip menu and palette call the tools
   // Motion & 3D: listed, marked as needing desktop or CLI in the browser.
   await rail.getByRole("button", { name: "Motion and 3D" }).click();
   await expect(page.getByRole("region", { name: "3D scenes" })).toBeVisible();
-  await expect(page.getByText("Needs desktop or CLI").first()).toBeVisible();
+  await expect(page.getByText("Needs CLI").first()).toBeVisible();
   await shot(page, "15-motion-3d");
 
   // Clip menu: the motion entries.
