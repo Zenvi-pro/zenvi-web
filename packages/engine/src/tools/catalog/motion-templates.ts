@@ -86,7 +86,7 @@ const input = z.strictObject({
   radius: z.number().min(0).max(120).optional().describe("grid: tile corner radius, px at 1080 (default 0)."),
   reveal: z.enum(GRID_REVEALS).optional().describe("grid: how a tile arrives on its beat: pop (springs up, default), slide (from the nearest edge), wipe, fade, cut (just appears; default for repeat and kaleidoscope)."),
   merge: z.boolean().optional().describe("grid: end with the last tile growing to fill the frame."),
-  zoom_into: z.number().int().min(1).max(9).optional().describe("grid: end with the camera pushing into this tile (1-based, in the final layout) until it fills the frame; not with merge."),
+  zoom_into: z.number().int().min(1).max(16).optional().describe("grid: end with the camera pushing into this tile (1-based, in the final layout) until it fills the frame; not with merge."),
   phase: z.number().min(0).max(2).optional().describe("grid repeat: seconds each copy runs ahead of the one before, so copies move out of phase (default 0: in step; narrowed when the clip is too short)."),
   mirror: z.boolean().optional().describe("grid repeat: mirror alternate copies so their edges meet as mirrors (a kaleidoscope always is)."),
   drift: z.enum(GRID_DRIFTS).optional().describe("grid: a slow camera move over the whole field for the template's length: in (push in 12 %), out (pull out), left, right, up, down (pan). Not with merge, zoom_into, band or film_strip."),

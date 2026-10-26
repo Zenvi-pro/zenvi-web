@@ -111,6 +111,21 @@ describe("add_motion_template_tool grid", () => {
     expect(doc.project.clips).toEqual([]);
   });
 
+  it("zooms into any copy of a 16-copy repeat (zoom_into reaches past 9)", async () => {
+    const doc = verticalProject();
+    const result = await runTool({ doc, host: host() }, "add_motion_template_tool", {
+      template: "grid",
+      layout: "repeat",
+      tiles: "16",
+      zoom_into: "12",
+      file_ids: [FILES[0]],
+      duration_seconds: "8",
+      bpm: "120",
+    });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toEqual(["Add motion template grid"]);
+  });
+
   it("folds one clip into a mirrored kaleidoscope that pushes in, every segment drawn mirrored by the renderer, in one undo step", async () => {
     const doc = verticalProject();
     const result = await runTool({ doc, host: host() }, "add_motion_template_tool", {
