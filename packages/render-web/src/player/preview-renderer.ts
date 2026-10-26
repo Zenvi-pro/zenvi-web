@@ -301,9 +301,9 @@ function ensuring(resources: LayerResources, ensure: (ref: MediaRef) => Promise<
       if (source.kind !== "color") await ensure({ fileId: source.fileId, path: source.path });
       return resources.picture(layer, mode);
     },
-    async image(path, width, height, time, mode) {
+    async image(path, width, height, time, mode, lane) {
       await ensure({ path });
-      return resources.image(path, width, height, time, mode);
+      return resources.image(path, width, height, time, mode, lane);
     },
     async text(path) {
       await ensure({ path });
