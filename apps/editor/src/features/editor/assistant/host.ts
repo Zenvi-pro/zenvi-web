@@ -3,6 +3,7 @@
  * Assistant (or the command palette) runs them here.
  */
 import type { CloudMediaRef, ExportOptions, ExportResult, ImportedMedia, ReaderInfo, ToolHost, ToolImage } from "@zenvi/engine";
+import { fetchLibraryHost, type LibraryFetch } from "@zenvi/engine/tools";
 import { canExportWith } from "@zenvi/render-web";
 import { backendRequest } from "@/lib/backend";
 import { config } from "@/lib/env";
@@ -206,6 +207,8 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
         return files.map((f) => gone.has(f.id));
       },
     },
+    // Openverse answers browsers (CORS *); anonymous: 20 searches a minute, 200 a day per address.
+    library: fetchLibraryHost({ fetch: (url, init) => fetch(url, init) as unknown as ReturnType<LibraryFetch> }),
     backend: {
       baseUrl: config.backendUrl,
       request: (path, init) => backendRequest(path, { ...init, auth: true }),

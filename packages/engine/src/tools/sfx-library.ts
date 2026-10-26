@@ -38,6 +38,8 @@ export const SOUND_LIBRARY_ORIGINS: readonly string[] = [/^https:\/\/[^/]+/.exec
 
 /** Largest library file downloaded, bytes (effects are small; this stops a whole album). */
 export const MAX_LIBRARY_BYTES = 25 * 1024 * 1024;
+/** Longest a library request may take, ms. */
+const LIBRARY_TIMEOUT_MS = 20_000;
 /** Most audio decoded from one library file, seconds. */
 const MAX_DECODE_SECONDS = 30;
 
@@ -65,7 +67,16 @@ export function fetchLibraryHost(options: { fetch: LibraryFetch; openverseToken?
       const headers: Record<string, string> = { accept: "application/json" };
       if (options.userAgent) headers["user-agent"] = options.userAgent;
       if (options.openverseToken) headers.authorization = `Bearer ${options.openverseToken}`;
-      const response = await options.fetch(url, { headers, signal: opts?.signal, redirect: "error" });
+      const signals = (globalThis as { AbortSignal?: { timeout?(ms: number): AbortSignal; any?(signals: AbortSignal[]): AbortSignal } }).AbortSignal;
+      const timeout = signals?.timeout?.(LIBRARY_TIMEOUT_MS);
+      const signal = opts?.signal && timeout && signals?.any ? signals.any([opts.signal, timeout]) : (opts?.signal ?? timeout);
+      let response: Awaited<ReturnType<LibraryFetch>>;
+      try {
+        response = await options.fetch(url, { headers, signal, redirect: "error" });
+      } catch (error) {
+        if (timeout?.aborted && !opts?.signal?.aborted) throw new Error(`the library did not answer within ${LIBRARY_TIMEOUT_MS / 1000} s.`);
+        throw new Error(`could not reach the library: ${errorText(error)}`);
+      }
       if (response.status === 429) {
         const wait = response.headers.get("retry-after");
         throw new Error(`Openverse's rate limit is reached (20 searches a minute, 200 a day without a key)${wait ? `; try again in ${wait} s` : ""}.`);

@@ -8,6 +8,7 @@ import { mkdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
+import { fetchLibraryHost, type LibraryFetch } from "@zenvi/engine/tools";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
 import { transcribeMediaFile } from "../audio/speech.js";
 import { engineAssetsDir } from "../resources.js";
@@ -201,6 +202,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         }),
       currentPath: () => current() ?? null,
     },
+    // Openverse for the sound tools; OPENVERSE_TOKEN (an Openverse API token) lifts the anonymous 20 a minute / 200 a day.
+    library: fetchLibraryHost({ fetch: globalThis.fetch as unknown as LibraryFetch, openverseToken: (options.env ?? process.env).OPENVERSE_TOKEN?.trim() || undefined, userAgent: "zenvi-cli (https://zenvi.pro)" }),
     log: options.log,
   };
   if (assets) host.assets = createAssetHost(assets);
