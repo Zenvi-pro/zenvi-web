@@ -11,6 +11,11 @@ Usage (the vitest suite ``render/parity/frame-parity.test.ts`` runs this)::
 
     PYTHONPATH=~/zenvi-deps-1.0/python ~/Projects/zenvi/.venv/bin/python \\
         packages/engine/scripts/parity/render_references.py <output-dir>
+
+It also writes ``motion-base.json`` (two clips cut back to back) for the
+engine to add motion transitions to; the suite then renders those projects
+here with ``--render-jobs <jobs.json>`` (``[{name, project, frames}]``),
+which writes ``<jobs>.out.json`` with the reference frames.
 """
 
 import copy
@@ -36,6 +41,8 @@ def make_media(out):
     # Lossless RGB video (PNG codec): FFmpegReader and the test decode identical pixels.
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=2", "-c:v", "png", "-pix_fmt", "rgb24", p("bars.mkv"))
     ffmpeg("-f", "lavfi", "-i", "testsrc=s=192x108:r=24:d=2", "-c:v", "png", "-pix_fmt", "rgb24", p("clock24.mkv"))
+    # A second full-frame 30 fps picture for motion transitions (the incoming shot).
+    ffmpeg("-f", "lavfi", "-i", "testsrc=s=320x180:r=30:d=2", "-c:v", "png", "-pix_fmt", "rgb24", p("cells.mkv"))
     # Opaque still with smooth gradients (resampling-sensitive).
     ffmpeg("-f", "lavfi", "-i", "gradients=s=200x120:c0=0x2050c0:c1=0xf0a020:x0=0:y0=0:x1=200:y1=120:seed=1",
            "-frames:v", "1", "-pix_fmt", "rgb24", p("grad.png"))
@@ -54,7 +61,7 @@ def make_media(out):
     # Video with a PCM tone (exact samples for audio-reactive effects).
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=2", "-f", "lavfi", "-i", "sine=f=330:r=48000:d=2,aformat=channel_layouts=stereo",
            "-c:v", "png", "-pix_fmt", "rgb24", "-c:a", "pcm_s16le", "-shortest", p("tone.mkv"))
-    return {name: p(name) for name in ["bars.mkv", "clock24.mkv", "grad.png", "logo.png", "mask.png", "green.png", "tone.mkv"]}
+    return {name: p(name) for name in ["bars.mkv", "cells.mkv", "clock24.mkv", "grad.png", "logo.png", "mask.png", "green.png", "tone.mkv"]}
 
 
 def kf(*points):
@@ -246,7 +253,23 @@ def render(proj, frames, out_prefix, max_size=None, export_size=None):
     return refs
 
 
+def render_jobs(jobs_path):
+    with open(jobs_path) as fh:
+        jobs = json.load(fh)
+    out = []
+    for job in jobs:
+        with open(job["project"]) as fh:
+            proj = json.load(fh)
+        prefix = os.path.splitext(job["project"])[0]
+        out.append({"name": job["name"], "project": job["project"], "frames": render(proj, job["frames"], prefix)})
+    with open(os.path.splitext(jobs_path)[0] + ".out.json", "w") as fh:
+        json.dump(out, fh, indent=1)
+
+
 def main():
+    if sys.argv[1] == "--render-jobs":
+        render_jobs(sys.argv[2])
+        return
     out = sys.argv[1]
     os.makedirs(out, exist_ok=True)
     media = make_media(out)
@@ -273,6 +296,11 @@ def main():
     refs = render(copy.deepcopy(proj), [1, 20], os.path.join(out, name), export_size=(192, 108))
     manifest["cases"].append({"name": name, "project": proj_path, "frames": refs, "export": [192, 108]})
     openshot.Settings.Instance().HIGH_QUALITY_SCALING = False
+    # Two shots cut back to back at 1 s, for the engine's motion transitions.
+    base = project([clip(media, "bars.mkv", position=0.0, end=1.0), clip(media, "cells.mkv", position=1.0, start=0.5, end=1.5)])
+    manifest["motion_base"] = os.path.join(out, "motion-base.json")
+    with open(manifest["motion_base"], "w") as fh:
+        json.dump(base, fh)
     with open(os.path.join(out, "manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=1)
     print(os.path.join(out, "manifest.json"))

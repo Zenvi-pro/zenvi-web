@@ -1036,6 +1036,34 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { climax_seconds: "999" }, status: "refused", summary: /^Error: climax_seconds \(999\) is after the end of the edit/ },
   },
 
+  // --- motion transitions ------------------------------------------------------------------
+  list_motion_transitions_tool: {
+    happy: { args: {}, summary: /^13 motion transitions; 0 on the timeline\.$/ },
+    failure: null,
+  },
+  apply_motion_transition_tool: {
+    happy: {
+      args: { preset: "whip", clip1_id: IDS.clipA, direction: "left", intensity: "1.5" },
+      summary: /^Added whip left on the cut at 10\.00s \(8 frames\) between CLIPINTV01 and CLIPBROL01\.$/,
+      check: ({ receipt }) => expect((receipt.data as { sfx_cues: { kind: string }[] }).sfx_cues.map((c) => c.kind)).toEqual(["whoosh"]),
+    },
+    failure: { args: { preset: "whip", clip1_id: IDS.clipA, clip2_id: IDS.clipLogo }, status: "refused", summary: /^Error: Clips CLIPINTV01 and CLIPLOGO01 are on different tracks/ },
+  },
+  apply_motion_transitions_tool: {
+    happy: { args: { track: String(L1), style: "hype" }, summary: /^Added 2 motion transition\(s\) on track 1 \(hype\): whip@10\.00s, whip@15\.00s\.$/ },
+    failure: { args: { track: String(L1), preset: "whip", style: "hype" }, status: "refused", summary: /^Error: give preset or style/ },
+  },
+  remove_motion_transition_tool: {
+    happy: {
+      setup: async (doc, host) => {
+        await runTool({ doc, host }, "apply_motion_transition_tool", { preset: "spin", clip1_id: IDS.clipB });
+      },
+      args: { clip_id: IDS.clipTail },
+      summary: /^Removed 1 motion transition\(s\); restored clips CLIPBROL01, CLIPINTV02\.$/,
+    },
+    failure: { args: { transition_id: "MTNOPE" }, status: "refused", summary: /^Error: no motion transition with id MTNOPE\.$/ },
+  },
+
   // --- stock search (web) -------------------------------------------------------------
   search_pexels_videos_tool: {
     happy: {

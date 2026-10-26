@@ -1,0 +1,77 @@
+{
+ "note": "Real footage for the motion transitions showcase (--real). Wikimedia Commons, CC0 / public domain / CC BY; downloaded at run time, never committed. CC BY clips credit their authors here.",
+ "clips": [
+  {
+   "name": "lathe",
+   "title": "Drilling a gear wheel on a turning machine.WebM",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/b/b1/Drilling_a_gear_wheel_on_a_turning_machine.WebM?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "page": "https://commons.wikimedia.org/wiki/File:Drilling_a_gear_wheel_on_a_turning_machine.WebM",
+   "license": "CC0",
+   "author": "Musicaloris",
+   "start": 21.55
+  },
+  {
+   "name": "highway",
+   "title": "Forrest Highway northbound turning off at Dorsett Road (E37@WTW2013).ogv",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Forrest_Highway_northbound_turning_off_at_Dorsett_Road_%28E37%40WTW2013%29.ogv?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "page": "https://commons.wikimedia.org/wiki/File:Forrest_Highway_northbound_turning_off_at_Dorsett_Road_(E37@WTW2013).ogv",
+   "license": "CC0",
+   "author": "Evad37",
+   "start": 12.13
+  },
+  {
+   "name": "train-door",
+   "title": "New Mexico Rail Runner arriving Santa Fe Depot.webm",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/2/29/New_Mexico_Rail_Runner_arriving_Santa_Fe_Depot.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "page": "https://commons.wikimedia.org/wiki/File:New_Mexico_Rail_Runner_arriving_Santa_Fe_Depot.webm",
+   "license": "CC BY 3.0",
+   "author": "alexvgau",
+   "start": 20.01
+  },
+  {
+   "name": "train-platform",
+   "title": "Rail Runner.webm",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/8/8a/Rail_Runner.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "page": "https://commons.wikimedia.org/wiki/File:Rail_Runner.webm",
+   "license": "CC BY 3.0",
+   "author": "Granger Meador",
+   "start": 31.33
+  },
+  {
+   "name": "hurricane-eye",
+   "title": "Close Up View of Milton’s Ferocious Eye (CIRA 2024-10-08 - nolabels).webm",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Close_Up_View_of_Milton%E2%80%99s_Ferocious_Eye_%28CIRA_2024-10-08_-_nolabels%29.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "page": "https://commons.wikimedia.org/wiki/File:Close_Up_View_of_Milton%E2%80%99s_Ferocious_Eye_(CIRA_2024-10-08_-_nolabels).webm",
+   "license": "Public domain",
+   "author": "GOES imagery: CSU/CIRA & NOAA",
+   "start": 0.5
+  },
+  {
+   "name": "street-walker",
+   "title": "Traffic on Slovenska street 2.webm",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/d/d9/Traffic_on_Slovenska_street_2.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "page": "https://commons.wikimedia.org/wiki/File:Traffic_on_Slovenska_street_2.webm",
+   "license": "CC BY 3.0",
+   "author": "Sounds of Changes",
+   "start": 7.49
+  },
+  {
+   "name": "cobbled-street",
+   "title": "Traffic on a cobbled street - soundscape.webm",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/e/e3/Traffic_on_a_cobbled_street_-_soundscape.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "page": "https://commons.wikimedia.org/wiki/File:Traffic_on_a_cobbled_street_-_soundscape.webm",
+   "license": "CC BY 3.0",
+   "author": "Sounds of Changes",
+   "start": 6.55
+  },
+  {
+   "name": "ocean-boats",
+   "title": "Ocean surface waves 07.ogv",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/7/70/Ocean_surface_waves_07.ogv?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "page": "https://commons.wikimedia.org/wiki/File:Ocean_surface_waves_07.ogv",
+   "license": "CC0",
+   "author": "Mostafameraji",
+   "start": 2.0
+  }
+ ]
+}
