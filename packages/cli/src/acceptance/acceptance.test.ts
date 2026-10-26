@@ -17,6 +17,7 @@ describe("scenario data", () => {
     const all = await loadScenarios();
     expect(all.map((s) => s.id)).toEqual(["basic", "motion-reel", "match-cut", "kinetic-captions", "blocks-fx-3d"]);
     expect(() => parseScenario({ id: "x", title: "x", steps: [{ id: "a", tool: "t" }, { id: "a", tool: "t" }] })).toThrow(/duplicate step id a/);
+    expect(() => parseScenario({ id: "x", title: "x", steps: [{ id: "a", tool: "t", after: ["b"] }, { id: "b", tool: "t" }] })).toThrow(/a runs after b, which is not an earlier step/);
   });
 
   it("reads receipt paths and resolves references, keeping a whole reference's type", () => {
