@@ -15,6 +15,12 @@
  *     under dialogue; clicks and textures stay out of speech entirely;
  *   - nothing rings past the picture: a hit near the end is rendered
  *     shorter (placement cuts and fades whatever still runs over).
+ *
+ * The hype references put a sound on 90-100 % of their cuts: density
+ * "every_cut" keeps every moment the 80 ms rule allows, alternating a light
+ * hit and a short whoosh on plain cuts, whooshes on transitions (whips),
+ * clicks on flashes and title slams (an impact where one may land), and no
+ * recipe twice in a row.
  */
 
 import { Rng, clamp01 } from "./dsp.js";
@@ -23,6 +29,8 @@ import type { SfxParams } from "./render.js";
 
 export const SFX_INTENSITIES = ["subtle", "normal", "hype"] as const;
 export type SfxIntensity = (typeof SFX_INTENSITIES)[number];
+export const SFX_DENSITIES = ["auto", "every_cut"] as const;
+export type SfxDensity = (typeof SFX_DENSITIES)[number];
 
 export type SoundMomentKind = "cut" | "transition" | "title" | "flash";
 
@@ -52,6 +60,8 @@ export interface SoundDesignInput {
   /** Timeline windows where someone speaks. */
   speech: readonly (readonly [number, number])[];
   intensity: SfxIntensity;
+  /** auto: the intensity's own spacing; every_cut: a sound on every cut and moment the 80 ms rule allows. Default auto. */
+  density?: SfxDensity;
   seed: number;
 }
 
@@ -102,6 +112,24 @@ function inSpeech(speech: SoundDesignInput["speech"], t: number): boolean {
   return speech.some(([a, b]) => t >= a - 0.05 && t <= b + 0.05);
 }
 
+/** every_cut: a light hit sits this far under a full one, dB, so the strong cuts still carry. */
+const LIGHT_HIT_DB = -4;
+/** every_cut: a light hit's length, seconds (a tight transient, gone before the next cut). */
+const LIGHT_HIT_SECONDS = 0.3;
+const CLICKS = ["ui_tap", "mouse_click", "camera_shutter", "toggle"] as const;
+/** The sound that stands in for a recipe that would repeat the one just before it. */
+const ALTERNATE: Readonly<Record<string, string>> = {
+  whip: "whoosh_short",
+  whoosh_short: "whip",
+  swish_airy: "whoosh_short",
+  whoosh_medium: "whoosh_rise",
+  whoosh_rise: "whoosh_medium",
+  whoosh_long: "whoosh_medium",
+  impact_punch: "impact_thud",
+  impact_thud: "impact_punch",
+  swoosh_hit: "impact_punch",
+};
+
 /** Pick from `pool` at random, but never the same recipe three times running. */
 function vary(pool: readonly string[], recent: string[], rng: Rng): string {
   const repeat = recent.length >= 2 && recent[recent.length - 1] === recent[recent.length - 2] ? recent[recent.length - 1] : undefined;
@@ -131,7 +159,8 @@ export interface SoundDesignPlan {
 
 /** Plan the cues for an edit. Deterministic for the same input. */
 export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
-  const d = DENSITY[input.intensity];
+  const everyCut = input.density === "every_cut";
+  const d = everyCut ? { ...DENSITY[input.intensity], gap: MIN_TRANSIENT_GAP, cutFloor: 0 } : DENSITY[input.intensity];
   const rng = new Rng(Math.imul(input.seed | 0, 2654435761) ^ 0x5fd);
   const cues: SfxCue[] = [];
   const hits: number[] = [];
@@ -172,12 +201,12 @@ export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
     const hitGap = entry.m.kind === "flash" ? d.hitGap / 2 : d.hitGap;
     const hitAllowed = impacts.every((x) => Math.abs(x - t) >= hitGap);
     const wantsHit = entry.m.kind === "flash" || (entry.m.kind === "cut" && entry.m.strength >= d.hitFloor);
-    const impact = wantsHit && hitAllowed ? "hit" : entry.m.kind === "flash" ? "accent" : null;
+    const impact = wantsHit && hitAllowed ? "hit" : entry.m.kind === "flash" && !everyCut ? "accent" : null;
     // The riser carries its stretch: only impacts land inside it (hype keeps everything).
-    if (impact !== "hit" && t >= riserFrom && t < (climax ?? Infinity) && input.intensity !== "hype") continue;
+    if (impact !== "hit" && t >= riserFrom && t < (climax ?? Infinity) && input.intensity !== "hype" && !everyCut) continue;
     const speech = inSpeech(input.speech, t);
     // Clicks and pops under someone speaking compete with the words.
-    if (speech && entry.m.kind === "title" && input.intensity !== "hype") continue;
+    if (speech && (entry.m.kind === "title" || (everyCut && entry.m.kind === "flash" && impact !== "hit")) && input.intensity !== "hype") continue;
     const gap = speech ? d.gap * 1.5 : d.gap;
     if (entry.priority < MUST_PRIORITY && taken.some((x) => Math.abs(x - t) < gap)) continue;
     accepted.push({ ...entry, impact });
@@ -190,8 +219,11 @@ export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
   accepted.sort((a, b) => a.m.time - b.m.time);
   let side = rng.next() < 0.5 ? -1 : 1;
   let titleTurn = 0;
+  let cutTurn = 0;
+  let clickTurn = Math.floor(rng.next() * CLICKS.length);
   const recentWhooshes: string[] = [];
   const recentHits: string[] = [];
+  const click = () => CLICKS[clickTurn++ % CLICKS.length]!;
   for (const { m, priority, impact } of accepted) {
     const t = m.time;
     const seed = Math.floor(rng.next() * 1e6);
@@ -211,10 +243,20 @@ export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
       cues.push({ recipe, at: t, params: { ...base, pitch: Math.min(pitch, 0.5), pan: combo ? (side = -side) * 0.5 : 0 }, gainDb: 0, reason: m.kind === "flash" ? "flash frame" : "strong cut" });
       continue;
     }
+    if (everyCut && (m.kind === "flash" || m.kind === "title")) {
+      cues.push({ recipe: click(), at: t, params: { ...base, pan: rng.range(-0.25, 0.25) }, gainDb: 0, reason: m.kind === "flash" ? "flash frame (click)" : "title slam (click)" });
+      continue;
+    }
     if (m.kind === "title") {
       const recipe = (["swish_airy", "ui_tap", "pop"] as const)[titleTurn % 3]!;
       titleTurn += 1;
       cues.push({ recipe, at: t, params: { ...base, pan: rng.range(-0.25, 0.25) }, gainDb: 0, reason: "title entrance" });
+      continue;
+    }
+    if (everyCut && m.kind === "cut" && cutTurn++ % 2 === 0) {
+      // Every other plain cut a light hit, the others a short whoosh: a sound on each without a machine gun.
+      const recipe = vary(["impact_punch", "impact_thud"], recentHits, rng);
+      cues.push({ recipe, at: t, params: { ...base, duration: LIGHT_HIT_SECONDS, pitch: Math.min(pitch, 0.5), pan: (side = -side) * 0.2 }, gainDb: LIGHT_HIT_DB, reason: "cut (light hit)" });
       continue;
     }
     // Cuts and transitions: a whoosh peaking on the moment, as long as the move.
@@ -222,6 +264,18 @@ export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
     const { recipe, duration } = whooshFor(Math.min(move, m.kind === "transition" ? 3 : 1.1), input.intensity, recentWhooshes, rng);
     side = -side;
     cues.push({ recipe, at: t, params: { ...base, duration, pan: side * rng.range(0.45, 0.8) }, gainDb: 0, reason: m.kind === "transition" ? "transition" : "cut" });
+  }
+
+  if (everyCut) {
+    // No recipe twice in a row along the edit (the sub under the climax doubles its impact on purpose).
+    const line = cues.filter((c) => c.recipe !== "sub_drop").sort((a, b) => a.at - b.at);
+    for (let i = 1; i < line.length; i += 1) {
+      const cue = line[i]!;
+      if (cue.recipe !== line[i - 1]!.recipe) continue;
+      const next = line[i + 1]?.recipe;
+      const swap = ALTERNATE[cue.recipe] ?? (CLICKS as readonly string[]).find((c) => c !== cue.recipe && c !== next);
+      if (swap) cue.recipe = swap;
+    }
   }
 
   for (const cue of cues) {
