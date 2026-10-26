@@ -21,7 +21,7 @@ import type { Transaction } from "../../history/document.js";
 import { isAudioOnlyMedia, isSingleImageMedia } from "../../model/media.js";
 import { Interpolation, ScaleMode, type Clip, type Project, type ProjectFile } from "../../model/types.js";
 import { addClip, deleteClips, setClipKeyframes, setClipProperty, setClipSpeed } from "../../ops/clips.js";
-import { addEffect, updateEffectValues } from "../../ops/effects.js";
+import { addEffect, setClipEffects, updateEffectValues } from "../../ops/effects.js";
 import { isOpError } from "../../ops/errors.js";
 import { rateOf } from "../../ops/internal.js";
 import { applyMotionTransition, planMotionTransitionEdit, type MotionTransitionResult, type TransitionSfxCue } from "../../ops/motion-transitions.js";
@@ -33,6 +33,7 @@ import { addTitleClip } from "../../ops/titles.js";
 import { addTrack } from "../../ops/tracks.js";
 import { removeTransition } from "../../ops/transitions.js";
 import { planAccents, type AccentTransition } from "../../reels/accents.js";
+import { DAYLIGHT_LUMA, daylightShare, hasNightWords, lookTarget, orderByFit } from "../../reels/grade.js";
 import { REUSE_GAP_SECONDS, planReel, type MusicBeats, type PlannedShot, type ReelMedia, type ReelPlan } from "../../reels/plan.js";
 import { REEL_STYLE_IDS, REEL_STYLES, type ReelTypography } from "../../reels/styles.js";
 import { bundledFamily } from "../../typography/families.js";
@@ -45,6 +46,9 @@ import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { loadFamilies, missingGlyphWarnings } from "../fonts.js";
 import { applied, failed, refused } from "../receipt.js";
+import { ColorValueError } from "../color-agent.js";
+import { effectFactory, mergedGradeEffects } from "./color-agent.js";
+import { gradeFootage, gradeReport, measureFootage, resolveReelLook, type ReelGrade } from "./reel-grade.js";
 import type { ImportedMedia } from "../types.js";
 
 const TOOL = "build_reel_tool";
@@ -60,6 +64,8 @@ const WINDUP_RAMP = [
   [0.4, 0.5],
   [1, 3],
 ] as const;
+/** The wind-up's own sound under the music: half the style's clip level (-6 dB), pitch-bent by the ramp (no pitch-preserving stretch here). */
+const WINDUP_VOLUME = 0.5;
 /** Tracks the reel uses, bottom to top. */
 const TRACKS = ["music", "video", "flash", "labels", "titles"] as const;
 type TrackRole = (typeof TRACKS)[number];
@@ -100,6 +106,14 @@ const input = z.strictObject({
     .optional()
     .describe("Beat times of the music in seconds (e.g. from detect_beats_tool) instead of analysing it here."),
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (they are removed in the same undo step)."),
+  grade: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "One look over every shot: 'auto' (default for hype and highlight) measures each clip, corrects it toward one target and lays one shared LUT " +
+        "(a cool night look when the titles say night or the footage is dark, else teal and orange); a LUT id from list_looks_tool uses that LUT; 'none' (default for the other styles) skips it. Needs a surface that renders frames.",
+    ),
 });
 
 type Input = z.infer<typeof input>;
@@ -237,14 +251,16 @@ function placeTitle(tx: Transaction, media: ImportedMedia, position: number, dur
  * rush that lands on the cut, keeping its length. Returns the clip id, or
  * null (nothing recorded) when the footage runs out before the shot ends.
  */
-function windUp(tx: Transaction, clipId: string, shot: PlannedShot): string | null {
+function windUp(tx: Transaction, clipId: string, shot: PlannedShot, volume: number): string | null {
   const length = shot.end - shot.start;
   const points = WINDUP_RAMP.map(([at, speed]) => ({ atSeconds: at * length, speed }));
   try {
     const ramp = planSpeedRamp(tx.project, clipId, { preset: "custom", points, ease: "in" });
     const frames = Math.round(length * rateOf(tx.project));
     if (Math.abs(ramp.frames - frames) > 0) return null;
-    applySpeedRamp(tx, clipId, ramp);
+    // The clip keeps its own sound, ducked: the engine's ramp bends the pitch with the speed.
+    applySpeedRamp(tx, clipId, ramp, { muteAudio: false });
+    if (volume > 0) setClipProperty(tx, clipId, "volume", volume * WINDUP_VOLUME);
     return clipId;
   } catch (error) {
     if (isOpError(error)) return null;
@@ -345,12 +361,44 @@ export const reelTools: CatalogTool[] = [
       if (args.words) warnings.push("words are for the motion styles (ui_promo, editorial_motion, product_callout, tutorial); this style does not use them.");
       const style = REEL_STYLES[styleId];
 
+      // One look (reels/grade.ts): every clip measured as the reel shows it, before the edit is recorded.
+      const gradeMode = args.grade?.trim() || (style.oneLook ? "auto" : "none");
+      const texts = [args.hook, args.end_card, args.end_card_subtitle, ...labels.values()];
+      try {
+        if (gradeMode !== "auto" && gradeMode !== "none") await resolveReelLook(call, gradeMode, texts, []);
+      } catch (error) {
+        if (error instanceof ColorValueError) return refused(TOOL, `Error: ${error.message}`);
+        throw error;
+      }
+      const night = hasNightWords(texts);
+      // Measured to grade, and whenever the titles say night: a night label over daylight footage gets a warning.
+      const measured = gradeMode !== "none" || night ? await measureFootage(call, project, media, style) : null;
+      if (gradeMode !== "none" && !measured) warnings.push("This surface cannot render frames: the shots keep their own colour (no one-look grade).");
+      const look = measured && gradeMode !== "none" ? await resolveReelLook(call, gradeMode, texts, [...measured.profiles.values()]) : null;
+      let ordered = media;
+      if (measured && look && !args.file_ids) {
+        // Bin order has no story: the clips that already fit the look open the reel and close it.
+        const order = orderByFit(media.map((m) => m.fileId), measured.profiles, lookTarget(look.choice.look, [...measured.profiles.values()]));
+        ordered = order.map((id) => media.find((m) => m.fileId === id)!);
+      }
+
       let plan: ReelPlan;
       const rate = rateOf(project);
       try {
-        plan = planReel({ style, media, music: beats, seconds: args.duration_seconds, frameRate: Number.isFinite(rate) && rate > 0 ? rate : undefined });
+        plan = planReel({ style, media: ordered, music: beats, seconds: args.duration_seconds, frameRate: Number.isFinite(rate) && rate > 0 ? rate : undefined });
       } catch (error) {
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      const grade: ReelGrade | null = measured && look ? await gradeFootage(call, measured, [...new Set(plan.shots.map((s) => s.fileId))], look) : null;
+      if (night && measured) {
+        const share = daylightShare(plan.shots, measured.profiles);
+        if (share > 0.5) {
+          warnings.push(
+            `The titles set this reel at night, but ${Math.round(share * 100)} % of its screen time is daylight footage (average luma ${DAYLIGHT_LUMA} or brighter)` +
+              `${grade ? "; the night grade darkens and cools it, but it still reads as day" : ""}. Import night footage and rebuild with replace=true, or change the titles.`,
+          );
+        }
       }
 
       const accents = planAccents(style, plan, Number.isFinite(rate) && rate > 0 ? rate : 30);
@@ -430,7 +478,13 @@ export const reelTools: CatalogTool[] = [
           const motion = shot.kind === "image" ? style.motion.image : style.motion.video;
           if (motion && motion !== "animate.none") applyClipPreset(tx, clip.id, motion);
           if (file.has_audio) setClipProperty(tx, clip.id, "volume", style.clipVolume);
-          for (const look of style.looks) applyLookPreset(tx, clip.id, look);
+          for (const preset of style.looks) applyLookPreset(tx, clip.id, preset);
+          if (grade) {
+            // The file's correction toward the look's target, then the shared LUT, on the shot's one ColorGrade.
+            const patch = { ...(grade.files.get(shot.fileId)?.knobs ?? {}), lut: { path: grade.lutPath, strength: grade.intensity } };
+            const own = tx.project.clips.find((c) => c.id === clip.id)!;
+            setClipEffects(tx, clip.id, mergedGradeEffects([...(own.effects ?? [])], patch, effectFactory(tx.project)).effects);
+          }
           const current = tx.project.clips.find((c) => c.id === clip.id)!;
           if (index === 0 && style.fadeIn) fadeAlpha(tx, current, 0, 1, shot.start, shot.start + Math.min(0.6, length / 2));
           if (index === plan.shots.length - 1 && style.fadeOut) fadeAlpha(tx, current, 1, 0, shot.end - Math.min(0.8, length / 2), shot.end);
@@ -446,7 +500,9 @@ export const reelTools: CatalogTool[] = [
           if (label && labelLength > 0 && (labelEnd === shot.end || labelLength >= 0.3)) placeTitle(tx, label, shot.start, labelLength, track.labels, null, rate);
         });
 
-        const ramp = accents.ramp !== null ? windUp(tx, shotClips[accents.ramp]!, plan.shots[accents.ramp]!) : null;
+        const rampShot = accents.ramp !== null ? plan.shots[accents.ramp]! : null;
+        const rampVolume = rampShot && files.get(rampShot.fileId)?.has_audio ? style.clipVolume : 0;
+        const ramp = accents.ramp !== null ? windUp(tx, shotClips[accents.ramp]!, rampShot!, rampVolume) : null;
         const transitions = accents.transitions.flatMap((t) => {
           const done = accentTransition(tx, shotClips[t.shot - 1]!, shotClips[t.shot]!, t);
           return done ? [done] : [];
@@ -473,11 +529,15 @@ export const reelTools: CatalogTool[] = [
         built.ramp ? `a speed ramp into the drop at ${plan.drop!.toFixed(2)}s` : "",
         flashes.size > 0 ? `${flashes.size} white flash(es)` : "",
       ].filter(Boolean);
+      const gradeNote = grade ? ` One look: ${grade.lut} over ${grade.files.size} graded clip(s) (${grade.choice.why}).` : "";
       const accentNote = accentParts.length > 0 ? ` Accents: ${accentParts.join(", ")}.` : "";
       if (accents.ramp !== null && !built.ramp) warnings.push("The wind-up shot before the drop has too little footage for its speed ramp; it plays at normal speed.");
-      return applied(TOOL, `Built a ${style.name.toLowerCase()} reel: ${plan.shots.length} shots cut to ${Math.round(plan.bpm)} BPM, ${brief.format}. Length ${plan.lengthNote}.${accentNote}`, {
+      return applied(TOOL, `Built a ${style.name.toLowerCase()} reel: ${plan.shots.length} shots cut to ${Math.round(plan.bpm)} BPM, ${brief.format}. Length ${plan.lengthNote}.${accentNote}${gradeNote}`, {
         warnings,
-        notes: ["Finish with master_audio_tool (preset social) after the sound is in place: it sets the loudness and balance."],
+        notes: [
+          ...(style.id === "hype" ? ["Sound design: auto_sound_design_tool with the receipt's sound_design args puts a sound on nearly every cut."] : []),
+          "Finish with master_audio_tool (preset social) after the sound is in place: it sets the loudness and balance.",
+        ],
         data: {
           style: style.id,
           duration: plan.duration,
@@ -496,6 +556,12 @@ export const reelTools: CatalogTool[] = [
           transitions: built.transitions.map((r) => ({ id: r.id, preset: r.preset, direction: r.direction, cut: r.cut, frames: r.frames })),
           speed_ramp: built.ramp ? { clip_id: built.ramp, start: plan.shots[accents.ramp!]!.start, end: round(plan.drop!) } : null,
           sfx_cues: built.transitions.flatMap((r): TransitionSfxCue[] => r.sfxCues),
+          grade: grade ? gradeReport(grade, names) : null,
+          // The next call: a hype reel has a sound on nearly every cut (the references: 90-100 %).
+          sound_design:
+            style.id === "hype"
+              ? { tool: "auto_sound_design_tool", args: { intensity: "hype", density: "every_cut", ...(plan.drop !== null ? { climax_seconds: round(plan.drop) } : {}) } }
+              : null,
           brief,
         },
       });

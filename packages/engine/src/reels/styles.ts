@@ -90,6 +90,8 @@ export interface ReelStyle {
   looks: readonly LookPresetId[];
   /** Share of the shots' own sound kept under the music (0 = music only). */
   clipVolume: number;
+  /** Grade every shot into one look by default (reels/grade.ts): build_reel_tool's grade "auto". */
+  oneLook?: boolean;
   accents?: ReelAccentStyle;
   /** Fade the picture in from black and out to black. */
   fadeIn: boolean;
@@ -126,6 +128,7 @@ export const REEL_STYLES: Readonly<Record<ReelStyleId, ReelStyle>> = {
     flash: "sections",
     looks: ["color.boost_color", "film_grain.35mm_fine"],
     clipVolume: 0,
+    oneLook: true,
     accents: { body: "whip", drop: "glitch", climax: ["flash_invert", "glitch"], landing: "zoom_out", windupBeats: 2 },
     fadeIn: false,
     fadeOut: true,
@@ -167,6 +170,7 @@ export const REEL_STYLES: Readonly<Record<ReelStyleId, ReelStyle>> = {
     flash: "sections",
     looks: ["color.boost_color"],
     clipVolume: 0.15,
+    oneLook: true,
     accents: { body: "whip", drop: "glitch", climax: ["zoom_in"], landing: "zoom_out", windupBeats: 2 },
     fadeIn: false,
     fadeOut: true,

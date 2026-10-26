@@ -122,7 +122,7 @@ function subjectsOf(call: ToolCall, args: Input, warnings: string[]): Clip[] {
   return [...clips].sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
 }
 
-interface ClipOutcome {
+export interface ClipOutcome {
   clip: Clip;
   before: Json;
   after: Json;
@@ -144,7 +144,7 @@ function gradeKnobs(grade: Json): Json {
 }
 
 /** The knobs as the clip's first ColorGrade has them (neutral without one). */
-function knobsOf(effects: readonly Effect[]): UnifyKnobs {
+export function knobsOf(effects: readonly Effect[]): UnifyKnobs {
   const grade = (findColorGrade(effects) as Json | null) ?? {};
   return {
     exposure: scalarY(grade, "exposure") ?? 0,
@@ -155,7 +155,7 @@ function knobsOf(effects: readonly Effect[]): UnifyKnobs {
 }
 
 /** Correct one clip toward the target on a working copy of its effects, re-measuring after each pass. */
-async function unifyClip(
+export async function unifyClip(
   call: ToolCall,
   clip: Clip,
   pack: ProfilePack,
