@@ -997,6 +997,43 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
   },
 
+  align_match_cut_tool: {
+    happy: {
+      args: {
+        clips: [
+          { clip_id: IDS.clipA, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.35 } },
+          { clip_id: IDS.clipB, box: { x: 0.55, y: 0.4, w: 0.1, h: 0.18 } },
+        ],
+        zoom_drift: "0.04",
+      },
+      summary: /^Aligned 2 clip\(s\) on a subject at \(0\.5, 0\.475\), 0\.353 of the frame tall; 1 zoomed in to keep the frame covered\.$/,
+    },
+    failure: { args: { clips: [{ clip_id: "NOPE000000", box: { x: 0.4, y: 0.3, w: 0.2, h: 0.2 } }] }, summary: /^Error: No clip with id NOPE000000\.$/ },
+  },
+  detect_subject_tool: {
+    happy: { args: { clip_id: IDS.clipA }, summary: /^(No circle found|Found \d+ circle\(s\)) in /, check: ({ receipt }) => expect(receipt.undoSteps).toBe(0) },
+    failure: { args: { file_id: IDS.music }, status: "refused", summary: /^Error: .* has no picture to look at\.$/ },
+  },
+  match_cut_montage_tool: {
+    happy: {
+      args: {
+        file_ids: [IDS.interview, IDS.broll],
+        subjects: [
+          { file_id: IDS.interview, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.35 } },
+          { file_id: IDS.broll, box: { x: 0.45, y: 0.35, w: 0.1, h: 0.18 } },
+        ],
+        duration_seconds: "4",
+        replace: "true",
+      },
+      summary: /^Cut a match-cut montage: \d+ shots \(\d+ of 3-8 frames\) at \d+ BPM, [\d.]+ s, every subject at \(0\.5, 0\.5\)/,
+      check: ({ receipt, doc }) => {
+        expect(doc.project.clips.some((c) => c.id === IDS.clipA)).toBe(false);
+        expect(receipt.undoSteps).toBe(1);
+      },
+    },
+    failure: { args: { file_ids: [IDS.interview], subjects: [{ file_id: IDS.broll, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.2 } }], replace: "true" }, status: "refused", summary: /^Error: subjects names .*, which is not in file_ids\.$/ },
+  },
+
   add_motion_template_tool: {
     happy: {
       args: { template: "end_card", text: "Northwind", subtitle: "Brews in four minutes", position_seconds: "1", bpm: "120" },

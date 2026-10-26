@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   INVERT_CONTRAST,
   MOTION_TRANSITION_IDS,
-  coverScale,
+  rotationCoverScale,
   defaultFrames,
   easeIn,
   easeOut,
@@ -134,10 +134,10 @@ describe("motion transition presets", () => {
   });
 
   it("covers the canvas while spinning", () => {
-    expect(coverScale(0, ASPECT)).toBe(1);
-    expect(coverScale(90, ASPECT)).toBeCloseTo(ASPECT, 6);
+    expect(rotationCoverScale(0, ASPECT)).toBe(1);
+    expect(rotationCoverScale(90, ASPECT)).toBeCloseTo(ASPECT, 6);
     const spin = planMotionTransition({ preset: "spin", fps: 30, aspect: ASPECT, direction: "ccw" });
-    for (const f of [...spin.out.frames, ...spin.in.frames]) expect(f.scale_x!).toBeGreaterThanOrEqual(coverScale(f.rotation!, ASPECT));
+    for (const f of [...spin.out.frames, ...spin.in.frames]) expect(f.scale_x!).toBeGreaterThanOrEqual(rotationCoverScale(f.rotation!, ASPECT));
     expect(spin.out.frames.at(-1)!.rotation).toBeLessThan(0);
   });
 

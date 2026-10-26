@@ -24,6 +24,7 @@ export * from "./values.js";
 export * from "./keyframes.js";
 export * from "./arrange.js";
 export * from "./look.js";
+export * from "./match-cut.js";
 export * from "./effects.js";
 export * from "./transitions.js";
 export * from "./tracks.js";

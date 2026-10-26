@@ -201,7 +201,7 @@ export const easeIn = (u: number): number => cubicBezier(0.7, 0, 0.84, 0, u);
 export const easeOut = (u: number): number => cubicBezier(0.16, 1, 0.3, 1, u);
 
 /** Smallest scale at which a canvas-sized picture rotated by `degrees` still covers the canvas. */
-export function coverScale(degrees: number, aspect: number): number {
+export function rotationCoverScale(degrees: number, aspect: number): number {
   const t = (Math.abs(degrees) * Math.PI) / 180;
   const k = Math.max(aspect, 1 / aspect);
   return Math.abs(Math.cos(t)) + k * Math.abs(Math.sin(t));
@@ -353,7 +353,7 @@ const PRESETS: readonly PresetDef[] = [
     frame: (ctx) => {
       const sign = ctx.dir === "ccw" ? -1 : 1;
       const degrees = (ctx.side === "out" ? 1 : -1) * sign * Math.min(90, 60 * ctx.intensity) * ctx.a;
-      const scale = coverScale(degrees, ctx.aspect) * (1 + 0.04 * ctx.a) * 1.002;
+      const scale = rotationCoverScale(degrees, ctx.aspect) * (1 + 0.04 * ctx.a) * 1.002;
       const radius = 0.035 * ctx.intensity * ctx.v;
       return { rotation: degrees, scale_x: scale, scale_y: scale, "Blur.horizontal_radius": radius, "Blur.vertical_radius": radius };
     },
@@ -395,7 +395,7 @@ const PRESETS: readonly PresetDef[] = [
       const lx = amp * JITTER_X[j % JITTER_X.length]!;
       const ly = amp * JITTER_Y[j % JITTER_Y.length]!;
       const r = 40 * amp * JITTER_R[j % JITTER_R.length]!;
-      const scale = coverScale(r, ctx.aspect) * (1 + 2 * Math.max(Math.abs(lx), Math.abs(ly))) * 1.002;
+      const scale = rotationCoverScale(r, ctx.aspect) * (1 + 2 * Math.max(Math.abs(lx), Math.abs(ly))) * 1.002;
       const radius = 0.008 * ctx.intensity * ctx.a;
       return { location_x: lx, location_y: ly, rotation: r, scale_x: scale, scale_y: scale, "Blur.horizontal_radius": radius, "Blur.vertical_radius": radius };
     },

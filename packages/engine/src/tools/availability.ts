@@ -200,6 +200,11 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     optional: ["audio.decodePcm"],
     partialNote: "without audio decoding cuts are weighed by `beats` (when given) instead of the music, and the climax comes only from `climax_seconds`",
   },
+  match_cut_montage_tool: {
+    optional: ["audio.decodePcm", "media.writeGenerated", "frames"],
+    partialNote:
+      "without audio decoding the cuts follow 120 BPM, not the music; without generated media there are no flash frames; without frame rendering files need subjects boxes (no circle search)",
+  },
   add_motion_template_tool: {
     methods: ["media.writeGenerated"],
     optional: ["audio.decodePcm"],

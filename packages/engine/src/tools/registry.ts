@@ -28,6 +28,7 @@ import { effectsColorLookTools } from "./catalog/effects-color-looks.js";
 import { exportTools } from "./catalog/export.js";
 import { generationTools } from "./catalog/generation.js";
 import { inspectTools } from "./catalog/inspect.js";
+import { matchCutTools } from "./catalog/match-cut.js";
 import { mediaTools } from "./catalog/media.js";
 import { mediaFilesTools } from "./catalog/media-files.js";
 import { mediaFilesTransitionTools } from "./catalog/media-files-transitions.js";
@@ -108,7 +109,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...reelTools, ...motionTemplateTools, ...kineticCaptionTools, ...soundDesignTools, ...motionTransitionTools, ...stockTools]) {
+  for (const tool of [...implemented, ...directTools, ...reelTools, ...matchCutTools, ...motionTemplateTools, ...kineticCaptionTools, ...soundDesignTools, ...motionTransitionTools, ...stockTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -132,7 +133,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools, ...reelTools, ...motionTemplateTools, ...kineticCaptionTools, ...soundDesignTools, ...motionTransitionTools, ...stockTools];
+  return [...contract, ...directTools, ...reelTools, ...matchCutTools, ...motionTemplateTools, ...kineticCaptionTools, ...soundDesignTools, ...motionTransitionTools, ...stockTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */
