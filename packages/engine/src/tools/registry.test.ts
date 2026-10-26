@@ -32,6 +32,7 @@ const DIRECT_TOOLS = [
   "apply_motion_transition_tool",
   "apply_motion_transitions_tool",
   "remove_motion_transition_tool",
+  "speed_ramp_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
 ];
