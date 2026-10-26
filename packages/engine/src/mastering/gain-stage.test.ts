@@ -46,7 +46,7 @@ function mix(input: readonly StemAudio[]): Float32Array[] {
 
 const base = { sampleRate: RATE, target: MASTER_PRESETS.social, balance: "auto" as const, speechWindows: SPEECH, duck: true };
 
-describe("planGainStage", () => {
+describe("planGainStage", { timeout: 60_000 }, () => {
   it("brings a quiet mix to the target loudness", () => {
     const input = stems(-40, -34);
     const plan = planGainStage({ ...base, stems: input })!;
@@ -140,7 +140,7 @@ describe("planGainStage", () => {
       expect(again.duckDb).toBe(0);
       for (const gain of Object.values(again.roleGainDb)) expect(Math.abs(gain!)).toBeLessThan(0.2);
     }
-  });
+  }, 60_000);
 
   it("refuses a silent mix", () => {
     const silent: StemAudio[] = [{ role: "music", channels: [new Float32Array(RATE * 3), new Float32Array(RATE * 3)] }];

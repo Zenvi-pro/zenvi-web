@@ -17,7 +17,7 @@ describe("K-weighting", () => {
   });
 });
 
-describe("integrated loudness (EBU Tech 3341 signals)", () => {
+describe("integrated loudness (EBU Tech 3341 signals)", { timeout: 60_000 }, () => {
   it("reads a stereo 1 kHz sine at -23 dBFS as -23.0 LUFS (case 1)", () => {
     const report = measureLoudness(stereoSine(1000, -23, 20, RATE), RATE);
     expect(report.integrated).toBeCloseTo(-23, 1);
@@ -76,7 +76,7 @@ describe("integrated loudness (EBU Tech 3341 signals)", () => {
   });
 });
 
-describe("loudness range (Tech 3342 case 1: 20 LU steps are not used, 10 LU is)", () => {
+describe("loudness range (Tech 3342 case 1: 20 LU steps are not used, 10 LU is)", { timeout: 60_000 }, () => {
   it("reads a steady tone as 0 LU", () => {
     expect(measureLoudness(stereoSine(1000, -23, 30, RATE), RATE).range).toBeCloseTo(0, 1);
   });

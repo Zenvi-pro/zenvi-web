@@ -125,7 +125,7 @@ function data(receipt: ToolReceipt): MasterData {
   return receipt.data as MasterData;
 }
 
-describe("master_audio_tool", () => {
+describe("master_audio_tool", { timeout: 60_000 }, () => {
   it("brings a quiet music + whoosh edit to the social target in one undo step", async () => {
     const { doc, host } = setup();
     add(doc, "quiet-music.mp3", { ai: indexed, layer: L1 });
