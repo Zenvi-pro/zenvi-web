@@ -47,6 +47,14 @@ export function build(ctx: BlockContext): void {
     return { row, el, label, sw, fill, knob };
   });
 
+  // The pill keeps the width of its longest text, so the title never reflows as the count changes.
+  const pillW = Math.max(...[`${n} of ${n} on`, String(p.done)].map((text) => {
+    count.textContent = text;
+    return pill.getBoundingClientRect().width;
+  }));
+  pill.style.width = `${Math.ceil(pillW)}px`;
+  pill.style.justifyContent = "center";
+  count.textContent = "";
   const rect = panel.getBoundingClientRect();
   const left = (W - rect.width) / 2;
   const top = safe.top + Math.max(0, (H - safe.top - safe.bottom - rect.height) / 2);

@@ -3,7 +3,7 @@
 .tp-head { display: flex; align-items: center; gap: 22px; padding-bottom: 28px; }
 .tp-tile { position: relative; width: 68px; height: 68px; border-radius: calc(var(--radius) * 0.55); background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); display: grid; place-items: center; flex: none; }
 .tp-tile .icon { position: absolute; width: 36px; height: 36px; display: block; }
-.tp-title { flex: 1; font-size: 40px; font-weight: 650; letter-spacing: -0.02em; }
+.tp-title { flex: 1; min-width: 0; font-size: 40px; font-weight: 650; letter-spacing: -0.02em; }
 .tp-pill { position: relative; height: 54px; padding: 0 24px; border-radius: 27px; display: flex; align-items: center; font-size: 26px; font-weight: 600; color: var(--muted); background: color-mix(in srgb, var(--ink) 8%, transparent); white-space: nowrap; overflow: hidden; }
 .tp-pill-fill { position: absolute; inset: 0; background: var(--accent); border-radius: inherit; }
 .tp-count { position: relative; }
