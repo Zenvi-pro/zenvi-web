@@ -356,6 +356,7 @@ export const reelTools: CatalogTool[] = [
 
       if (isMotionStyleId(styleId)) {
         if (args.labels && args.labels.length > ids.length) warnings.push("More labels than files: the extra labels are not used.");
+        if (args.grade) warnings.push("grade is for the cut styles (hype, highlight, ...); this style keeps the shots' own colour.");
         return buildMotionReel(call, { style: styleId, ids, music: music ?? null, beats, names, warnings, args });
       }
       if (args.words) warnings.push("words are for the motion styles (ui_promo, editorial_motion, product_callout, tutorial); this style does not use them.");
@@ -391,6 +392,8 @@ export const reelTools: CatalogTool[] = [
       }
 
       const grade: ReelGrade | null = measured && look ? await gradeFootage(call, measured, [...new Set(plan.shots.map((s) => s.fileId))], look) : null;
+      // Cancelled while measuring or grading: a half-graded reel is not what was asked for (unify_grade_tool refuses the same way).
+      if (measured && call.signal?.aborted) return refused(TOOL, "Error: cancelled; nothing changed");
       if (night && measured) {
         const share = daylightShare(plan.shots, measured.profiles);
         if (share > 0.5) {

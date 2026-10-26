@@ -332,6 +332,21 @@ describe("build_reel_tool: one look", { timeout: 60_000 }, () => {
     expect(bad.doc.undoLabels).toEqual([]);
   });
 
+  it("records nothing when cancelled while it measures the footage", async () => {
+    const { doc, host } = gradeProject(["day", "night", "night"]);
+    const abort = new AbortController();
+    let renders = 0;
+    host.frames = pixelFrameHost((path, w, h) => {
+      if (++renders === 2) abort.abort();
+      return ramp(w, h, path.includes("day") ? 190 : 60);
+    });
+    const result = await runTool({ doc, host, signal: abort.signal }, "build_reel_tool", { style: "hype", beats: BEATS, duration_seconds: 8 });
+    expect(result.ok).toBe(false);
+    expect(result.text).toMatch(/"summary":"Error: cancelled; nothing changed"/);
+    expect(doc.undoLabels).toEqual([]);
+    expect(doc.project.clips).toHaveLength(0);
+  });
+
   it("keeps a highlight wind-up's own sound, ducked under the music, instead of muting it", async () => {
     const { doc, host } = gradeProject(["night", "night", "night", "night", "night", "night"]);
     const result = await runTool({ doc, host }, "build_reel_tool", { style: "highlight", beats: BEATS, duration_seconds: 20, grade: "none" });
