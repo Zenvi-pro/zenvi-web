@@ -1,7 +1,8 @@
 /**
  * `createNodeHost`: the ToolHost the CLI, the local MCP server and the cloud
  * render worker give the engine's tools: local media, rendering, frame
- * previews, audio analysis, project storage and the Zenvi backend.
+ * previews, audio analysis, subject mattes, project storage and the Zenvi
+ * backend.
  */
 
 import { mkdir, readFile, stat } from "node:fs/promises";
@@ -17,6 +18,8 @@ import type { RenderEngine } from "../render/engine.js";
 import { renderFrame } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
 import { installedFontFamilies } from "../svg/fonts.js";
+import { createNodeMatteHost } from "../matte/host.js";
+import { onnxRuntimeAvailable, rvmModel, type MatteModel } from "../matte/rvm.js";
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createMediaResolver } from "./paths.js";
@@ -44,6 +47,11 @@ export interface NodeHostOptions {
    * where the desktop finds them.
    */
   desktopDir?: string;
+  /**
+   * Subject matting: a model (tests), or false for none. Default Robust
+   * Video Matting when onnxruntime-node is installed.
+   */
+  mattes?: MatteModel | false;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
@@ -204,6 +212,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     log: options.log,
   };
   if (assets) host.assets = createAssetHost(assets);
+  const matteModel = options.mattes ?? (onnxRuntimeAvailable() ? rvmModel({ env: options.env, signal: options.signal, log: options.log }) : false);
+  if (matteModel) host.mattes = createNodeMatteHost({ projectFile: current, resolveMedia, model: matteModel, signal: options.signal, log: options.log });
   const desktopDir = options.desktopDir;
   if (desktopDir) {
     Object.assign(host.storage!, {

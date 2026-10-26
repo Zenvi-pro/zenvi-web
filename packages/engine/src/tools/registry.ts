@@ -130,7 +130,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools];
+  return [...contract, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools, ...matteTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */
