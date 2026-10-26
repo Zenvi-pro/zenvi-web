@@ -7,10 +7,11 @@
  * rest of the success rate.
  */
 
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { checkMedia, hostHas, imageLuma, makeFixture, type CheckOutcome } from "./media.js";
 import { getPath, MissingReference, referencedRoots, resolveRefs, unmet, type Check, type Scenario, type Step, type StepExpect } from "./scenario.js";
-import type { CallOutcome, McpTarget } from "./targets.js";
+import type { CallOutcome, McpImage, McpTarget } from "./targets.js";
 
 export type Outcome = "pass" | "fail" | "skip";
 
@@ -34,6 +35,10 @@ export interface StepResult {
   ms: number;
   status?: string;
   summary?: string;
+  /** The receipt's warnings (a passing step may still have some worth reading). */
+  warnings?: string[];
+  /** The receipt's `data` keys, to write checks against. */
+  dataKeys?: string[];
   checks: CheckOutcome[];
   calls: ToolCallRecord[];
 }
@@ -87,6 +92,8 @@ export interface RunOptions {
   /** Where fixtures go (default `<target.work>/fixtures`). */
   fixtureDir?: string;
   onStep?: (result: StepResult) => void;
+  /** Save each step's first returned image here as `<scenario>-<runner>-<step>.<ext>` (contact sheets, previews). */
+  imageDir?: string;
 }
 
 /** Run `scenario` on `target`. Never throws for tool failures; they are results. */
@@ -112,7 +119,9 @@ export async function runScenario(target: McpTarget, scenario: Scenario, options
   const steps: StepResult[] = [];
 
   for (const step of scenario.steps) {
-    const result = await runStep(target, step, scope, listed, notDone, path.join(fixtureDir, "images"));
+    const result = await runStep(target, step, scope, listed, notDone, path.join(fixtureDir, "images"), (image) =>
+      options.imageDir ? saveImage(options.imageDir, `${scenario.id}-${target.kind}-${step.id}`, image) : Promise.resolve(),
+    );
     // A failed check leaves the step's receipt usable; only a call that did not succeed blocks its dependents.
     if (!(step.id in scope)) notDone.set(step.id, `${step.id} ${result.outcome === "skip" ? "was skipped" : "failed"}`);
     steps.push(result);
@@ -138,6 +147,7 @@ async function runStep(
   listed: Set<string>,
   notDone: Map<string, string>,
   imageDir: string,
+  keepImage: (image: McpImage) => Promise<void>,
 ): Promise<StepResult> {
   const override = step.on?.[target.kind];
   const tool = override?.tool ?? step.tool;
@@ -158,7 +168,21 @@ async function runStep(
 
   const call = await target.call(tool, args, step.timeoutSeconds * 1000);
   const record: ToolCallRecord = { tool, role: "step", outcome: "pass", ms: call.ms, status: statusOf(call), summary: summaryOf(call) };
-  const result: StepResult = { id: step.id, tool, outcome: "pass", ms: call.ms, status: record.status, summary: record.summary, checks: [], calls: [record] };
+  const warnings = Array.isArray(call.receipt?.warnings) ? (call.receipt.warnings as unknown[]).map(String) : [];
+  const data = call.receipt?.data;
+  const dataKeys = data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data) : [];
+  const result: StepResult = {
+    id: step.id,
+    tool,
+    outcome: "pass",
+    ms: call.ms,
+    status: record.status,
+    summary: record.summary,
+    ...(warnings.length ? { warnings } : {}),
+    ...(dataKeys.length ? { dataKeys } : {}),
+    checks: [],
+    calls: [record],
+  };
 
   const lacking = skipReason(step, call);
   if (lacking) {
@@ -172,6 +196,7 @@ async function runStep(
     return { ...result, outcome: "fail", reason: problems.join("; ") + (tail ? `\n${tail}` : "") };
   }
   scope[step.id] = { ...call.receipt, images: call.images.length };
+  if (call.images[0]) await keepImage(call.images[0]);
 
   for (const check of step.checks) {
     try {
@@ -183,6 +208,11 @@ async function runStep(
   const bad = result.checks.filter((c) => !c.ok);
   if (bad.length > 0) return { ...result, outcome: "fail", reason: bad.map((c) => `${c.name}: ${c.detail}`).join("; ") };
   return result;
+}
+
+async function saveImage(dir: string, stem: string, image: McpImage): Promise<void> {
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, `${stem}.${image.mimeType.includes("png") ? "png" : "jpg"}`), Buffer.from(image.data, "base64"));
 }
 
 /** One check of a step that succeeded; appends its outcomes (and a check's own tool call) to `result`. */

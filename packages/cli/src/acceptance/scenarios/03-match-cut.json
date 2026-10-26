@@ -1,0 +1,59 @@
+{
+  "id": "match-cut",
+  "title": "Match-cut montage on generated circle clips",
+  "description": "Four clips with a disc at a different place and size in each: detect_subject_tool finds it, match_cut_montage_tool cuts them on the beat with every disc landing in the same spot.",
+  "budgetSeconds": 120,
+  "fixtures": [
+    { "id": "c1", "file": "c1.mp4", "lavfi": ["color=c=0x203040:s=360x640:r=30:d=3,format=yuv420p,geq=lum='if(lt(hypot(X-120,Y-300),60),230,80)':cb=128:cr=128"], "output": ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"] },
+    { "id": "c2", "file": "c2.mp4", "lavfi": ["color=c=0x203040:s=360x640:r=30:d=3,format=yuv420p,geq=lum='if(lt(hypot(X-240,Y-420),90),230,80)':cb=110:cr=150"], "output": ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"] },
+    { "id": "c3", "file": "c3.mp4", "lavfi": ["color=c=0x203040:s=360x640:r=30:d=3,format=yuv420p,geq=lum='if(lt(hypot(X-180,Y-200),45),230,80)':cb=150:cr=110"], "output": ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"] },
+    { "id": "c4", "file": "c4.mp4", "lavfi": ["color=c=0x203040:s=360x640:r=30:d=3,format=yuv420p,geq=lum='if(lt(hypot(X-200,Y-330),70),230,80)':cb=140:cr=140"], "output": ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"] },
+    {
+      "id": "music",
+      "file": "music.wav",
+      "lavfi": ["aevalsrc='0.9*sin(2*PI*55*t)*exp(-25*mod(t,0.5))+0.15*sin(2*PI*220*t)':s=48000:d=12"],
+      "output": ["-c:a", "pcm_s16le"]
+    }
+  ],
+  "steps": [
+    { "id": "project", "tool": "open_project_file", "args": { "path": "matchcut.zvn" } },
+    { "id": "format", "tool": "set_project_setting_tool", "args": { "width": 360, "height": 640, "fps": 30 } },
+    {
+      "id": "import",
+      "tool": "import_files_tool",
+      "args": { "paths": "[\"${fixtures.c1}\", \"${fixtures.c2}\", \"${fixtures.c3}\", \"${fixtures.c4}\", \"${fixtures.music}\"]", "skip_indexing": "true" },
+      "expect": { "receipt": { "data.fileIds": { "length": { "min": 5, "max": 5 } } } }
+    },
+    {
+      "id": "detect",
+      "tool": "detect_subject_tool",
+      "args": { "file_id": "${import.data.fileIds[1]}" },
+      "expect": { "status": ["applied", "unchanged", "ok"] }
+    },
+    {
+      "id": "montage",
+      "tool": "match_cut_montage_tool",
+      "args": { "file_ids": ["${import.data.fileIds[0]}", "${import.data.fileIds[1]}", "${import.data.fileIds[2]}", "${import.data.fileIds[3]}"], "duration_seconds": 6 },
+      "expect": { "receipt": { "clips": { "length": { "min": 6 } } } }
+    },
+    {
+      "id": "frame",
+      "tool": "preview_frame",
+      "args": { "seconds": 3, "width": 180 },
+      "expect": { "image": true },
+      "checks": [{ "kind": "image", "minLuma": 30 }]
+    },
+    {
+      "id": "review",
+      "tool": "review_edit_tool",
+      "args": { "pace": "fast", "audio": false },
+      "expect": { "status": ["applied", "unchanged", "ok"], "image": true }
+    },
+    {
+      "id": "export",
+      "tool": "render_video",
+      "args": { "output": "matchcut.mp4", "quality": "low" },
+      "checks": [{ "kind": "media", "file": "${work}/matchcut.mp4", "durationSeconds": { "min": 5, "max": 9 }, "streams": ["video"], "frame": { "at": 1.5, "minLuma": 30 } }]
+    }
+  ]
+}

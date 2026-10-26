@@ -6,11 +6,12 @@
  *   npx tsx packages/cli/src/acceptance/main.ts replay [--runs <bench runs dir>]
  *     [--out <dir>] [--only <run name substring>] [--jobs 3]
  *
- * Writes report.json and report.md to --out (default a new temp folder) and
+ * Writes report.json, report.md and media/ (each scenario's exports and the
+ * images its steps returned) to --out (default a new temp folder) and
  * exits 1 when a step (or a replayed call that succeeded originally) fails.
  */
 
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -38,7 +39,7 @@ function log(line: string): void {
   process.stderr.write(`${line}\n`);
 }
 
-async function runOn(kind: RunnerKind, scenario: Scenario, scratch: string): Promise<ScenarioResult> {
+async function runOn(kind: RunnerKind, scenario: Scenario, scratch: string, media: string): Promise<ScenarioResult> {
   const work = await mkdtemp(path.join(scratch, `${scenario.id}-${kind}-`));
   const skipped = (reason: string): ScenarioResult => ({ id: scenario.id, title: scenario.title, runner: kind, target: kind, outcome: "skip", reason, ms: 0, steps: [] });
   let target;
@@ -50,9 +51,16 @@ async function runOn(kind: RunnerKind, scenario: Scenario, scratch: string): Pro
     target = await startPortable({ work, home: path.join(work, "home"), bundle: values.bundle });
   }
   try {
-    return await runScenario(target, scenario, {
+    const result = await runScenario(target, scenario, {
+      imageDir: media,
       onStep: (s) => log(`  ${s.outcome.padEnd(4)} ${s.id} (${s.tool}, ${(s.ms / 1000).toFixed(1)} s)${s.reason ? `: ${s.reason.split("\n")[0]!.slice(0, 200)}` : ""}`),
     });
+    // The exports next to the report, for a person to watch.
+    await mkdir(media, { recursive: true });
+    for (const name of (await readdir(work)).filter((n) => /\.(mp4|mov|webm|wav|mp3)$/.test(n))) {
+      await copyFile(path.join(work, name), path.join(media, `${scenario.id}-${kind}-${name}`));
+    }
+    return result;
   } finally {
     await target.close();
   }
@@ -69,7 +77,7 @@ async function scenarios(): Promise<number> {
   for (const kind of runners) {
     for (const s of all) {
       log(`${s.id} on ${kind}`);
-      const r = await runOn(kind, s, scratch);
+      const r = await runOn(kind, s, scratch, path.join(out, "media"));
       log(`=> ${r.outcome} in ${(r.ms / 1000).toFixed(1)} s${r.reason && r.steps.length === 0 ? `: ${r.reason}` : ""}`);
       results.push(r);
     }
