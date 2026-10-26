@@ -90,6 +90,23 @@ describe("runBridgeCall", () => {
     expect(broken.text).toMatch(/could not be read/);
   });
 
+  it("answers an untracked change as update_untracked, and refuses one the desktop cannot apply untracked", async () => {
+    const run = (tool: string, args: Record<string, unknown>, project = snapshot()) => runBridgeCall({ tool, args, project, project_file: projectFile }, { registry });
+    const seek = await run("seek_playhead_tool", { seconds: 2 });
+    expect(seek.ok, seek.text).toBe(true);
+    expect(seek.actions).toEqual([{ type: "update_untracked", key: ["playhead_position"], value: 2 }]);
+    expect(seek.label).toBeUndefined();
+
+    const stored = await run("set_export_setting_tool", { key: "quality", value: "high" });
+    expect(stored.ok, stored.text).toBe(true);
+    expect(stored.actions).toEqual([{ type: "update_untracked", key: ["export_overrides"], value: { quality: "high" } }]);
+
+    // Clearing removes a key, which an untracked merge cannot do: refused, not reported as done.
+    const cleared = await run("set_export_setting_tool", { key: "quality", clear: true }, { ...snapshot(), export_overrides: { quality: "high", preset: "GIF" } });
+    expect(cleared).toMatchObject({ ok: false, actions: [] });
+    expect(cleared.text).toMatch(/cannot apply/);
+  });
+
   it("lists tools with what the bridge host lacks", () => {
     const tools = bridgeTools(registry);
     expect(tools.find((t) => t.name === "add_motion_template_tool")).toMatchObject({ available: true });

@@ -8,6 +8,8 @@
  * (tools that need them answer that they are unavailable). Files a tool
  * writes go to the project's `<name>_assets` folder and are listed in the
  * answer; when the call fails or changes nothing they are removed again.
+ * Untracked changes (cached transcripts, the saved playhead, export
+ * overrides) are answered as `update_untracked` calls, outside the undo step.
  */
 
 import { rm } from "node:fs/promises";
@@ -20,6 +22,7 @@ import {
   projectAssetsDir,
   replaceNonFiniteTokens,
   toDesktopActions,
+  toDesktopUntracked,
   type ChangeEvent,
   type DesktopAction,
   type ImportedMedia,
@@ -34,8 +37,11 @@ import { createNodeHost, isInside, loadRoots, localPath, type NodeHostOptions } 
 import type { Registry } from "../engine/registry.js";
 import { VERSION } from "../version.js";
 
-/** Bumped when a request or answer field changes meaning; the desktop refuses a CLI it does not speak. */
-export const BRIDGE_PROTOCOL = 1;
+/**
+ * Bumped when a request or answer field changes meaning; the desktop refuses a CLI it does not speak.
+ * 2: `update_untracked` actions.
+ */
+export const BRIDGE_PROTOCOL = 2;
 
 export interface BridgeRequest {
   tool: string;
@@ -57,7 +63,7 @@ export interface BridgeAnswer {
   receipt?: ToolReceipt;
   /** Undo label for the transaction. */
   label?: string;
-  /** Desktop UpdateManager calls, in order; empty when nothing changed. */
+  /** Desktop UpdateManager calls, in order (`update_untracked` outside the undo step); empty when nothing changed. */
   actions: DesktopAction[];
   /** Files the call wrote, absolute. */
   files: string[];
@@ -165,7 +171,12 @@ export async function runBridgeCall(request: BridgeRequest, options: RunBridgeOp
   start = performance.now();
   let actions: DesktopAction[] = [];
   try {
-    for (const event of events) if (event.source === "apply") actions.push(...toDesktopActions(event.previous, event.actions, event.replaced));
+    for (const event of events) {
+      if (event.source === "apply") actions.push(...toDesktopActions(event.previous, event.actions, event.replaced));
+      else if (event.untracked) actions.push(...toDesktopUntracked(event.previous, event.project, event.untracked));
+      // The only untracked change without a key: ProjectDocument.clearHistory.
+      else throw new DesktopActionError("the desktop keeps its own undo history", ["history"]);
+    }
   } catch (error) {
     await discard();
     if (!(error instanceof DesktopActionError)) throw error;

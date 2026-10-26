@@ -63,6 +63,8 @@ export interface ChangeEvent {
    * part of the desktop action format; set on "apply" and "redo".
    */
   replaced?: boolean[];
+  /** For "untracked" from `setUntracked`: the key written (its value is in `project`). */
+  untracked?: KeyPath;
   label?: string;
 }
 
@@ -240,7 +242,7 @@ export class ProjectDocument {
       (container as Record<string | number, unknown>)[slot] = clone(value);
     }) as Project;
     this.revision += 1;
-    this.emit({ project: this.current, previous: before, source: "untracked", actions: [] });
+    this.emit({ project: this.current, previous: before, source: "untracked", actions: [], untracked: key });
   }
 
   /** Replace the whole project (open/new). Clears history unless `keepHistory`. */
