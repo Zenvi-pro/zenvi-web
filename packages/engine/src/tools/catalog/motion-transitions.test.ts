@@ -107,6 +107,14 @@ describe("motion transition tools", () => {
     expect(doc.undoLabels).toHaveLength(3);
   });
 
+  it("says which track has the cuts when the named one has none", async () => {
+    // Agents pass track 1 after build_reel_tool, which puts the music there and the shots on track 2.
+    const doc = editDoc();
+    const result = await call(doc, "apply_motion_transitions_tool", { track: "2", style: "hype" });
+    expect(summaryOf(result)).toMatch(/^No cuts on .*: no clips play back to back there\. Cuts are on track 1 \(3 cuts\): pass track="1"\.$/);
+    expect(doc.undoLabels).toHaveLength(0);
+  });
+
   it("removes one transition by id and refuses unknown ids", async () => {
     const doc = editDoc();
     const before = JSON.stringify(doc.project.clips);
