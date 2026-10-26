@@ -21,6 +21,7 @@ import {
   addMatteFile,
   buildStack,
   cutoutMask,
+  fileLabel,
   findMatte,
   generatedLut,
   generatedSvg,
@@ -78,7 +79,7 @@ async function subjectOf(call: ToolCall, tool: string, id: string, which: MatteS
     toolError(
       unavailableMessage(
         tool,
-        `${file.name ?? file.path} has no ${kind} matte yet and this host cannot make one (subject matting runs in the zenvi CLI with onnxruntime-node: zenvi call generate_subject_matte_tool)`,
+        `${fileLabel(file)} has no ${kind} matte yet and this host cannot make one (subject matting runs in the zenvi CLI with onnxruntime-node: zenvi call generate_subject_matte_tool)`,
       ),
     );
   }
@@ -87,7 +88,7 @@ async function subjectOf(call: ToolCall, tool: string, id: string, which: MatteS
   try {
     matte = await host.generate(file.path, { subject: kind, scale, signal: call.signal });
   } catch (error) {
-    return toolError(`matting ${file.name ?? file.path} failed: ${error instanceof Error ? error.message : String(error)}`);
+    return toolError(`matting ${fileLabel(file)} failed: ${error instanceof Error ? error.message : String(error)}`);
   }
   return { source, file, subject: kind, matte, scale, warnings };
 }
@@ -208,19 +209,19 @@ export const matteTools: CatalogTool[] = [
           };
         };
         if (existing && !input.regenerate) {
-          return unchanged(tool, `${file.name ?? file.path} already has a ${kind} matte (${existing.id}).`, { data: describe(existing) });
+          return unchanged(tool, `${fileLabel(file)} already has a ${kind} matte (${existing.id}).`, { data: describe(existing) });
         }
-        if (file.media_type !== "video" || file.has_video === false || file.has_single_image) toolError(`${file.name ?? file.path} is not video`);
+        if (file.media_type !== "video" || file.has_video === false || file.has_single_image) toolError(`${fileLabel(file)} is not video`);
         if (matteRecord(file)) toolError(`${file.id} is itself a matte`);
         const scale = input.size === "full" ? 1 : input.size === "half" ? 0.5 : autoScale(file);
         let matte: GeneratedMatte;
         try {
           matte = await call.host.mattes!.generate(file.path, { subject: kind, scale, signal: call.signal });
         } catch (error) {
-          return toolError(`matting ${file.name ?? file.path} failed: ${error instanceof Error ? error.message : String(error)}`);
+          return toolError(`matting ${fileLabel(file)} failed: ${error instanceof Error ? error.message : String(error)}`);
         }
         const added = call.commit((tx) => addMatteFile(tx, file, matte, kind, scale));
-        return applied(tool, `Made a ${kind} matte of ${file.name ?? file.path}: ${matte.frames} frames at ${matte.fps.toFixed(1)} fps (${added.id}).`, {
+        return applied(tool, `Made a ${kind} matte of ${fileLabel(file)}: ${matte.frames} frames at ${matte.fps.toFixed(1)} fps (${added.id}).`, {
           data: describe(added, matte.fps),
         });
       }),
@@ -297,7 +298,7 @@ export const matteTools: CatalogTool[] = [
           const file = project.files.find((f) => f.id === input.file_id);
           if (!input.file_id) toolError("background=file needs file_id");
           if (!file) toolError(`no project file with id='${input.file_id}'`);
-          if (file.media_type === "audio") toolError(`${file.name ?? file.path} is audio; pick a photo or video`);
+          if (file.media_type === "audio") toolError(`${fileLabel(file)} is audio; pick a photo or video`);
         } else if (input.file_id) toolError("file_id is only for background=file");
         const top = hexOf(input.color, input.background === "gradient" ? "#1b1464" : "#f4c20d", "color");
         const bottom = hexOf(input.color2, "#e8326d", "color2");

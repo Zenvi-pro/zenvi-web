@@ -380,7 +380,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
     conditional: {
       backend: "signed in with zenvi login",
       "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
-      mattes: "onnxruntime-node is installed (the matting model downloads on first use)",
+      mattes: "onnxruntime-node is installed; the matting model downloads on first use",
     },
   },
   cloud: {

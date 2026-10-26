@@ -2,8 +2,8 @@
  * Frame-size SVG layers for the matte composites: flat and gradient
  * backgrounds, letterbox bars and a line of big text. Each is one image clip
  * the size of the project, so it needs no transform. Gradients are drawn as
- * bands of flat rectangles: every SVG renderer Zenvi uses (resvg here, Qt
- * SVG on the desktop) draws those the same.
+ * overlapping bands of flat rectangles: every SVG renderer Zenvi uses
+ * (resvg here, Qt SVG on the desktop) draws those the same.
  */
 
 import { escapeXml, num, SANS } from "../motion/svg.js";
@@ -33,10 +33,10 @@ export function gradientSvg(width: number, height: number, top: string, bottom: 
   const parts: string[] = [];
   for (let i = 0; i < rows; i += 1) {
     const t = i / (rows - 1);
-    const y = (i * height) / rows;
-    // Each band overlaps the next by a pixel so no seam shows between them.
-    const h = height / rows + (i < rows - 1 ? 1 : 0);
-    parts.push(`<rect x="0" y="${num(y)}" width="${num(width)}" height="${num(h)}" fill="${hex([0, 1, 2].map((c) => a[c]! + (b[c]! - a[c]!) * t))}"/>`);
+    // Each band runs to the bottom and the next is drawn over it: band edges that meet
+    // inside a pixel (any scaled raster) would otherwise let the layer below show through.
+    const y = Math.round((i * height) / rows);
+    parts.push(`<rect x="0" y="${y}" width="${num(width)}" height="${num(height - y)}" fill="${hex([0, 1, 2].map((c) => a[c]! + (b[c]! - a[c]!) * t))}"/>`);
   }
   return doc(width, height, parts.join(""));
 }
@@ -67,15 +67,23 @@ export interface BigTextOptions {
   size?: number;
   /** Vertical centre of the text block, 0 (top) to 1 (bottom). */
   y: number;
-  /** At most this many lines (words are balanced across them). */
+  /** At most this many lines (default 2, 3 on vertical frames); words are balanced across them. */
   maxLines?: number;
 }
 
 /** Text as large as the frame allows, centred, the way "words behind the head" edits set it. */
 export function bigTextSvg(width: number, height: number, o: BigTextOptions): string {
   const words = o.text.trim().replace(/\s+/g, " ");
-  const lines = balanceLines(words, Math.max(1, o.maxLines ?? (width < height ? 3 : 2)));
-  const fitted = fitSize(lines, { font: "sans", bold: true }, width * 0.92, height * 0.45);
+  const style = { font: "sans", bold: true } as const;
+  // As few lines as keep the type big (a fifth of the frame height), balanced, and the block within 80 % of the height.
+  const most = Math.max(1, o.maxLines ?? (width < height ? 3 : 2));
+  let lines: string[] = [words];
+  let fitted = 0;
+  for (let n = 1; n <= most; n += 1) {
+    lines = balanceLines(words, n);
+    fitted = fitSize(lines, style, width * 0.92, Math.min(height * 0.45, (height * 0.8) / (lines.length * 0.92)));
+    if (fitted >= height * 0.2) break;
+  }
   const size = o.size !== undefined ? o.size * height : fitted;
   const lineHeight = size * 0.92;
   const top = o.y * height - (lineHeight * (lines.length - 1)) / 2;

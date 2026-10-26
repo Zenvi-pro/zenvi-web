@@ -62,6 +62,11 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/** A bin file as people name it: its display name, else its file name. */
+export function fileLabel(file: ProjectFile): string {
+  return String(file.name || file.path.split(/[\\/]/).pop() || file.id);
+}
+
 export function matteRecord(file: ProjectFile): MatteRecord | undefined {
   const m = (file as Record<string, unknown>)[MATTE_KEY];
   return isRecord(m) && typeof m.source_file_id === "string" ? (m as unknown as MatteRecord) : undefined;
@@ -103,7 +108,7 @@ export function matteableClipProblem(project: Project, clip: Clip): string | nul
   if (compositeTag(clip)) return `clip ${clip.id} is part of a ${compositeTag(clip)!.tool} stack; pick the footage clip it was built on (${compositeTag(clip)!.source_clip_id})`;
   const duration = Number(file.duration) || 0;
   if (duration > MAX_MATTE_SECONDS) {
-    return `${file.name ?? file.path} is ${duration.toFixed(0)} s long; mattes cover the whole file, at most ${MAX_MATTE_SECONDS} s (export the part you need and import it)`;
+    return `${fileLabel(file)} is ${duration.toFixed(0)} s long; mattes cover the whole file, at most ${MAX_MATTE_SECONDS} s (export the part you need and import it)`;
   }
   return null;
 }
@@ -237,6 +242,12 @@ const SCALE_CROP = 0;
 export function buildStack(tx: Transaction, tool: CompositeTool, source: Clip, specs: readonly PieceSpec[]): StackResult {
   const old = compositePieces(tx.project, tool, source.id);
   const oldIds = new Map(old.map((c) => [compositeTag(c)!.role, c.id]));
+  const oldEffectIds = new Map(old.map((c) => [c.id, (c.effects ?? []).map((e) => e.id)]));
+  // A rebuilt piece keeps its effects' ids, in order, so a re-run that changes nothing is a no-op.
+  const keepIds = (clipId: string, effects: Effect[]): Effect[] => {
+    const ids = oldEffectIds.get(clipId) ?? [];
+    return effects.map((e, i) => (i < ids.length ? { ...e, id: ids[i]! } : e));
+  };
   const oldFiles = new Set(old.map((c) => c.file_id).filter((id): id is string => typeof id === "string"));
   if (old.length > 0) deleteClips(tx, old.map((c) => c.id));
 
@@ -273,7 +284,7 @@ export function buildStack(tx: Transaction, tool: CompositeTool, source: Clip, s
       const copy = structuredClone(source) as Record<string, unknown>;
       const own = spec.sourceEffects ? structuredClone(source.effects ?? []) : [];
       assignNewEffectIds(own, nextId);
-      const effects = [...own, ...spec.effects(nextId)];
+      const effects = keepIds(id, [...own, ...spec.effects(nextId)]);
       Object.assign(copy, { id, layer, title: spec.title, effects, has_audio: constantKeyframe(0), [COMPOSITE_KEY]: tag(spec.role) });
       tx.insert(["clips"], copy);
       clip = copy as unknown as Clip;
@@ -289,7 +300,7 @@ export function buildStack(tx: Transaction, tool: CompositeTool, source: Clip, s
       } else {
         fileId = spec.fileId;
         props = { scale: SCALE_CROP };
-        effects = spec.effects ? spec.effects(nextId) : [];
+        effects = keepIds(id, spec.effects ? spec.effects(nextId) : []);
       }
       const file = tx.project.files.find((f) => f.id === fileId)!;
       const still = file.media_type === "image";

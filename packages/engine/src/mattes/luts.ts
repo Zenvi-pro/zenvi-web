@@ -13,15 +13,15 @@ export interface GradientStop {
   color: string;
 }
 
-/** Iron-bow thermal camera ramp: cold black-blue through magenta and orange to white hot. */
+/** Iron-bow thermal camera ramp: cold black-blue through magenta and orange to white hot (skin, mid-gray, reads orange). */
 export const THERMAL_RAMP: readonly GradientStop[] = [
   { at: 0, color: "#05003a" },
-  { at: 0.2, color: "#3a0a8c" },
-  { at: 0.4, color: "#b0127a" },
-  { at: 0.58, color: "#f0402a" },
-  { at: 0.75, color: "#ff9a1a" },
-  { at: 0.9, color: "#ffe14d" },
-  { at: 1, color: "#ffffff" },
+  { at: 0.12, color: "#3a0a8c" },
+  { at: 0.25, color: "#b0127a" },
+  { at: 0.38, color: "#f0402a" },
+  { at: 0.52, color: "#ff9a1a" },
+  { at: 0.7, color: "#ffe14d" },
+  { at: 0.9, color: "#ffffff" },
 ];
 
 /** The cold end of the thermal palette, for the scene behind a hot subject. */
