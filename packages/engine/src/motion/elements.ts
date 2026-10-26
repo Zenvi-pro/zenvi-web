@@ -76,7 +76,7 @@ export function glide(el: Element, at: number, frames: number, dy: number, ease:
   return { ...el, keys: moved.sort((a, b) => a.frame - b.frame) };
 }
 
-function samePose(a: Pose, b: Pose): boolean {
+export function samePose(a: Pose, b: Pose): boolean {
   const near = (x: number, y: number) => Math.abs(x - y) < 1e-6;
   return near(a.x, b.x) && near(a.y, b.y) && near(a.s, b.s) && near(a.alpha, b.alpha) && near(a.rotation, b.rotation) && near(a.sx ?? 1, b.sx ?? 1);
 }
@@ -149,7 +149,7 @@ export function mediaWindow(media: MotionMedia, seconds: number): { start: numbe
 /**
  * A media card: the picture (or its crop window) `width` px wide, rounded by
  * `radius`. `start` pins the source in-point (a crop lifted out of a shot
- * shows the shot's moment).
+ * shows the shot's moment), played at `speed` (default 1).
  */
 export function mediaCard(
   name: string,
@@ -158,10 +158,10 @@ export function mediaCard(
   to: number,
   media: MotionMedia,
   fps: number,
-  o: { width: number; radius: number; crop?: MediaSource["crop"]; start?: number },
+  o: { width: number; radius: number; crop?: MediaSource["crop"]; start?: number; speed?: number },
   keys: Key[],
 ): Element {
-  const win = o.start !== undefined && media.kind === "video" ? pinnedWindow(media, o.start, (to - from) / fps) : mediaWindow(media, (to - from) / fps);
+  const win = o.start !== undefined && media.kind === "video" ? pinnedWindow(media, o.start, (to - from) / fps, o.speed ?? 1) : mediaWindow(media, (to - from) / fps);
   const end = Math.min(to, from + Math.max(1, Math.floor(win.seconds * fps + 1e-6)));
   return {
     name,
@@ -173,10 +173,10 @@ export function mediaCard(
   };
 }
 
-/** A window from a fixed in-point: as much of `seconds` as the file has left. */
-function pinnedWindow(media: MotionMedia, start: number, seconds: number): { start: number; speed: number; seconds: number } {
+/** A window from a fixed in-point at `speed`: as much of `seconds` as the file has left. */
+function pinnedWindow(media: MotionMedia, start: number, seconds: number, speed: number): { start: number; speed: number; seconds: number } {
   const from = Math.max(0, Math.min(start, media.duration));
-  return { start: from, speed: 1, seconds: Math.min(seconds, Math.max(0, media.duration - from)) };
+  return { start: from, speed, seconds: Math.min(seconds, Math.max(0, media.duration - from) / speed) };
 }
 
 /** A media element covering the whole frame (scale mode Crop): it may only scale and fade. */
