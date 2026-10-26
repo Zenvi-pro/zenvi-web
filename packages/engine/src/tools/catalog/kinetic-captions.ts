@@ -59,9 +59,9 @@ const input = z.strictObject({
   end_seconds: z.number().min(0).optional().describe("Only words before this timeline time."),
   style: z.enum(CAPTION_STYLE_IDS).optional().describe(`Look and motion (default creator). ${STYLE_LINES}`),
   emphasis: z
-    .union([z.enum(["auto", "none"]), z.array(z.string().min(1).max(40)).max(60)])
+    .union([z.string().max(600), z.array(z.string().min(1).max(40)).max(60)])
     .optional()
-    .describe("Words to emphasise: auto (default: numbers, stressed and long content words, never stopwords), none, or a list of words."),
+    .describe("Words to emphasise: auto (default: numbers, stressed and long content words, never stopwords), none, or a list of words (an array, or one string separated by commas)."),
   avoid: z
     .array(z.strictObject({ x: unit, y: unit, w: unit.gt(0), h: unit.gt(0) }))
     .max(8)
@@ -74,6 +74,16 @@ const input = z.strictObject({
 });
 
 type Input = z.infer<typeof input>;
+
+/** The emphasis argument as the builder takes it: auto, none, or the words listed. */
+export function emphasisArg(value: string | readonly string[] | undefined): "auto" | "none" | string[] {
+  if (value === undefined) return "auto";
+  if (typeof value !== "string") return [...value];
+  const v = value.trim().toLowerCase();
+  if (v === "" || v === "auto") return "auto";
+  if (v === "none") return "none";
+  return value.split(/[,\n]+/).map((w) => w.trim()).filter(Boolean);
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -214,7 +224,7 @@ export const kineticCaptionTools: CatalogTool[] = [
       const fps = fpsFraction.num / fpsFraction.den;
       let built: KineticCaptionPlan;
       try {
-        built = buildKineticCaptions({ frame: { width, height, fps }, words, style, emphasis: args.emphasis ?? "auto", avoid: (args.avoid ?? []) as AvoidBox[], ...colours, lib });
+        built = buildKineticCaptions({ frame: { width, height, fps }, words, style, emphasis: emphasisArg(args.emphasis), avoid: (args.avoid ?? []) as AvoidBox[], ...colours, lib });
       } catch (error) {
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -239,6 +249,11 @@ export const kineticCaptionTools: CatalogTool[] = [
           files.add(p.fileId);
         }
         if (args.behind_subject) ensureTrack(tx, stack.layers[plan.tracks]!, TRACK_LABEL);
+        // Free unnamed tracks the captions landed on are named for them.
+        for (const number of stack.layers) {
+          const layer = tx.project.layers.find((l) => Number(l.number) === number);
+          if (layer && !String(layer.label ?? "").trim()) tx.update(["layers", { id: layer.id }], { label: TRACK_LABEL });
+        }
         const cutouts = args.behind_subject ? clips.map((c) => cutoutOf(tx, c, mattes.get(c.id)!, stack.layers[plan.tracks]!, tag)) : [];
         return { placed, cutouts, replaced: old.clips.length };
       }, `Add kinetic captions (${style})`);

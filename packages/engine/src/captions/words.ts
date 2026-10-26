@@ -8,7 +8,8 @@
  *              word ending a sentence (. ? !) or, once the group has two
  *              words, a clause (, ; :) or before a clause opener (but,
  *              and, so…); a group that fills up on a connector leaves it
- *              to open the next group. A group shows from its first word's
+ *              to open the next group, and a word that closes its phrase
+ *              may stretch a full group by one. A group shows from its first word's
  *              start to the next group's start, or `tail` after its last
  *              word (at least `minHold`). A single word left over by the
  *              limits joins the group before it when that stays within a
@@ -63,7 +64,11 @@ export function groupWords(words: readonly CaptionWord[], rules: GroupRules): Ca
     const count = i - first;
     if (count > 0) {
       const prev = words[i - 1]!;
-      const full = count >= rules.maxWords || chars + 1 + w.text.length > rules.maxChars;
+      let full = count >= rules.maxWords || chars + 1 + w.text.length > rules.maxChars;
+      // One word more when it closes the phrase (punctuation, a pause or a clause opener after it): no stranded word.
+      const after = words[i + 1];
+      const closes = SENTENCE_END.test(w.text) || CLAUSE_END.test(w.text) || !after || after.start - w.end > rules.maxGap || CLAUSE_OPENERS.has(bareWord(after.text));
+      if (full && closes && count + 1 <= rules.maxWords + 1 && chars + 1 + w.text.length <= rules.maxChars * 1.25) full = false;
       const pause = w.start - prev.end > rules.maxGap;
       const sentence = SENTENCE_END.test(prev.text) || (count >= 2 && CLAUSE_END.test(prev.text));
       // A clause opener (but, and, so…) starts the next group rather than ending this one.
