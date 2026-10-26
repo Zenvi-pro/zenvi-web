@@ -6,53 +6,58 @@ something, counters, a word rotator, a URL end card. Light, calm, premium.
 Reference feel: a new scene or UI state every 2-3 s, cuts on soft clicks and
 whooshes, camera always drifting.
 
-## Structure (20 s, 16:9)
+## Structure (20 s, 16:9): a new state every 2-3 s
 
 | t (s) | scene | block |
 | --- | --- | --- |
-| 0-3 | headline lands word by word over the landscape | `kinetic_headline` (`style: "blur"`, `emphasis: "serif"`) over the plate |
-| 3-7 | connector cards rise in, pointer clicks the toggle on | `glass_cards` full frame, plate as `background` |
-| 7-10 | the prompt / action | `prompt_bar` over a second plate |
-| 10-13 | the number that proves it | `counter` (`values`, `suffix`, `label`) |
-| 13-17 | the promise | `word_rotator` (`prefix`, `words`) |
-| 17-20 | the brand and URL | `kinetic_headline` or `end_card` (`variant: "logo"`) |
+| 0-2.5 | headline lands word by word on a soft light field | `gradient_field` (`style: "aurora"`, `palette: "light"`) + `kinetic_headline` over it |
+| 2.5-6.5 | connector cards rise in over the landscape, pointer clicks the toggle on | `glass_cards` full frame, plate as `background` |
+| 6.5-9 | the action: a prompt types and sends | `prompt_bar` over the second plate |
+| 9-11.5 | the proof: a number counts up | `counter` over the light field |
+| 11.5-15 | the promise | `word_rotator` over the light field |
+| 15-17.5 | the cards again in a new state, or a second glass scene | `glass_cards` (other `cards`, `click`) |
+| 17.5-20 | brand and URL | `kinetic_headline` (`text: "Island Control / *islandcontrol.ai*"`) on the light field |
 
-Scenes butt against each other on track 2+ over a landscape on track 1 that
-pushes in slowly the whole time (`ken_burns_in`). Cut between blocks on the
-music's bar lines.
+Text never sits straight on a busy photo: type scenes go on the light
+`gradient_field`, photos sit behind glass. Hold a finished state at most
+1-1.5 s, then the next thing happens.
 
 ## Tools
 
-1. Plates: 2-3 landscape clips or AI stills ("calm green hills and a lake,
-   soft light, empty sky"), `apply_clip_preset_tool` `preset:
-   "ken_burns_in"` on each.
-2. Blocks, back to back, all with one `palette` (`"light"` or `"sky"`) and
-   one `accent` (the brand's):
+1. Plates: 2 landscape clips (soft, misty, lots of sky). Grade them light and
+   quiet so glass reads over them: `color_grade_clip_tool` `scope: "all"`,
+   `exposure: 0.3`, `saturation: 0.7`, `contrast: -0.15`; and
+   `apply_clip_preset_tool` `preset: "ken_burns_in"` on each.
+2. One `palette` for every block (`"light"`; `"sky"` for cool brands) and one
+   `accent` from the brief or a calm deep colour (`"#1F5F4A"`, `"#2F6BFF"`),
+   never the palette's default red on a calm brand. Blocks back to back on the
+   track above the plates:
 
 ```json
-add_motion_block_tool {"block": "kinetic_headline", "position_seconds": 0, "duration_seconds": 3,
-  "params": {"text": "The *Control Plane* / for the Agentic Enterprise", "style": "blur", "emphasis": "serif", "palette": "light"}}
-add_motion_block_tool {"block": "glass_cards", "position_seconds": 3, "duration_seconds": 4, "placement": "full_frame",
+add_motion_block_tool {"block": "gradient_field", "position_seconds": 0, "duration_seconds": 2.5,
+  "params": {"style": "aurora", "palette": "light", "grain": true}}
+add_motion_block_tool {"block": "kinetic_headline", "position_seconds": 0, "duration_seconds": 2.5,
+  "params": {"text": "The *Control Plane* / for the Agentic Enterprise", "style": "blur", "emphasis": "serif", "palette": "light", "accent": "#1F5F4A"}}
+add_motion_block_tool {"block": "glass_cards", "position_seconds": 2.5, "duration_seconds": 4, "placement": "full_frame",
   "params": {"background": "<plate file id>", "headline": "Connect *every* tool", "cards": ["GitHub", "Salesforce", "HomeOps"],
-             "details": ["Connected", "Connected", "Off"], "click": 2, "status": "Connected"}}
-add_motion_block_tool {"block": "counter", "position_seconds": 10, "duration_seconds": 3,
-  "params": {"values": ["0", "8.7"], "decimals": 1, "suffix": "M", "label": "Events governed"}}
-add_motion_block_tool {"block": "word_rotator", "position_seconds": 13, "duration_seconds": 4,
-  "params": {"prefix": "So your", "words": ["agents", "approvals", "writing", "planning"], "suffix": "run themselves"}}
+             "details": ["Connected", "Connected", "Off"], "click": 2, "status": "Connected", "accent": "#1F5F4A"}}
+add_motion_block_tool {"block": "counter", "position_seconds": 9, "duration_seconds": 2.5,
+  "params": {"values": ["0", "8.7"], "decimals": 1, "suffix": "M", "label": "Agent actions governed", "accent": "#1F5F4A"}}
+add_motion_block_tool {"block": "word_rotator", "position_seconds": 11.5, "duration_seconds": 3.5,
+  "params": {"prefix": "So your", "words": ["agents", "approvals", "writing", "planning"], "suffix": "run themselves", "size": 110}}
 ```
 
-   Each render takes ~5-10 s per second of block; `draft: true` while
-   iterating, `update_motion_block_tool` `draft: false` at the end.
-   `motion_blur: 4` on the cards and headline for the final pass.
-3. Transitions: between full-frame blocks `blur_dissolve` (0.33 s) or
-   `slide` `direction: "left"`, one kind throughout; never crossfade.
+   Each block renders at ~5-10 s per second of block; `draft: true` while
+   iterating, then `update_motion_block_tool` `draft: false`, `motion_blur: 4`
+   on cards and headlines.
+3. Transitions: between full-frame scenes one kind, `blur_dissolve` (0.33 s)
+   or `slide` `direction: "left"`; never a crossfade.
 4. Sound: `auto_sound_design_tool` `intensity: "normal"`, then `add_sfx_tool`
-   per UI event: `mouse_click` at the click (block start + ~60 % of its
-   length; check the frame), `toggle` right after it, `typing_burst` for the
+   per UI event: `mouse_click` on the click (in `glass_cards` at ~55 % of the
+   block; check the frame), `toggle` right after it, `typing_burst` for the
    prompt, `ui_tap` on each card entrance (`gain_db: -16`), `swish_airy` on
-   scene changes. Music: minimal tech at full level, no ducking.
-5. Colour: blocks are designed; grade only the plates (`sunlit_cinema` at
-   0.4) so the glass blur stays clean.
+   each scene change. Music: minimal tech with a clear pulse (not ambient
+   pads), at full level, no ducking.
 
 ## Without motion blocks (web editor, Zenvi Cloud)
 
@@ -63,14 +68,17 @@ with `palette: "ui_light"` and `font_family: "inter"`.
 
 ## Checks
 
-Contact sheet: every 2-3 s a different composition. `preview_frame` at each
+Contact sheet: every 2-3 s a different composition, no type on a busy photo. `preview_frame` at each
 block's entrance end: headline inside title-safe and not touching cards;
 pointer on the toggle at the click; counter's last value readable; end card
 centred with the URL legible (≥ 36 px at 1080).
 
 ## Pitfalls
 
-- One static UI screenshot for 5 s: something must happen every second.
+- One static UI screenshot for 5 s, or a number held 2 s after it lands:
+  something must happen every second.
+- Saturated green plates under dark text: the reference plates are pale and
+  soft (bright, low saturation).
 - Three accent colours: one accent, the palette's neutrals.
 - The serif accent on every headline: once or twice per piece.
 - Generic copy ("Revolutionize your workflow"): use the brief's nouns.
