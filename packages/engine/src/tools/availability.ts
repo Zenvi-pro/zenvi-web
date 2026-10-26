@@ -199,6 +199,13 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     optional: ["audio.decodePcm"],
     partialNote: "without audio decoding the entrances follow `beats` or `bpm` (default 120 BPM), not the music on the timeline",
   },
+  // Zenvi FX renders with ffmpeg next to the media (the CLI and local MCP server offer fx).
+  apply_fx_tool: { methods: ["media.importPath"] },
+  update_fx_tool: { methods: ["media.importPath"] },
+  remove_fx_tool: {
+    optional: ["fx", "media.importPath"],
+    partialNote: "removing every effect (back to the original clip) works anywhere; removing one of several re-renders the rest, which needs Zenvi FX",
+  },
   diarize_media_tool: { desktopOnly: "on-device speaker diarization" },
   search_media_local_tool: { desktopOnly: "the on-device visual index" },
   modify_clip_tool: { desktopOnly: "the desktop's ffmpeg cut, upload and splice pipeline" },
@@ -343,7 +350,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "fx"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -366,7 +373,11 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "exporter.supports",
       "frames.fontFamilies",
     ],
-    conditional: { backend: "signed in with zenvi login", "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks" },
+    conditional: {
+      backend: "signed in with zenvi login",
+      "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
+      fx: "ffmpeg is installed (ZENVI_FX=0 turns it off)",
+    },
   },
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",

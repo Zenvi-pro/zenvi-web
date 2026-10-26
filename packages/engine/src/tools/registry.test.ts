@@ -22,6 +22,10 @@ const DIRECT_TOOLS = [
   "probe_media_tool",
   "build_reel_tool",
   "add_motion_template_tool",
+  "list_fx_tool",
+  "apply_fx_tool",
+  "update_fx_tool",
+  "remove_fx_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
 ];
@@ -85,6 +89,7 @@ describe("tool catalog", () => {
         if (key in args) continue;
         const type = tool.inputSchema.properties[key]?.type;
         if (key === "points") args[key] = [{ frame: 1, value: 1 }];
+        else if (key === "effects") args[key] = [{ effect: "bloom", amount: 0.5 }];
         else if (key === "subclips") args[key] = [{ source_start_seconds: 1, source_end_seconds: 2 }];
         else if (type === "array") args[key] = ["x"];
         // update_effect_tool's properties are an effect's (sigma is Blur's); set_clip_properties_tool takes any object.
@@ -168,7 +173,7 @@ describe("availability matrix", () => {
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "fx"],
       cloud: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
     };
     for (const tool of allTools) {

@@ -1006,6 +1006,38 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { template: "word_scroll", words: ["Only"] }, status: "refused", summary: /^Error: word_scroll needs words: 2 to 10 of them\.$/ },
   },
 
+  // --- Zenvi FX (catalog/fx.test.ts covers stacks, windows, slow motion, restoring) ------
+  list_fx_tool: { happy: { summary: /^13 FX\.$/ }, failure: null },
+  apply_fx_tool: {
+    happy: {
+      args: { clip_id: IDS.clipB, effects: JSON.stringify([{ effect: "bloom", amount: 0.6 }]) },
+      summary: /^Clip CLIPBROL01 now plays bloom \(rendered in 1\.5s\)\.$/,
+      check: ({ doc, host }) => {
+        expect(host.calls).toContain("fx /media/broll.mp4 0-5 bloom");
+        const clip = doc.project.clips.find((c) => c.id === IDS.clipB)!;
+        expect(doc.project.files.find((f) => f.id === clip.file_id)?.zenvi_link).toMatchObject({ kind: "zenvi-fx", source: { file_id: IDS.broll, start: 0, end: 5 } });
+      },
+    },
+    failure: { args: { clip_id: IDS.clipLogo, effects: JSON.stringify([{ effect: "glitch" }]) }, status: "refused", summary: /^Error: clip CLIPLOGO01 is not video footage/ },
+  },
+  update_fx_tool: {
+    happy: {
+      setup: async (doc, host) => void (await runTool({ doc, host }, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ effect: "glitch" }] })),
+      args: { clip_id: IDS.clipB, amount: "0.9", params: { seed: 3 } },
+      summary: /^Clip CLIPBROL01 now plays glitch \(rendered in 1\.5s\)\.$/,
+    },
+    failure: { args: { clip_id: IDS.clipB, amount: "0.9" }, status: "refused", summary: /^Error: clip CLIPBROL01 has no FX; add some with apply_fx_tool\.$/ },
+  },
+  remove_fx_tool: {
+    happy: {
+      setup: async (doc, host) => void (await runTool({ doc, host }, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ effect: "vignette" }] })),
+      args: { clip_id: IDS.clipB },
+      summary: /^Clip CLIPBROL01 plays the original .* again \(1 clip\(s\) restored\)\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipB)?.file_id).toBe(IDS.broll),
+    },
+    failure: { args: { clip_id: "NOPE000000" }, status: "refused", summary: /^Error: unknown timeline clip NOPE000000\.$/ },
+  },
+
   // --- stock search (web) -------------------------------------------------------------
   search_pexels_videos_tool: {
     happy: {

@@ -18,6 +18,8 @@
 import type { z } from "zod";
 import type { Transcription } from "../analysis/transcription.js";
 import type { ProjectDocument } from "../history/document.js";
+import type { FxEffect } from "../fx/catalog.js";
+import type { FxRender } from "../fx/link.js";
 import type { CloudMediaRef, FileFingerprint, Project, ProjectFile, ReaderInfo } from "../model/types.js";
 import type { WebVideoDownload, WebVideoRequest } from "../web-video/web-video.js";
 
@@ -539,6 +541,28 @@ export interface ReclaimableMedia {
   errors: string[];
 }
 
+export interface FxRenderRequest {
+  /** The source file's `path` as the project stores it (the host resolves it). */
+  path: string;
+  /** Source seconds to render, [start, end). */
+  start: number;
+  end: number;
+  /** The parsed stack (parseFxStack), in order; the host builds its graph with buildFxGraph. */
+  effects: FxEffect[];
+  signal?: AbortSignal;
+  onProgress?: (fraction: number) => void;
+}
+
+/**
+ * Zenvi FX: renders a source range through an FX stack with ffmpeg to a
+ * ProRes movie (4444 when the source has alpha), cached by fingerprint.
+ * Only hosts that run ffmpeg on the media's computer have it (the CLI and
+ * local MCP server). `render` rejects with a message in words.
+ */
+export interface FxHost {
+  render(request: FxRenderRequest): Promise<FxRender>;
+}
+
 /** Files bundled with the engine (`packages/engine/assets/…`), such as the title templates. */
 export interface AssetHost {
   /**
@@ -558,6 +582,7 @@ export interface ToolHost {
   storage?: StorageHost;
   audio?: AudioHost;
   assets?: AssetHost;
+  fx?: FxHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }
