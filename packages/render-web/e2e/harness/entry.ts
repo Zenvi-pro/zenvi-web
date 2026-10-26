@@ -18,6 +18,7 @@ import {
   MediaRegistry,
   PreviewPlayer,
   StillCache,
+  canPreviewInWorker,
   defaultEngine,
   exportFrame,
   exportProject,
@@ -799,6 +800,72 @@ const api = {
     canvas.remove();
     media.dispose();
     return { seekCode, size, coalescedCode, advanced: paused.time - 0.2, paused, monotonic, timeEvents: times.length, looped, ended, duration: state.duration, errors, trace };
+  },
+
+  /** PreviewPlayer rendering in a Worker (real engine there): seek, scrub, play, pause, remount, snapshot. */
+  async workerPlayer() {
+    const blob = await file("codes.webm");
+    const info = await probeMedia({ kind: "blob", blob }, { path: "codes.webm" });
+    const profile: Profile = { key: "test", description: "Test 160x90 30 fps", width: 160, height: 90, fps: { num: 30, den: 1 }, progressive: true, pixel_ratio: { num: 1, den: 1 }, display_ratio: { num: 16, den: 9 } };
+    const doc = new ProjectDocument(createProject({ profile }));
+    doc.transaction("Import", (tx) => {
+      const added = addFile(tx, { path: "codes.webm", info, name: "codes.webm" }, { id: "codes" });
+      addClip(tx, { fileId: added.id, position: 0, layer: 1000000, id: "CLIP1" });
+    });
+    const media = new MediaRegistry();
+    media.register("codes", { kind: "blob", blob });
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "320px";
+    canvas.style.height = "180px";
+    document.body.appendChild(canvas);
+    const worker = new Worker("/preview-worker.js", { type: "module" });
+    const supported = canPreviewInWorker();
+    const errors: string[] = [];
+    const screen = async (p: PreviewPlayer) => {
+      const bitmap = await p.snapshot(160);
+      if (!bitmap) return -1;
+      const code = codeOf(bitmap);
+      bitmap.close();
+      return code;
+    };
+    let player = new PreviewPlayer(canvas, { media, worker });
+    player.onError((e) => errors.push(`${e.kind}:${String("error" in e ? e.error : "")}`));
+    player.setProject(doc.project);
+    await player.seek(1);
+    const seekCode = await screen(player);
+    await Promise.all([0.1, 0.4, 0.8, 1.2, 1.5].map((t) => player.seek(t)));
+    const coalescedCode = await screen(player);
+    await player.seek(0.7, { scrub: true });
+    const scrubCode = await screen(player);
+
+    await player.seek(0.2);
+    const presentedBefore = player.presentedFrames;
+    player.play();
+    await new Promise((r) => setTimeout(r, 600));
+    player.pause();
+    await new Promise((r) => setTimeout(r, 200));
+    const paused = { frame: player.frame, code: await screen(player), presented: player.presentedFrames - presentedBefore };
+
+    // An edit reaches the worker: hide the clip, the frame goes black.
+    doc.transaction("Hide", (tx) => tx.update(["clips", { id: "CLIP1" }], { alpha: { Points: [{ co: { X: 1, Y: 0 }, interpolation: 2 }] } }));
+    player.setProject(doc.project);
+    await player.seek(1);
+    const hiddenCode = await screen(player);
+
+    // A remount (React StrictMode): a new player on the same canvas and worker.
+    player.dispose();
+    player = new PreviewPlayer(canvas, { media, worker });
+    player.setProject(doc.project);
+    doc.transaction("Show", (tx) => tx.update(["clips", { id: "CLIP1" }], { alpha: { Points: [{ co: { X: 1, Y: 1 }, interpolation: 2 }] } }));
+    player.setProject(doc.project);
+    await player.seek(1.5);
+    const remountCode = await screen(player);
+    const inWorker = player.inWorker;
+    player.dispose();
+    worker.terminate();
+    canvas.remove();
+    media.dispose();
+    return { supported, inWorker, seekCode, coalescedCode, scrubCode, paused, hiddenCode, remountCode, errors };
   },
 
   /** Scrubbing long-GOP media: a keyframe stands in at once, then the exact frame. */

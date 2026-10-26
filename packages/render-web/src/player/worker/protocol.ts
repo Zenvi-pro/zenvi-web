@@ -13,6 +13,7 @@ export interface RendererLook {
   resolution?: number;
   letterbox: string;
   frameCacheBytes?: number;
+  adaptive?: boolean;
 }
 
 /**
@@ -70,7 +71,7 @@ export type ToWorker =
   | { type: "close"; id: number };
 
 export type FromWorker =
-  | { type: "shown"; id: number; frame: number; presented: number }
+  | { type: "shown"; id: number; frame: number; presented: number; scale: number }
   /** Nothing waits to render; `seq` is the last render request the worker had received. */
   | { type: "idle"; id: number; seq: number; dropped: number }
   | { type: "error"; id: number; key: string; event: RenderErrorEvent }

@@ -247,6 +247,22 @@ test("PreviewPlayer seeks, coalesces, plays on the audio clock, pauses on a fram
   expect(r.errors).toEqual([]);
 });
 
+test("PreviewPlayer renders in a Worker: seeks, coalescing, playback, edits and a remount on one canvas", async ({ page }) => {
+  const r = await page.evaluate(() => window.harness.workerPlayer());
+  expect(r.supported).toBe(true);
+  expect(r.inWorker).toBe(true);
+  expect(r.errors).toEqual([]);
+  expect(r.seekCode).toBe(30);
+  expect(r.coalescedCode).toBe(45);
+  expect(r.scrubCode).toBe(21);
+  // Played ~0.6 s from 0.2 s, then rested on the frame on screen.
+  expect(r.paused.presented).toBeGreaterThan(5);
+  expect(r.paused.code).toBe(r.paused.frame - 1);
+  expect(r.paused.frame).toBeGreaterThan(15);
+  expect(r.hiddenCode).toBe(0);
+  expect(r.remountCode).toBe(45);
+});
+
 test("scrubbing long-GOP media shows a keyframe at once, then the exact frame", async ({ page }) => {
   const r = await page.evaluate(() => window.harness.scrub());
   expect(r.preview).toEqual({ exact: false, code: 0 });

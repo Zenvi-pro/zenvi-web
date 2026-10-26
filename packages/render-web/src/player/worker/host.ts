@@ -89,7 +89,7 @@ class Session {
     this.renderer.onBusy((busy) => {
       if (!busy) this.post({ type: "idle", id, seq: this.lastSeq, dropped: this.renderer.droppedFrames });
     });
-    this.renderer.onPresent((frame) => this.post({ type: "shown", id, frame, presented: this.renderer.presented }));
+    this.renderer.onPresent((frame) => this.post({ type: "shown", id, frame, presented: this.renderer.presented, scale: this.renderer.shownScale }));
     this.renderer.onError((key, event) => this.post({ type: "error", id, key, event: cloneableEvent(event) }));
   }
 

@@ -54,6 +54,12 @@ export interface PreviewPlayerOptions {
   letterbox?: string;
   /** Budget for decoded preview frames. Default 192 MB. */
   frameCacheBytes?: number;
+  /**
+   * While playing, render at a lower resolution (down to 0.375 of the box)
+   * when frames take longer than a frame lasts, and back up when they are
+   * cheap again. Paused frames and seeks are always full resolution. Default off.
+   */
+  adaptiveResolution?: boolean;
   /** A still/SVG cache to share with other consumers (page rendering only). */
   stills?: StillCache;
   /**
@@ -114,9 +120,14 @@ export class PreviewPlayer {
     this.media = options.media;
     this.engine = options.engine ?? defaultEngine;
     const letterbox = options.letterbox ?? "#000";
-    const look = { letterbox, ...(options.resolution !== undefined ? { resolution: options.resolution } : {}), ...(options.frameCacheBytes !== undefined ? { frameCacheBytes: options.frameCacheBytes } : {}) };
+    const look = {
+      letterbox,
+      ...(options.resolution !== undefined ? { resolution: options.resolution } : {}),
+      ...(options.frameCacheBytes !== undefined ? { frameCacheBytes: options.frameCacheBytes } : {}),
+      ...(options.adaptiveResolution ? { adaptive: true } : {}),
+    };
     if (options.worker) {
-      if (typeof HTMLCanvasElement === "undefined" || !(canvas instanceof HTMLCanvasElement)) throw new Error("A Worker preview needs an HTMLCanvasElement");
+      if (!("transferControlToOffscreen" in canvas)) throw new Error("A Worker preview needs an HTMLCanvasElement");
       this.target = new WorkerPreview(options.worker, canvas, this.media, look);
     } else {
       const surface = bindCanvas(canvas, { transparent: letterbox === "transparent" });
@@ -304,6 +315,11 @@ export class PreviewPlayer {
   /** Frames drawn on the canvas since the player was created. */
   get presentedFrames(): number {
     return this.target.presented;
+  }
+
+  /** Fraction of full resolution the frame on screen was rendered at (`adaptiveResolution`). */
+  get renderScale(): number {
+    return this.target.shownScale;
   }
 
   /** Whether frames render in a Worker. */

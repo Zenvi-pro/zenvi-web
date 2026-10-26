@@ -46,6 +46,7 @@ export class WorkerPreview implements PreviewTarget {
   private requested: number | null = null;
   private shown = 0;
   private presentedCount = 0;
+  private scaleShown = 1;
   private dropped = 0;
   private calls = 0;
   private readonly replies = new Map<number, { resolve: (value: unknown) => void; reject: (error: unknown) => void }>();
@@ -129,6 +130,10 @@ export class WorkerPreview implements PreviewTarget {
     return this.presentedCount;
   }
 
+  get shownScale(): number {
+    return this.scaleShown;
+  }
+
   get droppedFrames(): number {
     return this.dropped;
   }
@@ -184,6 +189,7 @@ export class WorkerPreview implements PreviewTarget {
       case "shown":
         this.shown = message.frame;
         this.presentedCount = message.presented;
+        this.scaleShown = message.scale;
         return;
       case "idle":
         this.dropped = message.dropped;

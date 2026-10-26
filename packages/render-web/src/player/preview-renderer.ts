@@ -18,6 +18,7 @@ import type { SvgRasterizer } from "../media/svg.js";
 import type { DecodeMode } from "../video/decode-cursor.js";
 import { FrameCache } from "../video/frame-cache.js";
 import { FrameProvider } from "../video/frame-provider.js";
+import { AdaptiveScale } from "./adaptive-scale.js";
 import type { CanvasSurface } from "./canvas-binding.js";
 import { fitViewport } from "./layout.js";
 
@@ -44,6 +45,8 @@ export interface PreviewTarget {
   readonly shownFrame: number;
   /** Frames drawn so far. */
   readonly presented: number;
+  /** Fraction of the canvas box the frame on screen was planned at (below 1 when adaptive playback scaled it down). */
+  readonly shownScale: number;
   /** Decoded pictures dropped because playback outran decoding. */
   readonly droppedFrames: number;
   /** Close decoders that have not been used for a while. */
@@ -67,6 +70,8 @@ export interface PreviewRendererOptions {
   letterbox?: string;
   /** Budget for decoded preview frames. Default 192 MB. */
   frameCacheBytes?: number;
+  /** Lower the resolution of playback frames while they render slower than real time (`AdaptiveScale`). */
+  adaptive?: boolean;
   /** A still/SVG cache to share with other consumers. */
   stills?: StillCache;
   /** SVG renderer when `stills` is not given (a Worker has no `<img>`). */
@@ -86,12 +91,14 @@ export class PreviewRenderer implements PreviewTarget {
   private readonly kernelAudio: KernelAudioSource;
   private readonly resolution: number;
   private readonly letterbox: string;
+  private readonly adaptive: AdaptiveScale | null;
 
   private pending: { frame: number; mode: DecodeMode } | null = null;
   private inFlight: number | null = null;
   private rendering = false;
   private shown = 0;
   private presentedCount = 0;
+  private scaleShown = 1;
   private generation = 0;
   private idle: (() => void)[] = [];
   private readonly busyListeners = new Set<(busy: boolean) => void>();
@@ -106,6 +113,7 @@ export class PreviewRenderer implements PreviewTarget {
     this.engine = options.engine ?? defaultEngine;
     this.resolution = Math.min(1, Math.max(0.1, options.resolution ?? 1));
     this.letterbox = options.letterbox ?? "#000";
+    this.adaptive = options.adaptive ? new AdaptiveScale() : null;
     const media = options.media;
     this.frames = new FrameProvider({ media, cache: new FrameCache(options.frameCacheBytes), quality: "medium" });
     this.ownsStills = !options.stills;
@@ -150,6 +158,10 @@ export class PreviewRenderer implements PreviewTarget {
 
   get presented(): number {
     return this.presentedCount;
+  }
+
+  get shownScale(): number {
+    return this.scaleShown;
   }
 
   get droppedFrames(): number {
@@ -230,8 +242,12 @@ export class PreviewRenderer implements PreviewTarget {
     const generation = this.generation;
     const canvas = this.surface.size();
     const projectSize = { width: project.width, height: project.height };
+    // Paused frames, seeks and scrubs always render at full resolution.
+    const playback = mode === "sequential" ? this.adaptive : null;
+    const scale = this.resolution * (playback?.scale ?? 1);
+    const started = performance.now();
     // The planner fits the project into this box (Timeline::SetMaxSize).
-    const box = { width: Math.max(1, Math.floor(canvas.width * this.resolution)), height: Math.max(1, Math.floor(canvas.height * this.resolution)) };
+    const box = { width: Math.max(1, Math.floor(canvas.width * scale)), height: Math.max(1, Math.floor(canvas.height * scale)) };
     let prepared: Awaited<ReturnType<Compositor["prepare"]>> | null = null;
     try {
       const plan = this.engine.planFrame(project, frame, box, { preview: true });
@@ -252,6 +268,8 @@ export class PreviewRenderer implements PreviewTarget {
       this.compositor.draw(prepared, ctx, fitViewport(canvas, projectSize, plan));
       this.shown = frame;
       this.presentedCount += 1;
+      this.scaleShown = playback?.scale ?? 1;
+      playback?.record(performance.now() - started, (this.engine.frameTime(project, 2) - this.engine.frameTime(project, 1)) * 1000);
       for (const listener of [...this.presentListeners]) listener(frame);
       // A scrub preview: decode the exact frame next, unless the playhead already moved on.
       if (!prepared.exact && !this.pending) this.pending = { frame, mode: "seek" };
