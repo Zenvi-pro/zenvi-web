@@ -6,7 +6,9 @@
 
 import { isAudioOnlyMedia } from "../model/media.js";
 import type { Clip, Project, ProjectFile } from "../model/types.js";
+import { listProjectMotionTransitions } from "../ops/motion-transitions.js";
 import { fpsFloat } from "../timeline/time.js";
+import { getMotionTransition } from "../transitions/motion/presets.js";
 import type { SoundMoment } from "./plan.js";
 
 /** `zenvi_role` of sound-effect files and the clips that play them. */
@@ -81,6 +83,12 @@ export function soundMoments(project: Project, grid: BeatGrid | null = null): So
 
   // Transitions: the move peaks halfway through.
   const transitions = project.effects.map((t) => ({ id: String(t.id), from: t.position, to: t.position + (t.end - t.start), layer: t.layer }));
+  // Motion transitions that move the frame (whips, slides, zooms) whoosh through the cut; glitches and flashes stay cuts, hit.
+  for (const m of listProjectMotionTransitions(project)) {
+    if (!getMotionTransition(m.preset)?.sfx.includes("whoosh")) continue;
+    const half = m.frames / fps / 2;
+    transitions.push({ id: m.id, from: m.cut - half, to: m.cut + half, layer: m.layer });
+  }
   for (const t of transitions) {
     moments.push({ kind: "transition", time: (t.from + t.to) / 2, strength: 0.6, duration: t.to - t.from, ids: [t.id] });
   }

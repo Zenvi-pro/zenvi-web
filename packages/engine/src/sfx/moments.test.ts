@@ -3,6 +3,7 @@ import { ProjectDocument } from "../history/document.js";
 import { createProject } from "../model/defaults.js";
 import { addClip } from "../ops/clips.js";
 import { addFile } from "../ops/files.js";
+import { applyMotionTransition } from "../ops/motion-transitions.js";
 import { addTrack } from "../ops/tracks.js";
 import { imageInfo, media, videoInfo } from "../tools/test-support/fixture.js";
 import { soundMoments } from "./moments.js";
@@ -51,5 +52,18 @@ describe("soundMoments", () => {
     expect(times(doc, "flash")).toEqual([2]);
     expect(times(doc, "title")).toEqual([6]);
     expect(times(doc, "cut")).toEqual([]);
+  });
+
+  it("hears a whip as a move through its cut, and a glitch as a cut", () => {
+    const doc = edit((tx, top) => {
+      const a = addClip(tx, { fileId: "FILEBXXXXX", position: 0, layer: top, start: 0, end: 3 });
+      const b = addClip(tx, { fileId: "FILECXXXXX", position: 3, layer: top, start: 0, end: 3 });
+      const c = addClip(tx, { fileId: "FILEBXXXXX", position: 6, layer: top, start: 5, end: 8 });
+      applyMotionTransition(tx, { outClipId: a.id, inClipId: b.id, preset: "whip", frames: 8 });
+      applyMotionTransition(tx, { outClipId: b.id, inClipId: c.id, preset: "glitch", frames: 6 });
+    });
+    expect(times(doc, "transition")).toEqual([3]);
+    // 9: the insert ends on the A-roll.
+    expect(times(doc, "cut")).toEqual([6, 9]);
   });
 });
