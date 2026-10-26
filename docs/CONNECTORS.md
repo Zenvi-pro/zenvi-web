@@ -40,9 +40,9 @@ Education on the web; workspace admins may have to allow it).
    e.g. "List my Zenvi projects", "Create a vertical 30 fps project called
    Launch teaser and import https://example.com/clip.mp4", "Render it".
 
-**The Zenvi editor in the chat.** Ask "open it in the editor" (or ChatGPT
-calls `open_in_editor` after building an edit): the Zenvi editor opens in the
-conversation with the project's preview and timeline. **Edit full screen**
+**The Zenvi editor in the chat.** Opening or creating a project shows the
+Zenvi editor in the conversation with the project's preview and timeline (ask
+"open it in the editor" to show it again). **Edit full screen**
 (the arrows at the top right) turns it into the whole editor beside the chat:
 library (files, titles, effects, transitions), preview, properties, timeline,
 undo. Everything ChatGPT changes with its tools appears in the open editor
@@ -53,6 +53,11 @@ cloud project at zenvi.pro/editor. The editor runs from Zenvi Cloud's own
 origin with a token for that one project (12 h; it renews itself through the
 chat), so nothing about your zenvi.pro sign-in is involved. If the chat
 cannot show it inline, the card offers to open it in a new tab.
+
+**No editor after a Zenvi update?** ChatGPT keeps the tools, descriptions and
+views it read when the app was added. Open Zenvi in ChatGPT's app settings
+(chatgpt.com/plugins, or Settings → Apps) and press **Refresh**, then start a
+new chat.
 
 Media: attach a video, audio or image file in the chat and ask Zenvi to use
 it (ChatGPT hands the file to `import_attached_file`), give a direct https
