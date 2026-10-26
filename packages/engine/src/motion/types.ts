@@ -196,4 +196,6 @@ export interface MotionPlan {
   layers: MotionLayer[];
   /** Frames where something enters or changes: the template's start or a beat (half beat) of the grid. */
   cues: number[];
+  /** What the template changed to fit its length, when anything. */
+  warnings?: string[];
 }

@@ -352,6 +352,7 @@ export const motionTemplateTools: CatalogTool[] = [
         plan = typed.plan;
         warnings.push(...missingGlyphWarnings(typed.missing));
       }
+      warnings.push(...(plan.warnings ?? []));
       const end = start + plan.frames / fps;
       const stack = planOverlayStack(project, start, end, plan.tracks);
       const written = await writeDrawings(call, plan, args.template);
