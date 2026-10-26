@@ -355,9 +355,11 @@ export const reelTools: CatalogTool[] = [
 
       const accents = planAccents(style, plan, Number.isFinite(rate) && rate > 0 ? rate : 30);
       const flashes = new Set(accents.flashes);
-      if (plan.closeRepeats > 0 && new Set(plan.shots.map((s) => s.fileId)).size < plan.clipsNeeded) {
+      // Counted from the shots, not file_ids: a clip that fits no shot is given but never on screen.
+      const used = new Set(plan.shots.map((s) => s.fileId)).size;
+      if (plan.closeRepeats > 0 && used < plan.clipsNeeded) {
         warnings.push(
-          `${plan.closeRepeats} shot(s) bring a clip back within ${REUSE_GAP_SECONDS} s: this pace needs about ${plan.clipsNeeded} different clips and the reel has ${new Set(ids).size}. Import more and rebuild with replace=true.`,
+          `${plan.closeRepeats} shot(s) bring a clip back within ${REUSE_GAP_SECONDS} s: this pace needs about ${plan.clipsNeeded} different clips and the reel uses ${used}. Import more and rebuild with replace=true.`,
         );
       }
 
