@@ -103,6 +103,7 @@ test("new project → import → arrange → split → undo → play → export"
   // Fade the clip in with a transition from the library (double-click applies it to the selection).
   await clips(page).first().click();
   await rail.getByRole("button", { name: "Transitions" }).click();
+  await page.getByRole("radio", { name: "Masks" }).click();
   await page.getByRole("button", { name: "Fade", exact: true }).first().dblclick();
   await expect(page.locator('[data-kind="transition"]')).toHaveCount(1);
   await shot(page, "05d-transition");
