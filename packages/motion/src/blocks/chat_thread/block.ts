@@ -148,10 +148,23 @@ export function build(ctx: BlockContext): void {
   const totalW = widths.reduce((a, b) => a + b, 0);
   const strokeFor = Math.min(0.9, 0.35 + totalW / 2400);
   const pen = resolveEase("in-out");
+  let joined = false;
   const sweeps = marks.map((w, k) => {
     const sweep = ctx.el("span", "chat-mark-sweep", w.el);
-    // Bridge the space to the next starred word of the same run.
-    if (marks[k + 1] && w.el.nextSibling?.nextSibling === marks[k + 1]!.el) sweep.style.right = "-0.34em";
+    // A run joined from the previous word starts square, flush with that word's bridge.
+    if (joined) Object.assign(sweep.style, { left: "-0.08em", borderTopLeftRadius: "0", borderBottomLeftRadius: "0" });
+    joined = false;
+    // Bridge the space to the next starred word of the same run when it is on the same line,
+    // ending square where that word's sweep starts (-0.08em, block.css) so the tint never doubles.
+    const next = marks[k + 1];
+    if (next && w.el.nextSibling?.nextSibling === next.el) {
+      const a = w.el.getBoundingClientRect();
+      const b = next.el.getBoundingClientRect();
+      if (Math.abs(a.top - b.top) < 1) {
+        Object.assign(sweep.style, { right: `${(a.right - b.left + 0.08 * textSize).toFixed(2)}px`, borderTopRightRadius: "0", borderBottomRightRadius: "0" });
+        joined = true;
+      }
+    }
     sweep.style.transform = "scaleX(0)";
     return sweep;
   });
