@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tokenizeLine, typeSeconds, typeTimes } from "./syntax.js";
+import { codeText, tokenizeLine, typeSeconds, typeTimes } from "./syntax.js";
 
 const kinds = (line: string, lang: Parameters<typeof tokenizeLine>[1] = "ts"): string =>
   tokenizeLine(line, lang)
@@ -28,5 +28,10 @@ describe("code_card syntax", () => {
     expect(times[3]).toBe(times[1]);
     expect(times[4]).toBeCloseTo(1.3);
     expect(typeSeconds("a\n  b", 10)).toBeCloseTo(0.3);
+  });
+  it("reads a one-line snippet's literal \\n as line breaks, but keeps escapes in real multi-line code", () => {
+    expect(codeText("a = 1\\nb = 2")).toBe("a = 1\nb = 2");
+    expect(codeText('rows = text.split("\\n")\nprint(rows)')).toBe('rows = text.split("\\n")\nprint(rows)');
+    expect(codeText("\tx")).toBe("  x");
   });
 });

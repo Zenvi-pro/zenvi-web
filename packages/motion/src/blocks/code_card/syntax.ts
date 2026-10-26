@@ -23,6 +23,16 @@ const COMMENT: Record<Language, RegExp> = {
   json: /^$a/,
 };
 
+/**
+ * The snippet to show: tabs as two spaces, and a one-line argument's literal
+ * `\n` read as line breaks (agents often send code that way). Code that
+ * already has line breaks keeps its `\n` escapes, e.g. `split("\n")`.
+ */
+export function codeText(raw: string): string {
+  const text = raw.includes("\n") ? raw : raw.replace(/\\n/g, "\n");
+  return text.replace(/\t/g, "  ");
+}
+
 /** One line's tokens (strings and comments do not span lines in the snippets this shows). */
 export function tokenizeLine(line: string, lang: Language): Token[] {
   const out: Token[] = [];

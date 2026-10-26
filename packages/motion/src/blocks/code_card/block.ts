@@ -1,13 +1,13 @@
 import type { BlockContext } from "../../runtime/index.js";
 import { icon } from "../ui.js";
-import { tokenizeLine, typeSeconds, typeTimes, type Language } from "./syntax.js";
+import { codeText, tokenizeLine, typeSeconds, typeTimes, type Language } from "./syntax.js";
 
 const MAX_LINES = 16;
 
 export function build(ctx: BlockContext): void {
   const { tl, params: p, width: W, height: H, safe } = ctx;
   const lang = String(p.language) as Language;
-  const code = String(p.code).replace(/\\n/g, "\n").replace(/\t/g, "  ").split("\n").slice(0, MAX_LINES).join("\n");
+  const code = codeText(String(p.code)).split("\n").slice(0, MAX_LINES).join("\n");
   const lines = code.split("\n");
   const output = String(p.output ?? "");
   const S = ctx.seconds;
