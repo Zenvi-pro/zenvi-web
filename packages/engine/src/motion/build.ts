@@ -72,6 +72,15 @@
  *              stay in view. 16:9 keeps its layouts: only the type floors, the
  *              search group's centring and the callout product (cropped
  *              squarer beside the wider labels) change it.
+ *   grid       tiles.ts places the tiles (rectangles in reveal order); montage-grid.ts
+ *              counts time in slots of a beat (two on a fast tempo, half a beat in a
+ *              short template): each stage's new tiles reveal one per slot, a layout
+ *              step cuts on a beat (tiles already up reappear in their new places),
+ *              merge / zoom_into start on a beat after the full grid has held. Every
+ *              tile is a media element (Crop to its shape, corner_radius, keyed pose);
+ *              a wipe is a second Crop that does not resize; a tile growing to the
+ *              frame keys corner_radius to 0 (Pose.radius). No tile has a short side
+ *              under 13 % of the frame's short side.
  *   tracks     `MotionPlan.tracks` stacked on the lowest free tracks above the
  *              video (add_motion_template_tool); a reel puts its music bed
  *              lowest and the scenes above it (build_reel_tool).
