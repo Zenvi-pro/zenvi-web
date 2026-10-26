@@ -343,6 +343,7 @@ export const motionTemplateTools: CatalogTool[] = [
         if (error instanceof MotionInputError) return refused(TOOL, `Error: ${error.message}.`);
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
       }
+      warnings.push(...(plan.warnings ?? []));
       if (args.font_family !== undefined) {
         const family = bundledFamily(args.font_family);
         if (!family) return refused(TOOL, unknownFamily(args.font_family));

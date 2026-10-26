@@ -310,8 +310,36 @@ describe("montage grid length and refusals", () => {
     expect(refusal({}, { fileIds: [...FILES, ...FILES, ...FILES, ...FILES] })).toMatch(/at most 9 files/);
   });
 
-  it("refuses tiles too small to read on a phone, and a template too short for the layout", () => {
+  it("refuses tiles too small to read on a phone, and a template too short for even the fewest tiles", () => {
     expect(refusal({ layout: "strips_h", tiles: 6, band: "21:9" })).toMatch(/px on their short side/);
-    expect(refusal({ steps: [3, 4, 6, 9], merge: true }, {}, { seconds: 3 })).toMatch(/needs at least [\d.]+ s/);
+    expect(refusal({ steps: [3, 4, 6, 9], merge: true }, {}, { seconds: 0.3 })).toMatch(/needs at least [\d.]+ s/);
+  });
+});
+
+describe("grid fitted to a short duration", () => {
+  const frame = FRAMES.portrait!;
+  const tiles = (plan: MotionPlan) => new Set(plan.layers.filter((l) => l.source.kind === "media").map((l) => l.name.replace(/-\d+$/, ""))).size;
+
+  it("keeps the tiles asked for and fills one every quarter beat when that fits", () => {
+    const { plan } = build(frame, { tiles: 9 }, {}, { seconds: 2 });
+    expect(plan.warnings).toEqual(["grid with 9 tiles fills a tile every quarter beat to fit 2.0 s (give a longer duration_seconds for one per beat)"]);
+    expect(plan.frames).toBe(60);
+  });
+
+  it("drops the earlier layout steps, then tiles, when even a quarter beat is too slow", () => {
+    const { plan } = build(frame, { steps: [3, 4, 6, 9], merge: true }, {}, { seconds: 1.2 });
+    expect(plan.warnings).toHaveLength(1);
+    expect(plan.warnings![0]).toMatch(/^grid with 3, 4, 6, 9 tiles does not fit 1\.2 s at this tempo; showing [\d, ]+ tiles instead/);
+    expect(plan.layers.every((l) => l.start >= 0 && l.start + l.frames <= plan.frames)).toBe(true);
+  });
+
+  it("zooms into the last tile shown when the one asked for was dropped", () => {
+    const { plan } = build(frame, { tiles: 9, zoomInto: 9 }, {}, { seconds: 0.9 });
+    expect(plan.warnings!.join(" ")).toMatch(/zoom_into 9 is past the \d tiles shown; zooming into tile \d/);
+  });
+
+  it("warns about nothing when the asked tiles fit at a beat or half beat", () => {
+    expect(build(frame, { tiles: 4 }).plan.warnings).toBeUndefined();
+    expect(tiles(build(frame, { tiles: 4 }).plan)).toBeGreaterThan(0);
   });
 });

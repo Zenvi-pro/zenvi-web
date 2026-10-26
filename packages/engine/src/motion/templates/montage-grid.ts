@@ -37,6 +37,8 @@ const MAX_FILES = 9;
 export const MIN_TILE = 0.13;
 /** Longest the full grid is held before it merges or zooms, in slots. */
 const MAX_HOLD = 4;
+/** Shortest slot a template squeezed into a short length fills tiles at, frames: faster stops reading as one per beat. */
+const MIN_SLOT_FRAMES = 3;
 
 interface Resolved {
   layout: GridLayoutId;
@@ -124,6 +126,35 @@ export function slotsOf(counts: readonly number[], finish: boolean): Slots {
     slot = first + (count - kept) - 1 + 2;
   });
   return { stage, reveal, action: slot, end: finish ? slot + 2 : slot };
+}
+
+/** A schedule that fits `frames`: the tile counts to show and the slot length in beats. */
+interface Fit {
+  counts: number[];
+  unit: number;
+}
+
+/**
+ * The tiles asked for at the longest slot that fits (the tempo's step, a beat
+ * or half a beat); else the same tiles filling every quarter beat; else fewer
+ * tiles: the earlier layout steps dropped, then smaller counts of the layout.
+ * Null when even the fewest tiles the layout takes do not fit.
+ */
+export function fitSchedule(counts: readonly number[], allowed: readonly number[], finish: boolean, beats: TemplateInput["beats"], frames: number): Fit | null {
+  const fits = (c: readonly number[], unit: number) => beats.frame(slotsOf(c, finish).end * unit) <= frames;
+  const exact = [...new Set([beats.step, 1, 0.5])].find((unit) => fits(counts, unit));
+  if (exact !== undefined) return { counts: [...counts], unit: exact };
+  const quick = beats.frame(0.25) - beats.frame(0) >= MIN_SLOT_FRAMES;
+  if (quick && fits(counts, 0.25)) return { counts: [...counts], unit: 0.25 };
+  const last = counts[counts.length - 1]!;
+  const fewer = [
+    ...counts.slice(1).map((_, i) => counts.slice(i + 1)),
+    ...[...allowed].filter((n) => n < last).sort((a, b) => b - a).map((n) => [n]),
+  ];
+  for (const c of fewer) {
+    for (const unit of quick ? [0.5, 0.25] : [0.5]) if (fits(c, unit)) return { counts: c, unit };
+  }
+  return null;
 }
 
 /** Beats the grid takes at `bpm` (a slot is a beat, or two on a fast tempo). */
@@ -222,11 +253,30 @@ export const montageGrid: TemplateSpec = {
   build(input: TemplateInput): TemplateOutput {
     const { content, layout, frames, beats, media, frame } = input;
     const { W, H } = layout;
-    const r = resolve(content, layout);
+    const asked = resolve(content, layout);
     const files = content.fileIds ?? [];
     if (files.length === 0) refuse("grid needs file_ids: the clips or photos that fill the tiles");
     if (files.length > MAX_FILES) refuse(`grid shows at most ${MAX_FILES} files`);
-    const finish = r.merge || r.zoomInto !== null;
+    const finish = asked.merge || asked.zoomInto !== null;
+
+    // Fit the tiles to the length given (agents pick a duration and a tile count separately): fill faster, or show fewer.
+    const fitted = fitSchedule(asked.counts, TILE_COUNTS[asked.layout], finish, beats, frames);
+    if (!fitted) {
+      const seconds = beats.time(slotsOf(asked.counts, finish).end * 0.5) - beats.time(0);
+      refuse(`grid with ${asked.counts.join(", ")} tiles needs at least ${seconds.toFixed(1)} s at this tempo; give a longer duration_seconds or fewer tiles`);
+    }
+    const unit = fitted.unit;
+    const length = `${(frames / frame.fps).toFixed(1)} s`;
+    const warnings: string[] = [];
+    const last = fitted.counts[fitted.counts.length - 1]!;
+    const zoomInto = asked.zoomInto === null ? null : Math.min(asked.zoomInto, last);
+    if (fitted.counts.join() !== asked.counts.join()) {
+      warnings.push(`grid with ${asked.counts.join(", ")} tiles does not fit ${length} at this tempo; showing ${fitted.counts.join(", ")} tiles instead (give a longer duration_seconds for all of them)`);
+      if (zoomInto !== asked.zoomInto) warnings.push(`zoom_into ${asked.zoomInto} is past the ${last} tiles shown; zooming into tile ${zoomInto}`);
+    } else if (unit < 0.5) {
+      warnings.push(`grid with ${asked.counts.join(", ")} tiles fills a tile every quarter beat to fit ${length} (give a longer duration_seconds for one per beat)`);
+    }
+    const r: Resolved = { ...asked, counts: fitted.counts, zoomInto };
     const region = bandRect(frame, r.band);
     const stages = r.counts.map((count) => tileRects(r.layout, count, region, r.gutter));
     const floor = MIN_TILE * Math.min(W, H);
@@ -237,14 +287,7 @@ export const montageGrid: TemplateSpec = {
       }
     });
 
-    // The unit of the schedule: the largest that fits the template's length.
     const need = slotsOf(r.counts, finish);
-    const units = [...new Set([beats.step, 1, 0.5])];
-    const unit = units.find((v) => beats.frame(need.end * v) <= frames);
-    if (unit === undefined) {
-      const seconds = beats.time(need.end * 0.5) - beats.time(0);
-      refuse(`grid with ${r.counts.join(", ")} tiles needs at least ${seconds.toFixed(1)} s at this tempo; give a longer duration_seconds or fewer tiles`);
-    }
     // Spare length goes to holding the full grid before the finish, never more than a few slots.
     let fit = need.end;
     while (beats.frame((fit + 1) * unit) <= frames) fit += 1;
@@ -345,6 +388,6 @@ export const montageGrid: TemplateSpec = {
       before = current;
     }
     if (finish) cues.add(actionAt);
-    return { elements, cues: [...cues] };
+    return { elements, cues: [...cues], ...(warnings.length > 0 ? { warnings } : {}) };
   },
 };
