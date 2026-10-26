@@ -10,7 +10,7 @@
  * swaps the media of every clip that plays it, in one undo step. The spec
  * lives on the file record (`zenvi_link`, kind "zenvi-motion",
  * links/zenvi-link.ts). Rendering is the host's (`MotionHost`): only hosts
- * that can run Chrome (the CLI, `zenvi mcp`) list these tools.
+ * that can run Chrome (the CLI, `zenvi mcp`, Zenvi Cloud) list these tools.
  */
 
 import { z } from "zod";

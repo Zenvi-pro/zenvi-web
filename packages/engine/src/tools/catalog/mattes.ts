@@ -88,7 +88,7 @@ async function subjectOf(call: ToolCall, composite: CompositeTool, id: string, w
     toolError(
       unavailableMessage(
         tool,
-        `${fileLabel(file)} has no ${kind} matte yet and this host cannot make one (subject matting runs in the zenvi CLI with onnxruntime-node: zenvi call generate_subject_matte_tool)`,
+        `${fileLabel(file)} has no ${kind} matte yet and this host cannot make one (subject matting runs in the zenvi CLI with onnxruntime-node, zenvi call generate_subject_matte_tool, and in Zenvi Cloud)`,
       ),
     );
   }

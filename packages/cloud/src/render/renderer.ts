@@ -7,7 +7,7 @@
  * a clear message while queues and job records keep working.
  */
 
-import type { AudioEnvelope, ExportOptions, MixPcm, Project, ReaderInfo, Transcription } from "@zenvi/engine";
+import type { AudioEnvelope, ExportOptions, MatteHost, MixPcm, MotionHost, Project, ReaderInfo, Transcription } from "@zenvi/engine";
 import type { TranscribeFileOptions } from "@zenvi/render-node";
 
 /**
@@ -100,6 +100,20 @@ export type FontLister = () => Promise<string[]>;
  * up in pieces).
  */
 export type SpeechTranscriber = (filePath: string, options: TranscribeFileOptions) => Promise<Transcription>;
+
+/**
+ * A host that renders next to local files, made for one tool call: it writes
+ * under `workDir` (the call's scratch folder, removed after the call) and
+ * reads media through `resolveMedia`, which knows the local copies the call
+ * fetched before rendering.
+ */
+export type LocalHostFactory<T> = (options: { workDir: string; resolveMedia: (projectPath: string) => string }) => T;
+
+/** Zenvi Motion blocks (`@zenvi/motion/node` `createMotionHost`, headless Chrome). */
+export type MotionHostFactory = LocalHostFactory<MotionHost>;
+
+/** Subject mattes (`@zenvi/render-node` `createNodeMatteHost`, Robust Video Matting in onnxruntime-node). */
+export type MatteHostFactory = LocalHostFactory<MatteHost>;
 
 export class RendererUnavailableError extends Error {
   constructor(what = "renderer") {

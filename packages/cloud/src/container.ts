@@ -21,7 +21,18 @@ import { OAuthService } from "./oauth/service.js";
 import { GenerationService } from "./generation/service.js";
 import { MediaCache } from "./render/cache.js";
 import type { RenderDispatch } from "./render/dispatch.js";
-import type { AssetSource, AudioAnalyzer, FontLister, MediaProber, MixRenderer, PcmDecoder, Renderer, SpeechTranscriber } from "./render/renderer.js";
+import type {
+  AssetSource,
+  AudioAnalyzer,
+  FontLister,
+  MatteHostFactory,
+  MediaProber,
+  MixRenderer,
+  MotionHostFactory,
+  PcmDecoder,
+  Renderer,
+  SpeechTranscriber,
+} from "./render/renderer.js";
 import { unavailableProber, unavailableRenderer } from "./render/renderer.js";
 import { RenderService } from "./render/service.js";
 import { TokenRepo } from "./repos/tokens.js";
@@ -68,6 +79,10 @@ export interface Dependencies {
   fontFamilies?: FontLister;
   /** Hands renders to render workers (`render/dispatch.ts`); absent = renders run in this process. */
   renderDispatch?: RenderDispatch;
+  /** Renders Zenvi Motion blocks (headless Chrome); absent = the motion block tools are not listed. */
+  motion?: MotionHostFactory;
+  /** Makes subject mattes (onnxruntime-node); absent = composites reuse mattes already in the bin. */
+  mattes?: MatteHostFactory;
 }
 
 export interface Services {
@@ -100,6 +115,8 @@ export interface Services {
   resolveAsset: ((projectPath: string) => string | undefined) | null;
   transcribeMedia: SpeechTranscriber | null;
   fontFamilies: FontLister | null;
+  motion: MotionHostFactory | null;
+  mattes: MatteHostFactory | null;
   transcripts: RecentTranscripts;
   limiter: RateLimiter;
   engine: EngineRegistry | null;
@@ -198,6 +215,8 @@ export function createServices(deps: Dependencies): Services {
     resolveAsset: deps.resolveAsset ?? null,
     transcribeMedia: deps.transcribeMedia ?? null,
     fontFamilies: deps.fontFamilies ?? null,
+    motion: deps.motion ?? null,
+    mattes: deps.mattes ?? null,
     transcripts: new RecentTranscripts(clock),
     limiter: new RateLimiter(clock),
     engine: deps.engine ?? null,
