@@ -997,6 +997,10 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
   },
 
+  unify_grade_tool: {
+    happy: { args: { timeline_clip_ids: [IDS.clipA, IDS.clipB], dry_run: true }, summary: /^Dry run: \d+ of 2 clip\(s\) brought within the band/ },
+    failure: { args: { timeline_clip_ids: [IDS.clipA], reference_clip_id: "NOPE" }, status: "refused", summary: /^Error: reference clip NOPE not found$/ },
+  },
   add_motion_template_tool: {
     happy: {
       args: { template: "end_card", text: "Northwind", subtitle: "Brews in four minutes", position_seconds: "1", bpm: "120" },
