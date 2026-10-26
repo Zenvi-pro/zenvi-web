@@ -13,7 +13,7 @@
  * Offset), so the picture never leaves the canvas; scale only grows (>= 1),
  * and rotation is paired with the smallest scale that still covers the
  * canvas at that angle. Timing and easing follow docs/TASTE.md: exits
- * `in` (0.70, 0, 0.84, 0), entrances `out` (0.16, 1, 0.30, 1).
+ * `in` (0.70, 0, 0.84, 0); landings a cubic-out (see `easeLand`).
  */
 
 export const MOTION_TRANSITION_IDS = [
@@ -187,6 +187,12 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number, u: n
 export const easeIn = (u: number): number => cubicBezier(0.7, 0, 0.84, 0, u);
 /** docs/TASTE.md `out` / entrance: fast off the cut, settles slowly. */
 export const easeOut = (u: number): number => cubicBezier(0.16, 1, 0.3, 1, u);
+/**
+ * Cubic-out (0.33, 1, 0.68, 1), the incoming side's landing. Sampled at whole
+ * frames, `out` is ~70 % settled after one frame of a 5-frame landing, so the
+ * smear vanishes on the cut; cubic-out keeps it visible for 2-3 frames.
+ */
+export const easeLand = (u: number): number => cubicBezier(0.33, 1, 0.68, 1, u);
 
 /** Smallest scale at which a canvas-sized picture rotated by `degrees` still covers the canvas. */
 export function coverScale(degrees: number, aspect: number): number {
@@ -239,11 +245,11 @@ const JITTER_R = [0.6, -1, 0.75, -0.4, 0.9, -0.8, 0.35, -0.6, 1, -0.5, 0.7, -0.9
 
 /** Glitch beats per frame, cut outward: RGB split, block offset, pixelation. */
 const GLITCH = [
-  { rgb: 1, shift: 0.09, pix: 0.32 },
+  { rgb: 1, shift: 0.09, pix: 0.55 },
   { rgb: 0.7, shift: -0.14, pix: 0 },
-  { rgb: 1, shift: 0.05, pix: 0.2 },
+  { rgb: 1, shift: 0.05, pix: 0.4 },
   { rgb: 0.45, shift: -0.06, pix: 0 },
-  { rgb: 0.8, shift: 0.11, pix: 0.26 },
+  { rgb: 0.8, shift: 0.11, pix: 0.5 },
 ];
 
 function windowCue(kind: SfxKind) {
@@ -398,10 +404,10 @@ const PRESETS: readonly PresetDef[] = [
       // Glitches flicker rather than ease: full strength on every frame but the outermost.
       const g = Math.min(1, ctx.intensity) * (ctx.a > 0.15 ? 1 : 0.5);
       return {
-        "ColorShift.red_x": 0.018 * ctx.intensity * beat.rgb * g,
-        "ColorShift.blue_x": -0.018 * ctx.intensity * beat.rgb * g,
+        "ColorShift.red_x": 0.03 * ctx.intensity * beat.rgb * g,
+        "ColorShift.blue_x": -0.03 * ctx.intensity * beat.rgb * g,
         "Shift.x": beat.shift * Math.min(2, ctx.intensity) * g,
-        "Pixelate.pixelization": Math.min(0.6, beat.pix * ctx.intensity) * g,
+        "Pixelate.pixelization": Math.min(0.7, beat.pix * ctx.intensity) * g,
       };
     },
     cues: windowCue("glitch"),
@@ -510,7 +516,7 @@ export function planMotionTransition(input: MotionTransitionPlanInput): MotionTr
     for (let k = 0; k < n; k += 1) {
       // Outgoing: rest at k = -1, full at the last frame. Incoming: continues the motion one step past the
       // peak (or, for flashes, peaks on its first frame) and rests one frame after the window.
-      const a = s === "out" ? easeIn((k + 1) / n) : def.peakOnIn ? (1 - k / n) ** 2 : 1 - easeOut((k + 1) / (n + 1));
+      const a = s === "out" ? easeIn((k + 1) / n) : def.peakOnIn ? (1 - k / n) ** 2 : 1 - easeLand((k + 1) / (n + 1));
       const values = def.frame({ side: s, k, n, a, dir, intensity, aspect: input.aspect, focus });
       const rounded: MotionFrameValues = {};
       for (const [ch, v] of Object.entries(values) as [MotionChannel, number][]) rounded[ch] = round6(v);
