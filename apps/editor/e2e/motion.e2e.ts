@@ -136,14 +136,22 @@ test("make it snappy runs as separate undo steps with one summary toast", async 
   const before = await undoButton(page).getAttribute("aria-label");
 
   await page.getByRole("button", { name: "Make it snappy" }).first().click();
-  // 3 steps here (gaps, transitions, sound); 4 once master_audio_tool is in the catalog.
-  const summary = toastWith(page, /Made it snappy: \d undo steps/);
+  // One line of what changed first; every step's summary under Details.
+  const summary = toastWith(page, "Made it snappy");
   await expect(summary).toBeVisible({ timeout: 60_000 });
-  const steps = Number(/Made it snappy: (\d)/.exec((await summary.textContent()) ?? "")?.[1]);
-  expect(steps).toBeGreaterThanOrEqual(3);
+  await expect(summary).toContainText(/\d+ transitions? · \d+ sounds?/);
+  await expect(summary).toContainText(/Not mastered|mastered to −\d+ LUFS/);
+  const details = summary.getByText("Details");
+  await expect(summary.getByText(/Close frame gaps:/)).toBeHidden();
+  await details.click();
   await expect(summary).toContainText("Close frame gaps");
   await expect(summary).toContainText("Motion transitions");
-  await expect(summary).toContainText("Sound design");
+  await expect(summary).toContainText(/Sound design: Sound-designed the edit \(hype\)/);
+  // 3 steps here (gaps, transitions, sound); 4 once master_audio_tool is in the catalog.
+  const steps = Number(/(\d) undo steps/.exec((await summary.textContent()) ?? "")?.[1]);
+  expect(steps).toBeGreaterThanOrEqual(3);
+  await shot(page, "18b-snappy-details");
+  await details.click();
   expect(await clips(page).count()).toBeGreaterThan(3);
   await page.waitForTimeout(600);
   await shot(page, "18-snappy-done");
