@@ -42,9 +42,15 @@ match_cut_montage_tool {
   "music_file_id": "<track>",
   "duration_seconds": 15,
   "min_frames": 3, "max_frames": 8,
-  "flash": true, "zoom_drift": 0.04
+  "flash": true, "zoom_drift": 0.04,
+  "target": {"x": 0.5, "y": 0.5, "size": 0.4}
 }
 ```
+
+   `target.size` 0.3-0.45 (a circle a third of the frame tall) keeps the
+   chain readable; with the default the subjects grow until the smallest
+   source fills the frame. Pose files are aligned by their box too, so put
+   the pose pair first and the circles after.
 
    Its receipt has the beats and the shots; it already aligns every shot
    (`cover: zoom_all`) and puts white flashes on downbeats.
@@ -63,6 +69,9 @@ match_cut_montage_tool {
 
 Read the receipt: a shot scaled above about 2.5x is soft and was aligned on
 the wrong thing; fix its box (or drop the file) and rerun with `replace: true`.
+Too dark to read (a black lamp shade, a night shot): drop it. The payoff shot
+holds 1.5-2.5 s; if the last shot is longer, lower `duration_seconds` or add
+files.
 
 `inspect_timeline_tool overview: true`, then `preview_frame` on 5 consecutive
 chain cuts (`grid: true`): the circle's centre within ±0.03 and its size
