@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getLong } from "../keyframe/evaluate.js";
 import { findClip } from "../model/query.js";
+import { planFrame } from "../render/plan/frame-plan.js";
 import type { Clip } from "../model/types.js";
 import { addClip, setClipSpeed } from "./clips.js";
 import { applySpeedRamp, planSpeedRamp, type RampRequest } from "./speed-ramp.js";
@@ -81,6 +82,20 @@ describe("planSpeedRamp / applySpeedRamp", () => {
     expect(plan.minSpeed).toBeLessThan(0.15);
     // The speed is continuous: no frame-to-frame jump anywhere on the curve.
     for (let i = 1; i < plan.speeds.length - 1; i += 1) expect(Math.abs(plan.speeds[i]! - plan.speeds[i - 1]!)).toBeLessThan(0.5);
+  });
+
+  it("the frame planner shows the planned source frame on every timeline frame, and plays exactly the clip's length", () => {
+    const doc = docWithClip();
+    const plan = ramp(doc, { preset: "velocity", hitAt: 3 });
+    const first = Math.round(1 * FPS) + 1; // clip at 1 s
+    const y = shown(clipOf(doc), plan.frames);
+    for (let i = 0; i < plan.frames; i += 1) {
+      const layers = planFrame(doc.project, first + i).layers;
+      expect(layers, `frame ${i}`).toHaveLength(1);
+      const source = layers[0]!.source;
+      expect(source.kind === "video" ? source.frame : -1).toBe(y[i]);
+    }
+    expect(planFrame(doc.project, first + plan.frames).layers).toHaveLength(0);
   });
 
   it("without hit_at the slow moment sits on the middle of the footage", () => {
