@@ -10,7 +10,7 @@ moment: the landing.
 | t (s) | scene | tool |
 | --- | --- | --- |
 | 0-3.5 | prompt bar types the wish, pointer clicks send, "Generating…" | `prompt_bar` full frame, `palette: "light"` |
-| 3.5-4.5 | icons/particles burst from the send button | `particle_burst` over it (`shape: "square"`, `rings: true`) |
+| 3.5-4.5 | icons/particles burst from the send button | `particle_burst` over it (`shape: "confetti"`, `rings: true`) |
 | 4.5-8 | the product spins in, lands, camera glides | `add_3d_scene_tool` `device_mockup` (`move: "hero"`) or `glass_hero`; or the AI product still with a scale/rotation pop |
 | 8-11 | callout chips around the product | `hud_callouts` over video (`grid: "none"`, `labels`, `values`, `points`) |
 | 11-12 | name / tagline | `kinetic_headline` `style: "pop"` |
@@ -30,7 +30,7 @@ moment: the landing.
 add_motion_block_tool {"block": "prompt_bar", "position_seconds": 0, "duration_seconds": 3.5, "placement": "full_frame",
   "params": {"prompt": "I want a minimal portable music player", "status": "Generating…", "palette": "light", "cursor": true}}
 add_motion_block_tool {"block": "particle_burst", "position_seconds": 3.3, "duration_seconds": 1.2,
-  "params": {"shape": "square", "count": 60, "origin": [{"x": 0.5, "y": 0.55}], "rings": true}}
+  "params": {"shape": "confetti", "count": 60, "origin": [{"x": 0.5, "y": 0.55}], "rings": true}}
 ```
 
 3. 3D (CLI with Blender): a draft first; look at it, then

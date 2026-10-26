@@ -9,7 +9,7 @@ Confident, fast-in long-settle motion, one signature colour.
 
 | t (s) | what | tool |
 | --- | --- | --- |
-| 0-1.5 | a dot / ring grows, bursts into lines, white flash | `particle_burst` (`shape: "streak"`) + `flash_white` |
+| 0-1.5 | a dot / ring grows, bursts into lines, white flash | `particle_burst` (`shape: "lines"`) + `flash_white` |
 | 1.5-4 | 3D initial or word tumbles in, light sweeps | `add_3d_scene_tool` `title_3d` (`style: "chrome"`, `animation: "tumble"`) |
 | 4-7 | the name, then what they do | `kinetic_headline` `style: "rise"`, `word_rotator` |
 | 7-11 | project tiles fill, camera pushes into one | `grid` `zoom_into` |
