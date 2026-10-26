@@ -20,7 +20,7 @@ import { isAudioOnlyMedia } from "../../model/media.js";
 import type { Clip, Project } from "../../model/types.js";
 import { deleteClips } from "../../ops/clips.js";
 import { isAutoSfxClip, isSfxClip, soundMoments, type BeatGrid } from "../../sfx/moments.js";
-import { SFX_INTENSITIES, musicClimax, planSoundDesign, type SfxCue, type TimelineBeat } from "../../sfx/plan.js";
+import { CLIMAX_TAIL, SFX_INTENSITIES, musicClimax, planSoundDesign, type SfxCue, type TimelineBeat } from "../../sfx/plan.js";
 import { SFX_RECIPES, SFX_RECIPE_IDS, sfxRecipe, type SfxFamily } from "../../sfx/recipes.js";
 import type { SfxParams } from "../../sfx/render.js";
 import { getEffectiveAiMetadata } from "../ai-metadata.js";
@@ -147,7 +147,9 @@ async function analyseMusic(call: ToolCall, bed: Clip | undefined, args: AutoInp
   const tracked = await trackBed(call, bed, duration);
   if (args.beats && args.beats.length >= 2) {
     const beats = [...args.beats].sort((a, b) => a - b);
-    return { ...tracked, grid: { beats, downbeats: beats.filter((_, i) => i % 4 === 0) }, note: undefined };
+    // Given beats replace the grid, not the climax: still say when none was found.
+    const note = tracked.note && tracked.climax === null && args.climax_seconds === undefined ? "The music could not be analysed, so no climax was found and no riser or impact is placed (pass climax_seconds)." : undefined;
+    return { ...tracked, grid: { beats, downbeats: beats.filter((_, i) => i % 4 === 0) }, note };
   }
   return tracked;
 }
@@ -327,6 +329,10 @@ export const soundDesignTools: CatalogTool[] = [
       const found = args.climax_seconds ?? music.climax;
       const climax = found === null ? null : snapToFrame(project, found);
       if (climax !== null && climax > duration) return refused(AUTO, `Error: climax_seconds (${climax}) is after the end of the edit (${duration.toFixed(2)} s).`);
+      // The planner drops a climax with no picture left for its impact: say so instead of silently placing none.
+      if (args.climax_seconds !== undefined && climax !== null && climax > duration - CLIMAX_TAIL) {
+        return refused(AUTO, `Error: climax_seconds (${climax}) leaves less than ${CLIMAX_TAIL} s of picture for its impact (the edit ends at ${duration.toFixed(2)} s); pick an earlier moment.`);
+      }
       const moments = soundMoments(project, music.grid);
       if (moments.length === 0 && climax === null) {
         return refused(AUTO, "Error: nothing to sound-design: the timeline has no cuts, transitions, titles or flashes, and no climax (pass climax_seconds).");

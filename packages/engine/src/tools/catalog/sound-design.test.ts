@@ -307,6 +307,12 @@ describe("auto_sound_design_tool", () => {
     const d = data<{ climax: number; cues: { recipe: string; at: number }[] }>(given);
     expect(d.climax).toBe(16);
     expect(d.cues.some((c) => c.recipe === "impact_boom" && c.at === 16)).toBe(true);
+    expect((given.data as { warnings: string[] }).warnings).toHaveLength(0);
+
+    // Beats alone replace the grid, not the climax the host could not find: the warning stays.
+    const beatsOnly = await runTool({ doc: editProject(), host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", { beats: Array.from({ length: 40 }, (_, i) => i * 0.5) });
+    expect(beatsOnly.ok, beatsOnly.text).toBe(true);
+    expect((beatsOnly.data as { warnings: string[] }).warnings.join(" ")).toMatch(/no climax was found/);
   });
 
   it("keeps the climax from the music when beats are given, and measures the edit by its picture", async () => {
@@ -386,7 +392,7 @@ describe("auto_sound_design_tool", () => {
     expect(doc.project.clips.filter(isAutoSfxClip)).toHaveLength(0);
   });
 
-  it("refuses an empty timeline and a climax past the end, leaving history untouched", async () => {
+  it("refuses an empty timeline and a climax past or on the end, leaving history untouched", async () => {
     const empty = new ProjectDocument(createProject({ id: "EMPTYPROJ1" }));
     const host = fakeHost();
     const none = await runTool({ doc: empty, host }, "auto_sound_design_tool", {});
@@ -395,6 +401,10 @@ describe("auto_sound_design_tool", () => {
     const doc = editProject();
     const late = await runTool({ doc, host }, "auto_sound_design_tool", { climax_seconds: 99 });
     expect(late.ok).toBe(false);
+    // On the last frames there is no picture left for the impact: refused, not silently dropped.
+    const edge = await runTool({ doc, host }, "auto_sound_design_tool", { climax_seconds: 19.9 });
+    expect(edge.ok).toBe(false);
+    expect(edge.text).toMatch(/less than 0.25 s of picture/);
     expect(doc.undoLabels).toHaveLength(0);
     expect(host.written.size).toBe(0);
   });
