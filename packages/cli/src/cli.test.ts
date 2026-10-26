@@ -246,6 +246,7 @@ describe("zenvi render options", () => {
     expect(exportOptionsFrom(project, undefined, { loudness: "-16.5" }).loudness).toEqual({ targetLufs: -16.5, truePeakDbtp: -1 });
     expect(() => exportOptionsFrom(project, undefined, { loudness: "loud" })).toThrow(/--loudness/);
     expect(() => exportOptionsFrom(project, undefined, { loudness: "3" })).toThrow(/--loudness/);
+    expect(() => exportOptionsFrom(project, undefined, { loudness: "constructor" })).toThrow(/--loudness/);
   });
 });
 

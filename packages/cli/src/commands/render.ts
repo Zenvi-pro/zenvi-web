@@ -46,7 +46,7 @@ export interface RenderFlags {
 export function parseLoudness(text: string | undefined): ExportOptions["loudness"] {
   const t = text?.trim().toLowerCase();
   if (!t || t === "off" || t === "none") return undefined;
-  const preset = MASTER_PRESETS[t as keyof typeof MASTER_PRESETS];
+  const preset = Object.hasOwn(MASTER_PRESETS, t) ? MASTER_PRESETS[t as keyof typeof MASTER_PRESETS] : undefined;
   if (preset) return { targetLufs: preset.targetLufs, truePeakDbtp: preset.ceilingDbtp };
   const lufs = Number(t);
   if (Number.isFinite(lufs) && lufs >= -40 && lufs <= -6) return { targetLufs: lufs, truePeakDbtp: -1 };
