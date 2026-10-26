@@ -103,6 +103,8 @@ export async function build(ctx: BlockContext): Promise<void> {
     const clickAt = hoverAt + 0.95;
     ptr.moveTo(bx, by, clickAt - 0.5, 0.45);
     ptr.click(clickAt);
+    // Colours have no rest value in the timeline: state the starting one, so seeking back restores it.
+    tl.set(button, { backgroundColor: ctx.palette.accent }, 0);
     tl.to(button, { scale: 0.92 }, { at: clickAt, duration: 0.08, ease: "out" });
     tl.to(button, { scale: 1, backgroundColor: ctx.palette.ink }, { at: clickAt + 0.08, duration: 0.3, ease: "back-out" });
     tl.to(label, { opacity: 0, y: -10 }, { at: clickAt + 0.05, duration: 0.2, ease: "exit" });

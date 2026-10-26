@@ -192,6 +192,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   tl.track(typewriter(typed, text, { at: typeAt, cps }));
   tl.track(caretBlink(caret, (t) => t >= typeAt && t < typedEnd + 0.1));
   tl.to(caret, { opacity: 0 }, { at: sendAt, duration: 0.15, ease: "smooth" });
+  tl.set(send, { backgroundColor: palette.ink }, 0);
   tl.to(send, { scale: 0.86, backgroundColor: palette.accent }, { at: sendAt, duration: 0.08, ease: "out" });
   tl.to(send, { scale: 1 }, { at: sendAt + 0.08, duration: 0.3, ease: "back-out" });
   if (divider) tl.fromTo(divider, { opacity: 0, scaleX: 0.6 }, { opacity: 1, scaleX: 1 }, { at: openAt + open * 0.5, duration: 0.5, ease: "out" });
@@ -216,12 +217,12 @@ export async function build(ctx: BlockContext): Promise<void> {
   if (ref?.kind === "video") {
     // A video's backdrop changes every frame: read it once the frame has decoded, before the capture.
     tl.track((t) => {
-      const ready = bg.decode().catch(() => undefined).then(() => paint(t, backdrop(bg, bg.naturalWidth, bg.naturalHeight, W, H, 18 * scale, ctx.doc)));
+      const ready = (bg.decode?.() ?? Promise.resolve()).catch(() => undefined).then(() => paint(t, backdrop(bg, bg.naturalWidth, bg.naturalHeight, W, H, 18 * scale, ctx.doc)));
       ctx.pending.add(ready);
       void ready.finally(() => ctx.pending.delete(ready));
     });
   } else {
-    await bg.decode().catch(() => undefined);
+    await (bg.decode?.() ?? Promise.resolve()).catch(() => undefined);
     still = backdrop(bg, bg.naturalWidth, bg.naturalHeight, W, H, 18 * scale, ctx.doc);
     tl.track((t) => paint(t, still));
   }

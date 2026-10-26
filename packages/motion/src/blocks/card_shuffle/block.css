@@ -1,0 +1,7 @@
+.cs-stage { position: absolute; inset: 0; perspective: 1800px; }
+.cs-card { position: absolute; border-radius: var(--radius); overflow: hidden; background: var(--surface); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.5); }
+.cs-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cs-shine { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.5) 48%, rgba(255,255,255,0) 62%); mix-blend-mode: soft-light; }
+.cs-shadow { position: absolute; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--ink) 34%, transparent), transparent); }
+.cs-names { position: absolute; left: 0; right: 0; overflow: hidden; text-align: center; }
+.cs-name { position: absolute; left: 0; right: 0; top: 0; font-family: var(--font-display); font-weight: 650; letter-spacing: -0.03em; line-height: 1.1; color: var(--ink); }

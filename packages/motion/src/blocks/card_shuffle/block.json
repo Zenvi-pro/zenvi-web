@@ -1,0 +1,109 @@
+{
+  "id": "card_shuffle",
+  "version": 1,
+  "title": "Card shuffle",
+  "description": "One card that flips through variants of its picture \u2014 colourways, styles, takes \u2014 faster and faster, holds for a breath, then lands on the last one with a pop while its name rolls in underneath. For 'pick a look', 'every style', options or before/after beats. Give media_1 to media_6 (bin file ids); without them a drawn character in different colourways is used.",
+  "tags": [
+    "card",
+    "flip",
+    "variants",
+    "shuffle",
+    "options",
+    "styles",
+    "character",
+    "promo"
+  ],
+  "duration": {
+    "default": 4.5,
+    "min": 2.5,
+    "max": 10
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": false,
+  "tokens": {
+    "palette": "lilac",
+    "radius": 44
+  },
+  "params": {
+    "media_1": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Variant 1 of the card's picture (file id)."
+    },
+    "media_2": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Variant 2 of the card's picture (file id)."
+    },
+    "media_3": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Variant 3 of the card's picture (file id)."
+    },
+    "media_4": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Variant 4 of the card's picture (file id)."
+    },
+    "media_5": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Variant 5 of the card's picture (file id)."
+    },
+    "media_6": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Variant 6 of the card's picture (file id)."
+    },
+    "names": {
+      "type": "strings",
+      "maxItems": 6,
+      "maxLength": 24,
+      "default": [
+        "Mint",
+        "Glacier",
+        "Amber",
+        "Plum",
+        "Meadow",
+        "Neon"
+      ],
+      "description": "A name under the card for each variant, in order (empty: no names)."
+    },
+    "variants": {
+      "type": "integer",
+      "min": 2,
+      "max": 6,
+      "default": 6,
+      "description": "How many variants it flips through when no media is given (with media: one per given file)."
+    }
+  }
+}
