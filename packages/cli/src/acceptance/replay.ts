@@ -245,7 +245,7 @@ export function normaliseMessage(summary: string): string {
     .split("\n")[0]!
     .replace(ID_IN_TEXT, "<id>")
     .replace(/'[^']{1,80}\.(mp4|mp3|ogg|wav|png|jpg|mov)'/g, "'<file>'")
-    .replace(/-?\d+(\.\d+)?/g, "N")
+    .replace(/\d+(\.\d+)?/g, "N")
     .slice(0, 220);
 }
 
@@ -268,10 +268,6 @@ const PROPOSALS: Array<{ tool?: string; pattern: RegExp; proposal: string }> = [
     proposal: "Clamp duration_seconds into the block's min-max and warn instead of refusing (the agent wanted 'about this long'); the receipt says the length used.",
   },
   {
-    pattern: /must be one of/,
-    proposal: "Accept near-miss enum values the agent clearly meant (plural 'dots' for 'dot', 'bottom' for 'lower', 'ui_light' for 'light') through per-param aliases, and list the valid values in the refusal (already done).",
-  },
-  {
     pattern: /already has .* during .*pick another track/,
     proposal: "When the agent names an occupied track for a title/overlay, place it on the first free track above (as with an empty track) and warn, instead of refusing.",
   },
@@ -287,8 +283,17 @@ const PROPOSALS: Array<{ tool?: string; pattern: RegExp; proposal: string }> = [
     pattern: /no (video )?effect matches/,
     proposal: "list_effects_tool should fall back to Zenvi FX / look ids for words it lacks (vignette, invert are apply_fx_tool / apply_look ids) and say which tool has them.",
   },
-  { pattern: /Unknown lookId/, proposal: "Map common look names (teal_orange) to the nearest look preset id, or list the closest ids in the refusal." },
-  { pattern: /size must be at least N/, proposal: "Clamp block text size params into range and warn (the agent passed max_size below the floor)." },
+  { pattern: /Unknown lookId/, proposal: "Map common look names (teal_orange, teal_orange_cinema) to the nearest look preset id, or list the closest ids in the refusal." },
+  { pattern: /size must be at least N|radius must be at most N/, proposal: "A block default outside its own range (word_rotator size 0, logo_reveal_end radius 999): fixed in this branch; the manifest test checks filled defaults now." },
+  { pattern: /shape must be one of/, proposal: "particle_burst v2 renamed its shapes: fixed in this branch (enum aliases for the v1 names, and a wrong plural is taken)." },
+  { pattern: /grid with N tiles needs at least N s/, proposal: "Fit the tiles to the duration given (fewer tiles, or a faster fill) and say so in a warning, instead of refusing." },
+  { pattern: /needs text \(or subtitle \/ lines\)/, proposal: "Agents send a blank title (text=' ') for a solid colour card: accept it for Solid_Color-style templates, or point at add_motion_block_tool / a colour clip." },
+  { pattern: /Additional properties are not allowed \('bpm'/, proposal: "build_reel_tool: accept bpm (beats every 60/bpm s from the first downbeat) or refuse naming beats=, which it does take." },
+  {
+    pattern: /must be one of/,
+    proposal: "Accept near-miss enum values the agent clearly meant (plural 'dots' for 'dot', 'bottom' for 'lower', 'ui_light' for 'light') through per-param aliases, and list the valid values in the refusal (already done).",
+  },
+  { pattern: /Provide startFrame, or clipId\+start\+end/, proposal: "inspect_timeline_tool: accept start/end in seconds without clipId (the agent's reading of the watchSuggested names)." },
 ];
 
 function proposalFor(tool: string, message: string): string | undefined {
