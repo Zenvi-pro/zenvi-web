@@ -21,7 +21,9 @@ zenvi() { (cd "$out" && npx --prefix "$root" tsx "$root/packages/cli/src/bin.ts"
 cd "$out"
 ffmpeg -v error -y -i demo.mp4 -vn -c:a pcm_s16le demo.wav
 
-zenvi --json call search_sfx_tool query=whoosh provider=openverse count=5 > search-whoosh.json
+# An uncached Openverse search can time out once (it checks every link) and answer at once when asked again.
+zenvi --json call search_sfx_tool query=whoosh provider=openverse count=5 > search-whoosh.json ||
+  zenvi --json call search_sfx_tool query=whoosh provider=openverse count=5 > search-whoosh.json
 
 zenvi --json call create_sound_kit_tool name=Dark tone=dark seed=3 > kit-dark.json
 zenvi --json call auto_sound_design_tool intensity=hype > sound-design-kit.json
