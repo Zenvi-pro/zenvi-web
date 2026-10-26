@@ -6,7 +6,9 @@
  * Arguments and checks may reference earlier results with `${...}`:
  * `${fixtures.clipA}` is a generated media file's absolute path,
  * `${work}` the scenario's working folder, and `${<step id>.<path>}` a value
- * from that step's receipt (`${add.clips[0].id}`, `${import.data.fileIds}`).
+ * from that step's receipt (`${add.clips[0].id}`, `${import.data.fileIds}`);
+ * `${<step id>.ids[n]}` is the n-th id named in its summary (the desktop's
+ * import receipt has its file ids only there).
  * A string that is exactly one reference keeps the value's type (an array of
  * ids stays an array); references inside longer strings are spliced in.
  */
@@ -91,7 +93,12 @@ const stepSchema = z
     /** Only these runners (default: every runner that lists the tool). */
     runners: z.array(z.enum(["portable", "desktop"])).optional(),
     /** Per-runner replacement for tool/args (the desktop names some tools differently). */
-    on: z.partialRecord(z.enum(["portable", "desktop"]), z.object({ tool: z.string().optional(), args: z.record(z.string(), z.unknown()).optional() }).strict()).optional(),
+    on: z
+      .partialRecord(
+        z.enum(["portable", "desktop"]),
+        z.object({ tool: z.string().optional(), args: z.record(z.string(), z.unknown()).optional(), expect: expectSchema.optional(), checks: z.array(check).optional() }).strict(),
+      )
+      .optional(),
     timeoutSeconds: z.number().positive().default(300),
   })
   .strict();

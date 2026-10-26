@@ -2,45 +2,167 @@
   "id": "kinetic-captions",
   "title": "Kinetic captions on a text-to-speech clip",
   "description": "A talking clip made with the OS voice; kinetic_captions_tool captions it word by word. Transcription runs on the Zenvi server, so without a sign-in the captions step is skipped with the server's reason.",
-  "requires": ["ffmpeg", "say"],
+  "requires": [
+    "ffmpeg",
+    "say"
+  ],
   "budgetSeconds": 120,
   "fixtures": [
     {
       "id": "talk",
       "file": "talk.mp4",
-      "lavfi": ["testsrc2=size=360x640:rate=30:duration=6"],
+      "lavfi": [
+        "testsrc2=size=360x640:rate=30:duration=6"
+      ],
       "say": "Ship faster. Three tools, one edit, zero waiting. This is Zenvi.",
-      "output": ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-shortest"]
+      "output": [
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-ar",
+        "48000",
+        "-shortest"
+      ]
     }
   ],
   "steps": [
-    { "id": "project", "tool": "open_project_file", "args": { "path": "captions.zvn" } },
-    { "id": "format", "tool": "set_project_setting_tool", "args": { "width": 360, "height": 640, "fps": 30 } },
-    { "id": "import", "tool": "import_files_tool", "args": { "paths": "[\"${fixtures.talk}\"]", "skip_indexing": "true" } },
+    {
+      "id": "project",
+      "tool": "open_project_file",
+      "args": {
+        "path": "captions.zvn"
+      },
+      "on": {
+        "desktop": {
+          "tool": "new_project_tool",
+          "args": {
+            "discard_unsaved": true
+          }
+        }
+      }
+    },
+    {
+      "id": "format",
+      "tool": "set_project_setting_tool",
+      "args": {
+        "width": 360,
+        "height": 640,
+        "fps": 30
+      },
+      "expect": {
+        "status": [
+          "applied",
+          "unchanged"
+        ]
+      }
+    },
+    {
+      "id": "import",
+      "tool": "import_files_tool",
+      "args": {
+        "paths": "[\"${fixtures.talk}\"]",
+        "skip_indexing": "true"
+      },
+      "on": {
+        "desktop": {
+          "expect": {
+            "receipt": {
+              "ids": {
+                "length": {
+                  "min": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     {
       "id": "place",
       "tool": "add_clip_to_timeline_tool",
-      "args": { "file_id": "${import.data.fileIds[0]}", "position_seconds": "0", "full_file": "true" }
+      "args": {
+        "file_id": "${import.data.fileIds[0]}",
+        "position_seconds": "0",
+        "full_file": "true"
+      },
+      "on": {
+        "desktop": {
+          "args": {
+            "file_id": "${import.ids[0]}",
+            "position_seconds": "0",
+            "full_file": "true"
+          }
+        }
+      }
     },
     {
       "id": "captions",
       "tool": "kinetic_captions_tool",
-      "args": { "style": "creator", "emphasis": "auto" },
-      "skipWhen": ["sign(ed)? in", "log ?in", "credits", "backend", "transcri(be|ption).*(not available|unavailable|needs)", "SUPABASE"],
-      "expect": { "receipt": { "clips": { "length": { "min": 3 } } } }
+      "args": {
+        "style": "creator",
+        "emphasis": "auto"
+      },
+      "skipWhen": [
+        "sign(ed)? in",
+        "log ?in",
+        "credits",
+        "backend",
+        "transcri(be|ption).*(not available|unavailable|needs)",
+        "SUPABASE"
+      ],
+      "expect": {
+        "receipt": {
+          "clips": {
+            "length": {
+              "min": 3
+            }
+          }
+        }
+      }
     },
     {
       "id": "frame",
       "tool": "preview_frame",
-      "args": { "seconds": 1.5, "width": 180 },
-      "expect": { "image": true },
-      "checks": [{ "kind": "image", "minLuma": 16 }]
+      "args": {
+        "seconds": 1.5,
+        "width": 180
+      },
+      "expect": {
+        "image": true
+      },
+      "checks": [
+        {
+          "kind": "image",
+          "minLuma": 16
+        }
+      ]
     },
     {
       "id": "export",
       "tool": "render_video",
-      "args": { "output": "captions.mp4", "quality": "low" },
-      "checks": [{ "kind": "media", "file": "${work}/captions.mp4", "streams": ["audio", "video"], "loudnessLufs": { "min": -40, "max": -5 } }]
+      "args": {
+        "output": "captions.mp4",
+        "quality": "low"
+      },
+      "checks": [
+        {
+          "kind": "media",
+          "file": "${work}/captions.mp4",
+          "streams": [
+            "audio",
+            "video"
+          ],
+          "loudnessLufs": {
+            "min": -40,
+            "max": -5
+          }
+        }
+      ]
     }
   ]
 }

@@ -155,7 +155,9 @@ async function runStep(
   if (step.runners && !step.runners.includes(target.kind)) return skip(`not run on ${target.kind}`);
   if (!listed.has(tool)) return skip(`${target.kind} does not offer ${tool}`);
   const rawArgs = override?.args ?? step.args;
-  const blocked = [...referencedRoots([rawArgs, step.checks])].map((r) => notDone.get(r)).find(Boolean);
+  const expect = override?.expect ?? step.expect;
+  const checks = override?.checks ?? step.checks;
+  const blocked = [...referencedRoots([rawArgs, checks])].map((r) => notDone.get(r)).find(Boolean);
   if (blocked) return skip(`needs ${blocked}`);
 
   let args: Record<string, unknown>;
@@ -189,16 +191,18 @@ async function runStep(
     record.outcome = "skip";
     return { ...result, outcome: "skip", reason: lacking };
   }
-  const problems = receiptProblems(call, step.expect);
+  // Expectations and references see the receipt plus `ids`: the ids its summary names, in order.
+  const ids = record.summary.match(/\b[A-Z0-9]{10}\b/g) ?? [];
+  const problems = receiptProblems(call.receipt ? { ...call, receipt: { ...call.receipt, ids } } : call, expect);
   if (problems.length > 0) {
     record.outcome = "fail";
     const tail = call.transportError ? target.stderrTail() : "";
     return { ...result, outcome: "fail", reason: problems.join("; ") + (tail ? `\n${tail}` : "") };
   }
-  scope[step.id] = { ...call.receipt, images: call.images.length };
+  scope[step.id] = { ...call.receipt, images: call.images.length, ids };
   if (call.images[0]) await keepImage(call.images[0]);
 
-  for (const check of step.checks) {
+  for (const check of checks) {
     try {
       await runCheck(target, check, call, scope, imageDir, result);
     } catch (error) {
