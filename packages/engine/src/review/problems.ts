@@ -6,6 +6,7 @@
  * edit holds nothing for 2 s, and cuts land on a beat or a hit.
  */
 
+import { REUSE_GAP_SECONDS } from "../reels/plan.js";
 import type { BeatAlignment, MixReview, PaceLimits, PaceProfile, ReviewProblem, Severity, TextBox, TimelineReview } from "./types.js";
 
 export const PACE_LIMITS: Readonly<Record<PaceProfile, PaceLimits>> = {
@@ -188,6 +189,28 @@ export function findProblems(input: ProblemInput): ReviewProblem[] {
         times: uses.map((s) => s.start).slice(0, 8),
         message: `${uses[0]!.name} shows the same part of its source ${uses.length} times.`,
         fix: "Use a different part of the clip or another clip for the repeats.",
+      });
+    }
+  }
+
+  // A clip back on screen within seconds of its last shot: a fast edit that has run out of footage.
+  if (pace === "fast") {
+    const lastEnd = new Map<string, number>();
+    const soon: typeof review.shots = [];
+    for (const shot of review.shots) {
+      const seen = lastEnd.get(shot.fileId);
+      if (seen !== undefined && shot.start - seen < REUSE_GAP_SECONDS - 1e-6) soon.push(shot);
+      lastEnd.set(shot.fileId, Math.max(seen ?? -Infinity, shot.end));
+    }
+    if (soon.length >= 2) {
+      const names = [...new Set(soon.map((s) => s.name))];
+      add({
+        code: "clip-back-soon",
+        severity: "low",
+        at: soon[0]!.start,
+        times: soon.map((s) => s.start).slice(0, 8),
+        message: `${soon.length} shots bring a clip back within ${REUSE_GAP_SECONDS} s of its last shot (${names.slice(0, 4).join(", ")}${names.length > 4 ? ", …" : ""}).`,
+        fix: "Import more clips (about one per shot in any 3 s) and rebuild, or move the repeats at least 3 s apart.",
       });
     }
   }

@@ -137,6 +137,15 @@ describe("findProblems", () => {
     expect(codes).toContain("repeated-footage");
   });
 
+  it("flags a clip back within 3 s in a fast edit, not one that rests longer", () => {
+    // a b a b …: each clip is back 0.5 s after its last shot.
+    const close = Array.from({ length: 6 }, (_, i) => ({ path: i % 2 ? "/m/b.mp4" : "/m/a.mp4", at: i * 0.5, length: 0.5, from: i }));
+    expect(problemsFor(build(close)).map((p) => p.code)).toContain("clip-back-soon");
+    expect(problemsFor(build(close), { pace: "slow" }).map((p) => p.code)).not.toContain("clip-back-soon");
+    const rested = Array.from({ length: 8 }, (_, i) => ({ path: `/m/c${i}.mp4`, at: i * 0.5, length: 0.5, from: 0 }));
+    expect(problemsFor(build(rested)).map((p) => p.code)).not.toContain("clip-back-soon");
+  });
+
   it("measures cuts against the beat grid and the hits", () => {
     const beats = Array.from({ length: 40 }, (_, i) => i * 0.5);
     const onGrid = alignCuts([0.5, 1, 1.52, 2, 2.5], beats, [], 120, 24);
