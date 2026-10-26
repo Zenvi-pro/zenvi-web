@@ -443,7 +443,8 @@ export const captionTools = [
             let entry: Record<string, unknown>;
             if (plan.clip === null) {
               const [spanStart, spanEnd] = span;
-              const { layer, created } = planOverlayTrack(tx.project, spanStart, spanEnd, overlayTrack);
+              const { layer, created, moved } = planOverlayTrack(tx.project, spanStart, spanEnd, overlayTrack);
+              if (moved) warnings.push(moved);
               const file = carrierFile(tx, carrier!);
               const overlay = placeOverlayClip(tx, {
                 fileId: file.id,

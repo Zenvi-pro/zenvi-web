@@ -628,16 +628,57 @@ describe("add_title_tool", () => {
     expect(clip(doc, String(d.timeline_clip_id))).toBeDefined();
   });
 
-  it("refuses a locked or busy explicit track before writing anything", async () => {
+  it("refuses a locked explicit track before writing anything", async () => {
     const doc = newDoc();
     addVideo(doc, { position: 0, end: 10, layer: L2 });
     doc.setUntracked(["layers", { number: 3_000_000 }, "lock"], true);
     const h = host();
     await expectRefusal(doc, h, "add_title_tool", { text: "X", track: "3" }, "locked");
-    await expectRefusal(doc, h, "add_title_tool", { text: "X", track: "2", position_seconds: "5" }, "already has");
     expect(h.calls.filter((c) => c.startsWith("writeGenerated"))).toEqual([]);
     const r = await call(doc, h, "add_title_tool", { text: "Y", track: "2", position_seconds: "10.5" });
     expect(clip(doc, String(data(r).timeline_clip_id))!.layer).toBe(L2);
+  });
+
+  it("puts a title for a busy explicit track on the first free track above it, with a warning, in one undo step", async () => {
+    const doc = newDoc();
+    addVideo(doc, { position: 0, end: 10, layer: L2 });
+    const undo = doc.undoLabels.length;
+    const r = await call(doc, host(), "add_title_tool", { text: "X", track: "2", position_seconds: "5" });
+    expect(r.status).toBe("applied");
+    expect(clip(doc, String(data(r).timeline_clip_id))!.layer).toBe(3_000_000);
+    expect(data(r)).toMatchObject({ track: 3, new_track: false });
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toMatch(/^track 2 already has 'video-0\.mp4' at 0\.00-10\.00s during 5\.00-10\.00s; placed on track 3 instead$/);
+    expect(r.summary).toContain(` Warning: ${r.warnings[0]}.`);
+    expect(data(r).warnings).toEqual(r.warnings);
+    expect(doc.undoLabels.length).toBe(undo + 1);
+  });
+
+  it("opens a new track on top when every track above the busy one is busy too", async () => {
+    const doc = newDoc();
+    for (const layer of [1, 2, 3, 4, 5]) addVideo(doc, { position: 0, duration: 30, layer: layer * 1_000_000 });
+    const r = await call(doc, host(), "add_title_tool", { text: "X", track: "5" });
+    expect(data(r)).toMatchObject({ layer: 6_000_000, new_track: true });
+    expect(r.warnings[0]).toContain("placed on a new track on top (track 6) instead");
+    expect(doc.project.layers.find((l) => l.number === 6_000_000)?.label).toBe("Titles");
+    expect(doc.undoLabels.at(-1)).toBeDefined();
+    doc.undo();
+    expect(doc.project.layers).toHaveLength(5);
+  });
+
+  it("skips a locked free track and still warns", async () => {
+    const doc = newDoc();
+    addVideo(doc, { position: 0, end: 10, layer: L2 });
+    doc.setUntracked(["layers", { number: 3_000_000 }, "lock"], true);
+    const r = await call(doc, host(), "add_title_tool", { text: "X", track: "2" });
+    expect(data(r).layer).toBe(4_000_000);
+    expect(r.warnings).toHaveLength(1);
+  });
+
+  it("says nothing when the named track is free", async () => {
+    const r = await call(newDoc(), host(), "add_title_tool", { text: "X", track: "2" });
+    expect(r.warnings).toEqual([]);
+    expect(data(r)).not.toHaveProperty("warnings");
   });
 
   it("fills a lower third's name and role from subtitle or a newline, anchored at the bottom", async () => {
@@ -674,7 +715,6 @@ describe("add_title_tool", () => {
     [{ text: "A", font_weight: "heavy" }, "font_weight"],
     [{ text: "A", duration_seconds: "0" }, "duration_seconds"],
     [{ text: "A", position_seconds: "-1" }, "position_seconds"],
-    [{ text: "A", template: "Solid_Color" }, "no text"],
     [{ text: "A", font: "Comic Papyrus" }, "font 'Comic Papyrus' is not installed; installed fonts like it: "],
   ])("refuses %j and leaves the project as it was", async (args, needle) => {
     await expectRefusal(newDoc(), host({ fonts: ["Arial", "DejaVu Sans", "Liberation Sans", "Lato"] }), "add_title_tool", args, needle);
@@ -685,6 +725,27 @@ describe("add_title_tool", () => {
     const r = await call(newDoc(), h, "add_title_tool", { template: "Solid_Color", background_color: "#1e90ff" });
     expect(backgroundColor(written(h, r))).toEqual(["#1e90ff", 1]);
     expect(data(r).background_color).toBe("#1e90ff");
+  });
+
+  it("draws text named on Solid_Color with a text template over the colour, with a warning", async () => {
+    const doc = newDoc();
+    const h = host();
+    const r = await call(doc, h, "add_title_tool", { template: "Solid_Color", text: "DOUBT", background_color: "#d4141c", text_color: "#ffffff" });
+    expect(r.status).toBe("applied");
+    expect(data(r)).toMatchObject({ template: "Standard_1", background_color: "#d4141c" });
+    expect(backgroundColor(written(h, r))).toEqual(["#d4141c", 1]);
+    expect(lineTexts(written(h, r))[0]).toBe("DOUBT");
+    expect(r.warnings).toEqual(["Solid_Color has no text; drew the text with Standard_1 over the colour #d4141c"]);
+    expect(r.summary).toContain(" Warning: Solid_Color has no text; drew the text with Standard_1 over the colour #d4141c.");
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("keeps the card's own colour for text on Solid_Color when no background_color is given", async () => {
+    const h = host();
+    const r = await call(newDoc(), h, "add_title_tool", { template: "Solid_Color", text: "Hi" });
+    const [colour, alpha] = backgroundColor(written(h, r));
+    expect(alpha).toBe(1);
+    expect(data(r).background_color).toBe(colour);
   });
 
   it("makes a blank title with a background colour a Solid_Color card (a white flash frame)", async () => {
