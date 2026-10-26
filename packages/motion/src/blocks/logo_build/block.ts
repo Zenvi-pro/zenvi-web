@@ -122,7 +122,6 @@ export function build(ctx: BlockContext): void {
   const revealAt = lockAt + 0.45;
 
   const stage = ctx.el("div", "lbx-stage");
-  stage.style.transformOrigin = `${cx}px ${cy}px`;
   const canvas = ctx.el("canvas", "lbx-trails", stage);
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = Math.round(W * dpr);
@@ -130,18 +129,24 @@ export function build(ctx: BlockContext): void {
   const svg = doc.createElementNS(SVG, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   stage.append(svg);
+  const group = doc.createElementNS(SVG, "g");
+  svg.append(group);
   const paths = pieces.map((_, k) => {
     const el = doc.createElementNS(SVG, "path");
     el.setAttribute("fill", colors[k]!);
-    svg.append(el);
+    group.append(el);
     return el;
   });
 
-  // The mark: built big, a punch and a turn as it locks, then aside for the wordmark.
-  tl.set(stage, { scale: BIG }, 0);
-  tl.to(stage, { scale: BIG * 1.06 }, { at: lockAt, duration: 0.16, ease: "out" });
-  tl.to(stage, { scale: BIG }, { at: lockAt + 0.16, duration: 0.36, ease: "back-out" });
-  if (turn) tl.fromTo(stage, { rotate: 0 }, { rotate: -turn }, { at: lockAt, duration: 0.6, ease: "back-out" });
+  // The mark: built big, a punch and a turn as it locks, then aside for the wordmark. It moves by
+  // drawing transforms about (cx, cy), not a CSS transform on the stage: the canvas makes the stage a
+  // composited layer, and Chrome rasterises a composited layer whose scale changes at a scale that
+  // depends on the frames before it, so the same t could capture different pixels.
+  const mark = { x: 0, y: 0, scale: BIG, rotate: 0 };
+  tl.set(mark, { scale: BIG }, 0);
+  tl.to(mark, { scale: BIG * 1.06 }, { at: lockAt, duration: 0.16, ease: "out" });
+  tl.to(mark, { scale: BIG }, { at: lockAt + 0.16, duration: 0.36, ease: "back-out" });
+  if (turn) tl.fromTo(mark, { rotate: 0 }, { rotate: -turn }, { at: lockAt, duration: 0.6, ease: "back-out" });
 
   if (named) {
     const word = ctx.el("div", "lbx-word");
@@ -168,7 +173,7 @@ export function build(ctx: BlockContext): void {
       markX = cx - total / 2 + R;
       Object.assign(word.style, { left: `${markX + R + gap}px`, top: `${cy - box.height / 2}px` });
     }
-    tl.to(stage, { x: markX - cx, y: markY - cy, scale: 1 }, { at: revealAt, duration: 0.8, ease: "in-out" });
+    tl.to(mark, { x: markX - cx, y: markY - cy, scale: 1 }, { at: revealAt, duration: 0.8, ease: "in-out" });
     // The letters rise once the mark has slid (and shrunk) clear of them; earlier, the first ones cross it.
     const rise = revealAt + 0.5;
     tl.fromTo(chars, { yPercent: 115, rotate: 6 }, { yPercent: 0, rotate: 0 }, { at: rise, duration: 0.7, ease: "out", stagger: 0.035 });
@@ -178,11 +183,16 @@ export function build(ctx: BlockContext): void {
   const out = EASES.out;
   const inOut = EASES["in-out"];
   tl.track((t) => {
+    group.setAttribute("transform", `translate(${cx + mark.x} ${cy + mark.y}) rotate(${mark.rotate}) scale(${mark.scale}) translate(${-cx} ${-cy})`);
     const g = canvas.getContext("2d");
     if (g) {
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, canvas.width, canvas.height);
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.translate(cx + mark.x, cy + mark.y);
+      g.rotate((mark.rotate * Math.PI) / 180);
+      g.scale(mark.scale, mark.scale);
+      g.translate(-cx, -cy);
     }
     flights.forEach((f, k) => {
       const q = (t - f.at) / FLY;
