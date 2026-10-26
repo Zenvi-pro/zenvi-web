@@ -139,8 +139,13 @@ Named easings every tool understands (cubic-bezier control points):
 - Audio: dialogue −12 to −6 dBFS peaks (≈ −16 LUFS integrated for social,
   −23 LUFS broadcast); music under dialogue −18 to −24 dB below; duck 6–10 dB
   with 0.3 s attack / 0.6 s release.
-
-
+- Pace by genre (average shot length): flash montage 0.1–0.2 s (3–6
+  frames), match-cut chain 0.1–0.27 s (3–8 frames), hype reel 0.2–0.25 s,
+  documentary / video-essay b-roll 0.5–1.5 s, kinetic-caption talking head
+  1–3 s with a new word every 0.25–0.4 s, motion-designed promo a new scene
+  or UI state every 1–2.5 s.
+- Something moves in every hold: a camera drift (3–6 % push), a staged
+  reveal, UI doing something. Idle loops (breathing, floating) do not count.
 - Loudness: the references sit at about −13…−16 dB RMS with peaks −2…−9
   dBFS. Without speech the music plays at full level; effects go on top.
 
