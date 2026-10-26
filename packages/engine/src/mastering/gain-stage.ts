@@ -52,6 +52,15 @@ export const DUCK_TOLERANCE_LU = 1;
 export const MAX_DUCK_DB = 24;
 /** One role is never moved further than this, dB. */
 export const MAX_ROLE_MOVE_DB = 30;
+/**
+ * When peaks stop the mix short of the target, the role that sets the peak
+ * (never the dialogue) is turned down by up to this much below its place in
+ * ROLE_OFFSET_LU, a step at a time, so the rest can come up.
+ */
+export const MAX_SHAVE_DB = 6;
+const SHAVE_STEP_DB = 1.5;
+/** Stop shaving once the mix is within this many LU of the target. */
+const SHAVE_GOOD_ENOUGH_LU = 0.5;
 
 const ATTACK = 0.15;
 const RELEASE = 0.4;
@@ -222,11 +231,34 @@ export function planGainStage(input: GainStageInput): GainStagePlan | null {
     }
   }
 
-  const staged = mixStems(stems, sampleRate, roleGainDb, { db: duckDb, windows: input.speechWindows });
-  const stagedReport = measureLoudness(staged, sampleRate);
+  const stageMix = (): LoudnessReport => measureLoudness(mixStems(stems, sampleRate, roleGainDb, { db: duckDb, windows: input.speechWindows }), sampleRate);
+  let stagedReport = stageMix();
   // Loudness scales exactly with gain, so the global gain is a subtraction; the ceiling caps it.
-  const toTarget = target.targetLufs - stagedReport.integrated;
-  const toCeiling = target.ceilingDbtp - stagedReport.truePeakDb;
+  const reach = (report: LoudnessReport): { toTarget: number; toCeiling: number } => ({
+    toTarget: target.targetLufs - report.integrated,
+    toCeiling: target.ceilingDbtp - report.truePeakDb,
+  });
+  const shaved: Partial<Record<StemRole, number>> = {};
+  while (input.balance === "auto") {
+    const { toTarget, toCeiling } = reach(stagedReport);
+    if (toCeiling >= toTarget - SHAVE_GOOD_ENOUGH_LU) break;
+    // The role whose peak is highest in the staged mix, among those with room left.
+    const candidates = present.filter((r) => r !== "speech" && (shaved[r] ?? 0) > -MAX_SHAVE_DB + 1e-9);
+    const loudest = candidates.sort((a, b) => measured[b]!.truePeakDb + roleGainDb[b]! - (measured[a]!.truePeakDb + roleGainDb[a]!))[0];
+    if (!loudest) break;
+    const step = Math.min(SHAVE_STEP_DB, MAX_SHAVE_DB + (shaved[loudest] ?? 0));
+    roleGainDb[loudest] = roleGainDb[loudest]! - step;
+    shaved[loudest] = (shaved[loudest] ?? 0) - step;
+    const next = stageMix();
+    // A cut that buys no loudness (the peak is elsewhere) is taken back and the role is out.
+    if (Math.min(reach(next).toTarget, reach(next).toCeiling) - Math.min(toTarget, toCeiling) < 0.2) {
+      roleGainDb[loudest] = roleGainDb[loudest]! + step;
+      shaved[loudest] = -MAX_SHAVE_DB;
+      continue;
+    }
+    stagedReport = next;
+  }
+  const { toTarget, toCeiling } = reach(stagedReport);
   const globalDb = Math.min(toTarget, toCeiling);
   for (const role of present) roleGainDb[role] = (roleGainDb[role] ?? 0) + globalDb;
   const predicted: LoudnessReport = {

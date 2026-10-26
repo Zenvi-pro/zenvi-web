@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MASTER_PRESETS, ROLE_OFFSET_LU, BED_UNDER_SPEECH_LU, duckEnvelope, planGainStage, type GainStagePlan, type StemAudio, type SpeechWindow } from "./gain-stage.js";
+import { MASTER_PRESETS, MAX_SHAVE_DB, ROLE_OFFSET_LU, BED_UNDER_SPEECH_LU, duckEnvelope, planGainStage, type GainStagePlan, type StemAudio, type SpeechWindow } from "./gain-stage.js";
 import { measureLoudness, sliceWindows } from "./loudness.js";
 import { stereoSine } from "./testing.js";
 
@@ -111,6 +111,25 @@ describe("planGainStage", () => {
     expect(plan.predicted.truePeakDb).toBeCloseTo(-1, 3);
     expect(plan.predicted.integrated).toBeLessThan(-14);
     expect(plan.shortfallLu).toBeGreaterThan(0.5);
+  });
+
+  it("turns down the role that sets the peak (never the dialogue) so the mix can come up, within MAX_SHAVE_DB", () => {
+    const clicks = new Float32Array(SECONDS * RATE);
+    for (let t = 0.25; t < SECONDS; t += 0.5) for (let i = 0; i < 480; i += 1) clicks[Math.round(t * RATE) + i] = 0.9 * Math.sin((2 * Math.PI * 1000 * i) / RATE);
+    const music = stems(-40, -22)[1]!;
+    const input: StemAudio[] = [music, { role: "sfx", channels: [clicks, Float32Array.from(clicks)] }];
+    const shaved = planGainStage({ ...base, stems: input, speechWindows: [] })!;
+    const kept = planGainStage({ ...base, stems: input, speechWindows: [], balance: "keep" })!;
+    // Nominal: the SFX stem sits ROLE_OFFSET under the music; the shave takes up to MAX_SHAVE_DB more.
+    const nominal = measureLoudness(music.channels, RATE).integrated + ROLE_OFFSET_LU.withoutSpeech.sfx - measureLoudness(input[1]!.channels, RATE).integrated;
+    const gap = shaved.roleGainDb.sfx! - shaved.roleGainDb.music!;
+    expect(gap).toBeLessThan(nominal - 1);
+    expect(gap).toBeGreaterThanOrEqual(nominal - MAX_SHAVE_DB - 1e-6);
+    expect(shaved.predicted.integrated).toBeGreaterThan(kept.predicted.integrated + 1);
+    expect(shaved.predicted.truePeakDb).toBeLessThanOrEqual(-0.99);
+    // The dialogue is never the one turned down for its peak.
+    const withSpeech = planGainStage({ ...base, stems: [...stems(-40, -22), input[1]!] })!;
+    expect(withSpeech.lead).toBe("speech");
   });
 
   it("is idempotent: planning the result again changes nothing", () => {

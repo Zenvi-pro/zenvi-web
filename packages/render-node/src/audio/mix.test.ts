@@ -124,6 +124,19 @@ describe("export loudness normalisation", () => {
     expect(after.truePeakDb).toBeLessThanOrEqual(-0.8);
   }, 60_000);
 
+  it("normalizes the audio of a video export, whose sources start after the picture input", async () => {
+    const out = path.join(dir, "normalized.mp4");
+    await renderProject(project(), {
+      resolveMedia: (p) => p,
+      output: out,
+      options: { format: "mp4", width: 160, height: 90, fps: { num: 25, den: 1 }, quality: "low", loudness: { targetLufs: -16, truePeakDbtp: -1 } },
+      engine: engine(),
+    });
+    const after = measureLoudness(await decodeStereo(out), 48000);
+    expect(after.integrated).toBeGreaterThan(-16.8);
+    expect(after.integrated).toBeLessThan(-15.2);
+  }, 60_000);
+
   it("skips a silent mix with a warning", async () => {
     const silent: RenderEngine = { ...engine(), planAudio: (_p, range) => ({ sampleRate: 48000, channels: 2, start: range.start, end: range.end, segments: [] }) };
     const out = path.join(dir, "silent.wav");
@@ -138,9 +151,9 @@ describe("export loudness normalisation", () => {
 
   it("builds the second pass from the first pass's readings", () => {
     const pass2 = loudnormPass2({ inputI: -27.6, inputTp: -9.1, inputLra: 3.2, inputThresh: -38, targetOffset: 0.3 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100);
-    expect(pass2).toContain("I=-14:TP=-1");
+    expect(pass2).toContain("I=-14:TP=-1.5");
     expect(pass2).toContain("measured_I=-27.6:measured_TP=-9.1:measured_LRA=3.2:measured_thresh=-38:offset=0.3:linear=true");
     expect(pass2).toContain("aresample=44100");
-    expect(pass2).toContain("alimiter=limit=0.89125:level=disabled");
+    expect(pass2).toContain("alimiter=limit=0.8414:level=disabled");
   });
 });

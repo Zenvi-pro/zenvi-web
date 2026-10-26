@@ -384,7 +384,8 @@ export const masteringTools: CatalogTool[] = [
         data.after = predicted;
         data.gainsDb = planNumbers(plan);
         data.duckDb = Math.round(plan.duckDb * 100) / 100;
-        return unchanged(TOOL, `Would master ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} -> ${fmtLufs(predicted.integratedLufs)}, ${fmtPeak(predicted.truePeakDbtp)} (${args.preset}). dry_run: nothing was changed.`, { data, warnings });
+        shortfallNote();
+        return unchanged(TOOL, `Would master ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} -> ${fmtLufs(predicted.integratedLufs)}, ${fmtPeak(predicted.truePeakDbtp)} (${args.preset}). dry_run: nothing was changed.`, { data, warnings, notes });
       }
 
       const results = call.commit((tx) => applyEdits(tx, edit(finalGains)), "Master audio");

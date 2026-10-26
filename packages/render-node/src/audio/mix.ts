@@ -27,9 +27,15 @@ export interface MixOptions {
   signal?: AbortSignal;
 }
 
-/** ffmpeg arguments that read a graph's inputs and run its filter; large graphs go through a script file. */
-async function graphArgs(graph: AudioGraph, filter: string, scriptPath: string): Promise<string[]> {
+/**
+ * ffmpeg arguments that read a graph's inputs and run its filter; large
+ * graphs go through a script file. A graph built for an export refers to its
+ * sources from `firstInput` (1 when the video arrives on input 0): the
+ * inputs before them are placeholders here.
+ */
+async function graphArgs(graph: AudioGraph, filter: string, scriptPath: string, firstInput = 0): Promise<string[]> {
   const args = ["-nostats", "-nostdin"];
+  for (let i = 0; i < firstInput; i += 1) args.push("-f", "lavfi", "-t", "0.1", "-i", "anullsrc");
   for (const input of graph.inputs) args.push("-ss", input.seek.toFixed(6), "-t", input.duration.toFixed(6), "-i", input.path);
   if (filter.length > SCRIPT_THRESHOLD) {
     await writeFile(scriptPath, filter);
@@ -127,17 +133,24 @@ export interface LoudnormMeasurement {
   targetOffset: number;
 }
 
+/**
+ * The true-peak ceiling is aimed this far under the requested one: AAC, MP3
+ * and Opus overshoot their input by a few tenths of a dB, and the file is
+ * what gets measured.
+ */
+const CODEC_HEADROOM_DB = 0.5;
+
 /** Loudness range the second pass may keep; wide, so a dynamic mix is gained as one (linear), not squeezed. */
 const LOOSE_LRA = 20;
 
 function loudnormBase(target: LoudnessTarget): string {
-  return `loudnorm=I=${num(target.targetLufs, 3)}:TP=${num(target.truePeakDbtp, 3)}:LRA=${LOOSE_LRA}`;
+  return `loudnorm=I=${num(target.targetLufs, 3)}:TP=${num(target.truePeakDbtp - CODEC_HEADROOM_DB, 3)}:LRA=${LOOSE_LRA}`;
 }
 
 /** Pass 1: run the export's audio graph through `loudnorm` and read what it measured. Null when the mix is silent. */
-export async function measureLoudnorm(graph: AudioGraph, target: LoudnessTarget, tempDir: string, signal?: AbortSignal): Promise<LoudnormMeasurement | null> {
+export async function measureLoudnorm(graph: AudioGraph, target: LoudnessTarget, tempDir: string, firstInput: number, signal?: AbortSignal): Promise<LoudnormMeasurement | null> {
   const filter = appendToOutput(graph.filter, `${loudnormBase(target)}:print_format=json`);
-  const args = ["-hide_banner", "-loglevel", "info", ...(await graphArgs(graph, filter, path.join(tempDir, "loudnorm-pass1.txt"))), "-map", "[aout]", "-f", "null", "-"];
+  const args = ["-hide_banner", "-loglevel", "info", ...(await graphArgs(graph, filter, path.join(tempDir, "loudnorm-pass1.txt"), firstInput)), "-map", "[aout]", "-f", "null", "-"];
   const managed = spawnManaged(resolveBinary("ffmpeg"), args, { signal, stdout: "ignore" });
   const code = await managed.exited;
   const spawnError = managed.spawnError();
@@ -160,7 +173,7 @@ export async function measureLoudnorm(graph: AudioGraph, target: LoudnessTarget,
  * resamples to 192 kHz).
  */
 export function loudnormPass2(measured: LoudnormMeasurement, target: LoudnessTarget, sampleRate: number): string {
-  const ceiling = 10 ** (target.truePeakDbtp / 20);
+  const ceiling = 10 ** ((target.truePeakDbtp - CODEC_HEADROOM_DB) / 20);
   return [
     `${loudnormBase(target)}:measured_I=${num(measured.inputI, 3)}:measured_TP=${num(measured.inputTp, 3)}:measured_LRA=${num(measured.inputLra, 3)}:measured_thresh=${num(measured.inputThresh, 3)}:offset=${num(measured.targetOffset, 3)}:linear=true`,
     `aresample=${sampleRate}`,
@@ -169,8 +182,8 @@ export function loudnormPass2(measured: LoudnormMeasurement, target: LoudnessTar
 }
 
 /** Normalize `graph`'s output to `target` (mutates the graph's filter). Returns a warning when it left the mix alone. */
-export async function normalizeLoudness(graph: AudioGraph, target: LoudnessTarget, sampleRate: number, tempDir: string, signal?: AbortSignal): Promise<string | undefined> {
-  const measured = await measureLoudnorm(graph, target, tempDir, signal);
+export async function normalizeLoudness(graph: AudioGraph, target: LoudnessTarget, sampleRate: number, tempDir: string, firstInput: number, signal?: AbortSignal): Promise<string | undefined> {
+  const measured = await measureLoudnorm(graph, target, tempDir, firstInput, signal);
   if (!measured) return "Loudness normalisation skipped: the mix is silent.";
   graph.filter = appendToOutput(graph.filter, loudnormPass2(measured, target, sampleRate));
   return undefined;
