@@ -5,13 +5,14 @@
  *     [--scenario basic,motion] [--out <dir>] [--bundle <zenvi.mjs>]
  *   npx tsx packages/cli/src/acceptance/main.ts replay [--runs <bench runs dir>]
  *     [--out <dir>] [--only <run name substring>] [--jobs 3]
+ *     [--skip-tools render_video,review_render_tool]
  *
  * Writes report.json, report.md and media/ (each scenario's exports and the
  * images its steps returned) to --out (default a new temp folder) and
  * exits 1 when a step (or a replayed call that succeeded originally) fails.
  */
 
-import { copyFile, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -32,6 +33,7 @@ const { values, positionals } = parseArgs({
     only: { type: "string" },
     jobs: { type: "string", default: "3" },
     keep: { type: "boolean", default: false },
+    "skip-tools": { type: "string", default: "render_video,review_render_tool" },
   },
 });
 
@@ -95,8 +97,19 @@ async function scenarios(): Promise<number> {
 
 async function replay(): Promise<number> {
   const out = values.out ?? (await mkdtemp(path.join(os.tmpdir(), "zenvi-replay-")));
-  const report = await replayRuns({ runsDir: values.runs!, only: values.only, jobs: Math.max(1, Number(values.jobs) || 1), bundle: values.bundle, keep: values.keep, log });
   await mkdir(out, { recursive: true });
+  const partial = path.join(out, "replay-calls.jsonl");
+  await writeFile(partial, "");
+  const report = await replayRuns({
+    runsDir: values.runs!,
+    only: values.only,
+    jobs: Math.max(1, Number(values.jobs) || 1),
+    bundle: values.bundle,
+    keep: values.keep,
+    skipTools: new Set(values["skip-tools"]!.split(",").map((t) => t.trim()).filter(Boolean)),
+    log,
+    onRun: (calls) => appendFile(partial, calls.map((c) => `${JSON.stringify(c)}\n`).join("")),
+  });
   await writeFile(path.join(out, "replay.json"), `${JSON.stringify(report, null, 2)}\n`);
   await writeFile(path.join(out, "replay.md"), replayMarkdown(report));
   log(`replayed ${report.totals.replayed} calls: ${report.totals.failed} failed (${report.totals.regressions} that succeeded originally); report: ${path.join(out, "replay.md")}`);

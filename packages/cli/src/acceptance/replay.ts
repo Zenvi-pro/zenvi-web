@@ -307,7 +307,7 @@ function outcomeOf(call: CallOutcome): { ok: boolean; summary: string } {
 }
 
 /** Replay one transcript on a fresh server. */
-export async function replayTranscript(run: string, file: string, options: { bundle?: string; keep?: boolean } = {}): Promise<ReplayCall[]> {
+export async function replayTranscript(run: string, file: string, options: { bundle?: string; keep?: boolean; skipTools?: ReadonlySet<string> } = {}): Promise<ReplayCall[]> {
   const { cwd, calls } = extractCalls(await readFile(file, "utf8"));
   const work = await mkdtemp(path.join(os.tmpdir(), "zenvi-replay-"));
   const target = await startPortable({ work, home: path.join(work, ".home"), bundle: options.bundle });
@@ -323,6 +323,10 @@ export async function replayTranscript(run: string, file: string, options: { bun
       };
       if (NETWORK_TOOLS.has(call.tool)) {
         skip("network tool: not replayed");
+        continue;
+      }
+      if (options.skipTools?.has(call.tool)) {
+        skip("skipped by --skip-tools");
         continue;
       }
       let args = call.args;
@@ -371,7 +375,11 @@ export interface ReplayRunsOptions {
   jobs: number;
   bundle?: string;
   keep?: boolean;
+  /** Tools not to replay (renders take most of a replay's time and rarely fail). */
+  skipTools?: ReadonlySet<string>;
   log?: (line: string) => void;
+  /** Each session's calls as soon as it is replayed (a long replay keeps what it did if stopped). */
+  onRun?: (calls: ReplayCall[]) => Promise<void>;
 }
 
 export async function replayRuns(options: ReplayRunsOptions): Promise<ReplayReport> {
@@ -387,6 +395,7 @@ export async function replayRuns(options: ReplayRunsOptions): Promise<ReplayRepo
         return [];
       });
       results.push(calls);
+      await options.onRun?.(calls);
       const failed = calls.filter((c) => c.outcome === "failed").length;
       options.log?.(`${t.run}: ${calls.length} calls, ${failed} failed (${((performance.now() - started) / 1000).toFixed(0)} s)`);
     }
