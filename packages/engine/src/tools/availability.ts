@@ -402,7 +402,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
-    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
+    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "exporter", "mattes", "motion"],
     methods: [
       "media.importUrl",
       "media.writeGenerated",
@@ -425,6 +425,8 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
       backend: "the server is set up to call the Zenvi backend",
+      mattes: "onnxruntime-node and the matting model are in the image; up to 60 s of video per call",
+      motion: "the image has chrome-headless-shell; one block renders at a time",
     },
     hidden: [
       "new_project_tool",
