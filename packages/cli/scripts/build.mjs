@@ -30,7 +30,7 @@ const pkg = JSON.parse(await readFile(path.join(cliRoot, "package.json"), "utf8"
 const require = createRequire(import.meta.url);
 
 /** Engine asset folders the Node runtime reads (effect icons ship for tools that list effects; colors are the LUTs). */
-const ENGINE_ASSETS = ["transitions", "titles", "effects", "emojis", "colors"];
+const ENGINE_ASSETS = ["transitions", "titles", "effects", "emojis", "colors", "fonts"];
 
 async function exists(p) {
   try {
@@ -118,6 +118,7 @@ await writeFile(
     "- Lato (fonts/Lato-Regular.ttf): SIL Open Font License 1.1, see fonts/OFL.txt.",
     "- assets/ (transition masks, title templates, effect icons): from the Zenvi desktop app (zenvi-core, after OpenShot), GPL-3.0-or-later.",
     "- assets/emojis: OpenMoji emoji graphics (https://openmoji.org), CC BY-SA 4.0, as the Zenvi desktop app ships them.",
+    "- assets/fonts (Inter, Anton, Bebas Neue, Archivo Black, Instrument Serif, Space Mono, Varela Round, Caveat Brush, Silkscreen): SIL Open Font License 1.1, each with its OFL.txt.",
     "- assets/colors (colour LUTs): from the Zenvi desktop app, by the freshluts.com community, CC0; see assets/colors/AUTHORS.md.",
     "- composite-worker.mjs: the engine's compositor for worker threads (same terms as zenvi.mjs).",
     "- adobe/pro.zenvi.link: Zenvi Link, the After Effects / Premiere Pro extension, GPL-3.0-or-later; host/*.jsx include Douglas Crockford's json2.js (public domain).",

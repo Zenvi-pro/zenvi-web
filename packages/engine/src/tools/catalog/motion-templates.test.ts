@@ -156,6 +156,30 @@ describe("add_motion_template_tool", () => {
     expect(host.written.size).toBe(0);
   });
 
+  it("sets its type in a bundled family as outlines, keeping the layout", async () => {
+    const plain = verticalProject();
+    const plainHost = motionHost();
+    await runTool({ doc: plain, host: plainHost }, "add_motion_template_tool", { template: "kinetic_type", text: "Brew better coffee" });
+    const doc = verticalProject();
+    const host = motionHost();
+    const result = await runTool({ doc, host }, "add_motion_template_tool", { template: "kinetic_type", text: "Brew better coffee", font_family: "Bebas Neue" });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toEqual(["Add motion template kinetic_type"]);
+    const svgs = [...host.written.values()].map((v) => (typeof v === "string" ? v : new TextDecoder().decode(v)));
+    expect(svgs.some((svg) => svg.includes('data-zenvi-outline="bebas-neue"'))).toBe(true);
+    // Same drawings, same sizes, same clips: only the letters change.
+    const sizes = (h: FakeHost) => [...h.written.values()].map((v) => /width="(\d+)" height="(\d+)"/.exec(typeof v === "string" ? v : new TextDecoder().decode(v))?.slice(1).join("x"));
+    expect(sizes(host)).toEqual(sizes(plainHost));
+    expect(doc.project.clips.map((c) => [c.position, c.layer])).toEqual(plain.project.clips.map((c) => [c.position, c.layer]));
+
+    const unknown = await runTool({ doc, host }, "add_motion_template_tool", { template: "kinetic_type", text: "Hi", font_family: "Comic Sans" });
+    expect(unknown.ok).toBe(false);
+    expect(unknown.text).toContain("bundled families: inter, anton");
+    const noFonts = await runTool({ doc: verticalProject(), host: motionHost({ without: ["assets"] }) }, "add_motion_template_tool", { template: "kinetic_type", text: "Hi", font_family: "anton" });
+    expect(noFonts.ok).toBe(false);
+    expect(noFonts.text).toContain("cannot read the bundled fonts");
+  });
+
   it("is not available where generated drawings cannot be stored", async () => {
     const result = await runTool({ doc: verticalProject(), host: motionHost({ omit: ["media.writeGenerated"] }) }, "add_motion_template_tool", { template: "end_card", text: "Zenvi" });
     expect(result.ok).toBe(false);

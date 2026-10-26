@@ -3,3 +3,4 @@ export { MOTION_STYLE_IDS, MOTION_STYLES, isMotionStyleId, type MotionStyle, typ
 export { MOTION_TEMPLATE_IDS, isMotionTemplateId, type MotionContent, type MotionTemplateId } from "./template.js";
 export { PALETTE_IDS, type MotionLayer, type MotionPlan, type PaletteId } from "./types.js";
 export { buildMotionTemplate, type BuildTemplateInput } from "./build.js";
+export * from "./typeface.js";
