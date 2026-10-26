@@ -28,6 +28,7 @@ import { effectsColorLookTools } from "./catalog/effects-color-looks.js";
 import { exportTools } from "./catalog/export.js";
 import { generationTools } from "./catalog/generation.js";
 import { inspectTools } from "./catalog/inspect.js";
+import { matteTools } from "./catalog/mattes.js";
 import { mediaTools } from "./catalog/media.js";
 import { mediaFilesTools } from "./catalog/media-files.js";
 import { mediaFilesTransitionTools } from "./catalog/media-files-transitions.js";
@@ -105,7 +106,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools]) {
+  for (const tool of [...implemented, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools, ...matteTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }

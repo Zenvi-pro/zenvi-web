@@ -548,6 +548,41 @@ export interface AssetHost {
   readText(path: string): Promise<string>;
 }
 
+/** What a subject matte separates from the rest of the frame. */
+export type MatteSubject = "person";
+
+export interface MatteRequest {
+  subject: MatteSubject;
+  /** Matte size relative to the source: 1 (same size) or 0.5 (half, faster; the Mask effect scales it up). */
+  scale: 1 | 0.5;
+  signal?: AbortSignal;
+}
+
+/** A matte video a host made: grayscale, white = subject, same frame rate and length as its source. */
+export interface GeneratedMatte {
+  /** The matte video, written into the project's assets, ready for the bin. */
+  media: ImportedMedia;
+  /** Model and release that made it, e.g. `rvm_mobilenetv3_fp32` / `1.0.0`. */
+  model: string;
+  version: string;
+  /** SPDX licence of the model weights. */
+  license: string;
+  frames: number;
+  /** Frames matted per second of wall time (what the person waits). */
+  fps: number;
+}
+
+/**
+ * Subject matting (`generate_subject_matte_tool` and the composites built
+ * on it). Only hosts that run a matting model have it (the CLI with
+ * onnxruntime-node); the model downloads on first use.
+ */
+export interface MatteHost {
+  readonly subjects: readonly MatteSubject[];
+  /** Matte every frame of the video at `path`. Rejects in words (no model, no video stream, cancelled). */
+  generate(path: string, request: MatteRequest): Promise<GeneratedMatte>;
+}
+
 export interface ToolHost {
   media?: MediaHost;
   player?: PlayerHost;
@@ -558,6 +593,7 @@ export interface ToolHost {
   storage?: StorageHost;
   audio?: AudioHost;
   assets?: AssetHost;
+  mattes?: MatteHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }
