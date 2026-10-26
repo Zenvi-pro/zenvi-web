@@ -317,15 +317,25 @@ export class ProjectDocument {
   }
 
   /**
-   * The project JSON to save: the current snapshot with the last
-   * `historyLimit` actions of each stack serialized in desktop format.
+   * The project JSON to save: the current snapshot with the latest steps of
+   * each stack, up to `historyLimit` actions, serialized in desktop format.
+   * Steps are kept whole (the newest even when it alone is larger): a step
+   * cut short would undo half an edit once reopened.
    */
   toJSON(): Project {
     const limit = this.historyLimit;
-    const flatten = (stack: HistoryEntry[]): UpdateAction[] =>
-      stack.flatMap((entry) => entry.actions.map((a) => stripHistory(a.action)));
-    const undo = limit > 0 ? flatten(this.undoStack).slice(-limit) : [];
-    const redo = limit > 0 ? flatten(this.redoStack).slice(-limit) : [];
+    const flatten = (stack: HistoryEntry[]): UpdateAction[] => {
+      if (limit <= 0) return [];
+      let first = stack.length;
+      let count = 0;
+      while (first > 0 && (first === stack.length || count + stack[first - 1]!.actions.length <= limit)) {
+        first -= 1;
+        count += stack[first]!.actions.length;
+      }
+      return stack.slice(first).flatMap((entry) => entry.actions.map((a) => stripHistory(a.action)));
+    };
+    const undo = flatten(this.undoStack);
+    const redo = flatten(this.redoStack);
     return { ...this.current, history: { ...this.current.history, undo, redo } };
   }
 
