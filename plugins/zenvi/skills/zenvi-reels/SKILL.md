@@ -79,9 +79,9 @@ build_reel_tool {
 
 | style | suits | pace |
 | --- | --- | --- |
-| `hype` | launches, sport, travel, events | cuts on every beat, 1/2-beat bursts in the last third, a flash every few seconds |
+| `hype` | launches, sport, travel, events | 1/2-beat cuts, a slow-motion wind-up ramping into the drop, then 1/4-beat bursts with glitch and negative hits; whips one way, white flashes open each section, condensed display titles |
 | `cinematic` | stories, brands, places | 2-beat holds tightening to 1, push-ins, grain, fades in and out |
-| `highlight` | the person's own clips of a game, trip or event | builds into the payoff (the last file), a little real sound under the music |
+| `highlight` | the person's own clips of a game, trip or event | builds through a ramped wind-up into the big moment and the payoff (the last file), a little real sound under the music |
 | `match_cut` | footage that shares a shape or pose (circles, hands, horizons) | one hard cut per beat, no camera moves so the shapes line up |
 | `minimal` | wellness, food, interiors, products | 4-beat holds, gentle moves, soft fades, light type |
 | `editorial` | fashion, design, tech | crisp cuts on 1/2 beats, a label on each shot (`labels`) |
@@ -177,14 +177,18 @@ sits at the same place and size on every cut.
 
 ### 4b. Move the cuts (optional, after the cut is final)
 
-`apply_motion_transitions_tool` `track: "1"`, `style: "hype"` (whips and a
-crash zoom) or `"cinematic"` (slides, blur dissolves, a zoom-through at the
-end) puts velocity on the cuts; one direction per reel. Re-cutting later
-means `remove_motion_transition_tool` on the track first.
+`hype` and `highlight` already carry their accents (the receipt's
+`transitions`, `speed_ramp`, `flashes`, `drop` and `sfx_cues`): do not run
+`apply_motion_transitions_tool` over them, it would put a move on every cut.
+For other styles, `apply_motion_transitions_tool` `track: "1"`, `style:
+"hype"` (whips and a crash zoom) or `"cinematic"` (slides, blur dissolves, a
+zoom-through at the end) puts velocity on the cuts; one direction per reel.
+Re-cutting later means `remove_motion_transition_tool` on the track first.
 
 ### 4c. Sound design (last, when the picture is locked)
 
-`auto_sound_design_tool` with the receipt's `beats` (`intensity`: `subtle`
+`auto_sound_design_tool` with the receipt's `beats` and, for hype and
+highlight, `climax_seconds` = the receipt's `drop` (`intensity`: `subtle`
 for minimal and cinematic, `normal`, `hype` for hype and match-cut reels)
 puts whooshes on cuts and transitions, hits on downbeats and flashes, clicks
 on title entrances and a riser into the climax. In professional reels a cut
