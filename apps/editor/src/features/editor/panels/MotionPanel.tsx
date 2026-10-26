@@ -13,7 +13,7 @@ function Badge({ state }: { state: EditorToolState }) {
   if (state.kind !== "elsewhere") return null;
   return (
     <span title={`In the browser: ${state.note}`} className="shrink-0 rounded-full border border-line-strong px-2 py-0.5 text-2xs text-fg-subtle">
-      Needs desktop or CLI
+      Needs {state.where}
     </span>
   );
 }

@@ -234,7 +234,7 @@ function motionToolsMenu(session: EditorSession, ids: string[], hasVisual: boole
     out.push(item("Match Cut (Align Subjects)", () => void matchCut(session, ids)), item("Grid Montage", () => void gridMontage(session, ids)));
   }
   const fx = editorToolState("apply_fx_tool");
-  if (hasVisual && fx.kind === "elsewhere") out.push(item("FX (needs desktop or CLI)", () => undefined, { disabled: true }));
+  if (hasVisual && fx.kind === "elsewhere") out.push(item(`FX (needs ${fx.where})`, () => undefined, { disabled: true }));
   if (hasAudio && ids.length === 1) {
     const kinetic = editorToolState("kinetic_captions_tool").kind === "ready";
     out.push(

@@ -13,16 +13,19 @@ import type { EditorSession } from "./session/EditorSession";
 /**
  * `ready`: runs here. `elsewhere`: in the catalog but needs a host the browser
  * lacks (headless Chrome, Blender, ffmpeg), so the UI marks it instead of
- * offering it. `missing`: not in this build's catalog, so the UI hides it.
+ * offering it; `where` names the hosts that run it ("desktop or CLI", "CLI").
+ * `missing`: not in this build's catalog, so the UI hides it.
  */
-export type EditorToolState = { kind: "ready" } | { kind: "elsewhere"; note: string } | { kind: "missing" };
+export type EditorToolState = { kind: "ready" } | { kind: "elsewhere"; note: string; where: string } | { kind: "missing" };
 
 export function editorToolState(name: string): EditorToolState {
   const tool = getTool(name);
   if (!tool) return { kind: "missing" };
   const availability = toolAvailability(tool);
-  if (availability.editor === "no") return { kind: "elsewhere", note: availability.notes.editor ?? "not available in the browser" };
-  return { kind: "ready" };
+  if (availability.editor !== "no") return { kind: "ready" };
+  // Web-only tools (3D scenes, motion blocks) are "no" on the desktop too: do not send people there.
+  const hosts = [availability.desktop !== "no" ? "desktop" : null, availability.cli !== "no" ? "CLI" : null].filter((h) => h !== null);
+  return { kind: "elsewhere", note: availability.notes.editor ?? "not available in the browser", where: hosts.length ? hosts.join(" or ") : "another Zenvi host" };
 }
 
 export function editorCanRun(name: string): boolean {
