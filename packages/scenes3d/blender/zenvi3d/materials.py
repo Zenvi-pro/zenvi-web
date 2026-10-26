@@ -25,7 +25,7 @@ def chrome(color="#DADCE2", roughness=0.05, name="Chrome", bands=None):
     mat, b = _principled(name)
     _set(b, Base_Color=rgb(color, 1.0), Metallic=1.0, Roughness=roughness)
     if bands:
-        _ramp_into(mat, b.inputs["Base Color"], bands, [(0.0, "#F4F6FA"), (0.42, "#9AA2B1"), (0.5, "#2B2F38"), (0.56, "#E9EDF3"), (1.0, "#6C7381")])
+        _ramp_into(mat, b.inputs["Base Color"], bands, [(0.0, "#FFFFFF"), (0.4, "#C3C9D4"), (0.47, "#4A505C"), (0.53, "#F2F5F9"), (1.0, "#9AA1AE")])
     return mat
 
 

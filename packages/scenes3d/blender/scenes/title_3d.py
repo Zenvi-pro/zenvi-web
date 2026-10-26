@@ -41,12 +41,13 @@ def build(job):
 
     scale = max(1.0, w / 2)
     lights.studio(scale=scale, rim_color=p.get("rim") or "#CFE0FF", energy=0.35 if p.get("style", "chrome") in ("chrome", "iridescent") else 1.0)
-    core.studio_world(job, strength=1.0, spin_degrees=150 if p.get("style", "chrome") in ("chrome", "iridescent", "glass") else 60)
+    core.studio_world(job, strength=1.8 if p.get("style", "chrome") == "chrome" else 1.0, spin_degrees=150 if p.get("style", "chrome") in ("chrome", "iridescent", "glass") else 60)
     aspect = camera.frame_aspect()
     cam, aim = camera.camera(lens=55, location=(0, -10, 0.35 * h))
     margin = 1.28 if aspect < 1 else 1.6
     dist = camera.fit_distance(cam, w * margin, h * 3.0)
-    cam.location = (0.0, -dist, 0.12 * dist)
+    # Slightly below the word: its faces mirror the bright horizon line, not the dark floor.
+    cam.location = (0.0, -dist, -0.05 * dist)
     aim.location = (0, 0, 0)
 
     start = 1

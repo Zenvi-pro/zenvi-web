@@ -22,7 +22,7 @@ def build(job):
     lights.studio(scale=1.6)
     core.studio_world(job, strength=0.8)
     aspect = camera.frame_aspect()
-    cam, aim = camera.camera(lens=45, target=(0, 0, 0), dof=float(p.get("fstop", 0.9)))
+    cam, aim = camera.camera(lens=45, target=(0, 0, 0), dof=float(p.get("fstop", 0.3)))
     hero_h = 1.0
     first = items[0] if items else None
     hero_a = min(1.5, (first["width"] / first["height"]) if first and first.get("height") else 1.25)
@@ -48,7 +48,7 @@ def build(job):
         card.rotation_euler = (math.radians(90), 0, 0)
         sx, sy, depth = SLOTS[i]
         spread = (dist + depth * hero_h) / dist
-        x, z, y = sx * hx * 0.78 * spread, sy * hy * 0.72 * spread, depth * hero_h
+        x, z, y = sx * hx * 0.78 * spread, sy * hy * (0.85 if aspect < 1 else 0.72) * spread, depth * hero_h
         holder.location = (x, y, z)
         tilt = (rng.uniform(-8, 8), rng.uniform(-6, 6), rng.uniform(-14, 14) - sx * 10)
         f0 = 1 + int(round(i * STAGGER * fps))

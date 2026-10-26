@@ -81,7 +81,7 @@ def build(job):
 
     aspect = camera.frame_aspect()
     cam, aim = camera.camera(lens=50, location=lights.orbit_point(6, -28, 18))
-    dist = camera.fit_distance(cam, 1.0 * (2.2 if aspect < 1 else 1.9), 1.0 * 2.0)
+    dist = camera.fit_distance(cam, 1.0 * (1.75 if aspect < 1 else 1.9), 1.0 * 2.0)
     cam.location = lights.orbit_point(dist, -28, 18)
     explode = bool(p.get("explode", True))
     spin_end = int(frames * (0.45 if explode else 1.0))

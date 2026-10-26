@@ -52,7 +52,7 @@ export const SCENE3D_PARAMS = {
     ...common,
     file_ids: fileIds(8, "Media-bin videos or images on the cards (1-8; the first is the sharp hero card).").optional(),
     count: z.number().int().min(1).max(8).optional().describe("Number of cards (default one per file, or 5 gradient cards)."),
-    fstop: z.number().min(0.3).max(16).default(0.9).describe("Depth of field: lower blurs the far cards more."),
+    fstop: z.number().min(0.05).max(16).default(0.3).describe("Depth of field: lower blurs the far cards more."),
   }),
   icon_cube: z.strictObject({
     ...common,
