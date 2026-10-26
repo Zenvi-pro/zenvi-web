@@ -1,8 +1,9 @@
 /**
  * "Make it snappy": the finishing pass editors do on a cut, as a chain of
  * the agents' own tools, each its own undo step: (one-frame gaps closed
- * when that is all that keeps the clips from cutting,) motion transitions on the
- * main sequence's cuts (in the direction it already moves), sound design
+ * when that is all that keeps the clips from cutting,) the main sequence's shots
+ * graded toward one another (a dark shot next to daylight ones reads as another
+ * video), motion transitions on its cuts (in the direction it already moves), sound design
  * that lands on them (as dense as the transitions are loud), then the mix
  * mastered for social. A step that cannot run is reported and the rest still run.
  */
@@ -12,7 +13,7 @@ import { mainSequence, tinyGapTrack } from "./cuts";
 import { editorToolRunner, editorToolState, type ToolRun, type ToolRunner } from "./editorTools";
 import type { EditorSession } from "./session/EditorSession";
 
-export type SnappyStepId = "gaps" | "transitions" | "sound" | "master";
+export type SnappyStepId = "gaps" | "grade" | "transitions" | "sound" | "master";
 
 export interface SnappyOutcome {
   step: SnappyStepId;
@@ -29,6 +30,7 @@ export interface SnappyOptions {
 }
 
 const MASTER_TOOL = "master_audio_tool";
+const GRADE_TOOL = "unify_grade_tool";
 
 /** Sound design as dense as the transitions are loud: hype cuts get a sound on almost every cut, as in the reference reels. */
 const SOUND_FOR_STYLE: Record<MotionTransitionStyle, SfxIntensity> = { hype: "hype", cinematic: "normal" };
@@ -48,6 +50,10 @@ function briefOf(step: SnappyStepId, r: ToolRun): string | undefined {
   switch (step) {
     case "gaps":
       return "frame gaps closed";
+    case "grade": {
+      const n = (r.data.counts as { unified?: unknown } | undefined)?.unified;
+      return typeof n === "number" ? `${plural(n, "shot")} graded to match` : "grade matched";
+    }
     case "transitions": {
       const n = count(r.data, "transitions");
       return n === null ? "motion transitions" : plural(n, "transition");
@@ -76,6 +82,11 @@ export async function makeItSnappy(project: () => Project, run: ToolRunner, opti
     await step("gaps", "Close frame gaps", "remove_gaps_tool", { track: String(gaps.layer), from_seconds: gaps.from });
     track = mainSequence(project());
   }
+  // Measured before the transitions go on: their blur and zoom frames are not the shot's colour.
+  const grade = editorToolState(GRADE_TOOL);
+  if (!track) outcomes.push({ step: "grade", label: "Match the grade", status: "skipped", detail: "No sequence of shots to match.", undoSteps: 0 });
+  else if (grade.kind === "ready") await step("grade", "Match the grade", GRADE_TOOL, { track: String(track.layer) });
+  else outcomes.push({ step: "grade", label: "Match the grade", status: "skipped", detail: grade.kind === "missing" ? "Grade not matched: not in this build yet." : `Grade not matched: it runs on the ${grade.where}.`, undoSteps: 0 });
   const style = options.style ?? "hype";
   if (track) await step("transitions", "Motion transitions", "apply_motion_transitions_tool", { track: String(track.layer), style, direction: "auto" });
   else outcomes.push({ step: "transitions", label: "Motion transitions", status: "skipped", detail: "No clips play back to back, so there is no cut to move.", undoSteps: 0 });
