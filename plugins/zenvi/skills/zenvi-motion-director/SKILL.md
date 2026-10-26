@@ -134,7 +134,10 @@ phone size, not over the face · type on a calm area (a field, glass, a
 scrim), never straight on a busy photo ·
 one focal point · grade consistent with the previous shot. Then the timeline:
 `get_timeline_state_tool` — no gaps, shot lengths as planned, an SFX clip at
-every cut, music covers the whole piece and fades out.
+every cut, music covers the whole piece and fades out. Audio:
+`analyze_timeline_audio_tool` for each clip's level; the mix should sit
+near −13…−16 dB RMS: lower a hot mastered track (`set_clip_volume_tool`
+`level_db: -4`) rather than burying the effects, raise nothing above 0 dB.
 
 Fix what fails with the tool that made it (or `undo_tool` and redo with other
 arguments), then look at that frame again. Report what you checked.
