@@ -138,6 +138,14 @@ tool refuses layouts that would be smaller.
 The receipt has `data.brief`, `data.beats` (the timeline's beat grid: put
 anything else that should land on the beat there) and `data.shots`.
 
+Footage effects the timeline cannot do natively (zoom blur, echo trails,
+radial chromatic aberration, bloom, glitch, pixel sort, halftone, dither,
+mirror, optical-flow slow motion, light leaks) come from `apply_fx_tool`
+(`list_fx_tool` for params): give each a short window on the beat or the
+cut it should punch (zoom blur 0.2-0.4 s into a cut, a 0.3 s glitch on a
+hit) rather than the whole clip, keep one look per section, and remove one
+with `remove_fx_tool` if it reads as a filter instead of a moment.
+
 ## 5. Look before you call it done
 
 `preview_frame` at: 0.5 s (the hook reads, nothing is cut off), a cut in the

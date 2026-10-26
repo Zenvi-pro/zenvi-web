@@ -95,6 +95,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   mattes: "subject matting (the zenvi CLI with onnxruntime-node)",
   motion: "Zenvi Motion block rendering (headless Chrome, the zenvi CLI and zenvi mcp)",
   scenes3d: "Zenvi 3D (Blender on this computer)",
+  fx: "Zenvi FX (ffmpeg renders on this computer)",
 };
 
 /**

@@ -40,6 +40,10 @@ const DIRECT_TOOLS = [
   "list_3d_scenes_tool",
   "add_3d_scene_tool",
   "rerender_3d_scene_tool",
+  "list_fx_tool",
+  "apply_fx_tool",
+  "update_fx_tool",
+  "remove_fx_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
   "generate_subject_matte_tool",
@@ -108,6 +112,7 @@ describe("tool catalog", () => {
         if (key in args) continue;
         const type = tool.inputSchema.properties[key]?.type;
         if (key === "points") args[key] = [{ frame: 1, value: 1 }];
+        else if (key === "effects") args[key] = [{ effect: "bloom", amount: 0.5 }];
         else if (key === "subclips") args[key] = [{ source_start_seconds: 1, source_end_seconds: 2 }];
         else if (key === "clips") args[key] = [{ clip_id: "x", box: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 } }];
         else if (type === "array") args[key] = ["x"];
@@ -192,7 +197,7 @@ describe("availability matrix", () => {
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes", "motion", "scenes3d"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes", "motion", "scenes3d", "fx"],
       cloud: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
     };
     for (const tool of allTools) {

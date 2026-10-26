@@ -40,6 +40,7 @@ import { motionTemplateTools } from "./catalog/motion-templates.js";
 import { kineticCaptionTools } from "./catalog/kinetic-captions.js";
 import { motionTransitionTools } from "./catalog/motion-transitions.js";
 import { scenes3dTools } from "./catalog/scenes3d.js";
+import { fxTools } from "./catalog/fx.js";
 import { overlayTools } from "./catalog/overlays.js";
 import { phase3Tools } from "./catalog/phase3.js";
 import { playbackTools } from "./catalog/playback.js";
@@ -113,7 +114,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...reelTools, ...matchCutTools, ...motionTemplateTools, ...kineticCaptionTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...stockTools, ...matteTools]) {
+  for (const tool of [...implemented, ...directTools, ...reelTools, ...matchCutTools, ...motionTemplateTools, ...kineticCaptionTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...stockTools, ...matteTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -137,7 +138,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools, ...reelTools, ...matchCutTools, ...motionTemplateTools, ...kineticCaptionTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...stockTools, ...matteTools];
+  return [...contract, ...directTools, ...reelTools, ...matchCutTools, ...motionTemplateTools, ...kineticCaptionTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...stockTools, ...matteTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */
