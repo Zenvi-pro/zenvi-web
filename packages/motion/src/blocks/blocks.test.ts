@@ -44,3 +44,15 @@ describe.each(BLOCKS.map((b) => [b.id, b] as const))("%s", (id, manifest) => {
     }
   });
 });
+
+describe.each(BLOCKS.map((b) => [b.id, b] as const))("%s with blank list items", (id, manifest) => {
+  const lists = Object.entries(manifest.params).filter(([, spec]) => spec.type === "strings").map(([name]) => name);
+  it.skipIf(lists.length === 0)("builds and seeks", async () => {
+    const mod = (await import(`./${id}/block.ts`)) as { build: BlockBuild };
+    const checked = checkParams(manifest, Object.fromEntries(lists.map((name) => [name, [" "]])));
+    if (!checked.ok) return;
+    const ctx = createContext(document, { block: id, params: checked.params, width: 1080, height: 1920, fps: 30, seconds: manifest.duration.default, alpha: manifest.alpha, media: {}, draft: false });
+    await mod.build(ctx);
+    ctx.tl.seek(manifest.duration.default / 2);
+  });
+});

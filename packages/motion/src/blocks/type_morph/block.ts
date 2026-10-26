@@ -11,6 +11,8 @@ const SMOOTH = 14;
 export function build(ctx: BlockContext): void {
   const { tl, params: p, width: W, height: H, safe, palette, doc } = ctx;
   const words = (p.words as string[]).map((w) => w.trim()).filter(Boolean);
+  // Only blank words: nothing to set (the block stays transparent).
+  if (words.length === 0) return;
   const cx = W / 2;
   const cy = safe.top + (H - safe.top - safe.bottom) / 2;
   const fill = p.color === "accent" ? palette.accent : palette.ink;
@@ -33,7 +35,7 @@ export function build(ctx: BlockContext): void {
   }
 
   // One size for every word (the morph is about the letters), fit to the safe width.
-  const widest = Math.max(...traced.map((t) => t!.width));
+  const widest = Math.max(1, ...traced.map((t) => t!.width));
   const scale = Math.min(Number(p.max_size) / TRACE_PX, (W - safe.left - safe.right) / widest);
   // One baseline for every word: centre the words' average ink box vertically.
   const boxes = traced.map((t) => bounds(t!.outline));
