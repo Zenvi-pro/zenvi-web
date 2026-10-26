@@ -4,21 +4,27 @@
  * planner the desktop matches), plus a contact sheet of each transition's
  * frames.
  *
- *   npx tsx packages/render-node/scripts/motion-transitions-showcase.ts [out-dir]
+ *   npx tsx packages/render-node/scripts/motion-transitions-showcase.ts [out-dir] [--real]
  *
  * Writes <out-dir>/showcase.mp4, <out-dir>/frames.png and the project
- * (<out-dir>/showcase.zvn) with its generated media. All pictures come from
- * ffmpeg's lavfi sources (no third-party media).
+ * (<out-dir>/showcase.zvn) with its media. By default every picture comes
+ * from ffmpeg's lavfi sources. With --real it uses real footage instead
+ * (showcase_real.*): the Wikimedia Commons clips (CC0 / public domain /
+ * CC BY) listed with their licences in motion-transitions-footage.json,
+ * downloaded at run time and never committed.
  */
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ProjectDocument, addClip, createProject, findProfile } from "@zenvi/engine";
 import { runTool, type ToolResult } from "@zenvi/engine/tools";
 import { createNodeHost, renderProject } from "@zenvi/render-node";
 
-const out = path.resolve(process.argv[2] ?? "showcase-motion-transitions");
+const args = process.argv.slice(2);
+const real = args.includes("--real");
+const out = path.resolve(args.find((a) => !a.startsWith("--")) ?? "showcase-motion-transitions");
+const NAME = real ? "showcase_real" : "showcase";
 const mediaDir = path.join(out, "media");
 mkdirSync(mediaDir, { recursive: true });
 
@@ -68,20 +74,55 @@ function check(result: ToolResult, what: string): void {
   if (!result.ok) throw new Error(`${what}: ${result.text}`);
 }
 
-async function main(): Promise<void> {
-  const files = SOURCES.map(([name, src]) => {
+interface Footage {
+  name: string;
+  url: string;
+  license: string;
+  start: number;
+}
+
+/** The real clips: downloaded once into their own folder, cut to 5 s at 1280×720, 30 fps (fill, centre crop). */
+async function realFootage(): Promise<string[]> {
+  const sidecar = JSON.parse(readFileSync(new URL("./motion-transitions-footage.json", import.meta.url), "utf8")) as { clips: Footage[] };
+  const raw = path.join(mediaDir, "downloads");
+  mkdirSync(raw, { recursive: true });
+  const files: string[] = [];
+  for (const clip of sidecar.clips) {
+    const source = path.join(raw, clip.name);
+    if (!existsSync(source)) {
+      const res = await fetch(clip.url, { headers: { "User-Agent": "zenvi-showcase/1.0 (https://github.com/Zenvi-pro/zenvi-web)" } });
+      if (!res.ok) throw new Error(`download ${clip.url}: HTTP ${res.status}`);
+      writeFileSync(source, Buffer.from(await res.arrayBuffer()));
+    }
+    const file = path.join(mediaDir, `${clip.name}.mp4`);
+    ffmpeg(["-ss", String(clip.start), "-t", "5", "-i", source, "-an", "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},format=yuv420p`, "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", file]);
+    files.push(file);
+  }
+  return files;
+}
+
+function generatedFootage(): string[] {
+  return SOURCES.map(([name, src]) => {
     const file = path.join(mediaDir, `${name}.mp4`);
     ffmpeg(["-f", "lavfi", "-i", `${src},format=yuv420p`, "-t", "8", "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", file]);
     return file;
   });
+}
 
-  const projectFile = path.join(out, "showcase.zvn");
+async function main(): Promise<void> {
+  const files = real ? await realFootage() : generatedFootage();
+
+  const projectFile = path.join(out, `${NAME}.zvn`);
   const profile = findProfile("HD 720p 30 fps");
   const doc = new ProjectDocument(createProject(profile ? { profile } : {}));
   const host = createNodeHost({ projectFile });
   const ctx = { doc, host };
   check(await runTool(ctx, "import_files_tool", { paths: JSON.stringify(files), skip_indexing: "true" }), "import");
-  const fileIds = files.map((f) => doc.project.files.find((x) => x.path === f)!.id);
+  const fileIds = files.map((f) => {
+    const file = doc.project.files.find((x) => x.path === f);
+    if (!file) throw new Error(`not imported: ${f}`);
+    return file.id;
+  });
 
   const cuts: { label: string; cut: number }[] = [];
   let t = 0;
@@ -105,7 +146,7 @@ async function main(): Promise<void> {
   }
   writeFileSync(projectFile, JSON.stringify(doc.toJSON()));
 
-  const video = path.join(out, "showcase.mp4");
+  const video = path.join(out, `${NAME}.mp4`);
   await renderProject(doc.project, {
     resolveMedia: (p) => p,
     output: video,
@@ -116,9 +157,9 @@ async function main(): Promise<void> {
 
   // Contact sheet: one row per demo, frames cut-4 … cut+5 (the cut lands between the 4th and 5th frame).
   const select = cuts.map(({ cut }) => `between(n\\,${Math.round(cut * FPS) - 4}\\,${Math.round(cut * FPS) + 5})`).join("+");
-  ffmpeg(["-i", video, "-vf", `select='${select}',scale=256:-2,tile=10x${cuts.length}:padding=4:margin=4:color=0x202020`, "-frames:v", "1", "-fps_mode", "vfr", path.join(out, "frames.png")]);
-  writeFileSync(path.join(out, "cuts.json"), JSON.stringify(cuts, null, 1));
-  console.log(`wrote ${video}\nwrote ${path.join(out, "frames.png")}`);
+  ffmpeg(["-i", video, "-vf", `select='${select}',scale=256:-2,tile=10x${cuts.length}:padding=4:margin=4:color=0x202020`, "-frames:v", "1", "-fps_mode", "vfr", path.join(out, real ? "frames_real.png" : "frames.png")]);
+  writeFileSync(path.join(out, `${NAME}_cuts.json`), JSON.stringify(cuts, null, 1));
+  console.log(`wrote ${video}\nwrote ${path.join(out, real ? "frames_real.png" : "frames.png")}`);
 }
 
 main().catch((error: unknown) => {

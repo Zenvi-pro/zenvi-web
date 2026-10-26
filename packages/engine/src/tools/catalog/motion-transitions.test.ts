@@ -40,7 +40,7 @@ describe("motion transition tools", () => {
     expect(result.ok, result.text).toBe(true);
     expect(doc.undoLabels).toEqual(["Motion transition zoom_in"]);
     const data = dataOf(result) as { transition_id: string; frames: number; clips: { clip_id: string; effect_ids: string[] }[]; sfx_cues: { kind: string; time: number }[] };
-    expect(data.frames).toBe(9);
+    expect(data.frames).toBe(10);
     expect(data.clips.map((c) => c.clip_id)).toEqual(["CLIP0", "CLIP1"]);
     expect(data.clips[0]!.effect_ids.length).toBe(1);
     expect(data.sfx_cues.map((c) => c.kind)).toEqual(["whoosh", "hit"]);
@@ -82,8 +82,8 @@ describe("motion transition tools", () => {
     const data = dataOf(result) as { transitions: { preset: string; cut: number }[]; sfx_cues: unknown[] };
     expect(data.transitions.map((t) => [t.preset, t.cut])).toEqual([
       ["whip", 2],
-      ["zoom_in", 4],
-      ["whip", 6],
+      ["whip", 4],
+      ["zoom_out", 6],
     ]);
     expect(data.sfx_cues.length).toBe(4);
     const again = await call(doc, "apply_motion_transitions_tool", { track: "1", preset: "glitch" });

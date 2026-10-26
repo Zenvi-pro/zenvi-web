@@ -33,10 +33,11 @@ describe("motion transition presets", () => {
     expect(defaultFrames("flash_white", 12)).toBe(2);
   });
 
-  it("gives the incoming side the larger share", () => {
-    expect(splitFrames(8)).toEqual({ out: 3, in: 5 });
+  it("splits moves evenly (mirrored) and gives flashes' incoming side the larger share", () => {
+    expect(splitFrames(8)).toEqual({ out: 4, in: 4 });
     expect(splitFrames(2)).toEqual({ out: 1, in: 1 });
-    expect(splitFrames(12)).toEqual({ out: 5, in: 7 });
+    expect(splitFrames(12)).toEqual({ out: 6, in: 6 });
+    expect(splitFrames(5, false)).toEqual({ out: 2, in: 3 });
   });
 
   it("eases like docs/TASTE.md (in accelerates, out decelerates)", () => {
@@ -76,6 +77,62 @@ describe("motion transition presets", () => {
     expect(whip.out.frames.every((f) => f["Blur.vertical_radius"] === undefined)).toBe(true);
   });
 
+  // The vector law (HeyGen HyperFrames motion-doctrine, Apache-2.0): same axis, same direction, matched
+  // speed, mid-motion on both sides of the cut; on Z the scale never changes sign across it.
+  it("obeys the vector law on every move", () => {
+    const moves: [Parameters<typeof planMotionTransition>[0]["preset"], string, string][] = [
+      ["whip", "left", "Shift.x"],
+      ["whip", "right", "Shift.x"],
+      ["whip", "up", "Shift.y"],
+      ["whip", "down", "Shift.y"],
+      ["slide", "left", "Shift.x"],
+      ["squash", "left", "Shift.x"],
+      ["spin", "cw", "rotation"],
+      ["spin", "ccw", "rotation"],
+    ];
+    for (const [preset, direction, ch] of moves) {
+      for (const frames of [6, 8, 12, 16]) {
+        const plan = planMotionTransition({ preset, fps: 30, aspect: ASPECT, frames, direction: direction as never });
+        const key = ch as keyof (typeof plan.out.frames)[number];
+        const a = plan.out.frames.map((f) => f[key]!);
+        const b = plan.in.frames.map((f) => f[key]!);
+        // Same axis: the other axis never moves.
+        const other = ch === "Shift.x" ? "Shift.y" : ch === "Shift.y" ? "Shift.x" : undefined;
+        if (other) for (const f of [...plan.out.frames, ...plan.in.frames]) expect(f[other as keyof typeof f] ?? 0).toBe(0);
+        const exit = a.at(-1)! - (a.at(-2) ?? 0);
+        // The incoming shot starts its path where the outgoing one's mirror ends: -end (Shift wraps; spin turns on).
+        const entry = b[0]! - -a.at(-1)!;
+        const label = `${preset} ${direction} ${frames}`;
+        expect(Math.sign(entry), label).toBe(Math.sign(exit));
+        expect(exit, label).not.toBe(0);
+        expect(Math.abs(entry), label).toBeCloseTo(Math.abs(exit), 5);
+        // Mid-flight: at least half way along its path on its first frame, at rest on its last.
+        expect(Math.abs(b[0]!), label).toBeLessThanOrEqual(0.5 * Math.abs(a.at(-1)!));
+        expect(b.at(-1), label).toBe(0);
+        // Motion blur follows speed: largest on the frames either side of the cut, equal there.
+        const blurKey = (ch === "Shift.y" ? "Blur.vertical_radius" : "Blur.horizontal_radius") as keyof (typeof plan.out.frames)[number];
+        const blurA = plan.out.frames.map((f) => f[blurKey]!);
+        const blurB = plan.in.frames.map((f) => f[blurKey]!);
+        expect(blurA.at(-1), label).toBe(Math.max(...blurA));
+        expect(blurB[0], label).toBe(Math.max(...blurB));
+        expect(blurB[0], label).toBeCloseTo(blurA.at(-1)!, 5);
+      }
+    }
+  });
+
+  it("never answers a push with a pull (or a pull with a push) on zoom seams", () => {
+    for (const preset of ["zoom_in", "zoom_out", "zoom_through", "blur_dissolve"] as const) {
+      const plan = planMotionTransition({ preset, fps: 30, aspect: ASPECT });
+      const a = plan.out.frames.map((f) => f.scale_x ?? 1);
+      const b = plan.in.frames.map((f) => f.scale_x ?? 1);
+      const exit = a.at(-1)! - a.at(-2)!;
+      const entry = b[1]! - b[0]!;
+      expect(exit * entry, preset).toBeGreaterThanOrEqual(0);
+      expect(Math.abs(exit) + Math.abs(entry), preset).toBeGreaterThan(0);
+      expect(b.at(-1), preset).toBe(1);
+    }
+  });
+
   it("covers the canvas while spinning", () => {
     expect(coverScale(0, ASPECT)).toBe(1);
     expect(coverScale(90, ASPECT)).toBeCloseTo(ASPECT, 6);
@@ -94,7 +151,7 @@ describe("motion transition presets", () => {
   it("cues sound design on the cut", () => {
     const zoom = planMotionTransition({ preset: "zoom_in", fps: 30, aspect: ASPECT });
     expect(zoom.sfx).toEqual([
-      { kind: "whoosh", offset: -3, frames: 7 },
+      { kind: "whoosh", offset: -4, frames: 8 },
       { kind: "hit", offset: 0, frames: 3 },
     ]);
     expect(planMotionTransition({ preset: "glitch", fps: 30, aspect: ASPECT }).sfx[0]!.kind).toBe("glitch");

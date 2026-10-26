@@ -50,19 +50,19 @@ describe("applyMotionTransition", () => {
       ["CLIP0", "out"],
       ["CLIP1", "in"],
     ]);
-    // Outgoing: rest at its last frame - 3, moving frames up to the last frame (clip frames count from start = 0 s).
-    expect(result.clips[0]!.frames).toEqual([57, 60]);
-    expect(result.clips[1]!.frames).toEqual([61, 66]);
-    expect(result.clips[0]!.properties).toEqual(["scale_x", "scale_y"]);
+    // Outgoing: rest at its last frame - 4, moving frames up to the last frame (clip frames count from start = 0 s).
+    expect(result.clips[0]!.frames).toEqual([56, 60]);
+    expect(result.clips[1]!.frames).toEqual([61, 65]);
+    expect(result.clips[0]!.properties).toEqual([]);
     const a = clip(doc, "CLIP0");
     expect(a.effects.map((e) => e.type)).toEqual(["Shift", "Blur"]);
     expect(result.clips[0]!.effectIds).toEqual(a.effects.map((e) => e.id));
     const shift = a.effects[0]!;
-    expect(evaluate(shift.x as never, 57)).toBe(0);
+    expect(evaluate(shift.x as never, 56)).toBe(0);
     expect(evaluate(shift.x as never, 60)).toBe(-0.5);
     expect(evaluate(shift.x as never, 1)).toBe(0);
-    expect(motionRecords(a)[0]).toMatchObject({ id: result.id, role: "out", partner: "CLIP1", preset: "whip", window: [57, 60] });
-    expect(result.sfxCues).toEqual([{ time: 1.9, kind: "whoosh", duration: 0.267 }]);
+    expect(motionRecords(a)[0]).toMatchObject({ id: result.id, role: "out", partner: "CLIP1", preset: "whip", window: [56, 60] });
+    expect(result.sfxCues).toEqual([{ time: 1.867, kind: "whoosh", duration: 0.267 }]);
     expectUndoRedo(doc, before);
   });
 
@@ -72,7 +72,7 @@ describe("applyMotionTransition", () => {
     const original = clip(doc, "CLIP0");
     doc.transaction("zoom", (tx) => applyMotionTransition(tx, { outClipId: "CLIP0", inClipId: "CLIP1", preset: "zoom_in" }));
     const a = clip(doc, "CLIP0");
-    for (let f = 1; f <= 57; f += 1) {
+    for (let f = 1; f <= 56; f += 1) {
       expect(evaluate(a.scale_x, f), `frame ${f}`).toBeCloseTo(evaluate(original.scale_x, f), 3);
       expect(evaluate(a.location_x, f)).toBe(evaluate(original.location_x, f));
     }
@@ -82,16 +82,16 @@ describe("applyMotionTransition", () => {
     expect(a.location_x).toEqual(original.location_x);
   });
 
-  it("follows the outgoing shot's own drift for an auto whip, else alternates", () => {
-    const doc = cutsDoc(3);
-    withKenBurns(doc);
-    const r = doc.transaction("auto", (tx) => applyMotionTransition(tx, { outClipId: "CLIP0", inClipId: "CLIP1", preset: "whip", direction: "auto" }));
-    expect(r.direction).toBe("right");
-    const r2 = doc.transaction("auto", (tx) => applyMotionTransition(tx, { outClipId: "CLIP1", inClipId: "CLIP2", preset: "whip", direction: "auto", index: 1 }));
-    expect(r2.direction).toBe("right");
-    const r3 = doc.transaction("auto", (tx) => applyMotionTransition(tx, { outClipId: "CLIP1", inClipId: "CLIP2", preset: "spin", direction: "auto", index: 1 }));
-    expect(r3.direction).toBe("ccw");
-    expect(r3.replaced).toBe(r2.id);
+  it("keeps the track's current for auto directions and never alternates", () => {
+    const doc = cutsDoc(4);
+    const auto = (out: string, inn: string, preset: "whip" | "spin" | "squash") =>
+      doc.transaction("auto", (tx) => applyMotionTransition(tx, { outClipId: out, inClipId: inn, preset, direction: "auto" })).direction;
+    expect(auto("CLIP0", "CLIP1", "whip")).toBe("left");
+    doc.transaction("right", (tx) => applyMotionTransition(tx, { outClipId: "CLIP0", inClipId: "CLIP1", preset: "whip", direction: "right" }));
+    // The cut after a right whip keeps going right, whatever the preset that can.
+    expect(auto("CLIP1", "CLIP2", "squash")).toBe("right");
+    expect(auto("CLIP2", "CLIP3", "whip")).toBe("right");
+    expect(auto("CLIP2", "CLIP3", "spin")).toBe("cw");
   });
 
   it("is deterministic", () => {

@@ -13,7 +13,17 @@
  * Offset), so the picture never leaves the canvas; scale only grows (>= 1),
  * and rotation is paired with the smallest scale that still covers the
  * canvas at that angle. Timing and easing follow docs/TASTE.md: exits
- * `in` (0.70, 0, 0.84, 0); landings a cubic-out (see `easeLand`).
+ * `in` (0.70, 0, 0.84, 0), landings its mirror `out` (0.16, 1, 0.30, 1).
+ *
+ * The seam obeys the vector law of HeyGen HyperFrames' motion doctrine
+ * (Apache-2.0, .claude/skills/motion-doctrine/SKILL.md, "The Vector Law"):
+ * the incoming shot enters on the same axis, in the same direction, at the
+ * speed the outgoing shot left (mirrored eases over the same number of
+ * frames), mid-motion on both sides of the cut. On zoom seams the scale only
+ * ever changes with one sign (a push is never answered by a pull); the side
+ * that cannot move without uncovering the frame holds and carries the smear.
+ * Smear is motion blur, so it follows speed: it peaks on the frames either
+ * side of the cut.
  */
 
 export const MOTION_TRANSITION_IDS = [
@@ -153,6 +163,8 @@ interface SideContext {
   n: number;
   /** Eased amount: 0 at rest, 1 at the cut. */
   a: number;
+  /** Speed this frame relative to the speed across the cut (1 next to the cut): what motion blur follows. */
+  v: number;
   dir: MotionDirection | null;
   intensity: number;
   aspect: number;
@@ -187,12 +199,6 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number, u: n
 export const easeIn = (u: number): number => cubicBezier(0.7, 0, 0.84, 0, u);
 /** docs/TASTE.md `out` / entrance: fast off the cut, settles slowly. */
 export const easeOut = (u: number): number => cubicBezier(0.16, 1, 0.3, 1, u);
-/**
- * Cubic-out (0.33, 1, 0.68, 1), the incoming side's landing. Sampled at whole
- * frames, `out` is ~70 % settled after one frame of a 5-frame landing, so the
- * smear vanishes on the cut; cubic-out keeps it visible for 2-3 frames.
- */
-export const easeLand = (u: number): number => cubicBezier(0.33, 1, 0.68, 1, u);
 
 /** Smallest scale at which a canvas-sized picture rotated by `degrees` still covers the canvas. */
 export function coverScale(degrees: number, aspect: number): number {
@@ -217,24 +223,30 @@ function axisOf(dir: MotionDirection | null): Axis {
 const PAN = ["left", "right", "up", "down"] as const;
 const SPIN = ["cw", "ccw"] as const;
 
+/**
+ * Shift wraps, so an offset picture has a hard seam where its edges meet;
+ * the smear must cover it while it is on screen (a slide on real footage
+ * showed it on the landing frames). Blur follows speed, but never drops
+ * below what the offset needs.
+ */
+function seamBlur(ctx: SideContext): number {
+  return Math.max(ctx.v, Math.min(1, 4 * ctx.a));
+}
+
 /** Wrap travel: 0.5 frame on each side lands the incoming picture where the outgoing one left off. */
-function travel(ctx: SideContext, distance: number, blur: number, punch: number): MotionFrameValues {
+function travel(ctx: SideContext, distance: number, blur: number): MotionFrameValues {
   const { axis, sign } = axisOf(ctx.dir);
   const s = ctx.side === "out" ? sign : -sign;
   const out: MotionFrameValues = {
     [axis === "x" ? "Shift.x" : "Shift.y"]: s * distance * ctx.a,
-    [axis === "x" ? "Blur.horizontal_radius" : "Blur.vertical_radius"]: blur * ctx.intensity * ctx.a,
+    [axis === "x" ? "Blur.horizontal_radius" : "Blur.vertical_radius"]: blur * ctx.intensity * seamBlur(ctx),
   };
-  if (punch > 0) {
-    out.scale_x = 1 + punch * ctx.intensity * ctx.a;
-    out.scale_y = out.scale_x;
-  }
   return out;
 }
 
 function zoom(ctx: SideContext, outAmount: number, inAmount: number, blur: number): MotionFrameValues {
   const scale = 1 + (ctx.side === "out" ? outAmount : inAmount) * ctx.intensity * ctx.a;
-  const radius = blur * ctx.intensity * ctx.a;
+  const radius = blur * ctx.intensity * ctx.v;
   return { scale_x: scale, scale_y: scale, "Blur.horizontal_radius": radius, "Blur.vertical_radius": radius };
 }
 
@@ -269,7 +281,7 @@ const PRESETS: readonly PresetDef[] = [
     directions: PAN,
     defaultDirection: "left",
     sfx: ["whoosh"],
-    frame: (ctx) => travel(ctx, 0.5, 0.075, 0.06),
+    frame: (ctx) => travel(ctx, 0.5, 0.075),
   },
   {
     id: "slide",
@@ -279,17 +291,17 @@ const PRESETS: readonly PresetDef[] = [
     directions: PAN,
     defaultDirection: "left",
     sfx: ["whoosh"],
-    frame: (ctx) => travel(ctx, 0.5, 0.02, 0.02),
+    frame: (ctx) => travel(ctx, 0.5, 0.035),
   },
   {
     id: "zoom_in",
     title: "Zoom punch in",
-    description: "Crash zoom into the cut: the outgoing shot punches in with a blur, the next one settles from slightly zoomed.",
+    description: "Crash zoom into the cut: the outgoing shot punches in with a blur, the next one lands composed as the smear clears (a push, never answered by a pull).",
     frames30: 7,
     directions: [],
     defaultDirection: null,
     sfx: ["whoosh", "hit"],
-    frame: (ctx) => zoom(ctx, 0.6, 0.22, 0.025),
+    frame: (ctx) => zoom(ctx, 0.6, 0, 0.025),
     cues: (nOut, nIn) => [
       { kind: "whoosh", offset: -nOut, frames: nOut + nIn },
       { kind: "hit", offset: 0, frames: 3 },
@@ -298,12 +310,12 @@ const PRESETS: readonly PresetDef[] = [
   {
     id: "zoom_out",
     title: "Zoom punch out",
-    description: "Pull-back punch: the next shot arrives zoomed in and snaps back to full frame.",
+    description: "Pull-back punch (an arrival): the outgoing shot smears out, the next one arrives zoomed in and snaps back to full frame.",
     frames30: 7,
     directions: [],
     defaultDirection: null,
     sfx: ["whoosh", "hit"],
-    frame: (ctx) => zoom(ctx, 0.22, 0.6, 0.025),
+    frame: (ctx) => zoom(ctx, 0, 0.6, 0.025),
     cues: (nOut, nIn) => [
       { kind: "whoosh", offset: -nOut, frames: nOut + nIn },
       { kind: "hit", offset: 0, frames: 3 },
@@ -318,9 +330,9 @@ const PRESETS: readonly PresetDef[] = [
     defaultDirection: null,
     sfx: ["whoosh"],
     frame: (ctx) => {
-      const amount = ctx.side === "out" ? 2 : 0.45;
+      const amount = ctx.side === "out" ? 2 : 0;
       const scale = 1 + amount * ctx.intensity * ctx.a;
-      const radius = 0.03 * ctx.intensity * ctx.a;
+      const radius = 0.03 * ctx.intensity * ctx.v;
       const values: MotionFrameValues = { scale_x: scale, scale_y: scale, "Blur.horizontal_radius": radius, "Blur.vertical_radius": radius };
       if (ctx.side === "out") {
         // Keep the focus point still while scaling about the centre: |offset| <= (scale - 1) / 2 keeps the edges covered.
@@ -342,7 +354,7 @@ const PRESETS: readonly PresetDef[] = [
       const sign = ctx.dir === "ccw" ? -1 : 1;
       const degrees = (ctx.side === "out" ? 1 : -1) * sign * Math.min(90, 60 * ctx.intensity) * ctx.a;
       const scale = coverScale(degrees, ctx.aspect) * (1 + 0.04 * ctx.a) * 1.002;
-      const radius = 0.035 * ctx.intensity * ctx.a;
+      const radius = 0.035 * ctx.intensity * ctx.v;
       return { rotation: degrees, scale_x: scale, scale_y: scale, "Blur.horizontal_radius": radius, "Blur.vertical_radius": radius };
     },
   },
@@ -352,7 +364,7 @@ const PRESETS: readonly PresetDef[] = [
     description: "The outgoing shot stretches as it shoots off along the direction; the next one lands squashed and springs back.",
     frames30: 8,
     directions: PAN,
-    defaultDirection: "up",
+    defaultDirection: "left",
     sfx: ["whoosh"],
     frame: (ctx) => {
       const { axis, sign } = axisOf(ctx.dir);
@@ -361,7 +373,7 @@ const PRESETS: readonly PresetDef[] = [
       const s = ctx.side === "out" ? sign : -sign;
       const values: MotionFrameValues = {
         [axis === "x" ? "Shift.x" : "Shift.y"]: s * 0.25 * ctx.a,
-        [axis === "x" ? "Blur.horizontal_radius" : "Blur.vertical_radius"]: (ctx.side === "out" ? 0.045 : 0.02) * ctx.intensity * ctx.a,
+        [axis === "x" ? "Blur.horizontal_radius" : "Blur.vertical_radius"]: 0.045 * ctx.intensity * seamBlur(ctx),
       };
       values[along] = 1 + (ctx.side === "out" ? 0.7 : 0) * ctx.intensity * ctx.a;
       values[across] = 1 + (ctx.side === "out" ? 0 : 0.35) * ctx.intensity * ctx.a;
@@ -446,7 +458,7 @@ const PRESETS: readonly PresetDef[] = [
     sfx: ["hit"],
     peakOnIn: true,
     frame: (ctx) =>
-      ctx.a >= 0.5
+      ctx.a > 0.75
         ? { "Brightness.brightness": 0, "Brightness.contrast": INVERT_CONTRAST }
         : { "Brightness.brightness": 0.35 * Math.min(1, ctx.intensity) * ctx.a, "Brightness.contrast": 0 },
     cues: cutCue("hit"),
@@ -461,7 +473,8 @@ const PRESETS: readonly PresetDef[] = [
     sfx: ["whoosh"],
     frame: (ctx) => {
       const radius = 0.05 * ctx.intensity * ctx.a;
-      const scale = 1 + 0.04 * ctx.intensity * ctx.a;
+      // A slow push out of the outgoing shot; the incoming one only pulls focus (no counter-zoom).
+      const scale = 1 + (ctx.side === "out" ? 0.04 : 0) * ctx.intensity * ctx.a;
       return { scale_x: scale, scale_y: scale, "Blur.horizontal_radius": radius, "Blur.vertical_radius": radius };
     },
   },
@@ -492,10 +505,15 @@ export function defaultFrames(preset: MotionTransitionId, fps: number): number {
 }
 
 /**
- * Frames on each side of the cut: the incoming side gets the larger share
- * (things leave fast and settle slowly).
+ * Frames on each side of the cut. Moves are mirrored, so both sides get the
+ * same length (the incoming side's last frame is its landing, at rest);
+ * flashes and glitches give the incoming side the larger share.
  */
-export function splitFrames(frames: number): { out: number; in: number } {
+export function splitFrames(frames: number, mirrored = true): { out: number; in: number } {
+  if (mirrored) {
+    const half = Math.max(1, Math.round(frames / 2));
+    return { out: half, in: half };
+  }
   const out = Math.max(1, Math.min(frames - 1, Math.round(frames * 0.4)));
   return { out, in: frames - out };
 }
@@ -510,14 +528,19 @@ export function planMotionTransition(input: MotionTransitionPlanInput): MotionTr
   const intensity = Math.min(2, Math.max(0.25, input.intensity ?? 1));
   const dir = def.directions.length === 0 ? null : input.direction && def.directions.includes(input.direction) ? input.direction : def.defaultDirection;
   const focus = { x: Math.min(1, Math.max(0, input.focus?.x ?? 0.5)), y: Math.min(1, Math.max(0, input.focus?.y ?? 0.5)) };
-  const split = splitFrames(frames);
+  const split = splitFrames(frames, !def.peakOnIn);
+  // Outgoing: rest at k = -1, full at its last frame. Incoming (mirrored): the same path backwards, one
+  // frame past the cut, so it enters mid-flight at the speed the outgoing shot left with and lands at rest
+  // on its last frame. Flashes peak on the incoming side's first frame instead.
+  const amount = (s: Side, k: number, n: number): number =>
+    s === "out" ? (k < 0 ? 0 : easeIn((k + 1) / n)) : def.peakOnIn ? 1 - k / n : k < 0 ? 1 : easeIn((n - 1 - k) / n);
+  const cutStep = Math.max(1e-9, 1 - easeIn((split.out - 1) / split.out));
   const side = (s: Side, n: number): MotionTransitionSidePlan => {
     const list: MotionFrameValues[] = [];
     for (let k = 0; k < n; k += 1) {
-      // Outgoing: rest at k = -1, full at the last frame. Incoming: continues the motion one step past the
-      // peak (or, for flashes, peaks on its first frame) and rests one frame after the window.
-      const a = s === "out" ? easeIn((k + 1) / n) : def.peakOnIn ? (1 - k / n) ** 2 : 1 - easeLand((k + 1) / (n + 1));
-      const values = def.frame({ side: s, k, n, a, dir, intensity, aspect: input.aspect, focus });
+      const a = amount(s, k, n);
+      const v = Math.min(1, Math.abs(a - amount(s, k - 1, n)) / cutStep);
+      const values = def.frame({ side: s, k, n, a, v, dir, intensity, aspect: input.aspect, focus });
       const rounded: MotionFrameValues = {};
       for (const [ch, v] of Object.entries(values) as [MotionChannel, number][]) rounded[ch] = round6(v);
       list.push(rounded);
@@ -528,7 +551,7 @@ export function planMotionTransition(input: MotionTransitionPlanInput): MotionTr
     preset: def.id,
     direction: dir,
     intensity,
-    frames,
+    frames: split.out + split.in,
     out: side("out", split.out),
     in: side("in", split.in),
     sfx: (def.cues ?? windowCue(def.sfx[0]!))(split.out, split.in),

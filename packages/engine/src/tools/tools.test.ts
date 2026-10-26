@@ -1020,7 +1020,7 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { preset: "whip", clip1_id: IDS.clipA, clip2_id: IDS.clipLogo }, status: "refused", summary: /^Error: Clips CLIPINTV01 and CLIPLOGO01 are on different tracks/ },
   },
   apply_motion_transitions_tool: {
-    happy: { args: { track: String(L1), style: "hype" }, summary: /^Added 2 motion transition\(s\) on track 1 \(hype\): whip@10\.00s, zoom_in@15\.00s\.$/ },
+    happy: { args: { track: String(L1), style: "hype" }, summary: /^Added 2 motion transition\(s\) on track 1 \(hype\): whip@10\.00s, whip@15\.00s\.$/ },
     failure: { args: { track: String(L1), preset: "whip", style: "hype" }, status: "refused", summary: /^Error: give preset or style/ },
   },
   remove_motion_transition_tool: {

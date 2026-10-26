@@ -16,7 +16,6 @@ import { createEffect } from "../effects/registry.js";
 import type { Clip, Effect, Keyframe, Project } from "../model/types.js";
 import { findClip } from "../model/query.js";
 import { deliveredSource } from "../render/plan/reader.js";
-import { clipKeyframe } from "../render/plan/transform.js";
 import { frameWindow, localFrame } from "../timeline/windows.js";
 import {
   EFFECT_CHANNELS,
@@ -67,14 +66,12 @@ export interface MotionTransitionInput {
   outClipId: string;
   inClipId: string;
   preset: MotionTransitionId;
-  /** `auto`: follow the outgoing clip's own motion, else alternate by `index`. */
+  /** `auto`: keep the track's current (the direction of the last motion transition before this cut), else the preset's default. */
   direction?: MotionDirection | "auto";
   /** Moving frames in all; default the preset's length at the project frame rate. */
   frames?: number;
   intensity?: number;
   focus?: { x: number; y: number };
-  /** The cut's index on its track (alternates `auto` directions). */
-  index?: number;
 }
 
 export interface SfxCue {
@@ -185,20 +182,21 @@ export function cutNear(project: Project, layer: number, seconds: number): Motio
   return best;
 }
 
-/** `auto`: keep the outgoing shot's own camera move going, else alternate so a sequence does not repeat. */
-function autoDirection(preset: MotionTransitionId, clip: Clip, lastFrame: number, firstFrame: number, index: number): MotionDirection | undefined {
+/**
+ * `auto`: keep the sequence's current, the "one dominant direction" of
+ * HyperFrames' motion doctrine (Apache-2.0, motion-doctrine/SKILL.md, "The
+ * Current"): the direction of the nearest earlier motion transition on the
+ * track that this preset can take, else the preset's default (left; spins
+ * clockwise). Never alternates: ping-pong across consecutive cuts reads as an
+ * error.
+ */
+function autoDirection(project: Project, preset: MotionTransitionId, layer: number, cut: number): MotionDirection | undefined {
   const info = getMotionTransition(preset)!;
   if (info.directions.length === 0) return undefined;
-  if (info.directions.includes("cw")) return index % 2 === 0 ? "cw" : "ccw";
-  const from = Math.max(firstFrame, lastFrame - 6);
-  const dx = clipKeyframe(clip, "location_x", lastFrame) - clipKeyframe(clip, "location_x", from);
-  const dy = clipKeyframe(clip, "location_y", lastFrame) - clipKeyframe(clip, "location_y", from);
-  if (Math.max(Math.abs(dx), Math.abs(dy)) > 0.002) {
-    if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? "right" : "left";
-    return dy > 0 ? "down" : "up";
-  }
-  const pair: [MotionDirection, MotionDirection] = info.defaultDirection === "up" || info.defaultDirection === "down" ? ["up", "down"] : ["left", "right"];
-  return pair[index % 2];
+  const earlier = listProjectMotionTransitions(project)
+    .filter((r) => r.layer === layer && r.cut < cut - 1e-6 && r.direction !== null && info.directions.includes(r.direction))
+    .sort((x, y) => y.cut - x.cut)[0];
+  return earlier?.direction ?? info.defaultDirection ?? undefined;
 }
 
 const SCALE_CHANNELS = new Set<TransformChannel>(["scale_x", "scale_y"]);
@@ -378,7 +376,7 @@ export function planMotionTransitionEdit(project: Project, input: MotionTransiti
 
   let direction: MotionDirection | undefined;
   if (input.direction === "auto" || input.direction === undefined) {
-    direction = input.direction === "auto" ? autoDirection(input.preset, outClip, lastA, firstA, input.index ?? 0) : undefined;
+    direction = autoDirection(project, input.preset, cut.layer, cut.cut);
   } else {
     if (!info.directions.includes(input.direction)) {
       throw invalid(info.directions.length ? `${input.preset} goes ${info.directions.join(", ")} or auto (got ${input.direction}).` : `${input.preset} has no direction (got ${input.direction}).`);

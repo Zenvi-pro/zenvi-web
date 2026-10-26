@@ -50,7 +50,7 @@ const PRESET_LINES = listMotionTransitions()
 
 const common = {
   duration: z.number().min(0.03).max(4).optional().describe("Length of the move in seconds, both clips together (default per preset, from docs/TASTE.md: whip 8 frames at 30 fps, zoom 7, spin 12, glitch 5, flash 3)."),
-  direction: z.enum([...MOTION_DIRECTIONS, "auto"]).optional().describe("whip/slide/squash: left, right, up, down; spin: cw, ccw. auto (default) follows the outgoing shot's own camera move, else alternates."),
+  direction: z.enum([...MOTION_DIRECTIONS, "auto"]).optional().describe("whip/slide/squash: left, right, up, down; spin: cw, ccw. auto (default) keeps the track's current: the direction of the previous motion transition on the track, else left (spin: cw). Keep one direction per sequence; up is a reserved accent."),
   intensity: z.number().min(0.25).max(2).optional().describe("0.25-2, default 1: scales travel, zoom, blur and flash strength."),
 };
 
@@ -70,7 +70,7 @@ const applyInput = z.strictObject({
 const applyAllInput = z.strictObject({
   track: z.string().max(64).describe("Track whose cuts get transitions: UI track number (1 = bottom), name, or layer number."),
   preset: z.enum(MOTION_TRANSITION_IDS).optional().describe(`One transition on every cut: ${PRESET_LINES}. Give this or style.`),
-  style: z.enum(MOTION_TRANSITION_STYLE_IDS as [MotionTransitionStyle, ...MotionTransitionStyle[]]).optional().describe("A mix that rotates presets cut by cut: hype (whips, punches, glitch, spin, flash, shake) or cinematic (blur dissolves, slow pushes, a dip to black)."),
+  style: z.enum(MOTION_TRANSITION_STYLE_IDS as [MotionTransitionStyle, ...MotionTransitionStyle[]]).optional().describe("A mix that repeats two or three presets: hype (whip, whip, crash zoom; the last cut a pull-back arrival) or cinematic (slide, blur dissolve; the last cut a zoom-through)."),
   ...common,
 });
 
@@ -109,7 +109,7 @@ function message(error: unknown): string {
 }
 
 /** The cut an apply call names, as op input. */
-function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionInput, "outClipId" | "inClipId" | "index"> {
+function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionInput, "outClipId" | "inClipId"> {
   if (args.clip1_id) {
     if (args.clip2_id) return { outClipId: args.clip1_id, inClipId: args.clip2_id };
     const clip = project.clips.find((c) => c.id === args.clip1_id);
@@ -117,13 +117,12 @@ function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionIn
     const cuts = trackCuts(project, clip.layer);
     const i = cuts.findIndex((c) => c.outClip.id === clip.id);
     if (i < 0) throw new ToolError(`no clip is cut back to back after ${clip.id} on its track; give clip2_id`);
-    return { outClipId: clip.id, inClipId: cuts[i]!.inClip.id, index: i };
+    return { outClipId: clip.id, inClipId: cuts[i]!.inClip.id };
   }
   if (args.track === undefined || args.time === undefined) throw new ToolError("give clip1_id (and optionally clip2_id), or track and time");
   const layer = resolveLayer(project, args.track);
   const cut = cutNear(project, layer, args.time);
-  const index = trackCuts(project, layer).findIndex((c) => c.outClip.id === cut.outClip.id);
-  return { outClipId: cut.outClip.id, inClipId: cut.inClip.id, index };
+  return { outClipId: cut.outClip.id, inClipId: cut.inClip.id };
 }
 
 const LIST = "list_motion_transitions_tool";
@@ -151,7 +150,7 @@ export const motionTransitionTools: CatalogTool[] = [
         default_duration: round(defaultFrames(p.id, fps) / fps),
         sfx: p.sfx,
       }));
-      const styles = Object.fromEntries(Object.entries(MOTION_TRANSITION_STYLES).map(([k, steps]) => [k, steps.map((s) => s.preset)]));
+      const styles = Object.fromEntries(MOTION_TRANSITION_STYLE_IDS.map((k) => [k, { pattern: MOTION_TRANSITION_STYLES[k].pattern.map((s) => s.preset), last_cut: MOTION_TRANSITION_STYLES[k].accent.preset }]));
       const onTimeline = listProjectMotionTransitions(project).map((r) => ({
         transition_id: r.id,
         preset: r.preset,
@@ -203,7 +202,8 @@ export const motionTransitionTools: CatalogTool[] = [
     name: APPLY_ALL,
     title: "Apply motion transitions to every cut",
     description:
-      "Put a motion transition on every cut of a track (clips back to back), one preset everywhere or a style mix that rotates presets cut by cut (hype, cinematic). " +
+      "Put a motion transition on every cut of a track (clips back to back), one preset everywhere or a style mix (hype: whip, whip, crash zoom, repeated, landing on a pull-back; cinematic: slide, blur dissolve, repeated, ending in a zoom-through). " +
+      "The sequence keeps ONE direction, the current (direction, default left), on every cut and never alternates; reserved moves (up, zoom-through, pull-back) are accents for the climax or last cut, and two or three presets repeated read as design where more read as noise. " +
       "Cuts whose clips are too short are skipped with a warning; cuts that already have one are replaced. One undo step; the receipt lists every transition and its sfx_cues.",
     input: applyAllInput,
     annotations: WRITE,
@@ -221,10 +221,10 @@ export const motionTransitionTools: CatalogTool[] = [
       if (cuts.length === 0) return unchanged(APPLY_ALL, `No cuts on ${trackName(project, layer)}: no clips play back to back there.`);
       const frames = framesOf(project, args.duration);
       const inputs = cuts.map((cut, index): MotionTransitionInput => {
-        const step = args.style ? styleStep(args.style, index) : { preset: args.preset as MotionTransitionId };
+        const step = args.style ? styleStep(args.style, index, cuts.length) : { preset: args.preset as MotionTransitionId };
         const intensity = args.intensity !== undefined ? args.intensity : step.intensity;
         const direction: MotionDirection | "auto" = args.direction ?? "auto";
-        return { outClipId: cut.outClip.id, inClipId: cut.inClip.id, preset: step.preset, frames, intensity, index, direction: direction };
+        return { outClipId: cut.outClip.id, inClipId: cut.inClip.id, preset: step.preset, frames, intensity, direction };
       });
       const warnings: string[] = [];
       const results = call.commit((tx) => {

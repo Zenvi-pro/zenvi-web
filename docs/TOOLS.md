@@ -3241,14 +3241,14 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `track` | string |  | Instead of clip ids: the track of the cut (UI track number, 1 = bottom; name; or layer number) ... |
 | `time` | number |  | ... and the cut's timeline time in seconds (the nearest cut within 0.5 s). (min 0) |
 | `duration` | number |  | Length of the move in seconds, both clips together (default per preset, from docs/TASTE.md: whip 8 frames at 30 fps, zoom 7, spin 12, glitch 5, flash 3). (min 0.03, max 4) |
-| `direction` | "left" \| "right" \| "up" \| "down" \| "cw" \| "ccw" \| "auto" |  | whip/slide/squash: left, right, up, down; spin: cw, ccw. auto (default) follows the outgoing shot's own camera move, else alternates. |
+| `direction` | "left" \| "right" \| "up" \| "down" \| "cw" \| "ccw" \| "auto" |  | whip/slide/squash: left, right, up, down; spin: cw, ccw. auto (default) keeps the track's current: the direction of the previous motion transition on the track, else left (spin: cw). Keep one direction per sequence; up is a reserved accent. |
 | `intensity` | number |  | 0.25-2, default 1: scales travel, zoom, blur and flash strength. (min 0.25, max 2) |
 | `focus_x` | number |  | zoom_through: point to fly into, 0 = left edge, 1 = right (default 0.5). (min 0, max 1) |
 | `focus_y` | number |  | zoom_through: 0 = top, 1 = bottom (default 0.5). (min 0, max 1) |
 
 ### apply_motion_transitions_tool
 
-**Apply motion transitions to every cut** (direct tool). Put a motion transition on every cut of a track (clips back to back), one preset everywhere or a style mix that rotates presets cut by cut (hype, cinematic).
+**Apply motion transitions to every cut** (direct tool). Put a motion transition on every cut of a track (clips back to back), one preset everywhere or a style mix (hype: whip, whip, crash zoom, repeated, landing on a pull-back; cinematic: slide, blur dissolve, repeated, ending in a zoom-through).
 
 Surfaces: mcp, cli, editor. edits.
 
@@ -3258,9 +3258,9 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | --- | --- | --- | --- |
 | `track` | string | yes | Track whose cuts get transitions: UI track number (1 = bottom), name, or layer number. |
 | `preset` | "whip" \| "slide" \| "zoom_in" \| "zoom_out" \| "zoom_through" \| "spin" \| "squash" \| "shake" \| "glitch" \| "flash_white" \| "flash_black" \| "flash_invert" \| "blur_dissolve" |  | One transition on every cut: whip (left/right/up/down), slide (left/right/up/down), zoom_in, zoom_out, zoom_through, spin (cw/ccw), squash (left/right/up/down), shake, glitch, flash_white, flash_black, flash_invert, blur_dissolve. Give this or style. |
-| `style` | "hype" \| "cinematic" |  | A mix that rotates presets cut by cut: hype (whips, punches, glitch, spin, flash, shake) or cinematic (blur dissolves, slow pushes, a dip to black). |
+| `style` | "hype" \| "cinematic" |  | A mix that repeats two or three presets: hype (whip, whip, crash zoom; the last cut a pull-back arrival) or cinematic (slide, blur dissolve; the last cut a zoom-through). |
 | `duration` | number |  | Length of the move in seconds, both clips together (default per preset, from docs/TASTE.md: whip 8 frames at 30 fps, zoom 7, spin 12, glitch 5, flash 3). (min 0.03, max 4) |
-| `direction` | "left" \| "right" \| "up" \| "down" \| "cw" \| "ccw" \| "auto" |  | whip/slide/squash: left, right, up, down; spin: cw, ccw. auto (default) follows the outgoing shot's own camera move, else alternates. |
+| `direction` | "left" \| "right" \| "up" \| "down" \| "cw" \| "ccw" \| "auto" |  | whip/slide/squash: left, right, up, down; spin: cw, ccw. auto (default) keeps the track's current: the direction of the previous motion transition on the track, else left (spin: cw). Keep one direction per sequence; up is a reserved accent. |
 | `intensity` | number |  | 0.25-2, default 1: scales travel, zoom, blur and flash strength. (min 0.25, max 2) |
 
 ### remove_motion_transition_tool
