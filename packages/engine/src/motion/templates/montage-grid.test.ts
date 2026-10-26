@@ -1,0 +1,299 @@
+import { describe, expect, it } from "vitest";
+import { evaluate } from "../../keyframe/evaluate.js";
+import type { Keyframe } from "../../model/types.js";
+import { buildMotionTemplate } from "../build.js";
+import { TemplateBeats, tempoGrid } from "../grid.js";
+import { PALETTES } from "../palettes.js";
+import { MotionInputError, type GridOptions, type MotionContent } from "../template.js";
+import { GRID_LAYOUTS, TILE_COUNTS, bandRect, parseBand, shortestSide, tileRects, type Rect } from "../tiles.js";
+import type { MotionFrame, MotionLayer, MotionMedia, MotionPlan } from "../types.js";
+import { MIN_TILE, gridBeats, slotsOf } from "./montage-grid.js";
+
+const FRAMES: Record<string, MotionFrame> = {
+  portrait: { width: 1080, height: 1920, fps: 30 },
+  landscape: { width: 1920, height: 1080, fps: 30 },
+};
+
+const MEDIA: MotionMedia[] = [
+  { fileId: "VIDEO00001", kind: "video", width: 1920, height: 1080, duration: 12 },
+  { fileId: "VIDEO00002", kind: "video", width: 1080, height: 1920, duration: 9 },
+  { fileId: "PHOTO00001", kind: "image", width: 1600, height: 1200, duration: 0 },
+];
+const MEDIA_BY_ID = new Map(MEDIA.map((m) => [m.fileId, m]));
+const FILES = MEDIA.map((m) => m.fileId);
+
+function build(frame: MotionFrame, grid: GridOptions, extra: Partial<MotionContent> = {}, o: { seconds?: number; start?: number; bpm?: number } = {}): { plan: MotionPlan; beats: TemplateBeats } {
+  const start = o.start ?? 2;
+  const tempo = tempoGrid(o.bpm ?? 120, start + 60, 0.25);
+  const plan = buildMotionTemplate({
+    template: "grid",
+    frame,
+    start,
+    ...(o.seconds !== undefined ? { seconds: o.seconds } : {}),
+    grid: tempo,
+    palette: PALETTES.ui_dark,
+    media: MEDIA_BY_ID,
+    content: { fileIds: FILES, grid, ...extra },
+  });
+  return { plan, beats: new TemplateBeats(tempo, start, frame.fps) };
+}
+
+/** A media layer's box on the frame at clip frame `at`, as Best Fit places it. */
+function boxAt(layer: MotionLayer, frame: MotionFrame, at: number): Rect {
+  const value = (name: string, fallback: number) => {
+    const kf = layer.props[name] as Keyframe | undefined;
+    return kf ? evaluate(kf, at) : fallback;
+  };
+  if (layer.source.kind !== "media") throw new Error(`${layer.name} is not a picture`);
+  const media = MEDIA_BY_ID.get(layer.source.fileId)!;
+  const crop = layer.effects.find((e) => (e as { class_name?: string }).class_name === "Crop" && (e as { resize?: boolean }).resize === true) as Record<string, Keyframe> | undefined;
+  const cut = (side: string) => (crop ? evaluate(crop[side]!, 1) : 0);
+  const aspect = (media.width * (1 - cut("left") - cut("right"))) / (media.height * (1 - cut("top") - cut("bottom")));
+  const fit = aspect > frame.width / frame.height ? { w: frame.width, h: frame.width / aspect } : { w: frame.height * aspect, h: frame.height };
+  const w = fit.w * value("scale_x", 1);
+  const h = fit.h * value("scale_y", 1);
+  const cx = (0.5 + value("location_x", 0)) * frame.width;
+  const cy = (0.5 + value("location_y", 0)) * frame.height;
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
+/** The key X of clip frame `n` of a layer (media keys count from the in-point). */
+function keyX(layer: MotionLayer, frame: MotionFrame, n: number): number {
+  return n + (layer.source.kind === "media" ? Math.round(layer.source.start * frame.fps) : 0);
+}
+
+const tiles = (plan: MotionPlan) => plan.layers.filter((l) => l.name.startsWith("tile-"));
+const overlap = (a: Rect, b: Rect) => a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5 && a.y < b.y + b.h - 0.5 && b.y < a.y + a.h - 0.5;
+
+describe.each(Object.entries(FRAMES))("montage grid geometry, %s", (_name, frame) => {
+  for (const band of [null, 16 / 9, 21 / 9]) {
+    for (const layout of GRID_LAYOUTS) {
+      it(`${layout}${band ? ` in a ${band.toFixed(2)} band` : ""}: every count keeps its tiles inside the region, apart, and readable`, () => {
+        const region = bandRect(frame, band);
+        for (const count of TILE_COUNTS[layout]) {
+          const rects = tileRects(layout, count, region, 6);
+          expect(rects, `${layout} ${count}`).toHaveLength(count);
+          for (const r of rects) {
+            expect(r.x).toBeGreaterThanOrEqual(region.x - 0.5);
+            expect(r.y).toBeGreaterThanOrEqual(region.y - 0.5);
+            expect(r.x + r.w).toBeLessThanOrEqual(region.x + region.w + 0.5);
+            expect(r.y + r.h).toBeLessThanOrEqual(region.y + region.h + 0.5);
+            expect(r.w).toBeGreaterThan(0);
+            expect(r.h).toBeGreaterThan(0);
+          }
+          rects.forEach((a, i) => rects.slice(i + 1).forEach((b) => expect(overlap(a, b), `${layout} ${count}`).toBe(false)));
+          // The tiles cover the region apart from gutters and, for a film strip, its sprocket margins.
+          if (layout !== "film_strip") {
+            const area = rects.reduce((sum, r) => sum + r.w * r.h, 0);
+            expect(area / (region.w * region.h)).toBeGreaterThan(0.9);
+          }
+        }
+      });
+    }
+  }
+
+  it("the default layouts are readable on a phone: no tile under 13 % of the short side (full frame and a 16:9 band)", () => {
+    const floor = MIN_TILE * Math.min(frame.width, frame.height);
+    for (const band of [null, 16 / 9]) {
+      for (const layout of GRID_LAYOUTS) {
+        if (band !== null && (layout === "strips_h" || layout === "film_strip") && frame.height > frame.width) continue;
+        for (const count of TILE_COUNTS[layout]) {
+          const small = shortestSide(tileRects(layout, count, bandRect(frame, band), 6));
+          expect(small, `${layout} ${count} ${band}`).toBeGreaterThanOrEqual(floor - 1);
+        }
+      }
+    }
+  });
+});
+
+describe("parseBand", () => {
+  it("reads ratios, numbers and 'full'", () => {
+    expect(parseBand(undefined)).toBeNull();
+    expect(parseBand("full")).toBeNull();
+    expect(parseBand("16:9")).toBeCloseTo(16 / 9, 9);
+    expect(parseBand("21/9")).toBeCloseTo(21 / 9, 9);
+    expect(parseBand("2.39:1")).toBeCloseTo(2.39, 9);
+    expect(parseBand(1.5)).toBe(1.5);
+    expect(parseBand("wide")).toBeUndefined();
+    expect(parseBand("0:9")).toBeUndefined();
+  });
+});
+
+describe.each(Object.entries(FRAMES))("montage grid template, %s", (_name, frame) => {
+  it("fills one tile per beat: 3 → 4 → 6 steps, each stage's new tiles on successive beats", () => {
+    const { plan, beats } = build(frame, { steps: [3, 4, 6], band: frame.height > frame.width ? "16:9" : undefined });
+    const by = (name: string) => plan.layers.find((l) => l.name === name)!;
+    // Stage 1: tiles 1-3 on beats 0, 1, 2 (120 BPM, one slot a beat).
+    expect([1, 2, 3].map((i) => by(`tile-1-${i}`).start)).toEqual([0, 1, 2].map((k) => beats.frame(k)));
+    // Stage 2 cuts one slot after the last reveal's hold: its three kept tiles appear together, the new one a beat later.
+    const cut = by("tile-2-1").start;
+    expect(cut).toBe(beats.frame(4));
+    expect([2, 3].map((i) => by(`tile-2-${i}`).start)).toEqual([cut, cut]);
+    expect(by("tile-2-4").start).toBe(beats.frame(5));
+    // Stage 3 likewise: four kept, then two new tiles on successive beats.
+    expect(by("tile-3-1").start).toBe(beats.frame(7));
+    expect(by("tile-3-4").start).toBe(beats.frame(7));
+    expect([5, 6].map((i) => by(`tile-3-${i}`).start)).toEqual([beats.frame(8), beats.frame(9)]);
+    // A stage ends where the next begins; the last runs to the end.
+    expect(by("tile-1-1").start + by("tile-1-1").frames).toBeLessThanOrEqual(cut);
+    expect(by("tile-3-6").start + by("tile-3-6").frames).toBeLessThanOrEqual(plan.frames);
+    for (const l of tiles(plan)) {
+      expect(l.cue, l.name).toBe(l.start);
+      expect(plan.cues).toContain(l.cue);
+    }
+  });
+
+  it("keeps every tile of every stage inside the band and apart at rest", () => {
+    const band = frame.height > frame.width ? "16:9" : "21:9";
+    const { plan } = build(frame, { steps: [3, 4, 6], band, gutter: 6 });
+    const region = bandRect(frame, parseBand(band) ?? null);
+    const byStage = new Map<string, Rect[]>();
+    for (const l of tiles(plan)) {
+      // At rest: the last clip frame.
+      const box = boxAt(l, frame, keyX(l, frame, l.frames));
+      expect(box.x, l.name).toBeGreaterThanOrEqual(region.x - 1);
+      expect(box.x + box.w, l.name).toBeLessThanOrEqual(region.x + region.w + 1);
+      expect(box.y, l.name).toBeGreaterThanOrEqual(region.y - 1);
+      expect(box.y + box.h, l.name).toBeLessThanOrEqual(region.y + region.h + 1);
+      const stage = l.name.split("-")[1]!;
+      byStage.set(stage, [...(byStage.get(stage) ?? []), box]);
+    }
+    for (const boxes of byStage.values()) boxes.forEach((a, i) => boxes.slice(i + 1).forEach((b) => expect(overlap(a, b)).toBe(false)));
+    // Bars: the backdrop is one still full-frame drawing under the tiles.
+    const bg = plan.layers.find((l) => l.name === "grid-bg")!;
+    expect(bg.track).toBe(0);
+    expect(tiles(plan).every((l) => l.track > bg.track)).toBe(true);
+  });
+
+  it("merge: the last tile to arrive grows until it covers the frame, on the beat after a held slot", () => {
+    const { plan, beats } = build(frame, { tiles: 4, merge: true, radius: 24 });
+    const last = plan.layers.find((l) => l.name === "tile-1-4")!;
+    const end = boxAt(last, frame, keyX(last, frame, last.frames));
+    expect(end.x).toBeLessThanOrEqual(0.5);
+    expect(end.y).toBeLessThanOrEqual(0.5);
+    expect(end.x + end.w).toBeGreaterThanOrEqual(frame.width - 0.5);
+    expect(end.y + end.h).toBeGreaterThanOrEqual(frame.height - 0.5);
+    // Rounded corners square off as it grows.
+    const radius = last.props.corner_radius as Keyframe;
+    expect(evaluate(radius, keyX(last, frame, 1) + 8)).toBeGreaterThan(0);
+    expect(evaluate(radius, keyX(last, frame, last.frames))).toBe(0);
+    // The others stay where they were; the growth starts on a beat.
+    const grew = (last.props.scale_x as Keyframe).Points;
+    const growsAt = last.start + (grew[grew.length - 2]!.co.X - keyX(last, frame, 1));
+    expect(plan.cues).toContain(growsAt);
+    expect(growsAt).toBeGreaterThanOrEqual(beats.frame(slotsOf([4], true).action));
+    expect([...Array(12).keys()].map((k) => beats.frame(k))).toContain(growsAt);
+  });
+
+  it("zoom_into: the camera pushes into the chosen tile until it fills the frame and the rest leave", () => {
+    const { plan } = build(frame, { tiles: 6, zoomInto: 5 });
+    const at = (name: string) => {
+      const l = plan.layers.find((x) => x.name === name)!;
+      return boxAt(l, frame, keyX(l, frame, l.frames));
+    };
+    const target = at("tile-1-5");
+    expect(target.w).toBeGreaterThanOrEqual(frame.width - 0.5);
+    expect(target.h).toBeGreaterThanOrEqual(frame.height - 0.5);
+    expect(Math.abs(target.x + target.w / 2 - frame.width / 2)).toBeLessThan(1);
+    expect(Math.abs(target.y + target.h / 2 - frame.height / 2)).toBeLessThan(1);
+    // The tile beside it is mostly off the frame.
+    const beside = at("tile-1-4");
+    expect(beside.x + beside.w <= 0 || beside.x >= frame.width || beside.y + beside.h <= 0 || beside.y >= frame.height).toBe(true);
+  });
+
+  it.each(["pop", "slide", "wipe", "fade"] as const)("%s: tiles arrive on their beat and rest where the layout puts them", (reveal) => {
+    const { plan } = build(frame, { tiles: 4, reveal });
+    const region = bandRect(frame, null);
+    const rects = tileRects("grid", 4, region, 6 * (Math.min(frame.width, frame.height) / 1080));
+    tiles(plan).forEach((l, i) => {
+      const box = boxAt(l, frame, keyX(l, frame, l.frames));
+      // A picture within 1 % of the tile's shape is not cropped to it: its other side may differ a little.
+      expect(Math.abs(box.x - rects[i]!.x)).toBeLessThan(6);
+      expect(Math.abs(box.y - rects[i]!.y)).toBeLessThan(6);
+      expect(Math.abs(box.w - rects[i]!.w)).toBeLessThan(6);
+      expect(Math.abs(box.h - rects[i]!.h)).toBeLessThan(6);
+      // Arriving: the first pose differs from rest (except a wipe, which opens a crop instead).
+      const start = boxAt(l, frame, keyX(l, frame, 1));
+      const alpha = l.props.alpha as Keyframe | undefined;
+      if (reveal === "wipe") {
+        // The wipe is a Crop that does not resize (a tile already in the tile's shape has no other).
+        const wipes = l.effects.filter((e) => (e as { class_name?: string }).class_name === "Crop" && (e as { resize?: boolean }).resize === false);
+        expect(wipes).toHaveLength(1);
+      } else if (reveal === "pop") {
+        expect(start.w).toBeLessThan(box.w * 0.7);
+      } else {
+        expect(alpha && evaluate(alpha, keyX(l, frame, 1))).toBe(0);
+      }
+    });
+  });
+
+  it("every layout builds with its default tiles, whole frames, entrances on the beat grid", () => {
+    for (const layout of GRID_LAYOUTS) {
+      const { plan, beats } = build(frame, { layout });
+      const onGrid = new Set<number>([0]);
+      for (let k = 0; beats.frame(k / 2) <= plan.frames; k += 1) onGrid.add(beats.frame(k / 2));
+      for (const l of plan.layers) {
+        expect(Number.isInteger(l.start) && Number.isInteger(l.frames), `${layout} ${l.name}`).toBe(true);
+        expect(onGrid.has(l.cue), `${layout} ${l.name}`).toBe(true);
+        expect(l.start).toBeGreaterThanOrEqual(l.cue);
+        expect(l.start + l.frames).toBeLessThanOrEqual(plan.frames);
+      }
+      expect(tiles(plan).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("film_strip: sprocketed bands under the small frames, the big frame last", () => {
+    const { plan } = build(frame, { layout: "film_strip", tiles: 5 });
+    const bg = plan.layers.find((l) => l.name === "grid-bg")!;
+    expect(bg.source.kind === "svg" && (bg.source.svg.match(/<rect/g) ?? []).length).toBeGreaterThan(20);
+    const starts = tiles(plan).map((l) => l.start);
+    expect(starts[starts.length - 1]).toBe(Math.max(...starts));
+    expect(new Set(starts).size).toBe(starts.length);
+  });
+});
+
+describe("montage grid length and refusals", () => {
+  const frame = FRAMES.portrait!;
+  const refusal = (grid: GridOptions, extra: Partial<MotionContent> = {}, o: { seconds?: number } = {}) => {
+    try {
+      build(frame, grid, extra, o);
+    } catch (error) {
+      expect(error).toBeInstanceOf(MotionInputError);
+      return (error as Error).message;
+    }
+    throw new Error("expected a refusal");
+  };
+
+  it("takes its natural length from the layout: slots of a beat, two on a fast tempo", () => {
+    expect(gridBeats({ grid: { tiles: 4 } }, 120)).toBe(6);
+    expect(gridBeats({ grid: { steps: [3, 4, 6], merge: true } }, 120)).toBeGreaterThan(gridBeats({ grid: { steps: [3, 4, 6] } }, 120));
+    // Beats come every 0.33 s at 180 BPM: one entrance every other beat.
+    expect(gridBeats({ grid: { tiles: 4 } }, 180)).toBe(10);
+    const { plan } = build(frame, { tiles: 4 });
+    expect(plan.frames).toBe(new TemplateBeats(tempoGrid(120, 70, 0.25), 2, 30).frame(6));
+  });
+
+  it("falls back to half-beat slots when the template is short", () => {
+    const { plan, beats } = build(frame, { tiles: 6 }, {}, { seconds: 3 });
+    const starts = tiles(plan).map((l) => l.start);
+    expect(starts).toEqual([0, 0.5, 1, 1.5, 2, 2.5].map((k) => beats.frame(k)));
+  });
+
+  it("refuses what it cannot lay out", () => {
+    expect(refusal({}, { fileIds: [] })).toMatch(/needs file_ids/);
+    expect(refusal({ layout: "grid", tiles: 5 })).toMatch(/grid layout takes 2, 3, 4, 6, 9 tiles|takes 2, 3, 4, 6, 9 tiles/);
+    expect(refusal({ steps: [6, 4] })).toMatch(/must increase/);
+    expect(refusal({ steps: [3, 4], tiles: 4 })).toMatch(/tiles or steps, not both/);
+    expect(refusal({ merge: true, zoomInto: 1 })).toMatch(/merge or zoom_into/);
+    expect(refusal({ tiles: 4, zoomInto: 5 })).toMatch(/zoom_into must be a tile from 1 to 4/);
+    expect(refusal({ band: "wide" })).toMatch(/band/);
+    expect(refusal({ reveal: "spin" as never })).toMatch(/reveal must be one of/);
+    expect(refusal({ gutter: 90 })).toMatch(/gutter/);
+    expect(refusal({}, { fileIds: [...FILES, ...FILES, ...FILES, ...FILES] })).toMatch(/at most 9 files/);
+  });
+
+  it("refuses tiles too small to read on a phone, and a template too short for the layout", () => {
+    expect(refusal({ layout: "strips_h", tiles: 6, band: "21:9" })).toMatch(/px on their short side/);
+    expect(refusal({ steps: [3, 4, 6, 9], merge: true }, {}, { seconds: 3 })).toMatch(/needs at least [\d.]+ s/);
+  });
+});
