@@ -44,10 +44,11 @@ function engine(planned: { frame: number; width: number; height: number }[], fil
 const project = { width: 160, height: 90, fps: { num: FPS, den: 1 }, duration: 300 } as unknown as Project;
 
 /** Two ends of an asynchronous channel (like a Worker and its scope), without cloning. */
-function channel(): { page: Endpoint<ToWorker, FromWorker>; worker: Endpoint<FromWorker, ToWorker>; sent: ToWorker[] } {
+function channel(): { page: Endpoint<ToWorker, FromWorker>; worker: Endpoint<FromWorker, ToWorker>; sent: ToWorker[]; received: FromWorker[] } {
   type Listener = (event: MessageEvent) => void;
   const ends = { page: new Set<Listener>(), worker: new Set<Listener>() };
   const sent: ToWorker[] = [];
+  const received: FromWorker[] = [];
   const end = <Out, In>(mine: Set<Listener>, theirs: Set<Listener>, log?: Out[]): Endpoint<Out, In> => ({
     postMessage(message) {
       log?.push(message);
@@ -58,7 +59,7 @@ function channel(): { page: Endpoint<ToWorker, FromWorker>; worker: Endpoint<Fro
     addEventListener: (_type, listener) => mine.add(listener as Listener),
     removeEventListener: (_type, listener) => mine.delete(listener as Listener),
   });
-  return { page: end<ToWorker, FromWorker>(ends.page, ends.worker, sent), worker: end<FromWorker, ToWorker>(ends.worker, ends.page), sent };
+  return { page: end<ToWorker, FromWorker>(ends.page, ends.worker, sent), worker: end<FromWorker, ToWorker>(ends.worker, ends.page, received), sent, received };
 }
 
 /** A page `<canvas>` as far as the player needs one. */
@@ -74,7 +75,7 @@ afterEach(() => uninstall());
 
 function setup(fileId?: string) {
   const planned: { frame: number; width: number; height: number }[] = [];
-  const { page, worker, sent } = channel();
+  const { page, worker, sent, received } = channel();
   const stop = servePreviewWorker(worker, { engine: engine(planned, fileId) });
   const media = new MediaRegistry();
   const canvas = element();
@@ -82,7 +83,7 @@ function setup(fileId?: string) {
   const errors: PlayerErrorEvent[] = [];
   player.onError((e) => errors.push(e));
   player.setProject(project);
-  return { player, planned, media, canvas, page, sent, errors, stop };
+  return { player, planned, media, canvas, page, sent, received, errors, stop };
 }
 
 describe("PreviewPlayer with a worker", () => {
@@ -112,7 +113,8 @@ describe("PreviewPlayer with a worker", () => {
   });
 
   it("reads media the page registers, and forgets it when the page does", async () => {
-    const { player, media, errors, stop } = setup();
+    const { player, media, errors, received, stop } = setup();
+    const lookups = () => received.filter((m) => m.type === "call" && m.method === "source").length;
     // Not on the page: the worker's read fails the way the page's would.
     await player.seek(0.5);
     expect(errors.at(-1)?.kind).toBe("layer");
@@ -127,9 +129,12 @@ describe("PreviewPlayer with a worker", () => {
     expect(String((errors[0] as { error: unknown }).error)).not.toMatch(/No media registered/);
 
     // Unregistered on the page: unknown in the worker again.
+    const before = lookups();
     media.unregister("F1");
     errors.length = 0;
     await player.seek(0.7);
+    // The worker dropped its entry and asked the page again.
+    expect(lookups()).toBe(before + 1);
     // The same MediaUnavailableError as the first seek is reported only once; nothing else is.
     expect(errors).toEqual([]);
     player.dispose();
