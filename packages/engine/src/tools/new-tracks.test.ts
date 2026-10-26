@@ -133,3 +133,71 @@ describe("other placement tools on a track past the top", () => {
     expect(doc.undoLabels).toHaveLength(1);
   });
 });
+
+describe("duplicate_clips_tool and move_clips_tool to a track past the top", () => {
+  it("duplicate_clips_tool adds the track and makes the copy in one undo step", async () => {
+    const doc = fixtureDoc();
+    const r = await run(doc, "duplicate_clips_tool", { timeline_clip_ids: [IDS.clipLogo], to_track: "6" });
+    expect(r.status).toBe("applied");
+    expect(r.summary).toContain("on track 6 on a new track");
+    expect((r.data as Record<string, unknown>).new_tracks).toBe(1);
+    expect(r.createdTracks.map((t) => t.layer)).toEqual([6_000_000]);
+    expect(doc.project.clips.filter((c) => c.layer === 6_000_000)).toHaveLength(1);
+    expect(doc.undoLabels).toHaveLength(1);
+    doc.undo();
+    expect(layerNumbers(doc)).toEqual([1, 2, 3, 4, 5].map((n) => n * 1_000_000));
+  });
+
+  it("duplicate_clips_tool keeps the stacking of clips from two tracks and adds the tracks between", async () => {
+    const doc = fixtureDoc();
+    // clipA is on track 1, clipLogo on track 3: the top-most source lands on track 8, the other two below it.
+    const r = await run(doc, "duplicate_clips_tool", { timeline_clip_ids: [IDS.clipA, IDS.clipLogo], to_track: "8" });
+    expect(r.status).toBe("applied");
+    expect(layerNumbers(doc).slice(5)).toEqual([6_000_000, 7_000_000, 8_000_000]);
+    const copies = doc.project.clips.filter((c) => !Object.values(IDS).includes(c.id as never));
+    expect(copies.map((c) => c.layer).sort((a, b) => a - b)).toEqual([6_000_000, 8_000_000]);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("move_clips_tool adds the track and moves the clip in one undo step", async () => {
+    const doc = fixtureDoc();
+    const r = await run(doc, "move_clips_tool", { timeline_clip_ids: [IDS.clipLogo], to_track: "7" });
+    expect(r.status).toBe("applied");
+    expect(r.summary).toContain("to track 7 on a new track (2 tracks added on top)");
+    expect(r.createdTracks.map((t) => t.layer)).toEqual([6_000_000, 7_000_000]);
+    expect(doc.project.clips.find((c) => c.id === IDS.clipLogo)?.layer).toBe(7_000_000);
+    expect(doc.undoLabels).toHaveLength(1);
+    doc.undo();
+    expect(layerNumbers(doc)).toHaveLength(5);
+    expect(doc.project.clips.find((c) => c.id === IDS.clipLogo)?.layer).toBe(3_000_000);
+  });
+
+  it.each(["duplicate_clips_tool", "move_clips_tool"])("%s refuses four past the top and changes nothing", async (tool) => {
+    const doc = fixtureDoc();
+    const before = JSON.stringify(doc.project);
+    const r = await run(doc, tool, { timeline_clip_ids: [IDS.clipLogo], to_track: "9" });
+    expect(r.summary).toMatch(/^Error: Unknown track or layer '9'/);
+    expect(JSON.stringify(doc.project)).toBe(before);
+    expect(doc.undoLabels).toHaveLength(0);
+  });
+
+  it("adds no track for a destination that exists", async () => {
+    const doc = fixtureDoc();
+    const r = await run(doc, "move_clips_tool", { timeline_clip_ids: [IDS.clipLogo], to_track: "4" });
+    expect(r.createdTracks).toEqual([]);
+    expect(r.summary).not.toContain("new track");
+  });
+});
+
+describe("overlays on a busy explicit track", () => {
+  it("add_timer_tool goes to the first free track above and warns", async () => {
+    const doc = fixtureDoc();
+    const timer = await run(doc, "add_timer_tool", { mode: "count_up", duration_seconds: "3", track: "1" });
+    expect(timer.status).toBe("applied");
+    expect(timer.warnings).toHaveLength(1);
+    expect(timer.warnings[0]).toMatch(/^track 1 already has .* placed on track 4 instead$/);
+    expect(timer.summary).toContain(" Warning: track 1 already has");
+    expect(doc.project.clips.find((c) => c.id === timer.clips[0]?.id)?.layer).toBe(4_000_000);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+});
