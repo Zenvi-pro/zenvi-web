@@ -105,13 +105,17 @@ for (const scene of values.scenes!.split(",") as Scene3dId[]) {
       await copyFile(r.path, path.join(out, name));
       timings.push(`| ${scene} | ${aspect} | ${background} | ${quality} | ${r.width}x${r.height} | ${r.frames} | ${r.cached ? "cached" : took.toFixed(1)} |`);
       console.log(`${name}: ${took.toFixed(1)}s`);
-      if (vertical && background === "dark") sheet.push(path.join(out, name));
     }
   }
 }
 renderer.close();
 
 await writeFile(path.join(out, `timings-${quality}.md`), ["| scene | aspect | background | quality | size | frames | seconds |", "| --- | --- | --- | --- | --- | --- | --- |", ...timings, ""].join("\n"));
+// The contact sheet shows every scene rendered so far, so re-rendering one scene keeps the others' rows.
+for (const scene of SCENE3D_IDS) {
+  const file = path.join(out, `${scene}_9x16_dark${quality === "draft" ? "_draft" : ""}.mp4`);
+  if (existsSync(file)) sheet.push(file);
+}
 if (sheet.length > 0) {
   // Contact sheet: three moments (25 %, 55 %, 90 %) of each 9:16 dark render, one row per scene.
   const rows: string[] = [];

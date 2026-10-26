@@ -291,8 +291,10 @@ def screen(item, aspect, glow=1.0, gloss=0.04, name="Screen"):
     tree = mat.node_tree
     tex = _image_node(tree, item, aspect)
     _set(b, Base_Color=(0.0, 0.0, 0.0, 1.0), Roughness=gloss)
-    b.inputs["Coat Weight"].default_value = 0.45
-    b.inputs["Coat Roughness"].default_value = 0.02
+    # A faint coat: the studio's strip boxes glint across the glass without hiding the picture.
+    b.inputs["Coat Weight"].default_value = 0.12
+    b.inputs["Specular IOR Level"].default_value = 0.12
+    b.inputs["Coat Roughness"].default_value = 0.06
     tree.links.new(tex.outputs["Color"], b.inputs["Emission Color"])
     b.inputs["Emission Strength"].default_value = glow
     return mat
