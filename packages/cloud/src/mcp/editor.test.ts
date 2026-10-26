@@ -62,6 +62,26 @@ describe("open_in_editor (editor embedded in the chat)", () => {
     await client.close();
   });
 
+  it("shows the editor when the model opens or creates a project, the way chats start", async () => {
+    const h = await harness();
+    const client = await connect(h, await pat(h));
+    const { tools } = await client.listTools();
+    for (const name of ["create_project", "open_project"]) {
+      expect(tools.find((t) => t.name === name)?._meta, name).toMatchObject({ "openai/outputTemplate": EDITOR_WIDGET_URI, ui: { resourceUri: EDITOR_WIDGET_URI } });
+    }
+    const created = (await client.callTool({ name: "create_project", arguments: { name: "Match day" } })) as CallResult;
+    const projectId = created.structuredContent?.project_id as string;
+    const opened = (await client.callTool({ name: "open_project", arguments: { project_id: projectId } })) as CallResult;
+    for (const result of [created, opened]) {
+      const session = result._meta?.[EDITOR_META_KEY] as EditorSessionMeta;
+      expect(session).toMatchObject({ url: `https://cloud.test/editor/embed/${projectId}`, projectId });
+      expect(session.token).toMatch(/^zvn_emb_/);
+      expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(session.token);
+      expect((await h.request("GET", `/v1/projects/${projectId}`, { token: session.token })).status).toBe(200);
+    }
+    await client.close();
+  });
+
   it("lets the token load, poll, save and render its project, and nothing else", async () => {
     const h = await harness();
     const client = await connect(h, await pat(h));

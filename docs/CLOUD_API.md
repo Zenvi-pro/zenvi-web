@@ -23,7 +23,7 @@ and Claude connect to (see [CONNECTORS.md](CONNECTORS.md)).
 | Supabase access token (ES256 JWT, `aud=authenticated`) | web editor, website, desktop (existing Supabase session) | `/v1/*`, `/oauth/consent` (not `/mcp`) |
 | `zvn_pat_…` personal access token | CLI and desktop after device login, account page | `/v1/*` except `/v1/tokens`, and `/mcp` |
 | `zvn_oat_…` OAuth access token (1 h) | MCP connectors | `/mcp` only (audience-bound, RFC 8707) |
-| `zvn_emb_…` embedded-editor token (12 h) | the editor inside a chat (minted by `open_in_editor`, handed to the MCP view in the result's `_meta`) | its one project only: `GET`/`PUT /v1/projects/:id`, `GET …/revision`, renders, and `/v1/media/*`. Another project answers `404`, any other route `403`, `/mcp` `401`. It carries the connection's scopes and ends when the connection's OAuth grant or personal access token is revoked |
+| `zvn_emb_…` embedded-editor token (12 h) | the editor inside a chat (minted by `open_in_editor`, `open_project` and `create_project`, handed to the MCP view in the result's `_meta`) | its one project only: `GET`/`PUT /v1/projects/:id`, `GET …/revision`, renders, and `/v1/media/*`. Another project answers `404`, any other route `403`, `/mcp` `401`. It carries the connection's scopes and ends when the connection's OAuth grant or personal access token is revoked |
 
 Tokens are never accepted in query strings. Zenvi tokens are 32 random bytes
 behind a prefix; only their SHA-256 is stored. Personal tokens carry the scopes
@@ -345,7 +345,7 @@ the same JSON as text, ChatGPT status strings):
 | --- | --- |
 | `list_projects` | the person's projects and the open one |
 | `create_project {name, profile? \| format? + fps?}` | new empty project, opens it. `profile`: an exact desktop profile name/key, or words — orientation (vertical, portrait, 9:16, square, 1:1, 4:5, landscape), resolution (4k, 1440p, 1080p, 720p, 480p, `1920x1080`), frame rate (24, 25, 29.97, 30, 50, 59.94, 60), e.g. `"vertical 1080p 30"`, `"4k 24"`. Progressive profiles win unless interlaced is asked for; no match → an error listing close profiles. Or `format` (`landscape_1080p` default, `landscape_720p`, `landscape_4k`, `vertical_1080p`, `square_1080p`) + `fps` |
-| `open_project {project_id}` | makes it the open project for this connection; overview with files |
+| `open_project {project_id}` | makes it the open project for this connection; overview with files; shows the editor view like `open_in_editor` (so does `create_project`) |
 | `import_media_from_url {url, name?}` | server-side download (https, public addresses only, pinned DNS, redirects re-checked, 512 MB, media types only), content-addressed, added to the bin; idempotent |
 | `import_attached_file {file}` | a file attached in ChatGPT (`openai/fileParams`: `{download_url, file_id, mime_type?, file_name?}`), imported like a URL |
 | `get_upload_link` | `${editor}/p/<id>?upload=1` for files on the person's device |
