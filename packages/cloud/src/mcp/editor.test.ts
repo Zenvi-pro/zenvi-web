@@ -266,6 +266,17 @@ describe("hosted editor build", () => {
     expect((await h.request("GET", "/editor/%E0%A4")).status).toBe(302);
   });
 
+  it("answers editor routes itself when the deployment's editor is its own /editor (no redirect loop)", async () => {
+    const h = await harness({ config: { editorDist: await dist(), editorUrl: "https://cloud.test/editor" } });
+    const page = await h.request("GET", "/editor/p/c_abc");
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("<title>Zenvi</title>");
+    expect(page.headers.get("x-frame-options")).toBe("DENY");
+    const client = await connect(h, await pat(h));
+    const created = (await client.callTool({ name: "create_project", arguments: { name: "Lab" } })) as CallResult;
+    expect(created.structuredContent?.editor_url).toMatch(/^https:\/\/cloud\.test\/editor\/p\//);
+  });
+
   it("says so when the build has no editor", async () => {
     const h = await harness();
     expect((await h.request("GET", "/editor/embed/c_abc")).status).toBe(503);

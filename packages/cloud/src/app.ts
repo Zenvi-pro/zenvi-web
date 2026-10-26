@@ -105,7 +105,7 @@ export function createApp(services: Services): Hono<AppEnv> {
   app.route("/v1/device", deviceRoutes(services));
   app.route("/v1", v1Routes(services));
   app.route("/mcp", mcpRoutes(services, tools, mcpAllowed));
-  app.route("/editor", editorRoutes(config.editorDist, config.editorUrl));
+  app.route("/editor", editorRoutes(config.editorDist, config.editorUrl, [config.publicBaseUrl, ...config.publicBaseUrlAliases]));
 
   app.notFound((c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
 

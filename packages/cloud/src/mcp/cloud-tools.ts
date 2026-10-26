@@ -369,7 +369,7 @@ const openInEditor = defineTool({
     const { meta } = await ctx.services.projects.get(ctx.principal.userId, projectId);
     const session = await editorSession(ctx, projectId);
     return {
-      text: `Opened “${meta.name}” in the Zenvi editor in this chat; edits you make with other tools show up there live. Full editor on zenvi.pro: ${session.openUrl}`,
+      text: `Opened “${meta.name}” in the Zenvi editor in this chat; edits you make with other tools show up there live. Full editor: ${session.openUrl}`,
       data: { project_id: projectId, name: meta.name, url: session.openUrl, embedded: true },
       meta: { [EDITOR_META_KEY]: session },
     };
