@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -148,6 +149,35 @@ test("new project → import → arrange → split → undo → play → export"
   await shot(page, "07-export-done");
 
   expect(errors).toEqual([]);
+});
+
+/** The integrated true peak ffmpeg's EBU R128 meter reads in `file`, dBTP. */
+function truePeakDb(file: string): number {
+  const { stderr } = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-af", "ebur128=peak=true", "-f", "null", "-"], { encoding: "utf8" });
+  const found = /True peak:\s+Peak:\s+(-?[\d.]+|-inf) dBFS/.exec(stderr);
+  if (!found) throw new Error(`ffmpeg measured no true peak in ${file}`);
+  return Number(found[1]);
+}
+
+test("an export of a mix far over full scale comes out under -1 dBTP", async ({ page }) => {
+  await page.goto("/editor/");
+  await page.getByRole("button", { name: /HD 1080p/ }).click();
+  await expect(page.getByRole("region", { name: "Timeline" })).toBeVisible();
+  await page.locator('input[type="file"][multiple][accept*="audio"]').first().setInputFiles(fixture("loud.wav"));
+  const tile = page.getByRole("button", { name: "loud.wav", exact: true });
+  await expect(tile).toBeVisible();
+  await tile.dblclick();
+  await expect(clips(page)).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Export", exact: true }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Export video" });
+  await expect(dialog).toBeVisible();
+  const downloadPromise = page.waitForEvent("download", { timeout: 180_000 });
+  await dialog.getByRole("button", { name: "Export", exact: true }).click();
+  const download = await downloadPromise;
+  const path = await download.path();
+  expect(truePeakDb(fixture("loud.wav"))).toBeGreaterThan(4);
+  expect(truePeakDb(path)).toBeLessThanOrEqual(-1);
 });
 
 test("assistant, shortcuts and login screens", async ({ page }) => {
