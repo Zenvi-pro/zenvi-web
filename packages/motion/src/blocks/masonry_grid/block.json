@@ -1,0 +1,125 @@
+{
+  "id": "masonry_grid",
+  "version": 1,
+  "title": "Masonry grid",
+  "description": "A board of picture cards in a masonry layout: the camera starts close on one card and pulls back as the others fly up into their columns around it, then the pointer hovers that card, it lifts off the board and its save button is clicked. For a feed, a gallery, a moodboard or a 'find anything' beat. Give media_1 to media_8 (bin file ids); without them drawn pictures fill the board.",
+  "tags": [
+    "ui",
+    "grid",
+    "masonry",
+    "gallery",
+    "cards",
+    "feed",
+    "cursor",
+    "promo"
+  ],
+  "duration": {
+    "default": 5,
+    "min": 4,
+    "max": 12
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": false,
+  "tokens": {
+    "palette": "porcelain",
+    "radius": 18
+  },
+  "params": {
+    "media_1": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Picture 1 on the board (file id); the board repeats the pictures it is given. Picture 1 is the one that lifts."
+    },
+    "media_2": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Picture 2 on the board (file id); the board repeats the pictures it is given."
+    },
+    "media_3": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Picture 3 on the board (file id); the board repeats the pictures it is given."
+    },
+    "media_4": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Picture 4 on the board (file id); the board repeats the pictures it is given."
+    },
+    "media_5": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Picture 5 on the board (file id); the board repeats the pictures it is given."
+    },
+    "media_6": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Picture 6 on the board (file id); the board repeats the pictures it is given."
+    },
+    "media_7": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Picture 7 on the board (file id); the board repeats the pictures it is given."
+    },
+    "media_8": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Picture 8 on the board (file id); the board repeats the pictures it is given."
+    },
+    "columns": {
+      "type": "integer",
+      "min": 0,
+      "max": 7,
+      "default": 0,
+      "description": "Columns on the board (0: 3 on vertical frames, 5 on wide ones)."
+    },
+    "save": {
+      "type": "string",
+      "maxLength": 16,
+      "default": "Save",
+      "description": "The button on the lifted card (empty: no button, no pointer)."
+    },
+    "saved": {
+      "type": "string",
+      "maxLength": 16,
+      "default": "Saved",
+      "description": "What the button says once clicked."
+    }
+  }
+}

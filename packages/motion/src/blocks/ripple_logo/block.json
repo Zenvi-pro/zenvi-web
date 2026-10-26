@@ -1,0 +1,18 @@
+{
+  "id": "ripple_logo",
+  "version": 1,
+  "title": "Ripple logo",
+  "description": "A logo moment: a disc of colour opens from the centre, a white badge with the mark punches in, ripple rings roll out from it across the field, then the whole picture breaks into particles that blow outward from the centre and leave the frame empty — transparent, so the next shot underneath shows through the hole. Use as a brand sting between scenes. Give `logo` (a bin image id) or a short `mark`; without either one of our drawn glyphs is used.",
+  "tags": ["logo", "brand", "ripple", "rings", "particles", "dissolve", "transition", "sting"],
+  "duration": { "default": 3.5, "min": 2.5, "max": 8 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": true,
+  "tokens": { "palette": "cherry", "display": "display" },
+  "params": {
+    "logo": { "type": "media", "accept": ["image"], "optional": true, "description": "The logo image drawn in the badge (file id; transparent PNG or SVG reads best)." },
+    "mark": { "type": "string", "maxLength": 3, "default": "", "description": "One to three letters drawn in the badge when there is no logo (empty: the glyph)." },
+    "glyph": { "type": "enum", "options": ["sparkle", "bolt", "play", "wave", "sun", "grid", "chat", "pen", "film"], "default": "sparkle", "description": "Our drawn glyph for the badge when there is neither logo nor mark." },
+    "grain": { "type": "integer", "min": 8, "max": 60, "default": 18, "description": "Particle size of the dissolve, px at 1080." },
+    "dissolve": { "type": "boolean", "default": true, "description": "Break into particles at the end (false: the rings keep rolling and the block fades out)." }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "dot_grid_reveal",
+  "version": 1,
+  "title": "Dot grid reveal",
+  "description": "One dot lands and holds, then multiplies into a dot-matrix grid that spreads from it; the dots swell and take the picture's colours until they read as a halftone of it, then close up into the picture itself. For an opening, a reveal of a photo or video, or a 'from nothing to something' beat. Give `media` (a bin file id); without one a drawn landscape is used.",
+  "tags": ["dots", "grid", "halftone", "reveal", "image", "intro", "transition"],
+  "duration": { "default": 5, "min": 3, "max": 10 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": false,
+  "tokens": { "palette": "tide" },
+  "params": {
+    "media": { "type": "media", "accept": ["image", "video"], "optional": true, "description": "The photo or video the dots resolve into (file id); a video's first frame sets the halftone, then it plays." },
+    "scene": { "type": "enum", "options": ["hills", "peaks", "sea", "orb", "bloom", "dunes", "mascot"], "default": "hills", "description": "The drawn picture used when no media is given (its colours follow the seed)." },
+    "cell": { "type": "integer", "min": 14, "max": 80, "default": 30, "description": "Grid spacing, px at 1080: smaller is finer." },
+    "dots": { "type": "enum", "options": ["color", "accent"], "default": "color", "description": "Halftone dots in the picture's colours, or all in the accent (a one-ink print)." },
+    "resolve": { "type": "boolean", "default": true, "description": "End on the picture itself (false: hold the halftone)." }
+  }
+}

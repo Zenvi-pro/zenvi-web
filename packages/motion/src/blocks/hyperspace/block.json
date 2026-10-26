@@ -1,0 +1,17 @@
+{
+  "id": "hyperspace",
+  "version": 1,
+  "title": "Hyperspace",
+  "description": "A jump to light speed from one point: a thin ring draws in to a glint, star streaks start to pour out of it and accelerate, the glint pulls in for a held breath, then the streaks stretch to the frame edges and a white flash swallows the frame. Ends on the flash, so cut to the next shot there (a flash transition, an intro, a reveal).",
+  "tags": ["hyperspace", "warp", "speed", "streaks", "stars", "flash", "transition", "intro"],
+  "duration": { "default": 3, "min": 1.5, "max": 8 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": false,
+  "tokens": { "palette": "night" },
+  "params": {
+    "origin": { "type": "points", "maxItems": 1, "default": [{ "x": 0.5, "y": 0.5 }], "description": "The vanishing point the streaks pour from, {x, y} from 0 to 1." },
+    "density": { "type": "integer", "min": 60, "max": 800, "default": 320, "description": "How many star streaks." },
+    "colors": { "type": "strings", "maxItems": 4, "maxLength": 9, "default": [], "description": "Streak colours as #rrggbb, the first most common (empty: the ink, then the accent and secondary)." },
+    "flash": { "type": "enum", "options": ["white", "accent", "none"], "default": "white", "description": "What the jump ends in: a white flash, an accent-colour flash, or none (the streaks fade out)." }
+  }
+}
