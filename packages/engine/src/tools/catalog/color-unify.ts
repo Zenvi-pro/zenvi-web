@@ -92,7 +92,7 @@ const input = z.strictObject({
 type Input = z.output<typeof input>;
 
 /** Footage worth grading: picture, and not a generated SVG/HTML card (titles, flashes, end cards keep their colours). */
-function isFootage(clip: Clip): boolean {
+export function isFootage(clip: Clip): boolean {
   if (!clipHasPicture(clip)) return false;
   const path = String((clip.reader as unknown as Json | undefined)?.path ?? "").toLowerCase();
   return !/\.(svg|html?)$/.test(path);

@@ -27,7 +27,7 @@ import { Drawing } from "../motion/svg.js";
 import type { Element, Key, MotionFrame, MotionPlan, Pose } from "../motion/types.js";
 import type { FontLibrary } from "../typography/library.js";
 import { inkBox, outlineCommands, typeset, type Box, type TextBlock } from "../typography/typeset.js";
-import { CAPTION_STYLES, DEFAULT_ACCENT, DEFAULT_INK, type CaptionFace, type CaptionStyle, type CaptionStyleId } from "./styles.js";
+import { CAPTION_STYLES, DEFAULT_ACCENT, DEFAULT_INK, type CaptionFace, type CaptionMotion, type CaptionStyle, type CaptionStyleId } from "./styles.js";
 import { groupWords, pickEmphasis, type CaptionWord } from "./words.js";
 
 /** A region to keep captions off (a face, a product), shares of the frame: centre x, y and size w, h. */
@@ -49,6 +49,12 @@ export interface KineticCaptionInput {
   accent?: string;
   /** The speaker is cut out above the captions: groups go high, where the words pass behind the head. */
   behind?: boolean;
+  /** Type size × the style's (emphasis words keep their ratio to the connectors). Default 1. */
+  size?: number;
+  /** Vertical centre of every group, share of the frame height, instead of the style's spots (still inside the safe area, still off the avoid boxes). */
+  y?: number;
+  /** Entrance and exit instead of the style's own (styles.ts CAPTION_ANIMATIONS). */
+  motion?: CaptionMotion;
   lib: FontLibrary;
 }
 
@@ -300,13 +306,14 @@ function keysFor(from: number, to: number, rest: Pose, style: CaptionStyle, fps:
 }
 
 export function buildKineticCaptions(input: KineticCaptionInput): KineticCaptionPlan {
-  const style = CAPTION_STYLES[input.style];
+  const style: CaptionStyle = input.motion ? { ...CAPTION_STYLES[input.style], motion: input.motion } : CAPTION_STYLES[input.style];
   const { frame, lib } = input;
   const fps = frame.fps;
   const layout = { W: frame.width, H: frame.height };
   const { W, H } = layout;
   const safe = captionSafe(frame);
-  const u = Math.min(W, H) / 1080;
+  // Px per style px: the frame's short side / 1080, times the size asked for.
+  const u = (Math.min(W, H) / 1080) * (input.size ?? 1);
   const colours = { ink: input.ink ?? DEFAULT_INK, accent: input.accent ?? DEFAULT_ACCENT[input.style] };
   const words = input.words.filter((w) => w.text.trim());
   if (words.length === 0) throw new Error("no words to caption");
@@ -316,7 +323,8 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
   const avoid = input.avoid.map((a): Box => ({ x: (a.x - a.w / 2) * W - margin, y: (a.y - a.h / 2) * H - margin, width: a.w * W + 2 * margin, height: a.h * H + 2 * margin }));
   const subject = input.avoid[0];
   const portrait = H > W * 1.05;
-  const spots = (input.behind ? [BEHIND[portrait ? "portrait" : "landscape"]] : portrait ? style.spots.portrait : style.spots.landscape).map((s) => ({ x: s.x * W, y: s.y * H }));
+  const own = portrait ? style.spots.portrait : style.spots.landscape;
+  const spots = (input.behind ? [BEHIND[portrait ? "portrait" : "landscape"]] : input.y !== undefined ? [{ x: own[0]!.x, y: input.y }] : own).map((s) => ({ x: s.x * W, y: s.y * H }));
   const safeWidth = safe.right - safe.left;
   const frameOf = (t: number) => Math.round(t * fps);
   const f0 = frameOf(groups[0]!.start);
