@@ -26,7 +26,7 @@ import { getCloseMatches } from "./difflib.js";
 import { projectFps } from "./frame-time.js";
 import { pyFixed, pyReprString } from "./pyfmt.js";
 import { refused } from "./receipt.js";
-import { buildTrackStack, formatTrackLabelForLlm, normalizeTrackOrLayerArg } from "./tracks.js";
+import { buildTrackStack, formatTrackLabelForLlm, normalizeTrackOrLayerArg, resolvePlacementTrack, type TrackResolution } from "./tracks.js";
 import type { ImportedMedia } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -314,12 +314,21 @@ export function ensureUnlocked(project: Project, layer: number): void {
 
 /** `resolve_layer`: a UI track number, label, track id or layer number → layer number. */
 export function resolveLayer(project: Project, track: unknown): number {
+  return requireTrack(track, (raw) => normalizeTrackOrLayerArg(raw, project.layers)).layer;
+}
+
+/** `resolve_placement_layer`: resolveLayer, or up to three tracks past the top to add (resolvePlacementTrack). */
+export function resolvePlacementLayer(project: Project, track: unknown): { layer: number; newTracks: number } {
+  return requireTrack(track, (raw) => resolvePlacementTrack(raw, project.layers));
+}
+
+function requireTrack(track: unknown, resolve: (raw: string) => TrackResolution): { layer: number; newTracks: number } {
   const raw = String(track ?? "").trim();
   if (!raw) toolError("a track is required (UI track number, name, or layer number)");
-  const res = normalizeTrackOrLayerArg(raw, project.layers);
+  const res = resolve(raw);
   if (res.error) toolError(res.error);
   if (res.layer === undefined) toolError(`no track matches ${pyReprString(raw)}`);
-  return res.layer;
+  return { layer: res.layer, newTracks: res.newTracks ?? 0 };
 }
 
 /** `track_info`: the receipt fields naming a track. */
@@ -347,7 +356,8 @@ export function clipsInWindow(project: Project, layer: number | null, start: num
 
 /**
  * `plan_overlay_track`: where an overlay shown over [start, end) goes.
- * An explicit `track` must exist, be unlocked and be free in the window;
+ * An explicit `track` must exist, be unlocked and be free in the window,
+ * or be one to three tracks past the top (created, with the ones between);
  * otherwise the lowest free, unlocked track above every clip with a
  * picture in the window, or a new track on top when none is free.
  */
@@ -359,7 +369,8 @@ export function planOverlayTrack(
   exclude: ReadonlySet<string> = new Set(),
 ): { layer: number; created: boolean } {
   if (String(track ?? "").trim()) {
-    const layer = resolveLayer(project, track);
+    const { layer, newTracks } = resolvePlacementLayer(project, track);
+    if (newTracks > 0) return { layer, created: true };
     ensureUnlocked(project, layer);
     const busy = clipsInWindow(project, layer, start, end, exclude);
     if (busy.length > 0) {

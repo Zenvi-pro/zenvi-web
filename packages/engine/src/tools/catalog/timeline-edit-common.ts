@@ -16,7 +16,7 @@ import { plannedOverlaps, type OverlapHit, type PlannedItem, type PlannedSpan } 
 import type { ToolCall, ToolOutcome } from "../define.js";
 import { pyFixed, pyFloat, pyReprString, pyStr } from "../pyfmt.js";
 import { applied, unchanged, type ToolReceipt } from "../receipt.js";
-import { layerNumberToDisplayIndex, normalizeTrackOrLayerArg } from "../tracks.js";
+import { layerNumberToDisplayIndex, normalizeTrackOrLayerArg, resolvePlacementTrack, type TrackResolution } from "../tracks.js";
 import { resolveClip } from "./common.js";
 
 /** A caller-side problem or an impossible request (desktop `ToolError`): answered as "Error: <message>". */
@@ -107,12 +107,21 @@ export function trackName(project: Project, layer: number): string {
 
 /** _base.resolve_layer: UI track number, label, track id or layer number → layer number. */
 export function resolveLayer(project: Project, track: unknown): number {
+  return requireTrack(track, (text) => normalizeTrackOrLayerArg(text, project.layers)).layer;
+}
+
+/** _base.resolve_placement_layer: resolveLayer, or up to three tracks past the top to add (resolvePlacementTrack). */
+export function resolvePlacementLayer(project: Project, track: unknown): { layer: number; newTracks: number } {
+  return requireTrack(track, (text) => resolvePlacementTrack(text, project.layers));
+}
+
+function requireTrack(track: unknown, resolve: (text: string) => TrackResolution): { layer: number; newTracks: number } {
   const text = track === undefined || track === null ? "" : String(track).trim();
   if (!text) throw new ToolError("a track is required (UI track number, name, or layer number)");
-  const resolved = normalizeTrackOrLayerArg(text, project.layers);
+  const resolved = resolve(text);
   if (resolved.error) throw new ToolError(resolved.error);
   if (resolved.layer === undefined) throw new ToolError(`no track matches ${pyReprString(String(track))}`);
-  return resolved.layer;
+  return { layer: resolved.layer, newTracks: resolved.newTracks ?? 0 };
 }
 
 /** timeline_edit_common.require_unlocked: refuse when any of these tracks is locked. */

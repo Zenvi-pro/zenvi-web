@@ -8,6 +8,7 @@
  */
 
 import type { Layer } from "../model/types.js";
+import { TRACK_STRIDE } from "../ops/tracks.js";
 import { parsePythonFloat } from "./coerce.js";
 import { pyReprString } from "./pyfmt.js";
 
@@ -53,7 +54,21 @@ export function trackStackJson(layers: readonly Layer[] | null | undefined): str
   return JSON.stringify(buildTrackStack(layers)).replace(/[\u0080-\uffff]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`);
 }
 
-export type TrackResolution = { layer: number; error?: undefined } | { layer?: undefined; error: string } | { layer?: undefined; error?: undefined };
+/**
+ * `newTracks`: how many tracks must be added on top for `layer` to exist
+ * (resolvePlacementTrack only).
+ */
+export type TrackResolution =
+  | { layer: number; newTracks?: number; error?: undefined }
+  | { layer?: undefined; newTracks?: undefined; error: string }
+  | { layer?: undefined; newTracks?: undefined; error?: undefined };
+
+/**
+ * How far past the top a placement may name a track. Agents name track 10 of
+ * 9 to mean "a new track on top" (most refusals in the W28 transcript replay);
+ * a bigger jump is more likely a wrong number than an intent.
+ */
+export const MAX_NEW_TRACKS_ON_TOP = 3;
 
 /**
  * Resolve an agent's track reference against the live layers
@@ -61,10 +76,25 @@ export type TrackResolution = { layer: number; error?: undefined } | { layer?: u
  * nothing (no layer, no error).
  */
 export function normalizeTrackOrLayerArg(raw: string | number | null | undefined, layers: readonly Layer[] | null | undefined): TrackResolution {
+  return resolveTrack(raw, layers, 0);
+}
+
+/**
+ * normalizeTrackOrLayerArg for tools that put something new on a track: a
+ * ui_track 1 to MAX_NEW_TRACKS_ON_TOP past the top resolves to the number the
+ * topmost added track will get (each new track takes the top number plus
+ * TRACK_STRIDE, as add_track_tool numbers them), with `newTracks` saying how
+ * many to add. The caller adds them in the same transaction (ensureTrack).
+ */
+export function resolvePlacementTrack(raw: string | number | null | undefined, layers: readonly Layer[] | null | undefined): TrackResolution {
+  return resolveTrack(raw, layers, MAX_NEW_TRACKS_ON_TOP);
+}
+
+function resolveTrack(raw: string | number | null | undefined, layers: readonly Layer[] | null | undefined, newOnTop: number): TrackResolution {
   const text = String(raw ?? "").trim();
   if (!text) return {};
   const all = layers ?? [];
-  if (all.length === 0) return { error: "Error: No tracks in project." };
+  if (all.length === 0 && newOnTop === 0) return { error: "Error: No tracks in project." };
 
   const stack = buildTrackStack(all);
   const numbers = new Set(stack.map((e) => e.layer_number));
@@ -107,6 +137,11 @@ export function normalizeTrackOrLayerArg(raw: string | number | null | undefined
 
   // 4) ui_track counted from the bottom
   if (uiNumber !== null && uiNumber >= 1 && uiNumber <= stack.length) return { layer: stack[uiNumber - 1]!.layer_number };
+  const missing = uiNumber === null ? 0 : uiNumber - stack.length;
+  if (missing >= 1 && missing <= newOnTop) {
+    const top = stack.length > 0 ? stack[stack.length - 1]!.layer_number : 0;
+    return { layer: top + missing * TRACK_STRIDE, newTracks: missing };
+  }
 
   return {
     error:
@@ -114,6 +149,12 @@ export function normalizeTrackOrLayerArg(raw: string | number | null | undefined
       "Call list_layers_tool and use layer_number (preferred), track_id, " +
       "ui_track (1=bottom), or the exact label.",
   };
+}
+
+/** Receipt wording for the tracks a placement added on top ("" for none). */
+export function newTracksNote(count: number | undefined): string {
+  if (!count || count <= 0) return "";
+  return count === 1 ? " on a new track" : ` on a new track (${count} tracks added on top)`;
 }
 
 /** e.g. `1000000 (stack_from_bottom=1, z_from_bottom=0, label='Hero')` (track_display.format_track_label_for_llm). */

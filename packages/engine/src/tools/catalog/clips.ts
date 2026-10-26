@@ -20,6 +20,7 @@ import type { ProjectDocument, Transaction } from "../../history/document.js";
 import type { Clip, Project, ProjectFile } from "../../model/types.js";
 import { addClip } from "../../ops/clips.js";
 import { addFile, detectMediaType } from "../../ops/files.js";
+import { ensureTrack } from "../../ops/overlays.js";
 import { getEffectiveAiMetadata, filterTagsStringForWindow, materializeClipAiMetadata } from "../ai-metadata.js";
 import { cueCoverage, snapWindowToBoundaries, speechWindows } from "../audio-mix.js";
 import { resolveRootAiMetadata } from "../clip-context.js";
@@ -44,7 +45,7 @@ import {
 } from "../placement.js";
 import { pyFixed, pyFloat, pyG } from "../pyfmt.js";
 import { applied } from "../receipt.js";
-import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, normalizeTrackOrLayerArg } from "../tracks.js";
+import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, newTracksNote, resolvePlacementTrack } from "../tracks.js";
 import type { ImportedMedia } from "../types.js";
 import { confirmWatchWindow, type WatchResult } from "../watch.js";
 import { boolArg, fileById, floatArg, fmtMmss, forgetFile, recallFile, record, rememberFile, selectedTrack, text } from "./common.js";
@@ -147,6 +148,8 @@ export interface PlacementArgs {
 
 export interface PlacementPlan {
   layer: number;
+  /** Tracks to add on top so `layer` exists (the caller named one past the stack). */
+  newTracks: number;
   position: number;
   /** Source window to trim to; undefined keeps addClip's defaults (the whole file / subclip window). */
   start?: number;
@@ -322,6 +325,7 @@ export async function planPlacement(call: ToolCall, file: ProjectFile, args: Pla
   // Track (the desktop's _do_add).
   const layers = project.layers ?? [];
   let layer: number;
+  let newTracks = 0;
   const trackText = text(args.track);
   if (!trackText) {
     if (isAudio) layer = defaultUnderlayLayerNumber(layers);
@@ -330,9 +334,10 @@ export async function planPlacement(call: ToolCall, file: ProjectFile, args: Pla
       layer = selected ? Math.trunc(Number(selected.number)) : defaultUnderlayLayerNumber(layers);
     }
   } else {
-    const resolved = normalizeTrackOrLayerArg(trackText, layers);
+    const resolved = resolvePlacementTrack(trackText, layers);
     if (resolved.error) return resolved.error;
     layer = resolved.layer ?? defaultUnderlayLayerNumber(layers);
+    newTracks = resolved.newTracks ?? 0;
   }
 
   // Position. An explicit position planned on where a resized clip was meant
@@ -359,6 +364,7 @@ export async function planPlacement(call: ToolCall, file: ProjectFile, args: Pla
 
   const plan: PlacementPlan = {
     layer,
+    newTracks,
     position,
     snapped: false,
     watched,
@@ -383,6 +389,7 @@ export async function planPlacement(call: ToolCall, file: ProjectFile, args: Pla
 
 /** Record a planned placement (inside the call's transaction). Returns the new clip. */
 export function applyPlacement(tx: Transaction, fileId: string, plan: PlacementPlan): Clip {
+  if (plan.newTracks > 0) ensureTrack(tx, plan.layer);
   const clip = addClip(tx, {
     fileId,
     position: plan.position,
@@ -426,7 +433,7 @@ export function placementText(project: Project, plan: PlacementPlan, clip: Clip)
     note += `, moved from ${pyFloat(plan.requested)}s to butt against the previous clip`;
   }
   const watchPart = plan.watched && plan.watched.ran ? " (watched)" : "";
-  return `Added clip to timeline at position ${pyFloat(plan.position)}s on track ${trackLabel}${durPart}${idPart}${note}${watchPart}.`;
+  return `Added clip to timeline at position ${pyFloat(plan.position)}s on track ${trackLabel}${newTracksNote(plan.newTracks)}${durPart}${idPart}${note}${watchPart}.`;
 }
 
 /**
