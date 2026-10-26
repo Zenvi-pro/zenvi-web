@@ -4,7 +4,7 @@
   "title": "Logo build",
   "description": "A logo sting: four coloured dots fly in on curved paths with comet trails, land, and morph into a mark (petals, pinwheel, stacked bars or a 2×2 kit of shapes); the mark turns and locks with a small settle, then moves aside as the wordmark rises letter by letter, with an optional tagline. The marks are original geometric marks, not anyone's logo. Opaque; for intros, outros and brand bumpers.",
   "tags": ["logo", "brand", "morph", "intro", "outro", "sting", "wordmark"],
-  "duration": { "default": 4.5, "min": 3, "max": 12 },
+  "duration": { "default": 4.5, "min": 4.4, "max": 12 },
   "aspects": ["9:16", "16:9", "1:1", "4:5"],
   "alpha": false,
   "tokens": { "palette": "cream", "display": "sans" },

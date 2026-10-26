@@ -176,8 +176,10 @@ export function build(ctx: BlockContext): void {
     tl.to(mark, { x: markX - cx, y: markY - cy, scale: 1 }, { at: revealAt, duration: 0.8, ease: "in-out" });
     // The letters rise once the mark has slid (and shrunk) clear of them; earlier, the first ones cross it.
     const rise = revealAt + 0.5;
-    tl.fromTo(chars, { yPercent: 115, rotate: 6 }, { yPercent: 0, rotate: 0 }, { at: rise, duration: 0.7, ease: "out", stagger: 0.035 });
-    if (tag) tl.fromTo(tag, { opacity: 0, y: 14 }, { opacity: 1, y: 0 }, { at: rise + 0.25 + chars.length * 0.035, duration: 0.6, ease: "out" });
+    // Long names stagger tighter, so the tagline lands by ~3.9 s at any length and holds before the exit (duration.min).
+    const each = Math.min(0.035, 0.32 / chars.length);
+    tl.fromTo(chars, { yPercent: 115, rotate: 6 }, { yPercent: 0, rotate: 0 }, { at: rise, duration: 0.7, ease: "out", stagger: each });
+    if (tag) tl.fromTo(tag, { opacity: 0, y: 14 }, { opacity: 1, y: 0 }, { at: rise + 0.25 + chars.length * each, duration: 0.6, ease: "out" });
   }
 
   const out = EASES.out;
