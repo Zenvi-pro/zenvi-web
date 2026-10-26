@@ -136,8 +136,11 @@ test("make it snappy runs as separate undo steps with one summary toast", async 
   const before = await undoButton(page).getAttribute("aria-label");
 
   await page.getByRole("button", { name: "Make it snappy" }).first().click();
-  const summary = toastWith(page, /Made it snappy: 3 undo steps/);
+  // 3 steps here (gaps, transitions, sound); 4 once master_audio_tool is in the catalog.
+  const summary = toastWith(page, /Made it snappy: \d undo steps/);
   await expect(summary).toBeVisible({ timeout: 60_000 });
+  const steps = Number(/Made it snappy: (\d)/.exec((await summary.textContent()) ?? "")?.[1]);
+  expect(steps).toBeGreaterThanOrEqual(3);
   await expect(summary).toContainText("Close frame gaps");
   await expect(summary).toContainText("Motion transitions");
   await expect(summary).toContainText("Sound design");
@@ -163,13 +166,13 @@ test("make it snappy runs as separate undo steps with one summary toast", async 
 
   // Each step is its own undo step, newest first.
   const labels: string[] = [];
-  for (let i = 0; i < 3; i += 1) {
+  for (let i = 0; i < steps; i += 1) {
     const label = (await undoButton(page).getAttribute("aria-label"))!;
     labels.push(label);
     await page.keyboard.press(`${mod}+Z`);
     await expect(undoButton(page)).not.toHaveAttribute("aria-label", label);
   }
-  expect(new Set(labels).size).toBe(3);
+  expect(new Set(labels).size).toBe(steps);
   await expect(undoButton(page)).toHaveAttribute("aria-label", before!);
   await expect(clips(page)).toHaveCount(3);
   await page.waitForTimeout(500);
