@@ -83,8 +83,8 @@ describe("build_reel_tool", () => {
     const project = doc.project;
     const video = project.clips.filter((c) => c.layer === data.tracks.video);
     expect(video).toHaveLength(data.shots.length);
-    // Every cut within a frame of a beat or half-beat of the music (positions snap to the 30 fps grid).
-    const grid = data.beats.flatMap((t, i) => (i + 1 < data.beats.length ? [t, (t + data.beats[i + 1]!) / 2] : [t]));
+    // Every cut within a frame of a beat, half- or quarter-beat of the music (positions snap to the 30 fps grid).
+    const grid = data.beats.flatMap((t, i) => (i + 1 < data.beats.length ? [0, 0.25, 0.5, 0.75].map((f) => t + f * (data.beats[i + 1]! - t)) : [t]));
     for (const clip of video) expect(Math.min(...grid.map((t) => Math.abs(t - clip.position)))).toBeLessThanOrEqual(1 / 30 + 1e-6);
     // Shots butt together with no gap.
     const sorted = [...video].sort((a, b) => a.position - b.position);
@@ -109,6 +109,55 @@ describe("build_reel_tool", () => {
     expect(doc.project.clips).toHaveLength(0);
     // Beat analysis of a minute of audio: slow on a loaded machine.
   }, 30_000);
+
+  it("gives a hype reel its accents: outlined display titles that slam in, whips one way, a ramped wind-up, a glitch on the drop", async () => {
+    const scratch = new ProjectDocument(createProject({ id: "REELHYPE01", profile: findProfile("HD 1080p 30 fps")! }));
+    scratch.transaction("fixture", (tx) => {
+      for (let i = 0; i < 12; i += 1) addFile(tx, media(`/media/c${i}.mp4`, videoInfo(`/media/c${i}.mp4`, 12)), { id: `CLIP${String(i).padStart(2, "0")}XXXX` });
+      addFile(tx, media("/media/song.mp3", audioInfo("/media/song.mp3", 60)), { id: "SONGXXXXXX" });
+    });
+    const doc = new ProjectDocument({ ...structuredClone(scratch.project), history: { undo: [], redo: [] } });
+    const host = fakeHost();
+    const beats = Array.from({ length: 100 }, (_, i) => i * 0.5);
+    const result = await runTool({ doc, host }, "build_reel_tool", { style: "hype", hook: "No brakes", end_card: "After dark", beats, duration_seconds: 24 });
+    expect(result.ok, result.text).toBe(true);
+    const data = (result.data as { data: Record<string, unknown> }).data as {
+      drop: number;
+      flashes: number[];
+      transitions: { preset: string; direction: string | null; cut: number }[];
+      speed_ramp: { clip_id: string; start: number; end: number } | null;
+      sfx_cues: { kind: string }[];
+      tracks: Record<string, number>;
+    };
+    expect(data.drop).toBe(16);
+    expect(data.flashes).toContain(16);
+    expect(data.transitions.find((t) => t.cut === 16)?.preset).toBe("glitch");
+    const whips = data.transitions.filter((t) => t.preset === "whip");
+    expect(whips.length).toBeGreaterThan(1);
+    expect(new Set(whips.map((t) => t.direction)).size).toBe(1);
+    expect(data.transitions[data.transitions.length - 1]!.preset).toBe("zoom_out");
+    expect(data.sfx_cues.some((c) => c.kind === "glitch")).toBe(true);
+    // The transitions are on the clips, recorded so they can be removed.
+    const recorded = doc.project.clips.filter((c) => Array.isArray((c as Record<string, unknown>).zenvi_motion_transitions));
+    expect(recorded.length).toBeGreaterThanOrEqual(data.transitions.length);
+    // The wind-up keeps its length and ends on the drop.
+    const ramped = doc.project.clips.find((c) => c.id === data.speed_ramp?.clip_id)!;
+    expect((ramped as Record<string, unknown>).zenvi_speed_ramp).toBeDefined();
+    expect(ramped.position + (ramped.end - ramped.start)).toBeCloseTo(16, 6);
+    // Titles are set in the bundled condensed face as outlines, and slam in out of a blur.
+    const svg = (name: string) => {
+      const bytes = host.written.get(`/generated/${name}`)!;
+      return typeof bytes === "string" ? bytes : new TextDecoder().decode(bytes);
+    };
+    expect(svg("reel-hook.svg")).toContain('data-zenvi-outline="anton"');
+    expect(svg("reel-end.svg")).toContain('stroke="#ffffff"');
+    const hook = doc.project.clips.filter((c) => c.layer === data.tracks.titles).reduce((a, b) => (b.position < a.position ? b : a));
+    expect((hook.scale_x as { Points: { co: { Y: number } }[] }).Points[0]!.co.Y).toBeCloseTo(1.35, 6);
+    expect((hook.effects as { class_name: string }[]).map((e) => e.class_name)).toContain("Blur");
+    expect(doc.undoLabels).toEqual(["Build hype montage reel"]);
+    doc.undo();
+    expect(doc.project.clips).toHaveLength(0);
+  });
 
   it("ends shot labels where the end card comes in", async () => {
     const doc = reelProject();

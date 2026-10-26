@@ -3,10 +3,15 @@
  * in the project. Cuts land on the music's beats; every shot gets the style's
  * camera move and look; flashes hit the downbeats; the hook title, shot
  * labels, end card and the music bed (faded out) go on their own tracks. The
- * whole edit is ONE undo step.
+ * whole edit is ONE undo step. Hype and highlight reels also get their
+ * accents (reels/accents.ts): whips on the body's downbeats, a slow-motion
+ * wind-up ramping into the drop, a glitch on it, negative and glitch hits on
+ * the climax's bar lines, a pull-back into the last shot, titles set in a
+ * bundled condensed face that slam in.
  *
  * reels/styles.ts says how each style cuts, moves, grades and titles,
- * reels/plan.ts places every shot, reels/typography.ts draws the titles.
+ * reels/plan.ts places every shot, reels/accents.ts picks the accents,
+ * reels/typography.ts draws the titles.
  * This tool reads the media and the music's beats (tools/beats.ts), writes
  * the title images through the host, then records the edit.
  */
@@ -16,27 +21,45 @@ import type { Transaction } from "../../history/document.js";
 import { isAudioOnlyMedia, isSingleImageMedia } from "../../model/media.js";
 import { Interpolation, ScaleMode, type Clip, type Project, type ProjectFile } from "../../model/types.js";
 import { addClip, deleteClips, setClipKeyframes, setClipProperty, setClipSpeed } from "../../ops/clips.js";
+import { addEffect, updateEffectValues } from "../../ops/effects.js";
+import { isOpError } from "../../ops/errors.js";
+import { rateOf } from "../../ops/internal.js";
+import { applyMotionTransition, planMotionTransitionEdit, type MotionTransitionResult, type TransitionSfxCue } from "../../ops/motion-transitions.js";
+import { applySpeedRamp, planSpeedRamp } from "../../ops/speed-ramp.js";
+import { openshotPoint } from "../../keyframe/edit.js";
 import { applyLookPreset } from "../../ops/look.js";
 import { applyClipPreset } from "../../ops/presets.js";
 import { addTitleClip } from "../../ops/titles.js";
 import { addTrack } from "../../ops/tracks.js";
 import { removeTransition } from "../../ops/transitions.js";
-import { planReel, type MusicBeats, type PlannedShot, type ReelMedia, type ReelPlan } from "../../reels/plan.js";
-import { REEL_STYLE_IDS, REEL_STYLES, type ReelStyle } from "../../reels/styles.js";
+import { planAccents, type AccentTransition } from "../../reels/accents.js";
+import { REUSE_GAP_SECONDS, planReel, type MusicBeats, type PlannedShot, type ReelMedia, type ReelPlan } from "../../reels/plan.js";
+import { REEL_STYLE_IDS, REEL_STYLES, type ReelTypography } from "../../reels/styles.js";
+import { bundledFamily } from "../../typography/families.js";
+import { outlineSvgText } from "../../typography/outline.js";
 import { MOTION_STYLE_IDS, MOTION_STYLES, isMotionStyleId } from "../../motion/styles.js";
 import { buildMotionReel } from "./motion-reels.js";
 import { placeMusicBed } from "./music-bed.js";
 import { cardSvg, flashSvg, type CardRole } from "../../reels/typography.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
+import { loadFamilies, missingGlyphWarnings } from "../fonts.js";
 import { applied, failed, refused } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
 
 const TOOL = "build_reel_tool";
 /** How long a white flash fades, seconds (three frames at 30 fps). */
 const FLASH_SECONDS = 0.1;
-/** Flash at most once per this many seconds: a flash on every bar strobes. */
-const FLASH_SPACING_SECONDS = 3;
+/**
+ * The wind-up into the drop as speed over the shot (share of its length,
+ * speed): slow motion for the first 40 %, then an ease-in rush to 3x that
+ * lands on the cut. It spends about 0.9x the shot's length of footage.
+ */
+const WINDUP_RAMP = [
+  [0, 0.5],
+  [0.4, 0.5],
+  [1, 3],
+] as const;
 /** Tracks the reel uses, bottom to top. */
 const TRACKS = ["music", "video", "flash", "labels", "titles"] as const;
 type TrackRole = (typeof TRACKS)[number];
@@ -140,20 +163,6 @@ function storyLine(plan: ReelPlan, names: Map<string, string>): string {
   return [unique[0], ...middle].join(", ") + `, ends on ${last}`;
 }
 
-/** The shots whose cut flashes: downbeats (in the climax only, for some styles), spaced so it never strobes. */
-function flashIndexes(style: ReelStyle, shots: readonly PlannedShot[]): Set<number> {
-  const out = new Set<number>();
-  let last = -Infinity;
-  shots.forEach((shot, index) => {
-    if (index === 0 || !shot.onDownbeat || style.flash === "none") return;
-    if (style.flash === "climax_downbeats" && !shot.climax) return;
-    if (shot.start - last < FLASH_SPACING_SECONDS) return;
-    out.add(index);
-    last = shot.start;
-  });
-  return out;
-}
-
 interface Prepared {
   hook?: ImportedMedia;
   end?: ImportedMedia;
@@ -187,13 +196,75 @@ function fadeAlpha(tx: Transaction, clip: Clip, from: number, to: number, start:
   );
 }
 
-function placeTitle(tx: Transaction, media: ImportedMedia, position: number, duration: number, layer: number, entrance: string | null): Clip {
+/**
+ * The hype title hit: the card lands from 135 % to full size in five frames
+ * (most of the way in two), out of a blur, opaque by the second frame.
+ */
+function slamIn(tx: Transaction, clip: Clip, fps: number): void {
+  const at = Number(clip.position) || 0;
+  const frame = (n: number) => at + n / fps;
+  for (const prop of ["scale_x", "scale_y"]) {
+    setClipKeyframes(
+      tx,
+      clip.id,
+      prop,
+      [
+        { time: frame(0), value: 1.35, interpolation: Interpolation.LINEAR },
+        { time: frame(2), value: 1.06, interpolation: Interpolation.LINEAR },
+        { time: frame(5), value: 1, interpolation: Interpolation.LINEAR },
+      ],
+      { mode: "merge" },
+    );
+  }
+  fadeAlpha(tx, clip, 0, 1, frame(0), frame(2));
+  const blur = addEffect(tx, clip.id, "Blur", {});
+  const radius = { Points: [openshotPoint(1, 24, Interpolation.LINEAR), openshotPoint(4, 0, Interpolation.LINEAR)] };
+  updateEffectValues(tx, blur.id, { horizontal_radius: radius, vertical_radius: structuredClone(radius) });
+}
+
+function placeTitle(tx: Transaction, media: ImportedMedia, position: number, duration: number, layer: number, entrance: ReelTypography["hookIn"] | null, fps: number): Clip {
   const { clip } = addTitleClip(tx, { file: media, position, duration, layer, title: media.name });
-  if (entrance && entrance !== "animate.none") applyClipPreset(tx, clip.id, entrance as Parameters<typeof applyClipPreset>[2]);
+  if (entrance === "slam_in") slamIn(tx, clip, fps);
+  else if (entrance && entrance !== "animate.none") applyClipPreset(tx, clip.id, entrance);
   // Leave a little before the next thing happens.
   const out = Math.min(0.25, duration / 4);
   fadeAlpha(tx, clip, 1, 0, position + duration - out, position + duration);
   return clip;
+}
+
+/**
+ * The wind-up into the drop: the shot's clip ramps from slow motion into a
+ * rush that lands on the cut, keeping its length. Returns the clip id, or
+ * null (nothing recorded) when the footage runs out before the shot ends.
+ */
+function windUp(tx: Transaction, clipId: string, shot: PlannedShot): string | null {
+  const length = shot.end - shot.start;
+  const points = WINDUP_RAMP.map(([at, speed]) => ({ atSeconds: at * length, speed }));
+  try {
+    const ramp = planSpeedRamp(tx.project, clipId, { preset: "custom", points, ease: "in" });
+    const frames = Math.round(length * rateOf(tx.project));
+    if (Math.abs(ramp.frames - frames) > 0) return null;
+    applySpeedRamp(tx, clipId, ramp);
+    return clipId;
+  } catch (error) {
+    if (isOpError(error)) return null;
+    throw error;
+  }
+}
+
+/** One accent's motion transition, shortened a frame at a time until both clips can take it; null when they cannot. */
+function accentTransition(tx: Transaction, outClipId: string, inClipId: string, accent: AccentTransition): MotionTransitionResult | null {
+  for (let frames = accent.frames; frames >= 2; frames -= 1) {
+    const input = { outClipId, inClipId, preset: accent.preset, frames, direction: "auto" as const };
+    try {
+      planMotionTransitionEdit(tx.project, input);
+    } catch (error) {
+      if (isOpError(error)) continue;
+      throw error;
+    }
+    return applyMotionTransition(tx, input);
+  }
+  return null;
 }
 
 export const reelTools: CatalogTool[] = [
@@ -202,7 +273,8 @@ export const reelTools: CatalogTool[] = [
     title: "Build a reel",
     description:
       "Cut a finished short-form video (Reels, TikTok, Shorts, ads) in one step from media already in the project: shots cut on the music's beats, " +
-      "camera moves, flashes, a look, an opening hook title, shot labels, an end card and the music faded out. One undo step. " +
+      "camera moves, flashes, a look, an opening hook title, shot labels, an end card and the music faded out. " +
+      "hype and highlight add the accents: whips in one direction on the downbeats, a slow-motion wind-up ramping into the drop, a glitch on the drop, negative/glitch hits in the climax, a pull-back into the last shot, condensed display titles that slam in (the receipt lists them and their sfx_cues). One undo step. " +
       "Put the videos/images and one music track in the media bin first (stock, AI, uploads, URLs); give them in story order. " +
       "Its sound is the music at full level, so once any sound design is added call master_audio_tool last to set the final loudness.",
     input,
@@ -273,19 +345,40 @@ export const reelTools: CatalogTool[] = [
       const style = REEL_STYLES[styleId];
 
       let plan: ReelPlan;
+      const rate = rateOf(project);
       try {
-        const fps = Number(project.fps?.num) / Number(project.fps?.den || 1);
-        plan = planReel({ style, media, music: beats, seconds: args.duration_seconds, frameRate: Number.isFinite(fps) ? fps : undefined });
+        plan = planReel({ style, media, music: beats, seconds: args.duration_seconds, frameRate: Number.isFinite(rate) && rate > 0 ? rate : undefined });
       } catch (error) {
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
       }
 
+      const accents = planAccents(style, plan, Number.isFinite(rate) && rate > 0 ? rate : 30);
+      const flashes = new Set(accents.flashes);
+      if (plan.closeRepeats > 0 && new Set(plan.shots.map((s) => s.fileId)).size < plan.clipsNeeded) {
+        warnings.push(
+          `${plan.closeRepeats} shot(s) bring a clip back within ${REUSE_GAP_SECONDS} s: this pace needs about ${plan.clipsNeeded} different clips and the reel has ${new Set(ids).size}. Import more and rebuild with replace=true.`,
+        );
+      }
+
       // Title images (written through the host before the edit is recorded).
       const prepared: Prepared = { labels: new Map() };
-      const flashes = flashIndexes(style, plan.shots);
       const width = Number(project.width) || 1920;
       const height = Number(project.height) || 1080;
-      const card = (text: string, role: CardRole, subtitle?: string) => cardSvg({ width, height, text, role, typography: style.typography, subtitle });
+      const face = style.typography.face;
+      // A bundled face is drawn as outlines; where the fonts cannot be read the text names it and falls back to the host's fonts.
+      let lib: Awaited<ReturnType<typeof loadFamilies>> | null = null;
+      if (face && call.host.media?.writeGenerated) {
+        lib = await loadFamilies(call, [face.display, face.label]);
+        if (typeof lib === "string") warnings.push(`${lib.replace(/^Error: /, "")} The titles use the system's fonts instead.`);
+      }
+      const missing = new Set<string>();
+      const card = (text: string, role: CardRole, subtitle?: string) => {
+        const svg = cardSvg({ width, height, text, role, typography: style.typography, subtitle });
+        if (!lib || typeof lib === "string") return svg;
+        const out = outlineSvgText(svg, lib, { family: bundledFamily, maxWidth: () => width * 0.9 });
+        for (const c of out.missing) missing.add(c);
+        return out.svg;
+      };
       if (call.host.media?.writeGenerated) {
         try {
           if (args.hook?.trim()) prepared.hook = await writeCard(call, "reel-hook.svg", card(args.hook, "hook"));
@@ -294,6 +387,7 @@ export const reelTools: CatalogTool[] = [
           for (const label of new Set(plan.shots.map((s) => s.label).filter((l): l is string => Boolean(l)))) {
             prepared.labels.set(label, await writeCard(call, `reel-label-${prepared.labels.size + 1}.svg`, card(label, "label")));
           }
+          warnings.push(...missingGlyphWarnings([...missing]));
         } catch (error) {
           return failed(TOOL, `Error: failed to write the reel's titles: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -314,6 +408,7 @@ export const reelTools: CatalogTool[] = [
         const last = plan.shots[plan.shots.length - 1]!;
         const endAt = prepared.end ? last.start + Math.min(0.3, (last.end - last.start) * 0.15) : plan.duration;
 
+        const shotClips: string[] = [];
         plan.shots.forEach((shot, index) => {
           const file = files.get(shot.fileId)!;
           const length = shot.end - shot.start;
@@ -324,6 +419,7 @@ export const reelTools: CatalogTool[] = [
             start: shot.kind === "video" ? shot.sourceStart : 0,
             end: shot.kind === "video" ? shot.sourceEnd : length,
           });
+          shotClips.push(clip.id);
           if (shot.speed < 0.999) setClipSpeed(tx, clip.id, shot.speed);
           // Fill the frame: landscape footage in a vertical reel is cropped, not letterboxed, and a
           // near-match (1080x2048 in 1080x1920) leaves no thin bars. With the same aspect, crop is fit.
@@ -343,16 +439,22 @@ export const reelTools: CatalogTool[] = [
           const label = shot.label ? prepared.labels.get(shot.label) : undefined;
           const labelEnd = Math.min(shot.end, endAt);
           const labelLength = labelEnd - shot.start;
-          if (label && labelLength > 0 && (labelEnd === shot.end || labelLength >= 0.3)) placeTitle(tx, label, shot.start, labelLength, track.labels, null);
+          if (label && labelLength > 0 && (labelEnd === shot.end || labelLength >= 0.3)) placeTitle(tx, label, shot.start, labelLength, track.labels, null, rate);
+        });
+
+        const ramp = accents.ramp !== null ? windUp(tx, shotClips[accents.ramp]!, plan.shots[accents.ramp]!) : null;
+        const transitions = accents.transitions.flatMap((t) => {
+          const done = accentTransition(tx, shotClips[t.shot - 1]!, shotClips[t.shot]!, t);
+          return done ? [done] : [];
         });
 
         if (prepared.hook) {
           const first = plan.shots[0]!;
           const hold = Math.min(3, Math.max(1.6, first.end - first.start));
-          placeTitle(tx, prepared.hook, 0, Math.min(hold, plan.duration), track.titles, style.typography.hookIn);
+          placeTitle(tx, prepared.hook, 0, Math.min(hold, plan.duration), track.titles, style.typography.hookIn, rate);
         }
-        if (prepared.end) placeTitle(tx, prepared.end, endAt, plan.duration - endAt, track.titles, style.typography.hookIn);
-        return { tracks: track };
+        if (prepared.end) placeTitle(tx, prepared.end, endAt, plan.duration - endAt, track.titles, style.typography.hookIn, rate);
+        return { tracks: track, ramp, transitions };
       }, `Build ${style.name.toLowerCase()} reel`);
 
       const brief = {
@@ -361,7 +463,15 @@ export const reelTools: CatalogTool[] = [
         pace: `${style.pace} (${Math.round(plan.bpm)} BPM)`,
         look: style.look,
       };
-      return applied(TOOL, `Built a ${style.name.toLowerCase()} reel: ${plan.shots.length} shots cut to ${Math.round(plan.bpm)} BPM, ${brief.format}. Length ${plan.lengthNote}.`, {
+      const round = (t: number) => Math.round(t * 1000) / 1000;
+      const accentParts = [
+        built.transitions.length > 0 ? `${built.transitions.length} motion transition(s) (${built.transitions.map((r) => `${r.preset}@${r.cut.toFixed(2)}s`).join(", ")})` : "",
+        built.ramp ? `a speed ramp into the drop at ${plan.drop!.toFixed(2)}s` : "",
+        flashes.size > 0 ? `${flashes.size} white flash(es)` : "",
+      ].filter(Boolean);
+      const accentNote = accentParts.length > 0 ? ` Accents: ${accentParts.join(", ")}.` : "";
+      if (accents.ramp !== null && !built.ramp) warnings.push("The wind-up shot before the drop has too little footage for its speed ramp; it plays at normal speed.");
+      return applied(TOOL, `Built a ${style.name.toLowerCase()} reel: ${plan.shots.length} shots cut to ${Math.round(plan.bpm)} BPM, ${brief.format}. Length ${plan.lengthNote}.${accentNote}`, {
         warnings,
         notes: ["Finish with master_audio_tool (preset social) after the sound is in place: it sets the loudness and balance."],
         data: {
@@ -376,6 +486,12 @@ export const reelTools: CatalogTool[] = [
           downbeats: plan.downbeats,
           shots: plan.shots.map((s) => ({ file_id: s.fileId, start: s.start, end: s.end, source_start: s.sourceStart, source_end: s.sourceEnd })),
           tracks: built.tracks,
+          // Where the edit hits: sound design puts its whooshes and hits here, and a later pass need not add more.
+          drop: plan.drop,
+          flashes: [...flashes].map((i) => plan.shots[i]!.start),
+          transitions: built.transitions.map((r) => ({ id: r.id, preset: r.preset, direction: r.direction, cut: r.cut, frames: r.frames })),
+          speed_ramp: built.ramp ? { clip_id: built.ramp, start: plan.shots[accents.ramp!]!.start, end: round(plan.drop!) } : null,
+          sfx_cues: built.transitions.flatMap((r): TransitionSfxCue[] => r.sfxCues),
           brief,
         },
       });
