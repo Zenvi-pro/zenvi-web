@@ -6,6 +6,7 @@ import type { Project } from "../model/types.js";
 import { addClip, addFile } from "../ops/index.js";
 import type { RgbaImage } from "../render/types.js";
 import { runTool } from "./registry.js";
+import { hasDarkEdges } from "./subjects.js";
 import { fakeHost } from "./test-support/fake-host.js";
 import { media, videoInfo } from "./test-support/fixture.js";
 import { pixelFrameHost } from "./test-support/pixel-host.js";
@@ -125,6 +126,26 @@ describe("align_match_cut_tool", () => {
     const loose = new ProjectDocument(project());
     const none = await runTool({ doc: loose, host }, "align_match_cut_tool", { clips: [{ clip_id: "C2", box: boxOf("/m/cup.mp4") }], target: { x: 0.5, y: 0.5, size: 0.3 }, cover: "none" });
     expect(none.data?.warnings?.join(" ")).toMatch(/black edges/);
+  });
+
+  it("lets footage with black edges skip the zoom, so it does not raise everyone's size", async () => {
+    const doc = new ProjectDocument(project());
+    const host: ToolHost = { frames: pixelFrameHost(paint) };
+    const clips = PATHS.map((p, i) => ({ clip_id: `C${i}`, box: boxOf(p), ...(i === 2 ? { allow_edges: true } : {}) }));
+    const result = await runTool({ doc, host }, "align_match_cut_tool", { clips, cover: "zoom_all" });
+    const data = result.data?.data as { target: { size: number }; clips: { cover_zoom: number }[] };
+    // The cup was the clip that needed the zoom: without it the first clip's size stands.
+    expect(data.target.size).toBeCloseTo(300 / 720, 2);
+    expect(data.clips.map((c) => c.cover_zoom)).toEqual([1, 1, 1, 1]);
+    expect(result.data?.warnings?.join(" ")).toMatch(/C2 leaves black edges/);
+  });
+
+  it("knows a night-sky frame by its black edges", () => {
+    const sky = paint("/none.mp4", 64, 36);
+    expect(hasDarkEdges(sky)).toBe(false);
+    sky.data.fill(0);
+    for (let i = 3; i < sky.data.length; i += 4) sky.data[i] = 255;
+    expect(hasDarkEdges(sky)).toBe(true);
   });
 
   it("refuses bad input before anything changes", async () => {

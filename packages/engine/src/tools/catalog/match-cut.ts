@@ -31,7 +31,7 @@ import { flashSvg } from "../../reels/typography.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, type CatalogTool } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
-import { detectSubjects, SUBJECT_KINDS, type DetectedSubject } from "../subjects.js";
+import { detectSubjects, SUBJECT_KINDS, type DetectedSubject, type FrameSubjects } from "../subjects.js";
 import type { ImportedMedia } from "../types.js";
 import { placeMusicBed } from "./music-bed.js";
 import { aspectOf, displayName, musicFromBeats, usableRange, visualKind, writeCard } from "./reels.js";
@@ -81,6 +81,7 @@ const alignInput = z.strictObject({
         time: z.number().min(0).optional().describe("Source seconds the box was measured at (default: the clip's first frame)."),
         end_box: boxSchema.optional().describe("The subject again later in the source, to follow it as it drifts."),
         end_time: z.number().min(0).optional().describe("Source seconds of end_box."),
+        allow_edges: z.boolean().optional().describe("This clip may show the canvas around it instead of zooming (footage whose edges are black already: a moon on a night sky)."),
       }),
     )
     .min(1)
@@ -109,7 +110,7 @@ const montageInput = z.strictObject({
       z.strictObject({
         file_id: z.string().min(1),
         box: boxSchema,
-        time: z.number().min(0).optional().describe("Source seconds of the box: the file's first shot starts here. Without it the subject is taken to stay put."),
+        time: z.number().min(0).optional().describe("Source seconds the box was measured at: the file's shots start here (every return replays this moment unless end_box follows the subject). Default: a third into the file."),
         end_box: boxSchema.optional(),
         end_time: z.number().min(0).optional(),
       }),
@@ -177,7 +178,7 @@ const alignTool = directTool({
   run: (call, args: AlignArgs) => {
     const inputs: AlignClipInput[] = args.clips.map((c) => {
       const later = laterBox(c);
-      return { clipId: c.clip_id, box: c.box, ...(c.time !== undefined ? { time: c.time } : {}), ...(later ? { later } : {}) };
+      return { clipId: c.clip_id, box: c.box, ...(c.time !== undefined ? { time: c.time } : {}), ...(later ? { later } : {}), ...(c.allow_edges ? { cover: "none" as const } : {}) };
     });
     const bad = args.clips.find((c) => (c.end_box === undefined) !== (c.end_time === undefined));
     if (bad) return refused(ALIGN, `Error: ${bad.clip_id}: give end_box and end_time together.`);
@@ -218,7 +219,7 @@ const detectTool = directTool({
   title: "Find the subject in a frame",
   description:
     "Find round subjects (iris/pupil, moon, sun, cup rim, vinyl, lens, clock, eclipse) in a frame of a media-bin file or a timeline clip, " +
-    "best first, as 0-1 boxes on the source frame ready for align_match_cut_tool and match_cut_montage_tool. Concentric rings (iris and pupil) come back as separate candidates. Reads only.",
+    "best first, as 0-1 boxes on the source frame ready for align_match_cut_tool and match_cut_montage_tool. Concentric rings (iris and pupil) come back as separate candidates; dark_edges says the frame's edges are black (allow_edges). Reads only.",
   input: detectInput,
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   requires: ["frames"],
@@ -246,12 +247,12 @@ const detectTool = directTool({
     });
     if (typeof found === "string") return failed(DETECT, found);
     const where = `${String(file.id)} at ${round(time, 3)}s`;
-    const rows = found.map(subjectRow);
+    const rows = found.subjects.map(subjectRow);
     const summary =
       rows.length === 0
         ? `No ${kind} found in ${where}. Read the box off a frame with a grid (inspect_media_tool) instead.`
         : `Found ${rows.length} ${kind}(s) in ${where}; best at (${rows[0]!.center.x}, ${rows[0]!.center.y}), radius ${rows[0]!.radius} of the frame height.`;
-    return applied(DETECT, summary, { data: { file_id: String(file.id), time: round(time, 3), kind, subjects: rows } }, 0);
+    return applied(DETECT, summary, { data: { file_id: String(file.id), time: round(time, 3), kind, subjects: rows, dark_edges: found.darkEdges } }, 0);
   },
 });
 
@@ -279,13 +280,21 @@ interface ShotSource {
   later?: { box: SubjectBox; time: number };
   /** Where the box came from. */
   from: "given" | "detected" | "centred";
+  /** The footage's edges are black: it may show the (black) canvas around it instead of zooming. */
+  darkEdges: boolean;
 }
 
 /** A centred box for footage whose subject could not be found: the shot stays framed as it is, centred. */
 const CENTRED: SubjectBox = { x: 0.3, y: 0.3, w: 0.4, h: 0.4 };
 
-/** Source in-points per shot: a file's first shot starts at its box time (or a third in), each return a little later. */
-function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<string, ProjectFile>, times: Map<string, number>): Array<{ start: number; end: number }> {
+/**
+ * Source in-points per shot. A file's shots start where its box was measured
+ * (or a third in): footage moves (a push-in on the moon), so a box only
+ * holds at the moment it describes and every return of the file replays that
+ * moment. Files with an end box are followed instead: each return shows a
+ * later moment and the box is interpolated there.
+ */
+function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<string, ProjectFile>, times: Map<string, number>, followed: ReadonlySet<string>): Array<{ start: number; end: number }> {
   const cursor = new Map<string, number>();
   return plan.shots.map((shot) => {
     const id = ids[shot.clip]!;
@@ -297,7 +306,7 @@ function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<str
     let start = cursor.get(id) ?? times.get(id) ?? a + room * 0.3;
     if (start + length > b + 1e-6) start = a;
     start = Math.max(0, Math.min(start, Math.max(a, b - length)));
-    cursor.set(id, start + length + 0.25);
+    cursor.set(id, followed.has(id) ? start + length + 0.25 : start);
     return { start, end: start + length };
   });
 }
@@ -383,36 +392,38 @@ const montageTool = directTool({
 
     // Every shot's source window and subject box, before anything is recorded.
     const boxTimes = new Map([...given].filter(([, s]) => s.time !== undefined).map(([id, s]) => [id, s.time!]));
-    const windows = sourceWindows(plan, ids, files, boxTimes);
-    const detected = new Map<string, SubjectBox | null>();
-    let cannotDetect = false;
+    const followed = new Set([...given].filter(([, g]) => g.end_box !== undefined).map(([id]) => id));
+    const windows = sourceWindows(plan, ids, files, boxTimes, followed);
+    // Each file is looked at once, at its first shot: its circle (unless given) and whether its edges are black.
+    const looked = new Map<string, FrameSubjects | null>();
+    let cannotLook = false;
     const sources: ShotSource[] = [];
     for (const [i, shot] of plan.shots.entries()) {
       const id = ids[shot.clip]!;
       const file = files.get(id)!;
       const w = windows[i]!;
       const kind = visualKind(file)!;
+      if (!looked.has(id) && call.host.frames && !cannotLook) {
+        const found = await detectSubjects(call, file, kind === "image" ? 0 : w.start, "circle", { limit: 1 });
+        if (typeof found === "string") {
+          cannotLook = true;
+          warnings.push(`${found} Shots without a subject box are kept centred.`);
+        } else looked.set(id, found);
+      }
+      const darkEdges = looked.get(id)?.darkEdges ?? false;
       const s = given.get(id);
       if (s) {
         const later = laterBox(s);
         // A box without a time stays put; with one, it is followed from where it was measured.
         const box = s.time === undefined ? s.box : boxAt(s.box, s.time, later, w.start);
-        sources.push({ fileId: id, kind, ...w, box, ...(later ? { later } : {}), from: "given" });
+        sources.push({ fileId: id, kind, ...w, box, ...(later ? { later } : {}), from: "given", darkEdges });
         continue;
       }
-      const key = `${id}@${kind === "image" ? 0 : round(w.start, 3)}`;
-      if (!detected.has(key) && call.host.frames && !cannotDetect) {
-        const found = await detectSubjects(call, file, kind === "image" ? 0 : w.start, "circle", { limit: 1 });
-        if (typeof found === "string") {
-          cannotDetect = true;
-          warnings.push(`${found} Shots without a subject box are kept centred.`);
-        } else detected.set(key, found[0]?.box ?? null);
-      }
-      const box = detected.get(key);
-      if (box) sources.push({ fileId: id, kind, ...w, box, from: "detected" });
+      const box = looked.get(id)?.subjects[0]?.box;
+      if (box) sources.push({ fileId: id, kind, ...w, box, from: "detected", darkEdges });
       else {
-        if (detected.has(key)) warnings.push(`No circle found in ${displayName(file)} at ${round(w.start, 2)}s: that shot is centred, not aligned.`);
-        sources.push({ fileId: id, kind, ...w, box: CENTRED, from: "centred" });
+        if (looked.has(id) && shot.use === 0) warnings.push(`No circle found in ${displayName(file)}: its shots are centred, not aligned.`);
+        sources.push({ fileId: id, kind, ...w, box: CENTRED, from: "centred", darkEdges });
       }
     }
     if (!call.host.frames && sources.some((s) => s.from === "centred")) warnings.push("This surface cannot read frames to find subjects: give subjects boxes to align every shot.");
@@ -465,7 +476,10 @@ const montageTool = directTool({
       const target = args.target ? toTarget(args.target) : { cx: 0.5, cy: 0.5, size: opening.size, angle: opening.angle };
       const alignment = alignMatchCut(
         tx,
-        clips.map((clip, i) => ({ clipId: String(clip.id), box: sources[i]!.box, time: sources[i]!.start, ...(sources[i]!.later ? { later: sources[i]!.later } : {}) })),
+        clips.map((clip, i) => {
+          const src = sources[i]!;
+          return { clipId: String(clip.id), box: src.box, time: src.start, ...(src.later ? { later: src.later } : {}), ...(src.darkEdges ? { cover: "none" as const } : {}) };
+        }),
         { target, fit, cover, zoomDrift: args.zoom_drift ?? 0.04 },
       );
       return { clips, alignment, tracks: track, requested: target };

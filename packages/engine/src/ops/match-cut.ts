@@ -47,6 +47,12 @@ export interface AlignClipInput {
   time?: number;
   /** The subject again later in the source, to follow its drift. */
   later?: { box: SubjectBox; time: number };
+  /**
+   * `none`: this clip may leave the canvas showing around it (footage whose
+   * edges are black already, a moon on a night sky); it does not raise the
+   * size under `zoom_all`. Default: the call's cover mode.
+   */
+  cover?: "none";
 }
 
 export interface AlignOptions {
@@ -87,6 +93,7 @@ export const SOFT_ZOOM = 3;
 
 interface Planned {
   clip: Clip;
+  cover: CoverMode;
   frames: number[];
   boxes: SubjectBox[];
   rotations: number[];
@@ -116,7 +123,7 @@ function keyFrames(first: number, last: number, moving: boolean): number[] {
   return out;
 }
 
-function plan(project: Project, input: AlignClipInput, target: CanvasSubject, fit: FitMode, drift: number): Planned {
+function plan(project: Project, input: AlignClipInput, target: CanvasSubject, fit: FitMode, drift: number, cover: CoverMode): Planned {
   const clip = requireEditableClip(project, input.clipId);
   if (clip.parentObjectId) throw invalid(`Clip ${input.clipId} follows a parent clip; align the parent instead.`);
   const window = frameWindow(clip, fpsOf(project));
@@ -135,6 +142,7 @@ function plan(project: Project, input: AlignClipInput, target: CanvasSubject, fi
   });
   return {
     clip,
+    cover: input.cover ?? cover,
     frames,
     boxes: plannedRow.map((r) => r.box),
     rotations: plannedRow.map((r) => r.rotation),
@@ -175,24 +183,22 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
     target = subjectOnCanvas(project, first, n, boxAt(inputs[0]!.box, t, inputs[0]!.later, sourceSecondsAt(project, first, n)));
   }
 
-  let plans = inputs.map((input) => plan(project, input, target!, fit, drift));
+  const planAll = (t: CanvasSubject) => inputs.map((input) => plan(project, input, t, fit, drift, cover));
+  let plans = planAll(target);
+  const stuck = plans.filter((p) => p.cover !== "none" && p.covers.some((c) => !Number.isFinite(c)));
+  if (stuck.length > 0) throw invalid(edgeMessage(stuck));
   if (cover === "zoom_all" && fit !== "position") {
-    // Every subject grows by the largest zoom any clip needs, so they all still match.
-    const zoom = Math.max(1, ...plans.flatMap((p) => p.covers.map((c, i) => c / p.fitScales[i]!)));
-    if (!Number.isFinite(zoom)) throw invalid(edgeMessage(plans));
+    // Every subject grows by the largest zoom any covered clip needs, so they all still match.
+    const zoom = Math.max(1, ...plans.filter((p) => p.cover !== "none").flatMap((p) => p.covers.map((c, i) => c / p.fitScales[i]!)));
     if (zoom > 1) {
       target = { ...target, size: target.size * zoom };
-      plans = inputs.map((input) => plan(project, input, target!, fit, drift));
+      plans = planAll(target);
     }
-  }
-  if (cover !== "none") {
-    const stuck = plans.filter((p) => p.covers.some((c) => !Number.isFinite(c)));
-    if (stuck.length > 0) throw invalid(edgeMessage(stuck));
   }
 
   const clips = plans.map((p): AlignedClip => {
     const id = String(p.clip.id);
-    const scales = p.fitScales.map((s, i) => (cover === "none" ? s : Math.max(s, p.covers[i]!)));
+    const scales = p.fitScales.map((s, i) => (p.cover === "none" ? s : Math.max(s, p.covers[i]!)));
     setClipKeyframes(tx, id, "scale_x", linear(p.frames, scales), { mode: "replace_range" });
     setClipKeyframes(tx, id, "scale_y", linear(p.frames, scales), { mode: "replace_range" });
     if (fit === "position_scale_rotation") setClipKeyframes(tx, id, "rotation", linear(p.frames, p.rotations), { mode: "replace_range" });
@@ -209,7 +215,7 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
       rotation: p.rotations[0]!,
       frames: p.frames,
       subject: subjectOnCanvas(tx.project, after, p.frames[0]!, p.boxes[0]!),
-      uncovered: cover === "none" && p.covers.some((c, i) => c > scales[i]! * COVER_SLACK),
+      uncovered: p.cover === "none" && p.covers.some((c, i) => c > scales[i]! * COVER_SLACK),
     };
   });
   return { target: target!, clips };

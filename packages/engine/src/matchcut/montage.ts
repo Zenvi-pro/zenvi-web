@@ -71,7 +71,12 @@ const MIN_DEFAULT_SECONDS = 8;
 /** Weights of a cut on each kind of musical event. */
 const WEIGHT = { onset: 1, downbeat: 1, beat: 0.7, eighth: 0.35, sixteenth: 0.15 };
 /** How strongly shot lengths keep to the accelerating target length (per frame², vs the weights). */
-const PACE = 0.06;
+const PACE = 0.1;
+/**
+ * What each cut costs before its event weight: without it more cuts always
+ * score more, and every shot shrinks to the minimum on sixteenth notes.
+ */
+const CUT_COST = 0.4;
 
 /** Event weight per frame index of the timeline: the strongest event within half a frame. */
 function cutWeights(totalFrames: number, fps: number, grid: { beats: number[]; downbeats: number[] }, onsets: readonly number[]): Float32Array {
@@ -111,7 +116,7 @@ function bodyCuts(from: number, to: number, min: number, max: number, weights: F
     for (let len = min; len <= max && len <= f; len += 1) {
       const before = best[f - len]!;
       if (!Number.isFinite(before)) continue;
-      const cost = before - weights[from + f]! + PACE * (len - pace) ** 2;
+      const cost = before + CUT_COST - weights[from + f]! + PACE * (len - pace) ** 2;
       if (cost < best[f]!) {
         best[f] = cost;
         prev[f] = f - len;
