@@ -1127,7 +1127,7 @@ const SPECS: Record<string, Spec> = {
   add_sfx_tool: {
     happy: {
       args: { recipe: "impact_punch", clip_id: IDS.clipB },
-      summary: /^Added impact, punch with its transient on the start of clip CLIPBROL01 \(clip \w+, -8 dB\)\.$/,
+      summary: /^Added impact, punch with its transient on the start of broll\.mp4 \(-8 dB\)\.$/,
       check: ({ doc, host }) => {
         expect(doc.project.layers.some((l) => l.label === "SFX")).toBe(true);
         expect([...host.written.keys()].some((p) => /^\/generated\/sfx-impact_punch-[0-9a-f]{8}\.wav$/.test(p))).toBe(true);
@@ -1148,7 +1148,7 @@ const SPECS: Record<string, Spec> = {
   apply_motion_transition_tool: {
     happy: {
       args: { preset: "whip", clip1_id: IDS.clipA, direction: "left", intensity: "1.5" },
-      summary: /^Added whip left on the cut at 10\.00s \(8 frames\) between CLIPINTV01 and CLIPBROL01\.$/,
+      summary: /^Added whip left on the cut at 10\.00s \(8 frames\) between interview\.mp4 and broll\.mp4\.$/,
       check: ({ receipt }) => expect((receipt.data as { sfx_cues: { kind: string }[] }).sfx_cues.map((c) => c.kind)).toEqual(["whoosh"]),
     },
     failure: { args: { preset: "whip", clip1_id: IDS.clipA, clip2_id: IDS.clipLogo }, status: "refused", summary: /^Error: Clips CLIPINTV01 and CLIPLOGO01 are on different tracks/ },
