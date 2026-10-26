@@ -28,7 +28,8 @@
  * arrives later, or a kept one re-placed by a layout step, shows the same
  * moment as its neighbours. Mirrors are negative scales on centred clips;
  * the tiles of a gapless field overlap by a pixel so no seam shows while the
- * camera drifts. A kaleidoscope's segments all arrive on the stage's beat.
+ * camera drifts. A kaleidoscope's segments all arrive on the stage's beat;
+ * a repeat fills one copy per beat, then multiplies on each re-cut (4 → 16).
  *
  * Time is counted in slots of `unit` beats (a beat, or two on a fast tempo,
  * or half a beat when the template is short). A stage is its tile reveals,
@@ -103,8 +104,8 @@ interface Resolved {
   backdrop: boolean;
   /** One clip on every tile (repeat, kaleidoscope). */
   field: boolean;
-  /** A stage's tiles all arrive on its beat (kaleidoscope). */
-  together: boolean;
+  /** Per stage: its tiles all arrive on its beat (every kaleidoscope stage; a repeat's re-cuts). */
+  together: boolean[];
   mirror: boolean;
   phase: number;
   drift: GridDrift | null;
@@ -170,7 +171,7 @@ function resolve(content: MotionContent, layout: Layout): Resolved {
     zoomInto: zoom ?? null,
     backdrop: content.backdrop ?? true,
     field,
-    together: kind === "kaleidoscope",
+    together: togetherOf(kind, counts.length),
     mirror: kind === "kaleidoscope" || (o?.mirror ?? false),
     phase,
     drift,
@@ -193,14 +194,19 @@ interface Slots {
   end: number;
 }
 
-export function slotsOf(counts: readonly number[], finish: boolean, together = false): Slots {
+/** Which stages arrive all at once: a kaleidoscope's segments always; a repeat fills one copy per beat, then multiplies on each re-cut. */
+function togetherOf(layout: GridLayoutId, stages: number): boolean[] {
+  return Array.from({ length: stages }, (_, s) => layout === "kaleidoscope" || (layout === "repeat" && s > 0));
+}
+
+export function slotsOf(counts: readonly number[], finish: boolean, together: readonly boolean[] = []): Slots {
   const stage: number[] = [];
   const reveal: number[][] = [];
   let slot = 0;
   counts.forEach((count, s) => {
     stage.push(slot);
     const kept = s > 0 ? counts[s - 1]! : 0;
-    if (together) {
+    if (together[s]) {
       // Every tile of the stage on its beat, then a slot of hold.
       reveal.push(Array.from({ length: count }, () => slot));
       slot += 2;
@@ -216,11 +222,11 @@ export function slotsOf(counts: readonly number[], finish: boolean, together = f
 /** Beats the grid takes at `bpm` (a slot is a beat, or two on a fast tempo). */
 export function gridBeats(content: MotionContent, bpm: number): number {
   let counts: number[];
-  let together = false;
+  let together: boolean[] = [];
   try {
     const parsed = countsOf(content.grid);
     counts = parsed.counts;
-    together = parsed.layout === "kaleidoscope";
+    together = togetherOf(parsed.layout, counts.length);
   } catch {
     counts = [4];
   }

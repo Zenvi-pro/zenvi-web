@@ -465,6 +465,14 @@ describe.each(Object.entries(FRAMES))("repeat and kaleidoscope fields, %s", (_na
     for (const at of starts) expect([0, 1, 2, 3, 4, 5, 6, 8].map((k) => beats.frame(k))).toContain(at);
   });
 
+  it("repeat fills one copy per beat, then multiplies on a re-cut: the new copies all on its beat", () => {
+    const { plan } = build(frame, { layout: "repeat", steps: [4, 16] }, {}, { seconds: 5 });
+    const second = tiles(plan).filter((l) => l.name.startsWith("tile-2-"));
+    expect(second).toHaveLength(16);
+    expect(new Set(second.map((l) => l.start)).size).toBe(1);
+    expect(new Set(tiles(plan).filter((l) => l.name.startsWith("tile-1-")).map((l) => l.start)).size).toBe(4);
+  });
+
   it("works on photos", () => {
     const { plan } = build(frame, { layout: "kaleidoscope", tiles: 6, drift: "in" }, { fileIds: ["PHOTO00001"] });
     expect(tiles(plan)).toHaveLength(6);
