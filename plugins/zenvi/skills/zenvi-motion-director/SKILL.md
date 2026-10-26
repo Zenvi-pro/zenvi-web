@@ -10,12 +10,36 @@ receipt); your job is the decisions a senior editor makes before touching the
 timeline and the frames you check after. `zenvi-reels` is the one-call reel;
 this skill is for edits that must hold up next to a professional one.
 
+## Start here: the genre and its recipe
+
+Pick the genre, then **read its recipe now with the Read tool**:
+`<this skill's base directory>/recipes/<file>.md` (the recipes are part of this
+skill, not the user's files). The recipe has the structure in seconds, the
+shot lengths, the sound plan and the exact tool calls; the rest of this file
+is the rules every genre shares. Do not plan before you have read it.
+
+| Ask sounds like | Recipe | Core tools |
+| --- | --- | --- |
+| shapes or poses that line up across cuts | `recipes/match-cut-montage.md` | match_cut_montage_tool, detect_subject_tool |
+| a new image every few frames, "evolution of" | `recipes/flash-montage.md` | match_cut_montage_tool / add_clip_to_timeline_tool, flash presets |
+| person talking, captions are the show | `recipes/kinetic-captions.md` | generate_tts…, add_captions_tool, add_title_tool, text_behind_subject_tool |
+| app, AI tool, SaaS launch | `recipes/saas-ui-promo.md` | add_motion_block_tool (glass_cards, prompt_bar, kinetic_headline, counter, word_rotator) |
+| one product, 3D, "spins in" | `recipes/3d-product-ad.md` | add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
+| type is the picture, design study, brand | `recipes/editorial-type.md` | kinetic_headline, text_scramble, hud_callouts, crop_labels, flash_white |
+| tiles filling on the beat, split screen | `recipes/grid-montage.md` | add_motion_template_tool template=grid |
+| voice-over essay, story, explainer | `recipes/documentary.md` | TTS, add_captions_tool, build_reel_tool cinematic, grid collage |
+| sport, cars, launch hype, "fast" | `recipes/hype-reel.md` | build_reel_tool hype, apply_motion_transitions_tool style=hype, speed_ramp_tool |
+| how-to, effect breakdown, tips | `recipes/tutorial.md` | build_reel_tool tutorial, step_card, end_card save |
+| intro, showreel, "about me" | `recipes/showreel-intro.md` | title_3d, word_rotator, grid zoom_into, particle_burst |
+
+Mixed asks: take the structure from the genre of the *first five seconds*
+and borrow single techniques from the others.
+
 ## The director loop
 
 1. **Brief.** One line each: format (size, fps, seconds), story in shot order,
-   pace, look, type, sound, the *one bold moment*. Pick a genre from the router
-   below and read its recipe (`recipes/<genre>.md`, next to this file) before
-   planning. Use the brief's own words, colours and names exactly.
+   pace, look, type, sound, the *one bold moment*, following the recipe. Use
+   the brief's own words, colours and names exactly.
 2. **Plan with timings.** Write the edit as a table before any tool call:
    `t (s) | shot / element | length (frames) | entrance / transition | sound`.
    Every row has a sound. Times snap to frames; music edits snap to beats.
@@ -53,25 +77,6 @@ Order matters: speed ramps change clip lengths (`ripple: true`), transitions
 read the cuts, sound design reads cuts, transitions and titles. Anything that
 moves a cut after step 6 means removing and re-applying the transitions on
 that track (`remove_motion_transition_tool track=...`) and re-running sound.
-
-## Genre router
-
-| Ask sounds like | Recipe | Core tools |
-| --- | --- | --- |
-| shapes or poses that line up across cuts | `recipes/match-cut-montage.md` | match_cut_montage_tool, detect_subject_tool |
-| a new image every few frames, "evolution of" | `recipes/flash-montage.md` | match_cut_montage_tool / add_clip_to_timeline_tool, flash presets |
-| person talking, captions are the show | `recipes/kinetic-captions.md` | generate_tts…, add_captions_tool, add_title_tool, text_behind_subject_tool |
-| app, AI tool, SaaS launch | `recipes/saas-ui-promo.md` | add_motion_block_tool (glass_cards, prompt_bar, kinetic_headline, counter, word_rotator) |
-| one product, 3D, "spins in" | `recipes/3d-product-ad.md` | add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
-| type is the picture, design study, brand | `recipes/editorial-type.md` | kinetic_headline, text_scramble, hud_callouts, crop_labels, flash_white |
-| tiles filling on the beat, split screen | `recipes/grid-montage.md` | add_motion_template_tool template=grid |
-| voice-over essay, story, explainer | `recipes/documentary.md` | TTS, add_captions_tool, build_reel_tool cinematic, grid collage |
-| sport, cars, launch hype, "fast" | `recipes/hype-reel.md` | build_reel_tool hype, apply_motion_transitions_tool style=hype, speed_ramp_tool |
-| how-to, effect breakdown, tips | `recipes/tutorial.md` | build_reel_tool tutorial, step_card, end_card save |
-| intro, showreel, "about me" | `recipes/showreel-intro.md` | title_3d, word_rotator, grid zoom_into, particle_burst |
-
-Mixed asks: take the structure from the genre of the *first five seconds*
-and borrow single techniques from the others.
 
 ## Non-negotiables
 
