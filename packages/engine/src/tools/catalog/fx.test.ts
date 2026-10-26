@@ -55,6 +55,36 @@ describe("apply_fx_tool", () => {
     expect(snapshotOf(doc.project)).toEqual(before);
   });
 
+  it("moves the clip's keyframes with its source frames, and back when the FX go", async () => {
+    // Keyframe X counts source frames: the interview tail starts at 10 s (frame 301 at 30 fps).
+    const doc = fixtureDoc();
+    const pt = (X: number, Y: number) => ({ co: { X, Y }, interpolation: 1 });
+    doc.transaction("animate", (tx) =>
+      tx.update(["clips", { id: IDS.clipTail }], {
+        alpha: { Points: [pt(301, 0), pt(331, 1)] },
+        scale_x: { Points: [pt(1, 1)] },
+        time: { Points: [pt(301, 301), pt(420, 420)] },
+        effects: [{ id: "BLUR1", type: "Blur", sigma: { Points: [pt(391, 0), pt(421, 3)] } }],
+      }),
+    );
+    const host = fakeHost();
+    const before = snapshotOf(doc.project);
+    const xs = (kf: unknown) => (kf as { Points: { co: { X: number; Y: number } }[] }).Points.map((p) => [p.co.X, p.co.Y]);
+    await call(doc, host, "apply_fx_tool", { clip_id: IDS.clipTail, effects: [{ effect: "bloom" }] });
+    let clip = clipOf(doc, IDS.clipTail);
+    expect(xs(clip.alpha)).toEqual([[1, 0], [31, 1]]);
+    expect(xs(clip.scale_x)).toEqual([[1, 1]]);
+    expect(xs(clip.time)).toEqual([[1, 1], [120, 120]]);
+    expect(xs(clip.effects?.[0]?.sigma)).toEqual([[91, 0], [121, 3]]);
+    // Slow motion at half speed stretches them with the render.
+    await call(doc, host, "apply_fx_tool", { clip_id: IDS.clipTail, effects: [{ effect: "optical_flow_slowmo", params: { speed: 0.5 } }] });
+    clip = clipOf(doc, IDS.clipTail);
+    expect(xs(clip.alpha)).toEqual([[1, 0], [61, 1]]);
+    expect(xs(clip.time)).toEqual([[1, 1], [239, 239]]);
+    await call(doc, host, "remove_fx_tool", { clip_id: IDS.clipTail });
+    expect(snapshotOf(doc.project)).toEqual(before);
+  });
+
   it("refuses stills, retimed clips and bad stacks without touching history", async () => {
     const doc = fixtureDoc();
     doc.transaction("speed", (tx) => tx.update(["clips", { id: IDS.clipB }], { time: { Points: [{ co: { X: 1, Y: 1 }, interpolation: 1 }, { co: { X: 100, Y: 200 }, interpolation: 1 }] } }));
