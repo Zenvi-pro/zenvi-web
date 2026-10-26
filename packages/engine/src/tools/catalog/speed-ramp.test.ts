@@ -100,6 +100,17 @@ describe("speed_ramp_tool", () => {
     expect(doc.undoLabels).toHaveLength(steps);
   });
 
+  it("the same ramp twice on a clip without sound is a no-op too", async () => {
+    const doc = fixtureDoc();
+    const reader = { ...findClip(doc.project, IDS.clipA)!.reader, has_audio: false };
+    doc.transaction("no sound", (tx) => tx.update(["clips", { id: IDS.clipA }], { reader }));
+    const args = { clip_id: IDS.clipA, preset: "velocity", ripple: true };
+    expect((await ramp(doc, args)).receipt.status).toBe("applied");
+    const again = await ramp(doc, args);
+    expect(again.receipt.status).toBe("unchanged");
+    expect(again.receipt.undoSteps).toBe(0);
+  });
+
   it("warns that slow motion on a 30 fps source is choppy", async () => {
     const { receipt } = await ramp(fixtureDoc(), { clip_id: IDS.clipA, preset: "hero", slow: 0.2, ripple: true });
     expect(receipt.warnings.join(" ")).toMatch(/choppy.*optical-flow/);

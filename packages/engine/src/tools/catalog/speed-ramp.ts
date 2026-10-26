@@ -109,10 +109,12 @@ export const speedRampTools: CatalogTool[] = [
       }
 
       const mute = (args.audio ?? "mute") === "mute";
+      // applySpeedRamp leaves the volume of a clip without sound alone.
+      const silent = clip.reader?.has_audio === false;
       const alreadyThere =
         sameJson(clip.time?.Points, plan.points) &&
         sameJson((clip as unknown as Record<string, unknown>).zenvi_speed_ramp, plan.recipe) &&
-        (!mute || (clip.volume?.Points?.length === 1 && clip.volume.Points[0]!.co.Y === 0));
+        (!mute || silent || (clip.volume?.Points?.length === 1 && clip.volume.Points[0]!.co.Y === 0));
       if (alreadyThere) return unchanged(TOOL, `Clip ${clip.id} already has that ramp; nothing to change.`);
 
       const shifted = call.commit((tx) => {
