@@ -61,6 +61,8 @@ class Session {
   private readonly canvas: OffscreenCanvas;
   /** Path-only media the page resolved (transition masks, bundled assets). */
   private readonly paths = new Map<string, MediaSourceSpec>();
+  /** Paths the page resolved for refs that also carry a file id, by that id (registering it there wins). */
+  private readonly pathsOfFile = new Map<string, Set<string>>();
   private readonly lookups = new Map<string, Promise<void>>();
   private calls = 0;
   private readonly replies = new Map<number, { resolve: (value: unknown) => void; reject: (error: unknown) => void }>();
@@ -158,8 +160,16 @@ class Session {
         // Unknown on the page too: the read fails with MediaUnavailableError, as it would there.
         if (!source || this.closed) return;
         const spec = this.specFrom(source);
-        if (source.key.startsWith("file:")) this.media.register(source.key.slice(5), spec);
-        else this.paths.set(source.key.slice(5), spec);
+        if (source.key.startsWith("file:")) {
+          this.media.register(source.key.slice(5), spec);
+          return;
+        }
+        const path = source.key.slice(5);
+        this.paths.set(path, spec);
+        if (ref.fileId) {
+          const paths = this.pathsOfFile.get(ref.fileId) ?? new Set();
+          this.pathsOfFile.set(ref.fileId, paths.add(path));
+        }
       });
       // Not cached once settled: media registered on the page later is found next time.
       const settle = () => this.lookups.delete(key);
@@ -171,8 +181,15 @@ class Session {
 
   private mediaChanged(key: string): void {
     if (key.startsWith("file:")) {
-      // New bytes or gone: forget the entry (dropping its caches); the next read asks again.
-      this.media.unregister(key.slice(5));
+      // New bytes, newly registered or gone: forget the entry (dropping its
+      // caches) and any path that stood in for it; the next read asks again.
+      const fileId = key.slice(5);
+      this.media.unregister(fileId);
+      for (const path of this.pathsOfFile.get(fileId) ?? []) {
+        this.paths.delete(path);
+        this.media.forgetPath(path);
+      }
+      this.pathsOfFile.delete(fileId);
       return;
     }
     const path = key.slice(5);
