@@ -1,6 +1,6 @@
 ---
 name: zenvi-motion-director
-description: Direct a short video with a professional editor's taste using the Zenvi MCP tools - plan the edit with timings, pick the genre's recipe (match-cut montage, flash montage, kinetic-caption talking head, SaaS/UI promo, 3D product ad, editorial/brand type, grid montage, documentary/video essay, hype/sport reel, tutorial/breakdown, showreel/intro), then cut, add motion transitions, motion blocks, 3D, captions, colour and sound design on every cut, and check contact frames before rendering. Use it whenever an edit must not look like a slideshow - a reel, ad, promo, montage, recreation of a reference, or any ask that names a style, a technique (match cut, whip pan, flash cut, speed ramp, text behind subject, glass UI, 3D title) or a reference video.
+description: Load this before the first Zenvi tool call whenever you make, cut or recreate a whole video with the Zenvi MCP tools (mcp__zenvi__*) - a reel, short, ad, promo, montage, trailer, explainer, talking head with captions, product or app video, or a reference to match. The director's playbook - a timed plan, the genre recipe with exact tool calls (match-cut montage, flash montage, kinetic captions, SaaS/UI promo, 3D product ad, editorial type, grid montage, documentary, hype reel, tutorial, showreel), motion transitions, motion blocks, 3D, a sound on every cut, and the frame checks that keep an edit from looking like a slideshow.
 ---
 
 # Zenvi motion director
