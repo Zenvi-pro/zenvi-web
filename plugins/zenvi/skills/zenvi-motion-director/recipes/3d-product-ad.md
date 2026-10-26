@@ -54,7 +54,10 @@ add_motion_block_tool {"block": "particle_burst", "position_seconds": 3.3, "dura
 6. Sound: `typing_burst` at 0.4 s (as long as the typing), `mouse_click` on
    send, `pop` on the burst, `whoosh_rise` ending on the landing,
    `impact_thud` on it (never `impact_slam` here), `ui_tap` per chip. Music
-   clean electronic, quieter than a hype edit (RMS −20…−24 dB).
+   clean electronic, quieter than a hype edit: the mix at RMS −20…−24 dB, so
+   a mastered track goes in at `set_clip_volume_tool` `level_db` −8…−10.
+   Keep the product moving the whole time (the 3D glide, or a 3-5 % push on
+   the still): a held still reads as a slideshow.
 
 ## Checks
 
