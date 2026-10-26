@@ -23,6 +23,10 @@ other (dark round → dark round, warm → warm); end on the most iconic one
    moon night sky", "human eye close up macro"...). Prefer centred, single,
    round subjects filling 20-50 % of the frame height; skip clips with two
    circles.
+   Look at each candidate (`inspect_media_tool` `fileId`, `overview: true`)
+   and drop it unless one clear shape fills the middle: an ear, a label or
+   two circles break the chain. Each shape once or twice, never the same
+   file cycled five times.
 2. Subjects: for circles, `detect_subject_tool` (`file_id`, `time`) per file
    and keep the best box; for poses read the box off
    `inspect_media_tool` (`fileId`, `start`, `end`, `maxFrames: 3`) frames.
