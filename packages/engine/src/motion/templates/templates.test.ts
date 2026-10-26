@@ -34,6 +34,7 @@ const CONTENT: Record<MotionTemplateId, { content: MotionContent; palette: Palet
   step_card: { content: { fileIds: ["VIDEO00001"], text: "Set up the shot", step: 1, tag: "Eye level", points: [{ x: 0.6, y: 0.4 }], subtitle: "Film better reels" }, palette: "tutorial" },
   grid_background: { content: { variant: "editorial", labels: ["Plate 01", "Study", "1:1", "Zenvi"] }, palette: "editorial" },
   end_card: { content: { variant: "logo", text: "Northwind", subtitle: "Brews in four minutes" }, palette: "ui_light" },
+  grid: { content: { fileIds: ["VIDEO00001", "VIDEO00002", "PHOTO00001"], grid: { layout: "grid", steps: [3, 4, 6], merge: true } }, palette: "ui_dark" },
 };
 
 const ALLOWED = new Set(["svg", "rect", "line", "polyline", "path", "circle", "text", "tspan"]);
