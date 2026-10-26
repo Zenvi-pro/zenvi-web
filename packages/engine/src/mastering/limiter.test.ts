@@ -35,6 +35,12 @@ describe("true-peak limiter", () => {
     expect(amplitudeToDb(truePeak(out!, RATE))).toBeLessThanOrEqual(-1 + 1e-6);
   });
 
+  it("limits at 192 kHz, where true peak is the sample peak", () => {
+    const tone = dbfsSine(1000, 3, 0.2, 192000);
+    const [out] = limitTruePeak([tone], { sampleRate: 192000, ceilingDb: -1 });
+    expect(amplitudeToDb(truePeak(out!, 192000))).toBeLessThanOrEqual(-1 + 1e-6);
+  });
+
   it("passes a mix under the ceiling through unchanged, delayed back into place", () => {
     const mix = stereoSine(440, -6, 0.5, RATE);
     const out = limitTruePeak(mix, { sampleRate: RATE, ceilingDb: -1 });

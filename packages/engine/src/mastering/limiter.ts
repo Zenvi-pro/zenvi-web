@@ -55,6 +55,8 @@ export class TruePeakLimiter {
   private readonly interp: TruePeakInterpolator;
   /** Samples read past a point to interpolate it. */
   private readonly reach: number;
+  /** Samples read before a point to interpolate it. */
+  private readonly back: number;
   private readonly lookahead: number;
   private readonly release: number;
   private readonly mask: number;
@@ -81,6 +83,7 @@ export class TruePeakLimiter {
     this.ceiling = 10 ** ((options.ceilingDb - AIM_UNDER_DB) / 20);
     this.interp = truePeakInterpolator(sampleRate);
     this.reach = this.interp.factor === 1 ? 0 : this.interp.taps >> 1;
+    this.back = this.interp.factor === 1 ? 0 : this.interp.taps - this.reach - 1;
     this.lookahead = Math.max(1, Math.round((options.lookaheadSeconds ?? LIMITER_LOOKAHEAD_SECONDS) * sampleRate));
     this.release = Math.exp(-1 / (Math.max(1e-4, options.releaseSeconds ?? LIMITER_RELEASE_SECONDS) * sampleRate));
     this.latency = this.reach + this.lookahead;
@@ -124,7 +127,7 @@ export class TruePeakLimiter {
       }
       const n = j - this.reach;
       if (n < 0) continue;
-      const peak = this.lastLoud >= n - this.reach + 1 ? this.peakAt(n) : 0;
+      const peak = this.lastLoud >= n - this.back ? this.peakAt(n) : 0;
       // The segment on either side of a sample can carry its interpolated peak.
       const needed = Math.min(1, this.ceiling / Math.max(peak, this.lastPeak, 1e-30));
       this.lastPeak = peak;
@@ -140,7 +143,7 @@ export class TruePeakLimiter {
       this.held[n & this.mask] = held;
       const o = n - this.lookahead;
       if (o < this.emitted) continue;
-      // The running sum drifts by rounding; never let it lift the gain over the newest hold.
+      // The running sum drifts by rounding; never let it lift the gain over unity.
       const gain = Math.min(1, this.heldSum / (this.lookahead + 1));
       for (let c = 0; c < this.ring.length; c += 1) out[c]![written] = this.ring[c]![o & this.mask]! * gain;
       written += 1;
