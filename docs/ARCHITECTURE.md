@@ -117,7 +117,9 @@ Key contracts (see `packages/engine/src/**/types.ts` for the source of truth):
 from a `File`/OPFS blob or a signed URL. Each `LayerPlan` is drawn with Canvas2D
 (`setTransform` + `globalAlpha` + `drawImage`, GPU-backed). Clips with effects or
 masks are first drawn into a scratch canvas and run through the engine's RGBA
-kernels. Preview renders at the preview widget size; export renders at full
+kernels. Preview renders at the preview widget size, in a Worker on an
+`OffscreenCanvas` where the browser allows (the page keeps the clock and Web
+Audio; playback drops resolution while effects cannot keep up); export renders at full
 size and encodes with Mediabunny (`CanvasSource` + `AudioBufferSource`, H.264/AAC
 MP4 when the browser can encode it, VP9/Opus WebM otherwise). Audio preview
 schedules decoded `AudioBuffer`s with Web Audio and applies the gain curve.

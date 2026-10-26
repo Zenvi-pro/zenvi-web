@@ -6,7 +6,8 @@
   "description": "Browser media runtime for Zenvi: WebCodecs decoding (Mediabunny), Canvas2D compositor, Web Audio playback and in-browser export.",
   "license": "GPL-3.0-or-later",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./preview-worker": "./src/preview-worker.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node-tests.json && tsc -p e2e/tsconfig.json",

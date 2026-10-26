@@ -6,8 +6,9 @@ import { join } from "node:path";
 /**
  * Generate media fixtures with ffmpeg into a fresh temp dir: a 4 s 640×360
  * VP9/Opus WebM with a moving test pattern and a tone (this Chromium has no
- * H.264 decoder), a PNG still, and a float WAV mixed far over full scale
- * (+6 dBTP) for the export's true-peak limiter.
+ * H.264 decoder), a 6 s 1920×1080 VP9 for the heavy-preview perf test, a PNG
+ * still, and a float WAV mixed far over full scale (+6 dBTP) for the export's
+ * true-peak limiter.
  */
 export default function globalSetup(): void {
   const dir = mkdtempSync(join(tmpdir(), "zenvi-editor-e2e-"));
@@ -37,6 +38,8 @@ export default function globalSetup(): void {
     "-shortest",
     video,
   ]);
+  const hd = join(dir, "hd.webm");
+  execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=1920x1080:r=30:d=6", "-c:v", "libvpx-vp9", "-b:v", "2M", "-deadline", "realtime", "-cpu-used", "8", "-row-mt", "1", hd]);
   const still = join(dir, "still.png");
   execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=1:d=1", "-frames:v", "1", still]);
   const loud = join(dir, "loud.wav");
