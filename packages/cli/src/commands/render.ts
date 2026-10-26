@@ -1,4 +1,4 @@
-/** `zenvi render` and `zenvi frame`. */
+/** `zenvi render`, `zenvi frame` and `zenvi review`. */
 
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -206,6 +206,44 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
         await writeFile(output, Buffer.from(data, "base64"));
         if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Wrote ${output}`, engine: executor.engine, project: executor.project ?? null, file: output, mimeType, seconds });
         else ctx.out.line(`${ctx.out.style("✓", "green")} Wrote ${output}`);
+      });
+    });
+
+  program
+    .command("review")
+    .description("watch the cut: one contact sheet of the edit at its cut points plus rhythm, loudness and a ranked list of problems with fixes (review_edit_tool)")
+    .argument("[output]", "contact sheet file (default: review-sheet.jpg)")
+    .option("--start <time>", "review from here (seconds or timecode)")
+    .option("--end <time>", "review up to here")
+    .option("--pace <pace>", "fast (default; reels, hype), medium (b-roll, promos) or slow (talking head, documentary)")
+    .option("--max-tiles <n>", "most frames on the sheet (default 24)")
+    .option("--tile-width <px>", "width of each frame, for a closer look at a short range")
+    .option("--no-audio", "skip mixing the audio down (no loudness, silence or beat alignment)")
+    .option("--no-image", "numbers and problems only")
+    .action(async (outputArg: string | undefined, opts: { start?: string; end?: string; pace?: string; maxTiles?: string; tileWidth?: string; audio: boolean; image: boolean }) => {
+      const args: Record<string, unknown> = {
+        start: parseTime(opts.start),
+        end: parseTime(opts.end),
+        pace: opts.pace,
+        max_tiles: opts.maxTiles,
+        tile_width: opts.tileWidth,
+        audio: opts.audio,
+        image: opts.image,
+      };
+      for (const key of Object.keys(args)) if (args[key] === undefined) delete args[key];
+      await withExecutor(ctx, async (executor) => {
+        const outcome = await executor.call("review_edit_tool", args);
+        let saved: string | undefined;
+        if (outcome.ok && outcome.images.length > 0) {
+          saved = path.resolve(ctx.cwd, outputArg ?? "review-sheet.jpg");
+          await writeFile(saved, Buffer.from(outcome.images[0]!.data, "base64"));
+        }
+        printOutcome(ctx, outcome, saved ? { sheet_file: saved } : {});
+        if (outcome.ok && !ctx.out.json) {
+          const problems = (outcome.receipt?.data as { problems?: { severity: string; code: string; at: number; message: string; fix: string }[] } | undefined)?.problems ?? [];
+          for (const [i, p] of problems.entries()) ctx.out.line(`${i + 1}. [${p.severity}] ${p.code} @${p.at.toFixed(2)}s  ${p.message}\n     fix: ${p.fix}`);
+          if (saved) ctx.out.line(`${ctx.out.style("✓", "green")} Wrote ${saved}`);
+        }
       });
     });
 }

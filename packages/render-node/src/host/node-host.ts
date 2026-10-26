@@ -9,11 +9,13 @@ import { homedir } from "node:os";
 import path from "node:path";
 import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
+import { measureMix } from "../audio/mix.js";
 import { transcribeMediaFile } from "../audio/speech.js";
 import { engineAssetsDir } from "../resources.js";
 import { encoderNames } from "../ffmpeg/capabilities.js";
 import { ffmpegCanWrite, FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
+import { renderContactSheet } from "../render/contact-sheet.js";
 import { renderFrame } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
 import { installedFontFamilies } from "../svg/fonts.js";
@@ -162,12 +164,15 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         });
         return { mimeType: format === "jpeg" ? "image/jpeg" : "image/png", data: bytes.toString("base64") };
       },
+      renderSheet: (project, tiles, layout, signal) =>
+        renderContactSheet(project, tiles, layout, { resolveMedia, engine: options.renderEngine, signal: signal ?? options.signal, log: options.log }),
       // The fonts SVG titles render with here (this computer's fonts and the bundled Lato).
       fontFamilies: () => installedFontFamilies(),
     },
     audio: {
       analyzeAudio: (p, o) => analyzeAudio(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
       decodePcm: (p, o) => decodePcm(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
+      measureMix: (project, o) => measureMix(project, { resolveMedia, engine: options.renderEngine, ...o, signal: o?.signal ?? options.signal }),
     },
     storage: {
       async save(project, target) {

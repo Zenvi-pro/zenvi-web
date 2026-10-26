@@ -158,11 +158,22 @@ zenvi render [output] [-f mp4|webm|mov|mkv|gif|mp3|wav|png] [--quality low|mediu
              [--width px] [--height px] [--fps 30|30000/1001] [--start t] [--end t]
              [--video-bitrate 8M] [--audio-bitrate 192k] [--crf n] [--encoder-preset veryfast] [--open]
 zenvi frame <t> [output.png|.jpg] [--width 1280] [--jpeg] [--grid]
+zenvi review [sheet.jpg] [--start t] [--end t] [--pace fast|medium|slow] [--max-tiles 24] [--tile-width px] [--no-audio] [--no-image]
 ```
 
 `zenvi frame 5 check.png` writes the composited frame at 5 s. `--grid`
 draws the same 0-1 coordinate grid and frame caption the desktop's inspect
 tools show models.
+
+`zenvi review` watches the cut (`review_edit_tool`): it writes one contact
+sheet of the edit at its cut points (each cut's last and first frame, plus
+frames from long shots; a coloured border marks a white flash or a black
+frame) and prints shot lengths, cuts per second, how many cuts land on a beat
+or hit of the mixed audio, loudness and a ranked list of problems with
+timestamps and fixes (shots held too long for the `--pace`, cuts off the
+beat, black or empty frames, silent stretches, text outside the safe
+area). A 20-shot reel's sheet is about 1,500 image tokens. Zoom in on a
+stretch with `--start/--end/--tile-width`. It changes nothing.
 
 ### Desktop app, agents, account
 
