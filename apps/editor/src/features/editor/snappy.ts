@@ -129,7 +129,7 @@ function oneLine(text: string): string {
 export interface SnappySummary {
   /** "23 transitions · 18 sounds · mastered to −14 LUFS", plus mastering's absence said once. */
   description: string;
-  /** One line per failed step. */
+  /** One line per failed step, and for transitions that could not run (the point of the chain). */
   issues: string[];
   /** Every step's full summary and the undo count, for "Details". */
   details: string;
@@ -143,7 +143,7 @@ export function snappySummary(outcomes: readonly SnappyOutcome[]): SnappySummary
   const steps = snappyUndoSteps(outcomes);
   return {
     description: lines.join("\n"),
-    issues: outcomes.filter((o) => o.status === "failed").map((o) => `${o.label} failed: ${oneLine(o.detail)}`),
+    issues: outcomes.filter((o) => o.status === "failed" || (o.step === "transitions" && o.status === "skipped")).map((o) => `${o.label} ${o.status}: ${oneLine(o.detail)}`),
     details: [...outcomes.filter((o) => o !== master).map((o) => `${MARK[o.status]} ${o.label}: ${o.detail}`), `${plural(steps, "undo step")}; Undo all takes them back.`].join("\n"),
   };
 }

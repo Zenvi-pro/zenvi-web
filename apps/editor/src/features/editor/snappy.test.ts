@@ -130,6 +130,13 @@ describe("make it snappy", () => {
     expect(summary.details).toMatch(/\d undo steps; Undo all takes them back\.$/);
   });
 
+  it("says up front when there was no cut for the transitions, not only under Details", async () => {
+    const session = sessionWithCuts(3, 1);
+    const outcomes = await makeItSnappy(() => session.project, editorToolRunner(session));
+    expect(outcomes.find((o) => o.step === "transitions")?.status).toBe("skipped");
+    expect(snappySummary(outcomes).issues).toContain("Motion transitions skipped: No clips play back to back, so there is no cut to move");
+  });
+
   it("calls out a failed step in one line, and says once that mastering is missing", () => {
     const outcomes: SnappyOutcome[] = [
       { step: "transitions", label: "Motion transitions", status: "done", detail: "Added 23 motion transition(s) on Track 1 (hype): whip@0.50s, …", brief: "23 transitions", undoSteps: 1 },
