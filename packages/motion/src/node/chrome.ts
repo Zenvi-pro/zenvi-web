@@ -71,8 +71,19 @@ export const CHROME_ARGS = [
   "--disable-dev-shm-usage",
 ];
 
+/**
+ * The flags for this environment. `ZENVI_CHROME_NO_SANDBOX=1` drops Chrome's
+ * own sandbox, which needs user namespaces that containers such as Azure
+ * Container Apps (the Zenvi Cloud image) do not grant: there the container
+ * is the boundary, and a block page reaches nothing but its own local page
+ * server (render.ts aborts every other request).
+ */
+export function chromeArgs(env: NodeJS.ProcessEnv = process.env): string[] {
+  return env.ZENVI_CHROME_NO_SANDBOX?.trim() === "1" ? [...CHROME_ARGS, "--no-sandbox"] : CHROME_ARGS;
+}
+
 export async function launchChrome(env: NodeJS.ProcessEnv = process.env): Promise<PuppeteerBrowser> {
   const executablePath = await findChrome(env);
   if (!executablePath) throw new ChromeMissingError();
-  return puppeteer.launch({ executablePath, headless: "shell", args: CHROME_ARGS, protocolTimeout: 120_000 });
+  return puppeteer.launch({ executablePath, headless: "shell", args: chromeArgs(env), protocolTimeout: 120_000 });
 }
