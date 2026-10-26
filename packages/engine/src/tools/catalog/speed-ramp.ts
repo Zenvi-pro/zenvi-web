@@ -115,7 +115,7 @@ export const speedRampTools: CatalogTool[] = [
         sameJson(clip.time?.Points, plan.points) &&
         sameJson((clip as unknown as Record<string, unknown>).zenvi_speed_ramp, plan.recipe) &&
         (!mute || silent || (clip.volume?.Points?.length === 1 && clip.volume.Points[0]!.co.Y === 0));
-      if (alreadyThere) return unchanged(TOOL, `Clip ${clip.id} already has that ramp; nothing to change.`);
+      if (alreadyThere) return unchanged(TOOL, `${clipTitle(clip)} already has that ramp; nothing to change.`);
 
       const shifted = call.commit((tx) => {
         applySpeedRamp(tx, clip.id, plan, { muteAudio: mute });

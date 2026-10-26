@@ -49,6 +49,16 @@ describe("motion transition tools", () => {
     expect(listed.on_timeline.map((t) => t.transition_id)).toEqual([data.transition_id]);
   });
 
+  it("names the clips in its summary as people know them (the ids stay in data)", async () => {
+    const doc = editDoc();
+    doc.transaction("titles", (tx) => {
+      tx.project.clips.find((c) => c.id === "CLIP0")!.title = "beach.mp4";
+    });
+    const result = await call(doc, "apply_motion_transition_tool", { preset: "whip", clip1_id: "CLIP0" });
+    expect(summaryOf(result)).toMatch(/between beach\.mp4 and \S+\.$/);
+    expect(summaryOf(result)).not.toContain("CLIP");
+  });
+
   it("finds the cut from a track and a time", async () => {
     const doc = editDoc();
     const result = await call(doc, "apply_motion_transition_tool", { preset: "whip", track: "1", time: "4.1", direction: "up" });
