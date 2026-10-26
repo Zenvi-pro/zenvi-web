@@ -7,7 +7,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { maxFrame, type MixPcm, type Project } from "@zenvi/engine";
+import { CODEC_HEADROOM_DB, LIMITER_LOOKAHEAD_SECONDS, LIMITER_RELEASE_SECONDS, maxFrame, truePeakInterpolator, type MixPcm, type Project } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { AbortedError, spawnManaged } from "../ffmpeg/process.js";
 import { streamStarts } from "../probe/starts.js";
@@ -133,13 +133,6 @@ export interface LoudnormMeasurement {
   targetOffset: number;
 }
 
-/**
- * The true-peak ceiling is aimed this far under the requested one: AAC, MP3
- * and Opus overshoot their input by up to a dB on limited material, and the file is
- * what gets measured.
- */
-const CODEC_HEADROOM_DB = 1;
-
 /** Most the limiter is asked to take off the loudest peaks, dB. */
 const MAX_LIMITING_DB = 6;
 
@@ -192,6 +185,21 @@ export function loudnormPass2(measured: LoudnormMeasurement, target: LoudnessTar
   // Past MAX_LIMITING_DB of peak reduction the mix would be crushed for the last LU: stop short of the target instead.
   const held = Math.min(gain, ceilingDb - measured.inputTp + MAX_LIMITING_DB);
   return `volume=${num(held, 3)}dB,alimiter=limit=${ceiling}:level=disabled`;
+}
+
+/** Going back down from the oversampled rate rings a few hundredths of a dB over the limit: aim under it. */
+const RESAMPLE_MARGIN_DB = 0.1;
+
+/**
+ * The export's safety limiter (`ExportOptions.truePeakLimit`): ffmpeg's
+ * lookahead limiter at the true-peak meter's oversampled rate, so it holds
+ * the peaks between samples too, with the engine limiter's timing
+ * (`@zenvi/engine` `TruePeakLimiter`, which the browser export runs).
+ */
+export function truePeakLimiterFilter(sampleRate: number, ceilingDb: number): string {
+  const { factor } = truePeakInterpolator(sampleRate);
+  const limit = `alimiter=limit=${num(10 ** ((ceilingDb - RESAMPLE_MARGIN_DB) / 20), 5)}:attack=${num(LIMITER_LOOKAHEAD_SECONDS * 1000, 3)}:release=${num(LIMITER_RELEASE_SECONDS * 1000, 3)}:level=disabled:latency=1`;
+  return factor === 1 ? limit : `aresample=${sampleRate * factor},${limit},aresample=${sampleRate}`;
 }
 
 /** Normalize `graph`'s output to `target` (mutates the graph's filter). Returns a warning when it left the mix alone. */

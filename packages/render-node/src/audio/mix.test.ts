@@ -103,6 +103,51 @@ describe("renderMixPcm", () => {
   });
 });
 
+describe("export true-peak limiter", () => {
+  // Both sines at gain 20 (amplitude 1 each on the upmix): about +3 dBTP summed.
+  const loud: () => RenderEngine = () => ({
+    ...engine(),
+    planAudio: (_p, range) => ({
+      sampleRate: 48000,
+      channels: 2,
+      start: range.start,
+      end: range.end,
+      segments: [segment("C1", quiet), segment("C2", other)].map((s) => ({ ...s, gain: [{ t: 0, gain: 20 }] })),
+    }),
+  });
+  const base = { width: 160, height: 90, fps: { num: 25, den: 1 } };
+
+  it("holds an over-loud mix under -1 dBTP in a WAV and in an AAC file, unless turned off", async () => {
+    const wav = path.join(dir, "loud.wav");
+    const mp4 = path.join(dir, "loud.mp4");
+    const raw = path.join(dir, "loud-raw.wav");
+    await renderProject(project(), { resolveMedia: (p) => p, output: wav, options: { ...base, format: "wav", audioCodec: "pcm_f32le" }, engine: loud() });
+    await renderProject(project(), { resolveMedia: (p) => p, output: mp4, options: { ...base, format: "mp4", quality: "low" }, engine: loud() });
+    await renderProject(project(), { resolveMedia: (p) => p, output: raw, options: { ...base, format: "wav", audioCodec: "pcm_f32le", truePeakLimit: false }, engine: loud() });
+    const unlimited = measureLoudness(await decodeStereo(raw), 48000);
+    expect(unlimited.truePeakDb).toBeGreaterThan(2);
+    const limitedWav = measureLoudness(await decodeStereo(wav), 48000);
+    expect(limitedWav.truePeakDb).toBeLessThanOrEqual(-1);
+    // Lossless output sits at the ceiling: the limiter does not squash more than it must.
+    expect(limitedWav.truePeakDb).toBeGreaterThan(-1.5);
+    expect(measureLoudness(await decodeStereo(mp4), 48000).truePeakDb).toBeLessThanOrEqual(-1);
+  }, 60_000);
+
+  it("leaves a mix under the ceiling as it was (to the oversampling's rounding)", async () => {
+    const limited = path.join(dir, "quiet-limited.wav");
+    const raw = path.join(dir, "quiet-raw.wav");
+    const options = { ...base, format: "wav" as const, audioCodec: "pcm_f32le" };
+    await renderProject(project(), { resolveMedia: (p) => p, output: limited, options, engine: engine() });
+    await renderProject(project(), { resolveMedia: (p) => p, output: raw, options: { ...options, truePeakLimit: false }, engine: engine() });
+    const [a, b] = [await decodeStereo(limited), await decodeStereo(raw)];
+    let diff = 0;
+    for (let i = 0; i < a[0]!.length; i += 1) diff = Math.max(diff, Math.abs(a[0]![i]! - b[0]![i]!));
+    // The 4x resample round trip moves samples by a fraction of a sample: under -60 dBFS, no change in level.
+    expect(diff).toBeLessThan(1e-3);
+    expect(measureLoudness(a, 48000).integrated).toBeCloseTo(measureLoudness(b, 48000).integrated, 2);
+  }, 60_000);
+});
+
 describe("export loudness normalisation", () => {
   it("brings a quiet mix to the target with the true peak under the ceiling, and leaves it alone otherwise", async () => {
     const plain = path.join(dir, "plain.wav");

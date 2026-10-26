@@ -291,6 +291,12 @@ export interface ExportOptions {
    * Absent: the mix is exported as the timeline plays.
    */
   loudness?: { targetLufs: number; truePeakDbtp: number };
+  /**
+   * Hold the exported mix under -1 dBTP with a true-peak limiter (2 dB under
+   * for lossy codecs, which overshoot): on unless `false`, which exports the
+   * mix exactly as the timeline plays (clipping included).
+   */
+  truePeakLimit?: boolean;
   /** Output location (CLI path). Hosts choose one when omitted. */
   output?: string;
 }

@@ -207,6 +207,12 @@ function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
   }
 }
 
+/** Whether the export's audio goes through a lossy codec (the default codec of `format` when none is named). */
+export function isLossyAudio(format: ContainerFormat, audioCodec?: string): boolean {
+  const codec = audioCodec ?? (format === "wav" ? "pcm_s16le" : format === "flac" ? "flac" : "aac");
+  return !/^(pcm_|flac$|alac$)/.test(codec);
+}
+
 function audioCodecArgs(job: EncodeJob): string[] {
   const rate = encoderRates(rateOptions(job)).audioBitsPerSecond ?? job.options.audioBitrate ?? FALLBACK_AUDIO_BITRATE;
   const bitrate = String(Math.round(rate));
