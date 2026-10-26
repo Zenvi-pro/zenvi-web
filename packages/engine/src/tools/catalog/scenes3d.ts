@@ -283,6 +283,10 @@ export const scenes3dTools: CatalogTool[] = [
       if (!link) return refused(RERENDER, `Error: ${fileId} is not a Zenvi 3D render (no zenvi_link of kind blender).`);
       const parsed = parseScene3dParams(link.scene, { ...link.props, ...(args.params ?? {}) });
       if (!parsed.ok) return refused(RERENDER, `Error: ${parsed.error}.`);
+      // A new length moves the cube's centre off the cut while its clip stays put; add a new one instead.
+      if (args.duration_seconds !== undefined && SCENE3D_INFO[link.scene].placement === "cut") {
+        return refused(RERENDER, `Error: ${link.scene} sits centred on its cut: delete the clip and add_3d_scene_tool again with the new duration_seconds.`);
+      }
       const fps = fpsOf(project);
       const stored = link.link.render as { duration_frames?: unknown; fingerprint?: unknown } | undefined;
       const oldFrames = Math.trunc(Number(stored?.duration_frames)) || Math.round((Number(file.duration) || 1) * (fps.num / fps.den));

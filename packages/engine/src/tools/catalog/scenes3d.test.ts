@@ -216,6 +216,18 @@ describe("rerender_3d_scene_tool", () => {
     expect(Number(doc.project.clips.find((c) => c.id === clipId)!.end)).toBeCloseTo(3, 6);
   });
 
+  it("refuses a new length for cube_cut, whose clip is centred on the cut", async () => {
+    const doc = fixtureDoc();
+    const { host, requests } = scenesHost();
+    const added = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "cube_cut", params: { from_clip_id: IDS.clipA, to_clip_id: IDS.clipB } });
+    const { file_id: fileId } = dataOf(added) as { file_id: string };
+    const result = await runTool({ doc, host }, "rerender_3d_scene_tool", { file_id: fileId, duration_seconds: 1.2 });
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("centred on its cut");
+    expect(requests).toHaveLength(1);
+    expect(doc.undoLabels).toEqual(["Add 3D cube_cut"]);
+  });
+
   it("refuses files that are not 3D renders", async () => {
     const { host, requests } = scenesHost();
     const result = await runTool({ doc: fixtureDoc(), host }, "rerender_3d_scene_tool", { file_id: IDS.broll });
