@@ -127,11 +127,12 @@ export function build(ctx: BlockContext): void {
 
   if (flash !== "none") {
     // A soft-edged disc from the point that swallows the frame, then holds: the cut lands on it.
+    // Solid out to 84 % of 1.2 × reach, so the farthest corner is fully covered on the last frames.
     ctx.ownExit = true;
     const disc = ctx.el("div", "hs-flash");
     const size = reach * 2.4;
     const color = flash === "accent" ? palette.accent : "#ffffff";
-    Object.assign(disc.style, { position: "absolute", left: `${ox - size / 2}px`, top: `${oy - size / 2}px`, width: `${size}px`, height: `${size}px`, borderRadius: "50%", background: `radial-gradient(circle, ${color} 0%, ${color} 58%, transparent 71%)` });
+    Object.assign(disc.style, { position: "absolute", left: `${ox - size / 2}px`, top: `${oy - size / 2}px`, width: `${size}px`, height: `${size}px`, borderRadius: "50%", background: `radial-gradient(circle closest-side, ${color} 0%, ${color} 84%, transparent 100%)` });
     tl.set(disc, { scale: 0, opacity: 0 }, 0);
     tl.fromTo(disc, { scale: 0.02, opacity: 1 }, { scale: 1, opacity: 1 }, { at: jump + 0.1, duration: flashEnd - jump - 0.1, ease: "in" });
   }
