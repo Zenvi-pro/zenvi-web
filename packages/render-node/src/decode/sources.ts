@@ -8,7 +8,9 @@
  * - SVG layers: rasterized at draw size (vector, so no rescale);
  * - color layers: nothing;
  * - masks / effect images: natural size (SVG fitted to the canvas like
- *   QtImageReader); LUT texts; per-layer clip audio when a layer asks.
+ *   QtImageReader); videos an effect reads (a matte `mask_reader`) per
+ *   layer, since two clips of one file read different frames of its matte;
+ *   LUT texts; per-layer clip audio when a layer asks.
  *
  * One `SourceManager` serves one render or preview and owns its children.
  */
@@ -39,6 +41,8 @@ export interface PreparedFrame {
   /** Per `plan.layers` index; null for color layers. */
   layers: (RgbaImage | null)[];
   images: Map<string, RgbaImage>;
+  /** Per layer index: this frame of each video its effects read, by path; null when none. */
+  layerImages: (Map<string, RgbaImage> | null)[];
   texts: Map<string, string>;
   /** Per layer index, when the layer's plan asks for audio. */
   audio: (KernelAudio | null)[];
@@ -112,12 +116,13 @@ export class SourceManager {
    * a Displace map), at its coded size like libopenshot's mask reader, which
    * does not rotate frames.
    */
-  private async auxVideoFrame(projectPath: string, frame: number): Promise<RgbaImage> {
+  private async auxVideoFrame(clipId: string, projectPath: string, frame: number): Promise<RgbaImage> {
     const reader = [...this.files.values()].find((f) => f.path === projectPath);
     const width = Math.max(1, Math.round(Number(reader?.width) || 0));
     const height = Math.max(1, Math.round(Number(reader?.height) || 0));
     if (!reader || width <= 1 || height <= 1) return this.auxImage(projectPath, { width: 1, height: 1 });
-    const decoder = await this.decoder(`aux\0${projectPath}\0${width}x${height}`, projectPath, reader, { width, height }, false);
+    // One decoder per clip, like layer videos: clones of a clip read its matte at different frames.
+    const decoder = await this.decoder(`aux\0${clipId}\0${projectPath}\0${width}x${height}`, projectPath, reader, { width, height }, false);
     return decoder.frame(Math.max(0, Math.round(frame) - 1));
   }
 
@@ -210,19 +215,35 @@ export class SourceManager {
     const fit = { width: plan.width, height: plan.height };
     const imagePaths = new Set<string>();
     const textPaths = new Set<string>();
-    // Video resources by path: the frame each needs (one per path and frame plan, like the kernels' `images`).
-    const videoFrames = new Map<string, number>();
-    for (const layer of plan.layers) {
+    // Video resources per layer: the source frame each path needs on that layer.
+    const videoFrames = plan.layers.map(() => new Map<string, number>());
+    plan.layers.forEach((layer, i) => {
       for (const mask of layer.masks) if (mask.maskPath) imagePaths.add(mask.maskPath);
       for (const effect of layer.effects) {
-        for (const p of effect.images ?? []) imagePaths.add(p);
+        for (const [p, at] of Object.entries(effect.imageFrames ?? {})) if (!videoFrames[i]!.has(p)) videoFrames[i]!.set(p, at.frame);
+        for (const p of effect.images ?? []) if (!effect.imageFrames?.[p]) imagePaths.add(p);
         for (const p of effect.texts ?? []) textPaths.add(p);
-        for (const [p, at] of Object.entries(effect.imageFrames ?? {})) if (!videoFrames.has(p)) videoFrames.set(p, at.frame);
       }
-    }
-    const [layers, images, texts, audio] = await Promise.all([
+    });
+    // Layers asking for the same frame of a video share one decode.
+    const decoded = new Map<string, Promise<RgbaImage>>();
+    const videoFrame = (clipId: string, p: string, frame: number): Promise<RgbaImage> => {
+      const key = `${p}\0${frame}`;
+      let hit = decoded.get(key);
+      if (!hit) {
+        hit = this.auxVideoFrame(clipId, p, frame);
+        decoded.set(key, hit);
+      }
+      return hit;
+    };
+    const [layers, images, layerImages, texts, audio] = await Promise.all([
       Promise.all(plan.layers.map((layer) => this.layerImage(layer))),
-      Promise.all([...imagePaths].map(async (p) => [p, await (videoFrames.has(p) ? this.auxVideoFrame(p, videoFrames.get(p)!) : this.auxImage(p, fit))] as const)),
+      Promise.all([...imagePaths].map(async (p) => [p, await this.auxImage(p, fit)] as const)),
+      Promise.all(
+        plan.layers.map(async (layer, i) =>
+          videoFrames[i]!.size ? new Map(await Promise.all([...videoFrames[i]!].map(async ([p, frame]) => [p, await videoFrame(layer.clipId, p, frame)] as const))) : null,
+        ),
+      ),
       Promise.all([...textPaths].map(async (p) => [p, await this.text(p)] as const)),
       Promise.all(
         plan.layers.map((layer) => {
@@ -232,7 +253,7 @@ export class SourceManager {
       ),
     ]);
     this.sweep();
-    return { layers, images: new Map(images), texts: new Map(texts), audio };
+    return { layers, images: new Map(images), layerImages, texts: new Map(texts), audio };
   }
 
   /** Stop decoders whose clips have not been drawn recently. */
