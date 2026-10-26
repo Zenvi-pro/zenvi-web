@@ -868,6 +868,104 @@ const api = {
     return { supported, inWorker, seekCode, coalescedCode, scrubCode, paused, hiddenCode, remountCode, errors };
   },
 
+  /**
+   * A Worker preview whose media goes through the page: a signed URL that has
+   * expired (the page refreshes it) read with the page's custom fetch, and an
+   * SVG title the page rasterizes (workers have no <img>).
+   */
+  async workerMedia() {
+    const blob = await file("codes.webm");
+    const info = await probeMedia({ kind: "blob", blob }, { path: "codes.webm" });
+    // A green band across the top, transparent below (the code bars stay readable mid-frame).
+    const svg = new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90"><rect width="160" height="20" fill="#00ff00"/></svg>'], { type: "image/svg+xml" });
+    const svgInfo = await probeMedia({ kind: "blob", blob: svg }, { path: "title.svg" });
+    const profile: Profile = { key: "test", description: "Test 160x90 30 fps", width: 160, height: 90, fps: { num: 30, den: 1 }, progressive: true, pixel_ratio: { num: 1, den: 1 }, display_ratio: { num: 16, den: 9 } };
+    const doc = new ProjectDocument(createProject({ profile }));
+    doc.transaction("Import", (tx) => {
+      addFile(tx, { path: "codes.webm", info, name: "codes.webm" }, { id: "codes" });
+      addFile(tx, { path: "title.svg", info: svgInfo, name: "title.svg" }, { id: "title" });
+      addClip(tx, { fileId: "codes", position: 0, layer: 1000000, id: "CLIP1" });
+      addClip(tx, { fileId: "title", position: 0, layer: 2000000, id: "TITLE" });
+    });
+    let refreshes = 0;
+    const fetched: { sig: string | null; range: string | null }[] = [];
+    const media = new MediaRegistry();
+    media.register("codes", {
+      kind: "url",
+      url: `${MEDIA}codes.webm?sig=old`,
+      refresh: async () => {
+        refreshes += 1;
+        return `${MEDIA}codes.webm?sig=new`;
+      },
+      fetch: (input, init) => {
+        fetched.push({ sig: new URL(String(input)).searchParams.get("sig"), range: new Headers(init?.headers).get("range") });
+        return fetch(input, init);
+      },
+    });
+    media.register("title", { kind: "blob", blob: svg, name: "title.svg" });
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "320px";
+    canvas.style.height = "180px";
+    document.body.appendChild(canvas);
+    const worker = new Worker("/preview-worker.js", { type: "module" });
+    const errors: string[] = [];
+    const player = new PreviewPlayer(canvas, { media, worker });
+    player.onError((e) => errors.push(`${e.kind}:${String("error" in e ? e.error : "")}`));
+    player.setProject(doc.project);
+    await player.seek(1);
+    const bitmap = await player.snapshot(160);
+    const shot = new OffscreenCanvas(160, 90).getContext("2d", { willReadFrequently: true })!;
+    if (bitmap) shot.drawImage(bitmap, 0, 0, 160, 90);
+    bitmap?.close();
+    const result = { inWorker: player.inWorker, code: readCode(shot, 0, 0, 160, 90), title: pixel(shot, 80, 8), refreshes, fetched, errors };
+    player.dispose();
+    worker.terminate();
+    canvas.remove();
+    media.dispose();
+    return result;
+  },
+
+  /** A Worker whose module fails to load: the player renders on the page instead, on a stand-in canvas. */
+  async workerFails() {
+    const blob = await file("codes.webm");
+    const info = await probeMedia({ kind: "blob", blob }, { path: "codes.webm" });
+    const profile: Profile = { key: "test", description: "Test 160x90 30 fps", width: 160, height: 90, fps: { num: 30, den: 1 }, progressive: true, pixel_ratio: { num: 1, den: 1 }, display_ratio: { num: 16, den: 9 } };
+    const doc = new ProjectDocument(createProject({ profile }));
+    doc.transaction("Import", (tx) => {
+      addFile(tx, { path: "codes.webm", info, name: "codes.webm" }, { id: "codes" });
+      addClip(tx, { fileId: "codes", position: 0, layer: 1000000, id: "CLIP1" });
+    });
+    const media = new MediaRegistry();
+    media.register("codes", { kind: "blob", blob });
+    const box = document.createElement("div");
+    const canvas = document.createElement("canvas");
+    canvas.className = "preview";
+    canvas.style.width = "320px";
+    canvas.style.height = "180px";
+    box.appendChild(canvas);
+    document.body.appendChild(box);
+    const worker = new Worker("/missing-preview-worker.js", { type: "module" });
+    const warnings: string[] = [];
+    const warn = console.warn;
+    console.warn = (...args: unknown[]) => void warnings.push(args.map(String).join(" "));
+    try {
+      const player = new PreviewPlayer(canvas, { media, worker });
+      player.setProject(doc.project);
+      await player.seek(1);
+      const standIn = box.querySelectorAll("canvas")[1];
+      const shown = { inWorker: player.inWorker, code: await player.snapshot(160).then((b) => (b ? codeOf(b) : -1)), frame: player.frame };
+      const layout = { hidden: canvas.style.display, standInClass: standIn?.className ?? null, standInWidth: standIn?.getBoundingClientRect().width ?? 0 };
+      player.dispose();
+      const afterDispose = { canvases: box.querySelectorAll("canvas").length, display: canvas.style.display };
+      return { ...shown, ...layout, afterDispose, warnings };
+    } finally {
+      console.warn = warn;
+      worker.terminate();
+      box.remove();
+      media.dispose();
+    }
+  },
+
   /** Scrubbing long-GOP media: a keyframe stands in at once, then the exact frame. */
   async scrub() {
     const media = new MediaRegistry();

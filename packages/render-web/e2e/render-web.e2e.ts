@@ -263,6 +263,32 @@ test("PreviewPlayer renders in a Worker: seeks, coalescing, playback, edits and 
   expect(r.remountCode).toBe(45);
 });
 
+test("a Worker preview reads a refreshed signed URL through the page's fetch and draws an SVG the page rasterizes", async ({ page }) => {
+  const r = await page.evaluate(() => window.harness.workerMedia());
+  expect(r.inWorker).toBe(true);
+  expect(r.errors).toEqual([]);
+  expect(r.code).toBe(30);
+  expect(r.title).toEqual([0, 255, 0, 255]);
+  // The expired URL was refused once, refreshed on the page, then read in ranges with the page's fetch.
+  expect(r.refreshes).toBe(1);
+  expect(r.fetched[0]!.sig).toBe("old");
+  expect(r.fetched.slice(1).every((f) => f.sig === "new")).toBe(true);
+  expect(r.fetched.some((f) => f.range !== null)).toBe(true);
+});
+
+test("a preview Worker that fails to load falls back to rendering on the page", async ({ page }) => {
+  const r = await page.evaluate(() => window.harness.workerFails());
+  expect(r.inWorker).toBe(false);
+  expect(r.frame).toBe(31);
+  expect(r.code).toBe(30);
+  expect(r.hidden).toBe("none");
+  expect(r.standInClass).toBe("preview");
+  expect(r.standInWidth).toBe(320);
+  expect(r.afterDispose).toEqual({ canvases: 1, display: "" });
+  expect(r.warnings).toHaveLength(1);
+  expect(r.warnings[0]).toMatch(/failed to start.*renders on the page/);
+});
+
 test("scrubbing long-GOP media shows a keyframe at once, then the exact frame", async ({ page }) => {
   const r = await page.evaluate(() => window.harness.scrub());
   expect(r.preview).toEqual({ exact: false, code: 0 });
