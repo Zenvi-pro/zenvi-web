@@ -15,7 +15,8 @@ export type ParamSpec =
   | (ParamBase & { type: "number" | "integer"; default?: number; min?: number; max?: number; optional?: boolean })
   | (ParamBase & { type: "boolean"; default?: boolean })
   | (ParamBase & { type: "color"; default?: string; optional?: boolean })
-  | (ParamBase & { type: "enum"; options: string[]; default?: string })
+  /** `aliases`: values agents send that mean an option (names from before a rename, near misses). */
+  | (ParamBase & { type: "enum"; options: string[]; default?: string; aliases?: Record<string, string> })
   | (ParamBase & { type: "strings"; default?: string[]; minItems?: number; maxItems?: number; maxLength?: number })
   | (ParamBase & { type: "points"; default?: { x: number; y: number }[]; minItems?: number; maxItems?: number })
   /** A bin file (photo or video) by file id; the renderer turns it into a page URL. */
@@ -130,8 +131,13 @@ function coerce(name: string, spec: ParamSpec, v: unknown): Coerced {
     }
     case "enum": {
       const s = typeof v === "string" ? v.trim().toLowerCase() : "";
-      if (!spec.options.includes(s)) return bad(`one of ${spec.options.join(", ")}`);
-      return { value: s };
+      if (spec.options.includes(s)) return { value: s };
+      const aliased = spec.aliases && Object.hasOwn(spec.aliases, s) ? spec.aliases[s] : undefined;
+      if (aliased && spec.options.includes(aliased)) return { value: aliased };
+      // "dot" for "dots" and "lines" for "line": agents get the plural wrong more than the word.
+      const plural = spec.options.find((o) => s && (o === `${s}s` || `${o}s` === s));
+      if (plural) return { value: plural };
+      return bad(`one of ${spec.options.join(", ")}`);
     }
     case "strings": {
       const list = asList(v) ?? (typeof v === "string" ? v.split("|").map((s) => s.trim()) : undefined);
