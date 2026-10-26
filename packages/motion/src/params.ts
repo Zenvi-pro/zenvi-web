@@ -59,7 +59,8 @@ export function tokenParams(manifest: Pick<BlockManifest, "tokens">): Record<str
     paper: { type: "color", optional: true, description: "Background colour (#rrggbb) replacing the palette's, for a brief's exact colours." },
     ink: { type: "color", optional: true, description: "Text colour (#rrggbb) replacing the palette's." },
     display_font: { type: "enum", options: [...FONT_ROLES], default: t.display ?? "sans", description: "Headline face: sans (Inter), serif (Instrument Serif), mono (JetBrains Mono), display (Anton, condensed)." },
-    radius: { type: "number", min: 0, max: 80, default: t.radius ?? 28, description: "Corner radius of cards and pills, px at 1080." },
+    // A block may default to a pill (logo_reveal_end: 999), so its own default stays in range.
+    radius: { type: "number", min: 0, max: Math.max(80, t.radius ?? 0), default: t.radius ?? 28, description: "Corner radius of cards and pills, px at 1080." },
     exit: { type: "boolean", default: true, description: "Animate out over the last 0.4 s." },
     seed: { type: "integer", min: 0, max: 2147483647, default: 1, description: "Seed for the block's random choices (particles, scramble glyphs)." },
   };

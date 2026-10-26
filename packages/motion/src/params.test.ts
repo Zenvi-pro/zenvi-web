@@ -29,6 +29,9 @@ describe("block manifests", () => {
       }
       const checked = checkParams(b, {});
       expect(checked.ok ? "ok" : checked.error, b.id).toBe("ok");
+      // The renderer checks the filled params again: every default must pass its own limits.
+      const again = checked.ok ? checkParams(b, checked.params) : checked;
+      expect(again.ok ? "ok" : again.error, `${b.id} defaults`).toBe("ok");
     }
   });
 });

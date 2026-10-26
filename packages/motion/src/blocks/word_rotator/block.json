@@ -64,7 +64,7 @@
     },
     "size": {
       "type": "number",
-      "min": 24,
+      "min": 0,
       "max": 220,
       "default": 0,
       "description": "Font size, px at 1080 (0: fit the safe width)."
