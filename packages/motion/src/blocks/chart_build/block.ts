@@ -65,7 +65,8 @@ export function build(ctx: BlockContext): void {
     ? { x: safe.left + contentW * 0.45, y: safe.top, w: contentW * 0.55, h: H - safe.top - safe.bottom }
     : { x: safe.left, y: headBottom + 70, w: contentW, h: H - safe.bottom - headBottom - 70 };
 
-  const badgeText = String(p.caption ?? "") || (kind === "donut" ? "" : [percentChange(values[0]!, values[hi]!), labels[0] && hi > 0 ? `vs ${labels[0]}` : ""].filter(Boolean).join(" "));
+  // The change badge compares the highlight with the first item; the first item has nothing to compare with.
+  const badgeText = String(p.caption ?? "") || (kind === "donut" || hi === 0 ? "" : [percentChange(values[0]!, values[hi]!), labels[0] ? `vs ${labels[0]}` : ""].filter(Boolean).join(" "));
   const badge = badgeText ? ctx.el("div", "cb-badge", ctx.root, badgeText) : null;
   if (badge) badge.style.color = onColor(accent);
 

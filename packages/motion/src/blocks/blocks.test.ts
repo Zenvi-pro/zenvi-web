@@ -79,3 +79,10 @@ describe("blocks with the most items they take still land their climax before th
     expect((b.root.querySelectorAll<HTMLElement>(".tp-tile .icon")[1]!).style.opacity).toBe("1");
   });
 });
+
+describe("chart_build's change badge", () => {
+  it("is left out when the highlight is the first bar (nothing to compare it with)", async () => {
+    expect((await built("chart_build", { values: ["9", "3", "4"] }, 5)).root.querySelector(".cb-badge")).toBeNull();
+    expect((await built("chart_build", { values: ["3", "9", "4"] }, 5)).root.querySelector(".cb-badge")?.textContent).toBe("+200% vs Jan");
+  });
+});
