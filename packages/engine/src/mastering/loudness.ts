@@ -237,15 +237,33 @@ function interpolationPhases(factor: number): Float64Array[] {
   return phases;
 }
 
+/**
+ * The true-peak meter's interpolator at `sampleRate`: `phases[p][k]` weighs
+ * sample `n - k + taps / 2` for the point `n + p / factor` (phase 0 is the
+ * sample itself), and `gain` is the most any phase can raise the loudest
+ * sample it reads.
+ */
+export interface TruePeakInterpolator {
+  factor: number;
+  taps: number;
+  phases: Float64Array[];
+  gain: number;
+}
+
+export function truePeakInterpolator(sampleRate: number): TruePeakInterpolator {
+  const factor = oversampling(sampleRate);
+  const phases = factor === 1 ? [] : interpolationPhases(factor);
+  const gain = Math.max(1, ...phases.map((branch) => branch.reduce((sum, tap) => sum + Math.abs(tap), 0)));
+  return { factor, taps: TAPS_PER_PHASE, phases, gain };
+}
+
 /** Highest magnitude of the oversampled signal. */
 export function truePeak(channel: Float32Array, sampleRate: number): number {
-  const factor = oversampling(sampleRate);
   let peak = 0;
   for (let i = 0; i < channel.length; i += 1) peak = Math.max(peak, Math.abs(channel[i]!));
+  const { factor, phases, gain } = truePeakInterpolator(sampleRate);
   if (factor === 1) return peak;
-  const phases = interpolationPhases(factor);
-  // Largest gain any branch can apply to a window of samples: chunks whose loudest sample stays under peak / gain cannot raise the peak.
-  const gain = Math.max(...phases.map((branch) => branch.reduce((sum, tap) => sum + Math.abs(tap), 0)));
+  // Chunks whose loudest sample stays under peak / gain cannot raise the peak.
   const chunk = 256;
   const reach = TAPS_PER_PHASE;
   for (let from = 0; from < channel.length; from += chunk) {

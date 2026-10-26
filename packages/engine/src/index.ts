@@ -28,6 +28,7 @@ export * from "./titles/templates.js";
 export * from "./presets/index.js";
 export * from "./analysis/beats.js";
 export * from "./mastering/loudness.js";
+export * from "./mastering/limiter.js";
 export * from "./mastering/gain-stage.js";
 export * from "./analysis/transcription.js";
 export * from "./reels/styles.js";
