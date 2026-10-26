@@ -22,6 +22,7 @@
 import { defaultEffectJson } from "../../effects/registry.js";
 import { makeKeyframePoint } from "../../keyframe/edit.js";
 import { Motion, backdrop, cropToAspect, enter, key, mediaCard, pose } from "../elements.js";
+import { entranceStep } from "../grid.js";
 import { keyframeThrough } from "../keyframes.js";
 import type { Layout } from "../layout.js";
 import { refuse, GRID_REVEALS, type GridOptions, type GridReveal, type MotionContent, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
@@ -134,8 +135,7 @@ export function gridBeats(content: MotionContent, bpm: number): number {
     counts = [4];
   }
   const finish = Boolean(content.grid?.merge) || content.grid?.zoomInto !== undefined;
-  const step = 60 / bpm < 0.38 ? 2 : 1;
-  const beats = slotsOf(counts, finish).end * step;
+  const beats = slotsOf(counts, finish).end * entranceStep(bpm);
   return beats + (beats % 2);
 }
 
@@ -151,6 +151,14 @@ function tileStart(media: MotionMedia, seconds: number, nth: number, of: number)
   // A clip too short for the tile is slowed down to fill it (mediaCard).
   if (length < seconds) return undefined;
   return lo + (length - seconds) * (of > 1 ? nth / (of - 1) : 0.3);
+}
+
+/** Where a kept tile's clip picks up after a layout step: where its last element stopped, if the clip has `seconds` left there. */
+function playOn(previous: Element, media: MotionMedia, seconds: number, fps: number): number | undefined {
+  const source = previous.source as MediaSource;
+  if (media.kind === "image" || source.speed < 0.999) return undefined;
+  const next = (Math.round(source.start * fps) + (previous.to - previous.from)) / fps;
+  return next + seconds <= media.duration ? next : undefined;
 }
 
 function centre(r: Rect): Pose {
@@ -244,15 +252,19 @@ export const montageGrid: TemplateSpec = {
     const slotFrame = (slot: number) => beats.frame(slot * unit);
     const travelOf = (slot: number) => Math.max(3, Math.min(10, slotFrame(slot + 1) - slotFrame(slot) - 1));
 
-    // Which clip each tile shows: one after another, a clip used again starting elsewhere.
+    // Which clip each tile shows: a tile kept through a layout step keeps its clip; new tiles take the next
+    // clips in turn, a clip used again starting elsewhere.
     const cursor: number[][] = [];
+    const uses = new Map<string, number>();
     let n = 0;
-    for (const count of r.counts) {
-      cursor.push(Array.from({ length: count }, () => n++ % files.length));
-    }
-    const uses = new Map<number, number>();
-    cursor.flat().forEach((f) => uses.set(f, (uses.get(f) ?? 0) + 1));
-    const seen = new Map<number, number>();
+    r.counts.forEach((count, s) => {
+      const kept = s > 0 ? r.counts[s - 1]! : 0;
+      cursor.push(Array.from({ length: count }, (_, i) => (i < kept ? cursor[s - 1]![i]! : n++ % files.length)));
+      cursor[s]!.slice(kept).forEach((f) => uses.set(files[f]!, (uses.get(files[f]!) ?? 0) + 1));
+    });
+    const seen = new Map<string, number>();
+    /** The previous stage's element of each tile: a kept tile plays on from where it was. */
+    let before: Element[] = [];
 
     const elements: Element[] = [];
     const cues = new Set<number>([0]);
@@ -283,16 +295,24 @@ export const montageGrid: TemplateSpec = {
       const rects = stages[s]!;
       const kept = s > 0 ? r.counts[s - 1]! : 0;
       const zoomT = s === lastStage && r.zoomInto !== null ? rects[target]! : null;
+      const current: Element[] = [];
       rects.forEach((rect, i) => {
         const slot = need.reveal[s]![i]!;
         const at = slotFrame(slot);
         cues.add(at);
-        const media0 = media.get(files[cursor[s]![i]!]!) as MotionMedia;
-        const fileIdx = cursor[s]![i]!;
-        const nth = seen.get(fileIdx) ?? 0;
-        seen.set(fileIdx, nth + 1);
+        const file = files[cursor[s]![i]!]!;
+        const media0 = media.get(file) as MotionMedia;
         const to = stageTo(s);
         const seconds = (to - at) / fps;
+        let start: number | undefined;
+        if (i < kept) {
+          start = playOn(before[i]!, media0, seconds, fps);
+        } else {
+          const nth = seen.get(file) ?? 0;
+          seen.set(file, nth + 1);
+          // A new tile stays up to the end (stages only add tiles): its window covers all of that when the clip allows.
+          start = tileStart(media0, (frames - at) / fps, nth, uses.get(file)!) ?? tileStart(media0, seconds, nth, uses.get(file)!);
+        }
         const focus = r.layout === "strips_v" ? { x: (i + 0.5) / rects.length, y: 0.5 } : r.layout === "strips_h" ? { x: 0.5, y: (i + 0.5) / rects.length } : undefined;
         const crop = cropToAspect(media0, rect.w / rect.h, focus);
         const rest = centre(rect);
@@ -314,14 +334,15 @@ export const montageGrid: TemplateSpec = {
           }
           keys = m.keys;
         }
-        const start = tileStart(media0, seconds, nth, uses.get(fileIdx)!);
         const el = mediaCard(`tile-${s + 1}-${i + 1}`, track0 + i, at, to, media0, fps, { width: rect.w, radius: r.radius, ...(crop ? { crop } : {}), ...(start !== undefined ? { start } : {}) }, keys);
         if (r.reveal === "wipe" && i >= kept) {
           const inFrames = Math.round((el.source as MediaSource).start * fps);
           el.effects = [wipeEffect(inFrames + 1, travel, r.layout === "strips_v")];
         }
         elements.push({ ...el, cue: at });
+        current.push(el);
       });
+      before = current;
     }
     if (finish) cues.add(actionAt);
     return { elements, cues: [...cues] };

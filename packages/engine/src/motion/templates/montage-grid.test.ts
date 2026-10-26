@@ -143,6 +143,24 @@ describe.each(Object.entries(FRAMES))("montage grid template, %s", (_name, frame
     }
   });
 
+  it("keeps a tile's clip through a layout step, playing on from where it was; new tiles take the next clips", () => {
+    const { plan } = build(frame, { steps: [2, 3] }, { fileIds: ["VIDEO00001", "VIDEO00002", "VIDEO00001"] });
+    const by = (name: string) => plan.layers.find((l) => l.name === name)!;
+    const source = (name: string) => {
+      const s = by(name).source;
+      if (s.kind !== "media") throw new Error(`${name} is not a picture`);
+      return s;
+    };
+    for (const i of [1, 2]) {
+      const [a, b] = [source(`tile-1-${i}`), source(`tile-2-${i}`)];
+      expect(b.fileId, `tile ${i}`).toBe(a.fileId);
+      expect(b.start, `tile ${i}`).toBeCloseTo(a.end, 6);
+    }
+    // The third tile is the third file; VIDEO00001 used again starts at another moment.
+    expect(source("tile-2-3").fileId).toBe("VIDEO00001");
+    expect(Math.abs(source("tile-2-3").start - source("tile-1-1").start)).toBeGreaterThan(1);
+  });
+
   it("keeps every tile of every stage inside the band and apart at rest", () => {
     const band = frame.height > frame.width ? "16:9" : "21:9";
     const { plan } = build(frame, { steps: [3, 4, 6], band, gutter: 6 });
