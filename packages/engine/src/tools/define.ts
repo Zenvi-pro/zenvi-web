@@ -92,6 +92,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   storage: "project storage",
   audio: "audio analysis",
   assets: "the bundled title templates and emoji",
+  scenes3d: "Zenvi 3D (Blender on this computer)",
 };
 
 /**

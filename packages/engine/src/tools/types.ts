@@ -19,6 +19,8 @@ import type { z } from "zod";
 import type { Transcription } from "../analysis/transcription.js";
 import type { ProjectDocument } from "../history/document.js";
 import type { CloudMediaRef, FileFingerprint, Project, ProjectFile, ReaderInfo } from "../model/types.js";
+import type { Scene3dId, Scene3dParams } from "../scenes3d/catalog.js";
+import type { Scene3dQuality, Scene3dRender } from "../scenes3d/link.js";
 import type { WebVideoDownload, WebVideoRequest } from "../web-video/web-video.js";
 
 export type ToolSurface = "assistant" | "mcp" | "cli" | "editor";
@@ -539,6 +541,46 @@ export interface ReclaimableMedia {
   errors: string[];
 }
 
+/** One project picture a 3D scene shows (a screen, a card, a cube face, a side of cube_cut). */
+export interface Scene3dMediaInput {
+  fileId: string;
+  /** The file's `path` as the project stores it (the host resolves it). */
+  path: string;
+  kind: "image" | "video";
+  width: number;
+  height: number;
+  /** Video frames per second and length in frames (images: 0). */
+  fps: number;
+  frames: number;
+  /** Seconds into the video where the scene starts showing it. */
+  start: number;
+}
+
+export interface Scene3dRenderRequest {
+  scene: Scene3dId;
+  /** Parsed params (parseScene3dParams), passed to the bpy scene as JSON. */
+  params: Scene3dParams;
+  width: number;
+  height: number;
+  fps: { num: number; den: number };
+  frames: number;
+  /** draft: half size, few samples (seconds); final: full size. */
+  quality: Scene3dQuality;
+  /** By slot: `screen`, `card0`…, `face0`…, `from` / `to`. */
+  media: Record<string, Scene3dMediaInput>;
+  signal?: AbortSignal;
+  onProgress?: (fraction: number, message: string) => void;
+}
+
+/**
+ * Zenvi 3D: renders Blender scenes (@zenvi/scenes3d) to movies. Only hosts
+ * on a computer with Blender have it (the CLI and local MCP server).
+ * `render` rejects with a message in words (no Blender, a failed render).
+ */
+export interface Scene3dHost {
+  render(request: Scene3dRenderRequest): Promise<Scene3dRender>;
+}
+
 /** Files bundled with the engine (`packages/engine/assets/…`), such as the title templates. */
 export interface AssetHost {
   /**
@@ -558,6 +600,7 @@ export interface ToolHost {
   storage?: StorageHost;
   audio?: AudioHost;
   assets?: AssetHost;
+  scenes3d?: Scene3dHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }
