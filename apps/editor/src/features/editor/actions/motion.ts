@@ -5,10 +5,9 @@
  */
 import { findClip, type Clip, type MotionDirection, type MotionPresetInfo, type MotionTransitionStyle } from "@zenvi/engine";
 import { toast } from "@/ui/Toast";
-import { targetCut, tinyGapTrack } from "../cuts";
 import { runEditorTool, runToolWithToast } from "../editorTools";
 import type { EditorSession } from "../session/EditorSession";
-import { snappyTrack } from "../snappy";
+import { mainSequence, targetCut, tinyGapTrack } from "../cuts";
 
 export type DirectionChoice = "auto" | Extract<MotionDirection, "left" | "right" | "up" | "down">;
 
@@ -61,7 +60,7 @@ export async function applyMotionTransition(session: EditorSession, info: Motion
 /** A style mix on every cut of the pointed-at track (else the main sequence). */
 export async function applyMotionStyle(session: EditorSession, style: MotionTransitionStyle, choice: DirectionChoice = "auto"): Promise<void> {
   const cut = targetCut(session.project, selected(session), session.playback.getState().time);
-  const layer = cut?.layer ?? snappyTrack(session.project)?.layer;
+  const layer = cut?.layer ?? mainSequence(session.project)?.layer;
   if (layer === undefined) return noCut(session);
   await runToolWithToast(
     session,
