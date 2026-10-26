@@ -150,34 +150,66 @@ export function planOverlayStack(project: Project, start: number, end: number, c
   return { layers, created };
 }
 
-function ensureTrack(tx: Transaction, layer: number): void {
+function ensureTrack(tx: Transaction, layer: number, label: string): void {
   if (findLayer(tx.project, layer)) return;
   const id = generateId((candidate) => tx.project.layers.some((l) => l.id === candidate));
-  tx.insert(["layers"], createLayer(layer, id, TRACK_LABEL));
+  tx.insert(["layers"], createLayer(layer, id, label));
 }
 
 /** Prepared drawing files, by layer name. */
-type Written = Map<string, ImportedMedia>;
+export type Written = Map<string, ImportedMedia>;
 
-async function writeDrawings(call: ToolCall, plan: MotionPlan, prefix: string): Promise<Written | string> {
+export async function writeDrawings(call: ToolCall, plan: MotionPlan, prefix: string): Promise<Written | string> {
   const media = call.host.media!;
   const out: Written = new Map();
   for (const layer of plan.layers) {
     if (layer.source.kind !== "svg") continue;
     const name = `${prefix}-${layer.source.name}.svg`;
+    let path: string | undefined;
     try {
-      const path = await media.writeGenerated!(name, new TextEncoder().encode(layer.source.svg), "image/svg+xml");
+      path = await media.writeGenerated!(name, new TextEncoder().encode(layer.source.svg), "image/svg+xml");
       out.set(layer.name, { path, info: await media.probe(path), name });
     } catch (error) {
+      await discardDrawings(call, [...[...out.values()].map((m) => m.path), ...(path === undefined ? [] : [path])]);
       return `Error: could not write the template's drawing ${name}: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
   return out;
 }
 
+/** Delete drawings no bin file points at (the call that wrote them failed), where the host can. */
+export async function discardDrawings(call: ToolCall, paths: readonly string[]): Promise<void> {
+  const media = call.host.media;
+  if (paths.length === 0 || !media?.discardGenerated) return;
+  try {
+    await media.discardGenerated(paths);
+  } catch {
+    // Best effort: the failure the call reports is the one that stopped it.
+  }
+}
+
+/** `call.commit` of an edit that places `written`; if it throws, the drawings are deleted before the error goes on. */
+export async function commitDrawn<T>(call: ToolCall, written: Written, body: (tx: Transaction) => T, label: string): Promise<T> {
+  try {
+    return call.commit(body, label);
+  } catch (error) {
+    await discardDrawings(call, [...written.values()].map((m) => m.path));
+    throw error;
+  }
+}
+
 /** Place a plan's layers (inside a transaction). Returns the clip of each layer. */
-export function placeMotionPlan(tx: Transaction, plan: MotionPlan, written: Written, position: number, fps: number, tracks: readonly number[], title: string): { layer: MotionLayer; clip: Clip; fileId: string }[] {
-  for (const layer of tracks) ensureTrack(tx, layer);
+export function placeMotionPlan(
+  tx: Transaction,
+  plan: MotionPlan,
+  written: Written,
+  position: number,
+  fps: number,
+  tracks: readonly number[],
+  title: string,
+  trackLabel = TRACK_LABEL,
+): { layer: MotionLayer; clip: Clip; fileId: string }[] {
+  for (const layer of tracks) ensureTrack(tx, layer, trackLabel);
   const nextId = idFactory(tx.project);
   const placed: { layer: MotionLayer; clip: Clip; fileId: string }[] = [];
   for (const layer of plan.layers) {
@@ -294,7 +326,7 @@ export const motionTemplateTools: CatalogTool[] = [
       const written = await writeDrawings(call, plan, args.template);
       if (typeof written === "string") return failed(TOOL, written);
 
-      const placed = call.commit((tx) => placeMotionPlan(tx, plan, written, start, fps, stack.layers, `Motion ${args.template}`), `Add motion template ${args.template}`);
+      const placed = await commitDrawn(call, written, (tx) => placeMotionPlan(tx, plan, written, start, fps, stack.layers, `Motion ${args.template}`), `Add motion template ${args.template}`);
       const doc = call.doc.project;
       const g = grid;
       const beatsIn = g.beats.filter((t) => t >= start - 1e-6 && t <= end + 1e-6);

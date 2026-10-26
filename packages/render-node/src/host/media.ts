@@ -213,6 +213,8 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
   const maxBytes = options.maxDownloadBytes ?? 4 * 1024 ** 3;
   const doFetch = options.fetchImpl ?? fetch;
   const scratch = options.scratchDir ?? path.join(tmpdir(), "zenvi-media");
+  /** What writeGenerated wrote: the only files discardGenerated deletes. */
+  const generated = new Set<string>();
 
   const mediaDir = async (sub: "media" | "title"): Promise<string> => {
     const project = options.projectFile();
@@ -294,7 +296,12 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
       const sub = contentType === "image/svg+xml" || name.toLowerCase().endsWith(".svg") ? "title" : "media";
       const dest = await uniquePath(await mediaDir(sub), safeName(name));
       await writeFile(dest, bytes);
+      generated.add(dest);
       return dest;
+    },
+
+    async discardGenerated(paths) {
+      for (const p of paths) if (generated.delete(p)) await rm(p, { force: true });
     },
   };
 }

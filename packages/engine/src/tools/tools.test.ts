@@ -1006,6 +1006,15 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { template: "word_scroll", words: ["Only"] }, status: "refused", summary: /^Error: word_scroll needs words: 2 to 10 of them\.$/ },
   },
 
+  kinetic_captions_tool: {
+    happy: {
+      args: { style: "karaoke", start_seconds: "0", accent: "#00ff88" },
+      summary: /^Added \d+ karaoke caption group\(s\) \(\d+ words\) at [\d.]+-[\d.]+s on 2 track\(s\)\.$/,
+      check: ({ host }) => expect([...host.written.keys()].some((p) => p.startsWith("/generated/captions-karaoke-"))).toBe(true),
+    },
+    failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
+  },
+
   // --- stock search (web) -------------------------------------------------------------
   search_pexels_videos_tool: {
     happy: {

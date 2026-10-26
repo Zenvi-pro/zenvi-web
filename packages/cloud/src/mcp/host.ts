@@ -126,6 +126,15 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
         generated.set(path, { file, cloud: { sha256, size: bytes.byteLength, name: fileName, content_type: type } });
         return path;
       },
+      // The stored bytes stay: they are content-addressed, and another project may use them.
+      discardGenerated: async (paths) => {
+        for (const p of paths) {
+          const made = generated.get(p);
+          if (!made) continue;
+          generated.delete(p);
+          await rm(made.file, { force: true });
+        }
+      },
       // Missing = not uploaded to Zenvi Cloud (what GET /v1/projects/:id lists as missingMedia).
       missing: async (files) => {
         const hashes = [...new Set(files.map((f) => fileSha256(f)).filter((h): h is string => h !== undefined))];
