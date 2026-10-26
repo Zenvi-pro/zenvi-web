@@ -1,5 +1,7 @@
 /** `zenvi tools` (the catalog) and `zenvi call <tool>` (any tool, raw arguments). */
 
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import type { Command } from "commander";
 import { createMotionHost } from "@zenvi/motion/node";
 import { createNodeHost } from "@zenvi/render-node";
@@ -86,10 +88,21 @@ export function registerToolCommands(program: Command, ctx: CommandContext): voi
     .argument("<tool>", "tool name (see `zenvi tools`)")
     .argument("[pairs...]", "key=value arguments")
     .option("--args <json>", "arguments as a JSON object")
-    .action(async (tool: string, pairs: string[], opts: { args?: string }) => {
+    .option("--images <dir>", "save the images the tool returns (frames, contact sheets) into this folder")
+    .action(async (tool: string, pairs: string[], opts: { args?: string; images?: string }) => {
       const args = parseCallArgs(opts.args, pairs);
       // ae_* / premiere_* run in After Effects / Premiere Pro through Zenvi Link.
       if (hostOfTool(tool)) await runHostToolCommand(ctx, tool, args);
-      else await runToolCommand(ctx, tool, args);
+      else {
+        const outcome = await runToolCommand(ctx, tool, args);
+        if (opts.images) {
+          await mkdir(opts.images, { recursive: true });
+          for (const [i, image] of outcome.images.entries()) {
+            const file = path.join(opts.images, `${tool}-${i + 1}.${image.mimeType === "image/jpeg" ? "jpg" : "png"}`);
+            await writeFile(file, Buffer.from(image.data, "base64"));
+            ctx.out.info(ctx.out.style(`image saved: ${file}`, "dim"));
+          }
+        }
+      }
     });
 }
