@@ -11,8 +11,11 @@
 #   scripts/azure/lab.sh down    # delete every lab resource this script made (the group itself stays)
 #
 # Auth is production's Supabase JWKS (read-only) or a Zenvi token from the lab's
-# own tokens table; the backend tools are off (no service secret). Connection
-# strings go to ~/.config/zenvi-dev/lab-cloud.env (mode 600) and are never printed.
+# own tokens table; the backend tools are off (no service secret). Stock search
+# uses the lab's own Pexels/Freesound keys when ~/.config/zenvi-dev/lab-stock.env
+# has PEXELS_API_KEY / FREESOUND_API_KEY (Container App secrets). Editor links
+# point at the lab's own /editor, not zenvi.pro. Connection strings and keys go
+# to ~/.config/zenvi-dev/lab-cloud.env (mode 600) and are never printed.
 set -euo pipefail
 
 LAB_RG="${LAB_RG:-zenvi-motion-lab}"
@@ -25,6 +28,7 @@ LAB_JOB="${LAB_JOB:-zenvi-render-lab}"
 LAB_QUEUE="${LAB_QUEUE:-render-jobs}"
 LAB_ENV_FILE="${LAB_ENV_FILE:-$HOME/.config/zenvi-dev/lab-cloud.env}"
 LAB_PAT_FILE="${LAB_PAT_FILE:-$HOME/.config/zenvi-dev/lab-pat.env}"
+LAB_STOCK_FILE="${LAB_STOCK_FILE:-$HOME/.config/zenvi-dev/lab-stock.env}"
 LAB_USER="${LAB_USER:-lab-motion-tester}"
 TAGS="purpose=zenvi-motion-experiments owner=jashan"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,6 +50,7 @@ up() {
   mkdir -p "$(dirname "$LAB_ENV_FILE")"
   (umask 077 && printf 'AZURE_STORAGE_CONNECTION_STRING=%s\n' \
     "$(az storage account show-connection-string -g "$LAB_RG" -n "$LAB_NAME" --query connectionString -o tsv)" > "$LAB_ENV_FILE")
+  if [ -r "$LAB_STOCK_FILE" ]; then grep -E '^(PEXELS|FREESOUND)_API_KEY=.' "$LAB_STOCK_FILE" >> "$LAB_ENV_FILE" || true; fi
   # Signed upload links are PUT from the person's browser or CLI.
   az storage cors clear --services b --connection-string "$(sed -n 's/^AZURE_STORAGE_CONNECTION_STRING=//p' "$LAB_ENV_FILE")" -o none
   az storage cors add --services b --methods GET HEAD PUT OPTIONS --origins '*' --allowed-headers '*' --exposed-headers '*' --max-age 3600 \
@@ -61,12 +66,16 @@ up() {
     az containerapp env create -g "$LAB_RG" -n "$LAB_ENV" -l "$LOCATION" --logs-destination none --tags $TAGS -o none
   fi
 
-  local tag
+  local tag domain
   tag="lab-$(git -C "$ROOT" rev-parse --short=12 HEAD)"
+  domain="$(az containerapp env show -g "$LAB_RG" -n "$LAB_ENV" --query properties.defaultDomain -o tsv)"
   local common=(RG="$LAB_RG" ENV_NAME="$LAB_ENV" REGISTRY="$LAB_NAME" ENV_FILE="$LAB_ENV_FILE" TAGS="$TAGS")
   # The service: 2 vCPU / 4 GiB (Chrome renders motion blocks in tool calls), scaled to zero.
-  env "${common[@]}" APP="$LAB_APP" RENDER_JOB="$LAB_JOB" MIN_REPLICAS=0 MAX_REPLICAS=1 CPU=2 MEMORY=4Gi RENDER_QUEUE="$LAB_QUEUE" \
-    "$HERE/deploy.sh" "$tag"
+  local service=(APP="$LAB_APP" RENDER_JOB="$LAB_JOB" MIN_REPLICAS=0 MAX_REPLICAS=1 CPU=2 MEMORY=4Gi RENDER_QUEUE="$LAB_QUEUE"
+    ZENVI_EDITOR_URL="https://$LAB_APP.$domain/editor")
+  env "${common[@]}" "${service[@]}" "$HERE/deploy.sh" "$tag"
+  step "Settings: the lab's own editor links and stock keys"
+  env "${common[@]}" "${service[@]}" IMAGE_TAG="$tag" "$HERE/provision.sh"
   step "Render job $LAB_JOB (2 vCPU / 4 GiB, at most 2 at once)"
   env "${common[@]}" JOB="$LAB_JOB" QUEUE="$LAB_QUEUE" CPU=2 MEMORY=4Gi MAX_EXECUTIONS=2 TIMEOUT_SECONDS=1800 IMAGE_TAG="$tag" \
     "$HERE/render-jobs.sh"

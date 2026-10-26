@@ -388,7 +388,8 @@ with `If-Match`, replaying the change if someone else saved in between.
 | --- | --- | --- |
 | `PUBLIC_BASE_URL` | `http://localhost:8080` | canonical origin: issuer, MCP resource, links |
 | `PUBLIC_BASE_URL_ALIASES` | | other origins that route here (custom domains); requests on them use their own issuer/resource |
-| `ZENVI_EDITOR_URL` | `https://zenvi.pro/editor` | consent, device and editor links |
+| `ZENVI_EDITOR_URL` | `https://zenvi.pro/editor` | consent, device and editor links (`editor_url`); when it is this service's own `<origin>/editor`, the hosted editor build answers those routes instead of redirecting (lab.sh sets it) |
+| `PEXELS_API_KEY`, `FREESOUND_API_KEY` | | secrets; stock search (`search_pexels_videos_tool`, `search_freesound_music_tool`, `create_reel`'s `stock_queries` / `music_query`) with the deployment's own keys when the backend is off. Freesound results are limited to CC0 and CC BY |
 | `SUPABASE_URL` | the zenvi.pro project | JWKS `…/auth/v1/.well-known/jwks.json`, issuer `…/auth/v1` |
 | `STORAGE` | `azure` | `memory` for local development |
 | `AZURE_STORAGE_CONNECTION_STRING` | | secret; container app secret `azure-storage-connection-string` |

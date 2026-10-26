@@ -265,6 +265,27 @@ describe("backend tools on the remote MCP server", () => {
     const names = (await client.listTools()).tools.map((tool) => tool.name);
     expect(names).not.toContain("generate_tts_and_add_to_timeline_tool");
     expect(names).not.toContain("generate_video");
+    expect(names).not.toContain("search_pexels_videos_tool");
+    await client.close();
+  });
+
+  it("searches stock with the deployment's own keys when the backend is off", async () => {
+    const stock = {
+      searchPexelsVideos: async (query: string) => ({
+        total: 1,
+        videos: [{ id: 5, width: 1080, height: 1920, duration: 7, user_name: "Ana", video_files: [{ quality: "hd", file_type: "video/mp4", width: 1080, height: 1920, link: `https://cdn.test/${query}.mp4` }] }],
+      }),
+      searchFreesound: async () => ({ total: 0, sounds: [] }),
+    };
+    const h = await harness({ engine: await loadEngineRegistry(), prober: fakeProber, network, stock });
+    const client = await connect(h);
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    expect(names).toEqual(expect.arrayContaining(["search_pexels_videos_tool", "search_freesound_music_tool", "import_stock_media_tool"]));
+    expect(names).not.toContain("generate_tts_and_add_to_timeline_tool");
+    await call(client, "create_project", { name: "Stock", format: "vertical_1080p" });
+    const found = await call(client, "search_pexels_videos_tool", { query: "surf" });
+    expect(found.isError).toBeFalsy();
+    expect(found.content[0]?.text).toContain("id=5  duration=0:07  res=1080×1920  portrait  user=Ana  link=https://cdn.test/surf.mp4");
     await client.close();
   });
 

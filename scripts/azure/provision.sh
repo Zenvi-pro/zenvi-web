@@ -55,6 +55,9 @@ CONN="$(sed -n 's/^AZURE_STORAGE_CONNECTION_STRING=//p' "$ENV_FILE" | head -n 1)
 [ -n "$CONN" ] || die "AZURE_STORAGE_CONNECTION_STRING is not set in $ENV_FILE"
 SERVICE_SECRET="$(sed -n 's/^ZENVI_BACKEND_SERVICE_SECRET=//p' "$ENV_FILE" | head -n 1)"
 SERVICE_ROLE="$(sed -n 's/^SUPABASE_SERVICE_ROLE_KEY=//p' "$ENV_FILE" | head -n 1)"
+# Stock search without the backend (a lab or self-hosted copy): the providers' own keys.
+PEXELS_KEY="$(sed -n 's/^PEXELS_API_KEY=//p' "$ENV_FILE" | head -n 1)"
+FREESOUND_KEY="$(sed -n 's/^FREESOUND_API_KEY=//p' "$ENV_FILE" | head -n 1)"
 
 step "Storage: blob container '$BLOB_CONTAINER' (private) and tables"
 az storage container create --name "$BLOB_CONTAINER" --public-access off --connection-string "$CONN" -o none
@@ -89,6 +92,14 @@ fi
 if [ -n "$SERVICE_ROLE" ]; then
   SECRETS+=("supabase-service-role-key=$SERVICE_ROLE")
   ENV_VARS+=("SUPABASE_SERVICE_ROLE_KEY=secretref:supabase-service-role-key")
+fi
+if [ -n "$PEXELS_KEY" ]; then
+  SECRETS+=("pexels-api-key=$PEXELS_KEY")
+  ENV_VARS+=("PEXELS_API_KEY=secretref:pexels-api-key")
+fi
+if [ -n "$FREESOUND_KEY" ]; then
+  SECRETS+=("freesound-api-key=$FREESOUND_KEY")
+  ENV_VARS+=("FREESOUND_API_KEY=secretref:freesound-api-key")
 fi
 [ -n "$IMAGE_TAG" ] && ENV_VARS+=("ZENVI_CLOUD_VERSION=$IMAGE_TAG")
 [ -n "$RENDER_QUEUE" ] && ENV_VARS+=("ZENVI_RENDER_QUEUE=$RENDER_QUEUE")
