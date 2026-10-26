@@ -1,0 +1,81 @@
+/**
+ * The Claude Code plugin's skills teach agents exact tool calls. Every tool
+ * they name must exist, and every JSON example must pass the tool's own
+ * argument validation (and a motion block's parameter check), so a renamed
+ * argument breaks this test instead of the agent's first call.
+ */
+
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { getTool, normalizeArgs } from "@zenvi/engine/tools";
+import { checkParams, getBlock } from "@zenvi/motion";
+import { describe, expect, it } from "vitest";
+
+const SKILLS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../plugins/zenvi/skills");
+const CHECKED = ["zenvi-motion-director", "zenvi-reels"];
+/** Tools `zenvi mcp` adds next to the engine catalog (src/mcp/extra-tools.ts). */
+const MCP_TOOLS = new Set(["open_project_file", "render_video", "preview_frame", "launch_editor", "push_to_cloud", "list_hosts"]);
+
+function markdownFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const file = path.join(dir, name);
+    if (statSync(file).isDirectory()) return markdownFiles(file);
+    return name.endsWith(".md") ? [file] : [];
+  });
+}
+
+/** `tool_name {json}` examples inside ```json fences (one call may span lines). */
+function examples(markdown: string): { tool: string; args: string }[] {
+  const found: { tool: string; args: string }[] = [];
+  for (const fence of markdown.matchAll(/```json\n([\s\S]*?)```/g)) {
+    const body = fence[1]!;
+    for (const start of body.matchAll(/^([a-z0-9_]+) \{/gm)) {
+      let depth = 0;
+      const from = start.index! + start[1]!.length + 1;
+      for (let i = from; i < body.length; i++) {
+        if (body[i] === "{") depth++;
+        else if (body[i] === "}" && --depth === 0) {
+          found.push({ tool: start[1]!, args: body.slice(from, i + 1) });
+          break;
+        }
+      }
+    }
+  }
+  return found;
+}
+
+const files = CHECKED.flatMap((skill) => markdownFiles(path.join(SKILLS, skill)));
+
+describe("plugin skills", () => {
+  it.each(files.map((f) => [path.relative(SKILLS, f), f]))("%s names only tools that exist", (_name, file) => {
+    const named = new Set([...readFileSync(file, "utf8").matchAll(/`([a-z0-9]+(?:_[a-z0-9]+)*_tool)\b/g)].map((m) => m[1]!));
+    const unknown = [...named].filter((tool) => !getTool(tool) && !MCP_TOOLS.has(tool));
+    expect(unknown).toEqual([]);
+  });
+
+  it.each(files.map((f) => [path.relative(SKILLS, f), f]))("%s examples pass argument validation", (_name, file) => {
+    for (const example of examples(readFileSync(file, "utf8"))) {
+      const tool = getTool(example.tool);
+      expect(tool, example.tool).toBeDefined();
+      const args = JSON.parse(example.args) as Record<string, unknown>;
+      const parsed = tool!.input.safeParse(normalizeArgs(tool!.inputSchema, args));
+      expect(parsed.success ? "ok" : `${example.tool}: ${JSON.stringify(parsed.error.issues[0])}`).toBe("ok");
+      if (example.tool === "add_motion_block_tool") {
+        const block = getBlock(String(args.block));
+        expect(block, String(args.block)).toBeDefined();
+        const check = checkParams(block!, (args.params ?? {}) as Record<string, unknown>);
+        expect(check.ok ? "ok" : check.error).toBe("ok");
+      }
+    }
+  });
+
+  it("finds the director's examples, and the check can fail", () => {
+    const director = files.filter((f) => f.includes("zenvi-motion-director"));
+    expect(director.reduce((n, f) => n + examples(readFileSync(f, "utf8")).length, 0)).toBeGreaterThanOrEqual(12);
+    const [bad] = examples('```json\nspeed_ramp_tool {"clip_id": "C1", "preset": "velocity", "hit": 2}\n```');
+    const tool = getTool(bad!.tool)!;
+    expect(tool.input.safeParse(normalizeArgs(tool.inputSchema, JSON.parse(bad!.args))).success).toBe(false);
+    expect(checkParams(getBlock("counter")!, { value: "3" }).ok).toBe(false);
+  });
+});
