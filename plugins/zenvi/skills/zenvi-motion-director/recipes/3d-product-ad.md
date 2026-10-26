@@ -19,7 +19,11 @@ moment: the landing.
 
 1. Product image: `generate_image_and_add_to_timeline_tool` `prompt:
    "minimal portable music player, white studio, soft shadow, product render,
-   3/4 view"`, `position_seconds: 4.5`, `duration_seconds: 6.5`.
+   3/4 view"`, `position_seconds: 4.5`, `duration_seconds: 6.5`. If
+   generation fails, the product is a stock clip on a white background
+   (`search_pexels_videos_tool` "white product on white background", "hand
+   holding small device white background"), never a generic phone standing in
+   for another product.
 2. Prompt scene:
 
 ```json
@@ -43,7 +47,11 @@ add_motion_block_tool {"block": "particle_burst", "position_seconds": 3.3, "dura
    "Weight", "Sound"], "values": ["30 h", "86 g", "Hi-Fi"], "points": [...],
    "grid": "none", "palette": "light"}`; read the points off a
    `preview_frame grid: true` of the product.
-5. Sound: `typing_burst` at 0.4 s (as long as the typing), `mouse_click` on
+   Give `points` (where each chip's line lands on the product); without them
+   the leaders point at nothing.
+5. Close on the name: `kinetic_headline` `style: "pop"`, `palette:
+   "light"`, 1.5-2 s, so the piece ends on a word, not on a held render.
+6. Sound: `typing_burst` at 0.4 s (as long as the typing), `mouse_click` on
    send, `pop` on the burst, `whoosh_rise` ending on the landing,
    `impact_thud` on it (never `impact_slam` here), `ui_tap` per chip. Music
    clean electronic, quieter than a hype edit (RMS −20…−24 dB).
