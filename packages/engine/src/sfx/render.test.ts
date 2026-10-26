@@ -25,6 +25,36 @@ function loudestRmsDb(audio: SfxAudio): number {
   return 10 * Math.log10(best);
 }
 
+/** Spectral centroid (Hz) of each 2048-sample frame of the mono mix, from a DFT at 96 log-spaced frequencies; frames below -50 dB are skipped. */
+function centroids(audio: SfxAudio): number[] {
+  const n = 2048;
+  const freqs = Array.from({ length: 96 }, (_, k) => 100 * Math.pow(160, k / 95));
+  const out: number[] = [];
+  for (let s = 0; s + n <= audio.left.length; s += n / 2) {
+    let energy = 0;
+    for (let i = s; i < s + n; i += 1) energy += ((audio.left[i]! + audio.right[i]!) / 2) ** 2;
+    if (10 * Math.log10(energy / n + 1e-20) < -50) continue;
+    let num = 0;
+    let den = 0;
+    for (const f of freqs) {
+      let re = 0;
+      let im = 0;
+      const w = (2 * Math.PI * f) / SFX_SAMPLE_RATE;
+      for (let i = 0; i < n; i += 1) {
+        const x = ((audio.left[s + i]! + audio.right[s + i]!) / 2) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / n));
+        re += x * Math.cos(w * i);
+        im -= x * Math.sin(w * i);
+      }
+      // Log-spaced bins: weight by bandwidth (∝ f) so the centroid is not biased low.
+      const p = (re * re + im * im) * f;
+      num += f * p;
+      den += p;
+    }
+    out.push(num / den);
+  }
+  return out;
+}
+
 describe("procedural sound effects", () => {
   it("has at least 24 recipes across every family, each with taste notes", () => {
     expect(SFX_RECIPES.length).toBeGreaterThanOrEqual(24);
@@ -81,6 +111,37 @@ describe("procedural sound effects", () => {
     expect(renderSfx("impact_punch").hit).toBe(0);
     const riser = renderSfx("riser_noise", { duration: 2 });
     expect(riser.hit).toBeCloseTo(2, 5);
+  });
+
+  it("sweeps: a rising whoosh brightens to its end, a falling one darkens, a pass-by goes up then down", () => {
+    const rise = centroids(renderSfx("whoosh_rise"));
+    expect(rise[rise.length - 1]!).toBeGreaterThan(rise[0]! * 3);
+    const third = Math.floor(rise.length / 3);
+    expect(rise.slice(-third).reduce((a, b) => a + b) / third).toBeGreaterThan(rise.slice(0, third).reduce((a, b) => a + b) / third * 2);
+    const fall = centroids(renderSfx("whoosh_fall"));
+    expect(fall[0]!).toBeGreaterThan(fall[fall.length - 1]! * 3);
+    const by = renderSfx("whoosh_long");
+    const c = centroids(by);
+    const peakFrame = c.indexOf(Math.max(...c));
+    expect(peakFrame).toBeGreaterThan(1);
+    expect(peakFrame).toBeLessThan(c.length - 2);
+    expect(c[peakFrame]!).toBeGreaterThan(c[0]! * 2);
+    expect(c[peakFrame]!).toBeGreaterThan(c[c.length - 1]! * 2);
+  });
+
+  it("travels across the stereo field: a whoosh starts on one side and ends on the other", () => {
+    const side = (pan: number) => {
+      const a = renderSfx("whoosh_medium", { pan });
+      const q = Math.floor(a.left.length / 4);
+      const level = (ch: Float32Array, from: number, to: number) => ch.slice(from, to).reduce((s, x) => s + x * x, 0);
+      return [level(a.left, 0, q) / level(a.right, 0, q), level(a.left, 3 * q, 4 * q) / level(a.right, 3 * q, 4 * q)];
+    };
+    const [startLr, endLr] = side(0.8);
+    expect(startLr!).toBeGreaterThan(2);
+    expect(endLr!).toBeLessThan(0.5);
+    const [backStart, backEnd] = side(-0.8);
+    expect(backStart!).toBeLessThan(0.5);
+    expect(backEnd!).toBeGreaterThan(2);
   });
 
   it("follows duration, pitch and pan", () => {

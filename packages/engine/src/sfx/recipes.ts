@@ -8,7 +8,7 @@
  * peak, an impact's transient, a riser's end).
  */
 
-import { Rng, StereoBuffer, SineOsc, SawOsc, Svf, OnePole, PinkNoise, Wander, addReverb, attackDecay, clamp01, expCurve, expLerp, lerp, panGains, saturate } from "./dsp.js";
+import { Rng, StereoBuffer, SineOsc, SawOsc, Svf, PinkNoise, Wander, addReverb, attackDecay, clamp01, expCurve, expLerp, lerp, panGains, saturate } from "./dsp.js";
 import { kick, modal, noiseBurst, whoosh, type Voice } from "./layers.js";
 
 export type SfxFamily = "whoosh" | "impact" | "riser" | "click" | "ui" | "texture" | "transition";
@@ -24,6 +24,8 @@ export interface SfxRecipe {
   use: string;
   hit: SfxHitKind;
   duration: { default: number; min: number; max: number };
+  /** Default `pan`: moving sounds travel left to right unless told otherwise. */
+  defaultPan?: number;
   /** Suggested clip gain, dB: the file peaks at -1 dBFS, so this puts its peak around -8…-14 dBFS in a mix. */
   mixDb: number;
   /** Renders into `v.out`; returns the hit point in seconds. */
@@ -39,13 +41,17 @@ function sr(v: Voice): number {
 // ---------------------------------------------------------------------------
 
 interface WhooshPreset {
+  /** Peak position as a fraction of the duration. */
   peak: number;
   riseK: number;
+  /** Fall time constant as a fraction of the duration. */
   fall: number;
-  low: number;
-  high: number;
+  /** Band centre at the start, the peak and the end, Hz. */
+  from: number;
+  top: number;
+  to: number;
   q: number;
-  air: number;
+  tone: number;
   roar: number;
   flutter: number;
 }
@@ -58,14 +64,14 @@ function whooshRecipe(v: Voice, w: WhooshPreset): number {
     end: d,
     riseK: w.riseK,
     fallTau: Math.max(0.02, d * w.fall),
-    low: w.low,
-    high: w.high * (0.8 + 0.4 * v.intensity),
+    from: w.from,
+    top: w.top * (0.85 + 0.3 * v.intensity),
+    to: w.to,
     q: w.q,
-    air: w.air,
+    tone: w.tone,
     roar: w.roar * (0.5 + v.intensity),
     flutter: w.flutter,
     travel: v.pan,
-    width: 0.55,
     level: 1,
   });
   return peak;
@@ -74,7 +80,7 @@ function whooshRecipe(v: Voice, w: WhooshPreset): number {
 /** Whip crack at the peak: the snap that sells a whip pan. */
 function crack(v: Voice, at: number, level: number): void {
   noiseBurst(v, { at, mode: "band", freq: 5200, freqEnd: 2600, q: 1.1, attack: 0.0004, decay: 0.009, level, width: 0.4, pan: v.pan * 0.3 });
-  noiseBurst(v, { at, mode: "high", freq: 3000, attack: 0.0002, decay: 0.004, level: level * 0.6, width: 0.6 });
+  noiseBurst(v, { at, mode: "band", freq: 7000, q: 0.9, attack: 0.0002, decay: 0.004, level: level * 0.6, width: 0.6 });
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +140,8 @@ function noiseRiser(v: Voice, level: number): void {
   const whites = [rng.fork(3), rng.fork(4)];
   const bp = [new Svf(s), new Svf(s)];
   const hp = [new Svf(s), new Svf(s)];
+  // The top octave is hiss, not tension.
+  const top = [new Svf(s), new Svf(s), new Svf(s), new Svf(s)];
   let tremPhase = 0;
   const ch = [0, 0];
   for (let i = 0; i < v.out.length; i += 1) {
@@ -146,7 +154,8 @@ function noiseRiser(v: Voice, level: number): void {
     const trem = 1 - 0.35 * v.intensity * x * (0.5 + 0.5 * Math.sin(2 * Math.PI * tremPhase));
     for (let c = 0; c < 2; c += 1) {
       const n = pinks[c]!.next() * 0.7 + whites[c]!.bipolar() * 0.3;
-      ch[c] = bp[c]!.bandpass(n, fc, q) + 0.35 * hp[c]!.highpass(n, fc * 1.5) * x;
+      const y = bp[c]!.bandpass(n, fc, q) + 0.35 * hp[c]!.highpass(n, fc * 1.5) * x;
+      ch[c] = top[c * 2 + 1]!.lowpass(top[c * 2]!.lowpass(y, 12000), 12000);
     }
     // Narrow at the start, fully wide at the hit; the pan drifts across with `pan`.
     const width = lerp(0.2, 1, x);
@@ -168,8 +177,9 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Fast cuts and quick slides (0.2-0.5 s moves): peak on the cut. The everyday transition sound; vary pitch and seed so a run of them does not machine-gun.",
     hit: "peak",
     duration: { default: 0.45, min: 0.2, max: 1 },
+    defaultPan: 0.6,
     mixDb: -9,
-    render: (v) => whooshRecipe(v, { peak: 0.58, riseK: 3, fall: 0.18, low: 260, high: 2600, q: 1.5, air: 0.4, roar: 0.15, flutter: 0.2 }),
+    render: (v) => whooshRecipe(v, { peak: 0.6, riseK: 3, fall: 0.12, from: 380, top: 2800, to: 600, q: 3, tone: 0.15, roar: 0.15, flutter: 0.2 }),
   },
   {
     id: "whoosh_medium",
@@ -178,8 +188,9 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Push-ins, slides and transitions of about half a second to a second; the default for a cut between two moving shots.",
     hit: "peak",
     duration: { default: 0.85, min: 0.4, max: 1.6 },
+    defaultPan: 0.6,
     mixDb: -10,
-    render: (v) => whooshRecipe(v, { peak: 0.6, riseK: 3.2, fall: 0.16, low: 170, high: 2200, q: 1.3, air: 0.35, roar: 0.35, flutter: 0.3 }),
+    render: (v) => whooshRecipe(v, { peak: 0.62, riseK: 3.4, fall: 0.11, from: 240, top: 2300, to: 330, q: 3.5, tone: 0.3, roar: 0.35, flutter: 0.3 }),
   },
   {
     id: "whoosh_long",
@@ -188,8 +199,9 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Slow zoom-throughs, camera fly-bys, a title sweeping across a held shot (1-3 s). Too long for fast cutting: it smears the rhythm.",
     hit: "peak",
     duration: { default: 1.7, min: 0.9, max: 3.5 },
+    defaultPan: 0.6,
     mixDb: -11,
-    render: (v) => whooshRecipe(v, { peak: 0.62, riseK: 3.6, fall: 0.15, low: 110, high: 1900, q: 1.1, air: 0.3, roar: 0.6, flutter: 0.45 }),
+    render: (v) => whooshRecipe(v, { peak: 0.62, riseK: 3.8, fall: 0.1, from: 150, top: 1700, to: 200, q: 4, tone: 0.45, roar: 0.6, flutter: 0.45 }),
   },
   {
     id: "whoosh_rise",
@@ -198,8 +210,9 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Something arriving: a card flying in, a zoom that lands on the cut. Builds to the end; put its end on the moment of arrival.",
     hit: "peak",
     duration: { default: 0.9, min: 0.3, max: 2.5 },
+    defaultPan: 0.6,
     mixDb: -10,
-    render: (v) => whooshRecipe(v, { peak: 0.9, riseK: 3.8, fall: 0.05, low: 150, high: 3200, q: 1.4, air: 0.45, roar: 0.25, flutter: 0.25 }),
+    render: (v) => whooshRecipe(v, { peak: 0.92, riseK: 2.6, fall: 0.03, from: 240, top: 4200, to: 4200, q: 3.5, tone: 0.3, roar: 0.25, flutter: 0.25 }),
   },
   {
     id: "whoosh_fall",
@@ -208,8 +221,9 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Something leaving: an element flying out, a zoom-out after a hit. Loudest at the start, trails away; put its start on the exit.",
     hit: "peak",
     duration: { default: 0.9, min: 0.3, max: 2.5 },
+    defaultPan: 0.6,
     mixDb: -10,
-    render: (v) => whooshRecipe(v, { peak: 0.07, riseK: 1, fall: 0.25, low: 140, high: 2800, q: 1.3, air: 0.35, roar: 0.3, flutter: 0.3 }),
+    render: (v) => whooshRecipe(v, { peak: 0.06, riseK: 1, fall: 0.28, from: 3600, top: 4200, to: 200, q: 3.5, tone: 0.3, roar: 0.3, flutter: 0.3 }),
   },
   {
     id: "swish_airy",
@@ -218,8 +232,9 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Light motion: text sliding, UI panels, a card flip, a cloth-like swipe. Thin and bright, it sits above music without muddying it.",
     hit: "peak",
     duration: { default: 0.35, min: 0.15, max: 0.8 },
+    defaultPan: 0.6,
     mixDb: -12,
-    render: (v) => whooshRecipe(v, { peak: 0.5, riseK: 2.5, fall: 0.14, low: 1400, high: 6500, q: 2.2, air: 0.9, roar: 0, flutter: 0.35 }),
+    render: (v) => whooshRecipe(v, { peak: 0.5, riseK: 2.5, fall: 0.12, from: 2000, top: 7500, to: 3000, q: 1.8, tone: 0, roar: 0, flutter: 0.35 }),
   },
   {
     id: "whip",
@@ -228,9 +243,10 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Whip pans and smash cuts between shots: a very fast sweep that snaps at the peak. Peak exactly on the cut; one per whip, not on ordinary cuts.",
     hit: "peak",
     duration: { default: 0.32, min: 0.15, max: 0.7 },
+    defaultPan: 0.6,
     mixDb: -9,
     render: (v) => {
-      const peak = whooshRecipe(v, { peak: 0.55, riseK: 5, fall: 0.09, low: 300, high: 3600, q: 1.6, air: 0.7, roar: 0.25, flutter: 0.15 });
+      const peak = whooshRecipe(v, { peak: 0.55, riseK: 5, fall: 0.06, from: 450, top: 5000, to: 900, q: 2.6, tone: 0.2, roar: 0.25, flutter: 0.15 });
       crack(v, peak, 0.35 + 0.35 * v.intensity);
       return peak;
     },
@@ -623,20 +639,27 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
       const s = sr(v);
       const rng = v.rng.fork(0x71);
       const bp = [new Svf(s), new Svf(s)];
-      const hp = [new OnePole(s), new OnePole(s)];
+      const lp = [new Svf(s), new Svf(s)];
       const flutter = new Wander(rng.fork(1), s);
-      const crackleRate = 120 + 300 * v.intensity;
+      const whistle = new SineOsc();
+      const tuneTo = rng.range(0.85, 1.2);
       for (let i = 0; i < v.out.length; i += 1) {
         const t = i / s;
         const env = clamp01(t / 0.006) * clamp01((v.duration - t) / 0.06);
-        const am = 0.75 + 0.25 * flutter.next(12);
-        const ch: number[] = [];
+        // Signal fighting through: the hiss swells and drops out in ragged steps.
+        const am = 0.55 + 0.45 * flutter.next(16);
+        // A faint tuning whistle gliding as if someone turns the dial.
+        const tone = whistle.next(expLerp(900, 900 * tuneTo, t / v.duration) * v.tune) * 0.05;
         for (let c = 0; c < 2; c += 1) {
-          const hiss = bp[c]!.bandpass(rng.bipolar(), 2800 * v.bright, 0.6);
-          const crackle = rng.next() < crackleRate / s ? rng.bipolar() : 0;
-          ch.push(hiss * am + hp[c]!.high(crackle, 1500) * 0.4);
+          const hiss = lp[c]!.lowpass(bp[c]!.bandpass(rng.bipolar(), 2400 * v.bright, 0.9), 6500);
+          const ch = c === 0 ? v.out.left : v.out.right;
+          ch[i] = (hiss * am + tone) * env;
         }
-        v.out.addStereo(i, ch[0]! * env, ch[1]! * env);
+      }
+      // Crackle: short, band-limited grains rather than full-band clicks.
+      const count = Math.round(v.duration * (25 + 60 * v.intensity));
+      for (let k = 0; k < count; k += 1) {
+        noiseBurst(v, { at: rng.range(0, v.duration * 0.9), mode: "band", freq: rng.range(1500, 4500), q: 2, attack: 0.0002, decay: rng.range(0.0008, 0.003), level: rng.range(0.4, 1.4), pan: rng.range(-0.6, 0.6) });
       }
       return 0;
     },
@@ -671,10 +694,11 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "One-shot transition for a big cut: a rising whoosh that lands on a punchy hit. Its hit point is the impact; use it where a whoosh and an impact would otherwise be stacked by hand.",
     hit: "peak",
     duration: { default: 1.3, min: 0.6, max: 3 },
+    defaultPan: 0.6,
     mixDb: -9,
     render: (v) => {
       const hit = Math.min(0.65, v.duration * 0.45);
-      whoosh(v, { peak: hit, end: hit + 0.12, riseK: 4, fallTau: 0.03, low: 180, high: 3000, q: 1.4, air: 0.5, roar: 0.4, flutter: 0.25, travel: v.pan, width: 0.55, level: 0.8 });
+      whoosh(v, { peak: hit, end: hit + 0.12, riseK: 3.5, fallTau: 0.03, from: 220, top: 3200, to: 2400, q: 3.2, tone: 0.3, roar: 0.4, flutter: 0.25, travel: v.pan, level: 0.8 });
       const hitBuffer = new StereoBuffer(v.out.length, sr(v));
       const h: Voice = { ...v, out: hitBuffer };
       punch(h, hit, (v.duration - hit) / 0.7);

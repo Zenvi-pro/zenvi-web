@@ -13,7 +13,7 @@ import type { Voice } from "./layers.js";
 import { sfxRecipe, type SfxRecipe } from "./recipes.js";
 
 /** Bump when any recipe's sound changes, so cached files are rendered again. */
-export const SFX_VERSION = 1;
+export const SFX_VERSION = 2;
 
 /** Peak of every rendered file, dBFS. */
 export const SFX_PEAK_DBFS = -1;
@@ -27,7 +27,7 @@ export interface SfxParams {
   brightness?: number;
   /** 0 (gentle) .. 1 (hard: more drive, tail, density). Default 0.7. */
   intensity?: number;
-  /** -1..1: position of static sounds; travel (direction and width) of moving ones. Default 0. */
+  /** -1..1: position of static sounds; travel (direction and width) of moving ones. Default 0 (moving sounds: 0.6, left to right). */
   pan?: number;
   /** Any integer: a different variation of the same recipe. Default 1. */
   seed?: number;
@@ -61,7 +61,7 @@ export function resolveSfxParams(recipe: SfxRecipe, params: SfxParams = {}): Res
     pitch: round(Math.min(12, Math.max(-12, num(params.pitch, 0))), 10),
     brightness: round(clamp01(num(params.brightness, 0.5)), 100),
     intensity: round(clamp01(num(params.intensity, 0.7)), 100),
-    pan: round(Math.min(1, Math.max(-1, num(params.pan, 0))), 100),
+    pan: round(Math.min(1, Math.max(-1, num(params.pan, recipe.defaultPan ?? 0))), 100),
     seed: Math.trunc(num(params.seed, 1)) | 0,
   };
 }

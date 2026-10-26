@@ -142,75 +142,107 @@ export function modal(v: Voice, o: ModalOptions): void {
 export interface WhooshOptions {
   /** Seconds into the buffer the move starts. */
   at?: number;
-  /** Seconds from the start to the loudest, brightest moment. */
+  /** Seconds from the start to the loudest moment (the pass, or the arrival). */
   peak: number;
   /** Seconds from the start to silence. */
   end: number;
-  /** Crescendo curvature (higher = it arrives faster at the end). */
+  /** Crescendo curvature: higher = a slow build that arrives fast. */
   riseK: number;
-  /** Fall time constant after the peak, seconds. */
+  /** Fall time constant after the peak, seconds: short for "by", long for "out". */
   fallTau: number;
-  /** Band-pass centre at silence and at the peak, Hz (before `tune` and `bright`). */
-  low: number;
-  high: number;
+  /** Centre of the resonant band at the start, at the peak and at the end, Hz (before `tune` and `bright`). */
+  from: number;
+  top: number;
+  to: number;
+  /** Resonance of the swept bands (3-5: a clearly moving band; 1.5: airy). */
   q: number;
-  /** High-passed air on top, 0..1. */
-  air: number;
+  /** Comb "doppler" body gliding with the band, 0..1. */
+  tone: number;
   /** Low body under it, 0..1. */
   roar: number;
   /** Turbulence, 0..1. */
   flutter: number;
   /** Pan travel: from -travel to +travel, crossing the centre at the peak. */
   travel: number;
-  /** Decorrelation between the channels, 0..1. */
-  width: number;
   level: number;
 }
 
+/** Feedback comb with a fractional, gliding delay: a pitched resonance in noise (the jet/doppler tone). */
+class GlideComb {
+  private readonly buffer: Float32Array;
+  private index = 0;
+
+  constructor(private readonly sampleRate: number) {
+    this.buffer = new Float32Array(Math.ceil(sampleRate / 30) + 2);
+  }
+
+  run(x: number, freqHz: number, feedback: number): number {
+    const n = this.buffer.length;
+    const delay = Math.min(n - 2, Math.max(2, this.sampleRate / freqHz));
+    const pos = this.index - delay + n;
+    const i0 = Math.floor(pos) % n;
+    const frac = pos - Math.floor(pos);
+    const delayed = this.buffer[i0]! * (1 - frac) + this.buffer[(i0 + 1) % n]! * frac;
+    const y = x + feedback * delayed;
+    this.buffer[this.index] = y;
+    this.index = (this.index + 1) % n;
+    return y * (1 - feedback);
+  }
+}
+
+/** Centre frequency along the move: `from` → `top` at the peak → `to`, gliding exponentially. */
+function sweep(o: WhooshOptions, t: number): number {
+  if (t <= o.peak) return expLerp(o.from, o.top, o.peak > 0 ? Math.pow(Math.min(1, t / o.peak), 1.6) : 1);
+  const tail = Math.max(o.end - o.peak, 1e-3);
+  return expLerp(o.top, o.to, Math.pow(Math.min(1, (t - o.peak) / tail), 0.6));
+}
+
 /**
- * Air rushing past: pink noise through two band-pass formants whose centre
- * follows the amplitude (the Doppler brightening of a pass-by), with air
- * and roar layers, turbulence and a pan sweep that crosses the centre at
- * the peak.
+ * Something moving past: pink noise through two resonant band-passes whose
+ * centre glides from `from` to `top` at the peak and on to `to` (the
+ * Doppler sweep), a wide band for body, a comb tone gliding with the band,
+ * turbulence, independent noise per side, and a pan path that crosses the
+ * centre at the peak. Everything above ~12 kHz is rolled off: air, not hiss.
  */
 export function whoosh(v: Voice, o: WhooshOptions): void {
   const sr = v.out.sampleRate;
   const at = o.at ?? 0;
   const rng = v.rng.fork(0x77);
   const pinks = [new PinkNoise(rng.fork(1)), new PinkNoise(rng.fork(2)), new PinkNoise(rng.fork(3))];
-  const whites = [rng.fork(4), rng.fork(5)];
-  const f = [new Svf(sr), new Svf(sr), new Svf(sr), new Svf(sr)];
-  const air = [new Svf(sr), new Svf(sr)];
+  const bands = Array.from({ length: 10 }, () => new Svf(sr));
+  const combs = [new GlideComb(sr), new GlideComb(sr)];
   const roar = [new OnePole(sr), new OnePole(sr), new OnePole(sr), new OnePole(sr)];
+  const hiss = [new Svf(sr), new Svf(sr), new Svf(sr), new Svf(sr)];
   // Rumble below ~80 Hz only muddies the music under a whoosh.
   const rumble = [new Svf(sr), new Svf(sr)];
   const wander = new Wander(rng.fork(6), sr);
   const [a, b] = span(v, at, o.end);
-  const travelSpan = Math.max(o.end * 0.35, 0.05);
+  const travelSpan = Math.max(o.end * 0.3, 0.04);
+  const ch = [0, 0];
   for (let i = a; i < b; i += 1) {
     const t = i / sr - at;
     const e = passBy(t, o.peak, o.end, o.riseK, o.fallTau);
-    const turb = 1 + o.flutter * 0.45 * wander.next(14 + 10 * e);
-    const fc = expLerp(o.low, o.high, Math.pow(e, 0.7)) * v.tune * v.bright;
-    const c = pinks[0]!.next();
-    const xl = c * (1 - o.width * 0.6) + pinks[1]!.next() * o.width;
-    const xr = c * (1 - o.width * 0.6) + pinks[2]!.next() * o.width;
-    let l = f[0]!.bandpass(xl, fc, o.q) + 0.55 * f[1]!.bandpass(xl, fc * 2.3, o.q * 1.4);
-    let r = f[2]!.bandpass(xr, fc * 1.03, o.q) + 0.55 * f[3]!.bandpass(xr, fc * 2.25, o.q * 1.4);
-    if (o.air > 0) {
-      const ae = Math.pow(e, 1.6) * o.air * 0.5;
-      l += air[0]!.highpass(whites[0]!.bipolar(), Math.max(fc * 2.5, 2500)) * ae;
-      r += air[1]!.highpass(whites[1]!.bipolar(), Math.max(fc * 2.4, 2500)) * ae;
+    const turb = 1 + o.flutter * 0.5 * wander.next(12 + 14 * e);
+    const fc = sweep(o, t) * v.tune * v.bright;
+    const common = pinks[0]!.next();
+    for (let c = 0; c < 2; c += 1) {
+      // Mostly independent noise per side: wide, and it moves as a whole with the pan.
+      const x = common * 0.45 + pinks[c + 1]!.next() * 0.9;
+      const detune = c === 0 ? 1 : 1.04;
+      // Two cascaded band-passes per formant (24 dB/octave skirts), so the sweep reads as a moving band, not a noise burst.
+      const k = c * 5;
+      const main = bands[k + 1]!.bandpass(bands[k]!.bandpass(x, fc * detune, o.q), fc * detune, o.q);
+      const formant = bands[k + 3]!.bandpass(bands[k + 2]!.bandpass(x, fc * 1.9 * detune, o.q * 1.2), fc * 1.9 * detune, o.q * 1.2);
+      let y = main * 2.2 + formant * 1.1 + 0.15 * bands[k + 4]!.bandpass(x, fc * 0.8, 0.9);
+      if (o.tone > 0) y += combs[c]!.run(x * 0.3, Math.max(40, (fc / 4) * detune), 0.82) * o.tone * 2.2;
+      if (o.roar > 0) {
+        const cut = (150 + 300 * e) * v.tune;
+        y += roar[c * 2 + 1]!.low(roar[c * 2]!.low(x, cut), cut) * Math.pow(e, 1.3) * o.roar * 1.4;
+      }
+      ch[c] = hiss[c * 2 + 1]!.lowpass(hiss[c * 2]!.lowpass(rumble[c]!.highpass(y, 85), 9500), 9500);
     }
-    if (o.roar > 0) {
-      const cut = (150 + 320 * e) * v.tune;
-      const re = Math.pow(e, 1.3) * o.roar * 1.2;
-      l += roar[1]!.low(roar[0]!.low(xl, cut), cut) * re;
-      r += roar[3]!.low(roar[2]!.low(xr, cut), cut) * re;
-    }
-    const p = o.travel * Math.tanh((t - o.peak) / travelSpan);
-    const [gl, gr] = panGains(p);
+    const [gl, gr] = panGains(o.travel * Math.tanh((t - o.peak) / travelSpan));
     const g = e * turb * o.level * SQRT2;
-    v.out.addStereo(i, rumble[0]!.highpass(l, 85) * g * gl, rumble[1]!.highpass(r, 85) * g * gr);
+    v.out.addStereo(i, ch[0]! * g * gl, ch[1]! * g * gr);
   }
 }
