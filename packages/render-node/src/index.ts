@@ -31,6 +31,7 @@ export * from "./net/public-address.js";
 export * from "./host/node-host.js";
 export { resolveTitleFont } from "./host/scenes3d.js";
 export { findBlender, MIN_BLENDER, versionAtLeast } from "@zenvi/scenes3d";
+export * from "./fx/render.js";
 export * from "./decode/audio.js";
 export * from "./svg/opentype.js";
 export * from "./svg/text.js";

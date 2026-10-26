@@ -260,8 +260,10 @@ it):
 }
 ```
 
-- `kind`: `remotion`, `hyperframes` or `aftereffects`. Unknown keys survive
-  saving in the desktop app and in `@zenvi/engine`.
+- `kind`: `remotion`, `hyperframes` or `aftereffects`; the CLI and
+  `zenvi mcp` also write `zenvi-fx` (footage effects rendered by ffmpeg, see
+  [FX.md](FX.md)). Unknown keys survive saving in the desktop app and in
+  `@zenvi/engine`.
 - **States**: `fresh` (rendered from the current source), `stale` (the
   sources, props or render settings changed), `rendering`, `error` (the last
   render failed; nothing changed), `missing_source` (the folder or `.aep`

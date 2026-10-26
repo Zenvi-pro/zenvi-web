@@ -26,6 +26,7 @@ import { createMediaResolver } from "./paths.js";
 import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
 import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
 import { createNodeScenes3d } from "./scenes3d.js";
+import { createNodeFx } from "./fx.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
 
 export interface NodeHostOptions {
@@ -55,6 +56,8 @@ export interface NodeHostOptions {
   mattes?: MatteModel | false;
   /** Zenvi 3D (Blender scenes) when Blender is installed (default true). */
   scenes3d?: boolean;
+  /** Zenvi FX (ffmpeg footage effects; default true). */
+  fx?: boolean;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
@@ -226,6 +229,10 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   if (options.scenes3d !== false) {
     const scenes3d = createNodeScenes3d({ env: options.env, resolveMedia, log: options.log });
     if (scenes3d) host.scenes3d = scenes3d;
+  }
+  if (options.fx !== false) {
+    const fx = createNodeFx({ env: options.env, resolveMedia, projectFile: current, log: options.log });
+    if (fx) host.fx = fx;
   }
   const desktopDir = options.desktopDir;
   if (desktopDir) {
