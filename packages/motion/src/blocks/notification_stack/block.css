@@ -1,0 +1,22 @@
+/* Sizes in em of the stack's font size (31 px landscape, larger on vertical frames: set in block.ts). */
+.ns-stack { position: absolute; font-size: 31px; }
+.ns-card { position: absolute; left: 0; top: 0; width: 100%; padding: 0.84em 0.97em 0.9em; border-radius: var(--radius); background: var(--surface); color: var(--ink); transform-origin: 50% 0; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 2px 4px rgba(10, 12, 20, 0.08), 0 18px 40px -12px rgba(10, 12, 20, 0.35); }
+.is-dark .ns-card { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 18px 40px -12px rgba(0, 0, 0, 0.6); border: 1.5px solid var(--line); }
+.ns-meta { display: flex; align-items: center; gap: 0.45em; font-size: 0.78em; font-weight: 600; color: var(--muted); margin-bottom: 0.55em; }
+.ns-tile { width: 1.65em; height: 1.65em; border-radius: 0.45em; background: var(--accent); display: grid; place-items: center; }
+.ns-tile .icon { width: 1em; height: 1em; display: block; }
+.ns-app { flex: 1; letter-spacing: -0.005em; }
+.ns-time { font-weight: 500; }
+.ns-title { font-weight: 650; letter-spacing: -0.015em; line-height: 1.2; }
+.ns-body { font-weight: 420; letter-spacing: -0.01em; line-height: 1.28; }
+.ns-dm { display: flex; gap: 0.7em; align-items: flex-start; }
+.ns-avatar { flex: none; width: 2.45em; height: 2.45em; border-radius: 50%; display: grid; place-items: center; font-size: 0.9em; font-weight: 650; letter-spacing: 0.01em; }
+.ns-text { flex: 1; min-width: 0; }
+.ns-head { display: flex; align-items: baseline; gap: 0.4em; margin-bottom: 0.12em; }
+.ns-head .ns-title { flex: 1; }
+.ns-head .ns-time { font-size: 0.78em; color: var(--muted); }
+.ns-dot { width: 0.45em; height: 0.45em; border-radius: 50%; background: var(--accent); flex: none; align-self: center; }
+.ns-card.is-hot { background: var(--accent); }
+.ns-card.is-hot .ns-meta, .ns-card.is-hot .ns-head .ns-time { color: inherit; opacity: 0.72; }
+.ns-card.is-hot .ns-tile, .ns-card.is-hot .ns-dot { background: currentColor; }
+.ns-card.is-hot .ns-tile { color: var(--accent) !important; }
