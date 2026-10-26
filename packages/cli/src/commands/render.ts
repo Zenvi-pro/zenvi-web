@@ -39,6 +39,8 @@ export interface RenderFlags {
   crf?: string;
   encoderPreset?: string;
   loudness?: string;
+  /** false from `--no-limiter`. */
+  limiter?: boolean;
   open?: boolean;
 }
 
@@ -93,6 +95,7 @@ export function exportOptionsFrom(project: Project, output: string | undefined, 
   }
   const loudness = parseLoudness(flags.loudness);
   if (loudness) options.loudness = loudness;
+  if (flags.limiter === false) options.truePeakLimit = false;
   if (output) options.output = output;
   return options;
 }
@@ -147,6 +150,7 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
     .option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)")
     .option("--encoder-preset <preset>", "encoder speed: ultrafast … veryslow (default veryfast; the desktop app encodes at medium)")
     .option("--loudness <target>", "normalize the mix: social (-14 LUFS, -1 dBTP), broadcast (-23), podcast (-16), or a LUFS number; two-pass loudnorm with a true-peak limiter (default off)")
+    .option("--no-limiter", "export the mix as the timeline plays, without the -1 dBTP true-peak limiter every portable render ends with")
     .option("--open", "open the result when done")
     .action(async (outputArg: string | undefined, flags: RenderFlags) => {
       await withExecutor(ctx, async (executor) => {

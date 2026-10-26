@@ -58,6 +58,8 @@ export const renderOptionsSchema = z
       .object({ targetLufs: z.number().min(-40).max(-6), truePeakDbtp: z.number().min(-9).max(0) })
       .strict()
       .optional(),
+    /** false: no -1 dBTP safety limiter on the mix. */
+    truePeakLimit: z.boolean().optional(),
     range: z
       .object({ start: z.number().min(0), end: z.number().positive() })
       .refine((r) => r.end > r.start, "range.end must be after range.start")
@@ -96,5 +98,6 @@ export function resolveRenderOptions(project: Project, preset: PresetName | unde
   if (overrides.channels) options.channels = overrides.channels;
   if (overrides.range) options.range = overrides.range;
   if (overrides.loudness) options.loudness = overrides.loudness;
+  if (overrides.truePeakLimit === false) options.truePeakLimit = false;
   return options;
 }

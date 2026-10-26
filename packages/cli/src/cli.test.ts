@@ -248,5 +248,12 @@ describe("zenvi render options", () => {
     expect(() => exportOptionsFrom(project, undefined, { loudness: "3" })).toThrow(/--loudness/);
     expect(() => exportOptionsFrom(project, undefined, { loudness: "constructor" })).toThrow(/--loudness/);
   });
+
+  it("keeps the true-peak limiter on unless --no-limiter", () => {
+    const project = createProject({ profile: "HD 720p 30 fps" });
+    expect(exportOptionsFrom(project, undefined, {}).truePeakLimit).toBeUndefined();
+    expect(exportOptionsFrom(project, undefined, { limiter: true }).truePeakLimit).toBeUndefined();
+    expect(exportOptionsFrom(project, undefined, { limiter: false }).truePeakLimit).toBe(false);
+  });
 });
 
