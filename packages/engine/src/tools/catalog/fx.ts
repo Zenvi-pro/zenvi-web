@@ -18,6 +18,7 @@ import { FX_IDS, FX_INFO, FX_PARAMS, MAX_FX_STACK, fxEffectInput, fxStretch, par
 import { FX_RENDERER_VERSION } from "../../fx/graph.js";
 import { fxLink, readFxLink, type FxRender } from "../../fx/link.js";
 import { isSingleImageMedia } from "../../model/media.js";
+import { clipsUsingFile, findLayer } from "../../model/query.js";
 import type { Clip, Project, ProjectFile } from "../../model/types.js";
 import { sameJson } from "../../ops/internal.js";
 import { linkFxRender, relinkFxRender, unlinkFxRender } from "../../ops/fx.js";
@@ -83,6 +84,9 @@ function target(project: Project, tool: string, id: string): FxTarget | ToolRece
   const file = project.files.find((f) => String(f.id) === String(clip.file_id));
   if (!file) return refused(tool, `Error: clip ${id} plays file ${String(clip.file_id)}, which is not in the project.`);
   const link = readFxLink(file);
+  // Refused before the render: a locked track would only refuse the swap after it.
+  const locked = (link ? clipsUsingFile(project, String(file.id)) : [clip]).find((c) => findLayer(project, c.layer)?.lock);
+  if (locked) return refused(tool, `Error: clip ${locked.id} is on a locked track; unlock the track first.`);
   if (link) {
     const original = project.files.find((f) => String(f.id) === link.source.file_id);
     if (!original) return refused(tool, `Error: clip ${id} plays an FX render of file ${link.source.file_id}, which is no longer in the project.`);

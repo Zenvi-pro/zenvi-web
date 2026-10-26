@@ -99,6 +99,20 @@ describe("apply_fx_tool", () => {
     expect(host.calls.some((c) => c.startsWith("fx "))).toBe(false);
   });
 
+  it("refuses a clip on a locked track before rendering", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    await call(doc, host, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ effect: "bloom" }] });
+    doc.transaction("lock", (tx) => tx.update(["layers", { number: clipOf(doc, IDS.clipB).layer }], { lock: true }));
+    const renders = host.calls.filter((c) => c.startsWith("fx ")).length;
+    for (const [name, args] of [["apply_fx_tool", { effects: [{ effect: "vignette" }] }], ["update_fx_tool", { amount: 1 }], ["remove_fx_tool", {}]] as const) {
+      const r = await call(doc, host, name, { clip_id: IDS.clipB, ...args });
+      expect(r).toMatchObject({ status: "refused", summary: expect.stringMatching(/locked track/) });
+    }
+    expect(host.calls.filter((c) => c.startsWith("fx "))).toHaveLength(renders);
+    expect(doc.undoLabels).toEqual(["Apply FX bloom", "lock"]);
+  });
+
   it("leaves history untouched when the render fails", async () => {
     const doc = fixtureDoc();
     doc.transaction("relink", (tx) => tx.update(["files", { id: IDS.broll }], { path: "/media/unrenderable.mp4" }));
