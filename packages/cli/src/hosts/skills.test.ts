@@ -1,13 +1,14 @@
 /**
  * The Claude Code plugin's skills teach agents exact tool calls. Every tool
  * they name must exist, and every JSON example must pass the tool's own
- * argument validation (and a motion block's parameter check), so a renamed
- * argument breaks this test instead of the agent's first call.
+ * argument validation (and a motion block's or 3D scene's parameter check),
+ * so a renamed argument breaks this test instead of the agent's first call.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseScene3dParams, type Scene3dId } from "@zenvi/engine";
 import { getTool, normalizeArgs } from "@zenvi/engine/tools";
 import { checkParams, getBlock } from "@zenvi/motion";
 import { describe, expect, it } from "vitest";
@@ -67,6 +68,10 @@ describe("plugin skills", () => {
         const check = checkParams(block!, (args.params ?? {}) as Record<string, unknown>);
         expect(check.ok ? "ok" : check.error).toBe("ok");
       }
+      if (example.tool === "add_3d_scene_tool") {
+        const check = parseScene3dParams(args.scene as Scene3dId, args.params);
+        expect(check.ok ? "ok" : check.error).toBe("ok");
+      }
     }
   });
 
@@ -77,5 +82,6 @@ describe("plugin skills", () => {
     const tool = getTool(bad!.tool)!;
     expect(tool.input.safeParse(normalizeArgs(tool.inputSchema, JSON.parse(bad!.args))).success).toBe(false);
     expect(checkParams(getBlock("counter")!, { value: "3" }).ok).toBe(false);
+    expect(parseScene3dParams("device_mockup", { device: "phone", move: "orbit_wildly" }).ok).toBe(false);
   });
 });

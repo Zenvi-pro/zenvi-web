@@ -33,15 +33,25 @@ add_motion_block_tool {"block": "particle_burst", "position_seconds": 3.3, "dura
   "params": {"shape": "square", "count": 60, "origin": [{"x": 0.5, "y": 0.55}], "rings": true}}
 ```
 
-3. 3D (CLI with Blender): `add_3d_scene_tool` `scene: "device_mockup"`,
-   `quality: "draft"`, `params: {"device": "phone", "file_id": "<screen
-   video>", "move": "hero"}`; look at the draft, then `rerender_3d_scene_tool`
-   `quality: "final"`. For a non-device product use `glass_hero` only as an
-   abstract accent; the product itself stays the AI still.
-   Without Blender: the still with `set_keyframes_tool` `scale_x`/`scale_y`
-   `[{seconds: 4.5, value: 0.6}, {seconds: 5.1, value: 1.04, ease:
-   "ease_out_back"}, {seconds: 5.35, value: 1}]` and `rotation` `-12 → 0` over
-   the same 0.6 s: fast in, small overshoot, settle.
+3. 3D (CLI with Blender): a draft first; look at it, then
+   `rerender_3d_scene_tool` `quality: "final"`. For a non-device product use
+   `glass_hero` only as an abstract accent; the product itself stays the AI
+   still.
+
+```json
+add_3d_scene_tool {"scene": "device_mockup", "quality": "draft", "position_seconds": 4.5, "duration_seconds": 3.5,
+  "params": {"device": "phone", "file_id": "<screen video>", "move": "hero"}}
+```
+
+   Without Blender: pop the still in with keyframes, the same points on
+   `scale_x` and `scale_y` (two calls), and `rotation` `-12 → 0` over the
+   same 0.6 s: fast in, small overshoot, settle. `timeline_seconds`, not
+   `seconds`: `seconds` counts from the clip's first frame.
+
+```json
+set_keyframes_tool {"timeline_clip_id": "<product still>", "property": "scale_x",
+  "points": [{"timeline_seconds": 4.5, "value": 0.6}, {"timeline_seconds": 5.1, "value": 1.04, "ease": "ease_out_back"}, {"timeline_seconds": 5.35, "value": 1}]}
+```
 4. Callouts: `add_motion_block_tool` `block: "hud_callouts"`,
    `position_seconds: 8`, `params: {"title": "", "labels": ["Battery",
    "Weight", "Sound"], "values": ["30 h", "86 g", "Hi-Fi"], "points": [...],

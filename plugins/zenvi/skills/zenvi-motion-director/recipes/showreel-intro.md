@@ -17,11 +17,14 @@ Confident, fast-in long-settle motion, one signature colour.
 
 ## Tools
 
-1. 3D (CLI with Blender): `add_3d_scene_tool` `scene: "title_3d"`,
-   `quality: "draft"`, `params: {"text": "M", "style": "chrome", "animation":
-   "tumble", "accent": "#FF5A36"}`; check, then `rerender_3d_scene_tool`
+1. 3D (CLI with Blender): a draft, check it, then `rerender_3d_scene_tool`
    `quality: "final"`. Without Blender: `kinetic_headline` `style: "pop"`
    with `display_font: "display"`.
+
+```json
+add_3d_scene_tool {"scene": "title_3d", "quality": "draft", "position_seconds": 1.5, "duration_seconds": 2.5,
+  "params": {"text": "M", "style": "chrome", "animation": "tumble", "accent": "#FF5A36"}}
+```
 2. Name and role:
 
 ```json
