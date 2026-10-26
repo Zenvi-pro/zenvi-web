@@ -2,7 +2,8 @@
  * The web editor as a tool host: what engine tools may use when the
  * Assistant (or the command palette) runs them here.
  */
-import type { CloudMediaRef, ExportOptions, ExportResult, ImportedMedia, ReaderInfo, ToolHost, ToolImage } from "@zenvi/engine";
+import type { BackendHost, CloudMediaRef, ExportOptions, ExportResult, ImportedMedia, ReaderInfo, ToolHost, ToolImage } from "@zenvi/engine";
+import { backendStock } from "@zenvi/engine/tools";
 import { canExportWith } from "@zenvi/render-web";
 import { backendRequest } from "@/lib/backend";
 import { config } from "@/lib/env";
@@ -121,6 +122,10 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
     if (!spec) throw new Error(`the media for ${path} is not loaded (relink it first)`);
     return spec;
   };
+  const backend: BackendHost = {
+    baseUrl: config.backendUrl,
+    request: (path, init) => backendRequest(path, { ...init, auth: true }),
+  };
   const host: ToolHost = {
     player: {
       get playhead() {
@@ -215,10 +220,8 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
         return files.map((f) => gone.has(f.id));
       },
     },
-    backend: {
-      baseUrl: config.backendUrl,
-      request: (path, init) => backendRequest(path, { ...init, auth: true }),
-    },
+    backend,
+    stock: backendStock(backend),
     storage: {
       async save(project) {
         await session.autosave.flush();

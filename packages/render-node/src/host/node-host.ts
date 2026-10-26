@@ -9,6 +9,7 @@ import { mkdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
+import { backendStock } from "@zenvi/engine/tools";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
 import { transcribeMediaFile } from "../audio/speech.js";
 import { engineAssetsDir } from "../resources.js";
@@ -247,6 +248,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   }
   if (options.backend) {
     host.backend = createBackendHost(options.backend);
+    host.stock = backendStock(host.backend);
     // Speech recognition through the Zenvi backend, as the person `zenvi login` signed in.
     const upload = backendSpeechUpload(options.backend);
     host.audio!.transcribe = (p, o) => transcribeMediaFile(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal, upload });

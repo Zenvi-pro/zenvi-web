@@ -28,6 +28,7 @@ import type {
   ToolImage,
 } from "../types.js";
 import { readBundledFont } from "../../typography/test-fonts.js";
+import { backendStock } from "../backend.js";
 import { fakeMotionHost } from "./fake-motion.js";
 import { SPOKEN_WORDS, TRANSCRIPT_CUES, infoForPath, videoInfo } from "./fixture.js";
 
@@ -555,6 +556,7 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
       },
     };
   }
+  if (!without.has("stock") && host.backend) host.stock = backendStock(host.backend);
   if (!without.has("storage")) {
     host.storage = {
       save: async (_project, path) => {

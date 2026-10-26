@@ -17,9 +17,9 @@ Every call returns a contract-3 receipt (`{contract: 3, status, tool, summary, c
 
 Availability follows each tool's required host capabilities and the host methods it calls at run time; the hosts are described in `SURFACE_PROFILES` (packages/engine/src/tools/availability.ts). Capabilities a session may lack (signed out of Zenvi, no WebCodecs export) are noted per tool.
 
-- **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage, assets, audio; methods media.importUrl, media.pickFiles, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, ui.openExportDialog, audio.decodePcm, audio.transcribe, ui.selection, ui.setSelection, ui.timelineView, ui.showTimelineRange, ui.setTimelineMode, ui.layout, ui.preferences, ui.clearPlaybackCache, exporter.supports; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
-- **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend, assets, mattes, motion, scenes3d; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, media.missing, media.fetchWebVideo, storage.open, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, storage.recoveryCopies, storage.customProfiles, media.collect, audio.decodePcm, audio.transcribe, exporter.supports, frames.fontFamilies; only sometimes: backend (signed in with zenvi login), media.fetchWebVideo (yt-dlp is installed; zenvi doctor checks), mattes (onnxruntime-node is installed; the matting model downloads on first use), motion (headless Chrome is installed: zenvi motion setup), scenes3d (Blender 4.2+ is installed (or ZENVI_BLENDER points to it)).
-- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, exporter, mattes, motion; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend), mattes (onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)), motion (the image has chrome-headless-shell (one block renders at a time)); hides 17 local-app tools.
+- **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, stock, storage, assets, audio; methods media.importUrl, media.pickFiles, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, ui.openExportDialog, audio.decodePcm, audio.transcribe, ui.selection, ui.setSelection, ui.timelineView, ui.showTimelineRange, ui.setTimelineMode, ui.layout, ui.preferences, ui.clearPlaybackCache, exporter.supports; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi), stock (signed in to Zenvi).
+- **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend, stock, assets, mattes, motion, scenes3d; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, media.missing, media.fetchWebVideo, storage.open, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, storage.recoveryCopies, storage.customProfiles, media.collect, audio.decodePcm, audio.transcribe, exporter.supports, frames.fontFamilies; only sometimes: backend (signed in with zenvi login), stock (signed in with zenvi login), media.fetchWebVideo (yt-dlp is installed; zenvi doctor checks), mattes (onnxruntime-node is installed; the matting model downloads on first use), motion (headless Chrome is installed: zenvi motion setup), scenes3d (Blender 4.2+ is installed (or ZENVI_BLENDER points to it)).
+- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, stock, exporter, mattes, motion; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend), stock (the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY), mattes (onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)), motion (the image has chrome-headless-shell (one block renders at a time)); hides 17 local-app tools.
 
 ## Matrix
 
@@ -1185,7 +1185,7 @@ Availability: editor yes (only when signed in to Zenvi); cli yes (only when sign
 
 Surfaces: assistant, mcp, cli, editor. edits, open world. Needs: media.
 
-Availability: editor partial (search needs the Zenvi backend; local_path needs local file access); cli yes; cloud partial (search needs the Zenvi backend; local_path needs local file access; only when ffprobe is available); desktop yes.
+Availability: editor partial (search needs stock search; local_path needs local file access); cli yes; cloud partial (search needs stock search; local_path needs local file access; only when ffprobe is available); desktop yes.
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -3535,9 +3535,9 @@ Availability: editor — (needs Zenvi 3D (Blender on this computer) and local fi
 
 **Search stock videos** (direct tool). Search Pexels stock videos (free to use, credit optional).
 
-Surfaces: mcp, cli, editor. read-only, open world. Needs: backend.
+Surfaces: mcp, cli, editor. read-only, open world. Needs: stock.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when the server is set up to call the Zenvi backend); desktop — (web-only direct tool).
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -3549,9 +3549,9 @@ Availability: editor yes (only when signed in to Zenvi); cli yes (only when sign
 
 **Search stock music** (direct tool). Search Freesound music and sound effects.
 
-Surfaces: mcp, cli, editor. read-only, open world. Needs: backend.
+Surfaces: mcp, cli, editor. read-only, open world. Needs: stock.
 
-Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when the server is set up to call the Zenvi backend); desktop — (web-only direct tool).
+Availability: editor yes (only when signed in to Zenvi); cli yes (only when signed in with zenvi login); cloud yes (only when the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |

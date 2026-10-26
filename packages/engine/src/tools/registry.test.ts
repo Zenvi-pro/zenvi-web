@@ -190,9 +190,9 @@ describe("availability matrix", () => {
 
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
-      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes", "motion", "scenes3d"],
-      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "exporter", "mattes", "motion"],
+      editor: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d"],
+      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion"],
     };
     for (const tool of allTools) {
       const a = toolAvailability(tool);
