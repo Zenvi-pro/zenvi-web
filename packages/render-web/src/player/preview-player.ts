@@ -8,24 +8,23 @@
  *   frame the clock says. A late frame is dropped, never drawn behind time.
  * - Frames render at the canvas's device-pixel size, fitted like libopenshot's
  *   `SetMaxSize` (never above the project size), letterboxed and centered.
+ * - With `worker`, frames are decoded and composited in that Worker on an
+ *   `OffscreenCanvas` (effects kernels included); the clock and sound stay
+ *   here, so the page's main thread only sends frame numbers.
  */
 
 import type { Project } from "@zenvi/engine";
 import { AudioPlayback } from "../audio/playback.js";
-import { KernelAudioSource } from "../audio/kernel-audio.js";
 import { AudioRenderer } from "../audio/renderer.js";
 import type { ClockAnchor } from "../audio/schedule.js";
-import { Compositor, type LayerError, type LayerResources } from "../compositor/compositor.js";
-import { mediaResources } from "../compositor/resources.js";
 import { defaultEngine, type RenderEngine } from "../engine.js";
 import type { MediaRegistry } from "../media/registry.js";
-import { StillCache } from "../media/stills.js";
+import type { StillCache } from "../media/stills.js";
 import type { DecodeMode } from "../video/decode-cursor.js";
-import { FrameCache } from "../video/frame-cache.js";
-import { FrameProvider } from "../video/frame-provider.js";
-import { bindCanvas, type CanvasSurface, type PreviewCanvas } from "./canvas-binding.js";
+import { bindCanvas, type PreviewCanvas } from "./canvas-binding.js";
 import { audibleContextTime, audioClock, performanceClock, type PlaybackClock } from "./clock.js";
-import { fitViewport } from "./layout.js";
+import { PreviewRenderer, type PreviewTarget, type RenderErrorEvent } from "./preview-renderer.js";
+import { WorkerPreview } from "./worker/client.js";
 
 export interface PlayerState {
   playing: boolean;
@@ -41,10 +40,7 @@ export interface PlayerState {
   waiting: boolean;
 }
 
-export type PlayerErrorEvent =
-  | { kind: "layer"; clipId: string; stage: LayerError["stage"]; error: unknown }
-  | { kind: "audio"; error: unknown }
-  | { kind: "render"; error: unknown };
+export type PlayerErrorEvent = RenderErrorEvent | { kind: "audio"; error: unknown };
 
 export interface PreviewPlayerOptions {
   media: MediaRegistry;
@@ -58,8 +54,15 @@ export interface PreviewPlayerOptions {
   letterbox?: string;
   /** Budget for decoded preview frames. Default 192 MB. */
   frameCacheBytes?: number;
-  /** A still/SVG cache to share with other consumers. */
+  /** A still/SVG cache to share with other consumers (page rendering only). */
   stills?: StillCache;
+  /**
+   * Render in this Worker (one running `@zenvi/render-web/preview-worker`; it
+   * may serve several players). Needs an `HTMLCanvasElement` that can
+   * `transferControlToOffscreen` (see `canPreviewInWorker`); the Worker uses
+   * the default engine. The caller owns the Worker.
+   */
+  worker?: Worker;
 }
 
 /** Audio scheduled this far in the future on play, so the first window is decoded before it is due. */
@@ -73,21 +76,15 @@ const AUDIO_START_TIMEOUT_MS = 2000;
 const MAX_SEQUENTIAL_RATE = 4;
 /** After this long without rendering, idle decoders are closed (scrubbing across many clips opens many). */
 const IDLE_SWEEP_MS = 4000;
+/** During playback, decoders are swept this often. */
+const PLAYBACK_SWEEP_MS = 1000;
 
 export class PreviewPlayer {
   private project: Project | null = null;
   private readonly engine: RenderEngine;
   private readonly media: MediaRegistry;
-  private readonly surface: CanvasSurface;
-  private readonly frames: FrameProvider;
-  private readonly stills: StillCache;
-  private readonly ownsStills: boolean;
-  private readonly compositor: Compositor;
-  private readonly resources: LayerResources;
+  private readonly target: PreviewTarget;
   private readonly audioRenderer: AudioRenderer;
-  private readonly kernelAudio: KernelAudioSource;
-  private readonly resolution: number;
-  private readonly letterbox: string;
   private audioContext: AudioContext | null;
   private readonly ownsAudioContext: boolean;
   private audio: AudioPlayback | null = null;
@@ -105,31 +102,26 @@ export class PreviewPlayer {
   private lastSweep = 0;
   private idleSweep: ReturnType<typeof setTimeout> | null = null;
 
-  private pending: { frame: number; mode: DecodeMode } | null = null;
-  private rendering = false;
-  private shownFrame = 0;
-  private generation = 0;
-  private idle: (() => void)[] = [];
 
   private readonly timeListeners = new Set<(seconds: number) => void>();
   private readonly stateListeners = new Set<(state: PlayerState) => void>();
   private readonly errorListeners = new Set<(event: PlayerErrorEvent) => void>();
   private readonly reported = new Set<string>();
   private disposed = false;
-  private readonly unbindResize: () => void;
+  private readonly unbind: (() => void)[];
 
   constructor(canvas: PreviewCanvas, options: PreviewPlayerOptions) {
     this.media = options.media;
     this.engine = options.engine ?? defaultEngine;
-    this.resolution = Math.min(1, Math.max(0.1, options.resolution ?? 1));
-    this.letterbox = options.letterbox ?? "#000";
-    this.surface = bindCanvas(canvas, { transparent: this.letterbox === "transparent" });
-    this.frames = new FrameProvider({ media: this.media, cache: new FrameCache(options.frameCacheBytes), quality: "medium" });
-    this.ownsStills = !options.stills;
-    this.stills = options.stills ?? new StillCache({ media: this.media, quality: "high" });
-    this.compositor = new Compositor({ engine: this.engine });
-    this.kernelAudio = new KernelAudioSource(this.media);
-    this.resources = mediaResources({ media: this.media, frames: this.frames, stills: this.stills, audio: this.kernelAudio });
+    const letterbox = options.letterbox ?? "#000";
+    const look = { letterbox, ...(options.resolution !== undefined ? { resolution: options.resolution } : {}), ...(options.frameCacheBytes !== undefined ? { frameCacheBytes: options.frameCacheBytes } : {}) };
+    if (options.worker) {
+      if (typeof HTMLCanvasElement === "undefined" || !(canvas instanceof HTMLCanvasElement)) throw new Error("A Worker preview needs an HTMLCanvasElement");
+      this.target = new WorkerPreview(options.worker, canvas, this.media, look);
+    } else {
+      const surface = bindCanvas(canvas, { transparent: letterbox === "transparent" });
+      this.target = new PreviewRenderer(surface, { media: this.media, engine: this.engine, ...look, ...(options.stills ? { stills: options.stills } : {}) });
+    }
     this.audioRenderer = new AudioRenderer({
       media: this.media,
       engine: this.engine,
@@ -137,7 +129,15 @@ export class PreviewPlayer {
     });
     this.audioContext = options.audioContext ?? null;
     this.ownsAudioContext = !options.audioContext;
-    this.unbindResize = this.surface.onResize(() => this.redraw());
+    this.unbind = [
+      this.target.onResize(() => this.redraw()),
+      this.target.onBusy((busy) => {
+        if (this.playing || this.disposed) return;
+        this.emitState();
+        if (!busy) this.scheduleIdleSweep();
+      }),
+      this.target.onError((key, event) => this.report(key, event)),
+    ];
   }
 
   // -------------------------------------------------------------------------
@@ -148,7 +148,7 @@ export class PreviewPlayer {
   setProject(project: Project): void {
     this.assertLive();
     this.project = project;
-    this.generation += 1;
+    this.target.setProject(project);
     if (this.playing) this.anchorAt(this.clampTime(this.currentClockTime()));
     this.redraw();
     this.emitState();
@@ -232,7 +232,7 @@ export class PreviewPlayer {
 
   /** The 1-based frame on screen. */
   get frame(): number {
-    return this.shownFrame;
+    return this.target.shownFrame;
   }
 
   /** Where the last clip or transition ends, seconds. */
@@ -288,17 +288,33 @@ export class PreviewPlayer {
     return {
       playing: this.playing,
       time: this.time,
-      frame: this.shownFrame,
+      frame: this.target.shownFrame,
       rate: this.rateValue,
       loop: this.loopValue,
       duration: this.duration,
-      waiting: this.rendering,
+      waiting: this.target.busy,
     };
   }
 
   /** Decoded pictures dropped because playback outran decoding. */
   get droppedFrames(): number {
-    return this.frames.droppedFrames;
+    return this.target.droppedFrames;
+  }
+
+  /** Frames drawn on the canvas since the player was created. */
+  get presentedFrames(): number {
+    return this.target.presented;
+  }
+
+  /** Whether frames render in a Worker. */
+  get inWorker(): boolean {
+    return this.target instanceof WorkerPreview;
+  }
+
+  /** The picture on screen, at most `maxWidth` wide (close it); null before the first frame. */
+  snapshot(maxWidth: number): Promise<ImageBitmap | null> {
+    this.assertLive();
+    return this.target.snapshot(maxWidth);
   }
 
   onTime(listener: (seconds: number) => void): () => void {
@@ -322,24 +338,17 @@ export class PreviewPlayer {
     // Stop without pause(): it would ask for one more frame while everything is torn down.
     this.disposed = true;
     this.playing = false;
-    this.pending = null;
     this.clock = null;
     this.stopLoop();
     if (this.idleSweep !== null) clearTimeout(this.idleSweep);
-    this.unbindResize();
-    this.surface.dispose();
+    for (const off of this.unbind) off();
+    this.target.dispose();
     this.audio?.dispose();
     void this.audioRenderer.dispose();
-    void this.kernelAudio.reset();
     if (this.ownsAudioContext) void this.audioContext?.close().catch(() => undefined);
-    void this.frames.dispose();
-    this.frames.cache.clear();
-    if (this.ownsStills) this.stills.dispose();
-    this.compositor.dispose();
     this.timeListeners.clear();
     this.stateListeners.clear();
     this.errorListeners.clear();
-    for (const resolve of this.idle.splice(0)) resolve();
   }
 
   // -------------------------------------------------------------------------
@@ -349,88 +358,28 @@ export class PreviewPlayer {
   private redraw(): void {
     const project = this.project;
     if (!project || this.disposed) return;
-    this.generation += 1;
+    this.target.invalidate();
     const frame = this.engine.frameAt(project, this.time);
     this.request(frame, this.playing ? this.playbackMode() : "seek");
   }
 
   /** Render `frame` next (replacing any frame still waiting to render). */
   private request(frame: number, mode: DecodeMode): void {
-    this.pending = { frame, mode };
-    if (!this.rendering) void this.renderLoop();
+    this.target.request(frame, mode);
   }
 
   /** `request`, resolving once rendering goes idle. */
   private show(frame: number, mode: DecodeMode): Promise<void> {
-    const done = new Promise<void>((resolve) => this.idle.push(resolve));
     this.request(frame, mode);
-    return done;
-  }
-
-  private async renderLoop(): Promise<void> {
-    this.rendering = true;
-    if (!this.playing) this.emitState();
-    try {
-      while (this.pending && !this.disposed) {
-        const { frame, mode } = this.pending;
-        this.pending = null;
-        await this.renderFrame(frame, mode);
-      }
-    } finally {
-      this.rendering = false;
-      for (const resolve of this.idle.splice(0)) resolve();
-      if (!this.playing && !this.disposed) {
-        this.emitState();
-        this.scheduleIdleSweep();
-      }
-    }
+    return this.target.whenIdle();
   }
 
   private scheduleIdleSweep(): void {
     if (this.idleSweep !== null) clearTimeout(this.idleSweep);
     this.idleSweep = setTimeout(() => {
       this.idleSweep = null;
-      if (!this.disposed && !this.playing && !this.rendering) this.frames.sweep();
+      if (!this.disposed && !this.playing && !this.target.busy) this.target.sweep();
     }, IDLE_SWEEP_MS);
-  }
-
-  private async renderFrame(frame: number, mode: DecodeMode): Promise<void> {
-    const project = this.project;
-    if (!project) return;
-    const generation = this.generation;
-    const canvas = this.surface.size();
-    const projectSize = { width: project.width, height: project.height };
-    // The planner fits the project into this box (Timeline::SetMaxSize).
-    const box = { width: Math.max(1, Math.floor(canvas.width * this.resolution)), height: Math.max(1, Math.floor(canvas.height * this.resolution)) };
-    let prepared: Awaited<ReturnType<Compositor["prepare"]>> | null = null;
-    try {
-      const plan = this.engine.planFrame(project, frame, box, { preview: true });
-      // A frame that does not follow the last one starts stateful effects afresh.
-      if (mode !== "sequential") this.compositor.resetEffectState();
-      prepared = await this.compositor.prepare(plan, this.resources, { mode });
-      // A resize or a new project arrived meanwhile: its own render follows.
-      if (generation !== this.generation || this.disposed) return;
-      const ctx = this.surface.ctx;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = "source-over";
-      if (this.letterbox === "transparent") ctx.clearRect(0, 0, canvas.width, canvas.height);
-      else {
-        ctx.fillStyle = this.letterbox;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      this.compositor.draw(prepared, ctx, fitViewport(canvas, projectSize, plan));
-      this.shownFrame = frame;
-      // A scrub preview: decode the exact frame next, unless the playhead already moved on.
-      if (!prepared.exact && !this.pending) this.pending = { frame, mode: "seek" };
-      for (const error of prepared.errors) {
-        this.report(`${error.clipId}:${error.stage}:${String(error.error)}`, { kind: "layer", ...error });
-      }
-    } catch (error) {
-      this.report(`render:${String(error)}`, { kind: "render", error });
-    } finally {
-      prepared?.release();
-    }
   }
 
   private playbackMode(): DecodeMode {
@@ -533,11 +482,11 @@ export class PreviewPlayer {
     this.timeValue = t;
     this.emitTime(t);
     const frame = this.engine.frameAt(project, t);
-    if (frame !== this.shownFrame && frame !== this.pending?.frame) this.request(frame, this.playbackMode());
+    if (this.target.wants(frame)) this.request(frame, this.playbackMode());
     this.audio?.pump();
-    if (now() - this.lastSweep > 1000) {
+    if (now() - this.lastSweep > PLAYBACK_SWEEP_MS) {
       this.lastSweep = now();
-      this.frames.sweep();
+      this.target.sweep();
     }
     this.raf = requestFrame(this.tick);
   };
