@@ -67,6 +67,20 @@ describe("FX filtergraphs", () => {
     }
   });
 
+  it("stay inside ffmpeg's option ranges at extreme amounts and thresholds", () => {
+    // curves refuses repeated or unordered points; colorchannelmixer gains top out at 2.
+    for (const [effect, params] of [["bloom", { threshold: 0 }], ["bloom", { threshold: 1 }], ["pixel_sort", { threshold: 0 }], ["pixel_sort", { threshold: 1 }]] as const) {
+      for (const amount of [0, 1]) {
+        const graph = buildFxGraph(stack([{ effect, amount, params }]), HD).filterComplex;
+        for (const [, points] of graph.matchAll(/curves=all='([^']+)'/g)) {
+          const xs = points!.split(" ").map((p) => Number(p.split("/")[0]));
+          expect(xs.every((x, i) => i === 0 || x > xs[i - 1]!), `${effect} ${amount}: ${points}`).toBe(true);
+        }
+        for (const [, gain] of graph.matchAll(/colorchannelmixer=rr=([\d.]+)/g)) expect(Number(gain)).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
   it("are deterministic: the same stack builds the same text", () => {
     const effects = stack([{ effect: "glitch", params: { seed: 11 } }, { effect: "light_leak" }]);
     expect(buildFxGraph(effects, HD).filterComplex).toBe(buildFxGraph(structuredClone(effects), HD).filterComplex);

@@ -240,7 +240,8 @@ function chromaticAberration(g: Graph, input: string, e: FxEffect<"chromatic_abe
 /** Highlights above the threshold, blurred at two sizes at quarter resolution, screened back over. */
 function bloom(g: Graph, input: string, e: FxEffect<"bloom">): string {
   const { width: w, height: h } = g.ctx;
-  const t = clamp(e.params.threshold, 0, 0.98);
+  // curves needs strictly increasing points.
+  const t = clamp(e.params.threshold, 0.01, 0.98);
   const qw = even(w / 4);
   const qh = even(h / 4);
   const sigma = (3 + 14 * e.params.radius) * g.k;
@@ -253,8 +254,11 @@ function bloom(g: Graph, input: string, e: FxEffect<"bloom">): string {
   g.add(`[${near}]gblur=sigma=${num(sigma)}[${n}]`);
   g.add(`[${far}]gblur=sigma=${num(sigma * 3.5)}[${f}]`);
   const glow = g.label();
-  const gain = num(1 + 1.2 * e.amount);
-  g.add(`[${n}][${f}]blend=all_mode=addition,colorchannelmixer=rr=${gain}:gg=${gain}:bb=${gain},scale=${w}:${h}:flags=bicubic${g.ctx.alpha ? ",format=gbrap" : ""}[${glow}]`);
+  // colorchannelmixer takes gains up to 2, so a stronger glow is two passes of the square root.
+  const gain = 1 + 1.2 * e.amount;
+  const pass = (k: number) => `colorchannelmixer=rr=${num(k)}:gg=${num(k)}:bb=${num(k)}`;
+  const boost = gain <= 2 ? pass(gain) : `${pass(Math.sqrt(gain))},${pass(Math.sqrt(gain))}`;
+  g.add(`[${n}][${f}]blend=all_mode=addition,${boost},scale=${w}:${h}:flags=bicubic${g.ctx.alpha ? ",format=gbrap" : ""}[${glow}]`);
   return g.blend(base!, glow, "screen", 0.5 + 0.5 * e.amount);
 }
 
@@ -332,7 +336,8 @@ function pixelSort(g: Graph, input: string, e: FxEffect<"pixel_sort">): string {
   const smear = g.label();
   g.add(`[${src}]dblur=angle=${angle}:radius=${len},${shift},eq=contrast=1.25:saturation=1.3[${smear}]`);
   const keyed = g.label();
-  const t = clamp(e.params.threshold, 0.02, 0.98);
+  // curves needs strictly increasing points: keep the ramp inside (0, 1).
+  const t = clamp(e.params.threshold, 0.03, 0.97);
   // The mask also smears, so the sorted streaks run past the bright region's edge.
   g.add(
     `[${key}]format=gray,curves=all='0/0 ${num(t - 0.02)}/0 ${num(t + 0.02)}/1 1/1',` +
