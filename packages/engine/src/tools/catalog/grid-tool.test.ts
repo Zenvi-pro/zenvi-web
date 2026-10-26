@@ -98,6 +98,7 @@ describe("add_motion_template_tool grid", () => {
       [{ template: "grid", file_ids: FILES, layout: "strips_h", tiles: 6, band: "21:9" }, /px on their short side/],
       [{ template: "grid", file_ids: FILES, merge: true, zoom_into: 2 }, /merge or zoom_into/],
       [{ template: "grid" }, /needs file_ids/],
+      [{ template: "ui_cards", file_ids: FILES, layout: "strips_v", tiles: 3 }, /layout, tiles only apply to the grid template/],
     ] as const) {
       const result = await runTool({ doc, host: host() }, "add_motion_template_tool", { ...args, bpm: "120" });
       expect(result.ok).toBe(false);

@@ -91,6 +91,9 @@ const input = z.strictObject({
 
 type Input = z.infer<typeof input>;
 
+/** Arguments only the grid template reads. */
+const GRID_ARGS = ["layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into"] as const satisfies readonly (keyof Input)[];
+
 function displaySize(file: ProjectFile): { width: number; height: number } | null {
   const w = Number(file.width);
   const h = Number(file.height);
@@ -233,6 +236,8 @@ export const motionTemplateTools: CatalogTool[] = [
         if (typeof m === "string") return refused(TOOL, `Error: ${m}; give a video or a photo.`);
         media.set(id, m);
       }
+      const gridOnly = GRID_ARGS.filter((k) => args[k] !== undefined);
+      if (args.template !== "grid" && gridOnly.length > 0) return refused(TOOL, `Error: ${gridOnly.join(", ")} only apply to the grid template.`);
       const gridOptions: GridOptions | undefined =
         args.template === "grid"
           ? {
