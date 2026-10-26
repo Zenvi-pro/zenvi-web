@@ -1,0 +1,2 @@
+.tmx-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.tmx-fallback { position: absolute; left: 0; right: 0; text-align: center; font-family: var(--font-display); font-weight: 800; color: var(--ink); }

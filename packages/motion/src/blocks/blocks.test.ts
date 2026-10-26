@@ -9,7 +9,7 @@ import { checkParams } from "../params.js";
 import { createContext, type BlockBuild } from "../runtime/index.js";
 
 /** Blocks that draw only into a canvas, which jsdom does not paint. */
-const CANVAS_ONLY = new Set(["gradient_field"]);
+const CANVAS_ONLY = new Set(["gradient_field", "line_trails"]);
 
 /** The root's HTML with each style attribute's declarations sorted (setting a property again may move it). */
 function normalized(root: HTMLElement): string {

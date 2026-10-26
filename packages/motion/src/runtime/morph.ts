@@ -174,20 +174,47 @@ export function prepareMorph(from: Outline, to: Outline, options: MorphOptions =
   return { pairs };
 }
 
-/**
- * The rings `p` of the way through `morph`. `delay(i)` (0..1) holds pair i
- * back so a morph can sweep across a word; each pair still finishes at p = 1.
- */
-export function morphRings(morph: Morph, p: number, delay?: (pair: number, center: Point) => number): Point[][] {
+export interface MorphFrame {
+  /** 0..1 per pair, holding pair i back so a morph can sweep across a word; each pair still finishes at p = 1. */
+  delay?: (pair: number, center: Point) => number;
+  /** Applied to each pair's own progress, after its delay (so every letter gets the whole curve). */
+  ease?: (q: number) => number;
+  /**
+   * Smoothing passes at mid-morph (0 = none): unrelated outlines cross
+   * themselves halfway; relaxing the in-between rings turns that into a
+   * soft, liquid in-between. Weighted by sin(πq), so the ends stay exact.
+   */
+  smooth?: number;
+}
+
+/** Relax a ring `passes` times (each point toward its neighbours' midpoint; a fractional last pass). */
+function relax(ring: Point[], passes: number): Point[] {
+  let r = ring;
+  for (let k = 0; k < Math.ceil(passes); k += 1) {
+    const w = Math.min(1, passes - k) * 0.5;
+    const n = r.length;
+    r = r.map((q, i) => {
+      const a = r[(i + n - 1) % n]!;
+      const b = r[(i + 1) % n]!;
+      return { x: q.x + w * ((a.x + b.x) / 2 - q.x), y: q.y + w * ((a.y + b.y) / 2 - q.y) };
+    });
+  }
+  return r;
+}
+
+/** The rings `p` (0..1, linear time) of the way through `morph`. */
+export function morphRings(morph: Morph, p: number, frame: MorphFrame = {}): Point[][] {
   return morph.pairs.map(([a, b], i) => {
     let q = p;
-    if (delay) {
-      const d = Math.min(0.9, Math.max(0, delay(i, centroid(a))));
+    if (frame.delay) {
+      const d = Math.min(0.9, Math.max(0, frame.delay(i, centroid(a))));
       q = Math.min(1, Math.max(0, (p - d) / (1 - d)));
     }
     if (q <= 0) return a;
     if (q >= 1) return b;
-    return a.map((pa, j) => ({ x: pa.x + (b[j]!.x - pa.x) * q, y: pa.y + (b[j]!.y - pa.y) * q }));
+    const e = frame.ease ? frame.ease(q) : q;
+    const mixed = a.map((pa, j) => ({ x: pa.x + (b[j]!.x - pa.x) * e, y: pa.y + (b[j]!.y - pa.y) * e }));
+    return frame.smooth ? relax(mixed, frame.smooth * Math.sin(Math.PI * q)) : mixed;
   });
 }
 

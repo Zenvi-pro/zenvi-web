@@ -72,10 +72,21 @@ describe("prepareMorph / morphRings", () => {
   it("delays pairs for a sweep but still lands every pair at p = 1", () => {
     const m = prepareMorph(toOutline([square(10, -20), square(10, 20)]), toOutline([circle(5, 24).map((p) => ({ x: p.x - 20, y: p.y })), circle(5, 24).map((p) => ({ x: p.x + 20, y: p.y }))]));
     const delay = (_: number, c: { x: number }) => (c.x > 0 ? 0.5 : 0);
-    const early = morphRings(m, 0.4, delay);
+    const early = morphRings(m, 0.4, { delay });
     expect(early[1]).toBe(m.pairs[1]![0]);
     expect(early[0]).not.toBe(m.pairs[0]![0]);
-    expect(morphRings(m, 1, delay)[1]).toBe(m.pairs[1]![1]);
+    expect(morphRings(m, 1, { delay })[1]).toBe(m.pairs[1]![1]);
+  });
+});
+
+describe("morphRings smoothing", () => {
+  it("relaxes only in between: the ends are exact", () => {
+    const m = prepareMorph(toOutline([square(100)]), toOutline([star(5, 0.4, 60)]));
+    const raw = morphRings(m, 0.5)[0]!;
+    const soft = morphRings(m, 0.5, { smooth: 20 })[0]!;
+    expect(perimeter(soft)).toBeLessThan(perimeter(raw));
+    expect(morphRings(m, 1, { smooth: 20 })[0]).toBe(m.pairs[0]![1]);
+    expect(morphRings(m, 0, { smooth: 20 })[0]).toBe(m.pairs[0]![0]);
   });
 });
 

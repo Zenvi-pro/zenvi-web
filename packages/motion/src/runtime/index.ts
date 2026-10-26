@@ -46,6 +46,7 @@ export {
   transformOutline,
   transformRing,
   type Morph,
+  type MorphFrame,
   type MorphOptions,
   type Outline,
   type Point,

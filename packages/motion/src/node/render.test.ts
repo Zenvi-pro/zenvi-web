@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -78,4 +79,22 @@ describe("render smoke (headless Chrome)", () => {
     expect(again.cached).toBe(true);
     expect(again.fingerprint).toBe(first.fingerprint);
   });
+
+  // Canvas tracks and traced outlines are only checked here: jsdom has no canvas.
+  for (const id of ["line_trails", "type_morph", "logo_build"]) {
+    it(`${id} renders the same pixels from one tab in order as from three at once`, async (t) => {
+      if (!chrome) t.skip();
+      const md5s: string[] = [];
+      for (const workers of [1, 3]) {
+        const dir = await mkdtemp(path.join(tmpdir(), "zenvi-motion-det-"));
+        const out = path.join(dir, "out.mp4");
+        await renderBlock(id, {}, { width: 216, height: 384, fps: 3, seconds: 3, alpha: false, output: out, env: { ...env, ZENVI_CACHE_DIR: dir }, workers });
+        const r = spawnSync("ffmpeg", ["-v", "error", "-i", out, "-f", "framemd5", "-"], { encoding: "utf8" });
+        md5s.push(r.stdout.split("\n").filter((l) => l && !l.startsWith("#")).join("\n"));
+        await rm(dir, { recursive: true, force: true });
+      }
+      expect(md5s[0]!.split("\n")).toHaveLength(9);
+      expect(md5s[1]).toBe(md5s[0]);
+    }, 60_000);
+  }
 });
