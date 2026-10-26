@@ -23,7 +23,7 @@ import { placeOverlayClip, repointFile } from "../../ops/overlays.js";
 import { SCENE3D_IDS, SCENE3D_INFO, SCENE3D_PARAMS, parseScene3dParams, type Scene3dId, type Scene3dParams } from "../../scenes3d/catalog.js";
 import { ZENVI_LINK_KEY, blenderLink, readBlenderLink, type Scene3dQuality, type Scene3dRender } from "../../scenes3d/link.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
-import { applied, failed, refused } from "../receipt.js";
+import { applied, failed, refused, unchanged } from "../receipt.js";
 import type { ImportedMedia, Scene3dMediaInput } from "../types.js";
 import { TextToolError, clipExtent, planOverlayTrack, projectSize, snapToFrame, trackInfo } from "../titles-text.js";
 
@@ -79,7 +79,7 @@ function mediaInput(project: Project, fileId: string, start: number): Scene3dMed
   if (isSingleImageMedia(file)) return { fileId, path: String(file.path), kind: "image", width, height, fps: 0, frames: 0, start: 0 };
   const fps = Number(file.fps?.num) / (Number(file.fps?.den) || 1) || 30;
   const frames = Math.max(1, Math.trunc(Number(file.video_length)) || Math.round((Number(file.duration) || 0) * fps));
-  return { fileId, path: String(file.path), kind: "video", width, height, fps, frames, start: Math.max(0, start) };
+  return { fileId, path: String(file.path), kind: "video", width, height, fps, frames, start };
 }
 
 interface Plan {
@@ -137,7 +137,8 @@ function planMedia(project: Project, scene: Scene3dId, params: Scene3dParams, du
   if (bSourceRaw < -1e-6) warnings.push(`${b.id} starts at the beginning of its media, so its face holds the first frame for ${(-bSourceRaw).toFixed(2)}s.`);
   let error = add("from", String(a.file_id), aSource);
   if (error) return error;
-  error = add("to", String(b.file_id), Math.max(0, bSourceRaw));
+  // Negative: the face holds B's first frame that long, so the last frame is B where the timeline has it.
+  error = add("to", String(b.file_id), bSourceRaw);
   if (error) return error;
   return { media, cut: { start, duration: d, trackOver: Math.max(Number(a.layer), Number(b.layer)) }, warnings };
 }
@@ -147,7 +148,7 @@ async function render(call: ToolCall, tool: string, scene: Scene3dId, params: Sc
   const [width, height] = projectSize(project);
   let result: Scene3dRender;
   try {
-    result = await call.host.scenes3d!.render({ scene, params, width, height, fps: fpsOf(project), frames, quality: q, media: plan.media });
+    result = await call.host.scenes3d!.render({ scene, params, width, height, fps: fpsOf(project), frames, quality: q, media: plan.media, signal: call.signal });
   } catch (error) {
     return `Error: the ${scene} render failed: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -283,7 +284,7 @@ export const scenes3dTools: CatalogTool[] = [
       const parsed = parseScene3dParams(link.scene, { ...link.props, ...(args.params ?? {}) });
       if (!parsed.ok) return refused(RERENDER, `Error: ${parsed.error}.`);
       const fps = fpsOf(project);
-      const stored = link.link.render as { duration_frames?: unknown } | undefined;
+      const stored = link.link.render as { duration_frames?: unknown; fingerprint?: unknown } | undefined;
       const oldFrames = Math.trunc(Number(stored?.duration_frames)) || Math.round((Number(file.duration) || 1) * (fps.num / fps.den));
       const frames = args.duration_seconds !== undefined ? Math.max(2, Math.round((Math.min(SCENE3D_INFO[link.scene].maxSeconds, args.duration_seconds) * fps.num) / fps.den)) : oldFrames;
       const plan = planMedia(project, link.scene, parsed.params, (frames * fps.den) / fps.num);
@@ -293,6 +294,10 @@ export const scenes3dTools: CatalogTool[] = [
       const done = await render(call, RERENDER, link.scene, parsed.params, plan, frames, q);
       if (typeof done === "string") return failed(RERENDER, done);
       const { render: r, imported } = done;
+      // Same fingerprint: the movie on the file already is this render; no undo step.
+      if (r.fingerprint === stored?.fingerprint) {
+        return unchanged(RERENDER, `${link.scene} is already rendered with these params (${q}).`, { data: { scene: link.scene, file_id: file.id, params: parsed.params, render: renderData(r, q) } });
+      }
       const oldSeconds = (oldFrames * fps.den) / fps.num;
       const newSeconds = (frames * fps.den) / fps.num;
       const changed: string[] = [];

@@ -139,8 +139,10 @@ describe("add_3d_scene_tool", () => {
     expect(data.layer).toBeGreaterThan(L1);
     expect(requests[0]!.frames).toBe(24);
     expect(requests[0]!.media.from).toMatchObject({ fileId: IDS.interview, start: 9.6 });
-    // B starts at its media's first frame, so its face holds that frame until the cut.
-    expect(requests[0]!.media.to).toMatchObject({ fileId: IDS.broll, start: 0 });
+    // B starts at its media's first frame, so its face holds that frame until the cut (start -0.4 s):
+    // the last frame is B 0.4 s in, where the timeline shows it when the cube ends.
+    expect(requests[0]!.media.to).toMatchObject({ fileId: IDS.broll });
+    expect(requests[0]!.media.to!.start).toBeCloseTo(-0.4, 6);
     expect(JSON.parse(result.text).warnings.join(" ")).toContain("holds the first frame");
     expect(requests[0]!.params).toMatchObject({ background: "dark", direction: "up" });
   });
@@ -181,6 +183,27 @@ describe("rerender_3d_scene_tool", () => {
     expect(readBlenderLink(file)!.link).toMatchObject({ props: { style: "plastic" }, scenes3d: { quality: "final" } });
     doc.undo();
     expect(doc.project.files.find((f) => f.id === fileId)!.path).toBe(oldPath);
+  });
+
+  it("a re-render that gives back the same movie adds no undo step", async () => {
+    const doc = fixtureDoc();
+    const { host } = scenesHost();
+    const render = host.scenes3d!.render;
+    // The cache: the same request is the same movie (same fingerprint).
+    host.scenes3d!.render = async (request) => ({ ...(await render(request)), path: "/cache/scenes3d/same.mov", fingerprint: "f".repeat(64) });
+    const added = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "glass_hero" });
+    const { file_id: fileId } = dataOf(added) as { file_id: string };
+    const again = await runTool({ doc, host }, "rerender_3d_scene_tool", { file_id: fileId });
+    expect(again.ok, again.text).toBe(true);
+    expect(JSON.parse(again.text).status).toBe("unchanged");
+    expect(doc.undoLabels).toEqual(["Add 3D glass_hero"]);
+  });
+
+  it("passes the call's abort signal to the render", async () => {
+    const { host, requests } = scenesHost();
+    const signal = new AbortController().signal;
+    await runTool({ doc: fixtureDoc(), host, signal }, "add_3d_scene_tool", { scene: "particle_burst", quality: "draft" });
+    expect(requests[0]!.signal).toBe(signal);
   });
 
   it("follows a new length on clips that showed the whole render", async () => {

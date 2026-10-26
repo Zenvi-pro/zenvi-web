@@ -252,7 +252,8 @@ def crystal(tint="#FFFFFF", roughness=0.04, ior=1.45, name="Crystal"):
 
 def media_image(item):
     """A bpy image for a job media item: a still, or a movie that plays
-    from `start` seconds (its frames advance with the scene)."""
+    from `start` seconds (its frames advance with the scene; a negative
+    start holds the first frame until then)."""
     img = bpy.data.images.load(item["file"], check_existing=True)
     if item["kind"] == "video":
         img.source = "MOVIE"
@@ -266,9 +267,11 @@ def _image_node(tree, item, cover_aspect=None):
     tex.interpolation = "Linear"
     if item["kind"] == "video":
         user = tex.image_user
+        start = float(item.get("start") or 0.0)
         user.frame_duration = max(1, int(item.get("frames") or 1))
-        user.frame_start = 1
-        user.frame_offset = int(round(float(item.get("start") or 0.0) * float(item.get("fps") or 30)))
+        # A negative start holds the first frame that long: before frame_start Blender shows frame 1.
+        user.frame_start = 1 + max(0, int(round(-start * bpy.context.scene.render.fps / bpy.context.scene.render.fps_base)))
+        user.frame_offset = int(round(max(0.0, start) * float(item.get("fps") or 30)))
         user.use_auto_refresh = True
         user.use_cyclic = False
     if cover_aspect:

@@ -552,7 +552,7 @@ export interface Scene3dMediaInput {
   /** Video frames per second and length in frames (images: 0). */
   fps: number;
   frames: number;
-  /** Seconds into the video where the scene starts showing it. */
+  /** Seconds into the video where the scene starts showing it (negative: it holds the first frame that long). */
   start: number;
 }
 
