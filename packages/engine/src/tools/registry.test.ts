@@ -21,6 +21,9 @@ const DIRECT_TOOLS = [
   "add_transition_tool",
   "probe_media_tool",
   "build_reel_tool",
+  "align_match_cut_tool",
+  "detect_subject_tool",
+  "match_cut_montage_tool",
   "add_motion_template_tool",
   "list_sfx_tool",
   "add_sfx_tool",
@@ -93,6 +96,7 @@ describe("tool catalog", () => {
         const type = tool.inputSchema.properties[key]?.type;
         if (key === "points") args[key] = [{ frame: 1, value: 1 }];
         else if (key === "subclips") args[key] = [{ source_start_seconds: 1, source_end_seconds: 2 }];
+        else if (key === "clips") args[key] = [{ clip_id: "x", box: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 } }];
         else if (type === "array") args[key] = ["x"];
         // update_effect_tool's properties are an effect's (sigma is Blur's); set_clip_properties_tool takes any object.
         else if (type === "object") args[key] = key === "properties" ? { sigma: 1 } : { x: 1 };

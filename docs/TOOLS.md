@@ -198,6 +198,9 @@ Availability follows each tool's required host capabilities and the host methods
 | [`add_transition_tool`](#add_transition_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`probe_media_tool`](#probe_media_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`build_reel_tool`](#build_reel_tool) | mcp, cli, editor | yes | yes | yes | — |
+| [`align_match_cut_tool`](#align_match_cut_tool) | mcp, cli, editor | yes | yes | yes | — |
+| [`detect_subject_tool`](#detect_subject_tool) | mcp, cli, editor | yes | yes | yes | — |
+| [`match_cut_montage_tool`](#match_cut_montage_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`add_motion_template_tool`](#add_motion_template_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`list_sfx_tool`](#list_sfx_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`add_sfx_tool`](#add_sfx_tool) | mcp, cli, editor | yes | yes | yes | — |
@@ -3179,6 +3182,64 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `words` | string[] |  | Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial). |
 | `beats` | number[] |  | Beat times of the music in seconds (e.g. from detect_beats_tool) instead of analysing it here. |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (they are removed in the same undo step). |
+
+### align_match_cut_tool
+
+**Align match cuts** (direct tool). Line up the shared subject of consecutive clips (an iris, the moon, a cup rim, a pose) so it sits at the same place and size on every cut: writes scale/location (and rotation) keyframes from each clip's subject box, keeps the frame covered (zooming when needed, reported) and is one undo step.
+
+Surfaces: mcp, cli, editor. edits.
+
+Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool).
+
+| Argument | Type | Required | Description |
+| --- | --- | --- | --- |
+| `clips` | object[] | yes | Timeline clips in cut order, each with its subject's box. |
+| `target` | object |  | Where every subject lands. Default: where the first clip shows its subject now, on its first frame. |
+| `fit` | "position" \| "position_scale" \| "position_scale_rotation" |  | position: move only; position_scale (default): move and resize so sizes match; position_scale_rotation: also turn each subject to the target angle (boxes need angle). |
+| `cover` | "zoom" \| "zoom_all" \| "none" |  | Keeping the frame covered: zoom scales a clip up just enough when moving or shrinking it would show black edges (its subject ends up larger); zoom_all raises the target size for every clip so all still match; none allows black edges. |
+| `zoom_drift` | number |  | Zoom each clip in by this fraction over its length, about the subject (0.04 = 4 %). Default 0. (min 0, max 0.5) |
+
+### detect_subject_tool
+
+**Find the subject in a frame** (direct tool). Find round subjects (iris/pupil, moon, sun, cup rim, vinyl, lens, clock, eclipse) in a frame of a media-bin file or a timeline clip, best first, as 0-1 boxes on the source frame ready for align_match_cut_tool and match_cut_montage_tool.
+
+Surfaces: mcp, cli, editor. read-only. Needs: frames.
+
+Availability: editor yes; cli yes; cloud yes (only when the render worker is configured); desktop — (web-only direct tool).
+
+| Argument | Type | Required | Description |
+| --- | --- | --- | --- |
+| `kind` | "circle" |  | What to look for. circle (default): round subjects (iris/pupil, moon, sun, cup rim, vinyl, lens, clock, eclipse). |
+| `file_id` | string |  | A media-bin video or image. |
+| `clip_id` | string |  | A timeline clip (its file is read). |
+| `time` | number |  | Source seconds to look at. Default: the clip's first frame, or the middle of the file. (min 0) |
+| `min_radius` | number |  | Smallest circle radius, fraction of the frame height (default 0.04). (max 1) |
+| `max_radius` | number |  | Largest circle radius, fraction of the frame height (default 0.6). (max 1) |
+| `limit` | integer |  | Candidates to return (default 3). (min 1, max 10) |
+
+### match_cut_montage_tool
+
+**Match-cut montage** (direct tool). Cut a full-circle match-cut montage in one step from media-bin files that share a shape or pose (eye, moon, cup, vinyl, lens): shots of 3-8 frames on the music's hits and beats with a held first and last shot, every shot aligned so the subject sits at the same place and size, white flashes on downbeats, a small zoom per shot and the music bed.
+
+Surfaces: mcp, cli, editor. edits, destructive. Needs: media.
+
+Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); desktop — (web-only direct tool).
+
+| Argument | Type | Required | Description |
+| --- | --- | --- | --- |
+| `file_ids` | string[] | yes | Media-bin videos and images in chain order: the first opens (held), the last closes (held), the others cycle in between. |
+| `subjects` | object[] |  | Subject boxes per file. Files without one are searched for a circle at each shot's first frame (detect_subject_tool), or kept centred when this surface cannot read frames. |
+| `music_file_id` | string |  | Music in the media bin to cut to. Default: the longest audio file in the bin. |
+| `beats` | number[] |  | Beat times of the music, seconds, instead of analysing it here. |
+| `duration_seconds` | number |  | Target length, seconds (default: one pass through the files, at least 8 s). Ends on a downbeat. (min 2, max 60) |
+| `target` | object |  | Where every subject lands. Default: the frame's centre, at the size the first file shows its subject. |
+| `fit` | "position" \| "position_scale" \| "position_scale_rotation" |  | position: move only; position_scale (default): move and resize so sizes match; position_scale_rotation: also turn each subject to the target angle (boxes need angle). |
+| `cover` | "zoom" \| "zoom_all" \| "none" |  | Default zoom_all: every subject the same size and no black edges. |
+| `min_frames` | integer |  | Shortest body shot, frames (default 3). (min 2, max 12) |
+| `max_frames` | integer |  | Longest body shot, frames (default 8). (min 2, max 24) |
+| `flash` | boolean |  | A white flash frame on cuts that land on a downbeat (default true). |
+| `zoom_drift` | number |  | Each shot zooms in by this fraction about its subject (default 0.04). (min 0, max 0.3) |
+| `replace` | boolean |  | Clear the timeline first when it already has clips (in the same undo step). |
 
 ### add_motion_template_tool
 

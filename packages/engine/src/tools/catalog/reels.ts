@@ -81,19 +81,19 @@ const input = z.strictObject({
 
 type Input = z.infer<typeof input>;
 
-function displayName(file: ProjectFile): string {
+export function displayName(file: ProjectFile): string {
   const base = String(file.name ?? file.path ?? file.id).split(/[\\/]/).pop() ?? String(file.id);
   return base.replace(/\.[A-Za-z0-9]+$/, "").replace(/[_-]+/g, " ").trim() || String(file.id);
 }
 
-function visualKind(file: ProjectFile): "video" | "image" | null {
+export function visualKind(file: ProjectFile): "video" | "image" | null {
   if (isAudioOnlyMedia(file)) return null;
   if (isSingleImageMedia(file)) return "image";
   return file.has_video ? "video" : null;
 }
 
 /** Display aspect of a file (width / height, with its pixel ratio), or null when unknown. */
-function aspectOf(file: ProjectFile): number | null {
+export function aspectOf(file: ProjectFile): number | null {
   const w = Number(file.width);
   const h = Number(file.height);
   if (!(w > 0 && h > 0)) return null;
@@ -103,13 +103,13 @@ function aspectOf(file: ProjectFile): number | null {
 }
 
 /** The usable part of a video: skip the first fifth of a second (camera settling) on longer clips. */
-function usableRange(file: ProjectFile): [number, number] {
+export function usableRange(file: ProjectFile): [number, number] {
   const duration = Number(file.duration) || 0;
   return duration > 3 ? [0.2, duration - 0.1] : [0, duration];
 }
 
 /** Music from evenly spaced beat times given by the caller. */
-function musicFromBeats(times: number[], duration: number): MusicBeats {
+export function musicFromBeats(times: number[], duration: number): MusicBeats {
   const beats = [...times].sort((a, b) => a - b);
   const gaps = beats.slice(1).map((t, i) => t - beats[i]!).sort((a, b) => a - b);
   const median = gaps[Math.floor(gaps.length / 2)] ?? 0.5;
@@ -161,7 +161,7 @@ interface Prepared {
   labels: Map<string, ImportedMedia>;
 }
 
-async function writeCard(call: ToolCall, name: string, svg: string): Promise<ImportedMedia> {
+export async function writeCard(call: ToolCall, name: string, svg: string): Promise<ImportedMedia> {
   const media = call.host.media!;
   const path = await media.writeGenerated!(name, new TextEncoder().encode(svg), "image/svg+xml");
   return { path, info: await media.probe(path), name };
