@@ -45,17 +45,11 @@ def build(job):
     # Shallow focus on the word: letters tumbling in from behind it arrive soft
     # (finals only: at draft samples depth of field is grain).
     cam, aim = camera.camera(lens=55, location=(0, -10, 0), dof=0.35 if p.get("dof", True) and job["quality"] == "final" else None)
-    # The word spans `width` of the title-safe width (80 % of the frame), and
-    # its height stays inside the safe area.
-    dist = camera.distance_for_width(cam, w, 0.8 * float(p.get("width", 0.65)))
-    hx, hy = camera.visible_half(cam, dist)
-    if h > 0.5 * 2 * hy:
-        dist *= h / (0.5 * 2 * hy)
-        hx, hy = camera.visible_half(cam, dist)
+    # The word spans `size` of the safe width on the optical centre; at most
+    # half the safe height, so short words stay a title, not a wall.
+    dist = camera.compose(cam, w, h, float(p.get("size", 0.66)), max_height=0.5)
     # A little above the word: its faces mirror the horizon line (core.studio_world).
-    # Aiming slightly low puts the word on the optical centre, ~4 % above the middle.
     cam.location = (0.0, -dist, 0.07 * dist)
-    aim.location = (0, 0, -0.08 * hy)
     if p.get("shadow", True):
         blob = shapes.shadow_blob("Shadow", w * 1.1, h * 1.4, strength=0.5, location=(0, 0.15 * h, -0.62 * h))
         motion.animate(blob, "scale", [(1, (0.001, h * 1.4, 1)), (1 + int(round(1.0 * fps)), (w * 1.1, h * 1.4, 1))], "out")

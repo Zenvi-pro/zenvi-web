@@ -77,3 +77,48 @@ def distance_for_width(cam, width, fraction):
     per_unit = cam.data.sensor_width / (2 * cam.data.lens)  # half-extent of the long side per unit of distance
     half_width = per_unit if aspect >= 1 else per_unit * aspect
     return (width / (2 * fraction)) / half_width
+
+
+def safe_area():
+    """The frame's safe area, (left, right, top, bottom) as fractions of the
+    frame. Wide and square: title-safe 90 %. Vertical: clear of the Reels /
+    TikTok side margins, top bar and bottom captions (the same 12 % / 20 %
+    the engine's captions keep, packages/engine/src/tools/caption-style.ts)."""
+    if frame_aspect() < 1:
+        return (0.06, 0.94, 0.12, 0.80)
+    return (0.05, 0.95, 0.05, 0.95)
+
+
+def optical_centre():
+    """Where a lone subject sits: centred across, a little above the middle
+    of the safe area (TASTE: 45 % down it)."""
+    left, right, top, bottom = safe_area()
+    return ((left + right) / 2, top + 0.45 * (bottom - top))
+
+
+def compose(cam, width, height, size, max_height=1.0):
+    """Frame a width x height subject facing `cam` at its target: it spans
+    `size` of the safe width, its height at most `max_height` of the room the
+    safe area leaves around the optical centre, and the lens shift puts the
+    target on the optical centre (shift keeps the perspective, so moves and
+    depth of field are unchanged). Returns the camera's distance."""
+    left, right, top, bottom = safe_area()
+    cx, cy = optical_centre()
+    room = 2 * min(cy - top, bottom - cy)
+    hx, hy = visible_half(cam, 1.0)
+    dist = max(width / (2 * hx * size * (right - left)), height / (2 * hy * max_height * room))
+    r = bpy.context.scene.render
+    longest = max(r.resolution_x, r.resolution_y)
+    # Shift is in units of the longer side; a positive shift_y moves the view up, the subject down.
+    cam.data.shift_x = -(cx - 0.5) * r.resolution_x / longest
+    cam.data.shift_y = (cy - 0.5) * r.resolution_y / longest
+    return dist
+
+
+def extent(objects):
+    """Width (the larger horizontal extent, so it holds while the subject
+    turns about Z) and height of the objects' evaluated world bounds."""
+    graph = bpy.context.evaluated_depsgraph_get()
+    points = [o.matrix_world @ Vector(c) for o in objects for c in o.evaluated_get(graph).bound_box]
+    span = [max(p[i] for p in points) - min(p[i] for p in points) for i in range(3)]
+    return max(span[0], span[1]), span[2]

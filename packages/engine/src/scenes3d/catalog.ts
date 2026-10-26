@@ -25,6 +25,9 @@ const common = {
   seed: z.number().int().min(0).max(1_000_000).default(7).describe("Random layout seed (same seed, same render)."),
 };
 
+const size = (fallback: number, what: string) =>
+  z.number().min(0.2).max(1).default(fallback).describe(`Width of the ${what} as a share of the safe width (title-safe 90 %; on 9:16 clear of the app's UI), centred a little above the middle; it also stays inside the safe height.`);
+
 const fileIds = (max: number, what: string) => z.array(z.string().min(1).max(64)).min(1).max(max).describe(what);
 
 export const SCENE3D_PARAMS = {
@@ -38,7 +41,7 @@ export const SCENE3D_PARAMS = {
     depth: z.number().min(0).max(1).default(0.35).describe("Extrusion depth, 0 (flat) to 1 (deep)."),
     font: z.string().min(1).max(200).optional().describe("Font family installed on this computer, or a .ttf/.otf path (default a heavy sans: Arial Black, Inter, Helvetica…)."),
     exit: z.boolean().default(false).describe("Shrink away over the last 0.4 s."),
-    width: z.number().min(0.2).max(1).default(0.65).describe("Width of the word as a share of the title-safe width (80 % of the frame); it also stays inside the safe height."),
+    size: size(0.66, "word"),
     shadow: z.boolean().default(true).describe("Soft contact shadow under the word."),
     dof: z.boolean().default(true).describe("Shallow depth of field on the word (letters arriving from behind are soft)."),
   }),
@@ -49,6 +52,7 @@ export const SCENE3D_PARAMS = {
     media_start_seconds: z.number().min(0).default(0).describe("Where in the video the screen starts playing."),
     move: z.enum(["orbit", "push", "hero", "float"]).default("orbit").describe("orbit: the camera arcs around; push: dolly in with depth of field; hero: the device spins in and lands; float: it hovers and turns."),
     body: z.union([z.enum(["graphite", "silver", "white"]), hex]).optional().describe("Body finish (default graphite; laptop silver)."),
+    size: size(0.65, "device"),
     open_lid: z.boolean().default(true).describe("laptop: the lid opens at the start."),
     shadow: z.boolean().default(true).describe("Soft contact shadow under the device."),
     dof: z.boolean().default(true).describe("Subtle depth of field focused on the device."),
@@ -78,6 +82,7 @@ export const SCENE3D_PARAMS = {
     shape: z.enum(["blob", "torus", "rings", "spheres"]).default("blob").describe("blob: a slowly morphing drop; torus; rings: two linked rings; spheres: a cluster."),
     material: z.enum(["glass", "chrome", "iridescent"]).default("glass"),
     colors: z.array(hex).length(2).optional().describe("The two gradient light colours (default #7B5CFF, #00C2FF)."),
+    size: size(0.66, "object"),
     turn_degrees: z.number().min(0).max(1080).default(120).describe("How far it turns over the clip."),
   }),
   particle_burst: z.strictObject({

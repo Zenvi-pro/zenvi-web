@@ -22,6 +22,12 @@ The params of each scene (zod) live in the engine:
 server offer them when Blender 4.2+ is installed (`ZENVI_BLENDER` sets its
 path, `ZENVI_SCENES3D=0` turns them off, `zenvi doctor` checks).
 
+Framing (`zenvi3d/camera.py` `compose`): the hero of `title_3d`,
+`device_mockup` and `glass_hero` spans `size` (default ~0.65) of the safe
+width, on the optical centre, a little above the middle of the safe area. The
+safe area is title-safe 90 % on wide frames; on 9:16 it keeps clear of the
+Reels / TikTok UI (6 % sides, 12 % top, 20 % bottom).
+
 ## Layout
 
 ```
