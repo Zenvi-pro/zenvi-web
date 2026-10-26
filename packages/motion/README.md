@@ -8,7 +8,7 @@ timeline as linked media (`zenvi_link`, kind `zenvi-motion`).
 
 ```
 src/runtime/   the page-side animation runtime (no GSAP): timeline, easings, text, effects
-src/blocks/    one folder per block: block.json + block.ts (+ block.css); base.css, ui.ts shared
+src/blocks/    one folder per block: block.json + block.ts (+ block.css); base.css, ui.ts, art.ts shared
 src/params.ts  block.json schema, shared token params, checking/coercion
 src/tokens.ts  palettes, font roles, the bundled faces (fonts/, SIL OFL 1.1)
 src/node/      the renderer (puppeteer-core + chrome-headless-shell + ffmpeg) and the CLI's MotionHost
@@ -61,3 +61,12 @@ frames. The same page also answers HyperFrames' `window.__hf = { duration, seek 
 
 Bump `version` when you change a block's look on purpose; any code change
 already changes the render fingerprint (the bundle is hashed).
+
+## Pictures without media
+
+Blocks that show pictures (dot_grid_reveal, liquid_glass, masonry_grid,
+dock_magnify, card_shuffle) take media params and, without them, draw their
+own scenes with `blocks/art.ts` (seeded SVG landscapes, orbs, flowers, a
+round character), rasterised once per build with `artImage` so Chrome does
+not re-rasterise grain on every frame. Several pictures are numbered media
+params (`media_1` … `media_8`); a board repeats the ones it is given.
