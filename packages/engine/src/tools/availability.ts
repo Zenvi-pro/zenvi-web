@@ -365,7 +365,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes", "motion"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -392,6 +392,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       backend: "signed in with zenvi login",
       "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
       mattes: "onnxruntime-node is installed; the matting model downloads on first use",
+      motion: "headless Chrome is installed: zenvi motion setup",
     },
   },
   cloud: {

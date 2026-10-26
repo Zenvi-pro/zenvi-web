@@ -15,6 +15,7 @@
 import path from "node:path";
 import type { Project, ToolHost, ToolResult, ToolSurface } from "@zenvi/engine";
 import { ProjectDocument } from "@zenvi/engine";
+import { createMotionHost } from "@zenvi/motion/node";
 import {
   createNodeHost,
   fileState,
@@ -65,7 +66,9 @@ export class ProjectSession {
   ) {
     this.fileValue = file ? path.resolve(file) : undefined;
     this.doc = this.makeDoc(project);
-    const base = createNodeHost({ ...options.host, projectFile: () => this.fileValue });
+    const node = createNodeHost({ ...options.host, projectFile: () => this.fileValue });
+    // Zenvi Motion blocks render on this computer (headless Chrome), next to the project's media.
+    const base = { ...node, motion: createMotionHost({ projectFile: () => this.fileValue, resolveMedia: node.resolveMedia, env: options.host?.env }) };
     // Track the desktop's file semantics: open switches files, save-as too.
     const storage = base.storage!;
     this.host = {

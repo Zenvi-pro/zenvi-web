@@ -585,6 +585,83 @@ export interface MatteHost {
   generate(path: string, request: MatteRequest): Promise<GeneratedMatte>;
 }
 
+/** One parameter of a Zenvi Motion block (its block.json entry). */
+export interface MotionBlockParam {
+  name: string;
+  /** string, number, integer, boolean, color, enum, strings, points or media (a bin file id). */
+  type: string;
+  description: string;
+  default?: unknown;
+  min?: number;
+  max?: number;
+  maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
+  options?: string[];
+  /** media: image and/or video. */
+  accept?: string[];
+  optional?: boolean;
+}
+
+/** A Zenvi Motion block: a parametric HTML motion graphic the host renders to video. */
+export interface MotionBlockInfo {
+  id: string;
+  version: number;
+  title: string;
+  description: string;
+  tags: string[];
+  params: MotionBlockParam[];
+  /** Seconds. */
+  duration: { default: number; min: number; max: number };
+  /** Aspect ratios the layout is designed for ("9:16", "16:9"…). */
+  aspects: string[];
+  /** Meant to sit over video (transparent) by default. */
+  alpha: boolean;
+}
+
+export type MotionParamsCheck = { ok: true; params: Record<string, unknown> } | { ok: false; error: string };
+
+export interface MotionRenderRequest {
+  block: string;
+  /** Checked params (`check`); media params hold bin file ids. */
+  params: Record<string, unknown>;
+  /** Project media path of each media param, by param name. */
+  media: Record<string, string>;
+  width: number;
+  height: number;
+  fps: { num: number; den: number };
+  seconds: number;
+  /** Transparent background (ProRes 4444 .mov) or opaque (H.264 .mp4). */
+  alpha: boolean;
+  /** Sub-frames averaged per frame (1 = no motion blur). */
+  motionBlurSamples: number;
+  /** Half-size preview render. */
+  draft: boolean;
+}
+
+export interface MotionRender {
+  /** The rendered file, ready for `addFile`. */
+  media: ImportedMedia;
+  codec: "prores4444" | "h264";
+  width: number;
+  height: number;
+  fps: { num: number; den: number };
+  frames: number;
+  /** Hash of everything that shaped the pixels (block code, params, media, size, timing). */
+  fingerprint: string;
+  /** True when an identical render was reused. */
+  cached: boolean;
+  renderSeconds: number;
+}
+
+/** Rendering Zenvi Motion blocks (headless Chrome on the person's computer: the CLI and `zenvi mcp`). */
+export interface MotionHost {
+  blocks(): readonly MotionBlockInfo[];
+  /** Params checked against the block and completed with defaults, or why they are wrong. */
+  check(block: string, params: Readonly<Record<string, unknown>>): MotionParamsCheck;
+  render(request: MotionRenderRequest, signal?: AbortSignal): Promise<MotionRender>;
+}
+
 export interface ToolHost {
   media?: MediaHost;
   player?: PlayerHost;
@@ -596,6 +673,7 @@ export interface ToolHost {
   audio?: AudioHost;
   assets?: AssetHost;
   mattes?: MatteHost;
+  motion?: MotionHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }

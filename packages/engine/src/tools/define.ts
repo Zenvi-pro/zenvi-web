@@ -93,6 +93,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   audio: "audio analysis",
   assets: "the bundled title templates and emoji",
   mattes: "subject matting (the zenvi CLI with onnxruntime-node)",
+  motion: "Zenvi Motion block rendering (headless Chrome, the zenvi CLI and zenvi mcp)",
 };
 
 /**
