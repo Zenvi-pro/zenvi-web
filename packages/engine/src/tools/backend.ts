@@ -16,7 +16,7 @@ import type { ToolCall } from "./define.js";
 import { getIndexBlock, isIndexed } from "./ai-metadata.js";
 import type { TimelineClipContext } from "./clip-context.js";
 import type { ClipCandidate, ProjectIndexSearch } from "./resolve.js";
-import type { BackendHost } from "./types.js";
+import type { BackendHost, StockHost } from "./types.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -201,26 +201,28 @@ function bareError(value: unknown, fallback: string): string {
   return String(value || fallback).trim().replace(/^error:\s*/i, "") || fallback;
 }
 
-/** GET /api/v1/pexels/search: Pexels videos for a query (the backend holds the API key). */
-export async function searchPexelsVideos(call: ToolCall, search: string, perPage: number): Promise<{ videos: PexelsVideo[]; total: number } | { error: string }> {
-  const res = await backendRequest<Record<string, unknown>>(call.host.backend, `/api/v1/pexels/search${query({ query: search, per_page: perPage, page: 1 })}`, { signal: call.signal });
-  if (!res.ok) return { error: res.error };
-  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
-  const videos = Array.isArray(res.data.videos) ? (res.data.videos.filter(isRecord) as unknown as PexelsVideo[]) : [];
-  return { videos, total: Number(res.data.total_results ?? videos.length) || videos.length };
-}
-
-/** GET /api/v1/freesound/search: Freesound sounds for a query, at least `minSeconds` long. */
-export async function searchFreesound(call: ToolCall, search: string, pageSize: number, minSeconds: number): Promise<{ sounds: FreesoundSound[]; total: number } | { error: string }> {
-  const res = await backendRequest<Record<string, unknown>>(
-    call.host.backend,
-    `/api/v1/freesound/search${query({ query: search, page_size: pageSize, min_duration: minSeconds > 0 ? Math.round(minSeconds) : undefined })}`,
-    { signal: call.signal },
-  );
-  if (!res.ok) return { error: res.error };
-  if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
-  const sounds = Array.isArray(res.data.sounds) ? (res.data.sounds.filter(isRecord) as unknown as FreesoundSound[]) : [];
-  return { sounds, total: Number(res.data.count ?? sounds.length) || sounds.length };
+/**
+ * Stock search through the backend's proxies (it holds the provider keys):
+ * GET /api/v1/pexels/search and GET /api/v1/freesound/search.
+ */
+export function backendStock(backend: BackendHost): StockHost {
+  return {
+    async searchPexelsVideos(search, { perPage, signal }) {
+      const data = await backend.request<Record<string, unknown>>(`/api/v1/pexels/search${query({ query: search, per_page: perPage, page: 1 })}`, { signal });
+      if (typeof data.error === "string" && data.error) throw new Error(data.error);
+      const videos = Array.isArray(data.videos) ? (data.videos.filter(isRecord) as unknown as PexelsVideo[]) : [];
+      return { videos, total: Number(data.total_results ?? videos.length) || videos.length };
+    },
+    async searchFreesound(search, { pageSize, minSeconds, signal }) {
+      const data = await backend.request<Record<string, unknown>>(
+        `/api/v1/freesound/search${query({ query: search, page_size: pageSize, min_duration: minSeconds > 0 ? Math.round(minSeconds) : undefined })}`,
+        { signal },
+      );
+      if (typeof data.error === "string" && data.error) throw new Error(data.error);
+      const sounds = Array.isArray(data.sounds) ? (data.sounds.filter(isRecord) as unknown as FreesoundSound[]) : [];
+      return { sounds, total: Number(data.count ?? sounds.length) || sounds.length };
+    },
+  };
 }
 
 /** The HD file of a Pexels video, else its first file (api_client.pick_pexels_hd_link). */

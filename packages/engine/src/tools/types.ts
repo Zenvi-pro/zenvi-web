@@ -22,6 +22,7 @@ import type { FxEffect } from "../fx/catalog.js";
 import type { FxRender } from "../fx/link.js";
 import type { CloudMediaRef, FileFingerprint, Project, ProjectFile, ReaderInfo } from "../model/types.js";
 import type { Scene3dId, Scene3dParams } from "../scenes3d/catalog.js";
+import type { FreesoundSound, PexelsVideo } from "../stock/stock.js";
 import type { Scene3dQuality, Scene3dRender } from "../scenes3d/link.js";
 import type { WebVideoDownload, WebVideoRequest } from "../web-video/web-video.js";
 
@@ -558,6 +559,18 @@ export interface BackendHost {
   request<T = unknown>(path: string, init?: { method?: string; body?: unknown; signal?: AbortSignal }): Promise<T>;
 }
 
+/**
+ * Stock footage and music search, in the Zenvi backend's result shapes
+ * (stock/stock.ts): the backend's proxies (`backendStock`), or a deployment's
+ * own provider keys (Zenvi Cloud without the backend). Throws on failure,
+ * like `BackendHost.request`.
+ */
+export interface StockHost {
+  searchPexelsVideos(query: string, options: { perPage: number; signal?: AbortSignal }): Promise<{ videos: PexelsVideo[]; total: number }>;
+  /** Sounds at least `minSeconds` long (0: any length). */
+  searchFreesound(query: string, options: { pageSize: number; minSeconds: number; signal?: AbortSignal }): Promise<{ sounds: FreesoundSound[]; total: number }>;
+}
+
 export interface StorageHost {
   /** Save the current project. Returns where it went. */
   save(project: Project, path?: string): Promise<string>;
@@ -871,6 +884,7 @@ export interface ToolHost {
   exporter?: ExportHost;
   frames?: FrameHost;
   backend?: BackendHost;
+  stock?: StockHost;
   storage?: StorageHost;
   audio?: AudioHost;
   assets?: AssetHost;

@@ -104,7 +104,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   open_project_tool: { methods: ["storage.open"] },
   import_files_tool: { methods: ["media.importPath"], optional: ["media.listPaths"], partialNote: "folders and globs need path listing" },
   import_video_url_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
-  import_stock_media_tool: { methods: ["media.importUrl"], optional: ["backend", "media.importPath"], partialNote: "search needs the Zenvi backend; local_path needs local file access" },
+  import_stock_media_tool: { methods: ["media.importUrl"], optional: ["stock", "media.importPath"], partialNote: "search needs stock search; local_path needs local file access" },
   place_motion_graphic_tool: { optional: ["media.importUrl"], partialNote: "url= needs URL downloads; file_id works" },
   fetch_motion_graphics_video_tool: { methods: ["media.importUrl"] },
   fetch_remotion_video_from_supabase_tool: { methods: ["media.importUrl"] },
@@ -355,7 +355,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   editor: {
     title: "Web editor (Zenvi Assistant, command palette)",
     host: "apps/editor/src/features/editor/assistant/host.ts",
-    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
+    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio"],
     methods: [
       "media.importUrl",
       "media.pickFiles",
@@ -381,12 +381,12 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "ui.clearPlaybackCache",
       "exporter.supports",
     ],
-    conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" },
+    conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi", stock: "signed in to Zenvi" },
   },
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes", "motion", "scenes3d", "fx"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -415,6 +415,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
     ],
     conditional: {
       backend: "signed in with zenvi login",
+      stock: "signed in with zenvi login",
       "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
       mattes: "onnxruntime-node is installed; the matting model downloads on first use",
       motion: "headless Chrome is installed: zenvi motion setup",
@@ -425,7 +426,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
-    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "exporter", "mattes", "motion"],
+    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion"],
     methods: [
       "media.importUrl",
       "media.writeGenerated",
@@ -450,6 +451,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       audio: "ffmpeg is available",
       "audio.mixPcm": "ffprobe is available",
       backend: "the server is set up to call the Zenvi backend",
+      stock: "the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY",
       mattes: "onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)",
       motion: "the image has chrome-headless-shell (one block renders at a time)",
     },
