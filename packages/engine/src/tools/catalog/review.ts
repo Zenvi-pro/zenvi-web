@@ -92,7 +92,7 @@ function reportText(data: Record<string, unknown>, problems: readonly ReviewProb
   const cuts = data.cuts as { count: number; perSecond: number; transitions: number };
   const range = data.range as { start: number; end: number };
   const lines = [
-    `Reviewed ${range.start.toFixed(2)}-${range.end.toFixed(2)} s: ${shots.count} shots (median ${shots.medianSeconds} s, longest ${shots.maxSeconds} s), ${cuts.count} cuts (${cuts.perSecond}/s${cuts.transitions ? `, ${cuts.transitions} with a transition` : ""}).`,
+    `Reviewed ${range.start.toFixed(2)}-${range.end.toFixed(2)} s: ${shots.count} shot${shots.count === 1 ? "" : "s"} (median ${shots.medianSeconds} s, longest ${shots.maxSeconds} s), ${cuts.count} cut${cuts.count === 1 ? "" : "s"} (${cuts.perSecond}/s${cuts.transitions ? `, ${cuts.transitions} with a transition` : ""}).`,
   ];
   const rhythm = data.rhythm as { onTransient: number; bpm: number } | null;
   if (rhythm) lines.push(`${Math.round(rhythm.onTransient * 100)}% of cuts land on a beat or hit (${rhythm.bpm ? `${rhythm.bpm} BPM` : "no steady beat"}).`);

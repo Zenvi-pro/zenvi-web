@@ -1000,7 +1000,7 @@ const SPECS: Record<string, Spec> = {
   review_edit_tool: {
     happy: {
       args: { image: "false", audio: "false" },
-      summary: /^Reviewed 0\.00-[\d.]+ s: \d+ shots \(median [\d.]+ s, longest [\d.]+ s\), \d+ cuts/,
+      summary: /^Reviewed 0\.00-[\d.]+ s: \d+ shots \(median [\d.]+ s, longest [\d.]+ s\), \d+ cuts?/,
       check: ({ receipt, doc }) => {
         expect((receipt.data as { shots: { count: number } }).shots.count).toBeGreaterThan(0);
         expect(doc.undoLabels).toEqual([]);
