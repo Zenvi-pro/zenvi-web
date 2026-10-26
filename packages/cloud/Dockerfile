@@ -46,7 +46,8 @@ RUN arch="$(node -p process.arch)" \
 # Zenvi Motion renders blocks with chrome-headless-shell (Chrome for Testing,
 # linux64), pinned so renders do not change under a rebuild.
 ARG CHROME_VERSION=156.0.8078.47
-RUN npx --no-install @puppeteer/browsers install "chrome-headless-shell@${CHROME_VERSION}" --path /opt/chrome \
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/* \
+ && npx --no-install @puppeteer/browsers install "chrome-headless-shell@${CHROME_VERSION}" --path /opt/chrome \
  && ln -s "$(find /opt/chrome -type f -name chrome-headless-shell -perm -u+x | head -n 1)" /opt/chrome/chrome-headless-shell-bin
 
 FROM node:22-bookworm-slim AS editor
