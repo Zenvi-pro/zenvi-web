@@ -36,6 +36,9 @@ const DIRECT_TOOLS = [
   "list_motion_blocks_tool",
   "add_motion_block_tool",
   "update_motion_block_tool",
+  "list_3d_scenes_tool",
+  "add_3d_scene_tool",
+  "rerender_3d_scene_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
   "generate_subject_matte_tool",
@@ -188,7 +191,7 @@ describe("availability matrix", () => {
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes", "motion"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes", "motion", "scenes3d"],
       cloud: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
     };
     for (const tool of allTools) {
