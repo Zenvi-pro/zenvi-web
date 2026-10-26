@@ -77,6 +77,8 @@ export interface EditorSessionOptions {
 }
 
 const THUMBNAIL_EVERY_MS = 20_000;
+/** A thumbnail comes from the preview Worker; a save never waits on it longer than this. */
+const THUMBNAIL_TIMEOUT_MS = 2_000;
 
 export class EditorSession {
   readonly doc: ProjectDocument;
@@ -358,7 +360,11 @@ export class EditorSession {
     const now = Date.now();
     let thumbnail = this.meta.getState().thumbnail;
     if (this.engine?.captureThumbnail && now - this.lastThumbnailAt > THUMBNAIL_EVERY_MS) {
-      const captured = this.engine.captureThumbnail(320);
+      // Saves are serialized: a Worker that never answers must not stop every later save.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), THUMBNAIL_TIMEOUT_MS)));
+      const captured = await Promise.race([this.engine.captureThumbnail(320).catch(() => null), timeout]);
+      clearTimeout(timer);
       if (captured) {
         thumbnail = captured;
         this.lastThumbnailAt = now;

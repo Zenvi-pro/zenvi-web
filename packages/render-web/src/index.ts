@@ -42,6 +42,9 @@ export { CanvasTextRasterizer } from "./compositor/text.js";
 
 // Preview
 export { PreviewPlayer, type PlayerErrorEvent, type PlayerState, type PreviewPlayerOptions } from "./player/preview-player.js";
+
+export { canPreviewInWorker } from "./player/worker/client.js";
+export { servePreviewWorker, type PreviewWorkerOptions } from "./player/worker/host.js";
 export { fitViewport } from "./player/layout.js";
 
 // Audio

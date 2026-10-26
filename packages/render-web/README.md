@@ -85,7 +85,7 @@ Nothing is decoded to probe; Mediabunny demuxes in Node too.
 ```ts
 new PreviewPlayer(canvas: HTMLCanvasElement | OffscreenCanvas, {
   media, engine?, audioContext?, resolution? /* 0.1..1 of device pixels */, letterbox? /* CSS color | "transparent" */,
-  frameCacheBytes?, stills?,
+  frameCacheBytes?, stills?, adaptiveResolution?, worker?,
 })
 ```
 
@@ -96,9 +96,29 @@ new PreviewPlayer(canvas: HTMLCanvasElement | OffscreenCanvas, {
 | `play()`, `pause()`, `toggle()`, `stepFrames(n)` | Pause rests on the start of the frame on screen, so an edit at the playhead cuts exactly there. |
 | `rate`, `loop`, `volume`, `muted` | Negative rates play backwards, silently. |
 | `time`, `frame`, `duration`, `isPlaying`, `state`, `droppedFrames` | `duration` is where the last clip ends (playback stops or loops there). |
+| `presentedFrames`, `renderScale`, `inWorker` | Frames drawn so far; the resolution scale of the frame on screen (below 1 while `adaptiveResolution` playback is scaled down); whether frames render in a Worker. |
+| `snapshot(maxWidth) → Promise<ImageBitmap \| null>` | The picture on screen (project thumbnails). Works for Worker previews too, where the canvas has no readable pixels on the page. |
 | `onTime(fn)`, `onState(fn)`, `onError(fn)` | Each returns an unsubscribe function. Errors (undecodable codec, effect failure, audio that cannot start) are reported once each; the frame still renders without the failed part. |
 | `dispose()` | |
 
+- **Worker.** `canPreviewInWorker()` says whether the browser can (OffscreenCanvas, a
+  `transferControlToOffscreen`-able `<canvas>`, WebCodecs). Then `new Worker(…)` over a module that
+  imports `@zenvi/render-web/preview-worker` and pass it as `worker` (one Worker can serve several
+  players; the caller owns it): the canvas is transferred, and planning, decoding, effects kernels
+  and compositing run there while the clock and Web Audio stay on the page. The worker keeps its own
+  registry, filled from the page's `MediaRegistry` on first use and dropped entry by entry when the
+  page's bytes change; URL refresh, custom `fetch` and SVG rasterization call back to the page. A
+  canvas is transferred once: later players on the same canvas and worker (a remount) reuse it. The
+  worker uses the default engine (`engine` only drives the page-side clock). If the worker fails to
+  start (an `error` before its first message, or no answer to `open` within 15 s), loses a message
+  (`messageerror`) or stays silent for 8 s while a frame is pending (pings unanswered: terminated or
+  crashed), the player warns once on the console and carries on on the page: pending `seek`s resolve
+  there, and the transferred canvas is hidden behind a stand-in `<canvas>` with its attributes. Later
+  players on that worker render on the page at once. An uncaught exception in a running worker is
+  reported as a `render` error. Without `worker` everything runs on the page, as before.
+- **Adaptive resolution.** With `adaptiveResolution`, playback frames that take longer than a
+  frame lasts are planned in a smaller box (0.75, 0.5, then 0.375 of the canvas) and scaled up;
+  cheap frames grow it back. Paused frames, seeks and scrubs always render at full resolution.
 - **Clock.** With audio, the AudioContext is the master clock (`getOutputTimestamp`, so output
   latency is accounted for); video shows the frame for what is being heard and drops frames rather
   than drifting. Without audio, `performance.now()`. If the output device never starts (no user
@@ -170,7 +190,8 @@ reverse, audio kernels with state across windows), `KernelAudioSource`, `chooseC
 
 **Workers.** Only the SVG rasterizer (an `<img>`), the canvas binding (ResizeObserver) and the
 player's AudioContext touch the DOM. The compositor, decoding and stills run in a Worker with
-`OffscreenCanvas`; pass an `svgRasterizer` there (e.g. resvg-wasm).
+`OffscreenCanvas` (`PreviewPlayer`'s `worker` does exactly this); elsewhere pass an
+`svgRasterizer` there (e.g. resvg-wasm).
 
 ## Engine bridge
 

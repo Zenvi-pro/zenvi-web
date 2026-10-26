@@ -70,10 +70,15 @@ describe("MediaRegistry", () => {
     const seen: string[] = [];
     media.onInvalidate((key) => seen.push(key));
     media.register("F1", { kind: "blob", blob: wav(1) });
+    // A new entry is news too (a ref read by its path until now reads by its id).
+    expect(seen).toEqual(["file:F1"]);
     const v1 = await media.acquire({ fileId: "F1" });
     expect(v1.media.version).toBe(1);
-    media.register("F1", { kind: "blob", blob: wav(2) });
-    expect(seen).toEqual(["file:F1"]);
+    const second = wav(2);
+    media.register("F1", { kind: "blob", blob: second });
+    expect(seen).toEqual(["file:F1", "file:F1"]);
+    media.register("F1", { kind: "blob", blob: second });
+    expect(seen).toHaveLength(2);
     const v2 = await media.acquire({ fileId: "F1" });
     expect(v2.media.version).toBe(2);
     expect(await v2.media.duration()).toBeCloseTo(2, 3);
@@ -83,6 +88,23 @@ describe("MediaRegistry", () => {
     expect(v1.media.input.disposed).toBe(true);
     expect(v2.media.input.disposed).toBe(false);
     v2.release();
+    media.dispose();
+  });
+
+  it("forgetPath drops a resolved path entry, so the next lookup resolves it again", () => {
+    let calls = 0;
+    const media = new MediaRegistry({ resolvePath: () => (calls++, { kind: "blob", blob: wav(1) }) });
+    const seen: string[] = [];
+    media.onInvalidate((key) => seen.push(key));
+    expect(media.has({ path: "a.wav" })).toBe(true);
+    expect(media.has({ path: "a.wav" })).toBe(true);
+    expect(calls).toBe(1);
+    media.forgetPath("a.wav");
+    expect(seen).toEqual(["path:a.wav"]);
+    expect(media.has({ path: "a.wav" })).toBe(true);
+    expect(calls).toBe(2);
+    media.forgetPath("unknown.wav");
+    expect(seen).toHaveLength(1);
     media.dispose();
   });
 

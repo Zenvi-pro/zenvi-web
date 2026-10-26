@@ -33,6 +33,8 @@ export interface Fixtures {
   dir: string;
   files: Map<string, Buffer>;
   bundle: string;
+  /** `src/preview-worker.ts`, served at `/preview-worker.js`. */
+  workerBundle: string;
   hasH264: boolean;
   cleanup(): void;
 }
@@ -79,7 +81,18 @@ export async function prepareFixtures(): Promise<Fixtures> {
     logLevel: "error",
   });
   const bundle = result.outputFiles[0]!.text;
-  return { dir, files, bundle, hasH264, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  const worker = await build({
+    entryPoints: [join(here, "../../src/preview-worker.ts")],
+    bundle: true,
+    format: "esm",
+    platform: "browser",
+    target: "es2022",
+    write: false,
+    sourcemap: "inline",
+    logLevel: "error",
+  });
+  const workerBundle = worker.outputFiles[0]!.text;
+  return { dir, files, bundle, workerBundle, hasH264, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 const TYPES: Record<string, string> = {
@@ -116,6 +129,7 @@ export async function attach(page: Page, fixtures: Fixtures): Promise<void> {
       return route.fulfill({ status: 200, contentType: "text/html", body: '<!doctype html><meta charset="utf-8"><title>render-web e2e</title><body><script type="module" src="/bundle.js"></script></body>' });
     }
     if (url.pathname === "/bundle.js") return route.fulfill({ status: 200, contentType: "text/javascript", body: fixtures.bundle });
+    if (url.pathname === "/preview-worker.js") return route.fulfill({ status: 200, contentType: "text/javascript", body: fixtures.workerBundle });
     if (url.pathname.startsWith("/media/")) return serveMedia(route, fixtures, url);
     return route.fulfill({ status: 404, body: "" });
   });

@@ -113,6 +113,23 @@ describe("EditorSession", () => {
     await session.dispose();
   });
 
+  it("saves without a thumbnail when the preview never answers (a dead Worker)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { session, repository } = newSession();
+      const engine = { setProject: vi.fn(), seek: vi.fn(), play: vi.fn(), pause: vi.fn(), setRate: vi.fn(), setLoop: vi.fn(), resize: vi.fn(), onTime: () => () => {}, onState: () => () => {}, renders: true, dispose: vi.fn(), captureThumbnail: () => new Promise<string | null>(() => {}) };
+      session.attachEngine(engine);
+      withClip(session);
+      const saved = session.autosave.flush();
+      await vi.advanceTimersByTimeAsync(2_000);
+      await saved;
+      expect((await repository.load("local1"))?.meta.clipCount).toBe(1);
+      await session.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("clamps seeks to the content", () => {
     const { session } = newSession();
     withClip(session);
