@@ -115,3 +115,21 @@ describe("placing on a track past the top", () => {
     expect(doc.undoLabels).toHaveLength(1);
   });
 });
+
+describe("other placement tools on a track past the top", () => {
+  it("generate_tts_and_add_to_timeline_tool adds the track in the same undo step as the audio", async () => {
+    const doc = fixtureDoc();
+    const r = await run(doc, "generate_tts_and_add_to_timeline_tool", { text: "Hi there", track: "6", position: "1" });
+    expect(r.summary).toMatch(/^Added TTS audio to timeline at position 1\.0s on track 6000000 \(stack_from_bottom=6, z_from_bottom=5\) on a new track timeline_clip_id=\w+\.$/);
+    expect(r.createdTracks.map((t) => t.layer)).toEqual([6_000_000]);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("add_timer_tool (a planOverlayTrack overlay) adds the tracks in between too", async () => {
+    const doc = fixtureDoc();
+    const r = await run(doc, "add_timer_tool", { mode: "count_up", duration_seconds: "3", track: "7" });
+    expect(r.status).toBe("applied");
+    expect(r.createdTracks.map((t) => t.layer)).toEqual([6_000_000, 7_000_000]);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+});
