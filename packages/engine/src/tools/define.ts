@@ -92,6 +92,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   storage: "project storage",
   audio: "audio analysis",
   assets: "the bundled title templates and emoji",
+  mattes: "subject matting (the zenvi CLI with onnxruntime-node)",
 };
 
 /**
