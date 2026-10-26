@@ -4,7 +4,7 @@
   "title": "Dock magnify",
   "description": "A desktop app dock over a wallpaper: the pointer glides along it and the icons swell under it (real dock magnification), it settles on one app, its name shows, it is clicked, and that icon zooms at the camera until its colour fills the frame with its glyph and name — an 'open the app' transition into the next scene. Give `background` (a bin file id) for the wallpaper; without one a drawn scene is used.",
   "tags": ["ui", "dock", "desktop", "app", "icons", "cursor", "zoom", "transition", "promo"],
-  "duration": { "default": 4.5, "min": 3, "max": 10 },
+  "duration": { "default": 4.5, "min": 4, "max": 10 },
   "aspects": ["9:16", "16:9", "1:1", "4:5"],
   "alpha": false,
   "tokens": { "palette": "lilac", "radius": 28 },

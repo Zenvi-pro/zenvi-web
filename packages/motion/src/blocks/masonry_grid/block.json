@@ -15,7 +15,7 @@
   ],
   "duration": {
     "default": 5,
-    "min": 3,
+    "min": 4,
     "max": 12
   },
   "aspects": [

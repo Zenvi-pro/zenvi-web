@@ -4,7 +4,7 @@
   "title": "Liquid glass",
   "description": "A pill of liquid glass over a photo or video: the rim bends what is behind it like a lens (with a hint of colour fringing), the face is frosted, a lit bevel catches the light and one highlight runs round it as it settles. A prompt types into it, the send key is pressed, and the pill flows open into a card listing what happened. The premium AI-product look. Give `background` (a bin file id); without one a drawn scene sits behind.",
   "tags": ["ui", "glass", "liquid glass", "refraction", "prompt", "saas", "promo", "card"],
-  "duration": { "default": 6, "min": 3, "max": 14 },
+  "duration": { "default": 6, "min": 4, "max": 14 },
   "aspects": ["9:16", "16:9", "1:1", "4:5"],
   "alpha": false,
   "tokens": { "palette": "night" },

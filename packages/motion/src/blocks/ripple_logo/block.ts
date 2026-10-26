@@ -59,7 +59,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   const badgeAt = 0.25;
   const ringsAt = 0.6;
   const ringEvery = 0.42;
-  const dissolveAt = dissolve ? Math.max(ringsAt + 0.6, S - 1.4) : Infinity;
+  const dissolveAt = dissolve ? Math.max(ringsAt + 0.5, S - 1.4) : Infinity;
   const ringColor = tint(palette.accent, 0.16);
   const haloColor = tint(palette.accent, 0.08);
 

@@ -66,7 +66,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   // Beats.
   const riseAt = 0.1;
   const glideAt = 0.75;
-  const hoverAt = Math.min(2.1, S * 0.45);
+  const hoverAt = Math.min(2.1, Math.max(1.6, S * 0.45));
   const clickAt = hoverAt + 0.45;
   const launchAt = clickAt + 0.3;
   // The pointer rests low on the icon so its glyph stays in view.

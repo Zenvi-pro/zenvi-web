@@ -141,7 +141,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   const enterAt = 0.2;
   const enterEnd = enterAt + 0.9;
   const typeAt = enterEnd + 0.15;
-  const cps = Math.max(18, Array.from(text).length / Math.max(0.8, S * 0.38));
+  const cps = Math.max(18, Array.from(text).length / Math.max(0.8, S * 0.25));
   const typedEnd = typeAt + Array.from(text).length / cps;
   const sendAt = typedEnd + 0.3;
   const openAt = sendAt + 0.2;

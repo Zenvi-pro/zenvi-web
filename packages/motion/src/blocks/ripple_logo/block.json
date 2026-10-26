@@ -4,7 +4,7 @@
   "title": "Ripple logo",
   "description": "A logo moment: a disc of colour opens from the centre, a white badge with the mark punches in, ripple rings roll out from it across the field, then the whole picture breaks into particles that blow outward from the centre and leave the frame empty — transparent, so the next shot underneath shows through the hole. Use as a brand sting between scenes. Give `logo` (a bin image id) or a short `mark`; without either one of our drawn glyphs is used.",
   "tags": ["logo", "brand", "ripple", "rings", "particles", "dissolve", "transition", "sting"],
-  "duration": { "default": 3.5, "min": 2, "max": 8 },
+  "duration": { "default": 3.5, "min": 2.5, "max": 8 },
   "aspects": ["9:16", "16:9", "1:1", "4:5"],
   "alpha": true,
   "tokens": { "palette": "cherry", "display": "display" },
