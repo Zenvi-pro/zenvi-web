@@ -21,6 +21,12 @@
  * actions are replayed on a scratch document to read those values. What
  * cannot be expressed at all is refused before the desktop changes anything.
  *
+ * The desktop undoes an update by merging the object's old value back
+ * (`_set` returned it), so a field the update added would survive the undo:
+ * an update that adds a field to an object is sent as an update of the field
+ * above it that already existed, or, for an item of a top-level list, as
+ * delete + insert of the whole item (undone exactly).
+ *
  * Untracked changes (`ProjectDocument.setUntracked`: cached transcripts, the
  * saved playhead, export overrides) follow the same rules and are sent as
  * `update_untracked`, which the desktop applies without an undo step.
@@ -72,29 +78,46 @@ function mergeMatches(old: unknown, value: unknown, replace: boolean): boolean {
   return !replace || Object.keys(old).every((k) => k in value);
 }
 
+/** Merging `value` into `old` adds no field, so the desktop's undo (merging `old` back) removes nothing it should. */
+function addsNoField(old: unknown, value: unknown): boolean {
+  return !isRecord(old) || !isRecord(value) || Object.keys(value).every((k) => k in old);
+}
+
+/** `key` names an item of a top-level list (`clips`, `files`, `effects`, …): delete + insert can stand in for an update. */
+function isListItem(key: KeyPath): boolean {
+  return key.length === 2 && typeof key[0] === "string" && typeof key[1] === "object";
+}
+
+function reinsert(key: KeyPath, now: Project): DesktopAction[] {
+  return [{ type: "delete", key }, { type: "insert", key: key.slice(0, 1), value: getAt(now as unknown as Record<string, unknown>, key) }];
+}
+
 /**
- * The action as is, when the desktop applies it exactly like the engine did;
- * a replaced item of a top-level list as delete + insert (it moves to the
- * end of the list, which nothing keyed by id depends on).
+ * The action as is, when the desktop applies (and undoes) it exactly like
+ * the engine did; a replaced item of a top-level list, or one gaining a
+ * field, as delete + insert (it moves to the end of the list, which nothing
+ * keyed by id depends on).
  */
-function direct(action: UpdateAction, replace: boolean, before: Project): DesktopAction[] | undefined {
+function direct(action: UpdateAction, replace: boolean, before: Project, now: Project, undoable: boolean): DesktopAction[] | undefined {
   const { key, type, value } = action;
   if (!addressable(before, key)) return undefined;
   if (type === "insert") return key.length === 1 ? [{ type, key, value }] : undefined;
   if (type === "delete") return key.length >= 2 ? [{ type, key }] : undefined;
-  if (mergeMatches(action.old_values, value, replace)) return [{ type: "update", key, value }];
+  if (mergeMatches(action.old_values, value, replace) && (!undoable || addsNoField(action.old_values, value))) return [{ type: "update", key, value }];
   if (key.length === 1 && !isRecord(value)) return [{ type: "update", key, value }];
-  if (key.length === 2 && typeof key[1] === "object" && isRecord(value) && value.id === key[1].id) {
-    return [{ type: "delete", key }, { type: "insert", key: key.slice(0, 1), value }];
+  if (isListItem(key) && isRecord(value) && (value.id === undefined || value.id === (key[1] as Record<string, unknown>).id)) {
+    return reinsert(key, now);
   }
   return undefined;
 }
 
 /**
  * The update that leaves the deepest addressable field on `key`'s path as
- * `now` holds it: `{ [name]: value }` on its parent, or the root key itself.
+ * `now` holds it: `{ [name]: value }` on its parent, or the root key itself;
+ * a field new to its parent is lifted further, or its top-level list item
+ * sent as delete + insert.
  */
-function lifted(key: KeyPath, before: Project, now: Project): DesktopAction {
+function lifted(key: KeyPath, before: Project, now: Project, undoable: boolean): DesktopAction[] {
   for (let n = key.length; n >= 1; n -= 1) {
     const field = key.slice(0, n);
     // The field as the project stores it: `{ [name]: value }` must merge into that field, not a new spelling of it.
@@ -103,12 +126,17 @@ function lifted(key: KeyPath, before: Project, now: Project): DesktopAction {
     const value = getAt(now as unknown as Record<string, unknown>, field);
     if (value === undefined) continue;
     if (n === 1) {
-      if (!isRecord(value) || mergeMatches(getAt(before as unknown as Record<string, unknown>, field), value, true)) return { type: "update", key: field, value };
+      if (!isRecord(value) || mergeMatches(getAt(before as unknown as Record<string, unknown>, field), value, true)) return [{ type: "update", key: field, value }];
       break;
     }
     // A parent update holding `objects` would be merged per id again.
     if (name === "objects" && isRecord(value)) continue;
-    return { type: "update", key: field.slice(0, -1), value: { [name]: value } };
+    const parent = field.slice(0, -1);
+    if (undoable && !addsNoField(getAt(before as unknown as Record<string, unknown>, parent), { [name]: value })) {
+      if (isListItem(parent) && addressable(before, parent)) return reinsert(parent, now);
+      continue;
+    }
+    return [{ type: "update", key: parent, value: { [name]: value } }];
   }
   throw new DesktopActionError(`the desktop cannot apply this change to ${formatKey(key)}`, key);
 }
@@ -118,7 +146,7 @@ function lifted(key: KeyPath, before: Project, now: Project): DesktopAction {
  * `.replaced`) into desktop UpdateManager calls, in order. Throws
  * DesktopActionError when one cannot be expressed.
  */
-export function toDesktopActions(previous: Project, actions: readonly UpdateAction[], replaced: readonly boolean[] = []): DesktopAction[] {
+export function toDesktopActions(previous: Project, actions: readonly UpdateAction[], replaced: readonly boolean[] = [], undoable = true): DesktopAction[] {
   const scratch = new ProjectDocument(previous, { historyLimit: 0 });
   const out: DesktopAction[] = [];
   scratch.transaction("bridge", (tx) => {
@@ -135,7 +163,7 @@ export function toDesktopActions(previous: Project, actions: readonly UpdateActi
       else if (action.type === "delete") tx.delete(key);
       else if (action.type === "update") (replace ? tx.replace : tx.update)(key, action.value);
       else throw new DesktopActionError(`a ${action.type} action has no desktop form`, key);
-      out.push(...(direct(action, replace, before) ?? [lifted(key, before, tx.project)]));
+      out.push(...(direct(action, replace, before, tx.project, undoable) ?? lifted(key, before, tx.project, undoable)));
     });
   });
   return out;
@@ -149,7 +177,8 @@ export function toDesktopActions(previous: Project, actions: readonly UpdateActi
 export function toDesktopUntracked(previous: Project, project: Project, key: KeyPath): DesktopAction[] {
   const at = (p: Project) => getAt(p as unknown as Record<string, unknown>, key);
   const write: UpdateAction = { type: "update", key, value: at(project), old_values: at(previous), transaction: "untracked" };
-  return toDesktopActions(previous, [write], [true]).map((action) => {
+  // Never undone: a field it adds may simply be merged in.
+  return toDesktopActions(previous, [write], [true], false).map((action) => {
     if (action.type !== "update") throw new DesktopActionError(`the desktop cannot change ${formatKey(key)} without an undo step`, key);
     return { ...action, type: "update_untracked" };
   });
