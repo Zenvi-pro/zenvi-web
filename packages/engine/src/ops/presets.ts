@@ -369,13 +369,24 @@ function resetRepeat(clip: Clip): Clip {
   return next as Clip;
 }
 
+/**
+ * The `time` curve is no longer the one speed_ramp_tool wrote: drop its recipe,
+ * so a later ramp refuses a freeze curve instead of overwriting it (ops/speed-ramp.ts).
+ */
+function dropRampRecipe(clip: Clip): Clip {
+  if (!("zenvi_speed_ramp" in clip)) return clip;
+  const next: Record<string, unknown> = { ...clip };
+  delete next.zenvi_speed_ramp;
+  return next as Clip;
+}
+
 function applyTime(tx: Transaction, clip: Clip, requested: TimePreset, opts: ClipPresetOptions): Clip {
   const project = tx.project;
   const fps = fpsOf(project);
   const rate = rateOf(project);
   // Reverse is a toggle (develop Time_Triggered): reversing a reversed clip resets it.
   const preset: TimePreset = requested === "reverse" && timeCurveIsReversed(clip.time) ? "none" : requested;
-  if (preset === "freeze" || preset === "freeze_zoom") return freeze(clip, preset === "freeze_zoom", opts, rate);
+  if (preset === "freeze" || preset === "freeze_zoom") return dropRampRecipe(freeze(clip, preset === "freeze_zoom", opts, rate));
   if (preset === "none") {
     const base = resetRepeat(clip);
     const reader: Record<string, unknown> = isRecord(base.reader) ? base.reader : {};
@@ -385,7 +396,7 @@ function applyTime(tx: Transaction, clip: Clip, requested: TimePreset, opts: Cli
     if (duration <= 0) duration = 1 / rate;
     const frames = Math.max(1, Math.trunc(pyRound(duration * rate)));
     const retimed = retimeClip(base, Number(base.start) + frames / rate, fps, 1, base.position) ?? base;
-    return { ...retimed, time: { Points: [{ co: { X: 1, Y: 1 }, interpolation: Interpolation.LINEAR }] } };
+    return dropRampRecipe({ ...retimed, time: { Points: [{ co: { X: 1, Y: 1 }, interpolation: Interpolation.LINEAR }] } });
   }
   if (preset === "reverse") {
     let end = Number(clip.end);

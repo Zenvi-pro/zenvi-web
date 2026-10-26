@@ -116,6 +116,14 @@ background), use `add_motion_template_tool`: it places one template on the
 lowest free tracks above the video, in one undo step, timed to the music on
 the timeline (or `beats` / `bpm`).
 
+For the velocity edit (footage rushes, slows to a near-freeze on a beat,
+rushes again) call `speed_ramp_tool` on a shot with `preset=velocity` and
+`hit_at` set to a beat from `data.beats`; `hero` holds a slow-mo moment,
+`ramp_in` / `ramp_out` ease into or out of slow motion. It plays the shot's
+trimmed footage at a changing speed, so the shot's length changes: pass
+`ripple=true` to move the later shots along, and give it enough footage
+(a 4 s rush needs about 10 s of source). Sound is muted unless `audio=keep`.
+
 The receipt has `data.brief`, `data.beats` (the timeline's beat grid: put
 anything else that should land on the beat there) and `data.shots`.
 

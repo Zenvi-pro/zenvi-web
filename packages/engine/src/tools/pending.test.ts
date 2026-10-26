@@ -92,12 +92,12 @@ describe("pending desktop tools", () => {
     for (const name of PENDING_DESKTOP_TOOLS) expect(listed.has(name), name).toBe(false);
   });
 
-  it("leave the listings as they were: 163 ported tools and 24 direct tools", () => {
-    expect(allTools).toHaveLength(187);
-    expect(listTools({ includeDeprecated: true })).toHaveLength(187);
+  it("leave the listings as they were: 163 ported tools and 25 direct tools", () => {
+    expect(allTools).toHaveLength(188);
+    expect(listTools({ includeDeprecated: true })).toHaveLength(188);
     // Hidden by default: remove_clip_tool, delete_clips_on_track_tool, suggest_motion_graphics_placements_tool,
     // fetch_remotion_video_from_supabase_tool (deprecated).
-    expect(listTools({ surface: "editor" })).toHaveLength(183);
+    expect(listTools({ surface: "editor" })).toHaveLength(184);
     expect(listTools({ surface: "assistant", includeDeprecated: true }).every((t) => t.contract)).toBe(true);
   });
 

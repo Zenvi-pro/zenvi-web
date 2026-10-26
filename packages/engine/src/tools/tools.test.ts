@@ -1101,6 +1101,15 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { transition_id: "MTNOPE" }, status: "refused", summary: /^Error: no motion transition with id MTNOPE\.$/ },
   },
 
+  speed_ramp_tool: {
+    happy: {
+      args: { clip_id: IDS.clipA, preset: "velocity", hit_at: "4" },
+      summary: /^Ramped the clip \(velocity\): 10\.00 s -> \d+\.\d\d s, speed 0\.1x-2\.5x, slowest at 4\.00 s\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipA)!.time.Points.length).toBeGreaterThan(10),
+    },
+    failure: { args: { clip_id: IDS.clipA, preset: "ramp_in", hit_at: "3" }, status: "refused", summary: /^Error: hit_at needs hero, velocity or custom/ },
+  },
+
   // --- stock search (web) -------------------------------------------------------------
   search_pexels_videos_tool: {
     happy: {
