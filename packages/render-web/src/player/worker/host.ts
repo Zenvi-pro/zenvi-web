@@ -12,7 +12,7 @@ import type { MediaSourceSpec } from "../../media/source.js";
 import type { SvgRasterizer } from "../../media/svg.js";
 import { bindCanvas } from "../canvas-binding.js";
 import { PreviewRenderer, type RenderErrorEvent } from "../preview-renderer.js";
-import { cloneableError, type Endpoint, type FromWorker, type ToWorker, type WireResponse, type WireSource, type WireSpec, type WorkerCall } from "./protocol.js";
+import { cloneableError, type Endpoint, type FromWorker, type ToWorker, type WireRequestInit, type WireResponse, type WireSource, type WireSpec, type WorkerCall } from "./protocol.js";
 
 export interface PreviewWorkerOptions {
   /** Planner and kernels. Default: `@zenvi/engine`. */
@@ -204,25 +204,27 @@ class Session {
       ...rest,
       ...(requestInit ? { requestInit } : {}),
       ...(refresh ? { refresh: () => this.call({ method: "refresh", key: source.key }) as Promise<string> } : {}),
-      ...(proxied ? { fetch: this.proxyFetch(source.key) } : {}),
+      ...(proxied ? { fetch: proxiedFetch(source.key, (request, signal) => this.call(request, signal)) } : {}),
     };
   }
 
-  /** A `fetch` run by the page's custom fetch (auth, tests) for this media. */
-  private proxyFetch(key: string): typeof fetch {
-    return async (input, init) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      const headers = init?.headers ? [...new Headers(init.headers)] : undefined;
-      const wire = (await this.call({ method: "fetch", key, url, init: { ...(init?.method ? { method: init.method } : {}), ...(headers ? { headers } : {}) } })) as WireResponse;
-      return new Response(wire.body, { status: wire.status, statusText: wire.statusText, headers: wire.headers });
-    };
-  }
-
-  private call(request: WorkerCall): Promise<unknown> {
+  private call(request: WorkerCall, signal?: AbortSignal): Promise<unknown> {
     if (this.closed) return Promise.reject(new Error("PreviewPlayer is disposed"));
     const call = ++this.calls;
     const reply = new Promise<unknown>((resolve, reject) => this.replies.set(call, { resolve, reject }));
-    this.post({ type: "call", id: this.id, call, ...request });
+    this.post({ type: "call", id: this.id, call, ...request }, request.method === "fetch" && request.init.body ? [request.init.body] : []);
+    if (signal) {
+      const abort = () => {
+        const pending = this.replies.get(call);
+        if (!pending) return;
+        this.replies.delete(call);
+        this.post({ type: "abort", id: this.id, call });
+        pending.reject(signal.reason);
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      const done = () => signal.removeEventListener("abort", abort);
+      reply.then(done, done);
+    }
     return reply;
   }
 
@@ -236,6 +238,39 @@ class Session {
       this.scope.postMessage({ ...message, event: { ...message.event, error: String(message.event.error) } }, []);
     }
   }
+}
+
+/**
+ * A `fetch` for the media at `key`, run on the page by its custom fetch
+ * (auth, tests): method, headers, body and abort cross over.
+ */
+export function proxiedFetch(key: string, call: (request: WorkerCall, signal: AbortSignal) => Promise<unknown>): typeof fetch {
+  return async (input, init) => {
+    // A Request normalizes every form of input, body and headers, and follows `init.signal`.
+    const request = new Request(input, init);
+    request.signal.throwIfAborted();
+    const body = request.body ? await request.arrayBuffer() : undefined;
+    const wire = (await call({ method: "fetch", key, url: request.url, init: wireRequest(request, body) }, request.signal)) as WireResponse;
+    // An opaque response (status 0) cannot be constructed; it reads like the network error it is to us.
+    if (wire.status === 0) return Response.error();
+    return new Response(wire.body, { status: wire.status, statusText: wire.statusText, headers: wire.headers });
+  };
+}
+
+function wireRequest(request: Request, body: ArrayBuffer | undefined): WireRequestInit & { body?: ArrayBuffer } {
+  return {
+    method: request.method,
+    headers: [...request.headers],
+    credentials: request.credentials,
+    mode: request.mode,
+    cache: request.cache,
+    redirect: request.redirect,
+    referrer: request.referrer,
+    referrerPolicy: request.referrerPolicy,
+    integrity: request.integrity,
+    keepalive: request.keepalive,
+    ...(body ? { body } : {}),
+  };
 }
 
 function cloneableEvent(event: RenderErrorEvent): RenderErrorEvent {

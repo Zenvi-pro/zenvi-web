@@ -34,6 +34,9 @@ export interface WireRequestInit {
   cache?: RequestCache;
   referrer?: string;
   referrerPolicy?: ReferrerPolicy;
+  redirect?: RequestRedirect;
+  integrity?: string;
+  keepalive?: boolean;
 }
 
 /** A page registry entry: its cache key (`file:…` or `path:…`) and where the bytes are. */
@@ -53,7 +56,7 @@ export interface WireResponse {
 export type WorkerCall =
   | { method: "source"; ref: MediaRef }
   | { method: "refresh"; key: string }
-  | { method: "fetch"; key: string; url: string; init: WireRequestInit & { headers?: [string, string][] } }
+  | { method: "fetch"; key: string; url: string; init: WireRequestInit & { body?: ArrayBuffer } }
   | { method: "svg"; svg: Blob; width: number; height: number };
 
 export type ToWorker =
@@ -68,14 +71,20 @@ export type ToWorker =
   | { type: "media-changed"; id: number; key: string }
   | { type: "snapshot"; id: number; call: number; maxWidth: number }
   | { type: "reply"; id: number; call: number; value?: unknown; error?: unknown }
+  | { type: "ping"; id: number }
   | { type: "close"; id: number };
 
 export type FromWorker =
+  /** The player's renderer is up (`error`: it could not be). */
+  | { type: "opened"; id: number; error?: unknown }
+  | { type: "pong"; id: number }
   | { type: "shown"; id: number; frame: number; presented: number; scale: number }
   /** Nothing waits to render; `seq` is the last render request the worker had received. */
   | { type: "idle"; id: number; seq: number; dropped: number }
   | { type: "error"; id: number; key: string; event: RenderErrorEvent }
   | ({ type: "call"; id: number; call: number } & WorkerCall)
+  /** The worker no longer wants the answer to `call` (its `fetch` was aborted). */
+  | { type: "abort"; id: number; call: number }
   | { type: "reply"; id: number; call: number; value?: unknown; error?: unknown };
 
 /** The `postMessage` side of a Worker or a worker's global scope. */
