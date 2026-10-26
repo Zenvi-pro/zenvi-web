@@ -116,6 +116,17 @@ background), use `add_motion_template_tool`: it places one template on the
 lowest free tracks above the video, in one undo step, timed to the music on
 the timeline (or `beats` / `bpm`).
 
+For a beat-sequenced grid montage (clips filling tiles one per beat), use
+`add_motion_template_tool template=grid` with `file_ids` (as many clips as
+tiles; fewer are reused from other moments) and `layout`: `grid` (2, 3, 4, 6
+or 9 tiles), `strips_v` / `strips_h`, `film_strip` (small frames on a
+sprocketed strip, the big frame last) or `mosaic`. `steps=[3,4,6]` re-cuts the
+grid on a beat for each count; `band=16:9` on a 9:16 frame letterboxes it
+into the viral band; `reveal` is pop, slide, wipe or fade; `merge=true` ends
+with the last tile growing to the full frame, `zoom_into=N` with the camera
+pushing into tile N. Tiles stay at least 13 % of the frame's short side; the
+tool refuses layouts that would be smaller.
+
 The receipt has `data.brief`, `data.beats` (the timeline's beat grid: put
 anything else that should land on the beat there) and `data.shots`.
 
