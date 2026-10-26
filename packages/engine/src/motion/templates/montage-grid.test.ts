@@ -457,6 +457,23 @@ describe.each(Object.entries(FRAMES))("repeat and kaleidoscope fields, %s", (_na
     }
   });
 
+  it("drift on a montage of several clips: the popped tiles and their gutters scale as one", () => {
+    const { plan } = build(frame, { layout: "grid", tiles: 4, drift: "in" }, {}, { seconds: 6 });
+    // Gutter 6 at 1080 on a frame whose short side is 1080: the gaps grow with the push-in, the lattice stays square.
+    for (const [f, z] of [
+      [Math.round(plan.frames * 0.7), 1 + 0.12 * (Math.round(plan.frames * 0.7) / (plan.frames - 1))],
+      [plan.frames - 1, 1.12],
+    ] as const) {
+      const boxes = boxesAt(plan, f).sort((p, q) => p.y - q.y || p.x - q.x);
+      expect(boxes).toHaveLength(4);
+      const [a, b, c] = boxes;
+      const wide = frame.width > frame.height;
+      const [p, q] = wide ? [a!, b!] : [a!, c!];
+      expect(wide ? q.x - (p.x + p.w) : q.y - (p.y + p.h), `${f}`).toBeCloseTo(6 * z, 0);
+      for (const box of boxes) expect(box.w, `${f}`).toBeCloseTo(boxes[0]!.w, 1);
+    }
+  });
+
   it("kaleidoscope steps re-cut all segments on the beat", () => {
     const { plan, beats } = build(frame, { layout: "kaleidoscope", steps: [2, 4, 8] }, {}, { seconds: 8 });
     const starts = [...new Set(tiles(plan).map((l) => l.start))].sort((a, b) => a - b);
