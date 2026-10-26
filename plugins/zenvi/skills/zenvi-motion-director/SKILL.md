@@ -129,7 +129,9 @@ For flash and match-cut montages also check 4-6 consecutive cuts in a row:
 the subject must sit in the same place and size.
 
 Checklist per frame: no black or letterbox edges · subject at the planned
-place · text inside title-safe, readable at phone size, not over the face ·
+place · every letter inside the frame and inside title-safe, readable at
+phone size, not over the face · type on a calm area (a field, glass, a
+scrim), never straight on a busy photo ·
 one focal point · grade consistent with the previous shot. Then the timeline:
 `get_timeline_state_tool` — no gaps, shot lengths as planned, an SFX clip at
 every cut, music covers the whole piece and fades out.
