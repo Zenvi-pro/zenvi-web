@@ -149,11 +149,39 @@ describe("export loudness normalisation", () => {
     expect(result.warnings.join(" ")).toMatch(/silent/);
   });
 
+  it("reaches the target on a mix whose peaks forbid a plain gain, under the ceiling", async () => {
+    // Quiet bed with three 20 ms bursts: ~18 dB between the bursts and the programme.
+    const gain = [{ t: 0, gain: 0.004 }];
+    for (const t of [1, 3, 5]) gain.push({ t: t - 0.001, gain: 0.004 }, { t, gain: 1 }, { t: t + 0.02, gain: 1 }, { t: t + 0.021, gain: 0.004 });
+    const peaky: RenderEngine = {
+      ...engine(),
+      planAudio: (_p, range) => ({ sampleRate: 48000, channels: 2, start: range.start, end: range.end, segments: [{ ...segment("C1", quiet), gain }] }),
+    };
+    const base = { format: "wav" as const, width: 160, height: 90, fps: { num: 25, den: 1 } };
+    const plain = path.join(dir, "peaky.wav");
+    const normalized = path.join(dir, "peaky-normalized.wav");
+    await renderProject(project(), { resolveMedia: (p) => p, output: plain, options: base, engine: peaky });
+    await renderProject(project(), { resolveMedia: (p) => p, output: normalized, options: { ...base, loudness: { targetLufs: -10, truePeakDbtp: -1 } }, engine: peaky });
+    const before = measureLoudness(await decodeStereo(plain), 48000);
+    const after = measureLoudness(await decodeStereo(normalized), 48000);
+    // A plain gain to the target would put the peaks over the ceiling.
+    expect(before.truePeakDb + (-10 - before.integrated)).toBeGreaterThan(-1);
+    expect(after.integrated).toBeGreaterThan(before.integrated + 2);
+    expect(after.integrated).toBeLessThan(-9);
+    expect(after.truePeakDb).toBeLessThanOrEqual(-1);
+  }, 60_000);
+
   it("builds the second pass from the first pass's readings", () => {
-    const pass2 = loudnormPass2({ inputI: -27.6, inputTp: -9.1, inputLra: 3.2, inputThresh: -38, targetOffset: 0.3 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100);
+    const pass2 = loudnormPass2({ inputI: -27.6, inputTp: -20, inputLra: 3.2, inputThresh: -38, targetOffset: 0.3 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100);
     expect(pass2).toContain("I=-14:TP=-2");
-    expect(pass2).toContain("measured_I=-27.6:measured_TP=-9.1:measured_LRA=3.2:measured_thresh=-38:offset=0.3:linear=true");
+    expect(pass2).toContain("measured_I=-27.6:measured_TP=-20:measured_LRA=3.2:measured_thresh=-38:offset=0.3:linear=true");
     expect(pass2).toContain("aresample=44100");
     expect(pass2).toContain("alimiter=limit=0.79433:level=disabled");
+    // +13.6 dB to reach -14 would take a -12 dBTP peak to +1.6: past -2, so a gain and a limiter.
+    const hot = loudnormPass2({ inputI: -27.6, inputTp: -12, inputLra: 3.2, inputThresh: -38, targetOffset: 0.3 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100);
+    expect(hot).toBe("volume=13.6dB,alimiter=limit=0.79433:level=disabled");
+    // Asked for far more than the limiter may take: the gain stops at 6 dB of peak reduction.
+    const crushed = loudnormPass2({ inputI: -45, inputTp: -22, inputLra: 3.2, inputThresh: -50, targetOffset: 0 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100);
+    expect(crushed).toBe("volume=26dB,alimiter=limit=0.79433:level=disabled");
   });
 });

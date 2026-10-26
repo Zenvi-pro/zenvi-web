@@ -140,6 +140,9 @@ export interface LoudnormMeasurement {
  */
 const CODEC_HEADROOM_DB = 1;
 
+/** Most the limiter is asked to take off the loudest peaks, dB. */
+const MAX_LIMITING_DB = 6;
+
 /** Loudness range the second pass may keep; wide, so a dynamic mix is gained as one (linear), not squeezed. */
 const LOOSE_LRA = 20;
 
@@ -167,18 +170,28 @@ export async function measureLoudnorm(graph: AudioGraph, target: LoudnessTarget,
 }
 
 /**
- * Pass 2: `loudnorm` fed pass 1's readings, linear (one gain for the whole
- * mix) whenever the true peak allows, then a limiter at the ceiling for
- * what the gain still pushes over, and back to the export's rate (loudnorm
- * resamples to 192 kHz).
+ * Pass 2, from pass 1's readings and back at the export's rate (loudnorm
+ * resamples to 192 kHz). When the gain to the target keeps the true peak
+ * under the ceiling that is `loudnorm` in linear mode (one gain for the
+ * whole mix). A mix whose peaks would pass the ceiling is gained to the
+ * target and held under it by a lookahead limiter instead, which is what a
+ * mastering chain does: linear `loudnorm` would stop short of the target and
+ * its dynamic mode squeezes the whole programme.
  */
 export function loudnormPass2(measured: LoudnormMeasurement, target: LoudnessTarget, sampleRate: number): string {
-  const ceiling = 10 ** ((target.truePeakDbtp - CODEC_HEADROOM_DB) / 20);
-  return [
-    `${loudnormBase(target)}:measured_I=${num(measured.inputI, 3)}:measured_TP=${num(measured.inputTp, 3)}:measured_LRA=${num(measured.inputLra, 3)}:measured_thresh=${num(measured.inputThresh, 3)}:offset=${num(measured.targetOffset, 3)}:linear=true`,
-    `aresample=${sampleRate}`,
-    `alimiter=limit=${num(ceiling, 5)}:level=disabled`,
-  ].join(",");
+  const ceilingDb = target.truePeakDbtp - CODEC_HEADROOM_DB;
+  const ceiling = num(10 ** (ceilingDb / 20), 5);
+  const gain = target.targetLufs - measured.inputI;
+  if (measured.inputTp + gain <= ceilingDb) {
+    return [
+      `${loudnormBase(target)}:measured_I=${num(measured.inputI, 3)}:measured_TP=${num(measured.inputTp, 3)}:measured_LRA=${num(measured.inputLra, 3)}:measured_thresh=${num(measured.inputThresh, 3)}:offset=${num(measured.targetOffset, 3)}:linear=true`,
+      `aresample=${sampleRate}`,
+      `alimiter=limit=${ceiling}:level=disabled`,
+    ].join(",");
+  }
+  // Past MAX_LIMITING_DB of peak reduction the mix would be crushed for the last LU: stop short of the target instead.
+  const held = Math.min(gain, ceilingDb - measured.inputTp + MAX_LIMITING_DB);
+  return `volume=${num(held, 3)}dB,alimiter=limit=${ceiling}:level=disabled`;
 }
 
 /** Normalize `graph`'s output to `target` (mutates the graph's filter). Returns a warning when it left the mix alone. */
