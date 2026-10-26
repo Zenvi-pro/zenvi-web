@@ -56,6 +56,8 @@ const result = await build({
   legalComments: "eof",
   metafile: true,
   logLevel: "warning",
+  // Zenvi Motion builds block pages with esbuild only from source; the bundle ships them prebuilt (dist/motion).
+  external: ["esbuild"],
   define: {
     __ZENVI_BUNDLE__: "true",
     __ZENVI_VERSION__: JSON.stringify(pkg.version),
@@ -107,6 +109,12 @@ const linkBuild = spawnSync(
   { cwd: repoRoot, stdio: "inherit" },
 );
 if (linkBuild.status !== 0) throw new Error(`building Zenvi Link failed (exit ${linkBuild.status})`);
+// Zenvi Motion: every block page prebuilt, and its OFL fonts (packages/motion/src/node/page.ts motionDir).
+const motionBuild = spawnSync(process.execPath, ["--import", "tsx", path.join(repoRoot, "packages", "motion", "scripts", "build-pages.ts"), "--out", path.join(dist, "motion")], {
+  cwd: repoRoot,
+  stdio: "inherit",
+});
+if (motionBuild.status !== 0) throw new Error(`building the Zenvi Motion pages failed (exit ${motionBuild.status})`);
 
 await writeFile(
   path.join(dist, "LICENSES.md"),
@@ -116,6 +124,7 @@ await writeFile(
     "- zenvi (this CLI): GPL-3.0-or-later.",
     "- resvg-wasm (resvg.wasm): MPL-2.0, https://github.com/yisibl/resvg-js.",
     "- Lato (fonts/Lato-Regular.ttf): SIL Open Font License 1.1, see fonts/OFL.txt.",
+    "- motion/fonts (Inter, Instrument Serif, JetBrains Mono, Anton): SIL Open Font License 1.1, see motion/fonts/OFL-*.txt.",
     "- assets/ (transition masks, title templates, effect icons): from the Zenvi desktop app (zenvi-core, after OpenShot), GPL-3.0-or-later.",
     "- assets/emojis: OpenMoji emoji graphics (https://openmoji.org), CC BY-SA 4.0, as the Zenvi desktop app ships them.",
     "- assets/colors (colour LUTs): from the Zenvi desktop app, by the freshluts.com community, CC0; see assets/colors/AUTHORS.md.",
