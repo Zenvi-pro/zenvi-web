@@ -382,6 +382,9 @@ describe("export end and size (W25a E2E bugs 2 and 5)", () => {
     const ed = studio();
     const landscape = await render(ed, { profile: "1080p" });
     expect([landscape.width, landscape.height]).toEqual([1920, 1080]);
+    // Zenvi Cloud's preset name works on every shape, not only turned ones.
+    const cloudName = await render(ed, { preset: "mp4-1080p" });
+    expect([cloudName.preset, cloudName.width, cloudName.height]).toEqual(["MP4 (h.264)", 1920, 1080]);
     ed.doc.transaction("tall", (tx) => setProfile(tx, "FHD Vertical 1080p 30 fps"));
     ed.doc.setUntracked(["height"], 8000);
     ed.mark();

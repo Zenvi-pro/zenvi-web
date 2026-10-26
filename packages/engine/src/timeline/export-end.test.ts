@@ -29,6 +29,14 @@ describe("defaultExportEnd", () => {
     expect(defaultExportEnd(podcast, true).end).toBe(30);
   });
 
+  it("counts only sound as cut: not a transition past the last picture, not a sub-millisecond tail", () => {
+    const fade = { ...project([clip("A", 0, 10)]), effects: [{ id: "T", layer: 1, position: 9.5, start: 0, end: 1 }] } as unknown as Project;
+    expect(defaultExportEnd(fade, true)).toEqual({ end: 10, contentEnd: 10.5, audioCut: 0 });
+    expect(audioCutNote(defaultExportEnd(project([clip("A", 0, 10), sound("S", 9, 1.0004)]), true))).toBeNull();
+    const both = { ...project([clip("A", 0, 10), sound("S", 9, 2)]), effects: [{ id: "T", layer: 1, position: 9.5, start: 0, end: 3 }] } as unknown as Project;
+    expect(audioCutNote(defaultExportEnd(both, true), "end")).toMatch(/1\.00s of sound after it \(to 11\.00s\).*pass end=11\.00 to keep it$/);
+  });
+
   it("does not count a clip whose picture is switched off", () => {
     const hidden = { ...clip("B", 0, 20), has_video: { Points: [{ co: { X: 1, Y: 0 } }] } } as unknown as Clip;
     expect(isVisualClip(hidden)).toBe(false);

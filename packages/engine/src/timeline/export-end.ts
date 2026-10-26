@@ -33,7 +33,10 @@ export interface ExportEnd {
   end: number;
   /** Seconds where the last item of any kind ends (the desktop's export end). */
   contentEnd: number;
-  /** Seconds of sound after `end` that the render leaves out (0 when none). */
+  /**
+   * Seconds of sound after `end` that the render leaves out (0 when none).
+   * Only clips without a picture count: a transition past the last picture is not sound.
+   */
   audioCut: number;
 }
 
@@ -42,8 +45,10 @@ export function defaultExportEnd(project: Project, picture: boolean): ExportEnd 
   const contentEnd = timelineEnd(project);
   const visual = picture ? pictureEnd(project) : 0;
   const end = visual > 0 ? visual : contentEnd;
+  let soundEnd = end;
+  for (const clip of project.clips) if (!isVisualClip(clip)) soundEnd = Math.max(soundEnd, itemEnd(clip));
   // Under one millisecond is rounding, not sound anyone hears.
-  const audioCut = contentEnd - end > 1e-3 ? contentEnd - end : 0;
+  const audioCut = soundEnd - end > 1e-3 ? soundEnd - end : 0;
   return { end, contentEnd, audioCut };
 }
 
@@ -53,7 +58,7 @@ export function defaultExportEnd(project: Project, picture: boolean): ExportEnd 
  */
 export function audioCutNote(cut: ExportEnd, endArgument?: string): string | null {
   if (cut.audioCut <= 0) return null;
-  const to = cut.contentEnd.toFixed(2);
+  const to = (cut.end + cut.audioCut).toFixed(2);
   const keep = endArgument ? `pass ${endArgument}=${to}` : `render with an end of ${to}s`;
   return (
     `the video ends with the last picture at ${cut.end.toFixed(2)}s: ${cut.audioCut.toFixed(2)}s of sound after it ` +

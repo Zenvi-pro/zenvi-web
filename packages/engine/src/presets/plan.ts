@@ -23,7 +23,7 @@ import { CHANNEL_LAYOUTS, channelLayoutNamed } from "../model/channel-layouts.js
 import { matchProfile, profileCatalog, ProfileRequestError, resolveProfileRequest, sizeFor, socialPreset } from "../model/profile-requests.js";
 import { aspectText, profileFpsFraction, type CatalogProfile } from "../model/profiles.js";
 import { pyRound } from "../model/rounding.js";
-import { audioCutNote, pictureEnd } from "../timeline/export-end.js";
+import { audioCutNote, defaultExportEnd } from "../timeline/export-end.js";
 import type { Fraction, Project } from "../model/types.js";
 import { pyFixed, pyReprString } from "../tools/pyfmt.js";
 import type { ContainerFormat } from "../tools/types.js";
@@ -387,9 +387,15 @@ const RESOLUTION_CLASSES: Readonly<Record<string, number>> = {
   "720p": 720, hd_720p: 720, "1080p": 1080, fhd: 1080, full_hd: 1080, "1440p": 1440, qhd: 1440, "2k": 1440, "2160p": 2160, "4k": 2160, uhd: 2160,
 };
 
-/** The short side a bare resolution class means ("1080p", "mp4-1080p", "4K"), or null. */
-function resolutionClass(text: string): number | null {
-  return RESOLUTION_CLASSES[norm(text).replace(/^mp4_/, "")] ?? null;
+/**
+ * The short side a resolution class means ("1080p", "mp4-1080p", "4K"), or
+ * null. On a landscape project only the "mp4-" form (Zenvi Cloud's preset
+ * names) counts: a bare "1080p" there stays the desktop's YouTube alias.
+ */
+function resolutionClass(text: string, landscape: boolean): number | null {
+  const key = norm(text);
+  if (landscape && !key.startsWith("mp4_")) return null;
+  return RESOLUTION_CLASSES[key.replace(/^mp4_/, "")] ?? null;
 }
 
 /** The longest side Zenvi's renderers take (render-node's limit is 16384; browsers' encoders stop near 8192). */
@@ -537,8 +543,8 @@ export function planExport(project: Project, request: ExportRequest = {}, contex
 
   const presetText = firstGiven(request.preset?.trim(), ov.preset) ?? "MP4 (h.264)";
   // "1080p" names the short side: on a vertical or square project it is not the landscape YouTube preset.
-  const turned = Number(project.width) <= Number(project.height);
-  const presetSide = turned ? resolutionClass(presetText) : null;
+  const landscape = Number(project.width) > Number(project.height);
+  const presetSide = resolutionClass(presetText, landscape);
   const p = resolveExportPreset(presetSide ? "MP4 (h.264)" : presetText);
   const qualities = presetQualities(p);
   const offered: PresetQuality[] = qualities.length > 0 ? qualities : ["High"];
@@ -558,7 +564,7 @@ export function planExport(project: Project, request: ExportRequest = {}, contex
   const record = projectRecord(project, catalog);
   let prof: CatalogProfile;
   // An explicit profile wins over the preset's resolution class.
-  const side = request.profile?.trim() ? (turned ? resolutionClass(request.profile) : null) : presetSide;
+  const side = request.profile?.trim() ? resolutionClass(request.profile, landscape) : presetSide;
   if (side) {
     prof = shortSideProfile(project, record, catalog, side, request.profile?.trim() || presetText);
   } else if (request.profile?.trim()) {
@@ -638,8 +644,8 @@ export function planExport(project: Project, request: ExportRequest = {}, contex
   if (rmode && !["whole", "selection", "custom"].includes(rmode)) throw new ExportPlanError("range must be whole, selection or custom");
   if (!rmode) rmode = given(request.start) || given(request.end) || given(ov.start_frame) || given(ov.end_frame) ? "custom" : "whole";
   // Video ends with the last picture unless an end is given (timeline/export-end.ts).
-  const picture = etype === "audio_only" ? 0 : pictureEnd(project);
-  const lastEnd = picture > 0 && picture < bounds[1] ? picture : bounds[1];
+  const cut = defaultExportEnd(project, etype !== "audio_only");
+  const lastEnd = cut.audioCut > 0 ? cut.end : bounds[1];
   let t0: number;
   let t1: number;
   if (rmode === "whole") [t0, t1] = [bounds[0], lastEnd];
@@ -655,7 +661,7 @@ export function planExport(project: Project, request: ExportRequest = {}, contex
   }
   const endDefaulted = rmode === "whole" || (rmode === "custom" && !given(request.end) && !given(ov.end_frame));
   if (endDefaulted && t1 === lastEnd) {
-    const note = audioCutNote({ end: lastEnd, contentEnd: bounds[1], audioCut: bounds[1] - lastEnd }, "end");
+    const note = audioCutNote(cut, "end");
     if (note) notes.push(note);
   }
   if (t1 <= t0) throw new ExportPlanError(`the range ends (${pyFixed(t1, 3)}s) before it starts (${pyFixed(t0, 3)}s)`);
