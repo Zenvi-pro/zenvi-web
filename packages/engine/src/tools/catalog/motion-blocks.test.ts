@@ -5,10 +5,11 @@ import { createProject } from "../../model/defaults.js";
 import { findProfile } from "../../model/profiles.js";
 import { addClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
+import { patchClip } from "../../ops/internal.js";
 import { listTools, runTool } from "../registry.js";
 import { fakeHost } from "../test-support/fake-host.js";
 import { media, videoInfo } from "../test-support/fixture.js";
-import { fakeMotionHost, type FakeMotionHost } from "../test-support/fake-motion.js";
+import { FAKE_MOTION_BLOCK, fakeMotionHost, type FakeMotionHost } from "../test-support/fake-motion.js";
 import type { ToolHost } from "../types.js";
 
 function project(): ProjectDocument {
@@ -82,6 +83,27 @@ describe("motion block tools", () => {
     expect(doc.undoLabels).toHaveLength(0);
   });
 
+  it("refuses a media param of the wrong kind before rendering", async () => {
+    const doc = project();
+    const motion = fakeMotionHost();
+    const photoOnly = { ...FAKE_MOTION_BLOCK, params: FAKE_MOTION_BLOCK.params.map((p) => (p.type === "media" ? { ...p, accept: ["image"] } : p)) };
+    motion.blocks = () => [photoOnly];
+    const result = await runTool({ doc, host: host(motion) }, "add_motion_block_tool", { block: "kinetic_headline", params: { background: "SHOTXXXXXX" } });
+    expect(result.text).toContain("background takes a photo, and SHOTXXXXXX is a video");
+    expect(motion.requests).toHaveLength(0);
+    expect(doc.undoLabels).toHaveLength(0);
+  });
+
+  it("renders whole frames, so the clip never outruns its media", async () => {
+    const doc = project();
+    const motion = fakeMotionHost();
+    const data = dataOf(await runTool({ doc, host: host(motion) }, "add_motion_block_tool", { block: "kinetic_headline", duration_seconds: 3.31 }));
+    expect(motion.requests[0]!.seconds).toBeCloseTo(3.3, 9);
+    const clip = doc.project.clips.find((c) => c.id === data.timeline_clip_id)!;
+    const file = doc.project.files.find((f) => f.id === data.file_id)!;
+    expect(Number(clip.end)).toBeLessThanOrEqual(Number(file.duration));
+  });
+
   it("passes media params as project paths and renders full frame when asked", async () => {
     const doc = project();
     const motion = fakeMotionHost();
@@ -118,6 +140,19 @@ describe("motion block tools", () => {
     expect(clip.end).toBe(5);
     doc.undo(1);
     expect(doc.project.files.find((f) => f.id === added.file_id)!.path).toBe("/links/kinetic_headline-1.mov");
+  });
+
+  it("refuses a length that would leave a trimmed clip empty", async () => {
+    const doc = project();
+    const motion = fakeMotionHost();
+    const h = host(motion);
+    const added = dataOf(await runTool({ doc, host: h }, "add_motion_block_tool", { block: "kinetic_headline" }));
+    doc.transaction("trim", (tx) => patchClip(tx, String(added.timeline_clip_id), { start: 2 }));
+    const result = await runTool({ doc, host: h }, "update_motion_block_tool", { file_id: added.file_id, duration_seconds: 1.5 });
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("starts 2s into the block");
+    expect(motion.requests).toHaveLength(1);
+    expect(doc.undoLabels).toEqual(["Add motion block kinetic_headline", "trim"]);
   });
 
   it("answers unchanged when the new spec renders the same", async () => {

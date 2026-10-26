@@ -14,7 +14,7 @@
  */
 
 import { z } from "zod";
-import { isAudioOnlyMedia } from "../../model/media.js";
+import { isAudioOnlyMedia, isSingleImageMedia } from "../../model/media.js";
 import type { Project, ProjectFile } from "../../model/types.js";
 import { clipsUsingFile } from "../../model/query.js";
 import { addFile, updateFile, writeFile } from "../../ops/files.js";
@@ -70,6 +70,9 @@ function mediaPaths(project: Project, block: MotionBlockInfo, params: Record<str
     const file = project.files.find((f) => String(f.id) === id);
     if (!file) return `Error: ${spec.name}: unknown file id ${id} (use a Project Files id).`;
     if (isAudioOnlyMedia(file)) return `Error: ${spec.name}: ${id} has no picture; give a photo or a video.`;
+    // The renderer refuses the wrong kind too, but only after the work of preparing it.
+    const kind = isSingleImageMedia(file) ? "image" : "video";
+    if (spec.accept && !spec.accept.includes(kind)) return `Error: ${spec.name} takes a ${spec.accept.includes("image") ? "photo" : "video"}, and ${id} is a ${kind === "image" ? "photo" : "video"}.`;
     out[spec.name] = String(file.path);
   }
   return out;
@@ -188,10 +191,12 @@ export const motionBlockTools: CatalogTool[] = [
       if (typeof raw === "string") return refused(ADD, raw);
       const checked = motion.check(block.id, raw);
       if (!checked.ok) return refused(ADD, errorText(checked.error));
-      const seconds = args.duration_seconds ?? block.duration.default;
-      if (seconds < block.duration.min || seconds > block.duration.max) {
-        return refused(ADD, `Error: ${block.id} runs ${block.duration.min}-${block.duration.max} s (got ${seconds}).`);
+      const asked = args.duration_seconds ?? block.duration.default;
+      if (asked < block.duration.min || asked > block.duration.max) {
+        return refused(ADD, `Error: ${block.id} runs ${block.duration.min}-${block.duration.max} s (got ${asked}).`);
       }
+      // Whole frames: the render has round(seconds × fps) frames, and the clip must not outrun them.
+      const seconds = snapToFrame(project, asked);
       const media = mediaPaths(project, block, checked.params);
       if (typeof media === "string") return refused(ADD, media);
       const start = snapToFrame(project, args.position_seconds ?? 0);
@@ -238,6 +243,7 @@ export const motionBlockTools: CatalogTool[] = [
         const clip = project.clips.find((c) => c.id === args.clip_id);
         if (!clip) return refused(UPDATE, `Error: unknown clip id ${args.clip_id}.`);
         file = project.files.find((f) => String(f.id) === String(clip.file_id));
+        if (!file) return refused(UPDATE, `Error: clip ${args.clip_id} plays no file in Project Files.`);
       } else return refused(UPDATE, "Error: give file_id or clip_id of the motion block.");
       if (!file) return refused(UPDATE, `Error: unknown file id ${args.file_id}.`);
       const current = readMotionLink(file);
@@ -253,10 +259,14 @@ export const motionBlockTools: CatalogTool[] = [
       }
       const checked = motion.check(block.id, merged);
       if (!checked.ok) return refused(UPDATE, errorText(checked.error));
-      const seconds = args.duration_seconds ?? (current.seconds || block.duration.default);
-      if (seconds < block.duration.min || seconds > block.duration.max) {
-        return refused(UPDATE, `Error: ${block.id} runs ${block.duration.min}-${block.duration.max} s (got ${seconds}).`);
+      const asked = args.duration_seconds ?? (current.seconds || block.duration.default);
+      if (asked < block.duration.min || asked > block.duration.max) {
+        return refused(UPDATE, `Error: ${block.id} runs ${block.duration.min}-${block.duration.max} s (got ${asked}).`);
       }
+      const seconds = snapToFrame(project, asked);
+      // A shorter block cuts every clip's end to it (writeFile); a clip trimmed to start past that would be empty.
+      const emptied = clipsUsingFile(project, String(file.id)).find((c) => Number(c.start) >= seconds);
+      if (emptied) return refused(UPDATE, `Error: clip ${emptied.id} starts ${round(Number(emptied.start))}s into the block; it cannot be shorter than that.`);
       const spec: MotionLinkSpec = {
         block: block.id,
         params: checked.params,
