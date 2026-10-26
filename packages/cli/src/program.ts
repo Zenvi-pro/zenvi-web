@@ -4,6 +4,7 @@
  */
 
 import type { Writable } from "node:stream";
+import { closeChrome } from "@zenvi/motion/node";
 import { Command, CommanderError } from "commander";
 import { Auth } from "./auth/session.js";
 import { registerAccountCommands } from "./commands/account.js";
@@ -118,5 +119,8 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       if (!cli && env.ZENVI_DEBUG && error instanceof Error && error.stack) ctx.out.info(error.stack);
     }
     return cli?.exitCode ?? EXIT.failed;
+  } finally {
+    // A render leaves its Chrome warm for the next one; this process has no next one.
+    await closeChrome();
   }
 }

@@ -13,10 +13,13 @@ import { cacheDir } from "@zenvi/render-node";
 
 export class ChromeMissingError extends Error {
   constructor() {
-    super("Zenvi Motion needs headless Chrome to render blocks: run `zenvi motion setup` (downloads chrome-headless-shell, about 90 MB) or set ZENVI_CHROME to a Chrome executable.");
+    super("Zenvi Motion needs headless Chrome to render blocks: run `zenvi motion setup` or call setup_motion_runtime_tool (downloads chrome-headless-shell, about 90 MB, once) or set ZENVI_CHROME to a Chrome executable.");
     this.name = "ChromeMissingError";
   }
 }
+
+/** Size of the chrome-headless-shell download, for the messages that offer it. */
+export const CHROME_DOWNLOAD_MB = 90;
 
 export function chromeCacheDir(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(cacheDir(env), "chrome");
@@ -71,8 +74,123 @@ export const CHROME_ARGS = [
   "--disable-dev-shm-usage",
 ];
 
-export async function launchChrome(env: NodeJS.ProcessEnv = process.env): Promise<PuppeteerBrowser> {
+/** How long one launch may take before it counts as failed (a loaded machine needs far more than puppeteer's 30 s). */
+export const LAUNCH_TIMEOUT_MS = 90_000;
+const LAUNCH_TRIES = 2;
+/** A warm browser nobody has used for this long is closed. */
+const IDLE_CLOSE_MS = 120_000;
+
+export class ChromeLaunchError extends Error {
+  constructor(tries: number, timeoutMs: number, cause: unknown) {
+    const why = cause instanceof Error ? cause.message.split("\n")[0] : String(cause);
+    super(`Headless Chrome did not start after ${tries} tries of ${Math.round(timeoutMs / 1000)} s (${why}). The computer looks busy or the Chrome install is damaged: close heavy programs and try again, or run \`zenvi motion setup\` again, or set ZENVI_CHROME to a Chrome executable.`);
+    this.name = "ChromeLaunchError";
+  }
+}
+
+export interface LaunchDeps {
+  launch?: typeof puppeteer.launch;
+}
+
+function launchTimeout(env: NodeJS.ProcessEnv): number {
+  const asked = Number(env.ZENVI_CHROME_TIMEOUT_MS);
+  return Number.isFinite(asked) && asked > 0 ? asked : LAUNCH_TIMEOUT_MS;
+}
+
+/** Start headless Chrome: a 90 s timeout per try and one retry (a busy machine, or macOS checking a fresh binary), then a clear error. */
+export async function launchChrome(env: NodeJS.ProcessEnv = process.env, deps: LaunchDeps = {}): Promise<PuppeteerBrowser> {
   const executablePath = await findChrome(env);
   if (!executablePath) throw new ChromeMissingError();
-  return puppeteer.launch({ executablePath, headless: "shell", args: CHROME_ARGS, protocolTimeout: 120_000 });
+  const launch = deps.launch ?? puppeteer.launch.bind(puppeteer);
+  const timeout = launchTimeout(env);
+  let last: unknown;
+  for (let attempt = 1; attempt <= LAUNCH_TRIES; attempt += 1) {
+    try {
+      return await launch({ executablePath, headless: "shell", args: CHROME_ARGS, protocolTimeout: 120_000, timeout });
+    } catch (error) {
+      last = error;
+    }
+  }
+  throw new ChromeLaunchError(LAUNCH_TRIES, timeout, last);
+}
+
+interface Warm {
+  browser: Promise<PuppeteerBrowser>;
+  leases: number;
+  idle?: NodeJS.Timeout;
+}
+
+let warm: Warm | undefined;
+let exitHook = false;
+
+function dropWarm(entry: Warm): void {
+  if (entry.idle) clearTimeout(entry.idle);
+  if (warm === entry) warm = undefined;
+}
+
+export interface ChromeLease {
+  browser: PuppeteerBrowser;
+  release(): void;
+}
+
+/**
+ * The process's one warm browser, started on first use and shared by every
+ * render until it has been idle for two minutes (a launch costs 1-3 s, and
+ * several renders in a row are the normal case). A browser that died is
+ * replaced. Release the lease when the render is done.
+ */
+export async function leaseChrome(env: NodeJS.ProcessEnv = process.env, deps: LaunchDeps = {}): Promise<ChromeLease> {
+  if (!exitHook) {
+    exitHook = true;
+    // Chrome must not outlive a process that never called closeChrome.
+    process.once("exit", () => {
+      void warm?.browser.then((b) => b.process()?.kill()).catch(() => undefined);
+    });
+  }
+  for (;;) {
+    const entry = warm ?? startWarm(env, deps);
+    entry.leases += 1;
+    if (entry.idle) clearTimeout(entry.idle);
+    entry.idle = undefined;
+    let browser: PuppeteerBrowser;
+    try {
+      browser = await entry.browser;
+    } catch (error) {
+      entry.leases -= 1;
+      throw error;
+    }
+    if (browser.connected) {
+      let released = false;
+      return {
+        browser,
+        release() {
+          if (released) return;
+          released = true;
+          entry.leases -= 1;
+          if (entry.leases === 0 && warm === entry) entry.idle = setTimeout(() => void closeChrome(), IDLE_CLOSE_MS);
+        },
+      };
+    }
+    // It died since the last render: replace it.
+    entry.leases -= 1;
+    dropWarm(entry);
+    void browser.close().catch(() => undefined);
+  }
+}
+
+function startWarm(env: NodeJS.ProcessEnv, deps: LaunchDeps): Warm {
+  const entry: Warm = { browser: launchChrome(env, deps), leases: 0 };
+  // A failed launch is not kept: the next render tries again.
+  entry.browser.catch(() => dropWarm(entry));
+  warm = entry;
+  return entry;
+}
+
+/** Close the warm browser now (a command that is about to exit, or a test). */
+export async function closeChrome(): Promise<void> {
+  const entry = warm;
+  if (!entry) return;
+  dropWarm(entry);
+  const browser = await entry.browser.catch(() => undefined);
+  await browser?.close().catch(() => undefined);
 }
