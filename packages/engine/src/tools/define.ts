@@ -92,6 +92,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   storage: "project storage",
   audio: "audio analysis",
   assets: "the bundled title templates and emoji",
+  motion: "Zenvi Motion block rendering (headless Chrome, the zenvi CLI and zenvi mcp)",
 };
 
 /**

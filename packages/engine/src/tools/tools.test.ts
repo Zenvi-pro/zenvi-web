@@ -13,10 +13,11 @@ import type { Project } from "../model/types.js";
 import type { ReceiptStatus, ToolReceipt } from "./receipt.js";
 import { allTools, runTool } from "./registry.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "./test-support/fake-host.js";
-import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf } from "./test-support/fixture.js";
+import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf, videoInfo } from "./test-support/fixture.js";
 import { createProject } from "../model/defaults.js";
 import { addClip } from "../ops/clips.js";
-import { addFile } from "../ops/files.js";
+import { addFile, updateFile } from "../ops/files.js";
+import { motionLink } from "../links/zenvi-link.js";
 import { addTransition } from "../ops/transitions.js";
 import { parseTitleSvg, setFieldText, titleFields, titleSvgText } from "../titles/title-svg.js";
 import type { ToolResult } from "./types.js";
@@ -1004,6 +1005,36 @@ const SPECS: Record<string, Spec> = {
       check: ({ host }) => expect([...host.written.keys()].filter((p) => p.startsWith("/generated/end_card-"))).toHaveLength(4),
     },
     failure: { args: { template: "word_scroll", words: ["Only"] }, status: "refused", summary: /^Error: word_scroll needs words: 2 to 10 of them\.$/ },
+  },
+
+  // --- Zenvi Motion blocks (the fake host renders one block) ---------------------------
+  list_motion_blocks_tool: {
+    happy: { args: {}, summary: /^1 motion block\(s\):\nkinetic_headline \(1\.5-10 s, default 3; over video\)/ },
+    failure: { args: { block: "nope" }, status: "refused", summary: /^Error: unknown motion block nope; blocks: kinetic_headline\.$/ },
+  },
+  add_motion_block_tool: {
+    happy: {
+      args: { block: "kinetic_headline", params: { text: "Big news" }, position_seconds: "1" },
+      summary: /^Added Kinetic headline at 1\.00-4\.00s on track \d+ over the video\.$/,
+      check: ({ doc, receipt }) => expect(doc.project.files.find((f) => f.id === (receipt.data as { file_id: string }).file_id)?.zenvi_link).toMatchObject({ kind: "zenvi-motion" }),
+    },
+    failure: { args: { block: "kinetic_headline", params: { colour: "red" } }, status: "refused", summary: /^Error: kinetic_headline has no parameter colour$/ },
+  },
+  update_motion_block_tool: {
+    happy: {
+      setup: (doc) => {
+        doc.transaction("motion block", (tx) => {
+          addFile(tx, media("/links/old.mov", videoInfo("/links/old.mov", 3)), { id: "MOTIONFILE" });
+          const spec = { block: "kinetic_headline", params: { text: "Old" }, seconds: 3, alpha: true, motionBlurSamples: 1, draft: false };
+          updateFile(tx, "MOTIONFILE", { zenvi_link: motionLink(spec, { codec: "prores4444", width: 1280, height: 720, fps: { num: 30, den: 1 }, frames: 90, output: "/links/old.mov", fingerprint: "old", renderedAt: "2026-10-26T00:00:00Z" }) });
+          addClip(tx, { fileId: "MOTIONFILE", position: 2, layer: L3, start: 0, end: 3, id: "MOTIONCLIP" });
+        });
+      },
+      args: { file_id: "MOTIONFILE", params: { text: "New" } },
+      summary: /^Re-rendered Kinetic headline; 1 clip\(s\) now play the new render\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === "MOTIONCLIP")?.reader).toMatchObject({ path: "/links/kinetic_headline-1.mov" }),
+    },
+    failure: { args: { file_id: IDS.broll }, status: "refused", summary: /is not a Zenvi Motion block/ },
   },
 
   // --- stock search (web) -------------------------------------------------------------

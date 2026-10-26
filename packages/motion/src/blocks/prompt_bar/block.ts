@@ -18,8 +18,8 @@ export function build(ctx: BlockContext): void {
     icon(ctx, "sparkle", "", brand);
     ctx.el("span", "", brand, String(p.brand));
   }
-  const card = ctx.el("div", "pb-card glass", wrap);
-  if (!ctx.alpha) card.classList.replace("glass", "card");
+  // Solid, not glass: over video (alpha) there is nothing in the page for a backdrop blur to see.
+  const card = ctx.el("div", "pb-card card", wrap);
   const field = ctx.el("div", "pb-field", card);
   const placeholder = ctx.el("div", "pb-placeholder", field, String(p.placeholder ?? ""));
   const typed = ctx.el("span", "pb-typed", field);
@@ -32,7 +32,7 @@ export function build(ctx: BlockContext): void {
   ctx.el("span", "", chip, ctx.portrait ? "Agent" : "Agent mode");
   const send = ctx.el("div", "pb-send", row);
   icon(ctx, "arrowUp", "", send);
-  const pill = status ? ctx.el("div", "pb-status glass", wrap) : null;
+  const pill = status ? ctx.el("div", "pb-status card", wrap) : null;
   let shimmer: HTMLElement | null = null;
   const dots: HTMLElement[] = [];
   if (pill) {

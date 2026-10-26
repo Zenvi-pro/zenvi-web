@@ -16,3 +16,4 @@ export {
   type RenderBlockOptions,
   type RenderedBlock,
 } from "./render.js";
+export { blockInfo, createMotionHost, type MotionHostOptions } from "./host.js";
