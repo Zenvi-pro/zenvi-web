@@ -8,7 +8,8 @@
  * ProjectDocument's:
  *
  * - String key parts and match fields are lower-cased before lookup, so a
- *   key with an upper-case part cannot be addressed.
+ *   field stored under an upper-case name cannot be addressed, however the
+ *   engine spelled it (engine lookups ignore case).
  * - An update with a non-object value at a nested key writes the *root* key
  *   of that name (`self._data[my_key] = values`); an object value is always
  *   merged (`obj.update`), with `objects` maps merged per id.
@@ -19,14 +20,19 @@
  * engine left there (`{ [name]: value }` merges exactly one field). The
  * actions are replayed on a scratch document to read those values. What
  * cannot be expressed at all is refused before the desktop changes anything.
+ *
+ * Untracked changes (`ProjectDocument.setUntracked`: cached transcripts, the
+ * saved playhead, export overrides) follow the same rules and are sent as
+ * `update_untracked`, which the desktop applies without an undo step.
  */
 
 import type { Project } from "../model/types.js";
 import { ProjectDocument, type UpdateAction } from "./document.js";
-import { formatKey, getAt, type KeyPath } from "./keypath.js";
+import { formatKey, getAt, storedKey, type KeyPath } from "./keypath.js";
 
 export interface DesktopAction {
-  type: "insert" | "update" | "delete";
+  /** `update_untracked`: UpdateManager.update_untracked, an update outside the undo history. */
+  type: "insert" | "update" | "delete" | "update_untracked";
   key: KeyPath;
   /** Inserted item or update values; absent for delete. */
   value?: unknown;
@@ -46,8 +52,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function addressable(key: KeyPath): boolean {
-  return key.every((part) => (typeof part === "string" ? part === part.toLowerCase() : Object.keys(part).every((k) => k === k.toLowerCase())));
+const lowerCase = (k: string): boolean => k === k.toLowerCase();
+
+/**
+ * Whether `_set` finds `key` in `project`: every part and match field is
+ * stored under a lower-case name, and match fields are written lower-case too
+ * (`_set` reads `key_part[subkey.lower()]`).
+ */
+function addressable(project: Project, key: KeyPath): boolean {
+  if (!key.every((part) => typeof part === "string" || Object.keys(part).every(lowerCase))) return false;
+  const stored = storedKey(project as unknown as Record<string, unknown>, key) ?? key;
+  return stored.every((part) => (typeof part === "string" ? lowerCase(part) : Object.keys(part).every(lowerCase)));
 }
 
 /** The desktop's merge gives the engine's result: every old field is overwritten, and no `objects` map is merged per id. */
@@ -62,9 +77,9 @@ function mergeMatches(old: unknown, value: unknown, replace: boolean): boolean {
  * a replaced item of a top-level list as delete + insert (it moves to the
  * end of the list, which nothing keyed by id depends on).
  */
-function direct(action: UpdateAction, replace: boolean): DesktopAction[] | undefined {
+function direct(action: UpdateAction, replace: boolean, before: Project): DesktopAction[] | undefined {
   const { key, type, value } = action;
-  if (!addressable(key)) return undefined;
+  if (!addressable(before, key)) return undefined;
   if (type === "insert") return key.length === 1 ? [{ type, key, value }] : undefined;
   if (type === "delete") return key.length >= 2 ? [{ type, key }] : undefined;
   if (mergeMatches(action.old_values, value, replace)) return [{ type: "update", key, value }];
@@ -82,8 +97,9 @@ function direct(action: UpdateAction, replace: boolean): DesktopAction[] | undef
 function lifted(key: KeyPath, before: Project, now: Project): DesktopAction {
   for (let n = key.length; n >= 1; n -= 1) {
     const field = key.slice(0, n);
-    const name = field[n - 1];
-    if (typeof name !== "string" || !addressable(field)) continue;
+    // The field as the project stores it: `{ [name]: value }` must merge into that field, not a new spelling of it.
+    const name = (storedKey(now as unknown as Record<string, unknown>, field) ?? field)[n - 1];
+    if (typeof name !== "string" || !addressable(now, field)) continue;
     const value = getAt(now as unknown as Record<string, unknown>, field);
     if (value === undefined) continue;
     if (n === 1) {
@@ -119,8 +135,22 @@ export function toDesktopActions(previous: Project, actions: readonly UpdateActi
       else if (action.type === "delete") tx.delete(key);
       else if (action.type === "update") (replace ? tx.replace : tx.update)(key, action.value);
       else throw new DesktopActionError(`a ${action.type} action has no desktop form`, key);
-      out.push(...(direct(action, replace) ?? [lifted(key, before, tx.project)]));
+      out.push(...(direct(action, replace, before) ?? [lifted(key, before, tx.project)]));
     });
   });
   return out;
+}
+
+/**
+ * Translate one untracked change (`ChangeEvent.previous`, `.project`,
+ * `.untracked`) into `update_untracked` calls. The desktop has no untracked
+ * insert or delete, so a change that needs one is refused.
+ */
+export function toDesktopUntracked(previous: Project, project: Project, key: KeyPath): DesktopAction[] {
+  const at = (p: Project) => getAt(p as unknown as Record<string, unknown>, key);
+  const write: UpdateAction = { type: "update", key, value: at(project), old_values: at(previous), transaction: "untracked" };
+  return toDesktopActions(previous, [write], [true]).map((action) => {
+    if (action.type !== "update") throw new DesktopActionError(`the desktop cannot change ${formatKey(key)} without an undo step`, key);
+    return { ...action, type: "update_untracked" };
+  });
 }
