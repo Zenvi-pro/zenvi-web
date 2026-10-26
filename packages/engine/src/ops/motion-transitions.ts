@@ -81,7 +81,7 @@ export interface MotionTransitionInput {
   focus?: { x: number; y: number };
 }
 
-export interface SfxCue {
+export interface TransitionSfxCue {
   /** Timeline seconds. */
   time: number;
   kind: SfxKind;
@@ -108,7 +108,7 @@ export interface MotionTransitionResult {
   /** Timeline seconds of the cut. */
   cut: number;
   clips: MotionClipReceipt[];
-  sfxCues: SfxCue[];
+  sfxCues: TransitionSfxCue[];
   /** The transition this one replaced on the same cut. */
   replaced?: string;
 }
