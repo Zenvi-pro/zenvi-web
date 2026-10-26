@@ -302,6 +302,16 @@ function ensureMappedTracks(tx: Transaction, project: Project, layerMap: Readonl
   if (highest > top) ensureTrack(tx, highest);
 }
 
+/**
+ * Summary notes for the tracks a move/copy added: `[on the named track, at the end]`. A
+ * selection from several tracks can name an existing track while lower sources' tracks are
+ * the new ones, so the count goes at the end instead of "on a new track".
+ */
+function addedTracksNotes(newTracks: number, namedIsNew: boolean): [string, string] {
+  if (newTracks <= 0) return ["", ""];
+  return namedIsNew ? [newTracksNote(newTracks), ""] : ["", `; ${newTracks} track${newTracks === 1 ? "" : "s"} added on top`];
+}
+
 async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">) {
   const project = call.doc.project;
   if (!clipsGiven(input)) throw new ToolError("say which clips to move: timeline_clip_ids, clip_query, or scope");
@@ -467,10 +477,13 @@ async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">
     }
   }
   const first = (moved[0]?.to ?? {}) as { position?: number };
+  const named = layerMap.get(clips[0]!.layer)!;
+  const [onNamed, added] = addedTracksNotes(newTracks, !project.layers.some((l) => l.number === named));
   const summary =
-    `Moved ${moved.length} clip(s) to ${trackName(after, layerMap.get(clips[0]!.layer)!)}${newTracksNote(newTracks)} at ${f2(first.position ?? 0)} s` +
+    `Moved ${moved.length} clip(s) to ${trackName(after, named)}${onNamed} at ${f2(first.position ?? 0)} s` +
     (shifted.length > 0 ? `; ${shifted.length} later clip(s) shifted` : "") +
     (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") +
+    added +
     ".";
   return ok(call, summary, { moved, shifted: shifted.sort(), overlaps: hits, ripple, ...(newTracks > 0 ? { new_tracks: newTracks } : {}) });
 }
@@ -815,10 +828,12 @@ async function duplicateClips(call: ToolCall, input: ContractInput<"duplicate_cl
   });
   const first = created[0]![0]! as { position: number; track: number | null };
   const pushedClips = shifted.filter((id) => project.clips.some((c) => c.id === id)).length;
+  const [onFirst, added] = addedTracksNotes(newTracks, (first.track ?? 0) > project.layers.length);
   const summary =
-    `Made ${copies} cop${copies === 1 ? "y" : "ies"} of ${clips.length} clip(s); the first starts at ${f2(first.position)} s on track ${first.track}${newTracksNote(newTracks)}` +
+    `Made ${copies} cop${copies === 1 ? "y" : "ies"} of ${clips.length} clip(s); the first starts at ${f2(first.position)} s on track ${first.track}${onFirst}` +
     (shifted.length > 0 ? `; ${pushedClips} later clip(s) pushed` : "") +
     (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") +
+    added +
     ".";
   return ok(call, summary, {
     copies: created,
