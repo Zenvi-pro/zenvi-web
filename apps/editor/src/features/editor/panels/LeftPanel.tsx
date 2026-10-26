@@ -1,4 +1,4 @@
-import { Blend, Clapperboard, Images, Sparkles, Type, WandSparkles } from "lucide-react";
+import { AudioLines, Blend, Box, Clapperboard, Images, Sparkles, Type, WandSparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/ui/cn";
 import { Tooltip } from "@/ui/Tooltip";
@@ -6,7 +6,9 @@ import { useSession, useUi } from "../session/context";
 import type { LeftTab } from "../session/uiStore";
 import { EffectsPanel } from "./EffectsPanel";
 import { GeneratePanel } from "./GeneratePanel";
+import { MotionPanel } from "./MotionPanel";
 import { ProjectFilesPanel } from "./ProjectFilesPanel";
+import { SoundPanel } from "./SoundPanel";
 import { StockPanel } from "./StockPanel";
 import { TitlesPanel } from "./TitlesPanel";
 import { TransitionsPanel } from "./TransitionsPanel";
@@ -15,7 +17,9 @@ const TABS: { id: LeftTab; label: string; short: string; icon: ReactNode }[] = [
   { id: "files", label: "Project files", short: "Media", icon: <Clapperboard size={18} /> },
   { id: "effects", label: "Effects", short: "Effects", icon: <Sparkles size={18} /> },
   { id: "transitions", label: "Transitions", short: "Transitions", icon: <Blend size={18} /> },
+  { id: "sound", label: "Sound", short: "Sound", icon: <AudioLines size={18} /> },
   { id: "titles", label: "Titles", short: "Text", icon: <Type size={18} /> },
+  { id: "motion", label: "Motion and 3D", short: "3D", icon: <Box size={18} /> },
   { id: "stock", label: "Stock media", short: "Stock", icon: <Images size={18} /> },
   { id: "generate", label: "Generate with AI", short: "AI", icon: <WandSparkles size={18} /> },
 ];
@@ -67,7 +71,9 @@ export function LeftPanel({ width, tabs, labeled = false }: { width: number; tab
           {tab === "files" ? <ProjectFilesPanel /> : null}
           {tab === "effects" ? <EffectsPanel /> : null}
           {tab === "transitions" ? <TransitionsPanel /> : null}
+          {tab === "sound" ? <SoundPanel /> : null}
           {tab === "titles" ? <TitlesPanel /> : null}
+          {tab === "motion" ? <MotionPanel /> : null}
           {tab === "stock" ? <StockPanel /> : null}
           {tab === "generate" ? <GeneratePanel /> : null}
         </div>
