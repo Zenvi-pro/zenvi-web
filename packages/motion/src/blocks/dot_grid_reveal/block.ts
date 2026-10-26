@@ -1,5 +1,5 @@
 import { frameUrl, videoTrack, type BlockContext } from "../../runtime/index.js";
-import { ART_THEMES, artImage, type ArtKind } from "../art.js";
+import { artImage, artTheme, type ArtKind } from "../art.js";
 
 const ease = (u: number): number => 1 - (1 - Math.min(1, Math.max(0, u))) ** 3;
 const easeIn = (u: number): number => Math.min(1, Math.max(0, u)) ** 2;
@@ -57,7 +57,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   let url: string;
   if (ref?.kind === "video") url = frameUrl(ref, 0);
   else if (ref?.kind === "image") url = ref.url;
-  else url = await artImage(ctx.doc, String(p.scene) as ArtKind, ART_THEMES[(ctx.seed - 1) % ART_THEMES.length]!, W, H, ctx.seed);
+  else url = await artImage(ctx.doc, String(p.scene) as ArtKind, artTheme(ctx.seed - 1), W, H, ctx.seed);
   photo.src = url;
   const canvas = ctx.el("canvas", "dg-canvas", stage);
   const dpr = Math.min(2, window.devicePixelRatio || 1);

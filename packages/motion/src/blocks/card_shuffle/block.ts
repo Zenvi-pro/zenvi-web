@@ -1,5 +1,5 @@
 import type { BlockContext } from "../../runtime/index.js";
-import { ART_THEMES, artImage } from "../art.js";
+import { artImage, artTheme } from "../art.js";
 
 /** Holds between the quick flips, shrinking: the shuffle speeds up before its pause. */
 const GAPS = [0.42, 0.34, 0.28, 0.24, 0.22];
@@ -33,7 +33,7 @@ export async function build(ctx: BlockContext): Promise<void> {
       // One character, a new colourway each time (the same seed keeps its shape).
       const img = ctx.el("img", "", card);
       img.alt = "";
-      img.src = await artImage(ctx.doc, "mascot", ART_THEMES[(COLOURWAYS[i]! + ctx.seed - 1) % ART_THEMES.length]!, cardW, cardH, ctx.seed);
+      img.src = await artImage(ctx.doc, "mascot", artTheme(COLOURWAYS[i]! + ctx.seed - 1), cardW, cardH, ctx.seed);
       layers.push(img);
     }
   }

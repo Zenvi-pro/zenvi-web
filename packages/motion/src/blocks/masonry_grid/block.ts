@@ -1,5 +1,5 @@
 import { mulberry32, type BlockContext } from "../../runtime/index.js";
-import { ART_KINDS, ART_THEMES, artImage } from "../art.js";
+import { ART_KINDS, artImage, artTheme } from "../art.js";
 import { icon, pointer } from "../ui.js";
 
 /** Card heights as a share of the column width: a masonry board mixes portrait, square and tall pictures. */
@@ -54,7 +54,7 @@ export async function build(ctx: BlockContext): Promise<void> {
       img.alt = "";
       // The hero is the one character on the board; the rest are scenes.
       const kind = card === hero ? "mascot" : SCENES[(i * 3 + ctx.seed) % SCENES.length]!;
-      img.src = await artImage(ctx.doc, kind, ART_THEMES[(i * 5 + ctx.seed) % ART_THEMES.length]!, card.w, card.h, ctx.seed * 31 + i);
+      img.src = await artImage(ctx.doc, kind, artTheme(i * 5 + ctx.seed), card.w, card.h, ctx.seed * 31 + i);
     }
     els.set(card, el);
   }

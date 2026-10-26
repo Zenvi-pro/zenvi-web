@@ -43,4 +43,18 @@ describe.each(BLOCKS.map((b) => [b.id, b] as const))("%s", (id, manifest) => {
       if (!CANVAS_ONLY.has(id)) expect(frame(0)).not.toBe(a);
     }
   });
+
+  it("builds at the seed bounds and its shortest and longest length", async () => {
+    const mod = (await import(`./${id}/block.ts`)) as { build: BlockBuild };
+    for (const seed of [0, 2147483647]) {
+      for (const seconds of [manifest.duration.min, manifest.duration.max]) {
+        document.body.innerHTML = "";
+        const checked = checkParams(manifest, { seed });
+        if (!checked.ok) throw new Error(checked.error);
+        const ctx = createContext(document, { block: id, params: checked.params, width: 1080, height: 1920, fps: 30, seconds, alpha: manifest.alpha, media: {}, draft: false });
+        await mod.build(ctx);
+        for (const t of [0, seconds / 2, seconds]) ctx.tl.seek(t);
+      }
+    }
+  });
 });

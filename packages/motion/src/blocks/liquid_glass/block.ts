@@ -1,5 +1,5 @@
 import { caretBlink, typewriter, videoTrack, type BlockContext } from "../../runtime/index.js";
-import { ART_THEMES, artImage, type ArtKind } from "../art.js";
+import { artImage, artTheme, type ArtKind } from "../art.js";
 import { icon } from "../ui.js";
 
 const clamp01 = (u: number): number => Math.min(1, Math.max(0, u));
@@ -126,7 +126,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   bg.alt = "";
   const ref = ctx.media.background;
   if (ref?.kind === "image") bg.src = ref.url;
-  else if (!ref) bg.src = await artImage(ctx.doc, String(p.scene) as ArtKind, ART_THEMES[(ctx.seed - 1) % ART_THEMES.length]!, W, H, ctx.seed);
+  else if (!ref) bg.src = await artImage(ctx.doc, String(p.scene) as ArtKind, artTheme(ctx.seed - 1), W, H, ctx.seed);
   else tl.track(videoTrack(bg, ref, ctx.pending));
   tl.fromTo(stage, { scale: 1.08 }, { scale: 1 }, { at: 0, duration: S, ease: "out" });
   const zoomAt = (t: number): number => Number(tl.valuesAt(stage, t).get("scale") ?? 1);

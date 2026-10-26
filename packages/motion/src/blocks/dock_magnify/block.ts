@@ -1,5 +1,5 @@
 import { videoTrack, type BlockContext } from "../../runtime/index.js";
-import { ART_THEMES, artImage, type ArtKind } from "../art.js";
+import { artImage, artTheme, type ArtKind } from "../art.js";
 import { ICONS, icon, pointer } from "../ui.js";
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -36,7 +36,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   const ref = ctx.media.background;
   if (ref?.kind === "image") bg.src = ref.url;
   else if (ref) tl.track(videoTrack(bg, ref, ctx.pending));
-  else bg.src = await artImage(ctx.doc, String(p.scene) as ArtKind, ART_THEMES[(ctx.seed + 2) % ART_THEMES.length]!, W, H, ctx.seed);
+  else bg.src = await artImage(ctx.doc, String(p.scene) as ArtKind, artTheme(ctx.seed + 2), W, H, ctx.seed);
 
   // Rest layout: the dock at rest spans at most 72 % (vertical) / 56 % (wide) of the frame.
   const gapK = 0.18;

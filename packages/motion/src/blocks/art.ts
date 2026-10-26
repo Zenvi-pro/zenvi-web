@@ -28,6 +28,12 @@ export const ART_THEMES: readonly ArtTheme[] = [
   { sky: ["#1B1F3B", "#4C5FD7", "#9FD3FF"], sun: "#FFFFFF", land: ["#5A6FE0", "#3445B5", "#1E2A7D", "#0E1446"] },
 ];
 
+/** The theme at index `n`, wrapping both ways: blocks offset by the seed, which may be 0. */
+export function artTheme(n: number): ArtTheme {
+  const k = ART_THEMES.length;
+  return ART_THEMES[((Math.trunc(n) % k) + k) % k]!;
+}
+
 const f = (n: number): string => n.toFixed(1);
 
 /** A smooth ridge across the width: y = base + a sum of sines; closed down to the bottom. */
