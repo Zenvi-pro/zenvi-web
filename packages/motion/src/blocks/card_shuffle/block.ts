@@ -12,7 +12,8 @@ export async function build(ctx: BlockContext): Promise<void> {
   const scale = Math.min(W, H) / 1080;
   const names = (p.names as string[]).filter((s) => s.trim());
   const mediaNames = Array.from({ length: 6 }, (_, i) => `media_${i + 1}`).filter((n) => ctx.media[n]);
-  const n = mediaNames.length > 0 ? mediaNames.length : Number(p.variants);
+  // A flip needs two faces: one file shows on both.
+  const n = mediaNames.length > 0 ? Math.max(2, mediaNames.length) : Number(p.variants);
 
   // The card, centred a little above the middle to leave room for the name.
   const nameSize = (ctx.portrait ? 76 : 64) * scale;
@@ -28,7 +29,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   const layers: HTMLElement[] = [];
   for (let i = 0; i < n; i += 1) {
     if (mediaNames.length > 0) {
-      layers.push(ctx.mediaImg(mediaNames[i]!, "", card)!);
+      layers.push(ctx.mediaImg(mediaNames[i % mediaNames.length]!, "", card)!);
     } else {
       // One character, a new colourway each time (the same seed keeps its shape).
       const img = ctx.el("img", "", card);

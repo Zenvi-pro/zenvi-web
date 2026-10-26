@@ -103,7 +103,7 @@
       "min": 2,
       "max": 6,
       "default": 6,
-      "description": "How many variants it flips through when no media is given (with media: one per given file)."
+      "description": "How many variants it flips through when no media is given (with media: one per given file; a single file flips onto itself)."
     }
   }
 }

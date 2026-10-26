@@ -58,3 +58,18 @@ describe.each(BLOCKS.map((b) => [b.id, b] as const))("%s", (id, manifest) => {
     }
   });
 });
+
+describe("card_shuffle", () => {
+  it("lands on a picture when given one file", async () => {
+    const { build } = await import("./card_shuffle/block.ts");
+    const manifest = BLOCKS.find((b) => b.id === "card_shuffle")!;
+    const checked = checkParams(manifest, {});
+    if (!checked.ok) throw new Error(checked.error);
+    const media = { media_1: { kind: "image" as const, url: "data:image/png;base64,iVBORw0KGgo=", width: 600, height: 800 } };
+    const ctx = createContext(document, { block: "card_shuffle", params: checked.params, width: 1080, height: 1920, fps: 30, seconds: 4.5, alpha: false, media, draft: false });
+    await build(ctx);
+    ctx.tl.seek(4.5);
+    const shown = Array.from(ctx.root.querySelectorAll<HTMLImageElement>(".cs-card img")).filter((img) => img.style.opacity !== "0");
+    expect(shown).toHaveLength(1);
+  });
+});
