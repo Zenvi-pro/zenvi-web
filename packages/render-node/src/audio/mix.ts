@@ -136,7 +136,7 @@ export interface LoudnormMeasurement {
 /**
  * The true-peak ceiling is aimed this far under the requested one: AAC, MP3
  * and Opus overshoot their input by up to a dB on limited material, and the file is
- * what gets measured (the CLI and cloud ceiling is thus ~1 dB lower in a lossy file than a WAV).
+ * what gets measured.
  */
 const CODEC_HEADROOM_DB = 1;
 
