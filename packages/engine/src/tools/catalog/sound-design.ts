@@ -290,7 +290,7 @@ export const soundDesignTools: CatalogTool[] = [
       const trim = trimmed > 0 ? { trimmed_seconds: round3(trimmed), fade_out_seconds: round3(fadeOut), ends_at: until } : {};
       return applied(
         ADD,
-        `Added ${recipe.title.toLowerCase()} with its ${recipe.hit === "onset" ? "transient" : recipe.hit} on ${moment} (clip ${clip.id}, ${gainDb} dB).` +
+        `Added ${recipe.title.toLowerCase()} with its ${recipe.hit === "onset" ? "transient" : recipe.hit} on ${moment} (${gainDb} dB).` +
           (trimmed > 0 ? ` Its last ${trimmed.toFixed(2)} s would run past the picture, so it ends with it at ${until!.toFixed(2)} s, faded over ${fadeOut.toFixed(2)} s.` : ""),
         {
           clips: [clipRow(call.doc.project, clip, { recipe: recipe.id, hit_seconds: hitAt, gain_db: gainDb, ...trim })],
