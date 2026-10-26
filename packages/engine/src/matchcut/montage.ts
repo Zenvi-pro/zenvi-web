@@ -179,6 +179,8 @@ export function planMontage(input: MontageInput): MontagePlan {
     closeStart = cuts[cuts.length - 1]! + min;
     cuts.push(closeStart);
   }
+  // Two clips alternate 1, 0, 1, …: an odd body would end on the closing clip, so its last shot joins the end hold.
+  if (input.clips === 2 && cuts.length % 2 === 0) cuts.pop();
   const bounds = [0, ...cuts, total];
   const bodyCount = bounds.length - 3;
   const order = input.clips === 1 ? Array.from({ length: bodyCount }, () => 0) : bodyOrder(input.clips, bodyCount);

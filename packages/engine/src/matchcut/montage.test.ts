@@ -58,6 +58,15 @@ describe("planMontage", () => {
     expect(second).toBeDefined();
   });
 
+  it("never cuts from a clip to itself with two clips", () => {
+    for (const seconds of [3, 4, 5, 6, 7, 8, 9, 10]) {
+      const shots = planMontage({ clips: 2, fps: 30, music: music(30), seconds }).shots;
+      expect(shots[0]!.clip).toBe(0);
+      expect(shots[shots.length - 1]!.clip).toBe(1);
+      shots.forEach((s, i) => i > 0 && expect(s.clip, `${seconds} s, shot ${i}`).not.toBe(shots[i - 1]!.clip));
+    }
+  });
+
   it("cuts to its own tempo without music, and copes with one clip", () => {
     const plan = planMontage({ clips: 3, fps: 24, music: null });
     expect(plan.musicStart).toBeNull();
