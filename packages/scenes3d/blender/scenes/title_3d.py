@@ -42,13 +42,23 @@ def build(job):
     scale = max(1.0, w / 2)
     lights.studio(scale=scale, rim_color=p.get("rim") or "#CFE0FF", energy=0.35 if p.get("style", "chrome") in ("chrome", "iridescent") else 1.0)
     core.studio_world(job, strength=1.8 if p.get("style", "chrome") == "chrome" else 1.0, spin_degrees=150 if p.get("style", "chrome") in ("chrome", "iridescent", "glass") else 60)
-    aspect = camera.frame_aspect()
-    cam, aim = camera.camera(lens=55, location=(0, -10, 0.35 * h))
-    margin = 1.28 if aspect < 1 else 1.6
-    dist = camera.fit_distance(cam, w * margin, h * 3.0)
-    # Slightly below the word: its faces mirror the bright horizon line, not the dark floor.
-    cam.location = (0.0, -dist, -0.05 * dist)
-    aim.location = (0, 0, 0)
+    # Shallow focus on the word: letters tumbling in from behind it arrive soft
+    # (finals only: at draft samples depth of field is grain).
+    cam, aim = camera.camera(lens=55, location=(0, -10, 0), dof=0.35 if p.get("dof", True) and job["quality"] == "final" else None)
+    # The word spans `width` of the title-safe width (80 % of the frame), and
+    # its height stays inside the safe area.
+    dist = camera.distance_for_width(cam, w, 0.8 * float(p.get("width", 0.65)))
+    hx, hy = camera.visible_half(cam, dist)
+    if h > 0.5 * 2 * hy:
+        dist *= h / (0.5 * 2 * hy)
+        hx, hy = camera.visible_half(cam, dist)
+    # A little above the word: its faces mirror the horizon line (core.studio_world).
+    # Aiming slightly low puts the word on the optical centre, ~4 % above the middle.
+    cam.location = (0.0, -dist, 0.07 * dist)
+    aim.location = (0, 0, -0.08 * hy)
+    if p.get("shadow", True):
+        blob = shapes.shadow_blob("Shadow", w * 1.1, h * 1.4, strength=0.5, location=(0, 0.15 * h, -0.62 * h))
+        motion.animate(blob, "scale", [(1, (0.001, h * 1.4, 1)), (1 + int(round(1.0 * fps)), (w * 1.1, h * 1.4, 1))], "out")
 
     start = 1
     enter = int(round(ENTRANCE * fps))
@@ -81,3 +91,4 @@ def build(job):
     if p.get("exit"):
         out = max(hold_from + 1, end - int(0.4 * fps))
         motion.animate(word, "scale", [(out, (1, 1, 1)), (end, (0.001, 0.001, 0.001))], "in")
+

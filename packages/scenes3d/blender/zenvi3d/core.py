@@ -67,7 +67,7 @@ def setup(job):
     r.use_file_extension = True
     r.filepath = job["output_dir"].rstrip("/") + "/f_"
     ee = scene.eevee
-    ee.taa_render_samples = 12 if draft else 64
+    ee.taa_render_samples = 8 if draft else 48
     ee.use_raytracing = True
     ee.ray_tracing_options.resolution_scale = "2" if draft else "1"
     ee.use_shadows = True
@@ -134,22 +134,30 @@ def studio_world(job, strength=1.0, tint=None, spin_degrees=0.0, colors=None):
     sep = node(tree, "ShaderNodeSeparateXYZ", (-800, 0))
     tree.links.new(mapping.outputs["Vector"], sep.inputs["Vector"])
     x, y, z = sep.outputs["X"], sep.outputs["Y"], sep.outputs["Z"]
-    # Elevation bands: a dark floor, a crisp bright horizon line, a cool
-    # ceiling gradient and an overhead softbox. Chrome bevels pick the line
-    # up as the sharp highlight that reads as "metal".
-    floor = math_node(tree, "ADD", 0.015, math_node(tree, "MULTIPLY", map_range(tree, z, -0.6, -0.05), 0.12))
-    horizon = math_node(tree, "MULTIPLY", math_node(tree, "MULTIPLY", map_range(tree, z, -0.04, -0.01), math_node(tree, "SUBTRACT", 1.0, map_range(tree, z, 0.04, 0.09))), 3.0)
-    ceiling = math_node(tree, "MULTIPLY", map_range(tree, z, 0.05, 0.6), 0.9)
-    top = math_node(tree, "MULTIPLY", map_range(tree, z, 0.7, 0.85), 5.0)
-    # Tall strip boxes at a few azimuths; the studio's spin sweeps them across.
+    # Elevation bands: a near-black floor, a crisp bright horizon line just
+    # below eye level (vertical faces seen from a camera a little above
+    # mirror it), a cool ceiling gradient, two thin overhead strips and a
+    # big overhead softbox. Hard-edged bands are what make chrome read as
+    # chrome: crisp light streaks against dark.
+    def band(lo, hi, soft, gain):
+        rise = map_range(tree, z, lo - soft, lo)
+        fall = math_node(tree, "SUBTRACT", 1.0, map_range(tree, z, hi, hi + soft))
+        return math_node(tree, "MULTIPLY", math_node(tree, "MULTIPLY", rise, fall), gain)
+
+    floor = math_node(tree, "ADD", 0.008, math_node(tree, "MULTIPLY", map_range(tree, z, -0.7, -0.15), 0.06))
+    horizon = band(-0.12, -0.03, 0.012, 3.5)
+    ceiling = math_node(tree, "MULTIPLY", map_range(tree, z, 0.05, 0.7), 0.5)
+    streaks = math_node(tree, "ADD", band(0.3, 0.33, 0.01, 4.0), band(0.48, 0.5, 0.01, 3.0))
+    top = math_node(tree, "MULTIPLY", map_range(tree, z, 0.72, 0.8), 6.0)
+    # Tall strip boxes at several azimuths (0 = behind the camera); the studio's spin sweeps them across.
     az = math_node(tree, "ARCTAN2", x, math_node(tree, "MULTIPLY", y, -1.0))
     strips = None
-    for center, width, gain in ((-0.65, 0.07, 6.0), (0.75, 0.05, 5.0), (2.6, 0.12, 4.0)):
+    for center, width, gain in ((-0.65, 0.05, 7.0), (0.3, 0.025, 5.0), (0.8, 0.04, 6.0), (2.5, 0.09, 4.0), (-2.4, 0.06, 4.0)):
         d = math_node(tree, "ABSOLUTE", math_node(tree, "SUBTRACT", az, center))
-        pulse = math_node(tree, "MULTIPLY", math_node(tree, "SUBTRACT", 1.0, map_range(tree, d, width * 0.6, width)), gain)
-        pulse = math_node(tree, "MULTIPLY", pulse, map_range(tree, z, -0.3, -0.05))
+        pulse = math_node(tree, "MULTIPLY", math_node(tree, "SUBTRACT", 1.0, map_range(tree, d, width * 0.75, width)), gain)
+        pulse = math_node(tree, "MULTIPLY", pulse, math_node(tree, "MULTIPLY", map_range(tree, z, -0.35, -0.2), math_node(tree, "SUBTRACT", 1.0, map_range(tree, z, 0.85, 0.9))))
         strips = pulse if strips is None else math_node(tree, "ADD", strips, pulse)
-    light = math_node(tree, "ADD", math_node(tree, "ADD", floor, horizon), math_node(tree, "ADD", math_node(tree, "ADD", ceiling, top), strips))
+    light = math_node(tree, "ADD", math_node(tree, "ADD", floor, horizon), math_node(tree, "ADD", math_node(tree, "ADD", ceiling, streaks), math_node(tree, "ADD", top, strips)))
     light = math_node(tree, "MULTIPLY", light, strength)
     env = node(tree, "ShaderNodeBackground", (600, 200))
     tree.links.new(light, env.inputs["Strength"])

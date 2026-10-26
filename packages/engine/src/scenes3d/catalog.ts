@@ -38,6 +38,9 @@ export const SCENE3D_PARAMS = {
     depth: z.number().min(0).max(1).default(0.35).describe("Extrusion depth, 0 (flat) to 1 (deep)."),
     font: z.string().min(1).max(200).optional().describe("Font family installed on this computer, or a .ttf/.otf path (default a heavy sans: Arial Black, Inter, Helvetica…)."),
     exit: z.boolean().default(false).describe("Shrink away over the last 0.4 s."),
+    width: z.number().min(0.2).max(1).default(0.65).describe("Width of the word as a share of the title-safe width (80 % of the frame); it also stays inside the safe height."),
+    shadow: z.boolean().default(true).describe("Soft contact shadow under the word."),
+    dof: z.boolean().default(true).describe("Shallow depth of field on the word (letters arriving from behind are soft)."),
   }),
   device_mockup: z.strictObject({
     ...common,
@@ -47,6 +50,8 @@ export const SCENE3D_PARAMS = {
     move: z.enum(["orbit", "push", "hero", "float"]).default("orbit").describe("orbit: the camera arcs around; push: dolly in with depth of field; hero: the device spins in and lands; float: it hovers and turns."),
     body: z.union([z.enum(["graphite", "silver", "white"]), hex]).optional().describe("Body finish (default graphite; laptop silver)."),
     open_lid: z.boolean().default(true).describe("laptop: the lid opens at the start."),
+    shadow: z.boolean().default(true).describe("Soft contact shadow under the device."),
+    dof: z.boolean().default(true).describe("Subtle depth of field focused on the device."),
   }),
   floating_cards: z.strictObject({
     ...common,

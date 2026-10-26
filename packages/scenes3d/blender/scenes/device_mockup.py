@@ -101,11 +101,14 @@ def build(job):
     size = max(w, h)
     lights.studio(scale=size / 1.5, rim_color=p.get("rim") or "#D6E4FF")
     core.studio_world(job, strength=0.9, spin_degrees=50)
-    shapes.shadow_blob("Shadow", w * 1.5, max(0.5, w * 0.6) if kind != "laptop" else 1.6, location=(0, 0, -0.002), strength=0.5 if core.backdrop_colors(job) else 0.35)
+    if p.get("shadow", True):
+        shapes.shadow_blob("Shadow", w * 1.5, max(0.5, w * 0.6) if kind != "laptop" else 1.6, location=(0, 0, -0.002), strength=0.5 if core.backdrop_colors(job) else 0.35)
 
     move = p.get("move", "orbit")
     target = (0, 0, h * 0.42 if kind == "laptop" else lift)
-    cam, aim = camera.camera(lens=50, target=target, dof=4.0 if move == "push" else None)
+    # Subtle depth of field on the device (stronger on the push-in; finals only).
+    fstop = (0.5 if move == "push" else 1.0) if p.get("dof", True) and job["quality"] == "final" else None
+    cam, aim = camera.camera(lens=50, target=target, dof=fstop)
     aspect = camera.frame_aspect()
     fill = 1.45 if aspect < 1 else 1.45
     dist = camera.fit_distance(cam, w * fill, h * fill)

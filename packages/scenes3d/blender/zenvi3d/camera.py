@@ -69,3 +69,11 @@ def visible_half(cam, distance):
     aspect = frame_aspect()
     long = cam.data.sensor_width / (2 * cam.data.lens) * distance
     return (long, long / aspect) if aspect >= 1 else (long * aspect, long)
+
+
+def distance_for_width(cam, width, fraction):
+    """Distance at which `width` spans `fraction` of the frame width."""
+    aspect = frame_aspect()
+    per_unit = cam.data.sensor_width / (2 * cam.data.lens)  # half-extent of the long side per unit of distance
+    half_width = per_unit if aspect >= 1 else per_unit * aspect
+    return (width / (2 * fraction)) / half_width
