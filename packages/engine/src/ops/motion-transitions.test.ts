@@ -7,7 +7,7 @@ import { compositeFrame } from "../render/cpu/compositor.js";
 import { planFrame } from "../render/plan/frame-plan.js";
 import { frameWindow } from "../timeline/windows.js";
 import { MOTION_TRANSITION_IDS } from "../transitions/motion/presets.js";
-import { addClip } from "./clips.js";
+import { addClip, splitClip } from "./clips.js";
 import { MOTION_TRANSITIONS_KEY, applyMotionTransition, boxSafeScale, motionRecords, removeMotionTransition, trackCuts } from "./motion-transitions.js";
 import { baseProject, expectRefused, expectUndoRedo, makeDoc } from "./testkit.js";
 
@@ -166,6 +166,22 @@ describe("removeMotionTransition", () => {
     expect(MOTION_TRANSITIONS_KEY in a).toBe(false);
     expect(a.effects).toEqual([]);
     expectRefused(doc, "not_found", (tx) => removeMotionTransition(tx, r.id));
+  });
+
+  it("removes everything from both halves of a clip split after the transition", () => {
+    // The split copies the record to both halves and gives the copied effects new ids.
+    const doc = cutsDoc();
+    withKenBurns(doc);
+    const original = clip(doc, "CLIP0");
+    const r = doc.transaction("whip", (tx) => applyMotionTransition(tx, { outClipId: "CLIP0", inClipId: "CLIP1", preset: "whip" }));
+    doc.transaction("split", (tx) => splitClip(tx, "CLIP0", 1));
+    expect(doc.project.clips).toHaveLength(3);
+    doc.transaction("remove", (tx) => removeMotionTransition(tx, r.id));
+    for (const c of doc.project.clips) {
+      expect(c.effects, c.id).toEqual([]);
+      expect(MOTION_TRANSITIONS_KEY in c, c.id).toBe(false);
+      if (c.id !== "CLIP1") expect(c.scale_x, c.id).toEqual(original.scale_x);
+    }
   });
 });
 

@@ -38,6 +38,13 @@ import { ids, rateOf } from "./internal.js";
 /** The unknown clip key holding the records. */
 export const MOTION_TRANSITIONS_KEY = "zenvi_motion_transitions";
 
+/**
+ * The unknown effect key naming the transition that added the effect: a split
+ * or a copy gives the clip's effects new ids (ops/internal.ts) but keeps
+ * their keys, so removal still finds them.
+ */
+export const MOTION_EFFECT_KEY = "zenvi_motion_transition";
+
 export type MotionRole = "out" | "in";
 
 /** What one transition owns on one clip. */
@@ -231,7 +238,7 @@ function withoutRecord(clip: Clip, id: string): Clip {
     }
   }
   const owned = new Set(mine.effects);
-  next.effects = (clip.effects ?? []).filter((e) => !owned.has(String(e.id)));
+  next.effects = (clip.effects ?? []).filter((e) => !owned.has(String(e.id)) && (e as Record<string, unknown>)[MOTION_EFFECT_KEY] !== id);
   if (others.length > 0) next[MOTION_TRANSITIONS_KEY] = others;
   else delete next[MOTION_TRANSITIONS_KEY];
   return next as Clip;
@@ -327,6 +334,7 @@ function writeSide(side: SidePlan, record: Omit<MotionTransitionRecord, "role" |
   const effects: Effect[] = [];
   for (const cls of classes) {
     const effect = createEffect(cls, {}, { id: nextId() }) as Record<string, unknown>;
+    effect[MOTION_EFFECT_KEY] = record.id;
     for (const ch of EFFECT_CHANNELS) {
       if (effectClass(ch) !== cls) continue;
       const param = ch.slice(cls.length + 1);
