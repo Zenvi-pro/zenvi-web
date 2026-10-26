@@ -172,6 +172,20 @@ describe("duplicate_clips_tool and move_clips_tool to a track past the top", () 
     expect(doc.project.clips.find((c) => c.id === IDS.clipLogo)?.layer).toBe(3_000_000);
   });
 
+  it.each([
+    ["move_clips_tool", "Moved 2 clip(s) to track 5 at 0.00 s; 2 tracks added on top."],
+    ["duplicate_clips_tool", "on track 5; 2 tracks added on top."],
+  ])("%s does not call an existing track new when a lower source lands on it", async (tool, summary) => {
+    const doc = fixtureDoc();
+    // clipA (track 1) lands on track 5, which exists; clipLogo (track 3) on the new track 7.
+    const r = await run(doc, tool, { timeline_clip_ids: [IDS.clipA, IDS.clipLogo], to_track: "7" });
+    expect(r.status).toBe("applied");
+    expect(r.summary).toContain(summary);
+    expect(r.summary).not.toContain("new track");
+    expect(r.createdTracks.map((t) => t.layer)).toEqual([6_000_000, 7_000_000]);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
   it.each(["duplicate_clips_tool", "move_clips_tool"])("%s refuses four past the top and changes nothing", async (tool) => {
     const doc = fixtureDoc();
     const before = JSON.stringify(doc.project);
