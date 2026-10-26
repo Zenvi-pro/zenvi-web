@@ -31,7 +31,8 @@ a small logo bug, low impacts on topic changes and a quiet music bed.
    `style: "minimal"`, `text_size: 0.045`, `position: "center"`.
 5. Logo bug: `add_title_tool` with a short mark (`text`, `font: "Space
    Mono"`, `font_scale: 0.5`) placed top right with `set_clip_property_tool`
-   `location_x`/`location_y`, `alpha` 0.7, for the full length.
+   (`property: "location_x"` / `"location_y"`, then `property: "alpha"`,
+   `value: 0.7`), for the full length.
 6. Grade: `apply_look_tool` `look_id: "elegant_dark_cinema"` or
    `"cool_haze"`, `all_clips: true`, 0.6, grain `16mm_classic`.
 7. Sound: music bed + `duck_under_speech_tool` (`duck_db: -12`);

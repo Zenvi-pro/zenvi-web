@@ -35,15 +35,16 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    `add_title_tool` `text: "IDEA"`, `font: "Anton"`, `text_color:
    "#E0201B"`, `font_scale` 3-4 for a 4-letter word, 2 for "DEAD LINE"
    (aim for 35-50 % of the frame height), `position_seconds` = word start;
-   then `set_clip_property_tool` `rotation` -6…6 and `location_x` within
-   ±0.2 to sit beside the head. `preview_frame` it: every letter must be
+   then `set_clip_property_tool` `property: "rotation"`, `value` -6…6, and
+   `property: "location_x"`, `value` within ±0.2 to sit beside the head. `preview_frame` it: every letter must be
    inside the frame; a cut-off word is the most visible failure. On the CLI,
    `text_behind_subject_tool` (`clip_id`, `text`, `color: "#e0201b"`,
    `font: "Anton"`, `y: 0.36`) for the one hero word. One embed per sentence.
 5. Card: real words, never grey placeholder lines: `add_motion_block_tool`
    `block: "glass_cards"`, `placement: "full_frame"`, the talking head as
-   `background`, `cards: ["@maya_edits"]`, `details: ["this changed how I
-   work"]`, `click: -1`; or `add_motion_template_tool` `template:
+   `background`, `headline: ""` (else the block's sample headline shows),
+   `cards: ["@maya_edits"]`, `details: ["this changed how I work"]`,
+   `click: -1`; or `add_motion_template_tool` `template:
    "ui_cards"` with `labels` and `subtitle`. 1.5-2 s.
 6. Transition: `apply_motion_transition_tool` `preset: "whip"`, `direction:
    "up"` on the one cut where the scene changes.

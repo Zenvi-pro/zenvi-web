@@ -13,7 +13,7 @@ black bars, almost no camera motion (the layout is the motion).
 | 0.4-4 | 3 panels fill, one per beat; hold a beat full |
 | 4-7.5 | re-cut into 4 panels, fill again |
 | 7.5-12 | 6 panels, fill again (fastest part) |
-| 12-15 | the last tile grows to the full band (`merge`) and holds |
+| 12-15 | the last tile grows to fill the frame (`merge`) and holds |
 
 ## Tools
 
@@ -57,8 +57,8 @@ add_motion_template_tool {
 ## Checks
 
 `preview_frame` after each layout step fills (all tiles playing, gutters
-even, nothing outside the band) and at the merge's end (full band, no
-leftover tile edges). The tool refuses tiles under 13 % of the short side: on
+even, nothing outside the band) and at the merge's end (the tile fills the frame, no
+leftover tile edges or bars). The tool refuses tiles under 13 % of the short side: on
 9:16 with a 2.39 band, 6 is the most that reads.
 
 ## Pitfalls
