@@ -41,7 +41,7 @@ export function build(ctx: BlockContext): void {
   const scale = dpr * 0.5;
   canvas.width = Math.round(W * scale);
   canvas.height = Math.round(H * scale);
-  const g = canvas.getContext("2d")!;
+  const g = canvas.getContext("2d");
 
   const rand = mulberry32(ctx.seed * 7919 + 1);
   const big = Math.max(W, H);
@@ -62,6 +62,7 @@ export function build(ctx: BlockContext): void {
   });
 
   tl.track((t) => {
+    if (!g) return;
     const s = t * speed;
     g.setTransform(1, 0, 0, 1, 0, 0);
     const base = g.createLinearGradient(0, 0, 0, canvas.height);
@@ -108,10 +109,11 @@ export function build(ctx: BlockContext): void {
     grain.width = size;
     grain.height = size;
     grain.style.backgroundSize = "auto";
-    const gg = grain.getContext("2d")!;
-    const img = gg.createImageData(size, size);
+    const gg = grain.getContext("2d");
+    const img = gg?.createImageData(size, size);
     // Grain changes every other frame (12-15 per second reads as film, not fizz).
     tl.track((t) => {
+      if (!gg || !img) return;
       const tick = Math.floor((t * ctx.fps) / 2);
       for (let i = 0; i < size * size; i += 1) {
         const v = Math.floor(random01(ctx.seed, tick, i) * 255);

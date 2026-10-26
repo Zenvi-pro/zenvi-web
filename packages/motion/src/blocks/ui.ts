@@ -31,8 +31,8 @@ export function pointer(ctx: BlockContext, from: { x: number; y: number }, at: n
   el.innerHTML = ICONS.pointer;
   const ring = ctx.el("div", "cursor-ring");
   Object.assign(ring.style, { position: "absolute", left: "0", top: "0", width: "84px", height: "84px", marginLeft: "-42px", marginTop: "-42px", borderRadius: "50%", border: "3px solid var(--accent)", zIndex: "49", opacity: "0" });
-  // The SVG's tip is at (6, 3.5) of 28: offset so x, y is the tip.
-  const tip = (x: number, y: number): { x: number; y: number } => ({ x: x - 12, y: y - 7 });
+  // The SVG's tip is at (6, 3.5) of 28 (64 px box): offset so x, y is the tip.
+  const tip = (x: number, y: number): { x: number; y: number } => ({ x: x - 14, y: y - 8 });
   let last = from;
   ctx.tl.fromTo(el, { ...tip(from.x, from.y), opacity: 0, scale: 0.8 }, { ...tip(from.x, from.y), opacity: 1, scale: 1 }, { at, duration: 0.3, ease: "out" });
   return {

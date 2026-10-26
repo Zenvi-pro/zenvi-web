@@ -262,7 +262,8 @@ interface Tab {
 
 async function openTab(browser: Browser, url: string, design: { width: number; height: number; scale: number }, alpha: boolean): Promise<Tab> {
   const page = await browser.newPage();
-  await page.setViewport({ width: design.width, height: design.height, deviceScaleFactor: design.scale });
+  // Chrome rasterizes at the device scale factor; below 1 it does not shrink screenshots, so the capture clip scales the rest.
+  await page.setViewport({ width: design.width, height: design.height, deviceScaleFactor: Math.max(1, design.scale) });
   const cdp = await page.createCDPSession();
   if (alpha) await cdp.send("Emulation.setDefaultBackgroundColorOverride", { color: { r: 0, g: 0, b: 0, a: 0 } });
   const errors: string[] = [];
@@ -300,6 +301,7 @@ async function capture(fp: Fingerprinted, frames: number, output: string, work: 
   const ownBrowser = options.browser ? undefined : await launchChrome(options.env);
   const browser = options.browser ?? ownBrowser!;
   const times = sampleTimes(frames, fpsValue, fp.samples);
+  const clip = { x: 0, y: 0, width: design.width, height: design.height, scale: design.scale / Math.max(1, design.scale) };
   const captured = { width: Math.round(design.width * design.scale), height: Math.round(design.height * design.scale) };
   const ffmpeg = spawnManaged(resolveBinary("ffmpeg"), encodeArgs({ alpha: fp.alpha, fps: fp.fps, samples: fp.samples, width: fp.width, height: fp.height, captured, draft, output }), { stdin: "pipe", stdout: "ignore", signal: options.signal });
   const stdin = ffmpeg.child.stdin!;
@@ -333,7 +335,7 @@ async function capture(fp: Fingerprinted, frames: number, output: string, work: 
           next += 1;
           while (i - written >= ahead) await new Promise<void>((r) => waiters.push(r));
           await tab.page.evaluate((t: number) => (globalThis as unknown as PageGlobals).__zenvi!.seek(t), times[i]!);
-          const shot = await tab.cdp.send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true, captureBeyondViewport: false, fromSurface: true });
+          const shot = await tab.cdp.send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true, captureBeyondViewport: false, fromSurface: true, clip });
           ready.set(i, Buffer.from(shot.data, "base64"));
           writing = writing.then(writeReady);
         }
