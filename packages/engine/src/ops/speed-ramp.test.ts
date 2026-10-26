@@ -4,7 +4,7 @@ import { findClip } from "../model/query.js";
 import { planFrame } from "../render/plan/frame-plan.js";
 import type { Clip } from "../model/types.js";
 import { addClip, setClipSpeed } from "./clips.js";
-import { applyClipPreset } from "./presets.js";
+import { applyClipPreset, repeatClip } from "./presets.js";
 import { applySpeedRamp, planSpeedRamp, type RampRequest } from "./speed-ramp.js";
 import { expectRefused, expectUndoRedo, makeDoc } from "./testkit.js";
 
@@ -262,6 +262,10 @@ describe("planSpeedRamp / applySpeedRamp", () => {
         expect(clipOf(frozen)).not.toHaveProperty("zenvi_speed_ramp");
         expect(refuse(frozen, { preset: "hero" }).message).toMatch(/custom time curve/);
       }
+
+      const looped = docWithClip();
+      looped.transaction("loop", (tx) => repeatClip(tx, "CLIP000001", { pattern: "loop", passes: 2 }));
+      expect(refuse(looped, { preset: "hero" }).message).toMatch(/is looped/);
 
       const image = makeDoc();
       image.transaction("add", (tx) => addClip(tx, { fileId: "IMAGE00001", position: 0, layer: V1, id: "CLIP000001" }));
