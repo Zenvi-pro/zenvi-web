@@ -57,9 +57,11 @@ export async function applyMotionTransition(session: EditorSession, info: Motion
   );
 }
 
-/** A style mix on every cut of the pointed-at track (else the main sequence). */
+/** A style mix on every cut of the selected clip's track, else the main sequence (as Make it snappy picks it). */
 export async function applyMotionStyle(session: EditorSession, style: MotionTransitionStyle, choice: DirectionChoice = "auto"): Promise<void> {
-  const cut = targetCut(session.project, selected(session), session.playback.getState().time);
+  const clipIds = selected(session);
+  // targetCut falls back to the cut nearest the playhead, which is not what "every cut" with nothing selected means.
+  const cut = clipIds.length ? targetCut(session.project, clipIds, session.playback.getState().time) : null;
   const layer = cut?.layer ?? mainSequence(session.project)?.layer;
   if (layer === undefined) return noCut(session);
   await runToolWithToast(
@@ -94,7 +96,7 @@ export async function matchCut(session: EditorSession, clipIds: readonly string[
     toast.info("Select two or more clips", { description: "Shots that share a round subject: an eye, the moon, a cup rim." });
     return;
   }
-  const subjects: { clip_id: string; box: unknown }[] = [];
+  const subjects: { clip_id: string; box: unknown; allow_edges?: boolean }[] = [];
   for (const clip of clips) {
     const found = await runEditorTool(session, "detect_subject_tool", { clip_id: clip.id });
     const best = (found.data.subjects as { box?: unknown }[] | undefined)?.[0]?.box;
@@ -102,7 +104,8 @@ export async function matchCut(session: EditorSession, clipIds: readonly string[
       toast.info("No round subject found", { description: found.ok ? `Nothing round in the first frame of ${clip.title || clip.id}.` : found.summary });
       return;
     }
-    subjects.push({ clip_id: clip.id, box: best });
+    // A moon on a night sky: the canvas around a moved shot is black too, so it needs no zoom to stay covered.
+    subjects.push({ clip_id: clip.id, box: best, ...(found.data.dark_edges === true ? { allow_edges: true } : {}) });
   }
   await runToolWithToast(session, "align_match_cut_tool", { clips: subjects }, { done: "Match cut aligned", failed: "Could not align the match cut" });
 }
