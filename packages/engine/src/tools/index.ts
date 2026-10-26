@@ -3,6 +3,7 @@ export type * from "./types.js";
 export * from "./receipt.js";
 export * from "./wire.js";
 export * from "./json-schema.js";
+export { aliasArguments, matchOption, type AliasedArguments, type OptionMatch } from "./aliases.js";
 export { HIDDEN_PARAMS, normalizeArgs } from "./coerce.js";
 export {
   CONTRACT_REF,
