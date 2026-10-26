@@ -1,13 +1,13 @@
 import { existsSync } from "node:fs";
-import { readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { createProject } from "@zenvi/engine";
-import { makeTempDir, removeDir } from "@zenvi/render-node/test-support";
+import { makeImage, makeTempDir, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { engineRegistry } from "../engine/registry.js";
 import { testEnv, zenvi } from "../test-support/harness.js";
-import { BRIDGE_PROTOCOL, runBridgeCall, type BridgeAnswer } from "./run.js";
+import { BRIDGE_PROTOCOL, bridgeHost, runBridgeCall, type BridgeAnswer } from "./run.js";
 import { bridgeTools, serveBridge } from "./server.js";
 
 const registry = engineRegistry();
@@ -61,6 +61,22 @@ describe("runBridgeCall", () => {
     expect(answer.files).toEqual([]);
     const after = existsSync(path.join(work, "promo_assets", "title")) ? await readdir(path.join(work, "promo_assets", "title")) : [];
     expect(after).toEqual(before);
+  });
+
+  it("never lists, or removes, a file the project's assets folder already held", async () => {
+    const media = path.join(work, "promo_assets", "media");
+    await mkdir(media, { recursive: true });
+    const image = await makeImage(media, "logo.png");
+    const written: string[] = [];
+    const imported = await bridgeHost(projectFile, written).media!.importPath!(image);
+    expect(imported.path).toBe(image);
+    expect(written).toEqual([]);
+
+    const answer = await runBridgeCall({ tool: "import_files_tool", args: { paths: [image] }, project: snapshot(), project_file: projectFile }, { registry });
+    expect(answer.ok, answer.text).toBe(true);
+    expect(answer.actions.some((a) => a.type === "insert" && a.key[0] === "files")).toBe(true);
+    expect(answer.files).toEqual([]);
+    expect(existsSync(image)).toBe(true);
   });
 
   it("refuses tools that replace the project, unknown tools and bad requests", async () => {

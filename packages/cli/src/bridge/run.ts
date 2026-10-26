@@ -30,7 +30,7 @@ import {
   type ToolSurface,
 } from "@zenvi/engine";
 import { parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
-import { createNodeHost, isInside, loadRoots, type NodeHostOptions } from "@zenvi/render-node";
+import { createNodeHost, isInside, loadRoots, localPath, type NodeHostOptions } from "@zenvi/render-node";
 import type { Registry } from "../engine/registry.js";
 import { VERSION } from "../version.js";
 
@@ -85,16 +85,17 @@ export function bridgeHost(projectFile: string, written: string[], options: Omit
     if (isInside(p, assets)) written.push(p);
     return p;
   };
-  const noteImport = (m: ImportedMedia): ImportedMedia => {
-    note(m.path);
+  // An import that keeps a file already in the assets folder where it is wrote nothing: only copies belong to the call.
+  const noteCopy = (source: string | undefined, m: ImportedMedia): ImportedMedia => {
+    if (source === undefined || path.resolve(m.path) !== source) note(m.path);
     return m;
   };
   const { collect: _collect, removeCopies: _removeCopies, ...kept } = media;
   const bridged: MediaHost = {
     ...kept,
     ...(media.writeGenerated ? { writeGenerated: async (name, bytes, type) => note(await media.writeGenerated!(name, bytes, type)) } : {}),
-    ...(media.importPath ? { importPath: async (p) => noteImport(await media.importPath!(p)) } : {}),
-    ...(media.importUrl ? { importUrl: async (u, o) => noteImport(await media.importUrl!(u, o)) } : {}),
+    ...(media.importPath ? { importPath: async (p) => noteCopy(localPath(p), await media.importPath!(p)) } : {}),
+    ...(media.importUrl ? { importUrl: async (u, o) => noteCopy(/^file:/i.test(u) ? localPath(u) : undefined, await media.importUrl!(u, o)) } : {}),
   };
   return { ...base, media: bridged };
 }
@@ -147,7 +148,14 @@ export async function runBridgeCall(request: BridgeRequest, options: RunBridgeOp
   };
 
   start = performance.now();
-  const result = await options.registry.run({ doc, host, signal: options.signal }, tool, request.args ?? {}, request.surface ?? "mcp");
+  let result: Awaited<ReturnType<Registry["run"]>>;
+  try {
+    result = await options.registry.run({ doc, host, signal: options.signal }, tool, request.args ?? {}, request.surface ?? "mcp");
+  } catch (error) {
+    // A programmer error: still leave no files behind.
+    await discard();
+    throw error;
+  }
   timings.run_ms = elapsed(start);
   const receipt = (result.data as ToolReceipt | undefined) ?? parseReceipt(result.text) ?? undefined;
 
@@ -159,8 +167,9 @@ export async function runBridgeCall(request: BridgeRequest, options: RunBridgeOp
   try {
     for (const event of events) if (event.source === "apply") actions.push(...toDesktopActions(event.previous, event.actions, event.replaced));
   } catch (error) {
+    await discard();
     if (!(error instanceof DesktopActionError)) throw error;
-    return errorAnswer(tool, `${tool} made a change the desktop cannot apply (${error.message})`, timings, await discard());
+    return errorAnswer(tool, `${tool} made a change the desktop cannot apply (${error.message})`, timings);
   }
   timings.translate_ms = elapsed(start);
   if (!result.ok) actions = [];
