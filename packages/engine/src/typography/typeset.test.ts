@@ -167,5 +167,20 @@ describe("outlineSvgText", () => {
     const ys = d.split(" ").filter((t) => !/^[A-Z]$/.test(t)).map(Number).filter((_, k) => k % 2 === 1);
     expect(Math.min(...ys)).toBeCloseTo(100 - 0.717 * 40, 0);
     expect(Math.max(...ys)).toBeCloseTo(100, 0);
-});
+  });
+
+  it("keeps the text's filter, clip, mask and opacity on its outlines", () => {
+    const glow =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><defs><filter id="glow"/></defs>' +
+      '<text id="t" x="0" y="100" font-family="Anton" font-size="40" opacity="0.5" style="fill:url(#gold);filter:url(#glow);clip-path:url(#c)" transform="rotate(5)">Gold</text></svg>';
+    const out = outlineSvgText(glow, lib, { family: () => "anton" });
+    const group = /<g [^>]*data-zenvi-outline="anton"[^>]*>/.exec(out.svg)![0];
+    expect(group).toContain('id="t-outline"');
+    expect(group).toContain('transform="rotate(5)"');
+    expect(group).toContain('opacity="0.5"');
+    expect(group).toContain('filter="url(#glow)"');
+    expect(group).toContain('clip-path="url(#c)"');
+    expect(group).not.toContain("mask");
+    expect(out.svg).toContain('fill="url(#gold)"');
+  });
 });
