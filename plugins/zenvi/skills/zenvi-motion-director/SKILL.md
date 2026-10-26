@@ -144,6 +144,10 @@ arguments), then look at that frame again. Report what you checked.
 
 A refusal starting with `Error:` names what is missing; switch to the
 fallback, do not retry the same call, and list it under the report's gaps.
+When the backend fails (TTS, AI images, stock search answer `Error: Zenvi
+backend ...`), try once more with other words, then work without it: write
+caption cues from the script at about 2.5 words per second and let the music
+be the clock; use stock instead of AI stills.
 
 ## Credits
 
