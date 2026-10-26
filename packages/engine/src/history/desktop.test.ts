@@ -68,6 +68,35 @@ function desktopSet(data: Record<string, unknown>, action: DesktopAction): void 
   }
 }
 
+/** What `_set` returns for `key` (the desktop keeps it as the action's old value): a copy of the value there. */
+function desktopGet(data: Record<string, unknown>, key: KeyPath): unknown {
+  let obj: unknown = data;
+  for (const part of key) {
+    if (typeof part === "object") obj = (obj as Record<string, unknown>[]).find((item) => Object.entries(part).every(([k, v]) => item[k.toLowerCase()] === v));
+    else obj = (obj as Record<string, unknown>)[part.toLowerCase()];
+  }
+  return structuredClone(obj);
+}
+
+/** Apply `actions` on the desktop oracle, then undo them as UpdateManager.undo does (reversed, old values merged back). */
+function desktopUndo(data: Record<string, unknown>, actions: DesktopAction[]): void {
+  const done = actions.map((action) => {
+    const old = action.type === "insert" ? undefined : desktopGet(data, action.key);
+    desktopSet(data, action);
+    return { action, old };
+  });
+  for (const { action, old } of done.reverse()) {
+    if (action.type === "insert") {
+      const id = (action.value as { id: string }).id;
+      desktopSet(data, { type: "delete", key: [...action.key, { id }] });
+    } else if (action.type === "delete") {
+      desktopSet(data, { type: "insert", key: action.key.slice(0, -1), value: old });
+    } else {
+      desktopSet(data, { type: "update", key: action.key, value: old });
+    }
+  }
+}
+
 function sortedById(p: Record<string, unknown>): unknown {
   const out = structuredClone(p);
   for (const list of ["clips", "files", "effects", "layers", "markers"]) {
@@ -97,12 +126,28 @@ describe("toDesktopActions", () => {
   it("keeps inserts, deletes and object merges as they are", () => {
     const { desktop } = roundTrip((tx) => {
       tx.insert(["clips"], { id: "C", position: 10, layer: 1000000, start: 0, end: 1 });
-      tx.update(["clips", { id: "A" }], { position: 2, title: "a" });
+      tx.update(["clips", { id: "A" }], { position: 2, end: 4 });
       tx.delete(["clips", { id: "B" }]);
       tx.delete(["clips", { id: "A" }, "effects", { id: "E1" }]);
     });
     expect(desktop.map((a) => a.type)).toEqual(["insert", "update", "delete", "delete"]);
-    expect(desktop[1]).toEqual({ type: "update", key: ["clips", { id: "A" }], value: { position: 2, title: "a" } });
+    expect(desktop[1]).toEqual({ type: "update", key: ["clips", { id: "A" }], value: { position: 2, end: 4 } });
+  });
+
+  it("adds a field to a list item by delete + insert, so the desktop's undo takes it away again", () => {
+    const body = (tx: Transaction) => {
+      tx.update(["clips", { id: "A" }], { position: 2, zenvi_tag: [{ id: "T1" }] });
+      tx.update(["clips", { id: "B" }, "reader", "fps"], 24);
+      tx.update(["clips", { id: "B" }, "reader"], { codec: "h264" });
+    };
+    const { desktop } = roundTrip(body);
+    expect(desktop.map((a) => a.type)).toEqual(["delete", "insert", "update", "update"]);
+    expect(desktop[2]).toEqual({ type: "update", key: ["clips", { id: "B" }, "reader"], value: { fps: 24 } });
+    // The field new to the reader goes with the whole reader, which the desktop's undo puts back whole.
+    expect(desktop[3]).toEqual({ type: "update", key: ["clips", { id: "B" }], value: { reader: { path: "/b.mp4", fps: 24, codec: "h264" } } });
+    const data = structuredClone(project()) as unknown as Record<string, unknown>;
+    desktopUndo(data, desktop);
+    expect(sortedById(data)).toEqual(sortedById(project() as unknown as Record<string, unknown>));
   });
 
   it("sends a nested scalar or list as an update of its parent", () => {
