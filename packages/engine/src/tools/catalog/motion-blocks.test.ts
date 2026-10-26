@@ -142,6 +142,29 @@ describe("motion block tools", () => {
     expect(doc.project.files.find((f) => f.id === added.file_id)!.path).toBe("/links/kinetic_headline-1.mov");
   });
 
+  it("an update carries the new render's content address, not the old one's", async () => {
+    const doc = project();
+    const motion = fakeMotionHost();
+    const render = motion.render.bind(motion);
+    // A cloud host keeps each render as content-addressed media (packages/cloud/src/mcp/host.ts keepRendered).
+    motion.render = async (request, signal) => {
+      const made = await render(request, signal);
+      const sha256 = String(motion.requests.length).repeat(64);
+      return { ...made, media: { ...made.media, cloud: { sha256, size: 1, name: "block.mov", content_type: "video/quicktime" } } };
+    };
+    const h = host(motion);
+    const added = dataOf(await runTool({ doc, host: h }, "add_motion_block_tool", { block: "kinetic_headline", params: { text: "One" } }));
+    expect((await runTool({ doc, host: h }, "update_motion_block_tool", { file_id: added.file_id, params: { text: "Two" } })).ok).toBe(true);
+    const file = doc.project.files.find((f) => f.id === added.file_id)!;
+    expect(file.cloud?.sha256).toBe("2".repeat(64));
+    const clip = doc.project.clips.find((c) => c.id === added.timeline_clip_id)!;
+    expect((clip.reader as { cloud?: { sha256: string } }).cloud?.sha256).toBe("2".repeat(64));
+    // A host without content addresses drops the stale one.
+    motion.render = render;
+    expect((await runTool({ doc, host: h }, "update_motion_block_tool", { file_id: added.file_id, params: { text: "Three" } })).ok).toBe(true);
+    expect(doc.project.files.find((f) => f.id === added.file_id)!.cloud).toBeUndefined();
+  });
+
   it("refuses a length that would leave a trimmed clip empty", async () => {
     const doc = project();
     const motion = fakeMotionHost();
