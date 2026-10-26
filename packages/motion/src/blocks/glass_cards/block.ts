@@ -2,6 +2,8 @@ import type { BlockContext } from "../../runtime/index.js";
 import { fitWidth, icon, parseRich, pointer } from "../ui.js";
 
 const ICON_FILLS = ["var(--accent)", "var(--secondary)", "#1E1E24", "#2BB673"];
+/** Neutral glyphs we draw (no third-party logos), one per card in turn. */
+const CARD_ICONS = ["film", "note", "captions", "layers"] as const;
 
 export function build(ctx: BlockContext): void {
   const { tl, params: p, width: W, height: H, safe } = ctx;
@@ -58,7 +60,8 @@ export function build(ctx: BlockContext): void {
     card.style.width = `${cardW}px`;
     if (ctx.portrait) Object.assign(card.style, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" });
     const top = ctx.el("div", "gc-top", card);
-    const ic = ctx.el("div", "gc-icon", top, title.slice(0, 1).toUpperCase());
+    const ic = ctx.el("div", "gc-icon", top);
+    icon(ctx, CARD_ICONS[i % CARD_ICONS.length]!, "", ic);
     ic.style.background = `linear-gradient(145deg, ${ICON_FILLS[i % ICON_FILLS.length]}, color-mix(in srgb, ${ICON_FILLS[i % ICON_FILLS.length]} 70%, #000))`;
     const text = ctx.el("div", "", ctx.portrait ? top : card);
     if (ctx.portrait) text.style.marginLeft = "26px";

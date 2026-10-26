@@ -3,17 +3,84 @@
   "version": 1,
   "title": "HUD callouts",
   "description": "Technical callouts over a product or shot: a thin crosshair grid and frame ticks draw on, anchor rings pop on points of interest, leader lines draw out to mono labels that decode in. Over video (alpha) or over its own photo/video background.",
-  "tags": ["hud", "callout", "technical", "labels", "product", "editorial"],
-  "duration": { "default": 5, "min": 2.5, "max": 14 },
-  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "tags": [
+    "hud",
+    "callout",
+    "technical",
+    "labels",
+    "product",
+    "editorial"
+  ],
+  "duration": {
+    "default": 5,
+    "min": 2.5,
+    "max": 14
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
   "alpha": true,
-  "tokens": { "palette": "mono", "display": "mono" },
+  "tokens": {
+    "palette": "mono",
+    "display": "mono"
+  },
   "params": {
-    "title": { "type": "string", "maxLength": 48, "default": "FIG. 01 / ANATOMY", "description": "Mono header at the top left (empty: none)." },
-    "labels": { "type": "strings", "minItems": 1, "maxItems": 6, "maxLength": 28, "default": ["Fan diameter", "Max thrust", "Bypass ratio"], "description": "The callout names." },
-    "values": { "type": "strings", "maxItems": 6, "maxLength": 20, "default": ["3.4 m", "79 kN", "11 : 1"], "description": "The second line of each callout (a spec, a number); fewer than labels leaves the rest without." },
-    "points": { "type": "points", "maxItems": 6, "default": [], "description": "Anchor of each callout on the frame, {x, y} from 0 to 1 (empty: spread around the centre)." },
-    "grid": { "type": "enum", "options": ["crosshair", "full", "none"], "default": "crosshair", "description": "crosshair: centre cross + frame ticks; full: plus a measuring grid; none." },
-    "background": { "type": "media", "accept": ["image", "video"], "optional": true, "description": "A photo or video under the callouts (file id); without it the block is transparent over the video below." }
+    "title": {
+      "type": "string",
+      "maxLength": 48,
+      "default": "UNIT SPEC",
+      "description": "Mono header at the top left (empty: none)."
+    },
+    "labels": {
+      "type": "strings",
+      "minItems": 1,
+      "maxItems": 6,
+      "maxLength": 28,
+      "default": [
+        "Battery",
+        "Weight",
+        "Range"
+      ],
+      "description": "The callout names."
+    },
+    "values": {
+      "type": "strings",
+      "maxItems": 6,
+      "maxLength": 20,
+      "default": [
+        "12 h",
+        "240 g",
+        "40 m"
+      ],
+      "description": "The second line of each callout (a spec, a number); fewer than labels leaves the rest without."
+    },
+    "points": {
+      "type": "points",
+      "maxItems": 6,
+      "default": [],
+      "description": "Anchor of each callout on the frame, {x, y} from 0 to 1 (empty: spread around the centre)."
+    },
+    "grid": {
+      "type": "enum",
+      "options": [
+        "crosshair",
+        "full",
+        "none"
+      ],
+      "default": "crosshair",
+      "description": "crosshair: centre cross + frame ticks; full: plus a measuring grid; none."
+    },
+    "background": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "A photo or video under the callouts (file id); without it the block is transparent over the video below."
+    }
   }
 }

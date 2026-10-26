@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -33,12 +33,28 @@ describe("block manifests", () => {
   });
 });
 
+/** Brands and products from the reference reels (and other third parties): never in a block's defaults or copy. */
+const THIRD_PARTY = ["GitHub", "Salesforce", "Island", "Pinterest", "Slack", "Google", "Apple", "Notion", "Figma", "ElevenLabs", "Rho", "Invideo", "Tesla"];
+
+describe("block defaults are original", () => {
+  it("name no third-party brand or product", () => {
+    const pattern = new RegExp(`\\b(${THIRD_PARTY.join("|")})\\b`, "i");
+    for (const b of BLOCKS) {
+      const checked = checkParams(b, {});
+      const text = JSON.stringify({ title: b.title, description: b.description, params: b.params, defaults: checked.ok ? checked.params : null });
+      expect(pattern.exec(text)?.[0], b.id).toBeUndefined();
+      const source = readFileSync(path.join(blocksDir, b.id, "block.ts"), "utf8");
+      expect(pattern.exec(source)?.[0], `${b.id}/block.ts`).toBeUndefined();
+    }
+  });
+});
+
 describe("checkParams", () => {
   const block = getBlock("counter")!;
 
   it("fills defaults", () => {
     const r = checkParams(block, {});
-    expect(r.ok && r.params.suffix).toBe("k");
+    expect(r.ok && r.params.label).toBe("Clips cut this week");
     expect(r.ok && r.params.palette).toBe("mono");
     expect(r.ok && "accent" in r.params).toBe(false);
   });

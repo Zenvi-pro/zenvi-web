@@ -55,6 +55,8 @@ export function tokenParams(manifest: Pick<BlockManifest, "tokens">): Record<str
   return {
     palette: { type: "enum", options: [...PALETTE_NAMES], default: t.palette ?? "light", description: "Colour palette: light, dark, cream, forest, mono, sky." },
     accent: { type: "color", optional: true, description: "Brand accent colour (#rrggbb); default the palette's." },
+    paper: { type: "color", optional: true, description: "Background colour (#rrggbb) replacing the palette's, for a brief's exact colours." },
+    ink: { type: "color", optional: true, description: "Text colour (#rrggbb) replacing the palette's." },
     display_font: { type: "enum", options: [...FONT_ROLES], default: t.display ?? "sans", description: "Headline face: sans (Inter), serif (Instrument Serif), mono (JetBrains Mono), display (Anton, condensed)." },
     radius: { type: "number", min: 0, max: 80, default: t.radius ?? 28, description: "Corner radius of cards and pills, px at 1080." },
     exit: { type: "boolean", default: true, description: "Animate out over the last 0.4 s." },

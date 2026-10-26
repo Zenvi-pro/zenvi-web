@@ -44,7 +44,7 @@ frames. The same page also answers HyperFrames' `window.__hf = { duration, seek 
    (a Project Files id; the renderer serves a photo, or a video as frames).
    Never name a param `path`, `image`, `resource`, `protobuf_data_path` or
    `lut_path` (the desktop rewrites those keys on save). Every block also gets
-   `palette`, `accent`, `display_font`, `radius`, `exit`, `seed`.
+   `palette`, `accent`, `paper`, `ink`, `display_font`, `radius`, `exit`, `seed`.
 2. `src/blocks/<id>/block.ts`: `export function build(ctx: BlockContext)`.
    Build DOM with `ctx.el(...)` inside `ctx.root`, measure layout if you need
    (fonts are loaded), then schedule with `ctx.tl.fromTo/to/set/track`. Use the

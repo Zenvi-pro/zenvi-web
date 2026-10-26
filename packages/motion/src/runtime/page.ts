@@ -67,7 +67,8 @@ const EXIT_SECONDS = 0.4;
 /** Build the context for `config` inside `doc` (exported for tests, which run it in jsdom). */
 export function createContext(doc: Document, config: BlockConfig): BlockContext {
   const p = config.params;
-  const palette = withAccent(PALETTES[(p.palette as PaletteName) ?? "light"] ?? PALETTES.light, typeof p.accent === "string" ? p.accent : undefined);
+  const base = withAccent(PALETTES[(p.palette as PaletteName) ?? "light"] ?? PALETTES.light, typeof p.accent === "string" ? p.accent : undefined);
+  const palette = { ...base, ...(typeof p.paper === "string" ? { paper: p.paper } : {}), ...(typeof p.ink === "string" ? { ink: p.ink } : {}) };
   const root = doc.createElement("div");
   root.id = "block";
   root.className = `block block-${config.block}${palette.dark ? " is-dark" : ""}${config.height > config.width * 1.2 ? " is-portrait" : ""}${config.alpha ? " is-alpha" : ""}`;
