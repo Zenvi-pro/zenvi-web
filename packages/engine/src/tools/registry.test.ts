@@ -35,6 +35,11 @@ const DIRECT_TOOLS = [
   "speed_ramp_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
+  "generate_subject_matte_tool",
+  "text_behind_subject_tool",
+  "replace_background_tool",
+  "subject_glow_tool",
+  "pop_out_tool",
 ];
 
 /** A valid string form of a scalar property, the way the Assistant backend sends arguments. */
@@ -180,7 +185,7 @@ describe("availability matrix", () => {
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes"],
       cloud: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
     };
     for (const tool of allTools) {

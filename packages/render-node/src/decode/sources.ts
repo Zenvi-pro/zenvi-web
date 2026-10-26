@@ -74,15 +74,11 @@ export class SourceManager {
     return hit;
   }
 
-  private async videoFrame(layer: LayerPlan, source: VideoSource): Promise<RgbaImage> {
-    const width = Math.max(1, Math.round(layer.drawWidth));
-    const height = Math.max(1, Math.round(layer.drawHeight));
-    const autorotate = source.applyRotation !== false;
-    const key = `${layer.clipId}\0${width}x${height}\0${autorotate ? 1 : 0}`;
+  /** A cached decoder for one video at one size (`key` names who reads it). */
+  private async decoder(key: string, projectPath: string, reader: ProjectFile | undefined, size: { width: number; height: number }, autorotate: boolean): Promise<VideoDecoder> {
     let entry = this.decoders.get(key);
     if (!entry) {
-      const file = await this.resolve(source.path);
-      const reader = this.files.get(source.fileId);
+      const file = await this.resolve(projectPath);
       const fps = reader?.fps && reader.fps.num > 0 && reader.fps.den > 0 ? reader.fps : { num: 30, den: 1 };
       const frameCount = Number(reader?.video_length);
       const starts = await streamStarts(file, this.options.signal);
@@ -94,12 +90,35 @@ export class SourceManager {
         frameCount: Number.isFinite(frameCount) && frameCount > 0 ? frameCount : undefined,
         autorotate,
       };
-      entry = { decoder: new VideoDecoder(info, { width, height }, { quality: this.options.quality, signal: this.options.signal }), lastFrame: this.frameCounter };
+      entry = { decoder: new VideoDecoder(info, size, { quality: this.options.quality, signal: this.options.signal }), lastFrame: this.frameCounter };
       this.decoders.set(key, entry);
     }
     entry.lastFrame = this.frameCounter;
+    return entry.decoder;
+  }
+
+  private async videoFrame(layer: LayerPlan, source: VideoSource): Promise<RgbaImage> {
+    const width = Math.max(1, Math.round(layer.drawWidth));
+    const height = Math.max(1, Math.round(layer.drawHeight));
+    const autorotate = source.applyRotation !== false;
+    const key = `${layer.clipId}\0${width}x${height}\0${autorotate ? 1 : 0}`;
+    const decoder = await this.decoder(key, source.path, this.files.get(source.fileId), { width, height }, autorotate);
     // LayerSource.time is (k − 1) / reader fps for libopenshot source frame k.
-    return entry.decoder.frame(Math.max(0, Math.round(source.frame) - 1));
+    return decoder.frame(Math.max(0, Math.round(source.frame) - 1));
+  }
+
+  /**
+   * Frame `frame` (1-based) of a video an effect reads (a matte `mask_reader`,
+   * a Displace map), at its coded size like libopenshot's mask reader, which
+   * does not rotate frames.
+   */
+  private async auxVideoFrame(projectPath: string, frame: number): Promise<RgbaImage> {
+    const reader = [...this.files.values()].find((f) => f.path === projectPath);
+    const width = Math.max(1, Math.round(Number(reader?.width) || 0));
+    const height = Math.max(1, Math.round(Number(reader?.height) || 0));
+    if (!reader || width <= 1 || height <= 1) return this.auxImage(projectPath, { width: 1, height: 1 });
+    const decoder = await this.decoder(`aux\0${projectPath}\0${width}x${height}`, projectPath, reader, { width, height }, false);
+    return decoder.frame(Math.max(0, Math.round(frame) - 1));
   }
 
   /** Natural size of a raster image after EXIF orientation. */
@@ -191,16 +210,19 @@ export class SourceManager {
     const fit = { width: plan.width, height: plan.height };
     const imagePaths = new Set<string>();
     const textPaths = new Set<string>();
+    // Video resources by path: the frame each needs (one per path and frame plan, like the kernels' `images`).
+    const videoFrames = new Map<string, number>();
     for (const layer of plan.layers) {
       for (const mask of layer.masks) if (mask.maskPath) imagePaths.add(mask.maskPath);
       for (const effect of layer.effects) {
         for (const p of effect.images ?? []) imagePaths.add(p);
         for (const p of effect.texts ?? []) textPaths.add(p);
+        for (const [p, at] of Object.entries(effect.imageFrames ?? {})) if (!videoFrames.has(p)) videoFrames.set(p, at.frame);
       }
     }
     const [layers, images, texts, audio] = await Promise.all([
       Promise.all(plan.layers.map((layer) => this.layerImage(layer))),
-      Promise.all([...imagePaths].map(async (p) => [p, await this.auxImage(p, fit)] as const)),
+      Promise.all([...imagePaths].map(async (p) => [p, await (videoFrames.has(p) ? this.auxVideoFrame(p, videoFrames.get(p)!) : this.auxImage(p, fit))] as const)),
       Promise.all([...textPaths].map(async (p) => [p, await this.text(p)] as const)),
       Promise.all(
         plan.layers.map((layer) => {
