@@ -6,11 +6,11 @@ export function parseValue(text: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** The smallest 1, 2, 2.5 or 5 × 10^k at or above `max`: an axis top people read at a glance. */
+/** The smallest round step × 10^k (1, 1.5, 2, 2.5, 3, 4, 5, 6, 8) at or above `max`: an axis top people read at a glance that leaves little empty headroom. */
 export function niceMax(max: number): number {
   if (!(max > 0)) return 1;
   const unit = 10 ** Math.floor(Math.log10(max));
-  for (const step of [1, 2, 2.5, 5, 10]) if (step * unit >= max - 1e-9) return step * unit;
+  for (const step of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (step * unit >= max - 1e-9) return step * unit;
   return 10 * unit;
 }
 

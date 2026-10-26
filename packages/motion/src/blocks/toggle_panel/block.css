@@ -14,3 +14,9 @@
 .tp-switch { position: relative; flex: none; width: 108px; height: 62px; border-radius: 31px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
 .tp-fill { position: absolute; inset: 0; border-radius: inherit; background: var(--accent); }
 .tp-knob { position: absolute; left: 6px; top: 6px; width: 50px; height: 50px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25); }
+/* Vertical frames: phone-sized type (the panel is the whole picture). */
+.is-portrait .tp-title { font-size: 46px; }
+.is-portrait .tp-label { font-size: 40px; }
+.is-portrait .tp-detail { font-size: 30px; }
+.is-portrait .tp-pill { font-size: 30px; height: 60px; }
+.is-portrait .tp-row { padding: 34px 0; }

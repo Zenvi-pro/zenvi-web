@@ -24,7 +24,7 @@ export function build(ctx: BlockContext): void {
   const S = ctx.seconds;
   const onAccent = onColor(palette.accent);
 
-  const panelW = ctx.portrait ? W - safe.left - safe.right : Math.min(980, W * 0.52);
+  const panelW = W <= H * 1.3 ? W - safe.left - safe.right : Math.min(980, W * 0.52);
   const panel = ctx.el("div", "tp-panel");
   panel.style.width = `${panelW}px`;
   const head = ctx.el("div", "tp-head", panel);

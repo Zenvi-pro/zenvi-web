@@ -28,7 +28,7 @@ export function build(ctx: BlockContext): void {
   const name = String(p.assistant);
   const S = ctx.seconds;
 
-  const colW = ctx.portrait ? W - safe.left - safe.right : Math.min(1180, W * 0.62);
+  const colW = W <= H * 1.3 ? W - safe.left - safe.right : Math.min(1180, W * 0.62);
   const col = ctx.el("div", "chat-col");
   Object.assign(col.style, { left: `${(W - colW) / 2}px`, top: `${safe.top}px`, width: `${colW}px`, height: `${H - safe.top - safe.bottom}px` });
 

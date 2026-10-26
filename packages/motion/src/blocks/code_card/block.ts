@@ -12,7 +12,7 @@ export function build(ctx: BlockContext): void {
   const output = String(p.output ?? "");
   const S = ctx.seconds;
 
-  const winW = ctx.portrait ? W - safe.left - safe.right + 60 : Math.min(1380, W * 0.68);
+  const winW = W <= H * 1.3 ? W - safe.left - safe.right + 60 : Math.min(1380, W * 0.68);
   const win = ctx.el("div", "cc-win");
   win.style.width = `${winW}px`;
   const bar = ctx.el("div", "cc-bar", win);

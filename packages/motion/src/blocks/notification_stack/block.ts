@@ -27,11 +27,11 @@ export function build(ctx: BlockContext): void {
   const onAccent = onColor(palette.accent);
 
   const pos = p.position === "auto" ? (ctx.portrait || W <= H * 1.3 ? "top" : "right") : String(p.position);
-  const cardW = pos === "right" ? Math.min(700, W * 0.36) : Math.min(860, W - safe.left - safe.right);
+  const cardW = pos === "right" ? Math.min(780, W * 0.4) : Math.min(860, W - safe.left - safe.right);
   const stack = ctx.el("div", "ns-stack");
   stack.style.width = `${cardW}px`;
   // Phone-sized type on vertical frames reads at a glance; desktop-sized on landscape.
-  if (pos !== "right") stack.style.fontSize = `${ctx.portrait ? 37 : 33}px`;
+  stack.style.fontSize = `${pos === "right" ? 34 : ctx.portrait ? 37 : 33}px`;
   stack.style.left = `${pos === "right" ? W - safe.right - cardW : (W - cardW) / 2}px`;
 
   // Avatar fills cycle through the palette (DMs), so neighbours never match.

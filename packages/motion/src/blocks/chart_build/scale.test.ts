@@ -8,10 +8,11 @@ describe("chart_build scale", () => {
     expect(parseValue("-3.5k")).toBe(-3.5);
     expect(parseValue("n/a")).toBe(0);
   });
-  it("rounds the axis top up to 1, 2, 2.5 or 5 × 10^k", () => {
+  it("rounds the axis top up to a round step × 10^k", () => {
     expect(niceMax(46)).toBe(50);
     expect(niceMax(50)).toBe(50);
-    expect(niceMax(51)).toBe(100);
+    expect(niceMax(51)).toBe(60);
+    expect(niceMax(620)).toBe(800);
     expect(niceMax(0.18)).toBe(0.2);
     expect(niceMax(2300)).toBe(2500);
     expect(niceMax(0)).toBe(1);
