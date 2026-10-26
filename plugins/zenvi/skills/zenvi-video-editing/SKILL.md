@@ -59,7 +59,10 @@ HyperFrames code the `code-video-handoff` skill.
    end, mid-hold, the last frame; pass `grid: true` for a 0-1 coordinate
    grid when placing things) against the review checklist in
    `zenvi://taste`. If something is off, fix it or `undo_tool`, and look
-   again. The `edit_review` prompt runs this loop.
+   again. The `edit_review` prompt runs this loop. To judge the cut as a
+   whole (pacing, rhythm against the music, black or empty frames, loudness)
+   call `review_edit_tool`: one contact sheet plus a ranked problem list;
+   fix what it flags and call it again.
 5. **Render.** `render_video` (mp4 by default; webm, mov, gif, mp3, wav, png
    frames). It returns the output path, duration and size.
 6. **Hand off.** `launch_editor` opens the project in the Zenvi desktop app
