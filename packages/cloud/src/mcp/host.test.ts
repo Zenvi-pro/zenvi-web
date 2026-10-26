@@ -497,6 +497,13 @@ describe("Zenvi Motion and subject mattes in the cloud", () => {
     const names = (await client.listTools()).tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(["list_motion_blocks_tool", "add_motion_block_tool", "update_motion_block_tool"]));
     expect(names).not.toContain("add_3d_scene_tool");
+    // Not listed, but a client that calls it anyway learns why.
+    const scene = await call(client, "add_3d_scene_tool", { scene: "title_3d" });
+    expect(scene.isError).toBe(true);
+    expect(textOf(scene)).toBe(
+      "Error: add_3d_scene_tool does not run on Zenvi Cloud: it needs Zenvi 3D (Blender on this computer). The zenvi CLI and its local MCP server (zenvi mcp) run it on a computer that has it.",
+    );
+    await expect(client.callTool({ name: "no_such_tool", arguments: {} })).rejects.toThrow(/Unknown tool: no_such_tool/);
     const projectId = (await call(client, "create_project", { name: "Promo" })).structuredContent?.project_id as string;
     const added = await call(client, "add_motion_block_tool", { block: "kinetic_headline", params: { text: "Ship it" } });
     expect(added.isError, textOf(added)).toBeFalsy();
@@ -530,7 +537,7 @@ describe("Zenvi Motion and subject mattes in the cloud", () => {
     const hl = await harness({ prober: long, mattes });
     const other = await projectWithMedia(hl, "clip.mp4", Buffer.from("clip"), "video/mp4");
     const refusing = createCloudHost(context(hl), other.projectId, () => other.project);
-    await expect(refusing.host.mattes!.generate("/Users/me/clip.mp4", { subject: "person", scale: 0.5 })).rejects.toThrow(/up to 1800 frames per call and this one has 5400/);
+    await expect(refusing.host.mattes!.generate("/Users/me/clip.mp4", { subject: "person", scale: 0.5 })).rejects.toThrow(/up to 300 frames per call and this one has 5400/);
     expect(runs).toBe(1);
     await refusing.dispose();
   });

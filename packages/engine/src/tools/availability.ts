@@ -425,7 +425,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
       backend: "the server is set up to call the Zenvi backend",
-      mattes: "onnxruntime-node and the matting model are in the image; up to 60 s of video per call",
+      mattes: "onnxruntime-node is in the image (the matting model downloads on first use); up to 10 s of video per call",
       motion: "the image has chrome-headless-shell; one block renders at a time",
     },
     hidden: [
