@@ -154,7 +154,7 @@ export function framePad(hit: number, fps: number): number {
 }
 
 /** `audio` with `seconds` of silence in front (the hit moves by the same amount). */
-export function padSfx(audio: SfxAudio, seconds: number): SfxAudio {
+export function padSfx<T extends Pick<SfxAudio, "sampleRate" | "left" | "right" | "hit" | "duration">>(audio: T, seconds: number): T {
   const lead = Math.round(seconds * audio.sampleRate);
   if (lead <= 0) return audio;
   const grow = (ch: Float32Array) => {

@@ -25,6 +25,9 @@ const DIRECT_TOOLS = [
   "list_sfx_tool",
   "add_sfx_tool",
   "auto_sound_design_tool",
+  "search_sfx_tool",
+  "list_credits_tool",
+  "create_sound_kit_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
 ];

@@ -22,6 +22,7 @@ import { addClip, fadeClip, setClipProperty } from "../ops/clips.js";
 import { addFile, removeFile, updateFile } from "../ops/files.js";
 import { addTrack } from "../ops/tracks.js";
 import { SFX_ROLE, isSfxClip, type SfxClipMark } from "../sfx/moments.js";
+import type { SfxCredit } from "../sfx/library.js";
 import { sfxRecipe } from "../sfx/recipes.js";
 import { SFX_VERSION, framePad, padSfx, renderSfx, resolveSfxParams, sfxKey, type ResolvedSfxParams, type SfxParams } from "../sfx/render.js";
 import { fileById, fpsFloatOf } from "./catalog/common.js";
@@ -35,8 +36,12 @@ const LANE = /^SFX(?: (\d+))?$/;
 /** What a sound-effect file records about itself (`file.zenvi_sfx`). */
 export interface SfxFileMark {
   key: string;
+  /** The recipe it is, or (a library sound) the recipe it stands in for. */
   recipe: string;
-  params: ResolvedSfxParams;
+  /** Procedural sounds: what it was rendered with. */
+  params?: ResolvedSfxParams;
+  /** Library sounds: the sound it was made from. */
+  library?: { provider: string; id: string };
   /** Seconds from the file's start to its hit point. */
   hit: number;
   /** Seconds of audio in the file. */
@@ -48,13 +53,16 @@ export interface SfxFileMark {
 export interface PreparedSfx {
   key: string;
   recipe: string;
-  params: ResolvedSfxParams;
+  params?: ResolvedSfxParams;
   hit: number;
   duration: number;
   /** A bin entry that already holds this sound. */
   fileId?: string;
   /** Freshly written media, added to the bin when placed. */
   media?: ImportedMedia;
+  /** Library sounds: the clip's title, and the credit recorded on the file. */
+  title?: string;
+  credit?: SfxCredit;
 }
 
 export interface SfxRequest {
@@ -62,7 +70,7 @@ export interface SfxRequest {
   params: SfxParams;
 }
 
-function markOf(file: ProjectFile): Partial<SfxFileMark> | undefined {
+export function markOf(file: ProjectFile): Partial<SfxFileMark> | undefined {
   return file.zenvi_role === SFX_ROLE ? (file.zenvi_sfx as Partial<SfxFileMark> | undefined) : undefined;
 }
 
@@ -198,14 +206,9 @@ export function placeSfx(tx: Transaction, sound: PreparedSfx, where: SfxPlacemen
   let end = sound.duration;
   if (where.until !== undefined) end = Math.min(end, start + (where.until - position));
   if (end - start < 0.01) return null;
-  if (!sound.fileId) {
-    const file = addFile(tx, sound.media!, { dedupe: true, mediaType: "audio" });
-    const mark: SfxFileMark = { key: sound.key, recipe: sound.recipe, params: sound.params, hit: sound.hit, duration: sound.duration, version: SFX_VERSION };
-    updateFile(tx, String(file.id), { zenvi_role: SFX_ROLE, zenvi_sfx: mark, name: sound.media!.name });
-    sound.fileId = String(file.id);
-  }
+  if (!sound.fileId) sound.fileId = addSfxFile(tx, sound);
   const layer = laneFor(tx, position, position + end - start);
-  const clip = addClip(tx, { fileId: sound.fileId, position, layer, start, end, title: recipe.title });
+  const clip = addClip(tx, { fileId: sound.fileId, position, layer, start, end, title: sound.title ?? recipe.title });
   setClipProperty(tx, clip.id, "volume", Math.round(10 ** (where.gainDb / 20) * 1000) / 1000);
   const trimmed = sound.duration - end > 1e-6 ? sound.duration - end : 0;
   let fadeOut = 0;
@@ -216,13 +219,34 @@ export function placeSfx(tx: Transaction, sound: PreparedSfx, where: SfxPlacemen
     fadeOut = Math.min(TAIL_FADE, end - start, Math.max((end - from) * 0.6, frame));
     fadeClip(tx, clip.id, { fadeOut, audio: true, video: false });
   }
-  const mark: SfxClipMark = { recipe: sound.recipe, auto: where.auto, ...(where.reason ? { reason: where.reason } : {}) };
+  const mark: SfxClipMark = {
+    recipe: sound.recipe,
+    auto: where.auto,
+    ...(where.reason ? { reason: where.reason } : {}),
+    ...(sound.credit ? { library: `${sound.credit.provider}:${sound.credit.id}` } : {}),
+  };
   return { clip: updateClipValues(tx, clip.id, { zenvi_role: SFX_ROLE, zenvi_sfx: mark }), trimmed, fadeOut };
 }
 
-/** Remove sound-effect files no clip plays any more (a rerun's leftovers). Returns their ids. */
-export function removeUnusedSfxFiles(tx: Transaction): string[] {
-  const used = new Set(tx.project.clips.map((c) => String(c.file_id)));
+/** Add a prepared sound's file to the bin, marked so tools find it (and, from a library, with its credit). Returns its id. */
+export function addSfxFile(tx: Transaction, sound: PreparedSfx): string {
+  const file = addFile(tx, sound.media!, { dedupe: true, mediaType: "audio" });
+  const mark: SfxFileMark = {
+    key: sound.key,
+    recipe: sound.recipe,
+    ...(sound.params ? { params: sound.params } : {}),
+    ...(sound.credit ? { library: { provider: sound.credit.provider, id: sound.credit.id } } : {}),
+    hit: sound.hit,
+    duration: sound.duration,
+    version: SFX_VERSION,
+  };
+  updateFile(tx, String(file.id), { zenvi_role: SFX_ROLE, zenvi_sfx: mark, name: sound.media!.name, ...(sound.credit ? { zenvi_credit: sound.credit } : {}) });
+  return String(file.id);
+}
+
+/** Remove sound-effect files no clip plays any more (a rerun's leftovers), but the ones in `keep` (the sound kit's). Returns their ids. */
+export function removeUnusedSfxFiles(tx: Transaction, keep: ReadonlySet<string> = new Set()): string[] {
+  const used = new Set([...tx.project.clips.map((c) => String(c.file_id)), ...keep]);
   const unused = tx.project.files.filter((f) => f.zenvi_role === SFX_ROLE && !used.has(String(f.id))).map((f) => String(f.id));
   for (const id of unused) removeFile(tx, id);
   return unused;
