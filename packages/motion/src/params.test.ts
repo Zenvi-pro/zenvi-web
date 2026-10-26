@@ -75,6 +75,14 @@ describe("checkParams", () => {
     expect(checkParams(block, { label: "x".repeat(61) })).toMatchObject({ ok: false, error: "label is longer than 60 characters" });
   });
 
+  it("takes an enum's old names and the wrong plural (bench sessions sent shape=dot and square)", () => {
+    const burst = getBlock("particle_burst")!;
+    expect(checkParams(burst, { shape: "dot" })).toMatchObject({ ok: true, params: { shape: "dots" } });
+    expect(checkParams(burst, { shape: "Square" })).toMatchObject({ ok: true, params: { shape: "confetti" } });
+    expect(checkParams(burst, { shape: "spark" })).toMatchObject({ ok: true, params: { shape: "sparks" } });
+    expect(checkParams(burst, { shape: "toString" })).toMatchObject({ ok: false, error: expect.stringContaining("shape must be one of sparks") });
+  });
+
   it("keeps a text value that happens to start with the param's name", () => {
     expect(checkParams(block, { label: "label must be kept" })).toMatchObject({ ok: true, params: { label: "label must be kept" } });
   });

@@ -9,7 +9,7 @@
   "alpha": true,
   "tokens": { "palette": "ember", "display": "sans", "radius": 80 },
   "params": {
-    "shape": { "type": "enum", "options": ["sparks", "confetti", "shards", "rings", "lines", "dots"], "default": "sparks", "description": "What bursts: sparks (white-hot streaks with a fall of embers), confetti (paper strips that flip as they fall), shards (splinters turning in the light), rings (ripples with a dust of dots), lines (short strokes shot evenly round, the drawn sparkle accent), dots." },
+    "shape": { "type": "enum", "options": ["sparks", "confetti", "shards", "rings", "lines", "dots"], "default": "sparks", "aliases": { "mixed": "sparks", "streak": "sparks", "square": "confetti", "sparkle": "lines" }, "description": "What bursts: sparks (white-hot streaks with a fall of embers), confetti (paper strips that flip as they fall), shards (splinters turning in the light), rings (ripples with a dust of dots), lines (short strokes shot evenly round, the drawn sparkle accent), dots." },
     "count": { "type": "integer", "min": 8, "max": 400, "default": 110, "description": "How many particles (lines: one stroke per 6, 6 to 24)." },
     "origin": { "type": "points", "maxItems": 1, "default": [{ "x": 0.5, "y": 0.5 }], "description": "Where it bursts, {x, y} from 0 to 1." },
     "colors": { "type": "strings", "maxItems": 5, "maxLength": 9, "default": [], "description": "Particle colours as #rrggbb (empty: the accent and secondary; confetti adds the ink)." },
