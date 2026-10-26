@@ -29,6 +29,7 @@ export * from "./host/backend.js";
 export * from "./host/web-video.js";
 export * from "./net/public-address.js";
 export * from "./host/node-host.js";
+export * from "./fx/render.js";
 export * from "./decode/audio.js";
 export * from "./svg/opentype.js";
 export * from "./svg/text.js";

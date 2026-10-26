@@ -22,6 +22,7 @@ import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.j
 import { createMediaResolver } from "./paths.js";
 import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
 import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
+import { createNodeFx } from "./fx.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
 
 export interface NodeHostOptions {
@@ -44,6 +45,8 @@ export interface NodeHostOptions {
    * where the desktop finds them.
    */
   desktopDir?: string;
+  /** Zenvi FX (ffmpeg footage effects; default true). */
+  fx?: boolean;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
@@ -204,6 +207,10 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     log: options.log,
   };
   if (assets) host.assets = createAssetHost(assets);
+  if (options.fx !== false) {
+    const fx = createNodeFx({ env: options.env, resolveMedia, projectFile: current, log: options.log });
+    if (fx) host.fx = fx;
+  }
   const desktopDir = options.desktopDir;
   if (desktopDir) {
     Object.assign(host.storage!, {
