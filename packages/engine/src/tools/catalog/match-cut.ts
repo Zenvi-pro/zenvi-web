@@ -394,6 +394,10 @@ const montageTool = directTool({
     const boxTimes = new Map([...given].filter(([, s]) => s.time !== undefined).map(([id, s]) => [id, s.time!]));
     const followed = new Set([...given].filter(([, g]) => g.end_box !== undefined).map(([id]) => id));
     const windows = sourceWindows(plan, ids, files, boxTimes, followed);
+    const firstStart = new Map<string, number>();
+    for (const [i, shot] of plan.shots.entries()) if (!firstStart.has(ids[shot.clip]!)) firstStart.set(ids[shot.clip]!, windows[i]!.start);
+    const unused = ids.filter((id) => !firstStart.has(id));
+    if (unused.length > 0) warnings.push(`${unused.length} file(s) did not fit in ${round(plan.duration, 2)} s: ${unused.join(", ")}. Give a longer duration_seconds.`);
     // Each file is looked at once, at its first shot: its circle (unless given) and whether its edges are black.
     const looked = new Map<string, FrameSubjects | null>();
     let cannotLook = false;
@@ -414,8 +418,8 @@ const montageTool = directTool({
       const s = given.get(id);
       if (s) {
         const later = laterBox(s);
-        // A box without a time stays put; with one, it is followed from where it was measured.
-        const box = s.time === undefined ? s.box : boxAt(s.box, s.time, later, w.start);
+        // A box without a time was measured where the file's first shot starts; it is followed from there.
+        const box = boxAt(s.box, s.time ?? firstStart.get(id)!, later, w.start);
         sources.push({ fileId: id, kind, ...w, box, ...(later ? { later } : {}), from: "given", darkEdges });
         continue;
       }

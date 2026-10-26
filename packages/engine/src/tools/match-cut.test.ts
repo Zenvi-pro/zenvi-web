@@ -11,7 +11,7 @@ import { runTool } from "./registry.js";
 import { hasDarkEdges } from "./subjects.js";
 import { fakeHost } from "./test-support/fake-host.js";
 import { media, videoInfo } from "./test-support/fixture.js";
-import { pixelFrameHost } from "./test-support/pixel-host.js";
+import { pixelFrameHost, type Painter } from "./test-support/pixel-host.js";
 import type { ToolHost } from "./types.js";
 
 /** Discs on the source frames, in source pixels (1280×720): different places and sizes, like unaligned circle shots. */
@@ -221,17 +221,20 @@ describe("match_cut_montage_tool", () => {
     base.clips = [];
     const doc = new ProjectDocument(base);
     const host: ToolHost = { ...fakeHost(), frames: pixelFrameHost(paint) };
-    const result = await runTool({ doc, host }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 4, target: { x: 0.5, y: 0.5, size: 0.4 } });
+    const result = await runTool({ doc, host }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 6, target: { x: 0.5, y: 0.5, size: 0.4 } });
     expect(result.data?.status, result.data?.summary).toBe("applied");
+    expect(result.data?.warnings?.join(" ")).not.toMatch(/did not fit/);
     expect(doc.undoLabels).toEqual(["Match-cut montage"]);
     const data = result.data?.data as {
-      shots: { clip_id: string; start: number; frames: number; subject_from: string }[];
+      shots: { clip_id: string; file_id: string; start: number; frames: number; subject_from: string }[];
       flashes: number[];
       sfx_cues: { time: number; kind: string; accent: boolean }[];
       target: { size: number };
     };
     expect(data.shots[0]!.frames).toBeGreaterThanOrEqual(24);
     expect(data.shots[data.shots.length - 1]!.frames).toBeGreaterThanOrEqual(36);
+    expect(data.shots.length).toBeGreaterThan(6);
+    expect(new Set(data.shots.map((s) => s.file_id))).toEqual(new Set(["F0", "F1", "F2", "F3"]));
     for (const shot of data.shots.slice(1, -1)) expect(shot.frames).toBeGreaterThanOrEqual(3);
     for (const shot of data.shots.slice(1, -1)) expect(shot.frames).toBeLessThanOrEqual(8);
     expect(data.shots.every((s) => s.subject_from === "detected")).toBe(true);
@@ -245,6 +248,55 @@ describe("match_cut_montage_tool", () => {
       expect(Math.abs(seen.y - 360), shot.clip_id).toBeLessThanOrEqual(2);
       expect(Math.abs(seen.r - data.target.size * 360), shot.clip_id).toBeLessThanOrEqual(2);
     }
+  });
+
+  it("follows a drifting subject from its box and end_box when no time is given", async () => {
+    // The moon slides right at 40 px per source second.
+    const moonAt = (t: number) => ({ x: 300 + 40 * t, y: 250, r: 90 });
+    const drifting: Painter = (path, width, height, seconds) => {
+      if (path !== "/m/moon.mp4") return paint(path, width, height);
+      const saved = DISCS[path]!;
+      DISCS[path] = moonAt(seconds);
+      try {
+        return paint(path, width, height);
+      } finally {
+        DISCS[path] = saved;
+      }
+    };
+    const boxAtTime = (t: number) => {
+      const d = moonAt(t);
+      return { x: (d.x - d.r) / W, y: (d.y - d.r) / H, w: (2 * d.r) / W, h: (2 * d.r) / H };
+    };
+    const host: ToolHost = { ...fakeHost(), frames: pixelFrameHost(drifting) };
+    const args = { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 6, flash: false, zoom_drift: 0, target: { x: 0.5, y: 0.5, size: 0.4 } };
+    type Shots = { shots: { file_id: string; start: number; source_start: number }[] };
+    const fresh = () => {
+      const base = project();
+      base.clips = [];
+      return new ProjectDocument(base);
+    };
+    // Source windows do not depend on the boxes: the first run says where F1's first shot starts in its file.
+    const probed = await runTool({ doc: fresh(), host }, "match_cut_montage_tool", args);
+    expect(probed.data?.status, probed.data?.summary).toBe("applied");
+    const probe = probed.data?.data as Shots;
+    const firstStart = probe.shots.find((s) => s.file_id === "F1")!.source_start;
+    const doc = fresh();
+    const result = await runTool({ doc, host }, "match_cut_montage_tool", { ...args, subjects: [{ file_id: "F1", box: boxAtTime(firstStart), end_box: boxAtTime(8), end_time: 8 }] });
+    const moon = (result.data?.data as Shots).shots.filter((s) => s.file_id === "F1");
+    expect(moon.length).toBeGreaterThan(1);
+    for (const shot of moon) {
+      const seen = measure(await frameAt(host, doc.project, Math.round(shot.start * 30) + 1));
+      expect(Math.abs(seen.x - 640), `F1 at ${shot.source_start}s`).toBeLessThanOrEqual(2);
+      expect(Math.abs(seen.y - 360), `F1 at ${shot.source_start}s`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("says which files a short montage leaves out", async () => {
+    const base = project();
+    base.clips = [];
+    // 4 s at 120 BPM: the opening hold runs to the 2 s downbeat and the end hold starts there.
+    const result = await runTool({ doc: new ProjectDocument(base), host: fakeHost() }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 4 });
+    expect(result.data?.warnings?.join(" ")).toMatch(/2 file\(s\) did not fit in 4 s: F1, F2/);
   });
 
   it("refuses an occupied timeline unless replace is set", async () => {
