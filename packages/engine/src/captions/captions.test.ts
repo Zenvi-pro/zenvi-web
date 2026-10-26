@@ -1,10 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { layoutOf } from "../motion/layout.js";
 import { FONT_FAMILY_IDS } from "../typography/families.js";
 import { FontLibrary } from "../typography/library.js";
 import { readBundledFont } from "../typography/test-fonts.js";
 import type { Box } from "../typography/typeset.js";
-import { buildKineticCaptions, type AvoidBox } from "./build.js";
+import { buildKineticCaptions, captionSafe, type AvoidBox } from "./build.js";
 import { CAPTION_STYLE_IDS, CAPTION_STYLES } from "./styles.js";
 import { emphasisScores, groupWords, pickEmphasis, type CaptionWord } from "./words.js";
 
@@ -46,8 +45,21 @@ describe("groupWords", () => {
     expect(texts(paused, groupWords(paused, RULES))).toEqual(["one two", "three four"]);
   });
 
+  it("holds a group until the next one while the speaker goes on: no blank frames between phrases", () => {
+    // Sentences 0.52 s apart: no gap on screen. A real pause (1 s): the group leaves after its tail.
+    const words = spoken("One idea. Two words. Then");
+    const groups = groupWords(words, RULES);
+    expect(groups.length).toBe(3);
+    expect(groups[0]!.stop).toBeCloseTo(groups[1]!.start, 9);
+    expect(groups[1]!.stop).toBeCloseTo(groups[2]!.start, 9);
+    const paused = [...spoken("Done here."), ...spoken("Later on", 3)];
+    const g = groupWords(paused, RULES);
+    expect(g[0]!.stop).toBeCloseTo(paused[1]!.end + RULES.tail, 9);
+    expect(g[1]!.start - g[0]!.stop).toBeGreaterThan(0.6);
+  });
+
   it("shows a group until the next one starts, or its tail; never shorter than minHold", () => {
-    const words = spoken("Hello there. Bye.");
+    const words = [...spoken("Hello there."), ...spoken("Bye.", 2.5)];
     const groups = groupWords(words, RULES);
     expect(groups[0]!.stop).toBeCloseTo(words[1]!.end + RULES.tail, 6);
     expect(groups[1]!.stop).toBeCloseTo(words[2]!.end + RULES.tail, 6);
@@ -104,10 +116,10 @@ function hits(b: Box, a: AvoidBox, frame: { width: number; height: number }): bo
 describe("buildKineticCaptions", () => {
   for (const style of CAPTION_STYLE_IDS) {
     for (const frame of [VERTICAL, WIDE]) {
-      it(`${style} at ${frame.width}x${frame.height}: in the safe area, off the face, on the word times`, () => {
+      it(`${style} at ${frame.width}x${frame.height}: in the platform/title-safe area, off the face, on the word times, no gaps`, () => {
         const words = spoken(SCRIPT);
         const built = buildKineticCaptions({ frame, words, style, emphasis: "auto", avoid: [FACE], lib });
-        const { safe } = layoutOf(frame);
+        const safe = captionSafe(frame);
         expect(built.groups.length).toBeGreaterThan(3);
         for (const g of built.groups) {
           for (const w of g.words) {
@@ -126,7 +138,9 @@ describe("buildKineticCaptions", () => {
             expect(Math.abs(f0 + layer.start - word.start * frame.fps), `${layer.name}`).toBeLessThanOrEqual(1);
           }
         }
-        for (let i = 1; i < built.groups.length; i += 1) expect(built.groups[i]!.start).toBeGreaterThanOrEqual(built.groups[i - 1]!.stop - 1e-9);
+        // The script never pauses longer than HOLD_GAP: each group hands over to the next on the same frame.
+        for (let i = 1; i < built.groups.length; i += 1) expect(built.groups[i]!.start).toBeCloseTo(built.groups[i - 1]!.stop, 9);
+        for (const g of built.groups) expect(inside(g.box, safe), `${style} group ${g.text}`).toBe(true);
         // Each drawing is outlined type: paths, no <text>.
         for (const layer of built.plan.layers) {
           if (layer.source.kind !== "svg") continue;

@@ -12,7 +12,7 @@
  *              style's size × the frame's short side / 1080, lines stacked
  *              on cap heights, then placed at the first spot (the style's
  *              spots, then beside, below and above the first avoid box)
- *              that stays in the safe area (motion/layout.ts) and clear of
+ *              that stays in the caption safe area (captionSafe) and clear of
  *              every avoid box by 2 % of the frame width. When no spot is
  *              clear the block is set smaller (85 %, 70 %) before taking
  *              the spot that overlaps least. Behind a cut-out speaker the
@@ -22,7 +22,6 @@
  *              one track and the moving marker on the next.
  */
 
-import { layoutOf } from "../motion/layout.js";
 import { planOf } from "../motion/keyframes.js";
 import { Drawing } from "../motion/svg.js";
 import type { Element, Key, MotionFrame, MotionPlan, Pose } from "../motion/types.js";
@@ -99,6 +98,19 @@ interface GroupBlock {
 }
 
 const MARGIN = 0.02;
+
+/**
+ * Where captions may go (TASTE.md §3): on 9:16 and taller frames the
+ * platform-safe area, out of the bottom 20 % (Reels / TikTok / Shorts UI)
+ * and the top 12 % (status bar, handle), 10 % in from the sides; on other
+ * frames title-safe, 10 % in from every edge.
+ */
+export function captionSafe(frame: { width: number; height: number }): { left: number; top: number; right: number; bottom: number } {
+  const W = frame.width;
+  const H = frame.height;
+  const tall = H >= W * 1.5;
+  return { left: 0.1 * W, right: 0.9 * W, top: (tall ? 0.12 : 0.1) * H, bottom: (tall ? 0.8 : 0.9) * H };
+}
 /** Largest type size (px at a 1080 px short side) whose halo grows with it. */
 const HALO_TYPE_SIZE = 64;
 /** Where groups go behind a cut-out speaker: across the top of the head. */
@@ -259,7 +271,12 @@ function drawWords(p: Painted, width: number, height: number, k: number, colours
   return d;
 }
 
-function keysFor(from: number, to: number, rest: Pose, style: CaptionStyle, fps: number, H: number, entrance = true): Key[] {
+/**
+ * Keys of a word or group: entrance, hold, exit. `travel` is the entrance's
+ * direction (1: rises from below, -1: drops from above, so a block on the
+ * safe area's bottom line never enters through the platform band).
+ */
+function keysFor(from: number, to: number, rest: Pose, style: CaptionStyle, fps: number, H: number, entrance = true, travel = 1): Key[] {
   const m = style.motion;
   const last = to - 1;
   const e = Math.max(1, Math.round(m.enter * fps));
@@ -267,7 +284,7 @@ function keysFor(from: number, to: number, rest: Pose, style: CaptionStyle, fps:
   if (last - from < 2) return [{ frame: from, pose: rest, ease: "linear" }];
   const keys: Key[] = [];
   if (entrance && last - from > e) {
-    keys.push({ frame: from, pose: { ...rest, alpha: 0, s: m.fromScale, y: rest.y + m.fromY * H }, ease: "linear" });
+    keys.push({ frame: from, pose: { ...rest, alpha: 0, s: m.fromScale, y: rest.y + travel * m.fromY * H }, ease: "linear" });
     keys.push({ frame: from + e, pose: rest, ease: m.enterEase });
   } else keys.push({ frame: from, pose: rest, ease: "linear" });
   const settled = keys[keys.length - 1]!.frame;
@@ -282,8 +299,9 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
   const style = CAPTION_STYLES[input.style];
   const { frame, lib } = input;
   const fps = frame.fps;
-  const layout = layoutOf(frame);
-  const { W, H, safe } = layout;
+  const layout = { W: frame.width, H: frame.height };
+  const { W, H } = layout;
+  const safe = captionSafe(frame);
   const u = Math.min(W, H) / 1080;
   const colours = { ink: input.ink ?? DEFAULT_INK, accent: input.accent ?? DEFAULT_ACCENT[input.style] };
   const words = input.words.filter((w) => w.text.trim());
@@ -353,7 +371,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
     }
     const b = block!;
     // Each word's frame offset (px) from block coordinates.
-    const offsetOf = (w: SetWord): { dx: number; dy: number } => {
+    const placedAt = (w: SetWord): { dx: number; dy: number } => {
       if (halves) {
         const left = w.baseline === b.words[0]!.baseline;
         const line = b.words.filter((x) => (x.baseline === b.words[0]!.baseline) === left);
@@ -365,9 +383,9 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
     };
     for (const w of b.words) for (const m of w.block.missing) missing.add(m);
 
-    const groupBox = (() => {
+    const boxesAt = (at: (w: SetWord) => { dx: number; dy: number }) => {
       const boxes = b.words.map((w) => {
-        const o = offsetOf(w);
+        const o = at(w);
         const wb = wordBounds(w.block);
         return { x: o.dx + w.x + wb.x, y: o.dy + w.baseline - w.block.ascent + wb.y, width: wb.width, height: wb.height };
       });
@@ -376,7 +394,17 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
       const x1 = Math.max(...boxes.map((x) => x.x + x.width));
       const y1 = Math.max(...boxes.map((x) => x.y + x.height));
       return { boxes, box: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } };
-    })();
+    };
+    // The ink (descenders, a slanted italic) may reach past the block's cap-height box: move it all inside the safe area.
+    const ink = boxesAt(placedAt).box;
+    const shiftX = ink.x < safe.left ? safe.left - ink.x : ink.x + ink.width > safe.right ? Math.max(safe.left - ink.x, safe.right - ink.x - ink.width) : 0;
+    const shiftY = ink.y < safe.top ? safe.top - ink.y : ink.y + ink.height > safe.bottom ? Math.max(safe.top - ink.y, safe.bottom - ink.y - ink.height) : 0;
+    const offsetOf = (w: SetWord): { dx: number; dy: number } => {
+      const o = placedAt(w);
+      return { dx: o.dx + shiftX, dy: o.dy + shiftY };
+    };
+    const groupBox = boxesAt(offsetOf);
+    const travel = groupBox.box.y + groupBox.box.height + style.motion.fromY * H > safe.bottom ? -1 : 1;
     placed.push({
       text: items.map((i) => i.text).join(" "),
       start: (f0 + from) / fps,
@@ -406,7 +434,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
         from: start,
         to: end,
         source: { kind: "svg", name, width, height, cx: width / 2, cy: height / 2, draw: (k) => drawWords({ words: [w], x: left, y: top }, width, height, k, colours, style, marker, u) },
-        keys: keysFor(start, end, rest, style, fps, H, entrance),
+        keys: keysFor(start, end, rest, style, fps, H, entrance, travel),
       };
     };
 
@@ -425,7 +453,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
         from,
         to,
         source: { kind: "svg", name, width, height, cx: width / 2, cy: height / 2, draw: (k) => drawWords({ words: b.words, x: left, y: top }, width, height, k, colours, style, false, u) },
-        keys: keysFor(from, to, { x: gb.x + gb.width / 2, y: gb.y + gb.height / 2, s: 1, alpha: 1, rotation: 0 }, style, fps, H),
+        keys: keysFor(from, to, { x: gb.x + gb.width / 2, y: gb.y + gb.height / 2, s: 1, alpha: 1, rotation: 0 }, style, fps, H, true, travel),
       });
       if (style.marker) {
         b.words.forEach((w, j) => {

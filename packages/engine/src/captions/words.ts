@@ -10,7 +10,8 @@
  *              and, so…); a group that fills up on a connector leaves it
  *              to open the next group, and a word that closes its phrase
  *              may stretch a full group by one. A group shows from its first word's
- *              start to the next group's start, or `tail` after its last
+ *              start to the next group's start when the speaker goes on
+ *              (a pause of at most HOLD_GAP), else `tail` after its last
  *              word (at least `minHold`). A single word left over by the
  *              limits joins the group before it when that stays within a
  *              word and a quarter of them.
@@ -37,6 +38,9 @@ export interface CaptionGroup {
   start: number;
   stop: number;
 }
+
+/** Longest pause, seconds, a group holds across until the next group: shorter gaps are not silence on screen. */
+export const HOLD_GAP = 0.6;
 
 export interface GroupRules {
   maxWords: number;
@@ -102,7 +106,8 @@ export function groupWords(words: readonly CaptionWord[], rules: GroupRules): Ca
     const start = words[g.first]!.start;
     const last = words[g.end - 1]!.end;
     const next = groups[k + 1] ? words[groups[k + 1]!.first]!.start : Infinity;
-    const stop = Math.min(next, Math.max(last + rules.tail, start + rules.minHold));
+    // Speech goes on (no pause longer than HOLD_GAP): the group holds until the next one, no blank frames between phrases.
+    const stop = next - last <= HOLD_GAP ? next : Math.min(next, Math.max(last + rules.tail, start + rules.minHold));
     return { ...g, start, stop: Math.max(stop, last) };
   });
 }

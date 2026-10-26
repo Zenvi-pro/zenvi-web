@@ -138,7 +138,7 @@ export const CAPTION_STYLES: Readonly<Record<CaptionStyleId, CaptionStyle>> = {
     reveal: "group",
     marker: false,
     motion: { enter: 0.2, fromScale: 1, fromY: 0.006, enterEase: "out", exit: 0.15, toScale: 1, exitEase: "in" },
-    spots: { portrait: [{ x: 0.5, y: 0.8 }, { x: 0.5, y: 0.2 }], landscape: [{ x: 0.5, y: 0.86 }, { x: 0.5, y: 0.14 }] },
+    spots: { portrait: [{ x: 0.5, y: 0.75 }, { x: 0.5, y: 0.2 }], landscape: [{ x: 0.5, y: 0.84 }, { x: 0.5, y: 0.16 }] },
     punctuation: "keep",
     shadow: true,
     gap: 0.3,
