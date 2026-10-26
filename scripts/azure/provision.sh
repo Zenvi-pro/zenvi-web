@@ -16,6 +16,11 @@
 # Touches only: blob container + tables in the storage account, and the
 # container app `zenvi-cloud` in environment `zenvi-env`. Other apps in the
 # environment are left alone.
+#
+# Sizing and the rest default to production's; scripts/azure/lab.sh sets them
+# for a lab copy: MIN_REPLICAS, MAX_REPLICAS, CPU, MEMORY, TAGS (space-separated
+# key=value, applied when the app is created) and RENDER_QUEUE (hand renders to
+# the render job, render-jobs.sh).
 set -euo pipefail
 
 RG="${RG:-zenvi-rg}"
@@ -32,6 +37,12 @@ BACKEND="${ZENVI_BACKEND_URL:-https://api.zenvi.pro}"
 CORS="${CORS_ORIGINS:-https://zenvi.pro,https://www.zenvi.pro,https://*.vercel.app,http://localhost:*,http://127.0.0.1:*}"
 ALIASES="${PUBLIC_BASE_URL_ALIASES:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
+MIN_REPLICAS="${MIN_REPLICAS:-1}"
+MAX_REPLICAS="${MAX_REPLICAS:-1}"
+CPU="${CPU:-1}"
+MEMORY="${MEMORY:-2Gi}"
+TAGS="${TAGS:-}"
+RENDER_QUEUE="${RENDER_QUEUE:-}"
 SECRET_NAME="azure-storage-connection-string"
 
 die() { echo "provision: $*" >&2; exit 1; }
@@ -80,6 +91,10 @@ if [ -n "$SERVICE_ROLE" ]; then
   ENV_VARS+=("SUPABASE_SERVICE_ROLE_KEY=secretref:supabase-service-role-key")
 fi
 [ -n "$IMAGE_TAG" ] && ENV_VARS+=("ZENVI_CLOUD_VERSION=$IMAGE_TAG")
+[ -n "$RENDER_QUEUE" ] && ENV_VARS+=("ZENVI_RENDER_QUEUE=$RENDER_QUEUE")
+TAG_ARGS=()
+# shellcheck disable=SC2206 # space-separated key=value pairs, by design
+[ -n "$TAGS" ] && TAG_ARGS=(--tags $TAGS)
 
 if ! az containerapp show -g "$RG" -n "$APP" -o none 2>/dev/null; then
   [ -n "$IMAGE_TAG" ] || die "IMAGE_TAG is required to create $APP (build one with scripts/azure/deploy.sh)"
@@ -90,9 +105,10 @@ if ! az containerapp show -g "$RG" -n "$APP" -o none 2>/dev/null; then
     --image "$ACR_SERVER/zenvi-cloud:$IMAGE_TAG" \
     --registry-server "$ACR_SERVER" --registry-username "$ACR_USER" --registry-password "$ACR_PASS" \
     --ingress external --target-port 8080 --transport auto \
-    --min-replicas 1 --max-replicas 1 --cpu 1 --memory 2Gi \
+    --min-replicas "$MIN_REPLICAS" --max-replicas "$MAX_REPLICAS" --cpu "$CPU" --memory "$MEMORY" \
     --secrets "${SECRETS[@]}" \
     --env-vars "${ENV_VARS[@]}" \
+    ${TAG_ARGS[@]+"${TAG_ARGS[@]}"} \
     -o none
 else
   step "Updating container app $APP"
@@ -100,7 +116,7 @@ else
   IMAGE_ARGS=()
   [ -n "$IMAGE_TAG" ] && IMAGE_ARGS=(--image "$ACR_SERVER/zenvi-cloud:$IMAGE_TAG")
   az containerapp update -g "$RG" -n "$APP" ${IMAGE_ARGS[@]+"${IMAGE_ARGS[@]}"} \
-    --min-replicas 1 --max-replicas 1 --cpu 1 --memory 2Gi \
+    --min-replicas "$MIN_REPLICAS" --max-replicas "$MAX_REPLICAS" --cpu "$CPU" --memory "$MEMORY" \
     --set-env-vars "${ENV_VARS[@]}" \
     -o none
   az containerapp ingress update -g "$RG" -n "$APP" --type external --target-port 8080 --transport auto -o none
