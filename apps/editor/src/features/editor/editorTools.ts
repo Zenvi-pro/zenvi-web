@@ -41,11 +41,19 @@ export interface ToolRun {
   undoSteps: number;
 }
 
+interface ReceiptFields {
+  status?: unknown;
+  summary?: unknown;
+  data?: unknown;
+  warnings?: unknown;
+  undoSteps?: unknown;
+}
+
 export function parseToolResult(text: string): ToolRun {
-  let receipt: { status?: unknown; summary?: unknown; data?: unknown; warnings?: unknown; undoSteps?: unknown } | null = null;
+  let receipt: ReceiptFields | null = null;
   try {
     const parsed: unknown = JSON.parse(text);
-    if (parsed && typeof parsed === "object") receipt = parsed as typeof receipt;
+    if (parsed && typeof parsed === "object") receipt = parsed as ReceiptFields;
   } catch {
     // plain text result (failures, desktop-format reads)
   }

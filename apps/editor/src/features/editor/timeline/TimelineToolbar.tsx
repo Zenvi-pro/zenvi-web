@@ -1,13 +1,15 @@
 import { timelineEnd } from "@zenvi/engine";
-import { BookmarkPlus, ChevronsLeftRight, Magnet, MousePointer2, Plus, Scissors, SquareSplitHorizontal, Trash2, ZoomIn, ZoomOut } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { BookmarkPlus, ChevronsLeftRight, Magnet, MousePointer2, Plus, Scissors, SquareSplitHorizontal, Trash2, Zap, ZoomIn, ZoomOut } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { secondsToTimecode } from "@/lib/timecode";
+import { Button } from "@/ui/Button";
 import { cn } from "@/ui/cn";
 import { Divider, IconButton, Slider } from "@/ui/Controls";
 import { shortcutFor } from "../commands";
 import { useRunCommand } from "../layout/commandsContext";
 import { useProjectSelector, useSession, useUi } from "../session/context";
 import { selectionIsEmpty } from "../session/uiStore";
+import { runMakeItSnappy } from "../snappy";
 import { sliderToZoom, zoomToSlider } from "./geometry";
 
 /** HH:MM:SS:FF, updated by direct DOM writes (60 fps during playback without re-rendering). */
@@ -36,6 +38,11 @@ export function TimelineToolbar() {
   const hasSelection = useUi((s) => !selectionIsEmpty(s.selection));
   const fps = useProjectSelector((p) => p.fps);
   const end = useProjectSelector((p) => timelineEnd(p));
+  const [snappyBusy, setSnappyBusy] = useState(false);
+  const snappy = () => {
+    setSnappyBusy(true);
+    void runMakeItSnappy(session).finally(() => setSnappyBusy(false));
+  };
 
   return (
     <div className="flex h-9 shrink-0 items-center gap-1 border-b border-line bg-base px-2">
@@ -64,6 +71,18 @@ export function TimelineToolbar() {
       <IconButton size="sm" label="Add marker" shortcut={shortcutFor("actionAddMarker")} onClick={() => run("actionAddMarker")} className="max-sm:hidden">
         <BookmarkPlus size={14} />
       </IconButton>
+      <Divider vertical />
+      <Button
+        size="xs"
+        variant="accent-outline"
+        icon={<Zap size={12} />}
+        loading={snappyBusy}
+        onClick={snappy}
+        title="Motion transitions on the cuts, sound design and mastering, each its own undo step"
+        className="max-sm:hidden"
+      >
+        Make it snappy
+      </Button>
 
       <div className="flex flex-1 items-center justify-center gap-2 text-sm">
         <LiveTimecode className="text-fg" />

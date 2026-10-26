@@ -30,6 +30,10 @@ import { downloadBlob, projectFileBlob, safeFileName } from "@/lib/projectFactor
 import { secondsToTimecode } from "@/lib/timecode";
 import { renderFrame } from "./render";
 import { runSoundDesign } from "./soundDesign";
+import { addKineticCaptions, KINETIC_CAPTION_STYLES } from "./actions/captions";
+import { applyMotionStyle, gridMontage, matchCut, speedRamp, SPEED_RAMPS } from "./actions/motion";
+import { editorToolState, runToolWithToast } from "./editorTools";
+import { runMakeItSnappy } from "./snappy";
 import { buildKeymap, primaryShortcut, type Keymap } from "@/lib/keyboard/keymap";
 import type { ShortcutCommand } from "@/lib/keyboard/dispatcher";
 import { toast } from "@/ui/Toast";
@@ -336,6 +340,32 @@ export function createCommands(session: EditorSession, env: CommandEnv): Map<str
     { id: "actionSoundDesign", label: "Sound design: whooshes, hits and risers", group: "Timeline", run: () => void runSoundDesign(session, "normal") },
     { id: "actionSoundDesignSubtle", label: "Sound design: subtle", group: "Timeline", run: () => void runSoundDesign(session, "subtle") },
     { id: "actionSoundDesignHype", label: "Sound design: hype", group: "Timeline", run: () => void runSoundDesign(session, "hype") },
+    { id: "actionMakeItSnappy", label: "Make it snappy: motion transitions, sound design, mastering", group: "Timeline", run: () => void runMakeItSnappy(session) },
+    { id: "actionMotionTransitionsHype", label: "Motion transitions on every cut: hype", group: "Timeline", run: () => void applyMotionStyle(session, "hype") },
+    { id: "actionMotionTransitionsCinematic", label: "Motion transitions on every cut: cinematic", group: "Timeline", run: () => void applyMotionStyle(session, "cinematic") },
+    {
+      id: "actionMasterAudio",
+      label: "Master audio for social (-14 LUFS)",
+      group: "Timeline",
+      hidden: editorToolState("master_audio_tool").kind !== "ready",
+      run: () => void runToolWithToast(session, "master_audio_tool", { preset: "social" }, { done: "Mastered for social", failed: "Could not master the mix" }),
+    },
+    { id: "actionMatchCut", label: "Match cut: line up the selected clips' subject", group: "Timeline", enabled: () => selection().clips.length >= 2, run: () => void matchCut(session, selection().clips) },
+    { id: "actionGridMontage", label: "Grid montage from the selected clips", group: "Timeline", enabled: () => selection().clips.length >= 2, run: () => void gridMontage(session, selection().clips) },
+    ...SPEED_RAMPS.map(({ preset, label }): EditorCommand => ({
+      id: `actionSpeedRamp_${preset}`,
+      label: `Speed ramp: ${label}`,
+      group: "Timeline",
+      enabled: () => selection().clips.length === 1,
+      run: () => void speedRamp(session, selection().clips[0]!, preset),
+    })),
+    ...KINETIC_CAPTION_STYLES.map(({ style, label }): EditorCommand => ({
+      id: `actionKineticCaptions_${style}`,
+      label: `Kinetic captions: ${label}`,
+      group: "Timeline",
+      hidden: editorToolState("kinetic_captions_tool").kind !== "ready",
+      run: () => void addKineticCaptions(session, selection().clips, style),
+    })),
 
     // View
     { id: "actionProperties", label: "Properties", group: "View", run: () => showTab(undefined, "properties") },
@@ -343,6 +373,8 @@ export function createCommands(session: EditorSession, env: CommandEnv): Map<str
     { id: "showFiles", label: "Project files", group: "View", run: () => showTab("files") },
     { id: "showEffects", label: "Effects", group: "View", run: () => showTab("effects") },
     { id: "showTransitions", label: "Transitions", group: "View", run: () => showTab("transitions") },
+    { id: "showSound", label: "Sound", group: "View", run: () => showTab("sound") },
+    { id: "showMotion", label: "Motion and 3D", group: "View", run: () => showTab("motion") },
     { id: "showTitles", label: "Titles", group: "View", run: () => showTab("titles") },
     { id: "showStock", label: "Stock media", group: "View", run: () => showTab("stock") },
     { id: "showGenerate", label: "Generate with AI", group: "View", run: () => showTab("generate") },
