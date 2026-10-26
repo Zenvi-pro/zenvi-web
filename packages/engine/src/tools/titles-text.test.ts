@@ -687,6 +687,33 @@ describe("add_title_tool", () => {
     expect(data(r).background_color).toBe("#1e90ff");
   });
 
+  it("makes a blank title with a background colour a Solid_Color card (a white flash frame)", async () => {
+    const doc = newDoc();
+    const h = host();
+    const r = await call(doc, h, "add_title_tool", { text: " ", background_color: "#FFFFFF", duration_seconds: "0.1" });
+    expect(r.status).toBe("applied");
+    expect(data(r)).toMatchObject({ template: "Solid_Color", background_color: "#ffffff", duration: 0.1 });
+    expect(backgroundColor(written(h, r))).toEqual(["#ffffff", 1]);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("blanks a named text template's fields when only a background colour is given", async () => {
+    const h = host();
+    const r = await call(newDoc(), h, "add_title_tool", { template: "Standard_1", background_color: "black" });
+    expect(r.status).toBe("applied");
+    expect(lineTexts(written(h, r)).every((t) => t.trim() === "")).toBe(true);
+  });
+
+  it("adds the tracks an explicit track one to three past the top names, in the same undo step", async () => {
+    const doc = newDoc();
+    const r = await call(doc, host(), "add_title_tool", { text: "Hi", track: "7" });
+    expect(r.summary).toBe("Added title 'Hi' (Bar_1) on track 7 at 0.00-5.00s on a new track.");
+    expect(r.createdTracks.map((t) => t.layer)).toEqual([6_000_000, 7_000_000]);
+    expect(doc.project.layers.find((l) => l.number === 7_000_000)?.label).toBe("Titles");
+    expect(doc.undoLabels).toHaveLength(1);
+    await expectRefusal(doc, host(), "add_title_tool", { text: "Hi", track: "11" }, "Unknown track or layer '11'");
+  });
+
   it("sets colours, font, weight, size and fades (frames 1-16 in, 91-121 out at 30 fps)", async () => {
     const doc = newDoc();
     const h = host();
