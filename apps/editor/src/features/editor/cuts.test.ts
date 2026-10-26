@@ -1,6 +1,6 @@
 import { addClip, addFile, createProject, findProfile, ProjectDocument, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
-import { targetCut } from "./cuts";
+import { targetCut, tinyGapTrack } from "./cuts";
 
 const video: ReaderInfo = {
   type: "FFmpegReader",
@@ -49,5 +49,34 @@ describe("targetCut", () => {
     const { p, lone } = project();
     expect(targetCut(p, [lone], 3.9)?.cut).toBeCloseTo(4, 1);
     expect(targetCut(p, [], 0.5)?.cut).toBeCloseTo(2, 1);
+  });
+});
+
+describe("tinyGapTrack", () => {
+  /** 2 s clips on the bottom track, `gaps[i]` seconds after clip i. */
+  function spaced(gaps: number[]) {
+    const doc = new ProjectDocument(createProject({ profile: findProfile("HD 1080p 30 fps")! }));
+    doc.transaction("Add", (tx) => {
+      const file = addFile(tx, { path: video.path, info: video, name: "clip.webm" });
+      let at = 1;
+      for (const gap of [...gaps, 0]) {
+        addClip(tx, { fileId: file.id, position: at, start: 0, end: 2, layer: tx.project.layers[0]!.number });
+        at += 2 + gap;
+      }
+    });
+    return doc.project;
+  }
+
+  it("finds a sequence split only by one-frame gaps, closing from just after its start", () => {
+    const p = spaced([1 / 30, 1 / 30]);
+    expect(tinyGapTrack(p)).toEqual({ layer: p.layers[0]!.number, gaps: 2, from: 1 + 0.5 / 30 });
+  });
+
+  it("leaves a track with a deliberate gap alone", () => {
+    expect(tinyGapTrack(spaced([1 / 30, 1]))).toBeNull();
+  });
+
+  it("has nothing to close when the clips already touch", () => {
+    expect(tinyGapTrack(spaced([0, 0]))).toBeNull();
   });
 });
