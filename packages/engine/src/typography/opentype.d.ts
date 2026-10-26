@@ -17,6 +17,10 @@ declare module "opentype.js/dist/opentype.mjs" {
     unicode: number | undefined;
     advanceWidth: number | undefined;
     path: Path;
+    /** Outline points, once `path` was read. */
+    points?: unknown[];
+    isComposite?: boolean;
+    components?: { glyphIndex: number }[];
   }
 
   export interface VariationAxis {
@@ -32,6 +36,7 @@ declare module "opentype.js/dist/opentype.mjs" {
     descender: number;
     names: Record<string, Record<string, string> | undefined>;
     tables: Record<string, unknown>;
+    glyphs: { get(index: number): Glyph };
     charToGlyph(char: string): Glyph;
     hasChar(char: string): boolean;
     variation?: { getTransform(glyph: Glyph, coords: Record<string, number>): Glyph };

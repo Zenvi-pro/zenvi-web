@@ -55,7 +55,7 @@ import {
   type ScreenPosition,
 } from "../titles-text.js";
 import { text } from "./common.js";
-import { outlineTitle, titleFontFamilies } from "../fonts.js";
+import { missingGlyphWarnings, outlineTitle, titleFontFamilies } from "../fonts.js";
 import { TitleStyle, assignTexts, fieldRows, readProjectSvg, writeTitle } from "./title-templates.js";
 
 /** #183's add_title_tool tried these in order when no template was named (titles_text.DEFAULT_TEMPLATES). */
@@ -222,7 +222,7 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   if (fadeIn || fadeOut) Object.assign(data, { fade_in: fadeIn, fade_out: fadeOut });
   if (Object.keys(fitted).length > 0) data.text_shrunk_to_fit = fitted;
   if (lift) data.lifted_for_vertical_ui = lift;
-  return applied(tool, summaryLine(summary), { data });
+  return applied(tool, summaryLine(summary), { data, warnings: missingGlyphWarnings(outlined.missing) });
 }
 
 export const titleTools: CatalogTool[] = [

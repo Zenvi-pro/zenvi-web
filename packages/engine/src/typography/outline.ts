@@ -227,9 +227,15 @@ export function outlineSvgText(svg: string, lib: FontLibrary, options: OutlineOp
       const family = options.family(firstFamily(own.family));
       if (!family || !lib.has(family) || getAttr(child, "display") === "none") continue;
       const group = element("g", [[OUTLINE_ATTR, family]], el);
-      for (const name of ["transform", "opacity", "id"]) {
-        const v = getAttr(child, name);
-        if (v) group.attrs.push([name === "id" ? "id" : name, name === "id" ? `${v}-outline` : v]);
+      const id = getAttr(child, "id");
+      if (id) group.attrs.push(["id", `${id}-outline`]);
+      const transform = getAttr(child, "transform");
+      if (transform) group.attrs.push(["transform", transform]);
+      // The text's own effects (Gold_1's glow, Post_it's shadow: `filter:url(#…)` in its style) draw the outlines too.
+      const textStyle = parseStyle(getAttr(child, "style"));
+      for (const name of ["opacity", "filter", "clip-path", "mask"]) {
+        const v = prop(child, textStyle, name);
+        if (v) group.attrs.push([name, v]);
       }
       for (const chunk of chunksOf(child, own)) {
         const set = chunk.runs

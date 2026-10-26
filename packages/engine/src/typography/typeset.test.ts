@@ -57,6 +57,22 @@ describe("typeset", () => {
     expect(typeset(lib, "Optical", { family: "inter", size: 80 }).width).toBeCloseTo(display.width, 3);
   });
 
+  it("varies every point of tuples that move all points (Inter's D and J, gvar.ts)", () => {
+    // fontTools instancer at wght 700, ControlBoundsPen, font units: [xMin, yMin, xMax, yMax].
+    const expected: Record<string, number[]> = {
+      D: [134.6, 0, 1385.2, 1490],
+      J: [67.6, -20, 1061.9, 1490],
+      é: [81.3, -21.8, 1142.6, 1571],
+    };
+    for (const [char, bounds] of Object.entries(expected)) {
+      const block = typeset(lib, char, { family: "inter", size: 2048, weight: 700, opticalSize: "off" });
+      const ink = inkBox(block.glyphs)!;
+      const base = block.glyphs[0]!.baseline;
+      const got = [ink.x, base - ink.y - ink.height, ink.x + ink.width, base - ink.y];
+      got.forEach((v, i) => expect(Math.abs(v - bounds[i]!), `${char} ${i}`).toBeLessThan(1.5));
+    }
+  });
+
   it("adds tracking between glyphs, not after the last", () => {
     const base = typeset(lib, "ABC", { family: "inter", size: 100 });
     const tracked = typeset(lib, "ABC", { family: "inter", size: 100, tracking: 0.1 });
@@ -167,5 +183,20 @@ describe("outlineSvgText", () => {
     const ys = d.split(" ").filter((t) => !/^[A-Z]$/.test(t)).map(Number).filter((_, k) => k % 2 === 1);
     expect(Math.min(...ys)).toBeCloseTo(100 - 0.717 * 40, 0);
     expect(Math.max(...ys)).toBeCloseTo(100, 0);
-});
+  });
+
+  it("keeps the text's filter, clip, mask and opacity on its outlines", () => {
+    const glow =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><defs><filter id="glow"/></defs>' +
+      '<text id="t" x="0" y="100" font-family="Anton" font-size="40" opacity="0.5" style="fill:url(#gold);filter:url(#glow);clip-path:url(#c)" transform="rotate(5)">Gold</text></svg>';
+    const out = outlineSvgText(glow, lib, { family: () => "anton" });
+    const group = /<g [^>]*data-zenvi-outline="anton"[^>]*>/.exec(out.svg)![0];
+    expect(group).toContain('id="t-outline"');
+    expect(group).toContain('transform="rotate(5)"');
+    expect(group).toContain('opacity="0.5"');
+    expect(group).toContain('filter="url(#glow)"');
+    expect(group).toContain('clip-path="url(#c)"');
+    expect(group).not.toContain("mask");
+    expect(out.svg).toContain('fill="url(#gold)"');
+  });
 });
