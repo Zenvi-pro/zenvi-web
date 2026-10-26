@@ -165,5 +165,7 @@ describe("toDesktopActions", () => {
     };
     expect(refusal(["history", "undo"], [])).toThrow(/undo history/);
     expect(refusal(["fps"], { num: 24, den: 1 })).toThrow(/frame rate/);
+    // Lifted, a nested change would reach the desktop as an update of root `fps` too.
+    expect(refusal(["fps", "num"], 24)).toThrow(/frame rate/);
   });
 });

@@ -108,9 +108,11 @@ export function toDesktopActions(previous: Project, actions: readonly UpdateActi
   scratch.transaction("bridge", (tx) => {
     actions.forEach((action, i) => {
       const { key } = action;
-      if (key[0] === "history") throw new DesktopActionError("the desktop keeps its own undo history", key);
+      const root = typeof key[0] === "string" ? key[0].toLowerCase() : undefined;
+      if (root === "history") throw new DesktopActionError("the desktop keeps its own undo history", key);
       // The desktop rescales every clip when fps changes (ProjectDataStore.changed); the engine already did.
-      if (key.length === 1 && key[0] === "fps") throw new DesktopActionError("changing the frame rate is the desktop's own operation", key);
+      // A change inside `fps` is lifted to an update of `fps` itself, so it is refused too.
+      if (root === "fps") throw new DesktopActionError("changing the frame rate is the desktop's own operation", key);
       const replace = replaced[i] === true;
       const before = tx.project;
       if (action.type === "insert") tx.insert(key, action.value);
