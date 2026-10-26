@@ -105,6 +105,20 @@ describe("planSoundDesign regressions", () => {
     expect(early.cues.map((c) => c.recipe)).toEqual(["impact_boom"]);
     expect(planSoundDesign(input({ moments: [], climax: 8 }))).toMatchObject({ climax: 8, riser: true });
   });
+
+  it("never rings past the picture: late hits are rendered shorter, a climax on the last frame gets nothing", () => {
+    const late = planSoundDesign(input({ moments: [], duration: 10, climax: 8.6, intensity: "hype" }));
+    const boom = late.cues.find((c) => c.recipe === "impact_boom")!;
+    expect(boom.params.duration).toBeCloseTo(1.4, 6);
+    expect(boom.reason).toMatch(/shortened to end with the picture/);
+    expect(late.cues.find((c) => c.recipe === "sub_drop")!.params.duration).toBeCloseTo(1.4, 6);
+    // Never below the recipe's shortest: placement cuts and fades the rest.
+    const last = planSoundDesign(input({ moments: [], duration: 10, climax: 9.5 }));
+    expect(last.cues.find((c) => c.recipe === "impact_boom")!.params.duration).toBe(sfxRecipe("impact_boom")!.duration.min);
+    expect(planSoundDesign(input({ moments: [], duration: 10, climax: 9.9 }))).toMatchObject({ cues: [], climax: null });
+    // A cut on the picture's last edge has nothing after it.
+    expect(planSoundDesign(input({ moments: [cut(10, 0.9)], duration: 10 })).cues).toEqual([]);
+  });
 });
 
 describe("musicClimax", () => {

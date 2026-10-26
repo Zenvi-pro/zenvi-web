@@ -10,7 +10,9 @@
  *
  * Effects are rendered here (pure DSP, the same on every surface), stored
  * through the host as WAV once per sound and placed on the "SFX" track
- * (more lanes when they overlap). Every call is one undo step.
+ * (more lanes when they overlap). No effect plays past the last frame of
+ * the picture (sfx-media.ts pictureEnd): the receipt names every tail it
+ * cut. Every call is one undo step.
  */
 
 import { z } from "zod";
@@ -26,7 +28,7 @@ import { MUSIC_MIN_DURATION, classifyClipAudioRole, speechWindowsFromCues } from
 import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused, unchanged, type ReceiptClip } from "../receipt.js";
-import { placeSfx, prepareSfx, removeUnusedSfxFiles, snapToFrame, type PreparedSfx } from "../sfx-media.js";
+import { pictureEnd, placeSfx, prepareSfx, removeUnusedSfxFiles, snapToFrame, type PlacedSfx, type PreparedSfx } from "../sfx-media.js";
 import { fileById } from "./common.js";
 
 const LIST = "list_sfx_tool";
@@ -170,6 +172,19 @@ async function trackBed(call: ToolCall, bed: Clip | undefined, duration: number)
   };
 }
 
+function round3(x: number): number {
+  return Math.round(x * 1000) / 1000;
+}
+
+/** Receipt fields of a tail cut at the picture's end (none when the sound fit). */
+function trimOf(trimmed: number): { trimmed_seconds?: number } {
+  return trimmed > 0 ? { trimmed_seconds: round3(trimmed) } : {};
+}
+
+function pastPicture(hitAt: number, end: number): string {
+  return `Error: ${hitAt.toFixed(2)} s is at or after the end of the picture (${end.toFixed(2)} s): the sound's hit would play over black. Pick an earlier moment.`;
+}
+
 const FAMILY_WORDS: Record<SfxFamily, [string, string]> = {
   whoosh: ["whoosh", "whooshes"],
   impact: ["hit", "hits"],
@@ -254,6 +269,10 @@ export const soundDesignTools: CatalogTool[] = [
 
       // A riser ends on its moment: at the very start of the timeline nothing of it would play.
       if (align === "peak" && recipe.hit === "end" && at < 0.05) return refused(ADD, "Error: a riser ends on its moment, so at 0 s nothing of it would play; pick a later moment or align=start.");
+      const until = pictureEnd(project) ?? undefined;
+      const late = (hitAt: number) => until !== undefined && (recipe.hit === "end" ? hitAt > until + 1e-6 : hitAt >= until - 1e-6);
+      // Checked again once the sound is rendered and its hit known (align=start).
+      if (align === "peak" ? late(at) : until !== undefined && at >= until - 1e-6) return refused(ADD, pastPicture(at, until!));
       let sound: PreparedSfx;
       try {
         [sound] = (await prepareSfx(call, [{ recipe: recipe.id, params: paramsOf(args) }])) as [PreparedSfx];
@@ -261,13 +280,21 @@ export const soundDesignTools: CatalogTool[] = [
         return failed(ADD, `Error: failed to store the sound effect: ${errorText(error)}`);
       }
       const cached = sound.fileId !== undefined;
-      const clip = call.commit((tx) => placeSfx(tx, sound, { at, align, gainDb, auto: false }), `Add ${recipe.title.toLowerCase()}`);
-      if (!clip) return refused(ADD, "Error: nothing of the sound is left on the timeline at that moment.");
       const hitAt = align === "peak" ? at : at + sound.hit;
-      return applied(ADD, `Added ${recipe.title.toLowerCase()} with its ${recipe.hit === "onset" ? "transient" : recipe.hit} on ${moment} (clip ${clip.id}, ${gainDb} dB).`, {
-        clips: [clipRow(call.doc.project, clip, { recipe: recipe.id, hit_seconds: hitAt, gain_db: gainDb })],
-        data: { clip_id: clip.id, file_id: clip.file_id, recipe: recipe.id, params: sound.params, hit_seconds: hitAt, gain_db: gainDb, cached },
-      });
+      if (late(hitAt)) return refused(ADD, pastPicture(hitAt, until!));
+      const placed = call.commit((tx) => placeSfx(tx, sound, { at, align, gainDb, auto: false, until }), `Add ${recipe.title.toLowerCase()}`);
+      if (!placed) return refused(ADD, "Error: nothing of the sound is left on the timeline at that moment.");
+      const { clip, trimmed, fadeOut } = placed;
+      const trim = trimmed > 0 ? { trimmed_seconds: round3(trimmed), fade_out_seconds: round3(fadeOut), ends_at: until } : {};
+      return applied(
+        ADD,
+        `Added ${recipe.title.toLowerCase()} with its ${recipe.hit === "onset" ? "transient" : recipe.hit} on ${moment} (clip ${clip.id}, ${gainDb} dB).` +
+          (trimmed > 0 ? ` Its last ${trimmed.toFixed(2)} s would run past the picture, so it ends with it at ${until!.toFixed(2)} s, faded over ${fadeOut.toFixed(2)} s.` : ""),
+        {
+          clips: [clipRow(call.doc.project, clip, { recipe: recipe.id, hit_seconds: hitAt, gain_db: gainDb, ...trim })],
+          data: { clip_id: clip.id, file_id: clip.file_id, recipe: recipe.id, params: sound.params, hit_seconds: hitAt, gain_db: gainDb, cached, ...trim },
+        },
+      );
     },
   }),
 
@@ -288,13 +315,8 @@ export const soundDesignTools: CatalogTool[] = [
       const locked = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
       if (previous.some((c) => locked.has(c.layer))) return refused(AUTO, "Error: the previous automatic sound effects are on a locked track; unlock it to replace them.");
 
-      // The edit lasts as long as its picture: a long untrimmed music bed does not stretch it.
-      const content = project.clips.filter((c) => !isSfxClip(c));
-      const visual = content.filter((c) => {
-        const file = fileById(project, String(c.file_id));
-        return file ? !isAudioOnlyMedia(file) : true;
-      });
-      const duration = (visual.length > 0 ? visual : content).reduce((end, c) => Math.max(end, c.position + (c.end - c.start)), 0);
+      // The edit lasts as long as its picture: a long untrimmed music bed does not stretch it, and no effect plays past it.
+      const duration = pictureEnd(project) ?? 0;
       if (duration <= 0) return refused(AUTO, "Error: the timeline is empty: there is nothing to sound-design.");
       const intensity = args.intensity ?? "normal";
       const warnings: string[] = [];
@@ -325,34 +347,39 @@ export const soundDesignTools: CatalogTool[] = [
 
       const placed = call.commit((tx) => {
         if (previous.length > 0) deleteClips(tx, previous.map((c) => c.id), { ripple: false });
-        const rows: { clip: Clip; cue: SfxCue; hit: number }[] = [];
+        const rows: (PlacedSfx & { cue: SfxCue; hit: number })[] = [];
         cues.forEach((cue, i) => {
           // A moment too close to the start for the sound's lead-in starts the sound instead of cutting into it.
           const sound = sounds[i]!;
           const align = cue.at >= sound.hit ? "peak" : "start";
-          const clip = placeSfx(tx, sound, { at: cue.at, align, gainDb: cue.gainDb, auto: true, reason: cue.reason });
-          if (clip) rows.push({ clip, cue, hit: align === "peak" ? cue.at : cue.at + sound.hit });
+          const hit = align === "peak" ? cue.at : cue.at + sound.hit;
+          if (hit >= duration && sfxRecipe(cue.recipe)!.hit !== "end") return;
+          const placed = placeSfx(tx, sound, { at: cue.at, align, gainDb: cue.gainDb, auto: true, reason: cue.reason, until: duration });
+          if (placed) rows.push({ ...placed, cue, hit });
         });
         const removedFiles = removeUnusedSfxFiles(tx);
         return { rows, removedFiles };
       }, "Automatic sound design");
 
       const after = call.doc.project;
+      const cut = placed.rows.filter((r) => r.trimmed > 0);
       const summary =
         placed.rows.length === 0
           ? `Removed the ${previous.length} effects of the last run: no moment of this edit is strong enough at ${intensity} intensity.`
           : `Sound-designed the edit (${intensity}): ${placed.rows.length} effects — ${familyCounts(placed.rows.map((r) => r.cue))}` +
             (plan.climax !== null ? `, ${plan.riser ? "a build into the climax and an impact on it" : "an impact on the climax"} at ${plan.climax.toFixed(2)} s` : "") +
             (previous.length > 0 ? `; replaced ${previous.length} from the last run` : "") +
+            (cut.length > 0 ? `; ${cut.length} ${cut.length === 1 ? "tail" : "tails"} cut and faded to end with the picture at ${duration.toFixed(2)} s` : "") +
             ".";
       return applied(AUTO, summary, {
         warnings,
-        clips: placed.rows.slice(0, 30).map(({ clip, cue, hit }) => clipRow(after, clip, { recipe: cue.recipe, hit_seconds: hit, gain_db: cue.gainDb, reason: cue.reason })),
+        clips: placed.rows.slice(0, 30).map(({ clip, cue, hit, trimmed }) => clipRow(after, clip, { recipe: cue.recipe, hit_seconds: hit, gain_db: cue.gainDb, reason: cue.reason, ...trimOf(trimmed) })),
         ...(placed.rows.length > 30 ? { clipsNote: `${placed.rows.length - 30} more in data.cues` } : {}),
         data: {
           intensity,
           // `at` is the moment; `hit_seconds` where the sound's hit plays (later when the moment is too early for its lead-in).
-          cues: placed.rows.map(({ clip, cue, hit }) => ({ clip_id: clip.id, recipe: cue.recipe, at: cue.at, hit_seconds: hit, gain_db: cue.gainDb, reason: cue.reason })),
+          cues: placed.rows.map(({ clip, cue, hit, trimmed }) => ({ clip_id: clip.id, recipe: cue.recipe, at: cue.at, hit_seconds: hit, gain_db: cue.gainDb, reason: cue.reason, ...trimOf(trimmed) })),
+          picture_end: duration,
           music: bed ? { clip_id: bed.id, bpm: music.bpm ?? null, beats_analysed: music.grid !== null } : null,
           climax: plan.climax,
           riser: plan.riser,

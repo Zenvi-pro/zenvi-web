@@ -39,19 +39,19 @@ function withAudio(host: FakeHost): FakeHost {
   return host;
 }
 
-/** 20 s cut every second (four shots alternating), the song under it, history empty. */
-function editProject(): ProjectDocument {
+/** `seconds` (default 20) cut every second (four shots alternating), the song under it, history empty. */
+function editProject(seconds = 20): ProjectDocument {
   const scratch = new ProjectDocument(createProject({ id: "SFXPROJ001" }));
   scratch.transaction("fixture", (tx) => {
     for (const name of ["aa", "bb", "cc", "dd"]) addFile(tx, media(`/media/${name}.mp4`, videoInfo(`/media/${name}.mp4`, 30)), { id: `SHOT${name.toUpperCase()}XXXX` });
     addFile(tx, media("/media/song.mp3", audioInfo("/media/song.mp3", 30)), { id: "SONGXXXXXX" });
     const top = tx.project.layers.map((l) => l.number).sort((a, b) => b - a)[0]!;
     const bottom = tx.project.layers.map((l) => l.number).sort((a, b) => a - b)[0]!;
-    for (let i = 0; i < 20; i += 1) {
+    for (let i = 0; i < seconds; i += 1) {
       const id = `SHOT${["AA", "BB", "CC", "DD"][i % 4]}XXXX`;
       addClip(tx, { fileId: id, position: i, layer: top, start: 1, end: 2, id: `CUT${String(i).padStart(7, "0")}` });
     }
-    addClip(tx, { fileId: "SONGXXXXXX", position: 0, layer: bottom, start: 0, end: 20, id: "MUSICCLIP1" });
+    addClip(tx, { fileId: "SONGXXXXXX", position: 0, layer: bottom, start: 0, end: seconds, id: "MUSICCLIP1" });
     addMarker(tx, 7.5, undefined, { id: "MARKER0001" });
   });
   const project: Project = structuredClone(scratch.project);
@@ -71,6 +71,15 @@ function data<T>(result: { data?: unknown }): T {
 function hitOf(doc: ProjectDocument, clip: Clip): number {
   const file = doc.project.files.find((f) => f.id === clip.file_id)!;
   return (file.zenvi_sfx as { hit: number }).hit;
+}
+
+function endOf(clip: Clip): number {
+  return clip.position + (clip.end - clip.start);
+}
+
+/** A clip's volume points, in frame order. */
+function volumePoints(clip: Clip): { X: number; Y: number }[] {
+  return (clip.volume as { Points: { co: { X: number; Y: number } }[] }).Points.map((p) => p.co).sort((a, b) => a.X - b.X);
 }
 
 describe("list_sfx_tool", () => {
@@ -147,6 +156,47 @@ describe("add_sfx_tool", () => {
     const host = fakeHost();
     for (let i = 0; i < 3; i += 1) expect((await runTool({ doc, host }, "add_sfx_tool", { recipe: "pop", at_seconds: 4 })).ok).toBe(true);
     expect(doc.project.layers.map((l) => l.label).filter((l) => /^SFX/.test(String(l))).sort()).toEqual(["SFX", "SFX 3", "SFX 4"]);
+  });
+
+  it("cuts a tail that would run past the picture at its last frame, fades it, and says so", async () => {
+    // E2E bug: a 2.6 s boom at 8.6 s on a 10 s picture ran to 11.2 s, and the render delivered black for it.
+    const doc = editProject(10);
+    const result = await runTool({ doc, host: fakeHost() }, "add_sfx_tool", { recipe: "impact_boom", at_seconds: "8.6" });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toHaveLength(1);
+    const [clip] = sfxClips(doc);
+    expect(clip!.position + hitOf(doc, clip!) - clip!.start).toBeCloseTo(8.6, 6);
+    expect(endOf(clip!)).toBeCloseTo(10, 6);
+    const d = data<{ trimmed_seconds: number; fade_out_seconds: number; ends_at: number }>(result);
+    expect(d.ends_at).toBe(10);
+    expect(d.trimmed_seconds).toBeGreaterThan(1);
+    expect(d.fade_out_seconds).toBeCloseTo(0.5, 6);
+    expect((result.data as { summary: string }).summary).toMatch(/ends with it at 10\.00 s, faded over 0\.50 s/);
+    // Full level until the fade, silent on the clip's last frame.
+    const points = volumePoints(clip!);
+    expect(points[0]!.Y).toBeCloseTo(10 ** (-8 / 20), 1);
+    expect(points[points.length - 1]!.Y).toBe(0);
+    expect(points[points.length - 1]!.X).toBe(Math.round(clip!.end * FPS) + 1);
+    // A sound that fits is left alone; a riser may end on the very last frame.
+    expect(data<{ trimmed_seconds?: number }>(await runTool({ doc, host: fakeHost() }, "add_sfx_tool", { recipe: "riser_noise", at_seconds: 10 })).trimmed_seconds).toBeUndefined();
+    expect(Math.max(...sfxClips(doc).map(endOf))).toBeCloseTo(10, 6);
+  });
+
+  it("refuses a hit at or after the end of the picture", async () => {
+    const doc = editProject(10);
+    const host = fakeHost();
+    for (const args of [
+      { recipe: "whoosh_short", clip_id: "CUT0000009", edge: "end" },
+      { recipe: "impact_punch", at_seconds: 12 },
+      { recipe: "riser_noise", at_seconds: 10.5 },
+      { recipe: "pop", at_seconds: 10, align: "start" },
+    ]) {
+      const result = await runTool({ doc, host }, "add_sfx_tool", args);
+      expect(result.ok, JSON.stringify(args)).toBe(false);
+      expect(result.text).toMatch(/end of the picture \(10\.00 s\)/);
+    }
+    expect(doc.undoLabels).toHaveLength(0);
+    expect(host.written.size).toBe(0);
   });
 
   it("refuses bad targets without touching history or writing media", async () => {
@@ -282,6 +332,27 @@ describe("auto_sound_design_tool", () => {
       const clip = doc.project.clips.find((x) => x.id === c.clip_id)!;
       expect(clip.position - clip.start + hitOf(doc, clip)).toBeCloseTo(c.hit_seconds, 6);
     }
+  });
+
+  it("never plays past the picture: a late climax gets a shorter impact, any tail left over is cut and faded", async () => {
+    // E2E bug: hype with the climax at 8.6 s of a 10 s picture placed a 2.6 s boom that ran 0.6 s into black.
+    const doc = editProject(10);
+    const result = await runTool({ doc, host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", { intensity: "hype", climax_seconds: "8.6" });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toHaveLength(1);
+    const d = data<{ picture_end: number; cues: { clip_id: string; recipe: string; reason: string; trimmed_seconds?: number }[] }>(result);
+    expect(d.picture_end).toBe(10);
+    for (const clip of sfxClips(doc)) expect(endOf(clip)).toBeLessThanOrEqual(10 + 1e-6);
+    const boom = d.cues.find((c) => c.recipe === "impact_boom")!;
+    expect(boom.reason).toMatch(/shortened to end with the picture/);
+    const boomFile = doc.project.files.find((f) => f.id === doc.project.clips.find((c) => c.id === boom.clip_id)!.file_id)!;
+    expect((boomFile.zenvi_sfx as { params: { duration: number } }).params.duration).toBeCloseTo(1.4, 6);
+    const cut = d.cues.filter((c) => c.trimmed_seconds !== undefined);
+    for (const c of cut) {
+      const points = volumePoints(doc.project.clips.find((x) => x.id === c.clip_id)!);
+      expect(points[points.length - 1]!.Y).toBe(0);
+    }
+    if (cut.length > 0) expect((result.data as { summary: string }).summary).toMatch(/cut and faded to end with the picture at 10\.00 s/);
   });
 
   it("changes nothing when no moment is strong enough", async () => {

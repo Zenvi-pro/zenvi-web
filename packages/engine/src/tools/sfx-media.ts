@@ -7,19 +7,24 @@
  * Files are padded so the hit sits on a frame boundary: libopenshot places
  * a clip's audio by whole frames, so the frame-snapped clip then puts the
  * hit exactly on the cut.
+ *
+ * No effect plays past the picture: renders run to the last clip of any
+ * kind, so a tail past the last frame would deliver black. A tail that would
+ * is cut at the picture's end and faded out.
  */
 
 import type { Transaction } from "../history/document.js";
 import { encodeWav } from "../io/wav.js";
+import { isAudioOnlyMedia } from "../model/media.js";
 import type { Clip, Layer, Project, ProjectFile } from "../model/types.js";
 import { updateClipValues } from "../ops/clip-props.js";
-import { addClip, setClipProperty } from "../ops/clips.js";
+import { addClip, fadeClip, setClipProperty } from "../ops/clips.js";
 import { addFile, removeFile, updateFile } from "../ops/files.js";
 import { addTrack } from "../ops/tracks.js";
-import { SFX_ROLE, type SfxClipMark } from "../sfx/moments.js";
+import { SFX_ROLE, isSfxClip, type SfxClipMark } from "../sfx/moments.js";
 import { sfxRecipe } from "../sfx/recipes.js";
 import { SFX_VERSION, framePad, padSfx, renderSfx, resolveSfxParams, sfxKey, type ResolvedSfxParams, type SfxParams } from "../sfx/render.js";
-import { fpsFloatOf } from "./catalog/common.js";
+import { fileById, fpsFloatOf } from "./catalog/common.js";
 import type { ToolCall } from "./define.js";
 import type { ImportedMedia } from "./types.js";
 
@@ -116,6 +121,24 @@ export async function prepareSfx(call: ToolCall, requests: readonly SfxRequest[]
   return out;
 }
 
+/**
+ * Where the picture ends, seconds: the end of the last clip that shows a
+ * picture (of any clip but an effect when none does). Null when the
+ * timeline holds nothing but effects.
+ */
+export function pictureEnd(project: Project): number | null {
+  const content = project.clips.filter((c) => !isSfxClip(c));
+  const visual = content.filter((c) => {
+    const file = fileById(project, String(c.file_id));
+    return file ? !isAudioOnlyMedia(file) : true;
+  });
+  const clips = visual.length > 0 ? visual : content;
+  return clips.length > 0 ? clips.reduce((end, c) => Math.max(end, c.position + (c.end - c.start)), 0) : null;
+}
+
+/** Longest fade on a tail cut at the picture's end, seconds. */
+const TAIL_FADE = 0.5;
+
 /** Sound-effect tracks, bottom to top. */
 export function sfxLanes(project: Project): Layer[] {
   return project.layers.filter((l) => LANE.test(String(l.label ?? "").trim())).sort((a, b) => a.number - b.number);
@@ -145,15 +168,26 @@ export interface SfxPlacement {
   gainDb: number;
   auto: boolean;
   reason?: string;
+  /** Timeline seconds the sound must not play past (the picture's end); its tail is cut there and faded. */
+  until?: number;
+}
+
+export interface PlacedSfx {
+  clip: Clip;
+  /** Seconds of the sound's tail cut at `until` (0 when it fits). */
+  trimmed: number;
+  /** Length of the fade-out on the cut tail, seconds (0 when it fits). */
+  fadeOut: number;
 }
 
 /**
  * Place a prepared sound: its bin entry (added once), a clip on a free SFX
  * lane, the gain as clip volume, and the marks that let tools find it. A
- * hit before the timeline's start trims the head instead. Returns null when
+ * hit before the timeline's start trims the head instead; a tail past
+ * `until` is cut there and faded out after the hit. Returns null when
  * nothing of the sound is left on the timeline.
  */
-export function placeSfx(tx: Transaction, sound: PreparedSfx, where: SfxPlacement): Clip | null {
+export function placeSfx(tx: Transaction, sound: PreparedSfx, where: SfxPlacement): PlacedSfx | null {
   const recipe = sfxRecipe(sound.recipe)!;
   let position = where.at - (where.align === "peak" ? sound.hit : 0);
   let start = 0;
@@ -161,18 +195,29 @@ export function placeSfx(tx: Transaction, sound: PreparedSfx, where: SfxPlacemen
     start = -position;
     position = 0;
   }
-  if (start >= sound.duration - 0.01) return null;
+  let end = sound.duration;
+  if (where.until !== undefined) end = Math.min(end, start + (where.until - position));
+  if (end - start < 0.01) return null;
   if (!sound.fileId) {
     const file = addFile(tx, sound.media!, { dedupe: true, mediaType: "audio" });
     const mark: SfxFileMark = { key: sound.key, recipe: sound.recipe, params: sound.params, hit: sound.hit, duration: sound.duration, version: SFX_VERSION };
     updateFile(tx, String(file.id), { zenvi_role: SFX_ROLE, zenvi_sfx: mark, name: sound.media!.name });
     sound.fileId = String(file.id);
   }
-  const layer = laneFor(tx, position, position + sound.duration - start);
-  const clip = addClip(tx, { fileId: sound.fileId, position, layer, start, end: sound.duration, title: recipe.title });
+  const layer = laneFor(tx, position, position + end - start);
+  const clip = addClip(tx, { fileId: sound.fileId, position, layer, start, end, title: recipe.title });
   setClipProperty(tx, clip.id, "volume", Math.round(10 ** (where.gainDb / 20) * 1000) / 1000);
+  const trimmed = sound.duration - end > 1e-6 ? sound.duration - end : 0;
+  let fadeOut = 0;
+  if (trimmed > 0) {
+    // Fade what plays after the hit (all of it when the cut comes first), never into the hit; at least a frame so the cut never clicks.
+    const from = sound.hit < end ? Math.max(start, sound.hit) : start;
+    const frame = 1 / (fpsFloatOf(tx.project) || 30);
+    fadeOut = Math.min(TAIL_FADE, end - start, Math.max((end - from) * 0.6, frame));
+    fadeClip(tx, clip.id, { fadeOut, audio: true, video: false });
+  }
   const mark: SfxClipMark = { recipe: sound.recipe, auto: where.auto, ...(where.reason ? { reason: where.reason } : {}) };
-  return updateClipValues(tx, clip.id, { zenvi_role: SFX_ROLE, zenvi_sfx: mark });
+  return { clip: updateClipValues(tx, clip.id, { zenvi_role: SFX_ROLE, zenvi_sfx: mark }), trimmed, fadeOut };
 }
 
 /** Remove sound-effect files no clip plays any more (a rerun's leftovers). Returns their ids. */

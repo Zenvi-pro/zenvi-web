@@ -12,7 +12,9 @@
  *   - no two transients closer than 80 ms; impacts are spaced further;
  *   - every cue has its own seed, pitch and pan so nothing machine-guns;
  *   - effects sit under the music (peaks around -8…-14 dBFS) and further
- *     under dialogue; clicks and textures stay out of speech entirely.
+ *     under dialogue; clicks and textures stay out of speech entirely;
+ *   - nothing rings past the picture: a hit near the end is rendered
+ *     shorter (placement cuts and fades whatever still runs over).
  */
 
 import { Rng, clamp01 } from "./dsp.js";
@@ -87,6 +89,8 @@ const DENSITY: Record<SfxIntensity, Density> = {
 
 /** No two transients closer than this, seconds: they smear into one flam. */
 export const MIN_TRANSIENT_GAP = 0.08;
+/** Least picture after the climax for its impact to land, seconds. */
+export const CLIMAX_TAIL = 0.25;
 /** Extra cut under speech, dB. */
 const SPEECH_DUCK_DB = -6;
 /** A moment at least this strong ignores the ordinary density gap (only the 80 ms rule holds). */
@@ -137,7 +141,7 @@ export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
   // The climax first: everything else fits around it.
   let riserFrom = Infinity;
   let climax: number | null = null;
-  if (input.climax !== null && input.climax > 0.5 && input.climax < input.duration + 0.01) {
+  if (input.climax !== null && input.climax > 0.5 && input.climax <= input.duration - CLIMAX_TAIL) {
     climax = input.climax;
     const at = input.climax;
     const length = Math.min(d.riser, at - 0.1);
@@ -154,7 +158,8 @@ export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
 
   // Then the other moments, strongest first.
   const ranked = input.moments
-    .filter((m) => m.time >= 0 && m.time <= input.duration + 0.01)
+    // A moment on the last frame's end has no picture after it.
+    .filter((m) => m.time >= 0 && m.time < input.duration)
     .map((m) => ({ m, priority: clamp01(m.strength) + KIND_BONUS[m.kind] }))
     .filter(({ m }) => m.kind !== "cut" || m.strength >= d.cutFloor)
     .sort((a, b) => b.priority - a.priority || a.m.time - b.m.time);
@@ -223,6 +228,13 @@ export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
     const recipe = sfxRecipe(cue.recipe)!;
     const speech = inSpeech(input.speech, cue.at) ? SPEECH_DUCK_DB : 0;
     cue.gainDb = Math.round((recipe.mixDb + d.gain + cue.gainDb + speech) * 10) / 10;
+    // A sound that starts on its hit and would ring past the picture: the shortest version that fits, so it decays on its own.
+    const length = cue.params.duration ?? recipe.duration.default;
+    const room = Math.floor((input.duration - cue.at) * 100) / 100;
+    if (recipe.hit === "onset" && length > room) {
+      cue.params.duration = Math.max(recipe.duration.min, room);
+      cue.reason += ", shortened to end with the picture";
+    }
     if (cue.params.seed !== undefined) cue.params.seed = Math.floor(cue.params.seed);
   }
   cues.sort((a, b) => a.at - b.at || a.recipe.localeCompare(b.recipe));
