@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { decodePngBase64 } from "../io/png.js";
 import { createProject } from "../model/defaults.js";
 import { ProjectDocument } from "../history/document.js";
-import type { Project } from "../model/types.js";
-import { addClip, addFile } from "../ops/index.js";
+import { subjectOnCanvas } from "../matchcut/fit.js";
+import { Interpolation, type Project } from "../model/types.js";
+import { addClip, addFile, setClipKeyframes } from "../ops/index.js";
+import { clipKeyframe } from "../render/plan/transform.js";
 import type { RgbaImage } from "../render/types.js";
 import { runTool } from "./registry.js";
 import { hasDarkEdges } from "./subjects.js";
@@ -146,6 +148,32 @@ describe("align_match_cut_tool", () => {
     sky.data.fill(0);
     for (let i = 3; i < sky.data.length; i += 4) sky.data[i] = 255;
     expect(hasDarkEdges(sky)).toBe(true);
+  });
+
+  it("keeps a stretched clip's aspect and keyframes outside its visible window", async () => {
+    const p = project();
+    const doc = new ProjectDocument(p);
+    doc.transaction("fixture", (tx) => {
+      setClipKeyframes(tx, "C1", "scale_y", [{ frame: 1, value: 0.5, interpolation: Interpolation.LINEAR }]);
+      // A key beyond the clip's out point (source frames 34-41 are visible).
+      setClipKeyframes(tx, "C1", "location_x", [{ frame: 90, value: 0.25, interpolation: Interpolation.LINEAR }], { mode: "merge" });
+    });
+    const target = { x: 0.4, y: 0.6, size: 0.3 };
+    for (const fit of ["position", "position_scale"] as const) {
+      const result = await runTool({ doc, host: {} }, "align_match_cut_tool", { clips: [{ clip_id: "C1", box: boxOf("/m/moon.mp4") }], target, fit, cover: "none" });
+      expect(result.data?.status, result.data?.summary).toBe("applied");
+      const clip = doc.project.clips.find((c) => c.id === "C1")!;
+      const frames = (result.data?.data as { clips: { keyframe_frames: number[] }[] }).clips[0]!.keyframe_frames;
+      expect(frames).toEqual([34, 41]);
+      for (const n of frames) {
+        expect(clipKeyframe(clip, "scale_y", n) / clipKeyframe(clip, "scale_x", n), `${fit} aspect at ${n}`).toBeCloseTo(0.5, 6);
+        const on = subjectOnCanvas(doc.project, clip, n, boxOf("/m/moon.mp4"));
+        expect(Math.abs(on.cx - target.x) * W, `${fit} x at ${n}`).toBeLessThan(0.5);
+        expect(Math.abs(on.cy - target.y) * H, `${fit} y at ${n}`).toBeLessThan(0.5);
+        if (fit === "position_scale") expect(on.size).toBeCloseTo(target.size, 3);
+      }
+      expect((clip.location_x as { Points: { co: { X: number; Y: number } }[] }).Points.find((pt) => pt.co.X === 90)?.co.Y).toBe(0.25);
+    }
   });
 
   it("refuses bad input before anything changes", async () => {

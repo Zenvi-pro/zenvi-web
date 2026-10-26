@@ -19,6 +19,7 @@ import {
   coverScale,
   fitRotation,
   fitScale,
+  scaleAspect,
   solveLocation,
   sourceSecondsAt,
   subjectOnCanvas,
@@ -99,6 +100,8 @@ interface Planned {
   rotations: number[];
   /** Scale per frame for the size match and the drift, before the cover zoom. */
   fitScales: number[];
+  /** scale_y / scale_x per frame, kept. */
+  aspects: number[];
   /** Smallest covering scale per frame. */
   covers: number[];
 }
@@ -138,7 +141,7 @@ function plan(project: Project, input: AlignClipInput, target: CanvasSubject, fi
     const rotation = fitRotation(g, box, target, fit);
     const progress = last > first ? (n - first) / (last - first) : 0;
     const scale = fitScale(g, box, target, fit) * (1 + drift * progress);
-    return { box, rotation, scale, cover: coverScale(g, box, target, rotation) * COVER_SLACK };
+    return { box, rotation, scale, aspect: scaleAspect(g), cover: coverScale(g, box, target, rotation) * COVER_SLACK };
   });
   return {
     clip,
@@ -147,6 +150,7 @@ function plan(project: Project, input: AlignClipInput, target: CanvasSubject, fi
     boxes: plannedRow.map((r) => r.box),
     rotations: plannedRow.map((r) => r.rotation),
     fitScales: plannedRow.map((r) => r.scale),
+    aspects: plannedRow.map((r) => r.aspect),
     covers: plannedRow.map((r) => r.cover),
   };
 }
@@ -200,7 +204,7 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
     const id = String(p.clip.id);
     const scales = p.fitScales.map((s, i) => (p.cover === "none" ? s : Math.max(s, p.covers[i]!)));
     setClipKeyframes(tx, id, "scale_x", linear(p.frames, scales), { mode: "replace_range" });
-    setClipKeyframes(tx, id, "scale_y", linear(p.frames, scales), { mode: "replace_range" });
+    setClipKeyframes(tx, id, "scale_y", linear(p.frames, scales.map((s, i) => s * p.aspects[i]!)), { mode: "replace_range" });
     if (fit === "position_scale_rotation") setClipKeyframes(tx, id, "rotation", linear(p.frames, p.rotations), { mode: "replace_range" });
     // Location after the scale is written: the decode size follows the scale curve (calculate_max_size).
     const scaled = tx.project.clips.find((c) => c.id === p.clip.id)!;

@@ -17,8 +17,9 @@
  *
  * With the subject centre c = (cx · ssw, cy · ssh) the subject lands on the
  * target T when (x, y) = T − o − R(r)·(c − o), and its size (geometric mean
- * of the box's drawn width and height) is s · √(w·base.w · h·base.h), so
- * s = target size / that root. Location is then read back from (x, y) by
+ * of the box's drawn width and height) is s · √(w·base.w · h·base.h·k), so
+ * s = target size / that root. k = scale_y / scale_x is the clip's own
+ * aspect, kept as it is (scale_y is written as k·s). Location is then read back from (x, y) by
  * inverting the gravity + location step, which is linear on each side of 0
  * (scale mode CROP measures location against the free space on that side).
  */
@@ -189,16 +190,22 @@ function locationFor(left: number, drawn: number, layoutStart: number, layoutSiz
   return d >= 0 ? d / Math.max(1e-9, layoutSize - anchored) : d / Math.max(1e-9, anchored + drawn);
 }
 
+/** The clip's scale_y / scale_x at this frame: a stretched clip stays stretched. */
+export function scaleAspect(g: ClipGeometry): number {
+  const k = g.current.scaleY / g.current.scale;
+  return Number.isFinite(k) && k > 0 ? k : 1;
+}
+
 /** Size of `box` drawn at scale 1, pixels (geometric mean of width and height). */
 export function baseSubjectSize(g: ClipGeometry, box: SubjectBox): number {
-  return Math.sqrt(Math.max(1e-12, box.w * g.baseW * box.h * g.baseH));
+  return Math.sqrt(Math.max(1e-12, box.w * g.baseW * box.h * g.baseH * scaleAspect(g)));
 }
 
 /**
  * The smallest scale at which the clip still covers the canvas with the
  * subject centred on `target`, rotated by `rotation`. A canvas corner Q maps
- * back to source u = cx + [R(−r)·(Q − T)].x / (base.w · s), which must stay
- * in 0..1, so each corner bounds s from below. Infinity when no scale covers
+ * back to source u = cx + [R(−r)·(Q − T)].x / (base.w · s) (v likewise over
+ * base.h · k · s), which must stay in 0..1, so each corner bounds s from below. Infinity when no scale covers
  * (the subject centre on the very edge of the source).
  */
 export function coverScale(g: ClipGeometry, box: SubjectBox, target: CanvasSubject, rotation: number): number {
@@ -206,6 +213,7 @@ export function coverScale(g: ClipGeometry, box: SubjectBox, target: CanvasSubje
   const ccy = box.y + box.h / 2;
   const tx = target.cx * g.width;
   const ty = target.cy * g.height;
+  const k = scaleAspect(g);
   let need = 0;
   const bound = (d: number, centre: number, base: number) => {
     if (d > 1e-9) need = Math.max(need, centre >= 1 ? Infinity : d / (base * (1 - centre)));
@@ -219,7 +227,7 @@ export function coverScale(g: ClipGeometry, box: SubjectBox, target: CanvasSubje
   ] as const) {
     const [dx, dy] = rotate(qx - tx, qy - ty, -rotation);
     bound(dx, ccx, g.baseW);
-    bound(dy, ccy, g.baseH);
+    bound(dy, ccy, g.baseH * k);
   }
   return need;
 }
@@ -237,7 +245,7 @@ export function fitScale(g: ClipGeometry, box: SubjectBox, target: CanvasSubject
 /** Location that puts the subject centre on the target at scale `scale` and rotation `rotation`. */
 export function solveLocation(g: ClipGeometry, box: SubjectBox, target: CanvasSubject, scale: number, rotation: number): FitValues {
   const ssw = g.baseW * scale;
-  const ssh = g.baseH * scale;
+  const ssh = g.baseH * scale * scaleAspect(g);
   const ox = g.originX * ssw;
   const oy = g.originY * ssh;
   const cx = (box.x + box.w / 2) * ssw;
