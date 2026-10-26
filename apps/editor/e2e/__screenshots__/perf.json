@@ -2,17 +2,17 @@
   "clipsInProject": 300,
   "clipsInDom": 36,
   "scrub": {
-    "frames": 178,
+    "frames": 179,
     "p50": 16.7,
-    "p95": 16.7,
-    "worst": 33.4,
+    "p95": 16.8,
+    "worst": 16.8,
     "longTasks": []
   },
   "scroll": {
-    "frames": 174,
+    "frames": 178,
     "p50": 16.7,
-    "p95": 16.8,
-    "worst": 66.6,
+    "p95": 16.7,
+    "worst": 49.9,
     "longTasks": []
   }
 }

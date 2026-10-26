@@ -40,7 +40,7 @@ export interface PreviewEngine {
   onTime(listener: (seconds: number) => void): () => void;
   onState(listener: (state: { playing: boolean }) => void): () => void;
   /** A small JPEG data URL of the current frame, for project thumbnails. */
-  captureThumbnail?(maxWidth: number): string | null;
+  captureThumbnail?(maxWidth: number): Promise<string | null>;
   /** True when frames are actually rendered (false for the clock fallback). */
   readonly renders: boolean;
   dispose(): void;

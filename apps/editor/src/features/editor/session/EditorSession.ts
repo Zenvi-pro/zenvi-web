@@ -358,7 +358,7 @@ export class EditorSession {
     const now = Date.now();
     let thumbnail = this.meta.getState().thumbnail;
     if (this.engine?.captureThumbnail && now - this.lastThumbnailAt > THUMBNAIL_EVERY_MS) {
-      const captured = this.engine.captureThumbnail(320);
+      const captured = await this.engine.captureThumbnail(320);
       if (captured) {
         thumbnail = captured;
         this.lastThumbnailAt = now;

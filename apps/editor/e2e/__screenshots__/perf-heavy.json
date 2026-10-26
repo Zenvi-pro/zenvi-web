@@ -1,0 +1,52 @@
+{
+  "main": {
+    "worker": false,
+    "playbackScale": 0.375,
+    "presentedFps": 16.6,
+    "raf": {
+      "frames": 149,
+      "p50": 16.8,
+      "p95": 83.4,
+      "worst": 300
+    },
+    "longTasks": {
+      "count": 25,
+      "worst": 298,
+      "totalMs": 2212
+    },
+    "slowEvents": {
+      "count": 89,
+      "worst": 584
+    },
+    "inputDelay": {
+      "p50": 1.2,
+      "p95": 50.5,
+      "worst": 283.8
+    }
+  },
+  "auto": {
+    "worker": true,
+    "playbackScale": 0.375,
+    "presentedFps": 18.2,
+    "raf": {
+      "frames": 359,
+      "p50": 16.7,
+      "p95": 16.7,
+      "worst": 16.8
+    },
+    "longTasks": {
+      "count": 0,
+      "worst": 0,
+      "totalMs": 0
+    },
+    "slowEvents": {
+      "count": 140,
+      "worst": 32
+    },
+    "inputDelay": {
+      "p50": 0.1,
+      "p95": 0.8,
+      "worst": 1.2
+    }
+  }
+}
