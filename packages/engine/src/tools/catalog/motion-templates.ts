@@ -29,7 +29,7 @@ import { TEMPLATES } from "../../motion/templates/index.js";
 import { bundledFamily } from "../../typography/families.js";
 import { PALETTE_IDS, type BeatGrid, type MotionLayer, type MotionMedia, type MotionPlan, type PaletteId } from "../../motion/types.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
-import { FONT_FAMILY_LIST, loadFamilies, unknownFamily } from "../fonts.js";
+import { FONT_FAMILY_LIST, loadFamilies, missingGlyphWarnings, unknownFamily } from "../fonts.js";
 import { planInTypeface } from "../../motion/typeface.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
@@ -287,7 +287,7 @@ export const motionTemplateTools: CatalogTool[] = [
         if (typeof lib === "string") return refused(TOOL, lib);
         const typed = planInTypeface(plan, lib, family);
         plan = typed.plan;
-        if (typed.missing.length > 0) warnings.push(`${args.font_family} has no glyph for ${typed.missing.join(" ")}; those characters are left out`);
+        warnings.push(...missingGlyphWarnings(typed.missing));
       }
       const end = start + plan.frames / fps;
       const stack = planOverlayStack(project, start, end, plan.tracks);

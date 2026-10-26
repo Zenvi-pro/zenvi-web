@@ -17,6 +17,11 @@ export function unknownFamily(value: string): string {
   return `Error: unknown font_family ${JSON.stringify(value)}; bundled families: ${FONT_FAMILY_IDS.join(", ")}.`;
 }
 
+/** The receipt warning for characters no bundled face could draw (none when every character was drawn). */
+export function missingGlyphWarnings(missing: readonly string[]): string[] {
+  return missing.length > 0 ? [`No bundled font has a glyph for ${missing.join(" ")}; those characters are left out.`] : [];
+}
+
 /** The families' fonts, or an `Error:` message when the host cannot read them. */
 export async function loadFamilies(call: ToolCall, families: Iterable<FontFamilyId>): Promise<FontLibrary | string> {
   const read = call.host.assets?.readBytes;

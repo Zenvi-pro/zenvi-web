@@ -510,6 +510,15 @@ describe("edit_title_tool", () => {
     expect(svgOf(h, String(data(back).path))).not.toContain("data-zenvi-outline");
   });
 
+  it("warns about characters no bundled font can draw", async () => {
+    const { doc, h, clipA } = twoClipTitle();
+    const r = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 漢", font: "Anton" });
+    expect(r.summary).toMatch(/^Updated title/);
+    expect(r.warnings).toEqual(["No bundled font has a glyph for 漢; those characters are left out."]);
+    const plain = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 漢", font: "Helvetica" });
+    expect(plain.warnings).toEqual([]);
+  });
+
   it("changes every clip's title to a new version; undo restores it", async () => {
     const { doc, h, fileId, clipA, clipB, path } = twoClipTitle();
     const undo = doc.undoLabels.length;
