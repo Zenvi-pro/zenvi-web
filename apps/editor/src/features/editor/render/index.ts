@@ -2,7 +2,7 @@
  * The editor's only door to `@zenvi/render-web`: probing, the media registry,
  * the preview engine, thumbnails, waveforms, frames and export.
  */
-import { builtinLutForPath, type ExportOptions, type Project, type ToolImage } from "@zenvi/engine";
+import { builtinLutForPath, type ExportOptions, type MixPcm, type Project, type ToolImage } from "@zenvi/engine";
 import {
   createFrameHost,
   ExportError,
@@ -12,7 +12,9 @@ import {
   MediaRegistry,
   PreviewPlayer,
   probeMedia,
+  renderMixPcm,
   type ExportProgress,
+  type MixPcmOptions,
 } from "@zenvi/render-web";
 import { browserSupport } from "@/lib/capabilities";
 import { resolveEmojiAsset, resolveTransitionAsset } from "../catalog";
@@ -209,4 +211,9 @@ export function exportFailure(error: unknown): ExportFailure {
 
 export async function renderFrame(project: Project, seconds: number, options: { width?: number; format?: "png" | "jpeg" }, media: MediaLibrary): Promise<ToolImage> {
   return createFrameHost(registryOf(media)).renderFrame(project, seconds, options);
+}
+
+/** The timeline's mix (or a stem) as the export mixes it, for master_audio_tool (`AudioHost.mixPcm`). */
+export function mixPcm(project: Project, media: MediaLibrary, options?: Omit<MixPcmOptions, "engine">): Promise<MixPcm> {
+  return renderMixPcm(project, registryOf(media), options);
 }

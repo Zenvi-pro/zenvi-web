@@ -329,6 +329,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.recentProjects",
       "ui.openExportDialog",
       "audio.decodePcm",
+      "audio.mixPcm",
       "audio.transcribe",
       "ui.selection",
       "ui.setSelection",
@@ -386,6 +387,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.currentPath",
       "storage.recentProjects",
       "audio.decodePcm",
+      "audio.mixPcm",
       "audio.transcribe",
       "frames.fontFamilies",
       "exporter.supports",
@@ -396,6 +398,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       media: "ffprobe is available",
       assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
+      "audio.mixPcm": "ffmpeg and ffprobe are available",
       backend: "the server is set up to call the Zenvi backend",
     },
     hidden: [

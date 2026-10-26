@@ -7,7 +7,7 @@
  * a clear message while queues and job records keep working.
  */
 
-import type { AudioEnvelope, ExportOptions, Project, ReaderInfo, Transcription } from "@zenvi/engine";
+import type { AudioEnvelope, ExportOptions, MixPcm, Project, ReaderInfo, Transcription } from "@zenvi/engine";
 import type { TranscribeFileOptions } from "@zenvi/render-node";
 
 /**
@@ -73,6 +73,15 @@ export type PcmDecoder = (
   filePath: string,
   options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
 ) => Promise<{ sampleRate: number; samples: Float32Array }>;
+
+/**
+ * The timeline's mix (or the stem of `clipIds`) through the export's audio
+ * graph (`@zenvi/render-node` `renderMixPcm`), for master_audio_tool.
+ */
+export type MixRenderer = (
+  project: Project,
+  options: { resolveMedia: PathResolver; clipIds?: readonly string[]; maxSeconds?: number; signal?: AbortSignal },
+) => Promise<MixPcm>;
 
 /**
  * The font families SVG titles render with in this process

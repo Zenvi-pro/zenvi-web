@@ -21,7 +21,7 @@ import { OAuthService } from "./oauth/service.js";
 import { GenerationService } from "./generation/service.js";
 import { MediaCache } from "./render/cache.js";
 import type { RenderDispatch } from "./render/dispatch.js";
-import type { AssetSource, AudioAnalyzer, FontLister, MediaProber, PcmDecoder, Renderer, SpeechTranscriber } from "./render/renderer.js";
+import type { AssetSource, AudioAnalyzer, FontLister, MediaProber, MixRenderer, PcmDecoder, Renderer, SpeechTranscriber } from "./render/renderer.js";
 import { unavailableProber, unavailableRenderer } from "./render/renderer.js";
 import { RenderService } from "./render/service.js";
 import { TokenRepo } from "./repos/tokens.js";
@@ -60,6 +60,8 @@ export interface Dependencies {
   analyzeAudio?: AudioAnalyzer;
   /** Decodes audio to PCM for beat tracking (detect_beats_tool, build_reel_tool); absent = beats from a fixed tempo. */
   decodePcm?: PcmDecoder;
+  /** Renders the timeline mix for master_audio_tool; absent = the tool is unavailable. */
+  mixPcm?: MixRenderer;
   /** Extracts speech audio and transcribes it through the backend (the speech tools); absent = index transcripts only. */
   transcribeMedia?: SpeechTranscriber;
   /** The fonts titles render with (add_title_tool / edit_title_tool check a font against them); absent = any font is taken as given. */
@@ -93,6 +95,9 @@ export interface Services {
   assets: AssetSource | null;
   analyzeAudio: AudioAnalyzer | null;
   decodePcm: PcmDecoder | null;
+  mixPcm: MixRenderer | null;
+  /** Built-in renderer assets on disk (what a mix of a project with bundled sounds reads). */
+  resolveAsset: ((projectPath: string) => string | undefined) | null;
   transcribeMedia: SpeechTranscriber | null;
   fontFamilies: FontLister | null;
   transcripts: RecentTranscripts;
@@ -188,6 +193,8 @@ export function createServices(deps: Dependencies): Services {
     assets: deps.assets ?? null,
     analyzeAudio: deps.analyzeAudio ?? null,
     decodePcm: deps.decodePcm ?? null,
+    mixPcm: deps.mixPcm ?? null,
+    resolveAsset: deps.resolveAsset ?? null,
     transcribeMedia: deps.transcribeMedia ?? null,
     fontFamilies: deps.fontFamilies ?? null,
     transcripts: new RecentTranscripts(clock),

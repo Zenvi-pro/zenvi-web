@@ -10,7 +10,7 @@ import { downloadBlob, safeFileName } from "@/lib/projectFactory";
 import { projectRepository } from "@/lib/storage/projects";
 import { savePanels } from "../session/uiStore";
 import { toast } from "@/ui/Toast";
-import { exportAvailable, extensionForMime, probe, renderFrame, resolveBundledMedia, startExport } from "../render";
+import { exportAvailable, extensionForMime, mixPcm, probe, renderFrame, resolveBundledMedia, startExport } from "../render";
 import { editorLayout, editorPreferences, withLayout, withPreference } from "./editorSettings";
 import type { EditorSession } from "../session/EditorSession";
 import { assetUrl } from "../catalog";
@@ -269,6 +269,10 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       },
       async decodePcm(path, options) {
         return decodePcm(specFor(path), options);
+      },
+      // Rendered offline by the exporter's own mixer (Web Audio), so mastering measures what an export encodes.
+      async mixPcm(project, options) {
+        return mixPcm(project, session.media, options);
       },
       // Speech recognition through the Zenvi backend, as the signed-in person.
       async transcribe(path, options) {
