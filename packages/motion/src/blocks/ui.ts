@@ -11,6 +11,10 @@ export const ICONS = {
   note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
   captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
   layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
+  bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
+  bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
+  shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
+  lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
   pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
 } as const;
 
@@ -29,14 +33,16 @@ export interface Pointer {
   click(at: number): void;
 }
 
-/** A mouse pointer that enters from `from` (design px) at `at`. */
-export function pointer(ctx: BlockContext, from: { x: number; y: number }, at: number): Pointer {
+/** A mouse pointer that enters from `from` (design px) at `at`; `size` is its box, px (default 64). */
+export function pointer(ctx: BlockContext, from: { x: number; y: number }, at: number, size = 64): Pointer {
   const el = ctx.el("div", "cursor");
   el.innerHTML = ICONS.pointer;
+  const ringSize = Math.round(size * 1.3);
+  if (size !== 64) Object.assign(el.style, { width: `${size}px`, height: `${size}px` });
   const ring = ctx.el("div", "cursor-ring");
-  Object.assign(ring.style, { position: "absolute", left: "0", top: "0", width: "84px", height: "84px", marginLeft: "-42px", marginTop: "-42px", borderRadius: "50%", border: "3px solid var(--accent)", zIndex: "49", opacity: "0" });
-  // The SVG's tip is at (6, 3.5) of 28 (64 px box): offset so x, y is the tip.
-  const tip = (x: number, y: number): { x: number; y: number } => ({ x: x - 14, y: y - 8 });
+  Object.assign(ring.style, { position: "absolute", left: "0", top: "0", width: `${ringSize}px`, height: `${ringSize}px`, marginLeft: `${-ringSize / 2}px`, marginTop: `${-ringSize / 2}px`, borderRadius: "50%", border: "3px solid var(--accent)", zIndex: "49", opacity: "0" });
+  // The SVG's tip is at (6, 3.5) of 28: offset so x, y is the tip.
+  const tip = (x: number, y: number): { x: number; y: number } => ({ x: x - Math.round((size * 6) / 28), y: y - Math.round((size * 3.5) / 28) });
   let last = from;
   ctx.tl.fromTo(el, { ...tip(from.x, from.y), opacity: 0, scale: 0.8 }, { ...tip(from.x, from.y), opacity: 1, scale: 1 }, { at, duration: 0.3, ease: "out" });
   return {
@@ -98,4 +104,17 @@ export function fitWidth(el: HTMLElement, lines: readonly HTMLElement[], maxWidt
   const size = Math.max(minSize, Math.min(maxSize, (probe * maxWidth) / widest));
   el.style.fontSize = `${size}px`;
   return size;
+}
+
+/** Black or white, whichever reads better on the hex colour `bg` (WCAG relative luminance). */
+export function onColor(bg: string): string {
+  const m = /^#?([0-9a-f]{6})/i.exec(bg.trim());
+  if (!m) return "#FFFFFF";
+  const lin = (i: number): number => {
+    const c = parseInt(m[1]!.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const l = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+  // Contrast against white (1.05 / (l + 0.05)) vs black ((l + 0.05) / 0.05).
+  return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
 }

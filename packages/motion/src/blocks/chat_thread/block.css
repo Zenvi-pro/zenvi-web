@@ -1,0 +1,24 @@
+.chat-col { position: absolute; }
+.chat-view { position: absolute; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 120px); mask-image: linear-gradient(180deg, transparent 0, #000 120px); }
+.chat-thread { position: absolute; left: 0; top: 0; width: 100%; display: flex; flex-direction: column; gap: 56px; padding-top: 140px; }
+.chat-me { align-self: flex-end; max-width: 80%; padding: 24px 34px 26px; border-radius: var(--radius) var(--radius) 10px var(--radius); background: var(--accent); font-size: 38px; font-weight: 500; line-height: 1.3; letter-spacing: -0.012em; transform-origin: 100% 100%; }
+.chat-ai { display: flex; gap: 26px; align-items: flex-start; }
+.chat-mark { flex: none; width: 64px; height: 64px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; }
+.chat-mark .icon { width: 32px; height: 32px; display: block; }
+.chat-body { position: relative; flex: 1; min-width: 0; padding-top: 4px; }
+.chat-name { font-size: 26px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
+.chat-text { font-family: var(--font-display); color: var(--ink); line-height: 1.16; letter-spacing: -0.015em; }
+.chat-text .word { position: relative; }
+.chat-mark-sweep { position: absolute; left: -0.08em; right: -0.08em; top: 0.12em; bottom: 0.02em; background: color-mix(in srgb, var(--accent) 34%, transparent); border-radius: 0.12em; transform-origin: 0 50%; z-index: -1; }
+.chat-text .em { position: relative; z-index: 0; display: inline-block; }
+.chat-dots { position: absolute; left: 0; top: 52px; display: flex; gap: 12px; padding: 26px 30px; border-radius: var(--radius); background: var(--surface); }
+.chat-dots i { width: 16px; height: 16px; border-radius: 50%; background: var(--muted); display: block; }
+.chat-composer { position: absolute; left: 0; right: 0; display: flex; align-items: flex-end; gap: 20px; padding: 22px 22px 22px 40px; border-radius: calc(var(--radius) + 8px); background: var(--surface); box-shadow: 0 1px 2px rgba(10, 12, 20, 0.06), 0 20px 50px -20px rgba(10, 12, 20, 0.28); }
+.is-dark .chat-composer { border: 1.5px solid var(--line); }
+.chat-field { position: relative; flex: 1; font-size: 34px; line-height: 1.3; letter-spacing: -0.01em; padding: 12px 0; min-height: calc(34px * 1.3 * var(--lines, 1) + 24px); }
+.chat-placeholder { position: absolute; left: 0; top: 12px; color: var(--muted); }
+.chat-typed { white-space: pre-wrap; }
+.chat-caret { display: inline-block; width: 3px; height: 1.1em; margin-left: 2px; vertical-align: -0.16em; background: var(--accent); border-radius: 2px; }
+.chat-send { flex: none; width: 72px; height: 72px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; }
+.chat-send .icon { width: 34px; height: 34px; display: block; }
+.chat-text .word { display: inline-block; }
