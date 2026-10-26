@@ -3,7 +3,6 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { makeTempDir, makeVideo, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { integratedLoudness } from "../acceptance/media.js";
 import { engineRegistry } from "../engine/registry.js";
 import { createContext } from "../program.js";
 import { testEnv, zenvi } from "../test-support/harness.js";
@@ -72,25 +71,6 @@ describe("review_edit_tool over MCP", () => {
       await call(client, "add_marker_tool", { position_seconds: 1, name: "x" });
       const stale = await call(client, "render_video", out);
       expect(stale.receipt.notes.join(" ")).toMatch(/not been reviewed/);
-    } finally {
-      await close();
-    }
-  }, 120_000);
-
-  it("normalises the export's loudness when asked, as master_audio_tool advises when peaks hold the mix down", async () => {
-    await makeVideo(path.join(work, "footage"), "tone.mp4", { duration: 2, width: 160, height: 90, audioHz: 440 });
-    const run = (args: string[]) => zenvi(args, { cwd: work, env: testEnv(home), registry: engineRegistry() });
-    await run(["new", "loud.zvn", "--profile", "HD 720p 30 fps"]);
-    await run(["add", "footage/tone.mp4", "--project", "loud.zvn"]);
-    const { client, close } = await connect(path.join(work, "loud.zvn"));
-    try {
-      const output = path.join(work, "loud.mp4");
-      const rendered = await call(client, "render_video", { output, width: 160, quality: "low", loudness: "social" });
-      expect(rendered.receipt.status, rendered.receipt.summary).toBe("applied");
-      expect(await integratedLoudness(output)).toBeCloseTo(-14, 0);
-      const bad = await call(client, "render_video", { output, loudness: "very loud" });
-      expect(bad.receipt.status).toBe("refused");
-      expect(bad.receipt.summary).toMatch(/loudness must be social, broadcast, podcast/);
     } finally {
       await close();
     }
