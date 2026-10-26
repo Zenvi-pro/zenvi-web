@@ -1017,6 +1017,19 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { path: "/media/interview.mp4" }, summary: /^\/media\/interview\.mp4: 1280x720 30\/1 fps, 2 ch 48000 Hz, 8\.00s\.$/ },
     failure: { args: { path: "/media/missing.mp4" }, summary: /^Error: No media at \/media\/missing\.mp4$/ },
   },
+  master_audio_tool: {
+    happy: {
+      setup: (_doc, host) => {
+        const tone = Float32Array.from({ length: 16000 * 3 }, (_, i) => 0.03 * Math.sin((2 * Math.PI * 1000 * i) / 16000));
+        host.audio!.mixPcm = async () => ({ sampleRate: 16000, channels: [tone, Float32Array.from(tone)] });
+      },
+      args: { dry_run: true },
+      status: "unchanged",
+      summary: /^Would master -[\d.]+ LUFS, -[\d.]+ dBTP -> -14\.0 LUFS/,
+    },
+    failure: { status: "refused", summary: /not available.*cannot render the timeline mix/ },
+  },
+
   build_reel_tool: {
     happy: {
       args: { style: "cinematic", replace: "true", duration_seconds: "8", hook: "Camera day" },

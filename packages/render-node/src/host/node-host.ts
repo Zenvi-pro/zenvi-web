@@ -10,6 +10,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
+import { renderMixPcm } from "../audio/mix.js";
 import { transcribeMediaFile } from "../audio/speech.js";
 import { engineAssetsDir } from "../resources.js";
 import { encoderNames } from "../ffmpeg/capabilities.js";
@@ -188,6 +189,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     audio: {
       analyzeAudio: (p, o) => analyzeAudio(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
       decodePcm: (p, o) => decodePcm(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
+      mixPcm: (project, o) => renderMixPcm(project, { ...o, resolveMedia, engine: options.renderEngine, signal: o?.signal ?? options.signal }),
     },
     storage: {
       async save(project, target) {

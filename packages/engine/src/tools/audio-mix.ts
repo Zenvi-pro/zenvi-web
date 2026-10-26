@@ -196,7 +196,7 @@ export function hasAudioStream(clip: unknown, file?: unknown): boolean {
   return true;
 }
 
-function hasVideoStream(clip: unknown, file: unknown): boolean {
+export function hasVideoStream(clip: unknown, file: unknown): boolean {
   const reader = readerOf(clip, file);
   const probe: Data = { ...reader };
   for (const key of ["path", "media_type"]) {

@@ -128,6 +128,14 @@ the result (libx264/aac by default). Audio is mixed by an ffmpeg filter graph
 generated from the `AudioPlan`. SVG titles are rasterized with resvg (WASM) so the
 bundle stays pure JS + WASM. The cloud render worker uses the same code.
 
+**Loudness.** The engine owns the meter (`mastering/loudness.ts`: BS.1770-4 /
+EBU R128 LUFS, true peak) and the gain-staging plan (`mastering/gain-stage.ts`);
+a renderer only supplies PCM through `AudioHost.mixPcm` (render-node runs the
+export's own audio graph). `master_audio_tool` turns the plan into clip volume
+and Compressor makeup gain, so the desktop plays the same mix. Export-time
+`ExportOptions.loudness` (render-node, cloud, `zenvi render --loudness`) is the
+safety net: two-pass ffmpeg `loudnorm` plus a limiter, off unless asked for.
+
 Both renderers execute the same `FramePlan`, so a frame looks the same in the
 browser preview, a CLI render and a cloud render.
 

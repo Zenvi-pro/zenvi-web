@@ -235,6 +235,8 @@ describe("render options", () => {
     expect(resolveRenderOptions(project, "mp4-720p")).toMatchObject({ width: 1280, height: 720, quality: "medium" });
     expect(resolveRenderOptions(project, "mp4", { width: 853 })).toMatchObject({ width: 854, height: 480 });
     expect(resolveRenderOptions(project, "mp3")).toMatchObject({ format: "mp3" });
+    expect(resolveRenderOptions(project, "mp4", { loudness: { targetLufs: -14, truePeakDbtp: -1 } }).loudness).toEqual({ targetLufs: -14, truePeakDbtp: -1 });
+    expect(resolveRenderOptions(project, "mp4").loudness).toBeUndefined();
     expect(resolveRenderOptions(project, "gif")).toMatchObject({ format: "gif", width: 640, height: 360 });
   });
 });

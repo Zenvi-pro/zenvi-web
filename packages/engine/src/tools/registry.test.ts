@@ -20,6 +20,7 @@ const DIRECT_TOOLS = [
   "fade_clip_tool",
   "add_transition_tool",
   "probe_media_tool",
+  "master_audio_tool",
   "build_reel_tool",
   "align_match_cut_tool",
   "detect_subject_tool",

@@ -9,6 +9,7 @@
 
 import path from "node:path";
 import { encoderRates, isSequenceFormat, type ContainerFormat, type ExportOptions, type Fraction, type VideoRate } from "@zenvi/engine";
+import { binaryVersion } from "../ffmpeg/capabilities.js";
 import { ffmpegThreads } from "../limits.js";
 import type { AudioGraph } from "./audio-graph.js";
 
@@ -257,7 +258,16 @@ export function ffmpegMajorVersion(version: string): number {
   return m ? Number(m[1]) : 99;
 }
 
-const SCRIPT_THRESHOLD = 8 * 1024;
+let versionPromise: Promise<number> | undefined;
+/** The installed ffmpeg's major version (cached; 99 when it cannot be read). */
+export function ffmpegMajor(): Promise<number> {
+  versionPromise ??= binaryVersion("ffmpeg")
+    .then((v) => ffmpegMajorVersion(v.version))
+    .catch(() => 99);
+  return versionPromise;
+}
+
+export const SCRIPT_THRESHOLD = 8 * 1024;
 
 export function encoderCommand(job: EncodeJob): EncodeCommand {
   const info = FORMATS[job.format];

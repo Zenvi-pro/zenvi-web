@@ -203,7 +203,8 @@ export const reelTools: CatalogTool[] = [
     description:
       "Cut a finished short-form video (Reels, TikTok, Shorts, ads) in one step from media already in the project: shots cut on the music's beats, " +
       "camera moves, flashes, a look, an opening hook title, shot labels, an end card and the music faded out. One undo step. " +
-      "Put the videos/images and one music track in the media bin first (stock, AI, uploads, URLs); give them in story order.",
+      "Put the videos/images and one music track in the media bin first (stock, AI, uploads, URLs); give them in story order. " +
+      "Its sound is the music at full level, so once any sound design is added call master_audio_tool last to set the final loudness.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["media"],
@@ -362,6 +363,7 @@ export const reelTools: CatalogTool[] = [
       };
       return applied(TOOL, `Built a ${style.name.toLowerCase()} reel: ${plan.shots.length} shots cut to ${Math.round(plan.bpm)} BPM, ${brief.format}.`, {
         warnings,
+        notes: ["Finish with master_audio_tool (preset social) after the sound is in place: it sets the loudness and balance."],
         data: {
           style: style.id,
           duration: plan.duration,
